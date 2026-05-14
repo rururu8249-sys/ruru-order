@@ -603,22 +603,53 @@ export default function AdminPage() {
     });
   }, [orders, settlementBroadcastId]);
 
-  const totalSales = settlementOrders.reduce(
-    (sum, order) => sum + Number(order.adjusted_total_price || order.total_price || 0),
-    0
-  );
+  const getRefundAmount = (order: any) => {
+    if (order.order_manage_status !== "환불") return 0;
 
-  const paysterSales = settlementOrders
-    .filter((order) => isPaysterPayment(order))
+    const savedRefund = Number(order.refund_amount || 0);
+
+    if (savedRefund > 0) return savedRefund;
+
+    return getOrderTotal(order);
+  };
+
+  const getNetOrderTotal = (order: any) => {
+    if (order.order_manage_status === "주문서취소") return 0;
+
+    const gross = getOrderTotal(order);
+    const refund = getRefundAmount(order);
+
+    return Math.max(0, gross - refund);
+  };
+
+  const grossSales = settlementOrders
+    .filter((order) => order.order_manage_status !== "주문서취소")
     .reduce(
-      (sum, order) => sum + Number(order.adjusted_total_price || order.total_price || 0),
+      (sum, order) => sum + getOrderTotal(order),
       0
     );
 
-  const paysterFee = Math.round(paysterSales * 0.07);
+  const totalRefundAmount = settlementOrders.reduce(
+    (sum, order) => sum + getRefundAmount(order),
+    0
+  );
+
+  const totalSales = settlementOrders.reduce(
+    (sum, order) => sum + getNetOrderTotal(order),
+    0
+  );
+
+  const cardSales = settlementOrders
+    .filter((order) => isPaysterPayment(order))
+    .reduce(
+      (sum, order) => sum + getNetOrderTotal(order),
+      0
+    );
+
+  const cardFeeSettlement = Math.round(cardSales * 0.07);
   const totalExpense = expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0);
   const finalProfit =
-    totalSales - warehouseCost - paysterFee - totalExpense + extraIncome;
+    totalSales - warehouseCost - cardFeeSettlement - totalExpense + extraIncome;
 
   const addExpense = () => {
     setExpenses((prev) => [...prev, { type: "생활비", amount: 0, memo: "" }]);
@@ -1062,6 +1093,8 @@ export default function AdminPage() {
                       {filteredOrders.map((order) => {
                         const status = getDisplayStatus(order);
                         const isCanceled = status === "주문서취소";
+                        const isRefunded = status === "환불" || status === "부분환불";
+                        const shouldStrike = isCanceled || isRefunded;
                         const paymentLabel = getPaymentLabel(order);
 
                         return (
@@ -1081,30 +1114,30 @@ export default function AdminPage() {
                             </td>
 
                             <td className="p-3">
-                              <div className={`font-extrabold ${isCanceled ? "line-through text-gray-400" : ""}`}>
+                              <div className={`font-extrabold ${shouldStrike ? "line-through text-gray-400" : ""}`}>
                                 {order.youtube_nickname || "-"}
                               </div>
-                              <div className={`text-sm text-gray-500 ${isCanceled ? "line-through" : ""}`}>
+                              <div className={`text-sm text-gray-500 ${shouldStrike ? "line-through" : ""}`}>
                                 {order.customer_name || "-"}
                               </div>
                             </td>
 
                             <td className="p-3">
-                              <div className={`font-bold ${isCanceled ? "line-through text-gray-400" : ""}`}>
+                              <div className={`font-bold ${shouldStrike ? "line-through text-gray-400" : ""}`}>
                                 {order.product_name || "상품명 없음"}
                               </div>
-                              <div className={`text-sm text-gray-500 ${isCanceled ? "line-through" : ""}`}>
+                              <div className={`text-sm text-gray-500 ${shouldStrike ? "line-through" : ""}`}>
                                 {order.color || "없음"} / {order.size || "없음"}
                               </div>
                             </td>
 
-                            <td className={`p-3 font-bold ${isCanceled ? "line-through text-gray-400" : ""}`}>
+                            <td className={`p-3 font-bold ${shouldStrike ? "line-through text-gray-400" : ""}`}>
                               {order.qty || 0}개
                             </td>
-                            <td className={`p-3 font-extrabold ${isCanceled ? "line-through text-gray-400" : ""}`}>
+                            <td className={`p-3 font-extrabold ${shouldStrike ? "line-through text-gray-400" : ""}`}>
                               {won(getOrderTotal(order))}
                             </td>
-                            <td className={`p-3 ${isCanceled ? "line-through text-gray-400" : ""}`}>
+                            <td className={`p-3 ${shouldStrike ? "line-through text-gray-400" : ""}`}>
                               {won(getOrderShipping(order))}
                             </td>
 
@@ -1129,11 +1162,11 @@ export default function AdminPage() {
                                   </div>
                                 </div>
                               ) : order.order_manage_status === "환불" ? (
-                                <div className="rounded-2xl p-3 border bg-orange-50 border-orange-200">
-                                  <div className="font-extrabold">
-                                    {order.refund_type || "환불"} / {won(order.refund_amount || 0)}
+                                <div className="rounded-2xl p-3 border bg-red-50 border-red-200">
+                                  <div className="font-extrabold text-red-700">
+                                    {order.refund_type || "환불"} / {won(getRefundAmount(order))}
                                   </div>
-                                  <div className="text-sm text-gray-600 mt-1">
+                                  <div className="text-sm text-red-700 mt-1">
                                     {order.refund_memo || "-"}
                                   </div>
                                 </div>
@@ -1154,6 +1187,8 @@ export default function AdminPage() {
                   {filteredOrders.map((order) => {
                     const status = getDisplayStatus(order);
                     const isCanceled = status === "주문서취소";
+                    const isRefunded = status === "환불" || status === "부분환불";
+                    const shouldStrike = isCanceled || isRefunded;
                     const paymentLabel = getPaymentLabel(order);
 
                     return (
@@ -1161,10 +1196,10 @@ export default function AdminPage() {
                         <div className="flex items-start justify-between gap-4 mb-4">
                           <div>
                             <div className="flex items-center gap-2 flex-wrap">
-                              <div className={`text-2xl font-extrabold ${isCanceled ? "line-through text-gray-400" : ""}`}>
+                              <div className={`text-2xl font-extrabold ${shouldStrike ? "line-through text-gray-400" : ""}`}>
                                 {order.youtube_nickname || "-"}
                               </div>
-                              <div className={`text-gray-500 ${isCanceled ? "line-through" : ""}`}>
+                              <div className={`text-gray-500 ${shouldStrike ? "line-through" : ""}`}>
                                 {order.customer_name || "-"}
                               </div>
 
@@ -1195,10 +1230,10 @@ export default function AdminPage() {
                         </div>
 
                         <div className="bg-gray-50 rounded-2xl border p-4">
-                          <div className={`font-bold text-lg ${isCanceled ? "line-through text-gray-400" : ""}`}>
+                          <div className={`font-bold text-lg ${shouldStrike ? "line-through text-gray-400" : ""}`}>
                             {order.product_name || "상품명 없음"}
                           </div>
-                          <div className={`mt-2 text-gray-600 ${isCanceled ? "line-through" : ""}`}>
+                          <div className={`mt-2 text-gray-600 ${shouldStrike ? "line-through" : ""}`}>
                             {order.color || "없음"} / {order.size || "없음"} / {order.qty || 0}개
                           </div>
                         </div>
@@ -1206,14 +1241,14 @@ export default function AdminPage() {
                         <div className="grid grid-cols-2 gap-3 mt-4">
                           <div className="bg-gray-50 rounded-2xl border p-4">
                             <div className="text-sm text-gray-500">결제금액</div>
-                            <div className={`text-xl font-extrabold ${isCanceled ? "line-through text-gray-400" : ""}`}>
+                            <div className={`text-xl font-extrabold ${shouldStrike ? "line-through text-gray-400" : ""}`}>
                               {won(getOrderTotal(order))}
                             </div>
                           </div>
 
                           <div className="bg-gray-50 rounded-2xl border p-4">
                             <div className="text-sm text-gray-500">배송비</div>
-                            <div className={`text-xl font-extrabold ${isCanceled ? "line-through text-gray-400" : ""}`}>
+                            <div className={`text-xl font-extrabold ${shouldStrike ? "line-through text-gray-400" : ""}`}>
                               {won(getOrderShipping(order))}
                             </div>
                           </div>
@@ -1231,12 +1266,12 @@ export default function AdminPage() {
                         )}
 
                         {!isCanceled && order.order_manage_status === "환불" && (
-                          <div className="mt-4 bg-orange-50 border border-orange-200 rounded-2xl p-4">
-                            <div className="font-extrabold">
-                              {order.refund_type || "환불"} / {won(order.refund_amount || 0)}
+                          <div className="mt-4 bg-red-50 border border-red-200 rounded-2xl p-4">
+                            <div className="font-extrabold text-red-700">
+                              {order.refund_type || "환불"} / {won(getRefundAmount(order))}
                             </div>
-                            <div className="text-sm text-gray-600 mt-1">
-                              {order.refund_memo || "-"}
+                            <div className="text-sm text-red-700 mt-1">
+                              환불 사유: {order.refund_memo || "-"}
                             </div>
                           </div>
                         )}
@@ -1371,16 +1406,19 @@ export default function AdminPage() {
                 <div className="bg-gray-50 rounded-2xl border p-5">
                   <div className="text-sm text-gray-500">방송 매출</div>
                   <div className="text-3xl font-extrabold mt-2">{won(totalSales)}</div>
+                  <div className="text-xs text-gray-500 mt-2">
+                    원매출 {won(grossSales)} - 환불 {won(totalRefundAmount)}
+                  </div>
                 </div>
 
                 <div className="bg-gray-50 rounded-2xl border p-5">
-                  <div className="text-sm text-gray-500">페이스터 매출</div>
-                  <div className="text-3xl font-extrabold mt-2">{won(paysterSales)}</div>
+                  <div className="text-sm text-gray-500">카드매출</div>
+                  <div className="text-3xl font-extrabold mt-2">{won(cardSales)}</div>
                 </div>
 
-                <div className="bg-gray-50 rounded-2xl border p-5">
-                  <div className="text-sm text-gray-500">페이스터 수수료 7%</div>
-                  <div className="text-3xl font-extrabold mt-2">{won(paysterFee)}</div>
+                <div className="bg-red-50 rounded-2xl border border-red-200 p-5">
+                  <div className="text-sm text-red-600">환불 차감</div>
+                  <div className="text-3xl font-extrabold mt-2 text-red-700">{won(totalRefundAmount)}</div>
                 </div>
 
                 <div className="bg-black text-white rounded-2xl border p-5">
@@ -1397,6 +1435,14 @@ export default function AdminPage() {
                     <div>
                       <div className="text-sm font-bold mb-2">창고 정산금액</div>
                       <MoneyInput value={warehouseCost} onChange={setWarehouseCost} />
+                    </div>
+
+                    <div>
+                      <div className="text-sm font-bold mb-2">카드 수수료정산(7%)</div>
+                      <MoneyInput value={cardFeeSettlement} onChange={() => {}} disabled />
+                      <div className="text-xs text-gray-500 mt-2">
+                        카드매출 기준 자동 계산됩니다.
+                      </div>
                     </div>
 
                     <div>
