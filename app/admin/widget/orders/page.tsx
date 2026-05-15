@@ -337,7 +337,7 @@ export default function PrismOrderWidgetPage() {
             </div>
           </header>
 
-          <div className="h-[43px] grid grid-cols-[70px_1fr_72px] items-center text-[13px] font-extrabold text-white/72">
+          <div className="h-[43px] grid grid-cols-[54px_1fr_48px] items-center text-[13px] font-extrabold text-white/72">
             <div>닉네임</div>
             <div>상품 / 옵션 / 수량</div>
             <div className="text-right">금액</div>
@@ -376,7 +376,7 @@ export default function PrismOrderWidgetPage() {
 
                     <div className="min-w-0">
                       <div className="text-[17px] leading-tight font-black truncate text-white">
-                        {shortText(order.product_name || "상품명없음", 9)}
+                        {shortText(order.product_name || "상품명없음", 16)}
                       </div>
 
                       <div className="mt-1 text-[13px] leading-tight font-bold text-white/58 truncate">
@@ -385,7 +385,7 @@ export default function PrismOrderWidgetPage() {
                     </div>
 
                     <div className="min-w-0 text-right">
-                      <div className="text-[20px] leading-tight font-black text-pink-200 drop-shadow-[0_0_7px_rgba(255,105,180,0.52)]">
+                      <div className="text-[14px] leading-tight font-black text-pink-200 drop-shadow-[0_0_7px_rgba(255,105,180,0.52)]">
                         {won(getOrderTotal(order)).replace("원", "")}
                       </div>
                       <div className="text-[12px] font-black text-white/70">
