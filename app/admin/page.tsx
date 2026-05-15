@@ -5,6 +5,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import ExcelJS from "exceljs";
 import { supabase } from "@/lib/supabase";
 import { PaymentBadge } from "@/components/admin/OrderStatusBadges";
 import AdminQuickFilters from "@/components/admin/AdminQuickFilters";
@@ -792,69 +793,214 @@ export default function AdminPage() {
     });
   }, [customers, memberSearch]);
 
-  const downloadRozenExcel = () => {
-    const targetOrders = filteredOrders.filter(
-      (order) => getDisplayStatus(order) === "주문확인완료"
+  const cleanOptionText = (value: any) => {
+    const text = String(value || "").trim();
+
+    if (!text) return "";
+    if (text === "없음") return "";
+    if (text === "-") return "";
+    if (text.toLowerCase() === "none") return "";
+
+    return text;
+  };
+
+  const getRozenItemText = (ordersInGroup: any[]) => {
+    const itemLines = ordersInGroup.map((order) => {
+      const productName = cleanOptionText(order.product_name) || "상품";
+      const color = cleanOptionText(order.color);
+      const size = cleanOptionText(order.size);
+      const option = cleanOptionText(order.option_name || order.product_option);
+
+      const qty = Number(order.qty || 1);
+
+      const optionParts = [color, size, option].filter(Boolean);
+      const optionText =
+        optionParts.length > 0 ? `(${optionParts.join(" / ")})` : "";
+
+      return `${productName}${optionText} x${qty}`;
+    });
+
+    const totalQty = ordersInGroup.reduce(
+      (sum, order) => sum + Number(order.qty || 1),
+      0
     );
 
-    if (targetOrders.length === 0) {
-      alert("주문확인완료 상태인 주문이 없습니다.");
-      return;
-    }
+    return `${itemLines.join(" / ")} / 총 ${totalQty}개`;
+  };
 
-    const rows = targetOrders.map((order) => {
+  const buildRozenGroups = (targetOrders: any[]) => {
+    const groupMap = new Map<string, any[]>();
+
+    targetOrders.forEach((order) => {
       const nickname = String(order.youtube_nickname || "").trim();
       const phone = String(order.customer_phone || "").replace(/[^0-9]/g, "");
-      const address = `${getFullAddress(order)} /${nickname}`.trim();
+      const address = getFullAddress(order);
 
-      const itemText = `${order.product_name || "상품"}${
-        order.color ? `(${order.color}` : ""
-      }${order.size ? ` / ${order.size}` : ""}${
-        order.color ? ")" : ""
-      } x${order.qty || 1} / 총 ${order.qty || 1}개`;
+      const key = `${nickname}__${phone}__${address}`;
 
-      return [
-        nickname,
-        "",
-        address,
-        phone,
-        phone,
-        "1",
-        "2750",
-        "010",
-        itemText,
-        "",
-        "친절배송부탁드립니다.",
-      ];
+      const prev = groupMap.get(key) || [];
+      groupMap.set(key, [...prev, order]);
     });
 
-    const headerlessTsv = rows
-      .map((row) =>
-        row
-          .map((cell) => String(cell ?? "").replace(/\t/g, " ").replace(/\n/g, " "))
-          .join("\t")
-      )
-      .join("\n");
+    return Array.from(groupMap.values());
+  };
 
-    const blob = new Blob(["\ufeff" + headerlessTsv], {
-      type: "application/vnd.ms-excel;charset=utf-8;",
-    });
+  const downloadRozenExcel = async () => {
+    try {
+      const targetOrders = filteredOrders.filter(
+        (order) => getDisplayStatus(order) === "주문확인완료"
+      );
 
-    const now = new Date();
-    const mm = String(now.getMonth() + 1).padStart(2, "0");
-    const dd = String(now.getDate()).padStart(2, "0");
-    const filename = `${mm}${dd}로젠택배.xls`;
+      if (targetOrders.length === 0) {
+        alert("주문확인완료 상태인 주문이 없습니다.");
+        return;
+      }
 
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
+      const response = await fetch("/rozen_template.xlsx");
 
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+      if (!response.ok) {
+        alert(
+          "로젠 송장 템플릿 파일을 찾을 수 없습니다.\\n/public/rozen_template.xlsx 파일이 있는지 확인해주세요."
+        );
+        return;
+      }
 
-    URL.revokeObjectURL(url);
+      const templateBuffer = await response.arrayBuffer();
+
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(templateBuffer);
+
+      const worksheet = workbook.worksheets[0];
+
+      if (!worksheet) {
+        alert("로젠 송장 템플릿에 시트가 없습니다.");
+        return;
+      }
+
+      const groups = buildRozenGroups(targetOrders);
+
+      const startRow = 2;
+      const templateRow = worksheet.getRow(startRow);
+
+      // 기존 데이터 영역 정리
+      const lastRow = Math.max(worksheet.rowCount, startRow);
+      for (let rowNumber = startRow; rowNumber <= lastRow; rowNumber += 1) {
+        const row = worksheet.getRow(rowNumber);
+
+        for (let col = 1; col <= 11; col += 1) {
+          row.getCell(col).value = null;
+        }
+
+        row.commit();
+      }
+
+      groups.forEach((ordersInGroup, index) => {
+        const firstOrder = ordersInGroup[0];
+
+        const rowNumber = startRow + index;
+        const row = worksheet.getRow(rowNumber);
+
+        // 원본 템플릿 2행 스타일을 새 행에 최대한 유지
+        if (index > 0) {
+          for (let col = 1; col <= 11; col += 1) {
+            const sourceCell = templateRow.getCell(col);
+            const targetCell = row.getCell(col);
+
+            // ExcelJS 스타일은 TypeScript 타입이 까다로워서
+            // 원본 템플릿 셀 스타일을 JSON 방식으로 안전하게 복사합니다.
+            targetCell.style = sourceCell.style
+              ? JSON.parse(JSON.stringify(sourceCell.style))
+              : {};
+
+            if (sourceCell.numFmt) {
+              targetCell.numFmt = sourceCell.numFmt;
+            }
+          }
+
+          row.height = templateRow.height;
+        }
+
+        const nickname = String(firstOrder.youtube_nickname || "").trim();
+        const phone = String(firstOrder.customer_phone || "").replace(/[^0-9]/g, "");
+        const fullAddress = getFullAddress(firstOrder);
+        const addressWithNickname = `${fullAddress} /${nickname}`.trim();
+        const itemText = getRozenItemText(ordersInGroup);
+
+        const values = [
+          nickname,
+          "",
+          addressWithNickname,
+          phone,
+          phone,
+          "1",
+          "2750",
+          "010",
+          itemText,
+          "",
+          "친절배송부탁드립니다.",
+        ];
+
+        values.forEach((value, colIndex) => {
+          row.getCell(colIndex + 1).value = value;
+        });
+
+        row.commit();
+      });
+
+      const totalOriginalQty = targetOrders.reduce(
+        (sum, order) => sum + Number(order.qty || 1),
+        0
+      );
+
+      const totalGroupedQty = groups.reduce(
+        (sum, ordersInGroup) =>
+          sum +
+          ordersInGroup.reduce(
+            (innerSum, order) => innerSum + Number(order.qty || 1),
+            0
+          ),
+        0
+      );
+
+      if (totalOriginalQty !== totalGroupedQty) {
+        alert(
+          `수량 검산 오류입니다.\\n원본수량: ${totalOriginalQty}개\\n송장수량: ${totalGroupedQty}개`
+        );
+        return;
+      }
+
+      const outputBuffer = await workbook.xlsx.writeBuffer();
+
+      const blob = new Blob([outputBuffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+
+      const now = new Date();
+      const yyyy = String(now.getFullYear());
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const dd = String(now.getDate()).padStart(2, "0");
+      const filename = `rozen_${yyyy}${mm}${dd}.xlsx`;
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      URL.revokeObjectURL(url);
+
+      alert(
+        `로젠 송장 생성 완료\\n합배송 묶음: ${groups.length}건\\n총수량: ${totalGroupedQty}개`
+      );
+    } catch (error: any) {
+      console.error(error);
+      alert(
+        "로젠 송장 생성 중 오류가 발생했습니다.\\n템플릿 파일 또는 주문 데이터를 확인해주세요."
+      );
+    }
   };
 
   if (!isAuthed) {
