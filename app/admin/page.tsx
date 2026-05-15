@@ -244,6 +244,11 @@ export default function AdminPage() {
   const [cancelModalOrder, setCancelModalOrder] = useState<any | null>(null);
   const [cancelReason, setCancelReason] = useState("");
 
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+  const [detailShippingFee, setDetailShippingFee] = useState(0);
+  const [detailTotalPrice, setDetailTotalPrice] = useState(0);
+  const [detailAdminMemo, setDetailAdminMemo] = useState("");
+
   const [colWidths, setColWidths] = useState<Record<string, number>>({
     status: 180,
     member: 180,
@@ -252,8 +257,6 @@ export default function AdminPage() {
     total: 150,
     shipping: 150,
     payment: 150,
-    memo: 320,
-    phone: 180,
   });
 
   const activeBroadcast = useMemo(() => {
@@ -565,6 +568,56 @@ export default function AdminPage() {
     if (order.order_manage_status === "환불" && order.refund_type === "부분환불") return "부분환불";
     if (order.order_manage_status === "환불") return "환불";
     return order.order_manage_status || "주문확인전";
+  };
+
+  const formatDateTime = (value: string) => {
+    if (!value) return "-";
+
+    try {
+      return new Date(value).toLocaleString("ko-KR", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return "-";
+    }
+  };
+
+  const getOrderCode = (order: any) => {
+    return String(order.order_lookup_code || `ORDER-${order.id || ""}`).toUpperCase();
+  };
+
+  const openOrderDetail = (order: any) => {
+    setSelectedOrder(order);
+    setDetailShippingFee(getOrderShipping(order));
+    setDetailTotalPrice(getOrderTotal(order));
+    setDetailAdminMemo(order.admin_memo || order.memo || "");
+  };
+
+  const saveOrderDetail = async () => {
+    if (!selectedOrder?.id) return;
+
+    const { error } = await supabase
+      .from("orders")
+      .update({
+        adjusted_shipping_fee: Number(detailShippingFee || 0),
+        final_shipping_fee: Number(detailShippingFee || 0),
+        adjusted_total_price: Number(detailTotalPrice || 0),
+        admin_memo: detailAdminMemo.trim(),
+      })
+      .eq("id", selectedOrder.id);
+
+    if (error) {
+      alert("주문 상세 저장 오류: " + error.message);
+      return;
+    }
+
+    setSelectedOrder(null);
+    await loadAll();
+    alert("주문 상세정보 저장 완료");
   };
 
   const filteredOrders = useMemo(() => {
@@ -1548,8 +1601,6 @@ export default function AdminPage() {
                         <ResizableTh colKey="total">금액</ResizableTh>
                         <ResizableTh colKey="shipping">배송비</ResizableTh>
                         <ResizableTh colKey="payment">결제수단</ResizableTh>
-                        <ResizableTh colKey="memo">환불/취소내역</ResizableTh>
-                        <ResizableTh colKey="phone">전화번호</ResizableTh>
                       </tr>
                     </thead>
 
@@ -1611,11 +1662,16 @@ export default function AdminPage() {
                             </td>
 
                             <td className="p-3">
+                              <button
+                                type="button"
+                                onClick={() => openOrderDetail(order)}
+                                className="mb-1 text-left text-xs font-extrabold text-blue-600 hover:underline"
+                              >
+                                #{getOrderCode(order)}
+                              </button>
+
                               <div className={`font-extrabold ${shouldStrike ? "line-through text-gray-400" : ""}`}>
-                                {order.youtube_nickname || "-"}
-                              </div>
-                              <div className={`text-sm text-gray-500 ${shouldStrike ? "line-through" : ""}`}>
-                                {order.customer_name || "-"}
+                                {order.youtube_nickname || "-"} / {order.customer_name || "-"}
                               </div>
                             </td>
 
@@ -1642,31 +1698,7 @@ export default function AdminPage() {
                               <PaymentBadge payment={paymentLabel} />
                             </td>
 
-                            <td className="p-3">
-                              {isCanceled ? (
-                                <div className="rounded-2xl p-3 border-2 bg-red-50 border-red-300">
-                                  <div className="font-extrabold text-red-700">
-                                    주문이 취소되었습니다.
-                                  </div>
-                                  <div className="text-sm text-red-700 mt-1">
-                                    사유: {order.cancel_reason || "-"}
-                                  </div>
-                                </div>
-                              ) : order.order_manage_status === "환불" ? (
-                                <div className="rounded-2xl p-3 border-2 bg-red-50 border-red-300">
-                                  <div className="font-extrabold text-red-700">
-                                    {order.refund_type || "환불"} / {won(getRefundAmount(order))}
-                                  </div>
-                                  <div className="text-sm text-red-700 mt-1">
-                                    {order.refund_memo || "-"}
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="text-gray-400 text-sm">-</div>
-                              )}
-                            </td>
 
-                            <td className="p-3">{order.customer_phone || "-"}</td>
                           </tr>
                         );
                       })}
@@ -1700,17 +1732,19 @@ export default function AdminPage() {
                         <div className="flex items-start justify-between gap-4 mb-4">
                           <div>
                             <div className="flex items-center gap-2 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() => openOrderDetail(order)}
+                                className="w-full text-left text-sm font-extrabold text-blue-600 hover:underline"
+                              >
+                                #{getOrderCode(order)}
+                              </button>
+
                               <div className={`text-2xl font-extrabold ${shouldStrike ? "line-through text-gray-400" : ""}`}>
-                                {order.youtube_nickname || "-"}
-                              </div>
-                              <div className={`text-gray-500 ${shouldStrike ? "line-through" : ""}`}>
-                                {order.customer_name || "-"}
+                                {order.youtube_nickname || "-"} / {order.customer_name || "-"}
                               </div>
 
                               <PaymentBadge payment={paymentLabel} />
-                            </div>
-                            <div className="text-sm text-gray-500 mt-1">
-                              {order.customer_phone || "-"}
                             </div>
                           </div>
 
@@ -1765,28 +1799,6 @@ export default function AdminPage() {
                             </div>
                           </div>
                         </div>
-
-                        {isCanceled && (
-                          <div className="mt-4 bg-red-50 border-2 border-red-300 rounded-2xl p-4">
-                            <div className="font-extrabold text-red-700">
-                              주문이 취소되었습니다.
-                            </div>
-                            <div className="text-sm text-red-700 mt-1">
-                              사유: {order.cancel_reason || "-"}
-                            </div>
-                          </div>
-                        )}
-
-                        {!isCanceled && order.order_manage_status === "환불" && (
-                          <div className="mt-4 bg-red-50 border-2 border-red-300 rounded-2xl p-4">
-                            <div className="font-extrabold text-red-700">
-                              {order.refund_type || "환불"} / {won(getRefundAmount(order))}
-                            </div>
-                            <div className="text-sm text-red-700 mt-1">
-                              환불 사유: {order.refund_memo || "-"}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     );
                   })}
@@ -2113,6 +2125,150 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+
+        {selectedOrder && (
+          <div className="fixed inset-0 z-[99999] bg-black/50 flex items-center justify-center p-4">
+            <section className="w-full max-w-4xl max-h-[90vh] overflow-auto bg-white rounded-[2rem] shadow-2xl border border-gray-200">
+              <div className="sticky top-0 bg-white border-b border-gray-200 p-5 flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm font-extrabold text-blue-600">
+                    #{getOrderCode(selectedOrder)}
+                  </div>
+                  <h2 className="text-2xl font-extrabold text-gray-950">
+                    주문 상세정보
+                  </h2>
+                </div>
+
+                <button
+                  onClick={() => setSelectedOrder(null)}
+                  className="rounded-2xl bg-gray-100 px-5 py-3 font-extrabold"
+                >
+                  닫기
+                </button>
+              </div>
+
+              <div className="p-5 grid gap-5">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="rounded-3xl border bg-gray-50 p-5">
+                    <div className="text-lg font-extrabold mb-4">주문 기본정보</div>
+
+                    <div className="grid gap-2 text-sm font-bold text-gray-700">
+                      <div>주문번호: #{getOrderCode(selectedOrder)}</div>
+                      <div>주문시간: {formatDateTime(selectedOrder.created_at)}</div>
+                      <div>방송명: {selectedOrder.broadcast_public_title || selectedOrder.broadcast_name || "-"}</div>
+                      <div>상태: {getDisplayStatus(selectedOrder)}</div>
+                      <div>결제수단: {getPaymentLabel(selectedOrder)}</div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-3xl border bg-gray-50 p-5">
+                    <div className="text-lg font-extrabold mb-4">고객 정보</div>
+
+                    <div className="grid gap-2 text-sm font-bold text-gray-700">
+                      <div>닉네임: {selectedOrder.youtube_nickname || "-"}</div>
+                      <div>이름: {selectedOrder.customer_name || "-"}</div>
+                      <div>전화번호: {selectedOrder.customer_phone || "-"}</div>
+                      <div>주소: {getFullAddress(selectedOrder) || "-"}</div>
+                      <div>요청사항: {selectedOrder.request_memo || selectedOrder.memo || "-"}</div>
+                      <div>고객확인: {selectedOrder.customer_match_status || "-"}</div>
+                      <div>고객메모: {selectedOrder.customer_memo || selectedOrder.customer_note || "-"}</div>
+                      <div>특이사항: {selectedOrder.special_note || selectedOrder.note || "-"}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border bg-white p-5">
+                  <div className="text-lg font-extrabold mb-4">상품 정보</div>
+
+                  <div className="grid md:grid-cols-4 gap-3 text-sm font-bold text-gray-700">
+                    <div className="rounded-2xl bg-gray-50 p-4">
+                      <div className="text-gray-400 text-xs mb-1">상품명</div>
+                      {selectedOrder.product_name || "상품명 없음"}
+                    </div>
+
+                    <div className="rounded-2xl bg-gray-50 p-4">
+                      <div className="text-gray-400 text-xs mb-1">색상/사이즈</div>
+                      {selectedOrder.color || "없음"} / {selectedOrder.size || "없음"}
+                    </div>
+
+                    <div className="rounded-2xl bg-gray-50 p-4">
+                      <div className="text-gray-400 text-xs mb-1">수량</div>
+                      {selectedOrder.qty || 0}개
+                    </div>
+
+                    <div className="rounded-2xl bg-gray-50 p-4">
+                      <div className="text-gray-400 text-xs mb-1">현재금액</div>
+                      {won(getOrderTotal(selectedOrder))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border bg-white p-5">
+                  <div className="text-lg font-extrabold mb-4">관리자 수정</div>
+
+                  <div className="grid md:grid-cols-3 gap-4">
+                    <div>
+                      <div className="text-sm font-bold mb-2 text-gray-700">
+                        배송비 수정
+                      </div>
+                      <MoneyInput value={detailShippingFee} onChange={setDetailShippingFee} />
+                    </div>
+
+                    <div>
+                      <div className="text-sm font-bold mb-2 text-gray-700">
+                        구매금액 수정
+                      </div>
+                      <MoneyInput value={detailTotalPrice} onChange={setDetailTotalPrice} />
+                    </div>
+
+                    <div>
+                      <div className="text-sm font-bold mb-2 text-gray-700">
+                        관리자 메모
+                      </div>
+                      <input
+                        value={detailAdminMemo}
+                        onChange={(e) => setDetailAdminMemo(e.target.value)}
+                        className="w-full border rounded-2xl p-4 font-bold"
+                        placeholder="관리자만 보는 메모"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border bg-red-50 border-red-200 p-5">
+                  <div className="text-lg font-extrabold mb-4 text-red-700">
+                    환불/취소내역
+                  </div>
+
+                  <div className="grid gap-2 text-sm font-bold text-red-700">
+                    <div>환불유형: {selectedOrder.refund_type || "-"}</div>
+                    <div>환불금액: {selectedOrder.refund_amount ? won(selectedOrder.refund_amount) : "-"}</div>
+                    <div>환불사유/메모: {selectedOrder.refund_memo || "-"}</div>
+                    <div>취소사유: {selectedOrder.cancel_reason || "-"}</div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={saveOrderDetail}
+                    className="flex-1 bg-black text-white rounded-2xl p-4 font-extrabold"
+                  >
+                    상세정보 저장
+                  </button>
+
+                  <button
+                    onClick={() => setSelectedOrder(null)}
+                    className="flex-1 bg-gray-100 text-gray-900 rounded-2xl p-4 font-extrabold"
+                  >
+                    닫기
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+        )}
+
 
         {refundModalOrder && (
           <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-5">

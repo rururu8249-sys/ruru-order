@@ -8,19 +8,62 @@
 // - 주문서 작성완료 시점 기준 실제 날짜 최근 7일만 조회
 // - 조회 실패 문구: 최근 7일간 주문내역이 존재하지 않습니다.
 // - 주문조회번호 입력칸만 우클릭/복사/붙여넣기 허용
+// - 고객 주문조회에 주문시간 표시
+// - 주문취소/환불/부분환불 상태 표시 개선
 
 "use client";
 
 import { supabase } from "@/lib/supabase";
 import { useState } from "react";
 
+const formatWon = (value: number) => `${Number(value || 0).toLocaleString()}원`;
+
+const formatDateTime = (value: string) => {
+  if (!value) return "-";
+
+  try {
+    return new Date(value).toLocaleString("ko-KR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "-";
+  }
+};
+
+const getCustomerStatusLabel = (order: any) => {
+  const manageStatus = String(order.order_manage_status || "");
+  const refundType = String(order.refund_type || "");
+
+  if (manageStatus === "주문서취소") return "주문취소";
+  if (manageStatus === "환불" && refundType === "부분환불") return "부분환불";
+  if (manageStatus === "환불") return "환불완료";
+  if (manageStatus === "출고완료") return "배송출발";
+  if (manageStatus === "출고대기") return "출고준비중";
+  if (manageStatus === "주문확인완료") return "확인완료";
+
+  return "주문접수";
+};
+
+const getStatusClassName = (label: string) => {
+  if (label === "주문취소") return "bg-red-100 text-red-700";
+  if (label === "환불완료") return "bg-gray-200 text-gray-800";
+  if (label === "부분환불") return "bg-orange-100 text-orange-700";
+  if (label === "배송출발") return "bg-green-100 text-green-700";
+  if (label === "출고준비중") return "bg-yellow-100 text-yellow-700";
+  if (label === "확인완료") return "bg-blue-100 text-blue-700";
+
+  return "bg-gray-100 text-gray-700";
+};
+
 export default function MyOrderPage() {
   const [lookupCode, setLookupCode] = useState("");
   const [orders, setOrders] = useState<any[]>([]);
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
-  const formatWon = (value: number) => `${Number(value || 0).toLocaleString()}원`;
 
   const handleLookup = async () => {
     const code = lookupCode.trim().toUpperCase();
@@ -82,7 +125,7 @@ export default function MyOrderPage() {
             <input
               data-security-allow="true"
               type="text"
-              placeholder="예) RURU-260515-ABCD"
+              placeholder="예) RURU-260516-0418-X8Q2M9"
               className="w-full rounded-2xl border border-gray-300 bg-gray-50 px-5 py-4 text-lg font-bold outline-none focus:border-black"
               value={lookupCode}
               onChange={(e) => setLookupCode(e.target.value.toUpperCase())}
@@ -107,16 +150,11 @@ export default function MyOrderPage() {
         {orders.length > 0 && (
           <section className="mt-6 grid gap-4">
             {orders.map((order) => {
-              const isCanceled =
-                order.order_status === "주문서취소" ||
-                order.admin_status === "주문서취소" ||
-                order.order_manage_status === "주문서취소";
-
+              const statusLabel = getCustomerStatusLabel(order);
+              const isCanceled = statusLabel === "주문취소";
               const isRefunded =
-                order.refund_type === "환불" ||
-                order.refund_type === "부분환불" ||
-                order.order_status === "환불" ||
-                order.admin_status === "환불";
+                statusLabel === "환불완료" ||
+                statusLabel === "부분환불";
 
               const shouldStrike = isCanceled || isRefunded;
 
@@ -131,13 +169,27 @@ export default function MyOrderPage() {
                       : "border-gray-200 bg-white"
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-3 mb-3">
-                    <div className="font-extrabold text-lg">
-                      {order.youtube_nickname || "-"}
+                  <div className="flex items-start justify-between gap-3 mb-4">
+                    <div>
+                      <div className="font-extrabold text-lg">
+                        {order.youtube_nickname || "-"}
+                      </div>
+
+                      <div className="text-sm text-gray-500 font-bold mt-1">
+                        주문시간 {formatDateTime(order.created_at)}
+                      </div>
+
+                      <div className="text-xs text-gray-400 font-bold mt-1">
+                        {order.order_lookup_code || "-"}
+                      </div>
                     </div>
 
-                    <div className="rounded-full bg-gray-100 px-3 py-1 text-xs font-extrabold text-gray-700">
-                      {order.order_status || order.admin_status || "주문완료신청"}
+                    <div
+                      className={`rounded-full px-3 py-1 text-xs font-extrabold ${getStatusClassName(
+                        statusLabel
+                      )}`}
+                    >
+                      {statusLabel}
                     </div>
                   </div>
 

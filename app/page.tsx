@@ -417,12 +417,36 @@ export default function Home() {
 
   const generateLookupCode = () => {
     const date = new Date();
-    const yymmdd =
-      String(date.getFullYear()).slice(2) +
-      String(date.getMonth() + 1).padStart(2, "0") +
-      String(date.getDate()).padStart(2, "0");
-    const random = Math.random().toString(36).slice(2, 6).toUpperCase();
-    return `RURU-${yymmdd}-${random}`;
+
+    const yy = String(date.getFullYear()).slice(2);
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    const hh = String(date.getHours()).padStart(2, "0");
+    const min = String(date.getMinutes()).padStart(2, "0");
+
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const makeRandom = (length: number) => {
+      let result = "";
+
+      if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+        const values = new Uint32Array(length);
+        crypto.getRandomValues(values);
+
+        for (let index = 0; index < length; index += 1) {
+          result += chars[values[index] % chars.length];
+        }
+
+        return result;
+      }
+
+      for (let index = 0; index < length; index += 1) {
+        result += chars[Math.floor(Math.random() * chars.length)];
+      }
+
+      return result;
+    };
+
+    return `RURU-${yy}${mm}${dd}-${hh}${min}-${makeRandom(6)}`;
   };
 
   const getSameBroadcastPreviousOrder = async () => {
