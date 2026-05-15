@@ -598,6 +598,47 @@ export default function AdminPage() {
     });
   }, [orders, search, selectedBroadcastId, statusFilter, paymentFilter]);
 
+  const orderSummary = useMemo(() => {
+    const totalCount = filteredOrders.length;
+
+    const refundCount = filteredOrders.filter((order) => {
+      const status = getDisplayStatus(order);
+      return status === "환불";
+    }).length;
+
+    const partialRefundCount = filteredOrders.filter((order) => {
+      const status = getDisplayStatus(order);
+      return status === "부분환불";
+    }).length;
+
+    const cancelCount = filteredOrders.filter((order) => {
+      const status = getDisplayStatus(order);
+      return status === "주문서취소";
+    }).length;
+
+    const cardCount = filteredOrders.filter((order) => {
+      return getPaymentLabel(order) === "카드결제";
+    }).length;
+
+    const bankCount = filteredOrders.filter((order) => {
+      return getPaymentLabel(order) === "무통장입금";
+    }).length;
+
+    const totalAmount = filteredOrders.reduce((sum, order) => {
+      return sum + Number(order.adjusted_total_price || order.total_price || 0);
+    }, 0);
+
+    return {
+      totalCount,
+      refundCount,
+      partialRefundCount,
+      cancelCount,
+      cardCount,
+      bankCount,
+      totalAmount,
+    };
+  }, [filteredOrders]);
+
   const settlementOrders = useMemo(() => {
     return orders.filter((order) => {
       if (settlementBroadcastId === "ALL") return true;
@@ -989,6 +1030,43 @@ export default function AdminPage() {
               paymentFilter={paymentFilter}
               setPaymentFilter={setPaymentFilter}
             />
+
+            <section className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 my-5">
+              <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+                <div className="text-xs text-gray-500 font-bold">조회 주문</div>
+                <div className="text-2xl font-extrabold mt-1">{orderSummary.totalCount}건</div>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+                <div className="text-xs text-gray-500 font-bold">조회 금액</div>
+                <div className="text-2xl font-extrabold mt-1">{won(orderSummary.totalAmount)}</div>
+              </div>
+
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-4 shadow-sm">
+                <div className="text-xs text-red-600 font-bold">환불</div>
+                <div className="text-2xl font-extrabold mt-1 text-red-700">{orderSummary.refundCount}건</div>
+              </div>
+
+              <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 shadow-sm">
+                <div className="text-xs text-orange-600 font-bold">부분환불</div>
+                <div className="text-2xl font-extrabold mt-1 text-orange-700">{orderSummary.partialRefundCount}건</div>
+              </div>
+
+              <div className="bg-gray-100 border border-gray-300 rounded-2xl p-4 shadow-sm">
+                <div className="text-xs text-gray-600 font-bold">주문서취소</div>
+                <div className="text-2xl font-extrabold mt-1 text-gray-800">{orderSummary.cancelCount}건</div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 shadow-sm">
+                <div className="text-xs text-blue-600 font-bold">카드결제</div>
+                <div className="text-2xl font-extrabold mt-1 text-blue-700">{orderSummary.cardCount}건</div>
+              </div>
+
+              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-sm">
+                <div className="text-xs text-gray-600 font-bold">무통장입금</div>
+                <div className="text-2xl font-extrabold mt-1 text-gray-800">{orderSummary.bankCount}건</div>
+              </div>
+            </section>
 
             <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-5 my-5">
               <div className="grid md:grid-cols-5 gap-3">
