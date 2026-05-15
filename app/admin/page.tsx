@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { OrderStatusBadge, PaymentBadge } from "@/components/admin/OrderStatusBadges";
+import AdminQuickFilters from "@/components/admin/AdminQuickFilters";
 
 const ADMIN_PASSWORD = "8249";
 
@@ -982,6 +983,13 @@ export default function AdminPage() {
 
         {tab === "orders" && (
           <>
+            <AdminQuickFilters
+              statusFilter={statusFilter}
+              setStatusFilter={setStatusFilter}
+              paymentFilter={paymentFilter}
+              setPaymentFilter={setPaymentFilter}
+            />
+
             <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-5 my-5">
               <div className="grid md:grid-cols-5 gap-3">
                 <input
