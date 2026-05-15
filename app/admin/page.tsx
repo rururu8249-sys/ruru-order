@@ -6,7 +6,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { OrderStatusBadge, PaymentBadge } from "@/components/admin/OrderStatusBadges";
+import { PaymentBadge } from "@/components/admin/OrderStatusBadges";
 import AdminQuickFilters from "@/components/admin/AdminQuickFilters";
 
 const ADMIN_PASSWORD = "8249";
@@ -1031,7 +1031,7 @@ export default function AdminPage() {
                   value={paymentFilter}
                   onChange={(e) => setPaymentFilter(e.target.value)}
                 >
-                  {PAYMENT_FILTER_OPTIONS.map((item) => (
+                  {PAYMENT_FILTER_OPTIONS.filter((item) => item !== "기타결제").map((item) => (
                     <option key={item} value={item}>
                       {item}
                     </option>
@@ -1082,10 +1082,10 @@ export default function AdminPage() {
               </div>
 
               {viewMode === "table" ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
+                <div className="overflow-auto max-h-[720px] border rounded-2xl">
+                  <table className="w-full border-collapse bg-white">
                     <thead>
-                      <tr className="bg-gray-100 text-sm">
+                      <tr className="bg-gray-100 text-sm sticky top-0 z-20 shadow-sm">
                         <ResizableTh colKey="status">상태</ResizableTh>
                         <ResizableTh colKey="member">닉네임 / 이름</ResizableTh>
                         <ResizableTh colKey="item">주문내역</ResizableTh>
@@ -1112,7 +1112,21 @@ export default function AdminPage() {
                               <select
                                 value={status === "부분환불" ? "환불" : status}
                                 onChange={(e) => handleStatusChange(order, e.target.value)}
-                                className={`w-full px-3 py-2 rounded-xl font-bold border ${getStatusColor(status)}`}
+                                className={`w-full px-3 py-2 rounded-xl font-extrabold border ${
+                                  status === "환불"
+                                    ? "bg-red-100 text-red-700 border-red-300"
+                                    : status === "부분환불"
+                                    ? "bg-orange-100 text-orange-700 border-orange-300"
+                                    : status === "주문서취소"
+                                    ? "bg-red-100 text-red-700 border-red-300"
+                                    : status === "출고대기"
+                                    ? "bg-yellow-100 text-yellow-700 border-yellow-300"
+                                    : status === "주문확인완료"
+                                    ? "bg-blue-100 text-blue-700 border-blue-300"
+                                    : status === "출고완료"
+                                    ? "bg-green-100 text-green-700 border-green-300"
+                                    : "bg-gray-100 text-gray-700 border-gray-300"
+                                }`}
                               >
                                 {STATUS_OPTIONS.map((item) => (
                                   <option key={item} value={item}>
@@ -1120,10 +1134,6 @@ export default function AdminPage() {
                                   </option>
                                 ))}
                               </select>
-
-                              <div className="mt-2">
-                                <OrderStatusBadge status={status} />
-                              </div>
                             </td>
 
                             <td className="p-3">
@@ -1160,7 +1170,7 @@ export default function AdminPage() {
 
                             <td className="p-3">
                               {isCanceled ? (
-                                <div className="rounded-2xl p-3 border bg-red-50 border-red-200">
+                                <div className="rounded-2xl p-3 border-2 bg-red-50 border-red-300">
                                   <div className="font-extrabold text-red-700">
                                     주문이 취소되었습니다.
                                   </div>
@@ -1169,7 +1179,7 @@ export default function AdminPage() {
                                   </div>
                                 </div>
                               ) : order.order_manage_status === "환불" ? (
-                                <div className="rounded-2xl p-3 border bg-red-50 border-red-200">
+                                <div className="rounded-2xl p-3 border-2 bg-red-50 border-red-300">
                                   <div className="font-extrabold text-red-700">
                                     {order.refund_type || "환불"} / {won(getRefundAmount(order))}
                                   </div>
@@ -1220,7 +1230,21 @@ export default function AdminPage() {
                           <select
                             value={status === "부분환불" ? "환불" : status}
                             onChange={(e) => handleStatusChange(order, e.target.value)}
-                            className={`px-3 py-2 rounded-xl font-bold border ${getStatusColor(status)}`}
+                            className={`px-3 py-2 rounded-xl font-extrabold border ${
+                              status === "환불"
+                                ? "bg-red-100 text-red-700 border-red-300"
+                                : status === "부분환불"
+                                ? "bg-orange-100 text-orange-700 border-orange-300"
+                                : status === "주문서취소"
+                                ? "bg-red-100 text-red-700 border-red-300"
+                                : status === "출고대기"
+                                ? "bg-yellow-100 text-yellow-700 border-yellow-300"
+                                : status === "주문확인완료"
+                                ? "bg-blue-100 text-blue-700 border-blue-300"
+                                : status === "출고완료"
+                                ? "bg-green-100 text-green-700 border-green-300"
+                                : "bg-gray-100 text-gray-700 border-gray-300"
+                            }`}
                           >
                             {STATUS_OPTIONS.map((item) => (
                               <option key={item} value={item}>
@@ -1228,10 +1252,6 @@ export default function AdminPage() {
                               </option>
                             ))}
                           </select>
-
-                          <div className="mt-2 text-right">
-                            <OrderStatusBadge status={status} />
-                          </div>
                         </div>
 
                         <div className="bg-gray-50 rounded-2xl border p-4">
@@ -1260,7 +1280,7 @@ export default function AdminPage() {
                         </div>
 
                         {isCanceled && (
-                          <div className="mt-4 bg-red-50 border border-red-200 rounded-2xl p-4">
+                          <div className="mt-4 bg-red-50 border-2 border-red-300 rounded-2xl p-4">
                             <div className="font-extrabold text-red-700">
                               주문이 취소되었습니다.
                             </div>
@@ -1271,7 +1291,7 @@ export default function AdminPage() {
                         )}
 
                         {!isCanceled && order.order_manage_status === "환불" && (
-                          <div className="mt-4 bg-red-50 border border-red-200 rounded-2xl p-4">
+                          <div className="mt-4 bg-red-50 border-2 border-red-300 rounded-2xl p-4">
                             <div className="font-extrabold text-red-700">
                               {order.refund_type || "환불"} / {won(getRefundAmount(order))}
                             </div>
