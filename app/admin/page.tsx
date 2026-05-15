@@ -625,12 +625,18 @@ export default function AdminPage() {
       return getPaymentLabel(order) === "무통장입금";
     }).length;
 
+    const newCount = filteredOrders.filter((order) => {
+      const status = getDisplayStatus(order);
+      return status === "주문확인전";
+    }).length;
+
     const totalAmount = filteredOrders.reduce((sum, order) => {
       return sum + Number(order.adjusted_total_price || order.total_price || 0);
     }, 0);
 
     return {
       totalCount,
+      newCount,
       refundCount,
       partialRefundCount,
       cancelCount,
@@ -639,6 +645,17 @@ export default function AdminPage() {
       totalAmount,
     };
   }, [filteredOrders]);
+
+  const newOrderAlerts = useMemo(() => {
+    return filteredOrders.filter((order) => {
+      const status = getDisplayStatus(order);
+      return status === "주문확인전";
+    });
+  }, [filteredOrders]);
+
+  const recentNewOrderAlerts = useMemo(() => {
+    return newOrderAlerts.slice(0, 4);
+  }, [newOrderAlerts]);
 
   const settlementOrders = useMemo(() => {
     return orders.filter((order) => {
@@ -1318,6 +1335,15 @@ export default function AdminPage() {
                 <div className="text-2xl font-extrabold mt-1">{orderSummary.totalCount}건</div>
               </div>
 
+              <button
+                type="button"
+                onClick={() => setStatusFilter("주문확인전")}
+                className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 shadow-sm text-left hover:bg-yellow-100 transition"
+              >
+                <div className="text-xs text-yellow-700 font-bold">신규 주문</div>
+                <div className="text-2xl font-extrabold mt-1 text-yellow-700">{orderSummary.newCount}건</div>
+              </button>
+
               <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
                 <div className="text-xs text-gray-500 font-bold">조회 금액</div>
                 <div className="text-2xl font-extrabold mt-1">{won(orderSummary.totalAmount)}</div>
@@ -1397,6 +1423,62 @@ export default function AdminPage() {
                   ))}
                 </select>
               </div>
+            </section>
+
+            <section className="bg-white rounded-3xl border border-yellow-200 shadow-sm p-5 my-5">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                <div>
+                  <div className="text-xl font-extrabold text-gray-900">
+                    🔔 신규 주문 알림
+                  </div>
+                  <div className="text-sm text-gray-500 font-bold mt-1">
+                    주문확인전 상태인 주문입니다. 상태를 변경하면 신규 표시가 자동으로 사라집니다.
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter("주문확인전")}
+                  className="rounded-2xl bg-yellow-400 text-black px-5 py-3 font-extrabold"
+                >
+                  신규주문 {newOrderAlerts.length}건 보기
+                </button>
+              </div>
+
+              {recentNewOrderAlerts.length > 0 ? (
+                <div className="grid gap-2">
+                  {recentNewOrderAlerts.map((order) => (
+                    <div
+                      key={`new-alert-${order.id}`}
+                      className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 rounded-2xl bg-yellow-50 border border-yellow-100 px-4 py-3"
+                    >
+                      <div className="font-extrabold text-gray-900">
+                        🟡 {order.youtube_nickname || "-"} / {order.customer_name || "-"}
+                      </div>
+
+                      <div className="text-sm font-bold text-gray-700 md:text-right">
+                        {order.product_name || "상품명 없음"}
+                        {" · "}
+                        {order.color || "없음"} / {order.size || "없음"}
+                        {" · "}
+                        {order.qty || 0}개
+                        {" · "}
+                        {won(getOrderTotal(order))}
+                      </div>
+                    </div>
+                  ))}
+
+                  {newOrderAlerts.length > recentNewOrderAlerts.length && (
+                    <div className="rounded-2xl bg-gray-50 border border-gray-200 px-4 py-3 text-sm font-bold text-gray-500 text-center">
+                      외 {newOrderAlerts.length - recentNewOrderAlerts.length}건 더 있습니다.
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-2xl bg-gray-50 border border-gray-200 px-4 py-4 text-center text-gray-500 font-bold">
+                  신규 주문 알림이 없습니다.
+                </div>
+              )}
             </section>
 
             <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-5">
@@ -1506,6 +1588,12 @@ export default function AdminPage() {
                                   </option>
                                 ))}
                               </select>
+
+                              {status === "주문확인전" && (
+                                <div className="mt-2 inline-flex items-center rounded-full bg-yellow-100 px-3 py-1 text-xs font-extrabold text-yellow-800 border border-yellow-200">
+                                  🟡 신규
+                                </div>
+                              )}
                             </td>
 
                             <td className="p-3">
@@ -1637,6 +1725,12 @@ export default function AdminPage() {
                               </option>
                             ))}
                           </select>
+
+                          {status === "주문확인전" && (
+                            <div className="inline-flex items-center rounded-full bg-yellow-100 px-3 py-1 text-xs font-extrabold text-yellow-800 border border-yellow-200">
+                              🟡 신규
+                            </div>
+                          )}
                         </div>
 
                         <div className="bg-gray-50 rounded-2xl border p-4">
