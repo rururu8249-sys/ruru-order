@@ -4,18 +4,12 @@
 // /Users/ruru/Desktop/ruru-order-app/app/components/PublicTopNav.tsx
 //
 // Vercel 빌드 오류 수정 버전
-// 핵심:
-// useSearchParams 사용 금지
-// window.location.search 로 주문서작성 화면 감지
+// useSearchParams 사용 안 함
+// HomeCenterMenu export 포함
 //
-// 적용:
-// 1) 첫화면(/)만 상단바 숨김
-// 2) 주문서작성 화면(/?screen=order)에서는 상단바 표시
-// 3) 모바일에서 메뉴가 가로 드래그 없이 2줄로 전부 보이게 처리
-// 4) 첫화면 가운데 메뉴에는 홈 버튼 제외
-//
-// 메뉴 순서:
-// 홈 → 공지 → 주문서작성 → 주문조회 → 카톡채널 → 루루동이밴드 → 유튜브
+// 메뉴:
+// 첫화면 가운데 메뉴 = 공지 / 주문서작성 / 주문조회 / 카톡채널 / 루루동이밴드 / 유튜브
+// 다른 페이지 상단바 = 홈 / 공지 / 주문서작성 / 주문조회 / 카톡채널 / 루루동이밴드 / 유튜브
 
 "use client";
 

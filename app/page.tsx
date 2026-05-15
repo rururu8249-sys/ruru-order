@@ -2,7 +2,6 @@
 
 import { supabase } from "@/lib/supabase";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { HomeCenterMenu } from "./components/PublicTopNav";
 
 declare global {
@@ -20,7 +19,6 @@ type ActiveBroadcast = {
 };
 
 export default function Home() {
-  const searchParams = useSearchParams();
   const [screen, setScreen] = useState<"menu" | "order" | "lookup">("menu");
 
   const [nickname, setNickname] = useState("");
@@ -109,7 +107,8 @@ export default function Home() {
   }, [customerName, customerPhone, activeBroadcast.id, broadcastTitle]);
 
   useEffect(() => {
-    const requestedScreen = searchParams.get("screen");
+    const params = new URLSearchParams(window.location.search);
+    const requestedScreen = params.get("screen");
 
     if (requestedScreen === "order") {
       setIsCompleted(false);
@@ -126,7 +125,7 @@ export default function Home() {
     if (!requestedScreen) {
       setScreen("menu");
     }
-  }, [searchParams]);
+  }, []);
 
   useEffect(() => {
     setCustomerCheckStatus("unchecked");
