@@ -3,9 +3,12 @@
 // 파일 위치:
 // /Users/ruru/Desktop/ruru-order-app/app/components/PublicTopNav.tsx
 //
-// Vercel 빌드 오류 수정 버전
-// useSearchParams 사용 안 함
-// HomeCenterMenu export 포함
+// 기능:
+// - 첫화면(/)만 상단바 숨김
+// - 주문서작성 화면(/?screen=order)은 상단바 표시
+// - 관리자(/admin)는 상단바 숨김
+// - 모바일에서 메뉴가 가로스크롤 없이 2줄로 전부 보이게 처리
+// - 첫화면 가운데 메뉴에는 홈 버튼 제외
 //
 // 메뉴:
 // 첫화면 가운데 메뉴 = 공지 / 주문서작성 / 주문조회 / 카톡채널 / 루루동이밴드 / 유튜브
@@ -65,7 +68,7 @@ function MenuButton({
   const baseClass =
     mode === "home"
       ? "min-h-[72px] px-3 py-4 rounded-3xl text-sm md:text-base font-extrabold text-center transition shadow-sm flex items-center justify-center"
-      : "px-3 py-2 rounded-full text-xs md:text-sm font-extrabold transition whitespace-nowrap flex items-center justify-center";
+      : "px-2 py-2 rounded-full text-[11px] md:text-sm font-extrabold transition whitespace-nowrap flex items-center justify-center min-h-[38px]";
 
   const colorClass = item.highlight
     ? "bg-black text-white hover:bg-gray-800"
@@ -135,7 +138,7 @@ export default function PublicTopNav() {
   }
 
   // 완전 첫화면만 상단바 숨김
-  // /?screen=order 같은 주문서작성 화면에서는 상단바 표시
+  // /?screen=order, /?screen=lookup 등은 상단바 표시
   if (pathname === "/" && !screen) {
     return null;
   }
@@ -143,30 +146,32 @@ export default function PublicTopNav() {
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-gray-200">
       <div className="max-w-6xl mx-auto px-3 py-3">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div className="flex flex-col gap-3">
+
           <Link
             href="/"
-            className="flex items-center justify-center md:justify-start gap-2 shrink-0"
+            className="flex items-center justify-center gap-2 shrink-0"
           >
-            <div className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-black text-white flex items-center justify-center font-extrabold">
+            <div className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center font-extrabold">
               R
             </div>
 
             <div className="leading-tight">
-              <div className="font-extrabold text-base md:text-lg text-gray-950">
+              <div className="font-extrabold text-lg text-gray-950">
                 루루동이
               </div>
-              <div className="text-[10px] md:text-xs text-gray-500 font-bold">
+              <div className="text-xs text-gray-500 font-bold">
                 LIVE ORDER
               </div>
             </div>
           </Link>
 
-          <nav className="grid grid-cols-4 sm:grid-cols-7 md:flex md:items-center gap-2 w-full md:w-auto">
+          <nav className="grid grid-cols-4 sm:grid-cols-7 gap-2 w-full">
             {TOP_MENU_ITEMS.map((item) => (
               <MenuButton key={item.label} item={item} mode="top" />
             ))}
           </nav>
+
         </div>
       </div>
     </header>
