@@ -1,114 +1,94 @@
+// app/components/SecurityBlocker.tsx
+// 전체 교체용
+// 파일 위치:
+// /Users/ruru/Desktop/ruru-order-app/app/components/SecurityBlocker.tsx
+//
+// 기능:
+// - 고객 페이지 우클릭 방지
+// - 텍스트 선택 방지
+// - 복사/잘라내기 방지
+// - 이미지 드래그 방지
+// - 개발자 단축키 일부 방지
+//
+// 예외:
+// data-security-allow="true" 속성이 있는 요소는 허용
+// 주문조회번호 입력칸 등 복사/붙여넣기 필요한 곳에 사용
+
 "use client";
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
+function isAllowedElement(target: EventTarget | null) {
+  if (!(target instanceof Element)) return false;
+
+  return Boolean(
+    target.closest('[data-security-allow="true"]')
+  );
+}
+
 export default function SecurityBlocker() {
   const pathname = usePathname();
 
   useEffect(() => {
-    const isAdminPage = pathname?.startsWith("/admin");
-
-    const isEditableElement = (target: EventTarget | null) => {
-      if (!(target instanceof HTMLElement)) return false;
-
-      const tagName = target.tagName.toLowerCase();
-
-      return (
-        tagName === "input" ||
-        tagName === "textarea" ||
-        target.isContentEditable
-      );
-    };
-
-    const allowCopyForAdmin = () => {
-      document.body.style.setProperty("user-select", "text");
-      document.body.style.setProperty("-webkit-user-select", "text");
-      document.body.style.setProperty("-moz-user-select", "text");
-      document.body.style.setProperty("-ms-user-select", "text");
-      document.body.style.setProperty("-webkit-touch-callout", "default");
-    };
-
-    const clearSecurityStyles = () => {
-      document.body.style.removeProperty("user-select");
-      document.body.style.removeProperty("-webkit-user-select");
-      document.body.style.removeProperty("-moz-user-select");
-      document.body.style.removeProperty("-ms-user-select");
-      document.body.style.removeProperty("-webkit-touch-callout");
-    };
-
-    if (isAdminPage) {
-      allowCopyForAdmin();
-
-      return () => {
-        clearSecurityStyles();
-      };
+    // 관리자 페이지는 보안차단 제외
+    if (pathname?.startsWith("/admin")) {
+      return;
     }
 
-    const preventContextMenu = (event: MouseEvent) => {
-      if (isEditableElement(event.target)) return;
+    const blockEvent = (event: Event) => {
+      if (isAllowedElement(event.target)) {
+        return;
+      }
+
       event.preventDefault();
     };
 
-    const preventSelectStart = (event: Event) => {
-      if (isEditableElement(event.target)) return;
-      event.preventDefault();
-    };
-
-    const preventCopy = (event: ClipboardEvent) => {
-      if (isEditableElement(event.target)) return;
-      event.preventDefault();
-    };
-
-    const preventCut = (event: ClipboardEvent) => {
-      if (isEditableElement(event.target)) return;
-      event.preventDefault();
-    };
-
-    const preventPaste = (event: ClipboardEvent) => {
-      if (isEditableElement(event.target)) return;
-      event.preventDefault();
-    };
-
-    const preventKeyDown = (event: KeyboardEvent) => {
-      if (isEditableElement(event.target)) return;
+    const blockKeyboard = (event: KeyboardEvent) => {
+      if (isAllowedElement(event.target)) {
+        return;
+      }
 
       const key = event.key.toLowerCase();
 
-      if (
-        (event.ctrlKey || event.metaKey) &&
-        ["c", "x", "u", "s", "a", "p"].includes(key)
-      ) {
-        event.preventDefault();
-      }
+      const blocked =
+        event.key === "F12" ||
+        (event.ctrlKey && event.shiftKey && ["i", "j", "c"].includes(key)) ||
+        (event.metaKey && event.altKey && ["i", "j", "c"].includes(key)) ||
+        (event.ctrlKey && ["u", "s", "p", "c", "x", "a"].includes(key)) ||
+        (event.metaKey && ["u", "s", "p", "c", "x", "a"].includes(key));
 
-      if (event.key === "F12") {
+      if (blocked) {
         event.preventDefault();
       }
     };
 
-    document.addEventListener("contextmenu", preventContextMenu);
-    document.addEventListener("selectstart", preventSelectStart);
-    document.addEventListener("copy", preventCopy);
-    document.addEventListener("cut", preventCut);
-    document.addEventListener("paste", preventPaste);
-    document.addEventListener("keydown", preventKeyDown);
+    const blockDrag = (event: DragEvent) => {
+      if (isAllowedElement(event.target)) {
+        return;
+      }
 
-    document.body.style.setProperty("user-select", "none");
-    document.body.style.setProperty("-webkit-user-select", "none");
-    document.body.style.setProperty("-moz-user-select", "none");
-    document.body.style.setProperty("-ms-user-select", "none");
-    document.body.style.setProperty("-webkit-touch-callout", "none");
+      event.preventDefault();
+    };
+
+    document.addEventListener("contextmenu", blockEvent);
+    document.addEventListener("selectstart", blockEvent);
+    document.addEventListener("copy", blockEvent);
+    document.addEventListener("cut", blockEvent);
+    document.addEventListener("dragstart", blockDrag);
+    document.addEventListener("keydown", blockKeyboard);
+
+    document.body.classList.add("customer-security-lock");
 
     return () => {
-      document.removeEventListener("contextmenu", preventContextMenu);
-      document.removeEventListener("selectstart", preventSelectStart);
-      document.removeEventListener("copy", preventCopy);
-      document.removeEventListener("cut", preventCut);
-      document.removeEventListener("paste", preventPaste);
-      document.removeEventListener("keydown", preventKeyDown);
+      document.removeEventListener("contextmenu", blockEvent);
+      document.removeEventListener("selectstart", blockEvent);
+      document.removeEventListener("copy", blockEvent);
+      document.removeEventListener("cut", blockEvent);
+      document.removeEventListener("dragstart", blockDrag);
+      document.removeEventListener("keydown", blockKeyboard);
 
-      clearSecurityStyles();
+      document.body.classList.remove("customer-security-lock");
     };
   }, [pathname]);
 

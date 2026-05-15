@@ -1,11 +1,13 @@
 // app/myorder/page.tsx
 // 전체 교체용
-// 파일 위치: /Users/ruru/Desktop/ruru-order-app/app/myorder/page.tsx
+// 파일 위치:
+// /Users/ruru/Desktop/ruru-order-app/app/myorder/page.tsx
 //
-// 적용 내용:
-// 1) 주문조회번호만으로 조회
-// 2) 주문서 작성완료 시점(created_at) 기준 실제 달력 날짜 7일 이내 주문만 조회
-// 3) 조회 결과 없을 때: "최근 7일간 주문내역이 존재하지 않습니다."
+// 적용:
+// - 주문조회번호만으로 조회
+// - 주문서 작성완료 시점 기준 실제 날짜 최근 7일만 조회
+// - 조회 실패 문구: 최근 7일간 주문내역이 존재하지 않습니다.
+// - 주문조회번호 입력칸만 우클릭/복사/붙여넣기 허용
 
 "use client";
 
@@ -32,8 +34,6 @@ export default function MyOrderPage() {
     setMessage("");
     setOrders([]);
 
-    // 실제 달력 날짜 기준:
-    // 주문서 작성완료 시점(created_at)으로부터 최근 7일 이내 주문만 조회
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
@@ -80,6 +80,7 @@ export default function MyOrderPage() {
 
           <div className="mt-6 grid gap-3">
             <input
+              data-security-allow="true"
               type="text"
               placeholder="예) RURU-260515-ABCD"
               className="w-full rounded-2xl border border-gray-300 bg-gray-50 px-5 py-4 text-lg font-bold outline-none focus:border-black"
