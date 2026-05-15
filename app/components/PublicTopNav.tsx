@@ -3,11 +3,10 @@
 // 파일 위치:
 // /Users/ruru/Desktop/ruru-order-app/app/components/PublicTopNav.tsx
 //
-// 기능:
-// - 첫화면(/)만 상단바 숨김
-// - 주문서작성 화면(/?screen=order)은 상단바 표시
-// - 관리자(/admin)는 상단바 숨김
-// - 모바일에서 메뉴가 가로스크롤 없이 2줄로 전부 보이게 처리
+// 수정 내용:
+// - 첫화면에서 주문서작성 클릭 시 반응 없는 문제 해결
+// - /?screen=order 같은 query 링크는 Next Link 대신 일반 a 태그 사용
+// - 모바일 메뉴 2줄 표시 유지
 // - 첫화면 가운데 메뉴에는 홈 버튼 제외
 //
 // 메뉴:
@@ -35,7 +34,7 @@ const ORDER_LOOKUP_URL = "/myorder";
 const TOP_MENU_ITEMS = [
   { label: "홈", href: "/", type: "internal" },
   { label: "공지", href: "/notice", type: "internal" },
-  { label: "주문서작성", href: ORDER_FORM_URL, type: "internal", highlight: true },
+  { label: "주문서작성", href: ORDER_FORM_URL, type: "internal", highlight: true, forceReload: true },
   { label: "주문조회", href: ORDER_LOOKUP_URL, type: "internal" },
   { label: "카톡채널", href: KAKAO_CHANNEL_URL, type: "external", kakao: true },
   { label: "루루동이밴드", href: BAND_URL, type: "external" },
@@ -54,6 +53,7 @@ function MenuButton({
     type: string;
     highlight?: boolean;
     kakao?: boolean;
+    forceReload?: boolean;
   };
   mode: "home" | "top";
 }) {
@@ -88,6 +88,16 @@ function MenuButton({
         rel="noopener noreferrer"
         className={className}
       >
+        {item.label}
+      </a>
+    );
+  }
+
+  // /?screen=order 처럼 같은 페이지 query만 바꾸는 링크는
+  // Next Link 대신 일반 a 태그로 처리해야 첫화면에서도 주문서작성 화면이 즉시 열립니다.
+  if (item.forceReload || item.href.startsWith("/?")) {
+    return (
+      <a href={item.href} className={className}>
         {item.label}
       </a>
     );
