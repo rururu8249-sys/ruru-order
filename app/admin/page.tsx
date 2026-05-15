@@ -856,16 +856,41 @@ export default function AdminPage() {
         return;
       }
 
-      const response = await fetch("/rozen_template.xlsx");
+      const templatePaths = [
+        "/templates/rozen_template.xlsx",
+        "/rozen_template.xlsx",
+      ];
 
-      if (!response.ok) {
+      let response: Response | null = null;
+      let usedTemplatePath = "";
+
+      for (const path of templatePaths) {
+        const tryResponse = await fetch(`${path}?v=${Date.now()}`);
+
+        if (tryResponse.ok) {
+          response = tryResponse;
+          usedTemplatePath = path;
+          break;
+        }
+      }
+
+      if (!response) {
         alert(
-          "로젠 송장 템플릿 파일을 찾을 수 없습니다.\\n/public/rozen_template.xlsx 파일이 있는지 확인해주세요."
+          "로젠 송장 템플릿 파일을 찾을 수 없습니다.\n\n확인 위치:\n/public/templates/rozen_template.xlsx\n\n시도 경로:\n" +
+            templatePaths.join("\n")
         );
         return;
       }
 
       const templateBuffer = await response.arrayBuffer();
+
+      if (!templateBuffer || templateBuffer.byteLength < 1000) {
+        alert(
+          "로젠 송장 템플릿 파일을 불러왔지만 파일 내용이 비정상입니다.\n\n사용 경로: " +
+            usedTemplatePath
+        );
+        return;
+      }
 
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(templateBuffer);
