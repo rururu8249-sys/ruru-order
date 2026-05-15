@@ -929,7 +929,7 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 mb-5">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-5">
           <button
             onClick={() => setTab("orders")}
             className={`p-4 rounded-2xl font-bold border ${
@@ -962,6 +962,13 @@ export default function AdminPage() {
           >
             통계/정산
           </button>
+
+          <a
+            href="/admin/notice"
+            className="p-4 rounded-2xl font-bold border bg-white text-gray-900 border-gray-300 text-center hover:bg-black hover:text-white transition"
+          >
+            공지관리
+          </a>
         </div>
 
         <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-5">
