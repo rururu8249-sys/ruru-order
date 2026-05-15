@@ -122,7 +122,7 @@ export default function PrismOrderWidgetPage() {
 
     timerRef.current = setTimeout(() => {
       setIsAnimating(false);
-    }, 2200);
+    }, 3300);
   };
 
   useEffect(() => {
@@ -313,7 +313,7 @@ export default function PrismOrderWidgetPage() {
         }
       `}</style>
 
-      <section className="relative w-[300px] h-[430px] rounded-[1.75rem] overflow-hidden text-white">
+      <section className="relative w-[260px] h-[370px] rounded-[1.75rem] overflow-hidden text-white">
         <div className="absolute inset-0 rounded-[1.75rem] bg-black/46 backdrop-blur-md border border-white/24 shadow-2xl" />
         <div className="absolute inset-0 rounded-[1.75rem] bg-gradient-to-br from-white/12 via-pink-300/10 to-black/18 pointer-events-none" />
         <div className="absolute inset-x-5 top-[72px] h-px bg-pink-300/48" />
