@@ -904,10 +904,12 @@ export default function AdminPage() {
 
       const groups = buildRozenGroups(targetOrders);
 
-      const startRow = 2;
+      // 로젠 업로드 파일은 헤더 없이 1행부터 실제 송장 데이터만 들어가야 합니다.
+      // 템플릿 1행은 스타일 참고용으로만 사용하고, 샘플 글씨는 전부 지운 뒤 1행부터 입력합니다.
+      const startRow = 1;
       const templateRow = worksheet.getRow(startRow);
 
-      // 기존 데이터 영역 정리
+      // 기존 샘플/데이터 영역 정리
       const lastRow = Math.max(worksheet.rowCount, startRow);
       for (let rowNumber = startRow; rowNumber <= lastRow; rowNumber += 1) {
         const row = worksheet.getRow(rowNumber);
@@ -925,7 +927,7 @@ export default function AdminPage() {
         const rowNumber = startRow + index;
         const row = worksheet.getRow(rowNumber);
 
-        // 원본 템플릿 2행 스타일을 새 행에 최대한 유지
+        // 원본 템플릿 1행 스타일을 새 행에 최대한 유지
         if (index > 0) {
           for (let col = 1; col <= 11; col += 1) {
             const sourceCell = templateRow.getCell(col);
