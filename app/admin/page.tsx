@@ -1031,6 +1031,60 @@ export default function AdminPage() {
               setPaymentFilter={setPaymentFilter}
             />
 
+            <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 my-5">
+
+              <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+                <div className="text-xs text-gray-500 font-bold">
+                  방송매출
+                </div>
+
+                <div className="text-2xl font-extrabold mt-1">
+                  {won(totalSales)}
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 shadow-sm">
+                <div className="text-xs text-blue-600 font-bold">
+                  카드매출
+                </div>
+
+                <div className="text-2xl font-extrabold mt-1 text-blue-700">
+                  {won(cardSales)}
+                </div>
+              </div>
+
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-4 shadow-sm">
+                <div className="text-xs text-red-600 font-bold">
+                  카드수수료(7%)
+                </div>
+
+                <div className="text-2xl font-extrabold mt-1 text-red-700">
+                  - {won(cardFeeSettlement)}
+                </div>
+              </div>
+
+              <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 shadow-sm">
+                <div className="text-xs text-orange-600 font-bold">
+                  환불금액
+                </div>
+
+                <div className="text-2xl font-extrabold mt-1 text-orange-700">
+                  - {won(totalRefundAmount)}
+                </div>
+              </div>
+
+              <div className="bg-black text-white rounded-2xl p-4 shadow-sm">
+                <div className="text-xs opacity-70 font-bold">
+                  최종순이익
+                </div>
+
+                <div className="text-3xl font-extrabold mt-1">
+                  {won(finalProfit)}
+                </div>
+              </div>
+
+            </section>
+
             <section className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 my-5">
               <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
                 <div className="text-xs text-gray-500 font-bold">조회 주문</div>
