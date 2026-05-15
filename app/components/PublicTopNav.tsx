@@ -4,10 +4,12 @@
 // /Users/ruru/Desktop/ruru-order-app/app/components/PublicTopNav.tsx
 //
 // 수정 내용:
-// - 첫화면에서 주문서작성 클릭 시 반응 없는 문제 해결
-// - /?screen=order 같은 query 링크는 Next Link 대신 일반 a 태그 사용
+// - 주문서작성 버튼은 어떤 화면에서도 검정색 활성화 처리 안 함
+// - 주문서작성 버튼은 항상 흰색 버튼 + 빨간 손그림 별표 표시
+// - 공지/주문조회/홈 등 실제 현재 메뉴만 검정색 활성화
+// - 카톡채널 노랑색 유지
 // - 모바일 메뉴 2줄 표시 유지
-// - 첫화면 가운데 메뉴에는 홈 버튼 제외
+// - 첫화면 주문서작성 클릭 반응 문제 해결 유지
 //
 // 메뉴:
 // 첫화면 가운데 메뉴 = 공지 / 주문서작성 / 주문조회 / 카톡채널 / 루루동이밴드 / 유튜브
@@ -34,7 +36,13 @@ const ORDER_LOOKUP_URL = "/myorder";
 const TOP_MENU_ITEMS = [
   { label: "홈", href: "/", type: "internal" },
   { label: "공지", href: "/notice", type: "internal" },
-  { label: "주문서작성", href: ORDER_FORM_URL, type: "internal", highlight: true, forceReload: true },
+  {
+    label: "주문서작성",
+    href: ORDER_FORM_URL,
+    type: "internal",
+    important: true,
+    forceReload: true,
+  },
   { label: "주문조회", href: ORDER_LOOKUP_URL, type: "internal" },
   { label: "카톡채널", href: KAKAO_CHANNEL_URL, type: "external", kakao: true },
   { label: "루루동이밴드", href: BAND_URL, type: "external" },
@@ -42,6 +50,38 @@ const TOP_MENU_ITEMS = [
 ];
 
 const HOME_MENU_ITEMS = TOP_MENU_ITEMS.filter((item) => item.label !== "홈");
+
+function RedHandStar() {
+  return (
+    <svg
+      className="
+        absolute -top-4 -right-3
+        h-8 w-8 md:h-9 md:w-9
+        pointer-events-none
+        drop-shadow-sm
+      "
+      viewBox="0 0 100 100"
+      aria-hidden="true"
+    >
+      <path
+        d="M52 8 L63 38 L94 39 L69 57 L78 88 L51 70 L25 88 L34 57 L9 39 L40 38 Z"
+        fill="none"
+        stroke="#ef1f1f"
+        strokeWidth="8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M17 42 C35 35 58 28 88 40"
+        fill="none"
+        stroke="#ef1f1f"
+        strokeWidth="5"
+        strokeLinecap="round"
+        opacity="0.75"
+      />
+    </svg>
+  );
+}
 
 function MenuButton({
   item,
@@ -51,34 +91,52 @@ function MenuButton({
     label: string;
     href: string;
     type: string;
-    highlight?: boolean;
+    important?: boolean;
     kakao?: boolean;
     forceReload?: boolean;
   };
   mode: "home" | "top";
 }) {
   const pathname = usePathname();
+  const [screen, setScreen] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setScreen(params.get("screen") || "");
+  }, []);
 
   const isActive = (() => {
-    if (item.href === "/") return pathname === "/";
+    // 주문서작성은 활성화 검정 처리하지 않음
+    if (item.important) return false;
+
+    if (item.href === "/") return pathname === "/" && !screen;
     if (item.href.startsWith("/?")) return false;
     return pathname?.startsWith(item.href);
   })();
 
   const baseClass =
     mode === "home"
-      ? "min-h-[72px] px-3 py-4 rounded-3xl text-sm md:text-base font-extrabold text-center transition shadow-sm flex items-center justify-center"
-      : "px-2 py-2 rounded-full text-[11px] md:text-sm font-extrabold transition whitespace-nowrap flex items-center justify-center min-h-[38px]";
+      ? "relative min-h-[72px] px-3 py-4 rounded-3xl text-sm md:text-base font-extrabold text-center transition shadow-sm flex items-center justify-center"
+      : "relative px-2 py-2 rounded-full text-[11px] md:text-sm font-extrabold transition whitespace-nowrap flex items-center justify-center min-h-[38px]";
 
-  const colorClass = item.highlight
-    ? "bg-black text-white hover:bg-gray-800"
-    : item.kakao
+  const colorClass = item.kakao
     ? "bg-yellow-300 text-black hover:bg-yellow-400"
     : isActive
     ? "bg-black text-white"
     : "bg-white text-gray-900 border border-gray-200 hover:bg-gray-100";
 
-  const className = `${baseClass} ${colorClass}`;
+  const importantClass = item.important
+    ? "border-red-100 hover:border-red-200"
+    : "";
+
+  const className = `${baseClass} ${colorClass} ${importantClass}`;
+
+  const content = (
+    <>
+      {item.important && <RedHandStar />}
+      {item.label}
+    </>
+  );
 
   if (item.type === "external") {
     return (
@@ -88,7 +146,7 @@ function MenuButton({
         rel="noopener noreferrer"
         className={className}
       >
-        {item.label}
+        {content}
       </a>
     );
   }
@@ -98,14 +156,14 @@ function MenuButton({
   if (item.forceReload || item.href.startsWith("/?")) {
     return (
       <a href={item.href} className={className}>
-        {item.label}
+        {content}
       </a>
     );
   }
 
   return (
     <Link href={item.href} className={className}>
-      {item.label}
+      {content}
     </Link>
   );
 }
@@ -157,7 +215,6 @@ export default function PublicTopNav() {
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-gray-200">
       <div className="max-w-6xl mx-auto px-3 py-3">
         <div className="flex flex-col gap-3">
-
           <Link
             href="/"
             className="flex items-center justify-center gap-2 shrink-0"
@@ -181,7 +238,6 @@ export default function PublicTopNav() {
               <MenuButton key={item.label} item={item} mode="top" />
             ))}
           </nav>
-
         </div>
       </div>
     </header>
