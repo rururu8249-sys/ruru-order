@@ -4,16 +4,12 @@
 // /Users/ruru/Desktop/ruru-order-app/app/components/PublicTopNav.tsx
 //
 // 수정 내용:
-// - 주문서작성 버튼은 어떤 화면에서도 검정색 활성화 처리 안 함
-// - 주문서작성 버튼은 항상 흰색 버튼 + 빨간 손그림 별표 표시
-// - 공지/주문조회/홈 등 실제 현재 메뉴만 검정색 활성화
+// - /?screen=order 주문서작성 화면에서 홈 버튼 검정 활성화 제거
+// - 홈 버튼 클릭 반응 없던 문제 해결: 홈도 일반 a 태그로 강제 이동
+// - 주문서작성 버튼은 항상 흰색 + 빨간 손그림 별표
+// - 현재 메뉴 활성화 검정색은 공지/주문조회 등 실제 페이지에만 적용
 // - 카톡채널 노랑색 유지
 // - 모바일 메뉴 2줄 표시 유지
-// - 첫화면 주문서작성 클릭 반응 문제 해결 유지
-//
-// 메뉴:
-// 첫화면 가운데 메뉴 = 공지 / 주문서작성 / 주문조회 / 카톡채널 / 루루동이밴드 / 유튜브
-// 다른 페이지 상단바 = 홈 / 공지 / 주문서작성 / 주문조회 / 카톡채널 / 루루동이밴드 / 유튜브
 
 "use client";
 
@@ -34,7 +30,7 @@ const ORDER_FORM_URL = "/?screen=order";
 const ORDER_LOOKUP_URL = "/myorder";
 
 const TOP_MENU_ITEMS = [
-  { label: "홈", href: "/", type: "internal" },
+  { label: "홈", href: "/", type: "internal", forceReload: true },
   { label: "공지", href: "/notice", type: "internal" },
   {
     label: "주문서작성",
@@ -54,12 +50,7 @@ const HOME_MENU_ITEMS = TOP_MENU_ITEMS.filter((item) => item.label !== "홈");
 function RedHandStar() {
   return (
     <svg
-      className="
-        absolute -top-4 -right-3
-        h-8 w-8 md:h-9 md:w-9
-        pointer-events-none
-        drop-shadow-sm
-      "
+      className="absolute -top-4 -right-3 h-8 w-8 md:h-9 md:w-9 pointer-events-none drop-shadow-sm"
       viewBox="0 0 100 100"
       aria-hidden="true"
     >
@@ -77,7 +68,7 @@ function RedHandStar() {
         stroke="#ef1f1f"
         strokeWidth="5"
         strokeLinecap="round"
-        opacity="0.75"
+        opacity="0.7"
       />
     </svg>
   );
@@ -86,6 +77,7 @@ function RedHandStar() {
 function MenuButton({
   item,
   mode,
+  screen,
 }: {
   item: {
     label: string;
@@ -96,21 +88,21 @@ function MenuButton({
     forceReload?: boolean;
   };
   mode: "home" | "top";
+  screen: string;
 }) {
   const pathname = usePathname();
-  const [screen, setScreen] = useState("");
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setScreen(params.get("screen") || "");
-  }, []);
 
   const isActive = (() => {
-    // 주문서작성은 활성화 검정 처리하지 않음
+    // 주문서작성은 검정 활성화 금지
     if (item.important) return false;
 
-    if (item.href === "/") return pathname === "/" && !screen;
+    // /?screen=order 같은 상태에서는 홈 활성화 금지
+    if (item.href === "/") {
+      return pathname === "/" && !screen;
+    }
+
     if (item.href.startsWith("/?")) return false;
+
     return pathname?.startsWith(item.href);
   })();
 
@@ -151,8 +143,8 @@ function MenuButton({
     );
   }
 
-  // /?screen=order 처럼 같은 페이지 query만 바꾸는 링크는
-  // Next Link 대신 일반 a 태그로 처리해야 첫화면에서도 주문서작성 화면이 즉시 열립니다.
+  // 홈(/)과 주문서작성(/?screen=order)은 같은 페이지 내부 상태가 꼬이지 않게
+  // 일반 a 태그로 강제 이동 처리합니다.
   if (item.forceReload || item.href.startsWith("/?")) {
     return (
       <a href={item.href} className={className}>
@@ -169,6 +161,13 @@ function MenuButton({
 }
 
 export function HomeCenterMenu() {
+  const [screen, setScreen] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setScreen(params.get("screen") || "");
+  }, []);
+
   return (
     <section className="w-full max-w-6xl mx-auto px-0 py-4 md:py-8">
       <div className="rounded-[2rem] border border-gray-200 bg-white/95 backdrop-blur p-5 md:p-7 shadow-sm">
@@ -184,7 +183,12 @@ export function HomeCenterMenu() {
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {HOME_MENU_ITEMS.map((item) => (
-            <MenuButton key={item.label} item={item} mode="home" />
+            <MenuButton
+              key={item.label}
+              item={item}
+              mode="home"
+              screen={screen}
+            />
           ))}
         </div>
       </div>
@@ -215,7 +219,7 @@ export default function PublicTopNav() {
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-gray-200">
       <div className="max-w-6xl mx-auto px-3 py-3">
         <div className="flex flex-col gap-3">
-          <Link
+          <a
             href="/"
             className="flex items-center justify-center gap-2 shrink-0"
           >
@@ -231,11 +235,16 @@ export default function PublicTopNav() {
                 LIVE ORDER
               </div>
             </div>
-          </Link>
+          </a>
 
           <nav className="grid grid-cols-4 sm:grid-cols-7 gap-2 w-full">
             {TOP_MENU_ITEMS.map((item) => (
-              <MenuButton key={item.label} item={item} mode="top" />
+              <MenuButton
+                key={item.label}
+                item={item}
+                mode="top"
+                screen={screen}
+              />
             ))}
           </nav>
         </div>
