@@ -1,5 +1,5 @@
 // app/admin/notice/page.tsx
-// 새 파일 생성용
+// 전체 교체용
 // 파일 위치:
 // /Users/ruru/Desktop/ruru-order-app/app/admin/notice/page.tsx
 //
@@ -10,6 +10,7 @@
 // - 상단고정 설정
 // - 팝업공지 수정
 // - 팝업 ON/OFF
+// - 팝업 크기 조절: 작게 / 보통 / 크게
 
 "use client";
 
@@ -33,6 +34,7 @@ type PopupNotice = {
   title: string;
   content: string;
   is_enabled: boolean;
+  popup_size?: "compact" | "normal" | "large";
 };
 
 const emptyNotice = {
@@ -55,6 +57,7 @@ export default function AdminNoticePage() {
     title: "주문 전 필수 확인",
     content: "",
     is_enabled: true,
+    popup_size: "compact",
   });
   const [loading, setLoading] = useState(false);
 
@@ -112,7 +115,10 @@ export default function AdminNoticePage() {
     }
 
     if (data) {
-      setPopup(data);
+      setPopup({
+        ...data,
+        popup_size: data.popup_size || "compact",
+      });
     }
   };
 
@@ -200,6 +206,7 @@ export default function AdminNoticePage() {
         title: popup.title.trim(),
         content: popup.content.trim(),
         is_enabled: popup.is_enabled,
+        popup_size: popup.popup_size || "compact",
         updated_at: new Date().toISOString(),
       });
 
@@ -381,6 +388,27 @@ export default function AdminNoticePage() {
                 />
                 팝업 사용
               </label>
+
+              <div>
+                <div className="text-sm font-extrabold mb-2">
+                  팝업 크기
+                </div>
+
+                <select
+                  value={popup.popup_size || "compact"}
+                  onChange={(e) =>
+                    setPopup({
+                      ...popup,
+                      popup_size: e.target.value as "compact" | "normal" | "large",
+                    })
+                  }
+                  className="w-full border rounded-2xl p-4 font-bold"
+                >
+                  <option value="compact">작게</option>
+                  <option value="normal">보통</option>
+                  <option value="large">크게</option>
+                </select>
+              </div>
 
               <input
                 value={popup.title}

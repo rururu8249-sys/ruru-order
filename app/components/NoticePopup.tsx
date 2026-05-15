@@ -6,8 +6,9 @@
 // 기능:
 // - Supabase popup_notice 테이블에서 팝업 공지 불러오기
 // - 관리자에서 ON/OFF 가능
+// - 관리자에서 팝업 크기 조절 가능: 작게 / 보통 / 크게
 // - 오늘 하루 닫기
-// - 팝업 크기 기존보다 작게 정리
+// - 모바일/PC 최적화
 
 "use client";
 
@@ -21,7 +22,49 @@ type PopupNotice = {
   title: string;
   content: string;
   is_enabled: boolean;
+  popup_size?: "compact" | "normal" | "large";
   updated_at?: string;
+};
+
+const getPopupSizeClass = (size?: string) => {
+  switch (size) {
+    case "large":
+      return {
+        wrap: "max-w-lg",
+        radius: "rounded-[2rem]",
+        head: "px-6 py-5",
+        body: "px-6 py-6",
+        inner: "px-5 py-5",
+        title: "text-2xl",
+        text: "text-[15px] leading-8",
+        button: "h-14 text-base",
+      };
+
+    case "normal":
+      return {
+        wrap: "max-w-md",
+        radius: "rounded-[1.8rem]",
+        head: "px-5 py-4",
+        body: "px-5 py-5",
+        inner: "px-4 py-4",
+        title: "text-xl",
+        text: "text-sm leading-7",
+        button: "h-12 text-sm",
+      };
+
+    case "compact":
+    default:
+      return {
+        wrap: "max-w-sm",
+        radius: "rounded-[1.5rem]",
+        head: "px-4 py-3",
+        body: "px-4 py-4",
+        inner: "px-4 py-4",
+        title: "text-lg",
+        text: "text-[13px] leading-6",
+        button: "h-11 text-sm",
+      };
+  }
 };
 
 export default function NoticePopup() {
@@ -68,6 +111,8 @@ export default function NoticePopup() {
 
   if (!open || !popup) return null;
 
+  const sizeClass = getPopupSizeClass(popup.popup_size);
+
   const lines = String(popup.content || "")
     .split("\n")
     .map((line) => line.trim())
@@ -75,25 +120,26 @@ export default function NoticePopup() {
 
   return (
     <div className="fixed inset-0 z-[99999] bg-black/45 backdrop-blur-[2px] flex items-center justify-center px-4 py-6">
-      <div className="w-full max-w-sm rounded-[1.6rem] bg-white shadow-2xl overflow-hidden border border-gray-100">
-
-        <div className="px-5 py-4 border-b border-gray-100">
-          <div className="text-[11px] font-extrabold text-gray-400 mb-1 tracking-wide">
+      <div
+        className={`w-full ${sizeClass.wrap} ${sizeClass.radius} bg-white shadow-2xl overflow-hidden border border-gray-100`}
+      >
+        <div className={`${sizeClass.head} border-b border-gray-100`}>
+          <div className="text-[10px] font-extrabold text-gray-400 mb-1 tracking-wide">
             RURU NOTICE
           </div>
 
-          <h2 className="text-xl font-extrabold text-gray-950 leading-snug">
+          <h2 className={`${sizeClass.title} font-extrabold text-gray-950 leading-snug`}>
             {popup.title}
           </h2>
         </div>
 
-        <div className="px-5 py-5">
-          <div className="rounded-2xl bg-red-50 border border-red-100 px-4 py-4">
-            <div className="text-red-600 font-extrabold text-base mb-3">
+        <div className={sizeClass.body}>
+          <div className={`rounded-2xl bg-red-50 border border-red-100 ${sizeClass.inner}`}>
+            <div className="text-red-600 font-extrabold text-sm mb-3">
               ⚠️ 꼭 확인해주세요
             </div>
 
-            <div className="text-sm leading-7 text-gray-800 font-bold space-y-1">
+            <div className={`${sizeClass.text} text-gray-800 font-bold space-y-1`}>
               {lines.map((line, index) => (
                 <p key={`${line}-${index}`}>{line}</p>
               ))}
@@ -104,19 +150,18 @@ export default function NoticePopup() {
         <div className="grid grid-cols-2 gap-2 px-4 pb-4">
           <button
             onClick={closeToday}
-            className="h-12 rounded-2xl bg-gray-100 text-gray-700 text-sm font-extrabold"
+            className={`${sizeClass.button} rounded-2xl bg-gray-100 text-gray-700 font-extrabold`}
           >
             오늘 하루 닫기
           </button>
 
           <button
             onClick={close}
-            className="h-12 rounded-2xl bg-black text-white text-sm font-extrabold"
+            className={`${sizeClass.button} rounded-2xl bg-black text-white font-extrabold`}
           >
             확인했습니다
           </button>
         </div>
-
       </div>
     </div>
   );
