@@ -1,6 +1,12 @@
 // app/components/PublicTopNav.tsx
 // 전체 교체용
-// 파일 위치: /Users/ruru/Desktop/ruru-order-app/app/components/PublicTopNav.tsx
+// 파일 위치:
+// /Users/ruru/Desktop/ruru-order-app/app/components/PublicTopNav.tsx
+//
+// Vercel 빌드 오류 수정 버전
+// 핵심:
+// useSearchParams 사용 금지
+// window.location.search 로 주문서작성 화면 감지
 //
 // 적용:
 // 1) 첫화면(/)만 상단바 숨김
@@ -14,7 +20,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const YOUTUBE_URL =
   process.env.NEXT_PUBLIC_YOUTUBE_URL || "https://www.youtube.com/@루루동이";
@@ -78,7 +85,12 @@ function MenuButton({
 
   if (item.type === "external") {
     return (
-      <a href={item.href} target="_blank" rel="noopener noreferrer" className={className}>
+      <a
+        href={item.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={className}
+      >
         {item.label}
       </a>
     );
@@ -117,8 +129,12 @@ export function HomeCenterMenu() {
 
 export default function PublicTopNav() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const screen = searchParams.get("screen");
+  const [screen, setScreen] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setScreen(params.get("screen") || "");
+  }, []);
 
   if (pathname?.startsWith("/admin")) {
     return null;
@@ -134,7 +150,10 @@ export default function PublicTopNav() {
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-gray-200">
       <div className="max-w-6xl mx-auto px-3 py-3">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <Link href="/" className="flex items-center justify-center md:justify-start gap-2 shrink-0">
+          <Link
+            href="/"
+            className="flex items-center justify-center md:justify-start gap-2 shrink-0"
+          >
             <div className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-black text-white flex items-center justify-center font-extrabold">
               R
             </div>
