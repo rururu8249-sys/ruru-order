@@ -6,6 +6,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { OrderStatusBadge, PaymentBadge } from "@/components/admin/OrderStatusBadges";
 
 const ADMIN_PASSWORD = "8249";
 
@@ -1111,6 +1112,10 @@ export default function AdminPage() {
                                   </option>
                                 ))}
                               </select>
+
+                              <div className="mt-2">
+                                <OrderStatusBadge status={status} />
+                              </div>
                             </td>
 
                             <td className="p-3">
@@ -1142,13 +1147,7 @@ export default function AdminPage() {
                             </td>
 
                             <td className="p-3">
-                              <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
-                                paymentLabel === "카드결제"
-                                  ? "bg-blue-100 text-blue-700"
-                                  : "bg-gray-100 text-gray-700"
-                              }`}>
-                                {paymentLabel}
-                              </span>
+                              <PaymentBadge payment={paymentLabel} />
                             </td>
 
                             <td className="p-3">
@@ -1203,13 +1202,7 @@ export default function AdminPage() {
                                 {order.customer_name || "-"}
                               </div>
 
-                              <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
-                                paymentLabel === "카드결제"
-                                  ? "bg-blue-100 text-blue-700"
-                                  : "bg-gray-100 text-gray-700"
-                              }`}>
-                                {paymentLabel}
-                              </span>
+                              <PaymentBadge payment={paymentLabel} />
                             </div>
                             <div className="text-sm text-gray-500 mt-1">
                               {order.customer_phone || "-"}
@@ -1227,6 +1220,10 @@ export default function AdminPage() {
                               </option>
                             ))}
                           </select>
+
+                          <div className="mt-2 text-right">
+                            <OrderStatusBadge status={status} />
+                          </div>
                         </div>
 
                         <div className="bg-gray-50 rounded-2xl border p-4">
