@@ -222,6 +222,7 @@ export default function AdminPage() {
   const [settlementBroadcastId, setSettlementBroadcastId] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("전체상태");
   const [paymentFilter, setPaymentFilter] = useState("전체결제");
+  const [showDetailStats, setShowDetailStats] = useState(false);
 
   const [publicTitle, setPublicTitle] = useState("");
   const [adminSubtitle, setAdminSubtitle] = useState("");
@@ -654,7 +655,7 @@ export default function AdminPage() {
   }, [filteredOrders]);
 
   const recentNewOrderAlerts = useMemo(() => {
-    return newOrderAlerts.slice(0, 4);
+    return newOrderAlerts.slice(0, 3);
   }, [newOrderAlerts]);
 
   const settlementOrders = useMemo(() => {
@@ -1275,8 +1276,7 @@ export default function AdminPage() {
               setPaymentFilter={setPaymentFilter}
             />
 
-            <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 my-5">
-
+            <section className="grid grid-cols-1 md:grid-cols-3 gap-3 my-5">
               <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
                 <div className="text-xs text-gray-500 font-bold">
                   방송매출
@@ -1297,26 +1297,6 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              <div className="bg-red-50 border border-red-200 rounded-2xl p-4 shadow-sm">
-                <div className="text-xs text-red-600 font-bold">
-                  카드수수료({cardFeeRate}%)
-                </div>
-
-                <div className="text-2xl font-extrabold mt-1 text-red-700">
-                  - {won(dashboardCardFeeSettlement)}
-                </div>
-              </div>
-
-              <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 shadow-sm">
-                <div className="text-xs text-orange-600 font-bold">
-                  환불금액
-                </div>
-
-                <div className="text-2xl font-extrabold mt-1 text-orange-700">
-                  - {won(dashboardRefundAmount)}
-                </div>
-              </div>
-
               <div className="bg-black text-white rounded-2xl p-4 shadow-sm">
                 <div className="text-xs opacity-70 font-bold">
                   최종순이익
@@ -1326,53 +1306,87 @@ export default function AdminPage() {
                   {won(dashboardFinalProfit)}
                 </div>
               </div>
-
             </section>
 
-            <section className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 my-5">
-              <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-                <div className="text-xs text-gray-500 font-bold">조회 주문</div>
-                <div className="text-2xl font-extrabold mt-1">{orderSummary.totalCount}건</div>
+            <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-5 my-5">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                <div>
+                  <div className="text-xl font-extrabold text-gray-900">
+                    주문 요약
+                  </div>
+                  <div className="text-sm text-gray-500 font-bold mt-1">
+                    현재 필터 기준으로 계산됩니다.
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowDetailStats((prev) => !prev)}
+                  className="rounded-2xl bg-gray-100 text-gray-800 px-5 py-3 font-extrabold"
+                >
+                  {showDetailStats ? "상세 접기" : "상세 보기"}
+                </button>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setStatusFilter("주문확인전")}
-                className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 shadow-sm text-left hover:bg-yellow-100 transition"
-              >
-                <div className="text-xs text-yellow-700 font-bold">신규 주문</div>
-                <div className="text-2xl font-extrabold mt-1 text-yellow-700">{orderSummary.newCount}건</div>
-              </button>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
+                  <div className="text-xs text-gray-500 font-bold">조회 주문</div>
+                  <div className="text-2xl font-extrabold mt-1">{orderSummary.totalCount}건</div>
+                </div>
 
-              <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-                <div className="text-xs text-gray-500 font-bold">조회 금액</div>
-                <div className="text-2xl font-extrabold mt-1">{won(orderSummary.totalAmount)}</div>
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
+                  <div className="text-xs text-gray-500 font-bold">조회 금액</div>
+                  <div className="text-2xl font-extrabold mt-1">{won(orderSummary.totalAmount)}</div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter("주문확인전")}
+                  className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-left hover:bg-yellow-100 transition"
+                >
+                  <div className="text-xs text-yellow-700 font-bold">신규 주문</div>
+                  <div className="text-2xl font-extrabold mt-1 text-yellow-700">{orderSummary.newCount}건</div>
+                </button>
+
+                <div className="bg-black text-white rounded-2xl p-4">
+                  <div className="text-xs opacity-70 font-bold">필터 순매출</div>
+                  <div className="text-2xl font-extrabold mt-1">{won(dashboardSales)}</div>
+                </div>
               </div>
 
-              <div className="bg-red-50 border border-red-200 rounded-2xl p-4 shadow-sm">
-                <div className="text-xs text-red-600 font-bold">환불</div>
-                <div className="text-2xl font-extrabold mt-1 text-red-700">{orderSummary.refundCount}건</div>
-              </div>
+              {showDetailStats && (
+                <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3 mt-3">
+                  <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+                    <div className="text-xs text-red-600 font-bold">환불</div>
+                    <div className="text-2xl font-extrabold mt-1 text-red-700">{orderSummary.refundCount}건</div>
+                  </div>
 
-              <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 shadow-sm">
-                <div className="text-xs text-orange-600 font-bold">부분환불</div>
-                <div className="text-2xl font-extrabold mt-1 text-orange-700">{orderSummary.partialRefundCount}건</div>
-              </div>
+                  <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4">
+                    <div className="text-xs text-orange-600 font-bold">부분환불</div>
+                    <div className="text-2xl font-extrabold mt-1 text-orange-700">{orderSummary.partialRefundCount}건</div>
+                  </div>
 
-              <div className="bg-gray-100 border border-gray-300 rounded-2xl p-4 shadow-sm">
-                <div className="text-xs text-gray-600 font-bold">주문서취소</div>
-                <div className="text-2xl font-extrabold mt-1 text-gray-800">{orderSummary.cancelCount}건</div>
-              </div>
+                  <div className="bg-gray-100 border border-gray-300 rounded-2xl p-4">
+                    <div className="text-xs text-gray-600 font-bold">주문서취소</div>
+                    <div className="text-2xl font-extrabold mt-1 text-gray-800">{orderSummary.cancelCount}건</div>
+                  </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 shadow-sm">
-                <div className="text-xs text-blue-600 font-bold">카드결제</div>
-                <div className="text-2xl font-extrabold mt-1 text-blue-700">{orderSummary.cardCount}건</div>
-              </div>
+                  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+                    <div className="text-xs text-blue-600 font-bold">카드결제</div>
+                    <div className="text-2xl font-extrabold mt-1 text-blue-700">{orderSummary.cardCount}건</div>
+                  </div>
 
-              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-sm">
-                <div className="text-xs text-gray-600 font-bold">무통장입금</div>
-                <div className="text-2xl font-extrabold mt-1 text-gray-800">{orderSummary.bankCount}건</div>
-              </div>
+                  <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
+                    <div className="text-xs text-gray-600 font-bold">무통장입금</div>
+                    <div className="text-2xl font-extrabold mt-1 text-gray-800">{orderSummary.bankCount}건</div>
+                  </div>
+
+                  <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+                    <div className="text-xs text-red-600 font-bold">환불금액</div>
+                    <div className="text-2xl font-extrabold mt-1 text-red-700">- {won(dashboardRefundAmount)}</div>
+                  </div>
+                </div>
+              )}
             </section>
 
             <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-5 my-5">
@@ -1432,7 +1446,7 @@ export default function AdminPage() {
                     🔔 신규 주문 알림
                   </div>
                   <div className="text-sm text-gray-500 font-bold mt-1">
-                    주문확인전 상태인 주문입니다. 상태를 변경하면 신규 표시가 자동으로 사라집니다.
+                    최근 신규 주문 3건까지 표시됩니다. 상태를 변경하면 신규 표시가 자동으로 사라집니다.
                   </div>
                 </div>
 
@@ -1725,12 +1739,6 @@ export default function AdminPage() {
                               </option>
                             ))}
                           </select>
-
-                          {status === "주문확인전" && (
-                            <div className="inline-flex items-center rounded-full bg-yellow-100 px-3 py-1 text-xs font-extrabold text-yellow-800 border border-yellow-200">
-                              🟡 신규
-                            </div>
-                          )}
                         </div>
 
                         <div className="bg-gray-50 rounded-2xl border p-4">

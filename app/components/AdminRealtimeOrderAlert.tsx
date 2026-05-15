@@ -6,13 +6,15 @@
 // 기능:
 // - 관리자 페이지(/admin)에서만 작동
 // - orders 신규 주문 실시간 감지
-// - 신규 주문 알림 팝업
+// - 신규 주문 화면 팝업
 // - 알림 소리 ON/OFF
+// - 브라우저 데스크톱 알림 지원
 // - 1.5초 후 자동 새로고침
 //
-// 참고:
-// 알림끄기 = 소리만 OFF
-// 실시간 감지와 자동갱신은 계속 유지됩니다.
+// 사용 조건:
+// - 관리자 페이지 탭은 열려 있어야 합니다.
+// - 처음 1회 "주문 알림켜기" 클릭 시 브라우저 알림 권한을 허용해야 합니다.
+// - Mac 시스템 설정에서 사용 중인 브라우저 알림이 허용되어 있어야 합니다.
 
 "use client";
 
@@ -42,12 +44,26 @@ export default function AdminRealtimeOrderAlert() {
   const [enabled, setEnabled] = useState(false);
   const [newOrder, setNewOrder] = useState<NewOrder | null>(null);
   const [status, setStatus] = useState<"idle" | "connected" | "error">("idle");
+  const [notificationPermission, setNotificationPermission] = useState<
+    "default" | "granted" | "denied" | "unsupported"
+  >("default");
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const formatWon = (value: number | undefined) =>
     `${Number(value || 0).toLocaleString()}원`;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (!("Notification" in window)) {
+      setNotificationPermission("unsupported");
+      return;
+    }
+
+    setNotificationPermission(Notification.permission);
+  }, []);
 
   const playBeep = () => {
     try {
@@ -81,27 +97,75 @@ export default function AdminRealtimeOrderAlert() {
     }
   };
 
+  const showDesktopNotification = (order: NewOrder) => {
+    try {
+      if (typeof window === "undefined") return;
+      if (!("Notification" in window)) return;
+      if (Notification.permission !== "granted") return;
+
+      const title = "🛒 루루동이 신규 주문";
+      const optionText = [order.color, order.size].filter(Boolean).join(" / ");
+
+      const body = [
+        `닉네임: ${order.youtube_nickname || "-"}`,
+        `주문자: ${order.customer_name || "-"}`,
+        `상품: ${order.product_name || "-"}`,
+        optionText ? `옵션: ${optionText}` : "",
+        `수량: ${order.qty || 0}개`,
+        `금액: ${formatWon(order.adjusted_total_price || order.total_price)}`,
+        `결제: ${order.payment_method || "-"}`,
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      const notification = new Notification(title, {
+        body,
+        tag: `ruru-order-${order.id || Date.now()}`,
+        requireInteraction: false,
+        silent: false,
+      });
+
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+      };
+
+      setTimeout(() => {
+        notification.close();
+      }, 8000);
+    } catch {
+      // 데스크톱 알림 실패 시 화면 알림만 유지
+    }
+  };
+
   const enableSound = async () => {
     try {
       const AudioContextClass =
         window.AudioContext || (window as any).webkitAudioContext;
 
-      if (!AudioContextClass) {
-        alert("이 브라우저에서는 알림 소리를 지원하지 않습니다.");
-        return;
+      if (AudioContextClass) {
+        const context = new AudioContextClass();
+        audioContextRef.current = context;
+
+        if (context.state === "suspended") {
+          await context.resume();
+        }
       }
 
-      const context = new AudioContextClass();
-      audioContextRef.current = context;
-
-      if (context.state === "suspended") {
-        await context.resume();
+      if ("Notification" in window) {
+        const permission = await Notification.requestPermission();
+        setNotificationPermission(permission);
+      } else {
+        setNotificationPermission("unsupported");
       }
 
       setEnabled(true);
 
       setTimeout(() => {
         try {
+          const context = audioContextRef.current;
+          if (!context) return;
+
           const osc = context.createOscillator();
           const gain = context.createGain();
 
@@ -120,7 +184,7 @@ export default function AdminRealtimeOrderAlert() {
         } catch {}
       }, 50);
     } catch {
-      alert("알림 소리 활성화에 실패했습니다.");
+      alert("알림 활성화에 실패했습니다.");
     }
   };
 
@@ -144,7 +208,9 @@ export default function AdminRealtimeOrderAlert() {
           const order = payload.new as NewOrder;
 
           setNewOrder(order);
+
           playBeep();
+          showDesktopNotification(order);
 
           if (reloadTimerRef.current) {
             clearTimeout(reloadTimerRef.current);
@@ -170,6 +236,15 @@ export default function AdminRealtimeOrderAlert() {
 
   if (!isAdminPage) return null;
 
+  const notificationText =
+    notificationPermission === "granted"
+      ? "브라우저 알림 허용됨"
+      : notificationPermission === "denied"
+      ? "브라우저 알림 차단됨"
+      : notificationPermission === "unsupported"
+      ? "브라우저 알림 미지원"
+      : "브라우저 알림 대기";
+
   return (
     <>
       <div className="fixed right-4 bottom-4 z-[99998] flex flex-col items-end gap-3">
@@ -181,9 +256,13 @@ export default function AdminRealtimeOrderAlert() {
             🔔 주문 알림켜기
           </button>
         ) : (
-          <div className="rounded-2xl bg-white border border-green-200 p-2 shadow-lg">
+          <div className="rounded-2xl bg-white border border-green-200 p-2 shadow-lg min-w-[210px]">
             <div className="px-3 py-2 text-sm font-extrabold text-green-700">
               🔔 실시간 주문 알림 ON
+            </div>
+
+            <div className="px-3 pb-2 text-[11px] font-bold text-gray-500">
+              {notificationText}
             </div>
 
             <button
@@ -198,6 +277,14 @@ export default function AdminRealtimeOrderAlert() {
         {status === "error" && (
           <div className="rounded-2xl bg-red-50 border border-red-200 px-4 py-3 text-sm font-extrabold text-red-700 shadow-lg">
             실시간 연결 오류
+          </div>
+        )}
+
+        {notificationPermission === "denied" && (
+          <div className="max-w-[260px] rounded-2xl bg-yellow-50 border border-yellow-200 px-4 py-3 text-xs font-bold text-yellow-800 shadow-lg leading-5">
+            브라우저 알림이 차단되어 있습니다.
+            <br />
+            주소창 왼쪽 설정에서 알림 허용으로 바꿔주세요.
           </div>
         )}
       </div>
