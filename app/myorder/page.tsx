@@ -2,8 +2,10 @@
 // 전체 교체용
 // 파일 위치: /Users/ruru/Desktop/ruru-order-app/app/myorder/page.tsx
 //
-// 적용:
-// 주문내역 조회는 주문조회번호만으로 검색합니다.
+// 적용 내용:
+// 1) 주문조회번호만으로 조회
+// 2) 주문서 작성완료 시점(created_at) 기준 실제 달력 날짜 7일 이내 주문만 조회
+// 3) 조회 결과 없을 때: "최근 7일간 주문내역이 존재하지 않습니다."
 
 "use client";
 
@@ -30,6 +32,8 @@ export default function MyOrderPage() {
     setMessage("");
     setOrders([]);
 
+    // 실제 달력 날짜 기준:
+    // 주문서 작성완료 시점(created_at)으로부터 최근 7일 이내 주문만 조회
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
@@ -48,7 +52,7 @@ export default function MyOrderPage() {
     }
 
     if (!data || data.length === 0) {
-      setMessage("조회된 주문이 없습니다. 주문조회번호를 다시 확인해주세요.");
+      setMessage("최근 7일간 주문내역이 존재하지 않습니다.");
       return;
     }
 
@@ -70,6 +74,8 @@ export default function MyOrderPage() {
 
           <p className="mt-3 text-gray-500 font-bold leading-relaxed">
             주문완료 후 발급된 주문조회번호로만 조회할 수 있습니다.
+            <br />
+            주문서 작성완료 시점 기준 최근 7일간만 조회 가능합니다.
           </p>
 
           <div className="mt-6 grid gap-3">
