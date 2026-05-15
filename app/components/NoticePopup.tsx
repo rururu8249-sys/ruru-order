@@ -4,30 +4,55 @@
 // /Users/ruru/Desktop/ruru-order-app/app/components/NoticePopup.tsx
 //
 // 기능:
-// - 사이트 접속 시 주문 전 필수 확인 팝업 표시
-// - 닫기
-// - 오늘 하루 보지 않기
-// - 모바일/PC 디자인 정리
-//
-// 다음 단계에서 관리자 공지관리와 연결 예정
+// - Supabase popup_notice 테이블에서 팝업 공지 불러오기
+// - 관리자에서 ON/OFF 가능
+// - 오늘 하루 닫기
+// - 팝업 크기 기존보다 작게 정리
 
 "use client";
 
 import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 const STORAGE_KEY = "ruru_notice_popup_hide_until";
 
+type PopupNotice = {
+  id: number;
+  title: string;
+  content: string;
+  is_enabled: boolean;
+  updated_at?: string;
+};
+
 export default function NoticePopup() {
   const [open, setOpen] = useState(false);
+  const [popup, setPopup] = useState<PopupNotice | null>(null);
 
   useEffect(() => {
+    loadPopup();
+  }, []);
+
+  const loadPopup = async () => {
     const hideUntil = localStorage.getItem(STORAGE_KEY);
     const now = Date.now();
 
-    if (!hideUntil || now > Number(hideUntil)) {
-      setOpen(true);
+    if (hideUntil && now <= Number(hideUntil)) {
+      return;
     }
-  }, []);
+
+    const { data, error } = await supabase
+      .from("popup_notice")
+      .select("*")
+      .eq("id", 1)
+      .single();
+
+    if (error || !data || !data.is_enabled) {
+      return;
+    }
+
+    setPopup(data);
+    setOpen(true);
+  };
 
   const close = () => {
     setOpen(false);
@@ -41,50 +66,52 @@ export default function NoticePopup() {
     setOpen(false);
   };
 
-  if (!open) return null;
+  if (!open || !popup) return null;
+
+  const lines = String(popup.content || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
 
   return (
     <div className="fixed inset-0 z-[99999] bg-black/45 backdrop-blur-[2px] flex items-center justify-center px-4 py-6">
-      <div className="w-full max-w-md rounded-[2rem] bg-white shadow-2xl overflow-hidden border border-gray-100">
+      <div className="w-full max-w-sm rounded-[1.6rem] bg-white shadow-2xl overflow-hidden border border-gray-100">
 
-        <div className="px-6 py-5 border-b border-gray-100">
-          <div className="text-xs font-extrabold text-gray-400 mb-2 tracking-wide">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <div className="text-[11px] font-extrabold text-gray-400 mb-1 tracking-wide">
             RURU NOTICE
           </div>
 
-          <h2 className="text-2xl font-extrabold text-gray-950">
-            주문 전 필수 확인
+          <h2 className="text-xl font-extrabold text-gray-950 leading-snug">
+            {popup.title}
           </h2>
         </div>
 
-        <div className="px-6 py-6">
-          <div className="rounded-3xl bg-red-50 border border-red-100 px-5 py-5">
-            <div className="text-red-600 font-extrabold text-lg mb-4">
-              ⚠️ 주문 전 꼭 확인해주세요
+        <div className="px-5 py-5">
+          <div className="rounded-2xl bg-red-50 border border-red-100 px-4 py-4">
+            <div className="text-red-600 font-extrabold text-base mb-3">
+              ⚠️ 꼭 확인해주세요
             </div>
 
-            <div className="text-[15px] leading-8 text-gray-800 font-bold">
-              <p>💁🏻‍♀ 방송 댓글 주문 후 주문서작성/입금 해주세요.</p>
-              <p>• 방송에서 접수되신 분만 주문서 작성해주세요.</p>
-              <p>• 주문서 작성 후 10분 이내 입금 부탁드립니다.</p>
-              <p>• 입금 후 카톡채널로 입금내역 캡처와 유튜브 닉네임을 남겨주세요.</p>
-              <p>• 상품명 · 색상 · 사이즈 · 수량 · 금액을 꼭 확인해주세요</p>
-              <p>• 교환·환불이 불가하니 신중구매 부탁드립니다🙏</p>
+            <div className="text-sm leading-7 text-gray-800 font-bold space-y-1">
+              {lines.map((line, index) => (
+                <p key={`${line}-${index}`}>{line}</p>
+              ))}
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 px-5 pb-5">
+        <div className="grid grid-cols-2 gap-2 px-4 pb-4">
           <button
             onClick={closeToday}
-            className="h-14 rounded-2xl bg-gray-100 text-gray-700 font-extrabold"
+            className="h-12 rounded-2xl bg-gray-100 text-gray-700 text-sm font-extrabold"
           >
             오늘 하루 닫기
           </button>
 
           <button
             onClick={close}
-            className="h-14 rounded-2xl bg-black text-white font-extrabold"
+            className="h-12 rounded-2xl bg-black text-white text-sm font-extrabold"
           >
             확인했습니다
           </button>
