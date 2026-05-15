@@ -1119,9 +1119,9 @@ export default function Home() {
               <div className="bg-gray-50 rounded-2xl p-5 mb-5 border">
                 <div className="text-xl font-bold mb-3">카드결제 신청 완료</div>
                 <p className="text-gray-700 leading-7">
-                  카드결제는 수수료가 추가됩니다.
+                  카드결제는 부가세 {cardFeeRate}%가 추가됩니다.
                   <br />
-                  관리자 확인 후 카톡채널로 결제링크를 보내드립니다.
+                  관리자 확인 후 고객님 휴대폰으로 결제링크를 보내드립니다.
                 </p>
               </div>
             )}
@@ -1204,15 +1204,16 @@ export default function Home() {
                 </div>
 
                 <div className="text-sm text-green-700 font-bold mt-2 leading-6">
-                  저장된 배송지로 접수됩니다.
-                  주소 변경이 필요하면 아래 버튼을 눌러주세요.
+                  주소 그대로면 바로 주문하세요 🙂
+                  <br />
+                  변경 시만 입력해주세요.
                 </div>
 
                 <button
                   onClick={openManualAddressForm}
                   className="w-full bg-white text-green-700 border border-green-300 p-3 rounded-xl font-bold mt-3"
                 >
-                  주소 직접 입력
+                  주소입력
                 </button>
               </div>
             )}
@@ -1342,17 +1343,25 @@ export default function Home() {
                 }}
               />
 
-              <input
-                type="text"
-                placeholder="* 상품금액(배송비빼고)"
-                className="w-full p-4 rounded-2xl bg-gray-50 border"
-                value={item.price ? formatWon(Number(item.price)) : ""}
-                onChange={(e) => {
-                  const copy = [...items];
-                  copy[index].price = onlyNumber(e.target.value);
-                  setItems(copy);
-                }}
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="* 상품금액(배송비빼고)"
+                  className="w-full p-4 pr-12 rounded-2xl bg-gray-50 border"
+                  value={item.price ? Number(item.price).toLocaleString() : ""}
+                  onChange={(e) => {
+                    const copy = [...items];
+                    copy[index].price = onlyNumber(e.target.value);
+                    setItems(copy);
+                  }}
+                />
+
+                <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">
+                  원
+                </span>
+              </div>
             </div>
           </section>
         ))}
@@ -1386,9 +1395,9 @@ export default function Home() {
               onChange={() => setPaymentMethod("카드결제")}
               className="mr-2"
             />
-            카드결제 (+수수료 {cardFeeRate}%)
+            카드결제 (+부가세 {cardFeeRate}%)
             <div className="text-sm text-gray-500 mt-2">
-              관리자 확인 후 카톡으로 결제링크 발송
+              관리자 확인 후 고객님 휴대폰으로 결제링크 발송
             </div>
           </label>
         </section>
