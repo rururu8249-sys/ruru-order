@@ -1,8 +1,9 @@
 "use client";
 
 import { supabase } from "@/lib/supabase";
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { HomeCenterMenu } from "./components/PublicTopNav";
 
 declare global {
   interface Window {
@@ -19,6 +20,7 @@ type ActiveBroadcast = {
 };
 
 export default function Home() {
+  const searchParams = useSearchParams();
   const [screen, setScreen] = useState<"menu" | "order" | "lookup">("menu");
 
   const [nickname, setNickname] = useState("");
@@ -73,13 +75,6 @@ export default function Home() {
 
   const bankAccount = "9002186993725";
 
-  const youtubeUrl =
-    process.env.NEXT_PUBLIC_YOUTUBE_URL || "https://www.youtube.com/@루루동이";
-  const bandUrl =
-    process.env.NEXT_PUBLIC_BAND_URL || "https://band.us/@ruru8249";
-  const kakaoChannelUrl =
-    process.env.NEXT_PUBLIC_KAKAO_CHANNEL_URL || "https://pf.kakao.com/_RMxaqX";
-
   useEffect(() => {
     const scriptId = "daum-postcode-script";
 
@@ -110,30 +105,28 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const openOrderFormFromHash = () => {
-      if (window.location.hash === "#order-form") {
-        setScreen("order");
-        setTimeout(() => {
-          document
-            .getElementById("order-form")
-            ?.scrollIntoView({ behavior: "smooth", block: "start" });
-        }, 100);
-      }
-    };
-
-    openOrderFormFromHash();
-    window.addEventListener("hashchange", openOrderFormFromHash);
-
-    return () => {
-      window.removeEventListener("hashchange", openOrderFormFromHash);
-    };
-  }, []);
-
-  useEffect(() => {
     checkShippingDiscountTargets();
   }, [customerName, customerPhone, activeBroadcast.id, broadcastTitle]);
+
+  useEffect(() => {
+    const requestedScreen = searchParams.get("screen");
+
+    if (requestedScreen === "order") {
+      setIsCompleted(false);
+      setScreen("order");
+      return;
+    }
+
+    if (requestedScreen === "lookup") {
+      setIsCompleted(false);
+      setScreen("lookup");
+      return;
+    }
+
+    if (!requestedScreen) {
+      setScreen("menu");
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     setCustomerCheckStatus("unchecked");
@@ -643,7 +636,7 @@ export default function Home() {
     setUseSavedAddress(false);
     setShowAddressForm(true);
 
-
+    return;
   };
 
   const openManualAddressForm = () => {
@@ -916,15 +909,8 @@ export default function Home() {
   };
 
   const handleLookup = async () => {
-    const phone = onlyNumber(lookupPhone);
-
     if (!lookupCode.trim()) {
       alert("주문조회번호를 입력해주세요.");
-      return;
-    }
-
-    if (phone.length < 10) {
-      alert("전화번호를 입력해주세요.");
       return;
     }
 
@@ -935,7 +921,6 @@ export default function Home() {
       .from("orders")
       .select("*")
       .eq("order_lookup_code", lookupCode.trim())
-      .eq("customer_phone", phone)
       .gte("created_at", sevenDaysAgo.toISOString())
       .order("created_at", { ascending: false });
 
@@ -966,78 +951,24 @@ export default function Home() {
 
   if (screen === "menu" && !isCompleted) {
     return (
-      <main className="min-h-screen bg-gray-50 p-5 flex items-center justify-center">
-        <div className="w-full max-w-5xl">
-          <section className="bg-white rounded-[2rem] p-6 md:p-8 border shadow-sm">
-            <div className="text-center mb-7">
-              <div className="text-sm font-extrabold text-gray-400 mb-2">
-                RURU LIVE ORDER
+      <main className="min-h-screen bg-gray-50 text-gray-900 px-4 py-10">
+        <div className="max-w-5xl mx-auto">
+          <section className="mb-6">
+            <div className="rounded-[2rem] border border-gray-200 bg-white p-6 md:p-8 shadow-sm">
+              <div className="text-sm text-gray-500 font-extrabold mb-2">
+                현재 방송
               </div>
-
-              <h1 className="text-3xl md:text-5xl font-extrabold text-gray-950">
-                루루동이 라이브마켓
-              </h1>
-
-              <p className="text-gray-500 font-bold mt-3">
-                주문서 작성 · 주문조회 · 공지 확인
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              <Link
-                href="/notice"
-                className="min-h-[74px] px-5 py-4 rounded-3xl bg-white text-gray-900 border border-gray-200 hover:bg-gray-100 font-extrabold text-center transition shadow-sm flex items-center justify-center"
-              >
-                공지
-              </Link>
-
-              <button
-                type="button"
-                onClick={() => setScreen("order")}
-                className="min-h-[74px] px-5 py-4 rounded-3xl bg-black text-white hover:bg-gray-800 font-extrabold text-center transition shadow-sm flex items-center justify-center"
-              >
-                주문서작성
-              </button>
-
-              <Link
-                href="/myorder"
-                className="min-h-[74px] px-5 py-4 rounded-3xl bg-white text-gray-900 border border-gray-200 hover:bg-gray-100 font-extrabold text-center transition shadow-sm flex items-center justify-center"
-              >
-                주문조회
-              </Link>
-
-              <a
-                href={kakaoChannelUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="min-h-[74px] px-5 py-4 rounded-3xl bg-yellow-300 text-black hover:bg-yellow-400 font-extrabold text-center transition shadow-sm flex items-center justify-center"
-              >
-                카톡채널
-              </a>
-
-              <a
-                href={bandUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="min-h-[74px] px-5 py-4 rounded-3xl bg-white text-gray-900 border border-gray-200 hover:bg-gray-100 font-extrabold text-center transition shadow-sm flex items-center justify-center"
-              >
-                루루동이밴드
-              </a>
-
-              <a
-                href={youtubeUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="min-h-[74px] px-5 py-4 rounded-3xl bg-white text-gray-900 border border-gray-200 hover:bg-gray-100 font-extrabold text-center transition shadow-sm flex items-center justify-center"
-              >
-                유튜브
-              </a>
-            </div>
-
-            <div className="text-xs text-gray-400 text-center mt-6 leading-5">
-              방송 중 접수된 주문만 주문서 작성이 가능합니다.
+              <div className="text-2xl md:text-4xl font-extrabold text-gray-950">
+                {broadcastTitle || activeBroadcast.public_title || "방송 주문 접수중"}
+              </div>
             </div>
           </section>
+
+          <HomeCenterMenu />
+
+          <p className="text-center text-xs text-gray-400 font-bold mt-4">
+            주문조회는 주문완료 후 발급되는 주문조회번호로 확인할 수 있습니다.
+          </p>
         </div>
       </main>
     );
@@ -1050,7 +981,7 @@ export default function Home() {
           <div className="bg-white rounded-3xl p-6 border shadow-sm mt-10">
             <h1 className="text-3xl font-extrabold mb-2">주문내역 조회</h1>
             <p className="text-gray-500 mb-5">
-              최근 7일 이내 주문만 조회 가능합니다.
+              주문완료 후 발급된 주문조회번호로만 조회 가능합니다.
             </p>
 
             <input
@@ -1061,14 +992,6 @@ export default function Home() {
               onChange={(e) => setLookupCode(e.target.value.toUpperCase())}
             />
 
-            <input
-              type="text"
-              inputMode="numeric"
-              placeholder="전화번호 01012345678"
-              className="w-full p-4 rounded-2xl bg-gray-50 border mb-3"
-              value={formatPhone(lookupPhone)}
-              onChange={(e) => setLookupPhone(onlyNumber(e.target.value))}
-            />
 
             <button
               onClick={handleLookup}
@@ -1211,9 +1134,6 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="bg-gray-50 border rounded-2xl p-4 text-sm text-gray-600 font-bold leading-6">
-              주문내역 확인은 상단 메뉴의 주문조회 또는 카톡채널 문의를 이용해주세요.
-            </div>
           </div>
         </div>
       </main>
@@ -1237,16 +1157,11 @@ export default function Home() {
           </div>
         </section>
 
+
+
         <section className="bg-white rounded-3xl p-5 border shadow-sm mb-4">
           <div className="font-bold text-lg mb-4">고객 정보</div>
 
-          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mb-4">
-            <div className="font-bold text-yellow-700 text-sm leading-6">
-              📦 주소는 최초 1회만 입력해주세요.
-              <br />
-              저장된 주소가 있으면 다음 주문부터 자동 입력됩니다.
-            </div>
-          </div>
 
           <p className="text-xs text-red-500 mb-4">* 표시는 필수 입력 항목입니다.</p>
 
@@ -1284,20 +1199,19 @@ export default function Home() {
             </button>
 
             {customerCheckStatus === "existing" && (
-              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 animate-pulse">
-                <div className="font-extrabold text-blue-700 text-lg leading-7">
-                  확인완료!
+              <div className="rounded-2xl border border-green-200 bg-green-50 p-4">
+                <div className="text-green-700 font-extrabold text-lg">
+                  ✅ 확인완료!
                 </div>
 
-                <div className="text-blue-700 text-sm font-bold leading-6 mt-1">
-                  기존 고객 확인 완료 · 저장된 배송지로 접수됩니다.
-                  <br />
+                <div className="text-sm text-green-700 font-bold mt-2 leading-6">
+                  저장된 배송지로 접수됩니다.
                   주소 변경이 필요하면 아래 버튼을 눌러주세요.
                 </div>
 
                 <button
                   onClick={openManualAddressForm}
-                  className="w-full bg-white text-blue-700 border border-blue-300 p-3 rounded-xl font-bold mt-3"
+                  className="w-full bg-white text-green-700 border border-green-300 p-3 rounded-xl font-bold mt-3"
                 >
                   주소 직접 입력
                 </button>
@@ -1307,9 +1221,9 @@ export default function Home() {
             {customerCheckStatus === "new" && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4">
                 <div className="font-bold text-yellow-700 text-sm leading-6">
-                  신규 고객 또는 확인이 필요한 고객입니다.
+                  신규 고객입니다.
                   <br />
-                  주소를 최초 1회 입력해주세요.
+                  아래 주소 입력칸은 모두 필수입니다.
                 </div>
               </div>
             )}
