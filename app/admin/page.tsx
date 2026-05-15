@@ -665,6 +665,32 @@ export default function AdminPage() {
     return Math.max(0, gross - refund);
   };
 
+  const dashboardGrossSales = filteredOrders
+    .filter((order) => order.order_manage_status !== "주문서취소")
+    .reduce((sum, order) => sum + getOrderTotal(order), 0);
+
+  const dashboardRefundAmount = filteredOrders.reduce(
+    (sum, order) => sum + getRefundAmount(order),
+    0
+  );
+
+  const dashboardSales = filteredOrders.reduce(
+    (sum, order) => sum + getNetOrderTotal(order),
+    0
+  );
+
+  const dashboardCardSales = filteredOrders
+    .filter((order) => isPaysterPayment(order))
+    .reduce((sum, order) => sum + getNetOrderTotal(order), 0);
+
+  const dashboardCardFeeSettlement = Math.round(
+    dashboardCardSales * (Number(cardFeeRate || 0) / 100)
+  );
+
+  const dashboardFinalProfit =
+    dashboardSales - dashboardCardFeeSettlement;
+
+
   const grossSales = settlementOrders
     .filter((order) => order.order_manage_status !== "주문서취소")
     .reduce(
@@ -689,13 +715,23 @@ export default function AdminPage() {
       0
     );
 
-  const cardFeeSettlement = Math.round(cardSales * 0.07);
+  const cardFeeSettlement = Math.round(cardSales * (Number(cardFeeRate || 0) / 100));
   const totalExpense = expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0);
   const finalProfit =
-    totalSales - warehouseCost - cardFeeSettlement - totalExpense + extraIncome;
+    totalSales - warehouseCost - cardFeeSettlement - totalExpense;
 
   const addExpense = () => {
     setExpenses((prev) => [...prev, { type: "생활비", amount: 0, memo: "" }]);
+  };
+
+  const removeExpense = (index: number) => {
+    setExpenses((prev) => {
+      if (prev.length <= 1) {
+        return [{ type: "생활비", amount: 0, memo: "" }];
+      }
+
+      return prev.filter((_, idx) => idx !== index);
+    });
   };
 
   const updateExpense = (index: number, key: string, value: any) => {
@@ -705,6 +741,17 @@ export default function AdminPage() {
         return { ...item, [key]: value };
       })
     );
+  };
+
+  const moveExpense = (fromIndex: number, toIndex: number) => {
+    if (toIndex < 0 || toIndex >= expenses.length) return;
+
+    setExpenses((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
   };
 
   const getCustomerStats = (customer: any) => {
@@ -1039,7 +1086,7 @@ export default function AdminPage() {
                 </div>
 
                 <div className="text-2xl font-extrabold mt-1">
-                  {won(totalSales)}
+                  {won(dashboardSales)}
                 </div>
               </div>
 
@@ -1049,17 +1096,17 @@ export default function AdminPage() {
                 </div>
 
                 <div className="text-2xl font-extrabold mt-1 text-blue-700">
-                  {won(cardSales)}
+                  {won(dashboardCardSales)}
                 </div>
               </div>
 
               <div className="bg-red-50 border border-red-200 rounded-2xl p-4 shadow-sm">
                 <div className="text-xs text-red-600 font-bold">
-                  카드수수료(7%)
+                  카드수수료({cardFeeRate}%)
                 </div>
 
                 <div className="text-2xl font-extrabold mt-1 text-red-700">
-                  - {won(cardFeeSettlement)}
+                  - {won(dashboardCardFeeSettlement)}
                 </div>
               </div>
 
@@ -1069,7 +1116,7 @@ export default function AdminPage() {
                 </div>
 
                 <div className="text-2xl font-extrabold mt-1 text-orange-700">
-                  - {won(totalRefundAmount)}
+                  - {won(dashboardRefundAmount)}
                 </div>
               </div>
 
@@ -1079,7 +1126,7 @@ export default function AdminPage() {
                 </div>
 
                 <div className="text-3xl font-extrabold mt-1">
-                  {won(finalProfit)}
+                  {won(dashboardFinalProfit)}
                 </div>
               </div>
 
@@ -1612,7 +1659,7 @@ export default function AdminPage() {
 
               <div className="grid xl:grid-cols-2 gap-5">
                 <div className="border rounded-3xl p-5">
-                  <div className="text-xl font-extrabold mb-5">방송 정산 입력</div>
+                  <div className="text-xl font-extrabold mb-5">매출 · 차감 정산</div>
 
                   <div className="space-y-4">
                     <div>
@@ -1621,7 +1668,7 @@ export default function AdminPage() {
                     </div>
 
                     <div>
-                      <div className="text-sm font-bold mb-2">카드 수수료정산(7%)</div>
+                      <div className="text-sm font-bold mb-2">카드 수수료정산({cardFeeRate}%)</div>
                       <MoneyInput value={cardFeeSettlement} onChange={() => {}} disabled />
                       <div className="text-xs text-gray-500 mt-2">
                         카드매출 기준 자동 계산됩니다.
@@ -1647,7 +1694,7 @@ export default function AdminPage() {
 
                 <div className="border rounded-3xl p-5">
                   <div className="flex items-center justify-between mb-5">
-                    <div className="text-xl font-extrabold">기타 지출</div>
+                    <div className="text-xl font-extrabold">기타 지출 관리</div>
                     <button
                       onClick={addExpense}
                       className="bg-black text-white px-4 py-2 rounded-2xl font-bold"
@@ -1656,9 +1703,53 @@ export default function AdminPage() {
                     </button>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="max-h-[360px] overflow-y-auto pr-1 space-y-4">
                     {expenses.map((expense, index) => (
-                      <div key={index} className="border rounded-2xl p-4 bg-gray-50">
+                      <div
+                        key={index}
+                        className="border rounded-2xl p-4 bg-gray-50"
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData("text/plain", String(index));
+                        }}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          const fromIndex = Number(e.dataTransfer.getData("text/plain"));
+                          moveExpense(fromIndex, index);
+                        }}
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-3">
+                          <div className="text-sm font-extrabold text-gray-500 cursor-move">
+                            ↕ 지출 {index + 1}
+                          </div>
+
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => moveExpense(index, index - 1)}
+                              className="px-3 py-2 rounded-xl bg-white border font-bold text-sm"
+                              type="button"
+                            >
+                              ↑
+                            </button>
+
+                            <button
+                              onClick={() => moveExpense(index, index + 1)}
+                              className="px-3 py-2 rounded-xl bg-white border font-bold text-sm"
+                              type="button"
+                            >
+                              ↓
+                            </button>
+
+                            <button
+                              onClick={() => removeExpense(index)}
+                              className="px-3 py-2 rounded-xl bg-red-500 text-white font-bold text-sm"
+                              type="button"
+                            >
+                              삭제
+                            </button>
+                          </div>
+                        </div>
+
                         <div className="grid md:grid-cols-3 gap-3">
                           <select
                             value={expense.type}
@@ -1686,6 +1777,11 @@ export default function AdminPage() {
                         </div>
                       </div>
                     ))}
+                  </div>
+
+                  <div className="mt-4 rounded-2xl bg-gray-50 border p-4">
+                    <div className="text-sm text-gray-500 font-bold">기타 지출 합계</div>
+                    <div className="text-2xl font-extrabold mt-1">{won(totalExpense)}</div>
                   </div>
                 </div>
               </div>
