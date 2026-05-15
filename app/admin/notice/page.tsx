@@ -11,6 +11,7 @@
 // - 팝업공지 수정
 // - 팝업 ON/OFF
 // - 팝업 크기 조절: 작게 / 보통 / 크게
+// - 공지 순서변경: 위로 / 아래로
 //
 // 수정:
 // - 관리자 공지관리 글씨 대비 강화
@@ -93,6 +94,28 @@ export default function AdminNoticePage() {
     setLoading(false);
   };
 
+  const normalizeNoticeSortOrder = async (list: Notice[]) => {
+    const needsNormalize = list.some((notice, index) => {
+      return !notice.sort_order || notice.sort_order === 0 || notice.sort_order !== index + 1;
+    });
+
+    if (!needsNormalize) return list;
+
+    const updates = list.map((notice, index) =>
+      supabase
+        .from("notices")
+        .update({ sort_order: index + 1 })
+        .eq("id", notice.id)
+    );
+
+    await Promise.all(updates);
+
+    return list.map((notice, index) => ({
+      ...notice,
+      sort_order: index + 1,
+    }));
+  };
+
   const loadNotices = async () => {
     const { data, error } = await supabase
       .from("notices")
@@ -106,7 +129,10 @@ export default function AdminNoticePage() {
       return;
     }
 
-    setNotices(data || []);
+    const sorted = data || [];
+    const normalized = await normalizeNoticeSortOrder(sorted);
+
+    setNotices(normalized);
   };
 
   const loadPopup = async () => {
@@ -137,13 +163,18 @@ export default function AdminNoticePage() {
       return;
     }
 
+    const nextSortOrder =
+      noticeForm.id
+        ? Number(noticeForm.sort_order || 0)
+        : Math.max(0, ...notices.map((notice) => Number(notice.sort_order || 0))) + 1;
+
     const payload = {
       title: noticeForm.title.trim(),
       content: noticeForm.content.trim(),
       category: noticeForm.category.trim() || "공지",
       is_pinned: noticeForm.is_pinned,
       is_visible: noticeForm.is_visible,
-      sort_order: Number(noticeForm.sort_order || 0),
+      sort_order: nextSortOrder,
       updated_at: new Date().toISOString(),
     };
 
@@ -190,6 +221,43 @@ export default function AdminNoticePage() {
     }
 
     loadNotices();
+  };
+
+  const moveNotice = async (notice: Notice, direction: "up" | "down") => {
+    const currentIndex = notices.findIndex((item) => item.id === notice.id);
+
+    if (currentIndex < 0) return;
+
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+
+    if (targetIndex < 0 || targetIndex >= notices.length) return;
+
+    const targetNotice = notices[targetIndex];
+
+    const currentSortOrder = Number(notice.sort_order || currentIndex + 1);
+    const targetSortOrder = Number(targetNotice.sort_order || targetIndex + 1);
+
+    const { error: currentError } = await supabase
+      .from("notices")
+      .update({ sort_order: targetSortOrder })
+      .eq("id", notice.id);
+
+    if (currentError) {
+      alert("순서 변경 실패\n" + currentError.message);
+      return;
+    }
+
+    const { error: targetError } = await supabase
+      .from("notices")
+      .update({ sort_order: currentSortOrder })
+      .eq("id", targetNotice.id);
+
+    if (targetError) {
+      alert("순서 변경 실패\n" + targetError.message);
+      return;
+    }
+
+    await loadNotices();
   };
 
   const savePopup = async () => {
@@ -321,18 +389,28 @@ export default function AdminNoticePage() {
                 className={`${textareaClass} min-h-[180px]`}
               />
 
-              <input
-                type="number"
-                value={noticeForm.sort_order}
-                onChange={(e) =>
-                  setNoticeForm({
-                    ...noticeForm,
-                    sort_order: Number(e.target.value || 0),
-                  })
-                }
-                placeholder="정렬순서"
-                className={inputClass}
-              />
+              <div className="rounded-2xl bg-gray-50 border border-gray-200 p-4">
+                <div className="text-sm font-extrabold text-gray-950">
+                  정렬순서
+                </div>
+
+                <div className="text-sm text-gray-600 font-bold mt-1">
+                  아래 등록된 공지에서 ↑ 위로 / ↓ 아래로 버튼으로 순서를 바꾸는 방식을 추천합니다.
+                </div>
+
+                <input
+                  type="number"
+                  value={noticeForm.sort_order}
+                  onChange={(e) =>
+                    setNoticeForm({
+                      ...noticeForm,
+                      sort_order: Number(e.target.value || 0),
+                    })
+                  }
+                  placeholder="정렬순서"
+                  className={`${inputClass} mt-3`}
+                />
+              </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <label className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-2xl p-4 font-extrabold text-gray-950">
@@ -455,60 +533,99 @@ export default function AdminNoticePage() {
         </section>
 
         <section className="bg-white rounded-3xl border border-gray-300 p-5 shadow-sm">
-          <h2 className="text-2xl font-extrabold mb-4 text-gray-950">
-            등록된 공지
-          </h2>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-2xl font-extrabold text-gray-950">
+                등록된 공지
+              </h2>
+
+              <div className="text-sm text-gray-600 font-bold mt-1">
+                위로/아래로 버튼으로 고객 공지 노출 순서를 바꿀 수 있습니다.
+              </div>
+            </div>
+
+            <button
+              onClick={loadNotices}
+              className="rounded-2xl bg-gray-100 border border-gray-300 px-5 py-3 font-extrabold text-gray-950 hover:bg-black hover:text-white transition"
+            >
+              순서 새로고침
+            </button>
+          </div>
 
           <div className="grid gap-3">
-            {notices.map((notice) => (
+            {notices.map((notice, index) => (
               <article
                 key={notice.id}
                 className="rounded-2xl border border-gray-300 bg-gray-50 p-4 text-gray-950"
               >
-                <div className="flex flex-wrap items-center gap-2 mb-2">
-                  {notice.is_pinned && (
-                    <span className="bg-black text-white rounded-full px-3 py-1 text-xs font-extrabold">
-                      상단고정
-                    </span>
-                  )}
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <span className="bg-black text-white rounded-full px-3 py-1 text-xs font-extrabold">
+                        순서 {index + 1}
+                      </span>
 
-                  <span className="bg-white border border-gray-300 rounded-full px-3 py-1 text-xs font-extrabold text-gray-950">
-                    {notice.category}
-                  </span>
+                      {notice.is_pinned && (
+                        <span className="bg-black text-white rounded-full px-3 py-1 text-xs font-extrabold">
+                          상단고정
+                        </span>
+                      )}
 
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-extrabold ${
-                      notice.is_visible
-                        ? "bg-green-100 text-green-800"
-                        : "bg-gray-200 text-gray-700"
-                    }`}
-                  >
-                    {notice.is_visible ? "공개" : "숨김"}
-                  </span>
-                </div>
+                      <span className="bg-white border border-gray-300 rounded-full px-3 py-1 text-xs font-extrabold text-gray-950">
+                        {notice.category}
+                      </span>
 
-                <div className="font-extrabold text-lg text-gray-950">
-                  {notice.title}
-                </div>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-extrabold ${
+                          notice.is_visible
+                            ? "bg-green-100 text-green-800"
+                            : "bg-gray-200 text-gray-700"
+                        }`}
+                      >
+                        {notice.is_visible ? "공개" : "숨김"}
+                      </span>
+                    </div>
 
-                <div className="text-gray-800 font-semibold mt-2 whitespace-pre-line line-clamp-3">
-                  {notice.content}
-                </div>
+                    <div className="font-extrabold text-lg text-gray-950">
+                      {notice.title}
+                    </div>
 
-                <div className="flex gap-2 mt-4">
-                  <button
-                    onClick={() => editNotice(notice)}
-                    className="bg-black text-white rounded-xl px-4 py-2 font-bold"
-                  >
-                    수정
-                  </button>
+                    <div className="text-gray-800 font-semibold mt-2 whitespace-pre-line line-clamp-3">
+                      {notice.content}
+                    </div>
+                  </div>
 
-                  <button
-                    onClick={() => deleteNotice(notice.id)}
-                    className="bg-red-500 text-white rounded-xl px-4 py-2 font-bold"
-                  >
-                    삭제
-                  </button>
+                  <div className="grid grid-cols-2 md:grid-cols-1 gap-2 shrink-0 md:w-[110px]">
+                    <button
+                      onClick={() => moveNotice(notice, "up")}
+                      disabled={index === 0}
+                      className="bg-white border border-gray-300 text-gray-950 rounded-xl px-3 py-2 font-extrabold disabled:opacity-35"
+                    >
+                      ↑ 위로
+                    </button>
+
+                    <button
+                      onClick={() => moveNotice(notice, "down")}
+                      disabled={index === notices.length - 1}
+                      className="bg-white border border-gray-300 text-gray-950 rounded-xl px-3 py-2 font-extrabold disabled:opacity-35"
+                    >
+                      ↓ 아래
+                    </button>
+
+                    <button
+                      onClick={() => editNotice(notice)}
+                      className="bg-black text-white rounded-xl px-3 py-2 font-bold"
+                    >
+                      수정
+                    </button>
+
+                    <button
+                      onClick={() => deleteNotice(notice.id)}
+                      className="bg-red-500 text-white rounded-xl px-3 py-2 font-bold"
+                    >
+                      삭제
+                    </button>
+                  </div>
                 </div>
               </article>
             ))}
