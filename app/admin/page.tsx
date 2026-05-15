@@ -1107,7 +1107,20 @@ export default function AdminPage() {
                         const paymentLabel = getPaymentLabel(order);
 
                         return (
-                          <tr key={order.id} className="border-b hover:bg-gray-50">
+                          <tr
+                            key={order.id}
+                            className={`border-b ${
+                              status === "환불"
+                                ? "bg-red-50 hover:bg-red-100"
+                                : status === "부분환불"
+                                ? "bg-orange-50 hover:bg-orange-100"
+                                : status === "주문서취소"
+                                ? "bg-gray-100 hover:bg-gray-200"
+                                : paymentLabel === "카드결제"
+                                ? "bg-blue-50/40 hover:bg-blue-50"
+                                : "hover:bg-gray-50"
+                            }`}
+                          >
                             <td className="p-3">
                               <select
                                 value={status === "부분환불" ? "환불" : status}
@@ -1209,7 +1222,20 @@ export default function AdminPage() {
                     const paymentLabel = getPaymentLabel(order);
 
                     return (
-                      <div key={order.id} className="border rounded-3xl p-5">
+                      <div
+                        key={order.id}
+                        className={`border rounded-3xl p-5 ${
+                          status === "환불"
+                            ? "bg-red-50 border-red-200"
+                            : status === "부분환불"
+                            ? "bg-orange-50 border-orange-200"
+                            : status === "주문서취소"
+                            ? "bg-gray-100 border-gray-300"
+                            : paymentLabel === "카드결제"
+                            ? "bg-blue-50/40 border-blue-100"
+                            : "bg-white"
+                        }`}
+                      >
                         <div className="flex items-start justify-between gap-4 mb-4">
                           <div>
                             <div className="flex items-center gap-2 flex-wrap">
