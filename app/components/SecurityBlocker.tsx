@@ -10,9 +10,12 @@
 // - 이미지 드래그 방지
 // - 개발자 단축키 일부 방지
 //
+// 중요:
+// - /admin, /admin/notice 등 관리자 페이지에서는 보안 차단 완전 해제
+// - 관리자 페이지 진입 시 customer-security-lock CSS 강제 제거
+//
 // 예외:
 // data-security-allow="true" 속성이 있는 요소는 허용
-// 주문조회번호 입력칸 등 복사/붙여넣기 필요한 곳에 사용
 
 "use client";
 
@@ -22,32 +25,26 @@ import { usePathname } from "next/navigation";
 function isAllowedElement(target: EventTarget | null) {
   if (!(target instanceof Element)) return false;
 
-  return Boolean(
-    target.closest('[data-security-allow="true"]')
-  );
+  return Boolean(target.closest('[data-security-allow="true"]'));
 }
 
 export default function SecurityBlocker() {
   const pathname = usePathname();
 
   useEffect(() => {
-    // 관리자 페이지는 보안차단 제외
+    // 관리자 페이지는 보안차단 제외 + 기존 보안 CSS도 강제 제거
     if (pathname?.startsWith("/admin")) {
+      document.body.classList.remove("customer-security-lock");
       return;
     }
 
     const blockEvent = (event: Event) => {
-      if (isAllowedElement(event.target)) {
-        return;
-      }
-
+      if (isAllowedElement(event.target)) return;
       event.preventDefault();
     };
 
     const blockKeyboard = (event: KeyboardEvent) => {
-      if (isAllowedElement(event.target)) {
-        return;
-      }
+      if (isAllowedElement(event.target)) return;
 
       const key = event.key.toLowerCase();
 
@@ -58,16 +55,11 @@ export default function SecurityBlocker() {
         (event.ctrlKey && ["u", "s", "p", "c", "x", "a"].includes(key)) ||
         (event.metaKey && ["u", "s", "p", "c", "x", "a"].includes(key));
 
-      if (blocked) {
-        event.preventDefault();
-      }
+      if (blocked) event.preventDefault();
     };
 
     const blockDrag = (event: DragEvent) => {
-      if (isAllowedElement(event.target)) {
-        return;
-      }
-
+      if (isAllowedElement(event.target)) return;
       event.preventDefault();
     };
 

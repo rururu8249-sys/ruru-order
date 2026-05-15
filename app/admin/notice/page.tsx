@@ -11,6 +11,10 @@
 // - 팝업공지 수정
 // - 팝업 ON/OFF
 // - 팝업 크기 조절: 작게 / 보통 / 크게
+//
+// 수정:
+// - 관리자 공지관리 글씨 대비 강화
+// - 입력칸/카드/버튼 글씨 진하게 표시
 
 "use client";
 
@@ -62,6 +66,8 @@ export default function AdminNoticePage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    document.body.classList.remove("customer-security-lock");
+
     const saved = sessionStorage.getItem("ruru_admin_login");
 
     if (saved === "Y") {
@@ -110,9 +116,7 @@ export default function AdminNoticePage() {
       .eq("id", 1)
       .single();
 
-    if (error) {
-      return;
-    }
+    if (error) return;
 
     if (data) {
       setPopup({
@@ -218,11 +222,17 @@ export default function AdminNoticePage() {
     alert("팝업 공지 저장 완료");
   };
 
+  const inputClass =
+    "w-full border border-gray-300 rounded-2xl p-4 font-bold text-gray-950 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black";
+
+  const textareaClass =
+    "w-full border border-gray-300 rounded-2xl p-4 font-bold text-gray-950 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black";
+
   if (!isAuthed) {
     return (
-      <main className="min-h-screen bg-gray-100 flex items-center justify-center p-5">
-        <section className="w-full max-w-sm bg-white rounded-3xl p-6 border">
-          <h1 className="text-3xl font-extrabold mb-5">
+      <main className="min-h-screen bg-gray-100 flex items-center justify-center p-5 text-gray-950">
+        <section className="w-full max-w-sm bg-white rounded-3xl p-6 border border-gray-300 shadow-sm">
+          <h1 className="text-3xl font-extrabold mb-5 text-gray-950">
             공지관리 로그인
           </h1>
 
@@ -234,12 +244,12 @@ export default function AdminNoticePage() {
             onKeyDown={(e) => {
               if (e.key === "Enter") login();
             }}
-            className="w-full border rounded-2xl p-4 mb-4"
+            className={inputClass}
           />
 
           <button
             onClick={login}
-            className="w-full bg-black text-white rounded-2xl p-4 font-bold"
+            className="w-full bg-black text-white rounded-2xl p-4 font-extrabold mt-4"
           >
             로그인
           </button>
@@ -249,37 +259,37 @@ export default function AdminNoticePage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 p-5">
+    <main className="min-h-screen bg-gray-100 p-5 text-gray-950">
       <div className="max-w-6xl mx-auto">
 
         <div className="mb-5 flex flex-col md:flex-row md:items-end md:justify-between gap-3">
           <div>
-            <div className="text-sm font-extrabold text-gray-500">
+            <div className="text-sm font-extrabold text-gray-600">
               RURU ADMIN
             </div>
-            <h1 className="text-4xl font-extrabold">
+            <h1 className="text-4xl font-extrabold text-gray-950">
               공지관리
             </h1>
           </div>
 
           <a
             href="/admin"
-            className="inline-flex justify-center rounded-2xl bg-white border px-5 py-3 font-extrabold"
+            className="inline-flex justify-center rounded-2xl bg-white border border-gray-300 px-5 py-3 font-extrabold text-gray-950 hover:bg-black hover:text-white transition"
           >
             관리자 홈
           </a>
         </div>
 
         {loading && (
-          <div className="rounded-3xl bg-white border p-6 font-bold mb-5">
+          <div className="rounded-3xl bg-white border border-gray-300 p-6 font-bold mb-5 text-gray-950">
             불러오는 중...
           </div>
         )}
 
         <section className="grid lg:grid-cols-2 gap-5 mb-5">
 
-          <div className="bg-white rounded-3xl border p-5 shadow-sm">
-            <h2 className="text-2xl font-extrabold mb-4">
+          <div className="bg-white rounded-3xl border border-gray-300 p-5 shadow-sm">
+            <h2 className="text-2xl font-extrabold mb-4 text-gray-950">
               공지사항 등록/수정
             </h2>
 
@@ -290,7 +300,7 @@ export default function AdminNoticePage() {
                   setNoticeForm({ ...noticeForm, title: e.target.value })
                 }
                 placeholder="공지 제목"
-                className="border rounded-2xl p-4 font-bold"
+                className={inputClass}
               />
 
               <input
@@ -299,7 +309,7 @@ export default function AdminNoticePage() {
                   setNoticeForm({ ...noticeForm, category: e.target.value })
                 }
                 placeholder="카테고리 예) 주문공지, 배송공지"
-                className="border rounded-2xl p-4 font-bold"
+                className={inputClass}
               />
 
               <textarea
@@ -308,7 +318,7 @@ export default function AdminNoticePage() {
                   setNoticeForm({ ...noticeForm, content: e.target.value })
                 }
                 placeholder="공지 내용"
-                className="border rounded-2xl p-4 font-bold min-h-[180px]"
+                className={`${textareaClass} min-h-[180px]`}
               />
 
               <input
@@ -321,11 +331,11 @@ export default function AdminNoticePage() {
                   })
                 }
                 placeholder="정렬순서"
-                className="border rounded-2xl p-4 font-bold"
+                className={inputClass}
               />
 
               <div className="grid grid-cols-2 gap-3">
-                <label className="flex items-center gap-2 bg-gray-50 rounded-2xl p-4 font-bold">
+                <label className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-2xl p-4 font-extrabold text-gray-950">
                   <input
                     type="checkbox"
                     checked={noticeForm.is_pinned}
@@ -339,7 +349,7 @@ export default function AdminNoticePage() {
                   상단고정
                 </label>
 
-                <label className="flex items-center gap-2 bg-gray-50 rounded-2xl p-4 font-bold">
+                <label className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-2xl p-4 font-extrabold text-gray-950">
                   <input
                     type="checkbox"
                     checked={noticeForm.is_visible}
@@ -364,7 +374,7 @@ export default function AdminNoticePage() {
               {noticeForm.id !== 0 && (
                 <button
                   onClick={() => setNoticeForm(emptyNotice)}
-                  className="bg-gray-200 text-gray-900 rounded-2xl p-4 font-extrabold"
+                  className="bg-gray-200 text-gray-950 rounded-2xl p-4 font-extrabold"
                 >
                   새 공지 작성으로 초기화
                 </button>
@@ -372,13 +382,13 @@ export default function AdminNoticePage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl border p-5 shadow-sm">
-            <h2 className="text-2xl font-extrabold mb-4">
+          <div className="bg-white rounded-3xl border border-gray-300 p-5 shadow-sm">
+            <h2 className="text-2xl font-extrabold mb-4 text-gray-950">
               팝업공지 수정
             </h2>
 
             <div className="grid gap-3">
-              <label className="flex items-center gap-2 bg-gray-50 rounded-2xl p-4 font-bold">
+              <label className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-2xl p-4 font-extrabold text-gray-950">
                 <input
                   type="checkbox"
                   checked={popup.is_enabled}
@@ -390,7 +400,7 @@ export default function AdminNoticePage() {
               </label>
 
               <div>
-                <div className="text-sm font-extrabold mb-2">
+                <div className="text-sm font-extrabold mb-2 text-gray-950">
                   팝업 크기
                 </div>
 
@@ -402,7 +412,7 @@ export default function AdminNoticePage() {
                       popup_size: e.target.value as "compact" | "normal" | "large",
                     })
                   }
-                  className="w-full border rounded-2xl p-4 font-bold"
+                  className={inputClass}
                 >
                   <option value="compact">작게</option>
                   <option value="normal">보통</option>
@@ -416,7 +426,7 @@ export default function AdminNoticePage() {
                   setPopup({ ...popup, title: e.target.value })
                 }
                 placeholder="팝업 제목"
-                className="border rounded-2xl p-4 font-bold"
+                className={inputClass}
               />
 
               <textarea
@@ -425,7 +435,7 @@ export default function AdminNoticePage() {
                   setPopup({ ...popup, content: e.target.value })
                 }
                 placeholder="팝업 내용"
-                className="border rounded-2xl p-4 font-bold min-h-[240px]"
+                className={`${textareaClass} min-h-[240px]`}
               />
 
               <button
@@ -435,7 +445,7 @@ export default function AdminNoticePage() {
                 팝업공지 저장
               </button>
 
-              <div className="text-xs text-gray-500 font-bold leading-5">
+              <div className="text-xs text-gray-600 font-bold leading-5">
                 팝업 내용을 수정하면 고객 화면 팝업에 바로 반영됩니다.
                 고객이 오늘 하루 닫기를 누른 경우에는 다음날 다시 보입니다.
               </div>
@@ -444,8 +454,8 @@ export default function AdminNoticePage() {
 
         </section>
 
-        <section className="bg-white rounded-3xl border p-5 shadow-sm">
-          <h2 className="text-2xl font-extrabold mb-4">
+        <section className="bg-white rounded-3xl border border-gray-300 p-5 shadow-sm">
+          <h2 className="text-2xl font-extrabold mb-4 text-gray-950">
             등록된 공지
           </h2>
 
@@ -453,7 +463,7 @@ export default function AdminNoticePage() {
             {notices.map((notice) => (
               <article
                 key={notice.id}
-                className="rounded-2xl border bg-gray-50 p-4"
+                className="rounded-2xl border border-gray-300 bg-gray-50 p-4 text-gray-950"
               >
                 <div className="flex flex-wrap items-center gap-2 mb-2">
                   {notice.is_pinned && (
@@ -462,26 +472,26 @@ export default function AdminNoticePage() {
                     </span>
                   )}
 
-                  <span className="bg-white border rounded-full px-3 py-1 text-xs font-extrabold">
+                  <span className="bg-white border border-gray-300 rounded-full px-3 py-1 text-xs font-extrabold text-gray-950">
                     {notice.category}
                   </span>
 
                   <span
                     className={`rounded-full px-3 py-1 text-xs font-extrabold ${
                       notice.is_visible
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-200 text-gray-600"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-gray-200 text-gray-700"
                     }`}
                   >
                     {notice.is_visible ? "공개" : "숨김"}
                   </span>
                 </div>
 
-                <div className="font-extrabold text-lg">
+                <div className="font-extrabold text-lg text-gray-950">
                   {notice.title}
                 </div>
 
-                <div className="text-gray-600 font-semibold mt-2 whitespace-pre-line line-clamp-3">
+                <div className="text-gray-800 font-semibold mt-2 whitespace-pre-line line-clamp-3">
                   {notice.content}
                 </div>
 
@@ -504,7 +514,7 @@ export default function AdminNoticePage() {
             ))}
 
             {notices.length === 0 && (
-              <div className="rounded-2xl border bg-gray-50 p-5 text-center font-bold text-gray-500">
+              <div className="rounded-2xl border border-gray-300 bg-gray-50 p-5 text-center font-bold text-gray-700">
                 등록된 공지가 없습니다.
               </div>
             )}
