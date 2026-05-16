@@ -1,3046 +1,1522 @@
-// app/admin/page.tsx
-// 전체 교체용
-// 주문관리: 거파/블랙 삭제, 주문서취소+사유팝업, 환불팝업, 결제수단 표시/필터, 상태필터, 로젠송장 생성, 페이스터 정산
-
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import ExcelJS from "exceljs";
 import { supabase } from "@/lib/supabase";
-import { PaymentBadge } from "@/components/admin/OrderStatusBadges";
-import AdminQuickFilters from "@/components/admin/AdminQuickFilters";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 
-const ADMIN_PASSWORD = "8249";
-
-const STATUS_OPTIONS = [
-  "주문확인전",
-  "주문확인완료",
-  "출고대기",
-  "출고완료",
-  "주문서취소",
-  "환불",
-];
-
-const STATUS_FILTER_OPTIONS = [
-  "전체상태",
-  "주문확인전",
-  "주문확인완료",
-  "출고대기",
-  "출고완료",
-  "주문서취소",
-  "환불",
-  "부분환불",
-];
-
-const PAYMENT_FILTER_OPTIONS = [
-  "전체결제",
-  "무통장입금",
-  "카드결제",
-  "기타결제",
-];
-
-const EXPENSE_OPTIONS = [
-  "생활비",
-  "주유비",
-  "택배비",
-  "알바비",
-  "환불",
-  "기타",
-];
-
-const onlyNumber = (value: string) =>
-  String(value || "").replace(/[^0-9]/g, "");
-
-const toNumber = (value: any) =>
-  Number(onlyNumber(String(value || "")) || 0);
-
-const moneyText = (value: any) =>
-  toNumber(value).toLocaleString();
-
-const won = (value: any) =>
-  `${Number(value || 0).toLocaleString()}원`;
-
-const getOrderTotal = (order: any) =>
-  Number(order.adjusted_total_price || order.total_price || 0);
-
-const getOrderShipping = (order: any) =>
-  Number(
-    order.final_shipping_fee ??
-      order.adjusted_shipping_fee ??
-      order.shipping_fee ??
-      0
-  );
-
-const getAddress = (order: any) =>
-  String(
-    order.address ||
-      order.customer_address ||
-      order.shipping_address ||
-      order.receiver_address ||
-      ""
-  ).trim();
-
-const getDetailAddress = (order: any) =>
-  String(
-    order.detail_address ||
-      order.address_detail ||
-      order.customer_detail_address ||
-      ""
-  ).trim();
-
-const getFullAddress = (order: any) =>
-  `${getAddress(order)} ${getDetailAddress(order)}`.trim();
-
-const getPaymentLabel = (order: any) => {
-  const raw = String(
-    order.payment_method ||
-      order.pay_method ||
-      order.payment_type ||
-      order.payment ||
-      ""
-  ).toLowerCase();
-
-  if (
-    raw.includes("카드") ||
-    raw.includes("card") ||
-    raw.includes("페이스터") ||
-    raw.includes("payster")
-  ) {
-    return "카드결제";
+declare global {
+  interface Window {
+    daum?: any;
   }
-
-  if (
-    raw.includes("무통장") ||
-    raw.includes("입금") ||
-    raw.includes("bank") ||
-    raw.includes("cash")
-  ) {
-    return "무통장입금";
-  }
-
-  return raw ? String(order.payment_method || order.pay_method || order.payment_type) : "무통장입금";
-};
-
-const isPaysterPayment = (order: any) => {
-  const label = getPaymentLabel(order);
-  const raw = String(
-    order.payment_method ||
-      order.pay_method ||
-      order.payment_type ||
-      order.payment ||
-      ""
-  ).toLowerCase();
-
-  return (
-    label === "카드결제" ||
-    raw.includes("페이스터") ||
-    raw.includes("payster")
-  );
-};
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "주문확인완료":
-      return "bg-blue-100 text-blue-700 border-blue-200";
-    case "출고대기":
-      return "bg-yellow-100 text-yellow-700 border-yellow-200";
-    case "출고완료":
-      return "bg-green-100 text-green-700 border-green-200";
-    case "부분환불":
-      return "bg-orange-100 text-orange-700 border-orange-200";
-    case "환불":
-      return "bg-gray-200 text-gray-800 border-gray-300";
-    case "주문서취소":
-      return "bg-red-100 text-red-700 border-red-200";
-    default:
-      return "bg-gray-100 text-gray-700 border-gray-200";
-  }
-};
-
-function MoneyInput({
-  value,
-  onChange,
-  disabled = false,
-}: {
-  value: number | string;
-  onChange: (value: number) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="relative">
-      <input
-        value={moneyText(value)}
-        disabled={disabled}
-        onChange={(e) => onChange(toNumber(e.target.value))}
-        className="w-full border rounded-2xl p-4 pr-12 font-bold disabled:bg-gray-100"
-      />
-      <div className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-gray-500">
-        원
-      </div>
-    </div>
-  );
 }
 
-function PercentInput({
-  value,
-  onChange,
-}: {
-  value: number | string;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <div className="relative">
-      <input
-        value={onlyNumber(String(value || ""))}
-        onChange={(e) => onChange(toNumber(e.target.value))}
-        className="w-full border rounded-2xl p-4 pr-12 font-bold"
-      />
-      <div className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-gray-500">
-        %
-      </div>
-    </div>
-  );
-}
+type ActiveBroadcast = {
+  id: number | null;
+  public_title: string;
+  admin_subtitle: string;
+  shipping_fee: number;
+  card_fee_rate: number;
+};
 
-export default function AdminPage() {
-  const [isAuthed, setIsAuthed] = useState(false);
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(true);
+export default function Home() {
+  const [screen, setScreen] = useState<"menu" | "order" | "lookup">("menu");
 
-  const [tab, setTab] = useState<"orders" | "members" | "stats" | "trash">("orders");
+  const [nickname, setNickname] = useState("");
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
 
-  const [orders, setOrders] = useState<any[]>([]);
-  const [broadcasts, setBroadcasts] = useState<any[]>([]);
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [zipcode, setZipcode] = useState("");
+  const [address, setAddress] = useState("");
+  const [detailAddress, setDetailAddress] = useState("");
+  const [saveAsDefaultAddress, setSaveAsDefaultAddress] = useState(true);
+  const [requestMemo, setRequestMemo] = useState("");
 
-  const [viewMode, setViewMode] = useState<"card" | "table">("table");
+  const [customerCheckStatus, setCustomerCheckStatus] = useState<"unchecked" | "existing" | "new">("unchecked");
+  const [checkedCustomer, setCheckedCustomer] = useState<any | null>(null);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [useSavedAddress, setUseSavedAddress] = useState(false);
 
-  const [search, setSearch] = useState("");
-  const [memberSearch, setMemberSearch] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("무통장입금");
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [completedTotal, setCompletedTotal] = useState(0);
+  const [completedPaymentMethod, setCompletedPaymentMethod] =
+    useState("무통장입금");
+  const [completedLookupCode, setCompletedLookupCode] = useState("");
 
-  const [selectedBroadcastId, setSelectedBroadcastId] = useState("ALL");
-  const [settlementBroadcastId, setSettlementBroadcastId] = useState("ALL");
-  const [statusFilter, setStatusFilter] = useState("전체상태");
-  const [paymentFilter, setPaymentFilter] = useState("전체결제");
-  const [showDetailStats, setShowDetailStats] = useState(false);
+  const [broadcastStatus, setBroadcastStatus] = useState("OFF");
+  const [broadcastTitle, setBroadcastTitle] = useState("");
+  const [activeBroadcast, setActiveBroadcast] = useState<ActiveBroadcast>({
+    id: null,
+    public_title: "",
+    admin_subtitle: "",
+    shipping_fee: 4000,
+    card_fee_rate: 10,
+  });
+  const [isLoadingBroadcast, setIsLoadingBroadcast] = useState(true);
 
-  const [publicTitle, setPublicTitle] = useState("");
-  const [adminSubtitle, setAdminSubtitle] = useState("");
-  const [shippingFee, setShippingFee] = useState(4000);
-  const [cardFeeRate, setCardFeeRate] = useState(10);
-  const [combineShippingEnabled, setCombineShippingEnabled] = useState(true);
-  const [combineShippingGroup, setCombineShippingGroup] = useState("");
-  const [combineShippingMemo, setCombineShippingMemo] = useState("");
+  const [hasPreviousOrderInSameBroadcast, setHasPreviousOrderInSameBroadcast] =
+    useState(false);
+  const [hasCombineShippingTargetOrder, setHasCombineShippingTargetOrder] =
+    useState(false);
+  const [sameBroadcastShippingChecked, setSameBroadcastShippingChecked] =
+    useState(false);
 
-  const [warehouseCost, setWarehouseCost] = useState(0);
-  const [extraIncome, setExtraIncome] = useState(0);
-  const [extraIncomeMemo, setExtraIncomeMemo] = useState("");
-  const [expenses, setExpenses] = useState([
-    { type: "생활비", amount: 0, memo: "" },
+  const [lookupCode, setLookupCode] = useState("");
+  const [lookupPhone, setLookupPhone] = useState("");
+  const [lookupOrders, setLookupOrders] = useState<any[]>([]);
+  const [lookupMessage, setLookupMessage] = useState("");
+
+  const [items, setItems] = useState([
+    { product: "", color: "", size: "", qty: "", price: "" },
   ]);
 
-  const [refundModalOrder, setRefundModalOrder] = useState<any | null>(null);
-  const [refundType, setRefundType] = useState<"전액환불" | "부분환불">("전액환불");
-  const [refundAmount, setRefundAmount] = useState(0);
-  const [refundMemo, setRefundMemo] = useState("");
+  const bankAccount = "9002186993725";
 
-  const [cancelModalOrder, setCancelModalOrder] = useState<any | null>(null);
-  const [cancelReason, setCancelReason] = useState("");
-
-  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
-  const [detailShippingFee, setDetailShippingFee] = useState(0);
-  const [detailTotalPrice, setDetailTotalPrice] = useState(0);
-  const [detailAdminMemo, setDetailAdminMemo] = useState("");
-
-  const [selectedOrderIds, setSelectedOrderIds] = useState<number[]>([]);
-  const [selectedTrashOrderIds, setSelectedTrashOrderIds] = useState<number[]>([]);
-
-  const [colWidths, setColWidths] = useState<Record<string, number>>({
-    check: 64,
-    status: 180,
-    member: 180,
-    item: 300,
-    qty: 100,
-    total: 150,
-    shipping: 150,
-    payment: 150,
-  });
-
-  const activeBroadcast = useMemo(() => {
-    return broadcasts.find((broadcast) => broadcast.status === "ON") || null;
-  }, [broadcasts]);
+  const youtubeUrl =
+    process.env.NEXT_PUBLIC_YOUTUBE_URL || "https://www.youtube.com/@루루동이";
+  const bandUrl =
+    process.env.NEXT_PUBLIC_BAND_URL || "https://band.us/@ruru8249";
+  const kakaoChannelUrl =
+    process.env.NEXT_PUBLIC_KAKAO_CHANNEL_URL || "https://pf.kakao.com/_RMxaqX";
 
   useEffect(() => {
-    setSelectedOrderIds([]);
-    setSelectedTrashOrderIds([]);
-  }, [tab, selectedBroadcastId, statusFilter, paymentFilter, search]);
+    const scriptId = "daum-postcode-script";
 
-  useEffect(() => {
-    const saved = sessionStorage.getItem("ruru_admin_login");
-
-    if (saved === "Y") {
-      setIsAuthed(true);
-      loadAll();
-    } else {
-      setLoading(false);
+    if (!document.getElementById(scriptId)) {
+      const script = document.createElement("script");
+      script.id = scriptId;
+      script.src =
+        "//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
+      script.async = true;
+      document.body.appendChild(script);
     }
+
+    const savedNickname = localStorage.getItem("ruru_youtube_nickname");
+    const savedName = localStorage.getItem("ruru_customer_name");
+    const savedPhone = localStorage.getItem("ruru_customer_phone");
+    const savedZipcode = localStorage.getItem("ruru_customer_zipcode");
+    const savedAddress = localStorage.getItem("ruru_customer_address");
+    const savedDetailAddress = localStorage.getItem("ruru_customer_detail_address");
+
+    if (savedNickname) setNickname(savedNickname);
+    if (savedName) setCustomerName(savedName);
+    if (savedPhone) setCustomerPhone(savedPhone);
+    if (savedZipcode) setZipcode(savedZipcode);
+    if (savedAddress) setAddress(savedAddress);
+    if (savedDetailAddress) setDetailAddress(savedDetailAddress);
+
+    loadBroadcastSettings();
   }, []);
 
   useEffect(() => {
-    if (!activeBroadcast) return;
+    if (typeof window === "undefined") return;
 
-    setPublicTitle(activeBroadcast.public_title || "");
-    setAdminSubtitle(activeBroadcast.admin_subtitle || "");
-    setShippingFee(Number(activeBroadcast.shipping_fee ?? 4000));
-    setCardFeeRate(Number(activeBroadcast.card_fee_rate ?? 10));
-    setCombineShippingEnabled(activeBroadcast.combine_shipping_enabled !== false);
-    setCombineShippingGroup(activeBroadcast.combine_shipping_group || "");
-    setCombineShippingMemo(activeBroadcast.combine_shipping_memo || "");
-  }, [activeBroadcast?.id]);
-
-  const loadAll = async () => {
-    setLoading(true);
-
-    const [ordersResult, broadcastsResult, customersResult] = await Promise.all([
-      supabase.from("orders").select("*").order("created_at", { ascending: false }),
-      supabase.from("broadcasts").select("*").order("created_at", { ascending: false }),
-      supabase.from("customers").select("*").order("last_order_at", { ascending: false }),
-    ]);
-
-    if (ordersResult.error) alert("주문 불러오기 오류: " + ordersResult.error.message);
-    if (broadcastsResult.error) alert("방송 불러오기 오류: " + broadcastsResult.error.message);
-    if (customersResult.error) alert("회원 불러오기 오류: " + customersResult.error.message);
-
-    setOrders(ordersResult.data || []);
-    setBroadcasts(broadcastsResult.data || []);
-    setCustomers(customersResult.data || []);
-    setLoading(false);
-  };
-
-  const handleLogin = () => {
-    if (password !== ADMIN_PASSWORD) {
-      alert("관리자 비밀번호가 틀렸습니다.");
-      return;
-    }
-
-    sessionStorage.setItem("ruru_admin_login", "Y");
-    setIsAuthed(true);
-    loadAll();
-  };
-
-  const handleLogout = () => {
-    sessionStorage.removeItem("ruru_admin_login");
-    setIsAuthed(false);
-    setPassword("");
-  };
-
-  const startBroadcast = async () => {
-    if (!publicTitle.trim()) {
-      alert("고객용 방송제목을 입력해주세요.");
-      return;
-    }
-
-    if (activeBroadcast) {
-      alert("이미 방송중입니다. 기존 방송 종료 후 새 방송을 시작해주세요.");
-      return;
-    }
-
-    const { error } = await supabase.from("broadcasts").insert({
-      public_title: publicTitle.trim(),
-      admin_subtitle: adminSubtitle.trim(),
-      status: "ON",
-      shipping_fee: shippingFee,
-      card_fee_rate: cardFeeRate,
-      combine_shipping_enabled: combineShippingEnabled,
-      combine_shipping_group: combineShippingGroup.trim() || publicTitle.trim(),
-      combine_shipping_memo: combineShippingMemo.trim(),
-      started_at: new Date().toISOString(),
-    });
-
-    if (error) {
-      alert("방송 시작 오류: " + error.message);
-      return;
-    }
-
-    await supabase.from("settings").upsert(
-      [
-        { key: "broadcast_status", value: "ON" },
-        { key: "current_broadcast_name", value: publicTitle.trim() },
-      ],
-      { onConflict: "key" }
-    );
-
-    await loadAll();
-    alert("방송 시작 완료");
-  };
-
-  const endBroadcast = async () => {
-    if (!activeBroadcast?.id) {
-      alert("현재 방송중인 방송이 없습니다.");
-      return;
-    }
-
-    if (!confirm("방송을 종료하고 주문서 작성을 막을까요?")) return;
-
-    const { error } = await supabase
-      .from("broadcasts")
-      .update({
-        status: "OFF",
-        ended_at: new Date().toISOString(),
-      })
-      .eq("id", activeBroadcast.id);
-
-    if (error) {
-      alert("방송 종료 오류: " + error.message);
-      return;
-    }
-
-    await supabase.from("settings").upsert(
-      [
-        { key: "broadcast_status", value: "OFF" },
-        { key: "current_broadcast_name", value: "" },
-      ],
-      { onConflict: "key" }
-    );
-
-    await loadAll();
-    alert("방송 종료 완료");
-  };
-
-  const saveBroadcastSettings = async () => {
-    if (!activeBroadcast?.id) {
-      alert("현재 방송중인 방송이 없습니다.");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("broadcasts")
-      .update({
-        public_title: publicTitle.trim(),
-        admin_subtitle: adminSubtitle.trim(),
-        shipping_fee: shippingFee,
-        card_fee_rate: cardFeeRate,
-        combine_shipping_enabled: combineShippingEnabled,
-        combine_shipping_group: combineShippingGroup.trim() || publicTitle.trim(),
-        combine_shipping_memo: combineShippingMemo.trim(),
-      })
-      .eq("id", activeBroadcast.id);
-
-    if (error) {
-      alert("방송 수정 오류: " + error.message);
-      return;
-    }
-
-    await supabase.from("settings").upsert(
-      [{ key: "current_broadcast_name", value: publicTitle.trim() }],
-      { onConflict: "key" }
-    );
-
-    await loadAll();
-    alert("방송 수정 완료");
-  };
-
-  const updateOrderStatus = async (orderId: number, status: string) => {
-    const { error } = await supabase
-      .from("orders")
-      .update({ order_manage_status: status })
-      .eq("id", orderId);
-
-    if (error) {
-      alert("주문상태 변경 오류: " + error.message);
-      return;
-    }
-
-    await loadAll();
-  };
-
-  const openRefundModal = (order: any) => {
-    setRefundModalOrder(order);
-    setRefundType("전액환불");
-    setRefundAmount(getOrderTotal(order));
-    setRefundMemo(order.refund_memo || "");
-  };
-
-  const saveRefund = async () => {
-    if (!refundModalOrder?.id) return;
-
-    if (!refundMemo.trim()) {
-      alert("환불 사유/메모를 입력해주세요.");
-      return;
-    }
-
-    if (refundType === "부분환불" && refundAmount <= 0) {
-      alert("부분환불 금액을 입력해주세요.");
-      return;
-    }
-
-    const finalAmount =
-      refundType === "전액환불" ? getOrderTotal(refundModalOrder) : refundAmount;
-
-    const { error } = await supabase
-      .from("orders")
-      .update({
-        order_manage_status: "환불",
-        refund_type: refundType,
-        refund_amount: finalAmount,
-        refund_memo: refundMemo.trim(),
-      })
-      .eq("id", refundModalOrder.id);
-
-    if (error) {
-      alert("환불 저장 오류: " + error.message);
-      return;
-    }
-
-    setRefundModalOrder(null);
-    setRefundMemo("");
-    setRefundAmount(0);
-    await loadAll();
-  };
-
-  const openCancelModal = (order: any) => {
-    setCancelModalOrder(order);
-    setCancelReason(order.cancel_reason || "");
-  };
-
-  const saveCancelOrder = async () => {
-    if (!cancelModalOrder?.id) return;
-
-    if (!cancelReason.trim()) {
-      alert("주문서 취소 사유를 입력해주세요.");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("orders")
-      .update({
-        order_manage_status: "주문서취소",
-        cancel_reason: cancelReason.trim(),
-      })
-      .eq("id", cancelModalOrder.id);
-
-    if (error) {
-      alert("주문서취소 저장 오류: " + error.message);
-      return;
-    }
-
-    setCancelModalOrder(null);
-    setCancelReason("");
-    await loadAll();
-  };
-
-  const handleStatusChange = (order: any, nextStatus: string) => {
-    if (nextStatus === "환불") {
-      openRefundModal(order);
-      return;
-    }
-
-    if (nextStatus === "주문서취소") {
-      openCancelModal(order);
-      return;
-    }
-
-    updateOrderStatus(order.id, nextStatus);
-  };
-
-  const startResize = (key: string, e: any) => {
-    e.preventDefault();
-
-    const startX = e.clientX;
-    const startWidth = colWidths[key];
-
-    const onMouseMove = (moveEvent: MouseEvent) => {
-      const nextWidth = Math.max(90, startWidth + moveEvent.clientX - startX);
-      setColWidths((prev) => ({ ...prev, [key]: nextWidth }));
+    const openOrderFormFromHash = () => {
+      if (window.location.hash === "#order-form") {
+        setScreen("order");
+        setTimeout(() => {
+          document
+            .getElementById("order-form")
+            ?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 100);
+      }
     };
 
-    const onMouseUp = () => {
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
+    openOrderFormFromHash();
+    window.addEventListener("hashchange", openOrderFormFromHash);
+
+    return () => {
+      window.removeEventListener("hashchange", openOrderFormFromHash);
     };
-
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-  };
-
-  const ResizableTh = ({
-    colKey,
-    children,
-  }: {
-    colKey: string;
-    children: any;
-  }) => {
-    return (
-      <th
-        className="p-3 text-left relative select-none"
-        style={{ width: colWidths[colKey], minWidth: colWidths[colKey] }}
-      >
-        {children}
-        <div
-          onMouseDown={(e) => startResize(colKey, e)}
-          className="absolute right-0 top-0 h-full w-2 cursor-col-resize hover:bg-blue-300"
-        />
-      </th>
-    );
-  };
-
-  const getDisplayStatus = (order: any) => {
-    if (order.order_manage_status === "주문서취소") return "주문서취소";
-    if (order.order_manage_status === "환불" && order.refund_type === "부분환불") return "부분환불";
-    if (order.order_manage_status === "환불") return "환불";
-    return order.order_manage_status || "주문확인전";
-  };
-
-  const formatDateTime = (value: string) => {
-    if (!value) return "-";
-
-    try {
-      return new Date(value).toLocaleString("ko-KR", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return "-";
-    }
-  };
-
-  const getOrderCode = (order: any) => {
-    return String(order.order_lookup_code || `ORDER-${order.id || ""}`).toUpperCase();
-  };
-
-  const openOrderDetail = (order: any) => {
-    setSelectedOrder(order);
-    setDetailShippingFee(getOrderShipping(order));
-    setDetailTotalPrice(getOrderTotal(order));
-    setDetailAdminMemo(order.admin_memo || order.memo || "");
-  };
-
-  const saveOrderDetail = async () => {
-    if (!selectedOrder?.id) return;
-
-    const { error } = await supabase
-      .from("orders")
-      .update({
-        adjusted_shipping_fee: Number(detailShippingFee || 0),
-        final_shipping_fee: Number(detailShippingFee || 0),
-        adjusted_total_price: Number(detailTotalPrice || 0),
-        admin_memo: detailAdminMemo.trim(),
-      })
-      .eq("id", selectedOrder.id);
-
-    if (error) {
-      alert("주문 상세 저장 오류: " + error.message);
-      return;
-    }
-
-    setSelectedOrder(null);
-    await loadAll();
-    alert("주문 상세정보 저장 완료");
-  };
-
-  const moveOrderToTrash = async (order: any) => {
-    if (!order?.id) return;
-
-    const code = getOrderCode(order);
-    const label = `${order.youtube_nickname || "-"} / ${order.customer_name || "-"}`;
-
-    if (!confirm(`이 주문을 휴지통으로 이동할까요?\n\n${code}\n${label}\n\n휴지통에서 복구할 수 있습니다.`)) {
-      return;
-    }
-
-    const { error } = await supabase
-      .from("orders")
-      .update({
-        is_deleted: true,
-        deleted_at: new Date().toISOString(),
-        delete_memo: "관리자 삭제",
-      })
-      .eq("id", order.id);
-
-    if (error) {
-      alert("휴지통 이동 오류: " + error.message);
-      return;
-    }
-
-    if (selectedOrder?.id === order.id) {
-      setSelectedOrder(null);
-    }
-
-    await loadAll();
-    alert("휴지통으로 이동했습니다.");
-  };
-
-  const restoreOrderFromTrash = async (order: any) => {
-    if (!order?.id) return;
-
-    const code = getOrderCode(order);
-
-    if (!confirm(`이 주문을 복구할까요?\n\n${code}`)) return;
-
-    const { error } = await supabase
-      .from("orders")
-      .update({
-        is_deleted: false,
-        deleted_at: null,
-        delete_memo: "",
-        is_permanently_deleted: false,
-        permanently_deleted_at: null,
-      })
-      .eq("id", order.id);
-
-    if (error) {
-      alert("주문 복구 오류: " + error.message);
-      return;
-    }
-
-    await loadAll();
-    alert("주문을 복구했습니다.");
-  };
-
-  const permanentlyDeleteOrder = async (order: any) => {
-    if (!order?.id) return;
-
-    const code = getOrderCode(order);
-
-    if (!confirm(`정말 완전삭제 처리할까요?\n\n${code}\n\n화면과 휴지통에서 완전히 사라집니다.`)) return;
-
-    const { error } = await supabase
-      .from("orders")
-      .update({
-        is_permanently_deleted: true,
-        permanently_deleted_at: new Date().toISOString(),
-        is_deleted: true,
-        deleted_at: order.deleted_at || new Date().toISOString(),
-        delete_memo: order.delete_memo || "관리자 영구삭제",
-      })
-      .eq("id", order.id);
-
-    if (error) {
-      alert("영구삭제 처리 오류: " + error.message);
-      return;
-    }
-
-    await loadAll();
-    alert("영구삭제 처리 완료");
-  };
-
-  const getTrashRemainDays = (order: any) => {
-    if (!order.deleted_at) return 30;
-
-    const deleted = new Date(order.deleted_at).getTime();
-    const now = Date.now();
-    const passedDays = Math.floor((now - deleted) / (1000 * 60 * 60 * 24));
-
-    return Math.max(0, 30 - passedDays);
-  };
-
-  const isTrashExpired = (order: any) => {
-    return getTrashRemainDays(order) <= 0;
-  };
-
-  const toggleOrderSelection = (orderId: number) => {
-    setSelectedOrderIds((prev) => {
-      if (prev.includes(orderId)) {
-        return prev.filter((id) => id !== orderId);
-      }
-
-      return [...prev, orderId];
-    });
-  };
-
-  const toggleTrashOrderSelection = (orderId: number) => {
-    setSelectedTrashOrderIds((prev) => {
-      if (prev.includes(orderId)) {
-        return prev.filter((id) => id !== orderId);
-      }
-
-      return [...prev, orderId];
-    });
-  };
-
-  const selectAllFilteredOrders = () => {
-    const ids = filteredOrders.map((order) => Number(order.id)).filter(Boolean);
-    setSelectedOrderIds(ids);
-  };
-
-  const clearSelectedOrders = () => {
-    setSelectedOrderIds([]);
-  };
-
-  const selectAllTrashOrders = () => {
-    const ids = trashOrders.map((order) => Number(order.id)).filter(Boolean);
-    setSelectedTrashOrderIds(ids);
-  };
-
-  const clearSelectedTrashOrders = () => {
-    setSelectedTrashOrderIds([]);
-  };
-
-  const bulkMoveOrdersToTrash = async () => {
-    if (selectedOrderIds.length === 0) {
-      alert("선택된 주문이 없습니다.");
-      return;
-    }
-
-    if (!confirm(`선택한 주문 ${selectedOrderIds.length}건을 휴지통으로 이동할까요?`)) {
-      return;
-    }
-
-    const { error } = await supabase
-      .from("orders")
-      .update({
-        is_deleted: true,
-        deleted_at: new Date().toISOString(),
-        delete_memo: "관리자 일괄 삭제",
-      })
-      .in("id", selectedOrderIds);
-
-    if (error) {
-      alert("일괄 휴지통 이동 오류: " + error.message);
-      return;
-    }
-
-    setSelectedOrderIds([]);
-    await loadAll();
-    alert(`선택 주문 ${selectedOrderIds.length}건을 휴지통으로 이동했습니다.`);
-  };
-
-  const bulkRestoreOrdersFromTrash = async () => {
-    if (selectedTrashOrderIds.length === 0) {
-      alert("선택된 휴지통 주문이 없습니다.");
-      return;
-    }
-
-    if (!confirm(`선택한 휴지통 주문 ${selectedTrashOrderIds.length}건을 복구할까요?`)) {
-      return;
-    }
-
-    const { error } = await supabase
-      .from("orders")
-      .update({
-        is_deleted: false,
-        deleted_at: null,
-        delete_memo: "",
-      })
-      .in("id", selectedTrashOrderIds);
-
-    if (error) {
-      alert("일괄 복구 오류: " + error.message);
-      return;
-    }
-
-    setSelectedTrashOrderIds([]);
-    await loadAll();
-    alert(`선택 주문 ${selectedTrashOrderIds.length}건을 복구했습니다.`);
-  };
-
-  const bulkPermanentlyDeleteOrders = async () => {
-    if (selectedTrashOrderIds.length === 0) {
-      alert("선택된 휴지통 주문이 없습니다.");
-      return;
-    }
-
-    const count = selectedTrashOrderIds.length;
-
-    if (!confirm(`선택한 주문 ${count}건을 영구삭제 처리할까요?\\n\\n화면과 휴지통에서 완전히 사라집니다.`)) {
-      return;
-    }
-
-    const { error } = await supabase
-      .from("orders")
-      .update({
-        is_permanently_deleted: true,
-        permanently_deleted_at: new Date().toISOString(),
-        is_deleted: true,
-      })
-      .in("id", selectedTrashOrderIds);
-
-    if (error) {
-      alert("일괄 영구삭제 처리 오류: " + error.message);
-      return;
-    }
-
-    setSelectedTrashOrderIds([]);
-    await loadAll();
-    alert(`선택 주문 ${count}건을 영구삭제 처리했습니다.`);
-  };
-
-  const filteredOrders = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-
-    return orders.filter((order) => {
-      if (order.is_permanently_deleted === true) return false;
-      if (order.is_deleted === true) return false;
-
-      const status = getDisplayStatus(order);
-      const paymentLabel = getPaymentLabel(order);
-
-      const matchesKeyword =
-        !keyword ||
-        String(order.customer_name || "").toLowerCase().includes(keyword) ||
-        String(order.youtube_nickname || "").toLowerCase().includes(keyword) ||
-        String(order.customer_phone || "").includes(keyword) ||
-        String(order.product_name || "").toLowerCase().includes(keyword) ||
-        String(order.order_lookup_code || "").toLowerCase().includes(keyword);
-
-      const matchesBroadcast =
-        selectedBroadcastId === "ALL" ||
-        String(order.broadcast_id || "") === selectedBroadcastId;
-
-      const matchesStatus =
-        statusFilter === "전체상태" || status === statusFilter;
-
-      const matchesPayment =
-        paymentFilter === "전체결제" ||
-        paymentLabel === paymentFilter ||
-        (paymentFilter === "기타결제" &&
-          paymentLabel !== "무통장입금" &&
-          paymentLabel !== "카드결제");
-
-      return matchesKeyword && matchesBroadcast && matchesStatus && matchesPayment;
-    });
-  }, [orders, search, selectedBroadcastId, statusFilter, paymentFilter]);
-
-  const trashOrders = useMemo(() => {
-    return orders
-      .filter((order) => order.is_deleted === true && order.is_permanently_deleted !== true)
-      .sort((a, b) => {
-        const aTime = new Date(a.deleted_at || a.created_at || "").getTime();
-        const bTime = new Date(b.deleted_at || b.created_at || "").getTime();
-        return bTime - aTime;
-      });
-  }, [orders]);
-
-  const selectedOrders = useMemo(() => {
-    return filteredOrders.filter((order) =>
-      selectedOrderIds.includes(Number(order.id))
-    );
-  }, [filteredOrders, selectedOrderIds]);
-
-  const selectedOrderSummary = useMemo(() => {
-    const totalQty = selectedOrders.reduce(
-      (sum, order) => sum + Number(order.qty || 0),
-      0
-    );
-
-    const orderAmount = selectedOrders.reduce(
-      (sum, order) => sum + getOrderTotal(order),
-      0
-    );
-
-    const shippingAmount = selectedOrders.reduce(
-      (sum, order) => sum + getOrderShipping(order),
-      0
-    );
-
-    const customerCardFeeRate = 10;
-    const customerCardFeeAmount = Math.round(orderAmount * (customerCardFeeRate / 100));
-    const cardPaymentAmount = orderAmount + customerCardFeeAmount;
-
-    const customerNames = Array.from(
-      new Set(
-        selectedOrders
-          .map((order) => `${order.youtube_nickname || "-"} / ${order.customer_name || "-"}`)
-          .filter(Boolean)
-      )
-    );
-
-    return {
-      count: selectedOrders.length,
-      totalQty,
-      orderAmount,
-      shippingAmount,
-      customerCardFeeRate,
-      customerCardFeeAmount,
-      cardPaymentAmount,
-      customerLabel:
-        customerNames.length === 1
-          ? customerNames[0]
-          : customerNames.length > 1
-          ? `${customerNames[0]} 외 ${customerNames.length - 1}명`
-          : "-",
-    };
-  }, [selectedOrders]);
-
-  const openPaysterCardPayment = () => {
-    if (selectedOrderIds.length === 0) {
-      alert("카드결제할 주문을 먼저 체크해주세요.");
-      return;
-    }
-
-    window.open(
-      "https://user.service.payster.co.kr/#/main",
-      "_blank",
-      "noopener,noreferrer"
-    );
-  };
-
-  const orderSummary = useMemo(() => {
-    const totalCount = filteredOrders.length;
-
-    const refundCount = filteredOrders.filter((order) => {
-      const status = getDisplayStatus(order);
-      return status === "환불";
-    }).length;
-
-    const partialRefundCount = filteredOrders.filter((order) => {
-      const status = getDisplayStatus(order);
-      return status === "부분환불";
-    }).length;
-
-    const cancelCount = filteredOrders.filter((order) => {
-      const status = getDisplayStatus(order);
-      return status === "주문서취소";
-    }).length;
-
-    const cardCount = filteredOrders.filter((order) => {
-      return getPaymentLabel(order) === "카드결제";
-    }).length;
-
-    const bankCount = filteredOrders.filter((order) => {
-      return getPaymentLabel(order) === "무통장입금";
-    }).length;
-
-    const newCount = filteredOrders.filter((order) => {
-      const status = getDisplayStatus(order);
-      return status === "주문확인전";
-    }).length;
-
-    const totalAmount = filteredOrders.reduce((sum, order) => {
-      return sum + Number(order.adjusted_total_price || order.total_price || 0);
-    }, 0);
-
-    return {
-      totalCount,
-      newCount,
-      refundCount,
-      partialRefundCount,
-      cancelCount,
-      cardCount,
-      bankCount,
-      totalAmount,
-    };
-  }, [filteredOrders]);
-
-  const newOrderAlerts = useMemo(() => {
-    return filteredOrders.filter((order) => {
-      const status = getDisplayStatus(order);
-      return status === "주문확인전";
-    });
-  }, [filteredOrders]);
-
-  const recentNewOrderAlerts = useMemo(() => {
-    return newOrderAlerts.slice(0, 3);
-  }, [newOrderAlerts]);
-
-  const settlementOrders = useMemo(() => {
-    return orders.filter((order) => {
-      if (order.is_permanently_deleted === true) return false;
-      if (order.is_deleted === true) return false;
-
-      if (settlementBroadcastId === "ALL") return true;
-      return String(order.broadcast_id || "") === settlementBroadcastId;
-    });
-  }, [orders, settlementBroadcastId]);
-
-  const getRefundAmount = (order: any) => {
-    if (order.order_manage_status !== "환불") return 0;
-
-    const savedRefund = Number(order.refund_amount || 0);
-
-    if (savedRefund > 0) return savedRefund;
-
-    return getOrderTotal(order);
-  };
-
-  const getNetOrderTotal = (order: any) => {
-    if (order.order_manage_status === "주문서취소") return 0;
-
-    const gross = getOrderTotal(order);
-    const refund = getRefundAmount(order);
-
-    return Math.max(0, gross - refund);
-  };
-
-  const dashboardGrossSales = filteredOrders
-    .filter((order) => order.order_manage_status !== "주문서취소")
-    .reduce((sum, order) => sum + getOrderTotal(order), 0);
-
-  const dashboardRefundAmount = filteredOrders.reduce(
-    (sum, order) => sum + getRefundAmount(order),
-    0
-  );
-
-  const dashboardSales = filteredOrders.reduce(
-    (sum, order) => sum + getNetOrderTotal(order),
-    0
-  );
-
-  const dashboardCardSales = filteredOrders
-    .filter((order) => isPaysterPayment(order))
-    .reduce((sum, order) => sum + getNetOrderTotal(order), 0);
-
-  const dashboardCardFeeSettlement = Math.round(
-    dashboardCardSales * (Number(cardFeeRate || 0) / 100)
-  );
-
-  const dashboardFinalProfit =
-    dashboardSales - dashboardCardFeeSettlement;
-
-
-  const grossSales = settlementOrders
-    .filter((order) => order.order_manage_status !== "주문서취소")
-    .reduce(
-      (sum, order) => sum + getOrderTotal(order),
-      0
-    );
-
-  const totalRefundAmount = settlementOrders.reduce(
-    (sum, order) => sum + getRefundAmount(order),
-    0
-  );
-
-  const totalSales = settlementOrders.reduce(
-    (sum, order) => sum + getNetOrderTotal(order),
-    0
-  );
-
-  const cardSales = settlementOrders
-    .filter((order) => isPaysterPayment(order))
-    .reduce(
-      (sum, order) => sum + getNetOrderTotal(order),
-      0
-    );
-
-  const cardFeeSettlement = Math.round(cardSales * (Number(cardFeeRate || 0) / 100));
-  const totalExpense = expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-  const finalProfit =
-    totalSales - warehouseCost - cardFeeSettlement - totalExpense;
-
-  const addExpense = () => {
-    setExpenses((prev) => [...prev, { type: "생활비", amount: 0, memo: "" }]);
-  };
-
-  const removeExpense = (index: number) => {
-    setExpenses((prev) => {
-      if (prev.length <= 1) {
-        return [{ type: "생활비", amount: 0, memo: "" }];
-      }
-
-      return prev.filter((_, idx) => idx !== index);
-    });
-  };
-
-  const updateExpense = (index: number, key: string, value: any) => {
-    setExpenses((prev) =>
-      prev.map((item, idx) => {
-        if (idx !== index) return item;
-        return { ...item, [key]: value };
-      })
-    );
-  };
-
-  const moveExpense = (fromIndex: number, toIndex: number) => {
-    if (toIndex < 0 || toIndex >= expenses.length) return;
-
-    setExpenses((prev) => {
-      const next = [...prev];
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
-      return next;
-    });
-  };
-
-  const getCustomerStats = (customer: any) => {
-    const phone = String(customer.customer_phone || "");
-    const nickname = String(customer.youtube_nickname || "");
-    const name = String(customer.customer_name || "");
-
-    const customerOrders = orders.filter((order) => {
-      if (order.is_permanently_deleted === true) return false;
-      if (order.is_deleted === true) return false;
-
-      const samePhone = phone && String(order.customer_phone || "") === phone;
-      const sameNickname = nickname && String(order.youtube_nickname || "") === nickname;
-      const sameName = name && String(order.customer_name || "") === name;
-      return samePhone || (sameNickname && sameName);
-    });
-
-    const totalAmount = customerOrders.reduce(
-      (sum, order) => sum + Number(order.adjusted_total_price || order.total_price || 0),
-      0
-    );
-
-    return {
-      count: customerOrders.length,
-      totalAmount,
-      lastOrderAt: customerOrders[0]?.created_at || customer.last_order_at || "",
-    };
-  };
-
-  const visibleCustomers = useMemo(() => {
-    const keyword = memberSearch.trim().toLowerCase();
-
-    return customers.filter((customer) => {
-      return (
-        !keyword ||
-        String(customer.customer_name || "").toLowerCase().includes(keyword) ||
-        String(customer.youtube_nickname || "").toLowerCase().includes(keyword) ||
-        String(customer.customer_phone || "").includes(keyword) ||
-        String(customer.address || "").toLowerCase().includes(keyword)
-      );
-    });
-  }, [customers, memberSearch]);
-
-  const cleanOptionText = (value: any) => {
-    const text = String(value || "").trim();
-
-    if (!text) return "";
-    if (text === "없음") return "";
-    if (text === "-") return "";
-    if (text.toLowerCase() === "none") return "";
-
-    return text;
-  };
-
-  const getRozenItemText = (ordersInGroup: any[]) => {
-    const itemLines = ordersInGroup.map((order) => {
-      const productName = cleanOptionText(order.product_name) || "상품";
-      const color = cleanOptionText(order.color);
-      const size = cleanOptionText(order.size);
-      const option = cleanOptionText(order.option_name || order.product_option);
-
-      const qty = Number(order.qty || 1);
-
-      const optionParts = [color, size, option].filter(Boolean);
-      const optionText = optionParts.length > 0 ? ` ${optionParts.join(" ")}` : "";
-
-      return `${productName}${optionText} x${qty}`;
-    });
-
-    const totalQty = ordersInGroup.reduce(
-      (sum, order) => sum + Number(order.qty || 1),
-      0
-    );
-
-    return `${itemLines.join(" / ")} / 총 ${totalQty}개`;
-  };
-
-  const buildRozenGroups = (targetOrders: any[]) => {
-    const groupMap = new Map<string, any[]>();
-
-    targetOrders.forEach((order) => {
-      const nickname = String(order.youtube_nickname || "").trim();
-      const phone = String(order.customer_phone || "").replace(/[^0-9]/g, "");
-      const address = getFullAddress(order);
-
-      const key = `${nickname}__${phone}__${address}`;
-
-      const prev = groupMap.get(key) || [];
-      groupMap.set(key, [...prev, order]);
-    });
-
-    return Array.from(groupMap.values());
-  };
-
-  const downloadRozenExcel = async () => {
-    try {
-      const targetOrders = filteredOrders.filter(
-        (order) => getDisplayStatus(order) === "주문확인완료"
-      );
-
-      if (targetOrders.length === 0) {
-        alert("주문확인완료 상태인 주문이 없습니다.");
-        return;
-      }
-
-      const templatePaths = [
-        "/templates/rozen_template.xlsx",
-        "/rozen_template.xlsx",
-      ];
-
-      let response: Response | null = null;
-      let usedTemplatePath = "";
-
-      for (const path of templatePaths) {
-        const tryResponse = await fetch(`${path}?v=${Date.now()}`);
-
-        if (tryResponse.ok) {
-          response = tryResponse;
-          usedTemplatePath = path;
-          break;
-        }
-      }
-
-      if (!response) {
-        alert(
-          "로젠 송장 템플릿 파일을 찾을 수 없습니다.\n\n확인 위치:\n/public/templates/rozen_template.xlsx\n\n시도 경로:\n" +
-            templatePaths.join("\n")
-        );
-        return;
-      }
-
-      const templateBuffer = await response.arrayBuffer();
-
-      if (!templateBuffer || templateBuffer.byteLength < 1000) {
-        alert(
-          "로젠 송장 템플릿 파일을 불러왔지만 파일 내용이 비정상입니다.\n\n사용 경로: " +
-            usedTemplatePath
-        );
-        return;
-      }
-
-      const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.load(templateBuffer);
-
-      const worksheet = workbook.worksheets[0];
-
-      if (!worksheet) {
-        alert("로젠 송장 템플릿에 시트가 없습니다.");
-        return;
-      }
-
-      const groups = buildRozenGroups(targetOrders);
-
-      // 로젠 업로드 파일은 헤더 없이 1행부터 실제 송장 데이터만 들어가야 합니다.
-      // 템플릿 1행은 스타일 참고용으로만 사용하고, 샘플 글씨는 전부 지운 뒤 1행부터 입력합니다.
-      const startRow = 1;
-      const templateRow = worksheet.getRow(startRow);
-
-      // 기존 샘플/데이터 영역 정리
-      const lastRow = Math.max(worksheet.rowCount, startRow);
-      for (let rowNumber = startRow; rowNumber <= lastRow; rowNumber += 1) {
-        const row = worksheet.getRow(rowNumber);
-
-        for (let col = 1; col <= 11; col += 1) {
-          row.getCell(col).value = null;
-        }
-
-        row.commit();
-      }
-
-      groups.forEach((ordersInGroup, index) => {
-        const firstOrder = ordersInGroup[0];
-
-        const rowNumber = startRow + index;
-        const row = worksheet.getRow(rowNumber);
-
-        // 원본 템플릿 1행 스타일을 새 행에 최대한 유지
-        if (index > 0) {
-          for (let col = 1; col <= 11; col += 1) {
-            const sourceCell = templateRow.getCell(col);
-            const targetCell = row.getCell(col);
-
-            // ExcelJS 스타일은 TypeScript 타입이 까다로워서
-            // 원본 템플릿 셀 스타일을 JSON 방식으로 안전하게 복사합니다.
-            targetCell.style = sourceCell.style
-              ? JSON.parse(JSON.stringify(sourceCell.style))
-              : {};
-
-            if (sourceCell.numFmt) {
-              targetCell.numFmt = sourceCell.numFmt;
-            }
-          }
-
-          row.height = templateRow.height;
-        }
-
-        const nickname = String(firstOrder.youtube_nickname || "").trim();
-        const phone = String(firstOrder.customer_phone || "").replace(/[^0-9]/g, "");
-        const fullAddress = getFullAddress(firstOrder);
-        const addressWithNickname = `${fullAddress} /${nickname}`.trim();
-        const itemText = getRozenItemText(ordersInGroup);
-        const requestMemos = Array.from(
-          new Set(
-            ordersInGroup
-              .map((order) =>
-                String(
-                  order.request_memo ||
-                    order.memo ||
-                    order.delivery_memo ||
-                    order.shipping_memo ||
-                    ""
-                ).trim()
-              )
-              .filter(Boolean)
-          )
-        );
-        const rozenMemo =
-          requestMemos.length > 0
-            ? requestMemos.join(" / ")
-            : "친절배송부탁드립니다.";
-
-        const values = [
-          nickname,
-          "",
-          addressWithNickname,
-          phone,
-          phone,
-          "1",
-          "2750",
-          "010",
-          itemText,
-          "",
-          rozenMemo,
-        ];
-
-        values.forEach((value, colIndex) => {
-          row.getCell(colIndex + 1).value = value;
+  }, []);
+
+  useEffect(() => {
+    checkShippingDiscountTargets();
+  }, [customerName, customerPhone, activeBroadcast.id, broadcastTitle]);
+
+  useEffect(() => {
+    setCustomerCheckStatus("unchecked");
+    setCheckedCustomer(null);
+    setUseSavedAddress(false);
+    setShowAddressForm(false);
+  }, [customerName, customerPhone]);
+
+
+
+  const loadBroadcastSettings = async () => {
+    const { data: settingData } = await supabase.from("settings").select("*");
+
+    const status =
+      settingData?.find((v) => v.key === "broadcast_status")?.value || "OFF";
+    const title =
+      settingData?.find((v) => v.key === "current_broadcast_name")?.value || "";
+
+    setBroadcastStatus(status);
+    setBroadcastTitle(title);
+
+    if (status === "ON") {
+      const { data: broadcastData } = await supabase
+        .from("broadcasts")
+        .select("*")
+        .eq("status", "ON")
+        .order("started_at", { ascending: false })
+        .limit(1);
+
+      const active = broadcastData?.[0];
+
+      if (active) {
+        setActiveBroadcast({
+          id: active.id,
+          public_title: active.public_title || title,
+          admin_subtitle: active.admin_subtitle || "",
+          shipping_fee: Number(active.shipping_fee || 4000),
+          card_fee_rate: Number(active.card_fee_rate || 10),
         });
-
-        row.commit();
-      });
-
-      const totalOriginalQty = targetOrders.reduce(
-        (sum, order) => sum + Number(order.qty || 1),
-        0
-      );
-
-      const totalGroupedQty = groups.reduce(
-        (sum, ordersInGroup) =>
-          sum +
-          ordersInGroup.reduce(
-            (innerSum, order) => innerSum + Number(order.qty || 1),
-            0
-          ),
-        0
-      );
-
-      if (totalOriginalQty !== totalGroupedQty) {
-        alert(
-          `수량 검산 오류입니다.\\n원본수량: ${totalOriginalQty}개\\n송장수량: ${totalGroupedQty}개`
-        );
-        return;
       }
+    }
 
-      const outputBuffer = await workbook.xlsx.writeBuffer();
+    setIsLoadingBroadcast(false);
+  };
 
-      const blob = new Blob([outputBuffer], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
+  const onlyNumber = (value: string) => value.replace(/[^0-9]/g, "");
 
-      const now = new Date();
-      const yyyy = String(now.getFullYear());
-      const mm = String(now.getMonth() + 1).padStart(2, "0");
-      const dd = String(now.getDate()).padStart(2, "0");
-      const filename = `rozen_${yyyy}${mm}${dd}.xlsx`;
+  const hasNumber = (value: string) => /[0-9]/.test(String(value || ""));
 
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
+  const normalizeName = (value: string) => {
+    return String(value || "")
+      .replace(/\s/g, "")
+      .replace(/[(){}\[\],.·ㆍ\-_/]/g, "")
+      .toLowerCase();
+  };
 
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+  const formatPhone = (value: string) => {
+    const numbers = onlyNumber(value);
+    if (numbers.length <= 3) return numbers;
+    if (numbers.length <= 7)
+      return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+    return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(
+      7,
+      11
+    )}`;
+  };
 
-      URL.revokeObjectURL(url);
+  const formatWon = (value: number) =>
+    `${Number(value || 0).toLocaleString()}원`;
 
-      alert(
-        `로젠 송장 생성 완료\\n합배송 묶음: ${groups.length}건\\n총수량: ${totalGroupedQty}개`
+  const normalizeKoreanText = (value: string) => {
+    return String(value || "")
+      .replace(/\s/g, "")
+      .replace(/[(){}\[\],.·ㆍ\-_/]/g, "")
+      .toLowerCase();
+  };
+
+  const isJejuAddress = () => {
+    const zip = onlyNumber(zipcode);
+    const rawFullAddress = `${address || ""} ${detailAddress || ""}`;
+    const full = normalizeKoreanText(rawFullAddress);
+
+    if (zip.startsWith("63")) {
+      return true;
+    }
+
+    const strongJejuKeywords = [
+      "제주특별자치도",
+      "제주특별",
+      "제주도",
+      "제주시",
+      "서귀포시",
+      "서귀포",
+    ];
+
+    if (
+      strongJejuKeywords.some((keyword) =>
+        full.includes(normalizeKoreanText(keyword))
+      )
+    ) {
+      return true;
+    }
+
+    const strongJejuLocalKeywords = [
+      "애월읍",
+      "한림읍",
+      "조천읍",
+      "구좌읍",
+      "성산읍",
+      "표선면",
+      "남원읍",
+      "대정읍",
+      "한경면",
+      "안덕면",
+      "추자면",
+      "우도면",
+      "노형동",
+      "연동",
+      "이도일동",
+      "이도이동",
+      "일도일동",
+      "일도이동",
+      "삼도일동",
+      "삼도이동",
+      "용담일동",
+      "용담이동",
+      "건입동",
+      "화북동",
+      "삼양동",
+      "봉개동",
+      "아라동",
+      "오라동",
+      "외도동",
+      "이호동",
+      "도두동",
+      "중문동",
+      "대륜동",
+      "대천동",
+      "동홍동",
+      "서홍동",
+      "송산동",
+      "영천동",
+      "예래동",
+      "정방동",
+      "중앙동",
+      "천지동",
+      "효돈동",
+    ];
+
+    const hasStrongLocalKeyword = strongJejuLocalKeywords.some((keyword) =>
+      full.includes(normalizeKoreanText(keyword))
+    );
+
+    if (hasStrongLocalKeyword) {
+      return true;
+    }
+
+    const englishJejuKeywords = ["jejusi", "jeju", "seogwipo"];
+
+    if (englishJejuKeywords.some((keyword) => full.includes(keyword))) {
+      return true;
+    }
+
+    return false;
+  };
+
+  const isJejuAddressByValues = (
+    targetZipcode: string,
+    targetAddress: string,
+    targetDetailAddress: string
+  ) => {
+    const zip = onlyNumber(targetZipcode);
+    const full = normalizeKoreanText(`${targetAddress || ""} ${targetDetailAddress || ""}`);
+
+    if (zip.startsWith("63")) return true;
+
+    const strongJejuKeywords = [
+      "제주특별자치도",
+      "제주특별",
+      "제주도",
+      "제주시",
+      "서귀포시",
+      "서귀포",
+    ];
+
+    if (
+      strongJejuKeywords.some((keyword) =>
+        full.includes(normalizeKoreanText(keyword))
+      )
+    ) {
+      return true;
+    }
+
+    const strongJejuLocalKeywords = [
+      "애월읍",
+      "한림읍",
+      "조천읍",
+      "구좌읍",
+      "성산읍",
+      "표선면",
+      "남원읍",
+      "대정읍",
+      "한경면",
+      "안덕면",
+      "추자면",
+      "우도면",
+      "노형동",
+      "연동",
+      "이도일동",
+      "이도이동",
+      "일도일동",
+      "일도이동",
+      "삼도일동",
+      "삼도이동",
+      "용담일동",
+      "용담이동",
+      "건입동",
+      "화북동",
+      "삼양동",
+      "봉개동",
+      "아라동",
+      "오라동",
+      "외도동",
+      "이호동",
+      "도두동",
+      "중문동",
+      "대륜동",
+      "대천동",
+      "동홍동",
+      "서홍동",
+      "송산동",
+      "영천동",
+      "예래동",
+      "정방동",
+      "중앙동",
+      "천지동",
+      "효돈동",
+    ];
+
+    if (
+      strongJejuLocalKeywords.some((keyword) =>
+        full.includes(normalizeKoreanText(keyword))
+      )
+    ) {
+      return true;
+    }
+
+    const englishJejuKeywords = ["jejusi", "jeju", "seogwipo"];
+    return englishJejuKeywords.some((keyword) => full.includes(keyword));
+  };
+
+  const baseShippingFee = useMemo(() => {
+    if (isJejuAddress()) return 6000;
+    return Number(activeBroadcast.shipping_fee || 4000);
+  }, [zipcode, address, detailAddress, activeBroadcast.shipping_fee]);
+
+  const finalShippingFee = useMemo(() => {
+    if (hasPreviousOrderInSameBroadcast || hasCombineShippingTargetOrder) return 0;
+    return baseShippingFee;
+  }, [hasPreviousOrderInSameBroadcast, hasCombineShippingTargetOrder, baseShippingFee]);
+
+  const shippingNotice = useMemo(() => {
+    if (hasPreviousOrderInSameBroadcast) {
+      return "동일 방송 추가주문으로 배송비 0원 적용";
+    }
+
+    if (hasCombineShippingTargetOrder) {
+      return "합배송 기준 방송 구매 이력 확인으로 배송비 0원 적용";
+    }
+
+    if (isJejuAddress()) {
+      return "제주 배송지로 확인되어 배송비 6,000원 적용";
+    }
+
+    return "기본 배송비 적용";
+  }, [hasPreviousOrderInSameBroadcast, hasCombineShippingTargetOrder, zipcode, address, detailAddress]);
+
+  const productTotal = items.reduce((sum, item) => {
+    return sum + Number(item.price || 0) * Number(item.qty || 0);
+  }, 0);
+
+  const cashTotal = productTotal + finalShippingFee;
+  const cardFeeRate = Number(activeBroadcast.card_fee_rate || 10);
+  const vatAmount =
+    paymentMethod === "카드결제"
+      ? Math.ceil(cashTotal * (cardFeeRate / 100))
+      : 0;
+  const total = cashTotal + vatAmount;
+
+  const generateLookupCode = () => {
+    const date = new Date();
+    const yymmdd =
+      String(date.getFullYear()).slice(2) +
+      String(date.getMonth() + 1).padStart(2, "0") +
+      String(date.getDate()).padStart(2, "0");
+    const random = Math.random().toString(36).slice(2, 6).toUpperCase();
+    return `RURU-${yymmdd}-${random}`;
+  };
+
+  const getSameBroadcastPreviousOrder = async () => {
+    const phone = onlyNumber(customerPhone);
+    const name = normalizeName(customerName);
+
+    if (phone.length < 10 || !name) {
+      return false;
+    }
+
+    const { data } = await supabase
+      .from("orders")
+      .select("id,customer_name,customer_phone,broadcast_id,broadcast_name,broadcast_public_title")
+      .eq("customer_phone", phone)
+      .limit(100);
+
+    const currentBroadcastId = String(activeBroadcast.id || "");
+    const currentBroadcastTitle = normalizeKoreanText(
+      activeBroadcast.public_title || broadcastTitle || ""
+    );
+
+    const matched = (data || []).some((order) => {
+      const sameName = normalizeName(order.customer_name || "") === name;
+
+      const sameBroadcastId =
+        currentBroadcastId &&
+        String(order.broadcast_id || "") === currentBroadcastId;
+
+      const savedBroadcastTitle = normalizeKoreanText(
+        order.broadcast_public_title || order.broadcast_name || ""
       );
+
+      const sameBroadcastTitle =
+        currentBroadcastTitle &&
+        savedBroadcastTitle &&
+        savedBroadcastTitle === currentBroadcastTitle;
+
+      return sameName && (sameBroadcastId || sameBroadcastTitle);
+    });
+
+    return matched;
+  };
+
+  const getCombineShippingTargetOrder = async () => {
+    const phone = onlyNumber(customerPhone);
+    const name = normalizeName(customerName);
+
+    if (phone.length < 10 || !name) {
+      return false;
+    }
+
+    const { data: targetBroadcasts } = await supabase
+      .from("broadcasts")
+      .select("id,public_title")
+      .eq("is_combine_shipping_target", true);
+
+    if (!targetBroadcasts || targetBroadcasts.length === 0) {
+      return false;
+    }
+
+    const targetIds = targetBroadcasts.map((broadcast) => Number(broadcast.id));
+    const targetTitles = targetBroadcasts.map((broadcast) =>
+      normalizeKoreanText(broadcast.public_title || "")
+    );
+
+    const { data: previousOrders } = await supabase
+      .from("orders")
+      .select("id,customer_name,customer_phone,broadcast_id,broadcast_name,broadcast_public_title")
+      .eq("customer_phone", phone)
+      .limit(200);
+
+    const matched = (previousOrders || []).some((order) => {
+      const sameName = normalizeName(order.customer_name || "") === name;
+
+      const orderBroadcastId = Number(order.broadcast_id || 0);
+      const orderBroadcastTitle = normalizeKoreanText(
+        order.broadcast_public_title || order.broadcast_name || ""
+      );
+
+      const matchedById = targetIds.includes(orderBroadcastId);
+      const matchedByTitle =
+        !!orderBroadcastTitle && targetTitles.includes(orderBroadcastTitle);
+
+      return sameName && (matchedById || matchedByTitle);
+    });
+
+    return matched;
+  };
+
+  const checkShippingDiscountTargets = async () => {
+    setSameBroadcastShippingChecked(false);
+    setHasPreviousOrderInSameBroadcast(false);
+    setHasCombineShippingTargetOrder(false);
+
+    const sameBroadcastMatched = await getSameBroadcastPreviousOrder();
+    const combineTargetMatched = await getCombineShippingTargetOrder();
+
+    setHasPreviousOrderInSameBroadcast(sameBroadcastMatched);
+    setHasCombineShippingTargetOrder(combineTargetMatched);
+    setSameBroadcastShippingChecked(true);
+  };
+
+  const openAddressSearch = () => {
+    if (!window.daum?.Postcode) {
+      alert("주소검색을 불러오는 중입니다. 잠시 후 다시 눌러주세요.");
+      return;
+    }
+
+    new window.daum.Postcode({
+      oncomplete: function (data: any) {
+        setZipcode(data.zonecode);
+        setAddress(data.roadAddress || data.jibunAddress);
+      },
+    }).open();
+  };
+
+  const addItem = () => {
+    setItems([
+      ...items,
+      { product: "", color: "", size: "", qty: "", price: "" },
+    ]);
+  };
+
+  const removeItem = (index: number) => {
+    if (items.length === 1) {
+      alert("상품은 최소 1개 이상 작성해야 합니다.");
+      return;
+    }
+
+    const copy = [...items];
+    copy.splice(index, 1);
+    setItems(copy);
+  };
+
+  const copyAccount = async () => {
+    await navigator.clipboard.writeText(bankAccount);
+    alert("계좌번호가 복사되었습니다.");
+  };
+
+  const copyLookupCode = async () => {
+    await navigator.clipboard.writeText(completedLookupCode);
+    alert("주문조회번호가 복사되었습니다.");
+  };
+
+  const checkBlockedCustomer = async () => {
+    const phone = onlyNumber(customerPhone);
+
+    if (phone.length < 10) return false;
+
+    const { data } = await supabase
+      .from("customers")
+      .select("*")
+      .eq("customer_phone", phone)
+      .limit(1);
+
+    const customer = data?.[0];
+
+    if (customer?.is_blocked === "Y") {
+      alert(
+        "⚠️ 주문 제한 안내\n\n주문 접수가 제한된 회원입니다.\n문의가 필요하신 경우 카톡채널로 연락 부탁드립니다."
+      );
+      return true;
+    }
+
+    return false;
+  };
+
+  const handleCustomerCheck = async () => {
+    const phone = onlyNumber(customerPhone);
+
+    if (!nickname.trim()) {
+      alert("유튜브 닉네임을 입력해주세요.");
+      return;
+    }
+
+    if (!customerName.trim()) {
+      alert("주문자 이름을 입력해주세요.");
+      return;
+    }
+
+    if (phone.length < 10) {
+      alert("전화번호를 정확히 입력해주세요.\n예) 01012345678");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("customers")
+      .select("*")
+      .eq("customer_phone", phone)
+      .limit(1);
+
+    if (error) {
+      alert("고객정보 확인 오류\n\n" + error.message);
+      return;
+    }
+
+    const customer = data?.[0];
+
+    if (customer && normalizeName(customer.customer_name || "") === normalizeName(customerName)) {
+      setCheckedCustomer(customer);
+      setCustomerCheckStatus("existing");
+      setUseSavedAddress(true);
+      setShowAddressForm(false);
+
+      return;
+    }
+
+    setCheckedCustomer(null);
+    setCustomerCheckStatus("new");
+    setUseSavedAddress(false);
+    setShowAddressForm(true);
+
+
+  };
+
+  const openManualAddressForm = () => {
+    setUseSavedAddress(false);
+    setShowAddressForm(true);
+  };
+
+  const saveCustomerInfo = async () => {
+    const phone = onlyNumber(customerPhone);
+
+    const { data: existing } = await supabase
+      .from("customers")
+      .select("*")
+      .eq("customer_phone", phone)
+      .limit(1);
+
+    const customer = existing?.[0];
+
+    const shouldUseSavedAddress =
+      useSavedAddress &&
+      checkedCustomer &&
+      customerCheckStatus === "existing";
+
+    const finalZipcode = shouldUseSavedAddress
+      ? checkedCustomer.zipcode || customer?.zipcode || ""
+      : zipcode;
+
+    const finalAddress = shouldUseSavedAddress
+      ? checkedCustomer.address || customer?.address || ""
+      : address;
+
+    const finalDetailAddress = shouldUseSavedAddress
+      ? checkedCustomer.detail_address || customer?.detail_address || ""
+      : detailAddress.trim();
+
+    const customerData = {
+      youtube_nickname: nickname.trim(),
+      customer_name: customerName.trim(),
+      customer_phone: phone,
+      zipcode: finalZipcode,
+      address: finalAddress,
+      detail_address: finalDetailAddress,
+      last_order_at: new Date().toISOString(),
+      is_default_address: saveAsDefaultAddress,
+    };
+
+    if (customer) {
+      const previousNames =
+        customer.customer_name !== customerName.trim()
+          ? `${customer.previous_names || ""} ${customer.customer_name}`.trim()
+          : customer.previous_names || "";
+
+      const previousNicknames =
+        customer.youtube_nickname !== nickname.trim()
+          ? `${customer.previous_nicknames || ""} ${
+              customer.youtube_nickname
+            }`.trim()
+          : customer.previous_nicknames || "";
+
+      const { error } = await supabase
+        .from("customers")
+        .update({
+          ...customerData,
+          previous_names: previousNames,
+          previous_nicknames: previousNicknames,
+        })
+        .eq("id", customer.id);
+
+      if (error) throw error;
+
+      return {
+        matchStatus:
+          customer.customer_name === customerName.trim()
+            ? "기존고객 정상"
+            : "관리자 확인 필요",
+        matchMemo:
+          customer.customer_name === customerName.trim()
+            ? ""
+            : `전화번호 동일 / 이름 다름: 기존(${customer.customer_name}) → 현재(${customerName.trim()})`,
+        zipcode: finalZipcode,
+        address: finalAddress,
+        detail_address: finalDetailAddress,
+      };
+    }
+
+    const { error } = await supabase.from("customers").insert(customerData);
+    if (error) throw error;
+
+    return {
+      matchStatus: "신규고객",
+      matchMemo: "",
+      zipcode: finalZipcode,
+      address: finalAddress,
+      detail_address: finalDetailAddress,
+    };
+  };
+
+  const handleSubmit = async () => {
+    if (broadcastStatus !== "ON") {
+      alert("현재 주문 접수 시간이 아닙니다.\n방송 시작 후 주문해주세요.");
+      return;
+    }
+
+    if (!nickname.trim()) {
+      alert("유튜브 닉네임을 입력해주세요.");
+      return;
+    }
+
+    if (!customerName.trim()) {
+      alert("주문자 이름을 입력해주세요.");
+      return;
+    }
+
+    const phone = onlyNumber(customerPhone);
+
+    if (phone.length < 10) {
+      alert("전화번호를 정확히 입력해주세요.\n예) 01012345678");
+      return;
+    }
+
+    if (customerCheckStatus === "unchecked") {
+      alert("고객정보 확인을 먼저 눌러주세요.");
+      return;
+    }
+
+    if (!useSavedAddress && (!zipcode || !address || !detailAddress.trim())) {
+      alert(
+        "배송지 정보가 없습니다.\n\n주소검색 후 상세주소까지 입력해주세요."
+      );
+      return;
+    }
+
+    if (useSavedAddress && (!checkedCustomer?.address || !checkedCustomer?.detail_address)) {
+      alert(
+        "저장된 배송지 정보가 부족합니다.\n\n[주소 직접 입력]을 눌러 주소를 입력해주세요."
+      );
+      return;
+    }
+
+    const blocked = await checkBlockedCustomer();
+    if (blocked) return;
+
+    const hasEmptyItem = items.some(
+      (item) =>
+        !item.product.trim() ||
+        !item.color.trim() ||
+        !item.size.trim() ||
+        !item.qty ||
+        !item.price
+    );
+
+    if (hasEmptyItem) {
+      alert(
+        "상품명 · 색상 · 사이즈 · 수량 · 금액을 모두 입력해주세요.\n\n색상/사이즈가 없으면 '없음' 이라고 작성해주세요."
+      );
+      return;
+    }
+
+    const hasNumberInColor = items.some((item) => hasNumber(item.color));
+
+    if (hasNumberInColor) {
+      alert("색상칸에는 숫자를 입력할 수 없습니다.\n\n색상이 없으면 '없음'이라고 작성해주세요.");
+      return;
+    }
+
+    localStorage.setItem("ruru_youtube_nickname", nickname.trim());
+    localStorage.setItem("ruru_customer_name", customerName.trim());
+    localStorage.setItem("ruru_customer_phone", phone);
+
+    if (!useSavedAddress) {
+      localStorage.setItem("ruru_customer_zipcode", zipcode);
+      localStorage.setItem("ruru_customer_address", address);
+      localStorage.setItem("ruru_customer_detail_address", detailAddress.trim());
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const isAdditionalOrder = await getSameBroadcastPreviousOrder();
+      const isCombineShippingOrder = await getCombineShippingTargetOrder();
+
+      const customerMatch = await saveCustomerInfo();
+      const orderGroupId = crypto.randomUUID();
+      const orderLookupCode = generateLookupCode();
+
+      const originalShippingFee = baseShippingFee;
+      const appliedShippingFee = isAdditionalOrder || isCombineShippingOrder ? 0 : baseShippingFee;
+      const submitCashTotal = productTotal + appliedShippingFee;
+      const submitVatAmount =
+        paymentMethod === "카드결제"
+          ? Math.ceil(submitCashTotal * (cardFeeRate / 100))
+          : 0;
+      const submitTotal = submitCashTotal + submitVatAmount;
+
+      const orderRows = items.map((item) => ({
+        order_group_id: orderGroupId,
+        order_lookup_code: orderLookupCode,
+
+        broadcast_id: activeBroadcast.id,
+        broadcast_name:
+          broadcastTitle || activeBroadcast.public_title || "방송명 미지정",
+        broadcast_public_title:
+          activeBroadcast.public_title || broadcastTitle || "방송명 미지정",
+        broadcast_admin_subtitle: activeBroadcast.admin_subtitle || "",
+
+        youtube_nickname: nickname.trim(),
+        customer_name: customerName.trim(),
+        customer_phone: phone,
+
+        zipcode: customerMatch.zipcode || "",
+        address: customerMatch.address || "",
+        detail_address: customerMatch.detail_address || "",
+        address_type: "고객입력",
+
+        customer_match_status: customerMatch.matchStatus,
+        customer_match_memo: customerMatch.matchMemo,
+
+        request_memo: requestMemo.trim(),
+        save_as_default_address: saveAsDefaultAddress,
+
+        product_name: item.product,
+        color: item.color,
+        size: item.size,
+        qty: Number(item.qty),
+        product_price: Number(item.price),
+
+        shipping_fee: appliedShippingFee,
+        original_shipping_fee: originalShippingFee,
+        final_shipping_fee: appliedShippingFee,
+        adjusted_shipping_fee: appliedShippingFee,
+        total_price: submitTotal,
+        adjusted_total_price: submitTotal,
+
+        combine_shipping_applied: isAdditionalOrder || isCombineShippingOrder,
+        combine_shipping_memo: isAdditionalOrder
+          ? "동일 방송 추가주문 배송비 0원 자동 적용"
+          : isCombineShippingOrder
+          ? "합배송 기준 방송 구매 이력으로 배송비 0원 자동 적용"
+          : isJejuAddressByValues(
+              customerMatch.zipcode || "",
+              customerMatch.address || "",
+              customerMatch.detail_address || ""
+            )
+          ? "제주 배송비 6,000원 자동 적용"
+          : "기본 배송비 적용",
+
+        shipping_status: "기본배송",
+        admin_status: "관리자 확인 전",
+        order_status: "주문완료신청",
+
+        payment_method: paymentMethod,
+        vat_amount: submitVatAmount,
+      }));
+
+      const { error } = await supabase.from("orders").insert(orderRows);
+      if (error) throw error;
+
+      setCompletedTotal(submitTotal);
+      setCompletedPaymentMethod(paymentMethod);
+      setCompletedLookupCode(orderLookupCode);
+      setIsCompleted(true);
+
+      setItems([{ product: "", color: "", size: "", qty: "", price: "" }]);
+      setRequestMemo("");
     } catch (error: any) {
-      console.error(error);
-      alert(
-        "로젠 송장 생성 중 오류가 발생했습니다.\\n템플릿 파일 또는 주문 데이터를 확인해주세요."
-      );
+      alert("주문 저장 실패\n\n" + error.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  if (!isAuthed) {
+  const handleLookup = async () => {
+    const phone = onlyNumber(lookupPhone);
+
+    if (!lookupCode.trim()) {
+      alert("주문조회번호를 입력해주세요.");
+      return;
+    }
+
+    if (phone.length < 10) {
+      alert("전화번호를 입력해주세요.");
+      return;
+    }
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("order_lookup_code", lookupCode.trim())
+      .eq("customer_phone", phone)
+      .gte("created_at", sevenDaysAgo.toISOString())
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setLookupOrders(data || []);
+
+    if (!data || data.length === 0) {
+      setLookupMessage("최근 7일 이내 조회 가능한 주문이 없습니다.");
+    } else {
+      setLookupMessage("");
+    }
+  };
+
+  if (isLoadingBroadcast) {
     return (
-      <main className="min-h-screen bg-gray-100 flex items-center justify-center p-5 text-gray-900">
-        <div className="w-full max-w-sm bg-white rounded-3xl p-6 border border-gray-200 shadow-sm">
-          <h1 className="text-3xl font-extrabold mb-2 text-gray-900">
-            관리자 로그인
-          </h1>
-          <p className="text-gray-700 mb-5">루루동이 관리자 페이지</p>
+      <main className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <div className="text-center text-gray-700">
+          <div className="text-2xl font-bold mb-2">루루동이 주문서</div>
+          <div>주문서 상태 확인중...</div>
+        </div>
+      </main>
+    );
+  }
 
-          <input
-            type="password"
-            placeholder="관리자 비밀번호"
-            className="w-full p-4 rounded-2xl border border-gray-300 bg-white text-gray-900 mb-4 placeholder:text-gray-400"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleLogin();
-            }}
-          />
+  if (screen === "menu" && !isCompleted) {
+    return (
+      <main className="min-h-screen bg-gray-50 p-5 flex items-center justify-center">
+        <div className="w-full max-w-5xl">
+          <section className="bg-white rounded-[2rem] p-6 md:p-8 border shadow-sm">
+            <div className="text-center mb-7">
+              <div className="text-sm font-extrabold text-gray-400 mb-2">
+                RURU LIVE ORDER
+              </div>
 
+              <h1 className="text-3xl md:text-5xl font-extrabold text-gray-950">
+                루루동이 라이브마켓
+              </h1>
+
+              <p className="text-gray-500 font-bold mt-3">
+                주문서 작성 · 주문조회 · 공지 확인
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              <Link
+                href="/notice"
+                className="min-h-[74px] px-5 py-4 rounded-3xl bg-white text-gray-900 border border-gray-200 hover:bg-gray-100 font-extrabold text-center transition shadow-sm flex items-center justify-center"
+              >
+                공지
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => setScreen("order")}
+                className="min-h-[74px] px-5 py-4 rounded-3xl bg-black text-white hover:bg-gray-800 font-extrabold text-center transition shadow-sm flex items-center justify-center"
+              >
+                주문서작성
+              </button>
+
+              <Link
+                href="/myorder"
+                className="min-h-[74px] px-5 py-4 rounded-3xl bg-white text-gray-900 border border-gray-200 hover:bg-gray-100 font-extrabold text-center transition shadow-sm flex items-center justify-center"
+              >
+                주문조회
+              </Link>
+
+              <a
+                href={kakaoChannelUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="min-h-[74px] px-5 py-4 rounded-3xl bg-yellow-300 text-black hover:bg-yellow-400 font-extrabold text-center transition shadow-sm flex items-center justify-center"
+              >
+                카톡채널
+              </a>
+
+              <a
+                href={bandUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="min-h-[74px] px-5 py-4 rounded-3xl bg-white text-gray-900 border border-gray-200 hover:bg-gray-100 font-extrabold text-center transition shadow-sm flex items-center justify-center"
+              >
+                루루동이밴드
+              </a>
+
+              <a
+                href={youtubeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="min-h-[74px] px-5 py-4 rounded-3xl bg-white text-gray-900 border border-gray-200 hover:bg-gray-100 font-extrabold text-center transition shadow-sm flex items-center justify-center"
+              >
+                유튜브
+              </a>
+            </div>
+
+            <div className="text-xs text-gray-400 text-center mt-6 leading-5">
+              방송 중 접수된 주문만 주문서 작성이 가능합니다.
+            </div>
+          </section>
+        </div>
+      </main>
+    );
+  }
+
+  if (screen === "lookup" && !isCompleted) {
+    return (
+      <main className="min-h-screen bg-gray-50 p-5">
+        <div className="max-w-md mx-auto">
+          <div className="bg-white rounded-3xl p-6 border shadow-sm mt-10">
+            <h1 className="text-3xl font-extrabold mb-2">주문내역 조회</h1>
+            <p className="text-gray-500 mb-5">
+              최근 7일 이내 주문만 조회 가능합니다.
+            </p>
+
+            <input
+              type="text"
+              placeholder="주문조회번호"
+              className="w-full p-4 rounded-2xl bg-gray-50 border mb-3"
+              value={lookupCode}
+              onChange={(e) => setLookupCode(e.target.value.toUpperCase())}
+            />
+
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="전화번호 01012345678"
+              className="w-full p-4 rounded-2xl bg-gray-50 border mb-3"
+              value={formatPhone(lookupPhone)}
+              onChange={(e) => setLookupPhone(onlyNumber(e.target.value))}
+            />
+
+            <button
+              onClick={handleLookup}
+              className="w-full bg-black text-white p-4 rounded-2xl font-bold mb-3"
+            >
+              조회하기
+            </button>
+
+            <button
+              onClick={() => setScreen("menu")}
+              className="w-full bg-gray-200 text-gray-900 p-4 rounded-2xl font-bold"
+            >
+              처음으로
+            </button>
+
+            {lookupMessage && (
+              <div className="mt-5 bg-red-50 text-red-600 rounded-2xl p-4 font-bold">
+                {lookupMessage}
+              </div>
+            )}
+
+            {lookupOrders.length > 0 && (
+              <div className="mt-5 grid gap-3">
+                {lookupOrders.map((order) => (
+                  <div
+                    key={order.id}
+                    className="bg-gray-50 rounded-2xl p-4 border"
+                  >
+                    <div className="font-bold">{order.product_name}</div>
+                    <div className="text-sm text-gray-600 mt-1">
+                      {order.color} / {order.size} / {order.qty}개
+                    </div>
+                    <div className="text-sm text-gray-600 mt-1">
+                      {order.address} {order.detail_address}
+                    </div>
+                    <div className="font-bold mt-2">
+                      {formatWon(order.adjusted_total_price || order.total_price)}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {order.order_status || "주문완료신청"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (broadcastStatus !== "ON" && screen === "order") {
+    return (
+      <main className="min-h-screen bg-gray-50 p-5 flex items-center justify-center">
+        <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-sm border text-center">
+          <div className="text-3xl font-bold mb-4">루루동이 주문서</div>
+          <div className="bg-red-50 text-red-600 rounded-2xl p-5 text-xl font-bold mb-5">
+            현재 주문 접수 시간이 아닙니다
+          </div>
+          <p className="text-gray-600 leading-7 mb-6">
+            방송 시작 후 주문서 작성이 가능합니다.
+            <br />
+            방송 중 안내에 따라 다시 접속해주세요.
+          </p>
           <button
-            onClick={handleLogin}
-            className="w-full bg-black text-white p-4 rounded-2xl font-bold"
+            onClick={loadBroadcastSettings}
+            className="w-full bg-black text-white font-bold p-4 rounded-2xl mb-3"
           >
-            로그인
+            주문서 다시 확인하기
+          </button>
+          <button
+            onClick={() => setScreen("menu")}
+            className="w-full bg-gray-200 text-gray-900 font-bold p-4 rounded-2xl"
+          >
+            처음으로
           </button>
         </div>
       </main>
     );
   }
 
-  if (loading) {
+  if (isCompleted) {
     return (
-      <main className="min-h-screen bg-gray-100 flex items-center justify-center p-5 text-gray-900">
-        <div className="bg-white rounded-3xl p-8 border border-gray-200 shadow-sm text-center">
-          <div className="text-2xl font-extrabold mb-2 text-gray-900">
-            루루동이 관리자
+      <main className="min-h-screen bg-gray-50 p-5">
+        <div className="max-w-md mx-auto">
+          <div className="bg-white rounded-3xl p-6 border shadow-sm mt-10">
+            <h1 className="text-3xl font-bold mb-4">주문완료신청 완료</h1>
+            <p className="text-gray-600 mb-6">주문서가 정상 접수되었습니다.</p>
+
+            <div className="bg-gray-50 rounded-2xl p-5 mb-5 border">
+              <div className="text-gray-500 mb-1">주문조회번호</div>
+              <div className="text-2xl font-extrabold mb-4">
+                {completedLookupCode}
+              </div>
+              <button
+                onClick={copyLookupCode}
+                className="w-full bg-gray-900 text-white font-bold p-4 rounded-2xl"
+              >
+                주문조회번호 복사하기
+              </button>
+            </div>
+
+            {completedPaymentMethod === "무통장입금" ? (
+              <div className="bg-gray-50 rounded-2xl p-5 mb-5 border">
+                <div className="text-red-600 text-xl font-bold mb-3">
+                  ⚠️ 10분 이내 입금해주세요
+                </div>
+                <div className="text-gray-700 mb-4 leading-7">
+                  입금 후 카톡채널에
+                  <br />
+                  <b>[입금내역 캡처 + 유튜브닉네임]</b>
+                  <br />
+                  남겨주셔야 최종 주문확인 완료됩니다.
+                </div>
+                <div className="text-gray-500 mb-1">새마을금고</div>
+                <div className="text-3xl font-bold mb-1">{bankAccount}</div>
+                <div className="text-lg mb-5">예금주 : 유혜원</div>
+                <button
+                  onClick={copyAccount}
+                  className="w-full bg-black text-white font-bold p-4 rounded-2xl text-lg"
+                >
+                  계좌번호 복사하기
+                </button>
+              </div>
+            ) : (
+              <div className="bg-gray-50 rounded-2xl p-5 mb-5 border">
+                <div className="text-xl font-bold mb-3">카드결제 신청 완료</div>
+                <p className="text-gray-700 leading-7">
+                  카드결제는 수수료가 추가됩니다.
+                  <br />
+                  관리자 확인 후 카톡채널로 결제링크를 보내드립니다.
+                </p>
+              </div>
+            )}
+
+            <div className="bg-black text-white rounded-2xl p-5 mb-6">
+              <div className="text-gray-300 mb-1">최종 결제금액</div>
+              <div className="text-4xl font-bold">
+                {formatWon(completedTotal)}
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border rounded-2xl p-4 text-sm text-gray-600 font-bold leading-6">
+              주문내역 확인은 상단 메뉴의 주문조회 또는 카톡채널 문의를 이용해주세요.
+            </div>
           </div>
-          <div className="text-gray-700">불러오는중...</div>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 p-5 text-gray-900">
-      <div className="max-w-7xl mx-auto pb-10">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-5">
-          <div>
-            <h1 className="text-3xl font-extrabold text-gray-900">
-              루루동이 관리자 ERP
-            </h1>
-            <p className="text-gray-700 mt-1">방송 / 주문 / 회원 / 정산 관리</p>
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={loadAll}
-              className="bg-black text-white px-5 py-3 rounded-2xl font-bold"
-            >
-              새로고침
-            </button>
-
-            <button
-              onClick={handleLogout}
-              className="bg-gray-300 text-black px-5 py-3 rounded-2xl font-bold"
-            >
-              로그아웃
-            </button>
-          </div>
+    <main id="order-form" className="min-h-screen bg-gray-50 text-gray-900 p-4">
+      <div className="max-w-md mx-auto pb-10">
+        <div className="py-4">
+          <h1 className="text-3xl font-extrabold tracking-tight">
+            루루동이 주문서
+          </h1>
+          <p className="text-gray-500 mt-1">라이브 방송 주문 전용</p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-5">
-          <button
-            onClick={() => setTab("orders")}
-            className={`p-4 rounded-2xl font-bold border ${
-              tab === "orders"
-                ? "bg-black text-white"
-                : "bg-white text-gray-900 border-gray-300"
-            }`}
-          >
-            주문관리
-          </button>
-
-          <a
-            href="/admin/broadcasts"
-            className="p-4 rounded-2xl font-bold border bg-white text-gray-900 border-gray-300 text-center hover:bg-black hover:text-white transition"
-          >
-            방송관리
-          </a>
-
-          <button
-            onClick={() => setTab("trash")}
-            className={`p-4 rounded-2xl font-bold border ${
-              tab === "trash"
-                ? "bg-black text-white"
-                : "bg-white text-gray-900 border-gray-300"
-            }`}
-          >
-            휴지통 {trashOrders.length > 0 ? `(${trashOrders.length})` : ""}
-          </button>
-
-          <button
-            onClick={() => setTab("members")}
-            className={`p-4 rounded-2xl font-bold border ${
-              tab === "members"
-                ? "bg-black text-white"
-                : "bg-white text-gray-900 border-gray-300"
-            }`}
-          >
-            회원관리
-          </button>
-
-          <button
-            onClick={() => setTab("stats")}
-            className={`p-4 rounded-2xl font-bold border ${
-              tab === "stats"
-                ? "bg-black text-white"
-                : "bg-white text-gray-900 border-gray-300"
-            }`}
-          >
-            통계/정산
-          </button>
-
-          <a
-            href="/admin/notice"
-            className="p-4 rounded-2xl font-bold border bg-white text-gray-900 border-gray-300 text-center hover:bg-black hover:text-white transition"
-          >
-            공지관리
-          </a>
-        </div>
-
-        <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-5">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <div className="text-2xl font-extrabold">현재 방송 상태</div>
-              <div className="text-sm text-gray-500 mt-1">
-                방송 정보 / 배송비 / 카드수수료 실시간 관리
-              </div>
-            </div>
-
-            <button
-              onClick={saveBroadcastSettings}
-              className="bg-black text-white px-5 py-3 rounded-2xl font-bold"
-            >
-              현재 방송 수정 저장
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
-            <div>
-              <div className="text-sm font-bold mb-2 text-gray-700">
-                고객용 방송제목
-              </div>
-              <input
-                value={publicTitle}
-                onChange={(e) => setPublicTitle(e.target.value)}
-                placeholder="예) 0515 신발 방송"
-                className="w-full border rounded-2xl px-4 py-3"
-              />
-            </div>
-
-            <div>
-              <div className="text-sm font-bold mb-2 text-gray-700">
-                관리자용 부제목
-              </div>
-              <input
-                value={adminSubtitle}
-                onChange={(e) => setAdminSubtitle(e.target.value)}
-                placeholder="예) 아지트1 / 1차"
-                className="w-full border rounded-2xl px-4 py-3"
-              />
-            </div>
-
-            <div>
-              <div className="text-sm font-bold mb-2 text-gray-700">배송비</div>
-              <MoneyInput value={shippingFee} onChange={setShippingFee} />
-            </div>
-
-            <div>
-              <div className="text-sm font-bold mb-2 text-gray-700">
-                카드수수료
-              </div>
-              <PercentInput value={cardFeeRate} onChange={setCardFeeRate} />
-            </div>
-
-            <div>
-              <div className="text-sm font-bold mb-2 text-gray-700">
-                합배송 사용
-              </div>
-
-              <label className="h-[54px] flex items-center gap-2 border rounded-2xl px-4 font-extrabold bg-white">
-                <input
-                  type="checkbox"
-                  checked={combineShippingEnabled}
-                  onChange={(e) => setCombineShippingEnabled(e.target.checked)}
-                />
-                사용
-              </label>
-            </div>
-
-            <div>
-              <div className="text-sm font-bold mb-2 text-gray-700">
-                합배송 그룹
-              </div>
-
-              <input
-                value={combineShippingGroup}
-                onChange={(e) => setCombineShippingGroup(e.target.value)}
-                placeholder="예) 0516 신발/의류"
-                className="w-full border rounded-2xl px-4 py-3"
-              />
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <div className="text-sm font-bold mb-2 text-gray-700">
-              합배송 메모
-            </div>
-
-            <input
-              value={combineShippingMemo}
-              onChange={(e) => setCombineShippingMemo(e.target.value)}
-              placeholder="예) 오늘 방송끼리 이름+전화번호+주소 같으면 무료배송"
-              className="w-full border rounded-2xl px-4 py-3"
-            />
-          </div>
-
-          <div className="mt-5 bg-gray-50 rounded-3xl border border-gray-200 p-5">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <div>
-                <div className="text-sm text-gray-500 mb-1">방송 상태</div>
-                <div
-                  className={`text-2xl font-extrabold ${
-                    activeBroadcast ? "text-green-600" : "text-red-500"
-                  }`}
-                >
-                  {activeBroadcast ? "방송중" : "방송종료"}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-sm text-gray-500 mb-1">방송 시작시간</div>
-                <div className="text-xl font-bold text-black">
-                  {activeBroadcast?.started_at
-                    ? new Date(activeBroadcast.started_at).toLocaleString("ko-KR")
-                    : "-"}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-sm text-gray-500 mb-1">현재 적용 정보</div>
-                <div className="text-base font-bold text-gray-800 leading-7">
-                  배송비 {shippingFee.toLocaleString()}원
-                  <br />
-                  카드수수료 {cardFeeRate}%
-                  <br />
-                  합배송 {combineShippingEnabled ? "사용" : "미사용"}
-                  {combineShippingGroup ? ` / ${combineShippingGroup}` : ""}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={startBroadcast}
-                className="bg-green-600 text-white px-6 py-4 rounded-2xl font-extrabold"
-              >
-                방송시작
-              </button>
-
-              <button
-                onClick={endBroadcast}
-                className="bg-red-500 text-white px-6 py-4 rounded-2xl font-extrabold"
-              >
-                방송종료
-              </button>
-            </div>
+        <section className="bg-white rounded-3xl p-5 border shadow-sm mb-4">
+          <div className="text-sm text-gray-500 mb-1">현재 방송</div>
+          <div className="text-xl font-bold">
+            {broadcastTitle || activeBroadcast.public_title || "방송 주문 접수중"}
           </div>
         </section>
 
-        {tab === "orders" && (
-          <>
-            <AdminQuickFilters
-              statusFilter={statusFilter}
-              setStatusFilter={setStatusFilter}
-              paymentFilter={paymentFilter}
-              setPaymentFilter={setPaymentFilter}
-            />
-
-            <section className="grid grid-cols-1 md:grid-cols-3 gap-3 my-5">
-              <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-                <div className="text-xs text-gray-500 font-bold">
-                  방송매출
-                </div>
-
-                <div className="text-2xl font-extrabold mt-1">
-                  {won(dashboardSales)}
-                </div>
-              </div>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 shadow-sm">
-                <div className="text-xs text-blue-600 font-bold">
-                  카드매출
-                </div>
-
-                <div className="text-2xl font-extrabold mt-1 text-blue-700">
-                  {won(dashboardCardSales)}
-                </div>
-              </div>
-
-              <div className="bg-black text-white rounded-2xl p-4 shadow-sm">
-                <div className="text-xs opacity-70 font-bold">
-                  최종순이익
-                </div>
-
-                <div className="text-3xl font-extrabold mt-1">
-                  {won(dashboardFinalProfit)}
-                </div>
-              </div>
-            </section>
-
-            <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-5 my-5">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-                <div>
-                  <div className="text-xl font-extrabold text-gray-900">
-                    주문 요약
-                  </div>
-                  <div className="text-sm text-gray-500 font-bold mt-1">
-                    현재 필터 기준으로 계산됩니다.
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setShowDetailStats((prev) => !prev)}
-                  className="rounded-2xl bg-gray-100 text-gray-800 px-5 py-3 font-extrabold"
-                >
-                  {showDetailStats ? "상세 접기" : "상세 보기"}
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
-                  <div className="text-xs text-gray-500 font-bold">조회 주문</div>
-                  <div className="text-2xl font-extrabold mt-1">{orderSummary.totalCount}건</div>
-                </div>
-
-                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
-                  <div className="text-xs text-gray-500 font-bold">조회 금액</div>
-                  <div className="text-2xl font-extrabold mt-1">{won(orderSummary.totalAmount)}</div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter("주문확인전")}
-                  className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-left hover:bg-yellow-100 transition"
-                >
-                  <div className="text-xs text-yellow-700 font-bold">신규 주문</div>
-                  <div className="text-2xl font-extrabold mt-1 text-yellow-700">{orderSummary.newCount}건</div>
-                </button>
-
-                <div className="bg-black text-white rounded-2xl p-4">
-                  <div className="text-xs opacity-70 font-bold">필터 순매출</div>
-                  <div className="text-2xl font-extrabold mt-1">{won(dashboardSales)}</div>
-                </div>
-              </div>
-
-              {showDetailStats && (
-                <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3 mt-3">
-                  <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
-                    <div className="text-xs text-red-600 font-bold">환불</div>
-                    <div className="text-2xl font-extrabold mt-1 text-red-700">{orderSummary.refundCount}건</div>
-                  </div>
-
-                  <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4">
-                    <div className="text-xs text-orange-600 font-bold">부분환불</div>
-                    <div className="text-2xl font-extrabold mt-1 text-orange-700">{orderSummary.partialRefundCount}건</div>
-                  </div>
-
-                  <div className="bg-gray-100 border border-gray-300 rounded-2xl p-4">
-                    <div className="text-xs text-gray-600 font-bold">주문서취소</div>
-                    <div className="text-2xl font-extrabold mt-1 text-gray-800">{orderSummary.cancelCount}건</div>
-                  </div>
-
-                  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-                    <div className="text-xs text-blue-600 font-bold">카드결제</div>
-                    <div className="text-2xl font-extrabold mt-1 text-blue-700">{orderSummary.cardCount}건</div>
-                  </div>
-
-                  <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
-                    <div className="text-xs text-gray-600 font-bold">무통장입금</div>
-                    <div className="text-2xl font-extrabold mt-1 text-gray-800">{orderSummary.bankCount}건</div>
-                  </div>
-
-                  <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
-                    <div className="text-xs text-red-600 font-bold">환불금액</div>
-                    <div className="text-2xl font-extrabold mt-1 text-red-700">- {won(dashboardRefundAmount)}</div>
-                  </div>
-                </div>
-              )}
-            </section>
-
-            <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-5 my-5">
-              <div className="grid md:grid-cols-5 gap-3">
-                <input
-                  type="text"
-                  placeholder="닉네임 / 이름 / 전화번호 / 상품 검색"
-                  className="w-full p-4 rounded-2xl border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 md:col-span-2"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-
-                <select
-                  className="w-full p-4 rounded-2xl border border-gray-300 bg-white text-gray-900"
-                  value={selectedBroadcastId}
-                  onChange={(e) => setSelectedBroadcastId(e.target.value)}
-                >
-                  <option value="ALL">전체 방송</option>
-                  {broadcasts.map((broadcast) => (
-                    <option key={broadcast.id} value={broadcast.id}>
-                      {broadcast.public_title}{" "}
-                      {broadcast.admin_subtitle ? `/ ${broadcast.admin_subtitle}` : ""}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  className="w-full p-4 rounded-2xl border border-gray-300 bg-white text-gray-900"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                >
-                  {STATUS_FILTER_OPTIONS.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  className="w-full p-4 rounded-2xl border border-gray-300 bg-white text-gray-900"
-                  value={paymentFilter}
-                  onChange={(e) => setPaymentFilter(e.target.value)}
-                >
-                  {PAYMENT_FILTER_OPTIONS.filter((item) => item !== "기타결제").map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </section>
-
-            <section className="bg-white rounded-3xl border border-yellow-200 shadow-sm p-5 my-5">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-                <div>
-                  <div className="text-xl font-extrabold text-gray-900">
-                    🔔 신규 주문 알림
-                  </div>
-                  <div className="text-sm text-gray-500 font-bold mt-1">
-                    최근 신규 주문 3건까지 표시됩니다. 상태를 변경하면 신규 표시가 자동으로 사라집니다.
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter("주문확인전")}
-                  className="rounded-2xl bg-yellow-400 text-black px-5 py-3 font-extrabold"
-                >
-                  신규주문 {newOrderAlerts.length}건 보기
-                </button>
-              </div>
-
-              {recentNewOrderAlerts.length > 0 ? (
-                <div className="grid gap-2">
-                  {recentNewOrderAlerts.map((order) => (
-                    <div
-                      key={`new-alert-${order.id}`}
-                      className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 rounded-2xl bg-yellow-50 border border-yellow-100 px-4 py-3"
-                    >
-                      <div className="font-extrabold text-gray-900">
-                        🟡 {order.youtube_nickname || "-"} / {order.customer_name || "-"}
-                      </div>
-
-                      <div className="text-sm font-bold text-gray-700 md:text-right">
-                        {order.product_name || "상품명 없음"}
-                        {" · "}
-                        {order.color || "없음"} / {order.size || "없음"}
-                        {" · "}
-                        {order.qty || 0}개
-                        {" · "}
-                        {won(getOrderTotal(order))}
-                      </div>
-                    </div>
-                  ))}
-
-                  {newOrderAlerts.length > recentNewOrderAlerts.length && (
-                    <div className="rounded-2xl bg-gray-50 border border-gray-200 px-4 py-3 text-sm font-bold text-gray-500 text-center">
-                      외 {newOrderAlerts.length - recentNewOrderAlerts.length}건 더 있습니다.
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="rounded-2xl bg-gray-50 border border-gray-200 px-4 py-4 text-center text-gray-500 font-bold">
-                  신규 주문 알림이 없습니다.
-                </div>
-              )}
-            </section>
-
-            <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-5">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5">
-                <div>
-                  <div className="text-2xl font-extrabold">주문 관리</div>
-                  <div className="text-sm text-gray-500 mt-1">
-                    주문상태 / 결제수단 / 환불 / 취소 / 로젠송장
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={downloadRozenExcel}
-                    className="px-5 py-3 rounded-2xl font-bold bg-blue-600 text-white"
-                  >
-                    로젠 송장 생성
-                  </button>
-
-                  <button
-                    onClick={selectAllFilteredOrders}
-                    className="px-5 py-3 rounded-2xl font-bold bg-gray-100 text-black"
-                  >
-                    전체선택
-                  </button>
-
-                  <button
-                    onClick={clearSelectedOrders}
-                    className="px-5 py-3 rounded-2xl font-bold bg-gray-100 text-black"
-                  >
-                    선택해제
-                  </button>
-
-                  <button
-                    onClick={bulkMoveOrdersToTrash}
-                    disabled={selectedOrderIds.length === 0}
-                    className="px-5 py-3 rounded-2xl font-bold bg-red-600 text-white disabled:opacity-40"
-                  >
-                    선택 {selectedOrderIds.length}건 삭제
-                  </button>
-
-                  <button
-                    onClick={() => setViewMode("card")}
-                    className={`px-5 py-3 rounded-2xl font-bold ${
-                      viewMode === "card"
-                        ? "bg-black text-white"
-                        : "bg-gray-100 text-black"
-                    }`}
-                  >
-                    카드형
-                  </button>
-
-                  <button
-                    onClick={() => setViewMode("table")}
-                    className={`px-5 py-3 rounded-2xl font-bold ${
-                      viewMode === "table"
-                        ? "bg-black text-white"
-                        : "bg-gray-100 text-black"
-                    }`}
-                  >
-                    테이블형
-                  </button>
-                </div>
-              </div>
-
-              {selectedOrderIds.length > 0 && (
-                <div className="mb-5 rounded-3xl border border-blue-200 bg-blue-50 p-5">
-                  <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
-                    <div>
-                      <div className="text-lg font-extrabold text-blue-900">
-                        선택 주문 합계
-                      </div>
-
-                      <div className="mt-2 grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
-                        <div className="rounded-2xl bg-white border border-blue-100 p-3">
-                          <div className="text-blue-500 font-bold">선택</div>
-                          <div className="text-xl font-extrabold text-blue-900">
-                            {selectedOrderSummary.count}건
-                          </div>
-                        </div>
-
-                        <div className="rounded-2xl bg-white border border-blue-100 p-3">
-                          <div className="text-blue-500 font-bold">고객</div>
-                          <div className="text-base font-extrabold text-blue-900 truncate">
-                            {selectedOrderSummary.customerLabel}
-                          </div>
-                        </div>
-
-                        <div className="rounded-2xl bg-white border border-blue-100 p-3">
-                          <div className="text-blue-500 font-bold">총수량</div>
-                          <div className="text-xl font-extrabold text-blue-900">
-                            {selectedOrderSummary.totalQty}개
-                          </div>
-                        </div>
-
-                        <div className="rounded-2xl bg-white border border-blue-100 p-3">
-                          <div className="text-blue-500 font-bold">주문금액</div>
-                          <div className="text-xl font-extrabold text-blue-900">
-                            {won(selectedOrderSummary.orderAmount)}
-                          </div>
-                        </div>
-
-                        <div className="rounded-2xl bg-white border border-blue-100 p-3">
-                          <div className="text-blue-500 font-bold">카드결제 요청</div>
-                          <div className="text-xl font-extrabold text-blue-900">
-                            {won(selectedOrderSummary.cardPaymentAmount)}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-2 text-xs font-bold text-blue-700">
-                        고객 카드추가금 {selectedOrderSummary.customerCardFeeRate}% 기준: {won(selectedOrderSummary.customerCardFeeAmount)}
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={openPaysterCardPayment}
-                      className="shrink-0 rounded-2xl bg-blue-600 px-6 py-4 font-extrabold text-white hover:bg-blue-700"
-                    >
-                      💳 카드결제 사이트 열기
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {viewMode === "table" ? (
-                <div className="overflow-auto max-h-[720px] border rounded-2xl">
-                  <table className="w-full border-collapse bg-white">
-                    <thead>
-                      <tr className="bg-gray-100 text-sm sticky top-0 z-20 shadow-sm">
-                        <ResizableTh colKey="check">
-                          <input
-                            type="checkbox"
-                            checked={
-                              filteredOrders.length > 0 &&
-                              selectedOrderIds.length === filteredOrders.length
-                            }
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                selectAllFilteredOrders();
-                              } else {
-                                clearSelectedOrders();
-                              }
-                            }}
-                          />
-                        </ResizableTh>
-                        <ResizableTh colKey="status">상태</ResizableTh>
-                        <ResizableTh colKey="member">닉네임 / 이름</ResizableTh>
-                        <ResizableTh colKey="item">주문내역</ResizableTh>
-                        <ResizableTh colKey="qty">수량</ResizableTh>
-                        <ResizableTh colKey="total">금액</ResizableTh>
-                        <ResizableTh colKey="shipping">배송비</ResizableTh>
-                        <ResizableTh colKey="payment">결제수단</ResizableTh>
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                      {filteredOrders.map((order) => {
-                        const status = getDisplayStatus(order);
-                        const isCanceled = status === "주문서취소";
-                        const isRefunded = status === "환불" || status === "부분환불";
-                        const shouldStrike = isCanceled || isRefunded;
-                        const paymentLabel = getPaymentLabel(order);
-
-                        return (
-                          <tr
-                            key={order.id}
-                            className={`border-b ${
-                              status === "환불"
-                                ? "bg-red-50 hover:bg-red-100"
-                                : status === "부분환불"
-                                ? "bg-orange-50 hover:bg-orange-100"
-                                : status === "주문서취소"
-                                ? "bg-gray-100 hover:bg-gray-200"
-                                : paymentLabel === "카드결제"
-                                ? "bg-blue-50/40 hover:bg-blue-50"
-                                : "hover:bg-gray-50"
-                            }`}
-                          >
-                            <td className="p-3 text-center">
-                              <input
-                                type="checkbox"
-                                checked={selectedOrderIds.includes(Number(order.id))}
-                                onChange={() => toggleOrderSelection(Number(order.id))}
-                                className="w-5 h-5"
-                              />
-                            </td>
-
-                            <td className="p-3">
-                              <select
-                                value={status === "부분환불" ? "환불" : status}
-                                onChange={(e) => handleStatusChange(order, e.target.value)}
-                                className={`w-full px-3 py-2 rounded-xl font-extrabold border ${
-                                  status === "환불"
-                                    ? "bg-red-100 text-red-700 border-red-300"
-                                    : status === "부분환불"
-                                    ? "bg-orange-100 text-orange-700 border-orange-300"
-                                    : status === "주문서취소"
-                                    ? "bg-red-100 text-red-700 border-red-300"
-                                    : status === "출고대기"
-                                    ? "bg-yellow-100 text-yellow-700 border-yellow-300"
-                                    : status === "주문확인완료"
-                                    ? "bg-blue-100 text-blue-700 border-blue-300"
-                                    : status === "출고완료"
-                                    ? "bg-green-100 text-green-700 border-green-300"
-                                    : "bg-gray-100 text-gray-700 border-gray-300"
-                                }`}
-                              >
-                                {STATUS_OPTIONS.map((item) => (
-                                  <option key={item} value={item}>
-                                    {item}
-                                  </option>
-                                ))}
-                              </select>
-
-                              {status === "주문확인전" && (
-                                <div className="mt-2 inline-flex items-center rounded-full bg-yellow-100 px-3 py-1 text-xs font-extrabold text-yellow-800 border border-yellow-200">
-                                  🟡 신규
-                                </div>
-                              )}
-                            </td>
-
-                            <td className="p-3">
-                              <button
-                                type="button"
-                                onClick={() => openOrderDetail(order)}
-                                className="mb-1 text-left text-xs font-extrabold text-blue-600 hover:underline"
-                              >
-                                #{getOrderCode(order)}
-                              </button>
-
-                              <div className={`font-extrabold ${shouldStrike ? "line-through text-gray-400" : ""}`}>
-                                {order.youtube_nickname || "-"} / {order.customer_name || "-"}
-                              </div>
-                            </td>
-
-                            <td className="p-3">
-                              <div className={`font-bold ${shouldStrike ? "line-through text-gray-400" : ""}`}>
-                                {order.product_name || "상품명 없음"}
-                              </div>
-                              <div className={`text-sm text-gray-500 ${shouldStrike ? "line-through" : ""}`}>
-                                {order.color || "없음"} / {order.size || "없음"}
-                              </div>
-                            </td>
-
-                            <td className={`p-3 font-bold ${shouldStrike ? "line-through text-gray-400" : ""}`}>
-                              {order.qty || 0}개
-                            </td>
-                            <td className={`p-3 font-extrabold ${shouldStrike ? "line-through text-gray-400" : ""}`}>
-                              {won(getOrderTotal(order))}
-                            </td>
-                            <td className={`p-3 ${shouldStrike ? "line-through text-gray-400" : ""}`}>
-                              {won(getOrderShipping(order))}
-                            </td>
-
-                            <td className="p-3">
-                              <PaymentBadge payment={paymentLabel} />
-
-                              <button
-                                type="button"
-                                onClick={() => moveOrderToTrash(order)}
-                                className="mt-2 w-full rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs font-extrabold text-red-700 hover:bg-red-100"
-                              >
-                                🗑 삭제
-                              </button>
-                            </td>
-
-
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="grid gap-4">
-                  {filteredOrders.map((order) => {
-                    const status = getDisplayStatus(order);
-                    const isCanceled = status === "주문서취소";
-                    const isRefunded = status === "환불" || status === "부분환불";
-                    const shouldStrike = isCanceled || isRefunded;
-                    const paymentLabel = getPaymentLabel(order);
-
-                    return (
-                      <div
-                        key={order.id}
-                        className={`border rounded-3xl p-5 ${
-                          status === "환불"
-                            ? "bg-red-50 border-red-200"
-                            : status === "부분환불"
-                            ? "bg-orange-50 border-orange-200"
-                            : status === "주문서취소"
-                            ? "bg-gray-100 border-gray-300"
-                            : paymentLabel === "카드결제"
-                            ? "bg-blue-50/40 border-blue-100"
-                            : "bg-white"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-4 mb-4">
-                          <div className="flex items-start gap-3">
-                            <input
-                              type="checkbox"
-                              checked={selectedOrderIds.includes(Number(order.id))}
-                              onChange={() => toggleOrderSelection(Number(order.id))}
-                              className="mt-2 w-5 h-5"
-                            />
-
-                            <div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                              <button
-                                type="button"
-                                onClick={() => openOrderDetail(order)}
-                                className="w-full text-left text-sm font-extrabold text-blue-600 hover:underline"
-                              >
-                                #{getOrderCode(order)}
-                              </button>
-
-                              <div className={`text-2xl font-extrabold ${shouldStrike ? "line-through text-gray-400" : ""}`}>
-                                {order.youtube_nickname || "-"} / {order.customer_name || "-"}
-                              </div>
-
-                              <PaymentBadge payment={paymentLabel} />
-
-                              <button
-                                type="button"
-                                onClick={() => moveOrderToTrash(order)}
-                                className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs font-extrabold text-red-700 hover:bg-red-100"
-                              >
-                                🗑 삭제
-                              </button>
-                              </div>
-                            </div>
-                          </div>
-
-                          <select
-                            value={status === "부분환불" ? "환불" : status}
-                            onChange={(e) => handleStatusChange(order, e.target.value)}
-                            className={`px-3 py-2 rounded-xl font-extrabold border ${
-                              status === "환불"
-                                ? "bg-red-100 text-red-700 border-red-300"
-                                : status === "부분환불"
-                                ? "bg-orange-100 text-orange-700 border-orange-300"
-                                : status === "주문서취소"
-                                ? "bg-red-100 text-red-700 border-red-300"
-                                : status === "출고대기"
-                                ? "bg-yellow-100 text-yellow-700 border-yellow-300"
-                                : status === "주문확인완료"
-                                ? "bg-blue-100 text-blue-700 border-blue-300"
-                                : status === "출고완료"
-                                ? "bg-green-100 text-green-700 border-green-300"
-                                : "bg-gray-100 text-gray-700 border-gray-300"
-                            }`}
-                          >
-                            {STATUS_OPTIONS.map((item) => (
-                              <option key={item} value={item}>
-                                {item}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="bg-gray-50 rounded-2xl border p-4">
-                          <div className={`font-bold text-lg ${shouldStrike ? "line-through text-gray-400" : ""}`}>
-                            {order.product_name || "상품명 없음"}
-                          </div>
-                          <div className={`mt-2 text-gray-600 ${shouldStrike ? "line-through" : ""}`}>
-                            {order.color || "없음"} / {order.size || "없음"} / {order.qty || 0}개
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 mt-4">
-                          <div className="bg-gray-50 rounded-2xl border p-4">
-                            <div className="text-sm text-gray-500">결제금액</div>
-                            <div className={`text-xl font-extrabold ${shouldStrike ? "line-through text-gray-400" : ""}`}>
-                              {won(getOrderTotal(order))}
-                            </div>
-                          </div>
-
-                          <div className="bg-gray-50 rounded-2xl border p-4">
-                            <div className="text-sm text-gray-500">배송비</div>
-                            <div className={`text-xl font-extrabold ${shouldStrike ? "line-through text-gray-400" : ""}`}>
-                              {won(getOrderShipping(order))}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
-          </>
-        )}
-
-
-        {tab === "trash" && (
-          <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-5 mt-5">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5">
-              <div>
-                <div className="text-2xl font-extrabold">주문 휴지통</div>
-                <div className="text-sm text-gray-500 mt-1">
-                  삭제한 주문을 복구하거나 영구삭제할 수 있습니다. 30일 경과 건은 완전삭제 대상입니다.
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={selectAllTrashOrders}
-                  className="bg-gray-100 text-black px-5 py-3 rounded-2xl font-bold"
-                >
-                  전체선택
-                </button>
-
-                <button
-                  onClick={clearSelectedTrashOrders}
-                  className="bg-gray-100 text-black px-5 py-3 rounded-2xl font-bold"
-                >
-                  선택해제
-                </button>
-
-                <button
-                  onClick={bulkRestoreOrdersFromTrash}
-                  disabled={selectedTrashOrderIds.length === 0}
-                  className="bg-black text-white px-5 py-3 rounded-2xl font-bold disabled:opacity-40"
-                >
-                  선택 {selectedTrashOrderIds.length}건 복구
-                </button>
-
-                <button
-                  onClick={bulkPermanentlyDeleteOrders}
-                  disabled={selectedTrashOrderIds.length === 0}
-                  className="bg-red-600 text-white px-5 py-3 rounded-2xl font-bold disabled:opacity-40"
-                >
-                  선택 영구삭제
-                </button>
-
-                <button
-                  onClick={loadAll}
-                  className="bg-gray-300 text-black px-5 py-3 rounded-2xl font-bold"
-                >
-                  새로고침
-                </button>
-              </div>
+        <section className="bg-white rounded-3xl p-5 border shadow-sm mb-4">
+          <div className="font-bold text-lg mb-4">고객 정보</div>
+
+          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mb-4">
+            <div className="font-bold text-yellow-700 text-sm leading-6">
+              📦 주소는 최초 1회만 입력해주세요.
+              <br />
+              저장된 주소가 있으면 다음 주문부터 자동 입력됩니다.
             </div>
+          </div>
 
-            {trashOrders.length === 0 ? (
-              <div className="rounded-3xl bg-gray-50 border border-gray-200 p-8 text-center font-bold text-gray-500">
-                휴지통에 있는 주문이 없습니다.
-              </div>
-            ) : (
-              <div className="grid gap-3">
-                {trashOrders.map((order) => {
-                  const remainDays = getTrashRemainDays(order);
-                  const expired = isTrashExpired(order);
+          <p className="text-xs text-red-500 mb-4">* 표시는 필수 입력 항목입니다.</p>
 
-                  return (
-                    <article
-                      key={order.id}
-                      className={`rounded-3xl border p-5 ${
-                        expired
-                          ? "bg-red-50 border-red-200"
-                          : "bg-gray-50 border-gray-200"
-                      }`}
-                    >
-                      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                        <div className="flex items-start gap-3 min-w-0">
-                          <input
-                            type="checkbox"
-                            checked={selectedTrashOrderIds.includes(Number(order.id))}
-                            onChange={() => toggleTrashOrderSelection(Number(order.id))}
-                            className="mt-2 w-5 h-5 shrink-0"
-                          />
-
-                          <div className="min-w-0">
-                            <div className="text-sm font-extrabold text-blue-600">
-                            #{getOrderCode(order)}
-                          </div>
-
-                          <div className="mt-1 text-xl font-extrabold text-gray-950">
-                            {order.youtube_nickname || "-"} / {order.customer_name || "-"}
-                          </div>
-
-                          <div className="mt-2 text-gray-700 font-bold">
-                            {order.product_name || "상품명 없음"} · {order.color || "없음"} / {order.size || "없음"} · {order.qty || 0}개
-                          </div>
-
-                          <div className="mt-1 text-gray-700 font-bold">
-                            금액 {won(getOrderTotal(order))} / 배송비 {won(getOrderShipping(order))}
-                          </div>
-
-                          <div className="mt-2 text-sm text-gray-500 font-bold">
-                            주문시간: {formatDateTime(order.created_at)}
-                            <br />
-                            삭제시간: {formatDateTime(order.deleted_at)}
-                            <br />
-                            삭제메모: {order.delete_memo || "-"}
-                          </div>
-
-                          <div
-                            className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${
-                              expired
-                                ? "bg-red-600 text-white"
-                                : "bg-gray-200 text-gray-700"
-                            }`}
-                          >
-                            {expired ? "30일 경과 · 완전삭제 대상" : `완전삭제까지 ${remainDays}일 남음`}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 md:grid-cols-1 gap-2 shrink-0 md:w-[150px]">
-                          <button
-                            onClick={() => restoreOrderFromTrash(order)}
-                            className="bg-black text-white rounded-2xl px-4 py-3 font-extrabold"
-                          >
-                            복구
-                          </button>
-
-                          <button
-                            onClick={() => permanentlyDeleteOrder(order)}
-                            className="bg-red-600 text-white rounded-2xl px-4 py-3 font-extrabold"
-                          >
-                            영구삭제
-                          </button>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-        )}
-
-        {tab === "members" && (
-          <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-5 mt-5">
-            <div className="text-2xl font-extrabold mb-5">회원관리</div>
+          <div className="grid gap-3">
+            <input
+              type="text"
+              placeholder="* 유튜브 닉네임"
+              className="w-full p-4 rounded-2xl bg-gray-50 border"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+            />
 
             <input
-              value={memberSearch}
-              onChange={(e) => setMemberSearch(e.target.value)}
-              placeholder="이름 / 닉네임 / 전화번호 / 주소 검색"
-              className="w-full border rounded-2xl p-4 mb-5"
+              type="text"
+              placeholder="* 주문자 이름"
+              className="w-full p-4 rounded-2xl bg-gray-50 border"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
             />
 
-            <div className="grid gap-4">
-              {visibleCustomers.map((customer) => {
-                const stats = getCustomerStats(customer);
-                const isBlocked = customer.is_blocked === "Y";
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="* 전화번호 01012345678"
+              className="w-full p-4 rounded-2xl bg-gray-50 border"
+              value={formatPhone(customerPhone)}
+              onChange={(e) => setCustomerPhone(onlyNumber(e.target.value))}
+            />
 
-                return (
-                  <div
-                    key={customer.id}
-                    className={`border rounded-3xl p-5 ${
-                      isBlocked ? "bg-red-50 border-red-300" : "bg-gray-50"
-                    }`}
-                  >
-                    <div className="flex flex-col md:flex-row md:justify-between gap-4">
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <div className="text-2xl font-extrabold">
-                            {customer.youtube_nickname || "-"}
-                          </div>
-                          <div className="text-lg text-gray-600">
-                            {customer.customer_name || "-"}
-                          </div>
-                          {isBlocked && (
-                            <span className="bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full">
-                              차단회원
-                            </span>
-                          )}
-                        </div>
+            <button
+              onClick={handleCustomerCheck}
+              className="w-full bg-gray-900 text-white p-4 rounded-2xl font-bold"
+            >
+              고객정보 확인
+            </button>
 
-                        <div className="mt-2 text-gray-700">
-                          전화번호: {customer.customer_phone || "-"}
-                        </div>
-                        <div className="mt-1 text-gray-700">
-                          주소: {customer.address || "-"} {customer.detail_address || ""}
-                        </div>
-                        <div className="mt-1 text-gray-700">
-                          누적 주문: {stats.count}건 / 누적 구매금액: {won(stats.totalAmount)}
-                        </div>
-                        <div className="mt-1 text-gray-700">
-                          최근 주문일:{" "}
-                          {stats.lastOrderAt
-                            ? new Date(stats.lastOrderAt).toLocaleString("ko-KR")
-                            : "-"}
-                        </div>
+            {customerCheckStatus === "existing" && (
+              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 animate-pulse">
+                <div className="font-extrabold text-blue-700 text-lg leading-7">
+                  확인완료!
+                </div>
 
-                        {customer.customer_memo && (
-                          <div className="mt-3 bg-yellow-50 border border-yellow-200 rounded-2xl p-3">
-                            특이사항: {customer.customer_memo}
-                          </div>
-                        )}
+                <div className="text-blue-700 text-sm font-bold leading-6 mt-1">
+                  기존 고객 확인 완료 · 저장된 배송지로 접수됩니다.
+                  <br />
+                  주소 변경이 필요하면 아래 버튼을 눌러주세요.
+                </div>
 
-                        {customer.block_memo && (
-                          <div className="mt-3 bg-red-100 border border-red-200 rounded-2xl p-3 text-red-700">
-                            차단메모: {customer.block_memo}
-                          </div>
-                        )}
-                      </div>
+                <button
+                  onClick={openManualAddressForm}
+                  className="w-full bg-white text-blue-700 border border-blue-300 p-3 rounded-xl font-bold mt-3"
+                >
+                  주소 직접 입력
+                </button>
+              </div>
+            )}
 
-                      <div className="flex md:flex-col gap-2">
-                        <button className="bg-black text-white px-4 py-3 rounded-2xl font-bold">
-                          특이사항
-                        </button>
-                        <button className="bg-red-600 text-white px-4 py-3 rounded-2xl font-bold">
-                          차단관리
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            {customerCheckStatus === "new" && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4">
+                <div className="font-bold text-yellow-700 text-sm leading-6">
+                  신규 고객 또는 확인이 필요한 고객입니다.
+                  <br />
+                  주소를 최초 1회 입력해주세요.
+                </div>
+              </div>
+            )}
+
+            {showAddressForm && (
+              <>
+                <button
+                  onClick={openAddressSearch}
+                  className="w-full bg-black text-white p-4 rounded-2xl font-bold"
+                >
+                  주소검색
+                </button>
+
+                <input
+                  type="text"
+                  placeholder="* 기본주소"
+                  className="w-full p-4 rounded-2xl bg-gray-50 border"
+                  value={address}
+                  readOnly
+                />
+
+                <input
+                  type="text"
+                  placeholder="* 상세주소 예) 101동 1001호"
+                  className="w-full p-4 rounded-2xl bg-gray-50 border"
+                  value={detailAddress}
+                  onChange={(e) => setDetailAddress(e.target.value)}
+                />
+
+                <label className="flex items-center gap-2 text-sm text-gray-700 mt-1">
+                  <input
+                    type="checkbox"
+                    checked={saveAsDefaultAddress}
+                    onChange={(e) => setSaveAsDefaultAddress(e.target.checked)}
+                  />
+                  이 주소를 기본 배송지로 설정
+                </label>
+              </>
+            )}
+
+            <textarea
+              placeholder="요청사항 입력 (선택사항)"
+              className="w-full p-4 rounded-2xl bg-gray-50 border min-h-[100px]"
+              value={requestMemo}
+              onChange={(e) => setRequestMemo(e.target.value)}
+            />
+          </div>
+        </section>
+
+        {items.map((item, index) => (
+          <section
+            key={index}
+            className="bg-white rounded-3xl p-5 border shadow-sm mb-4"
+          >
+            <div className="flex justify-between items-center mb-4">
+              <div className="font-bold text-lg">상품 {index + 1}</div>
+
+              {items.length > 1 && (
+                <button
+                  onClick={() => removeItem(index)}
+                  className="bg-red-500 text-white px-4 py-2 rounded-xl font-bold text-sm"
+                >
+                  ✕ 삭제
+                </button>
+              )}
+            </div>
+
+            <div className="grid gap-3">
+              <input
+                type="text"
+                placeholder="* 상품명"
+                className="w-full p-4 rounded-2xl bg-gray-50 border"
+                value={item.product}
+                onChange={(e) => {
+                  const copy = [...items];
+                  copy[index].product = e.target.value;
+                  setItems(copy);
+                }}
+              />
+
+              <input
+                type="text"
+                placeholder="* 색상 / 없으면 없음"
+                className="w-full p-4 rounded-2xl bg-gray-50 border"
+                value={item.color}
+                onChange={(e) => {
+                  const nextValue = e.target.value.replace(/[0-9]/g, "");
+                  const copy = [...items];
+                  copy[index].color = nextValue;
+                  setItems(copy);
+                }}
+              />
+
+              <input
+                type="text"
+                placeholder="* 사이즈 / 없으면 없음"
+                className="w-full p-4 rounded-2xl bg-gray-50 border"
+                value={item.size}
+                onChange={(e) => {
+                  const copy = [...items];
+                  copy[index].size = e.target.value;
+                  setItems(copy);
+                }}
+              />
+
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="* 주문수량 숫자만!"
+                className="w-full p-4 rounded-2xl bg-gray-50 border"
+                value={item.qty}
+                onChange={(e) => {
+                  const copy = [...items];
+                  copy[index].qty = onlyNumber(e.target.value);
+                  setItems(copy);
+                }}
+              />
+
+              <input
+                type="text"
+                placeholder="* 상품금액(배송비빼고)"
+                className="w-full p-4 rounded-2xl bg-gray-50 border"
+                value={item.price ? formatWon(Number(item.price)) : ""}
+                onChange={(e) => {
+                  const copy = [...items];
+                  copy[index].price = onlyNumber(e.target.value);
+                  setItems(copy);
+                }}
+              />
             </div>
           </section>
-        )}
+        ))}
 
-        {tab === "stats" && (
-          <>
-            <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-5 mt-5 mb-5">
-              <div className="text-xl font-extrabold mb-3">정산 조회 조건</div>
+        <button
+          onClick={addItem}
+          className="w-full bg-gray-200 text-gray-900 p-5 rounded-2xl mb-4 text-lg font-bold"
+        >
+          + 다른 상품도 같이 주문하기
+        </button>
 
-              <select
-                className="w-full p-4 rounded-2xl border border-gray-300 bg-white text-gray-900"
-                value={settlementBroadcastId}
-                onChange={(e) => setSettlementBroadcastId(e.target.value)}
-              >
-                <option value="ALL">전체 방송</option>
-                {broadcasts.map((broadcast) => (
-                  <option key={broadcast.id} value={broadcast.id}>
-                    {broadcast.public_title}{" "}
-                    {broadcast.admin_subtitle ? `/ ${broadcast.admin_subtitle}` : ""}
-                  </option>
-                ))}
-              </select>
-            </section>
+        <section className="bg-white rounded-3xl p-5 border shadow-sm mb-4">
+          <div className="text-lg font-bold mb-4">결제방식 선택</div>
 
-            <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-5">
-              <div className="flex items-center justify-between mb-5">
-                <div>
-                  <div className="text-2xl font-extrabold">방송 정산</div>
-                  <div className="text-sm text-gray-500 mt-1">
-                    방송별 정산 / 비용 / 순수익 관리
-                  </div>
-                </div>
+          <label className="block bg-gray-50 rounded-2xl p-4 mb-3 border">
+            <input
+              type="radio"
+              name="payment"
+              checked={paymentMethod === "무통장입금"}
+              onChange={() => setPaymentMethod("무통장입금")}
+              className="mr-2"
+            />
+            무통장입금
+          </label>
 
-                <button className="bg-black text-white px-5 py-3 rounded-2xl font-bold">
-                  프린트하기
-                </button>
-              </div>
-
-              <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
-                <div className="bg-gray-50 rounded-2xl border p-5">
-                  <div className="text-sm text-gray-500">방송 매출</div>
-                  <div className="text-3xl font-extrabold mt-2">{won(totalSales)}</div>
-                  <div className="text-xs text-gray-500 mt-2">
-                    원매출 {won(grossSales)} - 환불 {won(totalRefundAmount)}
-                  </div>
-                </div>
-
-                <div className="bg-gray-50 rounded-2xl border p-5">
-                  <div className="text-sm text-gray-500">카드매출</div>
-                  <div className="text-3xl font-extrabold mt-2">{won(cardSales)}</div>
-                </div>
-
-                <div className="bg-red-50 rounded-2xl border border-red-200 p-5">
-                  <div className="text-sm text-red-600">환불 차감</div>
-                  <div className="text-3xl font-extrabold mt-2 text-red-700">{won(totalRefundAmount)}</div>
-                </div>
-
-                <div className="bg-black text-white rounded-2xl border p-5">
-                  <div className="text-sm opacity-70">최종 순수익</div>
-                  <div className="text-4xl font-extrabold mt-2">{won(finalProfit)}</div>
-                </div>
-              </div>
-
-              <div className="grid xl:grid-cols-2 gap-5">
-                <div className="border rounded-3xl p-5">
-                  <div className="text-xl font-extrabold mb-5">매출 · 차감 정산</div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <div className="text-sm font-bold mb-2">창고 정산금액</div>
-                      <MoneyInput value={warehouseCost} onChange={setWarehouseCost} />
-                    </div>
-
-                    <div>
-                      <div className="text-sm font-bold mb-2">카드 수수료정산({cardFeeRate}%)</div>
-                      <MoneyInput value={cardFeeSettlement} onChange={() => {}} disabled />
-                      <div className="text-xs text-gray-500 mt-2">
-                        카드매출 기준 자동 계산됩니다.
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-sm font-bold mb-2">기타 매출</div>
-                      <MoneyInput value={extraIncome} onChange={setExtraIncome} />
-                    </div>
-
-                    <div>
-                      <div className="text-sm font-bold mb-2">기타 매출 메모</div>
-                      <input
-                        value={extraIncomeMemo}
-                        onChange={(e) => setExtraIncomeMemo(e.target.value)}
-                        className="w-full border rounded-2xl p-4"
-                        placeholder="예) 방송외 판매"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border rounded-3xl p-5">
-                  <div className="flex items-center justify-between mb-5">
-                    <div className="text-xl font-extrabold">기타 지출 관리</div>
-                    <button
-                      onClick={addExpense}
-                      className="bg-black text-white px-4 py-2 rounded-2xl font-bold"
-                    >
-                      추가하기
-                    </button>
-                  </div>
-
-                  <div className="max-h-[360px] overflow-y-auto pr-1 space-y-4">
-                    {expenses.map((expense, index) => (
-                      <div
-                        key={index}
-                        className="border rounded-2xl p-4 bg-gray-50"
-                        draggable
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData("text/plain", String(index));
-                        }}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={(e) => {
-                          const fromIndex = Number(e.dataTransfer.getData("text/plain"));
-                          moveExpense(fromIndex, index);
-                        }}
-                      >
-                        <div className="flex items-center justify-between gap-2 mb-3">
-                          <div className="text-sm font-extrabold text-gray-500 cursor-move">
-                            ↕ 지출 {index + 1}
-                          </div>
-
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => moveExpense(index, index - 1)}
-                              className="px-3 py-2 rounded-xl bg-white border font-bold text-sm"
-                              type="button"
-                            >
-                              ↑
-                            </button>
-
-                            <button
-                              onClick={() => moveExpense(index, index + 1)}
-                              className="px-3 py-2 rounded-xl bg-white border font-bold text-sm"
-                              type="button"
-                            >
-                              ↓
-                            </button>
-
-                            <button
-                              onClick={() => removeExpense(index)}
-                              className="px-3 py-2 rounded-xl bg-red-500 text-white font-bold text-sm"
-                              type="button"
-                            >
-                              삭제
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="grid md:grid-cols-3 gap-3">
-                          <select
-                            value={expense.type}
-                            onChange={(e) => updateExpense(index, "type", e.target.value)}
-                            className="border rounded-2xl p-4"
-                          >
-                            {EXPENSE_OPTIONS.map((item) => (
-                              <option key={item} value={item}>
-                                {item}
-                              </option>
-                            ))}
-                          </select>
-
-                          <MoneyInput
-                            value={expense.amount}
-                            onChange={(value) => updateExpense(index, "amount", value)}
-                          />
-
-                          <input
-                            value={expense.memo}
-                            onChange={(e) => updateExpense(index, "memo", e.target.value)}
-                            className="border rounded-2xl p-4"
-                            placeholder="메모"
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-4 rounded-2xl bg-gray-50 border p-4">
-                    <div className="text-sm text-gray-500 font-bold">기타 지출 합계</div>
-                    <div className="text-2xl font-extrabold mt-1">{won(totalExpense)}</div>
-                  </div>
-                </div>
-              </div>
-            </section>
-          </>
-        )}
-
-        {cancelModalOrder && (
-          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-5">
-            <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-xl border border-gray-200">
-              <div className="text-2xl font-extrabold mb-1">주문서 취소</div>
-              <div className="text-sm text-gray-500 mb-5">
-                {cancelModalOrder.youtube_nickname || "-"} / {cancelModalOrder.customer_name || "-"}
-              </div>
-
-              <div className="mb-5">
-                <div className="text-sm font-bold mb-2">주문서 취소 사유</div>
-                <textarea
-                  value={cancelReason}
-                  onChange={(e) => setCancelReason(e.target.value)}
-                  placeholder="예) 고객 미입금 / 중복 주문 / 고객 요청 취소 / 품절 취소"
-                  className="w-full border rounded-2xl p-4 min-h-[130px]"
-                />
-                <div className="text-xs text-gray-500 mt-2">
-                  이 내용은 고객 주문조회 화면에도 표시됩니다.
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={saveCancelOrder}
-                  className="flex-1 bg-red-600 text-white p-4 rounded-2xl font-extrabold"
-                >
-                  주문서취소 저장
-                </button>
-
-                <button
-                  onClick={() => {
-                    setCancelModalOrder(null);
-                    setCancelReason("");
-                  }}
-                  className="flex-1 bg-gray-200 text-black p-4 rounded-2xl font-extrabold"
-                >
-                  취소
-                </button>
-              </div>
+          <label className="block bg-gray-50 rounded-2xl p-4 border">
+            <input
+              type="radio"
+              name="payment"
+              checked={paymentMethod === "카드결제"}
+              onChange={() => setPaymentMethod("카드결제")}
+              className="mr-2"
+            />
+            카드결제 (+수수료 {cardFeeRate}%)
+            <div className="text-sm text-gray-500 mt-2">
+              관리자 확인 후 카톡으로 결제링크 발송
             </div>
+          </label>
+        </section>
+
+        <section className="bg-white rounded-3xl p-5 border shadow-sm mb-4">
+          <div className="flex justify-between mb-3">
+            <span>상품금액 합계</span>
+            <span>{formatWon(productTotal)}</span>
           </div>
-        )}
 
-
-        {selectedOrder && (
-          <div className="fixed inset-0 z-[99999] bg-black/50 flex items-center justify-center p-4">
-            <section className="w-full max-w-4xl max-h-[90vh] overflow-auto bg-white rounded-[2rem] shadow-2xl border border-gray-200">
-              <div className="sticky top-0 bg-white border-b border-gray-200 p-5 flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-sm font-extrabold text-blue-600">
-                    #{getOrderCode(selectedOrder)}
-                  </div>
-                  <h2 className="text-2xl font-extrabold text-gray-950">
-                    주문 상세정보
-                  </h2>
-                </div>
-
-                <button
-                  onClick={() => setSelectedOrder(null)}
-                  className="rounded-2xl bg-gray-100 px-5 py-3 font-extrabold"
-                >
-                  닫기
-                </button>
-              </div>
-
-              <div className="p-5 grid gap-5">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="rounded-3xl border bg-gray-50 p-5">
-                    <div className="text-lg font-extrabold mb-4">주문 기본정보</div>
-
-                    <div className="grid gap-2 text-sm font-bold text-gray-700">
-                      <div>주문번호: #{getOrderCode(selectedOrder)}</div>
-                      <div>주문시간: {formatDateTime(selectedOrder.created_at)}</div>
-                      <div>방송명: {selectedOrder.broadcast_public_title || selectedOrder.broadcast_name || "-"}</div>
-                      <div>상태: {getDisplayStatus(selectedOrder)}</div>
-                      <div>결제수단: {getPaymentLabel(selectedOrder)}</div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-3xl border bg-gray-50 p-5">
-                    <div className="text-lg font-extrabold mb-4">고객 정보</div>
-
-                    <div className="grid gap-2 text-sm font-bold text-gray-700">
-                      <div>닉네임: {selectedOrder.youtube_nickname || "-"}</div>
-                      <div>이름: {selectedOrder.customer_name || "-"}</div>
-                      <div>전화번호: {selectedOrder.customer_phone || "-"}</div>
-                      <div>주소: {getFullAddress(selectedOrder) || "-"}</div>
-                      <div>요청사항: {selectedOrder.request_memo || selectedOrder.memo || "-"}</div>
-                      <div>고객확인: {selectedOrder.customer_match_status || "-"}</div>
-                      <div>고객메모: {selectedOrder.customer_memo || selectedOrder.customer_note || "-"}</div>
-                      <div>특이사항: {selectedOrder.special_note || selectedOrder.note || "-"}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-3xl border bg-white p-5">
-                  <div className="text-lg font-extrabold mb-4">상품 정보</div>
-
-                  <div className="grid md:grid-cols-4 gap-3 text-sm font-bold text-gray-700">
-                    <div className="rounded-2xl bg-gray-50 p-4">
-                      <div className="text-gray-400 text-xs mb-1">상품명</div>
-                      {selectedOrder.product_name || "상품명 없음"}
-                    </div>
-
-                    <div className="rounded-2xl bg-gray-50 p-4">
-                      <div className="text-gray-400 text-xs mb-1">색상/사이즈</div>
-                      {selectedOrder.color || "없음"} / {selectedOrder.size || "없음"}
-                    </div>
-
-                    <div className="rounded-2xl bg-gray-50 p-4">
-                      <div className="text-gray-400 text-xs mb-1">수량</div>
-                      {selectedOrder.qty || 0}개
-                    </div>
-
-                    <div className="rounded-2xl bg-gray-50 p-4">
-                      <div className="text-gray-400 text-xs mb-1">현재금액</div>
-                      {won(getOrderTotal(selectedOrder))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-3xl border bg-white p-5">
-                  <div className="text-lg font-extrabold mb-4">관리자 수정</div>
-
-                  <div className="grid md:grid-cols-3 gap-4">
-                    <div>
-                      <div className="text-sm font-bold mb-2 text-gray-700">
-                        배송비 수정
-                      </div>
-                      <MoneyInput value={detailShippingFee} onChange={setDetailShippingFee} />
-                    </div>
-
-                    <div>
-                      <div className="text-sm font-bold mb-2 text-gray-700">
-                        구매금액 수정
-                      </div>
-                      <MoneyInput value={detailTotalPrice} onChange={setDetailTotalPrice} />
-                    </div>
-
-                    <div>
-                      <div className="text-sm font-bold mb-2 text-gray-700">
-                        관리자 메모
-                      </div>
-                      <input
-                        value={detailAdminMemo}
-                        onChange={(e) => setDetailAdminMemo(e.target.value)}
-                        className="w-full border rounded-2xl p-4 font-bold"
-                        placeholder="관리자만 보는 메모"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-3xl border bg-red-50 border-red-200 p-5">
-                  <div className="text-lg font-extrabold mb-4 text-red-700">
-                    환불/취소내역
-                  </div>
-
-                  <div className="grid gap-2 text-sm font-bold text-red-700">
-                    <div>환불유형: {selectedOrder.refund_type || "-"}</div>
-                    <div>환불금액: {selectedOrder.refund_amount ? won(selectedOrder.refund_amount) : "-"}</div>
-                    <div>환불사유/메모: {selectedOrder.refund_memo || "-"}</div>
-                    <div>취소사유: {selectedOrder.cancel_reason || "-"}</div>
-                  </div>
-                </div>
-
-                <div className="grid md:grid-cols-3 gap-2">
-                  <button
-                    onClick={saveOrderDetail}
-                    className="bg-black text-white rounded-2xl p-4 font-extrabold"
-                  >
-                    상세정보 저장
-                  </button>
-
-                  <button
-                    onClick={() => moveOrderToTrash(selectedOrder)}
-                    className="bg-red-50 border border-red-200 text-red-700 rounded-2xl p-4 font-extrabold"
-                  >
-                    🗑 휴지통 이동
-                  </button>
-
-                  <button
-                    onClick={() => setSelectedOrder(null)}
-                    className="bg-gray-100 text-gray-900 rounded-2xl p-4 font-extrabold"
-                  >
-                    닫기
-                  </button>
-                </div>
-              </div>
-            </section>
+          <div className="flex justify-between mb-2">
+            <span>배송비</span>
+            <span>{formatWon(finalShippingFee)}</span>
           </div>
-        )}
 
+          <div className="text-sm text-blue-600 mb-3">
+            {useSavedAddress
+              ? "기존 고객은 저장된 배송지 기준으로 최종 배송비가 적용됩니다."
+              : shippingNotice}
+          </div>
 
-        {refundModalOrder && (
-          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-5">
-            <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-xl border border-gray-200">
-              <div className="text-2xl font-extrabold mb-1">환불 처리</div>
-              <div className="text-sm text-gray-500 mb-5">
-                {refundModalOrder.youtube_nickname || "-"} / {refundModalOrder.customer_name || "-"}
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                <button
-                  onClick={() => {
-                    setRefundType("전액환불");
-                    setRefundAmount(getOrderTotal(refundModalOrder));
-                  }}
-                  className={`p-4 rounded-2xl font-bold border ${
-                    refundType === "전액환불" ? "bg-black text-white" : "bg-gray-50"
-                  }`}
-                >
-                  전액환불
-                </button>
-
-                <button
-                  onClick={() => {
-                    setRefundType("부분환불");
-                    setRefundAmount(0);
-                  }}
-                  className={`p-4 rounded-2xl font-bold border ${
-                    refundType === "부분환불" ? "bg-black text-white" : "bg-gray-50"
-                  }`}
-                >
-                  부분환불
-                </button>
-              </div>
-
-              <div className="mb-4">
-                <div className="text-sm font-bold mb-2">환불금액</div>
-                <MoneyInput
-                  value={refundAmount}
-                  onChange={setRefundAmount}
-                  disabled={refundType === "전액환불"}
-                />
-                {refundType === "전액환불" && (
-                  <div className="text-xs text-gray-500 mt-2">
-                    전액환불은 주문 총액이 자동 입력됩니다.
-                  </div>
-                )}
-              </div>
-
-              <div className="mb-5">
-                <div className="text-sm font-bold mb-2">환불사유 / 메모</div>
-                <textarea
-                  value={refundMemo}
-                  onChange={(e) => setRefundMemo(e.target.value)}
-                  placeholder="예) 품절 전액환불 / 상품 1개 부분환불 / 고객 요청"
-                  className="w-full border rounded-2xl p-4 min-h-[110px]"
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={saveRefund}
-                  className="flex-1 bg-black text-white p-4 rounded-2xl font-extrabold"
-                >
-                  저장
-                </button>
-
-                <button
-                  onClick={() => {
-                    setRefundModalOrder(null);
-                    setRefundMemo("");
-                    setRefundAmount(0);
-                  }}
-                  className="flex-1 bg-gray-200 text-black p-4 rounded-2xl font-extrabold"
-                >
-                  취소
-                </button>
-              </div>
+          {paymentMethod === "카드결제" && (
+            <div className="flex justify-between mb-3 text-red-600">
+              <span>카드결제 수수료 {cardFeeRate}%</span>
+              <span>{formatWon(vatAmount)}</span>
             </div>
+          )}
+
+          <div className="flex justify-between text-2xl font-extrabold pt-4 border-t">
+            <span>최종 결제금액</span>
+            <span>{formatWon(total)}</span>
           </div>
-        )}
+        </section>
+
+        <button
+          className="w-full bg-black text-white font-bold p-5 rounded-2xl text-xl disabled:opacity-50"
+          onClick={handleSubmit}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "주문 저장중..." : "주문완료신청"}
+        </button>
       </div>
     </main>
   );

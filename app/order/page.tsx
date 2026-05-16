@@ -2,59 +2,30 @@
 // 전체 교체용
 // 파일 위치: /Users/ruru/Desktop/ruru-order-app/app/order/page.tsx
 //
-// 최종 UX:
-// - 주문서 진입 시 처음에는 기존 고객 / 신규 고객 선택만 보임
-// - 자동로그인 저장 고객은 선택 화면 스킵 → 바로 주문서 작성
-// - 기존 고객: 전화번호 + PIN → 정보 불러오기 성공 후 주문서 작성
-// - 신규 고객: 닉네임/이름/전화번호/PIN/주소 입력 후 주문서 작성
-// - 유튜브 LIVE 접기/펼치기 표시
-// - 주소검색 1개
-// - 카드결제 한줄 안내
-// - 상품금액 원 표시
-// - 카드부가세 10%
+// 최종 복구/수정본
+// - 기존고객/신규고객 선택 화면 제거
+// - 저장된 고객정보 자동 입력
+// - 자동 로그인 상태면 PIN 입력칸 숨김
+// - [정보 변경] 버튼 / [로그아웃] 버튼
+// - 정보 변경 시 PIN 입력칸 다시 표시 가능
+// - 최초 입력 시 PIN번호(개인비밀번호) 6자리 + 재확인
+// - 주문상품 모든 칸 필수: 상품명/색상/사이즈/수량/상품금액
+// - 색상/사이즈 없으면 고객이 "없음" 입력해야 제출 가능
+// - 상품금액 쉼표 자동
+// - 주문 완료 화면에서 주문내역 + 계좌 안내 + 계좌번호 복사
+// - 폭죽/오토바이 애니메이션 포함
+// - 무통장 계좌 안내는 주문서 작성 중간에 노출하지 않음
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import YoutubeLiveBox from "../../components/YoutubeLiveBox";
 
 declare global {
   interface Window {
     daum?: any;
   }
 }
-
-type ActiveBroadcast = {
-  id: string | number | null;
-  public_title?: string;
-  broadcast_public_title?: string;
-  admin_subtitle?: string;
-  broadcast_admin_subtitle?: string;
-  shipping_fee?: number;
-  card_fee_rate?: number;
-  youtube_live_url?: string;
-  youtube_live_enabled?: boolean;
-  status?: string;
-};
-
-type Customer = {
-  id?: string | number;
-  youtube_nickname?: string;
-  member_nickname?: string;
-  customer_name?: string;
-  name?: string;
-  customer_phone?: string;
-  phone?: string;
-  zipcode?: string;
-  address?: string;
-  detail_address?: string;
-  request_memo?: string;
-  pin_hash?: string;
-  temp_pin_hash?: string;
-  is_blocked?: boolean;
-  block_reason?: string;
-};
 
 type OrderItem = {
   product_name: string;
@@ -64,8 +35,21 @@ type OrderItem = {
   product_price: string;
 };
 
-type EntryMode = "none" | "existing" | "new";
+type DoneData = {
+  nickname: string;
+  name: string;
+  paymentMethod: "무통장입금" | "카드결제";
+  items: OrderItem[];
+  totalQty: number;
+  productAmount: number;
+  shippingFee: number;
+  cardExtra: number;
+  totalAmount: number;
+};
 
+const BANK_NAME = "새마을금고";
+const BANK_ACCOUNT = "9002186993725";
+const BANK_HOLDER = "유혜원";
 const FOOTER_TEXT = "© since 2024 루루동이 | All Rights Reserved.";
 
 const emptyItem: OrderItem = {
@@ -76,31 +60,24 @@ const emptyItem: OrderItem = {
   product_price: "",
 };
 
-const normalizePhone = (value: string) =>
-  String(value || "").replace(/[^0-9]/g, "");
+const onlyNumber = (value: string) => String(value || "").replace(/[^0-9]/g, "");
+const normalizePhone = (value: string) => onlyNumber(value);
+const toNumber = (value: any) => Number(String(value || "0").replace(/[^0-9]/g, "")) || 0;
+const moneyText = (value: any) => toNumber(value).toLocaleString();
+const won = (value: any) => `${Number(value || 0).toLocaleString()}원`;
 
-const onlyNumber = (value: string) =>
-  String(value || "").replace(/[^0-9]/g, "");
-
-const toNumber = (value: string | number | undefined | null) =>
-  Number(String(value || "0").replace(/[^0-9]/g, "")) || 0;
-
-const won = (value: number) => `${Number(value || 0).toLocaleString()}원`;
-
-const cleanOption = (value: string) => {
+const hideNone = (value: any) => {
   const text = String(value || "").trim();
   if (!text) return "";
-  if (["없음", "없슴", "x", "X", "-", "none", "None", "NONE"].includes(text)) {
-    return "";
-  }
+  if (["없음", "없슴", "x", "X", "-", "none", "None", "NONE"].includes(text)) return "";
   return text;
 };
 
-const buildItemLabel = (item: OrderItem) => {
+const itemLabel = (item: OrderItem) => {
   return [
     item.product_name.trim(),
-    cleanOption(item.color),
-    cleanOption(item.size),
+    hideNone(item.color),
+    hideNone(item.size),
     `x${toNumber(item.qty) || 1}`,
   ]
     .filter(Boolean)
@@ -108,12 +85,12 @@ const buildItemLabel = (item: OrderItem) => {
 };
 
 async function sha256(value: string) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(value);
+  const data = new TextEncoder().encode(value);
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
 
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 async function makePinHash(phone: string, pin: string) {
@@ -121,13 +98,7 @@ async function makePinHash(phone: string, pin: string) {
 }
 
 export default function OrderPage() {
-  const [activeBroadcast, setActiveBroadcast] =
-    useState<ActiveBroadcast | null>(null);
-  const [loadingBroadcast, setLoadingBroadcast] = useState(true);
-
-  const [entryMode, setEntryMode] = useState<EntryMode>("none");
-  const [isOrderFormOpen, setIsOrderFormOpen] = useState(false);
-  const [autoLoginChecking, setAutoLoginChecking] = useState(true);
+  const [broadcast, setBroadcast] = useState<any | null>(null);
 
   const [youtubeNickname, setYoutubeNickname] = useState("");
   const [customerName, setCustomerName] = useState("");
@@ -136,37 +107,57 @@ export default function OrderPage() {
   const [address, setAddress] = useState("");
   const [detailAddress, setDetailAddress] = useState("");
   const [requestMemo, setRequestMemo] = useState("");
+
   const [pin, setPin] = useState("");
   const [pinConfirm, setPinConfirm] = useState("");
   const [showPin, setShowPin] = useState(false);
   const [showPinConfirm, setShowPinConfirm] = useState(false);
 
-  const [checkedCustomer, setCheckedCustomer] = useState<Customer | null>(null);
-  const [customerStatus, setCustomerStatus] = useState<
-    "idle" | "checking" | "existing" | "new" | "blocked"
-  >("idle");
-  const [showAddressEdit, setShowAddressEdit] = useState(false);
-  const [saveLoginInfo, setSaveLoginInfo] = useState(true);
-  const [autoLoginEnabled, setAutoLoginEnabled] = useState(true);
+  const [autoSaveInfo, setAutoSaveInfo] = useState(true);
+  const [hasSavedInfo, setHasSavedInfo] = useState(false);
+  const [isEditingCustomerInfo, setIsEditingCustomerInfo] = useState(false);
 
-  const [paymentMethod, setPaymentMethod] = useState<"무통장입금" | "카드결제">(
-    "무통장입금"
-  );
+  const [paymentMethod, setPaymentMethod] = useState<"무통장입금" | "카드결제">("무통장입금");
   const [items, setItems] = useState<OrderItem[]>([{ ...emptyItem }]);
   const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState<DoneData | null>(null);
+  const [copyDone, setCopyDone] = useState(false);
 
-  const shippingFee = Number(activeBroadcast?.shipping_fee ?? 4000);
-  const cardFeeRate = Number(activeBroadcast?.card_fee_rate ?? 10);
+  const shippingFee = Number(broadcast?.shipping_fee ?? 4000);
+  const cardRateForCustomer = 10;
+
+  const isAutoLoggedIn =
+    hasSavedInfo &&
+    !isEditingCustomerInfo &&
+    Boolean(customerPhone && youtubeNickname && customerName);
 
   useEffect(() => {
-    loadActiveBroadcast();
-    tryAutoLogin();
+    loadBroadcast();
+    loadSavedCustomerInfo();
   }, []);
 
-  const loadActiveBroadcast = async () => {
-    setLoadingBroadcast(true);
+  const loadSavedCustomerInfo = () => {
+    const savedPhone = localStorage.getItem("ruru_customer_phone") || "";
+    const savedNickname = localStorage.getItem("ruru_youtube_nickname") || "";
+    const savedName = localStorage.getItem("ruru_customer_name") || "";
+    const savedZipcode = localStorage.getItem("ruru_customer_zipcode") || "";
+    const savedAddress = localStorage.getItem("ruru_customer_address") || "";
+    const savedDetailAddress = localStorage.getItem("ruru_customer_detail_address") || "";
 
-    const { data, error } = await supabase
+    if (savedPhone || savedNickname || savedName || savedAddress) {
+      setHasSavedInfo(true);
+    }
+
+    if (savedPhone) setCustomerPhone(savedPhone);
+    if (savedNickname) setYoutubeNickname(savedNickname);
+    if (savedName) setCustomerName(savedName);
+    if (savedZipcode) setZipcode(savedZipcode);
+    if (savedAddress) setAddress(savedAddress);
+    if (savedDetailAddress) setDetailAddress(savedDetailAddress);
+  };
+
+  const loadBroadcast = async () => {
+    const { data } = await supabase
       .from("broadcasts")
       .select("*")
       .eq("status", "ON")
@@ -175,51 +166,71 @@ export default function OrderPage() {
       .limit(1)
       .maybeSingle();
 
-    if (!error && data) {
-      setActiveBroadcast(data);
-    }
-
-    setLoadingBroadcast(false);
+    if (data) setBroadcast(data);
   };
 
-  const tryAutoLogin = async () => {
-    try {
-      const saved = window.localStorage.getItem("ruru_saved_login");
+  const logoutCustomerInfo = () => {
+    if (!confirm("이 기기에 저장된 고객정보를 삭제할까요?")) return;
 
-      if (!saved) {
-        setAutoLoginChecking(false);
-        return;
-      }
+    [
+      "ruru_customer_phone",
+      "ruru_youtube_nickname",
+      "ruru_customer_name",
+      "ruru_customer_zipcode",
+      "ruru_customer_address",
+      "ruru_customer_detail_address",
+    ].forEach((key) => localStorage.removeItem(key));
 
-      const parsed = JSON.parse(saved);
+    setYoutubeNickname("");
+    setCustomerName("");
+    setCustomerPhone("");
+    setZipcode("");
+    setAddress("");
+    setDetailAddress("");
+    setRequestMemo("");
+    setPin("");
+    setPinConfirm("");
+    setHasSavedInfo(false);
+    setIsEditingCustomerInfo(false);
 
-      if (!parsed?.autoLogin || !parsed?.phone || !parsed?.pin) {
-        setAutoLoginChecking(false);
-        return;
-      }
+    alert("저장된 고객정보를 삭제했습니다.");
+  };
 
-      await loadSavedCustomerWithPin(parsed.phone, parsed.pin, true);
-    } catch {
-      setAutoLoginChecking(false);
-    }
+  const startEditCustomerInfo = () => {
+    setIsEditingCustomerInfo(true);
+    setPin("");
+    setPinConfirm("");
+    setTimeout(() => {
+      document.getElementById("youtubeNicknameInput")?.focus();
+    }, 100);
+  };
+
+  const cancelEditCustomerInfo = () => {
+    setIsEditingCustomerInfo(false);
+    setPin("");
+    setPinConfirm("");
+    loadSavedCustomerInfo();
   };
 
   const loadDaumPostcodeScript = () => {
     return new Promise<void>((resolve, reject) => {
-      if (typeof window === "undefined") return reject();
+      if (typeof window === "undefined") {
+        reject();
+        return;
+      }
 
       if (window.daum?.Postcode) {
         resolve();
         return;
       }
 
-      const existing = document.querySelector<HTMLScriptElement>(
+      const existingScript = document.querySelector<HTMLScriptElement>(
         "script[data-daum-postcode='true']"
       );
 
-      if (existing) {
-        existing.addEventListener("load", () => resolve());
-        existing.addEventListener("error", () => reject());
+      if (existingScript) {
+        existingScript.addEventListener("load", () => resolve());
+        existingScript.addEventListener("error", reject);
         return;
       }
 
@@ -228,7 +239,7 @@ export default function OrderPage() {
       script.async = true;
       script.dataset.daumPostcode = "true";
       script.onload = () => resolve();
-      script.onerror = () => reject();
+      script.onerror = reject;
       document.body.appendChild(script);
     });
   };
@@ -239,14 +250,12 @@ export default function OrderPage() {
 
       new window.daum.Postcode({
         oncomplete: (data: any) => {
-          const roadAddress = data.roadAddress || data.jibunAddress || "";
+          const selectedAddress = data.roadAddress || data.jibunAddress || "";
           setZipcode(data.zonecode || "");
-          setAddress(roadAddress);
-          setShowAddressEdit(true);
+          setAddress(selectedAddress);
 
           setTimeout(() => {
-            const input = document.getElementById("detailAddressInput");
-            input?.focus();
+            document.getElementById("detailAddressInput")?.focus();
           }, 100);
         },
       }).open();
@@ -255,196 +264,7 @@ export default function OrderPage() {
     }
   };
 
-  const fillCustomer = (data: Customer, cleanPhone: string, inputPin: string) => {
-    setCheckedCustomer(data);
-    setCustomerStatus("existing");
-    setEntryMode("existing");
-    setIsOrderFormOpen(true);
-
-    setCustomerPhone(cleanPhone);
-    setPin(inputPin);
-    setPinConfirm("");
-    setYoutubeNickname(data.youtube_nickname || data.member_nickname || "");
-    setCustomerName(data.customer_name || data.name || "");
-    setZipcode(data.zipcode || "");
-    setAddress(data.address || "");
-    setDetailAddress(data.detail_address || "");
-    setRequestMemo(data.request_memo || "");
-    setShowAddressEdit(false);
-  };
-
-  const loadSavedCustomerWithPin = async (
-    phoneValue?: string,
-    pinValue?: string,
-    silent = false
-  ) => {
-    const cleanPhone = normalizePhone(phoneValue || customerPhone);
-    const inputPin = String(pinValue || pin || "").trim();
-
-    if (cleanPhone.length < 10) {
-      if (!silent) alert("전화번호를 입력해주세요.");
-      setAutoLoginChecking(false);
-      return;
-    }
-
-    if (!/^\d{6}$/.test(inputPin)) {
-      if (!silent) alert("PIN번호 6자리를 입력해주세요.");
-      setAutoLoginChecking(false);
-      return;
-    }
-
-    setCustomerStatus("checking");
-
-    const { data, error } = await supabase
-      .from("customers")
-      .select("*")
-      .eq("customer_phone", cleanPhone)
-      .maybeSingle();
-
-    if (error) {
-      setCustomerStatus("idle");
-      setAutoLoginChecking(false);
-      if (!silent) alert("고객정보 확인 오류: " + error.message);
-      return;
-    }
-
-    if (!data || !data.pin_hash) {
-      setCheckedCustomer(null);
-      setCustomerStatus("new");
-      setEntryMode(silent ? "none" : "new");
-      setIsOrderFormOpen(false);
-      setShowAddressEdit(true);
-      setAutoLoginChecking(false);
-
-      if (!silent) {
-        alert("아직 저장된 고객정보가 없습니다. 신규 고객으로 체크 후 최초 1회 정보를 입력해주세요.");
-      }
-      return;
-    }
-
-    if (data.is_blocked) {
-      setCheckedCustomer(data);
-      setCustomerStatus("blocked");
-      setAutoLoginChecking(false);
-      return;
-    }
-
-    const pinHash = await makePinHash(cleanPhone, inputPin);
-
-    if (pinHash !== data.pin_hash && pinHash !== data.temp_pin_hash) {
-      setCustomerStatus("idle");
-      setAutoLoginChecking(false);
-      if (!silent) alert("전화번호 또는 PIN번호가 일치하지 않습니다.");
-      return;
-    }
-
-    fillCustomer(data, cleanPhone, inputPin);
-
-    if (autoLoginEnabled || silent) {
-      window.localStorage.setItem(
-        "ruru_saved_login",
-        JSON.stringify({
-          phone: cleanPhone,
-          pin: inputPin,
-          autoLogin: true,
-          savedAt: new Date().toISOString(),
-        })
-      );
-    }
-
-    setAutoLoginChecking(false);
-  };
-
-  const saveCustomerImmediately = async () => {
-    const cleanPhone = normalizePhone(customerPhone);
-
-    if (!saveLoginInfo) return;
-    if (cleanPhone.length < 10 || !customerName.trim()) return;
-
-    const updateData: any = {
-      youtube_nickname: youtubeNickname.trim(),
-      customer_name: customerName.trim(),
-      customer_phone: cleanPhone,
-      phone: cleanPhone,
-      zipcode: zipcode.trim(),
-      address: address.trim(),
-      detail_address: detailAddress.trim(),
-      request_memo: requestMemo.trim(),
-      last_order_at: new Date().toISOString(),
-    };
-
-    if (/^\d{6}$/.test(pin) && pin === pinConfirm) {
-      updateData.pin_hash = await makePinHash(cleanPhone, pin);
-      updateData.pin_updated_at = new Date().toISOString();
-    }
-
-    const { error } = await supabase
-      .from("customers")
-      .upsert(updateData, { onConflict: "customer_phone" });
-
-    if (!error && autoLoginEnabled && /^\d{6}$/.test(pin)) {
-      window.localStorage.setItem(
-        "ruru_saved_login",
-        JSON.stringify({
-          phone: cleanPhone,
-          pin,
-          autoLogin: true,
-          savedAt: new Date().toISOString(),
-        })
-      );
-    }
-  };
-
-  const startNewCustomer = () => {
-    setEntryMode("new");
-    setIsOrderFormOpen(true);
-    setCheckedCustomer(null);
-    setCustomerStatus("new");
-    setShowAddressEdit(true);
-    setYoutubeNickname("");
-    setCustomerName("");
-    setCustomerPhone("");
-    setZipcode("");
-    setAddress("");
-    setDetailAddress("");
-    setRequestMemo("");
-    setPin("");
-    setPinConfirm("");
-  };
-
-  const startExistingCustomer = () => {
-    setEntryMode("existing");
-    setIsOrderFormOpen(false);
-    setCheckedCustomer(null);
-    setCustomerStatus("idle");
-    setShowAddressEdit(false);
-    setYoutubeNickname("");
-    setCustomerName("");
-    setZipcode("");
-    setAddress("");
-    setDetailAddress("");
-    setRequestMemo("");
-    setPinConfirm("");
-  };
-
-  const resetSavedLogin = () => {
-    window.localStorage.removeItem("ruru_saved_login");
-    setEntryMode("none");
-    setIsOrderFormOpen(false);
-    setCheckedCustomer(null);
-    setCustomerStatus("idle");
-    setCustomerPhone("");
-    setPin("");
-    setPinConfirm("");
-    setYoutubeNickname("");
-    setCustomerName("");
-    setZipcode("");
-    setAddress("");
-    setDetailAddress("");
-    setRequestMemo("");
-  };
-
-  const totalProductAmount = useMemo(() => {
+  const productAmount = useMemo(() => {
     return items.reduce((sum, item) => {
       return sum + toNumber(item.product_price) * (toNumber(item.qty) || 1);
     }, 0);
@@ -454,22 +274,23 @@ export default function OrderPage() {
     return items.reduce((sum, item) => sum + (toNumber(item.qty) || 1), 0);
   }, [items]);
 
-  const cardExtraAmount = useMemo(() => {
-    if (paymentMethod !== "카드결제") return 0;
-    return Math.round(totalProductAmount * (cardFeeRate / 100));
-  }, [paymentMethod, totalProductAmount, cardFeeRate]);
+  const cardExtra = paymentMethod === "카드결제"
+    ? Math.round(productAmount * (cardRateForCustomer / 100))
+    : 0;
 
-  const totalAmount = totalProductAmount + shippingFee + cardExtraAmount;
+  const totalAmount = productAmount + shippingFee + cardExtra;
 
   const updateItem = (index: number, key: keyof OrderItem, value: string) => {
-    setItems((prev) => {
-      const next = [...prev];
-      next[index] = {
-        ...next[index],
-        [key]: value,
-      };
-      return next;
-    });
+    setItems((prev) =>
+      prev.map((item, itemIndex) =>
+        itemIndex === index
+          ? {
+              ...item,
+              [key]: value,
+            }
+          : item
+      )
+    );
   };
 
   const addItem = () => {
@@ -483,13 +304,58 @@ export default function OrderPage() {
     });
   };
 
-  const validate = () => {
+  const saveCustomer = async (pinHash?: string) => {
     const cleanPhone = normalizePhone(customerPhone);
 
-    if (customerStatus === "blocked" || checkedCustomer?.is_blocked) {
-      alert("주문 진행이 제한된 고객입니다. 카톡채널로 문의해주세요.");
-      return false;
+    const customerData: any = {
+      youtube_nickname: youtubeNickname.trim(),
+      customer_name: customerName.trim(),
+      customer_phone: cleanPhone,
+      zipcode: zipcode.trim(),
+      address: address.trim(),
+      detail_address: detailAddress.trim(),
+      request_memo: requestMemo.trim(),
+      last_order_at: new Date().toISOString(),
+    };
+
+    if (pinHash) {
+      customerData.pin_hash = pinHash;
+      customerData.pin_updated_at = new Date().toISOString();
     }
+
+    const { data: rows, error: findError } = await supabase
+      .from("customers")
+      .select("id")
+      .eq("customer_phone", cleanPhone)
+      .limit(1);
+
+    if (findError) throw findError;
+
+    if (rows && rows.length > 0) {
+      const { error } = await supabase
+        .from("customers")
+        .update(customerData)
+        .eq("customer_phone", cleanPhone);
+
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.from("customers").insert(customerData);
+      if (error) throw error;
+    }
+
+    if (autoSaveInfo) {
+      localStorage.setItem("ruru_youtube_nickname", youtubeNickname.trim());
+      localStorage.setItem("ruru_customer_name", customerName.trim());
+      localStorage.setItem("ruru_customer_phone", cleanPhone);
+      localStorage.setItem("ruru_customer_zipcode", zipcode.trim());
+      localStorage.setItem("ruru_customer_address", address.trim());
+      localStorage.setItem("ruru_customer_detail_address", detailAddress.trim());
+      setHasSavedInfo(true);
+    }
+  };
+
+  const validate = () => {
+    const cleanPhone = normalizePhone(customerPhone);
 
     if (!youtubeNickname.trim()) {
       alert("유튜브 닉네임을 입력해주세요.");
@@ -506,19 +372,16 @@ export default function OrderPage() {
       return false;
     }
 
-    if (entryMode === "existing" && !checkedCustomer?.pin_hash) {
-      alert("기존 고객은 전화번호 + PIN으로 기존 정보를 먼저 불러와주세요.");
-      return false;
-    }
+    if (!isAutoLoggedIn) {
+      if (!/^\d{6}$/.test(pin)) {
+        alert("PIN번호(개인비밀번호) 6자리를 입력해주세요.");
+        return false;
+      }
 
-    if (entryMode === "new" && !/^\d{6}$/.test(pin)) {
-      alert("최초 이용 시 PIN번호 6자리를 입력해주세요.");
-      return false;
-    }
-
-    if (entryMode === "new" && pin !== pinConfirm) {
-      alert("PIN번호 재확인이 일치하지 않습니다.");
-      return false;
+      if (pin !== pinConfirm) {
+        alert("PIN번호 재확인이 일치하지 않습니다.");
+        return false;
+      }
     }
 
     if (!address.trim()) {
@@ -526,7 +389,13 @@ export default function OrderPage() {
       return false;
     }
 
-    const validItems = items.filter((item) => item.product_name.trim());
+    const validItems = items.filter(
+      (item) =>
+        item.product_name.trim() ||
+        item.color.trim() ||
+        item.size.trim() ||
+        item.product_price.trim()
+    );
 
     if (validItems.length === 0) {
       alert("상품명을 입력해주세요.");
@@ -534,6 +403,21 @@ export default function OrderPage() {
     }
 
     for (const item of validItems) {
+      if (!item.product_name.trim()) {
+        alert("상품명을 입력해주세요.");
+        return false;
+      }
+
+      if (!String(item.color || "").trim()) {
+        alert("색상을 입력해주세요.\n색상이 없으면 '없음'이라고 입력해주세요.");
+        return false;
+      }
+
+      if (!String(item.size || "").trim()) {
+        alert("사이즈를 입력해주세요.\n사이즈가 없으면 '없음'이라고 입력해주세요.");
+        return false;
+      }
+
       if (!toNumber(item.qty)) {
         alert("수량을 입력해주세요.");
         return false;
@@ -550,7 +434,7 @@ export default function OrderPage() {
       }
     }
 
-    if (paymentMethod === "카드결제" && totalProductAmount < 100000) {
+    if (paymentMethod === "카드결제" && productAmount < 100000) {
       alert("카드결제는 10만원 이상 구매 시 가능합니다.");
       return false;
     }
@@ -566,122 +450,107 @@ export default function OrderPage() {
     try {
       const cleanPhone = normalizePhone(customerPhone);
 
-      await saveCustomerImmediately();
-
-      const validItems = items.filter((item) => item.product_name.trim());
-      const orderItems = validItems.map((item) => ({
-        product_name: item.product_name.trim(),
-        color: cleanOption(item.color),
-        size: cleanOption(item.size),
-        qty: toNumber(item.qty) || 1,
-        product_price: toNumber(item.product_price),
-        item_total: toNumber(item.product_price) * (toNumber(item.qty) || 1),
-        status: "주문확인전",
-      }));
-
-      const orderMemoLabel = orderItems
-        .map((item) => {
-          return [item.product_name, item.color, item.size, `x${item.qty}`]
-            .filter(Boolean)
-            .join(" ");
-        })
-        .join(" / ");
-
-      const firstItem = orderItems[0];
-      const pinHash =
-        /^\d{6}$/.test(pin) && (entryMode === "existing" || pin === pinConfirm)
-          ? await makePinHash(cleanPhone, pin)
-          : checkedCustomer?.pin_hash || "";
-
-      if (saveLoginInfo && pinHash) {
-        await supabase
-          .from("customers")
-          .upsert(
-            {
-              youtube_nickname: youtubeNickname.trim(),
-              customer_name: customerName.trim(),
-              customer_phone: cleanPhone,
-              phone: cleanPhone,
-              zipcode: zipcode.trim(),
-              address: address.trim(),
-              detail_address: detailAddress.trim(),
-              request_memo: requestMemo.trim(),
-              pin_hash: pinHash,
-              pin_updated_at: new Date().toISOString(),
-              last_order_at: new Date().toISOString(),
-            },
-            { onConflict: "customer_phone" }
-          );
-
-        if (autoLoginEnabled) {
-          window.localStorage.setItem(
-            "ruru_saved_login",
-            JSON.stringify({
-              phone: cleanPhone,
-              pin,
-              autoLogin: true,
-              savedAt: new Date().toISOString(),
-            })
-          );
-        }
+      if (isAutoLoggedIn) {
+        await saveCustomer();
+      } else {
+        const pinHash = await makePinHash(cleanPhone, pin);
+        await saveCustomer(pinHash);
       }
 
-      const { error } = await supabase.from("orders").insert({
-        broadcast_id: activeBroadcast?.id || null,
-        broadcast_name:
-          activeBroadcast?.broadcast_public_title ||
-          activeBroadcast?.public_title ||
-          "현재 방송",
-        broadcast_public_title:
-          activeBroadcast?.broadcast_public_title ||
-          activeBroadcast?.public_title ||
-          "현재 방송",
-        broadcast_admin_subtitle:
-          activeBroadcast?.broadcast_admin_subtitle ||
-          activeBroadcast?.admin_subtitle ||
-          "",
-        youtube_nickname: youtubeNickname.trim(),
-        customer_name: customerName.trim(),
-        customer_phone: cleanPhone,
-        phone: cleanPhone,
-        zipcode: zipcode.trim(),
-        address: address.trim(),
-        detail_address: detailAddress.trim(),
-        request_memo: requestMemo.trim(),
-        category: "",
-        product_name:
-          orderItems.length === 1
-            ? firstItem.product_name
-            : `${firstItem.product_name} 외 ${orderItems.length - 1}건`,
-        color: orderItems.length === 1 ? firstItem.color : "",
-        size: orderItems.length === 1 ? firstItem.size : "",
-        qty: totalQty,
-        product_price: totalProductAmount,
-        shipping_fee: shippingFee,
-        total_price: totalAmount,
-        adjusted_product_price: totalProductAmount,
-        adjusted_shipping_fee: shippingFee,
-        adjusted_total_price: totalAmount,
-        payment_method: paymentMethod,
-        vat_amount: cardExtraAmount,
-        order_status: "주문완료",
-        admin_status: "관리자 확인 전",
-        order_manage_status: "주문확인전",
-        shipping_status: "합배송중",
-        memo: orderMemoLabel,
-        special_note: requestMemo.trim(),
-        order_items: orderItems,
-        item_change_history: [],
-        pin_verified: Boolean(pinHash),
+      const validItems = items.filter(
+        (item) =>
+          item.product_name.trim() ||
+          item.color.trim() ||
+          item.size.trim() ||
+          item.product_price.trim()
+      );
+
+      const groupId = crypto.randomUUID();
+      const lookupCode = `RURU-${Date.now().toString(36).toUpperCase()}`;
+      const broadcastName =
+        broadcast?.broadcast_public_title ||
+        broadcast?.public_title ||
+        "현재 방송";
+
+      const orderRows = validItems.map((item, index) => {
+        const qty = toNumber(item.qty) || 1;
+        const price = toNumber(item.product_price);
+        const itemTotal = price * qty;
+        const rowShippingFee = index === 0 ? shippingFee : 0;
+        const rowCardExtra =
+          paymentMethod === "카드결제"
+            ? Math.round(itemTotal * (cardRateForCustomer / 100))
+            : 0;
+
+        return {
+          order_group_id: groupId,
+          order_lookup_code: lookupCode,
+
+          broadcast_id: broadcast?.id || null,
+          broadcast_name: broadcastName,
+          broadcast_public_title: broadcastName,
+          broadcast_admin_subtitle:
+            broadcast?.broadcast_admin_subtitle ||
+            broadcast?.admin_subtitle ||
+            "",
+
+          youtube_nickname: youtubeNickname.trim(),
+          customer_name: customerName.trim(),
+          customer_phone: cleanPhone,
+
+          zipcode: zipcode.trim(),
+          address: address.trim(),
+          detail_address: detailAddress.trim(),
+          request_memo: requestMemo.trim(),
+
+          product_name: item.product_name.trim(),
+          color: String(item.color || "").trim(),
+          size: String(item.size || "").trim(),
+          qty,
+          product_price: price,
+          shipping_fee: rowShippingFee,
+          total_price: itemTotal + rowShippingFee + rowCardExtra,
+
+          adjusted_product_price: itemTotal,
+          adjusted_shipping_fee: rowShippingFee,
+          adjusted_total_price: itemTotal + rowShippingFee + rowCardExtra,
+
+          payment_method: paymentMethod,
+          vat_amount: rowCardExtra,
+
+          order_status: "주문완료",
+          admin_status: "관리자 확인 전",
+          order_manage_status: "주문확인전",
+          shipping_status: "합배송중",
+
+          memo: itemLabel(item),
+          special_note: requestMemo.trim(),
+        };
       });
 
+      const { error } = await supabase.from("orders").insert(orderRows);
       if (error) throw error;
 
-      alert("주문서가 정상 접수되었습니다.\n입금 부탁드립니다!");
+      setDone({
+        nickname: youtubeNickname.trim(),
+        name: customerName.trim(),
+        paymentMethod,
+        items: validItems,
+        totalQty,
+        productAmount,
+        shippingFee,
+        cardExtra,
+        totalAmount,
+      });
 
       setItems([{ ...emptyItem }]);
       setRequestMemo("");
       setPaymentMethod("무통장입금");
+      setPin("");
+      setPinConfirm("");
+      setIsEditingCustomerInfo(false);
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error: any) {
       alert("주문서 제출 오류: " + error.message);
     }
@@ -689,521 +558,505 @@ export default function OrderPage() {
     setSubmitting(false);
   };
 
-  const renderEntryGate = () => (
-    <section className="rounded-[2rem] border border-pink-100 bg-white p-5 shadow-[0_18px_45px_rgba(255,120,160,0.13)]">
-      <h2 className="text-xl font-black">고객정보 선택</h2>
+  const copyBankAccount = async () => {
+    try {
+      await navigator.clipboard.writeText(BANK_ACCOUNT);
+      setCopyDone(true);
+      setTimeout(() => setCopyDone(false), 1800);
+    } catch {
+      alert(BANK_ACCOUNT);
+    }
+  };
 
-      <div className="mt-4 rounded-2xl bg-pink-50 p-3 text-xs font-bold leading-relaxed text-pink-700">
-        기존 고객은 전화번호+PIN으로 바로 불러오고,
-        <br />
-        신규 고객은 최초 1회만 정보를 저장하면 됩니다.
-      </div>
+  const buttonBase = "transition-all duration-150 active:scale-[0.97]";
 
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          onClick={startExistingCustomer}
-          className={`rounded-2xl p-4 font-black ${
-            entryMode === "existing"
-              ? "bg-gray-950 text-white"
-              : "bg-gray-50 text-gray-700"
-          }`}
-        >
-          기존 고객입니다
-        </button>
-
-        <button
-          type="button"
-          onClick={startNewCustomer}
-          className={`rounded-2xl p-4 font-black ${
-            entryMode === "new"
-              ? "bg-pink-500 text-white"
-              : "bg-pink-50 text-pink-700"
-          }`}
-        >
-          신규 고객입니다
-        </button>
-      </div>
-
-      {entryMode === "existing" && !isOrderFormOpen && (
-        <div className="mt-4 grid gap-3 rounded-2xl bg-gray-50 p-3">
-          <input
-            value={customerPhone}
-            onChange={(e) => setCustomerPhone(e.target.value)}
-            placeholder="전화번호"
-            inputMode="numeric"
-            className="w-full rounded-2xl border border-gray-200 bg-white p-4 font-bold outline-none focus:border-pink-300"
-          />
-
-          <div className="relative">
-            <input
-              value={pin}
-              onChange={(e) =>
-                setPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))
+  if (done) {
+    return (
+      <main className="min-h-screen bg-[#fbf7f8] px-4 py-6 text-gray-950">
+        <section className="mx-auto w-full max-w-md">
+          <section className="relative overflow-hidden rounded-[2rem] border border-pink-100 bg-white p-6 text-center shadow-[0_18px_45px_rgba(255,120,160,0.13)]">
+            <style>{`
+              @keyframes ruruPop {
+                0% { opacity: 0; transform: translateY(14px) scale(.92); }
+                100% { opacity: 1; transform: translateY(0) scale(1); }
               }
-              placeholder="PIN번호 6자리"
-              type={showPin ? "text" : "password"}
-              inputMode="numeric"
-              className="w-full rounded-2xl border border-gray-200 bg-white p-4 pr-14 font-bold outline-none focus:border-pink-300"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPin((prev) => !prev)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full px-2 py-1 text-xs font-black text-gray-500"
-            >
-              {showPin ? "숨김" : "보기"}
-            </button>
-          </div>
 
-          <label className="flex items-start gap-2 rounded-2xl bg-white p-3 text-sm font-bold text-gray-700">
-            <input
-              type="checkbox"
-              checked={autoLoginEnabled}
-              onChange={(e) => {
-                setAutoLoginEnabled(e.target.checked);
+              @keyframes ruruFirework {
+                0% { opacity: 0; transform: translate(-50%, -50%) scale(.3) rotate(0deg); }
+                25% { opacity: 1; }
+                100% { opacity: 0; transform: translate(-50%, -50%) scale(1.45) rotate(22deg); }
+              }
 
-                if (!e.target.checked) {
-                  window.localStorage.removeItem("ruru_saved_login");
-                }
-              }}
-              className="mt-1"
-            />
-            <span>
-              자동로그인 사용
-              <span className="mt-1 block text-xs text-gray-400">
-                다음 주문부터 기존/신규 선택 없이 바로 주문서 작성으로 이동합니다.
-              </span>
-            </span>
-          </label>
+              @keyframes ruruBike {
+                0% { transform: translateX(-140%) translateY(0); opacity: 0; }
+                15% { opacity: 1; }
+                80% { opacity: 1; }
+                100% { transform: translateX(140%) translateY(-2px); opacity: 0; }
+              }
 
-          <button
-            type="button"
-            onClick={() => loadSavedCustomerWithPin()}
-            className="rounded-2xl bg-gray-950 p-4 font-black text-white"
-          >
-            기존 정보 불러오기
-          </button>
+              .ruru-pop-1 { animation: ruruPop .75s ease-out both; }
+              .ruru-pop-2 { animation: ruruPop .85s ease-out .25s both; }
+              .ruru-pop-3 { animation: ruruPop .85s ease-out .55s both; }
+              .ruru-firework { position: absolute; left: 50%; top: 44%; pointer-events: none; animation: ruruFirework 1.3s ease-out .85s both; }
+              .ruru-bike { animation: ruruBike 2.2s ease-in-out 1.5s both; }
+            `}</style>
 
-          {customerStatus === "new" && (
-            <div className="rounded-2xl bg-yellow-50 p-3 text-sm font-black text-yellow-700">
-              아직 구매이력이 없는 회원입니다. 신규 고객으로 체크 후 진행해주세요.
+            <div className="ruru-firework text-7xl">🎆</div>
+            <div className="ruru-firework text-5xl" style={{ left: "25%", top: "35%", animationDelay: "1.05s" }}>✨</div>
+            <div className="ruru-firework text-5xl" style={{ left: "76%", top: "35%", animationDelay: "1.15s" }}>🎉</div>
+
+            <div className="ruru-pop-1 text-2xl font-black">{done.nickname || done.name}님</div>
+            <div className="ruru-pop-2 mt-2 text-5xl font-black text-pink-500">주문서</div>
+            <div className="ruru-pop-3 mt-1 text-5xl font-black">완료!</div>
+
+            <div className="ruru-bike mt-4 text-4xl">🛵💨</div>
+
+            <div className="mt-5 rounded-full bg-green-50 px-4 py-3 text-sm font-black text-green-700">
+              ✓ 주문서가 정상 접수 되었습니다
             </div>
-          )}
-        </div>
-      )}
-    </section>
-  );
+          </section>
 
-  const renderCustomerInfo = () => (
-    <section className="rounded-[2rem] border border-pink-100 bg-white p-5 shadow-[0_18px_45px_rgba(255,120,160,0.13)]">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-xl font-black">주문자 정보</h2>
+          <section className="mt-4 rounded-[2rem] bg-white p-5 shadow-sm">
+            <div className="text-xl font-black">주문내역</div>
 
-        {entryMode === "existing" && (
-          <button
-            type="button"
-            onClick={resetSavedLogin}
-            className="rounded-full bg-gray-100 px-3 py-2 text-xs font-black text-gray-600"
-          >
-            다른 고객
-          </button>
-        )}
-      </div>
-
-      {entryMode === "existing" && checkedCustomer?.pin_hash && (
-        <div className="mt-4 rounded-2xl bg-green-50 p-3 text-sm font-black text-green-700">
-          기존 고객정보를 불러왔습니다. 바로 주문서를 작성하시면 됩니다.
-        </div>
-      )}
-
-      {entryMode === "new" && (
-        <div className="mt-4 rounded-2xl bg-pink-50 p-3 text-xs font-bold leading-relaxed text-pink-700">
-          🤍 최초 1회만 닉네임·이름·전화번호·PIN·주소를 저장하면 다음 주문부터 자동으로 불러옵니다.
-        </div>
-      )}
-
-      <div className="mt-4 grid gap-3">
-        {entryMode === "new" && (
-          <>
-            <input
-              value={youtubeNickname}
-              onChange={(e) => setYoutubeNickname(e.target.value)}
-              onBlur={saveCustomerImmediately}
-              placeholder="유튜브 닉네임"
-              className="w-full rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-pink-300"
-            />
-
-            <input
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              onBlur={saveCustomerImmediately}
-              placeholder="이름"
-              className="w-full rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-pink-300"
-            />
-
-            <input
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              onBlur={saveCustomerImmediately}
-              placeholder="전화번호"
-              inputMode="numeric"
-              className="w-full rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-pink-300"
-            />
-
-            <div className="grid gap-2 rounded-2xl bg-pink-50 p-3">
-              <div className="relative">
-                <input
-                  value={pin}
-                  onChange={(e) =>
-                    setPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))
-                  }
-                  onBlur={saveCustomerImmediately}
-                  placeholder="PIN번호 6자리"
-                  type={showPin ? "text" : "password"}
-                  inputMode="numeric"
-                  className="w-full rounded-2xl border border-pink-100 bg-white p-4 pr-14 font-bold outline-none focus:border-pink-300"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPin((prev) => !prev)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full px-2 py-1 text-xs font-black text-gray-500"
-                >
-                  {showPin ? "숨김" : "보기"}
-                </button>
-              </div>
-
-              <div className="relative">
-                <input
-                  value={pinConfirm}
-                  onChange={(e) =>
-                    setPinConfirm(
-                      e.target.value.replace(/[^0-9]/g, "").slice(0, 6)
-                    )
-                  }
-                  onBlur={saveCustomerImmediately}
-                  placeholder="PIN번호 재확인"
-                  type={showPinConfirm ? "text" : "password"}
-                  inputMode="numeric"
-                  className="w-full rounded-2xl border border-pink-100 bg-white p-4 pr-14 font-bold outline-none focus:border-pink-300"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPinConfirm((prev) => !prev)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full px-2 py-1 text-xs font-black text-gray-500"
-                >
-                  {showPinConfirm ? "숨김" : "보기"}
-                </button>
-              </div>
-
-              <div className="px-1 text-xs font-bold leading-relaxed text-pink-700">
-                📌 신규 고객은 최초 1회 PIN번호 재확인이 필요합니다.
-                <br />
-                주문조회 및 개인정보 보호를 위한 비밀번호이니 꼭 기억해주세요.
-              </div>
-            </div>
-          </>
-        )}
-
-        {entryMode === "existing" && checkedCustomer?.pin_hash && (
-          <div className="rounded-2xl bg-gray-50 p-4">
-            <div className="text-xs font-black text-gray-400">불러온 고객정보</div>
-            <div className="mt-1 text-sm font-bold text-gray-800">
-              {youtubeNickname || "-"} / {customerName || "-"}
-            </div>
-          </div>
-        )}
-
-        {address && !showAddressEdit ? (
-          <div className="rounded-2xl bg-gray-50 p-4">
-            <div className="text-xs font-black text-gray-400">기본 배송지</div>
-            <div className="mt-1 text-sm font-bold text-gray-800">
-              {zipcode && `(${zipcode}) `}
-              {address} {detailAddress}
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowAddressEdit(true)}
-              className="mt-3 rounded-full bg-gray-950 px-4 py-2 text-xs font-black text-white"
-            >
-              배송지 변경
-            </button>
-          </div>
-        ) : (
-          <div className="grid gap-3 rounded-2xl bg-gray-50 p-3">
-            <button
-              type="button"
-              onClick={openAddressSearch}
-              className="rounded-2xl bg-gray-950 p-4 font-black text-white"
-            >
-              주소검색
-            </button>
-
-            <input
-              value={zipcode}
-              onChange={(e) => setZipcode(e.target.value)}
-              onBlur={saveCustomerImmediately}
-              placeholder="우편번호"
-              className="rounded-2xl border border-gray-200 bg-white p-4 font-bold"
-            />
-
-            <input
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              onBlur={saveCustomerImmediately}
-              placeholder="주소"
-              className="rounded-2xl border border-gray-200 bg-white p-4 font-bold"
-            />
-
-            <input
-              id="detailAddressInput"
-              value={detailAddress}
-              onChange={(e) => setDetailAddress(e.target.value)}
-              onBlur={saveCustomerImmediately}
-              placeholder="상세주소"
-              className="rounded-2xl border border-gray-200 bg-white p-4 font-bold"
-            />
-
-            <label className="flex items-start gap-2 rounded-2xl bg-white p-3 text-sm font-bold text-gray-700">
-              <input
-                type="checkbox"
-                checked={saveLoginInfo}
-                onChange={(e) => setSaveLoginInfo(e.target.checked)}
-                className="mt-1"
-              />
-              <span>
-                주문자 정보 저장하기
-                <span className="mt-1 block text-xs text-gray-400">
-                  닉네임·이름·전화번호·주소를 저장합니다. 자동로그인을 켜면 다음 주문부터 바로 불러옵니다.
-                </span>
-              </span>
-            </label>
-          </div>
-        )}
-      </div>
-    </section>
-  );
-
-  const renderOrderForm = () => (
-    <>
-      {renderCustomerInfo()}
-
-      <section className="mt-4 rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm">
-        <h2 className="text-xl font-black">주문상품</h2>
-
-        <div className="mt-4 grid gap-4">
-          {items.map((item, index) => (
-            <div
-              key={index}
-              className="rounded-[1.5rem] border border-gray-100 bg-gray-50 p-4"
-            >
-              <div className="mb-3 flex items-center justify-between">
-                <div className="font-black">상품 {index + 1}</div>
-                {items.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeItem(index)}
-                    className="rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-600"
-                  >
-                    삭제
-                  </button>
-                )}
-              </div>
-
-              <div className="grid gap-3">
-                <input
-                  value={item.product_name}
-                  onChange={(e) =>
-                    updateItem(index, "product_name", e.target.value)
-                  }
-                  placeholder="상품명"
-                  className="rounded-2xl border border-gray-200 bg-white p-4 font-bold"
-                />
-
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    value={item.color}
-                    onChange={(e) => updateItem(index, "color", e.target.value)}
-                    placeholder="색상 (없으면 비워두기)"
-                    className="rounded-2xl border border-gray-200 bg-white p-4 font-bold"
-                  />
-
-                  <input
-                    value={item.size}
-                    onChange={(e) => updateItem(index, "size", e.target.value)}
-                    placeholder="사이즈 (없으면 비워두기)"
-                    className="rounded-2xl border border-gray-200 bg-white p-4 font-bold"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    value={item.qty}
-                    onChange={(e) =>
-                      updateItem(index, "qty", onlyNumber(e.target.value))
-                    }
-                    placeholder="수량"
-                    inputMode="numeric"
-                    className="rounded-2xl border border-gray-200 bg-white p-4 font-bold"
-                  />
-
-                  <div className="relative">
-                    <input
-                      value={item.product_price}
-                      onChange={(e) =>
-                        updateItem(index, "product_price", onlyNumber(e.target.value))
-                      }
-                      placeholder="상품금액"
-                      inputMode="numeric"
-                      className="w-full rounded-2xl border border-gray-200 bg-white p-4 pr-10 font-bold"
-                    />
-                    <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-black text-gray-400">
-                      원
-                    </span>
-                  </div>
-                </div>
-
-                {item.product_name && (
-                  <div className="rounded-2xl bg-white p-3 text-sm font-black text-gray-600">
-                    {buildItemLabel(item)} /{" "}
+            <div className="mt-3 grid gap-2">
+              {done.items.map((item, index) => (
+                <div key={index} className="rounded-2xl bg-gray-50 p-4">
+                  <div className="font-black">{itemLabel(item)}</div>
+                  <div className="mt-1 text-sm font-bold text-gray-500">
                     {won(toNumber(item.product_price) * (toNumber(item.qty) || 1))}
                   </div>
-                )}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 rounded-[1.5rem] bg-gray-50 p-4">
+              <div className="flex justify-between text-sm font-bold text-gray-500">
+                <span>총수량</span>
+                <span>{done.totalQty}개</span>
+              </div>
+
+              <div className="mt-2 flex justify-between text-sm font-bold text-gray-500">
+                <span>상품금액</span>
+                <span>{won(done.productAmount)}</span>
+              </div>
+
+              <div className="mt-2 flex justify-between text-sm font-bold text-gray-500">
+                <span>배송비</span>
+                <span>{won(done.shippingFee)}</span>
+              </div>
+
+              {done.paymentMethod === "카드결제" && (
+                <div className="mt-2 flex justify-between text-sm font-bold text-blue-600">
+                  <span>카드 추가금 10%</span>
+                  <span>{won(done.cardExtra)}</span>
+                </div>
+              )}
+
+              <div className="mt-4 flex justify-between border-t pt-4 text-xl font-black">
+                <span>총 결제금액</span>
+                <span>{won(done.totalAmount)}</span>
               </div>
             </div>
-          ))}
+          </section>
 
-          <button
-            type="button"
-            onClick={addItem}
-            className="rounded-2xl border border-dashed border-pink-200 bg-pink-50 p-4 font-black text-pink-700"
-          >
-            + 상품 추가하기
-          </button>
-        </div>
-      </section>
+          {done.paymentMethod === "무통장입금" ? (
+            <section className="mt-4 rounded-[2rem] bg-white p-5 shadow-sm">
+              <div className="text-xl font-black">입금계좌 안내</div>
 
-      <section className="mt-4 rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm">
-        <h2 className="text-xl font-black">결제수단</h2>
+              <div className="mt-3 rounded-[1.5rem] bg-yellow-50 p-4">
+                <div className="text-sm font-bold text-yellow-700">{BANK_NAME}</div>
+                <div className="mt-1 text-3xl font-black tracking-[-0.04em]">{BANK_ACCOUNT}</div>
+                <div className="mt-1 text-lg font-black">{BANK_HOLDER}</div>
+              </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => setPaymentMethod("무통장입금")}
-            className={`rounded-2xl p-4 font-black ${
-              paymentMethod === "무통장입금"
-                ? "bg-gray-950 text-white"
-                : "bg-gray-50 text-gray-700"
-            }`}
-          >
-            무통장입금
-          </button>
+              <button
+                type="button"
+                onClick={copyBankAccount}
+                className={`${buttonBase} mt-3 w-full rounded-2xl bg-gray-950 p-4 font-black text-white`}
+              >
+                {copyDone ? "✓ 계좌번호가 복사되었습니다" : "계좌번호 복사"}
+              </button>
 
-          <button
-            type="button"
-            onClick={() => setPaymentMethod("카드결제")}
-            className={`rounded-2xl p-4 font-black ${
-              paymentMethod === "카드결제"
-                ? "bg-blue-600 text-white"
-                : "bg-blue-50 text-blue-700"
-            }`}
-          >
-            카드결제
-          </button>
-        </div>
-
-        {paymentMethod === "카드결제" && (
-          <div className="mt-3 rounded-2xl bg-blue-50 p-3 text-xs font-bold leading-relaxed text-blue-700">
-            💳 카드결제는 주문서 작성 후 카톡채널 문의 시 결제링크를 보내드립니다.
-          </div>
-        )}
-      </section>
-
-      <section className="mt-4 rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm">
-        <h2 className="text-xl font-black">요청사항</h2>
-
-        <textarea
-          value={requestMemo}
-          onChange={(e) => setRequestMemo(e.target.value)}
-          onBlur={saveCustomerImmediately}
-          placeholder="배송 요청사항이 있으면 입력해주세요."
-          className="mt-4 min-h-[100px] w-full resize-none rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-pink-300"
-        />
-
-        <div className="mt-5 rounded-[1.5rem] bg-gray-950 p-5 text-white">
-          <div className="flex items-center justify-between text-sm font-bold text-white/70">
-            <span>상품금액</span>
-            <span>{won(totalProductAmount)}</span>
-          </div>
-
-          <div className="mt-2 flex items-center justify-between text-sm font-bold text-white/70">
-            <span>배송비</span>
-            <span>{won(shippingFee)}</span>
-          </div>
-
-          {paymentMethod === "카드결제" && (
-            <div className="mt-2 flex items-center justify-between text-sm font-bold text-blue-200">
-              <span>카드부가세 {cardFeeRate}%</span>
-              <span>{won(cardExtraAmount)}</span>
-            </div>
+              <div className="mt-3 rounded-2xl bg-pink-50 p-3 text-center text-sm font-black text-pink-700">
+                주문서 작성 후 10분 이내 입금 부탁드립니다.
+              </div>
+            </section>
+          ) : (
+            <section className="mt-4 rounded-[2rem] bg-white p-5 text-center shadow-sm">
+              <div className="text-xl font-black text-blue-700">카드결제 안내</div>
+              <div className="mt-3 rounded-2xl bg-blue-50 p-4 text-sm font-bold text-blue-700">
+                카드결제는 카톡채널로 문의 부탁드립니다.
+              </div>
+            </section>
           )}
 
-          <div className="mt-4 flex items-center justify-between border-t border-white/15 pt-4">
-            <span className="font-black">총 결제금액</span>
-            <span className="text-2xl font-black">{won(totalAmount)}</span>
-          </div>
-        </div>
+          <button
+            type="button"
+            onClick={() => setDone(null)}
+            className={`${buttonBase} mt-4 w-full rounded-2xl bg-pink-500 p-4 font-black text-white shadow-lg shadow-pink-200`}
+          >
+            다른 상품 추가 주문하기
+          </button>
 
-        <button
-          type="button"
-          onClick={submitOrder}
-          disabled={submitting}
-          className="mt-4 w-full rounded-2xl bg-pink-500 p-5 text-xl font-black text-white shadow-[0_14px_30px_rgba(236,72,153,0.28)] disabled:opacity-50"
-        >
-          {submitting ? "제출 중..." : "주문서 제출"}
-        </button>
-      </section>
-    </>
-  );
+          <footer className="py-8 text-center text-[11px] font-bold text-gray-400">
+            {FOOTER_TEXT}
+          </footer>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#fbf7f8] px-4 py-6 text-gray-950">
       <section className="mx-auto w-full max-w-md">
         <header className="mb-5 text-center">
           <div className="text-sm font-black text-pink-400">RURU ORDER</div>
-          <h1 className="mt-1 text-4xl font-black tracking-tight">
-            주문서 작성
-          </h1>
+          <h1 className="mt-1 text-4xl font-black tracking-tight">주문서 작성</h1>
           <p className="mt-2 text-sm font-bold text-gray-500">
             방송 중 구매하신 상품을 작성해주세요.
           </p>
         </header>
 
-        {loadingBroadcast ? (
-          <div className="mb-4 rounded-[1.7rem] bg-white p-5 text-center font-black text-gray-500 shadow-sm">
-            방송 정보를 불러오는 중...
-          </div>
-        ) : (
-          <section className="mb-4 rounded-[1.7rem] border border-gray-100 bg-white p-5 shadow-sm">
-            <div className="text-xs font-black text-gray-400">현재 방송</div>
-            <div className="mt-1 text-2xl font-black">
-              {activeBroadcast?.broadcast_public_title ||
-                activeBroadcast?.public_title ||
-                "현재 방송"}
+        {hasSavedInfo && !isEditingCustomerInfo && (
+          <section className="mb-4 rounded-[1.5rem] border border-green-100 bg-green-50 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-sm font-black text-green-700">
+                  저장된 고객정보가 자동 입력되었습니다.
+                </div>
+                <div className="mt-1 truncate text-xs font-bold text-green-600">
+                  {youtubeNickname || customerName}님
+                </div>
+              </div>
+
+              <div className="flex shrink-0 gap-2">
+                <button
+                  type="button"
+                  onClick={startEditCustomerInfo}
+                  className={`${buttonBase} rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-gray-800 shadow-sm hover:bg-pink-50`}
+                >
+                  정보 변경
+                </button>
+
+                <button
+                  type="button"
+                  onClick={logoutCustomerInfo}
+                  className={`${buttonBase} rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-gray-800 shadow-sm hover:bg-gray-950 hover:text-white`}
+                >
+                  로그아웃
+                </button>
+              </div>
             </div>
           </section>
         )}
 
-        <YoutubeLiveBox youtubeUrl={activeBroadcast?.youtube_live_url || ""} />
+        {isEditingCustomerInfo && (
+          <section className="mb-4 rounded-[1.5rem] border border-pink-100 bg-pink-50 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm font-black text-pink-700">
+                고객정보 변경 모드입니다.
+              </div>
 
-        {autoLoginChecking ? (
-          <section className="rounded-[2rem] border border-pink-100 bg-white p-5 text-center font-black text-gray-500 shadow-sm">
-            자동로그인 확인 중...
+              <button
+                type="button"
+                onClick={cancelEditCustomerInfo}
+                className={`${buttonBase} rounded-2xl bg-white px-4 py-3 text-sm font-black text-gray-800`}
+              >
+                변경 취소
+              </button>
+            </div>
           </section>
-        ) : isOrderFormOpen ? (
-          renderOrderForm()
-        ) : (
-          renderEntryGate()
         )}
+
+        <section className="mb-4 rounded-[1.7rem] bg-white p-5 shadow-sm">
+          <div className="text-xs font-black text-gray-400">현재 방송</div>
+          <div className="mt-1 text-2xl font-black">
+            {broadcast?.broadcast_public_title || broadcast?.public_title || "현재 방송"}
+          </div>
+        </section>
+
+        <section className="rounded-[2rem] border border-pink-100 bg-white p-5 shadow-[0_18px_45px_rgba(255,120,160,0.13)]">
+          <h2 className="text-xl font-black">주문자 정보</h2>
+
+          <div className="mt-4 rounded-2xl bg-pink-50 p-3 text-xs font-bold leading-relaxed text-pink-700">
+            📌 PIN번호(개인비밀번호)는 주문 및 주문조회 시 필요한 비밀번호입니다.
+            <br />
+            꼭 기억해주세요. 분실 시 재설정이 필요할 수 있습니다.
+          </div>
+
+          <div className="mt-4 grid gap-3">
+            <input
+              id="youtubeNicknameInput"
+              value={youtubeNickname}
+              onChange={(event) => setYoutubeNickname(event.target.value)}
+              placeholder="유튜브 닉네임"
+              className="w-full rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-pink-300"
+            />
+
+            <input
+              value={customerName}
+              onChange={(event) => setCustomerName(event.target.value)}
+              placeholder="이름"
+              className="w-full rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-pink-300"
+            />
+
+            <input
+              value={customerPhone}
+              onChange={(event) => setCustomerPhone(event.target.value)}
+              placeholder="전화번호"
+              inputMode="numeric"
+              className="w-full rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-pink-300"
+            />
+
+            {!isAutoLoggedIn && (
+              <div className="grid gap-2 rounded-2xl bg-pink-50 p-3">
+                <div className="relative">
+                  <input
+                    value={pin}
+                    onChange={(event) =>
+                      setPin(event.target.value.replace(/[^0-9]/g, "").slice(0, 6))
+                    }
+                    placeholder="PIN번호(개인비밀번호) 6자리"
+                    type={showPin ? "text" : "password"}
+                    inputMode="numeric"
+                    className="w-full rounded-2xl border border-pink-100 bg-white p-4 pr-14 font-bold outline-none focus:border-pink-300"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setShowPin((value) => !value)}
+                    className={`${buttonBase} absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black text-gray-500`}
+                  >
+                    {showPin ? "숨김" : "보기"}
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <input
+                    value={pinConfirm}
+                    onChange={(event) =>
+                      setPinConfirm(event.target.value.replace(/[^0-9]/g, "").slice(0, 6))
+                    }
+                    placeholder="PIN번호 재확인"
+                    type={showPinConfirm ? "text" : "password"}
+                    inputMode="numeric"
+                    className="w-full rounded-2xl border border-pink-100 bg-white p-4 pr-14 font-bold outline-none focus:border-pink-300"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setShowPinConfirm((value) => !value)}
+                    className={`${buttonBase} absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black text-gray-500`}
+                  >
+                    {showPinConfirm ? "숨김" : "보기"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <label className="flex items-center gap-2 rounded-2xl bg-gray-50 p-3 text-sm font-black text-gray-700">
+              <input
+                type="checkbox"
+                checked={autoSaveInfo}
+                onChange={(event) => setAutoSaveInfo(event.target.checked)}
+              />
+              다음 주문부터 고객정보 자동 불러오기
+            </label>
+
+            <button
+              type="button"
+              onClick={openAddressSearch}
+              className={`${buttonBase} rounded-2xl bg-gray-950 p-4 font-black text-white`}
+            >
+              주소검색
+            </button>
+
+            <input
+              value={zipcode}
+              onChange={(event) => setZipcode(event.target.value)}
+              placeholder="우편번호"
+              className="rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold"
+            />
+
+            <input
+              value={address}
+              onChange={(event) => setAddress(event.target.value)}
+              placeholder="주소"
+              className="rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold"
+            />
+
+            <input
+              id="detailAddressInput"
+              value={detailAddress}
+              onChange={(event) => setDetailAddress(event.target.value)}
+              placeholder="상세주소"
+              className="rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold"
+            />
+          </div>
+        </section>
+
+        <section className="mt-4 rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-black">주문상품</h2>
+
+          <div className="mt-4 grid gap-4">
+            {items.map((item, index) => (
+              <div key={index} className="rounded-[1.5rem] border border-gray-100 bg-gray-50 p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="font-black">상품 {index + 1}</div>
+
+                  {items.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeItem(index)}
+                      className={`${buttonBase} rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-600`}
+                    >
+                      삭제
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid gap-3">
+                  <input
+                    value={item.product_name}
+                    onChange={(event) => updateItem(index, "product_name", event.target.value)}
+                    placeholder="상품명"
+                    className="rounded-2xl border border-gray-200 bg-white p-4 font-bold"
+                  />
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      value={item.color}
+                      onChange={(event) => updateItem(index, "color", event.target.value)}
+                      placeholder="색상"
+                      className="rounded-2xl border border-gray-200 bg-white p-4 font-bold"
+                    />
+
+                    <input
+                      value={item.size}
+                      onChange={(event) => updateItem(index, "size", event.target.value)}
+                      placeholder="사이즈"
+                      className="rounded-2xl border border-gray-200 bg-white p-4 font-bold"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      value={item.qty}
+                      onChange={(event) => updateItem(index, "qty", onlyNumber(event.target.value))}
+                      placeholder="수량"
+                      inputMode="numeric"
+                      className="rounded-2xl border border-gray-200 bg-white p-4 font-bold"
+                    />
+
+                    <div className="relative">
+                      <input
+                        value={moneyText(item.product_price)}
+                        onChange={(event) =>
+                          updateItem(index, "product_price", onlyNumber(event.target.value))
+                        }
+                        placeholder="상품금액"
+                        inputMode="numeric"
+                        className="w-full rounded-2xl border border-gray-200 bg-white p-4 pr-10 font-bold"
+                      />
+
+                      <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-black text-gray-400">
+                        원
+                      </span>
+                    </div>
+                  </div>
+
+                  {item.product_name && (
+                    <div className="rounded-2xl bg-white p-3 text-sm font-black text-gray-600">
+                      {itemLabel(item)} / {won(toNumber(item.product_price) * (toNumber(item.qty) || 1))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={addItem}
+              className={`${buttonBase} rounded-2xl border border-dashed border-pink-200 bg-pink-50 p-4 font-black text-pink-600`}
+            >
+              + 상품 추가하기
+            </button>
+          </div>
+        </section>
+
+        <section className="mt-4 rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-black">결제 및 요청사항</h2>
+
+          <div className="mt-4 grid gap-3">
+            <div className="grid grid-cols-2 gap-2">
+              {(["무통장입금", "카드결제"] as const).map((method) => (
+                <button
+                  key={method}
+                  type="button"
+                  onClick={() => setPaymentMethod(method)}
+                  className={`${buttonBase} rounded-2xl p-4 font-black ${
+                    paymentMethod === method
+                      ? method === "카드결제"
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-950 text-white"
+                      : "bg-gray-50 text-gray-700"
+                  }`}
+                >
+                  {method}
+                </button>
+              ))}
+            </div>
+
+            {paymentMethod === "카드결제" && (
+              <div className="rounded-2xl bg-blue-50 p-3 text-xs font-bold leading-relaxed text-blue-700">
+                💳 카드결제는 10만원 이상 구매 시 가능합니다.
+                <br />
+                주문서 작성 후 카톡채널 문의 부탁드립니다.
+              </div>
+            )}
+
+            <textarea
+              value={requestMemo}
+              onChange={(event) => setRequestMemo(event.target.value)}
+              placeholder="요청사항 / 배송메모"
+              className="min-h-[100px] rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-pink-300"
+            />
+
+            <div className="rounded-[1.5rem] bg-gray-50 p-4">
+              <div className="flex justify-between text-sm font-bold text-gray-500">
+                <span>상품금액</span>
+                <span>{won(productAmount)}</span>
+              </div>
+
+              <div className="mt-2 flex justify-between text-sm font-bold text-gray-500">
+                <span>배송비</span>
+                <span>{won(shippingFee)}</span>
+              </div>
+
+              {paymentMethod === "카드결제" && (
+                <div className="mt-2 flex justify-between text-sm font-bold text-blue-600">
+                  <span>카드 추가금 10%</span>
+                  <span>{won(cardExtra)}</span>
+                </div>
+              )}
+
+              <div className="mt-4 flex justify-between border-t pt-4 text-xl font-black">
+                <span>총 결제금액</span>
+                <span>{won(totalAmount)}</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={submitOrder}
+              disabled={submitting}
+              className={`${buttonBase} rounded-2xl bg-pink-500 p-5 text-lg font-black text-white shadow-lg shadow-pink-200 disabled:opacity-50`}
+            >
+              {submitting ? "제출 중..." : "주문서 제출하기"}
+            </button>
+          </div>
+        </section>
 
         <footer className="py-8 text-center text-[11px] font-bold text-gray-400">
           {FOOTER_TEXT}
