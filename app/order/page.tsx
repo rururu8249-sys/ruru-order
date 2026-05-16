@@ -6,9 +6,9 @@
 // - 기존고객/신규고객 선택 화면 제거
 // - 저장된 고객정보 자동 입력
 // - 자동 로그인 상태면 PIN 입력칸 숨김
-// - [정보 변경] 버튼 / [로그아웃] 버튼
-// - 정보 변경 시 PIN 입력칸 다시 표시 가능
-// - 최초 입력 시 PIN번호(개인비밀번호) 6자리 + 재확인
+// - [정보수정] 버튼 / [로그아웃] 버튼
+// - 정보수정 시 PIN 입력칸 다시 표시 가능
+// - 최초 입력 시 주문 비밀번호 (숫자 6자리) + 재확인
 // - 주문상품 모든 칸 필수: 상품명/색상/사이즈/수량/상품금액
 // - 색상/사이즈 없으면 고객이 "없음" 입력해야 제출 가능
 // - 상품금액 쉼표 자동
@@ -17,9 +17,11 @@
 // - 무통장 계좌 안내는 주문서 작성 중간에 노출하지 않음
 // - 홈/로그아웃 상단 버튼 추가
 // - 주문자 정보 접기/펼치기 추가
-// - 정보 변경완료 버튼 추가
-// - 색상/사이즈 한글/영어만 입력 제한
+// - 정보수정완료 버튼 추가
+// - 색상은 한글/영어/공백 허용, 사이즈는 한글/영어/숫자/공백 허용
 // - 고객페이지 기본 퍼가기 방지 적용
+// - 상품명은 자유 입력, 상품 1칸 1개 안내문 추가
+// - 상품금액 1,000원 미만 제출 금지
 
 "use client";
 
@@ -104,8 +106,11 @@ async function makePinHash(phone: string, pin: string) {
 }
 
 
-const koreanEnglishOnly = (value: string) =>
+const cleanColorText = (value: string) =>
   String(value || "").replace(/[^ㄱ-ㅎ가-힣a-zA-Z\s]/g, "").slice(0, 30);
+
+const cleanSizeText = (value: string) =>
+  String(value || "").replace(/[^ㄱ-ㅎ가-힣a-zA-Z0-9\s]/g, "").slice(0, 30);
 
 const blockCustomerCopyEvents = () => {
   const block = (event: Event) => event.preventDefault();
@@ -188,9 +193,17 @@ export default function OrderPage() {
   }, []);
 
   useEffect(() => {
-    if (!hasSavedInfo || isEditingCustomerInfo) {
+    if (isEditingCustomerInfo) {
       setIsCustomerInfoOpen(true);
+      return;
     }
+
+    if (hasSavedInfo) {
+      setIsCustomerInfoOpen(false);
+      return;
+    }
+
+    setIsCustomerInfoOpen(true);
   }, [hasSavedInfo, isEditingCustomerInfo]);
 
   const loadSavedCustomerInfo = () => {
@@ -302,7 +315,7 @@ export default function OrderPage() {
       }
 
       if (pin !== pinConfirm) {
-        alert("PIN번호 재확인이 일치하지 않습니다.");
+        alert("비밀번호 확인이 일치하지 않습니다.");
         return;
       }
     }
@@ -314,7 +327,7 @@ export default function OrderPage() {
       setIsCustomerInfoOpen(false);
       setPin("");
       setPinConfirm("");
-      alert("고객정보 변경이 완료되었습니다.");
+      alert("고객정보수정이 완료되었습니다.");
     } catch (error: any) {
       alert("고객정보 저장 오류: " + error.message);
     }
@@ -390,7 +403,11 @@ export default function OrderPage() {
 
   const updateItem = (index: number, key: keyof OrderItem, value: string) => {
     const safeValue =
-      key === "color" || key === "size" ? koreanEnglishOnly(value) : value;
+      key === "color"
+        ? cleanColorText(value)
+        : key === "size"
+          ? cleanSizeText(value)
+          : value;
 
     setItems((prev) =>
       prev.map((item, itemIndex) =>
@@ -485,12 +502,12 @@ export default function OrderPage() {
 
     if (!isAutoLoggedIn) {
       if (!/^\d{6}$/.test(pin)) {
-        alert("PIN번호(개인비밀번호) 6자리를 입력해주세요.");
+        alert("주문 비밀번호 (숫자 6자리)를 입력해주세요.");
         return false;
       }
 
       if (pin !== pinConfirm) {
-        alert("PIN번호 재확인이 일치하지 않습니다.");
+        alert("비밀번호 확인이 일치하지 않습니다.");
         return false;
       }
     }
@@ -540,7 +557,7 @@ export default function OrderPage() {
       }
 
       if (toNumber(item.product_price) < 1000) {
-        alert("상품금액을 다시 확인해주세요.");
+        alert("상품금액은 1,000원 이상으로 입력해주세요.");
         return false;
       }
     }
@@ -684,21 +701,43 @@ export default function OrderPage() {
 
 
   const TopCustomerNav = () => (
-    <div className="sticky top-3 z-30 mb-4 flex items-center justify-between gap-3 rounded-full border border-[#f4e7e9] bg-white/95 p-2 shadow-[0_12px_30px_rgba(30,20,20,0.08)] backdrop-blur">
-      <Link
-        href="/"
-        className={`${buttonBase} flex min-h-[44px] items-center justify-center rounded-full bg-[#fff2f4] px-4 text-[14px] font-black text-[#ff4b60]`}
-      >
-        🏠 HOME
-      </Link>
+    <div className="sticky top-3 z-30 mb-4 flex items-center justify-between gap-2 rounded-full border border-[#f4e7e9] bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(30,20,20,0.08)] backdrop-blur">
+      <div className="shrink-0 text-[13px] font-black tracking-[-0.04em] text-[#ff4b60]">
+        📺 루루동이
+      </div>
 
-      <button
-        type="button"
-        onClick={logoutCustomerInfo}
-        className={`${buttonBase} flex min-h-[44px] items-center justify-center rounded-full bg-[#f5f2f2] px-4 text-[14px] font-black text-[#5f5555]`}
-      >
-        로그아웃
-      </button>
+      <div className="flex min-w-0 items-center justify-end gap-2 text-[12px] font-black tracking-[-0.04em] text-[#5f5555]">
+        <Link
+          href="/"
+          className={`${buttonBase} whitespace-nowrap px-1 py-2 text-[#ff4b60]`}
+        >
+          🏠 HOME
+        </Link>
+
+        {hasSavedInfo && (
+          <>
+            <span className="text-[#e1d4d5]">/</span>
+
+            <button
+              type="button"
+              onClick={startEditCustomerInfo}
+              className={`${buttonBase} whitespace-nowrap px-1 py-2 text-[#5f5555]`}
+            >
+              정보수정
+            </button>
+
+            <span className="text-[#e1d4d5]">/</span>
+
+            <button
+              type="button"
+              onClick={logoutCustomerInfo}
+              className={`${buttonBase} whitespace-nowrap px-1 py-2 text-[#5f5555]`}
+            >
+              로그아웃
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 
@@ -854,33 +893,16 @@ export default function OrderPage() {
 
         {hasSavedInfo && !isEditingCustomerInfo && (
           <section className="mb-4 rounded-[1.5rem] border border-green-100 bg-green-50 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-sm font-black text-green-700">
-                  저장된 고객정보가 자동 입력되었습니다.
-                </div>
-                <div className="mt-1 truncate text-xs font-bold text-green-600">
-                  {youtubeNickname || customerName}님
-                </div>
-              </div>
-
-              <div className="flex shrink-0 gap-2">
-                <button
-                  type="button"
-                  onClick={startEditCustomerInfo}
-                  className={`${buttonBase} rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-gray-800 shadow-sm hover:bg-pink-50`}
-                >
-                  정보 변경
-                </button>
-
-                <button
-                  type="button"
-                  onClick={logoutCustomerInfo}
-                  className={`${buttonBase} rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-gray-800 shadow-sm hover:bg-gray-950 hover:text-white`}
-                >
-                  로그아웃
-                </button>
-              </div>
+            <div className="text-sm font-black text-green-700">
+              저장된 고객정보가 자동 입력되었습니다.
+            </div>
+            <div className="mt-1 truncate text-xs font-bold text-green-600">
+              {youtubeNickname || customerName}님
+            </div>
+            <div className="mt-2 text-xs font-bold leading-relaxed text-green-700/80">
+              닉네임 · 이름 · 연락처 · 주소는 최초 1회만 입력하면 됩니다.
+              다음 주문부터 자동 입력됩니다.
+              수정이 필요하면 상단 [정보수정]을 눌러주세요.
             </div>
           </section>
         )}
@@ -889,7 +911,7 @@ export default function OrderPage() {
           <section className="mb-4 rounded-[1.5rem] border border-pink-100 bg-pink-50 p-4">
             <div className="grid gap-3">
               <div className="text-sm font-black text-pink-700">
-                고객정보 변경 모드입니다. 수정 후 반드시 “변경완료”를 눌러주세요.
+                고객정보수정 모드입니다. 수정 후 반드시 “변경완료”를 눌러주세요.
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -929,7 +951,7 @@ export default function OrderPage() {
             <div>
               <h2 className="text-xl font-black">주문자 정보</h2>
               <p className="mt-1 text-xs font-bold text-pink-500">
-                닉네임 · 이름 · 연락처 · 주소
+                최초 1회 저장하면 다음 주문부터 자동 입력
               </p>
             </div>
             <span className="text-sm font-black text-pink-500">
@@ -945,17 +967,25 @@ export default function OrderPage() {
               <div className="mt-1 text-xs font-bold leading-relaxed text-green-600">
                 {youtubeNickname || customerName} / {customerPhone}
                 <br />
-                📍 {address} {detailAddress}
+📍 {address} {detailAddress}
+                <br />
+                다음 주문부터 이 정보로 자동 입력됩니다.
               </div>
             </div>
           )}
 
           {isCustomerInfoOpen && (
             <>
-              <div className="mt-4 rounded-2xl bg-pink-50 p-3 text-xs font-bold leading-relaxed text-pink-700">
-                📌 PIN번호(개인비밀번호)는 주문 및 주문조회 시 필요한 비밀번호입니다.
+              <div className="mt-4 rounded-2xl bg-[#fff1a8] p-3 text-xs font-black leading-relaxed text-[#2b2416]">
+                💡 닉네임 · 이름 · 연락처 · 주소는 최초 1회만 입력하면 됩니다.
                 <br />
-                꼭 기억해주세요. 분실 시 재설정이 필요할 수 있습니다.
+                저장 후에는 다음 주문부터 자동으로 불러옵니다.
+              </div>
+
+              <div className="mt-3 rounded-2xl bg-pink-50 p-3 text-xs font-bold leading-relaxed text-pink-700">
+                🔒 주문 비밀번호는 주문서 작성 및 주문조회에 사용하는 비밀번호입니다.
+                <br />
+                숫자 6자리로 입력하고 꼭 기억해주세요.
               </div>
 
               <div className="mt-4 grid gap-3">
@@ -990,7 +1020,7 @@ export default function OrderPage() {
                         onChange={(event) =>
                           setPin(event.target.value.replace(/[^0-9]/g, "").slice(0, 6))
                         }
-                        placeholder="PIN번호(개인비밀번호) 6자리"
+                        placeholder="주문 비밀번호 (숫자 6자리)"
                         type={showPin ? "text" : "password"}
                         inputMode="numeric"
                         className="w-full rounded-2xl border border-pink-100 bg-white p-4 pr-14 font-bold outline-none focus:border-pink-300"
@@ -1011,7 +1041,7 @@ export default function OrderPage() {
                         onChange={(event) =>
                           setPinConfirm(event.target.value.replace(/[^0-9]/g, "").slice(0, 6))
                         }
-                        placeholder="PIN번호 재확인"
+                        placeholder="비밀번호 확인"
                         type={showPinConfirm ? "text" : "password"}
                         inputMode="numeric"
                         className="w-full rounded-2xl border border-pink-100 bg-white p-4 pr-14 font-bold outline-none focus:border-pink-300"
@@ -1075,11 +1105,17 @@ export default function OrderPage() {
           <h2 className="text-xl font-black">주문상품</h2>
 
           <div className="mt-4 rounded-[1.4rem] bg-red-50 p-4 text-sm font-black leading-relaxed text-red-600">
-            ⚠️ 상품명 / 색상 / 사이즈 / 수량 / 금액 전부 필수입니다.
+            ⚠️ 상품 1칸에는 상품 1개만 입력하세요.
             <br />
+            다른 상품은 반드시 아래 [+ 상품 추가하기]를 눌러 따로 작성해주세요.
+            <br />
+            한 칸에 2개 이상 적으면 주문 누락될 수 있습니다.
+          </div>
+
+          <div className="mt-3 rounded-[1.4rem] bg-pink-50 p-4 text-xs font-bold leading-relaxed text-pink-700">
             색상·사이즈가 없으면 반드시 “없음”이라고 입력해주세요.
             <br />
-            비워두면 주문 접수 안됩니다.
+            상품명 / 색상 / 사이즈 / 수량 / 금액은 전부 필수입니다.
           </div>
 
           <div className="mt-4 grid gap-4">
@@ -1103,7 +1139,7 @@ export default function OrderPage() {
                   <input
                     value={item.product_name}
                     onChange={(event) => updateItem(index, "product_name", event.target.value)}
-                    placeholder="상품명"
+                    placeholder="상품명 1개만 입력"
                     className="rounded-2xl border border-gray-200 bg-white p-4 font-bold"
                   />
 
