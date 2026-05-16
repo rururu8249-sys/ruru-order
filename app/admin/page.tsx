@@ -914,6 +914,70 @@ export default function AdminPage() {
       });
   }, [orders]);
 
+  const selectedOrders = useMemo(() => {
+    return filteredOrders.filter((order) =>
+      selectedOrderIds.includes(Number(order.id))
+    );
+  }, [filteredOrders, selectedOrderIds]);
+
+  const selectedOrderSummary = useMemo(() => {
+    const totalQty = selectedOrders.reduce(
+      (sum, order) => sum + Number(order.qty || 0),
+      0
+    );
+
+    const orderAmount = selectedOrders.reduce(
+      (sum, order) => sum + getOrderTotal(order),
+      0
+    );
+
+    const shippingAmount = selectedOrders.reduce(
+      (sum, order) => sum + getOrderShipping(order),
+      0
+    );
+
+    const customerCardFeeRate = 10;
+    const customerCardFeeAmount = Math.round(orderAmount * (customerCardFeeRate / 100));
+    const cardPaymentAmount = orderAmount + customerCardFeeAmount;
+
+    const customerNames = Array.from(
+      new Set(
+        selectedOrders
+          .map((order) => `${order.youtube_nickname || "-"} / ${order.customer_name || "-"}`)
+          .filter(Boolean)
+      )
+    );
+
+    return {
+      count: selectedOrders.length,
+      totalQty,
+      orderAmount,
+      shippingAmount,
+      customerCardFeeRate,
+      customerCardFeeAmount,
+      cardPaymentAmount,
+      customerLabel:
+        customerNames.length === 1
+          ? customerNames[0]
+          : customerNames.length > 1
+          ? `${customerNames[0]} 외 ${customerNames.length - 1}명`
+          : "-",
+    };
+  }, [selectedOrders]);
+
+  const openPaysterCardPayment = () => {
+    if (selectedOrderIds.length === 0) {
+      alert("카드결제할 주문을 먼저 체크해주세요.");
+      return;
+    }
+
+    window.open(
+      "https://user.service.payster.co.kr/#/main",
+      "_blank",
+      "noopener,noreferrer"
+    );
+  };
+
   const orderSummary = useMemo(() => {
     const totalCount = filteredOrders.length;
 
@@ -1152,8 +1216,7 @@ export default function AdminPage() {
       const qty = Number(order.qty || 1);
 
       const optionParts = [color, size, option].filter(Boolean);
-      const optionText =
-        optionParts.length > 0 ? `(${optionParts.join(" / ")})` : "";
+      const optionText = optionParts.length > 0 ? ` ${optionParts.join(" ")}` : "";
 
       return `${productName}${optionText} x${qty}`;
     });
@@ -1290,6 +1353,25 @@ export default function AdminPage() {
         const fullAddress = getFullAddress(firstOrder);
         const addressWithNickname = `${fullAddress} /${nickname}`.trim();
         const itemText = getRozenItemText(ordersInGroup);
+        const requestMemos = Array.from(
+          new Set(
+            ordersInGroup
+              .map((order) =>
+                String(
+                  order.request_memo ||
+                    order.memo ||
+                    order.delivery_memo ||
+                    order.shipping_memo ||
+                    ""
+                ).trim()
+              )
+              .filter(Boolean)
+          )
+        );
+        const rozenMemo =
+          requestMemos.length > 0
+            ? requestMemos.join(" / ")
+            : "친절배송부탁드립니다.";
 
         const values = [
           nickname,
@@ -1302,7 +1384,7 @@ export default function AdminPage() {
           "010",
           itemText,
           "",
-          "친절배송부탁드립니다.",
+          rozenMemo,
         ];
 
         values.forEach((value, colIndex) => {
@@ -1440,7 +1522,7 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-5">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-5">
           <button
             onClick={() => setTab("orders")}
             className={`p-4 rounded-2xl font-bold border ${
@@ -1451,6 +1533,13 @@ export default function AdminPage() {
           >
             주문관리
           </button>
+
+          <a
+            href="/admin/broadcasts"
+            className="p-4 rounded-2xl font-bold border bg-white text-gray-900 border-gray-300 text-center hover:bg-black hover:text-white transition"
+          >
+            방송관리
+          </a>
 
           <button
             onClick={() => setTab("trash")}
@@ -1932,6 +2021,67 @@ export default function AdminPage() {
                   </button>
                 </div>
               </div>
+
+              {selectedOrderIds.length > 0 && (
+                <div className="mb-5 rounded-3xl border border-blue-200 bg-blue-50 p-5">
+                  <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+                    <div>
+                      <div className="text-lg font-extrabold text-blue-900">
+                        선택 주문 합계
+                      </div>
+
+                      <div className="mt-2 grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+                        <div className="rounded-2xl bg-white border border-blue-100 p-3">
+                          <div className="text-blue-500 font-bold">선택</div>
+                          <div className="text-xl font-extrabold text-blue-900">
+                            {selectedOrderSummary.count}건
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl bg-white border border-blue-100 p-3">
+                          <div className="text-blue-500 font-bold">고객</div>
+                          <div className="text-base font-extrabold text-blue-900 truncate">
+                            {selectedOrderSummary.customerLabel}
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl bg-white border border-blue-100 p-3">
+                          <div className="text-blue-500 font-bold">총수량</div>
+                          <div className="text-xl font-extrabold text-blue-900">
+                            {selectedOrderSummary.totalQty}개
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl bg-white border border-blue-100 p-3">
+                          <div className="text-blue-500 font-bold">주문금액</div>
+                          <div className="text-xl font-extrabold text-blue-900">
+                            {won(selectedOrderSummary.orderAmount)}
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl bg-white border border-blue-100 p-3">
+                          <div className="text-blue-500 font-bold">카드결제 요청</div>
+                          <div className="text-xl font-extrabold text-blue-900">
+                            {won(selectedOrderSummary.cardPaymentAmount)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-2 text-xs font-bold text-blue-700">
+                        고객 카드추가금 {selectedOrderSummary.customerCardFeeRate}% 기준: {won(selectedOrderSummary.customerCardFeeAmount)}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={openPaysterCardPayment}
+                      className="shrink-0 rounded-2xl bg-blue-600 px-6 py-4 font-extrabold text-white hover:bg-blue-700"
+                    >
+                      💳 카드결제 사이트 열기
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {viewMode === "table" ? (
                 <div className="overflow-auto max-h-[720px] border rounded-2xl">
