@@ -3,15 +3,20 @@
 // 파일 위치:
 // /Users/ruru/Desktop/ruru-order-app/app/myorder/page.tsx
 //
-// 긴급 수정:
+// 기능 유지:
 // - customers.phone 컬럼 사용 안 함
 // - customers.customer_phone만 사용
 // - 기존 고객DB가 없어도 최근 7일 주문이 있으면 입력한 PIN으로 고객DB 자동 생성
 // - 이후부터 전화번호 + PIN으로 주문조회 가능
 // - orders는 customer_phone / phone 둘 다 조회
+//
+// 디자인 변경:
+// - 홈화면 리뉴얼 톤에 맞춘 모바일 우선 핑크/화이트 카드형 UI
+// - 기존 주문조회 로직은 유지
 
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -20,8 +25,7 @@ const FOOTER_TEXT = "© since 2024 루루동이 | All Rights Reserved.";
 const normalizePhone = (value: string) =>
   String(value || "").replace(/[^0-9]/g, "");
 
-const won = (value: any) =>
-  `${Number(value || 0).toLocaleString()}원`;
+const won = (value: any) => `${Number(value || 0).toLocaleString()}원`;
 
 async function sha256(value: string) {
   const encoder = new TextEncoder();
@@ -94,7 +98,6 @@ export default function MyOrderPage() {
 
   useEffect(() => {
     const savedPhone = localStorage.getItem("ruru_customer_phone") || "";
-    const savedNickname = localStorage.getItem("ruru_youtube_nickname") || "";
 
     if (savedPhone) {
       setPhone(savedPhone);
@@ -244,24 +247,37 @@ export default function MyOrderPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#fbf7f8] px-4 py-7 text-gray-950">
-      <section className="mx-auto w-full max-w-md">
-        <header className="mb-5 text-center">
-          <div className="text-sm font-black text-pink-400">RURU ORDER</div>
-          <h1 className="mt-1 text-4xl font-black">주문조회</h1>
-          <p className="mt-2 text-sm font-bold text-gray-500">
+    <main className="min-h-screen bg-[#fffafa] px-4 py-6 text-[#171717]">
+      <section className="mx-auto w-full max-w-[480px]">
+        <header className="mb-5 rounded-[32px] border border-[#f4e7e9] bg-white px-5 py-6 text-center shadow-[0_16px_40px_rgba(30,20,20,0.06)]">
+          <Link
+            href="/"
+            className="mb-5 inline-flex rounded-full bg-[#fff2f4] px-4 py-2 text-[13px] font-black tracking-[-0.03em] text-[#ff4b60] transition active:scale-[0.98]"
+          >
+            ← 홈으로
+          </Link>
+
+          <div className="mx-auto inline-flex rounded-full bg-[#fff1a8] px-3 py-1 text-[12px] font-black text-[#2b2416]">
+            📦 최근 7일 주문
+          </div>
+
+          <h1 className="mt-3 text-[38px] font-black leading-tight tracking-[-0.07em] text-[#151515]">
+            주문조회
+          </h1>
+
+          <p className="mt-2 text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-[#7b6d6d]">
             전화번호와 PIN번호로 최근 7일 주문내역을 확인합니다.
           </p>
         </header>
 
-        <section className="rounded-[2rem] border border-pink-100 bg-white p-5 shadow-[0_18px_45px_rgba(255,120,160,0.13)]">
+        <section className="rounded-[32px] border border-[#f4e7e9] bg-white p-5 shadow-[0_18px_45px_rgba(255,120,160,0.13)]">
           {autoLoggedIn ? (
             <div className="grid gap-3">
-              <div className="rounded-2xl bg-green-50 p-4">
-                <div className="text-sm font-black text-green-700">
+              <div className="rounded-[24px] bg-[#ecfff3] p-4">
+                <div className="text-[14px] font-black text-green-700">
                   저장된 고객정보로 주문내역을 불러왔습니다.
                 </div>
-                <div className="mt-1 text-xs font-bold text-green-600">
+                <div className="mt-1 text-[12px] font-bold text-green-600">
                   전화번호: {phone}
                 </div>
               </div>
@@ -270,7 +286,7 @@ export default function MyOrderPage() {
                 type="button"
                 onClick={() => autoSearchOrders(phone)}
                 disabled={loading}
-                className="rounded-2xl bg-gray-950 p-4 font-black text-white disabled:opacity-50"
+                className="rounded-[22px] bg-gradient-to-br from-[#ff5d6d] via-[#ff4c62] to-[#ff405a] p-4 text-[16px] font-black text-white shadow-[0_14px_28px_rgba(255,76,98,0.22)] transition active:scale-[0.98] disabled:opacity-50"
               >
                 {loading ? "조회 중..." : "주문내역 새로고침"}
               </button>
@@ -278,7 +294,7 @@ export default function MyOrderPage() {
               <button
                 type="button"
                 onClick={logoutCustomerInfo}
-                className="rounded-2xl bg-gray-100 p-4 font-black text-gray-700"
+                className="rounded-[22px] bg-[#f5f2f2] p-4 text-[16px] font-black text-[#5f5555] transition active:scale-[0.98]"
               >
                 로그아웃
               </button>
@@ -290,7 +306,7 @@ export default function MyOrderPage() {
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="전화번호"
                 inputMode="numeric"
-                className="w-full rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-pink-300"
+                className="w-full rounded-[22px] border border-[#eee4e5] bg-[#fffafa] p-4 text-[16px] font-bold outline-none transition placeholder:text-[#b8abab] focus:border-[#ff94a0] focus:bg-white"
               />
 
               <div className="relative">
@@ -302,12 +318,12 @@ export default function MyOrderPage() {
                   placeholder="PIN번호(개인비밀번호)"
                   type={showPin ? "text" : "password"}
                   inputMode="numeric"
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 p-4 pr-14 font-bold outline-none focus:border-pink-300"
+                  className="w-full rounded-[22px] border border-[#eee4e5] bg-[#fffafa] p-4 pr-16 text-[16px] font-bold outline-none transition placeholder:text-[#b8abab] focus:border-[#ff94a0] focus:bg-white"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPin((prev) => !prev)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full px-2 py-1 text-xs font-black text-gray-500"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white px-3 py-1.5 text-[12px] font-black text-[#777] shadow-sm transition active:scale-[0.96]"
                 >
                   {showPin ? "숨김" : "보기"}
                 </button>
@@ -316,12 +332,12 @@ export default function MyOrderPage() {
               <button
                 onClick={searchOrders}
                 disabled={loading}
-                className="rounded-2xl bg-gray-950 p-4 font-black text-white disabled:opacity-50"
+                className="rounded-[22px] bg-gradient-to-br from-[#ff5d6d] via-[#ff4c62] to-[#ff405a] p-4 text-[16px] font-black text-white shadow-[0_14px_28px_rgba(255,76,98,0.22)] transition active:scale-[0.98] disabled:opacity-50"
               >
                 {loading ? "조회 중..." : "최근 주문조회"}
               </button>
 
-              <div className="rounded-2xl bg-pink-50 p-3 text-xs font-bold leading-relaxed text-pink-700">
+              <div className="rounded-[22px] bg-[#fff2f4] p-4 text-[12px] font-bold leading-relaxed tracking-[-0.03em] text-[#d7475b]">
                 📌 PIN번호(개인비밀번호)는 주문 및 주문조회 시 필요한 비밀번호입니다.
                 <br />
                 분실 시 재설정이 필요하니 꼭 기억해주세요.
@@ -331,7 +347,7 @@ export default function MyOrderPage() {
         </section>
 
         {message && (
-          <div className="mt-4 rounded-2xl bg-white p-4 text-center text-sm font-black text-gray-500 shadow-sm">
+          <div className="mt-4 rounded-[24px] border border-[#f1ecec] bg-white p-4 text-center text-[14px] font-black text-[#777] shadow-[0_12px_30px_rgba(30,20,20,0.06)]">
             {message}
           </div>
         )}
@@ -346,32 +362,34 @@ export default function MyOrderPage() {
             return (
               <article
                 key={order.id}
-                className={`rounded-[1.5rem] border border-gray-100 bg-white p-5 shadow-sm ${
+                className={`rounded-[28px] border border-[#f1ecec] bg-white p-5 shadow-[0_14px_35px_rgba(30,20,20,0.06)] ${
                   statusLabel === "주문취소" ? "opacity-70" : ""
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-xs font-black text-gray-400">
+                  <div className="min-w-0">
+                    <div className="text-[12px] font-black text-[#aaa]">
                       {formatDate(order.created_at)}
                     </div>
 
                     <div
-                      className={`mt-1 text-lg font-black ${
-                        statusLabel === "주문취소" ? "line-through text-gray-400" : ""
+                      className={`mt-1 break-keep text-[19px] font-black leading-snug tracking-[-0.04em] ${
+                        statusLabel === "주문취소"
+                          ? "line-through text-gray-400"
+                          : "text-[#151515]"
                       }`}
                     >
                       {order.product_name || "상품명 없음"}
                     </div>
 
-                    <div className="mt-1 text-sm font-bold text-gray-500">
+                    <div className="mt-1 text-[14px] font-bold text-[#777]">
                       {optionText}
                       {order.qty ? `${optionText ? " · " : ""}${order.qty}개` : ""}
                     </div>
                   </div>
 
                   <span
-                    className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${getStatusClassName(
+                    className={`shrink-0 rounded-full px-3 py-1 text-[12px] font-black ${getStatusClassName(
                       statusLabel
                     )}`}
                   >
@@ -379,11 +397,13 @@ export default function MyOrderPage() {
                   </span>
                 </div>
 
-                <div className="mt-4 flex items-center justify-between border-t pt-4">
-                  <span className="text-sm font-bold text-gray-500">결제금액</span>
+                <div className="mt-4 flex items-center justify-between border-t border-[#f1ecec] pt-4">
+                  <span className="text-[14px] font-bold text-[#777]">결제금액</span>
                   <span
-                    className={`text-xl font-black ${
-                      statusLabel === "주문취소" ? "line-through text-gray-400" : ""
+                    className={`text-[22px] font-black ${
+                      statusLabel === "주문취소"
+                        ? "line-through text-gray-400"
+                        : "text-[#151515]"
                     }`}
                   >
                     {won(order.adjusted_total_price || order.total_price)}
@@ -391,13 +411,13 @@ export default function MyOrderPage() {
                 </div>
 
                 {order.cancel_reason && (
-                  <div className="mt-3 rounded-2xl bg-red-50 p-3 text-sm font-bold text-red-600">
+                  <div className="mt-3 rounded-[20px] bg-red-50 p-3 text-[14px] font-bold text-red-600">
                     취소 사유: {order.cancel_reason}
                   </div>
                 )}
 
                 {order.request_memo && (
-                  <div className="mt-3 rounded-2xl bg-gray-50 p-3 text-sm font-bold text-gray-600">
+                  <div className="mt-3 rounded-[20px] bg-[#f8f5f5] p-3 text-[14px] font-bold text-[#666]">
                     요청사항: {order.request_memo}
                   </div>
                 )}
@@ -406,7 +426,7 @@ export default function MyOrderPage() {
           })}
         </section>
 
-        <footer className="py-8 text-center text-[11px] font-bold text-gray-400">
+        <footer className="py-8 text-center text-[11px] font-bold text-[#aaa]">
           {FOOTER_TEXT}
         </footer>
       </section>
