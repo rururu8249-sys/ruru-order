@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -85,9 +88,50 @@ function MiniMenuCard({
   );
 }
 
+
+const blockCustomerCopyEvents = () => {
+  const block = (event: Event) => event.preventDefault();
+
+  const blockKey = (event: KeyboardEvent) => {
+    const key = event.key.toLowerCase();
+    const isMac = event.metaKey;
+    const isWin = event.ctrlKey;
+
+    if (
+      event.key === "F12" ||
+      ((isWin || isMac) && ["c", "x", "u"].includes(key)) ||
+      (isWin && event.shiftKey && ["i", "j"].includes(key)) ||
+      (isMac && event.altKey && ["i", "j"].includes(key))
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  };
+
+  document.addEventListener("contextmenu", block);
+  document.addEventListener("copy", block);
+  document.addEventListener("cut", block);
+  document.addEventListener("dragstart", block);
+  document.addEventListener("selectstart", block);
+  document.addEventListener("keydown", blockKey);
+
+  return () => {
+    document.removeEventListener("contextmenu", block);
+    document.removeEventListener("copy", block);
+    document.removeEventListener("cut", block);
+    document.removeEventListener("dragstart", block);
+    document.removeEventListener("selectstart", block);
+    document.removeEventListener("keydown", blockKey);
+  };
+};
+
 export default function HomePage() {
+  useEffect(() => {
+    return blockCustomerCopyEvents();
+  }, []);
+
   return (
-    <main className="min-h-screen bg-[#fffafa] text-[#171717]">
+    <main className="min-h-screen select-none bg-[#fffafa] text-[#171717]" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
       <section className="mx-auto w-full max-w-[480px] bg-white shadow-[0_0_50px_rgba(30,20,20,0.08)]">
         <div className="relative overflow-hidden bg-[#fff7f5]">
           <Image

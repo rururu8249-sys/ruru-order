@@ -1,3 +1,5 @@
+"use client";
+
 // app/myorder/page.tsx
 // 전체 교체용
 // 파일 위치:
@@ -13,8 +15,6 @@
 // 디자인 변경:
 // - 홈화면 리뉴얼 톤에 맞춘 모바일 우선 핑크/화이트 카드형 UI
 // - 기존 주문조회 로직은 유지
-
-"use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -87,7 +87,48 @@ function getStatusClassName(label: string) {
   return "bg-gray-100 text-gray-700";
 }
 
+
+const blockCustomerCopyEvents = () => {
+  const block = (event: Event) => event.preventDefault();
+
+  const blockKey = (event: KeyboardEvent) => {
+    const key = event.key.toLowerCase();
+    const isMac = event.metaKey;
+    const isWin = event.ctrlKey;
+
+    if (
+      event.key === "F12" ||
+      ((isWin || isMac) && ["c", "x", "u"].includes(key)) ||
+      (isWin && event.shiftKey && ["i", "j"].includes(key)) ||
+      (isMac && event.altKey && ["i", "j"].includes(key))
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  };
+
+  document.addEventListener("contextmenu", block);
+  document.addEventListener("copy", block);
+  document.addEventListener("cut", block);
+  document.addEventListener("dragstart", block);
+  document.addEventListener("selectstart", block);
+  document.addEventListener("keydown", blockKey);
+
+  return () => {
+    document.removeEventListener("contextmenu", block);
+    document.removeEventListener("copy", block);
+    document.removeEventListener("cut", block);
+    document.removeEventListener("dragstart", block);
+    document.removeEventListener("selectstart", block);
+    document.removeEventListener("keydown", blockKey);
+  };
+};
+
 export default function MyOrderPage() {
+  useEffect(() => {
+    return blockCustomerCopyEvents();
+  }, []);
+
   const [phone, setPhone] = useState("");
   const [pin, setPin] = useState("");
   const [showPin, setShowPin] = useState(false);
@@ -246,16 +287,31 @@ export default function MyOrderPage() {
     setLoading(false);
   };
 
+
+  const TopCustomerNav = () => (
+    <div className="sticky top-3 z-30 mb-4 flex items-center justify-between gap-3 rounded-full border border-[#f4e7e9] bg-white/95 p-2 shadow-[0_12px_30px_rgba(30,20,20,0.08)] backdrop-blur">
+      <Link
+        href="/"
+        className="flex min-h-[44px] items-center justify-center rounded-full bg-[#fff2f4] px-4 text-[14px] font-black text-[#ff4b60] transition active:scale-[0.97]"
+      >
+        🏠 HOME
+      </Link>
+
+      <button
+        type="button"
+        onClick={logoutCustomerInfo}
+        className="flex min-h-[44px] items-center justify-center rounded-full bg-[#f5f2f2] px-4 text-[14px] font-black text-[#5f5555] transition active:scale-[0.97]"
+      >
+        로그아웃
+      </button>
+    </div>
+  );
+
   return (
-    <main className="min-h-screen bg-[#fffafa] px-4 py-6 text-[#171717]">
+    <main className="min-h-screen select-none bg-[#fffafa] px-4 py-6 text-[#171717]" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
       <section className="mx-auto w-full max-w-[480px]">
+        <TopCustomerNav />
         <header className="mb-5 rounded-[32px] border border-[#f4e7e9] bg-white px-5 py-6 text-center shadow-[0_16px_40px_rgba(30,20,20,0.06)]">
-          <Link
-            href="/"
-            className="mb-5 inline-flex rounded-full bg-[#fff2f4] px-4 py-2 text-[13px] font-black tracking-[-0.03em] text-[#ff4b60] transition active:scale-[0.98]"
-          >
-            ← 홈으로
-          </Link>
 
           <div className="mx-auto inline-flex rounded-full bg-[#fff1a8] px-3 py-1 text-[12px] font-black text-[#2b2416]">
             📦 최근 7일 주문
