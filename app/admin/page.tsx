@@ -207,7 +207,7 @@ export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const [tab, setTab] = useState<"orders" | "members" | "stats">("orders");
+  const [tab, setTab] = useState<"orders" | "members" | "stats" | "trash">("orders");
 
   const [orders, setOrders] = useState<any[]>([]);
   const [broadcasts, setBroadcasts] = useState<any[]>([]);
@@ -228,6 +228,9 @@ export default function AdminPage() {
   const [adminSubtitle, setAdminSubtitle] = useState("");
   const [shippingFee, setShippingFee] = useState(4000);
   const [cardFeeRate, setCardFeeRate] = useState(10);
+  const [combineShippingEnabled, setCombineShippingEnabled] = useState(true);
+  const [combineShippingGroup, setCombineShippingGroup] = useState("");
+  const [combineShippingMemo, setCombineShippingMemo] = useState("");
 
   const [warehouseCost, setWarehouseCost] = useState(0);
   const [extraIncome, setExtraIncome] = useState(0);
@@ -249,7 +252,11 @@ export default function AdminPage() {
   const [detailTotalPrice, setDetailTotalPrice] = useState(0);
   const [detailAdminMemo, setDetailAdminMemo] = useState("");
 
+  const [selectedOrderIds, setSelectedOrderIds] = useState<number[]>([]);
+  const [selectedTrashOrderIds, setSelectedTrashOrderIds] = useState<number[]>([]);
+
   const [colWidths, setColWidths] = useState<Record<string, number>>({
+    check: 64,
     status: 180,
     member: 180,
     item: 300,
@@ -262,6 +269,11 @@ export default function AdminPage() {
   const activeBroadcast = useMemo(() => {
     return broadcasts.find((broadcast) => broadcast.status === "ON") || null;
   }, [broadcasts]);
+
+  useEffect(() => {
+    setSelectedOrderIds([]);
+    setSelectedTrashOrderIds([]);
+  }, [tab, selectedBroadcastId, statusFilter, paymentFilter, search]);
 
   useEffect(() => {
     const saved = sessionStorage.getItem("ruru_admin_login");
@@ -281,6 +293,9 @@ export default function AdminPage() {
     setAdminSubtitle(activeBroadcast.admin_subtitle || "");
     setShippingFee(Number(activeBroadcast.shipping_fee ?? 4000));
     setCardFeeRate(Number(activeBroadcast.card_fee_rate ?? 10));
+    setCombineShippingEnabled(activeBroadcast.combine_shipping_enabled !== false);
+    setCombineShippingGroup(activeBroadcast.combine_shipping_group || "");
+    setCombineShippingMemo(activeBroadcast.combine_shipping_memo || "");
   }, [activeBroadcast?.id]);
 
   const loadAll = async () => {
@@ -336,6 +351,9 @@ export default function AdminPage() {
       status: "ON",
       shipping_fee: shippingFee,
       card_fee_rate: cardFeeRate,
+      combine_shipping_enabled: combineShippingEnabled,
+      combine_shipping_group: combineShippingGroup.trim() || publicTitle.trim(),
+      combine_shipping_memo: combineShippingMemo.trim(),
       started_at: new Date().toISOString(),
     });
 
@@ -402,6 +420,9 @@ export default function AdminPage() {
         admin_subtitle: adminSubtitle.trim(),
         shipping_fee: shippingFee,
         card_fee_rate: cardFeeRate,
+        combine_shipping_enabled: combineShippingEnabled,
+        combine_shipping_group: combineShippingGroup.trim() || publicTitle.trim(),
+        combine_shipping_memo: combineShippingMemo.trim(),
       })
       .eq("id", activeBroadcast.id);
 
@@ -620,10 +641,240 @@ export default function AdminPage() {
     alert("주문 상세정보 저장 완료");
   };
 
+  const moveOrderToTrash = async (order: any) => {
+    if (!order?.id) return;
+
+    const code = getOrderCode(order);
+    const label = `${order.youtube_nickname || "-"} / ${order.customer_name || "-"}`;
+
+    if (!confirm(`이 주문을 휴지통으로 이동할까요?\n\n${code}\n${label}\n\n휴지통에서 복구할 수 있습니다.`)) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from("orders")
+      .update({
+        is_deleted: true,
+        deleted_at: new Date().toISOString(),
+        delete_memo: "관리자 삭제",
+      })
+      .eq("id", order.id);
+
+    if (error) {
+      alert("휴지통 이동 오류: " + error.message);
+      return;
+    }
+
+    if (selectedOrder?.id === order.id) {
+      setSelectedOrder(null);
+    }
+
+    await loadAll();
+    alert("휴지통으로 이동했습니다.");
+  };
+
+  const restoreOrderFromTrash = async (order: any) => {
+    if (!order?.id) return;
+
+    const code = getOrderCode(order);
+
+    if (!confirm(`이 주문을 복구할까요?\n\n${code}`)) return;
+
+    const { error } = await supabase
+      .from("orders")
+      .update({
+        is_deleted: false,
+        deleted_at: null,
+        delete_memo: "",
+        is_permanently_deleted: false,
+        permanently_deleted_at: null,
+      })
+      .eq("id", order.id);
+
+    if (error) {
+      alert("주문 복구 오류: " + error.message);
+      return;
+    }
+
+    await loadAll();
+    alert("주문을 복구했습니다.");
+  };
+
+  const permanentlyDeleteOrder = async (order: any) => {
+    if (!order?.id) return;
+
+    const code = getOrderCode(order);
+
+    if (!confirm(`정말 완전삭제 처리할까요?\n\n${code}\n\n화면과 휴지통에서 완전히 사라집니다.`)) return;
+
+    const { error } = await supabase
+      .from("orders")
+      .update({
+        is_permanently_deleted: true,
+        permanently_deleted_at: new Date().toISOString(),
+        is_deleted: true,
+        deleted_at: order.deleted_at || new Date().toISOString(),
+        delete_memo: order.delete_memo || "관리자 영구삭제",
+      })
+      .eq("id", order.id);
+
+    if (error) {
+      alert("영구삭제 처리 오류: " + error.message);
+      return;
+    }
+
+    await loadAll();
+    alert("영구삭제 처리 완료");
+  };
+
+  const getTrashRemainDays = (order: any) => {
+    if (!order.deleted_at) return 30;
+
+    const deleted = new Date(order.deleted_at).getTime();
+    const now = Date.now();
+    const passedDays = Math.floor((now - deleted) / (1000 * 60 * 60 * 24));
+
+    return Math.max(0, 30 - passedDays);
+  };
+
+  const isTrashExpired = (order: any) => {
+    return getTrashRemainDays(order) <= 0;
+  };
+
+  const toggleOrderSelection = (orderId: number) => {
+    setSelectedOrderIds((prev) => {
+      if (prev.includes(orderId)) {
+        return prev.filter((id) => id !== orderId);
+      }
+
+      return [...prev, orderId];
+    });
+  };
+
+  const toggleTrashOrderSelection = (orderId: number) => {
+    setSelectedTrashOrderIds((prev) => {
+      if (prev.includes(orderId)) {
+        return prev.filter((id) => id !== orderId);
+      }
+
+      return [...prev, orderId];
+    });
+  };
+
+  const selectAllFilteredOrders = () => {
+    const ids = filteredOrders.map((order) => Number(order.id)).filter(Boolean);
+    setSelectedOrderIds(ids);
+  };
+
+  const clearSelectedOrders = () => {
+    setSelectedOrderIds([]);
+  };
+
+  const selectAllTrashOrders = () => {
+    const ids = trashOrders.map((order) => Number(order.id)).filter(Boolean);
+    setSelectedTrashOrderIds(ids);
+  };
+
+  const clearSelectedTrashOrders = () => {
+    setSelectedTrashOrderIds([]);
+  };
+
+  const bulkMoveOrdersToTrash = async () => {
+    if (selectedOrderIds.length === 0) {
+      alert("선택된 주문이 없습니다.");
+      return;
+    }
+
+    if (!confirm(`선택한 주문 ${selectedOrderIds.length}건을 휴지통으로 이동할까요?`)) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from("orders")
+      .update({
+        is_deleted: true,
+        deleted_at: new Date().toISOString(),
+        delete_memo: "관리자 일괄 삭제",
+      })
+      .in("id", selectedOrderIds);
+
+    if (error) {
+      alert("일괄 휴지통 이동 오류: " + error.message);
+      return;
+    }
+
+    setSelectedOrderIds([]);
+    await loadAll();
+    alert(`선택 주문 ${selectedOrderIds.length}건을 휴지통으로 이동했습니다.`);
+  };
+
+  const bulkRestoreOrdersFromTrash = async () => {
+    if (selectedTrashOrderIds.length === 0) {
+      alert("선택된 휴지통 주문이 없습니다.");
+      return;
+    }
+
+    if (!confirm(`선택한 휴지통 주문 ${selectedTrashOrderIds.length}건을 복구할까요?`)) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from("orders")
+      .update({
+        is_deleted: false,
+        deleted_at: null,
+        delete_memo: "",
+      })
+      .in("id", selectedTrashOrderIds);
+
+    if (error) {
+      alert("일괄 복구 오류: " + error.message);
+      return;
+    }
+
+    setSelectedTrashOrderIds([]);
+    await loadAll();
+    alert(`선택 주문 ${selectedTrashOrderIds.length}건을 복구했습니다.`);
+  };
+
+  const bulkPermanentlyDeleteOrders = async () => {
+    if (selectedTrashOrderIds.length === 0) {
+      alert("선택된 휴지통 주문이 없습니다.");
+      return;
+    }
+
+    const count = selectedTrashOrderIds.length;
+
+    if (!confirm(`선택한 주문 ${count}건을 영구삭제 처리할까요?\\n\\n화면과 휴지통에서 완전히 사라집니다.`)) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from("orders")
+      .update({
+        is_permanently_deleted: true,
+        permanently_deleted_at: new Date().toISOString(),
+        is_deleted: true,
+      })
+      .in("id", selectedTrashOrderIds);
+
+    if (error) {
+      alert("일괄 영구삭제 처리 오류: " + error.message);
+      return;
+    }
+
+    setSelectedTrashOrderIds([]);
+    await loadAll();
+    alert(`선택 주문 ${count}건을 영구삭제 처리했습니다.`);
+  };
+
   const filteredOrders = useMemo(() => {
     const keyword = search.trim().toLowerCase();
 
     return orders.filter((order) => {
+      if (order.is_permanently_deleted === true) return false;
+      if (order.is_deleted === true) return false;
+
       const status = getDisplayStatus(order);
       const paymentLabel = getPaymentLabel(order);
 
@@ -652,6 +903,16 @@ export default function AdminPage() {
       return matchesKeyword && matchesBroadcast && matchesStatus && matchesPayment;
     });
   }, [orders, search, selectedBroadcastId, statusFilter, paymentFilter]);
+
+  const trashOrders = useMemo(() => {
+    return orders
+      .filter((order) => order.is_deleted === true && order.is_permanently_deleted !== true)
+      .sort((a, b) => {
+        const aTime = new Date(a.deleted_at || a.created_at || "").getTime();
+        const bTime = new Date(b.deleted_at || b.created_at || "").getTime();
+        return bTime - aTime;
+      });
+  }, [orders]);
 
   const orderSummary = useMemo(() => {
     const totalCount = filteredOrders.length;
@@ -713,6 +974,9 @@ export default function AdminPage() {
 
   const settlementOrders = useMemo(() => {
     return orders.filter((order) => {
+      if (order.is_permanently_deleted === true) return false;
+      if (order.is_deleted === true) return false;
+
       if (settlementBroadcastId === "ALL") return true;
       return String(order.broadcast_id || "") === settlementBroadcastId;
     });
@@ -832,6 +1096,9 @@ export default function AdminPage() {
     const name = String(customer.customer_name || "");
 
     const customerOrders = orders.filter((order) => {
+      if (order.is_permanently_deleted === true) return false;
+      if (order.is_deleted === true) return false;
+
       const samePhone = phone && String(order.customer_phone || "") === phone;
       const sameNickname = nickname && String(order.youtube_nickname || "") === nickname;
       const sameName = name && String(order.customer_name || "") === name;
@@ -1173,7 +1440,7 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-5">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-5">
           <button
             onClick={() => setTab("orders")}
             className={`p-4 rounded-2xl font-bold border ${
@@ -1183,6 +1450,17 @@ export default function AdminPage() {
             }`}
           >
             주문관리
+          </button>
+
+          <button
+            onClick={() => setTab("trash")}
+            className={`p-4 rounded-2xl font-bold border ${
+              tab === "trash"
+                ? "bg-black text-white"
+                : "bg-white text-gray-900 border-gray-300"
+            }`}
+          >
+            휴지통 {trashOrders.length > 0 ? `(${trashOrders.length})` : ""}
           </button>
 
           <button
@@ -1232,7 +1510,7 @@ export default function AdminPage() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
             <div>
               <div className="text-sm font-bold mb-2 text-gray-700">
                 고객용 방송제목
@@ -1268,6 +1546,47 @@ export default function AdminPage() {
               </div>
               <PercentInput value={cardFeeRate} onChange={setCardFeeRate} />
             </div>
+
+            <div>
+              <div className="text-sm font-bold mb-2 text-gray-700">
+                합배송 사용
+              </div>
+
+              <label className="h-[54px] flex items-center gap-2 border rounded-2xl px-4 font-extrabold bg-white">
+                <input
+                  type="checkbox"
+                  checked={combineShippingEnabled}
+                  onChange={(e) => setCombineShippingEnabled(e.target.checked)}
+                />
+                사용
+              </label>
+            </div>
+
+            <div>
+              <div className="text-sm font-bold mb-2 text-gray-700">
+                합배송 그룹
+              </div>
+
+              <input
+                value={combineShippingGroup}
+                onChange={(e) => setCombineShippingGroup(e.target.value)}
+                placeholder="예) 0516 신발/의류"
+                className="w-full border rounded-2xl px-4 py-3"
+              />
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <div className="text-sm font-bold mb-2 text-gray-700">
+              합배송 메모
+            </div>
+
+            <input
+              value={combineShippingMemo}
+              onChange={(e) => setCombineShippingMemo(e.target.value)}
+              placeholder="예) 오늘 방송끼리 이름+전화번호+주소 같으면 무료배송"
+              className="w-full border rounded-2xl px-4 py-3"
+            />
           </div>
 
           <div className="mt-5 bg-gray-50 rounded-3xl border border-gray-200 p-5">
@@ -1298,6 +1617,9 @@ export default function AdminPage() {
                   배송비 {shippingFee.toLocaleString()}원
                   <br />
                   카드수수료 {cardFeeRate}%
+                  <br />
+                  합배송 {combineShippingEnabled ? "사용" : "미사용"}
+                  {combineShippingGroup ? ` / ${combineShippingGroup}` : ""}
                 </div>
               </div>
             </div>
@@ -1566,6 +1888,28 @@ export default function AdminPage() {
                   </button>
 
                   <button
+                    onClick={selectAllFilteredOrders}
+                    className="px-5 py-3 rounded-2xl font-bold bg-gray-100 text-black"
+                  >
+                    전체선택
+                  </button>
+
+                  <button
+                    onClick={clearSelectedOrders}
+                    className="px-5 py-3 rounded-2xl font-bold bg-gray-100 text-black"
+                  >
+                    선택해제
+                  </button>
+
+                  <button
+                    onClick={bulkMoveOrdersToTrash}
+                    disabled={selectedOrderIds.length === 0}
+                    className="px-5 py-3 rounded-2xl font-bold bg-red-600 text-white disabled:opacity-40"
+                  >
+                    선택 {selectedOrderIds.length}건 삭제
+                  </button>
+
+                  <button
                     onClick={() => setViewMode("card")}
                     className={`px-5 py-3 rounded-2xl font-bold ${
                       viewMode === "card"
@@ -1594,6 +1938,22 @@ export default function AdminPage() {
                   <table className="w-full border-collapse bg-white">
                     <thead>
                       <tr className="bg-gray-100 text-sm sticky top-0 z-20 shadow-sm">
+                        <ResizableTh colKey="check">
+                          <input
+                            type="checkbox"
+                            checked={
+                              filteredOrders.length > 0 &&
+                              selectedOrderIds.length === filteredOrders.length
+                            }
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                selectAllFilteredOrders();
+                              } else {
+                                clearSelectedOrders();
+                              }
+                            }}
+                          />
+                        </ResizableTh>
                         <ResizableTh colKey="status">상태</ResizableTh>
                         <ResizableTh colKey="member">닉네임 / 이름</ResizableTh>
                         <ResizableTh colKey="item">주문내역</ResizableTh>
@@ -1627,6 +1987,15 @@ export default function AdminPage() {
                                 : "hover:bg-gray-50"
                             }`}
                           >
+                            <td className="p-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={selectedOrderIds.includes(Number(order.id))}
+                                onChange={() => toggleOrderSelection(Number(order.id))}
+                                className="w-5 h-5"
+                              />
+                            </td>
+
                             <td className="p-3">
                               <select
                                 value={status === "부분환불" ? "환불" : status}
@@ -1696,6 +2065,14 @@ export default function AdminPage() {
 
                             <td className="p-3">
                               <PaymentBadge payment={paymentLabel} />
+
+                              <button
+                                type="button"
+                                onClick={() => moveOrderToTrash(order)}
+                                className="mt-2 w-full rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs font-extrabold text-red-700 hover:bg-red-100"
+                              >
+                                🗑 삭제
+                              </button>
                             </td>
 
 
@@ -1730,8 +2107,16 @@ export default function AdminPage() {
                         }`}
                       >
                         <div className="flex items-start justify-between gap-4 mb-4">
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
+                          <div className="flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedOrderIds.includes(Number(order.id))}
+                              onChange={() => toggleOrderSelection(Number(order.id))}
+                              className="mt-2 w-5 h-5"
+                            />
+
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
                               <button
                                 type="button"
                                 onClick={() => openOrderDetail(order)}
@@ -1745,6 +2130,15 @@ export default function AdminPage() {
                               </div>
 
                               <PaymentBadge payment={paymentLabel} />
+
+                              <button
+                                type="button"
+                                onClick={() => moveOrderToTrash(order)}
+                                className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs font-extrabold text-red-700 hover:bg-red-100"
+                              >
+                                🗑 삭제
+                              </button>
+                              </div>
                             </div>
                           </div>
 
@@ -1806,6 +2200,146 @@ export default function AdminPage() {
               )}
             </section>
           </>
+        )}
+
+
+        {tab === "trash" && (
+          <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-5 mt-5">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5">
+              <div>
+                <div className="text-2xl font-extrabold">주문 휴지통</div>
+                <div className="text-sm text-gray-500 mt-1">
+                  삭제한 주문을 복구하거나 영구삭제할 수 있습니다. 30일 경과 건은 완전삭제 대상입니다.
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={selectAllTrashOrders}
+                  className="bg-gray-100 text-black px-5 py-3 rounded-2xl font-bold"
+                >
+                  전체선택
+                </button>
+
+                <button
+                  onClick={clearSelectedTrashOrders}
+                  className="bg-gray-100 text-black px-5 py-3 rounded-2xl font-bold"
+                >
+                  선택해제
+                </button>
+
+                <button
+                  onClick={bulkRestoreOrdersFromTrash}
+                  disabled={selectedTrashOrderIds.length === 0}
+                  className="bg-black text-white px-5 py-3 rounded-2xl font-bold disabled:opacity-40"
+                >
+                  선택 {selectedTrashOrderIds.length}건 복구
+                </button>
+
+                <button
+                  onClick={bulkPermanentlyDeleteOrders}
+                  disabled={selectedTrashOrderIds.length === 0}
+                  className="bg-red-600 text-white px-5 py-3 rounded-2xl font-bold disabled:opacity-40"
+                >
+                  선택 영구삭제
+                </button>
+
+                <button
+                  onClick={loadAll}
+                  className="bg-gray-300 text-black px-5 py-3 rounded-2xl font-bold"
+                >
+                  새로고침
+                </button>
+              </div>
+            </div>
+
+            {trashOrders.length === 0 ? (
+              <div className="rounded-3xl bg-gray-50 border border-gray-200 p-8 text-center font-bold text-gray-500">
+                휴지통에 있는 주문이 없습니다.
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {trashOrders.map((order) => {
+                  const remainDays = getTrashRemainDays(order);
+                  const expired = isTrashExpired(order);
+
+                  return (
+                    <article
+                      key={order.id}
+                      className={`rounded-3xl border p-5 ${
+                        expired
+                          ? "bg-red-50 border-red-200"
+                          : "bg-gray-50 border-gray-200"
+                      }`}
+                    >
+                      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={selectedTrashOrderIds.includes(Number(order.id))}
+                            onChange={() => toggleTrashOrderSelection(Number(order.id))}
+                            className="mt-2 w-5 h-5 shrink-0"
+                          />
+
+                          <div className="min-w-0">
+                            <div className="text-sm font-extrabold text-blue-600">
+                            #{getOrderCode(order)}
+                          </div>
+
+                          <div className="mt-1 text-xl font-extrabold text-gray-950">
+                            {order.youtube_nickname || "-"} / {order.customer_name || "-"}
+                          </div>
+
+                          <div className="mt-2 text-gray-700 font-bold">
+                            {order.product_name || "상품명 없음"} · {order.color || "없음"} / {order.size || "없음"} · {order.qty || 0}개
+                          </div>
+
+                          <div className="mt-1 text-gray-700 font-bold">
+                            금액 {won(getOrderTotal(order))} / 배송비 {won(getOrderShipping(order))}
+                          </div>
+
+                          <div className="mt-2 text-sm text-gray-500 font-bold">
+                            주문시간: {formatDateTime(order.created_at)}
+                            <br />
+                            삭제시간: {formatDateTime(order.deleted_at)}
+                            <br />
+                            삭제메모: {order.delete_memo || "-"}
+                          </div>
+
+                          <div
+                            className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${
+                              expired
+                                ? "bg-red-600 text-white"
+                                : "bg-gray-200 text-gray-700"
+                            }`}
+                          >
+                            {expired ? "30일 경과 · 완전삭제 대상" : `완전삭제까지 ${remainDays}일 남음`}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-1 gap-2 shrink-0 md:w-[150px]">
+                          <button
+                            onClick={() => restoreOrderFromTrash(order)}
+                            className="bg-black text-white rounded-2xl px-4 py-3 font-extrabold"
+                          >
+                            복구
+                          </button>
+
+                          <button
+                            onClick={() => permanentlyDeleteOrder(order)}
+                            className="bg-red-600 text-white rounded-2xl px-4 py-3 font-extrabold"
+                          >
+                            영구삭제
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
         )}
 
         {tab === "members" && (
@@ -2249,17 +2783,24 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="grid md:grid-cols-3 gap-2">
                   <button
                     onClick={saveOrderDetail}
-                    className="flex-1 bg-black text-white rounded-2xl p-4 font-extrabold"
+                    className="bg-black text-white rounded-2xl p-4 font-extrabold"
                   >
                     상세정보 저장
                   </button>
 
                   <button
+                    onClick={() => moveOrderToTrash(selectedOrder)}
+                    className="bg-red-50 border border-red-200 text-red-700 rounded-2xl p-4 font-extrabold"
+                  >
+                    🗑 휴지통 이동
+                  </button>
+
+                  <button
                     onClick={() => setSelectedOrder(null)}
-                    className="flex-1 bg-gray-100 text-gray-900 rounded-2xl p-4 font-extrabold"
+                    className="bg-gray-100 text-gray-900 rounded-2xl p-4 font-extrabold"
                   >
                     닫기
                   </button>

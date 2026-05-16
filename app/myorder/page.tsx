@@ -1,234 +1,216 @@
 // app/myorder/page.tsx
 // 전체 교체용
-// 파일 위치:
-// /Users/ruru/Desktop/ruru-order-app/app/myorder/page.tsx
+// 파일 위치: /Users/ruru/Desktop/ruru-order-app/app/myorder/page.tsx
 //
-// 적용:
-// - 주문조회번호만으로 조회
-// - 주문서 작성완료 시점 기준 실제 날짜 최근 7일만 조회
-// - 조회 실패 문구: 최근 7일간 주문내역이 존재하지 않습니다.
-// - 주문조회번호 입력칸만 우클릭/복사/붙여넣기 허용
-// - 고객 주문조회에 주문시간 표시
-// - 주문취소/환불/부분환불 상태 표시 개선
+// 주문번호 조회 제거.
+// 전화번호 + PIN번호 6자리로 최근 7일 주문조회.
 
 "use client";
 
-import { supabase } from "@/lib/supabase";
 import { useState } from "react";
+import { supabase } from "@/lib/supabase";
 
-const formatWon = (value: number) => `${Number(value || 0).toLocaleString()}원`;
+const FOOTER_TEXT = "© since 2024 루루동이 | All Rights Reserved.";
 
-const formatDateTime = (value: string) => {
+const normalizePhone = (value: string) => String(value || "").replace(/[^0-9]/g, "");
+const won = (value: any) => `${Number(value || 0).toLocaleString()}원`;
+
+async function sha256(value: string) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(value);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function makePinHash(phone: string, pin: string) {
+  return sha256(`ruru:${normalizePhone(phone)}:${pin}`);
+}
+
+function formatDate(value: string) {
   if (!value) return "-";
-
-  try {
-    return new Date(value).toLocaleString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return "-";
-  }
-};
-
-const getCustomerStatusLabel = (order: any) => {
-  const manageStatus = String(order.order_manage_status || "");
-  const refundType = String(order.refund_type || "");
-
-  if (manageStatus === "주문서취소") return "주문취소";
-  if (manageStatus === "환불" && refundType === "부분환불") return "부분환불";
-  if (manageStatus === "환불") return "환불완료";
-  if (manageStatus === "출고완료") return "배송출발";
-  if (manageStatus === "출고대기") return "출고준비중";
-  if (manageStatus === "주문확인완료") return "확인완료";
-
-  return "주문접수";
-};
-
-const getStatusClassName = (label: string) => {
-  if (label === "주문취소") return "bg-red-100 text-red-700";
-  if (label === "환불완료") return "bg-gray-200 text-gray-800";
-  if (label === "부분환불") return "bg-orange-100 text-orange-700";
-  if (label === "배송출발") return "bg-green-100 text-green-700";
-  if (label === "출고준비중") return "bg-yellow-100 text-yellow-700";
-  if (label === "확인완료") return "bg-blue-100 text-blue-700";
-
-  return "bg-gray-100 text-gray-700";
-};
+  return new Date(value).toLocaleString("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 export default function MyOrderPage() {
-  const [lookupCode, setLookupCode] = useState("");
+  const [phone, setPhone] = useState("");
+  const [pin, setPin] = useState("");
+  const [showPin, setShowPin] = useState(false);
   const [orders, setOrders] = useState<any[]>([]);
   const [message, setMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleLookup = async () => {
-    const code = lookupCode.trim().toUpperCase();
+  const searchOrders = async () => {
+    const cleanPhone = normalizePhone(phone);
 
-    if (!code) {
-      alert("주문조회번호를 입력해주세요.");
+    if (cleanPhone.length < 10) {
+      alert("전화번호를 입력해주세요.");
       return;
     }
 
-    setIsLoading(true);
-    setMessage("");
+    if (!/^\d{6}$/.test(pin)) {
+      alert("PIN번호 6자리를 입력해주세요.");
+      return;
+    }
+
+    setLoading(true);
     setOrders([]);
+    setMessage("");
 
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    try {
+      const { data: customer, error: customerError } = await supabase
+        .from("customers")
+        .select("*")
+        .eq("customer_phone", cleanPhone)
+        .maybeSingle();
 
-    const { data, error } = await supabase
-      .from("orders")
-      .select("*")
-      .eq("order_lookup_code", code)
-      .gte("created_at", sevenDaysAgo.toISOString())
-      .order("created_at", { ascending: false });
+      if (customerError) throw customerError;
 
-    setIsLoading(false);
+      if (!customer?.pin_hash) {
+        setMessage("등록된 고객정보가 없거나 PIN번호가 설정되지 않았습니다.");
+        setLoading(false);
+        return;
+      }
 
-    if (error) {
-      alert(error.message);
-      return;
+      const pinHash = await makePinHash(cleanPhone, pin);
+
+      if (pinHash !== customer.pin_hash && pinHash !== customer.temp_pin_hash) {
+        setMessage("전화번호 또는 PIN번호가 일치하지 않습니다.");
+        setLoading(false);
+        return;
+      }
+
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("customer_phone", cleanPhone)
+        .gte("created_at", sevenDaysAgo.toISOString())
+        .neq("is_permanently_deleted", true)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        setMessage("최근 7일간 주문내역이 없습니다.");
+      } else {
+        setOrders(data);
+      }
+    } catch (error: any) {
+      alert("주문조회 오류: " + error.message);
     }
 
-    if (!data || data.length === 0) {
-      setMessage("최근 7일간 주문내역이 존재하지 않습니다.");
-      return;
-    }
-
-    setOrders(data);
+    setLoading(false);
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 px-4 py-8 text-gray-900">
-      <div className="max-w-2xl mx-auto">
-
-        <section className="bg-white rounded-[2rem] border border-gray-200 shadow-sm p-6 md:p-8">
-          <div className="text-sm font-extrabold text-gray-500 mb-2">
-            ORDER LOOKUP
-          </div>
-
-          <h1 className="text-4xl md:text-5xl font-extrabold">
-            주문조회
-          </h1>
-
-          <p className="mt-3 text-gray-500 font-bold leading-relaxed">
-            주문완료 후 발급된 주문조회번호로만 조회할 수 있습니다.
-            <br />
-            주문서 작성완료 시점 기준 최근 7일간만 조회 가능합니다.
+    <main className="min-h-screen bg-[#fbf7f8] px-4 py-7 text-gray-950">
+      <section className="mx-auto w-full max-w-md">
+        <header className="mb-5 text-center">
+          <div className="text-sm font-black text-pink-400">RURU ORDER</div>
+          <h1 className="mt-1 text-4xl font-black">주문조회</h1>
+          <p className="mt-2 text-sm font-bold text-gray-500">
+            전화번호와 PIN번호로 최근 7일 주문내역을 확인합니다.
           </p>
+        </header>
 
-          <div className="mt-6 grid gap-3">
+        <section className="rounded-[2rem] border border-pink-100 bg-white p-5 shadow-[0_18px_45px_rgba(255,120,160,0.13)]">
+          <div className="grid gap-3">
             <input
-              data-security-allow="true"
-              type="text"
-              placeholder="예) RURU-260516-0418-X8Q2M9"
-              className="w-full rounded-2xl border border-gray-300 bg-gray-50 px-5 py-4 text-lg font-bold outline-none focus:border-black"
-              value={lookupCode}
-              onChange={(e) => setLookupCode(e.target.value.toUpperCase())}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="전화번호"
+              inputMode="numeric"
+              className="w-full rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-pink-300"
             />
 
+            <div className="relative">
+              <input
+                value={pin}
+                onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                placeholder="PIN번호 6자리"
+                type={showPin ? "text" : "password"}
+                inputMode="numeric"
+                className="w-full rounded-2xl border border-gray-200 bg-gray-50 p-4 pr-14 font-bold outline-none focus:border-pink-300"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPin((prev) => !prev)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full px-2 py-1 text-xs font-black text-gray-500"
+              >
+                {showPin ? "숨김" : "보기"}
+              </button>
+            </div>
+
             <button
-              onClick={handleLookup}
-              disabled={isLoading}
-              className="w-full bg-black text-white rounded-2xl py-4 text-lg font-extrabold disabled:opacity-50"
+              onClick={searchOrders}
+              disabled={loading}
+              className="rounded-2xl bg-gray-950 p-4 font-black text-white disabled:opacity-50"
             >
-              {isLoading ? "조회중..." : "조회하기"}
+              {loading ? "조회 중..." : "최근 주문조회"}
             </button>
+
+            <div className="rounded-2xl bg-pink-50 p-3 text-xs font-bold leading-relaxed text-pink-700">
+              📌 PIN번호는 주문 및 주문조회 시 필요한 비밀번호입니다.
+              <br />
+              분실 시 재설정이 필요하니 꼭 기억해주세요.
+            </div>
           </div>
         </section>
 
         {message && (
-          <section className="mt-6 rounded-3xl border border-gray-300 bg-white p-6 text-center text-gray-500 font-bold">
+          <div className="mt-4 rounded-2xl bg-white p-4 text-center text-sm font-black text-gray-500 shadow-sm">
             {message}
-          </section>
+          </div>
         )}
 
-        {orders.length > 0 && (
-          <section className="mt-6 grid gap-4">
-            {orders.map((order) => {
-              const statusLabel = getCustomerStatusLabel(order);
-              const isCanceled = statusLabel === "주문취소";
-              const isRefunded =
-                statusLabel === "환불완료" ||
-                statusLabel === "부분환불";
-
-              const shouldStrike = isCanceled || isRefunded;
-
-              return (
-                <article
-                  key={order.id}
-                  className={`rounded-3xl border p-5 shadow-sm ${
-                    isCanceled
-                      ? "border-red-200 bg-red-50"
-                      : isRefunded
-                      ? "border-orange-200 bg-orange-50"
-                      : "border-gray-200 bg-white"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3 mb-4">
-                    <div>
-                      <div className="font-extrabold text-lg">
-                        {order.youtube_nickname || "-"}
-                      </div>
-
-                      <div className="text-sm text-gray-500 font-bold mt-1">
-                        주문시간 {formatDateTime(order.created_at)}
-                      </div>
-
-                      <div className="text-xs text-gray-400 font-bold mt-1">
-                        {order.order_lookup_code || "-"}
-                      </div>
-                    </div>
-
-                    <div
-                      className={`rounded-full px-3 py-1 text-xs font-extrabold ${getStatusClassName(
-                        statusLabel
-                      )}`}
-                    >
-                      {statusLabel}
-                    </div>
+        <section className="mt-4 grid gap-3">
+          {orders.map((order) => (
+            <article key={order.id} className="rounded-[1.5rem] border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs font-black text-gray-400">
+                    {formatDate(order.created_at)}
                   </div>
-
-                  <div className={shouldStrike ? "line-through text-gray-400" : ""}>
-                    <div className="text-2xl font-extrabold">
-                      {order.product_name || "상품명 없음"}
-                    </div>
-
-                    <div className="mt-2 text-gray-600 font-bold">
-                      {(order.color && order.color !== "없음") ? order.color : ""}
-                      {(order.color && order.color !== "없음" && order.size && order.size !== "없음") ? " / " : ""}
-                      {(order.size && order.size !== "없음") ? order.size : ""}
-                      {" / "}
-                      {order.qty || 0}개
-                    </div>
-
-                    <div className="mt-3 text-xl font-extrabold">
-                      {formatWon(order.adjusted_total_price || order.total_price)}
-                    </div>
+                  <div className="mt-1 text-lg font-black">
+                    {order.product_name || "상품명 없음"}
                   </div>
+                  <div className="mt-1 text-sm font-bold text-gray-500">
+                    {[order.color, order.size].filter((v) => v && v !== "없음").join(" / ")}
+                    {order.qty ? ` · ${order.qty}개` : ""}
+                  </div>
+                </div>
 
-                  {isCanceled && order.cancel_reason && (
-                    <div className="mt-4 rounded-2xl bg-white border border-red-200 p-4 text-red-700 font-bold">
-                      취소 사유: {order.cancel_reason}
-                    </div>
-                  )}
+                <span className="shrink-0 rounded-full bg-gray-100 px-3 py-1 text-xs font-black text-gray-700">
+                  {order.order_manage_status || order.order_status || "주문접수"}
+                </span>
+              </div>
 
-                  {isRefunded && order.refund_memo && (
-                    <div className="mt-4 rounded-2xl bg-white border border-orange-200 p-4 text-orange-700 font-bold">
-                      환불 메모: {order.refund_memo}
-                    </div>
-                  )}
-                </article>
-              );
-            })}
-          </section>
-        )}
+              <div className="mt-4 flex items-center justify-between border-t pt-4">
+                <span className="text-sm font-bold text-gray-500">결제금액</span>
+                <span className="text-xl font-black">{won(order.adjusted_total_price || order.total_price)}</span>
+              </div>
 
-      </div>
+              {order.request_memo && (
+                <div className="mt-3 rounded-2xl bg-gray-50 p-3 text-sm font-bold text-gray-600">
+                  요청사항: {order.request_memo}
+                </div>
+              )}
+            </article>
+          ))}
+        </section>
+
+        <footer className="py-8 text-center text-[11px] font-bold text-gray-400">
+          {FOOTER_TEXT}
+        </footer>
+      </section>
     </main>
   );
 }
