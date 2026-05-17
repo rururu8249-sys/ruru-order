@@ -6,8 +6,6 @@
 // - /order 이동 없음
 // - 상품카드 → 사진보러가기 → 바로주문 → 페이지 안에서 주문폼 펼침
 // - 주문서 작성 페이지와 같은 톤/문구/입력 UX 적용
-// - 기존고객: 전화번호 + 주문 비밀번호 6자리로 확인
-// - 신규고객: 닉네임/이름/전화번호/주소/배송메모/주문 비밀번호 저장
 // - 저장된 고객정보가 있으면 불필요한 입력영역 숨김
 // - 배송: 일반배송=방송상품+합배송 가능 공구상품, 업체배송=별도배송
 
@@ -44,7 +42,6 @@ type CustomerSession = {
   zipcode: string;
   address: string;
   detail_address: string;
-  pin_code: string;
 };
 
 const KAKAO_CHANNEL_URL = "https://pf.kakao.com/_RMxaqX";
@@ -271,17 +268,12 @@ export default function GroupBuyPage() {
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
   const [customerMode, setCustomerMode] = useState<"saved" | "load" | "new">("load");
 
+  const [loginName, setLoginName] = useState("");
   const [loginPhone, setLoginPhone] = useState("");
-  const [loginPin, setLoginPin] = useState("");
-  const [showLoginPin, setShowLoginPin] = useState(false);
 
   const [nickname, setNickname] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
-  const [pinCode, setPinCode] = useState("");
-  const [pinConfirm, setPinConfirm] = useState("");
-  const [showPin, setShowPin] = useState(false);
-  const [showPinConfirm, setShowPinConfirm] = useState(false);
   const [zipcode, setZipcode] = useState("");
   const [address, setAddress] = useState("");
   const [detailAddress, setDetailAddress] = useState("");
@@ -338,37 +330,34 @@ export default function GroupBuyPage() {
     setZipcode(customer.zipcode || "");
     setAddress(customer.address || "");
     setDetailAddress(customer.detail_address || "");
-    setPinCode(onlyNumber(customer.pin_code || "").slice(0, 6));
   };
 
   const saveSession = (customer: CustomerSession) => {
     setSession(customer);
     localStorage.setItem("ruru_customer_session", JSON.stringify(customer));
     fillCustomerForm(customer);
-    setPinConfirm("");
     setCustomerMode("saved");
   };
 
   const logout = () => {
     localStorage.removeItem("ruru_customer_session");
+
     setSession(null);
     setIsEditingCustomer(false);
     setCustomerMode("load");
+
+    setLoginName("");
     setLoginPhone("");
-    setLoginPin("");
+
     setNickname("");
     setCustomerName("");
     setCustomerPhone("");
-    setPinCode("");
-    setPinConfirm("");
-    setLoginPin("");
-    setShowLoginPin(false);
-    setShowPin(false);
-    setShowPinConfirm(false);
     setZipcode("");
     setAddress("");
     setDetailAddress("");
     setRequestMemo("");
+
+    alert("로그아웃되었습니다. 오늘도 좋은 하루 보내세요 :)");
   };
 
   const openAddressSearch = () => {
@@ -385,17 +374,17 @@ export default function GroupBuyPage() {
     }).open();
   };
 
-  const loadCustomerByPin = async () => {
+  const loadCustomerByNamePhone = async () => {
+    const cleanName = String(loginName || "").trim();
     const phone = onlyNumber(loginPhone);
-    const pin = onlyNumber(loginPin).slice(0, 6);
 
-    if (phone.length < 10) {
-      alert("전화번호를 정확히 입력해주세요.");
+    if (!cleanName) {
+      alert("이름을 입력해주세요.");
       return;
     }
 
-    if (pin.length !== 6) {
-      alert("주문 비밀번호 숫자 6자리를 입력해주세요.");
+    if (phone.length < 10) {
+      alert("전화번호를 정확히 입력해주세요.");
       return;
     }
 
@@ -403,17 +392,17 @@ export default function GroupBuyPage() {
       .from("customers")
       .select("*")
       .eq("customer_phone", phone)
-      .eq("pin_code", pin)
+      .eq("customer_name", cleanName)
       .limit(1);
 
     if (error) {
-      alert("고객정보 불러오기 오류\n\n" + error.message);
+      alert("고객정보 확인 오류\n\n" + error.message);
       return;
     }
 
     const customer = data?.[0];
     if (!customer) {
-      alert("일치하는 고객정보가 없습니다.\n전화번호와 주문 비밀번호를 확인해주세요.");
+      alert("일치하는 고객정보가 없습니다.\n이름과 전화번호를 확인해주세요.");
       return;
     }
 
@@ -425,18 +414,15 @@ export default function GroupBuyPage() {
       zipcode: customer.zipcode || "",
       address: customer.address || "",
       detail_address: customer.detail_address || "",
-      pin_code: customer.pin_code || pin,
     };
 
     saveSession(nextSession);
     setIsEditingCustomer(false);
-    alert("고객정보를 불러왔습니다. 바로 주문 가능합니다.");
+    alert("확인되었습니다. 바로 주문 가능합니다.");
   };
 
   const validateCustomerForm = () => {
     const phone = onlyNumber(customerPhone);
-    const pin = onlyNumber(pinCode).slice(0, 6);
-
     if (!nickname.trim()) {
       alert("유튜브 닉네임을 입력해주세요.");
       return false;
@@ -457,15 +443,6 @@ export default function GroupBuyPage() {
       return false;
     }
 
-    if (pin.length !== 6) {
-      alert("주문 비밀번호는 숫자 6자리로 입력해주세요.");
-      return false;
-    }
-
-    if (customerMode === "new" && pin !== onlyNumber(pinConfirm).slice(0, 6)) {
-      alert("비밀번호 확인이 일치하지 않습니다.");
-      return false;
-    }
 
     return true;
   };
@@ -474,8 +451,6 @@ export default function GroupBuyPage() {
     if (!validateCustomerForm()) return null;
 
     const phone = onlyNumber(customerPhone);
-    const pin = onlyNumber(pinCode).slice(0, 6);
-
     const customerData = {
       youtube_nickname: nickname.trim(),
       customer_name: customerName.trim(),
@@ -483,7 +458,6 @@ export default function GroupBuyPage() {
       zipcode,
       address,
       detail_address: detailAddress.trim(),
-      pin_code: pin,
       last_order_at: new Date().toISOString(),
       is_default_address: true,
     };
@@ -526,7 +500,6 @@ export default function GroupBuyPage() {
         zipcode: data.zipcode || "",
         address: data.address || "",
         detail_address: data.detail_address || "",
-        pin_code: data.pin_code || pin,
       };
 
       saveSession(nextSession);
@@ -545,7 +518,6 @@ export default function GroupBuyPage() {
       zipcode: data.zipcode || "",
       address: data.address || "",
       detail_address: data.detail_address || "",
-      pin_code: data.pin_code || pin,
     };
 
     saveSession(nextSession);
@@ -880,36 +852,22 @@ export default function GroupBuyPage() {
                                     기존 고객 정보 불러오기
                                   </div>
                                   <p className="mt-1 text-[12px] font-bold leading-relaxed text-[#6b7280]">
-                                    전화번호와 주문 비밀번호로 저장된 정보를 불러옵니다.
+                                    이름과 전화번호로 저장된 정보를 확인합니다.
                                   </p>
                                   <div className="mt-3 grid gap-3">
+                                    <TextInput
+                                      value={loginName}
+                                      onChange={setLoginName}
+                                      placeholder="이름"
+                                    />
                                     <TextInput
                                       value={formatPhone(loginPhone)}
                                       onChange={(value) => setLoginPhone(onlyNumber(value))}
                                       placeholder="전화번호"
                                       inputMode="numeric"
                                     />
-                                    <div className="relative">
-                                      <input
-                                        value={loginPin}
-                                        onChange={(event) =>
-                                          setLoginPin(onlyNumber(event.target.value).slice(0, 6))
-                                        }
-                                        placeholder="주문 비밀번호 (숫자 6자리)"
-                                        type={showLoginPin ? "text" : "password"}
-                                        inputMode="numeric"
-                                        className="w-full rounded-[20px] border border-[#f0e6e7] bg-[#fffafa] px-4 py-4 pr-14 text-[15px] font-bold outline-none transition focus:border-[#ff6b7a] focus:bg-white"
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => setShowLoginPin((value) => !value)}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-500 transition active:scale-[0.97]"
-                                      >
-                                        {showLoginPin ? "숨김" : "보기"}
-                                      </button>
-                                    </div>
                                     <PressButton
-                                      onClick={loadCustomerByPin}
+                                      onClick={loadCustomerByNamePhone}
                                       className="rounded-[20px] bg-[#171717] px-4 py-4 text-[15px] font-black text-white"
                                     >
                                       확인
@@ -926,11 +884,6 @@ export default function GroupBuyPage() {
                                     저장 후에는 다음 주문부터 자동으로 불러옵니다.
                                   </div>
 
-                                  <div className="mt-3 rounded-2xl bg-pink-50 p-3 text-xs font-bold leading-relaxed text-pink-700">
-                                    🔒 주문 비밀번호는 주문서 작성 및 주문조회에 사용하는 비밀번호입니다.
-                                    <br />
-                                    숫자 6자리로 입력하고 꼭 기억해주세요.
-                                  </div>
 
                                   <div className="mt-3 grid gap-3">
                                     <TextInput value={nickname} onChange={setNickname} placeholder="유튜브 닉네임" />
@@ -941,45 +894,6 @@ export default function GroupBuyPage() {
                                       placeholder="전화번호"
                                       inputMode="numeric"
                                     />
-                                    <div className="relative">
-                                      <input
-                                        value={pinCode}
-                                        onChange={(event) =>
-                                          setPinCode(onlyNumber(event.target.value).slice(0, 6))
-                                        }
-                                        placeholder="주문 비밀번호 (숫자 6자리)"
-                                        type={showPin ? "text" : "password"}
-                                        inputMode="numeric"
-                                        className="w-full rounded-[20px] border border-[#f0e6e7] bg-[#fffafa] px-4 py-4 pr-14 text-[15px] font-bold outline-none transition focus:border-[#ff6b7a] focus:bg-white"
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => setShowPin((value) => !value)}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-500 transition active:scale-[0.97]"
-                                      >
-                                        {showPin ? "숨김" : "보기"}
-                                      </button>
-                                    </div>
-
-                                    <div className="relative">
-                                      <input
-                                        value={pinConfirm}
-                                        onChange={(event) =>
-                                          setPinConfirm(onlyNumber(event.target.value).slice(0, 6))
-                                        }
-                                        placeholder="비밀번호 확인"
-                                        type={showPinConfirm ? "text" : "password"}
-                                        inputMode="numeric"
-                                        className="w-full rounded-[20px] border border-[#f0e6e7] bg-[#fffafa] px-4 py-4 pr-14 text-[15px] font-bold outline-none transition focus:border-[#ff6b7a] focus:bg-white"
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => setShowPinConfirm((value) => !value)}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-500 transition active:scale-[0.97]"
-                                      >
-                                        {showPinConfirm ? "숨김" : "보기"}
-                                      </button>
-                                    </div>
                                     <PressButton
                                       onClick={openAddressSearch}
                                       className="rounded-[20px] bg-[#171717] px-4 py-4 text-[15px] font-black text-white"

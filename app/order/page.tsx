@@ -5,10 +5,7 @@
 // 최종 복구/수정본
 // - 기존고객/신규고객 선택 화면 제거
 // - 저장된 고객정보 자동 입력
-// - 자동 로그인 상태면 PIN 입력칸 숨김
 // - [정보수정] 버튼 / [로그아웃] 버튼
-// - 정보수정 시 PIN 입력칸 다시 표시 가능
-// - 최초 입력 시 주문 비밀번호 (숫자 6자리) + 재확인
 // - 주문상품 모든 칸 필수: 상품명/색상/사이즈/수량/상품금액
 // - 색상/사이즈 없으면 고객이 "없음" 입력해야 제출 가능
 // - 상품금액 쉼표 자동
@@ -17,7 +14,6 @@
 // - 무통장 계좌 안내는 주문서 작성 중간에 노출하지 않음
 // - 홈/로그아웃 상단 버튼 추가
 // - 주문자 정보 기존고객/신규고객 탭 방식 적용
-// - 확인 버튼 문구 통일 / 비밀번호 보기 버튼 적용
 // - 색상은 한글/영어/공백 허용, 사이즈는 한글/영어/숫자/공백 허용
 // - 고객페이지 기본 퍼가기 방지 적용
 // - 상품명은 자유 입력, 상품 1칸 1개 안내문 추가
@@ -98,22 +94,10 @@ const itemLabel = (item: OrderItem) => {
     .join(" ");
 };
 
-async function sha256(value: string) {
-  const data = new TextEncoder().encode(value);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-
-  return Array.from(new Uint8Array(hashBuffer))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-async function makePinHash(phone: string, pin: string) {
-  return sha256(`ruru:${normalizePhone(phone)}:${pin}`);
-}
 
 
 const cleanColorText = (value: string) =>
-  String(value || "").replace(/[^ㄱ-ㅎ가-힣a-zA-Z\s]/g, "").slice(0, 30);
+  String(value || "").replace(/[0-9]/g, "").slice(0, 30);
 
 const cleanSizeText = (value: string) =>
   String(value || "").replace(/[^ㄱ-ㅎ가-힣a-zA-Z0-9\s]/g, "").slice(0, 30);
@@ -166,18 +150,13 @@ export default function OrderPage() {
   const [requestMemo, setRequestMemo] = useState("");
 
   const [pin, setPin] = useState("");
-  const [pinConfirm, setPinConfirm] = useState("");
-  const [showPin, setShowPin] = useState(false);
-  const [showPinConfirm, setShowPinConfirm] = useState(false);
-
   const [autoSaveInfo, setAutoSaveInfo] = useState(true);
   const [hasSavedInfo, setHasSavedInfo] = useState(false);
   const [isEditingCustomerInfo, setIsEditingCustomerInfo] = useState(false);
   const [isCustomerInfoOpen, setIsCustomerInfoOpen] = useState(false);
   const [customerMode, setCustomerMode] = useState<"load" | "new">("load");
+  const [loginName, setLoginName] = useState("");
   const [loginPhone, setLoginPhone] = useState("");
-  const [loginPin, setLoginPin] = useState("");
-  const [showLoginPin, setShowLoginPin] = useState(false);
 
   const [paymentMethod, setPaymentMethod] = useState<"무통장입금" | "카드결제">("무통장입금");
   const [items, setItems] = useState<OrderItem[]>([{ ...emptyItem }]);
@@ -271,10 +250,9 @@ export default function OrderPage() {
     setAddress("");
     setDetailAddress("");
     setRequestMemo("");
-    setPin("");
-    setPinConfirm("");
+    
+    setLoginName("");
     setLoginPhone("");
-    setLoginPin("");
     setHasSavedInfo(false);
     setIsEditingCustomerInfo(false);
     setIsCustomerInfoOpen(true);
@@ -287,8 +265,7 @@ export default function OrderPage() {
     setIsEditingCustomerInfo(true);
     setIsCustomerInfoOpen(true);
     setCustomerMode("new");
-    setPin("");
-    setPinConfirm("");
+    
     setTimeout(() => {
       document.getElementById("youtubeNicknameInput")?.focus();
     }, 100);
@@ -296,24 +273,23 @@ export default function OrderPage() {
 
   const cancelEditCustomerInfo = () => {
     setIsEditingCustomerInfo(false);
-    setPin("");
-    setPinConfirm("");
+    
     loadSavedCustomerInfo();
     setIsCustomerInfoOpen(false);
     setCustomerMode("load");
   };
 
-  const loadCustomerByPin = async () => {
+  const loadCustomerByNamePhone = async () => {
+    const cleanName = String(loginName || "").trim();
     const cleanPhone = normalizePhone(loginPhone);
-    const cleanPin = String(loginPin || "").replace(/[^0-9]/g, "").slice(0, 6);
 
-    if (cleanPhone.length < 10) {
-      alert("전화번호를 정확히 입력해주세요.");
+    if (!cleanName) {
+      alert("이름을 입력해주세요.");
       return;
     }
 
-    if (cleanPin.length !== 6) {
-      alert("주문 비밀번호 숫자 6자리를 입력해주세요.");
+    if (cleanPhone.length < 10) {
+      alert("전화번호를 정확히 입력해주세요.");
       return;
     }
 
@@ -322,6 +298,7 @@ export default function OrderPage() {
         .from("customers")
         .select("*")
         .eq("customer_phone", cleanPhone)
+        .eq("customer_name", cleanName)
         .limit(1);
 
       if (error) throw error;
@@ -329,26 +306,7 @@ export default function OrderPage() {
       const customer = data?.[0];
 
       if (!customer) {
-        alert("일치하는 고객정보가 없습니다.\n전화번호와 주문 비밀번호를 확인해주세요.");
-        return;
-      }
-
-      const inputHash = await makePinHash(cleanPhone, cleanPin);
-      const savedHash = customer.pin_hash || "";
-      const savedPinCode = customer.pin_code || "";
-
-      if (savedHash && savedHash !== inputHash) {
-        alert("주문 비밀번호가 일치하지 않습니다.\n다시 확인해주세요.");
-        return;
-      }
-
-      if (!savedHash && savedPinCode && savedPinCode !== cleanPin) {
-        alert("주문 비밀번호가 일치하지 않습니다.\n다시 확인해주세요.");
-        return;
-      }
-
-      if (!savedHash && !savedPinCode) {
-        alert("저장된 주문 비밀번호가 없습니다.\n정보수정에서 정보를 다시 저장해주세요.");
+        alert("일치하는 고객정보가 없습니다.\n이름과 전화번호를 확인해주세요.");
         return;
       }
 
@@ -377,8 +335,6 @@ export default function OrderPage() {
       setIsEditingCustomerInfo(false);
       setIsCustomerInfoOpen(false);
       setCustomerMode("load");
-      setPin("");
-      setPinConfirm("");
 
       alert("확인되었습니다. 바로 주문 가능합니다.");
     } catch (error: any) {
@@ -409,25 +365,12 @@ export default function OrderPage() {
       return;
     }
 
-    if (pin || pinConfirm) {
-      if (!/^\d{6}$/.test(pin)) {
-        alert("PIN번호를 변경하려면 6자리로 입력해주세요.");
-        return;
-      }
-
-      if (pin !== pinConfirm) {
-        alert("비밀번호 확인이 일치하지 않습니다.");
-        return;
-      }
-    }
-
     try {
-      const pinHash = pin ? await makePinHash(cleanPhone, pin) : undefined;
-      await saveCustomer(pinHash);
+      await saveCustomer();
       setIsEditingCustomerInfo(false);
       setIsCustomerInfoOpen(false);
       setPin("");
-      setPinConfirm("");
+      
       alert("고객정보수정이 완료되었습니다.");
     } catch (error: any) {
       alert("고객정보 저장 오류: " + error.message);
@@ -533,7 +476,7 @@ export default function OrderPage() {
     });
   };
 
-  const saveCustomer = async (pinHash?: string) => {
+  const saveCustomer = async () => {
     const cleanPhone = normalizePhone(customerPhone);
 
     const customerData: any = {
@@ -547,10 +490,6 @@ export default function OrderPage() {
       last_order_at: new Date().toISOString(),
     };
 
-    if (pinHash) {
-      customerData.pin_hash = pinHash;
-      customerData.pin_updated_at = new Date().toISOString();
-    }
 
     const { data: rows, error: findError } = await supabase
       .from("customers")
@@ -602,17 +541,6 @@ export default function OrderPage() {
       return false;
     }
 
-    if (!isAutoLoggedIn) {
-      if (!/^\d{6}$/.test(pin)) {
-        alert("주문 비밀번호 (숫자 6자리)를 입력해주세요.");
-        return false;
-      }
-
-      if (pin !== pinConfirm) {
-        alert("비밀번호 확인이 일치하지 않습니다.");
-        return false;
-      }
-    }
 
     if (!address.trim()) {
       alert("주소를 입력해주세요.");
@@ -680,12 +608,7 @@ export default function OrderPage() {
     try {
       const cleanPhone = normalizePhone(customerPhone);
 
-      if (isAutoLoggedIn) {
-        await saveCustomer();
-      } else {
-        const pinHash = await makePinHash(cleanPhone, pin);
-        await saveCustomer(pinHash);
-      }
+      await saveCustomer();
 
       const validItems = items.filter(
         (item) =>
@@ -777,7 +700,7 @@ export default function OrderPage() {
       setRequestMemo("");
       setPaymentMethod("무통장입금");
       setPin("");
-      setPinConfirm("");
+      
       setIsEditingCustomerInfo(false);
       setIsCustomerInfoOpen(false);
 
@@ -1060,10 +983,17 @@ export default function OrderPage() {
                     기존 고객 정보 확인
                   </div>
                   <p className="mt-1 text-xs font-bold leading-relaxed text-[#6b7280]">
-                    전화번호와 주문 비밀번호로 저장된 정보를 확인합니다.
+                    이름과 전화번호로 저장된 정보를 확인합니다.
                   </p>
 
                   <div className="mt-3 grid gap-3">
+                    <input
+                      value={loginName}
+                      onChange={(event) => setLoginName(event.target.value)}
+                      placeholder="이름"
+                      className="w-full rounded-2xl border border-gray-200 bg-[#fffafa] p-4 font-bold outline-none focus:border-pink-300"
+                    />
+
                     <input
                       value={formatPhone(loginPhone)}
                       onChange={(event) => setLoginPhone(normalizePhone(event.target.value))}
@@ -1072,30 +1002,9 @@ export default function OrderPage() {
                       className="w-full rounded-2xl border border-gray-200 bg-[#fffafa] p-4 font-bold outline-none focus:border-pink-300"
                     />
 
-                    <div className="relative">
-                      <input
-                        value={loginPin}
-                        onChange={(event) =>
-                          setLoginPin(event.target.value.replace(/[^0-9]/g, "").slice(0, 6))
-                        }
-                        placeholder="주문 비밀번호 (숫자 6자리)"
-                        type={showLoginPin ? "text" : "password"}
-                        inputMode="numeric"
-                        className="w-full rounded-2xl border border-gray-200 bg-[#fffafa] p-4 pr-14 font-bold outline-none focus:border-pink-300"
-                      />
-
-                      <button
-                        type="button"
-                        onClick={() => setShowLoginPin((value) => !value)}
-                        className={`${buttonBase} absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black text-gray-500`}
-                      >
-                        {showLoginPin ? "숨김" : "보기"}
-                      </button>
-                    </div>
-
                     <button
                       type="button"
-                      onClick={loadCustomerByPin}
+                      onClick={loadCustomerByNamePhone}
                       className={`${buttonBase} rounded-2xl bg-[#171717] p-4 font-black text-white`}
                     >
                       확인
@@ -1112,11 +1021,6 @@ export default function OrderPage() {
                     저장 후에는 다음 주문부터 자동으로 불러옵니다.
                   </div>
 
-                  <div className="mt-3 rounded-2xl bg-pink-50 p-3 text-xs font-bold leading-relaxed text-pink-700">
-                    🔒 주문 비밀번호는 주문서 작성 및 주문조회에 사용하는 비밀번호입니다.
-                    <br />
-                    숫자 6자리로 입력하고 꼭 기억해주세요.
-                  </div>
 
                   <div className="mt-3 grid gap-3">
                     <input
@@ -1141,48 +1045,6 @@ export default function OrderPage() {
                       inputMode="numeric"
                       className="w-full rounded-2xl border border-gray-200 bg-[#fffafa] p-4 font-bold outline-none focus:border-pink-300"
                     />
-
-                    <div className="relative">
-                      <input
-                        value={pin}
-                        onChange={(event) =>
-                          setPin(event.target.value.replace(/[^0-9]/g, "").slice(0, 6))
-                        }
-                        placeholder="주문 비밀번호 (숫자 6자리)"
-                        type={showPin ? "text" : "password"}
-                        inputMode="numeric"
-                        className="w-full rounded-2xl border border-gray-200 bg-[#fffafa] p-4 pr-14 font-bold outline-none focus:border-pink-300"
-                      />
-
-                      <button
-                        type="button"
-                        onClick={() => setShowPin((value) => !value)}
-                        className={`${buttonBase} absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black text-gray-500`}
-                      >
-                        {showPin ? "숨김" : "보기"}
-                      </button>
-                    </div>
-
-                    <div className="relative">
-                      <input
-                        value={pinConfirm}
-                        onChange={(event) =>
-                          setPinConfirm(event.target.value.replace(/[^0-9]/g, "").slice(0, 6))
-                        }
-                        placeholder="비밀번호 확인"
-                        type={showPinConfirm ? "text" : "password"}
-                        inputMode="numeric"
-                        className="w-full rounded-2xl border border-gray-200 bg-[#fffafa] p-4 pr-14 font-bold outline-none focus:border-pink-300"
-                      />
-
-                      <button
-                        type="button"
-                        onClick={() => setShowPinConfirm((value) => !value)}
-                        className={`${buttonBase} absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black text-gray-500`}
-                      >
-                        {showPinConfirm ? "숨김" : "보기"}
-                      </button>
-                    </div>
 
                     <label className="flex items-center gap-2 rounded-2xl bg-[#fffafa] p-3 text-sm font-black text-gray-700">
                       <input
