@@ -117,21 +117,35 @@ export default function NoticePage() {
   };
 
   const TopCustomerNav = () => (
-    <div className="sticky top-3 z-30 mb-4 flex items-center justify-between gap-3 rounded-full border border-[#f4e7e9] bg-white/95 p-2 shadow-[0_12px_30px_rgba(30,20,20,0.08)] backdrop-blur">
+    <div className="sticky top-3 z-40 mx-auto mb-4 flex w-full max-w-[456px] items-center justify-between rounded-full border border-[#f3e5e7] bg-white/95 px-4 py-3 shadow-[0_10px_24px_rgba(30,20,20,0.07)] backdrop-blur">
       <Link
         href="/"
-        className="flex min-h-[44px] items-center justify-center rounded-full bg-[#fff2f4] px-4 text-[14px] font-black text-[#ff4b60] transition active:scale-[0.97]"
+        className="shrink-0 text-[14px] font-black tracking-[-0.04em] text-[#ff4b60] transition active:scale-[0.97]"
       >
         🏠 HOME
       </Link>
 
-      <button
-        type="button"
-        onClick={logoutCustomerInfo}
-        className="flex min-h-[44px] items-center justify-center rounded-full bg-[#f5f2f2] px-4 text-[14px] font-black text-[#5f5555] transition active:scale-[0.97]"
-      >
-        로그아웃
-      </button>
+      <div className="flex items-center gap-2 text-[13px] font-black tracking-[-0.04em] text-[#5f5555]">
+        <Link href="/myorder" className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]">
+          주문조회
+        </Link>
+        <span className="text-[#e1d4d5]">/</span>
+        <button
+          type="button"
+          onClick={() => { window.location.href = "/order"; }}
+          className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]"
+        >
+          정보수정
+        </button>
+        <span className="text-[#e1d4d5]">/</span>
+        <button
+          type="button"
+          onClick={logoutCustomerInfo}
+          className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]"
+        >
+          로그아웃
+        </button>
+      </div>
     </div>
   );
 

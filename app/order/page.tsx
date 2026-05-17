@@ -39,6 +39,17 @@ type OrderItem = {
   product_price: string;
 };
 
+type BroadcastProduct = {
+  id: string | number;
+  product_name: string;
+  price: number;
+  stock: number;
+  status: string;
+  product_type: string;
+  shipping_type: string;
+  combine_shipping: string;
+};
+
 type DoneData = {
   nickname: string;
   name: string;
@@ -140,6 +151,9 @@ const blockCustomerCopyEvents = () => {
 
 export default function OrderPage() {
   const [broadcast, setBroadcast] = useState<any | null>(null);
+  const [broadcastProducts, setBroadcastProducts] = useState<BroadcastProduct[]>([]);
+  const [productSearchOpenIndex, setProductSearchOpenIndex] = useState<number | null>(null);
+  const [productSearchText, setProductSearchText] = useState("");
 
   const [youtubeNickname, setYoutubeNickname] = useState("");
   const [customerName, setCustomerName] = useState("");
@@ -219,16 +233,58 @@ export default function OrderPage() {
   };
 
   const loadBroadcast = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("broadcasts")
       .select("*")
       .eq("status", "ON")
-      .neq("is_deleted", true)
       .order("started_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (data) setBroadcast(data);
+    if (error) {
+      console.log("방송정보 불러오기 오류", error.message);
+      setBroadcast(null);
+      setBroadcastProducts([]);
+      return;
+    }
+
+    if (!data) {
+      setBroadcast(null);
+      setBroadcastProducts([]);
+      return;
+    }
+
+    setBroadcast(data);
+    await loadBroadcastProducts(data.id);
+  };
+
+  const loadBroadcastProducts = async (broadcastId: string | number) => {
+    const { data, error } = await supabase
+      .from("broadcast_products")
+      .select("product_id, products(*)")
+      .eq("broadcast_id", broadcastId);
+
+    if (error) {
+      console.log("방송상품 불러오기 오류", error.message);
+      setBroadcastProducts([]);
+      return;
+    }
+
+    const nextProducts = (data || [])
+      .map((row: any) => row.products)
+      .filter((product: any) => product && product.status !== "숨김")
+      .map((product: any) => ({
+        id: product.id,
+        product_name: product.product_name || "",
+        price: Number(product.price || 0),
+        stock: Number(product.stock || 0),
+        status: product.status || "판매중",
+        product_type: product.product_type || "방송상품",
+        shipping_type: product.shipping_type || "일반",
+        combine_shipping: product.combine_shipping || "Y",
+      }));
+
+    setBroadcastProducts(nextProducts);
   };
 
   const logoutCustomerInfo = () => {
@@ -444,6 +500,32 @@ export default function OrderPage() {
     : 0;
 
   const totalAmount = productAmount + shippingFee + cardExtra;
+
+  const filteredBroadcastProducts = useMemo(() => {
+    const word = productSearchText.trim().toLowerCase();
+
+    return broadcastProducts.filter((product) => {
+      if (!word) return true;
+      return String(product.product_name || "").toLowerCase().includes(word);
+    });
+  }, [broadcastProducts, productSearchText]);
+
+  const selectBroadcastProduct = (index: number, product: BroadcastProduct) => {
+    setItems((prev) =>
+      prev.map((item, itemIndex) =>
+        itemIndex === index
+          ? {
+              ...item,
+              product_name: product.product_name,
+              product_price: String(product.price || ""),
+            }
+          : item
+      )
+    );
+
+    setProductSearchOpenIndex(null);
+    setProductSearchText("");
+  };
 
   const updateItem = (index: number, key: keyof OrderItem, value: string) => {
     const safeValue =
@@ -845,7 +927,7 @@ export default function OrderPage() {
 
               {done.paymentMethod === "카드결제" && (
                 <div className="mt-2 flex justify-between text-sm font-bold text-blue-600">
-                  <span>카드 추가금 10%</span>
+                  <span>카드부가세 10%</span>
                   <span>{won(done.cardExtra)}</span>
                 </div>
               )}
@@ -1112,6 +1194,24 @@ export default function OrderPage() {
         <section className="mt-4 rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-black">주문상품</h2>
 
+          {broadcast && broadcastProducts.length > 0 && (
+            <div className="mt-4 rounded-[1.4rem] bg-[#fff7f8] p-4 text-xs font-bold leading-relaxed text-pink-700">
+              🔴 현재 방송상품 {broadcastProducts.length}개가 연결되어 있습니다.
+              <br />
+              상품명 칸을 누르면 오늘 방송상품을 선택할 수 있고, 금액은 자동 입력됩니다.
+              <br />
+              목록에 없는 상품은 기존처럼 직접 입력 가능합니다.
+            </div>
+          )}
+
+          {broadcast && broadcastProducts.length === 0 && (
+            <div className="mt-4 rounded-[1.4rem] bg-yellow-50 p-4 text-xs font-bold leading-relaxed text-yellow-700">
+              ⚠️ 현재 방송은 ON 상태지만 연결된 방송상품이 없습니다.
+              <br />
+              상품명은 기존처럼 직접 입력해주세요.
+            </div>
+          )}
+
           <div className="mt-4 rounded-[1.4rem] bg-red-50 p-4 text-sm font-black leading-relaxed text-red-600">
             ⚠️ 상품 1칸에는 상품 1개만 입력하세요.
             <br />
@@ -1144,12 +1244,73 @@ export default function OrderPage() {
                 </div>
 
                 <div className="grid gap-3">
-                  <input
-                    value={item.product_name}
-                    onChange={(event) => updateItem(index, "product_name", event.target.value)}
-                    placeholder="상품명 1개만 입력"
-                    className="rounded-2xl border border-gray-200 bg-white p-4 font-bold"
-                  />
+                  <div className="relative">
+                    <input
+                      value={item.product_name}
+                      onFocus={() => {
+                        if (broadcastProducts.length > 0) {
+                          setProductSearchOpenIndex(index);
+                          setProductSearchText(item.product_name);
+                        }
+                      }}
+                      onChange={(event) => {
+                        updateItem(index, "product_name", event.target.value);
+                        setProductSearchOpenIndex(index);
+                        setProductSearchText(event.target.value);
+                      }}
+                      placeholder="상품명 1개만 입력"
+                      className="w-full rounded-2xl border border-gray-200 bg-white p-4 font-bold"
+                    />
+
+                    {productSearchOpenIndex === index && broadcastProducts.length > 0 && (
+                      <div className="absolute left-0 right-0 top-[58px] z-40 max-h-72 overflow-auto rounded-3xl border border-pink-100 bg-white p-2 shadow-[0_18px_45px_rgba(30,20,20,0.15)]">
+                        <div className="px-3 py-2 text-xs font-black text-pink-500">
+                          오늘 방송상품 선택
+                        </div>
+
+                        {filteredBroadcastProducts.length === 0 ? (
+                          <div className="px-3 py-4 text-sm font-bold text-gray-500">
+                            검색된 방송상품이 없습니다. 직접 입력해주세요.
+                          </div>
+                        ) : (
+                          filteredBroadcastProducts.map((product) => (
+                            <button
+                              key={String(product.id)}
+                              type="button"
+                              onClick={() => selectBroadcastProduct(index, product)}
+                              className={`${buttonBase} mb-1 w-full rounded-2xl px-3 py-3 text-left hover:bg-pink-50`}
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="truncate font-black text-gray-950">
+                                    {product.product_name}
+                                  </div>
+                                  <div className="mt-1 text-xs font-bold text-gray-500">
+                                    재고 {product.stock || 0}개 · {product.shipping_type}배송 · 합배송 {product.combine_shipping === "N" ? "불가" : "가능"}
+                                  </div>
+                                </div>
+
+                                <div className="shrink-0 text-sm font-black text-pink-500">
+                                  {won(product.price)}
+                                </div>
+                              </div>
+                            </button>
+                          ))
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProductSearchOpenIndex(null);
+                            setProductSearchText("");
+                          }}
+                          className={`${buttonBase} mt-1 w-full rounded-2xl bg-gray-100 p-3 text-sm font-black text-gray-600`}
+                        >
+                          직접입력 계속하기
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
                   <div className="grid grid-cols-2 gap-2">
                     <input
@@ -1263,7 +1424,7 @@ export default function OrderPage() {
 
               {paymentMethod === "카드결제" && (
                 <div className="mt-2 flex justify-between text-sm font-bold text-blue-600">
-                  <span>카드 추가금 10%</span>
+                  <span>카드부가세 10%</span>
                   <span>{won(cardExtra)}</span>
                 </div>
               )}

@@ -196,27 +196,30 @@ export default function MyOrderPage() {
       style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
     >
       <section className="mx-auto w-full max-w-md">
-        <div className="sticky top-3 z-30 mb-4 flex items-center justify-between gap-2 rounded-full border border-[#f4e7e9] bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(30,20,20,0.08)] backdrop-blur">
-          <div className="shrink-0 text-[13px] font-black tracking-[-0.04em] text-[#ff4b60]">
-            📺 루루동이
-          </div>
+        <div className="sticky top-3 z-40 mx-auto mb-4 flex w-full max-w-[456px] items-center justify-between rounded-full border border-[#f3e5e7] bg-white/95 px-4 py-3 shadow-[0_10px_24px_rgba(30,20,20,0.07)] backdrop-blur">
+          <Link
+            href="/"
+            className="shrink-0 text-[14px] font-black tracking-[-0.04em] text-[#ff4b60] transition active:scale-[0.97]"
+          >
+            🏠 HOME
+          </Link>
 
-          <div className="flex items-center gap-2 text-[12px] font-black tracking-[-0.04em]">
-            <Link href="/" className="whitespace-nowrap px-1 py-2 text-[#ff4b60] transition active:scale-[0.97]">
-              🏠 HOME
+          <div className="flex items-center gap-2 text-[13px] font-black tracking-[-0.04em] text-[#5f5555]">
+            <Link href="/myorder" className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]">
+              주문조회
             </Link>
-            {(customerName || phone) && (
-              <>
-                <span className="text-[#e1d4d5]">/</span>
-                <button
-                  type="button"
-                  onClick={logout}
-                  className="whitespace-nowrap px-1 py-2 text-[#5f5555] transition active:scale-[0.97]"
-                >
-                  로그아웃
-                </button>
-              </>
-            )}
+            <span className="text-[#e1d4d5]">/</span>
+            <Link href="/order" className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]">
+              정보수정
+            </Link>
+            <span className="text-[#e1d4d5]">/</span>
+            <button
+              type="button"
+              onClick={logout}
+              className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]"
+            >
+              로그아웃
+            </button>
           </div>
         </div>
 

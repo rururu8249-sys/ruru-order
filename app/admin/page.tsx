@@ -4,1520 +4,2234 @@ import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-declare global {
-  interface Window {
-    daum?: any;
-  }
-}
+type ProductStatus = "판매중" | "품절" | "숨김";
+type ProductType = "공구상품" | "방송상품";
+type ShippingType = "일반" | "업체";
+type CombineShipping = "Y" | "N";
 
-type ActiveBroadcast = {
-  id: number | null;
-  public_title: string;
-  admin_subtitle: string;
-  shipping_fee: number;
-  card_fee_rate: number;
+type Product = {
+  id?: string | number;
+  product_name: string;
+  description: string;
+  price: number;
+  stock: number;
+  shipping_type: ShippingType;
+  combine_shipping: CombineShipping;
+  product_type: ProductType;
+  external_image_url: string;
+  image_url: string;
+  status: ProductStatus;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
 };
 
-export default function Home() {
-  const [screen, setScreen] = useState<"menu" | "order" | "lookup">("menu");
+type Broadcast = {
+  id?: string | number;
+  public_title: string;
+  admin_subtitle: string;
+  status: string;
+  started_at?: string | null;
+  ended_at?: string | null;
+  shipping_fee: number;
+  card_fee_rate: number;
+  is_combine_shipping_target?: boolean;
+  created_at?: string;
+};
 
-  const [nickname, setNickname] = useState("");
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
+type OrderRow = {
+  id?: string | number;
+  created_at?: string;
+  order_group_id?: string;
+  order_lookup_code?: string;
+  broadcast_id?: string | number | null;
+  broadcast_name?: string;
+  broadcast_public_title?: string;
+  broadcast_admin_subtitle?: string;
+  youtube_nickname?: string;
+  customer_name?: string;
+  customer_phone?: string;
+  zipcode?: string;
+  address?: string;
+  detail_address?: string;
+  request_memo?: string;
+  product_name?: string;
+  color?: string;
+  size?: string;
+  qty?: number;
+  product_price?: number;
+  shipping_fee?: number;
+  total_price?: number;
+  adjusted_total_price?: number;
+  combine_shipping_memo?: string;
+  shipping_status?: string;
+  admin_status?: string;
+  order_status?: string;
+  payment_method?: string;
+  vat_amount?: number;
+};
 
-  const [zipcode, setZipcode] = useState("");
-  const [address, setAddress] = useState("");
-  const [detailAddress, setDetailAddress] = useState("");
-  const [saveAsDefaultAddress, setSaveAsDefaultAddress] = useState(true);
-  const [requestMemo, setRequestMemo] = useState("");
+const emptyProduct: Product = {
+  product_name: "",
+  description: "",
+  price: 0,
+  stock: 0,
+  shipping_type: "일반",
+  combine_shipping: "Y",
+  product_type: "공구상품",
+  external_image_url: "",
+  image_url: "",
+  status: "판매중",
+  sort_order: 1,
+};
 
-  const [customerCheckStatus, setCustomerCheckStatus] = useState<"unchecked" | "existing" | "new">("unchecked");
-  const [checkedCustomer, setCheckedCustomer] = useState<any | null>(null);
-  const [showAddressForm, setShowAddressForm] = useState(false);
-  const [useSavedAddress, setUseSavedAddress] = useState(false);
+const money = (value: number | string) =>
+  `${Number(value || 0).toLocaleString()}원`;
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("무통장입금");
-  const [isCompleted, setIsCompleted] = useState(false);
-  const [completedTotal, setCompletedTotal] = useState(0);
-  const [completedPaymentMethod, setCompletedPaymentMethod] =
-    useState("무통장입금");
-  const [completedLookupCode, setCompletedLookupCode] = useState("");
+const onlyNumber = (value: string) => value.replace(/[^0-9]/g, "");
 
-  const [broadcastStatus, setBroadcastStatus] = useState("OFF");
+export default function AdminPage() {
+  const [activeMenu, setActiveMenu] = useState<
+    "dashboard" | "products" | "broadcasts" | "orders" | "customers"
+  >("dashboard");
+
+  const [products, setProducts] = useState<Product[]>([]);
+  const [form, setForm] = useState<Product>(emptyProduct);
+  const [editingId, setEditingId] = useState<string | number | null>(null);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [savingProduct, setSavingProduct] = useState(false);
+
+  const [keyword, setKeyword] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"전체" | ProductStatus>("전체");
+  const [typeFilter, setTypeFilter] = useState<"전체" | ProductType>("전체");
+
+  const [selectedIds, setSelectedIds] = useState<Array<string | number>>([]);
+  const [bulkShippingType, setBulkShippingType] = useState<ShippingType>("일반");
+  const [bulkCombineShipping, setBulkCombineShipping] =
+    useState<CombineShipping>("Y");
+  const [bulkStatus, setBulkStatus] = useState<ProductStatus>("판매중");
+
+  const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
+  const [activeBroadcast, setActiveBroadcast] = useState<Broadcast | null>(null);
+  const [loadingBroadcasts, setLoadingBroadcasts] = useState(true);
+  const [savingBroadcast, setSavingBroadcast] = useState(false);
   const [broadcastTitle, setBroadcastTitle] = useState("");
-  const [activeBroadcast, setActiveBroadcast] = useState<ActiveBroadcast>({
-    id: null,
-    public_title: "",
-    admin_subtitle: "",
-    shipping_fee: 4000,
-    card_fee_rate: 10,
-  });
-  const [isLoadingBroadcast, setIsLoadingBroadcast] = useState(true);
+  const [broadcastSubtitle, setBroadcastSubtitle] = useState("");
+  const [broadcastShippingFee, setBroadcastShippingFee] = useState(4000);
+  const [broadcastCardFeeRate, setBroadcastCardFeeRate] = useState(10);
+  const [isCombineShippingTarget, setIsCombineShippingTarget] = useState(true);
+  const [selectedBroadcastProductIds, setSelectedBroadcastProductIds] = useState<Array<string | number>>([]);
 
-  const [hasPreviousOrderInSameBroadcast, setHasPreviousOrderInSameBroadcast] =
-    useState(false);
-  const [hasCombineShippingTargetOrder, setHasCombineShippingTargetOrder] =
-    useState(false);
-  const [sameBroadcastShippingChecked, setSameBroadcastShippingChecked] =
-    useState(false);
-
-  const [lookupCode, setLookupCode] = useState("");
-  const [lookupPhone, setLookupPhone] = useState("");
-  const [lookupOrders, setLookupOrders] = useState<any[]>([]);
-  const [lookupMessage, setLookupMessage] = useState("");
-
-  const [items, setItems] = useState([
-    { product: "", color: "", size: "", qty: "", price: "" },
-  ]);
-
-  const bankAccount = "9002186993725";
-
-  const youtubeUrl =
-    process.env.NEXT_PUBLIC_YOUTUBE_URL || "https://www.youtube.com/@루루동이";
-  const bandUrl =
-    process.env.NEXT_PUBLIC_BAND_URL || "https://band.us/@ruru8249";
-  const kakaoChannelUrl =
-    process.env.NEXT_PUBLIC_KAKAO_CHANNEL_URL || "https://pf.kakao.com/_RMxaqX";
+  const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [savingOrderId, setSavingOrderId] = useState<string | number | null>(null);
+  const [orderKeyword, setOrderKeyword] = useState("");
+  const [orderStatusFilter, setOrderStatusFilter] = useState<"전체" | "주문완료신청" | "입금확인" | "배송준비" | "출고완료" | "취소">("전체");
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Array<string | number>>([]);
+  const [broadcastFilters, setBroadcastFilters] = useState<string[]>([]);
+  const [payFilters, setPayFilters] = useState<string[]>([]);
+  const [shipFilters, setShipFilters] = useState<string[]>([]);
+  const [productKindFilters, setProductKindFilters] = useState<string[]>([]);
 
   useEffect(() => {
-    const scriptId = "daum-postcode-script";
-
-    if (!document.getElementById(scriptId)) {
-      const script = document.createElement("script");
-      script.id = scriptId;
-      script.src =
-        "//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
-      script.async = true;
-      document.body.appendChild(script);
-    }
-
-    const savedNickname = localStorage.getItem("ruru_youtube_nickname");
-    const savedName = localStorage.getItem("ruru_customer_name");
-    const savedPhone = localStorage.getItem("ruru_customer_phone");
-    const savedZipcode = localStorage.getItem("ruru_customer_zipcode");
-    const savedAddress = localStorage.getItem("ruru_customer_address");
-    const savedDetailAddress = localStorage.getItem("ruru_customer_detail_address");
-
-    if (savedNickname) setNickname(savedNickname);
-    if (savedName) setCustomerName(savedName);
-    if (savedPhone) setCustomerPhone(savedPhone);
-    if (savedZipcode) setZipcode(savedZipcode);
-    if (savedAddress) setAddress(savedAddress);
-    if (savedDetailAddress) setDetailAddress(savedDetailAddress);
-
-    loadBroadcastSettings();
+    loadAll();
   }, []);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const openOrderFormFromHash = () => {
-      if (window.location.hash === "#order-form") {
-        setScreen("order");
-        setTimeout(() => {
-          document
-            .getElementById("order-form")
-            ?.scrollIntoView({ behavior: "smooth", block: "start" });
-        }, 100);
-      }
-    };
-
-    openOrderFormFromHash();
-    window.addEventListener("hashchange", openOrderFormFromHash);
-
-    return () => {
-      window.removeEventListener("hashchange", openOrderFormFromHash);
-    };
-  }, []);
-
-  useEffect(() => {
-    checkShippingDiscountTargets();
-  }, [customerName, customerPhone, activeBroadcast.id, broadcastTitle]);
-
-  useEffect(() => {
-    setCustomerCheckStatus("unchecked");
-    setCheckedCustomer(null);
-    setUseSavedAddress(false);
-    setShowAddressForm(false);
-  }, [customerName, customerPhone]);
-
-
-
-  const loadBroadcastSettings = async () => {
-    const { data: settingData } = await supabase.from("settings").select("*");
-
-    const status =
-      settingData?.find((v) => v.key === "broadcast_status")?.value || "OFF";
-    const title =
-      settingData?.find((v) => v.key === "current_broadcast_name")?.value || "";
-
-    setBroadcastStatus(status);
-    setBroadcastTitle(title);
-
-    if (status === "ON") {
-      const { data: broadcastData } = await supabase
-        .from("broadcasts")
-        .select("*")
-        .eq("status", "ON")
-        .order("started_at", { ascending: false })
-        .limit(1);
-
-      const active = broadcastData?.[0];
-
-      if (active) {
-        setActiveBroadcast({
-          id: active.id,
-          public_title: active.public_title || title,
-          admin_subtitle: active.admin_subtitle || "",
-          shipping_fee: Number(active.shipping_fee || 4000),
-          card_fee_rate: Number(active.card_fee_rate || 10),
-        });
-      }
-    }
-
-    setIsLoadingBroadcast(false);
+  const loadAll = async () => {
+    await Promise.all([loadProducts(), loadBroadcasts(), loadOrders()]);
   };
 
-  const onlyNumber = (value: string) => value.replace(/[^0-9]/g, "");
-
-  const hasNumber = (value: string) => /[0-9]/.test(String(value || ""));
-
-  const normalizeName = (value: string) => {
-    return String(value || "")
-      .replace(/\s/g, "")
-      .replace(/[(){}\[\],.·ㆍ\-_/]/g, "")
-      .toLowerCase();
-  };
-
-  const formatPhone = (value: string) => {
-    const numbers = onlyNumber(value);
-    if (numbers.length <= 3) return numbers;
-    if (numbers.length <= 7)
-      return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
-    return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(
-      7,
-      11
-    )}`;
-  };
-
-  const formatWon = (value: number) =>
-    `${Number(value || 0).toLocaleString()}원`;
-
-  const normalizeKoreanText = (value: string) => {
-    return String(value || "")
-      .replace(/\s/g, "")
-      .replace(/[(){}\[\],.·ㆍ\-_/]/g, "")
-      .toLowerCase();
-  };
-
-  const isJejuAddress = () => {
-    const zip = onlyNumber(zipcode);
-    const rawFullAddress = `${address || ""} ${detailAddress || ""}`;
-    const full = normalizeKoreanText(rawFullAddress);
-
-    if (zip.startsWith("63")) {
-      return true;
-    }
-
-    const strongJejuKeywords = [
-      "제주특별자치도",
-      "제주특별",
-      "제주도",
-      "제주시",
-      "서귀포시",
-      "서귀포",
-    ];
-
-    if (
-      strongJejuKeywords.some((keyword) =>
-        full.includes(normalizeKoreanText(keyword))
-      )
-    ) {
-      return true;
-    }
-
-    const strongJejuLocalKeywords = [
-      "애월읍",
-      "한림읍",
-      "조천읍",
-      "구좌읍",
-      "성산읍",
-      "표선면",
-      "남원읍",
-      "대정읍",
-      "한경면",
-      "안덕면",
-      "추자면",
-      "우도면",
-      "노형동",
-      "연동",
-      "이도일동",
-      "이도이동",
-      "일도일동",
-      "일도이동",
-      "삼도일동",
-      "삼도이동",
-      "용담일동",
-      "용담이동",
-      "건입동",
-      "화북동",
-      "삼양동",
-      "봉개동",
-      "아라동",
-      "오라동",
-      "외도동",
-      "이호동",
-      "도두동",
-      "중문동",
-      "대륜동",
-      "대천동",
-      "동홍동",
-      "서홍동",
-      "송산동",
-      "영천동",
-      "예래동",
-      "정방동",
-      "중앙동",
-      "천지동",
-      "효돈동",
-    ];
-
-    const hasStrongLocalKeyword = strongJejuLocalKeywords.some((keyword) =>
-      full.includes(normalizeKoreanText(keyword))
-    );
-
-    if (hasStrongLocalKeyword) {
-      return true;
-    }
-
-    const englishJejuKeywords = ["jejusi", "jeju", "seogwipo"];
-
-    if (englishJejuKeywords.some((keyword) => full.includes(keyword))) {
-      return true;
-    }
-
-    return false;
-  };
-
-  const isJejuAddressByValues = (
-    targetZipcode: string,
-    targetAddress: string,
-    targetDetailAddress: string
-  ) => {
-    const zip = onlyNumber(targetZipcode);
-    const full = normalizeKoreanText(`${targetAddress || ""} ${targetDetailAddress || ""}`);
-
-    if (zip.startsWith("63")) return true;
-
-    const strongJejuKeywords = [
-      "제주특별자치도",
-      "제주특별",
-      "제주도",
-      "제주시",
-      "서귀포시",
-      "서귀포",
-    ];
-
-    if (
-      strongJejuKeywords.some((keyword) =>
-        full.includes(normalizeKoreanText(keyword))
-      )
-    ) {
-      return true;
-    }
-
-    const strongJejuLocalKeywords = [
-      "애월읍",
-      "한림읍",
-      "조천읍",
-      "구좌읍",
-      "성산읍",
-      "표선면",
-      "남원읍",
-      "대정읍",
-      "한경면",
-      "안덕면",
-      "추자면",
-      "우도면",
-      "노형동",
-      "연동",
-      "이도일동",
-      "이도이동",
-      "일도일동",
-      "일도이동",
-      "삼도일동",
-      "삼도이동",
-      "용담일동",
-      "용담이동",
-      "건입동",
-      "화북동",
-      "삼양동",
-      "봉개동",
-      "아라동",
-      "오라동",
-      "외도동",
-      "이호동",
-      "도두동",
-      "중문동",
-      "대륜동",
-      "대천동",
-      "동홍동",
-      "서홍동",
-      "송산동",
-      "영천동",
-      "예래동",
-      "정방동",
-      "중앙동",
-      "천지동",
-      "효돈동",
-    ];
-
-    if (
-      strongJejuLocalKeywords.some((keyword) =>
-        full.includes(normalizeKoreanText(keyword))
-      )
-    ) {
-      return true;
-    }
-
-    const englishJejuKeywords = ["jejusi", "jeju", "seogwipo"];
-    return englishJejuKeywords.some((keyword) => full.includes(keyword));
-  };
-
-  const baseShippingFee = useMemo(() => {
-    if (isJejuAddress()) return 6000;
-    return Number(activeBroadcast.shipping_fee || 4000);
-  }, [zipcode, address, detailAddress, activeBroadcast.shipping_fee]);
-
-  const finalShippingFee = useMemo(() => {
-    if (hasPreviousOrderInSameBroadcast || hasCombineShippingTargetOrder) return 0;
-    return baseShippingFee;
-  }, [hasPreviousOrderInSameBroadcast, hasCombineShippingTargetOrder, baseShippingFee]);
-
-  const shippingNotice = useMemo(() => {
-    if (hasPreviousOrderInSameBroadcast) {
-      return "동일 방송 추가주문으로 배송비 0원 적용";
-    }
-
-    if (hasCombineShippingTargetOrder) {
-      return "합배송 기준 방송 구매 이력 확인으로 배송비 0원 적용";
-    }
-
-    if (isJejuAddress()) {
-      return "제주 배송지로 확인되어 배송비 6,000원 적용";
-    }
-
-    return "기본 배송비 적용";
-  }, [hasPreviousOrderInSameBroadcast, hasCombineShippingTargetOrder, zipcode, address, detailAddress]);
-
-  const productTotal = items.reduce((sum, item) => {
-    return sum + Number(item.price || 0) * Number(item.qty || 0);
-  }, 0);
-
-  const cashTotal = productTotal + finalShippingFee;
-  const cardFeeRate = Number(activeBroadcast.card_fee_rate || 10);
-  const vatAmount =
-    paymentMethod === "카드결제"
-      ? Math.ceil(cashTotal * (cardFeeRate / 100))
-      : 0;
-  const total = cashTotal + vatAmount;
-
-  const generateLookupCode = () => {
-    const date = new Date();
-    const yymmdd =
-      String(date.getFullYear()).slice(2) +
-      String(date.getMonth() + 1).padStart(2, "0") +
-      String(date.getDate()).padStart(2, "0");
-    const random = Math.random().toString(36).slice(2, 6).toUpperCase();
-    return `RURU-${yymmdd}-${random}`;
-  };
-
-  const getSameBroadcastPreviousOrder = async () => {
-    const phone = onlyNumber(customerPhone);
-    const name = normalizeName(customerName);
-
-    if (phone.length < 10 || !name) {
-      return false;
-    }
-
-    const { data } = await supabase
-      .from("orders")
-      .select("id,customer_name,customer_phone,broadcast_id,broadcast_name,broadcast_public_title")
-      .eq("customer_phone", phone)
-      .limit(100);
-
-    const currentBroadcastId = String(activeBroadcast.id || "");
-    const currentBroadcastTitle = normalizeKoreanText(
-      activeBroadcast.public_title || broadcastTitle || ""
-    );
-
-    const matched = (data || []).some((order) => {
-      const sameName = normalizeName(order.customer_name || "") === name;
-
-      const sameBroadcastId =
-        currentBroadcastId &&
-        String(order.broadcast_id || "") === currentBroadcastId;
-
-      const savedBroadcastTitle = normalizeKoreanText(
-        order.broadcast_public_title || order.broadcast_name || ""
-      );
-
-      const sameBroadcastTitle =
-        currentBroadcastTitle &&
-        savedBroadcastTitle &&
-        savedBroadcastTitle === currentBroadcastTitle;
-
-      return sameName && (sameBroadcastId || sameBroadcastTitle);
-    });
-
-    return matched;
-  };
-
-  const getCombineShippingTargetOrder = async () => {
-    const phone = onlyNumber(customerPhone);
-    const name = normalizeName(customerName);
-
-    if (phone.length < 10 || !name) {
-      return false;
-    }
-
-    const { data: targetBroadcasts } = await supabase
-      .from("broadcasts")
-      .select("id,public_title")
-      .eq("is_combine_shipping_target", true);
-
-    if (!targetBroadcasts || targetBroadcasts.length === 0) {
-      return false;
-    }
-
-    const targetIds = targetBroadcasts.map((broadcast) => Number(broadcast.id));
-    const targetTitles = targetBroadcasts.map((broadcast) =>
-      normalizeKoreanText(broadcast.public_title || "")
-    );
-
-    const { data: previousOrders } = await supabase
-      .from("orders")
-      .select("id,customer_name,customer_phone,broadcast_id,broadcast_name,broadcast_public_title")
-      .eq("customer_phone", phone)
-      .limit(200);
-
-    const matched = (previousOrders || []).some((order) => {
-      const sameName = normalizeName(order.customer_name || "") === name;
-
-      const orderBroadcastId = Number(order.broadcast_id || 0);
-      const orderBroadcastTitle = normalizeKoreanText(
-        order.broadcast_public_title || order.broadcast_name || ""
-      );
-
-      const matchedById = targetIds.includes(orderBroadcastId);
-      const matchedByTitle =
-        !!orderBroadcastTitle && targetTitles.includes(orderBroadcastTitle);
-
-      return sameName && (matchedById || matchedByTitle);
-    });
-
-    return matched;
-  };
-
-  const checkShippingDiscountTargets = async () => {
-    setSameBroadcastShippingChecked(false);
-    setHasPreviousOrderInSameBroadcast(false);
-    setHasCombineShippingTargetOrder(false);
-
-    const sameBroadcastMatched = await getSameBroadcastPreviousOrder();
-    const combineTargetMatched = await getCombineShippingTargetOrder();
-
-    setHasPreviousOrderInSameBroadcast(sameBroadcastMatched);
-    setHasCombineShippingTargetOrder(combineTargetMatched);
-    setSameBroadcastShippingChecked(true);
-  };
-
-  const openAddressSearch = () => {
-    if (!window.daum?.Postcode) {
-      alert("주소검색을 불러오는 중입니다. 잠시 후 다시 눌러주세요.");
-      return;
-    }
-
-    new window.daum.Postcode({
-      oncomplete: function (data: any) {
-        setZipcode(data.zonecode);
-        setAddress(data.roadAddress || data.jibunAddress);
-      },
-    }).open();
-  };
-
-  const addItem = () => {
-    setItems([
-      ...items,
-      { product: "", color: "", size: "", qty: "", price: "" },
-    ]);
-  };
-
-  const removeItem = (index: number) => {
-    if (items.length === 1) {
-      alert("상품은 최소 1개 이상 작성해야 합니다.");
-      return;
-    }
-
-    const copy = [...items];
-    copy.splice(index, 1);
-    setItems(copy);
-  };
-
-  const copyAccount = async () => {
-    await navigator.clipboard.writeText(bankAccount);
-    alert("계좌번호가 복사되었습니다.");
-  };
-
-  const copyLookupCode = async () => {
-    await navigator.clipboard.writeText(completedLookupCode);
-    alert("주문조회번호가 복사되었습니다.");
-  };
-
-  const checkBlockedCustomer = async () => {
-    const phone = onlyNumber(customerPhone);
-
-    if (phone.length < 10) return false;
-
-    const { data } = await supabase
-      .from("customers")
-      .select("*")
-      .eq("customer_phone", phone)
-      .limit(1);
-
-    const customer = data?.[0];
-
-    if (customer?.is_blocked === "Y") {
-      alert(
-        "⚠️ 주문 제한 안내\n\n주문 접수가 제한된 회원입니다.\n문의가 필요하신 경우 카톡채널로 연락 부탁드립니다."
-      );
-      return true;
-    }
-
-    return false;
-  };
-
-  const handleCustomerCheck = async () => {
-    const phone = onlyNumber(customerPhone);
-
-    if (!nickname.trim()) {
-      alert("유튜브 닉네임을 입력해주세요.");
-      return;
-    }
-
-    if (!customerName.trim()) {
-      alert("주문자 이름을 입력해주세요.");
-      return;
-    }
-
-    if (phone.length < 10) {
-      alert("전화번호를 정확히 입력해주세요.\n예) 01012345678");
-      return;
-    }
+  const loadProducts = async () => {
+    setLoadingProducts(true);
 
     const { data, error } = await supabase
-      .from("customers")
+      .from("products")
       .select("*")
-      .eq("customer_phone", phone)
-      .limit(1);
+      .order("sort_order", { ascending: true })
+      .order("id", { ascending: false });
 
     if (error) {
-      alert("고객정보 확인 오류\n\n" + error.message);
+      alert("상품 목록 불러오기 실패\n\n" + error.message);
+      setLoadingProducts(false);
       return;
     }
 
-    const customer = data?.[0];
+    setProducts((data || []) as Product[]);
+    setLoadingProducts(false);
+  };
 
-    if (customer && normalizeName(customer.customer_name || "") === normalizeName(customerName)) {
-      setCheckedCustomer(customer);
-      setCustomerCheckStatus("existing");
-      setUseSavedAddress(true);
-      setShowAddressForm(false);
+  const loadBroadcastProductIds = async (broadcastId: string | number) => {
+    const { data, error } = await supabase
+      .from("broadcast_products")
+      .select("product_id")
+      .eq("broadcast_id", broadcastId);
 
+    if (error) {
+      console.log("broadcast_products 불러오기 실패", error.message);
+      setSelectedBroadcastProductIds([]);
       return;
     }
 
-    setCheckedCustomer(null);
-    setCustomerCheckStatus("new");
-    setUseSavedAddress(false);
-    setShowAddressForm(true);
-
-
+    setSelectedBroadcastProductIds(
+      (data || []).map((row: any) => row.product_id).filter(Boolean)
+    );
   };
 
-  const openManualAddressForm = () => {
-    setUseSavedAddress(false);
-    setShowAddressForm(true);
-  };
+  const loadBroadcasts = async () => {
+    setLoadingBroadcasts(true);
 
-  const saveCustomerInfo = async () => {
-    const phone = onlyNumber(customerPhone);
-
-    const { data: existing } = await supabase
-      .from("customers")
+    const { data, error } = await supabase
+      .from("broadcasts")
       .select("*")
-      .eq("customer_phone", phone)
-      .limit(1);
+      .order("started_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(20);
 
-    const customer = existing?.[0];
+    if (error) {
+      alert("방송 목록 불러오기 실패\n\n" + error.message);
+      setLoadingBroadcasts(false);
+      return;
+    }
 
-    const shouldUseSavedAddress =
-      useSavedAddress &&
-      checkedCustomer &&
-      customerCheckStatus === "existing";
+    const rows = (data || []) as Broadcast[];
+    setBroadcasts(rows);
 
-    const finalZipcode = shouldUseSavedAddress
-      ? checkedCustomer.zipcode || customer?.zipcode || ""
-      : zipcode;
+    const active = rows.find((row) => row.status === "ON") || null;
+    setActiveBroadcast(active);
 
-    const finalAddress = shouldUseSavedAddress
-      ? checkedCustomer.address || customer?.address || ""
-      : address;
+    if (active) {
+      setBroadcastTitle(active.public_title || "");
+      setBroadcastSubtitle(active.admin_subtitle || "");
+      setBroadcastShippingFee(Number(active.shipping_fee || 4000));
+      setBroadcastCardFeeRate(Number(active.card_fee_rate || 10));
+      setIsCombineShippingTarget(Boolean(active.is_combine_shipping_target));
+      if (active.id) await loadBroadcastProductIds(Number(active.id));
+    } else {
+      setSelectedBroadcastProductIds([]);
+    }
 
-    const finalDetailAddress = shouldUseSavedAddress
-      ? checkedCustomer.detail_address || customer?.detail_address || ""
-      : detailAddress.trim();
+    setLoadingBroadcasts(false);
+  };
 
-    const customerData = {
-      youtube_nickname: nickname.trim(),
-      customer_name: customerName.trim(),
-      customer_phone: phone,
-      zipcode: finalZipcode,
-      address: finalAddress,
-      detail_address: finalDetailAddress,
-      last_order_at: new Date().toISOString(),
-      is_default_address: saveAsDefaultAddress,
-    };
+  const loadOrders = async () => {
+    setLoadingOrders(true);
 
-    if (customer) {
-      const previousNames =
-        customer.customer_name !== customerName.trim()
-          ? `${customer.previous_names || ""} ${customer.customer_name}`.trim()
-          : customer.previous_names || "";
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(300);
 
-      const previousNicknames =
-        customer.youtube_nickname !== nickname.trim()
-          ? `${customer.previous_nicknames || ""} ${
-              customer.youtube_nickname
-            }`.trim()
-          : customer.previous_nicknames || "";
+    if (error) {
+      alert("주문 목록 불러오기 실패\n\n" + error.message);
+      setLoadingOrders(false);
+      return;
+    }
 
-      const { error } = await supabase
-        .from("customers")
-        .update({
-          ...customerData,
-          previous_names: previousNames,
-          previous_nicknames: previousNicknames,
-        })
-        .eq("id", customer.id);
+    setOrders((data || []) as OrderRow[]);
+    setLoadingOrders(false);
+  };
 
-      if (error) throw error;
+  const updateOrderStatus = async (
+    orderId: string | number | undefined,
+    patch: Partial<Pick<OrderRow, "admin_status" | "shipping_status" | "order_status">>
+  ) => {
+    if (!orderId) return;
+
+    setSavingOrderId(orderId);
+
+    const { error } = await supabase
+      .from("orders")
+      .update(patch)
+      .eq("id", orderId);
+
+    if (error) {
+      alert("주문 상태 변경 실패\n\n" + error.message);
+      setSavingOrderId(null);
+      return;
+    }
+
+    await loadOrders();
+    setSavingOrderId(null);
+  };
+
+  const filteredProducts = useMemo(() => {
+    const word = keyword.trim().toLowerCase();
+
+    return products.filter((product) => {
+      const matchKeyword =
+        !word ||
+        String(product.product_name || "").toLowerCase().includes(word) ||
+        String(product.description || "").toLowerCase().includes(word);
+
+      const matchStatus =
+        statusFilter === "전체" || product.status === statusFilter;
+
+      const matchType = typeFilter === "전체" || product.product_type === typeFilter;
+
+      return matchKeyword && matchStatus && matchType;
+    });
+  }, [products, keyword, statusFilter, typeFilter]);
+
+  const broadcastSelectableProducts = useMemo(() => {
+    return products.filter(
+      (product) =>
+        product.status !== "숨김" &&
+        (product.product_type === "방송상품" || product.product_type === "공구상품")
+    );
+  }, [products]);
+
+  const dashboardCounts = useMemo(() => {
+    const selling = products.filter((p) => p.status === "판매중").length;
+    const soldout = products.filter((p) => p.status === "품절").length;
+    const hidden = products.filter((p) => p.status === "숨김").length;
+    const groupBuy = products.filter((p) => p.product_type === "공구상품").length;
+
+    return { selling, soldout, hidden, groupBuy };
+  }, [products]);
+
+
+  const getOrderProductKind = (order: OrderRow) => {
+    const raw = `${order.broadcast_public_title || ""} ${order.broadcast_name || ""} ${order.broadcast_admin_subtitle || ""}`;
+    return raw.includes("공구") ? "공구상품" : "방송상품";
+  };
+
+  const getOrderPayStatus = (order: OrderRow) => {
+    const mainStatus = order.order_status || "주문완료신청";
+    const paidStatuses = ["입금확인", "배송준비", "출고완료"];
+
+    if (
+      order.admin_status === "입금확인" ||
+      paidStatuses.includes(mainStatus)
+    ) {
+      return "입금확인";
+    }
+
+    if (mainStatus === "취소" || order.admin_status === "취소") return "취소";
+
+    return "입금대기";
+  };
+
+  const getOrderShipStatus = (order: OrderRow) => {
+    return order.shipping_status || "배송대기";
+  };
+
+  const orderBroadcastOptions = useMemo(() => {
+    const values = orders
+      .map((order) => order.broadcast_public_title || order.broadcast_name || "방송명 없음")
+      .filter(Boolean);
+
+    return Array.from(new Set(values));
+  }, [orders]);
+
+  const toggleStringFilter = (
+    value: string,
+    current: string[],
+    setter: (value: string[] | ((prev: string[]) => string[])) => void
+  ) => {
+    setter((prev) =>
+      prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]
+    );
+  };
+
+  const resetOrderFilters = () => {
+    setOrderKeyword("");
+    setOrderStatusFilter("전체");
+    setBroadcastFilters([]);
+    setPayFilters([]);
+    setShipFilters([]);
+    setProductKindFilters([]);
+  };
+
+  const filteredOrders = useMemo(() => {
+    const word = orderKeyword.trim().toLowerCase();
+
+    return orders.filter((order) => {
+      const broadcastTitle = order.broadcast_public_title || order.broadcast_name || "방송명 없음";
+      const payStatus = getOrderPayStatus(order);
+      const shipStatus = getOrderShipStatus(order);
+      const productKind = getOrderProductKind(order);
+
+      const joined = [
+        order.order_lookup_code,
+        order.broadcast_public_title,
+        order.broadcast_name,
+        order.youtube_nickname,
+        order.customer_name,
+        order.customer_phone,
+        order.product_name,
+        order.color,
+        order.size,
+        order.address,
+        order.detail_address,
+        order.request_memo,
+        order.admin_status,
+        order.shipping_status,
+        order.order_status,
+        payStatus,
+        shipStatus,
+        productKind,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      const matchKeyword = !word || joined.includes(word);
+      const statusValue = order.order_status || order.admin_status || "주문완료신청";
+      const matchStatus =
+        orderStatusFilter === "전체" ||
+        statusValue === orderStatusFilter ||
+        order.admin_status === orderStatusFilter ||
+        order.shipping_status === orderStatusFilter;
+
+      const matchBroadcast = broadcastFilters.length === 0 || broadcastFilters.includes(broadcastTitle);
+      const matchPay = payFilters.length === 0 || payFilters.includes(payStatus);
+      const matchShip = shipFilters.length === 0 || shipFilters.includes(shipStatus);
+      const matchProductKind = productKindFilters.length === 0 || productKindFilters.includes(productKind);
+
+      return matchKeyword && matchStatus && matchBroadcast && matchPay && matchShip && matchProductKind;
+    });
+  }, [orders, orderKeyword, orderStatusFilter, broadcastFilters, payFilters, shipFilters, productKindFilters]);
+
+  const orderStats = useMemo(() => {
+    const totalCount = filteredOrders.length;
+    const totalAmount = filteredOrders.reduce((sum, order) => {
+      return sum + Number(order.adjusted_total_price || order.total_price || 0);
+    }, 0);
+    const paidOrders = filteredOrders.filter((order) => getOrderPayStatus(order) === "입금확인");
+    const paidCount = paidOrders.length;
+    const paidAmount = paidOrders.reduce((sum, order) => {
+      return sum + Number(order.adjusted_total_price || order.total_price || 0);
+    }, 0);
+    const waitingCount = filteredOrders.filter((order) => getOrderPayStatus(order) === "입금대기").length;
+    const readyShipCount = filteredOrders.filter((order) => getOrderShipStatus(order) === "배송준비").length;
+
+    return { totalCount, totalAmount, paidCount, paidAmount, waitingCount, readyShipCount };
+  }, [filteredOrders]);
+
+  const toggleOrderSelect = (id: string | number | undefined) => {
+    if (!id) return;
+
+    setSelectedOrderIds((prev) =>
+      prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllFilteredOrders = () => {
+    const ids = filteredOrders.map((order) => order.id).filter(Boolean) as Array<string | number>;
+    const allSelected = ids.length > 0 && ids.every((id) => selectedOrderIds.includes(id));
+    setSelectedOrderIds(allSelected ? [] : ids);
+  };
+
+  const selectedOrders = useMemo(() => {
+    return orders.filter((order) => order.id !== undefined && selectedOrderIds.includes(order.id));
+  }, [orders, selectedOrderIds]);
+
+  const downloadSelectedOrdersForLogen = () => {
+    if (selectedOrders.length === 0) {
+      alert("송장 출력할 주문을 먼저 체크해주세요.");
+      return;
+    }
+
+    const grouped = new Map<string, OrderRow[]>();
+
+    selectedOrders.forEach((order) => {
+      const key = [
+        order.customer_name || "",
+        order.customer_phone || "",
+        order.zipcode || "",
+        order.address || "",
+        order.detail_address || "",
+      ].join("|");
+
+      grouped.set(key, [...(grouped.get(key) || []), order]);
+    });
+
+    const rows = Array.from(grouped.values()).map((group) => {
+      const first = group[0];
+      const itemTexts = group.map((order) => {
+        const option = [order.color, order.size].filter(Boolean).join("/") || "옵션없음";
+        return `${order.product_name || "상품명없음"}(${option}) x${order.qty || 0}`;
+      });
+      const totalQty = group.reduce((sum, order) => sum + Number(order.qty || 0), 0);
 
       return {
-        matchStatus:
-          customer.customer_name === customerName.trim()
-            ? "기존고객 정상"
-            : "관리자 확인 필요",
-        matchMemo:
-          customer.customer_name === customerName.trim()
-            ? ""
-            : `전화번호 동일 / 이름 다름: 기존(${customer.customer_name}) → 현재(${customerName.trim()})`,
-        zipcode: finalZipcode,
-        address: finalAddress,
-        detail_address: finalDetailAddress,
+        받는분성명: first.customer_name || "",
+        받는분전화번호: first.customer_phone || "",
+        받는분우편번호: first.zipcode || "",
+        받는분주소: `${first.address || ""} ${first.detail_address || ""}`.trim(),
+        배송메모: first.request_memo || "",
+        상품명: `${itemTexts.join(" / ")} + 총 ${totalQty}개`,
       };
-    }
+    });
 
-    const { error } = await supabase.from("customers").insert(customerData);
-    if (error) throw error;
+    const headers = ["받는분성명", "받는분전화번호", "받는분우편번호", "받는분주소", "배송메모", "상품명"];
+    const csv = [
+      headers.join(","),
+      ...rows.map((row) =>
+        headers
+          .map((header) => `"${String((row as any)[header] || "").replace(/"/g, '""')}"`)
+          .join(",")
+      ),
+    ].join("\n");
 
-    return {
-      matchStatus: "신규고객",
-      matchMemo: "",
-      zipcode: finalZipcode,
-      address: finalAddress,
-      detail_address: finalDetailAddress,
-    };
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `logen_orders_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
-  const handleSubmit = async () => {
-    if (broadcastStatus !== "ON") {
-      alert("현재 주문 접수 시간이 아닙니다.\n방송 시작 후 주문해주세요.");
-      return;
+  const resetForm = () => {
+    setForm({
+      ...emptyProduct,
+      sort_order: Math.max(1, products.length + 1),
+    });
+    setEditingId(null);
+  };
+
+  const startEdit = (product: Product) => {
+    setEditingId(product.id ?? null);
+    setForm({
+      product_name: product.product_name || "",
+      description: product.description || "",
+      price: Number(product.price || 0),
+      stock: Number(product.stock || 0),
+      shipping_type: (product.shipping_type || "일반") as ShippingType,
+      combine_shipping: (product.combine_shipping || "Y") as CombineShipping,
+      product_type: (product.product_type || "공구상품") as ProductType,
+      external_image_url: product.external_image_url || "",
+      image_url: product.image_url || "",
+      status: (product.status || "판매중") as ProductStatus,
+      sort_order: Number(product.sort_order || 1),
+    });
+
+    setActiveMenu("products");
+
+    setTimeout(() => {
+      document
+        .getElementById("product-form")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  };
+
+  const cloneProduct = (product: Product) => {
+    setEditingId(null);
+    setForm({
+      product_name: `${product.product_name || ""} 복사본`,
+      description: product.description || "",
+      price: Number(product.price || 0),
+      stock: Number(product.stock || 0),
+      shipping_type: (product.shipping_type || "일반") as ShippingType,
+      combine_shipping: (product.combine_shipping || "Y") as CombineShipping,
+      product_type: (product.product_type || "공구상품") as ProductType,
+      external_image_url: product.external_image_url || "",
+      image_url: product.image_url || "",
+      status: "숨김",
+      sort_order: Math.max(1, products.length + 1),
+    });
+
+    setActiveMenu("products");
+
+    setTimeout(() => {
+      document
+        .getElementById("product-form")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  };
+
+  const validateForm = () => {
+    if (!form.product_name.trim()) {
+      alert("상품명을 입력해주세요.");
+      return false;
     }
 
-    if (!nickname.trim()) {
-      alert("유튜브 닉네임을 입력해주세요.");
-      return;
+    if (Number(form.price || 0) < 0) {
+      alert("금액은 0원 이상으로 입력해주세요.");
+      return false;
     }
 
-    if (!customerName.trim()) {
-      alert("주문자 이름을 입력해주세요.");
-      return;
+    if (Number(form.stock || 0) < 0) {
+      alert("재고는 0개 이상으로 입력해주세요.");
+      return false;
     }
 
-    const phone = onlyNumber(customerPhone);
+    return true;
+  };
 
-    if (phone.length < 10) {
-      alert("전화번호를 정확히 입력해주세요.\n예) 01012345678");
-      return;
-    }
+  const saveProduct = async () => {
+    if (!validateForm()) return;
 
-    if (customerCheckStatus === "unchecked") {
-      alert("고객정보 확인을 먼저 눌러주세요.");
-      return;
-    }
+    setSavingProduct(true);
 
-    if (!useSavedAddress && (!zipcode || !address || !detailAddress.trim())) {
-      alert(
-        "배송지 정보가 없습니다.\n\n주소검색 후 상세주소까지 입력해주세요."
-      );
-      return;
-    }
-
-    if (useSavedAddress && (!checkedCustomer?.address || !checkedCustomer?.detail_address)) {
-      alert(
-        "저장된 배송지 정보가 부족합니다.\n\n[주소 직접 입력]을 눌러 주소를 입력해주세요."
-      );
-      return;
-    }
-
-    const blocked = await checkBlockedCustomer();
-    if (blocked) return;
-
-    const hasEmptyItem = items.some(
-      (item) =>
-        !item.product.trim() ||
-        !item.color.trim() ||
-        !item.size.trim() ||
-        !item.qty ||
-        !item.price
-    );
-
-    if (hasEmptyItem) {
-      alert(
-        "상품명 · 색상 · 사이즈 · 수량 · 금액을 모두 입력해주세요.\n\n색상/사이즈가 없으면 '없음' 이라고 작성해주세요."
-      );
-      return;
-    }
-
-    const hasNumberInColor = items.some((item) => hasNumber(item.color));
-
-    if (hasNumberInColor) {
-      alert("색상칸에는 숫자를 입력할 수 없습니다.\n\n색상이 없으면 '없음'이라고 작성해주세요.");
-      return;
-    }
-
-    localStorage.setItem("ruru_youtube_nickname", nickname.trim());
-    localStorage.setItem("ruru_customer_name", customerName.trim());
-    localStorage.setItem("ruru_customer_phone", phone);
-
-    if (!useSavedAddress) {
-      localStorage.setItem("ruru_customer_zipcode", zipcode);
-      localStorage.setItem("ruru_customer_address", address);
-      localStorage.setItem("ruru_customer_detail_address", detailAddress.trim());
-    }
-
-    setIsSubmitting(true);
+    const payload = {
+      product_name: form.product_name.trim(),
+      description: form.description.trim(),
+      price: Number(form.price || 0),
+      stock: Number(form.stock || 0),
+      shipping_type: form.shipping_type,
+      combine_shipping: form.combine_shipping,
+      product_type: form.product_type,
+      external_image_url: form.external_image_url.trim(),
+      image_url: form.image_url.trim(),
+      status: form.status,
+      sort_order: Number(form.sort_order || 1),
+      updated_at: new Date().toISOString(),
+    };
 
     try {
-      const isAdditionalOrder = await getSameBroadcastPreviousOrder();
-      const isCombineShippingOrder = await getCombineShippingTargetOrder();
+      if (editingId) {
+        const { error } = await supabase
+          .from("products")
+          .update(payload)
+          .eq("id", editingId);
 
-      const customerMatch = await saveCustomerInfo();
-      const orderGroupId = crypto.randomUUID();
-      const orderLookupCode = generateLookupCode();
+        if (error) throw error;
+        alert("상품 수정 완료");
+      } else {
+        const { error } = await supabase.from("products").insert(payload);
 
-      const originalShippingFee = baseShippingFee;
-      const appliedShippingFee = isAdditionalOrder || isCombineShippingOrder ? 0 : baseShippingFee;
-      const submitCashTotal = productTotal + appliedShippingFee;
-      const submitVatAmount =
-        paymentMethod === "카드결제"
-          ? Math.ceil(submitCashTotal * (cardFeeRate / 100))
-          : 0;
-      const submitTotal = submitCashTotal + submitVatAmount;
+        if (error) throw error;
+        alert("상품 등록 완료");
+      }
 
-      const orderRows = items.map((item) => ({
-        order_group_id: orderGroupId,
-        order_lookup_code: orderLookupCode,
-
-        broadcast_id: activeBroadcast.id,
-        broadcast_name:
-          broadcastTitle || activeBroadcast.public_title || "방송명 미지정",
-        broadcast_public_title:
-          activeBroadcast.public_title || broadcastTitle || "방송명 미지정",
-        broadcast_admin_subtitle: activeBroadcast.admin_subtitle || "",
-
-        youtube_nickname: nickname.trim(),
-        customer_name: customerName.trim(),
-        customer_phone: phone,
-
-        zipcode: customerMatch.zipcode || "",
-        address: customerMatch.address || "",
-        detail_address: customerMatch.detail_address || "",
-        address_type: "고객입력",
-
-        customer_match_status: customerMatch.matchStatus,
-        customer_match_memo: customerMatch.matchMemo,
-
-        request_memo: requestMemo.trim(),
-        save_as_default_address: saveAsDefaultAddress,
-
-        product_name: item.product,
-        color: item.color,
-        size: item.size,
-        qty: Number(item.qty),
-        product_price: Number(item.price),
-
-        shipping_fee: appliedShippingFee,
-        original_shipping_fee: originalShippingFee,
-        final_shipping_fee: appliedShippingFee,
-        adjusted_shipping_fee: appliedShippingFee,
-        total_price: submitTotal,
-        adjusted_total_price: submitTotal,
-
-        combine_shipping_applied: isAdditionalOrder || isCombineShippingOrder,
-        combine_shipping_memo: isAdditionalOrder
-          ? "동일 방송 추가주문 배송비 0원 자동 적용"
-          : isCombineShippingOrder
-          ? "합배송 기준 방송 구매 이력으로 배송비 0원 자동 적용"
-          : isJejuAddressByValues(
-              customerMatch.zipcode || "",
-              customerMatch.address || "",
-              customerMatch.detail_address || ""
-            )
-          ? "제주 배송비 6,000원 자동 적용"
-          : "기본 배송비 적용",
-
-        shipping_status: "기본배송",
-        admin_status: "관리자 확인 전",
-        order_status: "주문완료신청",
-
-        payment_method: paymentMethod,
-        vat_amount: submitVatAmount,
-      }));
-
-      const { error } = await supabase.from("orders").insert(orderRows);
-      if (error) throw error;
-
-      setCompletedTotal(submitTotal);
-      setCompletedPaymentMethod(paymentMethod);
-      setCompletedLookupCode(orderLookupCode);
-      setIsCompleted(true);
-
-      setItems([{ product: "", color: "", size: "", qty: "", price: "" }]);
-      setRequestMemo("");
+      resetForm();
+      await loadProducts();
     } catch (error: any) {
-      alert("주문 저장 실패\n\n" + error.message);
+      alert("상품 저장 실패\n\n" + error.message);
     } finally {
-      setIsSubmitting(false);
+      setSavingProduct(false);
     }
   };
 
-  const handleLookup = async () => {
-    const phone = onlyNumber(lookupPhone);
+  const quickUpdateProduct = async (
+    id: string | number | undefined,
+    patch: Partial<Product>
+  ) => {
+    if (!id) return;
 
-    if (!lookupCode.trim()) {
-      alert("주문조회번호를 입력해주세요.");
-      return;
-    }
-
-    if (phone.length < 10) {
-      alert("전화번호를 입력해주세요.");
-      return;
-    }
-
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-    const { data, error } = await supabase
-      .from("orders")
-      .select("*")
-      .eq("order_lookup_code", lookupCode.trim())
-      .eq("customer_phone", phone)
-      .gte("created_at", sevenDaysAgo.toISOString())
-      .order("created_at", { ascending: false });
+    const { error } = await supabase
+      .from("products")
+      .update({
+        ...patch,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
 
     if (error) {
-      alert(error.message);
+      alert("변경 실패\n\n" + error.message);
       return;
     }
 
-    setLookupOrders(data || []);
+    await loadProducts();
+  };
 
-    if (!data || data.length === 0) {
-      setLookupMessage("최근 7일 이내 조회 가능한 주문이 없습니다.");
-    } else {
-      setLookupMessage("");
+  const toggleSelect = (id: string | number | undefined) => {
+    if (!id) return;
+
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]
+    );
+  };
+
+  const toggleBroadcastProduct = (id: string | number | undefined) => {
+    if (!id) return;
+
+    setSelectedBroadcastProductIds((prev) =>
+      prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]
+    );
+  };
+
+  const clearSelected = () => {
+    setSelectedIds([]);
+  };
+
+  const applyBulkUpdate = async (type: "shipping" | "combine" | "status") => {
+    if (selectedIds.length === 0) {
+      alert("먼저 변경할 상품을 체크해주세요.");
+      return;
+    }
+
+    const patch =
+      type === "shipping"
+        ? { shipping_type: bulkShippingType }
+        : type === "combine"
+        ? { combine_shipping: bulkCombineShipping }
+        : { status: bulkStatus };
+
+    const { error } = await supabase
+      .from("products")
+      .update({
+        ...patch,
+        updated_at: new Date().toISOString(),
+      })
+      .in("id", selectedIds);
+
+    if (error) {
+      alert("일괄 변경 실패\n\n" + error.message);
+      return;
+    }
+
+    alert("일괄 변경 완료");
+    setSelectedIds([]);
+    await loadProducts();
+  };
+
+  const upsertSetting = async (key: string, value: string) => {
+    const { data } = await supabase
+      .from("settings")
+      .select("id,key")
+      .eq("key", key)
+      .limit(1);
+
+    const existing = data?.[0];
+
+    if (existing?.id) {
+      const { error } = await supabase
+        .from("settings")
+        .update({ value })
+        .eq("id", existing.id);
+
+      if (error) throw error;
+      return;
+    }
+
+    const { error } = await supabase.from("settings").insert({ key, value });
+    if (error) throw error;
+  };
+
+  const saveBroadcastProducts = async (broadcastId: string | number) => {
+    const { error: deleteError } = await supabase
+      .from("broadcast_products")
+      .delete()
+      .eq("broadcast_id", broadcastId);
+
+    if (deleteError) throw deleteError;
+
+    if (selectedBroadcastProductIds.length === 0) return;
+
+    const rows = selectedBroadcastProductIds.map((productId) => ({
+      broadcast_id: broadcastId,
+      product_id: productId,
+    }));
+
+    const { error: insertError } = await supabase
+      .from("broadcast_products")
+      .insert(rows);
+
+    if (insertError) throw insertError;
+  };
+
+  const startBroadcast = async () => {
+    if (!broadcastTitle.trim()) {
+      alert("방송 제목을 입력해주세요.");
+      return;
+    }
+
+    setSavingBroadcast(true);
+
+    try {
+      const { data: activeRows } = await supabase
+        .from("broadcasts")
+        .select("id")
+        .eq("status", "ON");
+
+      if ((activeRows || []).length > 0) {
+        const { error } = await supabase
+          .from("broadcasts")
+          .update({
+            status: "OFF",
+            ended_at: new Date().toISOString(),
+          })
+          .in(
+            "id",
+            (activeRows || []).map((row: any) => row.id)
+          );
+
+        if (error) throw error;
+      }
+
+      const payload = {
+        public_title: broadcastTitle.trim(),
+        admin_subtitle: broadcastSubtitle.trim(),
+        status: "ON",
+        started_at: new Date().toISOString(),
+        ended_at: null,
+        shipping_fee: Number(broadcastShippingFee || 4000),
+        card_fee_rate: Number(broadcastCardFeeRate || 10),
+        is_combine_shipping_target: isCombineShippingTarget,
+      };
+
+      const { data, error } = await supabase
+        .from("broadcasts")
+        .insert(payload)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      await saveBroadcastProducts(data.id);
+
+      await upsertSetting("broadcast_status", "ON");
+      await upsertSetting("current_broadcast_name", broadcastTitle.trim());
+
+      alert("방송 시작 처리 완료");
+      await loadBroadcasts();
+    } catch (error: any) {
+      alert("방송 시작 실패\n\n" + error.message);
+    } finally {
+      setSavingBroadcast(false);
     }
   };
 
-  if (isLoadingBroadcast) {
-    return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-        <div className="text-center text-gray-700">
-          <div className="text-2xl font-bold mb-2">루루동이 주문서</div>
-          <div>주문서 상태 확인중...</div>
-        </div>
-      </main>
+  const saveActiveBroadcast = async () => {
+    if (!activeBroadcast?.id) {
+      alert("현재 방송중인 방송이 없습니다.");
+      return;
+    }
+
+    if (!broadcastTitle.trim()) {
+      alert("방송 제목을 입력해주세요.");
+      return;
+    }
+
+    setSavingBroadcast(true);
+
+    try {
+      const { error } = await supabase
+        .from("broadcasts")
+        .update({
+          public_title: broadcastTitle.trim(),
+          admin_subtitle: broadcastSubtitle.trim(),
+          shipping_fee: Number(broadcastShippingFee || 4000),
+          card_fee_rate: Number(broadcastCardFeeRate || 10),
+          is_combine_shipping_target: isCombineShippingTarget,
+        })
+        .eq("id", activeBroadcast.id);
+
+      if (error) throw error;
+
+      await saveBroadcastProducts(activeBroadcast.id);
+      await upsertSetting("current_broadcast_name", broadcastTitle.trim());
+
+      alert("방송 설정 저장 완료");
+      await loadBroadcasts();
+    } catch (error: any) {
+      alert("방송 설정 저장 실패\n\n" + error.message);
+    } finally {
+      setSavingBroadcast(false);
+    }
+  };
+
+  const endBroadcast = async () => {
+    if (!activeBroadcast?.id) {
+      alert("현재 방송중인 방송이 없습니다.");
+      return;
+    }
+
+    const ok = window.confirm(
+      "방송을 종료할까요?\n\n종료하면 고객 주문서가 방송 OFF 상태로 바뀝니다."
     );
-  }
 
-  if (screen === "menu" && !isCompleted) {
-    return (
-      <main className="min-h-screen bg-gray-50 p-5 flex items-center justify-center">
-        <div className="w-full max-w-5xl">
-          <section className="bg-white rounded-[2rem] p-6 md:p-8 border shadow-sm">
-            <div className="text-center mb-7">
-              <div className="text-sm font-extrabold text-gray-400 mb-2">
-                RURU LIVE ORDER
-              </div>
+    if (!ok) return;
 
-              <h1 className="text-3xl md:text-5xl font-extrabold text-gray-950">
-                루루동이 라이브마켓
-              </h1>
+    setSavingBroadcast(true);
 
-              <p className="text-gray-500 font-bold mt-3">
-                주문서 작성 · 주문조회 · 공지 확인
-              </p>
-            </div>
+    try {
+      const { error } = await supabase
+        .from("broadcasts")
+        .update({
+          status: "OFF",
+          ended_at: new Date().toISOString(),
+        })
+        .eq("id", activeBroadcast.id);
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              <Link
-                href="/notice"
-                className="min-h-[74px] px-5 py-4 rounded-3xl bg-white text-gray-900 border border-gray-200 hover:bg-gray-100 font-extrabold text-center transition shadow-sm flex items-center justify-center"
-              >
-                공지
-              </Link>
+      if (error) throw error;
 
-              <button
-                type="button"
-                onClick={() => setScreen("order")}
-                className="min-h-[74px] px-5 py-4 rounded-3xl bg-black text-white hover:bg-gray-800 font-extrabold text-center transition shadow-sm flex items-center justify-center"
-              >
-                주문서작성
-              </button>
+      await upsertSetting("broadcast_status", "OFF");
+      await upsertSetting("current_broadcast_name", "");
 
-              <Link
-                href="/myorder"
-                className="min-h-[74px] px-5 py-4 rounded-3xl bg-white text-gray-900 border border-gray-200 hover:bg-gray-100 font-extrabold text-center transition shadow-sm flex items-center justify-center"
-              >
-                주문조회
-              </Link>
+      alert("방송 종료 처리 완료");
+      setBroadcastTitle("");
+      setBroadcastSubtitle("");
+      setSelectedBroadcastProductIds([]);
+      await loadBroadcasts();
+    } catch (error: any) {
+      alert("방송 종료 실패\n\n" + error.message);
+    } finally {
+      setSavingBroadcast(false);
+    }
+  };
 
-              <a
-                href={kakaoChannelUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="min-h-[74px] px-5 py-4 rounded-3xl bg-yellow-300 text-black hover:bg-yellow-400 font-extrabold text-center transition shadow-sm flex items-center justify-center"
-              >
-                카톡채널
-              </a>
-
-              <a
-                href={bandUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="min-h-[74px] px-5 py-4 rounded-3xl bg-white text-gray-900 border border-gray-200 hover:bg-gray-100 font-extrabold text-center transition shadow-sm flex items-center justify-center"
-              >
-                루루동이밴드
-              </a>
-
-              <a
-                href={youtubeUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="min-h-[74px] px-5 py-4 rounded-3xl bg-white text-gray-900 border border-gray-200 hover:bg-gray-100 font-extrabold text-center transition shadow-sm flex items-center justify-center"
-              >
-                유튜브
-              </a>
-            </div>
-
-            <div className="text-xs text-gray-400 text-center mt-6 leading-5">
-              방송 중 접수된 주문만 주문서 작성이 가능합니다.
-            </div>
-          </section>
-        </div>
-      </main>
-    );
-  }
-
-  if (screen === "lookup" && !isCompleted) {
-    return (
-      <main className="min-h-screen bg-gray-50 p-5">
-        <div className="max-w-md mx-auto">
-          <div className="bg-white rounded-3xl p-6 border shadow-sm mt-10">
-            <h1 className="text-3xl font-extrabold mb-2">주문내역 조회</h1>
-            <p className="text-gray-500 mb-5">
-              최근 7일 이내 주문만 조회 가능합니다.
-            </p>
-
-            <input
-              type="text"
-              placeholder="주문조회번호"
-              className="w-full p-4 rounded-2xl bg-gray-50 border mb-3"
-              value={lookupCode}
-              onChange={(e) => setLookupCode(e.target.value.toUpperCase())}
-            />
-
-            <input
-              type="text"
-              inputMode="numeric"
-              placeholder="전화번호 01012345678"
-              className="w-full p-4 rounded-2xl bg-gray-50 border mb-3"
-              value={formatPhone(lookupPhone)}
-              onChange={(e) => setLookupPhone(onlyNumber(e.target.value))}
-            />
-
-            <button
-              onClick={handleLookup}
-              className="w-full bg-black text-white p-4 rounded-2xl font-bold mb-3"
-            >
-              조회하기
-            </button>
-
-            <button
-              onClick={() => setScreen("menu")}
-              className="w-full bg-gray-200 text-gray-900 p-4 rounded-2xl font-bold"
-            >
-              처음으로
-            </button>
-
-            {lookupMessage && (
-              <div className="mt-5 bg-red-50 text-red-600 rounded-2xl p-4 font-bold">
-                {lookupMessage}
-              </div>
-            )}
-
-            {lookupOrders.length > 0 && (
-              <div className="mt-5 grid gap-3">
-                {lookupOrders.map((order) => (
-                  <div
-                    key={order.id}
-                    className="bg-gray-50 rounded-2xl p-4 border"
-                  >
-                    <div className="font-bold">{order.product_name}</div>
-                    <div className="text-sm text-gray-600 mt-1">
-                      {order.color} / {order.size} / {order.qty}개
-                    </div>
-                    <div className="text-sm text-gray-600 mt-1">
-                      {order.address} {order.detail_address}
-                    </div>
-                    <div className="font-bold mt-2">
-                      {formatWon(order.adjusted_total_price || order.total_price)}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {order.order_status || "주문완료신청"}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  if (broadcastStatus !== "ON" && screen === "order") {
-    return (
-      <main className="min-h-screen bg-gray-50 p-5 flex items-center justify-center">
-        <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-sm border text-center">
-          <div className="text-3xl font-bold mb-4">루루동이 주문서</div>
-          <div className="bg-red-50 text-red-600 rounded-2xl p-5 text-xl font-bold mb-5">
-            현재 주문 접수 시간이 아닙니다
-          </div>
-          <p className="text-gray-600 leading-7 mb-6">
-            방송 시작 후 주문서 작성이 가능합니다.
-            <br />
-            방송 중 안내에 따라 다시 접속해주세요.
-          </p>
-          <button
-            onClick={loadBroadcastSettings}
-            className="w-full bg-black text-white font-bold p-4 rounded-2xl mb-3"
-          >
-            주문서 다시 확인하기
-          </button>
-          <button
-            onClick={() => setScreen("menu")}
-            className="w-full bg-gray-200 text-gray-900 font-bold p-4 rounded-2xl"
-          >
-            처음으로
-          </button>
-        </div>
-      </main>
-    );
-  }
-
-  if (isCompleted) {
-    return (
-      <main className="min-h-screen bg-gray-50 p-5">
-        <div className="max-w-md mx-auto">
-          <div className="bg-white rounded-3xl p-6 border shadow-sm mt-10">
-            <h1 className="text-3xl font-bold mb-4">주문완료신청 완료</h1>
-            <p className="text-gray-600 mb-6">주문서가 정상 접수되었습니다.</p>
-
-            <div className="bg-gray-50 rounded-2xl p-5 mb-5 border">
-              <div className="text-gray-500 mb-1">주문조회번호</div>
-              <div className="text-2xl font-extrabold mb-4">
-                {completedLookupCode}
-              </div>
-              <button
-                onClick={copyLookupCode}
-                className="w-full bg-gray-900 text-white font-bold p-4 rounded-2xl"
-              >
-                주문조회번호 복사하기
-              </button>
-            </div>
-
-            {completedPaymentMethod === "무통장입금" ? (
-              <div className="bg-gray-50 rounded-2xl p-5 mb-5 border">
-                <div className="text-red-600 text-xl font-bold mb-3">
-                  ⚠️ 10분 이내 입금해주세요
-                </div>
-                <div className="text-gray-700 mb-4 leading-7">
-                  입금 후 카톡채널에
-                  <br />
-                  <b>[입금내역 캡처 + 유튜브닉네임]</b>
-                  <br />
-                  남겨주셔야 최종 주문확인 완료됩니다.
-                </div>
-                <div className="text-gray-500 mb-1">새마을금고</div>
-                <div className="text-3xl font-bold mb-1">{bankAccount}</div>
-                <div className="text-lg mb-5">예금주 : 유혜원</div>
-                <button
-                  onClick={copyAccount}
-                  className="w-full bg-black text-white font-bold p-4 rounded-2xl text-lg"
-                >
-                  계좌번호 복사하기
-                </button>
-              </div>
-            ) : (
-              <div className="bg-gray-50 rounded-2xl p-5 mb-5 border">
-                <div className="text-xl font-bold mb-3">카드결제 신청 완료</div>
-                <p className="text-gray-700 leading-7">
-                  카드결제는 수수료가 추가됩니다.
-                  <br />
-                  관리자 확인 후 카톡채널로 결제링크를 보내드립니다.
-                </p>
-              </div>
-            )}
-
-            <div className="bg-black text-white rounded-2xl p-5 mb-6">
-              <div className="text-gray-300 mb-1">최종 결제금액</div>
-              <div className="text-4xl font-bold">
-                {formatWon(completedTotal)}
-              </div>
-            </div>
-
-            <div className="bg-gray-50 border rounded-2xl p-4 text-sm text-gray-600 font-bold leading-6">
-              주문내역 확인은 상단 메뉴의 주문조회 또는 카톡채널 문의를 이용해주세요.
-            </div>
-          </div>
-        </div>
-      </main>
-    );
-  }
+  const menuItems = [
+    { key: "dashboard", label: "대시보드", icon: "🏠" },
+    { key: "products", label: "상품관리", icon: "🛍" },
+    { key: "broadcasts", label: "방송관리", icon: "🔴" },
+    { key: "orders", label: "주문관리", icon: "📦" },
+    { key: "customers", label: "고객관리", icon: "👥" },
+  ] as const;
 
   return (
-    <main id="order-form" className="min-h-screen bg-gray-50 text-gray-900 p-4">
-      <div className="max-w-md mx-auto pb-10">
-        <div className="py-4">
-          <h1 className="text-3xl font-extrabold tracking-tight">
-            루루동이 주문서
-          </h1>
-          <p className="text-gray-500 mt-1">라이브 방송 주문 전용</p>
-        </div>
-
-        <section className="bg-white rounded-3xl p-5 border shadow-sm mb-4">
-          <div className="text-sm text-gray-500 mb-1">현재 방송</div>
-          <div className="text-xl font-bold">
-            {broadcastTitle || activeBroadcast.public_title || "방송 주문 접수중"}
-          </div>
-        </section>
-
-        <section className="bg-white rounded-3xl p-5 border shadow-sm mb-4">
-          <div className="font-bold text-lg mb-4">고객 정보</div>
-
-          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mb-4">
-            <div className="font-bold text-yellow-700 text-sm leading-6">
-              📦 주소는 최초 1회만 입력해주세요.
-              <br />
-              저장된 주소가 있으면 다음 주문부터 자동 입력됩니다.
+    <main className="min-h-screen bg-[#f7f7f8] text-gray-950">
+      <div className="flex min-h-screen">
+        <aside className="hidden md:flex w-72 bg-white border-r border-gray-200 p-5 flex-col">
+          <div className="mb-8">
+            <div className="text-xs font-black text-rose-500 mb-2 tracking-widest">
+              RURU ADMIN
             </div>
-          </div>
-
-          <p className="text-xs text-red-500 mb-4">* 표시는 필수 입력 항목입니다.</p>
-
-          <div className="grid gap-3">
-            <input
-              type="text"
-              placeholder="* 유튜브 닉네임"
-              className="w-full p-4 rounded-2xl bg-gray-50 border"
-              value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
-            />
-
-            <input
-              type="text"
-              placeholder="* 주문자 이름"
-              className="w-full p-4 rounded-2xl bg-gray-50 border"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-            />
-
-            <input
-              type="text"
-              inputMode="numeric"
-              placeholder="* 전화번호 01012345678"
-              className="w-full p-4 rounded-2xl bg-gray-50 border"
-              value={formatPhone(customerPhone)}
-              onChange={(e) => setCustomerPhone(onlyNumber(e.target.value))}
-            />
-
-            <button
-              onClick={handleCustomerCheck}
-              className="w-full bg-gray-900 text-white p-4 rounded-2xl font-bold"
-            >
-              고객정보 확인
-            </button>
-
-            {customerCheckStatus === "existing" && (
-              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 animate-pulse">
-                <div className="font-extrabold text-blue-700 text-lg leading-7">
-                  확인완료!
-                </div>
-
-                <div className="text-blue-700 text-sm font-bold leading-6 mt-1">
-                  기존 고객 확인 완료 · 저장된 배송지로 접수됩니다.
-                  <br />
-                  주소 변경이 필요하면 아래 버튼을 눌러주세요.
-                </div>
-
-                <button
-                  onClick={openManualAddressForm}
-                  className="w-full bg-white text-blue-700 border border-blue-300 p-3 rounded-xl font-bold mt-3"
-                >
-                  주소 직접 입력
-                </button>
-              </div>
-            )}
-
-            {customerCheckStatus === "new" && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4">
-                <div className="font-bold text-yellow-700 text-sm leading-6">
-                  신규 고객 또는 확인이 필요한 고객입니다.
-                  <br />
-                  주소를 최초 1회 입력해주세요.
-                </div>
-              </div>
-            )}
-
-            {showAddressForm && (
-              <>
-                <button
-                  onClick={openAddressSearch}
-                  className="w-full bg-black text-white p-4 rounded-2xl font-bold"
-                >
-                  주소검색
-                </button>
-
-                <input
-                  type="text"
-                  placeholder="* 기본주소"
-                  className="w-full p-4 rounded-2xl bg-gray-50 border"
-                  value={address}
-                  readOnly
-                />
-
-                <input
-                  type="text"
-                  placeholder="* 상세주소 예) 101동 1001호"
-                  className="w-full p-4 rounded-2xl bg-gray-50 border"
-                  value={detailAddress}
-                  onChange={(e) => setDetailAddress(e.target.value)}
-                />
-
-                <label className="flex items-center gap-2 text-sm text-gray-700 mt-1">
-                  <input
-                    type="checkbox"
-                    checked={saveAsDefaultAddress}
-                    onChange={(e) => setSaveAsDefaultAddress(e.target.checked)}
-                  />
-                  이 주소를 기본 배송지로 설정
-                </label>
-              </>
-            )}
-
-            <textarea
-              placeholder="요청사항 입력 (선택사항)"
-              className="w-full p-4 rounded-2xl bg-gray-50 border min-h-[100px]"
-              value={requestMemo}
-              onChange={(e) => setRequestMemo(e.target.value)}
-            />
-          </div>
-        </section>
-
-        {items.map((item, index) => (
-          <section
-            key={index}
-            className="bg-white rounded-3xl p-5 border shadow-sm mb-4"
-          >
-            <div className="flex justify-between items-center mb-4">
-              <div className="font-bold text-lg">상품 {index + 1}</div>
-
-              {items.length > 1 && (
-                <button
-                  onClick={() => removeItem(index)}
-                  className="bg-red-500 text-white px-4 py-2 rounded-xl font-bold text-sm"
-                >
-                  ✕ 삭제
-                </button>
-              )}
-            </div>
-
-            <div className="grid gap-3">
-              <input
-                type="text"
-                placeholder="* 상품명"
-                className="w-full p-4 rounded-2xl bg-gray-50 border"
-                value={item.product}
-                onChange={(e) => {
-                  const copy = [...items];
-                  copy[index].product = e.target.value;
-                  setItems(copy);
-                }}
-              />
-
-              <input
-                type="text"
-                placeholder="* 색상 / 없으면 없음"
-                className="w-full p-4 rounded-2xl bg-gray-50 border"
-                value={item.color}
-                onChange={(e) => {
-                  const nextValue = e.target.value.replace(/[0-9]/g, "");
-                  const copy = [...items];
-                  copy[index].color = nextValue;
-                  setItems(copy);
-                }}
-              />
-
-              <input
-                type="text"
-                placeholder="* 사이즈 / 없으면 없음"
-                className="w-full p-4 rounded-2xl bg-gray-50 border"
-                value={item.size}
-                onChange={(e) => {
-                  const copy = [...items];
-                  copy[index].size = e.target.value;
-                  setItems(copy);
-                }}
-              />
-
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                placeholder="* 주문수량 숫자만!"
-                className="w-full p-4 rounded-2xl bg-gray-50 border"
-                value={item.qty}
-                onChange={(e) => {
-                  const copy = [...items];
-                  copy[index].qty = onlyNumber(e.target.value);
-                  setItems(copy);
-                }}
-              />
-
-              <input
-                type="text"
-                placeholder="* 상품금액(배송비빼고)"
-                className="w-full p-4 rounded-2xl bg-gray-50 border"
-                value={item.price ? formatWon(Number(item.price)) : ""}
-                onChange={(e) => {
-                  const copy = [...items];
-                  copy[index].price = onlyNumber(e.target.value);
-                  setItems(copy);
-                }}
-              />
-            </div>
-          </section>
-        ))}
-
-        <button
-          onClick={addItem}
-          className="w-full bg-gray-200 text-gray-900 p-5 rounded-2xl mb-4 text-lg font-bold"
-        >
-          + 다른 상품도 같이 주문하기
-        </button>
-
-        <section className="bg-white rounded-3xl p-5 border shadow-sm mb-4">
-          <div className="text-lg font-bold mb-4">결제방식 선택</div>
-
-          <label className="block bg-gray-50 rounded-2xl p-4 mb-3 border">
-            <input
-              type="radio"
-              name="payment"
-              checked={paymentMethod === "무통장입금"}
-              onChange={() => setPaymentMethod("무통장입금")}
-              className="mr-2"
-            />
-            무통장입금
-          </label>
-
-          <label className="block bg-gray-50 rounded-2xl p-4 border">
-            <input
-              type="radio"
-              name="payment"
-              checked={paymentMethod === "카드결제"}
-              onChange={() => setPaymentMethod("카드결제")}
-              className="mr-2"
-            />
-            카드결제 (+수수료 {cardFeeRate}%)
+            <div className="text-2xl font-black">루루동이 관리자</div>
             <div className="text-sm text-gray-500 mt-2">
-              관리자 확인 후 카톡으로 결제링크 발송
+              방송 · 주문 · 상품 운영
             </div>
-          </label>
-        </section>
-
-        <section className="bg-white rounded-3xl p-5 border shadow-sm mb-4">
-          <div className="flex justify-between mb-3">
-            <span>상품금액 합계</span>
-            <span>{formatWon(productTotal)}</span>
           </div>
 
-          <div className="flex justify-between mb-2">
-            <span>배송비</span>
-            <span>{formatWon(finalShippingFee)}</span>
+          <nav className="grid gap-2">
+            {menuItems.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setActiveMenu(item.key)}
+                className={`text-left px-5 py-4 rounded-2xl font-black transition ${
+                  activeMenu === item.key
+                    ? "bg-gray-950 text-white shadow-sm"
+                    : "bg-gray-50 text-gray-800 hover:bg-rose-50"
+                }`}
+              >
+                <span className="mr-3">{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="mt-auto pt-6 text-xs text-gray-400 leading-5">
+            고객페이지는 건드리지 않고
+            <br />
+            관리자만 새로 구성중입니다.
+          </div>
+        </aside>
+
+        <section className="flex-1 p-4 md:p-8">
+          <div className="md:hidden bg-white rounded-3xl p-4 border shadow-sm mb-4">
+            <div className="font-black text-xl mb-3">루루동이 관리자</div>
+            <div className="grid grid-cols-3 gap-2">
+              {menuItems.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setActiveMenu(item.key)}
+                  className={`px-3 py-3 rounded-2xl text-sm font-black ${
+                    activeMenu === item.key
+                      ? "bg-gray-950 text-white"
+                      : "bg-gray-50 text-gray-800"
+                  }`}
+                >
+                  <div>{item.icon}</div>
+                  <div>{item.label}</div>
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="text-sm text-blue-600 mb-3">
-            {useSavedAddress
-              ? "기존 고객은 저장된 배송지 기준으로 최종 배송비가 적용됩니다."
-              : shippingNotice}
-          </div>
+          {activeMenu === "dashboard" && (
+            <div className="grid gap-5">
+              <div className="bg-white rounded-[2rem] p-6 border shadow-sm">
+                <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-black text-rose-500 mb-2">
+                      ADMIN DASHBOARD
+                    </div>
+                    <h1 className="text-3xl md:text-5xl font-black">
+                      루루동이 운영센터
+                    </h1>
+                    <p className="text-gray-500 font-bold mt-3">
+                      상품관리 + 방송 ON/OFF 1차 연결 단계입니다.
+                    </p>
+                  </div>
 
-          {paymentMethod === "카드결제" && (
-            <div className="flex justify-between mb-3 text-red-600">
-              <span>카드결제 수수료 {cardFeeRate}%</span>
-              <span>{formatWon(vatAmount)}</span>
+                  <Link
+                    href="/"
+                    className="inline-flex justify-center px-5 py-4 rounded-2xl bg-gray-950 text-white font-black"
+                  >
+                    고객페이지 보기
+                  </Link>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                <div className="bg-white rounded-3xl p-5 border shadow-sm">
+                  <div className="text-gray-500 font-bold text-sm">방송상태</div>
+                  <div className="text-3xl font-black mt-2">
+                    {activeBroadcast ? "ON" : "OFF"}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-3xl p-5 border shadow-sm">
+                  <div className="text-gray-500 font-bold text-sm">판매중</div>
+                  <div className="text-4xl font-black mt-2">
+                    {dashboardCounts.selling}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-3xl p-5 border shadow-sm">
+                  <div className="text-gray-500 font-bold text-sm">품절</div>
+                  <div className="text-4xl font-black mt-2">
+                    {dashboardCounts.soldout}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-3xl p-5 border shadow-sm">
+                  <div className="text-gray-500 font-bold text-sm">숨김</div>
+                  <div className="text-4xl font-black mt-2">
+                    {dashboardCounts.hidden}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-3xl p-5 border shadow-sm">
+                  <div className="text-gray-500 font-bold text-sm">공구상품</div>
+                  <div className="text-4xl font-black mt-2">
+                    {dashboardCounts.groupBuy}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-[2rem] p-6 border shadow-sm">
+                <div className="font-black text-xl mb-4">빠른 작업</div>
+                <div className="grid md:grid-cols-4 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveMenu("broadcasts");
+                    }}
+                    className="p-5 rounded-3xl bg-rose-500 text-white font-black text-left active:scale-[0.98]"
+                  >
+                    방송관리 열기
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveMenu("products");
+                      resetForm();
+                    }}
+                    className="p-5 rounded-3xl bg-gray-950 text-white font-black text-left active:scale-[0.98]"
+                  >
+                    + 공구상품 등록
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveMenu("products")}
+                    className="p-5 rounded-3xl bg-white border font-black text-left active:scale-[0.98]"
+                  >
+                    상품목록 관리
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={loadAll}
+                    className="p-5 rounded-3xl bg-white border font-black text-left active:scale-[0.98]"
+                  >
+                    새로고침
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
-          <div className="flex justify-between text-2xl font-extrabold pt-4 border-t">
-            <span>최종 결제금액</span>
-            <span>{formatWon(total)}</span>
-          </div>
-        </section>
+          {activeMenu === "products" && (
+            <div className="grid gap-5">
+              <div className="bg-white rounded-[2rem] p-6 border shadow-sm">
+                <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-black text-rose-500 mb-2">
+                      PRODUCT MANAGER
+                    </div>
+                    <h1 className="text-3xl md:text-5xl font-black">
+                      상품관리
+                    </h1>
+                    <p className="text-gray-500 font-bold mt-3">
+                      공구상품 / 방송상품 등록, 재고, 배송유형, 합배송 설정
+                    </p>
+                  </div>
 
-        <button
-          className="w-full bg-black text-white font-bold p-5 rounded-2xl text-xl disabled:opacity-50"
-          onClick={handleSubmit}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? "주문 저장중..." : "주문완료신청"}
-        </button>
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="px-5 py-4 rounded-2xl bg-gray-950 text-white font-black active:scale-[0.98]"
+                  >
+                    + 새 상품 등록
+                  </button>
+                </div>
+              </div>
+
+              <section
+                id="product-form"
+                className="bg-white rounded-[2rem] p-5 md:p-6 border shadow-sm"
+              >
+                <div className="font-black text-2xl mb-5">
+                  {editingId ? "상품 수정" : "상품 등록"}
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-black mb-2">
+                      상품명
+                    </label>
+                    <input
+                      value={form.product_name}
+                      onChange={(e) =>
+                        setForm({ ...form, product_name: e.target.value })
+                      }
+                      placeholder="예) 뉴발1906 / 향수 / 메리제인"
+                      className="w-full p-4 rounded-2xl bg-gray-50 border font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-black mb-2">
+                      판매금액
+                    </label>
+                    <input
+                      value={form.price ? Number(form.price).toLocaleString() : ""}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          price: Number(onlyNumber(e.target.value) || 0),
+                        })
+                      }
+                      inputMode="numeric"
+                      placeholder="0"
+                      className="w-full p-4 rounded-2xl bg-gray-50 border font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-black mb-2">
+                      재고수량
+                    </label>
+                    <input
+                      value={String(form.stock || "")}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          stock: Number(onlyNumber(e.target.value) || 0),
+                        })
+                      }
+                      inputMode="numeric"
+                      placeholder="0"
+                      className="w-full p-4 rounded-2xl bg-gray-50 border font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-black mb-2">
+                      정렬순서
+                    </label>
+                    <input
+                      value={String(form.sort_order || "")}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          sort_order: Number(onlyNumber(e.target.value) || 1),
+                        })
+                      }
+                      inputMode="numeric"
+                      placeholder="1"
+                      className="w-full p-4 rounded-2xl bg-gray-50 border font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-black mb-2">
+                      상품유형
+                    </label>
+                    <select
+                      value={form.product_type}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          product_type: e.target.value as ProductType,
+                        })
+                      }
+                      className="w-full p-4 rounded-2xl bg-gray-50 border font-bold"
+                    >
+                      <option value="공구상품">공구상품</option>
+                      <option value="방송상품">방송상품</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-black mb-2">
+                      상품상태
+                    </label>
+                    <select
+                      value={form.status}
+                      onChange={(e) =>
+                        setForm({ ...form, status: e.target.value as ProductStatus })
+                      }
+                      className="w-full p-4 rounded-2xl bg-gray-50 border font-bold"
+                    >
+                      <option value="판매중">판매중</option>
+                      <option value="품절">품절</option>
+                      <option value="숨김">숨김</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-black mb-2">
+                      배송유형
+                    </label>
+                    <select
+                      value={form.shipping_type}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          shipping_type: e.target.value as ShippingType,
+                        })
+                      }
+                      className="w-full p-4 rounded-2xl bg-gray-50 border font-bold"
+                    >
+                      <option value="일반">일반</option>
+                      <option value="업체">업체</option>
+                    </select>
+                    <div className="text-xs text-gray-500 font-bold mt-2">
+                      일반 = 방송상품 + 합배송 가능한 공구상품 / 업체 = 별도배송
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-black mb-2">
+                      합배송 가능
+                    </label>
+                    <select
+                      value={form.combine_shipping}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          combine_shipping: e.target.value as CombineShipping,
+                        })
+                      }
+                      className="w-full p-4 rounded-2xl bg-gray-50 border font-bold"
+                    >
+                      <option value="Y">Y 가능</option>
+                      <option value="N">N 불가</option>
+                    </select>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-black mb-2">
+                      사진보러가기 외부링크
+                    </label>
+                    <input
+                      value={form.external_image_url}
+                      onChange={(e) =>
+                        setForm({ ...form, external_image_url: e.target.value })
+                      }
+                      placeholder="인포크 / 블로그 / 드라이브 / 밴드 링크"
+                      className="w-full p-4 rounded-2xl bg-gray-50 border font-bold"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-black mb-2">
+                      대표사진 URL 또는 업로드 후 주소
+                    </label>
+                    <input
+                      value={form.image_url}
+                      onChange={(e) =>
+                        setForm({ ...form, image_url: e.target.value })
+                      }
+                      placeholder="초기에는 비워둬도 됨. 나중에 업로드 기능 연결 가능"
+                      className="w-full p-4 rounded-2xl bg-gray-50 border font-bold"
+                    />
+                    <div className="text-xs text-gray-500 font-bold mt-2">
+                      현재 1차는 URL 저장 구조입니다. 직접 업로드 버튼은 다음 단계에서 붙이면 됩니다.
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-black mb-2">
+                      상품설명
+                    </label>
+                    <textarea
+                      value={form.description}
+                      onChange={(e) =>
+                        setForm({ ...form, description: e.target.value })
+                      }
+                      placeholder="배송 안내 / 업체배송 / 합배송 불가 / 주 1~2회 출고 등"
+                      className="w-full p-4 rounded-2xl bg-gray-50 border font-bold min-h-[120px]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-3 mt-5">
+                  <button
+                    type="button"
+                    onClick={saveProduct}
+                    disabled={savingProduct}
+                    className="p-5 rounded-2xl bg-gray-950 text-white font-black text-lg disabled:opacity-50 active:scale-[0.98]"
+                  >
+                    {savingProduct
+                      ? "저장중..."
+                      : editingId
+                      ? "수정 저장"
+                      : "상품 등록"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="p-5 rounded-2xl bg-gray-100 text-gray-900 font-black text-lg active:scale-[0.98]"
+                  >
+                    입력 초기화
+                  </button>
+                </div>
+              </section>
+
+              <section className="bg-white rounded-[2rem] p-5 md:p-6 border shadow-sm">
+                <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-5">
+                  <div>
+                    <div className="font-black text-2xl">상품목록</div>
+                    <div className="text-gray-500 font-bold mt-1">
+                      체크 후 일괄 설정 가능
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-3 gap-2">
+                    <input
+                      value={keyword}
+                      onChange={(e) => setKeyword(e.target.value)}
+                      placeholder="상품 검색"
+                      className="p-3 rounded-2xl bg-gray-50 border font-bold"
+                    />
+
+                    <select
+                      value={typeFilter}
+                      onChange={(e) => setTypeFilter(e.target.value as any)}
+                      className="p-3 rounded-2xl bg-gray-50 border font-bold"
+                    >
+                      <option value="전체">전체유형</option>
+                      <option value="공구상품">공구상품</option>
+                      <option value="방송상품">방송상품</option>
+                    </select>
+
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value as any)}
+                      className="p-3 rounded-2xl bg-gray-50 border font-bold"
+                    >
+                      <option value="전체">전체상태</option>
+                      <option value="판매중">판매중</option>
+                      <option value="품절">품절</option>
+                      <option value="숨김">숨김</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="bg-rose-50 border border-rose-100 rounded-3xl p-4 mb-5">
+                  <div className="font-black mb-3">
+                    선택상품 일괄설정 ({selectedIds.length}개 선택)
+                  </div>
+
+                  <div className="grid md:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-[1fr_auto] gap-2">
+                      <select
+                        value={bulkShippingType}
+                        onChange={(e) =>
+                          setBulkShippingType(e.target.value as ShippingType)
+                        }
+                        className="p-3 rounded-2xl bg-white border font-bold"
+                      >
+                        <option value="일반">일반</option>
+                        <option value="업체">업체</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => applyBulkUpdate("shipping")}
+                        className="px-4 rounded-2xl bg-gray-950 text-white font-black"
+                      >
+                        배송변경
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-[1fr_auto] gap-2">
+                      <select
+                        value={bulkCombineShipping}
+                        onChange={(e) =>
+                          setBulkCombineShipping(e.target.value as CombineShipping)
+                        }
+                        className="p-3 rounded-2xl bg-white border font-bold"
+                      >
+                        <option value="Y">합배송 가능</option>
+                        <option value="N">합배송 불가</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => applyBulkUpdate("combine")}
+                        className="px-4 rounded-2xl bg-gray-950 text-white font-black"
+                      >
+                        합배송변경
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-[1fr_auto] gap-2">
+                      <select
+                        value={bulkStatus}
+                        onChange={(e) =>
+                          setBulkStatus(e.target.value as ProductStatus)
+                        }
+                        className="p-3 rounded-2xl bg-white border font-bold"
+                      >
+                        <option value="판매중">판매중</option>
+                        <option value="품절">품절</option>
+                        <option value="숨김">숨김</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => applyBulkUpdate("status")}
+                        className="px-4 rounded-2xl bg-gray-950 text-white font-black"
+                      >
+                        상태변경
+                      </button>
+                    </div>
+                  </div>
+
+                  {selectedIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={clearSelected}
+                      className="mt-3 text-sm font-black text-gray-500"
+                    >
+                      선택 해제
+                    </button>
+                  )}
+                </div>
+
+                {loadingProducts ? (
+                  <div className="p-10 text-center font-black text-gray-500">
+                    상품 불러오는 중...
+                  </div>
+                ) : filteredProducts.length === 0 ? (
+                  <div className="p-10 text-center font-black text-gray-500">
+                    등록된 상품이 없습니다.
+                  </div>
+                ) : (
+                  <div className="grid gap-3">
+                    {filteredProducts.map((product) => (
+                      <div
+                        key={product.id}
+                        className="rounded-3xl border bg-white p-4 shadow-sm"
+                      >
+                        <div className="grid lg:grid-cols-[auto_1fr_auto] gap-4 lg:items-center">
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={product.id !== undefined && selectedIds.includes(product.id)}
+                              onChange={() => toggleSelect(product.id)}
+                              className="w-5 h-5"
+                            />
+
+                            {product.image_url ? (
+                              <img
+                                src={product.image_url}
+                                alt={product.product_name}
+                                className="w-20 h-20 rounded-2xl object-cover bg-gray-100"
+                              />
+                            ) : (
+                              <div className="w-20 h-20 rounded-2xl bg-gray-100 flex items-center justify-center text-2xl">
+                                🛍
+                              </div>
+                            )}
+                          </div>
+
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <span className="px-3 py-1 rounded-full bg-gray-950 text-white text-xs font-black">
+                                {product.product_type || "공구상품"}
+                              </span>
+
+                              <span
+                                className={`px-3 py-1 rounded-full text-xs font-black ${
+                                  product.status === "판매중"
+                                    ? "bg-green-100 text-green-700"
+                                    : product.status === "품절"
+                                    ? "bg-red-100 text-red-700"
+                                    : "bg-gray-100 text-gray-500"
+                                }`}
+                              >
+                                {product.status || "판매중"}
+                              </span>
+
+                              <span className="px-3 py-1 rounded-full bg-rose-50 text-rose-600 text-xs font-black">
+                                {product.shipping_type || "일반"}배송
+                              </span>
+
+                              <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-black">
+                                합배송 {product.combine_shipping === "N" ? "불가" : "가능"}
+                              </span>
+                            </div>
+
+                            <div className="text-xl font-black">
+                              {product.product_name}
+                            </div>
+
+                            <div className="text-gray-500 font-bold mt-1">
+                              {money(product.price)} · 재고 {product.stock || 0}개 ·
+                              순서 {product.sort_order || 1}
+                            </div>
+
+                            {product.description && (
+                              <div className="text-sm text-gray-500 mt-2 line-clamp-2">
+                                {product.description}
+                              </div>
+                            )}
+
+                            {product.external_image_url && (
+                              <a
+                                href={product.external_image_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex mt-3 text-sm font-black text-rose-500"
+                              >
+                                사진보러가기 링크 확인 →
+                              </a>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => startEdit(product)}
+                              className="px-4 py-3 rounded-2xl bg-gray-950 text-white font-black active:scale-[0.98]"
+                            >
+                              수정
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => cloneProduct(product)}
+                              className="px-4 py-3 rounded-2xl bg-rose-500 text-white font-black active:scale-[0.98]"
+                            >
+                              복제
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                quickUpdateProduct(product.id, {
+                                  status:
+                                    product.status === "숨김" ? "판매중" : "숨김",
+                                })
+                              }
+                              className="px-4 py-3 rounded-2xl bg-gray-100 text-gray-900 font-black active:scale-[0.98]"
+                            >
+                              {product.status === "숨김" ? "판매중" : "숨김"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                quickUpdateProduct(product.id, {
+                                  status:
+                                    product.status === "품절" ? "판매중" : "품절",
+                                })
+                              }
+                              className="px-4 py-3 rounded-2xl bg-red-50 text-red-600 font-black active:scale-[0.98]"
+                            >
+                              {product.status === "품절" ? "품절해제" : "품절"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
+          )}
+
+          {activeMenu === "broadcasts" && (
+            <div className="grid gap-5">
+              <section className="bg-white rounded-[2rem] p-6 border shadow-sm">
+                <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-black text-rose-500 mb-2">
+                      BROADCAST MANAGER
+                    </div>
+                    <h1 className="text-3xl md:text-5xl font-black">
+                      방송관리
+                    </h1>
+                    <p className="text-gray-500 font-bold mt-3">
+                      방송 ON/OFF, 오늘 방송상품 선택, 배송비/카드수수료 설정
+                    </p>
+                  </div>
+
+                  <div
+                    className={`px-5 py-4 rounded-2xl font-black ${
+                      activeBroadcast
+                        ? "bg-red-50 text-red-600"
+                        : "bg-gray-100 text-gray-500"
+                    }`}
+                  >
+                    현재 방송 {activeBroadcast ? "ON" : "OFF"}
+                  </div>
+                </div>
+              </section>
+
+              <section className="bg-white rounded-[2rem] p-5 md:p-6 border shadow-sm">
+                <div className="font-black text-2xl mb-5">
+                  {activeBroadcast ? "현재 방송 설정" : "새 방송 시작"}
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-black mb-2">
+                      방송 제목
+                    </label>
+                    <input
+                      value={broadcastTitle}
+                      onChange={(e) => setBroadcastTitle(e.target.value)}
+                      placeholder="예) 5월 17일 루루동이 LIVE"
+                      className="w-full p-4 rounded-2xl bg-gray-50 border font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-black mb-2">
+                      관리자 메모 / 부제
+                    </label>
+                    <input
+                      value={broadcastSubtitle}
+                      onChange={(e) => setBroadcastSubtitle(e.target.value)}
+                      placeholder="예) 뉴발 / 향수 / 공구"
+                      className="w-full p-4 rounded-2xl bg-gray-50 border font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-black mb-2">
+                      기본 배송비
+                    </label>
+                    <input
+                      value={Number(broadcastShippingFee || 0).toLocaleString()}
+                      onChange={(e) =>
+                        setBroadcastShippingFee(
+                          Number(onlyNumber(e.target.value) || 0)
+                        )
+                      }
+                      inputMode="numeric"
+                      className="w-full p-4 rounded-2xl bg-gray-50 border font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-black mb-2">
+                      카드결제 수수료 %
+                    </label>
+                    <input
+                      value={String(broadcastCardFeeRate || "")}
+                      onChange={(e) =>
+                        setBroadcastCardFeeRate(
+                          Number(onlyNumber(e.target.value) || 0)
+                        )
+                      }
+                      inputMode="numeric"
+                      className="w-full p-4 rounded-2xl bg-gray-50 border font-bold"
+                    />
+                  </div>
+
+                  <label className="md:col-span-2 flex items-center gap-3 p-4 rounded-2xl bg-rose-50 border border-rose-100 font-black">
+                    <input
+                      type="checkbox"
+                      checked={isCombineShippingTarget}
+                      onChange={(e) => setIsCombineShippingTarget(e.target.checked)}
+                      className="w-5 h-5"
+                    />
+                    이 방송을 합배송 기준 방송으로 사용
+                  </label>
+                </div>
+              </section>
+
+              <section className="bg-white rounded-[2rem] p-5 md:p-6 border shadow-sm">
+                <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-5">
+                  <div>
+                    <div className="font-black text-2xl">
+                      오늘 방송상품 선택
+                    </div>
+                    <div className="text-gray-500 font-bold mt-1">
+                      체크한 상품만 오늘 방송상품으로 연결됩니다.
+                    </div>
+                  </div>
+
+                  <div className="font-black text-rose-500">
+                    {selectedBroadcastProductIds.length}개 선택
+                  </div>
+                </div>
+
+                {broadcastSelectableProducts.length === 0 ? (
+                  <div className="p-8 rounded-3xl bg-gray-50 text-center font-black text-gray-500">
+                    먼저 상품관리에서 상품을 등록해주세요.
+                  </div>
+                ) : (
+                  <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {broadcastSelectableProducts.map((product) => (
+                      <label
+                        key={product.id}
+                        className={`p-4 rounded-3xl border cursor-pointer active:scale-[0.98] ${
+                          product.id !== undefined && selectedBroadcastProductIds.includes(product.id)
+                            ? "bg-gray-950 text-white border-gray-950"
+                            : "bg-white hover:bg-gray-50"
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={product.id !== undefined && selectedBroadcastProductIds.includes(product.id)}
+                            onChange={() => toggleBroadcastProduct(product.id)}
+                            className="w-5 h-5 mt-1"
+                          />
+
+                          <div>
+                            <div className="font-black text-lg">
+                              {product.product_name}
+                            </div>
+                            <div
+                              className={`text-sm font-bold mt-1 ${
+                                product.id !== undefined && selectedBroadcastProductIds.includes(product.id)
+                                  ? "text-gray-200"
+                                  : "text-gray-500"
+                              }`}
+                            >
+                              {money(product.price)} · 재고 {product.stock || 0}개
+                            </div>
+                            <div className="text-xs font-black mt-2">
+                              {product.product_type} · {product.shipping_type}배송 ·
+                              합배송{" "}
+                              {product.combine_shipping === "N" ? "불가" : "가능"}
+                            </div>
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                <div className="grid md:grid-cols-3 gap-3 mt-5">
+                  {activeBroadcast ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={saveActiveBroadcast}
+                        disabled={savingBroadcast}
+                        className="p-5 rounded-2xl bg-gray-950 text-white font-black disabled:opacity-50 active:scale-[0.98]"
+                      >
+                        {savingBroadcast ? "저장중..." : "방송 설정 저장"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={endBroadcast}
+                        disabled={savingBroadcast}
+                        className="p-5 rounded-2xl bg-red-500 text-white font-black disabled:opacity-50 active:scale-[0.98]"
+                      >
+                        방송 종료
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={loadBroadcasts}
+                        className="p-5 rounded-2xl bg-gray-100 text-gray-900 font-black active:scale-[0.98]"
+                      >
+                        새로고침
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={startBroadcast}
+                        disabled={savingBroadcast}
+                        className="md:col-span-2 p-5 rounded-2xl bg-rose-500 text-white font-black disabled:opacity-50 active:scale-[0.98]"
+                      >
+                        {savingBroadcast ? "시작중..." : "방송 시작"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={loadBroadcasts}
+                        className="p-5 rounded-2xl bg-gray-100 text-gray-900 font-black active:scale-[0.98]"
+                      >
+                        새로고침
+                      </button>
+                    </>
+                  )}
+                </div>
+              </section>
+
+              <section className="bg-white rounded-[2rem] p-5 md:p-6 border shadow-sm">
+                <div className="font-black text-2xl mb-5">최근 방송기록</div>
+
+                {loadingBroadcasts ? (
+                  <div className="p-8 text-center font-black text-gray-500">
+                    방송 목록 불러오는 중...
+                  </div>
+                ) : broadcasts.length === 0 ? (
+                  <div className="p-8 text-center font-black text-gray-500">
+                    방송 기록이 없습니다.
+                  </div>
+                ) : (
+                  <div className="grid gap-3">
+                    {broadcasts.map((broadcast) => (
+                      <div
+                        key={broadcast.id}
+                        className="p-4 rounded-3xl border bg-white flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                      >
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span
+                              className={`px-3 py-1 rounded-full text-xs font-black ${
+                                broadcast.status === "ON"
+                                  ? "bg-red-50 text-red-600"
+                                  : "bg-gray-100 text-gray-500"
+                              }`}
+                            >
+                              {broadcast.status}
+                            </span>
+
+                            {broadcast.is_combine_shipping_target && (
+                              <span className="px-3 py-1 rounded-full text-xs font-black bg-blue-50 text-blue-600">
+                                합배송기준
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="font-black text-lg">
+                            {broadcast.public_title || "방송명 없음"}
+                          </div>
+
+                          <div className="text-sm text-gray-500 font-bold mt-1">
+                            {broadcast.admin_subtitle || "관리자 메모 없음"}
+                          </div>
+                        </div>
+
+                        <div className="text-sm text-gray-500 font-bold">
+                          배송비 {money(broadcast.shipping_fee || 0)}
+                          <br />
+                          카드수수료 {broadcast.card_fee_rate || 0}%
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
+          )}
+
+          {activeMenu === "orders" && (
+            <div className="grid gap-5">
+              <section className="bg-white rounded-[2rem] p-6 border shadow-sm">
+                <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-black text-rose-500 mb-2">
+                      ORDER MANAGER
+                    </div>
+                    <h1 className="text-3xl md:text-5xl font-black">
+                      주문관리
+                    </h1>
+                    <p className="text-gray-500 font-bold mt-3">
+                      조건별 주문 확인 · 입금확인 · 배송준비 · 송장출력까지 한 화면에서 처리합니다.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={loadOrders}
+                      className="px-5 py-4 rounded-2xl bg-gray-950 text-white font-black active:scale-[0.98]"
+                    >
+                      주문 새로고침
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={downloadSelectedOrdersForLogen}
+                      className="px-5 py-4 rounded-2xl bg-rose-500 text-white font-black active:scale-[0.98]"
+                    >
+                      선택 송장출력
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              <section className="bg-white rounded-[2rem] p-5 md:p-6 border shadow-sm">
+                <div className="grid md:grid-cols-[1fr_220px] gap-3 mb-4">
+                  <input
+                    value={orderKeyword}
+                    onChange={(e) => setOrderKeyword(e.target.value)}
+                    placeholder="닉네임 / 이름 / 전화번호 / 상품명 / 주소 검색"
+                    className="p-4 rounded-2xl bg-gray-50 border font-bold"
+                  />
+
+                  <select
+                    value={orderStatusFilter}
+                    onChange={(e) => setOrderStatusFilter(e.target.value as any)}
+                    className="p-4 rounded-2xl bg-gray-50 border font-bold"
+                  >
+                    <option value="전체">전체상태</option>
+                    <option value="주문완료신청">주문완료신청</option>
+                    <option value="입금확인">입금확인</option>
+                    <option value="배송준비">배송준비</option>
+                    <option value="출고완료">출고완료</option>
+                    <option value="취소">취소</option>
+                  </select>
+                </div>
+
+                <div className="rounded-[2rem] bg-gray-50 p-4 mb-5 border">
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
+                    <div>
+                      <div className="font-black text-lg">다중 조건 필터</div>
+                      <div className="text-sm font-bold text-gray-500 mt-1">
+                        여러 개를 동시에 체크하면 조건에 맞는 주문만 표시됩니다.
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={resetOrderFilters}
+                      className="px-4 py-3 rounded-2xl bg-white border font-black active:scale-[0.98]"
+                    >
+                      필터 초기화
+                    </button>
+                  </div>
+
+                  <div className="grid xl:grid-cols-4 gap-4">
+                    <div className="rounded-3xl bg-white p-4 border">
+                      <div className="font-black mb-3">방송별</div>
+                      <div className="grid gap-2 max-h-40 overflow-auto pr-1">
+                        {orderBroadcastOptions.length === 0 ? (
+                          <div className="text-sm font-bold text-gray-400">방송 없음</div>
+                        ) : (
+                          orderBroadcastOptions.map((title) => (
+                            <label key={title} className="flex items-center gap-2 text-sm font-bold">
+                              <input
+                                type="checkbox"
+                                checked={broadcastFilters.includes(title)}
+                                onChange={() => toggleStringFilter(title, broadcastFilters, setBroadcastFilters)}
+                                className="w-4 h-4"
+                              />
+                              <span className="break-keep">{title}</span>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-3xl bg-white p-4 border">
+                      <div className="font-black mb-3">입금상태</div>
+                      <div className="grid gap-2">
+                        {["입금대기", "입금확인", "취소"].map((status) => (
+                          <label key={status} className="flex items-center gap-2 text-sm font-bold">
+                            <input
+                              type="checkbox"
+                              checked={payFilters.includes(status)}
+                              onChange={() => toggleStringFilter(status, payFilters, setPayFilters)}
+                              className="w-4 h-4"
+                            />
+                            {status}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-3xl bg-white p-4 border">
+                      <div className="font-black mb-3">배송상태</div>
+                      <div className="grid gap-2">
+                        {["배송대기", "기본배송", "일반배송", "업체배송", "배송준비", "출고완료"].map((status) => (
+                          <label key={status} className="flex items-center gap-2 text-sm font-bold">
+                            <input
+                              type="checkbox"
+                              checked={shipFilters.includes(status)}
+                              onChange={() => toggleStringFilter(status, shipFilters, setShipFilters)}
+                              className="w-4 h-4"
+                            />
+                            {status}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-3xl bg-white p-4 border">
+                      <div className="font-black mb-3">상품유형</div>
+                      <div className="grid gap-2">
+                        {["방송상품", "공구상품"].map((kind) => (
+                          <label key={kind} className="flex items-center gap-2 text-sm font-bold">
+                            <input
+                              type="checkbox"
+                              checked={productKindFilters.includes(kind)}
+                              onChange={() => toggleStringFilter(kind, productKindFilters, setProductKindFilters)}
+                              className="w-4 h-4"
+                            />
+                            {kind}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-5 grid grid-cols-2 xl:grid-cols-6 gap-3">
+                  <div className="rounded-3xl bg-gray-950 p-4 text-white">
+                    <div className="text-xs font-black text-gray-300">표시 주문</div>
+                    <div className="mt-2 text-3xl font-black">{orderStats.totalCount}건</div>
+                  </div>
+
+                  <div className="rounded-3xl bg-white p-4 border">
+                    <div className="text-xs font-black text-gray-500">선택 주문</div>
+                    <div className="mt-2 text-3xl font-black">{selectedOrders.length}건</div>
+                  </div>
+
+                  <div className="rounded-3xl bg-white p-4 border">
+                    <div className="text-xs font-black text-gray-500">주문 합계</div>
+                    <div className="mt-2 text-2xl font-black">{money(orderStats.totalAmount)}</div>
+                  </div>
+
+                  <div className="rounded-3xl bg-green-50 p-4 border border-green-100">
+                    <div className="text-xs font-black text-green-700">입금확인</div>
+                    <div className="mt-2 text-2xl font-black text-green-700">{orderStats.paidCount}건</div>
+                    <div className="mt-1 text-sm font-black text-green-700">{money(orderStats.paidAmount)}</div>
+                  </div>
+
+                  <div className="rounded-3xl bg-rose-50 p-4 border border-rose-100">
+                    <div className="text-xs font-black text-rose-600">입금대기</div>
+                    <div className="mt-2 text-2xl font-black text-rose-600">{orderStats.waitingCount}건</div>
+                  </div>
+
+                  <div className="rounded-3xl bg-blue-50 p-4 border border-blue-100">
+                    <div className="text-xs font-black text-blue-700">배송준비</div>
+                    <div className="mt-2 text-2xl font-black text-blue-700">{orderStats.readyShipCount}건</div>
+                  </div>
+                </div>
+
+                <div className="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 rounded-3xl bg-white border p-4">
+                  <label className="flex items-center gap-3 font-black">
+                    <input
+                      type="checkbox"
+                      checked={filteredOrders.length > 0 && filteredOrders.every((order) => order.id !== undefined && selectedOrderIds.includes(order.id))}
+                      onChange={toggleSelectAllFilteredOrders}
+                      className="w-5 h-5"
+                    />
+                    현재 표시 주문 전체 선택
+                  </label>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedOrderIds([])}
+                      className="px-4 py-3 rounded-2xl bg-gray-100 text-gray-900 font-black active:scale-[0.98]"
+                    >
+                      선택해제
+                    </button>
+                    <button
+                      type="button"
+                      onClick={downloadSelectedOrdersForLogen}
+                      className="px-4 py-3 rounded-2xl bg-rose-500 text-white font-black active:scale-[0.98]"
+                    >
+                      선택주문 로젠 CSV
+                    </button>
+                  </div>
+                </div>
+
+                {loadingOrders ? (
+                  <div className="p-10 text-center font-black text-gray-500">
+                    주문 목록 불러오는 중...
+                  </div>
+                ) : filteredOrders.length === 0 ? (
+                  <div className="p-10 text-center font-black text-gray-500">
+                    표시할 주문이 없습니다.
+                  </div>
+                ) : (
+                  <div className="grid gap-3">
+                    {filteredOrders.map((order) => {
+                      const orderId = order.id;
+                      const totalPrice = Number(order.adjusted_total_price || order.total_price || 0);
+                      const phone = String(order.customer_phone || "");
+                      const formattedPhone = phone.length === 11
+                        ? `${phone.slice(0, 3)}-${phone.slice(3, 7)}-${phone.slice(7, 11)}`
+                        : phone;
+                      const mainStatus = order.order_status || "주문완료신청";
+                      const payStatus = getOrderPayStatus(order);
+                      const shipStatus = getOrderShipStatus(order);
+                      const productKind = getOrderProductKind(order);
+
+                      return (
+                        <article
+                          key={orderId}
+                          className="rounded-3xl border bg-white p-4 shadow-sm"
+                        >
+                          <div className="grid xl:grid-cols-[auto_1.4fr_1fr_auto] gap-4 xl:items-center">
+                            <label className="flex xl:block items-center gap-2 font-black">
+                              <input
+                                type="checkbox"
+                                checked={orderId !== undefined && selectedOrderIds.includes(orderId)}
+                                onChange={() => toggleOrderSelect(orderId)}
+                                className="w-5 h-5"
+                              />
+                              <span className="xl:hidden">선택</span>
+                            </label>
+
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2 mb-2">
+                                <span className="px-3 py-1 rounded-full bg-gray-950 text-white text-xs font-black">
+                                  {order.broadcast_public_title || order.broadcast_name || "주문"}
+                                </span>
+                                <span className="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-black">
+                                  {productKind}
+                                </span>
+                                <span className="px-3 py-1 rounded-full bg-rose-50 text-rose-600 text-xs font-black">
+                                  {mainStatus}
+                                </span>
+                                <span className={`px-3 py-1 rounded-full text-xs font-black ${payStatus === "입금확인" ? "bg-green-50 text-green-600" : payStatus === "취소" ? "bg-gray-100 text-gray-500" : "bg-red-50 text-red-600"}`}>
+                                  {payStatus}
+                                </span>
+                                <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-black">
+                                  {shipStatus}
+                                </span>
+                              </div>
+
+                              <div className="text-xl font-black">
+                                {order.product_name || "상품명 없음"}
+                              </div>
+
+                              <div className="text-gray-500 font-bold mt-1">
+                                {order.color || "옵션 없음"} / {order.size || "사이즈 없음"} / {order.qty || 0}개
+                              </div>
+
+                              <div className="text-gray-950 font-black mt-2">
+                                {money(totalPrice)}
+                              </div>
+
+                              {order.request_memo && (
+                                <div className="mt-3 rounded-2xl bg-yellow-50 border border-yellow-100 p-3 text-sm font-bold text-yellow-700 leading-6">
+                                  요청사항: {order.request_memo}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="rounded-3xl bg-gray-50 p-4">
+                              <div className="text-sm font-black text-gray-500 mb-2">
+                                고객정보
+                              </div>
+                              <div className="font-black">
+                                {order.youtube_nickname || "닉네임 없음"}
+                              </div>
+                              <div className="text-sm font-bold text-gray-600 mt-1">
+                                {order.customer_name || "이름 없음"} · {formattedPhone}
+                              </div>
+                              <div className="text-sm font-bold text-gray-600 mt-2 leading-6">
+                                {order.address || "주소 없음"} {order.detail_address || ""}
+                              </div>
+                              {order.order_lookup_code && (
+                                <div className="text-xs font-black text-gray-400 mt-2">
+                                  조회번호: {order.order_lookup_code}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="grid grid-cols-2 xl:grid-cols-1 gap-2">
+                              <button
+                                type="button"
+                                disabled={savingOrderId === orderId}
+                                onClick={() =>
+                                  updateOrderStatus(orderId, {
+                                    admin_status: "입금확인",
+                                    order_status: "입금확인",
+                                  })
+                                }
+                                className="px-4 py-3 rounded-2xl bg-green-600 text-white font-black disabled:opacity-50 active:scale-[0.98]"
+                              >
+                                입금확인
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={savingOrderId === orderId}
+                                onClick={() =>
+                                  updateOrderStatus(orderId, {
+                                    shipping_status: "배송준비",
+                                    order_status: "배송준비",
+                                  })
+                                }
+                                className="px-4 py-3 rounded-2xl bg-gray-950 text-white font-black disabled:opacity-50 active:scale-[0.98]"
+                              >
+                                배송준비
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={savingOrderId === orderId}
+                                onClick={() =>
+                                  updateOrderStatus(orderId, {
+                                    shipping_status: "출고완료",
+                                    order_status: "출고완료",
+                                  })
+                                }
+                                className="px-4 py-3 rounded-2xl bg-blue-600 text-white font-black disabled:opacity-50 active:scale-[0.98]"
+                              >
+                                출고완료
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={savingOrderId === orderId}
+                                onClick={() =>
+                                  updateOrderStatus(orderId, {
+                                    admin_status: "취소",
+                                    order_status: "취소",
+                                  })
+                                }
+                                className="px-4 py-3 rounded-2xl bg-red-50 text-red-600 font-black disabled:opacity-50 active:scale-[0.98]"
+                              >
+                                취소
+                              </button>
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            </div>
+          )}
+
+          {activeMenu === "customers" && (
+            <ComingSoon
+              title="고객관리"
+              description="고객목록, 특이사항, 차단고객 관리는 다음 단계에서 연결합니다."
+            />
+          )}
+        </section>
       </div>
     </main>
+  );
+}
+
+function ComingSoon({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <section className="bg-white rounded-[2rem] p-8 border shadow-sm">
+      <div className="text-sm font-black text-rose-500 mb-2">NEXT STEP</div>
+      <h1 className="text-4xl font-black mb-4">{title}</h1>
+      <p className="text-gray-500 font-bold leading-7">{description}</p>
+    </section>
   );
 }

@@ -8,6 +8,7 @@
 // - 주문서 작성 페이지와 같은 톤/문구/입력 UX 적용
 // - 저장된 고객정보가 있으면 불필요한 입력영역 숨김
 // - 배송: 일반배송=방송상품+합배송 가능 공구상품, 업체배송=별도배송
+// - 관리자 products 테이블에서 공구상품/판매중 상품 자동 노출
 
 "use client";
 
@@ -22,16 +23,18 @@ declare global {
 }
 
 type GroupProduct = {
-  id: string;
-  productName: string;
+  id: string | number;
+  product_name: string;
+  description: string;
   price: number;
-  stockStatus: "주문가능" | "품절" | "마감임박";
-  deliveryType: "일반배송" | "업체배송" | "합배송불가" | "별도배송";
-  canCombineShipping: boolean;
-  shortDesc: string;
-  photoUrl?: string;
-  imageUrl?: string;
-  optionPlaceholder?: string;
+  stock: number;
+  shipping_type: "일반" | "업체";
+  combine_shipping: "Y" | "N";
+  product_type: "공구상품" | "방송상품";
+  external_image_url: string;
+  image_url: string;
+  status: "판매중" | "품절" | "숨김";
+  sort_order: number;
 };
 
 type CustomerSession = {
@@ -44,36 +47,8 @@ type CustomerSession = {
   detail_address: string;
 };
 
-const KAKAO_CHANNEL_URL = "https://pf.kakao.com/_RMxaqX";
 const NORMAL_SHIPPING_FEE = 4000;
 const VENDOR_SHIPPING_FEE = 4000;
-
-const groupProducts: GroupProduct[] = [
-  {
-    id: "test-normal-1",
-    productName: "테스트 일반배송 공구상품",
-    price: 39000,
-    stockStatus: "주문가능",
-    deliveryType: "일반배송",
-    canCombineShipping: true,
-    shortDesc: "방송상품과 합배송 가능한 일반배송 테스트 상품입니다.",
-    photoUrl: "https://www.youtube.com/@rururu8249",
-    imageUrl: "",
-    optionPlaceholder: "색상/사이즈 또는 옵션을 적어주세요",
-  },
-  {
-    id: "test-vendor-1",
-    productName: "테스트 업체배송 공구상품",
-    price: 59000,
-    stockStatus: "주문가능",
-    deliveryType: "업체배송",
-    canCombineShipping: false,
-    shortDesc: "업체에서 따로 출고되는 별도배송 테스트 상품입니다.",
-    photoUrl: "https://pf.kakao.com/_RMxaqX",
-    imageUrl: "",
-    optionPlaceholder: "옵션 없음 또는 수량만 작성",
-  },
-];
 
 const blockCustomerCopyEvents = () => {
   const block = (event: Event) => event.preventDefault();
@@ -128,7 +103,13 @@ const formatPhone = (value: string) => {
 };
 
 const isNormalDeliveryProduct = (product: GroupProduct) => {
-  return product.deliveryType === "일반배송" || product.canCombineShipping;
+  return product.shipping_type === "일반" && product.combine_shipping === "Y";
+};
+
+const getProductStockStatus = (product: GroupProduct) => {
+  if (product.status === "품절" || Number(product.stock || 0) <= 0) return "품절";
+  if (Number(product.stock || 0) <= 3) return "마감임박";
+  return "주문가능";
 };
 
 const generateLookupCode = () => {
@@ -166,51 +147,42 @@ function PressButton({
   );
 }
 
-function TopCustomerNav({
-  hasSession,
-  onEdit,
-  onLogout,
-}: {
-  hasSession: boolean;
-  onEdit: () => void;
-  onLogout: () => void;
-}) {
+function TopCustomerNav({ onEdit, onLogout }: { onEdit: () => void; onLogout: () => void }) {
   return (
-    <div className="sticky top-3 z-30 mb-4 flex items-center justify-between gap-2 rounded-full border border-[#f4e7e9] bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(30,20,20,0.08)] backdrop-blur">
-      <div className="shrink-0 text-[13px] font-black tracking-[-0.04em] text-[#ff4b60]">
-        📺 루루동이
-      </div>
+    <div className="sticky top-3 z-40 mx-auto mb-4 flex w-full max-w-[456px] items-center justify-between rounded-full border border-[#f3e5e7] bg-white/95 px-4 py-3 shadow-[0_10px_24px_rgba(30,20,20,0.07)] backdrop-blur">
+      <Link
+        href="/"
+        className="shrink-0 text-[14px] font-black tracking-[-0.04em] text-[#ff4b60] transition active:scale-[0.97]"
+      >
+        🏠 HOME
+      </Link>
 
-      <div className="flex items-center gap-2 text-[12px] font-black tracking-[-0.04em]">
-        <Link href="/" className="whitespace-nowrap px-1 py-2 text-[#ff4b60] transition active:scale-[0.97]">
-          🏠 HOME
+      <div className="flex items-center gap-2 text-[13px] font-black tracking-[-0.04em] text-[#5f5555]">
+        <Link href="/myorder" className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]">
+          주문조회
         </Link>
-        {hasSession && (
-          <>
-            <span className="text-[#e1d4d5]">/</span>
-            <button
-              type="button"
-              onClick={onEdit}
-              className="whitespace-nowrap px-1 py-2 text-[#5f5555] transition active:scale-[0.97]"
-            >
-              정보변경
-            </button>
-            <span className="text-[#e1d4d5]">/</span>
-            <button
-              type="button"
-              onClick={onLogout}
-              className="whitespace-nowrap px-1 py-2 text-[#5f5555] transition active:scale-[0.97]"
-            >
-              로그아웃
-            </button>
-          </>
-        )}
+        <span className="text-[#e1d4d5]">/</span>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]"
+        >
+          정보수정
+        </button>
+        <span className="text-[#e1d4d5]">/</span>
+        <button
+          type="button"
+          onClick={onLogout}
+          className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]"
+        >
+          로그아웃
+        </button>
       </div>
     </div>
   );
 }
 
-function StockBadge({ status }: { status: GroupProduct["stockStatus"] }) {
+function StockBadge({ status }: { status: "주문가능" | "품절" | "마감임박" }) {
   const className =
     status === "품절"
       ? "bg-gray-200 text-gray-700"
@@ -223,13 +195,13 @@ function StockBadge({ status }: { status: GroupProduct["stockStatus"] }) {
 
 function DeliveryBadge({ product }: { product: GroupProduct }) {
   const isNormal = isNormalDeliveryProduct(product);
-  const label = isNormal ? "일반배송 · 합배송 가능" : "업체배송 · 별도배송";
+  const label = isNormal ? "일반배송 · 합배송 가능" : "업체/별도배송";
   const color = isNormal ? "bg-[#edf8f4] text-[#29916f]" : "bg-[#fff2f4] text-[#ff4b60]";
 
   return (
     <div className="flex flex-wrap gap-2">
       <span className="rounded-full bg-[#f6f3f3] px-3 py-1 text-[12px] font-black text-[#5f5555]">
-        {product.deliveryType}
+        {product.shipping_type}배송
       </span>
       <span className={`rounded-full px-3 py-1 text-[12px] font-black ${color}`}>{label}</span>
     </div>
@@ -263,6 +235,8 @@ function TextInput({
 }
 
 export default function GroupBuyPage() {
+  const [groupProducts, setGroupProducts] = useState<GroupProduct[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
   const [openedProductId, setOpenedProductId] = useState<string | null>(null);
   const [session, setSession] = useState<CustomerSession | null>(null);
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
@@ -286,6 +260,7 @@ export default function GroupBuyPage() {
 
   useEffect(() => {
     const cleanup = blockCustomerCopyEvents();
+    loadGroupProducts();
 
     const scriptId = "daum-postcode-script";
     if (!document.getElementById(scriptId)) {
@@ -312,8 +287,29 @@ export default function GroupBuyPage() {
   }, []);
 
   const selectedProduct = useMemo(() => {
-    return groupProducts.find((product) => product.id === openedProductId) || null;
-  }, [openedProductId]);
+    return groupProducts.find((product) => String(product.id) === openedProductId) || null;
+  }, [groupProducts, openedProductId]);
+
+  const loadGroupProducts = async () => {
+    setLoadingProducts(true);
+
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .eq("product_type", "공구상품")
+      .eq("status", "판매중")
+      .order("sort_order", { ascending: true })
+      .order("id", { ascending: false });
+
+    if (error) {
+      alert("공구상품 불러오기 실패\n\n" + error.message);
+      setLoadingProducts(false);
+      return;
+    }
+
+    setGroupProducts((data || []) as GroupProduct[]);
+    setLoadingProducts(false);
+  };
 
   const productAmount = selectedProduct ? selectedProduct.price * Number(qty || 0) : 0;
   const shippingFee = selectedProduct
@@ -528,7 +524,7 @@ export default function GroupBuyPage() {
   const submitGroupOrder = async () => {
     if (!selectedProduct) return;
 
-    if (selectedProduct.stockStatus === "품절") {
+    if (getProductStockStatus(selectedProduct) === "품절") {
       alert("품절 상품은 주문할 수 없습니다.");
       return;
     }
@@ -573,7 +569,7 @@ export default function GroupBuyPage() {
         detail_address: customer.detail_address,
         address_type: "공구상품 고객입력",
 
-        customer_match_status: session ? "PIN 로그인 고객" : "신규/수정 고객",
+        customer_match_status: session ? "기존 고객" : "신규/수정 고객",
         customer_match_memo: isNormal
           ? "공구상품 일반배송: 방송상품 및 일반배송 공구상품과 합배송 가능"
           : "공구상품 업체배송: 별도배송 상품",
@@ -581,7 +577,7 @@ export default function GroupBuyPage() {
         request_memo: requestMemo.trim(),
         save_as_default_address: true,
 
-        product_name: selectedProduct.productName,
+        product_name: selectedProduct.product_name,
         color: optionText.trim() || "없음",
         size: "공구상품",
         qty: Number(qty),
@@ -623,8 +619,9 @@ export default function GroupBuyPage() {
     }
   };
 
-  const openOrderForm = (productId: string) => {
-    setOpenedProductId((prev) => (prev === productId ? null : productId));
+  const openOrderForm = (productId: string | number) => {
+    const nextProductId = String(productId);
+    setOpenedProductId((prev) => (prev === nextProductId ? null : nextProductId));
     setCompleteMessage("");
     setQty("1");
     setOptionText("");
@@ -644,7 +641,6 @@ export default function GroupBuyPage() {
     >
       <section className="mx-auto w-full max-w-[480px]">
         <TopCustomerNav
-          hasSession={Boolean(session)}
           onEdit={() => {
             setIsEditingCustomer(true);
             setCustomerMode("new");
@@ -685,7 +681,17 @@ export default function GroupBuyPage() {
           </p>
         </section>
 
-        {groupProducts.length === 0 ? (
+        {loadingProducts ? (
+          <section className="rounded-[30px] border border-[#f1ecec] bg-white p-6 text-center shadow-[0_14px_35px_rgba(30,20,20,0.07)]">
+            <div className="text-[44px]">⏳</div>
+            <h2 className="mt-3 text-[25px] font-black tracking-[-0.055em] text-[#151515]">
+              공구상품 불러오는 중
+            </h2>
+            <p className="mt-3 text-[14px] font-bold leading-relaxed tracking-[-0.03em] text-[#777]">
+              관리자에 등록된 공구상품을 확인하고 있습니다.
+            </p>
+          </section>
+        ) : groupProducts.length === 0 ? (
           <section className="rounded-[30px] border border-[#f1ecec] bg-white p-6 text-center shadow-[0_14px_35px_rgba(30,20,20,0.07)]">
             <div className="text-[44px]">🛍</div>
             <h2 className="mt-3 text-[25px] font-black tracking-[-0.055em] text-[#151515]">
@@ -699,20 +705,21 @@ export default function GroupBuyPage() {
         ) : (
           <section className="grid gap-4">
             {groupProducts.map((product) => {
-              const canOrder = product.stockStatus !== "품절";
-              const isOpened = openedProductId === product.id;
+              const productStockStatus = getProductStockStatus(product);
+              const canOrder = productStockStatus !== "품절";
+              const isOpened = openedProductId === String(product.id);
               const isNormal = isNormalDeliveryProduct(product);
 
               return (
                 <article
-                  key={product.id}
+                  key={String(product.id)}
                   className="overflow-hidden rounded-[30px] border border-[#f1ecec] bg-white shadow-[0_14px_35px_rgba(30,20,20,0.07)]"
                 >
-                  {product.imageUrl && (
+                  {product.image_url && (
                     <div className="h-[210px] w-full bg-[#fff7f8]">
                       <img
-                        src={product.imageUrl}
-                        alt={product.productName}
+                        src={product.image_url}
+                        alt={product.product_name}
                         draggable={false}
                         className="h-full w-full object-cover"
                       />
@@ -721,16 +728,16 @@ export default function GroupBuyPage() {
 
                   <div className="p-5">
                     <div className="mb-3 flex flex-wrap items-center gap-2">
-                      <StockBadge status={product.stockStatus} />
+                      <StockBadge status={productStockStatus} />
                       <DeliveryBadge product={product} />
                     </div>
 
                     <h2 className="break-keep text-[23px] font-black leading-snug tracking-[-0.05em] text-[#151515]">
-                      {product.productName}
+                      {product.product_name}
                     </h2>
 
                     <p className="mt-2 text-[14px] font-bold leading-relaxed tracking-[-0.03em] text-[#777]">
-                      {product.shortDesc}
+                      {product.description || "상품 사진 확인 후 주문해주세요."}
                     </p>
 
                     <div className="mt-4 rounded-[22px] bg-[#fffafa] p-4">
@@ -747,9 +754,9 @@ export default function GroupBuyPage() {
                     </div>
 
                     <div className="mt-4 grid grid-cols-2 gap-3">
-                      {product.photoUrl ? (
+                      {product.external_image_url ? (
                         <a
-                          href={product.photoUrl}
+                          href={product.external_image_url}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="rounded-[20px] bg-[#f5f2f2] px-4 py-4 text-center text-[14px] font-black text-[#5f5555] transition active:scale-[0.97]"
@@ -786,7 +793,7 @@ export default function GroupBuyPage() {
                             📝 바로주문
                           </div>
                           <h3 className="mt-3 text-[24px] font-black tracking-[-0.055em] text-[#151515]">
-                            {product.productName}
+                            {product.product_name}
                           </h3>
                           <p className="mt-1 text-[13px] font-bold leading-relaxed text-[#777]">
                             주문서 작성 화면과 같은 방식으로 진행됩니다.
@@ -810,7 +817,7 @@ export default function GroupBuyPage() {
                               </p>
                               <p className="mt-2 text-[12px] font-bold leading-relaxed text-green-700/80">
                                 로그아웃 전까지 이 정보로 바로 주문됩니다.
-                                수정이 필요하면 상단 [정보변경]을 눌러주세요.
+                                수정이 필요하면 상단 [정보수정]을 눌러주세요.
                               </p>
                             </div>
                           ) : (
@@ -926,7 +933,7 @@ export default function GroupBuyPage() {
                           <TextInput
                             value={optionText}
                             onChange={setOptionText}
-                            placeholder={product.optionPlaceholder || "옵션/색상/사이즈 없으면 없음"}
+                            placeholder="옵션/색상/사이즈 없으면 없음"
                           />
                           <TextInput
                             value={qty}
