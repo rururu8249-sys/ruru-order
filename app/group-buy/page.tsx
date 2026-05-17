@@ -109,6 +109,42 @@ const formatPhone = (value: string) => {
   return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
 };
 
+const maskName = (value: string) => {
+  const text = String(value || "").trim();
+  if (!text) return "-";
+  if (text.length <= 1) return `${text}*`;
+  if (text.length === 2) return `${text[0]}*`;
+  return `${text[0]}${"*".repeat(Math.max(1, text.length - 2))}${text[text.length - 1]}`;
+};
+
+const maskNickname = (value: string) => {
+  const text = String(value || "").trim();
+  if (!text) return "-";
+  if (text.length <= 1) return `${text}*`;
+  return `${text[0]}${"*".repeat(Math.min(2, text.length - 1))}`;
+};
+
+const maskPhone = (value: string) => {
+  const numbers = onlyNumber(value);
+  if (numbers.length >= 11) return `${numbers.slice(0, 3)}-****-${numbers.slice(7, 11)}`;
+  if (numbers.length >= 7) return `${numbers.slice(0, 3)}-****`;
+  return formatPhone(numbers);
+};
+
+const maskAddress = (base: string, detail: string) => {
+  const full = `${String(base || "").trim()} ${String(detail || "").trim()}`.trim();
+  if (!full) return "-";
+
+  const parts = full.split(/\s+/);
+  if (parts.length <= 2) return `${parts[0] || ""} ***`.trim();
+
+  const last = parts[parts.length - 1] || "";
+  const maskedLast = last.length <= 1 ? "*" : `${last[0]}${"*".repeat(Math.min(3, last.length - 1))}`;
+
+  return [...parts.slice(0, -1), maskedLast].join(" ");
+};
+
+
 const isNormalDeliveryProduct = (product: GroupProduct) => {
   return product.shipping_type === "일반" && product.combine_shipping === "Y";
 };
@@ -202,16 +238,11 @@ function StockBadge({ status }: { status: "주문가능" | "품절" | "마감임
 
 function DeliveryBadge({ product }: { product: GroupProduct }) {
   const isNormal = isNormalDeliveryProduct(product);
-  const label = isNormal ? "일반배송 · 합배송 가능" : "업체/별도배송";
+  const label = isNormal ? "🟢 합배송 가능" : "🔴 별도배송";
   const color = isNormal ? "bg-[#edf8f4] text-[#29916f]" : "bg-[#fff2f4] text-[#ff4b60]";
 
   return (
-    <div className="flex flex-wrap gap-2">
-      <span className="rounded-full bg-[#f6f3f3] px-3 py-1 text-[12px] font-black text-[#5f5555]">
-        {product.shipping_type}배송
-      </span>
-      <span className={`rounded-full px-3 py-1 text-[12px] font-black ${color}`}>{label}</span>
-    </div>
+    <span className={`rounded-full px-3 py-1 text-[12px] font-black ${color}`}>{label}</span>
   );
 }
 
@@ -246,6 +277,8 @@ export default function GroupBuyPage() {
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [openedProductId, setOpenedProductId] = useState<string | null>(null);
   const [session, setSession] = useState<CustomerSession | null>(null);
+  const [showSavedCustomerDetail, setShowSavedCustomerDetail] = useState(false);
+  const [showDeliveryGuideDetail, setShowDeliveryGuideDetail] = useState(false);
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
   const [customerMode, setCustomerMode] = useState<"saved" | "load" | "new">("load");
 
@@ -389,6 +422,7 @@ export default function GroupBuyPage() {
     localStorage.removeItem("ruru_customer_detail_address");
 
     setSession(null);
+    setShowSavedCustomerDetail(false);
     setIsEditingCustomer(false);
     setCustomerMode("load");
 
@@ -463,6 +497,7 @@ export default function GroupBuyPage() {
     };
 
     saveSession(nextSession);
+    setShowSavedCustomerDetail(false);
     setIsEditingCustomer(false);
     alert("확인되었습니다. 바로 주문 가능합니다.");
   };
@@ -786,18 +821,39 @@ export default function GroupBuyPage() {
           </h1>
 
           <p className="mt-2 text-[15px] font-bold leading-relaxed tracking-[-0.04em] text-[#7b6d6d]">
-            사진 확인 후 이 페이지에서 바로 주문하세요.
-            <br />다른 주문서 화면으로 이동하지 않습니다.
+            사진 확인 후 바로 주문하세요 🤍
           </p>
         </header>
 
         <section className="mb-4 rounded-[28px] bg-[#fff2f4] p-5">
-          <div className="text-[16px] font-black text-[#d7475b]">📌 배송비 기준</div>
-          <p className="mt-2 text-[13px] font-bold leading-relaxed tracking-[-0.03em] text-[#d7475b]">
-            일반배송 = 방송상품 + 합배송 가능 공구상품입니다.
-            <br />업체배송 = 별도배송입니다.
-            <br />일반+일반은 배송비 1회, 일반+업체는 배송비 2회 기준입니다.
-          </p>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[16px] font-black text-[#d7475b]">📌 배송비 안내</div>
+              <p className="mt-1 text-[13px] font-bold leading-relaxed text-[#d7475b]">
+                일반+일반 = 배송비 1회 / 일반+업체 = 배송비 2회
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowDeliveryGuideDetail((value) => !value)}
+              className="shrink-0 rounded-full bg-white px-3 py-2 text-xs font-black text-[#d7475b] transition active:scale-[0.97]"
+            >
+              {showDeliveryGuideDetail ? "내용닫기 ▲" : "내용보기 ▼"}
+            </button>
+          </div>
+
+          {showDeliveryGuideDetail && (
+            <div className="mt-3 rounded-[20px] bg-white p-4 text-[13px] font-bold leading-relaxed text-[#d7475b]">
+              • 일반배송 = 방송상품 + 합배송 가능 공구상품
+              <br />
+              • 업체배송 = 별도배송
+              <br />
+              • 일반+일반 배송비 1회
+              <br />
+              • 일반+업체 배송비 2회
+            </div>
+          )}
         </section>
 
         {loadingProducts ? (
@@ -924,20 +980,36 @@ export default function GroupBuyPage() {
                             주문자 정보
                           </div>
 
+                          {(!session || isEditingCustomer) && (
+                            <div className="mt-3 rounded-2xl bg-[#fff1a8] p-3 text-xs font-black leading-relaxed text-[#2b2416]">
+                              💡 최초 1회만 입력하면 다음 주문부터 자동 입력됩니다.
+                            </div>
+                          )}
+
                           {session && !isEditingCustomer ? (
                             <div className="mt-4 rounded-[22px] bg-green-50 p-4">
-                              <div className="text-[14px] font-black text-green-700">
-                                
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="text-[14px] font-black text-green-700">
+                                  ✅ {session.customer_name || session.youtube_nickname}님 로그인중
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => setShowSavedCustomerDetail((value) => !value)}
+                                  className="shrink-0 rounded-full bg-white px-3 py-2 text-xs font-black text-green-700 transition active:scale-[0.97]"
+                                >
+                                  {showSavedCustomerDetail ? "내용닫기 ▲" : "내용보기 ▼"}
+                                </button>
                               </div>
-                              <p className="mt-1 text-[13px] font-bold leading-relaxed text-green-700">
-                                {session.customer_name}님 / {formatPhone(session.customer_phone)}
-                                <br />
-                                📍 {session.address} {session.detail_address}
-                              </p>
-                              <p className="mt-2 text-[12px] font-bold leading-relaxed text-green-700/80">
-                                로그아웃 전까지 이 정보로 바로 주문됩니다.
-                                수정이 필요하면 상단 [정보수정]을 눌러주세요.
-                              </p>
+
+                              {showSavedCustomerDetail && (
+                                <div className="mt-3 rounded-[18px] bg-white p-3 text-[12px] font-bold leading-relaxed text-green-800">
+                                  <div>닉네임: {maskNickname(session.youtube_nickname)}</div>
+                                  <div>이름: {maskName(session.customer_name)}</div>
+                                  <div>전화번호: {maskPhone(session.customer_phone)}</div>
+                                  <div>주소: {maskAddress(session.address, session.detail_address)}</div>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <>
@@ -1004,13 +1076,6 @@ export default function GroupBuyPage() {
 
                               {customerMode === "new" && (
                                 <div className="mt-4 rounded-[22px] bg-white p-4">
-                                  <div className="rounded-2xl bg-[#fff1a8] p-3 text-xs font-black leading-relaxed text-[#2b2416]">
-                                    💡 닉네임 · 이름 · 연락처 · 주소는 최초 1회만 입력하면 됩니다.
-                                    <br />
-                                    저장 후에는 다음 주문부터 자동으로 불러옵니다.
-                                  </div>
-
-
                                   <div className="mt-3 grid gap-3">
                                     <TextInput value={nickname} onChange={setNickname} placeholder="유튜브 닉네임" />
                                     <TextInput value={customerName} onChange={setCustomerName} placeholder="이름" />

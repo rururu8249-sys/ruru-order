@@ -130,13 +130,9 @@ export default function NoticePage() {
           주문조회
         </Link>
         <span className="text-[#e1d4d5]">/</span>
-        <button
-          type="button"
-          onClick={() => { window.location.href = "/order"; }}
-          className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]"
-        >
+        <Link href="/order" className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]">
           정보수정
-        </button>
+        </Link>
         <span className="text-[#e1d4d5]">/</span>
         <button
           type="button"
@@ -148,6 +144,7 @@ export default function NoticePage() {
       </div>
     </div>
   );
+;
 
   return (
     <main className="min-h-screen select-none bg-[#fffafa] px-4 py-6 text-[#171717]" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>

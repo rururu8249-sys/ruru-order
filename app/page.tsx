@@ -1,5 +1,9 @@
 "use client";
 
+// app/page.tsx
+// 전체 교체용
+// 첫화면 상단바 MASTER 기준
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";

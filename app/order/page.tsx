@@ -113,6 +113,42 @@ const cleanColorText = (value: string) =>
 const cleanSizeText = (value: string) =>
   String(value || "").replace(/[^ㄱ-ㅎ가-힣a-zA-Z0-9\s]/g, "").slice(0, 30);
 
+const maskName = (value: string) => {
+  const text = String(value || "").trim();
+  if (!text) return "-";
+  if (text.length <= 1) return `${text}*`;
+  if (text.length === 2) return `${text[0]}*`;
+  return `${text[0]}${"*".repeat(Math.max(1, text.length - 2))}${text[text.length - 1]}`;
+};
+
+const maskNickname = (value: string) => {
+  const text = String(value || "").trim();
+  if (!text) return "-";
+  if (text.length <= 1) return `${text}*`;
+  return `${text[0]}${"*".repeat(Math.min(2, text.length - 1))}`;
+};
+
+const maskPhone = (value: string) => {
+  const numbers = onlyNumber(value);
+  if (numbers.length >= 11) return `${numbers.slice(0, 3)}-****-${numbers.slice(7, 11)}`;
+  if (numbers.length >= 7) return `${numbers.slice(0, 3)}-****`;
+  return formatPhone(numbers);
+};
+
+const maskAddress = (base: string, detail: string) => {
+  const full = `${String(base || "").trim()} ${String(detail || "").trim()}`.trim();
+  if (!full) return "-";
+
+  const parts = full.split(/\s+/);
+  if (parts.length <= 2) return `${parts[0] || ""} ***`.trim();
+
+  const last = parts[parts.length - 1] || "";
+  const maskedLast = last.length <= 1 ? "*" : `${last[0]}${"*".repeat(Math.min(3, last.length - 1))}`;
+
+  return [...parts.slice(0, -1), maskedLast].join(" ");
+};
+
+
 const blockCustomerCopyEvents = () => {
   const block = (event: Event) => event.preventDefault();
 
@@ -168,6 +204,8 @@ export default function OrderPage() {
   const [hasSavedInfo, setHasSavedInfo] = useState(false);
   const [isEditingCustomerInfo, setIsEditingCustomerInfo] = useState(false);
   const [isCustomerInfoOpen, setIsCustomerInfoOpen] = useState(false);
+  const [showSavedCustomerDetail, setShowSavedCustomerDetail] = useState(false);
+  const [showProductGuideDetail, setShowProductGuideDetail] = useState(false);
   const [customerMode, setCustomerMode] = useState<"load" | "new">("load");
   const [loginName, setLoginName] = useState("");
   const [loginPhone, setLoginPhone] = useState("");
@@ -310,6 +348,7 @@ export default function OrderPage() {
     setLoginName("");
     setLoginPhone("");
     setHasSavedInfo(false);
+    setShowSavedCustomerDetail(false);
     setIsEditingCustomerInfo(false);
     setIsCustomerInfoOpen(true);
     setCustomerMode("load");
@@ -388,6 +427,7 @@ export default function OrderPage() {
       localStorage.setItem("ruru_customer_detail_address", nextDetailAddress);
 
       setHasSavedInfo(true);
+      setShowSavedCustomerDetail(false);
       setIsEditingCustomerInfo(false);
       setIsCustomerInfoOpen(false);
       setCustomerMode("load");
@@ -808,42 +848,34 @@ export default function OrderPage() {
 
 
   const TopCustomerNav = () => (
-    <div className="sticky top-3 z-30 mb-4 flex items-center justify-between gap-2 rounded-full border border-[#f4e7e9] bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(30,20,20,0.08)] backdrop-blur">
-      <div className="shrink-0 text-[13px] font-black tracking-[-0.04em] text-[#ff4b60]">
-        📺 루루동이
-      </div>
+    <div className="sticky top-3 z-40 mx-auto mb-4 flex w-full max-w-[456px] items-center justify-between rounded-full border border-[#f3e5e7] bg-white/95 px-4 py-3 shadow-[0_10px_24px_rgba(30,20,20,0.07)] backdrop-blur">
+      <Link
+        href="/"
+        className="shrink-0 text-[14px] font-black tracking-[-0.04em] text-[#ff4b60] transition active:scale-[0.97]"
+      >
+        🏠 HOME
+      </Link>
 
-      <div className="flex min-w-0 items-center justify-end gap-2 text-[12px] font-black tracking-[-0.04em] text-[#5f5555]">
-        <Link
-          href="/"
-          className={`${buttonBase} whitespace-nowrap px-1 py-2 text-[#ff4b60]`}
-        >
-          🏠 HOME
+      <div className="flex items-center gap-2 text-[13px] font-black tracking-[-0.04em] text-[#5f5555]">
+        <Link href="/myorder" className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]">
+          주문조회
         </Link>
-
-        {hasSavedInfo && (
-          <>
-            <span className="text-[#e1d4d5]">/</span>
-
-            <button
-              type="button"
-              onClick={startEditCustomerInfo}
-              className={`${buttonBase} whitespace-nowrap px-1 py-2 text-[#5f5555]`}
-            >
-              정보수정
-            </button>
-
-            <span className="text-[#e1d4d5]">/</span>
-
-            <button
-              type="button"
-              onClick={logoutCustomerInfo}
-              className={`${buttonBase} whitespace-nowrap px-1 py-2 text-[#5f5555]`}
-            >
-              로그아웃
-            </button>
-          </>
-        )}
+        <span className="text-[#e1d4d5]">/</span>
+        <button
+          type="button"
+          onClick={startEditCustomerInfo}
+          className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]"
+        >
+          정보수정
+        </button>
+        <span className="text-[#e1d4d5]">/</span>
+        <button
+          type="button"
+          onClick={logoutCustomerInfo}
+          className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]"
+        >
+          로그아웃
+        </button>
       </div>
     </div>
   );
@@ -1004,27 +1036,40 @@ export default function OrderPage() {
           <div className="mb-4">
             <h2 className="text-xl font-black">주문자 정보</h2>
             <p className="mt-1 text-xs font-bold text-pink-500">
-              신규 고객은 최초 1회만 입력
+              주문 전 정보 확인 후 작성해주세요.
             </p>
           </div>
 
           {hasSavedInfo && !isEditingCustomerInfo ? (
             <div className="rounded-[1.5rem] bg-green-50 p-4">
-              <div className="text-sm font-black text-green-700">
-                {customerName || youtubeNickname}님 로그인중
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-black text-green-700">
+                  ✅ {customerName || youtubeNickname}님 로그인중
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowSavedCustomerDetail((value) => !value)}
+                  className={`${buttonBase} shrink-0 rounded-full bg-white px-3 py-2 text-xs font-black text-green-700`}
+                >
+                  {showSavedCustomerDetail ? "내용닫기 ▲" : "내용보기 ▼"}
+                </button>
               </div>
-              <div className="mt-1 text-xs font-bold leading-relaxed text-green-700">
-                {formatPhone(customerPhone)}
-                <br />
-                📍 {address} {detailAddress}
-              </div>
-              <p className="mt-2 text-xs font-bold leading-relaxed text-green-700/80">
-                로그아웃 전까지 이 정보로 주문서가 자동 입력됩니다.
-                수정이 필요하면 상단 [정보수정]을 눌러주세요.
-              </p>
+
+              {showSavedCustomerDetail && (
+                <div className="mt-3 rounded-[1.2rem] bg-white p-3 text-xs font-bold leading-relaxed text-green-800">
+                  <div>닉네임: {maskNickname(youtubeNickname)}</div>
+                  <div>이름: {maskName(customerName)}</div>
+                  <div>전화번호: {maskPhone(customerPhone)}</div>
+                  <div>주소: {maskAddress(address, detailAddress)}</div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="rounded-[1.5rem] bg-[#fff7f8] p-3">
+              <div className="mb-3 rounded-2xl bg-[#fff1a8] p-3 text-xs font-black leading-relaxed text-[#2b2416]">
+                💡 최초 1회만 입력하면 다음 주문부터 자동 입력됩니다.
+              </div>
               {isEditingCustomerInfo ? (
                 <div className="rounded-[1.2rem] bg-white p-2">
                   <div className="rounded-[1rem] bg-[#ff4b60] px-3 py-3 text-center text-sm font-black text-white">
@@ -1097,13 +1142,6 @@ export default function OrderPage() {
 
               {customerMode === "new" && (
                 <div className="mt-4 rounded-[1.4rem] bg-white p-4">
-                  <div className="rounded-2xl bg-[#fff1a8] p-3 text-xs font-black leading-relaxed text-[#2b2416]">
-                    💡 닉네임 · 이름 · 연락처 · 주소는 최초 1회만 입력하면 됩니다.
-                    <br />
-                    저장 후에는 다음 주문부터 자동으로 불러옵니다.
-                  </div>
-
-
                   <div className="mt-3 grid gap-3">
                     <input
                       id="youtubeNicknameInput"
@@ -1194,36 +1232,58 @@ export default function OrderPage() {
         <section className="mt-4 rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-black">주문상품</h2>
 
-          {broadcast && broadcastProducts.length > 0 && (
-            <div className="mt-4 rounded-[1.4rem] bg-[#fff7f8] p-4 text-xs font-bold leading-relaxed text-pink-700">
-              🔴 현재 방송상품 {broadcastProducts.length}개가 연결되어 있습니다.
-              <br />
-              상품명 칸을 누르면 오늘 방송상품을 선택할 수 있고, 금액은 자동 입력됩니다.
-              <br />
-              목록에 없는 상품은 기존처럼 직접 입력 가능합니다.
+          <div className="mt-4 rounded-[1.4rem] bg-pink-50 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="text-sm font-black leading-relaxed text-pink-700">
+                ⚠️ 상품 1칸 = 상품 1개만 작성
+                <br />
+                📌 색상/사이즈 없으면 “없음”
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowProductGuideDetail((value) => !value)}
+                className={`${buttonBase} shrink-0 rounded-full bg-white px-3 py-2 text-xs font-black text-pink-700`}
+              >
+                {showProductGuideDetail ? "내용닫기 ▲" : "내용보기 ▼"}
+              </button>
             </div>
-          )}
 
-          {broadcast && broadcastProducts.length === 0 && (
-            <div className="mt-4 rounded-[1.4rem] bg-yellow-50 p-4 text-xs font-bold leading-relaxed text-yellow-700">
-              ⚠️ 현재 방송은 ON 상태지만 연결된 방송상품이 없습니다.
-              <br />
-              상품명은 기존처럼 직접 입력해주세요.
-            </div>
-          )}
+            {showProductGuideDetail && (
+              <div className="mt-3 grid gap-3">
+                {broadcast && broadcastProducts.length > 0 && (
+                  <div className="rounded-[1.2rem] bg-white p-3 text-xs font-bold leading-relaxed text-pink-700">
+                    🔴 현재 방송상품 {broadcastProducts.length}개가 연결되어 있습니다.
+                    <br />
+                    상품명 칸을 누르면 오늘 방송상품 선택 및 금액 자동입력이 가능합니다.
+                    <br />
+                    목록에 없는 상품은 직접 입력 가능합니다.
+                  </div>
+                )}
 
-          <div className="mt-4 rounded-[1.4rem] bg-red-50 p-4 text-sm font-black leading-relaxed text-red-600">
-            ⚠️ 상품 1칸에는 상품 1개만 입력하세요.
-            <br />
-            다른 상품은 반드시 아래 [+ 상품 추가하기]를 눌러 따로 작성해주세요.
-            <br />
-            한 칸에 2개 이상 적으면 주문 누락될 수 있습니다.
-          </div>
+                {broadcast && broadcastProducts.length === 0 && (
+                  <div className="rounded-[1.2rem] bg-yellow-50 p-3 text-xs font-bold leading-relaxed text-yellow-700">
+                    ⚠️ 현재 방송은 ON 상태지만 연결된 방송상품이 없습니다.
+                    <br />
+                    상품명은 기존처럼 직접 입력해주세요.
+                  </div>
+                )}
 
-          <div className="mt-3 rounded-[1.4rem] bg-pink-50 p-4 text-xs font-bold leading-relaxed text-pink-700">
-            색상·사이즈가 없으면 반드시 “없음”이라고 입력해주세요.
-            <br />
-            상품명 / 색상 / 사이즈 / 수량 / 금액은 전부 필수입니다.
+                <div className="rounded-[1.2rem] bg-red-50 p-3 text-xs font-black leading-relaxed text-red-600">
+                  ⚠️ 상품 1칸에는 상품 1개만 입력하세요.
+                  <br />
+                  다른 상품은 반드시 아래 [+ 상품 추가하기]를 눌러 따로 작성해주세요.
+                  <br />
+                  한 칸에 2개 이상 적으면 주문 누락될 수 있습니다.
+                </div>
+
+                <div className="rounded-[1.2rem] bg-white p-3 text-xs font-bold leading-relaxed text-pink-700">
+                  색상·사이즈가 없으면 반드시 “없음”이라고 입력해주세요.
+                  <br />
+                  상품명 / 색상 / 사이즈 / 수량 / 금액은 전부 필수입니다.
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mt-4 grid gap-4">
