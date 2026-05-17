@@ -9,6 +9,8 @@
 // - 저장된 고객정보가 있으면 불필요한 입력영역 숨김
 // - 배송: 일반배송=방송상품+합배송 가능 공구상품, 업체배송=별도배송
 // - 관리자 products 테이블에서 공구상품/판매중 상품 자동 노출
+// - 주문서작성과 동일한 결제방식 UI/UX 적용
+// - 공구상품 로그인 정보를 주문서작성 localStorage와 동기화
 
 "use client";
 
@@ -49,6 +51,11 @@ type CustomerSession = {
 
 const NORMAL_SHIPPING_FEE = 4000;
 const VENDOR_SHIPPING_FEE = 4000;
+const BANK_NAME = "새마을금고";
+const BANK_ACCOUNT = "9002186993725";
+const BANK_HOLDER = "유혜원";
+const KAKAO_CHANNEL_URL = "https://pf.kakao.com/_RMxaqX";
+const CARD_RATE_FOR_CUSTOMER = 10;
 
 const blockCustomerCopyEvents = () => {
   const block = (event: Event) => event.preventDefault();
@@ -257,6 +264,10 @@ export default function GroupBuyPage() {
   const [optionText, setOptionText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [completeMessage, setCompleteMessage] = useState("");
+  const [completePaymentMethod, setCompletePaymentMethod] = useState<"무통장입금" | "카드결제">("무통장입금");
+  const [completeTotalAmount, setCompleteTotalAmount] = useState(0);
+  const [paymentMethod, setPaymentMethod] = useState<"무통장입금" | "카드결제">("무통장입금");
+  const [copyDone, setCopyDone] = useState(false);
 
   useEffect(() => {
     const cleanup = blockCustomerCopyEvents();
@@ -280,6 +291,28 @@ export default function GroupBuyPage() {
         setCustomerMode("saved");
       } catch {
         localStorage.removeItem("ruru_customer_session");
+      }
+    } else {
+      const savedPhone = localStorage.getItem("ruru_customer_phone") || "";
+      const savedNickname = localStorage.getItem("ruru_youtube_nickname") || "";
+      const savedName = localStorage.getItem("ruru_customer_name") || "";
+      const savedZipcode = localStorage.getItem("ruru_customer_zipcode") || "";
+      const savedAddress = localStorage.getItem("ruru_customer_address") || "";
+      const savedDetailAddress = localStorage.getItem("ruru_customer_detail_address") || "";
+
+      if (savedPhone && savedName) {
+        const parsed: CustomerSession = {
+          youtube_nickname: savedNickname,
+          customer_name: savedName,
+          customer_phone: savedPhone,
+          zipcode: savedZipcode,
+          address: savedAddress,
+          detail_address: savedDetailAddress,
+        };
+        setSession(parsed);
+        localStorage.setItem("ruru_customer_session", JSON.stringify(parsed));
+        fillCustomerForm(parsed);
+        setCustomerMode("saved");
       }
     }
 
@@ -317,7 +350,10 @@ export default function GroupBuyPage() {
       ? NORMAL_SHIPPING_FEE
       : VENDOR_SHIPPING_FEE
     : 0;
-  const totalAmount = productAmount + shippingFee;
+  const cardExtra = paymentMethod === "카드결제"
+    ? Math.round(productAmount * (CARD_RATE_FOR_CUSTOMER / 100))
+    : 0;
+  const totalAmount = productAmount + shippingFee + cardExtra;
 
   const fillCustomerForm = (customer: CustomerSession) => {
     setNickname(customer.youtube_nickname || "");
@@ -331,12 +367,26 @@ export default function GroupBuyPage() {
   const saveSession = (customer: CustomerSession) => {
     setSession(customer);
     localStorage.setItem("ruru_customer_session", JSON.stringify(customer));
+
+    localStorage.setItem("ruru_youtube_nickname", customer.youtube_nickname || "");
+    localStorage.setItem("ruru_customer_name", customer.customer_name || "");
+    localStorage.setItem("ruru_customer_phone", onlyNumber(customer.customer_phone || ""));
+    localStorage.setItem("ruru_customer_zipcode", customer.zipcode || "");
+    localStorage.setItem("ruru_customer_address", customer.address || "");
+    localStorage.setItem("ruru_customer_detail_address", customer.detail_address || "");
+
     fillCustomerForm(customer);
     setCustomerMode("saved");
   };
 
   const logout = () => {
     localStorage.removeItem("ruru_customer_session");
+    localStorage.removeItem("ruru_customer_phone");
+    localStorage.removeItem("ruru_youtube_nickname");
+    localStorage.removeItem("ruru_customer_name");
+    localStorage.removeItem("ruru_customer_zipcode");
+    localStorage.removeItem("ruru_customer_address");
+    localStorage.removeItem("ruru_customer_detail_address");
 
     setSession(null);
     setIsEditingCustomer(false);
@@ -539,6 +589,11 @@ export default function GroupBuyPage() {
       return;
     }
 
+    if (paymentMethod === "카드결제" && productAmount < 100000) {
+      alert("카드결제는 10만원 이상 구매 시 가능합니다.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -549,7 +604,12 @@ export default function GroupBuyPage() {
       const orderLookupCode = generateLookupCode();
       const isNormal = isNormalDeliveryProduct(selectedProduct);
       const finalShippingFee = isNormal ? NORMAL_SHIPPING_FEE : VENDOR_SHIPPING_FEE;
-      const finalTotal = selectedProduct.price * Number(qty) + finalShippingFee;
+      const finalProductAmount = selectedProduct.price * Number(qty);
+      const finalCardExtra =
+        paymentMethod === "카드결제"
+          ? Math.round(finalProductAmount * (CARD_RATE_FOR_CUSTOMER / 100))
+          : 0;
+      const finalTotal = finalProductAmount + finalShippingFee + finalCardExtra;
 
       const orderRow = {
         order_group_id: orderGroupId,
@@ -589,6 +649,7 @@ export default function GroupBuyPage() {
         adjusted_shipping_fee: finalShippingFee,
         total_price: finalTotal,
         adjusted_total_price: finalTotal,
+        adjusted_product_price: finalProductAmount,
 
         combine_shipping_applied: false,
         combine_shipping_memo: isNormal
@@ -599,23 +660,36 @@ export default function GroupBuyPage() {
         admin_status: "관리자 확인 전",
         order_status: "주문완료신청",
 
-        payment_method: "무통장입금",
-        vat_amount: 0,
+        payment_method: paymentMethod,
+        vat_amount: finalCardExtra,
       };
 
       const { error } = await supabase.from("orders").insert([orderRow]);
       if (error) throw error;
 
       setCompleteMessage(`주문완료신청 완료! 주문조회번호: ${orderLookupCode}`);
+      setCompletePaymentMethod(paymentMethod);
+      setCompleteTotalAmount(finalTotal);
       setQty("1");
       setOptionText("");
       setRequestMemo("");
+      setPaymentMethod("무통장입금");
       setOpenedProductId(null);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error: any) {
       alert("주문 저장 실패\n\n" + error.message);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const copyBankAccount = async () => {
+    try {
+      await navigator.clipboard.writeText(BANK_ACCOUNT);
+      setCopyDone(true);
+      setTimeout(() => setCopyDone(false), 1800);
+    } catch {
+      alert(BANK_ACCOUNT);
     }
   };
 
@@ -626,6 +700,7 @@ export default function GroupBuyPage() {
     setQty("1");
     setOptionText("");
     setRequestMemo("");
+    setPaymentMethod("무통장입금");
     if (session) {
       setCustomerMode("saved");
       setIsEditingCustomer(false);
@@ -651,9 +726,53 @@ export default function GroupBuyPage() {
         {completeMessage && (
           <section className="mb-4 rounded-[28px] border border-green-200 bg-green-50 p-5 shadow-sm">
             <div className="text-[18px] font-black text-green-700">✅ {completeMessage}</div>
-            <p className="mt-2 text-[13px] font-bold leading-relaxed text-green-700">
-              입금 후 카톡채널로 입금내역 캡처와 유튜브 닉네임을 남겨주세요.
-            </p>
+
+            <div className="mt-4 rounded-[22px] bg-white p-4">
+              <div className="flex items-center justify-between text-[14px] font-bold text-[#5f5555]">
+                <span>최종 결제금액</span>
+                <span className="text-[22px] font-black text-[#151515]">
+                  {won(completeTotalAmount)}
+                </span>
+              </div>
+            </div>
+
+            {completePaymentMethod === "무통장입금" ? (
+              <div className="mt-4 rounded-[22px] bg-yellow-50 p-4">
+                <div className="text-[14px] font-black text-yellow-700">입금계좌 안내</div>
+                <div className="mt-2 text-[13px] font-bold text-yellow-700">{BANK_NAME}</div>
+                <div className="mt-1 text-[26px] font-black tracking-[-0.04em] text-[#151515]">
+                  {BANK_ACCOUNT}
+                </div>
+                <div className="mt-1 text-[17px] font-black text-[#151515]">{BANK_HOLDER}</div>
+
+                <button
+                  type="button"
+                  onClick={copyBankAccount}
+                  className="mt-3 w-full rounded-[18px] bg-[#171717] px-4 py-4 text-[14px] font-black text-white transition active:scale-[0.97]"
+                >
+                  {copyDone ? "✓ 계좌번호가 복사되었습니다" : "계좌번호 복사"}
+                </button>
+
+                <p className="mt-3 text-[13px] font-bold leading-relaxed text-yellow-700">
+                  입금 후 카톡채널로 입금내역 캡처와 유튜브 닉네임을 남겨주세요.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-4 rounded-[22px] bg-blue-50 p-4 text-center">
+                <div className="text-[16px] font-black text-blue-700">카드결제 안내</div>
+                <p className="mt-2 text-[13px] font-bold leading-relaxed text-blue-700">
+                  카드결제는 카톡채널로 문의 주시면 관리자 확인 후 결제 링크를 보내드립니다.
+                </p>
+                <a
+                  href={KAKAO_CHANNEL_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 block rounded-[18px] bg-blue-600 px-4 py-4 text-[14px] font-black text-white transition active:scale-[0.97]"
+                >
+                  카톡채널 문의하기
+                </a>
+              </div>
+            )}
           </section>
         )}
 
@@ -949,6 +1068,46 @@ export default function GroupBuyPage() {
                           />
                         </div>
 
+                        <div className="mt-4 rounded-[22px] border border-[#eee4e5] bg-white p-4">
+                          <div className="text-[16px] font-black text-[#151515]">결제방식</div>
+                          <div className="mt-3 grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setPaymentMethod("무통장입금")}
+                              className={`rounded-[18px] px-3 py-4 text-[14px] font-black transition active:scale-[0.97] ${
+                                paymentMethod === "무통장입금"
+                                  ? "bg-[#171717] text-white"
+                                  : "bg-[#f5f2f2] text-[#5f5555]"
+                              }`}
+                            >
+                              무통장입금
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setPaymentMethod("카드결제")}
+                              className={`rounded-[18px] px-3 py-4 text-[14px] font-black transition active:scale-[0.97] ${
+                                paymentMethod === "카드결제"
+                                  ? "bg-blue-600 text-white"
+                                  : "bg-[#f5f2f2] text-[#5f5555]"
+                              }`}
+                            >
+                              카드결제
+                            </button>
+                          </div>
+
+                          {paymentMethod === "무통장입금" ? (
+                            <div className="mt-3 rounded-[18px] bg-yellow-50 p-3 text-[12px] font-bold leading-relaxed text-yellow-700">
+                              주문완료 후 입금계좌가 안내됩니다.
+                            </div>
+                          ) : (
+                            <div className="mt-3 rounded-[18px] bg-blue-50 p-3 text-[12px] font-bold leading-relaxed text-blue-700">
+                              카드결제는 10만원 이상 가능하며, 카드결제 부가세 10%가 추가됩니다.
+                              주문완료 후 카톡채널로 결제 링크를 요청해주세요.
+                            </div>
+                          )}
+                        </div>
+
                         <div className="mt-4 rounded-[22px] bg-[#fffafa] p-4 text-[14px] font-bold text-[#5f5555]">
                           <div className="flex justify-between">
                             <span>상품금액</span>
@@ -958,6 +1117,12 @@ export default function GroupBuyPage() {
                             <span>{isNormal ? "일반배송비" : "업체배송비"}</span>
                             <span>{won(shippingFee)}</span>
                           </div>
+                          {paymentMethod === "카드결제" && (
+                            <div className="mt-2 flex justify-between text-blue-600">
+                              <span>카드결제 부가세 10%</span>
+                              <span>{won(cardExtra)}</span>
+                            </div>
+                          )}
                           <div className="mt-3 flex justify-between border-t border-[#eee5e5] pt-3 text-[20px] font-black text-[#151515]">
                             <span>최종금액</span>
                             <span>{won(totalAmount)}</span>
