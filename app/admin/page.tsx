@@ -51,6 +51,54 @@ type OrderNotice = {
   createdAt: string;
 };
 
+type AdminOrder = {
+  id?: string | number;
+  order_group_id?: string;
+  order_lookup_code?: string;
+  created_at?: string;
+  broadcast_id?: string | number;
+  broadcast_name?: string;
+  youtube_nickname?: string;
+  customer_name?: string;
+  customer_phone?: string;
+  zipcode?: string;
+  address?: string;
+  detail_address?: string;
+  request_memo?: string;
+  product_name?: string;
+  color?: string;
+  size?: string;
+  qty?: number;
+  product_price?: number;
+  total_price?: number;
+  adjusted_total_price?: number;
+  payment_method?: string;
+  order_status?: string;
+  admin_status?: string;
+  order_manage_status?: string;
+  shipping_status?: string;
+  memo?: string;
+  special_note?: string;
+  is_deleted?: boolean;
+  admin_order_status?: string;
+  admin_product_price?: number;
+  admin_shipping_fee?: number;
+  shipping_fee?: number;
+};
+
+type CustomerProfile = {
+  id?: string | number;
+  youtube_nickname?: string;
+  customer_name?: string;
+  customer_phone?: string;
+  zipcode?: string;
+  address?: string;
+  detail_address?: string;
+  request_memo?: string;
+  is_blocked?: boolean;
+  admin_memo?: string;
+};
+
 const emptyProduct: Product = {
   product_name: "",
   description: "",
@@ -69,6 +117,7 @@ const money = (value: number | string) =>
   `${Number(value || 0).toLocaleString()}원`;
 
 const onlyNumber = (value: string) => value.replace(/[^0-9]/g, "");
+const normalizePhoneKey = (value?: string) => String(value || "").replace(/[^0-9]/g, "");
 
 export default function AdminPage() {
   const [activeMenu, setActiveMenu] = useState<
@@ -110,8 +159,26 @@ export default function AdminPage() {
   const recentOrderGroupRef = useRef<Set<string>>(new Set());
   const audioContextRef = useRef<any>(null);
 
+  const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [orderKeyword, setOrderKeyword] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState<"전체" | "무통장입금" | "카드결제">("전체");
+  const [selectedOrderGroupIds, setSelectedOrderGroupIds] = useState<string[]>([]);
+  const [selectedOrderDetailGroupId, setSelectedOrderDetailGroupId] = useState<string | null>(null);
+  const [customerKeyword, setCustomerKeyword] = useState("");
+  const [blockedPhones, setBlockedPhones] = useState<string[]>([]);
+  const [customers, setCustomers] = useState<CustomerProfile[]>([]);
+  const [selectedCustomerKeys, setSelectedCustomerKeys] = useState<string[]>([]);
+  const [selectedCustomerDetailKey, setSelectedCustomerDetailKey] = useState<string | null>(null);
+  const [showOnlyLinkedProducts, setShowOnlyLinkedProducts] = useState(false);
+
   useEffect(() => {
     loadAll();
+
+    if (typeof window !== "undefined") {
+      const savedSound = localStorage.getItem("ruru_admin_order_sound") === "ON";
+      if (savedSound) setSoundEnabled(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -168,8 +235,39 @@ export default function AdminPage() {
     };
   }, [soundEnabled]);
 
+  useEffect(() => {
+    if (!soundEnabled) return;
+
+    const resumeSound = async () => {
+      try {
+        const AudioContextClass =
+          (window as any).AudioContext || (window as any).webkitAudioContext;
+
+        if (!AudioContextClass) return;
+
+        if (!audioContextRef.current) {
+          audioContextRef.current = new AudioContextClass();
+        }
+
+        if (audioContextRef.current.state === "suspended") {
+          await audioContextRef.current.resume();
+        }
+      } catch {
+        // 사용자 입력 전 브라우저 정책으로 실패 가능
+      }
+    };
+
+    document.addEventListener("click", resumeSound, { once: true });
+    document.addEventListener("keydown", resumeSound, { once: true });
+
+    return () => {
+      document.removeEventListener("click", resumeSound);
+      document.removeEventListener("keydown", resumeSound);
+    };
+  }, [soundEnabled]);
+
   const loadAll = async () => {
-    await Promise.all([loadProducts(), loadBroadcasts()]);
+    await Promise.all([loadProducts(), loadBroadcasts(), loadOrders(), loadCustomers()]);
   };
 
   const loadProducts = async () => {
@@ -189,6 +287,41 @@ export default function AdminPage() {
 
     setProducts((data || []) as Product[]);
     setLoadingProducts(false);
+  };
+
+  const loadOrders = async () => {
+    setLoadingOrders(true);
+
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(300);
+
+    if (error) {
+      console.log("주문 목록 불러오기 실패", error.message);
+      setOrders([]);
+      setLoadingOrders(false);
+      return;
+    }
+
+    setOrders(((data || []) as AdminOrder[]).filter((order) => order.is_deleted !== true));
+    setLoadingOrders(false);
+  };
+
+  const loadCustomers = async () => {
+    const { data, error } = await supabase
+      .from("customers")
+      .select("*")
+      .limit(1000);
+
+    if (error) {
+      console.log("고객 목록 불러오기 실패", error.message);
+      setCustomers([]);
+      return;
+    }
+
+    setCustomers((data || []) as CustomerProfile[]);
   };
 
   const loadBroadcastProductIds = async (broadcastId: string | number) => {
@@ -214,6 +347,7 @@ export default function AdminPage() {
     const { data, error } = await supabase
       .from("broadcasts")
       .select("*")
+      .neq("is_deleted", true)
       .order("started_at", { ascending: false })
       .order("id", { ascending: false })
       .limit(20);
@@ -269,6 +403,179 @@ export default function AdminPage() {
         (product.product_type === "방송상품" || product.product_type === "공구상품")
     );
   }, [products]);
+
+  const selectedBroadcastProducts = useMemo(() => {
+    return products.filter(
+      (product) =>
+        product.id !== undefined && selectedBroadcastProductIds.includes(product.id)
+    );
+  }, [products, selectedBroadcastProductIds]);
+
+  const visibleBroadcastSelectableProducts = useMemo(() => {
+    if (!showOnlyLinkedProducts) return broadcastSelectableProducts;
+
+    return broadcastSelectableProducts.filter(
+      (product) =>
+        product.id !== undefined && selectedBroadcastProductIds.includes(product.id)
+    );
+  }, [broadcastSelectableProducts, selectedBroadcastProductIds, showOnlyLinkedProducts]);
+
+  const filteredOrders = useMemo(() => {
+    const word = orderKeyword.trim().toLowerCase();
+
+    return orders.filter((order) => {
+      const matchPayment =
+        paymentFilter === "전체" || order.payment_method === paymentFilter;
+
+      const target = [
+        order.youtube_nickname,
+        order.customer_name,
+        order.customer_phone,
+        order.product_name,
+        order.order_lookup_code,
+        order.broadcast_name,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      const matchWord = !word || target.includes(word);
+
+      return matchPayment && matchWord;
+    });
+  }, [orders, orderKeyword, paymentFilter]);
+
+  const orderGroups = useMemo(() => {
+    const map = new Map<string, AdminOrder[]>();
+
+    filteredOrders.forEach((order) => {
+      const key = String(order.order_group_id || order.order_lookup_code || order.id || "");
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)?.push(order);
+    });
+
+    return Array.from(map.entries()).map(([groupId, rows]) => ({
+      groupId,
+      rows,
+      first: rows[0],
+      totalQty: rows.reduce((sum, row) => sum + Number(row.qty || 0), 0),
+      totalAmount: rows.reduce(
+        (sum, row) =>
+          sum +
+          Number(
+            row.adjusted_total_price ||
+              row.total_price ||
+              Number(row.product_price || 0) * Number(row.qty || 1)
+          ),
+        0
+      ),
+    }));
+  }, [filteredOrders]);
+
+
+  const isCanceledOrder = (order: AdminOrder) => {
+    const text = [
+      order.admin_order_status,
+      order.order_status,
+      order.admin_status,
+      order.order_manage_status,
+      order.shipping_status,
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    return /취소|환불|주문취소|삭제/.test(text);
+  };
+
+  const selectedOrderDetail = useMemo(() => {
+    if (!selectedOrderDetailGroupId) return null;
+    return orderGroups.find((group) => group.groupId === selectedOrderDetailGroupId) || null;
+  }, [orderGroups, selectedOrderDetailGroupId]);
+
+    const customerRows = useMemo(() => {
+    const map = new Map<string, AdminOrder[]>();
+
+    orders.forEach((order) => {
+      const phoneKey = normalizePhoneKey(order.customer_phone || "");
+      const key =
+        phoneKey ||
+        String(order.youtube_nickname || order.customer_name || order.id || "");
+
+      if (!key) return;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)?.push(order);
+    });
+
+    const keyword = customerKeyword.trim().toLowerCase();
+
+    return Array.from(map.entries())
+      .map(([key, rows]) => {
+        const first = rows[0] || {};
+        const phoneKey = normalizePhoneKey(first.customer_phone || "");
+
+        const totalQty = rows.reduce(
+          (sum, row) => sum + Number(row.qty || 0),
+          0
+        );
+
+        const totalAmount = rows.reduce(
+          (sum, row) =>
+            sum +
+            Number(
+              row.adjusted_total_price ||
+                row.total_price ||
+                Number(row.product_price || 0) * Number(row.qty || 1)
+            ),
+          0
+        );
+
+        const cancelCount = rows.filter((row) => isCanceledOrder(row)).length;
+
+        const recentOrderAt =
+          rows
+            .map((row) => row.created_at || "")
+            .filter(Boolean)
+            .sort()
+            .reverse()[0] || "";
+
+        return {
+          key,
+          first,
+          profile: first,
+          rows,
+          totalQty,
+          totalAmount,
+          cancelCount,
+          recentOrderAt,
+          isBlocked: phoneKey ? blockedPhones.includes(phoneKey) : false,
+          adminMemo: first.memo || "",
+          orderCount: new Set(
+            rows.map((row) => row.order_group_id || row.order_lookup_code || row.id)
+          ).size,
+        };
+      })
+      .filter((customer) => {
+        if (!keyword) return true;
+
+        const target = [
+          customer.first.youtube_nickname,
+          customer.first.customer_name,
+          customer.first.customer_phone,
+          customer.first.address,
+          customer.first.detail_address,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        return target.includes(keyword);
+      });
+  }, [orders, customerKeyword, blockedPhones]);
+
+const selectedCustomerDetail = useMemo(() => {
+    if (!selectedCustomerDetailKey) return null;
+    return customerRows.find((customer) => customer.key === selectedCustomerDetailKey) || null;
+  }, [customerRows, selectedCustomerDetailKey]);
 
   const dashboardCounts = useMemo(() => {
     const selling = products.filter((p) => p.status === "판매중").length;
@@ -660,6 +967,305 @@ export default function AdminPage() {
     }
   };
 
+  const selectAllBroadcastProducts = () => {
+    setSelectedBroadcastProductIds(
+      broadcastSelectableProducts
+        .map((product) => product.id)
+        .filter((id): id is string | number => id !== undefined)
+    );
+  };
+
+  const clearBroadcastProducts = () => {
+    setSelectedBroadcastProductIds([]);
+  };
+
+  const hideBroadcast = async (broadcastId: string | number | undefined) => {
+    if (!broadcastId) return;
+
+    const ok = window.confirm(
+      "이 방송기록을 관리자 화면에서 숨길까요?\n\n주문정보는 삭제하지 않습니다."
+    );
+
+    if (!ok) return;
+
+    const { error } = await supabase
+      .from("broadcasts")
+      .update({ is_deleted: true })
+      .eq("id", broadcastId);
+
+    if (error) {
+      alert("방송기록 숨김 실패\n\n" + error.message);
+      return;
+    }
+
+    alert("방송기록을 숨김 처리했습니다.");
+    await loadBroadcasts();
+  };
+
+  const orderItemLabel = (order: AdminOrder) => {
+    const color = String(order.color || "").trim();
+    const size = String(order.size || "").trim();
+    const qty = Number(order.qty || 1);
+
+    return [
+      String(order.product_name || "").trim(),
+      color && color !== "없음" ? color : "",
+      size && size !== "없음" ? size : "",
+      `x${qty}`,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  };
+
+  const fullAddress = (order: AdminOrder) => {
+    return [order.address, order.detail_address].filter(Boolean).join(" ").trim();
+  };
+
+  const selectedOrderRowsForExport = () => {
+    if (selectedOrderGroupIds.length === 0) return orderGroups;
+    return orderGroups.filter((group) => selectedOrderGroupIds.includes(group.groupId));
+  };
+
+  const toggleOrderGroup = (groupId: string) => {
+    setSelectedOrderGroupIds((prev) =>
+      prev.includes(groupId)
+        ? prev.filter((id) => id !== groupId)
+        : [...prev, groupId]
+    );
+  };
+
+
+  const hideSelectedOrders = async () => {
+    if (selectedOrderGroupIds.length === 0) {
+      alert("숨길 주문을 먼저 체크해주세요.");
+      return;
+    }
+
+    const ok = window.confirm(
+      `선택한 주문 ${selectedOrderGroupIds.length}건을 관리자 화면에서 숨길까요?\n\n주문 데이터는 삭제하지 않고 숨김 처리만 합니다.`
+    );
+
+    if (!ok) return;
+
+    const targetIds = orderGroups
+      .filter((group) => selectedOrderGroupIds.includes(group.groupId))
+      .flatMap((group) => group.rows.map((row) => row.id))
+      .filter((id): id is string | number => id !== undefined);
+
+    if (targetIds.length === 0) {
+      alert("숨길 주문 ID를 찾지 못했습니다.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("orders")
+      .update({ is_deleted: true })
+      .in("id", targetIds);
+
+    if (error) {
+      alert("주문 숨김 실패\n\n" + error.message);
+      return;
+    }
+
+    alert("선택 주문을 숨김 처리했습니다.");
+    setSelectedOrderGroupIds([]);
+    await loadOrders();
+  };
+
+  const orderStatusValue = (order: AdminOrder) => {
+    return order.admin_order_status || order.order_manage_status || "미설정";
+  };
+
+  const updateOrderGroupStatus = async (groupId: string, nextStatus: string) => {
+    const group = orderGroups.find((item) => item.groupId === groupId);
+    if (!group) return;
+
+    const ids = group.rows.map((row) => row.id).filter((id): id is string | number => id !== undefined);
+    if (ids.length === 0) return;
+
+    setOrders((prev) =>
+      prev.map((order) =>
+        order.id !== undefined && ids.includes(order.id)
+          ? {
+              ...order,
+              admin_order_status: nextStatus,
+              order_manage_status: nextStatus,
+            }
+          : order
+      )
+    );
+
+    const { error } = await supabase
+      .from("orders")
+      .update({
+        admin_order_status: nextStatus,
+        order_manage_status: nextStatus,
+      })
+      .in("id", ids);
+
+    if (error) {
+      alert("주문상태 변경 실패\n\n" + error.message);
+      await loadOrders();
+    }
+  };
+
+  const updateOrderLocalField = (
+    rowId: string | number | undefined,
+    field: keyof AdminOrder,
+    value: any
+  ) => {
+    if (rowId === undefined) return;
+
+    setOrders((prev) =>
+      prev.map((order) =>
+        order.id === rowId
+          ? {
+              ...order,
+              [field]: value,
+            }
+          : order
+      )
+    );
+  };
+
+  const saveOrderMoneyEdits = async () => {
+    if (!selectedOrderDetail) return;
+
+    try {
+      for (const row of selectedOrderDetail.rows) {
+        if (row.id === undefined) continue;
+
+        const qty = Number(row.qty || 1);
+        const productPrice = Number(row.product_price || 0);
+        const shippingFee = Number(row.shipping_fee || row.admin_shipping_fee || 0);
+        const adjustedProductPrice = productPrice * qty;
+        const adjustedTotalPrice = adjustedProductPrice + shippingFee;
+
+        const { error } = await supabase
+          .from("orders")
+          .update({
+            product_price: productPrice,
+            shipping_fee: shippingFee,
+            adjusted_product_price: adjustedProductPrice,
+            adjusted_shipping_fee: shippingFee,
+            adjusted_total_price: adjustedTotalPrice,
+            total_price: adjustedTotalPrice,
+          })
+          .eq("id", row.id);
+
+        if (error) throw error;
+      }
+
+      alert("금액 수정 저장 완료");
+      await loadOrders();
+    } catch (error: any) {
+      alert("금액 수정 저장 실패\n\n" + error.message);
+    }
+  };
+
+  const toggleCustomerSelect = (key: string) => {
+    setSelectedCustomerKeys((prev) =>
+      prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]
+    );
+  };
+  const toggleCustomerBlock = async (target?: any) => {
+    const phoneKey = normalizePhoneKey(
+      typeof target === "string"
+        ? target
+        : target?.first?.customer_phone ||
+            target?.customer_phone ||
+            target?.phone ||
+            target?.rows?.[0]?.customer_phone ||
+            ""
+    );
+
+    if (!phoneKey) {
+      alert("전화번호가 없어 차단 처리할 수 없습니다.");
+      return;
+    }
+
+    const nowBlocked = blockedPhones.includes(phoneKey);
+    const nextPhones = nowBlocked
+      ? blockedPhones.filter((item) => item !== phoneKey)
+      : [...blockedPhones, phoneKey];
+
+    const uniquePhones = Array.from(new Set(nextPhones.filter(Boolean)));
+
+    setBlockedPhones(uniquePhones);
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem("ruru_blocked_phones", JSON.stringify(uniquePhones));
+    }
+
+    try {
+      await supabase
+        .from("customers")
+        .update({ is_blocked: !nowBlocked })
+        .eq("customer_phone", phoneKey);
+    } catch {
+      // customers 테이블 구조가 달라도 localStorage 기준 차단은 유지됩니다.
+    }
+  };
+
+  const exportRozenWaybill = () => {
+    const groups = selectedOrderRowsForExport();
+
+    if (groups.length === 0) {
+      alert("내보낼 주문이 없습니다.");
+      return;
+    }
+
+    const cleanPhoneForExcel = (phone?: string) => {
+      const digits = normalizePhoneKey(phone);
+      return digits ? `'${digits}` : "";
+    };
+
+    const rows = groups.map((group) => {
+      const first = group.first;
+      const itemText =
+        group.rows.map((row) => orderItemLabel(row)).filter(Boolean).join(" / ") +
+        ` + 총 ${group.totalQty}개`;
+
+      const memo = [first.request_memo, first.special_note, first.memo]
+        .filter(Boolean)
+        .join(" / ");
+
+      return [
+        first.youtube_nickname || first.customer_name || "", // A 닉네임
+        "", // B 공백
+        fullAddress(first), // C 주소
+        cleanPhoneForExcel(first.customer_phone), // D 전화번호: 앞 0 보존
+        cleanPhoneForExcel(first.customer_phone), // E 전화번호: 앞 0 보존
+        "1", // F 숫자 1
+        "2750", // G 숫자 2750
+        "'010", // H 010: 앞 0 보존
+        itemText, // I 구매내역
+        "", // J 공백
+        memo, // K 구매자요청사항/배송메모
+      ];
+    });
+
+    const escapeCsv = (value: any) => {
+      const text = String(value ?? "");
+      return `"${text.replace(/"/g, '""')}"`;
+    };
+
+    const csv = rows.map((row) => row.map(escapeCsv).join(",")).join("\n");
+    const blob = new Blob(["\ufeff" + csv], {
+      type: "text/csv;charset=utf-8;",
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    link.href = url;
+    link.download = `rozen_waybill_${today}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const enableOrderSound = async () => {
     try {
       const AudioContextClass =
@@ -679,6 +1285,7 @@ export default function AdminPage() {
       }
 
       setSoundEnabled(true);
+      localStorage.setItem("ruru_admin_order_sound", "ON");
       playOrderSound();
     } catch {
       alert("알림음 켜기에 실패했습니다. 브라우저 소리 권한을 확인해주세요.");
@@ -740,6 +1347,20 @@ export default function AdminPage() {
 
   const clearOrderNotices = () => {
     setOrderNotices([]);
+  };
+  const isPhoneBlocked = (target?: any) => {
+    const phoneKey = normalizePhoneKey(
+      typeof target === "string"
+        ? target
+        : target?.first?.customer_phone ||
+            target?.customer_phone ||
+            target?.phone ||
+            target?.rows?.[0]?.customer_phone ||
+            ""
+    );
+
+    if (!phoneKey) return false;
+    return blockedPhones.includes(phoneKey);
   };
 
   const menuItems = [
@@ -1346,7 +1967,7 @@ export default function AdminPage() {
                               <span
                                 className={`px-3 py-1 rounded-full text-xs font-black ${
                                   product.status === "판매중"
-                                    ? "bg-green-100 text-green-700"
+                                    ? "bg-blue-100 text-blue-700"
                                     : product.status === "품절"
                                     ? "bg-red-100 text-red-700"
                                     : "bg-gray-100 text-gray-500"
@@ -1556,10 +2177,57 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  <div className="font-black text-rose-500">
-                    {selectedBroadcastProductIds.length}개 선택
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="font-black text-rose-500">
+                      {selectedBroadcastProductIds.length}개 선택
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={selectAllBroadcastProducts}
+                      className="rounded-xl bg-gray-950 px-3 py-2 text-xs font-black text-white active:scale-[0.98]"
+                    >
+                      전체선택
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={clearBroadcastProducts}
+                      className="rounded-xl bg-gray-100 px-3 py-2 text-xs font-black text-gray-700 active:scale-[0.98]"
+                    >
+                      전체해제
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowOnlyLinkedProducts((prev) => !prev)}
+                      className="rounded-xl bg-rose-50 px-3 py-2 text-xs font-black text-rose-600 active:scale-[0.98]"
+                    >
+                      {showOnlyLinkedProducts ? "전체상품 보기" : "연결상품만 보기"}
+                    </button>
                   </div>
                 </div>
+
+                {selectedBroadcastProducts.length > 0 && (
+                  <div className="mb-4 rounded-3xl bg-blue-50 p-4">
+                    <div className="mb-2 text-sm font-black text-blue-700">
+                      현재 이 방송에 연결된 상품
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {selectedBroadcastProducts.map((product) => (
+                        <button
+                          key={String(product.id)}
+                          type="button"
+                          onClick={() => toggleBroadcastProduct(product.id)}
+                          className="rounded-full bg-white px-3 py-2 text-xs font-black text-blue-700 shadow-sm active:scale-[0.98]"
+                        >
+                          {product.product_name} ×
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {broadcastSelectableProducts.length === 0 ? (
                   <div className="p-8 rounded-3xl bg-gray-50 text-center font-black text-gray-500">
@@ -1567,7 +2235,7 @@ export default function AdminPage() {
                   </div>
                 ) : (
                   <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-                    {broadcastSelectableProducts.map((product) => (
+                    {visibleBroadcastSelectableProducts.map((product) => (
                       <label
                         key={product.id}
                         className={`p-4 rounded-3xl border cursor-pointer active:scale-[0.98] ${
@@ -1707,10 +2375,20 @@ export default function AdminPage() {
                           </div>
                         </div>
 
-                        <div className="text-sm text-gray-500 font-bold">
-                          배송비 {money(broadcast.shipping_fee || 0)}
-                          <br />
-                          카드수수료 {broadcast.card_fee_rate || 0}%
+                        <div className="flex items-center gap-3">
+                          <div className="text-sm text-gray-500 font-bold">
+                            배송비 {money(broadcast.shipping_fee || 0)}
+                            <br />
+                            카드수수료 {broadcast.card_fee_rate || 0}%
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => hideBroadcast(broadcast.id)}
+                            className="rounded-2xl bg-gray-100 px-4 py-3 text-sm font-black text-gray-600 active:scale-[0.98]"
+                          >
+                            숨김
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -1721,21 +2399,512 @@ export default function AdminPage() {
           )}
 
           {activeMenu === "orders" && (
-            <ComingSoon
-              title="주문관리"
-              description="주문 목록, 입금상태, 배송상태, 메모 수정은 다음 단계에서 연결합니다."
-            />
+            <div className="grid gap-5">
+              <section className="bg-white rounded-[2rem] p-6 border shadow-sm">
+                <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-black text-rose-500 mb-2">
+                      ORDER MANAGER
+                    </div>
+                    <h1 className="text-3xl md:text-5xl font-black">
+                      주문관리
+                    </h1>
+                    <p className="text-gray-500 font-bold mt-3">
+                      주문번호 클릭 → 상세내역 / 상태변경 / 금액수정
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={loadOrders}
+                    className="rounded-2xl bg-gray-950 px-5 py-4 font-black text-white active:scale-[0.98]"
+                  >
+                    주문 새로고침
+                  </button>
+                </div>
+              </section>
+
+              <section className="bg-white rounded-[2rem] p-5 md:p-6 border shadow-sm">
+                <div className="grid md:grid-cols-[1fr_auto_auto_auto_auto_auto] gap-3">
+                  <input
+                    value={orderKeyword}
+                    onChange={(event) => setOrderKeyword(event.target.value)}
+                    placeholder="닉네임 / 이름 / 전화번호 / 상품명 검색"
+                    className="rounded-2xl border bg-gray-50 p-4 font-bold"
+                  />
+
+                  <select
+                    value={paymentFilter}
+                    onChange={(event) => setPaymentFilter(event.target.value as any)}
+                    className="rounded-2xl border bg-gray-50 p-4 font-bold"
+                  >
+                    <option value="전체">전체 결제</option>
+                    <option value="무통장입금">무통장입금</option>
+                    <option value="카드결제">카드결제</option>
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedOrderGroupIds(orderGroups.map((group) => group.groupId))
+                    }
+                    className="rounded-2xl bg-gray-100 px-5 py-4 font-black text-gray-700 active:scale-[0.98]"
+                  >
+                    전체선택
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOrderGroupIds([])}
+                    className="rounded-2xl bg-gray-100 px-5 py-4 font-black text-gray-700 active:scale-[0.98]"
+                  >
+                    선택해제
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={hideSelectedOrders}
+                    className="rounded-2xl bg-red-50 px-5 py-4 font-black text-red-600 active:scale-[0.98]"
+                  >
+                    선택숨김
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={exportRozenWaybill}
+                    className="rounded-2xl bg-rose-500 px-5 py-4 font-black text-white active:scale-[0.98]"
+                  >
+                    로젠 엑셀
+                  </button>
+                </div>
+
+                <div className="mt-3 text-sm font-black text-gray-500">
+                  총 {orderGroups.length}건 / 선택 {selectedOrderGroupIds.length}건
+                </div>
+              </section>
+
+              <section className="bg-white rounded-[2rem] p-4 md:p-5 border shadow-sm">
+                {loadingOrders ? (
+                  <div className="p-10 text-center font-black text-gray-500">
+                    주문 불러오는 중...
+                  </div>
+                ) : orderGroups.length === 0 ? (
+                  <div className="p-10 text-center font-black text-gray-500">
+                    주문이 없습니다.
+                  </div>
+                ) : (
+                  <div className="grid gap-2">
+                    {orderGroups.map((group) => {
+                      const first = group.first;
+                      const statusValue = orderStatusValue(first);
+                      const canceled = statusValue === "주문취소" || isCanceledOrder(first);
+                      const orderCode =
+                        first.order_lookup_code ||
+                        first.order_group_id ||
+                        String(first.id || "").slice(0, 8);
+
+                      return (
+                        <div
+                          key={group.groupId}
+                          className={`rounded-2xl border px-3 py-3 shadow-sm ${
+                            canceled
+                              ? "border-red-200 bg-red-50/80 opacity-80"
+                              : "bg-white"
+                          }`}
+                        >
+                          <div className="grid grid-cols-[auto_110px_1fr_150px_auto] items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedOrderGroupIds.includes(group.groupId)}
+                              onChange={() => toggleOrderGroup(group.groupId)}
+                              className="h-5 w-5"
+                            />
+
+                            <button
+                              type="button"
+                              onClick={() => setSelectedOrderDetailGroupId(group.groupId)}
+                              className="rounded-xl bg-gray-950 px-3 py-2 text-xs font-black text-white active:scale-[0.98]"
+                            >
+                              {orderCode || "상세보기"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setSelectedOrderDetailGroupId(group.groupId)}
+                              className="min-w-0 text-left active:scale-[0.99]"
+                            >
+                              <div
+                                className={`truncate text-base font-black ${
+                                  canceled ? "text-red-700 line-through decoration-2" : ""
+                                }`}
+                              >
+                                {first.youtube_nickname || "닉네임없음"} / {" "}
+                                {first.customer_name || "이름없음"} / {" "}
+                                {first.customer_phone || "전화번호없음"}
+                              </div>
+
+                              <div
+                                className={`mt-1 truncate text-xs font-bold ${
+                                  canceled ? "text-red-500 line-through" : "text-gray-500"
+                                }`}
+                              >
+                                {group.rows.map((row) => orderItemLabel(row)).join(" / ")}
+                              </div>
+                            </button>
+
+                            <select
+                              value={statusValue}
+                              onChange={(event) =>
+                                updateOrderGroupStatus(group.groupId, event.target.value)
+                              }
+                              className={`rounded-2xl border p-3 text-sm font-black ${
+                                canceled
+                                  ? "border-red-200 bg-red-100 text-red-700"
+                                  : "bg-gray-50 text-gray-700"
+                              }`}
+                            >
+                              <option value="미설정">미설정</option>
+                              <option value="입금확인">입금확인</option>
+                              <option value="포장전">포장전</option>
+                              <option value="출고완료">출고완료</option>
+                              <option value="킵">킵</option>
+                              <option value="주문취소">주문취소</option>
+                            </select>
+
+                            <div className="text-right">
+                              <div className="text-xs font-black text-gray-500">
+                                {first.payment_method || "결제없음"} · {group.totalQty}개
+                              </div>
+                              <div className="text-base font-black text-rose-500">
+                                {money(group.totalAmount)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+
+              {selectedOrderDetail && (
+                <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/40 p-4">
+                  <div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-[2rem] bg-white p-6 shadow-2xl">
+                    <div className="mb-5 flex items-start justify-between gap-4">
+                      <div>
+                        <div className="text-sm font-black text-rose-500">
+                          주문 상세내역
+                        </div>
+                        <h2 className="mt-1 text-3xl font-black">
+                          {selectedOrderDetail.first.order_lookup_code ||
+                            selectedOrderDetail.first.order_group_id ||
+                            selectedOrderDetail.groupId}
+                        </h2>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOrderDetailGroupId(null)}
+                        className="rounded-2xl bg-gray-100 px-4 py-3 font-black text-gray-700 active:scale-[0.98]"
+                      >
+                        닫기
+                      </button>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-3">
+                      <InfoBox label="주문시간" value={selectedOrderDetail.first.created_at || "-"} />
+                      <InfoBox label="결제방식" value={selectedOrderDetail.first.payment_method || "-"} />
+                      <InfoBox label="유튜브 닉네임" value={selectedOrderDetail.first.youtube_nickname || "-"} />
+                      <InfoBox label="주문자명" value={selectedOrderDetail.first.customer_name || "-"} />
+                      <InfoBox label="전화번호" value={selectedOrderDetail.first.customer_phone || "-"} />
+                      <InfoBox label="주소" value={fullAddress(selectedOrderDetail.first) || "-"} />
+                    </div>
+
+                    <div className="mt-5 rounded-3xl bg-gray-50 p-4">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div className="text-lg font-black">상품/금액 수정</div>
+                        <button
+                          type="button"
+                          onClick={saveOrderMoneyEdits}
+                          className="rounded-2xl bg-gray-950 px-4 py-3 text-sm font-black text-white active:scale-[0.98]"
+                        >
+                          금액 수정 저장
+                        </button>
+                      </div>
+
+                      <div className="grid gap-2">
+                        {selectedOrderDetail.rows.map((row) => (
+                          <div
+                            key={String(row.id)}
+                            className="rounded-2xl bg-white p-3"
+                          >
+                            <div className="font-black">{orderItemLabel(row)}</div>
+
+                            <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
+                              <label className="text-xs font-black text-gray-500">
+                                상품금액
+                                <input
+                                  value={String(row.product_price || "")}
+                                  onChange={(event) =>
+                                    updateOrderLocalField(
+                                      row.id,
+                                      "product_price",
+                                      Number(onlyNumber(event.target.value) || 0)
+                                    )
+                                  }
+                                  inputMode="numeric"
+                                  className="mt-1 w-full rounded-xl border bg-gray-50 p-3 font-black text-gray-900"
+                                />
+                              </label>
+
+                              <label className="text-xs font-black text-gray-500">
+                                배송비
+                                <input
+                                  value={String(row.shipping_fee || row.admin_shipping_fee || 0)}
+                                  onChange={(event) =>
+                                    updateOrderLocalField(
+                                      row.id,
+                                      "shipping_fee",
+                                      Number(onlyNumber(event.target.value) || 0)
+                                    )
+                                  }
+                                  inputMode="numeric"
+                                  className="mt-1 w-full rounded-xl border bg-gray-50 p-3 font-black text-gray-900"
+                                />
+                              </label>
+
+                              <InfoBox label="수량" value={`${row.qty || 1}개`} />
+                              <InfoBox
+                                label="예상합계"
+                                value={money(
+                                  Number(row.product_price || 0) * Number(row.qty || 1) +
+                                    Number(row.shipping_fee || row.admin_shipping_fee || 0)
+                                )}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-5 grid md:grid-cols-2 gap-3">
+                      <InfoBox
+                        label="배송메모"
+                        value={selectedOrderDetail.first.request_memo || "-"}
+                      />
+                      <InfoBox
+                        label="특이사항"
+                        value={
+                          selectedOrderDetail.first.special_note ||
+                          selectedOrderDetail.first.memo ||
+                          "-"
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {activeMenu === "customers" && (
-            <ComingSoon
-              title="고객관리"
-              description="고객목록, 특이사항, 차단고객 관리는 다음 단계에서 연결합니다."
-            />
+            <div className="grid gap-5">
+              <section className="bg-white rounded-[2rem] p-6 border shadow-sm">
+                <div>
+                  <div className="text-sm font-black text-rose-500 mb-2">
+                    CUSTOMER MANAGER
+                  </div>
+                  <h1 className="text-3xl md:text-5xl font-black">
+                    고객관리
+                  </h1>
+                  <p className="text-gray-500 font-bold mt-3">
+                    회원별 총 구매금액 / 취소횟수 / 차단 관리
+                  </p>
+                </div>
+              </section>
+
+              <section className="bg-white rounded-[2rem] p-5 border shadow-sm">
+                <div className="grid md:grid-cols-[1fr_auto_auto] gap-3">
+                  <input
+                    value={customerKeyword}
+                    onChange={(event) => setCustomerKeyword(event.target.value)}
+                    placeholder="닉네임 / 이름 / 전화번호 / 주소 검색"
+                    className="w-full rounded-2xl border bg-gray-50 p-4 font-bold"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedCustomerKeys(customerRows.map((customer) => customer.key))
+                    }
+                    className="rounded-2xl bg-gray-100 px-5 py-4 font-black text-gray-700 active:scale-[0.98]"
+                  >
+                    전체선택
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCustomerKeys([])}
+                    className="rounded-2xl bg-gray-100 px-5 py-4 font-black text-gray-700 active:scale-[0.98]"
+                  >
+                    선택해제
+                  </button>
+                </div>
+              </section>
+
+              <section className="bg-white rounded-[2rem] p-5 border shadow-sm">
+                {customerRows.length === 0 ? (
+                  <div className="p-10 text-center font-black text-gray-500">
+                    고객 데이터가 없습니다.
+                  </div>
+                ) : (
+                  <div className="grid gap-3">
+                    {customerRows.map((customer) => (
+                      <div
+                        key={customer.key}
+                        className="rounded-3xl border bg-white p-4 shadow-sm"
+                      >
+                        <div className="grid md:grid-cols-[auto_1fr_auto_auto] gap-3 items-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedCustomerKeys.includes(customer.key)}
+                            onChange={() => toggleCustomerSelect(customer.key)}
+                            className="h-5 w-5"
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCustomerDetailKey(customer.key)}
+                            className="min-w-0 text-left active:scale-[0.99]"
+                          >
+                            <div className="truncate text-xl font-black">
+                              {customer.first.youtube_nickname || "닉네임없음"} / {" "}
+                              {customer.first.customer_name || "이름없음"}
+                            </div>
+                            <div className="mt-1 truncate text-sm font-bold text-gray-500">
+                              {customer.first.customer_phone || "-"} · {fullAddress(customer.first) || "주소 없음"}
+                            </div>
+                          </button>
+
+                          <div className="text-right text-sm font-black text-gray-500">
+                            <div>주문 {customer.orderCount}건</div>
+                            <div>취소 {customer.cancelCount}건</div>
+                            <div>수량 {customer.totalQty}개</div>
+                            <div className="text-lg text-rose-500">
+                              {money(customer.totalAmount)}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => toggleCustomerBlock(customer)}
+                            className={`rounded-2xl border px-4 py-3 text-sm font-black transition active:scale-[0.98] ${
+                              isPhoneBlocked(customer)
+                                ? "border-red-300 bg-red-100 text-red-700 hover:bg-red-200"
+                                : "border-green-300 bg-green-100 text-green-700 hover:bg-green-200"
+                            }`}
+                          >
+                            {isPhoneBlocked(customer) ? "차단" : "정상"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {selectedCustomerDetail && (
+                <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/40 p-4">
+                  <div className="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-[2rem] bg-white p-6 shadow-2xl">
+                    <div className="mb-5 flex items-start justify-between gap-4">
+                      <div>
+                        <div className="text-sm font-black text-rose-500">
+                          고객 상세정보
+                        </div>
+                        <h2 className="mt-1 text-3xl font-black">
+                          {selectedCustomerDetail.first.youtube_nickname || "닉네임없음"} / {" "}
+                          {selectedCustomerDetail.first.customer_name || "이름없음"}
+                        </h2>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCustomerDetailKey(null)}
+                        className="rounded-2xl bg-gray-100 px-4 py-3 font-black text-gray-700 active:scale-[0.98]"
+                      >
+                        닫기
+                      </button>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-3">
+                      <InfoBox label="전화번호" value={selectedCustomerDetail.first.customer_phone || "-"} />
+                      <InfoBox label="주소" value={fullAddress(selectedCustomerDetail.first) || "-"} />
+                      <InfoBox label="총 주문건수" value={`${selectedCustomerDetail.orderCount}건`} />
+                      <InfoBox label="총 구매수량" value={`${selectedCustomerDetail.totalQty}개`} />
+                      <InfoBox label="총 구매금액" value={money(selectedCustomerDetail.totalAmount)} />
+                      <InfoBox label="취소/환불 횟수" value={`${selectedCustomerDetail.cancelCount}건`} />
+                      <InfoBox label="최근 주문일" value={selectedCustomerDetail.recentOrderAt || "-"} />
+                      <div className="rounded-3xl bg-gray-50 p-4">
+                        <div className="text-xs font-black text-gray-400">고객상태</div>
+                        <button
+                          type="button"
+                          onClick={() => toggleCustomerBlock(selectedCustomerDetail)}
+                          className={`mt-2 rounded-2xl border px-4 py-3 text-base font-black transition active:scale-[0.98] ${
+                            isPhoneBlocked(selectedCustomerDetail)
+                              ? "border-red-300 bg-red-100 text-red-700 hover:bg-red-200"
+                              : "border-green-300 bg-green-100 text-green-700 hover:bg-green-200"
+                          }`}
+                        >
+                          {isPhoneBlocked(selectedCustomerDetail) ? "차단" : "정상"}
+                        </button>
+                        <div className="mt-2 text-xs font-bold text-gray-400">
+                          정상은 초록색, 차단은 빨간색으로 표시됩니다. 버튼을 누르면 상태가 전환됩니다.
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 rounded-3xl bg-yellow-50 p-4">
+                      <div className="text-lg font-black text-yellow-700">관리자 메모 / 특이사항</div>
+                      <div className="mt-2 whitespace-pre-wrap text-sm font-bold text-yellow-700">
+                        {selectedCustomerDetail.adminMemo ||
+                          selectedCustomerDetail.first.special_note ||
+                          selectedCustomerDetail.first.request_memo ||
+                          "등록된 메모가 없습니다."}
+                      </div>
+                    </div>
+
+                    <div className="mt-5 rounded-3xl bg-gray-50 p-4">
+                      <div className="mb-3 text-lg font-black">최근 주문내역</div>
+                      <div className="grid gap-2">
+                        {selectedCustomerDetail.rows.slice(0, 10).map((row) => (
+                          <div key={String(row.id)} className="rounded-2xl bg-white p-3">
+                            <div className="font-black">{orderItemLabel(row)}</div>
+                            <div className="mt-1 text-sm font-bold text-gray-500">
+                              {row.created_at || "-"} · {row.payment_method || "결제없음"} · {money(row.total_price || row.adjusted_total_price || 0)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </section>
       </div>
     </main>
+  );
+}
+
+function InfoBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-3xl bg-gray-50 p-4">
+      <div className="text-xs font-black text-gray-400">{label}</div>
+      <div className="mt-2 whitespace-pre-wrap break-words text-base font-black text-gray-950">
+        {value}
+      </div>
+    </div>
   );
 }
 
@@ -1835,7 +3004,6 @@ function OrderNoticePopups({
                 <span>투명도</span>
                 <span>{opacity}%</span>
               </div>
-
               <input
                 type="range"
                 min="45"
@@ -1855,12 +3023,9 @@ function OrderNoticePopups({
                 <div className="text-[11px] font-black text-rose-500">
                   주문서가 새로 들어왔습니다
                 </div>
-
                 <div
                   className={
-                    compact
-                      ? "truncate text-base font-black"
-                      : "text-xl font-black"
+                    compact ? "truncate text-base font-black" : "text-xl font-black"
                   }
                 >
                   {latestNotice.customerName}
@@ -1887,7 +3052,6 @@ function OrderNoticePopups({
               <div className="truncate text-sm font-black text-gray-950">
                 {latestNotice.productName}
               </div>
-
               <div className="mt-1 text-xs font-bold text-gray-500">
                 수량 {latestNotice.qty}개 · {money(latestNotice.amount)}
               </div>
