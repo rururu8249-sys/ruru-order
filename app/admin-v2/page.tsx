@@ -77,6 +77,22 @@ type DepositRow = {
   created_at: string | null;
 };
 
+type MoneyEditLogRow = {
+  id: number;
+  order_id: number;
+  order_group_id: string | null;
+  order_lookup_code: string | null;
+  changed_at: string | null;
+  changed_by: string | null;
+  change_source: string | null;
+  field_name: string | null;
+  before_value: string | null;
+  after_value: string | null;
+  before_numeric: number | null;
+  after_numeric: number | null;
+  reason: string | null;
+};
+
 type BroadcastRow = {
   id: string;
   public_title: string | null;
@@ -163,6 +179,7 @@ export default function AdminV2Page() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [deposits, setDeposits] = useState<DepositRow[]>([]);
+  const [moneyEditLogs, setMoneyEditLogs] = useState<MoneyEditLogRow[]>([]);
   const [broadcasts, setBroadcasts] = useState<BroadcastRow[]>([]);
   const [settings, setSettings] = useState<SettingRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -177,10 +194,11 @@ export default function AdminV2Page() {
   const loadData = async () => {
     setLoading(true);
 
-    const [ordersResult, customersResult, depositsResult, broadcastsResult, settingsResult] = await Promise.all([
+    const [ordersResult, customersResult, depositsResult, moneyLogsResult, broadcastsResult, settingsResult] = await Promise.all([
       supabase.from("orders").select("*").neq("is_deleted", true).order("created_at", { ascending: false }).limit(500),
       supabase.from("customers").select("*").order("last_order_at", { ascending: false, nullsFirst: false }).limit(500),
       supabase.from("deposits").select("*").order("created_at", { ascending: false }).limit(500),
+      supabase.rpc("get_order_money_edit_logs_for_admin_v2"),
       supabase.from("broadcasts").select("*").order("started_at", { ascending: false }).limit(120),
       supabase.from("settings").select("key,value").order("key"),
     ]);
@@ -192,6 +210,14 @@ export default function AdminV2Page() {
     else setCustomers((customersResult.data || []) as CustomerRow[]);
 
     setDeposits((depositsResult.data || []) as DepositRow[]);
+
+    if (moneyLogsResult.error) {
+      alert("금액수정이력 불러오기 실패\n\n" + moneyLogsResult.error.message);
+      setMoneyEditLogs([]);
+    } else {
+      setMoneyEditLogs((moneyLogsResult.data || []) as MoneyEditLogRow[]);
+    }
+
     setBroadcasts((broadcastsResult.data || []) as BroadcastRow[]);
     setSettings((settingsResult.data || []) as SettingRow[]);
     setLoading(false);
@@ -424,6 +450,15 @@ export default function AdminV2Page() {
       )
     );
 
+    const { data: latestLogs, error: latestLogsError } = await supabase
+      .rpc("get_order_money_edit_logs_for_admin_v2");
+
+    if (latestLogsError) {
+      alert("금액수정은 저장됐지만 이력 재조회에 실패했습니다.\n\n" + latestLogsError.message);
+    } else {
+      setMoneyEditLogs((latestLogs || []) as MoneyEditLogRow[]);
+    }
+
     alert("최종정산금액 수정 및 이력 저장이 완료되었습니다.");
   };
 
@@ -527,7 +562,7 @@ export default function AdminV2Page() {
 
                   <div className="grid gap-3 xl:grid-cols-[minmax(780px,1fr)_340px]">
                     <div className="min-w-0">
-                      <OrderWorkTable groups={pagedGroups} openedOrderGroupIds={openedOrderGroupIds} onToggle={toggleOrderDetail} onStatusChange={updateOrderStatus} onFinalAmountChange={updateOrderFinalAmount} />
+                      <OrderWorkTable groups={pagedGroups} openedOrderGroupIds={openedOrderGroupIds} moneyEditLogs={moneyEditLogs} onToggle={toggleOrderDetail} onStatusChange={updateOrderStatus} onFinalAmountChange={updateOrderFinalAmount} />
                       <Pagination page={page} totalPages={totalPages} setPage={setPage} totalCount={filteredOrderGroups.length} />
                     </div>
                     <OperationSummary buyerRanking={sideSummary.buyerRanking} productRanking={sideSummary.productRanking} onMore={() => setActiveTab("settlement")} />
@@ -718,12 +753,14 @@ function buildItemSummary(group: OrderGroup) {
 function OrderWorkTable({
   groups,
   openedOrderGroupIds,
+  moneyEditLogs,
   onToggle,
   onStatusChange,
   onFinalAmountChange,
 }: {
   groups: OrderGroup[];
   openedOrderGroupIds: string[];
+  moneyEditLogs: MoneyEditLogRow[];
   onToggle: (groupId: string) => void;
   onStatusChange: (group: OrderGroup, status: string) => void;
   onFinalAmountChange: (row: OrderRow, nextAmount: number, reason: string) => Promise<void>;
@@ -744,6 +781,8 @@ function OrderWorkTable({
       {groups.map((group) => {
         const isOpen = openedOrderGroupIds.includes(group.groupId);
         const status = group.first.admin_order_status_v2 || "미설정";
+        const rowIds = new Set(group.rows.map((row) => row.id));
+        const groupMoneyLogs = moneyEditLogs.filter((log) => rowIds.has(Number(log.order_id)));
 
         return (
           <div key={group.groupId} className="border-t border-neutral-100 first:border-t-0">
@@ -762,6 +801,9 @@ function OrderWorkTable({
               <div className="text-[13px] font-black text-neutral-600">{group.first.payment_method || "-"}</div>
               <div className="text-left lg:text-right">
                 <div className="text-[15px] font-black">{money(group.totalAmount)}</div>
+                {groupMoneyLogs.length > 0 ? (
+                  <div className="mt-0.5 text-[10px] font-black text-red-600">금액수정 {groupMoneyLogs.length}건</div>
+                ) : null}
               </div>
               <select value={status} onChange={(event) => onStatusChange(group, event.target.value)} className={`h-8 w-full rounded-lg border px-2 text-center text-xs font-black outline-none ${selectClass(status)}`}>
                 {ORDER_STATUSES.map((option) => <option key={option} value={option}>{option}</option>)}
@@ -771,7 +813,7 @@ function OrderWorkTable({
               </button>
             </div>
 
-            {isOpen ? <OrderDetailBlock group={group} onFinalAmountChange={onFinalAmountChange} /> : null}
+            {isOpen ? <OrderDetailBlock group={group} moneyEditLogs={groupMoneyLogs} onFinalAmountChange={onFinalAmountChange} /> : null}
           </div>
         );
       })}
@@ -781,9 +823,11 @@ function OrderWorkTable({
 
 function OrderDetailBlock({
   group,
+  moneyEditLogs,
   onFinalAmountChange,
 }: {
   group: OrderGroup;
+  moneyEditLogs: MoneyEditLogRow[];
   onFinalAmountChange: (row: OrderRow, nextAmount: number, reason: string) => Promise<void>;
 }) {
   const first = group.first;
@@ -829,6 +873,49 @@ function OrderDetailBlock({
           ))}
         </div>
       </div>
+
+      <MoneyEditLogPanel logs={moneyEditLogs} />
+    </div>
+  );
+}
+
+function MoneyEditLogPanel({ logs }: { logs: MoneyEditLogRow[] }) {
+  return (
+    <div className="mt-3 rounded-xl border border-neutral-200 bg-white p-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-[15px] font-black">🧾 금액 수정이력</div>
+          <div className="mt-0.5 text-[12px] font-bold text-neutral-500">
+            최종정산금액을 누가/언제/얼마에서 얼마로/왜 바꿨는지 확인합니다.
+          </div>
+        </div>
+        <div className="rounded-lg bg-neutral-100 px-2 py-1 text-[11px] font-black text-neutral-600">
+          {logs.length}건
+        </div>
+      </div>
+
+      {logs.length === 0 ? (
+        <div className="rounded-xl bg-neutral-50 p-3 text-center text-[12px] font-bold text-neutral-400">
+          금액 수정이력이 없습니다.
+        </div>
+      ) : (
+        <div className="grid gap-1.5">
+          {logs.map((log) => (
+            <div key={log.id} className="grid gap-1 rounded-xl bg-neutral-50 p-2 text-[12px] font-bold text-neutral-700 md:grid-cols-[128px_1fr_160px] md:items-center">
+              <div className="font-black text-neutral-500">{formatDateLabel(log.changed_at)}</div>
+              <div>
+                <span className="font-black text-red-700">{money(log.before_numeric)}</span>
+                <span className="mx-1 text-neutral-400">→</span>
+                <span className="font-black text-blue-700">{money(log.after_numeric)}</span>
+                <span className="ml-2 text-neutral-500">사유: {log.reason || "-"}</span>
+              </div>
+              <div className="text-neutral-500 md:text-right">
+                {log.changed_by || "admin-v2"} · 주문ID {log.order_id}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
