@@ -94,6 +94,23 @@ type MoneyEditLogRow = {
   reason: string | null;
 };
 
+type StatusChangeLogRow = {
+  id: number;
+  order_id: number | null;
+  order_group_id: string | null;
+  order_lookup_code: string | null;
+  changed_at: string | null;
+  changed_by: string | null;
+  change_source: string | null;
+  before_status: string | null;
+  after_status: string | null;
+  before_order_manage_status: string | null;
+  after_order_manage_status: string | null;
+  payment_method: string | null;
+  deposit_confirmed_at_before: string | null;
+  deposit_confirmed_at_after: string | null;
+};
+
 type BroadcastRow = {
   id: string;
   public_title: string | null;
@@ -264,6 +281,7 @@ export default function AdminV2Page() {
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [deposits, setDeposits] = useState<DepositRow[]>([]);
   const [moneyEditLogs, setMoneyEditLogs] = useState<MoneyEditLogRow[]>([]);
+  const [statusChangeLogs, setStatusChangeLogs] = useState<StatusChangeLogRow[]>([]);
   const [broadcasts, setBroadcasts] = useState<BroadcastRow[]>([]);
   const [settings, setSettings] = useState<SettingRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -278,11 +296,12 @@ export default function AdminV2Page() {
   const loadData = async () => {
     setLoading(true);
 
-    const [ordersResult, customersResult, depositsResult, moneyLogsResult, broadcastsResult, settingsResult] = await Promise.all([
+    const [ordersResult, customersResult, depositsResult, moneyLogsResult, statusLogsResult, broadcastsResult, settingsResult] = await Promise.all([
       supabase.from("orders").select("*").neq("is_deleted", true).order("created_at", { ascending: false }).limit(500),
       supabase.from("customers").select("*").order("last_order_at", { ascending: false, nullsFirst: false }).limit(500),
       supabase.from("deposits").select("*").order("created_at", { ascending: false }).limit(500),
       supabase.rpc("get_order_money_edit_logs_for_admin_v2"),
+      supabase.rpc("get_order_status_change_logs_for_admin_v2"),
       supabase.from("broadcasts").select("*").order("started_at", { ascending: false }).limit(120),
       supabase.from("settings").select("key,value").order("key"),
     ]);
@@ -300,6 +319,13 @@ export default function AdminV2Page() {
       setMoneyEditLogs([]);
     } else {
       setMoneyEditLogs((moneyLogsResult.data || []) as MoneyEditLogRow[]);
+    }
+
+    if (statusLogsResult.error) {
+      alert("상태변경이력 불러오기 실패\n\n" + statusLogsResult.error.message);
+      setStatusChangeLogs([]);
+    } else {
+      setStatusChangeLogs((statusLogsResult.data || []) as StatusChangeLogRow[]);
     }
 
     setBroadcasts((broadcastsResult.data || []) as BroadcastRow[]);
@@ -462,6 +488,12 @@ export default function AdminV2Page() {
     const ids = group.rows.map((row) => row.id).filter(Boolean);
     const nowIso = new Date().toISOString();
 
+    const changedRows = group.rows.filter((row) => getOrderStatusValue(row) !== nextStatus);
+
+    if (changedRows.length === 0) {
+      return;
+    }
+
     const shouldSaveDepositConfirmedAt = nextStatus === "입금확인";
     const updatePayload: Partial<OrderRow> = {
       admin_order_status_v2: nextStatus,
@@ -476,6 +508,43 @@ export default function AdminV2Page() {
         updatePayload.deposit_confirmed_at = nowIso;
       }
     }
+
+    const statusLogPayloads = changedRows.map((row) => {
+      const beforeStatus = getOrderStatusValue(row);
+      const depositConfirmedAtAfter =
+        shouldSaveDepositConfirmedAt && !row.deposit_confirmed_at
+          ? nowIso
+          : row.deposit_confirmed_at;
+
+      return {
+        order_id: row.id,
+        order_group_id: row.order_group_id,
+        order_lookup_code: row.order_lookup_code,
+        changed_by: "admin-v2",
+        change_source: "admin-v2-status-change",
+        before_status: beforeStatus,
+        after_status: nextStatus,
+        before_order_manage_status: row.order_manage_status || beforeStatus,
+        after_order_manage_status: nextStatus,
+        payment_method: row.payment_method || "",
+        deposit_confirmed_at_before: row.deposit_confirmed_at || "",
+        deposit_confirmed_at_after: depositConfirmedAtAfter || "",
+        snapshot_before: {
+          id: row.id,
+          admin_order_status_v2: row.admin_order_status_v2,
+          order_manage_status: row.order_manage_status,
+          payment_method: row.payment_method,
+          deposit_confirmed_at: row.deposit_confirmed_at,
+        },
+        snapshot_after: {
+          id: row.id,
+          admin_order_status_v2: nextStatus,
+          order_manage_status: nextStatus,
+          payment_method: row.payment_method,
+          deposit_confirmed_at: depositConfirmedAtAfter,
+        },
+      };
+    });
 
     setOrders((prev) =>
       prev.map((order) => {
@@ -501,6 +570,26 @@ export default function AdminV2Page() {
     if (error) {
       alert("상태 변경 실패\n\n" + error.message);
       await loadData();
+      return;
+    }
+
+    const { error: logError } = await supabase.rpc("insert_order_status_change_logs_for_admin_v2", {
+      p_logs: statusLogPayloads,
+    });
+
+    if (logError) {
+      alert("상태는 변경됐지만 상태변경이력 저장에 실패했습니다.\n\n" + logError.message);
+      await loadData();
+      return;
+    }
+
+    const { data: latestStatusLogs, error: latestStatusLogsError } = await supabase
+      .rpc("get_order_status_change_logs_for_admin_v2");
+
+    if (latestStatusLogsError) {
+      alert("상태변경이력 재조회에 실패했습니다.\n\n" + latestStatusLogsError.message);
+    } else {
+      setStatusChangeLogs((latestStatusLogs || []) as StatusChangeLogRow[]);
     }
   };
 
@@ -677,7 +766,7 @@ export default function AdminV2Page() {
 
                   <div className="grid gap-3 xl:grid-cols-[minmax(780px,1fr)_340px]">
                     <div className="min-w-0">
-                      <OrderWorkTable groups={pagedGroups} openedOrderGroupIds={openedOrderGroupIds} moneyEditLogs={moneyEditLogs} onToggle={toggleOrderDetail} onStatusChange={updateOrderStatus} onFinalAmountChange={updateOrderFinalAmount} />
+                      <OrderWorkTable groups={pagedGroups} openedOrderGroupIds={openedOrderGroupIds} moneyEditLogs={moneyEditLogs} statusChangeLogs={statusChangeLogs} onToggle={toggleOrderDetail} onStatusChange={updateOrderStatus} onFinalAmountChange={updateOrderFinalAmount} />
                       <Pagination page={page} totalPages={totalPages} setPage={setPage} totalCount={filteredOrderGroups.length} />
                     </div>
                     <OperationSummary buyerRanking={sideSummary.buyerRanking} productRanking={sideSummary.productRanking} onMore={() => setActiveTab("settlement")} />
@@ -869,6 +958,7 @@ function OrderWorkTable({
   groups,
   openedOrderGroupIds,
   moneyEditLogs,
+  statusChangeLogs,
   onToggle,
   onStatusChange,
   onFinalAmountChange,
@@ -876,6 +966,7 @@ function OrderWorkTable({
   groups: OrderGroup[];
   openedOrderGroupIds: string[];
   moneyEditLogs: MoneyEditLogRow[];
+  statusChangeLogs: StatusChangeLogRow[];
   onToggle: (groupId: string) => void;
   onStatusChange: (group: OrderGroup, status: string) => void;
   onFinalAmountChange: (row: OrderRow, nextAmount: number, reason: string) => Promise<void>;
@@ -899,6 +990,7 @@ function OrderWorkTable({
         const paymentMeta = paymentStatusMeta(group.first);
         const rowIds = new Set(group.rows.map((row) => row.id));
         const groupMoneyLogs = moneyEditLogs.filter((log) => rowIds.has(Number(log.order_id)));
+        const groupStatusLogs = statusChangeLogs.filter((log) => rowIds.has(Number(log.order_id)));
 
         return (
           <div key={group.groupId} className="border-t border-neutral-100 first:border-t-0">
@@ -926,15 +1018,20 @@ function OrderWorkTable({
                   <div className="mt-0.5 text-[10px] font-black text-red-600">금액수정 {groupMoneyLogs.length}건</div>
                 ) : null}
               </div>
-              <select value={status} onChange={(event) => onStatusChange(group, event.target.value)} className={`h-8 w-full rounded-lg border px-2 text-center text-xs font-black outline-none ${selectClass(status)}`}>
-                {ORDER_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
+              <div>
+                <select value={status} onChange={(event) => onStatusChange(group, event.target.value)} className={`h-8 w-full rounded-lg border px-2 text-center text-xs font-black outline-none ${selectClass(status)}`}>
+                  {ORDER_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+                {groupStatusLogs.length > 0 ? (
+                  <div className="mt-0.5 text-center text-[10px] font-black text-blue-700">상태변경 {groupStatusLogs.length}건</div>
+                ) : null}
+              </div>
               <button type="button" onClick={() => onToggle(group.groupId)} className="h-8 rounded-lg border border-neutral-300 bg-white px-2 text-xs font-black text-neutral-700 hover:bg-neutral-50">
                 {isOpen ? "상세닫기" : "상세보기"}
               </button>
             </div>
 
-            {isOpen ? <OrderDetailBlock group={group} moneyEditLogs={groupMoneyLogs} onFinalAmountChange={onFinalAmountChange} /> : null}
+            {isOpen ? <OrderDetailBlock group={group} moneyEditLogs={groupMoneyLogs} statusChangeLogs={groupStatusLogs} onFinalAmountChange={onFinalAmountChange} /> : null}
           </div>
         );
       })}
@@ -945,10 +1042,12 @@ function OrderWorkTable({
 function OrderDetailBlock({
   group,
   moneyEditLogs,
+  statusChangeLogs,
   onFinalAmountChange,
 }: {
   group: OrderGroup;
   moneyEditLogs: MoneyEditLogRow[];
+  statusChangeLogs: StatusChangeLogRow[];
   onFinalAmountChange: (row: OrderRow, nextAmount: number, reason: string) => Promise<void>;
 }) {
   const first = group.first;
@@ -999,6 +1098,51 @@ function OrderDetailBlock({
       </div>
 
       <MoneyEditLogPanel logs={moneyEditLogs} />
+      <StatusChangeLogPanel logs={statusChangeLogs} />
+    </div>
+  );
+}
+
+function StatusChangeLogPanel({ logs }: { logs: StatusChangeLogRow[] }) {
+  return (
+    <div className="mt-3 rounded-xl border border-neutral-200 bg-white p-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-[15px] font-black">🔁 상태 변경이력</div>
+          <div className="mt-0.5 text-[12px] font-bold text-neutral-500">
+            주문 상태를 누가/언제/무엇에서 무엇으로 바꿨는지 확인합니다.
+          </div>
+        </div>
+        <div className="rounded-lg bg-neutral-100 px-2 py-1 text-[11px] font-black text-neutral-600">
+          {logs.length}건
+        </div>
+      </div>
+
+      {logs.length === 0 ? (
+        <div className="rounded-xl bg-neutral-50 p-3 text-center text-[12px] font-bold text-neutral-400">
+          상태 변경이력이 없습니다.
+        </div>
+      ) : (
+        <div className="grid gap-1.5">
+          {logs.map((log) => (
+            <div key={log.id} className="grid gap-1 rounded-xl bg-neutral-50 p-2 text-[12px] font-bold text-neutral-700 md:grid-cols-[128px_1fr_160px] md:items-center">
+              <div className="font-black text-neutral-500">{formatDateLabel(log.changed_at)}</div>
+              <div>
+                <span className="font-black text-amber-700">{getOrderStatusLabel(log.before_status)}</span>
+                <span className="mx-1 text-neutral-400">→</span>
+                <span className="font-black text-blue-700">{getOrderStatusLabel(log.after_status)}</span>
+                <span className="ml-2 text-neutral-500">
+                  {log.payment_method || "-"}
+                  {log.deposit_confirmed_at_after ? ` · 입금확인 ${formatDateLabel(log.deposit_confirmed_at_after)}` : ""}
+                </span>
+              </div>
+              <div className="text-neutral-500 md:text-right">
+                {log.changed_by || "admin-v2"} · 주문ID {log.order_id || "-"}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
