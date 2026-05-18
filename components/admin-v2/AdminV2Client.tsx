@@ -1354,13 +1354,13 @@ function SettlementPanel({
       <div className="rounded-xl border border-neutral-200 bg-white p-3 text-[15px] font-black">
         기준: {dateLabel}
         <div className="mt-1 text-[12px] font-bold text-neutral-500">
-          카드수수료는 주문 당시 저장된 actual_card_fee_rate_applied를 우선 사용하고, 없는 기존 주문만 {actualCardRate}%를 보조 적용합니다.
+          최종 주문매출은 취소 제외 + 환불 차감 후 금액입니다. 환불전 정산금액은 final_amount → adjusted_total_price → total_price 순서로 잡습니다. 카드수수료는 주문 당시 저장된 actual_card_fee_rate_applied를 우선 사용합니다.
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-        <SummaryCard label="주문매출" value={money(orderSales)} />
-        <SummaryCard label="기준금액" value={money(grossBaseSales)} />
+        <SummaryCard label="최종 주문매출" value={money(orderSales)} />
+        <SummaryCard label="환불전 정산금액" value={money(grossBaseSales)} />
         <SummaryCard label="무통장 확인" value={money(bankConfirmedOrderSales)} />
         <SummaryCard label="카드 확인" value={money(cardConfirmedOrderSales)} />
         <SummaryCard label="미결제 합계" value={money(unpaidOrderSales)} strong />
@@ -1375,7 +1375,7 @@ function SettlementPanel({
       </div>
 
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[12px] font-bold text-amber-900">
-        ⚠️ 환불금액(refund_amount)이 따로 입력되어 있으면 final_amount에서 차감합니다. final_amount를 이미 환불 반영 금액으로 직접 낮춘 경우에는 refund_amount를 중복 입력하지 않는 운영 기준이 필요합니다.
+        ⚠️ 환불금액(refund_amount)이 따로 입력되어 있으면 최종정산금액에서 차감합니다. 이미 최종정산금액(final_amount)을 환불 반영 금액으로 낮춘 경우에는 refund_amount를 중복 입력하면 매출이 이중 차감됩니다.
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">
