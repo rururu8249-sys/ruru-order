@@ -40,12 +40,23 @@ import {
   getShippingExcelMemo,
   getShippingRequestMemo,
   getSpecialNote,
+  groupActualCardFeeAmount,
+  groupCanceledAmount,
+  groupCustomerCardExtraAmount,
+  groupGrossBaseAmount,
+  groupNetSalesAmount,
+  groupRefundAmount,
+  isBankPaid,
   isBankPayment,
+  isBankUnpaid,
+  isCardPaid,
   isCardPayment,
+  isCardUnpaid,
   isOrderCanceled,
   isOrderPaid,
   isPaymentUnpaid,
   orderBaseAmount,
+  orderNetSalesAmount,
   paymentStatusMeta,
   readSettingNumber,
   selectClass,
@@ -127,13 +138,20 @@ export function AdminV2Client() {
       map.get(groupId)?.push(order);
     });
 
-    return Array.from(map.entries()).map(([groupId, rows]) => ({
-      groupId,
-      first: rows[0],
-      rows,
-      totalAmount: rows.reduce((sum, row) => sum + Number(row.final_amount ?? row.adjusted_total_price ?? row.total_price ?? 0), 0),
-      totalQty: rows.reduce((sum, row) => sum + Number(row.qty || 0), 0),
-    }));
+    return Array.from(map.entries()).map(([groupId, rows]) => {
+      const group = {
+        groupId,
+        first: rows[0],
+        rows,
+        totalAmount: 0,
+        totalQty: rows.reduce((sum, row) => sum + Number(row.qty || 0), 0),
+      };
+
+      return {
+        ...group,
+        totalAmount: groupNetSalesAmount(group),
+      };
+    });
   }, [orders]);
 
   const dateOptions = useMemo(() => {
@@ -204,15 +222,13 @@ export function AdminV2Client() {
 
     const totalOrderProductQty = filteredOrderGroups.reduce((sum, group) => sum + group.totalQty, 0);
     const totalOrderCount = filteredOrderGroups.length;
-    const totalOrderAmount = notCanceled.reduce((sum, group) => sum + group.totalAmount, 0);
+    const totalOrderAmount = notCanceled.reduce((sum, group) => sum + groupNetSalesAmount(group), 0);
 
-    const bankPaid = filteredOrderGroups.filter((group) => isBankPayment(group.first) && isOrderPaid(group.first)).length;
-    const bankUnpaid = filteredOrderGroups.filter((group) => isBankPayment(group.first) && isPaymentUnpaid(group.first)).length;
-    const cardPaid = filteredOrderGroups.filter((group) => isCardPayment(group.first) && isOrderPaid(group.first)).length;
-    const cardUnpaid = filteredOrderGroups.filter((group) => isCardPayment(group.first) && isPaymentUnpaid(group.first)).length;
-    const canceledAmount = filteredOrderGroups
-      .filter((group) => isOrderCanceled(group.first))
-      .reduce((sum, group) => sum + group.totalAmount, 0);
+    const bankPaid = filteredOrderGroups.filter((group) => isBankPaid(group.first)).length;
+    const bankUnpaid = filteredOrderGroups.filter((group) => isBankUnpaid(group.first)).length;
+    const cardPaid = filteredOrderGroups.filter((group) => isCardPaid(group.first)).length;
+    const cardUnpaid = filteredOrderGroups.filter((group) => isCardUnpaid(group.first)).length;
+    const canceledAmount = filteredOrderGroups.reduce((sum, group) => sum + groupCanceledAmount(group), 0);
 
     return {
       totalOrderProductQty,
@@ -243,7 +259,7 @@ export function AdminV2Client() {
         const productName = row.product_name || "상품명 없음";
         const currentProduct = productMap.get(productName) || { name: productName, qty: 0, amount: 0 };
         currentProduct.qty += Number(row.qty || 0);
-        currentProduct.amount += Number(row.final_amount ?? row.adjusted_total_price ?? row.total_price ?? 0);
+        currentProduct.amount += orderNetSalesAmount(row);
         productMap.set(productName, currentProduct);
       });
     });
@@ -605,6 +621,7 @@ export function AdminV2Client() {
                   orderGroups={filteredOrderGroups}
                   deposits={deposits}
                   actualCardRate={settingsSummary.actualCardRate}
+                  selectedDateKey={dateFilter}
                   dateLabel={dateOptions.find((item) => item.value === dateFilter)?.label || "최근 기준"}
                   buyerRanking={sideSummary.buyerRanking}
                   productRanking={sideSummary.productRanking}
@@ -1274,6 +1291,7 @@ function SettlementPanel({
   orderGroups,
   deposits,
   actualCardRate,
+  selectedDateKey,
   dateLabel,
   buyerRanking,
   productRanking,
@@ -1281,25 +1299,85 @@ function SettlementPanel({
   orderGroups: OrderGroup[];
   deposits: DepositRow[];
   actualCardRate: number;
+  selectedDateKey: string;
   dateLabel: string;
   buyerRanking: Array<{ name: string; amount: number; count: number }>;
   productRanking: Array<{ name: string; qty: number; amount: number }>;
 }) {
-  const orderSales = orderGroups.reduce((sum, group) => sum + group.totalAmount, 0);
-  const depositSales = deposits.filter((item) => item.match_status === "확인완료").reduce((sum, item) => sum + Number(item.amount || 0), 0);
-  const cardFeeLoss = Math.round(depositSales * (actualCardRate / 100));
+  const activeGroups = orderGroups.filter((group) => !isOrderCanceled(group.first));
+
+  const depositsForDate = deposits.filter((item) => {
+    if (!selectedDateKey) return true;
+    return toDateKey(item.deposited_time || item.created_at) === selectedDateKey;
+  });
+
+  const orderSales = activeGroups.reduce((sum, group) => sum + groupNetSalesAmount(group), 0);
+  const grossBaseSales = activeGroups.reduce((sum, group) => sum + groupGrossBaseAmount(group), 0);
+  const refundAmount = activeGroups.reduce((sum, group) => sum + groupRefundAmount(group), 0);
+  const canceledAmount = orderGroups.reduce((sum, group) => sum + groupCanceledAmount(group), 0);
+
+  const bankConfirmedOrderSales = activeGroups
+    .filter((group) => isBankPaid(group.first))
+    .reduce((sum, group) => sum + groupNetSalesAmount(group), 0);
+
+  const cardConfirmedOrderSales = activeGroups
+    .filter((group) => isCardPaid(group.first))
+    .reduce((sum, group) => sum + groupNetSalesAmount(group), 0);
+
+  const bankUnpaidOrderSales = activeGroups
+    .filter((group) => isBankUnpaid(group.first))
+    .reduce((sum, group) => sum + groupNetSalesAmount(group), 0);
+
+  const cardUnpaidOrderSales = activeGroups
+    .filter((group) => isCardUnpaid(group.first))
+    .reduce((sum, group) => sum + groupNetSalesAmount(group), 0);
+
+  const confirmedBankDeposits = depositsForDate
+    .filter((item) => item.match_status === "확인완료")
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  const actualCardFee = activeGroups
+    .filter((group) => isCardPaid(group.first))
+    .reduce((sum, group) => sum + groupActualCardFeeAmount(group, actualCardRate), 0);
+
+  const customerCardExtra = activeGroups
+    .filter((group) => isCardPaid(group.first))
+    .reduce((sum, group) => sum + groupCustomerCardExtraAmount(group), 0);
+
+  const cardFeeMargin = customerCardExtra - actualCardFee;
+  const expectedConfirmedSales = bankConfirmedOrderSales + cardConfirmedOrderSales;
+  const unpaidOrderSales = bankUnpaidOrderSales + cardUnpaidOrderSales;
+  const bankDepositDiff = bankConfirmedOrderSales - confirmedBankDeposits;
 
   return (
     <div className="grid gap-3">
       <div className="rounded-xl border border-neutral-200 bg-white p-3 text-[15px] font-black">
         기준: {dateLabel}
+        <div className="mt-1 text-[12px] font-bold text-neutral-500">
+          카드수수료는 주문 당시 저장된 actual_card_fee_rate_applied를 우선 사용하고, 없는 기존 주문만 {actualCardRate}%를 보조 적용합니다.
+        </div>
       </div>
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
         <SummaryCard label="주문매출" value={money(orderSales)} />
-        <SummaryCard label="확인입금" value={money(depositSales)} />
-        <SummaryCard label="카드수수료" value={money(cardFeeLoss)} />
-        <SummaryCard label="차액" value={money(orderSales - depositSales)} strong />
+        <SummaryCard label="기준금액" value={money(grossBaseSales)} />
+        <SummaryCard label="무통장 확인" value={money(bankConfirmedOrderSales)} />
+        <SummaryCard label="카드 확인" value={money(cardConfirmedOrderSales)} />
+        <SummaryCard label="미결제 합계" value={money(unpaidOrderSales)} strong />
+        <SummaryCard label="확인입금자료" value={money(confirmedBankDeposits)} />
+        <SummaryCard label="무통장 차액" value={money(bankDepositDiff)} strong={bankDepositDiff !== 0} />
+        <SummaryCard label="카드 실수수료" value={money(actualCardFee)} />
+        <SummaryCard label="카드 추가금" value={money(customerCardExtra)} />
+        <SummaryCard label="카드 수수료차익" value={money(cardFeeMargin)} strong={cardFeeMargin < 0} />
+        <SummaryCard label="환불금액" value={money(refundAmount)} />
+        <SummaryCard label="취소금액" value={money(canceledAmount)} />
+        <SummaryCard label="확정매출" value={money(expectedConfirmedSales)} />
       </div>
+
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[12px] font-bold text-amber-900">
+        ⚠️ 환불금액(refund_amount)이 따로 입력되어 있으면 final_amount에서 차감합니다. final_amount를 이미 환불 반영 금액으로 직접 낮춘 경우에는 refund_amount를 중복 입력하지 않는 운영 기준이 필요합니다.
+      </div>
+
       <div className="grid gap-3 lg:grid-cols-2">
         <SidePanel title="👑 최대구매자 전체">
           <RankingList items={buyerRanking.map((item) => ({ title: item.name, sub: `${item.count}건`, right: money(item.amount) }))} />

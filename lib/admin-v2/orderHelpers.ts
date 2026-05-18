@@ -11,8 +11,89 @@ export const readSettingNumber = (settings: SettingRow[], key: string, fallback:
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-export const orderBaseAmount = (row: OrderRow) =>
-  Number(row.final_amount ?? row.adjusted_total_price ?? row.total_price ?? 0);
+export const toSafeNumber = (value: unknown, fallback = 0) => {
+  const parsed = Number(value ?? fallback);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+export const roundWon = (value: unknown) => Math.round(toSafeNumber(value, 0));
+
+export const orderOriginalAmount = (row: Pick<OrderRow, "total_price">) => roundWon(row.total_price);
+
+export const orderCalculatedAmount = (row: Pick<OrderRow, "adjusted_total_price" | "total_price">) =>
+  roundWon(row.adjusted_total_price ?? row.total_price ?? 0);
+
+// 현재 최종정산 기준 금액.
+// final_amount가 있으면 final_amount를 최우선으로 사용하고, 없으면 조정금액/원본금액 순서로 사용합니다.
+export const orderBaseAmount = (row: Pick<OrderRow, "final_amount" | "adjusted_total_price" | "total_price">) =>
+  roundWon(row.final_amount ?? row.adjusted_total_price ?? row.total_price ?? 0);
+
+export const orderRefundAmount = (row: Pick<OrderRow, "refund_amount">) =>
+  Math.max(0, roundWon(row.refund_amount ?? 0));
+
+export const orderCanceledAmount = (
+  row: Pick<OrderRow, "admin_order_status_v2" | "order_manage_status" | "final_amount" | "adjusted_total_price" | "total_price">
+) => {
+  if (!isOrderCanceled(row)) return 0;
+  return orderBaseAmount(row);
+};
+
+// 실제 매출 반영 금액.
+// 주문취소는 0원 처리하고, refund_amount가 따로 있으면 최종정산 기준에서 차감합니다.
+// 주의: final_amount 자체가 이미 환불 반영 금액이라면 refund_amount를 중복 입력하지 않는 운영 기준이 필요합니다.
+export const orderNetSalesAmount = (
+  row: Pick<OrderRow, "admin_order_status_v2" | "order_manage_status" | "final_amount" | "adjusted_total_price" | "total_price" | "refund_amount">
+) => {
+  if (isOrderCanceled(row)) return 0;
+
+  const baseAmount = orderBaseAmount(row);
+  const refundAmount = orderRefundAmount(row);
+
+  return Math.max(0, baseAmount - refundAmount);
+};
+
+export const orderActualCardFeeRate = (row: Pick<OrderRow, "actual_card_fee_rate_applied">, fallbackActualRate = 7) => {
+  const appliedRate = toSafeNumber(row.actual_card_fee_rate_applied, NaN);
+  return Number.isFinite(appliedRate) ? appliedRate : fallbackActualRate;
+};
+
+export const orderCustomerCardExtraRate = (row: Pick<OrderRow, "customer_card_extra_rate_applied">, fallbackCustomerRate = 0) => {
+  const appliedRate = toSafeNumber(row.customer_card_extra_rate_applied, NaN);
+  return Number.isFinite(appliedRate) ? appliedRate : fallbackCustomerRate;
+};
+
+export const orderCustomerCardExtraAmount = (row: Pick<OrderRow, "payment_method" | "vat_amount" | "admin_order_status_v2" | "order_manage_status">) => {
+  if (!isCardPayment(row) || isOrderCanceled(row)) return 0;
+  return Math.max(0, roundWon(row.vat_amount ?? 0));
+};
+
+export const orderActualCardFeeAmount = (
+  row: Pick<OrderRow, "payment_method" | "admin_order_status_v2" | "order_manage_status" | "final_amount" | "adjusted_total_price" | "total_price" | "refund_amount" | "actual_card_fee_rate_applied">,
+  fallbackActualRate = 7
+) => {
+  if (!isCardPayment(row) || !isOrderPaid(row) || isOrderCanceled(row)) return 0;
+
+  const rate = orderActualCardFeeRate(row, fallbackActualRate);
+  return Math.round(orderNetSalesAmount(row) * (rate / 100));
+};
+
+export const groupNetSalesAmount = (group: Pick<OrderGroup, "rows">) =>
+  group.rows.reduce((sum, row) => sum + orderNetSalesAmount(row), 0);
+
+export const groupGrossBaseAmount = (group: Pick<OrderGroup, "rows">) =>
+  group.rows.reduce((sum, row) => sum + orderBaseAmount(row), 0);
+
+export const groupCanceledAmount = (group: Pick<OrderGroup, "rows">) =>
+  group.rows.reduce((sum, row) => sum + orderCanceledAmount(row), 0);
+
+export const groupRefundAmount = (group: Pick<OrderGroup, "rows">) =>
+  group.rows.reduce((sum, row) => sum + (isOrderCanceled(row) ? 0 : orderRefundAmount(row)), 0);
+
+export const groupActualCardFeeAmount = (group: Pick<OrderGroup, "rows">, fallbackActualRate = 7) =>
+  group.rows.reduce((sum, row) => sum + orderActualCardFeeAmount(row, fallbackActualRate), 0);
+
+export const groupCustomerCardExtraAmount = (group: Pick<OrderGroup, "rows">) =>
+  group.rows.reduce((sum, row) => sum + orderCustomerCardExtraAmount(row), 0);
 
 export const getOrderStatusValue = (row: Pick<OrderRow, "admin_order_status_v2" | "order_manage_status">) => {
   return String(row.admin_order_status_v2 || row.order_manage_status || "미설정").trim() || "미설정";
@@ -44,6 +125,18 @@ export const isPaymentUnpaid = (
 ) => {
   return !isOrderCanceled(row) && !isOrderPaid(row);
 };
+
+export const isBankPaid = (row: Pick<OrderRow, "payment_method" | "admin_order_status_v2" | "order_manage_status">) =>
+  isBankPayment(row) && isOrderPaid(row);
+
+export const isCardPaid = (row: Pick<OrderRow, "payment_method" | "admin_order_status_v2" | "order_manage_status">) =>
+  isCardPayment(row) && isOrderPaid(row);
+
+export const isBankUnpaid = (row: Pick<OrderRow, "payment_method" | "admin_order_status_v2" | "order_manage_status">) =>
+  isBankPayment(row) && isPaymentUnpaid(row);
+
+export const isCardUnpaid = (row: Pick<OrderRow, "payment_method" | "admin_order_status_v2" | "order_manage_status">) =>
+  isCardPayment(row) && isPaymentUnpaid(row);
 
 export const paymentStatusMeta = (
   row: Pick<OrderRow, "admin_order_status_v2" | "order_manage_status" | "payment_method">
