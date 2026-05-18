@@ -114,6 +114,34 @@ const moneyNumber = (value: unknown) => Number(String(value ?? "0").replace(/[^0
 const moneyInput = (value: unknown) => String(value ?? "").replace(/[^0-9]/g, "");
 const orderBaseAmount = (row: OrderRow) => Number(row.final_amount ?? row.adjusted_total_price ?? row.total_price ?? 0);
 
+const digitsOnly = (value: unknown) => String(value ?? "").replace(/[^0-9]/g, "");
+
+const formatKoreanPhone = (value: unknown) => {
+  const digits = digitsOnly(value);
+
+  if (!digits) return "-";
+  if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}`;
+  if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+
+  return String(value ?? "").trim() || "-";
+};
+
+const orderPhoneDigits = (row: Pick<OrderRow, "customer_phone" | "phone">) => {
+  const customerPhone = digitsOnly(row.customer_phone);
+  if (customerPhone.length >= 10) return customerPhone;
+
+  const legacyPhone = digitsOnly(row.phone);
+  if (legacyPhone.length >= 10) return legacyPhone;
+
+  return "";
+};
+
+const displayOrderPhone = (row: Pick<OrderRow, "customer_phone" | "phone">) => {
+  const phoneDigits = orderPhoneDigits(row);
+  if (!phoneDigits) return "-";
+  return formatKoreanPhone(phoneDigits);
+};
+
 const readSettingNumber = (settings: SettingRow[], key: string, fallback: number) => {
   const found = settings.find((item) => item.key === key);
   const parsed = Number(found?.value);
@@ -239,10 +267,12 @@ export default function AdminV2Page() {
         group.first.order_lookup_code,
         group.first.youtube_nickname,
         group.first.customer_name,
+        displayOrderPhone(group.first),
+        orderPhoneDigits(group.first),
         group.first.phone,
         group.first.customer_phone,
         group.first.payment_method,
-        ...group.rows.map((row) => `${row.product_name} ${row.color} ${row.size}`),
+        ...group.rows.map((row) => `${row.product_name} ${row.color} ${row.size} ${displayOrderPhone(row)} ${orderPhoneDigits(row)}`),
       ].filter(Boolean).join(" ").toLowerCase();
 
       return matchStatus && matchPayment && matchDate && (!word || target.includes(word));
@@ -700,7 +730,9 @@ function OrderWorkTable({
               <div className="text-[13px] font-bold text-neutral-500">{formatDateLabel(group.first.created_at)}</div>
               <div className="min-w-0">
                 <div className="truncate text-[15px] font-black">{group.first.youtube_nickname || "-"}</div>
-                <div className="truncate text-[12px] font-bold text-neutral-500">{group.first.customer_name || "-"}</div>
+                <div className="truncate text-[12px] font-bold text-neutral-500">
+                  {group.first.customer_name || "-"} · {displayOrderPhone(group.first)}
+                </div>
               </div>
               <div className="min-w-0">
                 <div className="truncate text-[15px] font-bold text-neutral-800">{buildItemSummary(group)}</div>
@@ -740,7 +772,7 @@ function OrderDetailBlock({
     <div className="border-t border-neutral-100 bg-neutral-50 px-3 py-3">
       <div className="grid gap-2 md:grid-cols-[1.1fr_1.4fr_1fr]">
         <DetailBox title="고객정보">
-          <div>전화번호: {first.customer_phone || first.phone || "-"}</div>
+          <div>전화번호: {displayOrderPhone(first)}</div>
           <div>주소: {address || "-"}</div>
         </DetailBox>
         <DetailBox title="상세상품">
@@ -902,7 +934,7 @@ function CustomerPanel({ customers }: { customers: CustomerRow[] }) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-base font-black">{customer.youtube_nickname || "-"}</div>
-                <div className="mt-1 text-[13px] font-bold text-neutral-500">{customer.customer_name || "-"} · {customer.customer_phone || "-"}</div>
+                <div className="mt-1 text-[13px] font-bold text-neutral-500">{customer.customer_name || "-"} · {formatKoreanPhone(customer.customer_phone)}</div>
               </div>
               <span className={`rounded-full px-2 py-1 text-[11px] font-black ${blocked ? "bg-red-100 text-red-700" : "bg-neutral-100 text-neutral-600"}`}>{blocked ? "차단" : "정상"}</span>
             </div>
