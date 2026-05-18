@@ -28,10 +28,19 @@ type OrderRow = {
   color: string | null;
   size: string | null;
   qty: number | null;
-  payment_method: string | null;
+  product_price: number | null;
+  shipping_fee: number | null;
   total_price: number | null;
+  adjusted_product_price: number | null;
+  adjusted_shipping_fee: number | null;
   adjusted_total_price: number | null;
   final_amount: number | null;
+  vat_amount: number | null;
+  admin_price_memo: string | null;
+  customer_card_extra_rate_applied: number | null;
+  actual_card_fee_rate_applied: number | null;
+  refund_amount: number | null;
+  payment_method: string | null;
   admin_order_status_v2: string | null;
   order_manage_status: string | null;
   tracking_number: string | null;
@@ -101,6 +110,9 @@ const PAID_STATUSES = ["입금확인", "출고대기", "출고완료", "킵", "�
 const PAGE_SIZE = 15;
 
 const money = (value: unknown) => `${Number(value || 0).toLocaleString()}원`;
+const moneyNumber = (value: unknown) => Number(String(value ?? "0").replace(/[^0-9.-]/g, "")) || 0;
+const moneyInput = (value: unknown) => String(value ?? "").replace(/[^0-9]/g, "");
+const orderBaseAmount = (row: OrderRow) => Number(row.final_amount ?? row.adjusted_total_price ?? row.total_price ?? 0);
 
 const readSettingNumber = (settings: SettingRow[], key: string, fallback: number) => {
   const found = settings.find((item) => item.key === key);
@@ -321,6 +333,70 @@ export default function AdminV2Page() {
     }
   };
 
+  const updateOrderFinalAmount = async (row: OrderRow, nextAmount: number, reason: string) => {
+    const cleanReason = reason.trim();
+    const beforeAmount = orderBaseAmount(row);
+
+    if (!Number.isFinite(nextAmount) || nextAmount < 0) {
+      alert("최종정산금액을 정확히 입력해주세요.");
+      return;
+    }
+
+    if (!cleanReason || cleanReason.length < 2) {
+      alert("금액 수정 사유를 2글자 이상 입력해주세요.\n예: 부분환불, 금액오입력, 배송비조정");
+      return;
+    }
+
+    if (beforeAmount === nextAmount) {
+      alert("현재 기준금액과 동일합니다. 수정할 금액을 다시 확인해주세요.");
+      return;
+    }
+
+    const ok = confirm(
+      `최종정산금액을 수정할까요?
+
+이전: ${beforeAmount.toLocaleString()}원
+변경: ${nextAmount.toLocaleString()}원
+사유: ${cleanReason}
+
+수정이력에 기록됩니다.`
+    );
+
+    if (!ok) return;
+
+    const { data, error } = await supabase.rpc("update_order_final_amount_with_log", {
+      p_order_id: row.id,
+      p_final_amount: nextAmount,
+      p_reason: cleanReason,
+      p_editor: "admin-v2",
+    });
+
+    if (error) {
+      alert(
+        "금액 수정 실패\n\n" +
+          error.message +
+          "\n\n먼저 Supabase SQL Editor에서 money_log_sql_setup.sql을 실행했는지 확인해주세요."
+      );
+      return;
+    }
+
+    const updatedRow = Array.isArray(data) ? data[0] : data;
+
+    setOrders((prev) =>
+      prev.map((order) =>
+        order.id === row.id
+          ? {
+              ...order,
+              final_amount: Number(updatedRow?.final_amount ?? nextAmount),
+              admin_price_memo: String(updatedRow?.admin_price_memo ?? cleanReason),
+            }
+          : order
+      )
+    );
+
+    alert("최종정산금액 수정 및 이력 저장이 완료되었습니다.");
+  };
+
   const saveSetting = async (key: string, value: string) => {
     const { data, error: selectError } = await supabase.from("settings").select("id").eq("key", key).limit(1);
     if (selectError) return alert("설정 확인 실패\n\n" + selectError.message);
@@ -421,7 +497,7 @@ export default function AdminV2Page() {
 
                   <div className="grid gap-3 xl:grid-cols-[minmax(780px,1fr)_340px]">
                     <div className="min-w-0">
-                      <OrderWorkTable groups={pagedGroups} openedOrderGroupIds={openedOrderGroupIds} onToggle={toggleOrderDetail} onStatusChange={updateOrderStatus} />
+                      <OrderWorkTable groups={pagedGroups} openedOrderGroupIds={openedOrderGroupIds} onToggle={toggleOrderDetail} onStatusChange={updateOrderStatus} onFinalAmountChange={updateOrderFinalAmount} />
                       <Pagination page={page} totalPages={totalPages} setPage={setPage} totalCount={filteredOrderGroups.length} />
                     </div>
                     <OperationSummary buyerRanking={sideSummary.buyerRanking} productRanking={sideSummary.productRanking} onMore={() => setActiveTab("settlement")} />
@@ -592,11 +668,13 @@ function OrderWorkTable({
   openedOrderGroupIds,
   onToggle,
   onStatusChange,
+  onFinalAmountChange,
 }: {
   groups: OrderGroup[];
   openedOrderGroupIds: string[];
   onToggle: (groupId: string) => void;
   onStatusChange: (group: OrderGroup, status: string) => void;
+  onFinalAmountChange: (row: OrderRow, nextAmount: number, reason: string) => Promise<void>;
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
@@ -639,7 +717,7 @@ function OrderWorkTable({
               </button>
             </div>
 
-            {isOpen ? <OrderDetailBlock group={group} /> : null}
+            {isOpen ? <OrderDetailBlock group={group} onFinalAmountChange={onFinalAmountChange} /> : null}
           </div>
         );
       })}
@@ -647,7 +725,13 @@ function OrderWorkTable({
   );
 }
 
-function OrderDetailBlock({ group }: { group: OrderGroup }) {
+function OrderDetailBlock({
+  group,
+  onFinalAmountChange,
+}: {
+  group: OrderGroup;
+  onFinalAmountChange: (row: OrderRow, nextAmount: number, reason: string) => Promise<void>;
+}) {
   const first = group.first;
   const address = [first.address, first.detail_address].filter(Boolean).join(" ");
   const memo = [first.request_memo, first.memo, first.special_note, first.admin_memo].filter(Boolean).join(" / ");
@@ -660,13 +744,102 @@ function OrderDetailBlock({ group }: { group: OrderGroup }) {
           <div>주소: {address || "-"}</div>
         </DetailBox>
         <DetailBox title="상세상품">
-          {group.rows.map((row) => <div key={row.id}>{[row.product_name, row.color, row.size].filter(Boolean).join(" / ")} x{row.qty || 1}</div>)}
+          {group.rows.map((row) => (
+            <div key={row.id}>
+              {[row.product_name, row.color, row.size].filter(Boolean).join(" / ")} x{row.qty || 1} · 현재 최종 {money(orderBaseAmount(row))}
+            </div>
+          ))}
         </DetailBox>
         <DetailBox title="관리정보">
           <div>송장: {first.tracking_company || "로젠"} {first.tracking_number || "미등록"}</div>
           <div>메모: {memo || "-"}</div>
         </DetailBox>
       </div>
+
+      <div className="mt-3 rounded-xl border border-neutral-200 bg-white p-3">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-[15px] font-black">💰 최종정산금액 수정</div>
+            <div className="mt-0.5 text-[12px] font-bold text-neutral-500">
+              원본 금액은 건드리지 않고 final_amount만 저장합니다. 수정 사유는 필수입니다.
+            </div>
+          </div>
+          <div className="rounded-lg bg-red-50 px-2 py-1 text-[11px] font-black text-red-700">
+            돈 로직: 사유 없이 수정 금지
+          </div>
+        </div>
+
+        <div className="grid gap-2">
+          {group.rows.map((row) => (
+            <FinalAmountEditor key={row.id} row={row} onSave={onFinalAmountChange} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FinalAmountEditor({
+  row,
+  onSave,
+}: {
+  row: OrderRow;
+  onSave: (row: OrderRow, nextAmount: number, reason: string) => Promise<void>;
+}) {
+  const currentAmount = orderBaseAmount(row);
+  const [amountText, setAmountText] = useState(String(currentAmount));
+  const [reason, setReason] = useState(row.admin_price_memo || "");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setAmountText(String(orderBaseAmount(row)));
+    setReason(row.admin_price_memo || "");
+  }, [row.final_amount, row.adjusted_total_price, row.total_price, row.admin_price_memo]);
+
+  const save = async () => {
+    const nextAmount = moneyNumber(amountText);
+    setSaving(true);
+    try {
+      await onSave(row, nextAmount, reason);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const hasFinalOverride = row.final_amount !== null && row.final_amount !== undefined;
+
+  return (
+    <div className="grid gap-2 rounded-xl border border-neutral-100 bg-neutral-50 p-2 lg:grid-cols-[minmax(220px,1fr)_130px_150px_minmax(200px,1fr)_82px] lg:items-center">
+      <div className="min-w-0">
+        <div className="truncate text-[13px] font-black text-neutral-800">
+          {[row.product_name, row.color, row.size].filter(Boolean).join(" / ") || "상품명 없음"}
+        </div>
+        <div className="mt-0.5 text-[11px] font-bold text-neutral-500">
+          원본 {money(row.total_price)} · 기준계산 {money(row.adjusted_total_price ?? row.total_price)} · 최종정산 {hasFinalOverride ? `${money(row.final_amount)} 직접수정됨` : "미수정"}
+        </div>
+      </div>
+      <div className="text-[12px] font-black text-neutral-600 lg:text-right">현재 최종 {money(currentAmount)}</div>
+      <input
+        value={Number(amountText || 0).toLocaleString()}
+        onChange={(event) => setAmountText(moneyInput(event.target.value))}
+        inputMode="numeric"
+        className="h-9 rounded-lg border border-neutral-200 bg-white px-2 text-right text-[14px] font-black outline-none focus:border-neutral-950"
+        placeholder="최종금액"
+      />
+      <input
+        value={reason}
+        onChange={(event) => setReason(event.target.value)}
+        className="h-9 rounded-lg border border-neutral-200 bg-white px-2 text-[13px] font-bold outline-none focus:border-neutral-950"
+        placeholder="수정사유 필수 예: 부분환불"
+      />
+      <button
+        type="button"
+        onClick={save}
+        disabled={saving}
+        className="h-9 rounded-lg bg-neutral-950 px-2 text-[13px] font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-400"
+      >
+        {saving ? "저장중" : "저장"}
+      </button>
     </div>
   );
 }
