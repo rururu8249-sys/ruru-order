@@ -72,6 +72,8 @@ type AdminOrder = {
   product_price?: number;
   total_price?: number;
   adjusted_total_price?: number;
+  adjusted_product_price?: number;
+  adjusted_shipping_fee?: number;
   payment_method?: string;
   order_status?: string;
   admin_status?: string;
@@ -84,6 +86,7 @@ type AdminOrder = {
   admin_product_price?: number;
   admin_shipping_fee?: number;
   shipping_fee?: number;
+  vat_amount?: number;
 };
 
 type CustomerProfile = {
@@ -97,6 +100,78 @@ type CustomerProfile = {
   request_memo?: string;
   is_blocked?: boolean;
   admin_memo?: string;
+};
+
+type DepositEntry = {
+  id: string;
+  depositor: string;
+  amount: number;
+  time: string;
+  raw: string;
+};
+
+type DepositSummary = {
+  depositor: string;
+  totalAmount: number;
+  count: number;
+  times: string[];
+  entries: DepositEntry[];
+};
+
+type DepositMatchStatus =
+  | "완전일치"
+  | "합산일치"
+  | "금액맞음"
+  | "부분입금"
+  | "초과입금"
+  | "미입금"
+  | "확인필요"
+  | "주문없음"
+  | "확인완료";
+
+type DepositMatchRow = {
+  groupId: string;
+  orderCode: string;
+  nickname: string;
+  customerName: string;
+  phone: string;
+  orderAmount: number;
+  itemText: string;
+  paymentMethod: string;
+  currentStatus: string;
+  matchedName: string;
+  depositAmount: number;
+  depositCount: number;
+  depositTimes: string;
+  status: DepositMatchStatus;
+  memo: string;
+};
+
+type DepositReviewOrder = {
+  groupId: string;
+  orderAmount: number;
+  itemText: string;
+  status: string;
+};
+
+type DepositReviewEntry = DepositEntry & {
+  matchScore?: number;
+  matchReason?: string;
+};
+
+type DepositReviewGroup = {
+  reviewKey: string;
+  nickname: string;
+  customerName: string;
+  phone: string;
+  orders: DepositReviewOrder[];
+  deposits: DepositReviewEntry[];
+  siteTotal: number;
+  depositTotal: number;
+  difference: number;
+  status: DepositMatchStatus;
+  memo: string;
+  isDepositOnly?: boolean;
 };
 
 const emptyProduct: Product = {
@@ -121,8 +196,15 @@ const normalizePhoneKey = (value?: string) => String(value || "").replace(/[^0-9
 
 export default function AdminPage() {
   const [activeMenu, setActiveMenu] = useState<
-    "dashboard" | "products" | "broadcasts" | "orders" | "customers"
-  >("dashboard");
+    "dashboard" | "products" | "broadcasts" | "orders" | "customers" | "deposits"
+  >(() => {
+    if (typeof window === "undefined") return "dashboard";
+
+    const saved = window.localStorage.getItem("ruru_admin_active_menu");
+    const allowed = ["dashboard", "products", "broadcasts", "orders", "customers", "deposits"];
+
+    return allowed.includes(saved || "") ? (saved as any) : "dashboard";
+  });
 
   const [products, setProducts] = useState<Product[]>([]);
   const [form, setForm] = useState<Product>(emptyProduct);
@@ -165,6 +247,8 @@ export default function AdminPage() {
   const [paymentFilter, setPaymentFilter] = useState<"전체" | "무통장입금" | "카드결제">("전체");
   const [selectedOrderGroupIds, setSelectedOrderGroupIds] = useState<string[]>([]);
   const [selectedOrderDetailGroupId, setSelectedOrderDetailGroupId] = useState<string | null>(null);
+  const [orderPageSize, setOrderPageSize] = useState(10);
+  const [orderPage, setOrderPage] = useState(1);
   const [customerKeyword, setCustomerKeyword] = useState("");
   const [blockedPhones, setBlockedPhones] = useState<string[]>([]);
   const [customers, setCustomers] = useState<CustomerProfile[]>([]);
@@ -172,12 +256,38 @@ export default function AdminPage() {
   const [selectedCustomerDetailKey, setSelectedCustomerDetailKey] = useState<string | null>(null);
   const [showOnlyLinkedProducts, setShowOnlyLinkedProducts] = useState(false);
 
+  const [depositRawText, setDepositRawText] = useState("");
+  const [depositKeyword, setDepositKeyword] = useState("");
+  const [depositStatusFilter, setDepositStatusFilter] = useState<"전체" | DepositMatchStatus>("전체");
+  const [confirmedDepositReviewKeys, setConfirmedDepositReviewKeys] = useState<string[]>([]);
+
   useEffect(() => {
     loadAll();
 
     if (typeof window !== "undefined") {
       const savedSound = localStorage.getItem("ruru_admin_order_sound") === "ON";
       if (savedSound) setSoundEnabled(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("ruru_admin_active_menu", activeMenu);
+  }, [activeMenu]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const saved = localStorage.getItem("ruru_deposit_review_confirmed_keys");
+    if (!saved) return;
+
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        setConfirmedDepositReviewKeys(parsed.filter(Boolean));
+      }
+    } catch {
+      setConfirmedDepositReviewKeys([]);
     }
   }, []);
 
@@ -445,6 +555,10 @@ export default function AdminPage() {
     });
   }, [orders, orderKeyword, paymentFilter]);
 
+  useEffect(() => {
+    setOrderPage(1);
+  }, [orderKeyword, paymentFilter, orderPageSize]);
+
   const orderGroups = useMemo(() => {
     const map = new Map<string, AdminOrder[]>();
 
@@ -463,14 +577,727 @@ export default function AdminPage() {
         (sum, row) =>
           sum +
           Number(
-            row.adjusted_total_price ||
-              row.total_price ||
+            row.adjusted_total_price ??
+              row.total_price ??
               Number(row.product_price || 0) * Number(row.qty || 1)
           ),
         0
       ),
     }));
   }, [filteredOrders]);
+
+
+  const normalizeDepositName = (value: any) => {
+    return String(value || "")
+      .replace(/\s/g, "")
+      .replace(/[(){}\[\],.·ㆍ\-_/]/g, "")
+      .toLowerCase();
+  };
+
+  const safeMoneyNumber = (value: any) => {
+    if (value === null || value === undefined || value === "") return 0;
+    const cleaned = String(value).replace(/[^0-9.-]/g, "");
+    return Number(cleaned || 0);
+  };
+
+  const getOrderRowQty = (row: AdminOrder) => {
+    const qty = safeMoneyNumber(row.qty);
+    return qty > 0 ? qty : 1;
+  };
+
+  const getOrderRowProductTotal = (row: AdminOrder) => {
+    return safeMoneyNumber(row.product_price) * getOrderRowQty(row);
+  };
+
+  const getOrderRowShippingFee = (row: AdminOrder) => {
+    return safeMoneyNumber(
+      row.shipping_fee ??
+        row.admin_shipping_fee ??
+        row.adjusted_shipping_fee ??
+        0
+    );
+  };
+
+  const getOrderRowCardRate = (row: AdminOrder) => {
+    if (row.payment_method !== "카드결제") return 0;
+
+    const previousProductTotal =
+      safeMoneyNumber(row.adjusted_product_price) ||
+      safeMoneyNumber(row.product_price) * getOrderRowQty(row);
+
+    const previousVat = safeMoneyNumber(row.vat_amount);
+
+    if (previousProductTotal > 0 && previousVat > 0) {
+      return previousVat / previousProductTotal;
+    }
+
+    return 0.1;
+  };
+
+  const getOrderRowCardFee = (row: AdminOrder) => {
+    if (row.payment_method !== "카드결제") return 0;
+    return Math.round(getOrderRowProductTotal(row) * getOrderRowCardRate(row));
+  };
+
+  const calculateOrderRowTotal = (row: AdminOrder) => {
+    return (
+      getOrderRowProductTotal(row) +
+      getOrderRowShippingFee(row) +
+      getOrderRowCardFee(row)
+    );
+  };
+
+  const orderGroupAmount = (rows: AdminOrder[]) => {
+    return rows.reduce((sum, row) => {
+      const storedTotal =
+        row.adjusted_total_price !== undefined && row.adjusted_total_price !== null
+          ? safeMoneyNumber(row.adjusted_total_price)
+          : row.total_price !== undefined && row.total_price !== null
+          ? safeMoneyNumber(row.total_price)
+          : calculateOrderRowTotal(row);
+
+      return sum + storedTotal;
+    }, 0);
+  };
+
+  const parseDepositEntries = (text: string): DepositEntry[] => {
+    const lines = String(text || "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    const entries: DepositEntry[] = [];
+
+    for (let index = 0; index < lines.length; index += 1) {
+      const statusLine = lines[index] || "";
+
+      if (!/^미매칭$/i.test(statusLine.trim())) {
+        continue;
+      }
+
+      const depositorLine = lines[index + 1] || "";
+      const amountLine = lines[index + 2] || "";
+      const timeLine = lines[index + 3] || "";
+
+      const amountMatch = amountLine.match(/^\+\s*([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)\s*원$/);
+      const timeMatch = timeLine.match(/^([0-2]?\d):([0-5]\d)$/);
+
+      if (!depositorLine || !amountMatch) {
+        continue;
+      }
+
+      entries.push({
+        id: `${index}-${depositorLine}-${amountLine}-${timeLine}`,
+        depositor: depositorLine.trim(),
+        amount: Number(String(amountMatch[1] || "0").replace(/,/g, "")),
+        time: timeMatch ? `${timeMatch[1].padStart(2, "0")}:${timeMatch[2]}` : "",
+        raw: [statusLine, depositorLine, amountLine, timeLine].join(" / "),
+      });
+
+      index += 3;
+    }
+
+    return entries;
+  };
+
+  const depositEntries = useMemo(() => {
+    return parseDepositEntries(depositRawText);
+  }, [depositRawText]);
+
+  const depositSummaries = useMemo(() => {
+    const map = new Map<string, DepositSummary>();
+
+    depositEntries.forEach((entry) => {
+      const key = normalizeDepositName(entry.depositor);
+      if (!key) return;
+
+      if (!map.has(key)) {
+        map.set(key, {
+          depositor: entry.depositor,
+          totalAmount: 0,
+          count: 0,
+          times: [],
+          entries: [],
+        });
+      }
+
+      const summary = map.get(key);
+      if (!summary) return;
+
+      summary.totalAmount += Number(entry.amount || 0);
+      summary.count += 1;
+      if (entry.time) summary.times.push(entry.time);
+      summary.entries.push(entry);
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.totalAmount - a.totalAmount);
+  }, [depositEntries]);
+
+  const compactKoreanName = (value: any) => {
+    return normalizeDepositName(value)
+      .replace(/유민영|고객님|님$/g, "")
+      .trim();
+  };
+
+  const isSimilarDepositName = (depositName: string, orderName: string) => {
+    const depositKey = compactKoreanName(depositName);
+    const orderKey = compactKoreanName(orderName);
+
+    if (!depositKey || !orderKey) return false;
+    if (depositKey === orderKey) return true;
+
+    if (depositKey.length >= 2 && orderKey.includes(depositKey)) return true;
+    if (orderKey.length >= 2 && depositKey.includes(orderKey)) return true;
+
+    if (depositKey.length >= 3 && orderKey.includes(depositKey.slice(0, 3))) return true;
+    if (orderKey.length >= 3 && depositKey.includes(orderKey.slice(0, 3))) return true;
+
+    return false;
+  };
+
+  const findSimilarDepositSummary = (
+    nickname: string,
+    customerName: string,
+    summaries: DepositSummary[]
+  ) => {
+    return (
+      summaries.find((summary) => isSimilarDepositName(summary.depositor, nickname)) ||
+      summaries.find((summary) => isSimilarDepositName(summary.depositor, customerName)) ||
+      null
+    );
+  };
+
+  const isCrossNameMatch = (depositor: string, nickname: string, customerName: string) => {
+    const depositKey = normalizeDepositName(depositor);
+    const nicknameKey = normalizeDepositName(nickname);
+    const nameKey = normalizeDepositName(customerName);
+
+    if (!depositKey) return false;
+
+    if (nicknameKey && depositKey === nicknameKey) return true;
+    if (nameKey && depositKey === nameKey) return true;
+
+    return false;
+  };
+
+  const isPossibleNameMatch = (depositor: string, nickname: string, customerName: string) => {
+    const depositKey = normalizeDepositName(depositor);
+    const nicknameKey = normalizeDepositName(nickname);
+    const nameKey = normalizeDepositName(customerName);
+
+    if (!depositKey) return false;
+
+    const candidates = [nicknameKey, nameKey].filter(Boolean);
+
+    return candidates.some((target) => {
+      if (!target) return false;
+      if (depositKey === target) return true;
+
+      // 수수밭 ↔ 옥수수밭유민영 같은 일부 포함 케이스
+      if (depositKey.length >= 2 && target.includes(depositKey)) return true;
+      if (target.length >= 2 && depositKey.includes(target)) return true;
+
+      // 앞글자 일부 일치도 미입금으로 버리지 않고 확인필요로 올림
+      if (depositKey.length >= 3 && target.includes(depositKey.slice(0, 3))) return true;
+      if (target.length >= 3 && depositKey.includes(target.slice(0, 3))) return true;
+
+      return false;
+    });
+  };
+
+  const findExactDepositSummary = (
+    nickname: string,
+    customerName: string,
+    summaries: DepositSummary[]
+  ) => {
+    return (
+      summaries.find((summary) => isCrossNameMatch(summary.depositor, nickname, customerName)) ||
+      null
+    );
+  };
+
+  const findPossibleDepositSummary = (
+    nickname: string,
+    customerName: string,
+    summaries: DepositSummary[]
+  ) => {
+    return (
+      summaries.find((summary) => isPossibleNameMatch(summary.depositor, nickname, customerName)) ||
+      null
+    );
+  };
+
+  const depositMatchRows = useMemo<DepositMatchRow[]>(() => {
+    const customerOrderTotalMap = new Map<string, number>();
+    const customerOrderCountMap = new Map<string, number>();
+
+    const customerKeyOf = (nickname: string, customerName: string, phone?: string) => {
+      const phoneKey = normalizePhoneKey(phone || "");
+      const nicknameKey = normalizeDepositName(nickname);
+      const nameKey = normalizeDepositName(customerName);
+
+      return phoneKey || `${nicknameKey}|${nameKey}`;
+    };
+
+    orderGroups.forEach((group) => {
+      const first = group.first;
+      const nickname = String(first.youtube_nickname || "").trim();
+      const customerName = String(first.customer_name || "").trim();
+      const key = customerKeyOf(nickname, customerName, first.customer_phone);
+      const amount = orderGroupAmount(group.rows);
+
+      customerOrderTotalMap.set(key, (customerOrderTotalMap.get(key) || 0) + amount);
+      customerOrderCountMap.set(key, (customerOrderCountMap.get(key) || 0) + 1);
+    });
+
+    return orderGroups.map((group) => {
+      const first = group.first;
+      const orderAmount = orderGroupAmount(group.rows);
+      const nickname = String(first.youtube_nickname || "").trim();
+      const customerName = String(first.customer_name || "").trim();
+      const customerKey = customerKeyOf(nickname, customerName, first.customer_phone);
+      const customerTotalOrderAmount = customerOrderTotalMap.get(customerKey) || orderAmount;
+      const customerOrderCount = customerOrderCountMap.get(customerKey) || 1;
+
+      const exactSummary = findExactDepositSummary(nickname, customerName, depositSummaries);
+      const possibleSummary = !exactSummary
+        ? findPossibleDepositSummary(nickname, customerName, depositSummaries)
+        : null;
+
+      const sameOrderAmountDifferentName = depositSummaries.filter(
+        (summary) =>
+          summary.totalAmount === orderAmount &&
+          !isCrossNameMatch(summary.depositor, nickname, customerName)
+      );
+
+      const sameCustomerTotalDifferentName = depositSummaries.filter(
+        (summary) =>
+          summary.totalAmount === customerTotalOrderAmount &&
+          !isCrossNameMatch(summary.depositor, nickname, customerName)
+      );
+
+      let status: DepositMatchStatus = "미입금";
+      let matchedSummary: DepositSummary | null = null;
+      let memo = "일치하는 입금내역 없음";
+
+      if (exactSummary) {
+        matchedSummary = exactSummary;
+
+        if (exactSummary.totalAmount === customerTotalOrderAmount) {
+          status = exactSummary.count > 1 || customerOrderCount > 1 ? "합산일치" : "완전일치";
+          memo =
+            customerOrderCount > 1
+              ? `닉네임/이름이 같은 고객 주문 ${customerOrderCount}건 총액 ${money(customerTotalOrderAmount)}과 입금합계가 일치`
+              : "입금자명이 닉네임 또는 이름과 일치하고 금액도 일치";
+        } else if (exactSummary.totalAmount === orderAmount) {
+          status = exactSummary.count > 1 ? "합산일치" : "완전일치";
+          memo = "입금자명이 닉네임 또는 이름과 일치하고 해당 주문금액과 일치";
+        } else if (exactSummary.totalAmount < customerTotalOrderAmount) {
+          status = "부분입금";
+          memo = `닉네임/이름은 일치하지만 같은 고객 전체 주문금액보다 ${money(customerTotalOrderAmount - exactSummary.totalAmount)} 부족`;
+        } else {
+          status = "초과입금";
+          memo = `닉네임/이름은 일치하지만 같은 고객 전체 주문금액보다 ${money(exactSummary.totalAmount - customerTotalOrderAmount)} 초과`;
+        }
+      } else if (possibleSummary) {
+        matchedSummary = possibleSummary;
+        status = "확인필요";
+
+        if (possibleSummary.totalAmount === customerTotalOrderAmount) {
+          memo = `입금자명이 닉네임/이름과 일부 유사하고 같은 고객 주문 ${customerOrderCount}건 총액과 일치`;
+        } else if (possibleSummary.totalAmount === orderAmount) {
+          memo = "입금자명이 닉네임/이름과 일부 유사하고 해당 주문금액과 일치";
+        } else if (possibleSummary.totalAmount < customerTotalOrderAmount) {
+          memo = `입금자명이 유사하지만 같은 고객 전체 주문금액보다 ${money(customerTotalOrderAmount - possibleSummary.totalAmount)} 부족`;
+        } else {
+          memo = `입금자명이 유사하지만 같은 고객 전체 주문금액보다 ${money(possibleSummary.totalAmount - customerTotalOrderAmount)} 초과`;
+        }
+      } else if (sameCustomerTotalDifferentName.length === 1 && customerOrderCount > 1) {
+        matchedSummary = sameCustomerTotalDifferentName[0];
+        status = "확인필요";
+        memo = `입금자명은 다르지만 같은 고객 주문 ${customerOrderCount}건 총액과 같은 입금이 있어 확인 필요`;
+      } else if (sameOrderAmountDifferentName.length === 1) {
+        matchedSummary = sameOrderAmountDifferentName[0];
+        status = "확인필요";
+        memo = "주문금액과 같은 입금은 있지만 입금자명이 닉네임/이름과 달라 확인 필요";
+      } else if (sameOrderAmountDifferentName.length > 1 || sameCustomerTotalDifferentName.length > 1) {
+        matchedSummary = sameOrderAmountDifferentName[0] || sameCustomerTotalDifferentName[0] || null;
+        status = "확인필요";
+        memo = "같은 금액의 입금자가 여러 명이라 확인 필요";
+      }
+
+      return {
+        groupId: group.groupId,
+        orderCode: String(first.order_lookup_code || first.order_group_id || first.id || "").slice(0, 20),
+        nickname: nickname || "-",
+        customerName: customerName || "-",
+        phone: first.customer_phone || "",
+        orderAmount,
+        itemText: group.rows
+          .map((row) =>
+            [
+              String(row.product_name || "").trim(),
+              String(row.color || "").trim() && String(row.color || "").trim() !== "없음"
+                ? String(row.color || "").trim()
+                : "",
+              String(row.size || "").trim() && String(row.size || "").trim() !== "없음"
+                ? String(row.size || "").trim()
+                : "",
+              `x${Number(row.qty || 1)}`,
+            ]
+              .filter(Boolean)
+              .join(" ")
+          )
+          .join(" / "),
+        paymentMethod: first.payment_method || "-",
+        currentStatus: first.admin_order_status || first.order_manage_status || "미설정",
+        matchedName: matchedSummary?.depositor || "-",
+        depositAmount: matchedSummary?.totalAmount || 0,
+        depositCount: matchedSummary?.count || 0,
+        depositTimes: matchedSummary?.times.join(", ") || "-",
+        status,
+        memo,
+      };
+    });
+  }, [orderGroups, depositSummaries]);
+
+  const inlineOrderItemLabel = (row: AdminOrder) => {
+    return [
+      String(row.product_name || "").trim(),
+      String(row.color || "").trim() && String(row.color || "").trim() !== "없음"
+        ? String(row.color || "").trim()
+        : "",
+      String(row.size || "").trim() && String(row.size || "").trim() !== "없음"
+        ? String(row.size || "").trim()
+        : "",
+      `x${Number(row.qty || 1)}`,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  };
+
+  const getReviewCustomerKey = (nickname: string, customerName: string, phone?: string) => {
+    const phoneKey = normalizePhoneKey(phone || "");
+    const nicknameKey = normalizeDepositName(nickname);
+    const nameKey = normalizeDepositName(customerName);
+
+    return phoneKey || `${nicknameKey}|${nameKey}`;
+  };
+
+  const getDepositReviewScore = (
+    entry: DepositEntry,
+    nickname: string,
+    customerName: string,
+    siteTotal: number,
+    orders: DepositReviewOrder[]
+  ) => {
+    const depositorKey = normalizeDepositName(entry.depositor);
+    const nicknameKey = normalizeDepositName(nickname);
+    const nameKey = normalizeDepositName(customerName);
+
+    let score = 0;
+    const reasons: string[] = [];
+
+    if (depositorKey && nicknameKey && depositorKey === nicknameKey) {
+      score += 3;
+      reasons.push("닉네임 일치");
+    }
+
+    if (depositorKey && nameKey && depositorKey === nameKey) {
+      score += 3;
+      reasons.push("이름 일치");
+    }
+
+    if (
+      depositorKey &&
+      nicknameKey &&
+      depositorKey !== nicknameKey &&
+      isSimilarDepositName(entry.depositor, nickname)
+    ) {
+      score += 1;
+      reasons.push("닉네임 유사");
+    }
+
+    if (
+      depositorKey &&
+      nameKey &&
+      depositorKey !== nameKey &&
+      isSimilarDepositName(entry.depositor, customerName)
+    ) {
+      score += 1;
+      reasons.push("이름 유사");
+    }
+
+    if (entry.amount === siteTotal) {
+      score += 3;
+      reasons.push("총액 일치");
+    }
+
+    if (orders.some((order) => order.orderAmount === entry.amount)) {
+      score += 1;
+      reasons.push("단건금액 일치");
+    }
+
+    return {
+      score,
+      reason: reasons.join(" + ") || "후보",
+    };
+  };
+
+  const depositReviewGroups = useMemo<DepositReviewGroup[]>(() => {
+    const customerMap = new Map<string, DepositReviewGroup>();
+
+    orderGroups.forEach((group) => {
+      const first = group.first;
+      const nickname = String(first.youtube_nickname || "").trim();
+      const customerName = String(first.customer_name || "").trim();
+      const phone = first.customer_phone || "";
+      const reviewKey = getReviewCustomerKey(nickname, customerName, phone);
+      const orderAmount = orderGroupAmount(group.rows);
+
+      if (!customerMap.has(reviewKey)) {
+        customerMap.set(reviewKey, {
+          reviewKey,
+          nickname: nickname || "-",
+          customerName: customerName || "-",
+          phone,
+          orders: [],
+          deposits: [],
+          siteTotal: 0,
+          depositTotal: 0,
+          difference: 0,
+          status: "미입금",
+          memo: "",
+        });
+      }
+
+      const target = customerMap.get(reviewKey);
+      if (!target) return;
+
+      target.orders.push({
+        groupId: group.groupId,
+        orderAmount,
+        itemText: group.rows.map((row) => inlineOrderItemLabel(row)).filter(Boolean).join(" / "),
+        status: first.admin_order_status || first.order_manage_status || "미설정",
+      });
+
+      target.siteTotal += orderAmount;
+    });
+
+    const groups: DepositReviewGroup[] = Array.from(customerMap.values());
+    const assignedDepositIds = new Set<string>();
+
+    depositEntries.forEach((entry) => {
+      let bestGroupIndex = -1;
+      let bestScore = 0;
+      let bestReason = "";
+
+      groups.forEach((group, groupIndex) => {
+        const result = getDepositReviewScore(
+          entry,
+          group.nickname,
+          group.customerName,
+          group.siteTotal,
+          group.orders
+        );
+
+        if (result.score > bestScore) {
+          bestGroupIndex = groupIndex;
+          bestScore = result.score;
+          bestReason = result.reason;
+        }
+      });
+
+      if (bestGroupIndex >= 0 && bestScore >= 2) {
+        groups[bestGroupIndex].deposits.push({
+          ...entry,
+          matchScore: bestScore,
+          matchReason: bestReason,
+        });
+
+        assignedDepositIds.add(entry.id);
+      }
+    });
+
+    depositEntries.forEach((entry) => {
+      if (assignedDepositIds.has(entry.id)) return;
+
+      groups.push({
+        reviewKey: `deposit-only-${entry.id}`,
+        nickname: "-",
+        customerName: "-",
+        phone: "",
+        orders: [],
+        deposits: [{ ...entry, matchScore: 0, matchReason: "주문 후보 없음" }],
+        siteTotal: 0,
+        depositTotal: entry.amount,
+        difference: entry.amount,
+        status: "주문없음",
+        memo: "입금은 있지만 연결된 사이트 주문 후보가 없습니다.",
+        isDepositOnly: true,
+      });
+    });
+
+    groups.forEach((group) => {
+      group.depositTotal = group.deposits.reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+      group.difference = group.depositTotal - group.siteTotal;
+
+      if (confirmedDepositReviewKeys.includes(group.reviewKey)) {
+        group.status = "확인완료";
+        group.memo = "관리자가 수동 확인 완료";
+        return;
+      }
+
+      if (group.isDepositOnly) {
+        group.status = "주문없음";
+        return;
+      }
+
+      if (group.deposits.length === 0) {
+        group.status = "미입금";
+        group.memo = "입금 후보가 없습니다.";
+      } else if (group.difference === 0) {
+        group.status = group.orders.length > 1 || group.deposits.length > 1 ? "합산일치" : "완전일치";
+        group.memo = "사이트 주문합계와 복붙 입금합계가 일치합니다.";
+      } else if (group.difference < 0) {
+        group.status = "부분입금";
+        group.memo = `입금이 ${money(Math.abs(group.difference))} 부족합니다.`;
+      } else if (group.difference > 0) {
+        group.status = "초과입금";
+        group.memo = `입금이 ${money(group.difference)} 많습니다.`;
+      } else {
+        group.status = "확인필요";
+        group.memo = "확인이 필요합니다.";
+      }
+    });
+
+    return groups.sort((a, b) => {
+      const aConfirmed = a.status === "확인완료" ? 1 : 0;
+      const bConfirmed = b.status === "확인완료" ? 1 : 0;
+      const aProblem = a.status === "미입금" || a.status === "주문없음" || a.status === "초과입금" || a.status === "부분입금" ? 0 : 1;
+      const bProblem = b.status === "미입금" || b.status === "주문없음" || b.status === "초과입금" || b.status === "부분입금" ? 0 : 1;
+
+      return aConfirmed - bConfirmed || aProblem - bProblem || b.siteTotal - a.siteTotal;
+    });
+  }, [orderGroups, depositEntries, confirmedDepositReviewKeys]);
+
+  const filteredDepositReviewGroups = useMemo(() => {
+    const word = depositKeyword.trim().toLowerCase();
+
+    return depositReviewGroups.filter((group) => {
+      const matchStatus =
+        depositStatusFilter === "전체" || group.status === depositStatusFilter;
+
+      const target = [
+        group.nickname,
+        group.customerName,
+        group.phone,
+        group.status,
+        group.memo,
+        ...group.orders.map((order) => order.itemText),
+        ...group.deposits.map((entry) => `${entry.depositor} ${entry.amount} ${entry.time}`),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      const matchWord = !word || target.includes(word);
+
+      return matchStatus && matchWord;
+    });
+  }, [depositReviewGroups, depositKeyword, depositStatusFilter]);
+
+  const saveConfirmedDepositReviewKeys = (keys: string[]) => {
+    const uniqueKeys = Array.from(new Set(keys.filter(Boolean)));
+    setConfirmedDepositReviewKeys(uniqueKeys);
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem("ruru_deposit_review_confirmed_keys", JSON.stringify(uniqueKeys));
+    }
+  };
+
+  const confirmDepositReviewGroup = async (group: DepositReviewGroup) => {
+    for (const order of group.orders) {
+      await updateOrderGroupStatus(order.groupId, "입금확인");
+    }
+
+    saveConfirmedDepositReviewKeys([...confirmedDepositReviewKeys, group.reviewKey]);
+  };
+
+  const undoDepositReviewGroup = (group: DepositReviewGroup) => {
+    saveConfirmedDepositReviewKeys(
+      confirmedDepositReviewKeys.filter((key) => key !== group.reviewKey)
+    );
+  };
+
+  const depositTotalSummary = useMemo(() => {
+    const totalDepositAmount = depositEntries.reduce(
+      (sum, entry) => sum + Number(entry.amount || 0),
+      0
+    );
+
+    const matchedDepositAmount = depositReviewGroups
+      .filter((group) => group.status === "완전일치" || group.status === "합산일치" || group.status === "확인완료")
+      .reduce((sum, group) => sum + Number(group.depositTotal || 0), 0);
+
+    const needCheckDepositAmount = depositReviewGroups
+      .filter((group) => group.status === "확인필요" || group.status === "부분입금" || group.status === "초과입금" || group.status === "주문없음")
+      .reduce((sum, group) => sum + Number(group.depositTotal || 0), 0);
+
+    const unpaidAmount = depositReviewGroups
+      .filter((group) => group.status === "미입금")
+      .reduce((sum, group) => sum + Number(group.siteTotal || 0), 0);
+
+    return {
+      totalDepositAmount,
+      matchedDepositAmount,
+      needCheckDepositAmount,
+      unpaidAmount,
+    };
+  }, [depositEntries, depositReviewGroups]);
+
+  const filteredDepositMatchRows = useMemo(() => {
+    const word = depositKeyword.trim().toLowerCase();
+
+    return depositMatchRows.filter((row) => {
+      const matchStatus =
+        depositStatusFilter === "전체" || row.status === depositStatusFilter;
+
+      const target = [
+        row.orderCode,
+        row.nickname,
+        row.customerName,
+        row.phone,
+        row.itemText,
+        row.matchedName,
+        row.status,
+        row.memo,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      const matchWord = !word || target.includes(word);
+
+      return matchStatus && matchWord;
+    });
+  }, [depositMatchRows, depositKeyword, depositStatusFilter]);
+
+  const depositStatusStyle = (status: DepositMatchStatus) => {
+    if (status === "완전일치") return "bg-green-100 text-green-700";
+    if (status === "합산일치") return "bg-blue-100 text-blue-700";
+    if (status === "금액맞음") return "bg-emerald-100 text-emerald-700";
+    if (status === "부분입금") return "bg-orange-100 text-orange-700";
+    if (status === "초과입금") return "bg-red-100 text-red-700";
+    if (status === "미입금") return "bg-gray-100 text-gray-600";
+    if (status === "주문없음") return "bg-pink-100 text-pink-700";
+    if (status === "확인완료") return "bg-green-600 text-white";
+    return "bg-yellow-100 text-yellow-700";
+  };
+
+  const confirmDepositMatch = async (groupId: string) => {
+    await updateOrderGroupStatus(groupId, "입금확인");
+  };
 
 
   const isCanceledOrder = (order: AdminOrder) => {
@@ -486,6 +1313,26 @@ export default function AdminPage() {
 
     return /취소|환불|주문취소|삭제/.test(text);
   };
+
+  const totalOrderPages = Math.max(1, Math.ceil(orderGroups.length / orderPageSize));
+
+  const paginatedOrderGroups = useMemo(() => {
+    const safePage = Math.min(Math.max(orderPage, 1), totalOrderPages);
+    const startIndex = (safePage - 1) * orderPageSize;
+    return orderGroups.slice(startIndex, startIndex + orderPageSize);
+  }, [orderGroups, orderPage, orderPageSize, totalOrderPages]);
+
+  const orderPageNumbers = useMemo(() => {
+    const pages: number[] = [];
+    const start = Math.max(1, orderPage - 2);
+    const end = Math.min(totalOrderPages, orderPage + 2);
+
+    for (let page = start; page <= end; page += 1) {
+      pages.push(page);
+    }
+
+    return pages;
+  }, [orderPage, totalOrderPages]);
 
   const selectedOrderDetail = useMemo(() => {
     if (!selectedOrderDetailGroupId) return null;
@@ -1076,19 +1923,55 @@ const selectedCustomerDetail = useMemo(() => {
     return order.admin_order_status || order.order_manage_status || "미설정";
   };
 
-  const updateOrderGroupStatus = async (groupId: string, nextStatus: string) => {
-    const group = orderGroups.find((item) => item.groupId === groupId);
-    if (!group) return;
+  const orderStatusStyle = (status: string) => {
+    if (status === "입금확인") return "border-green-200 bg-green-50 text-green-700";
+    if (status === "포장전") return "border-yellow-200 bg-yellow-50 text-yellow-700";
+    if (status === "출고완료") return "border-blue-200 bg-blue-50 text-blue-700";
+    if (status === "킵") return "border-purple-200 bg-purple-50 text-purple-700";
+    if (status === "주문취소") return "border-red-200 bg-red-50 text-red-700 line-through";
+    return "border-gray-200 bg-gray-50 text-gray-700";
+  };
 
-    const ids = group.rows.map((row) => row.id).filter((id): id is string | number => id !== undefined);
+  const orderSelectStatusStyle = (status: string) => {
+    if (status === "입금확인") return "border-green-400 bg-green-50 text-green-700";
+    if (status === "포장전") return "border-yellow-400 bg-yellow-50 text-yellow-700";
+    if (status === "출고완료") return "border-blue-400 bg-blue-50 text-blue-700";
+    if (status === "킵") return "border-purple-400 bg-purple-50 text-purple-700";
+    if (status === "주문취소") return "border-red-400 bg-red-50 text-red-700";
+    return "border-gray-300 bg-white text-gray-700";
+  };
+
+  const orderCardStyle = (status: string) => {
+    if (status === "주문취소") return "border-red-200 bg-red-50/70 text-red-600";
+    if (status === "입금확인") return "border-green-200 bg-green-50/50";
+    if (status === "포장전") return "border-yellow-200 bg-yellow-50/50";
+    if (status === "출고완료") return "border-blue-200 bg-blue-50/50";
+    if (status === "킵") return "border-purple-200 bg-purple-50/50";
+    return "border-gray-950 bg-white";
+  };
+
+  const updateOrderGroupStatus = async (groupId: string, nextStatus: string) => {
+    const targetRows = orders.filter((order) => {
+      const candidateGroupId = String(
+        order.order_group_id || order.order_lookup_code || order.id || ""
+      );
+
+      return candidateGroupId === String(groupId);
+    });
+
+    const ids = targetRows
+      .map((order) => order.id)
+      .filter((id): id is string | number => id !== undefined && id !== null);
+
     if (ids.length === 0) return;
 
     setOrders((prev) =>
       prev.map((order) =>
-        order.id !== undefined && ids.includes(order.id)
+        order.id !== undefined &&
+        order.id !== null &&
+        ids.includes(order.id)
           ? {
               ...order,
-              admin_order_status: nextStatus,
               order_manage_status: nextStatus,
             }
           : order
@@ -1098,7 +1981,6 @@ const selectedCustomerDetail = useMemo(() => {
     const { error } = await supabase
       .from("orders")
       .update({
-        admin_order_status: nextStatus,
         order_manage_status: nextStatus,
       })
       .in("id", ids);
@@ -1135,11 +2017,15 @@ const selectedCustomerDetail = useMemo(() => {
       for (const row of selectedOrderDetail.rows) {
         if (row.id === undefined) continue;
 
-        const qty = Number(row.qty || 1);
-        const productPrice = Number(row.product_price || 0);
-        const shippingFee = Number(row.shipping_fee || row.admin_shipping_fee || 0);
+        const qty = getOrderRowQty(row);
+        const productPrice = safeMoneyNumber(row.product_price);
+        const shippingFee = getOrderRowShippingFee(row);
         const adjustedProductPrice = productPrice * qty;
-        const adjustedTotalPrice = adjustedProductPrice + shippingFee;
+        const cardFee =
+          row.payment_method === "카드결제"
+            ? Math.round(adjustedProductPrice * getOrderRowCardRate(row))
+            : 0;
+        const adjustedTotalPrice = adjustedProductPrice + shippingFee + cardFee;
 
         const { error } = await supabase
           .from("orders")
@@ -1148,6 +2034,7 @@ const selectedCustomerDetail = useMemo(() => {
             shipping_fee: shippingFee,
             adjusted_product_price: adjustedProductPrice,
             adjusted_shipping_fee: shippingFee,
+            vat_amount: cardFee,
             adjusted_total_price: adjustedTotalPrice,
             total_price: adjustedTotalPrice,
           })
@@ -1159,7 +2046,7 @@ const selectedCustomerDetail = useMemo(() => {
       alert("금액 수정 저장 완료");
       await loadOrders();
     } catch (error: any) {
-      alert("금액 수정 저장 실패\n\n" + error.message);
+      alert("금액 수정 저장 실패\\n\\n" + error.message);
     }
   };
 
@@ -1368,6 +2255,7 @@ const selectedCustomerDetail = useMemo(() => {
     { key: "products", label: "상품관리", icon: "🛍" },
     { key: "broadcasts", label: "방송관리", icon: "🔴" },
     { key: "orders", label: "주문관리", icon: "📦" },
+    { key: "deposits", label: "입금매칭센터", icon: "💳" },
     { key: "customers", label: "고객관리", icon: "👥" },
   ] as const;
 
@@ -2443,6 +3331,19 @@ const selectedCustomerDetail = useMemo(() => {
                     <option value="카드결제">카드결제</option>
                   </select>
 
+                      <select
+                        value={orderPageSize}
+                        onChange={(event) => {
+                          setOrderPageSize(Number(event.target.value));
+                          setOrderPage(1);
+                        }}
+                        className="rounded-2xl border bg-gray-50 p-4 font-bold"
+                      >
+                        <option value={10}>10개씩 보기</option>
+                        <option value={20}>20개씩 보기</option>
+                        <option value={50}>50개씩 보기</option>
+                      </select>
+
                   <button
                     type="button"
                     onClick={() =>
@@ -2479,7 +3380,7 @@ const selectedCustomerDetail = useMemo(() => {
                 </div>
 
                 <div className="mt-3 text-sm font-black text-gray-500">
-                  총 {orderGroups.length}건 / 선택 {selectedOrderGroupIds.length}건
+                  총 {orderGroups.length}건 / {orderPage}페이지 / 선택 {selectedOrderGroupIds.length}건
                 </div>
               </section>
 
@@ -2488,13 +3389,13 @@ const selectedCustomerDetail = useMemo(() => {
                   <div className="p-10 text-center font-black text-gray-500">
                     주문 불러오는 중...
                   </div>
-                ) : orderGroups.length === 0 ? (
+                ) : paginatedOrderGroups.length === 0 ? (
                   <div className="p-10 text-center font-black text-gray-500">
                     주문이 없습니다.
                   </div>
                 ) : (
                   <div className="grid gap-2">
-                    {orderGroups.map((group) => {
+                    {paginatedOrderGroups.map((group) => {
                       const first = group.first;
                       const statusValue = orderStatusValue(first);
                       const canceled = statusValue === "주문취소" || isCanceledOrder(first);
@@ -2557,11 +3458,7 @@ const selectedCustomerDetail = useMemo(() => {
                               onChange={(event) =>
                                 updateOrderGroupStatus(group.groupId, event.target.value)
                               }
-                              className={`rounded-2xl border p-3 text-sm font-black ${
-                                canceled
-                                  ? "border-red-200 bg-red-100 text-red-700"
-                                  : "bg-gray-50 text-gray-700"
-                              }`}
+                              className={`rounded-2xl border px-4 py-3 font-black outline-none transition ${orderSelectStatusStyle(orderStatusValue(group.first))}`}
                             >
                               <option value="미설정">미설정</option>
                               <option value="입금확인">입금확인</option>
@@ -2586,6 +3483,69 @@ const selectedCustomerDetail = useMemo(() => {
                   </div>
                 )}
               </section>
+
+              {orderGroups.length > 0 && (
+                <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    aria-label="주문 페이지 이전"
+                    onClick={() => setOrderPage((prev) => Math.max(1, prev - 1))}
+                    disabled={orderPage <= 1}
+                    className="rounded-2xl border bg-white px-4 py-3 text-sm font-black disabled:opacity-30"
+                  >
+                    이전
+                  </button>
+
+                  {orderPage > 3 && (
+                    <button
+                      type="button"
+                      onClick={() => setOrderPage(1)}
+                      className="rounded-2xl border bg-white px-4 py-3 text-sm font-black"
+                    >
+                      1
+                    </button>
+                  )}
+
+                  {orderPage > 4 && <span className="px-2 font-black text-gray-400">...</span>}
+
+                  {orderPageNumbers.map((page) => (
+                    <button
+                      key={page}
+                      type="button"
+                      onClick={() => setOrderPage(page)}
+                      className={`rounded-2xl px-4 py-3 text-sm font-black ${
+                        page === orderPage
+                          ? "bg-gray-950 text-white"
+                          : "border bg-white text-gray-700"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+
+                  {orderPage < totalOrderPages - 3 && <span className="px-2 font-black text-gray-400">...</span>}
+
+                  {orderPage < totalOrderPages - 2 && (
+                    <button
+                      type="button"
+                      onClick={() => setOrderPage(totalOrderPages)}
+                      className="rounded-2xl border bg-white px-4 py-3 text-sm font-black"
+                    >
+                      {totalOrderPages}
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    aria-label="주문 페이지 다음"
+                    onClick={() => setOrderPage((prev) => Math.min(totalOrderPages, prev + 1))}
+                    disabled={orderPage >= totalOrderPages}
+                    className="rounded-2xl border bg-white px-4 py-3 text-sm font-black disabled:opacity-30"
+                  >
+                    다음
+                  </button>
+                </div>
+              )}
 
               {selectedOrderDetail && (
                 <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/40 p-4">
@@ -2660,7 +3620,7 @@ const selectedCustomerDetail = useMemo(() => {
                               <label className="text-xs font-black text-gray-500">
                                 배송비
                                 <input
-                                  value={String(row.shipping_fee || row.admin_shipping_fee || 0)}
+                                  value={String(row.shipping_fee ?? row.admin_shipping_fee ?? row.adjusted_shipping_fee ?? 0)}
                                   onChange={(event) =>
                                     updateOrderLocalField(
                                       row.id,
@@ -2676,10 +3636,7 @@ const selectedCustomerDetail = useMemo(() => {
                               <InfoBox label="수량" value={`${row.qty || 1}개`} />
                               <InfoBox
                                 label="예상합계"
-                                value={money(
-                                  Number(row.product_price || 0) * Number(row.qty || 1) +
-                                    Number(row.shipping_fee || row.admin_shipping_fee || 0)
-                                )}
+                                value={money(calculateOrderRowTotal(row))}
                               />
                             </div>
                           </div>
@@ -2704,6 +3661,301 @@ const selectedCustomerDetail = useMemo(() => {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeMenu === "deposits" && (
+            <div className="mx-auto grid max-w-[1280px] gap-5">
+              <section className="bg-white rounded-[2rem] p-6 border shadow-sm">
+                <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-black text-rose-500 mb-2">
+                      DEPOSIT REVIEW CENTER
+                    </div>
+                    <h1 className="text-3xl md:text-5xl font-black">
+                      입금매칭센터
+                    </h1>
+                    <p className="text-gray-500 font-bold mt-3">
+                      왼쪽은 사이트 주문, 오른쪽은 복붙 입금내역으로 나란히 비교합니다.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={loadOrders}
+                    className="rounded-2xl bg-gray-950 px-5 py-4 font-black text-white active:scale-[0.98]"
+                  >
+                    주문 새로고침
+                  </button>
+                </div>
+              </section>
+
+              <section className="grid xl:grid-cols-[380px_1fr] gap-5">
+                <div className="bg-white rounded-[2rem] p-5 md:p-6 border shadow-sm">
+                  <div className="font-black text-2xl mb-3">입금내역 붙여넣기</div>
+                  <p className="text-sm font-bold text-gray-500 mb-4">
+                    4줄 1세트: 미매칭 / 입금자명 / +금액원 / 시간
+                  </p>
+
+                  <textarea
+                    value={depositRawText}
+                    onChange={(event) => setDepositRawText(event.target.value)}
+                    placeholder={`미매칭
+이순신
++62,000원
+21:09
+
+미매칭
+옥수수밭유민영
++29,000원
+21:26`}
+                    className="min-h-[330px] w-full rounded-3xl border bg-gray-50 p-4 font-bold outline-none focus:border-rose-300"
+                  />
+
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setDepositRawText("")}
+                      className="rounded-2xl bg-gray-100 p-4 font-black text-gray-700 active:scale-[0.98]"
+                    >
+                      비우기
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        saveConfirmedDepositReviewKeys([]);
+                        alert("확인완료 표시를 초기화했습니다.");
+                      }}
+                      className="rounded-2xl bg-red-50 p-4 font-black text-red-600 active:scale-[0.98]"
+                    >
+                      확인초기화
+                    </button>
+                  </div>
+
+                  <div className="mt-5 rounded-3xl bg-rose-50 p-4">
+                    <div className="text-sm font-black text-rose-600">복붙 정리 결과</div>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-sm font-black text-gray-700">
+                      <div>입금 {depositEntries.length}건</div>
+                      <div>{money(depositTotalSummary.totalDepositAmount)}</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 max-h-[280px] overflow-auto rounded-3xl border bg-white">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-gray-950 text-white">
+                        <tr>
+                          <th className="px-3 py-2 text-left">입금자명</th>
+                          <th className="px-3 py-2 text-right">금액</th>
+                          <th className="px-3 py-2 text-left">시간</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {depositEntries.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} className="px-3 py-8 text-center font-black text-gray-400">
+                              붙여넣은 입금내역 없음
+                            </td>
+                          </tr>
+                        ) : (
+                          depositEntries.map((entry) => (
+                            <tr key={entry.id} className="border-b">
+                              <td className="px-3 py-2 font-black">{entry.depositor}</td>
+                              <td className="px-3 py-2 text-right font-black text-rose-500">{money(entry.amount)}</td>
+                              <td className="px-3 py-2 font-bold text-gray-500">{entry.time || "-"}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="grid gap-5 min-w-0">
+                  <section className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+                    <div className="rounded-3xl border bg-white p-5 shadow-sm">
+                      <div className="text-sm font-black text-gray-400">총 입금</div>
+                      <div className="mt-2 text-2xl font-black">{money(depositTotalSummary.totalDepositAmount)}</div>
+                    </div>
+                    <div className="rounded-3xl border bg-white p-5 shadow-sm">
+                      <div className="text-sm font-black text-gray-400">확인/일치</div>
+                      <div className="mt-2 text-2xl font-black text-green-600">{money(depositTotalSummary.matchedDepositAmount)}</div>
+                    </div>
+                    <div className="rounded-3xl border bg-white p-5 shadow-sm">
+                      <div className="text-sm font-black text-gray-400">확인필요</div>
+                      <div className="mt-2 text-2xl font-black text-yellow-600">{money(depositTotalSummary.needCheckDepositAmount)}</div>
+                    </div>
+                    <div className="rounded-3xl border bg-white p-5 shadow-sm">
+                      <div className="text-sm font-black text-gray-400">미입금</div>
+                      <div className="mt-2 text-2xl font-black text-red-600">{money(depositTotalSummary.unpaidAmount)}</div>
+                    </div>
+                  </section>
+
+                  <section className="bg-white rounded-[2rem] p-5 border shadow-sm">
+                    <div className="grid md:grid-cols-[1fr_auto_auto] gap-3">
+                      <input
+                        value={depositKeyword}
+                        onChange={(event) => setDepositKeyword(event.target.value)}
+                        placeholder="닉네임 / 이름 / 입금자명 / 상품 검색"
+                        className="rounded-2xl border bg-gray-50 p-4 font-bold"
+                      />
+
+                      <select
+                        value={depositStatusFilter}
+                        onChange={(event) => setDepositStatusFilter(event.target.value as any)}
+                        className="rounded-2xl border bg-gray-50 p-4 font-bold"
+                      >
+                        <option value="전체">전체</option>
+                        <option value="완전일치">완전일치</option>
+                        <option value="합산일치">합산일치</option>
+                        <option value="확인필요">확인필요</option>
+                        <option value="부분입금">부분입금</option>
+                        <option value="초과입금">초과입금</option>
+                        <option value="미입금">미입금</option>
+                        <option value="주문없음">주문없음</option>
+                        <option value="확인완료">확인완료</option>
+                      </select>
+
+                      <div className="rounded-2xl bg-gray-950 px-5 py-4 text-center font-black text-white">
+                        {filteredDepositReviewGroups.length}명
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="rounded-[2rem] border bg-white shadow-sm">
+                    <div className="max-h-[760px] overflow-auto p-4">
+                      <div className="grid gap-3">
+                        {filteredDepositReviewGroups.length === 0 ? (
+                          <div className="p-10 text-center font-black text-gray-500">
+                            표시할 내역이 없습니다.
+                          </div>
+                        ) : (
+                          filteredDepositReviewGroups.map((group) => {
+                            const checked = confirmedDepositReviewKeys.includes(group.reviewKey);
+                            const ok = group.difference === 0 && group.deposits.length > 0;
+
+                            return (
+                              <div
+                                key={group.reviewKey}
+                                className={`rounded-3xl border p-4 ${
+                                  checked
+                                    ? "border-green-300 bg-green-50"
+                                    : group.status === "미입금"
+                                    ? "border-gray-200 bg-white"
+                                    : group.status === "주문없음"
+                                    ? "border-pink-200 bg-pink-50"
+                                    : ok
+                                    ? "border-green-200 bg-green-50/50"
+                                    : "border-yellow-200 bg-yellow-50/70"
+                                }`}
+                              >
+                                <div className="grid gap-3 xl:grid-cols-[180px_1fr_1fr_150px] xl:items-stretch">
+                                  <div className="rounded-2xl bg-white/80 p-4">
+                                    <div className="text-xs font-black text-gray-400">사이트 고객</div>
+                                    <div className="mt-2 text-lg font-black">
+                                      {group.nickname}
+                                    </div>
+                                    <div className="text-sm font-bold text-gray-600">
+                                      {group.customerName}
+                                    </div>
+                                    <div className="mt-3">
+                                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${depositStatusStyle(group.status)}`}>
+                                        {checked ? "확인완료" : group.status}
+                                      </span>
+                                    </div>
+                                    <div className="mt-3 text-xs font-bold text-gray-500">
+                                      {group.memo}
+                                    </div>
+                                  </div>
+
+                                  <div className="rounded-2xl bg-white p-4 border">
+                                    <div className="flex items-center justify-between gap-3">
+                                      <div className="font-black">사이트 주문</div>
+                                      <div className="text-xl font-black text-gray-950">{money(group.siteTotal)}</div>
+                                    </div>
+                                    <div className="mt-3 grid gap-2">
+                                      {group.orders.length === 0 ? (
+                                        <div className="rounded-2xl bg-gray-50 p-3 text-center font-black text-gray-400">
+                                          사이트 주문 없음
+                                        </div>
+                                      ) : (
+                                        group.orders.map((order) => (
+                                          <div key={order.groupId} className="rounded-2xl bg-gray-50 p-3">
+                                            <div className="flex items-center justify-between gap-3">
+                                              <div className="truncate text-sm font-bold text-gray-600">{order.itemText}</div>
+                                              <div className="shrink-0 font-black">{money(order.orderAmount)}</div>
+                                            </div>
+                                          </div>
+                                        ))
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="rounded-2xl bg-white p-4 border">
+                                    <div className="flex items-center justify-between gap-3">
+                                      <div className="font-black">복붙 입금</div>
+                                      <div className="text-xl font-black text-rose-500">{money(group.depositTotal)}</div>
+                                    </div>
+                                    <div className="mt-3 grid gap-2">
+                                      {group.deposits.length === 0 ? (
+                                        <div className="rounded-2xl bg-gray-50 p-3 text-center font-black text-gray-400">
+                                          입금 후보 없음
+                                        </div>
+                                      ) : (
+                                        group.deposits.map((entry) => (
+                                          <div key={entry.id} className="rounded-2xl bg-gray-50 p-3">
+                                            <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
+                                              <div>
+                                                <div className="font-black">{entry.depositor}</div>
+                                                <div className="text-xs font-bold text-gray-400">
+                                                  {entry.matchReason || "후보"}
+                                                </div>
+                                              </div>
+                                              <div className="font-black text-rose-500">{money(entry.amount)}</div>
+                                              <div className="text-sm font-bold text-gray-500">{entry.time || "-"}</div>
+                                            </div>
+                                          </div>
+                                        ))
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="rounded-2xl bg-white/80 p-4 grid content-between gap-3">
+                                    <div>
+                                      <div className="text-xs font-black text-gray-400">차액</div>
+                                      <div className={`mt-1 text-2xl font-black ${
+                                        group.difference === 0 ? "text-green-600" : "text-red-600"
+                                      }`}>
+                                        {money(group.difference)}
+                                      </div>
+                                    </div>
+
+                                    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-gray-950 px-4 py-3 font-black text-white active:scale-[0.98]">
+                                      <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={(event) => {
+                                          if (event.target.checked) {
+                                            confirmDepositReviewGroup(group);
+                                          } else {
+                                            undoDepositReviewGroup(group);
+                                          }
+                                        }}
+                                        className="h-5 w-5"
+                                      />
+                                      확인완료
+                                    </label>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </section>
             </div>
           )}
 

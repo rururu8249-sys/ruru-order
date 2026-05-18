@@ -59,6 +59,7 @@ type DoneData = {
   productAmount: number;
   shippingFee: number;
   cardExtra: number;
+  customerCardRate: number;
   totalAmount: number;
 };
 
@@ -215,9 +216,12 @@ export default function OrderPage() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState<DoneData | null>(null);
   const [copyDone, setCopyDone] = useState(false);
+  const [customerCardRate, setCustomerCardRate] = useState(10);
+  const [defaultShippingFee, setDefaultShippingFee] = useState(4000);
 
-  const shippingFee = Number(broadcast?.shipping_fee ?? 4000);
-  const cardRateForCustomer = 10;
+  const actualCardFeeRate = 7;
+  const shippingFee = Number(broadcast?.shipping_fee ?? defaultShippingFee);
+  const cardRateForCustomer = customerCardRate;
 
   const isAutoLoggedIn =
     hasSavedInfo &&
@@ -225,6 +229,7 @@ export default function OrderPage() {
     Boolean(customerPhone && youtubeNickname && customerName);
 
   useEffect(() => {
+    loadOrderSettings();
     loadBroadcast();
     loadSavedCustomerInfo();
   }, []);
@@ -248,6 +253,30 @@ export default function OrderPage() {
     setIsCustomerInfoOpen(true);
     setCustomerMode("load");
   }, [hasSavedInfo, isEditingCustomerInfo]);
+
+  const loadOrderSettings = async () => {
+    const { data, error } = await supabase
+      .from("settings")
+      .select("key,value")
+      .in("key", ["customer_card_extra_rate", "default_shipping_fee"]);
+
+    if (error) {
+      console.log("설정 불러오기 오류", error.message);
+      return;
+    }
+
+    const readNumber = (key: string, fallback: number) => {
+      const found = (data || []).find((item: any) => item.key === key);
+      const parsed = Number(found?.value);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+
+    const nextCustomerCardRate = Math.min(10, Math.max(0, readNumber("customer_card_extra_rate", 10)));
+    const nextDefaultShippingFee = Math.max(0, readNumber("default_shipping_fee", 4000));
+
+    setCustomerCardRate(nextCustomerCardRate);
+    setDefaultShippingFee(nextDefaultShippingFee);
+  };
 
   const loadSavedCustomerInfo = () => {
     const savedPhone = localStorage.getItem("ruru_customer_phone") || "";
@@ -792,6 +821,8 @@ export default function OrderPage() {
 
           payment_method: paymentMethod,
           vat_amount: rowCardExtra,
+          customer_card_extra_rate_applied: paymentMethod === "카드결제" ? cardRateForCustomer : 0,
+          actual_card_fee_rate_applied: paymentMethod === "카드결제" ? actualCardFeeRate : 0,
 
           order_status: "주문완료",
           admin_status: "관리자 확인 전",
@@ -815,6 +846,7 @@ export default function OrderPage() {
         productAmount,
         shippingFee,
         cardExtra,
+        customerCardRate: cardRateForCustomer,
         totalAmount,
       });
 
@@ -959,7 +991,7 @@ export default function OrderPage() {
 
               {done.paymentMethod === "카드결제" && (
                 <div className="mt-2 flex justify-between text-sm font-bold text-blue-600">
-                  <span>카드부가세 10%</span>
+                  <span>카드추가금 {cardRateForCustomer}%</span>
                   <span>{won(done.cardExtra)}</span>
                 </div>
               )}
@@ -1484,7 +1516,7 @@ export default function OrderPage() {
 
               {paymentMethod === "카드결제" && (
                 <div className="mt-2 flex justify-between text-sm font-bold text-blue-600">
-                  <span>카드부가세 10%</span>
+                  <span>카드추가금 {cardRateForCustomer}%</span>
                   <span>{won(cardExtra)}</span>
                 </div>
               )}
