@@ -653,26 +653,48 @@ function OperationSummary({
   );
 }
 
-function toDateKey(value: string | null | undefined) {
-  if (!value) return "";
+const KST_TIME_ZONE = "Asia/Seoul";
+
+function getKstParts(value: string | null | undefined) {
+  if (!value) return null;
+
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+  if (Number.isNaN(date.getTime())) return null;
+
+  const parts = new Intl.DateTimeFormat("ko-KR", {
+    timeZone: KST_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date).reduce<Record<string, string>>((acc, part) => {
+    if (part.type !== "literal") acc[part.type] = part.value;
+    return acc;
+  }, {});
+
+  return {
+    yyyy: parts.year || "",
+    mm: parts.month || "",
+    dd: parts.day || "",
+    day: (parts.weekday || "").replace("요일", ""),
+    hh: parts.hour || "00",
+    mi: parts.minute || "00",
+  };
+}
+
+function toDateKey(value: string | null | undefined) {
+  const parts = getKstParts(value);
+  if (!parts) return "";
+  return `${parts.yyyy}-${parts.mm}-${parts.dd}`;
 }
 
 function formatDateLabel(value: string | null | undefined) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  const day = dayNames[date.getDay()];
-  return `${yyyy}.${mm}.${dd}(${day})`;
+  const parts = getKstParts(value);
+  if (!parts) return "-";
+  return `${parts.yyyy}.${parts.mm}.${parts.dd}(${parts.day}) ${parts.hh}:${parts.mi}`;
 }
 
 function shortOrderCode(group: OrderGroup) {

@@ -801,6 +801,7 @@ export default function OrderPage() {
           youtube_nickname: youtubeNickname.trim(),
           customer_name: customerName.trim(),
           customer_phone: cleanPhone,
+          phone: cleanPhone,
 
           zipcode: zipcode.trim(),
           address: address.trim(),
