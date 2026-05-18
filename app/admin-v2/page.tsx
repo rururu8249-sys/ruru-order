@@ -46,6 +46,7 @@ type OrderRow = {
   tracking_number: string | null;
   tracking_company: string | null;
   customer_id: number | null;
+  deposit_confirmed_at: string | null;
   is_deleted: boolean | null;
 };
 
@@ -459,11 +460,42 @@ export default function AdminV2Page() {
 
   const updateOrderStatus = async (group: OrderGroup, nextStatus: string) => {
     const ids = group.rows.map((row) => row.id).filter(Boolean);
-    setOrders((prev) => prev.map((order) => ids.includes(order.id) ? { ...order, admin_order_status_v2: nextStatus, order_manage_status: nextStatus } : order));
+    const nowIso = new Date().toISOString();
+
+    const shouldSaveDepositConfirmedAt = nextStatus === "입금확인";
+    const updatePayload: Partial<OrderRow> = {
+      admin_order_status_v2: nextStatus,
+      order_manage_status: nextStatus,
+    };
+
+    // 입금확인 시간을 처음 처리한 시점으로 보존하기 위해,
+    // 이미 deposit_confirmed_at 이 있는 주문은 덮어쓰지 않습니다.
+    if (shouldSaveDepositConfirmedAt) {
+      const needsDepositTime = group.rows.some((row) => !row.deposit_confirmed_at);
+      if (needsDepositTime) {
+        updatePayload.deposit_confirmed_at = nowIso;
+      }
+    }
+
+    setOrders((prev) =>
+      prev.map((order) => {
+        if (!ids.includes(order.id)) return order;
+
+        return {
+          ...order,
+          admin_order_status_v2: nextStatus,
+          order_manage_status: nextStatus,
+          deposit_confirmed_at:
+            shouldSaveDepositConfirmedAt && !order.deposit_confirmed_at
+              ? nowIso
+              : order.deposit_confirmed_at,
+        };
+      })
+    );
 
     const { error } = await supabase
       .from("orders")
-      .update({ admin_order_status_v2: nextStatus, order_manage_status: nextStatus })
+      .update(updatePayload)
       .in("id", ids);
 
     if (error) {
@@ -940,6 +972,7 @@ function OrderDetailBlock({
         </DetailBox>
         <DetailBox title="관리정보">
           <div>결제상태: {paymentMeta.label} · {paymentMeta.desc}</div>
+          <div>입금확인시간: {first.deposit_confirmed_at ? formatDateLabel(first.deposit_confirmed_at) : "미확인"}</div>
           <div>송장: {first.tracking_company || "로젠"} {first.tracking_number || "미등록"}</div>
           <div>메모: {memo || "-"}</div>
         </DetailBox>
