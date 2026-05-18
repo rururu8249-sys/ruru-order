@@ -120,7 +120,17 @@ const TABS: Array<{ key: AdminTab; label: string; desc: string }> = [
   { key: "settings", label: "설정", desc: "배송비·수수료" },
 ];
 
-const ORDER_STATUSES = ["미설정", "입금확인", "출고대기", "출고완료", "킵", "픽업예정", "주문취소"];
+const ORDER_STATUS_OPTIONS = [
+  { value: "미설정", label: "미결제/확인대기" },
+  { value: "입금확인", label: "입금확인" },
+  { value: "출고대기", label: "출고대기" },
+  { value: "출고완료", label: "출고완료" },
+  { value: "킵", label: "킵" },
+  { value: "픽업예정", label: "픽업예정" },
+  { value: "주문취소", label: "주문취소" },
+];
+
+const ORDER_STATUSES = ORDER_STATUS_OPTIONS.map((option) => option.value);
 const PAYMENT_FILTERS = ["전체", "무통장입금", "카드결제"];
 const PAID_STATUSES = ["입금확인", "출고대기", "출고완료", "킵", "픽업예정"];
 const PAGE_SIZE = 15;
@@ -164,7 +174,80 @@ const readSettingNumber = (settings: SettingRow[], key: string, fallback: number
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const getOrderStatusValue = (row: Pick<OrderRow, "admin_order_status_v2" | "order_manage_status">) => {
+  return String(row.admin_order_status_v2 || row.order_manage_status || "미설정").trim() || "미설정";
+};
+
+const getOrderStatusLabel = (status: string | null | undefined) => {
+  const value = String(status || "미설정").trim() || "미설정";
+  return ORDER_STATUS_OPTIONS.find((option) => option.value === value)?.label || value;
+};
+
+const isOrderCanceled = (row: Pick<OrderRow, "admin_order_status_v2" | "order_manage_status">) => {
+  return getOrderStatusValue(row) === "주문취소";
+};
+
+const isOrderPaid = (row: Pick<OrderRow, "admin_order_status_v2" | "order_manage_status">) => {
+  return PAID_STATUSES.includes(getOrderStatusValue(row));
+};
+
+const isBankPayment = (row: Pick<OrderRow, "payment_method">) => {
+  return String(row.payment_method || "무통장입금") === "무통장입금";
+};
+
+const isCardPayment = (row: Pick<OrderRow, "payment_method">) => {
+  return String(row.payment_method || "") === "카드결제";
+};
+
+const isPaymentUnpaid = (row: Pick<OrderRow, "admin_order_status_v2" | "order_manage_status" | "payment_method">) => {
+  return !isOrderCanceled(row) && !isOrderPaid(row);
+};
+
+const paymentStatusMeta = (row: Pick<OrderRow, "admin_order_status_v2" | "order_manage_status" | "payment_method">) => {
+  const paymentMethod = String(row.payment_method || "무통장입금");
+  const status = getOrderStatusValue(row);
+
+  if (status === "주문취소") {
+    return {
+      label: "주문취소",
+      desc: "매출 제외",
+      className: "bg-red-100 text-red-700",
+    };
+  }
+
+  if (PAID_STATUSES.includes(status)) {
+    return {
+      label: paymentMethod === "카드결제" ? "카드 결제완료" : "무통장 입금확인",
+      desc: getOrderStatusLabel(status),
+      className: "bg-emerald-100 text-emerald-700",
+    };
+  }
+
+  if (paymentMethod === "카드결제") {
+    return {
+      label: "카드 미결제",
+      desc: "링크발송/결제확인 필요",
+      className: "bg-rose-100 text-rose-700",
+    };
+  }
+
+  if (paymentMethod === "무통장입금") {
+    return {
+      label: "무통장 미입금",
+      desc: "입금확인 필요",
+      className: "bg-amber-100 text-amber-800",
+    };
+  }
+
+  return {
+    label: "결제확인 필요",
+    desc: paymentMethod || "결제수단 없음",
+    className: "bg-neutral-100 text-neutral-700",
+  };
+};
+
 const selectClass = (status?: string | null) => {
+  if (!status || status === "미설정") return "border-amber-300 bg-amber-50 text-amber-900";
   if (status === "입금확인") return "border-emerald-300 bg-emerald-50 text-emerald-800";
   if (status === "출고대기") return "border-amber-300 bg-amber-50 text-amber-800";
   if (status === "출고완료") return "border-blue-300 bg-blue-50 text-blue-800";
@@ -282,7 +365,7 @@ export default function AdminV2Page() {
     const word = keyword.trim().toLowerCase();
 
     return orderGroups.filter((group) => {
-      const status = group.first.admin_order_status_v2 || "미설정";
+      const status = getOrderStatusValue(group.first);
       const payment = group.first.payment_method || "미설정";
       const matchStatus = statusFilter === "전체" || status === statusFilter;
       const matchPayment = paymentFilter === "전체" || payment === paymentFilter;
@@ -313,18 +396,18 @@ export default function AdminV2Page() {
   }), [settings]);
 
   const summaryCards = useMemo(() => {
-    const notCanceled = filteredOrderGroups.filter((group) => (group.first.admin_order_status_v2 || "미설정") !== "주문취소");
+    const notCanceled = filteredOrderGroups.filter((group) => !isOrderCanceled(group.first));
 
     const totalOrderProductQty = filteredOrderGroups.reduce((sum, group) => sum + group.totalQty, 0);
     const totalOrderCount = filteredOrderGroups.length;
     const totalOrderAmount = notCanceled.reduce((sum, group) => sum + group.totalAmount, 0);
 
-    const bankPaid = filteredOrderGroups.filter((group) => group.first.payment_method === "무통장입금" && PAID_STATUSES.includes(group.first.admin_order_status_v2 || "")).length;
-    const bankUnpaid = filteredOrderGroups.filter((group) => group.first.payment_method === "무통장입금" && (group.first.admin_order_status_v2 || "미설정") === "미설정").length;
-    const cardPaid = filteredOrderGroups.filter((group) => group.first.payment_method === "카드결제" && PAID_STATUSES.includes(group.first.admin_order_status_v2 || "")).length;
-    const cardUnpaid = filteredOrderGroups.filter((group) => group.first.payment_method === "카드결제" && (group.first.admin_order_status_v2 || "미설정") === "미설정").length;
+    const bankPaid = filteredOrderGroups.filter((group) => isBankPayment(group.first) && isOrderPaid(group.first)).length;
+    const bankUnpaid = filteredOrderGroups.filter((group) => isBankPayment(group.first) && isPaymentUnpaid(group.first)).length;
+    const cardPaid = filteredOrderGroups.filter((group) => isCardPayment(group.first) && isOrderPaid(group.first)).length;
+    const cardUnpaid = filteredOrderGroups.filter((group) => isCardPayment(group.first) && isPaymentUnpaid(group.first)).length;
     const canceledAmount = filteredOrderGroups
-      .filter((group) => (group.first.admin_order_status_v2 || "미설정") === "주문취소")
+      .filter((group) => isOrderCanceled(group.first))
       .reduce((sum, group) => sum + group.totalAmount, 0);
 
     return {
@@ -344,7 +427,7 @@ export default function AdminV2Page() {
     const productMap = new Map<string, { name: string; qty: number; amount: number }>();
 
     filteredOrderGroups.forEach((group) => {
-      if ((group.first.admin_order_status_v2 || "미설정") === "주문취소") return;
+      if (isOrderCanceled(group.first)) return;
 
       const nickname = group.first.youtube_nickname || group.first.customer_name || "이름없음";
       const currentBuyer = buyerMap.get(nickname) || { name: nickname, amount: 0, count: 0 };
@@ -596,10 +679,10 @@ function SummaryCards({
       <SummaryCard label="총 주문 상품개수" value={`${summaryCards.totalOrderProductQty}개`} />
       <SummaryCard label="총 주문서 개수" value={`${summaryCards.totalOrderCount}건`} />
       <SummaryCard label="📋 주문서 총 합계" value={money(summaryCards.totalOrderAmount)} />
-      <SummaryCard label="무통장 결제완료" value={`${summaryCards.bankPaid}명`} />
+      <SummaryCard label="무통장 입금확인" value={`${summaryCards.bankPaid}명`} />
       <SummaryCard label="무통장 미입금" value={`${summaryCards.bankUnpaid}명`} strong />
       <SummaryCard label="카드 결제완료" value={`${summaryCards.cardPaid}명`} />
-      <SummaryCard label="카드 미결제" value={`${summaryCards.cardUnpaid}명`} />
+      <SummaryCard label="카드 미결제/링크대기" value={`${summaryCards.cardUnpaid}명`} strong />
       <SummaryCard label="취소금액" value={money(summaryCards.canceledAmount)} />
     </div>
   );
@@ -645,7 +728,7 @@ function FilterBar({
       </select>
       <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-10 rounded-lg border border-neutral-200 px-3 text-[14px] font-black outline-none">
         <option value="전체">전체상태</option>
-        {ORDER_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+        {ORDER_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
       <select value={paymentFilter} onChange={(event) => setPaymentFilter(event.target.value)} className="h-10 rounded-lg border border-neutral-200 px-3 text-[14px] font-black outline-none">
         {PAYMENT_FILTERS.map((payment) => <option key={payment} value={payment}>{payment}</option>)}
@@ -780,7 +863,8 @@ function OrderWorkTable({
 
       {groups.map((group) => {
         const isOpen = openedOrderGroupIds.includes(group.groupId);
-        const status = group.first.admin_order_status_v2 || "미설정";
+        const status = getOrderStatusValue(group.first);
+        const paymentMeta = paymentStatusMeta(group.first);
         const rowIds = new Set(group.rows.map((row) => row.id));
         const groupMoneyLogs = moneyEditLogs.filter((log) => rowIds.has(Number(log.order_id)));
 
@@ -798,7 +882,12 @@ function OrderWorkTable({
               <div className="min-w-0">
                 <div className="truncate text-[15px] font-bold text-neutral-800">{buildItemSummary(group)}</div>
               </div>
-              <div className="text-[13px] font-black text-neutral-600">{group.first.payment_method || "-"}</div>
+              <div className="min-w-0">
+                <div className="truncate text-[13px] font-black text-neutral-700">{group.first.payment_method || "-"}</div>
+                <div className={`mt-0.5 inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-black ${paymentMeta.className}`}>
+                  {paymentMeta.label}
+                </div>
+              </div>
               <div className="text-left lg:text-right">
                 <div className="text-[15px] font-black">{money(group.totalAmount)}</div>
                 {groupMoneyLogs.length > 0 ? (
@@ -806,7 +895,7 @@ function OrderWorkTable({
                 ) : null}
               </div>
               <select value={status} onChange={(event) => onStatusChange(group, event.target.value)} className={`h-8 w-full rounded-lg border px-2 text-center text-xs font-black outline-none ${selectClass(status)}`}>
-                {ORDER_STATUSES.map((option) => <option key={option} value={option}>{option}</option>)}
+                {ORDER_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
               <button type="button" onClick={() => onToggle(group.groupId)} className="h-8 rounded-lg border border-neutral-300 bg-white px-2 text-xs font-black text-neutral-700 hover:bg-neutral-50">
                 {isOpen ? "상세닫기" : "상세보기"}
@@ -831,6 +920,7 @@ function OrderDetailBlock({
   onFinalAmountChange: (row: OrderRow, nextAmount: number, reason: string) => Promise<void>;
 }) {
   const first = group.first;
+  const paymentMeta = paymentStatusMeta(first);
   const address = [first.address, first.detail_address].filter(Boolean).join(" ");
   const memo = [first.request_memo, first.memo, first.special_note, first.admin_memo].filter(Boolean).join(" / ");
 
@@ -849,6 +939,7 @@ function OrderDetailBlock({
           ))}
         </DetailBox>
         <DetailBox title="관리정보">
+          <div>결제상태: {paymentMeta.label} · {paymentMeta.desc}</div>
           <div>송장: {first.tracking_company || "로젠"} {first.tracking_number || "미등록"}</div>
           <div>메모: {memo || "-"}</div>
         </DetailBox>
