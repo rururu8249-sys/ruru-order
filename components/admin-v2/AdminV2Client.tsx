@@ -16,6 +16,7 @@ import type {
   MoneyEditLogRow,
   OrderGroup,
   OrderRow,
+  RosenShippingPreviewRow,
   SettingRow,
   StatusChangeLogRow,
 } from "@/lib/admin-v2/types";
@@ -24,6 +25,7 @@ import {
   displayOrderPhone,
   formatDateLabel,
   formatKoreanPhone,
+  digitsOnly,
   money,
   moneyInput,
   moneyNumber,
@@ -62,6 +64,402 @@ import {
   selectClass,
   shortOrderCode,
 } from "@/lib/admin-v2/orderHelpers";
+
+
+const ROSEN_SHIPPING_KEY_PREFIX = "R";
+const ROSEN_LEGACY_SHIPPING_KEY_PREFIX = "RURU|";
+const ROSEN_TEMPLATE_PATH = "/templates/rozen_template.xlsx";
+const ROSEN_FIXED_FARE = 2750;
+
+const ROSEN_UPLOAD_HEADERS = [
+  "수하인명",
+  "",
+  "수하인주소",
+  "수하인전화번호",
+  "수하인핸드폰번호",
+  "택배수량",
+  "택배운임",
+  "운임구분",
+  "품목명",
+  "",
+  "배송메세지",
+];
+
+type RosenUploadExcelRow = {
+  recipientName: string;
+  internalKey: string;
+  address: string;
+  phone: string;
+  mobilePhone: string;
+  parcelQty: string;
+  shippingFee: string;
+  feeType: string;
+  itemName: string;
+  backup: string;
+  requestMemo: string;
+};
+
+function cleanText(value: unknown) {
+  return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function normalizeLooseText(value: unknown) {
+  return cleanText(value).replace(/[\s\-_.]/g, "").toLowerCase();
+}
+
+function normalizeAddressForCompare(value: unknown) {
+  return cleanText(value).replace(/[\s,()\[\]{}\-_.]/g, "").toLowerCase();
+}
+
+function combineOrderAddress(row: Pick<OrderRow, "address" | "detail_address">) {
+  return [row.address, row.detail_address].filter(Boolean).join(" ").trim();
+}
+
+function getGroupRecipientName(group: OrderGroup) {
+  return cleanText(group.first.customer_name || group.first.youtube_nickname || "");
+}
+
+function buildRosenShippingKey(group: OrderGroup) {
+  const ids = Array.from(new Set(group.rows.map((row) => Number(row.id)).filter(Boolean))).sort((a, b) => a - b);
+  return `${ROSEN_SHIPPING_KEY_PREFIX}${ids.join(",")}`;
+}
+
+function buildRosenOrderFormGroups(rows: OrderRow[]): OrderGroup[] {
+  // 송장관리에서는 절대 묶지 않습니다.
+  // order_group_id, order_lookup_code, 고객명, 전화번호, 주소가 같아도 합치지 않습니다.
+  // DB 주문행 1개 = 로젠 엑셀 1줄입니다.
+  // 여러 줄 합배송/묶음처리는 로젠 프로그램에 맡깁니다.
+  return [...rows]
+    .sort((a, b) => {
+      const aTime = new Date(a.created_at || "").getTime() || 0;
+      const bTime = new Date(b.created_at || "").getTime() || 0;
+      if (aTime !== bTime) return bTime - aTime;
+      return Number(b.id || 0) - Number(a.id || 0);
+    })
+    .map((row) => ({
+      groupId: `row:${row.id}`,
+      first: row,
+      rows: [row],
+      totalAmount: orderNetSalesAmount(row),
+      totalQty: Number(row.qty || 0),
+    }));
+}
+
+function buildRosenItemTextFromRow(row: OrderRow) {
+  const productName = cleanText(row.product_name) || "상품명없음";
+  const optionText = [row.color, row.size].map((value) => cleanText(value)).filter(Boolean).join(" / ");
+  const qty = Math.max(1, Number(row.qty || 0));
+
+  return optionText ? `${productName}(${optionText}) x${qty}개` : `${productName} x${qty}개`;
+}
+
+function getRosenItemName(group: OrderGroup) {
+  // DB 주문행 1개를 그대로 I열 품목명에 넣습니다.
+  // 송장관리에서는 order_lookup_code 기준으로도 합치지 않습니다.
+  // 상품과 상품 사이 구분자는 합쳐질 때만 " , "를 쓰지만, 1차 원칙상 rows는 항상 1개입니다.
+  // 배송메세지 K열에는 절대 상품정보를 섞지 않고 request_memo만 넣습니다.
+  const items = group.rows
+    .map((row) => buildRosenItemTextFromRow(row))
+    .filter((item) => Boolean(cleanText(item)));
+
+  if (items.length === 0) return "의류";
+
+  return items.join(" , ");
+}
+
+function parseRosenShippingKey(value: unknown) {
+  const text = cleanText(value).replace(/\s+/g, "");
+  let rawIds = "";
+
+  // 신규 형식: R92 / R1050
+  // 이전에 내려받은 파일도 실수 없이 읽을 수 있도록 기존 형식 RURU|92도 같이 허용합니다.
+  if (/^R[0-9,]+$/.test(text)) {
+    rawIds = text.slice(ROSEN_SHIPPING_KEY_PREFIX.length);
+  } else if (text.startsWith(ROSEN_LEGACY_SHIPPING_KEY_PREFIX)) {
+    rawIds = text.slice(ROSEN_LEGACY_SHIPPING_KEY_PREFIX.length);
+  }
+
+  if (!rawIds) return [];
+
+  return rawIds
+    .split(",")
+    .map((item) => Number(String(item).replace(/[^0-9]/g, "")))
+    .filter((id) => Number.isFinite(id) && id > 0);
+}
+
+function isRosenShippingKey(value: unknown) {
+  return parseRosenShippingKey(value).length > 0;
+}
+
+function getShippingDownloadBlockReason(group: OrderGroup) {
+  const status = getOrderStatusValue(group.first);
+  const recipientName = getGroupRecipientName(group);
+  const phoneDigits = orderPhoneDigits(group.first);
+  const address = combineOrderAddress(group.first);
+
+  if (isOrderCanceled(group.first)) return "주문취소";
+  if (group.rows.some((row) => getOrderStatusValue(row) === "출고완료" || row.shipped_at)) return "이미 출고완료";
+  if (status !== "출고대기") return `현재 상태: ${getOrderStatusLabel(status)}`;
+  if (!recipientName) return "수하인명 없음";
+  if (!phoneDigits) return "전화번호 없음";
+  if (!address) return "주소 없음";
+
+  return "";
+}
+
+function buildRosenUploadRow(group: OrderGroup): RosenUploadExcelRow {
+  const phone = displayOrderPhone(group.first);
+
+  return {
+    recipientName: getGroupRecipientName(group),
+    internalKey: buildRosenShippingKey(group),
+    address: combineOrderAddress(group.first),
+    phone,
+    mobilePhone: phone,
+    parcelQty: "1",
+    shippingFee: String(ROSEN_FIXED_FARE),
+    feeType: "010",
+    itemName: getRosenItemName(group),
+    backup: "",
+    requestMemo: getShippingExcelMemo(group.first),
+  };
+}
+
+function escapeTsvCell(value: unknown) {
+  return String(value ?? "").replace(/\t/g, " ").replace(/\r?\n/g, " ").trim();
+}
+
+function buildRosenUploadMatrix(rows: RosenUploadExcelRow[]) {
+  return rows.map((row) => [
+    row.recipientName,
+    row.internalKey,
+    row.address,
+    row.phone,
+    row.mobilePhone,
+    Number(row.parcelQty || 1),
+    ROSEN_FIXED_FARE,
+    row.feeType,
+    row.itemName,
+    row.backup,
+    row.requestMemo,
+  ]);
+}
+
+function buildRosenCopyTsv(rows: RosenUploadExcelRow[]) {
+  return buildRosenUploadMatrix(rows)
+    .map((row) => row.map((cell) => escapeTsvCell(cell)).join("\t"))
+    .join("\r\n");
+}
+
+function downloadBlobFile(fileName: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function downloadTextFile(fileName: string, content: string, mimeType: string) {
+  downloadBlobFile(fileName, new Blob(["\ufeff", content], { type: mimeType }));
+}
+
+async function buildRosenTemplateWorkbookBlob(rows: RosenUploadExcelRow[]) {
+  const XLSX = await import("xlsx");
+  const response = await fetch(ROSEN_TEMPLATE_PATH, { cache: "no-store" });
+
+  if (!response.ok) {
+    throw new Error(`로젠 템플릿 파일을 찾을 수 없습니다. public/templates/rozen_template.xlsx 위치를 확인해주세요. (${response.status})`);
+  }
+
+  const templateBuffer = await response.arrayBuffer();
+  const workbook = XLSX.read(templateBuffer, { type: "array", cellStyles: true });
+  const firstSheetName = workbook.SheetNames[0];
+  const worksheet = workbook.Sheets[firstSheetName];
+
+  if (!firstSheetName || !worksheet) {
+    throw new Error("로젠 템플릿 첫 번째 시트를 읽을 수 없습니다.");
+  }
+
+  const matrix = buildRosenUploadMatrix(rows);
+  const clearRowCount = Math.max(matrix.length + 20, 200);
+
+  for (let rowIndex = 0; rowIndex < clearRowCount; rowIndex += 1) {
+    for (let colIndex = 0; colIndex < ROSEN_UPLOAD_HEADERS.length; colIndex += 1) {
+      const address = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex });
+      const prevCell = worksheet[address] || {};
+
+      if (rowIndex < matrix.length) {
+        const value = matrix[rowIndex][colIndex] ?? "";
+        const isNumberColumn = colIndex === 5 || colIndex === 6;
+
+        worksheet[address] = {
+          ...prevCell,
+          t: isNumberColumn ? "n" : "s",
+          v: isNumberColumn ? Number(value || 0) : String(value),
+          z: isNumberColumn ? "0" : "@",
+        };
+      } else if (worksheet[address]) {
+        worksheet[address] = {
+          ...prevCell,
+          t: "s",
+          v: "",
+          w: "",
+          z: "@",
+        };
+      }
+    }
+  }
+
+  worksheet["!ref"] = `A1:K${Math.max(1, matrix.length)}`;
+
+  const output = XLSX.write(workbook, {
+    bookType: "xlsx",
+    type: "array",
+    cellStyles: true,
+  });
+
+  return new Blob([output], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+}
+
+function extractRowsFromUploadedText(text: string) {
+  const clean = text.replace(/^\ufeff/, "");
+
+  if (/<table[\s>]/i.test(clean)) {
+    const doc = new DOMParser().parseFromString(clean, "text/html");
+    return Array.from(doc.querySelectorAll("tr")).map((tr) =>
+      Array.from(tr.querySelectorAll("th,td")).map((cell) => cleanText(cell.textContent || ""))
+    );
+  }
+
+  return clean
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.split(line.includes("\t") ? "\t" : ",").map((cell) => cleanText(cell)));
+}
+
+async function extractRowsFromUploadedFile(file: File) {
+  const lowerName = file.name.toLowerCase();
+
+  if (lowerName.endsWith(".xlsx")) {
+    const XLSX = await import("xlsx");
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: "array" });
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+
+    if (!firstSheetName || !worksheet) {
+      throw new Error("첫 번째 시트를 읽을 수 없습니다.");
+    }
+
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
+      header: 1,
+      raw: false,
+      defval: "",
+    });
+
+    return rows.map((row) => row.map((cell) => cleanText(cell)));
+  }
+
+  const text = await file.text();
+  return extractRowsFromUploadedText(text);
+}
+
+function buildRosenShippingPreviewRows(rawRows: string[][], orders: OrderRow[]): RosenShippingPreviewRow[] {
+  const orderMap = new Map<number, OrderRow>();
+  orders.forEach((order) => orderMap.set(Number(order.id), order));
+
+  const candidates = rawRows.flatMap((cells, index) => {
+    const rowNumber = index + 1;
+    const hasAnyData = cells.some((cell) => cleanText(cell));
+    const key = cleanText(cells[1] || "");
+
+    if (!hasAnyData) return [];
+    if (rowNumber === 1 && !isRosenShippingKey(key)) return [];
+
+    const orderIds = parseRosenShippingKey(key);
+
+    return [{ rowNumber, cells, key, orderIds }];
+  });
+
+  const idCounts = new Map<number, number>();
+  candidates.forEach((candidate) => {
+    candidate.orderIds.forEach((id) => idCounts.set(id, (idCounts.get(id) || 0) + 1));
+  });
+
+  return candidates.map((candidate) => {
+    const customerName = cleanText(candidate.cells[0] || "");
+    const address = cleanText(candidate.cells[2] || "");
+    const phone = cleanText(candidate.cells[4] || candidate.cells[3] || "");
+    const itemSummary = cleanText(candidate.cells[8] || "");
+    const requestMemo = cleanText(candidate.cells[10] || "");
+    const blockingReasons: string[] = [];
+    const checkReasons: string[] = [];
+
+    if (!candidate.key) blockingReasons.push("B열 주문키 없음");
+    if (candidate.key && !isRosenShippingKey(candidate.key)) blockingReasons.push("B열 R키 형식 아님");
+    if (isRosenShippingKey(candidate.key) && candidate.orderIds.length === 0) blockingReasons.push("B열 주문ID 없음");
+
+    const foundRows = candidate.orderIds.map((id) => orderMap.get(id)).filter(Boolean) as OrderRow[];
+    const missingIds = candidate.orderIds.filter((id) => !orderMap.has(id));
+
+    if (missingIds.length > 0) blockingReasons.push(`사이트 주문 없음: ${missingIds.join(",")}`);
+
+    const first = foundRows[0];
+
+    if (first) {
+      const expectedName = cleanText(first.customer_name || first.youtube_nickname || "");
+      const expectedPhone = orderPhoneDigits(first);
+      const expectedAddress = combineOrderAddress(first);
+      const uploadedPhone = digitsOnly(phone);
+
+      if (foundRows.some((row) => isOrderCanceled(row))) checkReasons.push("주문취소 포함");
+      if (foundRows.some((row) => getOrderStatusValue(row) === "출고완료" || row.shipped_at)) checkReasons.push("이미 출고완료 포함");
+      if (foundRows.some((row) => getOrderStatusValue(row) !== "출고대기")) checkReasons.push("출고대기 아닌 주문 포함");
+      if (candidate.orderIds.some((id) => (idCounts.get(id) || 0) > 1)) checkReasons.push("같은 주문ID가 엑셀에 중복됨");
+      if (foundRows.some((row) => normalizeLooseText(row.customer_name || row.youtube_nickname || "") !== normalizeLooseText(expectedName))) checkReasons.push("주문ID끼리 수하인명 다름");
+      if (foundRows.some((row) => orderPhoneDigits(row) !== expectedPhone)) checkReasons.push("주문ID끼리 전화번호 다름");
+      if (foundRows.some((row) => normalizeAddressForCompare(combineOrderAddress(row)) !== normalizeAddressForCompare(expectedAddress))) checkReasons.push("주문ID끼리 주소 다름");
+
+      if (customerName && expectedName && normalizeLooseText(customerName) !== normalizeLooseText(expectedName)) checkReasons.push("엑셀 수하인명과 주문 수하인명 불일치");
+      if (uploadedPhone && expectedPhone && uploadedPhone !== expectedPhone) checkReasons.push("엑셀 전화번호와 주문 전화번호 불일치");
+      if (address && expectedAddress && normalizeAddressForCompare(address) !== normalizeAddressForCompare(expectedAddress)) checkReasons.push("엑셀 주소와 주문 주소 불일치");
+    }
+
+    const status = blockingReasons.length > 0 ? "blocked" : checkReasons.length > 0 ? "check" : "ready";
+    const message = [...blockingReasons, ...checkReasons].join(" / ") || "출고완료 일괄반영 가능";
+
+    return {
+      rowNumber: candidate.rowNumber,
+      key: candidate.key || "-",
+      orderIds: candidate.orderIds,
+      customerName,
+      phone,
+      address,
+      itemSummary,
+      requestMemo,
+      status,
+      message,
+    };
+  });
+}
+
+function getShippingPreviewLabel(status: RosenShippingPreviewRow["status"]) {
+  if (status === "ready") return "정상반영";
+  if (status === "check") return "확인필요";
+  return "미반영";
+}
+
+function getShippingPreviewClass(status: RosenShippingPreviewRow["status"]) {
+  if (status === "ready") return "bg-emerald-50 text-emerald-700 border-emerald-200";
+  if (status === "check") return "bg-amber-50 text-amber-800 border-amber-200";
+  return "bg-red-50 text-red-700 border-red-200";
+}
 
 export function AdminV2Client() {
   const [activeTab, setActiveTab] = useState<AdminTab>("orders");
@@ -209,6 +607,15 @@ export function AdminV2Client() {
       return matchStatus && matchPayment && matchDate && (!word || target.includes(word));
     });
   }, [orderGroups, keyword, statusFilter, paymentFilter, dateFilter]);
+
+  const rosenShippingOrderGroups = useMemo(() => {
+    const dateRows = orders.filter((order) => !dateFilter || toDateKey(order.created_at) === dateFilter);
+
+    // 송장관리 전용: 어떤 기준으로도 합치지 않습니다.
+    // DB 주문행 1개 = 로젠 엑셀 1줄입니다.
+    // 같은 고객/전화/주소/order_group_id/order_lookup_code여도 그대로 각각 출력합니다.
+    return buildRosenOrderFormGroups(dateRows);
+  }, [orders, dateFilter]);
 
   const settingsSummary = useMemo(() => ({
     customerCardRate: readSettingNumber(settings, "customer_card_extra_rate", 10),
@@ -421,6 +828,128 @@ export function AdminV2Client() {
     }
   };
 
+
+  const bulkMarkShippingDoneFromExcel = async (previewRows: RosenShippingPreviewRow[]) => {
+    const readyRows = previewRows.filter((row) => row.status === "ready");
+    const orderIds = Array.from(new Set(readyRows.flatMap((row) => row.orderIds))).filter(Boolean);
+
+    if (orderIds.length === 0) {
+      alert("정상반영 가능한 주문이 없습니다.\n\n확인필요/미반영 항목을 먼저 확인해주세요.");
+      return;
+    }
+
+    const orderMap = new Map<number, OrderRow>();
+    orders.forEach((order) => orderMap.set(Number(order.id), order));
+
+    const currentRows = orderIds.map((id) => orderMap.get(id)).filter(Boolean) as OrderRow[];
+    const blockedNow = currentRows.filter(
+      (row) => isOrderCanceled(row) || getOrderStatusValue(row) !== "출고대기" || getOrderStatusValue(row) === "출고완료" || Boolean(row.shipped_at)
+    );
+
+    if (currentRows.length !== orderIds.length || blockedNow.length > 0) {
+      alert(
+        "미리보기 이후 주문 상태가 바뀐 항목이 있습니다.\n\n새로고침 후 다시 엑셀을 업로드해서 확인해주세요."
+      );
+      await loadData();
+      return;
+    }
+
+    const ok = confirm(
+      `정상반영 ${readyRows.length}줄 / 주문행 ${orderIds.length}건을 출고완료 처리할까요?\n\n송장번호는 저장하지 않습니다.\n출고완료 상태와 출고완료시간만 저장합니다.`
+    );
+
+    if (!ok) return;
+
+    const nowIso = new Date().toISOString();
+    const statusLogPayloads = currentRows.map((row) => {
+      const beforeStatus = getOrderStatusValue(row);
+
+      return {
+        order_id: row.id,
+        order_group_id: row.order_group_id,
+        order_lookup_code: row.order_lookup_code,
+        changed_by: "admin-v2",
+        change_source: "admin-v2-rosen-original-upload-shipped-bulk",
+        before_status: beforeStatus,
+        after_status: "출고완료",
+        before_order_manage_status: row.order_manage_status || beforeStatus,
+        after_order_manage_status: "출고완료",
+        payment_method: row.payment_method || "",
+        deposit_confirmed_at_before: row.deposit_confirmed_at || "",
+        deposit_confirmed_at_after: row.deposit_confirmed_at || "",
+        snapshot_before: {
+          id: row.id,
+          admin_order_status_v2: row.admin_order_status_v2,
+          order_manage_status: row.order_manage_status,
+          payment_method: row.payment_method,
+          deposit_confirmed_at: row.deposit_confirmed_at,
+          shipped_at: row.shipped_at,
+          tracking_company: row.tracking_company,
+          tracking_number: row.tracking_number,
+        },
+        snapshot_after: {
+          id: row.id,
+          admin_order_status_v2: "출고완료",
+          order_manage_status: "출고완료",
+          payment_method: row.payment_method,
+          deposit_confirmed_at: row.deposit_confirmed_at,
+          shipped_at: nowIso,
+          tracking_company: row.tracking_company,
+          tracking_number: row.tracking_number,
+        },
+      };
+    });
+
+    setOrders((prev) =>
+      prev.map((order) =>
+        orderIds.includes(order.id)
+          ? {
+              ...order,
+              admin_order_status_v2: "출고완료",
+              order_manage_status: "출고완료",
+              shipped_at: order.shipped_at || nowIso,
+            }
+          : order
+      )
+    );
+
+    const { error } = await supabase
+      .from("orders")
+      .update({
+        admin_order_status_v2: "출고완료",
+        order_manage_status: "출고완료",
+        shipped_at: nowIso,
+      })
+      .in("id", orderIds);
+
+    if (error) {
+      alert("출고완료 일괄반영 실패\n\n" + error.message);
+      await loadData();
+      return;
+    }
+
+    const { error: logError } = await supabase.rpc("insert_order_status_change_logs_for_admin_v2", {
+      p_logs: statusLogPayloads,
+    });
+
+    if (logError) {
+      alert("출고완료는 반영됐지만 상태변경이력 저장에 실패했습니다.\n\n" + logError.message);
+      await loadData();
+      return;
+    }
+
+    const { data: latestStatusLogs, error: latestStatusLogsError } = await supabase
+      .rpc("get_order_status_change_logs_for_admin_v2");
+
+    if (latestStatusLogsError) {
+      alert("상태변경이력 재조회에 실패했습니다.\n\n" + latestStatusLogsError.message);
+    } else {
+      setStatusChangeLogs((latestStatusLogs || []) as StatusChangeLogRow[]);
+    }
+
+    alert(`출고완료 일괄반영이 완료되었습니다.\n\n반영 주문행: ${orderIds.length}건`);
+  };
+
   const updateOrderTracking = async (group: OrderGroup, trackingCompany: string, trackingNumber: string) => {
     const cleanCompany = String(trackingCompany || "").trim() || "로젠";
     const cleanNumber = String(trackingNumber || "").trim().replace(/\s+/g, "");
@@ -612,7 +1141,16 @@ export function AdminV2Client() {
             <>
               <SummaryCards summaryCards={summaryCards} />
 
-              {activeTab === "customers" ? (
+              {activeTab === "shipping" ? (
+                <ShippingPanel
+                  orderGroups={rosenShippingOrderGroups}
+                  orders={orders}
+                  dateOptions={dateOptions}
+                  dateFilter={dateFilter}
+                  setDateFilter={setDateFilter}
+                  onApplyShippingDone={bulkMarkShippingDoneFromExcel}
+                />
+              ) : activeTab === "customers" ? (
                 <CustomerPanel customers={customers} />
               ) : activeTab === "deposits" ? (
                 <DepositPanel deposits={deposits} />
@@ -657,6 +1195,276 @@ export function AdminV2Client() {
         </section>
       </div>
     </main>
+  );
+}
+
+
+function ShippingPanel({
+  orderGroups,
+  orders,
+  dateOptions,
+  dateFilter,
+  setDateFilter,
+  onApplyShippingDone,
+}: {
+  orderGroups: OrderGroup[];
+  orders: OrderRow[];
+  dateOptions: Array<{ value: string; label: string }>;
+  dateFilter: string;
+  setDateFilter: (value: string) => void;
+  onApplyShippingDone: (previewRows: RosenShippingPreviewRow[]) => Promise<void>;
+}) {
+  const [previewRows, setPreviewRows] = useState<RosenShippingPreviewRow[]>([]);
+  const [previewFileName, setPreviewFileName] = useState("");
+  const [applying, setApplying] = useState(false);
+
+  const downloadTargets = useMemo(() => {
+    return orderGroups.filter((group) => !getShippingDownloadBlockReason(group));
+  }, [orderGroups]);
+
+  const blockedDownloadGroups = useMemo(() => {
+    return orderGroups
+      .map((group) => ({ group, reason: getShippingDownloadBlockReason(group) }))
+      .filter((item) => item.reason);
+  }, [orderGroups]);
+
+  const previewSummary = useMemo(() => ({
+    ready: previewRows.filter((row) => row.status === "ready").length,
+    check: previewRows.filter((row) => row.status === "check").length,
+    blocked: previewRows.filter((row) => row.status === "blocked").length,
+  }), [previewRows]);
+
+  const getRosenDownloadRows = () => {
+    if (downloadTargets.length === 0) {
+      alert("다운로드할 출고대기 주문이 없습니다.\n\n출고대기 상태, 수하인명, 전화번호, 주소를 확인해주세요.");
+      return null;
+    }
+
+    return downloadTargets.map((group) => buildRosenUploadRow(group));
+  };
+
+  const downloadRosenExcel = async () => {
+    const excelRows = getRosenDownloadRows();
+    if (!excelRows) return;
+
+    const dateStamp = (dateFilter || new Date().toISOString().slice(0, 10)).replace(/[^0-9]/g, "");
+
+    try {
+      const blob = await buildRosenTemplateWorkbookBlob(excelRows);
+      downloadBlobFile(`ruru_rosen_upload_${dateStamp}.xlsx`, blob);
+    } catch (error) {
+      alert(
+        "로젠 템플릿 xlsx 생성에 실패했습니다.\n\n" +
+          (error instanceof Error ? error.message : String(error)) +
+          "\n\n우선 복사용 TSV 파일로 내려받습니다. 로젠 템플릿을 열고 A1부터 붙여넣어주세요."
+      );
+
+      downloadTextFile(
+        `ruru_rosen_copy_${dateStamp}.tsv`,
+        buildRosenCopyTsv(excelRows),
+        "text/tab-separated-values;charset=utf-8"
+      );
+    }
+  };
+
+  const downloadRosenCopyTsv = () => {
+    const excelRows = getRosenDownloadRows();
+    if (!excelRows) return;
+
+    const dateStamp = (dateFilter || new Date().toISOString().slice(0, 10)).replace(/[^0-9]/g, "");
+    downloadTextFile(
+      `ruru_rosen_copy_${dateStamp}.tsv`,
+      buildRosenCopyTsv(excelRows),
+      "text/tab-separated-values;charset=utf-8"
+    );
+  };
+
+  const handleUploadOriginalExcel = async (file: File | null) => {
+    if (!file) return;
+
+    try {
+      const rows = await extractRowsFromUploadedFile(file);
+      const nextPreviewRows = buildRosenShippingPreviewRows(rows, orders);
+
+      if (nextPreviewRows.length === 0) {
+        alert("읽을 수 있는 R 주문키가 없습니다.\n\n사이트에서 다운로드했던 로젠 업로드용 원본 xlsx/tsv 파일을 다시 올렸는지 확인해주세요.");
+        return;
+      }
+
+      setPreviewRows(nextPreviewRows);
+      setPreviewFileName(file.name);
+    } catch (error) {
+      alert("엑셀 읽기 실패\n\n" + (error instanceof Error ? error.message : String(error)));
+    }
+  };
+
+  const applyReadyRows = async () => {
+    setApplying(true);
+    try {
+      await onApplyShippingDone(previewRows);
+      setPreviewRows([]);
+      setPreviewFileName("");
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  return (
+    <div className="grid gap-3">
+      <div className="rounded-xl border border-neutral-200 bg-white p-3">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-[17px] font-black">🚚 송장관리 1차</div>
+            <div className="mt-1 text-[12px] font-bold text-neutral-500">
+              public/templates/rozen_template.xlsx 원본 양식에 맞춰 로젠 업로드용 xlsx를 생성합니다. 송장관리에서는 어떤 기준으로도 합치지 않습니다. DB 주문행 1개를 로젠 엑셀 1줄로 그대로 내보냅니다. 같은 고객/전화/주소/order_lookup_code여도 사이트에서 합치지 않습니다. B열 R 주문키로 출고완료만 일괄반영하고, I열에는 해당 행의 상품명/옵션/수량만 넣습니다.
+            </div>
+          </div>
+          <div className="rounded-lg bg-emerald-50 px-2 py-1 text-[11px] font-black text-emerald-700">
+            I열 상품 사이 쉼표 · 총수량 없음 · K열 배송메모 전용
+          </div>
+        </div>
+
+        <div className="grid gap-2 lg:grid-cols-[minmax(240px,360px)_1fr_220px] lg:items-end">
+          <div>
+            <div className="mb-1 text-[12px] font-black text-neutral-500">다운로드 기준 날짜</div>
+            <select
+              value={dateFilter}
+              onChange={(event) => setDateFilter(event.target.value)}
+              className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-[14px] font-black outline-none focus:border-neutral-950"
+            >
+              {dateOptions.length === 0 ? <option value="">방송/날짜 없음</option> : null}
+              {dateOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <SummaryCard label="다운로드 가능 주문서" value={`${downloadTargets.length}건`} />
+            <SummaryCard label="제외/확인" value={`${blockedDownloadGroups.length}건`} strong={blockedDownloadGroups.length > 0} />
+            <SummaryCard label="현재 날짜 주문" value={`${orderGroups.length}건`} />
+          </div>
+
+          <div className="grid gap-2">
+            <button
+              type="button"
+              onClick={downloadRosenExcel}
+              className="h-10 rounded-lg bg-neutral-950 px-3 text-[14px] font-black text-white hover:bg-neutral-800"
+            >
+              로젠 템플릿 xlsx 다운로드
+            </button>
+            <button
+              type="button"
+              onClick={downloadRosenCopyTsv}
+              className="h-10 rounded-lg border border-neutral-300 bg-white px-3 text-[13px] font-black text-neutral-800 hover:bg-neutral-50"
+            >
+              복붙용 TSV 다운로드
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[12px] font-bold text-amber-900">
+          ⚠️ 사이트에서는 송장을 절대 합치지 않습니다. 같은 고객/전화/주소/order_lookup_code라도 DB 주문행마다 각각 한 줄로 내려갑니다. 다운로드한 파일을 로젠에 업로드해서 송장 출력/실제 출고까지 끝낸 뒤, 그 파일을 아래에 다시 업로드하세요. TSV는 템플릿 A1부터 붙여넣기용입니다.
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-neutral-200 bg-white p-3">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-[15px] font-black">1차 출고완료 반영</div>
+            <div className="mt-1 text-[12px] font-bold text-neutral-500">
+              처음 다운로드했던 로젠 업로드용 xlsx/tsv 파일을 다시 올리면 B열 R 주문키를 읽어 미리보기합니다.
+            </div>
+          </div>
+          <label className="cursor-pointer rounded-lg border border-neutral-300 bg-white px-3 py-2 text-[13px] font-black text-neutral-800 hover:bg-neutral-50">
+            원본 엑셀 업로드
+            <input
+              type="file"
+              accept=".xlsx,.xls,.html,.txt,.csv,.tsv"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0] || null;
+                event.currentTarget.value = "";
+                handleUploadOriginalExcel(file);
+              }}
+            />
+          </label>
+        </div>
+
+        {previewRows.length === 0 ? (
+          <div className="rounded-xl bg-neutral-50 p-5 text-center text-[13px] font-bold text-neutral-500">
+            아직 업로드된 원본 엑셀이 없습니다.
+          </div>
+        ) : (
+          <div className="grid gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-neutral-50 p-3">
+              <div className="text-[13px] font-black text-neutral-700">파일: {previewFileName || "-"}</div>
+              <div className="flex flex-wrap gap-1.5 text-[12px] font-black">
+                <span className="rounded-lg bg-emerald-50 px-2 py-1 text-emerald-700">정상반영 {previewSummary.ready}건</span>
+                <span className="rounded-lg bg-amber-50 px-2 py-1 text-amber-800">확인필요 {previewSummary.check}건</span>
+                <span className="rounded-lg bg-red-50 px-2 py-1 text-red-700">미반영 {previewSummary.blocked}건</span>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-xl border border-neutral-200">
+              <div className="hidden grid-cols-[54px_110px_120px_126px_minmax(220px,1fr)_106px_minmax(220px,1.2fr)] bg-neutral-950 px-3 py-2 text-[12px] font-black text-white lg:grid">
+                <div>행</div>
+                <div>결과</div>
+                <div>고객</div>
+                <div>전화</div>
+                <div>상품</div>
+                <div>주문ID</div>
+                <div>메시지</div>
+              </div>
+
+              {previewRows.map((row) => (
+                <div key={`${row.rowNumber}-${row.key}`} className="grid gap-1 border-t border-neutral-100 px-3 py-2 text-[12px] font-bold first:border-t-0 lg:grid-cols-[54px_110px_120px_126px_minmax(220px,1fr)_106px_minmax(220px,1.2fr)] lg:items-center">
+                  <div className="font-black text-neutral-500">{row.rowNumber}</div>
+                  <div>
+                    <span className={`inline-flex rounded-lg border px-2 py-1 text-[11px] font-black ${getShippingPreviewClass(row.status)}`}>
+                      {getShippingPreviewLabel(row.status)}
+                    </span>
+                  </div>
+                  <div className="truncate font-black">{row.customerName || "-"}</div>
+                  <div className="truncate text-neutral-600">{row.phone || "-"}</div>
+                  <div className="truncate text-neutral-700">{row.itemSummary || "-"}</div>
+                  <div className="truncate text-neutral-500">{row.orderIds.join(",") || "-"}</div>
+                  <div className="text-neutral-600">{row.message}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+              <div className="text-[12px] font-bold text-neutral-500">
+                정상반영 항목만 출고완료 처리합니다. 확인필요/미반영은 자동처리하지 않습니다.
+              </div>
+              <button
+                type="button"
+                onClick={applyReadyRows}
+                disabled={applying || previewSummary.ready === 0}
+                className="rounded-lg bg-neutral-950 px-4 py-2 text-[13px] font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
+              >
+                {applying ? "반영중" : `정상반영 ${previewSummary.ready}건 출고완료 처리`}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {blockedDownloadGroups.length > 0 ? (
+        <div className="rounded-xl border border-neutral-200 bg-white p-3">
+          <div className="mb-2 text-[15px] font-black">다운로드 제외/확인 필요</div>
+          <div className="grid gap-1.5">
+            {blockedDownloadGroups.slice(0, 30).map(({ group, reason }) => (
+              <div key={group.groupId} className="grid gap-1 rounded-lg bg-neutral-50 px-3 py-2 text-[12px] font-bold text-neutral-600 md:grid-cols-[90px_120px_1fr_160px] md:items-center">
+                <div className="font-black text-neutral-500">{shortOrderCode(group)}</div>
+                <div>{group.first.youtube_nickname || group.first.customer_name || "-"}</div>
+                <div className="truncate">{buildItemSummary(group)}</div>
+                <div className="font-black text-red-700">{reason}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

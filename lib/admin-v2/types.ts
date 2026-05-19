@@ -1,8 +1,8 @@
 // lib/admin-v2/types.ts
 // admin-v2 공통 타입
-// 리팩토링 1단계: 기존 타입을 파일로 분리. 계산 결과/DB 구조 변경 없음.
+// 송장관리 1차 추가: 로젠 원본 업로드 엑셀 재업로드로 출고완료만 반영. DB 구조 변경 없음.
 
-export type AdminTab = "today" | "orders" | "customers" | "deposits" | "settlement" | "settings";
+export type AdminTab = "today" | "orders" | "shipping" | "customers" | "deposits" | "settlement" | "settings";
 
 export type OrderRow = {
   id: number;
@@ -126,4 +126,19 @@ export type OrderGroup = {
   rows: OrderRow[];
   totalAmount: number;
   totalQty: number;
+};
+
+export type RosenShippingPreviewStatus = "ready" | "check" | "blocked";
+
+export type RosenShippingPreviewRow = {
+  rowNumber: number;
+  key: string;
+  orderIds: number[];
+  customerName: string;
+  phone: string;
+  address: string;
+  itemSummary: string;
+  requestMemo: string;
+  status: RosenShippingPreviewStatus;
+  message: string;
 };
