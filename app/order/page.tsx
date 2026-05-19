@@ -24,6 +24,11 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import OrderPageShell from "@/components/order/OrderPageShell";
+import OrderCustomerTopNav from "@/components/order/OrderCustomerTopNav";
+import OrderHero from "@/components/order/OrderHero";
+import OrderGuideCard from "@/components/order/OrderGuideCard";
+import OrderPriceSummaryBox from "@/components/order/OrderPriceSummaryBox";
 
 declare global {
   interface Window {
@@ -72,7 +77,7 @@ const emptyItem: OrderItem = {
   product_name: "",
   color: "",
   size: "",
-  qty: "1",
+  qty: "",
   product_price: "",
 };
 
@@ -96,11 +101,13 @@ const hideNone = (value: any) => {
 };
 
 const itemLabel = (item: OrderItem) => {
+  const qty = toNumber(item.qty);
+
   return [
     item.product_name.trim(),
     hideNone(item.color),
     hideNone(item.size),
-    `x${toNumber(item.qty) || 1}`,
+    qty ? `x${qty}` : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -112,7 +119,7 @@ const cleanColorText = (value: string) =>
   String(value || "").replace(/[0-9]/g, "").slice(0, 30);
 
 const cleanSizeText = (value: string) =>
-  String(value || "").replace(/[^ㄱ-ㅎ가-힣a-zA-Z0-9\s]/g, "").slice(0, 30);
+  String(value || "").slice(0, 30);
 
 const maskName = (value: string) => {
   const text = String(value || "").trim();
@@ -556,12 +563,12 @@ export default function OrderPage() {
 
   const productAmount = useMemo(() => {
     return items.reduce((sum, item) => {
-      return sum + toNumber(item.product_price) * (toNumber(item.qty) || 1);
+      return sum + toNumber(item.product_price) * toNumber(item.qty);
     }, 0);
   }, [items]);
 
   const totalQty = useMemo(() => {
-    return items.reduce((sum, item) => sum + (toNumber(item.qty) || 1), 0);
+    return items.reduce((sum, item) => sum + toNumber(item.qty), 0);
   }, [items]);
 
   const cardExtra = paymentMethod === "카드결제"
@@ -777,7 +784,7 @@ export default function OrderPage() {
         "현재 방송";
 
       const orderRows = validItems.map((item, index) => {
-        const qty = toNumber(item.qty) || 1;
+        const qty = toNumber(item.qty);
         const price = toNumber(item.product_price);
         const itemTotal = price * qty;
         const rowShippingFee = index === 0 ? shippingFee : 0;
@@ -881,94 +888,93 @@ export default function OrderPage() {
 
 
   const TopCustomerNav = () => (
-    <div className="sticky top-3 z-40 mx-auto mb-4 flex w-full max-w-[456px] items-center justify-between rounded-full border border-[#f3e5e7] bg-white/95 px-4 py-3 shadow-[0_10px_24px_rgba(30,20,20,0.07)] backdrop-blur">
-      <Link
-        href="/"
-        className="shrink-0 text-[14px] font-black tracking-[-0.04em] text-[#ff4b60] transition active:scale-[0.97]"
-      >
-        🏠 HOME
-      </Link>
-
-      <div className="flex items-center gap-2 text-[13px] font-black tracking-[-0.04em] text-[#5f5555]">
-        <Link href="/myorder" className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]">
-          주문조회
-        </Link>
-        <span className="text-[#e1d4d5]">/</span>
-        <button
-          type="button"
-          onClick={startEditCustomerInfo}
-          className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]"
-        >
-          정보수정
-        </button>
-        <span className="text-[#e1d4d5]">/</span>
-        <button
-          type="button"
-          onClick={logoutCustomerInfo}
-          className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]"
-        >
-          로그아웃
-        </button>
-      </div>
-    </div>
+    <OrderCustomerTopNav
+      isLoggedIn={hasSavedInfo}
+      greetingName={youtubeNickname || customerName}
+      onEditInfo={startEditCustomerInfo}
+      onLogout={logoutCustomerInfo}
+    />
   );
 
   if (done) {
     return (
-      <main className="min-h-screen bg-[#fbf7f8] px-4 py-6 text-gray-950 select-none" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
+      <main className="min-h-screen bg-[#f8f1e8] px-4 py-6 text-[#241b17] select-none" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
         <section className="mx-auto w-full max-w-md">
           <TopCustomerNav />
-          <section className="relative overflow-hidden rounded-[2rem] border border-pink-100 bg-white p-6 text-center shadow-[0_18px_45px_rgba(255,120,160,0.13)]">
-            <style>{`
-              @keyframes ruruPop {
-                0% { opacity: 0; transform: translateY(14px) scale(.92); }
-                100% { opacity: 1; transform: translateY(0) scale(1); }
-              }
 
-              @keyframes ruruFirework {
-                0% { opacity: 0; transform: translate(-50%, -50%) scale(.3) rotate(0deg); }
-                25% { opacity: 1; }
-                100% { opacity: 0; transform: translate(-50%, -50%) scale(1.45) rotate(22deg); }
-              }
+          {done.paymentMethod === "무통장입금" ? (
+            <section className="rounded-[30px] bg-white p-5 shadow-[0_12px_26px_rgba(70,45,25,0.10)] ring-1 ring-black/5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[13px] font-black tracking-[-0.04em] text-[#f05a45]">
+                    입금 먼저 확인해주세요
+                  </div>
+                  <h1 className="mt-1 text-[27px] font-black tracking-[-0.07em] text-[#241b17]">
+                    입금계좌 안내
+                  </h1>
+                </div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#fff7ec] text-[26px]">
+                  💳
+                </div>
+              </div>
 
-              @keyframes ruruBike {
-                0% { transform: translateX(-140%) translateY(0); opacity: 0; }
-                15% { opacity: 1; }
-                80% { opacity: 1; }
-                100% { transform: translateX(140%) translateY(-2px); opacity: 0; }
-              }
+              <div className="mt-4 rounded-[24px] bg-[#fff8dc] p-5">
+                <div className="text-sm font-black text-[#9a5b00]">{BANK_NAME}</div>
+                <div className="mt-2 break-all text-[29px] font-black tracking-[-0.05em] text-[#111827]">
+                  {BANK_ACCOUNT}
+                </div>
+                <div className="mt-2 text-lg font-black text-[#241b17]">{BANK_HOLDER}</div>
+              </div>
 
-              .ruru-pop-1 { animation: ruruPop .75s ease-out both; }
-              .ruru-pop-2 { animation: ruruPop .85s ease-out .25s both; }
-              .ruru-pop-3 { animation: ruruPop .85s ease-out .55s both; }
-              .ruru-firework { position: absolute; left: 50%; top: 44%; pointer-events: none; animation: ruruFirework 1.3s ease-out .85s both; }
-              .ruru-bike { animation: ruruBike 2.2s ease-in-out 1.5s both; }
-            `}</style>
+              <button
+                type="button"
+                onClick={copyBankAccount}
+                className={`${buttonBase} mt-3 w-full rounded-2xl bg-gray-950 p-4 font-black text-white`}
+              >
+                {copyDone ? "✓ 계좌번호가 복사되었습니다" : "계좌번호 복사"}
+              </button>
 
-            <div className="ruru-firework text-7xl">🎆</div>
-            <div className="ruru-firework text-5xl" style={{ left: "25%", top: "35%", animationDelay: "1.05s" }}>✨</div>
-            <div className="ruru-firework text-5xl" style={{ left: "76%", top: "35%", animationDelay: "1.15s" }}>🎉</div>
+              <div className="mt-3 rounded-2xl bg-[#fff0f3] p-3 text-center text-sm font-black leading-relaxed text-[#e11d48]">
+                주문서 작성 후 10분 이내 입금 부탁드립니다.
+              </div>
 
-            <div className="ruru-pop-1 text-2xl font-black">{done.nickname || done.name}님</div>
-            <div className="ruru-pop-2 mt-2 text-5xl font-black text-pink-500">주문서</div>
-            <div className="ruru-pop-3 mt-1 text-5xl font-black">완료!</div>
+              <div className="mt-3 rounded-2xl bg-green-50 px-4 py-3 text-center text-sm font-black text-green-700">
+                ✓ {done.nickname || done.name}님 주문서가 정상 접수되었습니다
+              </div>
+            </section>
+          ) : (
+            <section className="rounded-[30px] bg-white p-5 text-center shadow-[0_12px_26px_rgba(70,45,25,0.10)] ring-1 ring-black/5">
+              <div className="text-[13px] font-black tracking-[-0.04em] text-[#2563eb]">
+                카드결제 안내
+              </div>
+              <h1 className="mt-1 text-[27px] font-black tracking-[-0.07em] text-[#241b17]">
+                카톡채널 문의
+              </h1>
 
-            <div className="ruru-bike mt-4 text-4xl">🛵💨</div>
+              <div className="mt-4 rounded-2xl bg-blue-50 p-4 text-sm font-bold leading-relaxed text-blue-700">
+                카드결제는 카톡채널로 문의 부탁드립니다.
+              </div>
 
-            <div className="mt-5 rounded-full bg-green-50 px-4 py-3 text-sm font-black text-green-700">
-              ✓ 주문서가 정상 접수 되었습니다
+              <div className="mt-3 rounded-2xl bg-green-50 px-4 py-3 text-center text-sm font-black text-green-700">
+                ✓ {done.nickname || done.name}님 주문서가 정상 접수되었습니다
+              </div>
+            </section>
+          )}
+
+          <section className="mt-4 rounded-[30px] bg-white p-5 shadow-[0_12px_26px_rgba(70,45,25,0.10)] ring-1 ring-black/5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-xl font-black tracking-[-0.05em]">주문내역</div>
+              <div className="rounded-full bg-[#f5f1eb] px-3 py-1 text-xs font-black text-[#7b6554]">
+                총 {done.totalQty}개
+              </div>
             </div>
-          </section>
-
-          <section className="mt-4 rounded-[2rem] bg-white p-5 shadow-sm">
-            <div className="text-xl font-black">주문내역</div>
 
             <div className="mt-3 grid gap-2">
               {done.items.map((item, index) => (
                 <div key={index} className="rounded-2xl bg-gray-50 p-4">
                   <div className="font-black">{itemLabel(item)}</div>
                   <div className="mt-1 text-sm font-bold text-gray-500">
-                    {won(toNumber(item.product_price) * (toNumber(item.qty) || 1))}
+                    {won(toNumber(item.product_price) * toNumber(item.qty))}
                   </div>
                 </div>
               ))}
@@ -1004,46 +1010,15 @@ export default function OrderPage() {
             </div>
           </section>
 
-          {done.paymentMethod === "무통장입금" ? (
-            <section className="mt-4 rounded-[2rem] bg-white p-5 shadow-sm">
-              <div className="text-xl font-black">입금계좌 안내</div>
-
-              <div className="mt-3 rounded-[1.5rem] bg-yellow-50 p-4">
-                <div className="text-sm font-bold text-yellow-700">{BANK_NAME}</div>
-                <div className="mt-1 text-3xl font-black tracking-[-0.04em]">{BANK_ACCOUNT}</div>
-                <div className="mt-1 text-lg font-black">{BANK_HOLDER}</div>
-              </div>
-
-              <button
-                type="button"
-                onClick={copyBankAccount}
-                className={`${buttonBase} mt-3 w-full rounded-2xl bg-gray-950 p-4 font-black text-white`}
-              >
-                {copyDone ? "✓ 계좌번호가 복사되었습니다" : "계좌번호 복사"}
-              </button>
-
-              <div className="mt-3 rounded-2xl bg-pink-50 p-3 text-center text-sm font-black text-pink-700">
-                주문서 작성 후 10분 이내 입금 부탁드립니다.
-              </div>
-            </section>
-          ) : (
-            <section className="mt-4 rounded-[2rem] bg-white p-5 text-center shadow-sm">
-              <div className="text-xl font-black text-blue-700">카드결제 안내</div>
-              <div className="mt-3 rounded-2xl bg-blue-50 p-4 text-sm font-bold text-blue-700">
-                카드결제는 카톡채널로 문의 부탁드립니다.
-              </div>
-            </section>
-          )}
-
           <button
             type="button"
             onClick={() => setDone(null)}
-            className={`${buttonBase} mt-4 w-full rounded-2xl bg-pink-500 p-4 font-black text-white shadow-lg shadow-pink-200`}
+            className={`${buttonBase} mt-4 w-full rounded-2xl bg-[#f05a45] p-4 font-black text-white shadow-lg shadow-orange-100`}
           >
             다른 상품 추가 주문하기
           </button>
 
-          <footer className="py-8 text-center text-[11px] font-bold text-gray-400">
+          <footer className="py-8 text-center text-[11px] font-bold text-[#9b8d82]">
             {FOOTER_TEXT}
           </footer>
         </section>
@@ -1052,23 +1027,22 @@ export default function OrderPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#fbf7f8] px-4 py-6 text-gray-950 select-none" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
-      <section className="mx-auto w-full max-w-md">
+    <OrderPageShell>
         <TopCustomerNav />
-        <header className="mb-5 text-center">
-          <div className="text-sm font-black text-pink-400">RURU ORDER</div>
-          <h1 className="mt-1 text-4xl font-black tracking-tight">주문서 작성</h1>
-          <p className="mt-2 text-sm font-bold text-gray-500">
-            방송 중 구매하신 상품을 작성해주세요.
-          </p>
-        </header>
+        <OrderHero
+          broadcastTitle={
+            broadcast?.broadcast_public_title ||
+            broadcast?.public_title ||
+            broadcast?.broadcast_name ||
+            ""
+          }
+        />
+        <OrderGuideCard />
 
-
-
-        <section className="rounded-[2rem] border border-pink-100 bg-white p-5 shadow-[0_18px_45px_rgba(255,120,160,0.13)]">
+        <section className="rounded-[28px] bg-white p-5 shadow-[0_12px_26px_rgba(70,45,25,0.10)] ring-1 ring-black/5">
           <div className="mb-4">
             <h2 className="text-xl font-black">주문자 정보</h2>
-            <p className="mt-1 text-xs font-bold text-pink-500">
+            <p className="mt-1 text-xs font-bold text-[#f05a45]">
               주문 전 정보 확인 후 작성해주세요.
             </p>
           </div>
@@ -1270,7 +1244,7 @@ export default function OrderPage() {
               <div className="text-sm font-black leading-relaxed text-pink-700">
                 ⚠️ 상품 1칸 = 상품 1개만 작성
                 <br />
-                📌 색상/사이즈 없으면 “없음”
+                💰 상품금액만 입력 · 택배비 제외
               </div>
 
               <button
@@ -1304,6 +1278,8 @@ export default function OrderPage() {
 
                 <div className="rounded-[1.2rem] bg-red-50 p-3 text-xs font-black leading-relaxed text-red-600">
                   ⚠️ 상품 1칸에는 상품 1개만 입력하세요.
+                  <br />
+                  상품금액은 택배비를 빼고 상품 가격만 적어주세요.
                   <br />
                   다른 상품은 반드시 아래 [+ 상품 추가하기]를 눌러 따로 작성해주세요.
                   <br />
@@ -1432,11 +1408,11 @@ export default function OrderPage() {
 
                     <div className="relative">
                       <input
-                        value={moneyText(item.product_price)}
+                        value={item.product_price ? moneyText(item.product_price) : ""}
                         onChange={(event) =>
                           updateItem(index, "product_price", onlyNumber(event.target.value))
                         }
-                        placeholder="상품금액"
+                        placeholder="상품금액만 입력"
                         inputMode="numeric"
                         className="w-full rounded-2xl border border-gray-200 bg-white p-4 pr-10 font-bold"
                       />
@@ -1447,9 +1423,13 @@ export default function OrderPage() {
                     </div>
                   </div>
 
+                  <div className="rounded-2xl bg-[#fff7ec] px-3 py-2 text-xs font-black leading-relaxed text-[#8a5a36]">
+                    💰 상품금액만 입력해주세요. 택배비는 자동으로 따로 계산됩니다.
+                  </div>
+
                   {item.product_name && (
                     <div className="rounded-2xl bg-white p-3 text-sm font-black text-gray-600">
-                      {itemLabel(item)} / {won(toNumber(item.product_price) * (toNumber(item.qty) || 1))}
+                      {itemLabel(item)} / {won(toNumber(item.product_price) * toNumber(item.qty))}
                     </div>
                   )}
                 </div>
@@ -1504,29 +1484,13 @@ export default function OrderPage() {
               className="min-h-[100px] rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-pink-300"
             />
 
-            <div className="rounded-[1.5rem] bg-gray-50 p-4">
-              <div className="flex justify-between text-sm font-bold text-gray-500">
-                <span>상품금액</span>
-                <span>{won(productAmount)}</span>
-              </div>
-
-              <div className="mt-2 flex justify-between text-sm font-bold text-gray-500">
-                <span>배송비</span>
-                <span>{won(shippingFee)}</span>
-              </div>
-
-              {paymentMethod === "카드결제" && (
-                <div className="mt-2 flex justify-between text-sm font-bold text-blue-600">
-                  <span>카드추가금 {cardRateForCustomer}%</span>
-                  <span>{won(cardExtra)}</span>
-                </div>
-              )}
-
-              <div className="mt-4 flex justify-between border-t pt-4 text-xl font-black">
-                <span>총 결제금액</span>
-                <span>{won(totalAmount)}</span>
-              </div>
-            </div>
+            <OrderPriceSummaryBox
+              productAmount={productAmount}
+              shippingFee={shippingFee}
+              cardExtra={cardExtra}
+              totalAmount={totalAmount}
+              paymentMethod={paymentMethod}
+            />
 
             <button
               type="button"
@@ -1539,10 +1503,9 @@ export default function OrderPage() {
           </div>
         </section>
 
-        <footer className="py-8 text-center text-[11px] font-bold text-gray-400">
+        <footer className="py-8 text-center text-[11px] font-bold text-[#9b8d82]">
           {FOOTER_TEXT}
         </footer>
-      </section>
-    </main>
+    </OrderPageShell>
   );
 }

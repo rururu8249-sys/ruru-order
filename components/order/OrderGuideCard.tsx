@@ -1,0 +1,29 @@
+// components/order/OrderGuideCard.tsx
+// 새 파일 생성
+// 위치: /Users/ruru/Desktop/ruru-order-app/components/order/OrderGuideCard.tsx
+// 목적: 주문서 작성 전 고객 안내 카드
+// 주의: 주문 저장/금액/DB 로직 없음
+
+export default function OrderGuideCard() {
+  return (
+    <section className="mb-5 rounded-[28px] bg-white p-5 shadow-[0_12px_26px_rgba(70,45,25,0.10)] ring-1 ring-black/5">
+      <div className="flex items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#f8e9df] text-[24px]">
+          📝
+        </div>
+
+        <div>
+          <h2 className="text-[20px] font-black tracking-[-0.06em] text-[#241b17]">
+            주문 전 확인
+          </h2>
+
+          <div className="mt-2 space-y-1 text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-[#756b64]">
+            <p>• 상품은 방송에서 접수 후 작성해주세요.</p>
+            <p>• 상품명 / 색상 / 사이즈 / 수량 / 금액을 정확히 입력해주세요.</p>
+            <p>• 색상이나 사이즈가 없으면 “없음”으로 입력해주세요.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}

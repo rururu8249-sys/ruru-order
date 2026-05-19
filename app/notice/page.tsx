@@ -15,9 +15,9 @@
 // - 홈화면 리뉴얼 톤에 맞춘 모바일 우선 핑크/화이트 카드형 UI
 // - 기존 Supabase 조회 로직은 유지
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import CustomerTopNav from "@/components/customer/CustomerTopNav";
 
 type Notice = {
   id: number;
@@ -100,67 +100,23 @@ export default function NoticePage() {
   };
 
 
-  const logoutCustomerInfo = () => {
-    if (!confirm("이 기기에 저장된 고객정보를 삭제할까요?")) return;
 
-    [
-      "ruru_customer_phone",
-      "ruru_youtube_nickname",
-      "ruru_customer_name",
-      "ruru_customer_zipcode",
-      "ruru_customer_address",
-      "ruru_customer_detail_address",
-      "ruru_auto_save_info",
-    ].forEach((key) => localStorage.removeItem(key));
-
-    alert("저장된 고객정보를 삭제했습니다.");
-  };
-
-  const TopCustomerNav = () => (
-    <div className="sticky top-3 z-40 mx-auto mb-4 flex w-full max-w-[456px] items-center justify-between rounded-full border border-[#f3e5e7] bg-white/95 px-4 py-3 shadow-[0_10px_24px_rgba(30,20,20,0.07)] backdrop-blur">
-      <Link
-        href="/"
-        className="shrink-0 text-[14px] font-black tracking-[-0.04em] text-[#ff4b60] transition active:scale-[0.97]"
-      >
-        🏠 HOME
-      </Link>
-
-      <div className="flex items-center gap-2 text-[13px] font-black tracking-[-0.04em] text-[#5f5555]">
-        <Link href="/myorder" className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]">
-          주문조회
-        </Link>
-        <span className="text-[#e1d4d5]">/</span>
-        <Link href="/order" className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]">
-          정보수정
-        </Link>
-        <span className="text-[#e1d4d5]">/</span>
-        <button
-          type="button"
-          onClick={logoutCustomerInfo}
-          className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]"
-        >
-          로그아웃
-        </button>
-      </div>
-    </div>
-  );
-;
 
   return (
-    <main className="min-h-screen select-none bg-[#fffafa] px-4 py-6 text-[#171717]" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
-      <section className="mx-auto w-full max-w-[480px]">
-        <TopCustomerNav />
-        <header className="mb-5 rounded-[32px] border border-[#f4e7e9] bg-white px-5 py-6 shadow-[0_16px_40px_rgba(30,20,20,0.06)]">
+    <main className="min-h-screen select-none bg-[#f8f1e8] px-4 py-6 text-[#241b17]" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
+      <section className="mx-auto w-full max-w-md">
+        <CustomerTopNav />
+        <header className="mb-5 rounded-[34px] bg-[#fffaf3] px-5 py-6 shadow-[0_18px_40px_rgba(70,45,25,0.10)] ring-1 ring-white/70">
 
           <div className="inline-flex rounded-full bg-[#fff1a8] px-3 py-1 text-[12px] font-black text-[#2b2416]">
             📢 필독 공지
           </div>
 
-          <h1 className="mt-3 text-[38px] font-black leading-tight tracking-[-0.07em] text-[#151515]">
+          <h1 className="mt-3 text-[38px] font-black leading-tight tracking-[-0.07em] text-[#2b211c]">
             공지사항
           </h1>
 
-          <p className="mt-2 text-[15px] font-bold leading-relaxed tracking-[-0.04em] text-[#7b6d6d]">
+          <p className="mt-2 text-[15px] font-bold leading-relaxed tracking-[-0.04em] text-[#7b6554]">
             주문 전 꼭 확인해야 하는 안내입니다.
           </p>
         </header>

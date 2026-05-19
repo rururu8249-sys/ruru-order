@@ -9,11 +9,14 @@
 // - 이름 + 전화번호로 최근 7일 주문조회
 // - 고객 페이지 퍼가기 방지 유지
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import CustomerTopNav from "@/components/customer/CustomerTopNav";
 
 const FOOTER_TEXT = "© since 2024 루루동이 | All Rights Reserved.";
+const BANK_NAME = "새마을금고";
+const BANK_ACCOUNT = "9002186993725";
+const BANK_HOLDER = "유혜원";
 
 const normalizePhone = (value: string) =>
   String(value || "").replace(/[^0-9]/g, "");
@@ -116,6 +119,8 @@ export default function MyOrderPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [copyDone, setCopyDone] = useState(false);
+  const [hasCustomerInfo, setHasCustomerInfo] = useState(false);
 
   useEffect(() => {
     return blockCustomerCopyEvents();
@@ -129,6 +134,8 @@ export default function MyOrderPage() {
     if (savedPhone) setPhone(savedPhone);
 
     if (savedName && savedPhone) {
+      setHasCustomerInfo(true);
+
       setTimeout(() => {
         void loadOrders(savedName, savedPhone);
       }, 100);
@@ -171,93 +178,124 @@ export default function MyOrderPage() {
 
     localStorage.setItem("ruru_customer_name", name);
     localStorage.setItem("ruru_customer_phone", cleanPhone);
+    setHasCustomerInfo(true);
 
     setOrders(data || []);
     setLoading(false);
   };
 
-  const logout = () => {
-    localStorage.removeItem("ruru_customer_name");
-    localStorage.removeItem("ruru_customer_phone");
-    localStorage.removeItem("ruru_youtube_nickname");
-    localStorage.removeItem("ruru_customer_zipcode");
-    localStorage.removeItem("ruru_customer_address");
-    localStorage.removeItem("ruru_customer_detail_address");
-    setCustomerName("");
-    setPhone("");
-    setOrders([]);
-    setSearched(false);
-    alert("로그아웃되었습니다. 오늘도 좋은 하루 보내세요 :)");
+
+
+  const isLoggedIn = hasCustomerInfo;
+
+  const copyBankAccount = async () => {
+    try {
+      await navigator.clipboard.writeText(BANK_ACCOUNT);
+      setCopyDone(true);
+      setTimeout(() => setCopyDone(false), 1800);
+    } catch {
+      alert(BANK_ACCOUNT);
+    }
   };
 
   return (
     <main
-      className="min-h-screen select-none bg-[#fbf7f8] px-4 py-6 text-gray-950"
+      className="min-h-screen select-none bg-[#f8f1e8] px-4 py-6 text-[#241b17]"
       style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
     >
       <section className="mx-auto w-full max-w-md">
-        <div className="sticky top-3 z-40 mx-auto mb-4 flex w-full max-w-[456px] items-center justify-between rounded-full border border-[#f3e5e7] bg-white/95 px-4 py-3 shadow-[0_10px_24px_rgba(30,20,20,0.07)] backdrop-blur">
-          <Link
-            href="/"
-            className="shrink-0 text-[14px] font-black tracking-[-0.04em] text-[#ff4b60] transition active:scale-[0.97]"
-          >
-            🏠 HOME
-          </Link>
-
-          <div className="flex items-center gap-2 text-[13px] font-black tracking-[-0.04em] text-[#5f5555]">
-            <Link href="/myorder" className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]">
-              주문조회
-            </Link>
-            <span className="text-[#e1d4d5]">/</span>
-            <Link href="/order" className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]">
-              정보수정
-            </Link>
-            <span className="text-[#e1d4d5]">/</span>
-            <button
-              type="button"
-              onClick={logout}
-              className="whitespace-nowrap px-1 py-1 transition active:scale-[0.97]"
-            >
-              로그아웃
-            </button>
-          </div>
-        </div>
+        <CustomerTopNav />
 
         <header className="mb-5 text-center">
-          <div className="text-sm font-black text-pink-400">RURU ORDER</div>
+          <div className="text-sm font-black text-[#f05a45]">RURU ORDER</div>
           <h1 className="mt-1 text-4xl font-black tracking-tight">주문조회</h1>
-          <p className="mt-2 text-sm font-bold text-gray-500">
+          <p className="mt-2 text-sm font-bold text-[#7b6554]">
             이름과 전화번호로 최근 7일 주문내역을 확인합니다.
           </p>
         </header>
 
-        <section className="rounded-[2rem] border border-pink-100 bg-white p-5 shadow-[0_18px_45px_rgba(255,120,160,0.13)]">
-          <div className="grid gap-3">
-            <input
-              value={customerName}
-              onChange={(event) => setCustomerName(event.target.value)}
-              placeholder="이름"
-              className="w-full rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-pink-300"
-            />
+        {isLoggedIn && (
+          <section className="mb-4 rounded-[30px] bg-white p-5 shadow-[0_12px_26px_rgba(70,45,25,0.10)] ring-1 ring-black/5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[13px] font-black tracking-[-0.04em] text-[#f05a45]">
+                  입금계좌 확인
+                </div>
+                <h2 className="mt-1 text-[24px] font-black tracking-[-0.07em] text-[#241b17]">
+                  계좌번호 다시 보기
+                </h2>
+              </div>
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#fff7ec] text-[25px]">
+                💳
+              </div>
+            </div>
 
-            <input
-              value={formatPhone(phone)}
-              onChange={(event) => setPhone(normalizePhone(event.target.value))}
-              placeholder="전화번호"
-              inputMode="numeric"
-              className="w-full rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-pink-300"
-            />
+            <div className="mt-4 rounded-[24px] bg-[#fff8dc] p-5">
+              <div className="text-sm font-black text-[#9a5b00]">{BANK_NAME}</div>
+              <div className="mt-2 break-all text-[28px] font-black tracking-[-0.05em] text-[#111827]">
+                {BANK_ACCOUNT}
+              </div>
+              <div className="mt-2 text-lg font-black text-[#241b17]">{BANK_HOLDER}</div>
+            </div>
 
             <button
               type="button"
-              onClick={() => loadOrders()}
-              disabled={loading}
-              className="rounded-2xl bg-gray-950 p-4 font-black text-white transition active:scale-[0.97] disabled:opacity-60"
+              onClick={copyBankAccount}
+              className="mt-3 w-full rounded-2xl bg-gray-950 p-4 font-black text-white transition active:scale-[0.97]"
             >
-              {loading ? "조회중..." : "확인"}
+              {copyDone ? "✓ 계좌번호가 복사되었습니다" : "계좌번호 복사"}
             </button>
-          </div>
-        </section>
+
+            <p className="mt-3 rounded-2xl bg-[#fff0f3] p-3 text-center text-sm font-black leading-relaxed text-[#e11d48]">
+              입금 시 주문자명과 입금자명이 다르면 확인이 늦어질 수 있습니다.
+            </p>
+          </section>
+        )}
+
+        {!isLoggedIn && (
+          <section className="rounded-[28px] bg-white p-5 shadow-[0_12px_26px_rgba(70,45,25,0.10)] ring-1 ring-black/5">
+            <div className="mb-3">
+              <h2 className="text-[20px] font-black tracking-[-0.06em] text-[#241b17]">
+                주문조회 로그인
+              </h2>
+              <p className="mt-1 text-sm font-bold leading-relaxed text-[#7b6554]">
+                이름과 전화번호 확인 후 주문내역과 계좌번호를 볼 수 있습니다.
+              </p>
+            </div>
+
+            <div className="grid gap-3">
+              <input
+                value={customerName}
+                onChange={(event) => setCustomerName(event.target.value)}
+                placeholder="이름"
+                className="w-full rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-[#f05a45]"
+              />
+
+              <input
+                value={formatPhone(phone)}
+                onChange={(event) => setPhone(normalizePhone(event.target.value))}
+                placeholder="전화번호"
+                inputMode="numeric"
+                className="w-full rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-[#f05a45]"
+              />
+
+              <button
+                type="button"
+                onClick={() => loadOrders()}
+                disabled={loading}
+                className="rounded-2xl bg-gray-950 p-4 font-black text-white transition active:scale-[0.97] disabled:opacity-60"
+              >
+                {loading ? "조회중..." : "확인"}
+              </button>
+            </div>
+          </section>
+        )}
+
+        {isLoggedIn && (
+          <section className="mt-4 rounded-[24px] bg-white/80 p-4 text-sm font-black text-[#6b5b50] shadow-[0_8px_18px_rgba(70,45,25,0.06)] ring-1 ring-black/5">
+            {customerName}님 주문내역을 자동으로 불러왔습니다.
+          </section>
+        )}
 
         {searched && orders.length === 0 && (
           <section className="mt-4 rounded-[1.5rem] border border-gray-100 bg-white p-5 text-center text-sm font-bold text-gray-500 shadow-sm">
@@ -314,7 +352,7 @@ export default function MyOrderPage() {
           })}
         </section>
 
-        <footer className="mt-8 border-t border-gray-200 pt-5 text-center text-xs font-bold text-gray-400">
+        <footer className="mt-8 border-t border-[#ead8c8] pt-5 text-center text-xs font-bold text-[#9b8d82]">
           {FOOTER_TEXT}
         </footer>
       </section>

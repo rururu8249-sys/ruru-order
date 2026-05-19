@@ -136,7 +136,7 @@ export default function CustomerHomePage() {
           <div className="pointer-events-none absolute -right-10 top-10 h-28 w-28 rounded-full bg-[#f5d7c8]/70 blur-2xl" />
 
           <div className="relative text-center">
-            <h1 className="text-[38px] font-black leading-tight tracking-[-0.08em] text-[#2b211c]">
+            <h1 className="text-[34px] font-black leading-tight tracking-[-0.08em] text-[#2b211c] sm:text-[38px]">
               루루동이 집구석
               <span className="ml-2 inline-flex translate-y-[-4px] items-center rounded-2xl bg-[#f05a45] px-3 py-1 text-[22px] font-black tracking-[-0.02em] text-white shadow-[0_8px_18px_rgba(240,90,69,0.26)]">
                 LIVE
@@ -149,23 +149,30 @@ export default function CustomerHomePage() {
 
           <Link
             href="/order"
-            className="relative mt-7 flex min-h-[188px] items-center gap-5 rounded-[34px] bg-gradient-to-br from-[#ff7664] to-[#ee3f31] p-6 text-white shadow-[0_18px_35px_rgba(236,69,49,0.25)] ring-2 ring-white/70 active:scale-[0.99]"
+            className="relative mt-7 block overflow-hidden rounded-[34px] bg-gradient-to-br from-[#ff7664] to-[#ee3f31] px-5 py-7 text-white shadow-[0_18px_35px_rgba(236,69,49,0.25)] ring-2 ring-white/70 active:scale-[0.99]"
           >
-            <div className="flex h-[104px] w-[104px] shrink-0 items-center justify-center rounded-full bg-white/18 text-[54px] shadow-inner">
-              📝
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[39px] font-black leading-none tracking-[-0.08em]">
-                주문서 작성
-              </p>
-              <p className="mt-4 text-[17px] font-bold leading-relaxed tracking-[-0.04em] text-white/95">
-                방송에서 루루언니에게 접수하신 후,
-                <br />
-                주문서 작성은 꼭 완료해주세요!
-              </p>
-            </div>
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-[30px] font-black text-[#ee4a37] shadow-lg">
-              ›
+            <div className="pointer-events-none absolute -left-10 -top-10 h-36 w-36 rounded-full bg-white/10" />
+            <div className="pointer-events-none absolute -bottom-12 -right-10 h-40 w-40 rounded-full bg-white/10" />
+
+            <div className="relative flex items-center gap-4">
+              <div className="flex h-[82px] w-[82px] shrink-0 items-center justify-center rounded-full bg-white/18 text-[42px] shadow-inner">
+                📝
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p className="whitespace-nowrap text-[34px] font-black leading-none tracking-[-0.08em]">
+                  주문서 작성
+                </p>
+                <p className="mt-3 break-keep text-[15px] font-extrabold leading-relaxed tracking-[-0.04em] text-white/95">
+                  방송에서 루루언니에게 접수 후
+                  <br />
+                  주문서 작성 필수!
+                </p>
+              </div>
+
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-[28px] font-black text-[#ee4a37] shadow-lg">
+                ›
+              </div>
             </div>
           </Link>
         </section>
