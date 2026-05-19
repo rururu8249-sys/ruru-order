@@ -24,6 +24,14 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import {
+  COMBINE_SHIPPING_SETTING_KEYS,
+  DEFAULT_COMBINE_SHIPPING_SETTINGS,
+  hasPaidShippingFee,
+  isCombineShippingActiveNow,
+  parseCombineShippingSettings,
+  type CombineShippingSettings,
+} from "@/lib/admin-v2/combineShipping";
 import OrderPageShell from "@/components/order/OrderPageShell";
 import OrderCustomerTopNav from "@/components/order/OrderCustomerTopNav";
 import OrderHero from "@/components/order/OrderHero";
@@ -225,9 +233,13 @@ export default function OrderPage() {
   const [copyDone, setCopyDone] = useState(false);
   const [customerCardRate, setCustomerCardRate] = useState(10);
   const [defaultShippingFee, setDefaultShippingFee] = useState(4000);
+  const [combineShippingSettings, setCombineShippingSettings] =
+    useState<CombineShippingSettings>(DEFAULT_COMBINE_SHIPPING_SETTINGS);
+  const [alreadyPaidShipping, setAlreadyPaidShipping] = useState(false);
 
   const actualCardFeeRate = 7;
-  const shippingFee = Number(broadcast?.shipping_fee ?? defaultShippingFee);
+  const baseShippingFee = Number(broadcast?.shipping_fee ?? defaultShippingFee);
+  const shippingFee = alreadyPaidShipping ? 0 : baseShippingFee;
   const cardRateForCustomer = customerCardRate;
 
   const isAutoLoggedIn =
@@ -261,11 +273,31 @@ export default function OrderPage() {
     setCustomerMode("load");
   }, [hasSavedInfo, isEditingCustomerInfo]);
 
+  useEffect(() => {
+    const cleanPhone = normalizePhone(customerPhone);
+
+    if (cleanPhone.length < 10) {
+      setAlreadyPaidShipping(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void checkAlreadyPaidShipping(cleanPhone);
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [customerPhone, combineShippingSettings.enabled, combineShippingSettings.startAt, combineShippingSettings.endAt]);
+
+
   const loadOrderSettings = async () => {
     const { data, error } = await supabase
       .from("settings")
       .select("key,value")
-      .in("key", ["customer_card_extra_rate", "default_shipping_fee"]);
+      .in("key", [
+        "customer_card_extra_rate",
+        "default_shipping_fee",
+        ...COMBINE_SHIPPING_SETTING_KEYS,
+      ]);
 
     if (error) {
       console.log("설정 불러오기 오류", error.message);
@@ -283,6 +315,7 @@ export default function OrderPage() {
 
     setCustomerCardRate(nextCustomerCardRate);
     setDefaultShippingFee(nextDefaultShippingFee);
+    setCombineShippingSettings(parseCombineShippingSettings(data));
   };
 
   const loadSavedCustomerInfo = () => {
@@ -360,6 +393,139 @@ export default function OrderPage() {
 
     setBroadcastProducts(nextProducts);
   };
+
+
+  const loadCombineShippingSettings = async () => {
+    const { data, error } = await supabase
+      .from("settings")
+      .select("key,value")
+      .in("key", COMBINE_SHIPPING_SETTING_KEYS);
+
+    if (error) {
+      console.log("합배송 설정 불러오기 오류", error.message);
+      return combineShippingSettings;
+    }
+
+    const nextSettings = parseCombineShippingSettings(data);
+    setCombineShippingSettings(nextSettings);
+
+    return nextSettings;
+  };
+
+  const getCombineShippingLocalKey = (
+    phoneValue: string,
+    settings: CombineShippingSettings
+  ) => {
+    const cleanPhone = normalizePhone(phoneValue);
+
+    return [
+      "ruru_combine_shipping_paid",
+      cleanPhone,
+      settings.startAt || "no_start",
+      settings.endAt || "no_end",
+    ].join(":");
+  };
+
+  const hasPaidShippingInThisBrowser = (
+    phoneValue: string,
+    settings: CombineShippingSettings
+  ) => {
+    if (typeof window === "undefined") return false;
+
+    const key = getCombineShippingLocalKey(phoneValue, settings);
+    const savedValue = window.localStorage.getItem(key);
+
+    if (savedValue !== "Y") return false;
+
+    const endMs = new Date(settings.endAt).getTime();
+
+    if (!Number.isFinite(endMs)) return false;
+
+    return Date.now() <= endMs;
+  };
+
+  const markPaidShippingInThisBrowser = (
+    phoneValue: string,
+    settings: CombineShippingSettings
+  ) => {
+    if (typeof window === "undefined") return;
+
+    const cleanPhone = normalizePhone(phoneValue);
+
+    if (cleanPhone.length < 10) return;
+    if (!settings.startAt || !settings.endAt) return;
+
+    const key = getCombineShippingLocalKey(cleanPhone, settings);
+
+    window.localStorage.setItem(key, "Y");
+  };
+
+  const checkAlreadyPaidShipping = async (phoneValue = customerPhone) => {
+    const cleanPhone = normalizePhone(phoneValue);
+
+    if (cleanPhone.length < 10) {
+      setAlreadyPaidShipping(false);
+      return false;
+    }
+
+    const settings = await loadCombineShippingSettings();
+
+    if (!settings.enabled || !settings.startAt || !settings.endAt) {
+      setAlreadyPaidShipping(false);
+      return false;
+    }
+
+    const startMs = new Date(settings.startAt).getTime();
+    const endMs = new Date(settings.endAt).getTime();
+    const nowMs = Date.now();
+
+    if (
+      !Number.isFinite(startMs) ||
+      !Number.isFinite(endMs) ||
+      startMs >= endMs ||
+      nowMs < startMs ||
+      nowMs > endMs
+    ) {
+      setAlreadyPaidShipping(false);
+      return false;
+    }
+
+    if (hasPaidShippingInThisBrowser(cleanPhone, settings)) {
+      setAlreadyPaidShipping(true);
+      return true;
+    }
+
+    const formattedPhone =
+      cleanPhone.length === 11
+        ? `${cleanPhone.slice(0, 3)}-${cleanPhone.slice(3, 7)}-${cleanPhone.slice(7, 11)}`
+        : cleanPhone;
+
+    const phoneValues = Array.from(new Set([cleanPhone, formattedPhone]));
+
+    const { data, error } = await supabase
+      .from("orders")
+      .select("id, customer_phone, shipping_fee, adjusted_shipping_fee, order_manage_status, created_at")
+      .in("customer_phone", phoneValues)
+      .gte("created_at", settings.startAt)
+      .lte("created_at", settings.endAt)
+      .limit(100);
+
+    if (error) {
+      console.log("기존 배송비 확인 오류", error.message);
+      setAlreadyPaidShipping(false);
+      return false;
+    }
+
+    const hasShipping = (data || []).some((order: any) => hasPaidShippingFee(order));
+
+    if (hasShipping) {
+      markPaidShippingInThisBrowser(cleanPhone, settings);
+    }
+
+    setAlreadyPaidShipping(hasShipping);
+    return hasShipping;
+  };
+
 
   const logoutCustomerInfo = () => {
     if (!confirm("이 기기에 저장된 고객정보를 삭제할까요?")) return;
@@ -467,6 +633,8 @@ export default function OrderPage() {
       setIsEditingCustomerInfo(false);
       setIsCustomerInfoOpen(false);
       setCustomerMode("load");
+
+      void checkAlreadyPaidShipping(cleanPhone);
 
       alert("확인되었습니다. 바로 주문 가능합니다.");
     } catch (error: any) {
@@ -765,6 +933,10 @@ export default function OrderPage() {
 
     try {
       const cleanPhone = normalizePhone(customerPhone);
+      const paidShippingBeforeSubmit = await checkAlreadyPaidShipping(cleanPhone);
+      const appliedShippingFee = paidShippingBeforeSubmit ? 0 : baseShippingFee;
+      const appliedTotalAmount = productAmount + appliedShippingFee + cardExtra;
+      const latestCombineSettings = await loadCombineShippingSettings();
 
       await saveCustomer();
 
@@ -787,7 +959,7 @@ export default function OrderPage() {
         const qty = toNumber(item.qty);
         const price = toNumber(item.product_price);
         const itemTotal = price * qty;
-        const rowShippingFee = index === 0 ? shippingFee : 0;
+        const rowShippingFee = index === 0 ? appliedShippingFee : 0;
         const rowCardExtra =
           paymentMethod === "카드결제"
             ? Math.round(itemTotal * (cardRateForCustomer / 100))
@@ -852,17 +1024,23 @@ export default function OrderPage() {
         items: validItems,
         totalQty,
         productAmount,
-        shippingFee,
+        shippingFee: appliedShippingFee,
         cardExtra,
         customerCardRate: cardRateForCustomer,
-        totalAmount,
+        totalAmount: appliedTotalAmount,
       });
 
       setItems([{ ...emptyItem }]);
       setRequestMemo("");
       setPaymentMethod("무통장입금");
       setPin("");
-      
+
+      if (appliedShippingFee > 0) {
+        markPaidShippingInThisBrowser(cleanPhone, latestCombineSettings);
+      }
+
+      setAlreadyPaidShipping(true);
+
       setIsEditingCustomerInfo(false);
       setIsCustomerInfoOpen(false);
 
@@ -1483,6 +1661,12 @@ export default function OrderPage() {
               placeholder="요청사항 / 배송메모"
               className="min-h-[100px] rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-pink-300"
             />
+
+            {alreadyPaidShipping && (
+              <div className="rounded-2xl bg-green-50 p-3 text-xs font-black leading-relaxed text-green-700">
+                ✅ 같은 전화번호의 기존 배송비 결제가 확인되어 이번 주문은 합배송 배송비 0원으로 적용됩니다.
+              </div>
+            )}
 
             <OrderPriceSummaryBox
               productAmount={productAmount}
