@@ -4,7 +4,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { fetchBankdaTransactions } from "@/lib/bankda/fetchBankdaTransactions";
-import { runAutoPaymentMatch } from "@/lib/admin-v2/autoPaymentMatch";
 
 
 function getSupabaseAdmin() {
@@ -131,20 +130,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    let autoMatchResult = {
-      matchedCount: 0,
-      scannedOrders: 0,
-      scannedDeposits: 0,
-      matched: [] as Array<any>,
-    };
-    let autoMatchError = "";
-
-    try {
-      autoMatchResult = await runAutoPaymentMatch(supabase);
-    } catch (error) {
-      autoMatchError = error instanceof Error ? error.message : String(error);
-    }
-
     return NextResponse.json({
       ok: true,
       rawCount,
@@ -152,10 +137,6 @@ export async function POST(request: NextRequest) {
       fetchedCount: deposits.length,
       insertedCount: insertRows.length,
       skippedCount: deposits.length - insertRows.length,
-      autoMatchedCount: autoMatchResult.matchedCount,
-      autoMatchScannedOrders: autoMatchResult.scannedOrders,
-      autoMatchScannedDeposits: autoMatchResult.scannedDeposits,
-      autoMatchError,
     });
   } catch (error) {
     return NextResponse.json(
