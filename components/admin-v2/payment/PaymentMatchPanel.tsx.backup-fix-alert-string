@@ -42,7 +42,7 @@ function getCandidateCount(group: OrderGroup, deposits: DepositRow[]) {
   const name = normalizeText(group.first.customer_name);
   const amount = orderBaseAmount(group.first);
 
-  return deposits.filter((deposit) => {
+  return depositsForDisplay.filter((deposit) => {
     if (isDepositConfirmed(deposit)) return false;
     const depositor = normalizeText(deposit.depositor_name);
     const amountMatch = Number(deposit.amount || 0) === amount;
@@ -67,7 +67,9 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
       const result = await response.json().catch(() => null);
 
       if (!response.ok || !result?.ok) {
-        alert("입금내역 화면 조회 실패\n\n" + (result?.message || "알 수 없는 오류"));
+        alert("입금내역 화면 조회 실패
+
+" + (result?.message || "알 수 없는 오류"));
         return;
       }
 

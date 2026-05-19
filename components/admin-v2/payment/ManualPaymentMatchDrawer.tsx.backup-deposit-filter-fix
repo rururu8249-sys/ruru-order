@@ -1,0 +1,238 @@
+// components/admin-v2/payment/ManualPaymentMatchDrawer.tsx
+// 새 파일 생성
+// 목적: 주문관리에서 바로 여는 수동 입금매칭 오른쪽 슬라이드 패널
+
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import type { DepositRow, OrderGroup } from "@/lib/admin-v2/types";
+import { displayOrderPhone, formatDateLabel, money } from "@/lib/admin-v2/formatters";
+import { buildItemSummary, orderBaseAmount, shortOrderCode } from "@/lib/admin-v2/orderHelpers";
+
+type Props = {
+  group: OrderGroup | null;
+  deposits: DepositRow[];
+  onClose: () => void;
+  onConfirm: (group: OrderGroup, deposit: DepositRow) => Promise<void>;
+};
+
+const normalizeText = (value: unknown) =>
+  String(value ?? "").replace(/[\\s\-_.]/g, "").toLowerCase();
+
+const isDepositAlreadyConfirmed = (deposit: DepositRow) => {
+  const status = String(deposit.match_status || "");
+  return Boolean(deposit.confirmed_at) || status.includes("확인") || status.includes("완료");
+};
+
+const formatDepositTime = (value: string | null) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "-";
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).format(date);
+};
+
+function getMatchHint(group: OrderGroup, deposit: DepositRow) {
+  const expectedName = normalizeText(group.first.youtube_nickname || group.first.customer_name || "");
+  const depositName = normalizeText(deposit.depositor_name);
+  const expectedAmount = orderBaseAmount(group.first);
+  const amountMatch = Number(deposit.amount || 0) === expectedAmount;
+  const nameMatch = expectedName && depositName && expectedName === depositName;
+  const nameContains =
+    expectedName && depositName && (depositName.includes(expectedName) || expectedName.includes(depositName));
+
+  if (nameMatch && amountMatch) return { label: "추천", className: "bg-emerald-100 text-emerald-700" };
+  if (amountMatch && nameContains) return { label: "유사+금액일치", className: "bg-lime-100 text-lime-700" };
+  if (amountMatch) return { label: "금액일치", className: "bg-amber-100 text-amber-800" };
+  if (nameMatch || nameContains) return { label: "이름유사", className: "bg-sky-100 text-sky-700" };
+  return { label: "확인필요", className: "bg-neutral-100 text-neutral-600" };
+}
+
+export default function ManualPaymentMatchDrawer({ group, deposits, onClose, onConfirm }: Props) {
+  const [keyword, setKeyword] = useState("");
+  const [selectedDepositId, setSelectedDepositId] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!group) return;
+    setKeyword(group.first.youtube_nickname || group.first.customer_name || "");
+    setSelectedDepositId(null);
+    setSaving(false);
+  }, [group]);
+
+  const expectedAmount = group ? orderBaseAmount(group.first) : 0;
+
+  const filteredDeposits = useMemo(() => {
+    if (!group) return [];
+    const word = normalizeText(keyword);
+    const nickname = normalizeText(group.first.youtube_nickname);
+    const name = normalizeText(group.first.customer_name);
+
+    return deposits
+      .filter((deposit) => !isDepositAlreadyConfirmed(deposit))
+      .filter((deposit) => {
+        if (!word) return true;
+        const depositor = normalizeText(deposit.depositor_name);
+        const amountText = String(deposit.amount || "");
+        return (
+          depositor.includes(word) ||
+          word.includes(depositor) ||
+          amountText.includes(word) ||
+          depositor.includes(nickname) ||
+          depositor.includes(name)
+        );
+      })
+      .sort((a, b) => {
+        const aScore = getMatchHint(group, a).label === "추천" ? 0 : Number(a.amount || 0) === expectedAmount ? 1 : 2;
+        const bScore = getMatchHint(group, b).label === "추천" ? 0 : Number(b.amount || 0) === expectedAmount ? 1 : 2;
+        if (aScore !== bScore) return aScore - bScore;
+        const aTime = new Date(a.deposited_time || a.created_at || "").getTime() || 0;
+        const bTime = new Date(b.deposited_time || b.created_at || "").getTime() || 0;
+        return bTime - aTime;
+      });
+  }, [deposits, expectedAmount, group, keyword]);
+
+  if (!group) return null;
+
+  const selectedDeposit =
+    filteredDeposits.find((deposit) => deposit.id === selectedDepositId) ||
+    deposits.find((deposit) => deposit.id === selectedDepositId) ||
+    null;
+
+  const handleConfirm = async () => {
+    if (!selectedDeposit) {
+      alert("입금내역을 먼저 선택해주세요.");
+      return;
+    }
+
+    const ok = confirm(
+      [
+        "이 입금내역으로 수동매칭 처리할까요?",
+        "",
+        `주문: ${group.first.youtube_nickname || group.first.customer_name || "-"} / ${money(expectedAmount)}`,
+        `입금: ${selectedDeposit.depositor_name} / ${money(selectedDeposit.amount)}`,
+        "",
+        "처리 후 주문상태가 입금확인으로 변경됩니다.",
+      ].join("\n")
+    );
+
+    if (!ok) return;
+
+    setSaving(true);
+    try {
+      await onConfirm(group, selectedDeposit);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/35">
+      <aside className="ml-auto flex h-full w-full max-w-[560px] flex-col bg-white shadow-[-24px_0_70px_rgba(0,0,0,0.24)]">
+        <header className="shrink-0 border-b border-neutral-200 p-4">
+          <div className="grid gap-1">
+            <div>
+              <div className="text-[12px] font-black tracking-widest text-neutral-400">MANUAL PAYMENT MATCH</div>
+              <h2 className="mt-1 text-2xl font-black tracking-[-0.04em]">수동 입금매칭</h2>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-neutral-200 bg-neutral-50 p-3">
+            <div className="grid grid-cols-2 gap-2 text-[13px] font-bold text-neutral-600">
+              <div>
+                <div className="text-[11px] font-black text-neutral-400">주문번호</div>
+                <div className="mt-0.5 text-base font-black text-neutral-950">{shortOrderCode(group)}</div>
+              </div>
+              <div>
+                <div className="text-[11px] font-black text-neutral-400">입금예정금액</div>
+                <div className="mt-0.5 text-base font-black text-red-600">{money(expectedAmount)}</div>
+              </div>
+              <div>
+                <div className="text-[11px] font-black text-neutral-400">닉네임</div>
+                <div className="mt-0.5 font-black text-neutral-950">{group.first.youtube_nickname || "-"}</div>
+              </div>
+              <div>
+                <div className="text-[11px] font-black text-neutral-400">이름/전화번호</div>
+                <div className="mt-0.5 font-black text-neutral-950">{group.first.customer_name || "-"} · {displayOrderPhone(group.first)}</div>
+              </div>
+              <div className="col-span-2">
+                <div className="text-[11px] font-black text-neutral-400">주문내역</div>
+                <div className="mt-0.5 break-keep font-black text-neutral-950">{buildItemSummary(group)}</div>
+              </div>
+              <div className="col-span-2">
+                <div className="text-[11px] font-black text-neutral-400">주문시간</div>
+                <div className="mt-0.5 font-black text-neutral-950">{formatDateLabel(group.first.created_at)}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <label className="text-[12px] font-black text-neutral-500">입금자명 검색</label>
+            <input
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+              placeholder="닉네임 / 이름 / 입금자명 / 금액"
+              className="mt-1 h-11 w-full rounded-xl border border-neutral-200 px-3 text-[15px] font-black outline-none focus:border-neutral-950"
+            />
+          </div>
+        </header>
+
+        <section className="min-h-0 flex-1 overflow-y-auto p-4">
+          {filteredDeposits.length === 0 ? (
+            <div className="rounded-2xl bg-neutral-50 p-6 text-center text-sm font-bold text-neutral-500">검색된 미확인 입금내역이 없습니다.</div>
+          ) : (
+            <div className="grid gap-2">
+              {filteredDeposits.map((deposit) => {
+                const hint = getMatchHint(group, deposit);
+                const selected = selectedDepositId === deposit.id;
+                const amountDifferent = Number(deposit.amount || 0) !== expectedAmount;
+
+                return (
+                  <button
+                    key={deposit.id}
+                    type="button"
+                    onClick={() => setSelectedDepositId(deposit.id)}
+                    className={`grid gap-2 rounded-2xl border p-3 text-left transition active:scale-[0.99] ${selected ? "border-neutral-950 bg-neutral-950 text-white" : "border-neutral-200 bg-white hover:bg-neutral-50"}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-base font-black">{deposit.depositor_name}</div>
+                      <span className={`rounded-full px-2 py-1 text-[11px] font-black ${selected ? "bg-white text-neutral-950" : hint.className}`}>{hint.label}</span>
+                    </div>
+                    <div className="grid grid-cols-[1fr_auto] gap-3 text-sm font-bold">
+                      <div className={selected ? "text-white/70" : "text-neutral-500"}>{formatDepositTime(deposit.deposited_time || deposit.created_at)}</div>
+                      <div className={amountDifferent ? "font-black text-red-500" : "font-black"}>{money(deposit.amount)}</div>
+                    </div>
+                    {amountDifferent ? (
+                      <div className={`rounded-xl px-3 py-2 text-xs font-black ${selected ? "bg-red-500/20 text-red-100" : "bg-red-50 text-red-700"}`}>
+                        입금예정금액과 다릅니다. 확인 후 처리하세요.
+                      </div>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        <footer className="shrink-0 border-t border-neutral-200 bg-white p-4">
+          <div className="mb-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold leading-relaxed text-amber-800">
+            수동매칭은 돈 관련 작업입니다. 선택한 입금내역과 주문 금액/입금자명을 반드시 확인하세요.
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" onClick={onClose} className="h-12 rounded-xl border border-neutral-300 bg-white text-sm font-black text-neutral-700 active:scale-[0.98]">취소</button>
+            <button type="button" disabled={saving || !selectedDeposit} onClick={handleConfirm} className="h-12 rounded-xl bg-neutral-950 text-sm font-black text-white active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-neutral-300">
+              {saving ? "처리중..." : "수동매칭"}
+            </button>
+          </div>
+        </footer>
+      </aside>
+    </div>
+  );
+}

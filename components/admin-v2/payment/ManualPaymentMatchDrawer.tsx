@@ -1,133 +1,240 @@
 // components/admin-v2/payment/ManualPaymentMatchDrawer.tsx
-// 새 파일 생성
-// 목적: 주문관리에서 바로 여는 수동 입금매칭 오른쪽 슬라이드 패널
+// 목적: 주문관리에서 미입금 주문의 입금내역을 직접 선택해 수동매칭하는 팝업
+// UX 기준: 상단 닫기/X 없음. 하단 [취소] [수동매칭]만 사용.
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import type { DepositRow, OrderGroup } from "@/lib/admin-v2/types";
-import { displayOrderPhone, formatDateLabel, money } from "@/lib/admin-v2/formatters";
-import { buildItemSummary, orderBaseAmount, shortOrderCode } from "@/lib/admin-v2/orderHelpers";
 
 type Props = {
-  group: OrderGroup | null;
-  deposits: DepositRow[];
+  group?: OrderGroup | null;
+  orderGroup?: OrderGroup | null;
+  deposits?: DepositRow[];
   onClose: () => void;
-  onConfirm: (group: OrderGroup, deposit: DepositRow) => Promise<void>;
+  onMatched?: () => Promise<void> | void;
+  onConfirm?: (group: OrderGroup, deposit: DepositRow) => Promise<void> | void;
 };
 
-const normalizeText = (value: unknown) =>
-  String(value ?? "").replace(/[\\s\-_.]/g, "").toLowerCase();
-
-const isDepositAlreadyConfirmed = (deposit: DepositRow) => {
-  const status = String(deposit.match_status || "");
-  return Boolean(deposit.confirmed_at) || status.includes("확인") || status.includes("완료");
-};
-
-const formatDepositTime = (value: string | null) => {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return "-";
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
-  }).format(date);
-};
-
-function getMatchHint(group: OrderGroup, deposit: DepositRow) {
-  const expectedName = normalizeText(group.first.youtube_nickname || group.first.customer_name || "");
-  const depositName = normalizeText(deposit.depositor_name);
-  const expectedAmount = orderBaseAmount(group.first);
-  const amountMatch = Number(deposit.amount || 0) === expectedAmount;
-  const nameMatch = expectedName && depositName && expectedName === depositName;
-  const nameContains =
-    expectedName && depositName && (depositName.includes(expectedName) || expectedName.includes(depositName));
-
-  if (nameMatch && amountMatch) return { label: "추천", className: "bg-emerald-100 text-emerald-700" };
-  if (amountMatch && nameContains) return { label: "유사+금액일치", className: "bg-lime-100 text-lime-700" };
-  if (amountMatch) return { label: "금액일치", className: "bg-amber-100 text-amber-800" };
-  if (nameMatch || nameContains) return { label: "이름유사", className: "bg-sky-100 text-sky-700" };
-  return { label: "확인필요", className: "bg-neutral-100 text-neutral-600" };
+function digitsOnly(value: unknown) {
+  return String(value ?? "").replace(/[^0-9]/g, "");
 }
 
-export default function ManualPaymentMatchDrawer({ group, deposits, onClose, onConfirm }: Props) {
+function normalizeText(value: unknown) {
+  return String(value ?? "")
+    .trim()
+    .replace(/\s+/g, "")
+    .toLowerCase();
+}
+
+function money(value: unknown) {
+  return `${Number(value || 0).toLocaleString()}원`;
+}
+
+function getOrderAmount(group: OrderGroup) {
+  if (Number(group.totalAmount || 0) > 0) {
+    return Number(group.totalAmount || 0);
+  }
+
+  return group.rows.reduce((sum, row) => {
+    const amount =
+      Number(row.final_amount || 0) ||
+      Number(row.adjusted_total_price || 0) ||
+      Number(row.total_price || 0) ||
+      0;
+
+    return sum + amount;
+  }, 0);
+}
+
+function getOrderIds(group: OrderGroup) {
+  return group.rows
+    .map((row) => Number(row.id))
+    .filter((id) => Number.isFinite(id) && id > 0);
+}
+
+function getNameScore(depositName: string, nickname: string, customerName: string) {
+  const d = normalizeText(depositName);
+  const n = normalizeText(nickname);
+  const c = normalizeText(customerName);
+
+  if (!d) return 0;
+  if (n && d === n) return 100;
+  if (c && d === c) return 95;
+  if (n && (d.includes(n) || n.includes(d))) return 80;
+  if (c && (d.includes(c) || c.includes(d))) return 75;
+
+  return 0;
+}
+
+function isDepositConfirmed(deposit: DepositRow) {
+  const status = String(deposit.match_status || "").trim();
+
+  if (!status || status === "미확인" || status === "미매칭") {
+    return false;
+  }
+
+  return Boolean(deposit.confirmed_at) || ["수동입금확인", "자동입금확인", "입금확인", "매칭완료", "처리완료", "완료"].includes(status);
+}
+
+function getDepositTimeLabel(value: unknown) {
+  const text = String(value || "").trim();
+  if (!text) return "-";
+  return text.slice(0, 8);
+}
+
+export default function ManualPaymentMatchDrawer(props: Props) {
+  const group = props.group || props.orderGroup || null;
+  const [serverDeposits, setServerDeposits] = useState<DepositRow[]>(props.deposits || []);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [selectedDepositId, setSelectedDepositId] = useState<number | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+
+  const first = group?.first || null;
+  const nickname = first?.youtube_nickname || "";
+  const customerName = first?.customer_name || "";
+  const phone = first?.customer_phone || first?.phone || "";
+  const expectedAmount = group ? getOrderAmount(group) : 0;
 
   useEffect(() => {
-    if (!group) return;
-    setKeyword(group.first.youtube_nickname || group.first.customer_name || "");
-    setSelectedDepositId(null);
-    setSaving(false);
-  }, [group]);
+    setServerDeposits(props.deposits || []);
+  }, [props.deposits]);
 
-  const expectedAmount = group ? orderBaseAmount(group.first) : 0;
+  useEffect(() => {
+    if (group) {
+      setKeyword(nickname || customerName || "");
+      void loadDeposits();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [group?.groupId]);
 
-  const filteredDeposits = useMemo(() => {
-    if (!group) return [];
+  const loadDeposits = async () => {
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/admin-v2/deposits", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || !result?.ok) {
+        alert("입금내역 불러오기 실패\n\n" + (result?.message || "알 수 없는 오류"));
+        return;
+      }
+
+      setServerDeposits((result.deposits || []) as DepositRow[]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const depositsForDisplay = useMemo(() => {
     const word = normalizeText(keyword);
-    const nickname = normalizeText(group.first.youtube_nickname);
-    const name = normalizeText(group.first.customer_name);
+    const nicknameNorm = normalizeText(nickname);
+    const customerNorm = normalizeText(customerName);
 
-    return deposits
-      .filter((deposit) => !isDepositAlreadyConfirmed(deposit))
+    return (serverDeposits || [])
       .filter((deposit) => {
-        if (!word) return true;
-        const depositor = normalizeText(deposit.depositor_name);
-        const amountText = String(deposit.amount || "");
+        if (isDepositConfirmed(deposit)) return false;
+
+        if (showAll) return true;
+
+        const depositName = normalizeText(deposit.depositor_name);
+        const amountText = digitsOnly(deposit.amount);
+        const amountMatch = Number(deposit.amount || 0) === expectedAmount;
+        const nameMatch =
+          getNameScore(deposit.depositor_name, nickname, customerName) > 0;
+
+        if (!word) {
+          return amountMatch || nameMatch;
+        }
+
         return (
-          depositor.includes(word) ||
-          word.includes(depositor) ||
-          amountText.includes(word) ||
-          depositor.includes(nickname) ||
-          depositor.includes(name)
+          amountMatch ||
+          nameMatch ||
+          depositName.includes(word) ||
+          word.includes(depositName) ||
+          amountText.includes(digitsOnly(keyword)) ||
+          (nicknameNorm && depositName.includes(nicknameNorm)) ||
+          (customerNorm && depositName.includes(customerNorm))
         );
       })
       .sort((a, b) => {
-        const aScore = getMatchHint(group, a).label === "추천" ? 0 : Number(a.amount || 0) === expectedAmount ? 1 : 2;
-        const bScore = getMatchHint(group, b).label === "추천" ? 0 : Number(b.amount || 0) === expectedAmount ? 1 : 2;
-        if (aScore !== bScore) return aScore - bScore;
-        const aTime = new Date(a.deposited_time || a.created_at || "").getTime() || 0;
-        const bTime = new Date(b.deposited_time || b.created_at || "").getTime() || 0;
-        return bTime - aTime;
+        const aAmount = Number(a.amount || 0) === expectedAmount ? 1 : 0;
+        const bAmount = Number(b.amount || 0) === expectedAmount ? 1 : 0;
+
+        if (aAmount !== bAmount) return bAmount - aAmount;
+
+        const aName = getNameScore(a.depositor_name, nickname, customerName);
+        const bName = getNameScore(b.depositor_name, nickname, customerName);
+
+        if (aName !== bName) return bName - aName;
+
+        return Number(b.id || 0) - Number(a.id || 0);
       });
-  }, [deposits, expectedAmount, group, keyword]);
+  }, [serverDeposits, keyword, expectedAmount, nickname, customerName, showAll]);
 
-  if (!group) return null;
+  const selectedDeposit = useMemo(() => {
+    return serverDeposits.find((deposit) => Number(deposit.id) === Number(selectedDepositId)) || null;
+  }, [serverDeposits, selectedDepositId]);
 
-  const selectedDeposit =
-    filteredDeposits.find((deposit) => deposit.id === selectedDepositId) ||
-    deposits.find((deposit) => deposit.id === selectedDepositId) ||
-    null;
+  if (!group || !first) {
+    return null;
+  }
 
-  const handleConfirm = async () => {
+  const confirmManualMatch = async () => {
     if (!selectedDeposit) {
-      alert("입금내역을 먼저 선택해주세요.");
+      alert("매칭할 입금내역을 선택해주세요.");
       return;
     }
 
     const ok = confirm(
       [
-        "이 입금내역으로 수동매칭 처리할까요?",
+        "선택한 입금내역으로 수동매칭할까요?",
         "",
-        `주문: ${group.first.youtube_nickname || group.first.customer_name || "-"} / ${money(expectedAmount)}`,
-        `입금: ${selectedDeposit.depositor_name} / ${money(selectedDeposit.amount)}`,
+        `주문고객: ${nickname || customerName || "-"}`,
+        `주문금액: ${money(expectedAmount)}`,
         "",
-        "처리 후 주문상태가 입금확인으로 변경됩니다.",
+        `입금자명: ${selectedDeposit.depositor_name || "-"}`,
+        `입금금액: ${money(selectedDeposit.amount)}`,
       ].join("\n")
     );
 
     if (!ok) return;
 
     setSaving(true);
+
     try {
-      await onConfirm(group, selectedDeposit);
-      onClose();
+      const response = await fetch("/api/admin-v2/manual-payment-match", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          orderGroupId: group.groupId,
+          orderIds: getOrderIds(group),
+          depositId: selectedDeposit.id,
+        }),
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || !result?.ok) {
+        alert("수동매칭 실패\n\n" + (result?.message || "알 수 없는 오류"));
+        return;
+      }
+
+      alert("수동매칭 완료\n\n주문 상태가 입금확인으로 변경되었습니다.");
+
+      await props.onMatched?.();
+
+      props.onClose();
+
+      window.location.reload();
     } finally {
       setSaving(false);
     }
@@ -135,85 +242,154 @@ export default function ManualPaymentMatchDrawer({ group, deposits, onClose, onC
 
   return (
     <div className="fixed inset-0 z-50 bg-black/35">
-      <aside className="ml-auto flex h-full w-full max-w-[560px] flex-col bg-white shadow-[-24px_0_70px_rgba(0,0,0,0.24)]">
-        <header className="shrink-0 border-b border-neutral-200 p-4">
-          <div className="grid gap-1">
+      <aside className="ml-auto flex h-full w-full max-w-3xl flex-col bg-white shadow-[0_24px_70px_rgba(0,0,0,0.28)]">
+        <header className="shrink-0 border-b border-neutral-200 p-5">
+          <div className="text-[12px] font-black tracking-widest text-neutral-400">
+            MANUAL PAYMENT MATCH
+          </div>
+
+          <h2 className="mt-1 text-2xl font-black tracking-[-0.04em]">
+            수동 입금매칭
+          </h2>
+
+          <div className="mt-4 grid gap-2 rounded-2xl bg-neutral-50 p-4 text-sm font-bold text-neutral-700 md:grid-cols-2">
             <div>
-              <div className="text-[12px] font-black tracking-widest text-neutral-400">MANUAL PAYMENT MATCH</div>
-              <h2 className="mt-1 text-2xl font-black tracking-[-0.04em]">수동 입금매칭</h2>
+              주문번호: <span className="font-black text-neutral-950">{group.groupId}</span>
+            </div>
+            <div>
+              닉네임: <span className="font-black text-neutral-950">{nickname || "-"}</span>
+            </div>
+            <div>
+              이름: <span className="font-black text-neutral-950">{customerName || "-"}</span>
+            </div>
+            <div>
+              전화번호: <span className="font-black text-neutral-950">{phone || "-"}</span>
+            </div>
+            <div>
+              입금예정금액: <span className="font-black text-neutral-950">{money(expectedAmount)}</span>
+            </div>
+            <div>
+              상품수량: <span className="font-black text-neutral-950">{group.totalQty || group.rows.length}개</span>
             </div>
           </div>
 
-          <div className="mt-4 rounded-2xl border border-neutral-200 bg-neutral-50 p-3">
-            <div className="grid grid-cols-2 gap-2 text-[13px] font-bold text-neutral-600">
-              <div>
-                <div className="text-[11px] font-black text-neutral-400">주문번호</div>
-                <div className="mt-0.5 text-base font-black text-neutral-950">{shortOrderCode(group)}</div>
-              </div>
-              <div>
-                <div className="text-[11px] font-black text-neutral-400">입금예정금액</div>
-                <div className="mt-0.5 text-base font-black text-red-600">{money(expectedAmount)}</div>
-              </div>
-              <div>
-                <div className="text-[11px] font-black text-neutral-400">닉네임</div>
-                <div className="mt-0.5 font-black text-neutral-950">{group.first.youtube_nickname || "-"}</div>
-              </div>
-              <div>
-                <div className="text-[11px] font-black text-neutral-400">이름/전화번호</div>
-                <div className="mt-0.5 font-black text-neutral-950">{group.first.customer_name || "-"} · {displayOrderPhone(group.first)}</div>
-              </div>
-              <div className="col-span-2">
-                <div className="text-[11px] font-black text-neutral-400">주문내역</div>
-                <div className="mt-0.5 break-keep font-black text-neutral-950">{buildItemSummary(group)}</div>
-              </div>
-              <div className="col-span-2">
-                <div className="text-[11px] font-black text-neutral-400">주문시간</div>
-                <div className="mt-0.5 font-black text-neutral-950">{formatDateLabel(group.first.created_at)}</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-3">
-            <label className="text-[12px] font-black text-neutral-500">입금자명 검색</label>
+          <div className="mt-4 grid grid-cols-[1fr_92px_92px] gap-2">
             <input
               value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-              placeholder="닉네임 / 이름 / 입금자명 / 금액"
-              className="mt-1 h-11 w-full rounded-xl border border-neutral-200 px-3 text-[15px] font-black outline-none focus:border-neutral-950"
+              onChange={(event) => {
+                setKeyword(event.target.value);
+                setShowAll(false);
+              }}
+              placeholder="입금자명 / 닉네임 / 이름 / 금액 검색"
+              className="h-12 rounded-xl border border-neutral-200 px-4 text-base font-black outline-none focus:border-neutral-950"
             />
+
+            <button
+              type="button"
+              onClick={() => {
+                setKeyword("");
+                setShowAll(true);
+              }}
+              className="h-12 rounded-xl bg-neutral-950 text-sm font-black text-white active:scale-[0.98]"
+            >
+              전체보기
+            </button>
+
+            <button
+              type="button"
+              onClick={loadDeposits}
+              disabled={loading}
+              className="h-12 rounded-xl bg-blue-600 text-sm font-black text-white active:scale-[0.98] disabled:bg-neutral-300"
+            >
+              {loading ? "로딩중" : "다시불러오기"}
+            </button>
+          </div>
+
+          <div className="mt-3 rounded-xl bg-amber-50 px-4 py-3 text-xs font-black leading-relaxed text-amber-800">
+            수동매칭은 돈 관련 작업입니다. 입금자명과 금액을 반드시 확인하세요.
           </div>
         </header>
 
-        <section className="min-h-0 flex-1 overflow-y-auto p-4">
-          {filteredDeposits.length === 0 ? (
-            <div className="rounded-2xl bg-neutral-50 p-6 text-center text-sm font-bold text-neutral-500">검색된 미확인 입금내역이 없습니다.</div>
+        <section className="min-h-0 flex-1 overflow-y-auto p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="text-sm font-black text-neutral-700">
+              입금내역 후보 {depositsForDisplay.length.toLocaleString()}건
+            </div>
+            <div className="text-xs font-bold text-neutral-400">
+              저장된 전체 입금내역 {serverDeposits.length.toLocaleString()}건
+            </div>
+          </div>
+
+          {depositsForDisplay.length === 0 ? (
+            <div className="rounded-2xl bg-neutral-50 px-4 py-16 text-center text-base font-black text-neutral-500">
+              표시할 미확인 입금내역이 없습니다.
+              <br />
+              검색어를 지우거나 전체보기를 눌러주세요.
+            </div>
           ) : (
-            <div className="grid gap-2">
-              {filteredDeposits.map((deposit) => {
-                const hint = getMatchHint(group, deposit);
-                const selected = selectedDepositId === deposit.id;
-                const amountDifferent = Number(deposit.amount || 0) !== expectedAmount;
+            <div className="overflow-hidden rounded-2xl border border-neutral-200">
+              {depositsForDisplay.map((deposit) => {
+                const selected = Number(selectedDepositId) === Number(deposit.id);
+                const amountMatch = Number(deposit.amount || 0) === expectedAmount;
+                const nameScore = getNameScore(deposit.depositor_name, nickname, customerName);
+
+                let tag = "확인필요";
+
+                if (amountMatch && nameScore >= 90) tag = "추천";
+                else if (amountMatch && nameScore > 0) tag = "이름유사";
+                else if (amountMatch) tag = "금액일치";
+                else if (nameScore > 0) tag = "이름유사";
 
                 return (
                   <button
                     key={deposit.id}
                     type="button"
-                    onClick={() => setSelectedDepositId(deposit.id)}
-                    className={`grid gap-2 rounded-2xl border p-3 text-left transition active:scale-[0.99] ${selected ? "border-neutral-950 bg-neutral-950 text-white" : "border-neutral-200 bg-white hover:bg-neutral-50"}`}
+                    onClick={() => setSelectedDepositId(Number(deposit.id))}
+                    className={[
+                      "grid w-full grid-cols-[38px_1fr_120px_100px_90px] items-center gap-2 border-b border-neutral-100 px-4 py-3 text-left transition active:scale-[0.995]",
+                      selected ? "bg-blue-50" : "bg-white hover:bg-neutral-50",
+                    ].join(" ")}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-base font-black">{deposit.depositor_name}</div>
-                      <span className={`rounded-full px-2 py-1 text-[11px] font-black ${selected ? "bg-white text-neutral-950" : hint.className}`}>{hint.label}</span>
+                    <div
+                      className={[
+                        "flex h-6 w-6 items-center justify-center rounded-md border text-xs font-black",
+                        selected ? "border-blue-600 bg-blue-600 text-white" : "border-neutral-300 text-transparent",
+                      ].join(" ")}
+                    >
+                      ✓
                     </div>
-                    <div className="grid grid-cols-[1fr_auto] gap-3 text-sm font-bold">
-                      <div className={selected ? "text-white/70" : "text-neutral-500"}>{formatDepositTime(deposit.deposited_time || deposit.created_at)}</div>
-                      <div className={amountDifferent ? "font-black text-red-500" : "font-black"}>{money(deposit.amount)}</div>
-                    </div>
-                    {amountDifferent ? (
-                      <div className={`rounded-xl px-3 py-2 text-xs font-black ${selected ? "bg-red-500/20 text-red-100" : "bg-red-50 text-red-700"}`}>
-                        입금예정금액과 다릅니다. 확인 후 처리하세요.
+
+                    <div>
+                      <div className="text-sm font-black text-neutral-950">
+                        {deposit.depositor_name || "-"}
                       </div>
-                    ) : null}
+                      <div className="mt-0.5 text-xs font-bold text-neutral-400">
+                        입금시간 {getDepositTimeLabel(deposit.deposited_time)}
+                      </div>
+                    </div>
+
+                    <div className="text-right text-sm font-black text-neutral-950">
+                      {money(deposit.amount)}
+                    </div>
+
+                    <div
+                      className={[
+                        "rounded-full px-2 py-1 text-center text-xs font-black",
+                        tag === "추천"
+                          ? "bg-blue-100 text-blue-700"
+                          : tag === "금액일치"
+                            ? "bg-green-100 text-green-700"
+                            : tag === "이름유사"
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-neutral-100 text-neutral-500",
+                      ].join(" ")}
+                    >
+                      {tag}
+                    </div>
+
+                    <div className="text-right text-xs font-black text-neutral-400">
+                      {deposit.match_status || "미확인"}
+                    </div>
                   </button>
                 );
               })}
@@ -221,16 +397,24 @@ export default function ManualPaymentMatchDrawer({ group, deposits, onClose, onC
           )}
         </section>
 
-        <footer className="shrink-0 border-t border-neutral-200 bg-white p-4">
-          <div className="mb-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold leading-relaxed text-amber-800">
-            수동매칭은 돈 관련 작업입니다. 선택한 입금내역과 주문 금액/입금자명을 반드시 확인하세요.
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <button type="button" onClick={onClose} className="h-12 rounded-xl border border-neutral-300 bg-white text-sm font-black text-neutral-700 active:scale-[0.98]">취소</button>
-            <button type="button" disabled={saving || !selectedDeposit} onClick={handleConfirm} className="h-12 rounded-xl bg-neutral-950 text-sm font-black text-white active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-neutral-300">
-              {saving ? "처리중..." : "수동매칭"}
-            </button>
-          </div>
+        <footer className="grid shrink-0 grid-cols-2 gap-2 border-t border-neutral-200 bg-white p-5">
+          <button
+            type="button"
+            onClick={props.onClose}
+            disabled={saving}
+            className="h-13 rounded-xl border border-neutral-300 bg-white text-base font-black text-neutral-700 active:scale-[0.98] disabled:opacity-50"
+          >
+            취소
+          </button>
+
+          <button
+            type="button"
+            onClick={confirmManualMatch}
+            disabled={saving || !selectedDeposit}
+            className="h-13 rounded-xl bg-neutral-950 text-base font-black text-white active:scale-[0.98] disabled:bg-neutral-300"
+          >
+            {saving ? "처리중..." : "수동매칭"}
+          </button>
         </footer>
       </aside>
     </div>

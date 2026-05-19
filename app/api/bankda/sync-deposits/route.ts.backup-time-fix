@@ -1,0 +1,94 @@
+// app/api/bankda/sync-deposits/route.ts
+// 뱅크다 입금내역을 가져와 deposits 테이블에 저장
+
+import { NextRequest, NextResponse } from "next/server";
+import { supabase } from "@/lib/supabase";
+import { fetchBankdaTransactions } from "@/lib/bankda/fetchBankdaTransactions";
+
+function sameDepositKey(item: {
+  depositor_name: string;
+  amount: number;
+  deposited_time: string | null;
+}) {
+  return [
+    String(item.depositor_name || "").trim(),
+    String(Number(item.amount || 0)),
+    String(item.deposited_time || "").slice(0, 19),
+  ].join("|");
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json().catch(() => null);
+
+    const { deposits, rawCount } = await fetchBankdaTransactions({
+      datefrom: body?.datefrom,
+      dateto: body?.dateto,
+      accountnum: body?.accountnum,
+    });
+
+    const { data: existing, error: existingError } = await supabase
+      .from("deposits")
+      .select("id,depositor_name,amount,deposited_time")
+      .limit(5000);
+
+    if (existingError) {
+      return NextResponse.json(
+        { ok: false, message: existingError.message },
+        { status: 500 }
+      );
+    }
+
+    const existingKeys = new Set(
+      (existing || []).map((item) =>
+        sameDepositKey({
+          depositor_name: item.depositor_name,
+          amount: item.amount,
+          deposited_time: item.deposited_time,
+        })
+      )
+    );
+
+    const insertRows = deposits
+      .filter((item) => !existingKeys.has(sameDepositKey(item)))
+      .map((item) => ({
+        depositor_name: item.depositor_name,
+        amount: item.amount,
+        deposited_time: item.deposited_time,
+        match_order_group_id: null,
+        match_customer_id: null,
+        match_status: "미확인",
+        confirmed_at: null,
+        confirmed_note: item.confirmed_note,
+      }));
+
+    if (insertRows.length > 0) {
+      const { error: insertError } = await supabase
+        .from("deposits")
+        .insert(insertRows);
+
+      if (insertError) {
+        return NextResponse.json(
+          { ok: false, message: insertError.message },
+          { status: 500 }
+        );
+      }
+    }
+
+    return NextResponse.json({
+      ok: true,
+      rawCount,
+      fetchedCount: deposits.length,
+      insertedCount: insertRows.length,
+      skippedCount: deposits.length - insertRows.length,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 }
+    );
+  }
+}

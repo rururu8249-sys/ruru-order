@@ -42,7 +42,7 @@ function getCandidateCount(group: OrderGroup, deposits: DepositRow[]) {
   const name = normalizeText(group.first.customer_name);
   const amount = orderBaseAmount(group.first);
 
-  return deposits.filter((deposit) => {
+  return depositsForDisplay.filter((deposit) => {
     if (isDepositConfirmed(deposit)) return false;
     const depositor = normalizeText(deposit.depositor_name);
     const amountMatch = Number(deposit.amount || 0) === amount;
