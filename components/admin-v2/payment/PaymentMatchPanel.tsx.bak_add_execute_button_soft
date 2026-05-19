@@ -341,19 +341,8 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
                   실제 입금확인은 처리하지 않았습니다. 닉네임 완전일치 + 금액 완전일치 + 1:1 단일 후보만 표시합니다.
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <div className="rounded-lg bg-white px-3 py-2 text-[12px] font-black text-amber-900">
-                  후보 {(previewResult.summary?.auto_match_preview_count ?? 0).toLocaleString()}건
-                </div>
-
-                <button
-                  type="button"
-                  onClick={runAutoMatchExecute}
-                  disabled={autoRunLoading || (previewResult.summary?.auto_match_preview_count ?? 0) <= 0}
-                  className="rounded-lg bg-emerald-600 px-3 py-2 text-[12px] font-black text-white active:scale-[0.98] disabled:bg-neutral-300"
-                >
-                  {autoRunLoading ? "실행중..." : "자동매칭 실행"}
-                </button>
+              <div className="rounded-lg bg-white px-3 py-2 text-[12px] font-black text-amber-900">
+                후보 {(previewResult.summary?.auto_match_preview_count ?? 0).toLocaleString()}건
               </div>
             </div>
 
