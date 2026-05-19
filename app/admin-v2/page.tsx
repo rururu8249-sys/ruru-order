@@ -1,8 +1,9 @@
 // app/admin-v2/page.tsx
-// admin-v2 진입 페이지
-// 리팩토링 1단계 오류수정: AdminV2Client named export 방식으로 고정.
+// 전체 교체
+// 위치: /Users/ruru/Desktop/ruru-order-app/app/admin-v2/page.tsx
+// 주의: 여기는 관리자 v2 입구입니다. 고객 첫 화면 코드를 넣으면 안 됩니다.
 
-import { AdminV2Client } from "@/components/admin-v2/AdminV2Client";
+import AdminV2Client from "@/components/admin-v2/AdminV2Client";
 
 export default function AdminV2Page() {
   return <AdminV2Client />;
