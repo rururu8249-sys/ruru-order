@@ -7,8 +7,6 @@
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import ManualPaymentMatchDrawer from "@/components/admin-v2/payment/ManualPaymentMatchDrawer";
-import PaymentMatchPanel from "@/components/admin-v2/payment/PaymentMatchPanel";
 
 import type {
   AdminTab,
@@ -480,7 +478,6 @@ export function AdminV2Client() {
   const [dateFilter, setDateFilter] = useState("");
   const [openedOrderGroupIds, setOpenedOrderGroupIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
-  const [manualMatchGroup, setManualMatchGroup] = useState<OrderGroup | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -685,114 +682,6 @@ export function AdminV2Client() {
 
   const toggleOrderDetail = (groupId: string) => {
     setOpenedOrderGroupIds((prev) => prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId]);
-  };
-
-
-  const handleManualPaymentConfirm = async (group: OrderGroup, deposit: DepositRow) => {
-    const ids = group.rows.map((row) => row.id).filter(Boolean);
-    const nowIso = new Date().toISOString();
-
-    if (ids.length === 0) {
-      alert("입금확인 처리할 주문 ID가 없습니다.");
-      return;
-    }
-
-    const changedRows = group.rows.filter((row) => getOrderStatusValue(row) !== "입금확인");
-
-    const statusLogPayloads = changedRows.map((row) => {
-      const beforeStatus = getOrderStatusValue(row);
-
-      return {
-        order_id: row.id,
-        order_group_id: row.order_group_id,
-        order_lookup_code: row.order_lookup_code,
-        changed_by: "admin-v2",
-        change_source: "admin-v2-manual-payment-match",
-        before_status: beforeStatus,
-        after_status: "입금확인",
-        before_order_manage_status: row.order_manage_status || beforeStatus,
-        after_order_manage_status: "입금확인",
-        payment_method: row.payment_method || "",
-        deposit_confirmed_at_before: row.deposit_confirmed_at || "",
-        deposit_confirmed_at_after: row.deposit_confirmed_at || nowIso,
-        snapshot_before: {
-          id: row.id,
-          admin_order_status_v2: row.admin_order_status_v2,
-          order_manage_status: row.order_manage_status,
-          payment_method: row.payment_method,
-          deposit_confirmed_at: row.deposit_confirmed_at,
-          matched_deposit_id: deposit.id,
-        },
-        snapshot_after: {
-          id: row.id,
-          admin_order_status_v2: "입금확인",
-          order_manage_status: "입금확인",
-          payment_method: row.payment_method,
-          deposit_confirmed_at: row.deposit_confirmed_at || nowIso,
-          matched_deposit_id: deposit.id,
-        },
-      };
-    });
-
-    setOrders((prev) =>
-      prev.map((order) =>
-        ids.includes(order.id)
-          ? {
-              ...order,
-              admin_order_status_v2: "입금확인",
-              order_manage_status: "입금확인",
-              deposit_confirmed_at: order.deposit_confirmed_at || nowIso,
-            }
-          : order
-      )
-    );
-
-    const { error: orderError } = await supabase
-      .from("orders")
-      .update({
-        admin_order_status_v2: "입금확인",
-        order_manage_status: "입금확인",
-        deposit_confirmed_at: nowIso,
-      })
-      .in("id", ids);
-
-    if (orderError) {
-      alert("수동 입금확인 처리 실패\n\n" + orderError.message);
-      await loadData();
-      return;
-    }
-
-    const { error: depositError } = await supabase
-      .from("deposits")
-      .update({
-        match_order_group_id: group.groupId,
-        match_customer_id: group.first.customer_id,
-        match_status: "수동입금확인",
-        confirmed_at: nowIso,
-        confirmed_note: `관리자 수동매칭 / 주문 ${group.groupId}`,
-      })
-      .eq("id", deposit.id);
-
-    if (depositError) {
-      alert("주문은 입금확인 처리됐지만 입금내역 연결 저장에 실패했습니다.\n\n" + depositError.message);
-      await loadData();
-      return;
-    }
-
-    if (statusLogPayloads.length > 0) {
-      const { error: logError } = await supabase.rpc("insert_order_status_change_logs_for_admin_v2", {
-        p_logs: statusLogPayloads,
-      });
-
-      if (logError) {
-        alert("입금확인은 처리됐지만 상태변경이력 저장에 실패했습니다.\n\n" + logError.message);
-        await loadData();
-        return;
-      }
-    }
-
-    await loadData();
-    alert("수동 입금확인 처리가 완료되었습니다.");
   };
 
   const updateOrderStatus = async (group: OrderGroup, nextStatus: string) => {
@@ -1264,11 +1153,7 @@ export function AdminV2Client() {
               ) : activeTab === "customers" ? (
                 <CustomerPanel customers={customers} />
               ) : activeTab === "deposits" ? (
-                <PaymentMatchPanel
-                  deposits={deposits}
-                  orderGroups={filteredOrderGroups}
-                  onOpenManualMatch={setManualMatchGroup}
-                />
+                <DepositPanel deposits={deposits} />
               ) : activeTab === "settlement" ? (
                 <SettlementPanel
                   orderGroups={filteredOrderGroups}
@@ -1298,7 +1183,7 @@ export function AdminV2Client() {
 
                   <div className="grid gap-3 xl:grid-cols-[minmax(780px,1fr)_340px]">
                     <div className="min-w-0">
-                      <OrderWorkTable groups={pagedGroups} openedOrderGroupIds={openedOrderGroupIds} moneyEditLogs={moneyEditLogs} statusChangeLogs={statusChangeLogs} onToggle={toggleOrderDetail} onStatusChange={updateOrderStatus} onTrackingChange={updateOrderTracking} onFinalAmountChange={updateOrderFinalAmount} onOpenManualMatch={setManualMatchGroup} />
+                      <OrderWorkTable groups={pagedGroups} openedOrderGroupIds={openedOrderGroupIds} moneyEditLogs={moneyEditLogs} statusChangeLogs={statusChangeLogs} onToggle={toggleOrderDetail} onStatusChange={updateOrderStatus} onTrackingChange={updateOrderTracking} onFinalAmountChange={updateOrderFinalAmount} />
                       <Pagination page={page} totalPages={totalPages} setPage={setPage} totalCount={filteredOrderGroups.length} />
                     </div>
                     <OperationSummary buyerRanking={sideSummary.buyerRanking} productRanking={sideSummary.productRanking} onMore={() => setActiveTab("settlement")} />
@@ -1309,13 +1194,6 @@ export function AdminV2Client() {
           )}
         </section>
       </div>
-
-      <ManualPaymentMatchDrawer
-        group={manualMatchGroup}
-        deposits={deposits}
-        onClose={() => setManualMatchGroup(null)}
-        onConfirm={handleManualPaymentConfirm}
-      />
     </main>
   );
 }
@@ -1710,7 +1588,6 @@ function OrderWorkTable({
   onStatusChange,
   onTrackingChange,
   onFinalAmountChange,
-  onOpenManualMatch,
 }: {
   groups: OrderGroup[];
   openedOrderGroupIds: string[];
@@ -1720,7 +1597,6 @@ function OrderWorkTable({
   onStatusChange: (group: OrderGroup, status: string) => void;
   onTrackingChange: (group: OrderGroup, trackingCompany: string, trackingNumber: string) => Promise<void>;
   onFinalAmountChange: (row: OrderRow, nextAmount: number, reason: string) => Promise<void>;
-  onOpenManualMatch: (group: OrderGroup) => void;
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
@@ -1765,19 +1641,6 @@ function OrderWorkTable({
                 <div className={`mt-0.5 inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-black ${paymentMeta.className}`}>
                   {paymentMeta.label}
                 </div>
-                {isBankUnpaid(group.first) ? (
-                  <button
-                    type="button"
-                    onClick={() => onOpenManualMatch(group)}
-                    className="mt-1 rounded-md bg-neutral-950 px-2 py-1 text-[10px] font-black text-white active:scale-[0.98]"
-                  >
-                    입금매칭
-                  </button>
-                ) : isBankPaid(group.first) ? (
-                  <div className="mt-1 rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-black text-emerald-700">
-                    입금확인 완료
-                  </div>
-                ) : null}
               </div>
               <div className="text-left lg:text-right">
                 <div className="text-[15px] font-black">{money(group.totalAmount)}</div>
