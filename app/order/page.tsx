@@ -35,6 +35,7 @@ import {
 import OrderPageShell from "@/components/order/OrderPageShell";
 import OrderCustomerTopNav from "@/components/order/OrderCustomerTopNav";
 import OrderPriceSummaryBox from "@/components/order/OrderPriceSummaryBox";
+import OrderDepositConfirmModal from "@/components/order/OrderDepositConfirmModal";
 import OrderCustomerInfoIntro from "@/components/order/OrderCustomerInfoIntro";
 import OrderCustomerEntryPanel from "@/components/order/OrderCustomerEntryPanel";
 import OrderCustomerInfoFormCard from "@/components/order/OrderCustomerInfoFormCard";
@@ -233,6 +234,7 @@ export default function OrderPage() {
   const [paymentMethod, setPaymentMethod] = useState<"무통장입금" | "카드결제">("무통장입금");
   const [items, setItems] = useState<OrderItem[]>([{ ...emptyItem }]);
   const [submitting, setSubmitting] = useState(false);
+  const [showDepositConfirmModal, setShowDepositConfirmModal] = useState(false);
   const [done, setDone] = useState<DoneData | null>(null);
   const [copyDone, setCopyDone] = useState(false);
   const [customerCardRate, setCustomerCardRate] = useState(10);
@@ -1105,6 +1107,46 @@ export default function OrderPage() {
   const buttonBase = "transition-all duration-150 active:scale-[0.97]";
 
 
+  const DEPOSIT_CONFIRM_HIDE_UNTIL_KEY = "ruru_deposit_confirm_hide_until";
+
+  const shouldSkipDepositConfirm = () => {
+    if (typeof window === "undefined") return false;
+
+    const hideUntil = Number(localStorage.getItem(DEPOSIT_CONFIRM_HIDE_UNTIL_KEY) || 0);
+    return Number.isFinite(hideUntil) && hideUntil > Date.now();
+  };
+
+  const handleSubmitOrderClick = () => {
+    if (paymentMethod !== "무통장입금") {
+      submitOrder();
+      return;
+    }
+
+    if (productAmount <= 0 || totalAmount <= 0) {
+      submitOrder();
+      return;
+    }
+
+    if (shouldSkipDepositConfirm()) {
+      submitOrder();
+      return;
+    }
+
+    setShowDepositConfirmModal(true);
+  };
+
+  const handleDepositConfirmSubmit = (hideFor24Hours: boolean) => {
+    if (hideFor24Hours && typeof window !== "undefined") {
+      localStorage.setItem(
+        DEPOSIT_CONFIRM_HIDE_UNTIL_KEY,
+        String(Date.now() + 24 * 60 * 60 * 1000),
+      );
+    }
+
+    setShowDepositConfirmModal(false);
+    submitOrder();
+  };
+
   const TopCustomerNav = () => (
     <OrderCustomerTopNav
       isLoggedIn={hasSavedInfo}
@@ -1535,7 +1577,7 @@ export default function OrderPage() {
 
             <button
               type="button"
-              onClick={submitOrder}
+              onClick={handleSubmitOrderClick}
               disabled={submitting}
               className={`${buttonBase} rounded-2xl bg-blue-500 p-5 text-lg font-black text-white shadow-lg shadow-blue-200 disabled:opacity-50`}
             >
@@ -1545,6 +1587,13 @@ export default function OrderPage() {
         </section>
           </>
         )}
+
+        <OrderDepositConfirmModal
+          open={showDepositConfirmModal}
+          nickname={youtubeNickname || customerName}
+          totalAmount={totalAmount}
+          onConfirm={handleDepositConfirmSubmit}
+        />
 
         <footer className="py-8 text-center text-[11px] font-bold text-[#9b8d82]">
           {FOOTER_TEXT}

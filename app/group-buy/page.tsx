@@ -752,7 +752,7 @@ export default function GroupBuyPage() {
       className="min-h-screen select-none bg-[#f5f8ff] px-4 py-6 text-[#151923]"
       style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
     >
-      <section className="mx-auto w-full max-w-[480px]">
+      <section className="mx-auto w-full max-w-[456px]">
         <CommonCustomerTopNav />
 
         {completeMessage && (
