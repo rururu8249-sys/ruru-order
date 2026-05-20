@@ -240,13 +240,24 @@ export default function OrderPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const nextMode = new URLSearchParams(window.location.search).get("mode");
-    if (nextMode !== "edit") return;
+    const params = new URLSearchParams(window.location.search);
+    const nextMode = params.get("mode");
 
-    setIsEditMode(true);
-    setIsEditingCustomerInfo(true);
-    setCustomerMode("new");
-    setIsCustomerInfoOpen(true);
+    if (nextMode === "edit") {
+      setIsEditMode(true);
+      setIsEditingCustomerInfo(true);
+      setCustomerMode("new");
+      setIsCustomerInfoOpen(true);
+      return;
+    }
+
+    if (nextMode === "new") {
+      setIsEditMode(false);
+      setIsEditingCustomerInfo(false);
+      setCustomerMode("new");
+      setIsCustomerInfoOpen(true);
+      return;
+    }
   }, []);
 
   useEffect(() => {
@@ -571,9 +582,9 @@ export default function OrderPage() {
     setCustomerMode("load");
   };
 
-  const loadCustomerByNamePhone = async () => {
-    const cleanName = String(loginName || "").trim();
-    const cleanPhone = normalizePhone(loginPhone);
+  const loadCustomerByNamePhone = async (nameValue = loginName, phoneValue = loginPhone) => {
+    const cleanName = String(nameValue || "").trim();
+    const cleanPhone = normalizePhone(phoneValue);
 
     if (!cleanName) {
       alert("이름을 입력해주세요.");
@@ -636,6 +647,27 @@ export default function OrderPage() {
       alert("확인 중 오류가 발생했습니다.\n\n" + error.message);
     }
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("mode") !== "load") return;
+
+    const queryName = String(params.get("loginName") || "").trim();
+    const queryPhone = normalizePhone(params.get("loginPhone") || "");
+
+    if (!queryName && !queryPhone) return;
+
+    setLoginName(queryName);
+    setLoginPhone(queryPhone);
+
+    window.history.replaceState(null, "", "/order");
+
+    window.setTimeout(() => {
+      void loadCustomerByNamePhone(queryName, queryPhone);
+    }, 80);
+  }, []);
 
   const completeEditCustomerInfo = async () => {
     const cleanPhone = normalizePhone(customerPhone);
