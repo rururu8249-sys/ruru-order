@@ -1,7 +1,9 @@
 // app/admin-v2/combine/page.tsx
-// 목적: 관리자 v2 합배송 시간 설정 페이지
-// 주의: settings 테이블의 합배송 시간 설정만 저장합니다.
-// 주문금액, 기존 주문 재계산, 입금매칭, 정산 로직은 건드리지 않습니다.
+// 목적: 관리자 v2 시간지정 합배송 설정 페이지
+// 주의:
+// - 이 화면은 자정 넘김 방송/특정 시간대 묶음용 추가 설정입니다.
+// - 기본 같은 날짜 자동합배송 로직을 대체하지 않습니다.
+// - 주문금액, 기존 주문 재계산, 입금매칭, 정산 로직은 건드리지 않습니다.
 
 "use client";
 
@@ -17,9 +19,9 @@ import {
 } from "@/lib/admin-v2/combineShipping";
 
 const SETTING_LABELS = {
-  enabled: "합배송 사용",
-  startAt: "합배송 시작",
-  endAt: "합배송 마감",
+  enabled: "시간지정 합배송 사용",
+  startAt: "합배송 시작 시간",
+  endAt: "합배송 마감 시간",
 };
 
 const formatLocalLabel = (value: string) => {
@@ -80,12 +82,12 @@ export default function CombineShippingAdminPage() {
 
   const saveSettings = async () => {
     if (!startLocal) {
-      alert(`${SETTING_LABELS.startAt} 시간을 입력해주세요.`);
+      alert(`${SETTING_LABELS.startAt}을 입력해주세요.`);
       return;
     }
 
     if (!endLocal) {
-      alert(`${SETTING_LABELS.endAt} 시간을 입력해주세요.`);
+      alert(`${SETTING_LABELS.endAt}을 입력해주세요.`);
       return;
     }
 
@@ -98,7 +100,7 @@ export default function CombineShippingAdminPage() {
     }
 
     if (new Date(startIso).getTime() >= new Date(endIso).getTime()) {
-      alert("합배송 마감시간은 시작시간보다 늦어야 합니다.");
+      alert("합배송 마감 시간은 시작 시간보다 늦어야 합니다.");
       return;
     }
 
@@ -121,7 +123,7 @@ export default function CombineShippingAdminPage() {
       return;
     }
 
-    alert("합배송 설정을 저장했습니다.");
+    alert("시간지정 합배송 설정을 저장했습니다.");
   };
 
   const applyTonightDefault = () => {
@@ -133,7 +135,7 @@ export default function CombineShippingAdminPage() {
   };
 
   const forceEndNow = async () => {
-    if (!confirm("지금 합배송을 강제 종료할까요?\n이후 새 주문은 배송비가 다시 붙습니다.")) {
+    if (!confirm("시간지정 합배송을 종료할까요?\n\n종료 후 새 주문은 기본 같은날 합배송 기준으로 다시 판단됩니다.")) {
       return;
     }
 
@@ -155,11 +157,11 @@ export default function CombineShippingAdminPage() {
     setSaving(false);
 
     if (error) {
-      alert("강제종료 오류: " + error.message);
+      alert("종료 오류: " + error.message);
       return;
     }
 
-    alert("합배송을 강제 종료했습니다.");
+    alert("시간지정 합배송을 종료했습니다.");
   };
 
   return (
@@ -169,7 +171,7 @@ export default function CombineShippingAdminPage() {
           <div>
             <div className="text-[13px] font-black text-blue-600">루루동이 관리자</div>
             <h1 className="mt-1 text-[30px] font-black tracking-[-0.06em]">
-              합배송 설정
+              시간지정 합배송 설정
             </h1>
           </div>
 
@@ -193,16 +195,20 @@ export default function CombineShippingAdminPage() {
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-[1440px] gap-5 px-6 py-6 lg:grid-cols-[1fr_360px]">
+      <section className="mx-auto grid max-w-[1440px] gap-5 px-6 py-6 lg:grid-cols-[1fr_380px]">
         <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="text-[13px] font-black text-blue-600">배송비 중복 방지</div>
+              <div className="text-[13px] font-black text-blue-600">
+                자정 넘김 방송용 추가 설정
+              </div>
               <h2 className="mt-1 text-[24px] font-black tracking-[-0.05em]">
-                방송 합배송 시간
+                시간지정 합배송 기준
               </h2>
-              <p className="mt-1 text-[13px] font-bold text-slate-500">
-                같은 전화번호 고객이 설정 시간 안에서 이미 배송비를 낸 주문이 있으면, 다음 주문 배송비를 0원으로 판단합니다.
+              <p className="mt-2 max-w-[920px] text-[14px] font-bold leading-relaxed text-slate-600">
+                평소에는 같은 날짜 안에서 같은 전화번호 고객 주문이 기본 자동합배송으로 판단됩니다.
+                <br />
+                이 화면은 방송이 밤 12시를 넘기거나, 특정 방송 시간대로 합배송을 묶어야 할 때만 사용하세요.
               </p>
             </div>
 
@@ -213,8 +219,12 @@ export default function CombineShippingAdminPage() {
                   : "bg-slate-100 text-slate-500 ring-1 ring-slate-200"
               }`}
             >
-              {enabled ? "합배송 ON" : "합배송 OFF"}
+              {enabled ? "시간지정 ON" : "시간지정 OFF"}
             </div>
+          </div>
+
+          <div className="mb-5 rounded-[22px] border border-blue-100 bg-blue-50 px-4 py-3 text-[14px] font-black leading-relaxed text-blue-800">
+            기본 같은날 자동합배송은 별도로 적용됩니다. 여기서는 “날짜가 넘어가는 방송”만 시간으로 묶어주는 보조 설정입니다.
           </div>
 
           {loading ? (
@@ -227,19 +237,19 @@ export default function CombineShippingAdminPage() {
                 <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
                   <div className="text-[13px] font-black text-slate-500">현재 상태</div>
                   <div className={`mt-2 text-[22px] font-black ${enabled ? "text-green-600" : "text-slate-500"}`}>
-                    {enabled ? "ON" : "OFF"}
+                    {enabled ? "시간지정 ON" : "시간지정 OFF"}
                   </div>
                 </div>
 
                 <div className="rounded-[22px] border border-blue-100 bg-blue-50 p-4">
-                  <div className="text-[13px] font-black text-blue-600">시작</div>
+                  <div className="text-[13px] font-black text-blue-600">시간지정 시작</div>
                   <div className="mt-2 text-[18px] font-black text-slate-950">
                     {formatLocalLabel(startIsoPreview)}
                   </div>
                 </div>
 
                 <div className="rounded-[22px] border border-blue-100 bg-blue-50 p-4">
-                  <div className="text-[13px] font-black text-blue-600">마감</div>
+                  <div className="text-[13px] font-black text-blue-600">시간지정 마감</div>
                   <div className="mt-2 text-[18px] font-black text-slate-950">
                     {formatLocalLabel(endIsoPreview)}
                   </div>
@@ -249,8 +259,10 @@ export default function CombineShippingAdminPage() {
               <label className="flex items-center justify-between rounded-[22px] border border-slate-200 bg-white p-4">
                 <div>
                   <div className="text-[17px] font-black">{SETTING_LABELS.enabled}</div>
-                  <div className="mt-1 text-[13px] font-bold text-slate-500">
-                    ON이면 설정 시간 안에서 같은 고객 배송비 중복을 막습니다.
+                  <div className="mt-1 text-[13px] font-bold leading-relaxed text-slate-500">
+                    방송이 밤 12시를 넘기거나 특정 시간 범위로 합배송을 묶어야 할 때만 켜주세요.
+                    <br />
+                    평소 같은 날짜 주문은 기본 합배송 기준으로 처리됩니다.
                   </div>
                 </div>
 
@@ -290,7 +302,7 @@ export default function CombineShippingAdminPage() {
 
               {!isValidRange && (
                 <div className="rounded-[18px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-600">
-                  합배송 마감시간은 시작시간보다 늦어야 합니다.
+                  합배송 마감 시간은 시작 시간보다 늦어야 합니다.
                 </div>
               )}
 
@@ -300,7 +312,7 @@ export default function CombineShippingAdminPage() {
                   onClick={applyTonightDefault}
                   className="rounded-[18px] border border-blue-100 bg-blue-50 p-4 text-sm font-black text-blue-700 transition active:scale-[0.98]"
                 >
-                  오늘 19:00 ~ 내일 04:00
+                  오늘 밤 방송 시간 자동입력
                 </button>
 
                 <button
@@ -309,7 +321,7 @@ export default function CombineShippingAdminPage() {
                   disabled={saving || !isValidRange}
                   className="rounded-[18px] bg-blue-600 p-4 text-sm font-black text-white shadow-lg shadow-blue-100 transition active:scale-[0.98] disabled:opacity-50"
                 >
-                  {saving ? "저장 중..." : "합배송 설정 저장"}
+                  {saving ? "저장 중..." : "시간지정 합배송 저장"}
                 </button>
 
                 <button
@@ -318,7 +330,7 @@ export default function CombineShippingAdminPage() {
                   disabled={saving}
                   className="rounded-[18px] border border-red-200 bg-white p-4 text-sm font-black text-red-600 transition active:scale-[0.98] disabled:opacity-50"
                 >
-                  합배송 강제 종료
+                  시간지정 합배송 종료
                 </button>
               </div>
             </div>
@@ -327,26 +339,34 @@ export default function CombineShippingAdminPage() {
 
         <aside className="grid gap-4">
           <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-            <div className="text-[17px] font-black">운영 기준</div>
-            <div className="mt-4 grid gap-3 text-[13px] font-bold leading-relaxed text-slate-600">
+            <div className="text-[17px] font-black">헷갈리지 않는 기준</div>
+
+            <div className="mt-4 grid gap-3 text-[13px] font-bold leading-relaxed">
               <div className="rounded-2xl bg-green-50 p-3 text-green-700 ring-1 ring-green-100">
-                저장 후 새 주문부터 적용됩니다.
+                기본: 같은 날짜 안에서 같은 전화번호 고객은 자동합배송으로 판단합니다.
               </div>
+
               <div className="rounded-2xl bg-blue-50 p-3 text-blue-700 ring-1 ring-blue-100">
-                기존 주문 금액은 재계산하지 않습니다.
+                시간지정: 방송이 자정을 넘기거나 특정 방송 시간으로 묶을 때만 사용합니다.
               </div>
+
+              <div className="rounded-2xl bg-slate-50 p-3 text-slate-700 ring-1 ring-slate-100">
+                첫 주문은 기본 배송비가 붙고, 같은 기준 안의 다음 주문은 배송비 0원으로 판단됩니다.
+              </div>
+
               <div className="rounded-2xl bg-red-50 p-3 text-red-600 ring-1 ring-red-100">
-                강제종료 후 새 주문은 배송비가 다시 붙습니다.
+                기존 주문 금액은 다시 계산하지 않습니다.
               </div>
             </div>
           </section>
 
           <section className="rounded-[26px] border border-blue-100 bg-blue-50 p-5">
             <div className="text-[17px] font-black text-blue-900">
-              방송이 밤 12시를 넘길 때
+              예시
             </div>
             <p className="mt-3 text-[13px] font-bold leading-relaxed text-blue-800">
-              예: 토요일 19:00 시작, 일요일 새벽 04:00 마감으로 설정하면 날짜가 넘어가도 같은 합배송 기준으로 묶을 수 있습니다.
+              토요일 밤 19:00 방송이 일요일 새벽 04:00까지 이어지면,
+              시간지정 합배송을 19:00 ~ 다음날 04:00으로 잡아두면 됩니다.
             </p>
           </section>
         </aside>
