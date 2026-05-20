@@ -665,6 +665,11 @@ export default function OrderPage() {
       return;
     }
 
+    if (!detailAddress.trim()) {
+      alert("상세주소를 입력해주세요.\n아파트/빌라/건물명, 동/호수까지 꼭 입력해주세요.");
+      return;
+    }
+
     try {
       await saveCustomer();
       setIsEditingCustomerInfo(false);
@@ -870,6 +875,11 @@ export default function OrderPage() {
 
     if (!address.trim()) {
       alert("주소를 입력해주세요.");
+      return false;
+    }
+
+    if (!detailAddress.trim()) {
+      alert("상세주소를 입력해주세요.\n아파트/빌라/건물명, 동/호수까지 꼭 입력해주세요.");
       return false;
     }
 
