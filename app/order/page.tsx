@@ -30,6 +30,7 @@ import {
   hasPaidShippingFee,
   isCombineShippingActiveNow,
   parseCombineShippingSettings,
+  resolveCombineShippingLookupWindow,
   type CombineShippingSettings,
 } from "@/lib/admin-v2/combineShipping";
 import OrderPageShell from "@/components/order/OrderPageShell";
@@ -500,27 +501,14 @@ export default function OrderPage() {
       return false;
     }
 
-    const settings = await loadCombineShippingSettings();
-
-    if (!settings.enabled || !settings.startAt || !settings.endAt) {
-      setAlreadyPaidShipping(false);
-      return false;
-    }
-
-    const startMs = new Date(settings.startAt).getTime();
-    const endMs = new Date(settings.endAt).getTime();
-    const nowMs = Date.now();
-
-    if (
-      !Number.isFinite(startMs) ||
-      !Number.isFinite(endMs) ||
-      startMs >= endMs ||
-      nowMs < startMs ||
-      nowMs > endMs
-    ) {
-      setAlreadyPaidShipping(false);
-      return false;
-    }
+    const loadedSettings = await loadCombineShippingSettings();
+    const lookupWindow = resolveCombineShippingLookupWindow(loadedSettings);
+    const settings: CombineShippingSettings = {
+      ...loadedSettings,
+      enabled: true,
+      startAt: lookupWindow.startAt,
+      endAt: lookupWindow.endAt,
+    };
 
     if (hasPaidShippingInThisBrowser(cleanPhone, settings)) {
       setAlreadyPaidShipping(true);
@@ -979,6 +967,13 @@ export default function OrderPage() {
       const appliedShippingFee = paidShippingBeforeSubmit ? 0 : baseShippingFee;
       const appliedTotalAmount = productAmount + appliedShippingFee + cardExtra;
       const latestCombineSettings = await loadCombineShippingSettings();
+      const latestLookupWindow = resolveCombineShippingLookupWindow(latestCombineSettings);
+      const markCombineSettings: CombineShippingSettings = {
+        ...latestCombineSettings,
+        enabled: true,
+        startAt: latestLookupWindow.startAt,
+        endAt: latestLookupWindow.endAt,
+      };
 
       await saveCustomer();
 
@@ -1078,7 +1073,7 @@ export default function OrderPage() {
       setPin("");
 
       if (appliedShippingFee > 0) {
-        markPaidShippingInThisBrowser(cleanPhone, latestCombineSettings);
+        markPaidShippingInThisBrowser(cleanPhone, markCombineSettings);
       }
 
       setAlreadyPaidShipping(true);

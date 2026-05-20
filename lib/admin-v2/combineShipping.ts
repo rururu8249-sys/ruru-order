@@ -109,3 +109,57 @@ export const getDefaultTonightCombineWindow = () => {
     endLocal: toDateTimeLocalValue(end.toISOString()),
   };
 };
+
+export type CombineShippingLookupWindow = {
+  startAt: string;
+  endAt: string;
+  source: "admin-window" | "same-day";
+  reason: string;
+};
+
+export const getKoreaTodayCombineWindow = (now = new Date()) => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+
+  const readPart = (type: string) =>
+    parts.find((part) => part.type === type)?.value || "";
+
+  const year = Number(readPart("year"));
+  const month = Number(readPart("month"));
+  const day = Number(readPart("day"));
+
+  const startUtcMs = Date.UTC(year, month - 1, day, 0, 0, 0, 0) - 9 * 60 * 60 * 1000;
+  const endUtcMs = startUtcMs + 24 * 60 * 60 * 1000 - 1;
+
+  return {
+    startAt: new Date(startUtcMs).toISOString(),
+    endAt: new Date(endUtcMs).toISOString(),
+  };
+};
+
+export const resolveCombineShippingLookupWindow = (
+  settings: CombineShippingSettings,
+  now = new Date()
+): CombineShippingLookupWindow => {
+  if (isCombineShippingActiveNow(settings, now)) {
+    return {
+      startAt: settings.startAt,
+      endAt: settings.endAt,
+      source: "admin-window",
+      reason: "관리자 합배송 시간이 현재 유효해서 해당 구간 기준으로 합배송 판단",
+    };
+  }
+
+  const sameDayWindow = getKoreaTodayCombineWindow(now);
+
+  return {
+    ...sameDayWindow,
+    source: "same-day",
+    reason: "관리자 합배송 시간이 꺼졌거나 현재 범위 밖이라 한국시간 오늘 기준으로 합배송 판단",
+  };
+};
+
