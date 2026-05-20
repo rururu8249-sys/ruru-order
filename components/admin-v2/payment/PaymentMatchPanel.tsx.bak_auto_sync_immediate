@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DepositRow, OrderGroup } from "@/lib/admin-v2/types";
 import { formatDateLabel, money } from "@/lib/admin-v2/formatters";
 import { buildItemSummary, isBankPaid, isBankUnpaid, orderBaseAmount, shortOrderCode } from "@/lib/admin-v2/orderHelpers";
@@ -137,7 +137,6 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
   const [autoSyncLoading, setAutoSyncLoading] = useState(false);
   const [lastAutoSyncLabel, setLastAutoSyncLabel] = useState("");
   const [lastAutoSyncMessage, setLastAutoSyncMessage] = useState("자동조회 대기중");
-  const autoSyncInFlightRef = useRef(false);
 
   const runBankdaSync = async () => {
     setSyncing(true);
@@ -220,9 +219,8 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
   };
 
   const runSilentBankdaAutoSync = async () => {
-    if (autoSyncInFlightRef.current) return;
+    if (autoSyncLoading) return;
 
-    autoSyncInFlightRef.current = true;
     setAutoSyncLoading(true);
 
     try {
@@ -269,7 +267,6 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
     } catch (error) {
       setLastAutoSyncMessage(error instanceof Error ? error.message : "자동조회 오류");
     } finally {
-      autoSyncInFlightRef.current = false;
       setAutoSyncLoading(false);
     }
   };
@@ -277,14 +274,12 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
   useEffect(() => {
     if (!autoSyncEnabled) return;
 
-    void runSilentBankdaAutoSync();
-
     const timer = window.setInterval(() => {
       void runSilentBankdaAutoSync();
     }, 310000);
 
     return () => window.clearInterval(timer);
-  }, [autoSyncEnabled]);
+  }, [autoSyncEnabled, autoSyncLoading]);
 
   const summary = useMemo(() => ({
     unpaid: orderGroups.filter((group) => isBankUnpaid(group.first)).length,
