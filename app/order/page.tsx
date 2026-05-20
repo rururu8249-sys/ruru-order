@@ -172,9 +172,39 @@ const maskAddress = (base: string, detail: string) => {
 
 
 const blockCustomerCopyEvents = () => {
-  // 모바일 버튼 클릭 방해 방지를 위해 터치/클릭 이벤트 차단은 하지 않습니다.
-  // 필요 시 텍스트 선택 방지는 CSS select-none 수준에서만 처리합니다.
-  return () => {};
+  const block = (event: Event) => event.preventDefault();
+
+  const blockKey = (event: KeyboardEvent) => {
+    const key = event.key.toLowerCase();
+    const isMac = event.metaKey;
+    const isWin = event.ctrlKey;
+
+    if (
+      event.key === "F12" ||
+      ((isWin || isMac) && ["c", "x", "u"].includes(key)) ||
+      (isWin && event.shiftKey && ["i", "j"].includes(key)) ||
+      (isMac && event.altKey && ["i", "j"].includes(key))
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  };
+
+  document.addEventListener("contextmenu", block);
+  document.addEventListener("copy", block);
+  document.addEventListener("cut", block);
+  document.addEventListener("dragstart", block);
+  document.addEventListener("selectstart", block);
+  document.addEventListener("keydown", blockKey);
+
+  return () => {
+    document.removeEventListener("contextmenu", block);
+    document.removeEventListener("copy", block);
+    document.removeEventListener("cut", block);
+    document.removeEventListener("dragstart", block);
+    document.removeEventListener("selectstart", block);
+    document.removeEventListener("keydown", blockKey);
+  };
 };
 
 export default function OrderPage() {
@@ -261,6 +291,10 @@ export default function OrderPage() {
       window.history.replaceState(null, "", "/order");
     }
   }, [isEditMode, isEditingCustomerInfo, hasSavedInfo, customerPhone, youtubeNickname, customerName]);
+
+  useEffect(() => {
+    return blockCustomerCopyEvents();
+  }, []);
 
   useEffect(() => {
     if (isEditingCustomerInfo) {
@@ -1128,7 +1162,7 @@ export default function OrderPage() {
 
   if (done) {
     return (
-      <main className="min-h-screen bg-[#f5f8ff] px-4 py-6 text-[#151923] select-none">
+      <main className="min-h-screen bg-[#f5f8ff] px-4 py-6 text-[#151923] select-none" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
         <section className="mx-auto w-full max-w-md">
           <TopCustomerNav />
 
