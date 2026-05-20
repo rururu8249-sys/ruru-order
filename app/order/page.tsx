@@ -38,6 +38,7 @@ import OrderHero from "@/components/order/OrderHero";
 import OrderGuideCard from "@/components/order/OrderGuideCard";
 import OrderPriceSummaryBox from "@/components/order/OrderPriceSummaryBox";
 import OrderCustomerInfoIntro from "@/components/order/OrderCustomerInfoIntro";
+import OrderProductInputGuideDetail from "@/components/order/OrderProductInputGuideDetail";
 
 declare global {
   interface Window {
@@ -1443,48 +1444,16 @@ export default function OrderPage() {
               </button>
             </div>
 
-            {showProductGuideDetail && (
-              <div className="mt-3 grid gap-3">
-                {broadcast && broadcastProducts.length > 0 && (
-                  <div className="rounded-[1.2rem] bg-white p-3 text-xs font-bold leading-relaxed text-pink-700">
-                    🔴 현재 방송상품 {broadcastProducts.length}개가 연결되어 있습니다.
-                    <br />
-                    상품명 칸을 누르면 오늘 방송상품 선택 및 금액 자동입력이 가능합니다.
-                    <br />
-                    목록에 없는 상품은 직접 입력 가능합니다.
-                  </div>
-                )}
-
-                {broadcast && broadcastProducts.length === 0 && (
-                  <div className="rounded-[1.2rem] bg-yellow-50 p-3 text-xs font-bold leading-relaxed text-yellow-700">
-                    ⚠️ 현재 방송은 ON 상태지만 연결된 방송상품이 없습니다.
-                    <br />
-                    상품명은 기존처럼 직접 입력해주세요.
-                  </div>
-                )}
-
-                <div className="rounded-[1.2rem] bg-red-50 p-3 text-xs font-black leading-relaxed text-red-600">
-                  ⚠️ 상품 1칸에는 상품 1개만 입력하세요.
-                  <br />
-                  상품금액은 택배비를 빼고 상품 가격만 적어주세요.
-                  <br />
-                  다른 상품은 반드시 아래 [+ 상품 추가하기]를 눌러 따로 작성해주세요.
-                  <br />
-                  한 칸에 2개 이상 적으면 주문 누락될 수 있습니다.
-                </div>
-
-                <div className="rounded-[1.2rem] bg-white p-3 text-xs font-bold leading-relaxed text-pink-700">
-                  색상·사이즈가 없으면 반드시 “없음”이라고 입력해주세요.
-                  <br />
-                  상품명 / 색상 / 사이즈 / 수량 / 금액은 전부 필수입니다.
-                </div>
-              </div>
-            )}
+            <OrderProductInputGuideDetail
+              show={showProductGuideDetail}
+              broadcastActive={Boolean(broadcast)}
+              broadcastProductCount={broadcastProducts.length}
+            />
           </div>
 
           <div className="mt-4 grid gap-4">
             {items.map((item, index) => (
-              <div key={index} className="rounded-[1.5rem] border border-gray-100 bg-gray-50 p-4">
+              <div key={index} className="rounded-[26px] border border-blue-100 bg-white p-4 shadow-[0_10px_22px_rgba(30,64,175,0.06)]">
                 <div className="mb-3 flex items-center justify-between">
                   <div className="font-black">상품 {index + 1}</div>
 
@@ -1514,7 +1483,7 @@ export default function OrderPage() {
                         setProductSearchOpenIndex(index);
                         setProductSearchText(event.target.value);
                       }}
-                      placeholder="상품명 1개만 입력"
+                      placeholder="상품명"
                       className="w-full rounded-2xl border border-gray-200 bg-white p-4 font-bold"
                     />
 
@@ -1572,14 +1541,14 @@ export default function OrderPage() {
                     <input
                       value={item.color}
                       onChange={(event) => updateItem(index, "color", event.target.value)}
-                      placeholder="색상 (없으면 없음)"
+                      placeholder="색상"
                       className="rounded-2xl border border-gray-200 bg-white p-4 font-bold"
                     />
 
                     <input
                       value={item.size}
                       onChange={(event) => updateItem(index, "size", event.target.value)}
-                      placeholder="사이즈 (없으면 없음)"
+                      placeholder="사이즈"
                       className="rounded-2xl border border-gray-200 bg-white p-4 font-bold"
                     />
                   </div>
@@ -1599,7 +1568,7 @@ export default function OrderPage() {
                         onChange={(event) =>
                           updateItem(index, "product_price", onlyNumber(event.target.value))
                         }
-                        placeholder="상품금액만 입력"
+                        placeholder="상품금액"
                         inputMode="numeric"
                         className="w-full rounded-2xl border border-gray-200 bg-white p-4 pr-10 font-bold"
                       />
@@ -1634,7 +1603,7 @@ export default function OrderPage() {
         </section>
 
         <section className="mt-4 rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black">결제 및 요청사항</h2>
+          <h2 className="text-xl font-black">결제방식 / 요청사항</h2>
 
           <div className="mt-4 grid gap-3">
             <div className="grid grid-cols-2 gap-2">
@@ -1667,7 +1636,7 @@ export default function OrderPage() {
             <textarea
               value={requestMemo}
               onChange={(event) => setRequestMemo(event.target.value)}
-              placeholder="요청사항 / 배송메모"
+              placeholder="요청사항(선택) / 배송메모"
               className="min-h-[100px] rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-pink-300"
             />
 
