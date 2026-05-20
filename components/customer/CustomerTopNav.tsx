@@ -1,17 +1,15 @@
 // components/customer/CustomerTopNav.tsx
-// 새 파일 생성
-// 위치: /Users/ruru/Desktop/ruru-order-app/components/customer/CustomerTopNav.tsx
 // 목적: 고객 페이지 공통 상단바
-// 적용 대상: /notice, /myorder, 필요 시 /order
 // 규칙:
-// - 로그아웃 상태: HOME 버튼만 표시
-// - 로그인 상태: 안녕하세요 / 닉네임님 + HOME / 정보수정 / 로그아웃 표시
-// - 주문 저장, 금액, 카드수수료, Supabase 주문 로직 없음
+// - 루루동이 LIVE / HOME / 주문조회 / 정보수정 / 로그아웃 / 인사말 / 포인트 0원 표시
+// - 공구상품은 상단바에 넣지 않음
+// - 주문 저장, 금액, 카드수수료, Supabase, 입금매칭, 송장 로직 없음
 
 "use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import CustomerPointBadge from "@/components/customer/CustomerPointBadge";
 import {
   clearSavedCustomerInfo,
   getCustomerGreetingName,
@@ -54,46 +52,49 @@ export default function CustomerTopNav({
 
     clearSavedCustomerInfo();
     setCustomerInfo(initialInfo);
-
     window.location.href = "/";
   };
 
   return (
-    <header className={`mb-5 flex items-start justify-between gap-3 ${className}`}>
-      {showGreeting ? (
-        <div className="min-h-[48px] pt-1">
-          {isLoggedIn ? (
-            <div className="leading-tight">
-              <p className="text-[20px] font-extrabold tracking-[-0.04em] text-[#1f1713]">
-                안녕하세요
-              </p>
-              <p className="mt-1 text-[20px] font-extrabold tracking-[-0.04em] text-[#1f1713]">
-                {greetingName || "고객"}님
-              </p>
-            </div>
-          ) : (
-            <p className="text-[20px] font-extrabold tracking-[-0.04em] text-[#1f1713]">
-              안녕하세요
+    <header className={`mb-5 rounded-[28px] bg-white/95 p-4 shadow-[0_12px_28px_rgba(30,64,175,0.08)] ring-1 ring-blue-100/70 ${className}`}>
+      <div className="flex items-start justify-between gap-3">
+        <Link href="/" className="min-w-0 active:scale-[0.99]">
+          <p className="text-[15px] font-black tracking-[-0.04em] text-blue-700">
+            루루동이 LIVE
+          </p>
+
+          {showGreeting && (
+            <p className="mt-1 truncate text-[18px] font-black tracking-[-0.06em] text-[#151923]">
+              {isLoggedIn
+                ? `${greetingName || "고객"}님 안녕하세요`
+                : "주문 전 정보를 확인해주세요"}
             </p>
           )}
-        </div>
-      ) : (
-        <div />
-      )}
+        </Link>
 
-      <div className="flex flex-wrap justify-end gap-2">
+        <CustomerPointBadge className="shrink-0" />
+      </div>
+
+      <nav className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Link
           href="/"
-          className="rounded-2xl bg-white/95 px-3.5 py-2 text-sm font-extrabold text-[#241b17] shadow-[0_8px_20px_rgba(60,38,20,0.12)] ring-1 ring-black/5 active:scale-[0.98]"
+          className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[14px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
         >
           🏠 HOME
         </Link>
 
-        {isLoggedIn && (
+        <Link
+          href="/myorder"
+          className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[14px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
+        >
+          주문조회
+        </Link>
+
+        {isLoggedIn ? (
           <>
             <Link
               href="/order"
-              className="rounded-2xl bg-white/95 px-3.5 py-2 text-sm font-extrabold text-[#241b17] shadow-[0_8px_20px_rgba(60,38,20,0.12)] ring-1 ring-black/5 active:scale-[0.98]"
+              className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[14px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
             >
               정보수정
             </Link>
@@ -101,13 +102,26 @@ export default function CustomerTopNav({
             <button
               type="button"
               onClick={handleLogout}
-              className="rounded-2xl bg-white/95 px-3.5 py-2 text-sm font-extrabold text-[#241b17] shadow-[0_8px_20px_rgba(60,38,20,0.12)] ring-1 ring-black/5 active:scale-[0.98]"
+              className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[14px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
             >
               로그아웃
             </button>
           </>
+        ) : (
+          <>
+            <Link
+              href="/order"
+              className="rounded-2xl bg-blue-600 px-3 py-3 text-center text-[14px] font-black tracking-[-0.04em] text-white shadow-[0_10px_20px_rgba(37,99,235,0.20)] active:scale-[0.98]"
+            >
+              주문시작
+            </Link>
+
+            <span className="rounded-2xl bg-blue-50 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-blue-700 ring-1 ring-blue-100">
+              첫 주문 환영
+            </span>
+          </>
         )}
-      </div>
+      </nav>
     </header>
   );
 }
