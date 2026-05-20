@@ -10,14 +10,8 @@ export default function AdminOrderAmountCell({
   warningText,
 }: AdminOrderAmountCellProps) {
   return (
-    <div className="text-left lg:text-right">
-      <div className="text-[15px] font-black">{amountText}</div>
-
-      {warningText ? (
-        <div className="mt-0.5 text-[10px] font-black text-red-600">
-          {warningText}
-        </div>
-      ) : null}
+    <div className="text-left lg:text-right" title={warningText || ""}>
+      <div className="text-[14px] font-black">{amountText}</div>
     </div>
   );
 }

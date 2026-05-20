@@ -1,5 +1,7 @@
 "use client";
 
+import AdminOrderCriticalFlag from "@/components/admin-v2/orders/AdminOrderCriticalFlag";
+
 type StatusOption = {
   value: string;
   label: string;
@@ -24,8 +26,13 @@ export default function AdminOrderStatusCell({
   showShippedTimeMissing,
   onChange,
 }: AdminOrderStatusCellProps) {
+  const hiddenMeta = [
+    statusLogCount > 0 ? `변경이력 ${statusLogCount}건` : "",
+    showShippedTimeMissing ? "출고시간 미기록" : "",
+  ].filter(Boolean).join(" / ");
+
   return (
-    <div>
+    <div title={hiddenMeta}>
       <select
         value={status}
         onChange={(event) => onChange(event.target.value)}
@@ -38,23 +45,7 @@ export default function AdminOrderStatusCell({
         ))}
       </select>
 
-      {statusLogCount > 0 ? (
-        <div className="mt-0.5 text-center text-[10px] font-black text-blue-700">
-          변경 {statusLogCount}
-        </div>
-      ) : null}
-
-      {showTrackingMissing ? (
-        <div className="mt-0.5 text-center text-[10px] font-black text-red-600">
-          송장없음
-        </div>
-      ) : null}
-
-      {showShippedTimeMissing ? (
-        <div className="mt-0.5 text-center text-[10px] font-black text-red-600">
-          시간없음
-        </div>
-      ) : null}
+      {showTrackingMissing ? <AdminOrderCriticalFlag text="송장없음" /> : null}
     </div>
   );
 }

@@ -18,25 +18,21 @@ export default function AdminOrderPaymentCell({
   onOpenManualMatch,
 }: AdminOrderPaymentCellProps) {
   return (
-    <div className="min-w-0">
-      <div className="truncate text-[12px] font-black text-neutral-700">
-        {paymentMethod || "-"}
-      </div>
-
+    <div className="min-w-0" title={paymentMethod || paymentLabel || ""}>
       {isBankUnpaid ? (
         <button
           type="button"
           onClick={onOpenManualMatch}
-          className="mt-1 inline-flex rounded-md bg-neutral-950 px-2.5 py-1.5 text-[11px] font-black text-white active:scale-[0.98]"
+          className="inline-flex rounded-md bg-neutral-950 px-2.5 py-1.5 text-[11px] font-black text-white active:scale-[0.98]"
         >
-          입금 매칭
+          입금매칭
         </button>
       ) : isBankPaid ? (
-        <div className="mt-1 inline-flex rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-black text-emerald-700">
+        <div className="inline-flex rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-black text-emerald-700">
           결제완료
         </div>
       ) : (
-        <div className={`mt-1 inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-black ${paymentClassName}`}>
+        <div className={`inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-black ${paymentClassName}`}>
           {paymentLabel}
         </div>
       )}
