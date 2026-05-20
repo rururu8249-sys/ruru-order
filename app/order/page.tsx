@@ -229,7 +229,7 @@ export default function OrderPage() {
   const [isCustomerInfoOpen, setIsCustomerInfoOpen] = useState(false);
   const [showSavedCustomerDetail, setShowSavedCustomerDetail] = useState(false);
   const [showProductGuideDetail, setShowProductGuideDetail] = useState(false);
-  const [customerMode, setCustomerMode] = useState<"load" | "new">("load");
+  const [customerMode, setCustomerMode] = useState<"load" | "new">("new");
   const [loginName, setLoginName] = useState("");
   const [loginPhone, setLoginPhone] = useState("");
 
@@ -299,18 +299,22 @@ export default function OrderPage() {
   useEffect(() => {
     if (isEditingCustomerInfo) {
       setIsCustomerInfoOpen(true);
+      setCustomerMode("new");
       return;
     }
 
-    if (hasSavedInfo) {
+    const hasCompleteSavedInfo =
+      hasSavedInfo && Boolean(customerPhone && youtubeNickname && customerName);
+
+    if (hasCompleteSavedInfo) {
       setIsCustomerInfoOpen(false);
       setCustomerMode("load");
       return;
     }
 
     setIsCustomerInfoOpen(true);
-    setCustomerMode("load");
-  }, [hasSavedInfo, isEditingCustomerInfo]);
+    setCustomerMode("new");
+  }, [hasSavedInfo, isEditingCustomerInfo, customerPhone, youtubeNickname, customerName]);
 
   useEffect(() => {
     const cleanPhone = normalizePhone(customerPhone);
@@ -729,7 +733,7 @@ export default function OrderPage() {
       }
 
       const script = document.createElement("script");
-      script.src = "//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
+      script.src = "https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
       script.async = true;
       script.dataset.daumPostcode = "true";
       script.onload = () => resolve();
@@ -739,22 +743,50 @@ export default function OrderPage() {
   };
 
   const openAddressSearch = async () => {
+    const manualAddress = () => {
+      const typedAddress = window.prompt(
+        "주소검색창이 안 뜨면 주소를 직접 입력해주세요.\n\n예) 서울 강남구 테헤란로 123"
+      );
+
+      if (typedAddress && typedAddress.trim()) {
+        setAddress(typedAddress.trim());
+
+        setTimeout(() => {
+          const detailInput = document.querySelector<HTMLInputElement>(
+            "input[placeholder='상세주소를 입력해주세요']"
+          );
+          detailInput?.focus();
+        }, 100);
+      }
+    };
+
     try {
       await loadDaumPostcodeScript();
 
+      if (!window.daum?.Postcode) {
+        manualAddress();
+        return;
+      }
+
       new window.daum.Postcode({
         oncomplete: (data: any) => {
-          const selectedAddress = data.roadAddress || data.jibunAddress || "";
-          setZipcode(data.zonecode || "");
-          setAddress(selectedAddress);
+          const nextAddress = data.roadAddress || data.jibunAddress || "";
+          const nextZipcode = data.zonecode || "";
+
+          setAddress(nextAddress);
+          setZipcode(nextZipcode);
 
           setTimeout(() => {
-            document.getElementById("detailAddressInput")?.focus();
+            const detailInput = document.querySelector<HTMLInputElement>(
+              "input[placeholder='상세주소를 입력해주세요']"
+            );
+            detailInput?.focus();
           }, 100);
         },
+        onclose: () => {},
       }).open();
-    } catch {
-      alert("주소검색을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
+    } catch (error) {
+      manualAddress();
     }
   };
 
