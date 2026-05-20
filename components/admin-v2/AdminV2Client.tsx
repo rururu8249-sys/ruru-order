@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import ManualPaymentMatchDrawer from "@/components/admin-v2/payment/ManualPaymentMatchDrawer";
 import PaymentMatchPanel from "@/components/admin-v2/payment/PaymentMatchPanel";
+import AdminOrderPaymentCell from "@/components/admin-v2/orders/AdminOrderPaymentCell";
 
 import type {
   AdminTab,
@@ -1808,25 +1809,14 @@ function OrderWorkTable({
               <div className="min-w-0">
                 <div className="truncate text-[15px] font-bold text-neutral-800">{buildItemSummary(group)}</div>
               </div>
-              <div className="min-w-0">
-                <div className="truncate text-[13px] font-black text-neutral-700">{group.first.payment_method || "-"}</div>
-                <div className={`mt-0.5 inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-black ${paymentMeta.className}`}>
-                  {paymentMeta.label}
-                </div>
-                {isBankUnpaid(group.first) ? (
-                  <button
-                    type="button"
-                    onClick={() => onOpenManualMatch(group)}
-                    className="mt-1 rounded-md bg-neutral-950 px-2 py-1 text-[10px] font-black text-white active:scale-[0.98]"
-                  >
-                    입금매칭
-                  </button>
-                ) : isBankPaid(group.first) ? (
-                  <div className="mt-1 rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-black text-emerald-700">
-                    입금확인 완료
-                  </div>
-                ) : null}
-              </div>
+              <AdminOrderPaymentCell
+                paymentMethod={group.first.payment_method || "-"}
+                paymentLabel={paymentMeta.label}
+                paymentClassName={paymentMeta.className}
+                isBankUnpaid={isBankUnpaid(group.first)}
+                isBankPaid={isBankPaid(group.first)}
+                onOpenManualMatch={() => onOpenManualMatch(group)}
+              />
               <div className="text-left lg:text-right">
                 <div className="text-[15px] font-black">{money(group.totalAmount)}</div>
                 {groupMoneyLogs.length > 0 ? (
