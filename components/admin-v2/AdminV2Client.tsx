@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import ManualPaymentMatchDrawer from "@/components/admin-v2/payment/ManualPaymentMatchDrawer";
 import PaymentMatchPanel from "@/components/admin-v2/payment/PaymentMatchPanel";
 import AdminOrderPaymentCell from "@/components/admin-v2/orders/AdminOrderPaymentCell";
+import AdminOrderTableHeader from "@/components/admin-v2/orders/AdminOrderTableHeader";
 
 import type {
   AdminTab,
@@ -1773,16 +1774,7 @@ function OrderWorkTable({
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
-      <div className="hidden grid-cols-[84px_124px_128px_minmax(250px,1fr)_82px_108px_106px_90px] bg-neutral-950 px-3 py-2 text-[13px] font-black text-white lg:grid">
-        <div>주문번호</div>
-        <div>작성일</div>
-        <div>고객</div>
-        <div>주문내역</div>
-        <div>결제</div>
-        <div className="text-right">금액</div>
-        <div className="text-center">상태</div>
-        <div className="text-center">상세</div>
-      </div>
+      <AdminOrderTableHeader />
 
       {groups.map((group) => {
         const isOpen = openedOrderGroupIds.includes(group.groupId);
