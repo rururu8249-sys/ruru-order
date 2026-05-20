@@ -15,6 +15,7 @@ import AdminOrderMainRow from "@/components/admin-v2/orders/AdminOrderMainRow";
 import AdminOrderAmountCell from "@/components/admin-v2/orders/AdminOrderAmountCell";
 import AdminOrderStatusCell from "@/components/admin-v2/orders/AdminOrderStatusCell";
 import AdminOrderDetailButton from "@/components/admin-v2/orders/AdminOrderDetailButton";
+import AdminOrderDetailBox from "@/components/admin-v2/orders/AdminOrderDetailBox";
 
 import type {
   AdminTab,
@@ -1868,24 +1869,24 @@ function OrderDetailBlock({
   return (
     <div className="border-t border-neutral-100 bg-neutral-50 px-3 py-3">
       <div className="grid gap-2 md:grid-cols-[1.1fr_1.4fr_1fr]">
-        <DetailBox title="고객정보">
+        <AdminOrderDetailBox title="고객정보">
           <div>전화번호: {displayOrderPhone(first)}</div>
           <div>주소: {address || "-"}</div>
-        </DetailBox>
-        <DetailBox title="상품요약">
+        </AdminOrderDetailBox>
+        <AdminOrderDetailBox title="상품요약">
           {group.rows.map((row) => (
             <div key={row.id}>
               {buildProductSummaryFromRow(row)} · 현재 최종 {money(orderBaseAmount(row))}
             </div>
           ))}
-        </DetailBox>
-        <DetailBox title="관리정보">
+        </AdminOrderDetailBox>
+        <AdminOrderDetailBox title="관리정보">
           <div>결제상태: {paymentMeta.label} · {paymentMeta.desc}</div>
           <div>입금확인시간: {first.deposit_confirmed_at ? formatDateLabel(first.deposit_confirmed_at) : "미확인"}</div>
           <div>출고완료시간: {first.shipped_at ? formatDateLabel(first.shipped_at) : "미처리"}</div>
           <div>송장: {first.tracking_company || "로젠"} {first.tracking_number || "미등록"}</div>
           <div>관리자메모: {adminMemo || "없음"}</div>
-        </DetailBox>
+        </AdminOrderDetailBox>
       </div>
 
       <div className="mt-3 rounded-xl border border-neutral-200 bg-white p-3">
@@ -1902,18 +1903,18 @@ function OrderDetailBlock({
         </div>
 
         <div className="grid gap-2 md:grid-cols-2">
-          <DetailBox title="배송메모 / 택배사 전송">
+          <AdminOrderDetailBox title="배송메모 / 택배사 전송">
             <div>{shippingExcelMemo || "없음"}</div>
-          </DetailBox>
-          <DetailBox title="상품요약 / 내부확인">
+          </AdminOrderDetailBox>
+          <AdminOrderDetailBox title="상품요약 / 내부확인">
             <div>{productSummary || legacyProductMemo || "상품요약 없음"}</div>
-          </DetailBox>
-          <DetailBox title="관리자메모">
+          </AdminOrderDetailBox>
+          <AdminOrderDetailBox title="관리자메모">
             <div>{adminMemo || "없음"}</div>
-          </DetailBox>
-          <DetailBox title="특이사항">
+          </AdminOrderDetailBox>
+          <AdminOrderDetailBox title="특이사항">
             <div>{specialNote || "없음"}</div>
-          </DetailBox>
+          </AdminOrderDetailBox>
         </div>
       </div>
 
