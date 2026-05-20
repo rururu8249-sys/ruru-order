@@ -39,7 +39,7 @@ import OrderCustomerTopNav from "@/components/order/OrderCustomerTopNav";
 import OrderPriceSummaryBox from "@/components/order/OrderPriceSummaryBox";
 import OrderDepositConfirmModal from "@/components/order/OrderDepositConfirmModal";
 import OrderCustomerInfoIntro from "@/components/order/OrderCustomerInfoIntro";
-import OrderCustomerEntryPanel from "@/components/order/OrderCustomerEntryPanel";
+import OrderEntryGateV2 from "@/components/order/OrderEntryGateV2";
 import OrderCustomerInfoFormCard from "@/components/order/OrderCustomerInfoFormCard";
 import OrderProductInputGuideDetail from "@/components/order/OrderProductInputGuideDetail";
 import OrderCompletePaymentNotice from "@/components/order/OrderCompletePaymentNotice";
@@ -1191,19 +1191,22 @@ export default function OrderPage() {
     <OrderPageShell>
         <TopCustomerNav />
 
-        {!isAutoLoggedIn && (
-          <OrderCustomerInfoIntro mode={isEditingCustomerInfo ? "edit" : "check"} />
-        )}
-
         {!isAutoLoggedIn && !isEditingCustomerInfo && customerMode === "load" && (
-          <OrderCustomerEntryPanel
+          <OrderEntryGateV2
             loginName={loginName}
             loginPhone={formatPhone(loginPhone)}
             onLoginNameChange={setLoginName}
             onLoginPhoneChange={(value) => setLoginPhone(normalizePhone(value))}
             onLoadCustomer={loadCustomerByNamePhone}
-            onStartNew={() => setCustomerMode("new")}
+            onStartNew={() => {
+              setCustomerMode("new");
+              setIsCustomerInfoOpen(true);
+            }}
           />
+        )}
+
+        {!isAutoLoggedIn && (isEditingCustomerInfo || customerMode === "new") && (
+          <OrderCustomerInfoIntro mode={isEditingCustomerInfo ? "edit" : "check"} />
         )}
 
         {!isAutoLoggedIn && (isEditingCustomerInfo || customerMode === "new") && (
