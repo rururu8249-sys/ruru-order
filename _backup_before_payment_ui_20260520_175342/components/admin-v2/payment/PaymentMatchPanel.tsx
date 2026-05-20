@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DepositRow, OrderGroup } from "@/lib/admin-v2/types";
 import { formatDateLabel, money } from "@/lib/admin-v2/formatters";
 import { buildItemSummary, isBankPaid, isBankUnpaid, orderBaseAmount, shortOrderCode } from "@/lib/admin-v2/orderHelpers";
@@ -133,6 +133,11 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewResult, setPreviewResult] = useState<AutoMatchPreviewResult | null>(null);
   const [autoRunLoading, setAutoRunLoading] = useState(false);
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
+  const [autoSyncLoading, setAutoSyncLoading] = useState(false);
+  const [lastAutoSyncLabel, setLastAutoSyncLabel] = useState("");
+  const [lastAutoSyncMessage, setLastAutoSyncMessage] = useState("자동조회 대기중");
+  const autoSyncInFlightRef = useRef(false);
 
   const runBankdaSync = async () => {
     setSyncing(true);
@@ -213,6 +218,73 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
       setAutoRunLoading(false);
     }
   };
+
+  const runSilentBankdaAutoSync = async () => {
+    if (autoSyncInFlightRef.current) return;
+
+    autoSyncInFlightRef.current = true;
+    setAutoSyncLoading(true);
+
+    try {
+      const response = await fetch("/api/bankda/sync-deposits", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+        body: JSON.stringify({}),
+      });
+
+      const result = await response.json().catch(() => null);
+
+      const nowLabel = new Date().toLocaleTimeString("ko-KR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+
+      setLastAutoSyncLabel(nowLabel);
+
+      if (!response.ok || !result?.ok) {
+        setLastAutoSyncMessage(result?.message || "자동조회 실패");
+        return;
+      }
+
+      const fetched = Number(result.rawCount ?? result.fetchedCount ?? 0);
+      const inserted = Number(result.insertedCount ?? 0);
+      const skipped = Number(result.skippedCount ?? 0);
+      const autoMatched = Number(result.autoMatchedCount ?? 0);
+      const bankdaDescription = String(result.bankdaDescription || "").trim();
+
+      if (bankdaDescription.includes("5분") || bankdaDescription.includes("경과")) {
+        setLastAutoSyncMessage("뱅크다 5분 제한 대기중");
+      } else {
+        setLastAutoSyncMessage(
+          `조회 ${fetched}건 · 신규 ${inserted}건 · 중복 ${skipped}건 · 자동후보검사 ${autoMatched}건`
+        );
+      }
+
+      await forceLoadServerDeposits();
+      await runAutoMatchPreview();
+    } catch (error) {
+      setLastAutoSyncMessage(error instanceof Error ? error.message : "자동조회 오류");
+    } finally {
+      autoSyncInFlightRef.current = false;
+      setAutoSyncLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!autoSyncEnabled) return;
+
+    void runSilentBankdaAutoSync();
+
+    const timer = window.setInterval(() => {
+      void runSilentBankdaAutoSync();
+    }, 310000);
+
+    return () => window.clearInterval(timer);
+  }, [autoSyncEnabled]);
 
   const summary = useMemo(() => ({
     unpaid: orderGroups.filter((group) => isBankUnpaid(group.first)).length,
@@ -306,14 +378,34 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={forceLoadServerDeposits}
-              disabled={serverDepositLoading}
-              className="rounded-lg bg-blue-600 px-3 py-2 text-[12px] font-black text-white active:scale-[0.98] disabled:bg-neutral-300"
-            >
-              {serverDepositLoading ? "불러오는중..." : "입금내역 다시 불러오기"}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setAutoSyncEnabled((value) => !value)}
+                className={`rounded-lg px-3 py-2 text-[12px] font-black active:scale-[0.98] ${
+                  autoSyncEnabled ? "bg-emerald-600 text-white" : "bg-neutral-200 text-neutral-700"
+                }`}
+              >
+                {autoSyncEnabled ? "5분 자동조회 ON" : "5분 자동조회 OFF"}
+              </button>
+
+              <button
+                type="button"
+                onClick={forceLoadServerDeposits}
+                disabled={serverDepositLoading}
+                className="rounded-lg bg-blue-600 px-3 py-2 text-[12px] font-black text-white active:scale-[0.98] disabled:bg-neutral-300"
+              >
+                {serverDepositLoading ? "불러오는중..." : "입금내역 다시 불러오기"}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-3 rounded-lg bg-white px-3 py-2 text-[11px] font-black text-blue-800">
+            자동조회 상태: {autoSyncEnabled ? "ON" : "OFF"}
+            {autoSyncLoading ? " · 조회중..." : ""}
+            {lastAutoSyncLabel ? ` · 마지막 ${lastAutoSyncLabel}` : ""}
+            {" · "}
+            {lastAutoSyncMessage}
           </div>
 
           {depositsForDisplay.length > 0 && (
@@ -341,8 +433,19 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
                   실제 입금확인은 처리하지 않았습니다. 닉네임 완전일치 + 금액 완전일치 + 1:1 단일 후보만 표시합니다.
                 </div>
               </div>
-              <div className="rounded-lg bg-white px-3 py-2 text-[12px] font-black text-amber-900">
-                후보 {(previewResult.summary?.auto_match_preview_count ?? 0).toLocaleString()}건
+              <div className="flex flex-wrap gap-2">
+                <div className="rounded-lg bg-white px-3 py-2 text-[12px] font-black text-amber-900">
+                  후보 {(previewResult.summary?.auto_match_preview_count ?? 0).toLocaleString()}건
+                </div>
+
+                <button
+                  type="button"
+                  onClick={runAutoMatchExecute}
+                  disabled={autoRunLoading || (previewResult.summary?.auto_match_preview_count ?? 0) <= 0}
+                  className="rounded-lg bg-emerald-600 px-3 py-2 text-[12px] font-black text-white active:scale-[0.98] disabled:bg-neutral-300"
+                >
+                  {autoRunLoading ? "실행중..." : "자동매칭 실행"}
+                </button>
               </div>
             </div>
 
