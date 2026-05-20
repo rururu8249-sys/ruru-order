@@ -200,6 +200,7 @@ export default function OrderPage() {
   const [showSavedCustomerDetail, setShowSavedCustomerDetail] = useState(false);
   const [showProductGuideDetail, setShowProductGuideDetail] = useState(false);
   const [customerMode, setCustomerMode] = useState<"load" | "new">("load");
+  const [orderModeFromUrl, setOrderModeFromUrl] = useState("");
   const [loginName, setLoginName] = useState("");
   const [loginPhone, setLoginPhone] = useState("");
 
@@ -225,10 +226,7 @@ export default function OrderPage() {
   const shippingFee = alreadyPaidShipping ? 0 : baseShippingFee;
   const cardRateForCustomer = customerCardRate;
 
-  const currentOrderMode =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("mode")
-      : "";
+  const currentOrderMode = orderModeFromUrl;
 
   const isForcedOrderEntryMode =
     currentOrderMode === "new" || currentOrderMode === "load";
@@ -264,6 +262,8 @@ export default function OrderPage() {
 
     const params = new URLSearchParams(window.location.search);
     const nextMode = params.get("mode");
+
+    setOrderModeFromUrl(nextMode || "");
 
     if (nextMode === "edit") {
       setIsEditMode(true);
