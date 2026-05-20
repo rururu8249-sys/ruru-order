@@ -1091,7 +1091,7 @@ export default function OrderPage() {
 
   if (done) {
     return (
-      <main className="min-h-screen bg-[#f8f1e8] px-4 py-6 text-[#241b17] select-none" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
+      <main className="min-h-screen bg-[#f5f8ff] px-4 py-6 text-[#151923] select-none" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
         <section className="mx-auto w-full max-w-md">
           <TopCustomerNav />
 
@@ -1102,7 +1102,7 @@ export default function OrderPage() {
                   <div className="text-[13px] font-black tracking-[-0.04em] text-[#f05a45]">
                     입금정보를 확인해주세요
                   </div>
-                  <h1 className="mt-1 text-[27px] font-black tracking-[-0.07em] text-[#241b17]">
+                  <h1 className="mt-1 text-[27px] font-black tracking-[-0.07em] text-[#151923]">
                     입금계좌 안내
                   </h1>
                 </div>
@@ -1116,7 +1116,7 @@ export default function OrderPage() {
                 <div className="mt-2 break-all text-[29px] font-black tracking-[-0.05em] text-[#111827]">
                   {BANK_ACCOUNT}
                 </div>
-                <div className="mt-2 text-lg font-black text-[#241b17]">{BANK_HOLDER}</div>
+                <div className="mt-2 text-lg font-black text-[#151923]">{BANK_HOLDER}</div>
               </div>
 
               <button
@@ -1140,7 +1140,7 @@ export default function OrderPage() {
               <div className="text-[13px] font-black tracking-[-0.04em] text-[#2563eb]">
                 카드결제 안내
               </div>
-              <h1 className="mt-1 text-[27px] font-black tracking-[-0.07em] text-[#241b17]">
+              <h1 className="mt-1 text-[27px] font-black tracking-[-0.07em] text-[#151923]">
                 카톡채널 문의
               </h1>
 
