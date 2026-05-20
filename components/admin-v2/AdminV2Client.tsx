@@ -1432,7 +1432,7 @@ function ShippingPanel({
   };
 
   return (
-    <div className="grid gap-3">
+    <div className="grid w-full gap-3">
       <div className="rounded-xl border border-neutral-200 bg-white p-3">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -1518,7 +1518,7 @@ function ShippingPanel({
             아직 업로드된 원본 엑셀이 없습니다.
           </div>
         ) : (
-          <div className="grid gap-3">
+          <div className="grid w-full gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-neutral-50 p-3">
               <div className="text-[13px] font-black text-neutral-700">파일: {previewFileName || "-"}</div>
               <div className="flex flex-wrap gap-1.5 text-[12px] font-black">
@@ -1700,8 +1700,8 @@ function OrderWorkTable({
   onOpenManualMatch: (group: OrderGroup) => void;
 }) {
   return (
-    <div className="w-full overflow-x-auto overflow-hidden rounded-xl border border-neutral-200 bg-white">
-      <AdminOrderTableHeader />
+    <div className="w-full min-w-full overflow-x-auto rounded-xl border border-neutral-200 bg-white">
+      <div className="w-full min-w-full"><AdminOrderTableHeader /></div>
 
       {groups.map((group) => {
         const isOpen = openedOrderGroupIds.includes(group.groupId);
@@ -1919,7 +1919,7 @@ function SettlementPanel({
   const bankDepositDiff = bankConfirmedOrderSales - confirmedBankDeposits;
 
   return (
-    <div className="grid gap-3">
+    <div className="grid w-full gap-3">
       <div className="rounded-xl border border-neutral-200 bg-white p-3 text-[15px] font-black">
         기준: {dateLabel}
         <div className="mt-1 text-[12px] font-bold text-neutral-500">
