@@ -164,7 +164,7 @@ export async function fetchBankdaTransactions(options?: {
   dateto?: string;
   accountnum?: string;
 }) {
-  const token = process.env.BANKDA_ACCESS_TOKEN;
+  const token = String(process.env.BANKDA_ACCESS_TOKEN || "").trim();
 
   if (!token) {
     throw new Error("BANKDA_ACCESS_TOKEN 환경변수가 없습니다.");
@@ -175,7 +175,8 @@ export async function fetchBankdaTransactions(options?: {
 
   body.append("datefrom", options?.datefrom || range.datefrom);
   body.append("dateto", options?.dateto || range.dateto);
-  body.append("accountnum", options?.accountnum || process.env.BANKDA_ACCOUNT_NUM || "");
+  const cleanAccountNum = String(options?.accountnum || process.env.BANKDA_ACCOUNT_NUM || "").replace(/[^0-9]/g, "");
+  body.append("accountnum", cleanAccountNum);
   body.append("datatype", "json");
   body.append("charset", "utf8");
   body.append("istest", "n");
