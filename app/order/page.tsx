@@ -225,16 +225,20 @@ export default function OrderPage() {
   const shippingFee = alreadyPaidShipping ? 0 : baseShippingFee;
   const cardRateForCustomer = customerCardRate;
 
-  const isAutoLoggedIn =
-    hasSavedInfo &&
-    !isEditingCustomerInfo &&
-    !isEditMode &&
-    Boolean(customerPhone && youtubeNickname && customerName);
-
   const currentOrderMode =
     typeof window !== "undefined"
       ? new URLSearchParams(window.location.search).get("mode")
       : "";
+
+  const isForcedOrderEntryMode =
+    currentOrderMode === "new" || currentOrderMode === "load";
+
+  const isAutoLoggedIn =
+    !isForcedOrderEntryMode &&
+    hasSavedInfo &&
+    !isEditingCustomerInfo &&
+    !isEditMode &&
+    Boolean(customerPhone && youtubeNickname && customerName);
 
   const isNewCustomerEntryMode =
     currentOrderMode === "new" || customerMode === "new";
