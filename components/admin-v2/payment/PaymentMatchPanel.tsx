@@ -91,9 +91,6 @@ function getCandidateCount(group: OrderGroup, deposits: DepositRow[]) {
   }).length;
 }
 
-const BANKDA_AUTO_SYNC_MIN_GAP_MS = 5 * 60 * 1000;
-const BANKDA_MANUAL_SYNC_MIN_GAP_MS = 10 * 1000;
-
 export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualMatch, onSyncBankdaDeposits }: Props) {
   const [serverDeposits, setServerDeposits] = useState<DepositRow[]>(deposits || []);
   const [serverDepositLoading, setServerDepositLoading] = useState(false);
@@ -141,23 +138,8 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
   const [lastAutoSyncLabel, setLastAutoSyncLabel] = useState("");
   const [lastAutoSyncMessage, setLastAutoSyncMessage] = useState("자동조회 대기중");
   const autoSyncInFlightRef = useRef(false);
-  const lastBankdaSyncAtRef = useRef(0);
 
   const runBankdaSync = async () => {
-    const now = Date.now();
-    const gap = now - lastBankdaSyncAtRef.current;
-
-    if (syncing || autoSyncInFlightRef.current) {
-      setLastAutoSyncMessage("이미 뱅크다 조회가 진행중입니다.");
-      return;
-    }
-
-    if (lastBankdaSyncAtRef.current > 0 && gap < BANKDA_MANUAL_SYNC_MIN_GAP_MS) {
-      setLastAutoSyncMessage("방금 조회했습니다. 잠시 후 다시 눌러주세요.");
-      return;
-    }
-
-    lastBankdaSyncAtRef.current = now;
     setSyncing(true);
 
     try {
@@ -378,7 +360,7 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
             <button
               type="button"
               onClick={runBankdaSync}
-              disabled={syncing || autoSyncLoading}
+              disabled={syncing}
               className="rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-black text-white shadow-sm active:scale-[0.98] disabled:bg-neutral-300"
             >
               {syncing ? "가져오는중..." : "뱅크다 입금내역 가져오기"}

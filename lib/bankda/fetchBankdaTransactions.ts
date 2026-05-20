@@ -10,8 +10,6 @@ export type NormalizedBankdaDeposit = {
   confirmed_note: string;
 };
 
-const BANKDA_FETCH_TIMEOUT_MS = 20_000;
-
 const BANKDA_URL = "https://a.bankda.com/dtsvc/bank_tr.php";
 
 function ymdKst(date: Date) {
@@ -183,11 +181,7 @@ export async function fetchBankdaTransactions(options?: {
   body.append("charset", "utf8");
   body.append("istest", "n");
 
-  const response = const abortController = new AbortController();
-  const response =   const abortTimer = setTimeout(() => abortController.abort(), BANKDA_FETCH_TIMEOUT_MS);
-
-    const response = await fetch(BANKDA_URL, {
-  const response =   signal: abortController.signal,
+  const response = await fetch(BANKDA_URL, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -196,7 +190,6 @@ export async function fetchBankdaTransactions(options?: {
     body,
     cache: "no-store",
   });
-  const response = clearTimeout(abortTimer);
 
   const text = await response.text();
 
