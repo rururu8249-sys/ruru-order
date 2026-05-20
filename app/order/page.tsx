@@ -36,10 +36,10 @@ import OrderPageShell from "@/components/order/OrderPageShell";
 import OrderCustomerTopNav from "@/components/order/OrderCustomerTopNav";
 import OrderPriceSummaryBox from "@/components/order/OrderPriceSummaryBox";
 import OrderCustomerInfoIntro from "@/components/order/OrderCustomerInfoIntro";
+import OrderCustomerEntryPanel from "@/components/order/OrderCustomerEntryPanel";
+import OrderCustomerInfoFormCard from "@/components/order/OrderCustomerInfoFormCard";
 import OrderProductInputGuideDetail from "@/components/order/OrderProductInputGuideDetail";
 import OrderCompletePaymentNotice from "@/components/order/OrderCompletePaymentNotice";
-import OrderSavedCustomerSummary from "@/components/order/OrderSavedCustomerSummary";
-import OrderCustomerModeSwitch from "@/components/order/OrderCustomerModeSwitch";
 
 declare global {
   interface Window {
@@ -300,7 +300,7 @@ export default function OrderPage() {
     }
 
     setIsCustomerInfoOpen(true);
-    setCustomerMode("new");
+    setCustomerMode("load");
   }, [hasSavedInfo, isEditingCustomerInfo]);
 
   useEffect(() => {
@@ -1258,149 +1258,51 @@ export default function OrderPage() {
     <OrderPageShell>
         <TopCustomerNav />
 
-        {!isAutoLoggedIn && <OrderCustomerInfoIntro mode={isEditingCustomerInfo ? "edit" : "check"} />}
-
         {!isAutoLoggedIn && (
-        <section className="mt-5 rounded-[34px] bg-white p-5 shadow-[0_18px_40px_rgba(30,64,175,0.10)] ring-1 ring-blue-100">
+          <OrderCustomerInfoIntro mode={isEditingCustomerInfo ? "edit" : "check"} />
+        )}
 
-          {hasSavedInfo && !isEditingCustomerInfo ? (
-            <OrderSavedCustomerSummary
-              customerLabel={customerName || youtubeNickname}
-              nickname={maskNickname(youtubeNickname)}
-              name={maskName(customerName)}
-              phone={maskPhone(customerPhone)}
-              address={maskAddress(address, detailAddress)}
-              showDetail={showSavedCustomerDetail}
-              onToggleDetail={() => setShowSavedCustomerDetail((value) => !value)}
-            />
-          ) : (
-            <div className="grid gap-4">
-              {(hasSavedInfo || isEditingCustomerInfo) && (
-                <OrderCustomerModeSwitch
-                  isEditing={isEditingCustomerInfo}
-                  customerMode={customerMode}
-                  onModeChange={setCustomerMode}
-                />
-              )}
+        {!isAutoLoggedIn && !isEditingCustomerInfo && customerMode === "load" && (
+          <OrderCustomerEntryPanel
+            loginName={loginName}
+            loginPhone={formatPhone(loginPhone)}
+            onLoginNameChange={setLoginName}
+            onLoginPhoneChange={(value) => setLoginPhone(normalizePhone(value))}
+            onLoadCustomer={loadCustomerByNamePhone}
+            onStartNew={() => setCustomerMode("new")}
+          />
+        )}
 
-
-              {customerMode === "load" && (
-                <div className="mt-2 rounded-[28px] bg-white p-1">
-                  <div className="text-sm font-black text-[#315f9f]">
-                    저장된 정보 확인
-                  </div>
-                  <p className="mt-1 text-xs font-bold leading-relaxed text-[#6b7280]">
-                    이름과 전화번호로 저장된 주문 정보를 확인합니다.
-                  </p>
-
-                  <div className="mt-3 grid gap-3">
-                    <input
-                      value={loginName}
-                      onChange={(event) => setLoginName(event.target.value)}
-                      placeholder="이름"
-                      className="w-full rounded-2xl border border-blue-100 bg-white p-4 text-[15px] font-bold outline-none focus:border-blue-500"
-                    />
-
-                    <input
-                      value={formatPhone(loginPhone)}
-                      onChange={(event) => setLoginPhone(normalizePhone(event.target.value))}
-                      placeholder="숫자만 입력해주세요"
-                      inputMode="numeric"
-                      className="w-full rounded-2xl border border-blue-100 bg-white p-4 text-[15px] font-bold outline-none focus:border-blue-500"
-                    />
-
-                    <button
-                      type="button"
-                      onClick={loadCustomerByNamePhone}
-                      className={`${buttonBase} rounded-2xl bg-[#171717] p-4 font-black text-white`}
-                    >
-                      확인
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {customerMode === "new" && (
-                <div className="mt-2 rounded-[28px] bg-white p-1">
-                  <div className="mt-3 grid gap-3">
-                    <input
-                      id="youtubeNicknameInput"
-                      value={youtubeNickname}
-                      onChange={(event) => setYoutubeNickname(event.target.value)}
-                      placeholder="유튜브 닉네임"
-                      className="w-full rounded-2xl border border-blue-100 bg-white p-4 text-[15px] font-bold outline-none focus:border-blue-500"
-                    />
-
-                    <input
-                      value={customerName}
-                      onChange={(event) => setCustomerName(event.target.value)}
-                      placeholder="이름"
-                      className="w-full rounded-2xl border border-blue-100 bg-white p-4 text-[15px] font-bold outline-none focus:border-blue-500"
-                    />
-
-                    <input
-                      value={formatPhone(customerPhone)}
-                      onChange={(event) => setCustomerPhone(normalizePhone(event.target.value))}
-                      placeholder="숫자만 입력해주세요"
-                      inputMode="numeric"
-                      className="w-full rounded-2xl border border-blue-100 bg-white p-4 text-[15px] font-bold outline-none focus:border-blue-500"
-                    />
-
-                    <button
-                      type="button"
-                      onClick={openAddressSearch}
-                      className={`${buttonBase} rounded-2xl border border-blue-500 bg-white p-4 font-black text-blue-600`}
-                    >
-                      주소검색
-                    </button>
-
-                    <input type="hidden" value={zipcode} readOnly />
-
-                    <input
-                      value={address}
-                      onChange={(event) => setAddress(event.target.value)}
-                      placeholder="주소를 검색해주세요"
-                      className="rounded-2xl border border-blue-100 bg-white p-4 text-[15px] font-bold outline-none focus:border-blue-500"
-                    />
-
-                    <input
-                      id="detailAddressInput"
-                      value={detailAddress}
-                      onChange={(event) => setDetailAddress(event.target.value)}
-                      placeholder="상세주소를 입력해주세요"
-                      className="rounded-2xl border border-blue-100 bg-white p-4 text-[15px] font-bold outline-none focus:border-blue-500"
-                    />
-
-                    <div className={isEditingCustomerInfo ? "grid grid-cols-2 gap-2" : "grid"}>
-                      {isEditingCustomerInfo && (
-                        <button
-                          type="button"
-                          onClick={cancelEditCustomerInfo}
-                          className={`${buttonBase} rounded-2xl bg-slate-100 p-4 font-black text-slate-600`}
-                        >
-                          취소
-                        </button>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={completeEditCustomerInfo}
-                        className={`${buttonBase} rounded-2xl bg-blue-600 p-5 text-lg font-black text-white shadow-[0_12px_24px_rgba(37,99,235,0.22)]`}
-                      >
-                        확인
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </section>
-
+        {!isAutoLoggedIn && (isEditingCustomerInfo || customerMode === "new") && (
+          <OrderCustomerInfoFormCard
+            isEdit={isEditingCustomerInfo}
+            youtubeNickname={youtubeNickname}
+            customerName={customerName}
+            customerPhone={formatPhone(customerPhone)}
+            address={address}
+            detailAddress={detailAddress}
+            onYoutubeNicknameChange={setYoutubeNickname}
+            onCustomerNameChange={setCustomerName}
+            onCustomerPhoneChange={(value) => setCustomerPhone(normalizePhone(value))}
+            onAddressChange={setAddress}
+            onDetailAddressChange={setDetailAddress}
+            onOpenAddressSearch={openAddressSearch}
+            onCancel={cancelEditCustomerInfo}
+            onConfirm={completeEditCustomerInfo}
+          />
         )}
 
         {isAutoLoggedIn && (
           <>
+            <section className="mb-4 rounded-[28px] bg-white px-5 py-4 shadow-[0_12px_28px_rgba(30,64,175,0.08)] ring-1 ring-blue-100">
+              <div className="text-[15px] font-black tracking-[-0.04em] text-blue-700">
+                바로 주문 가능
+              </div>
+              <p className="mt-1 text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
+                주문상품을 입력해주세요.
+              </p>
+            </section>
+
         <section className="mt-4 rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-black">주문상품</h2>
 
@@ -1641,7 +1543,6 @@ export default function OrderPage() {
             </button>
           </div>
         </section>
-
           </>
         )}
 
