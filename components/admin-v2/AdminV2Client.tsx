@@ -32,6 +32,12 @@ import type {
 } from "@/lib/admin-v2/types";
 import { ORDER_STATUS_OPTIONS, PAGE_SIZE, PAYMENT_FILTERS, TABS } from "@/lib/admin-v2/constants";
 import {
+  buildRosenItemTextFromOrderRow,
+  buildRosenRecipientAddress,
+  getRosenBaseAddress,
+  getRosenRecipientNickname,
+} from "@/lib/admin-v2/rosenExportRules";
+import {
   displayOrderPhone,
   formatDateLabel,
   formatKoreanPhone,
@@ -122,11 +128,11 @@ function normalizeAddressForCompare(value: unknown) {
 }
 
 function combineOrderAddress(row: Pick<OrderRow, "address" | "detail_address">) {
-  return [row.address, row.detail_address].filter(Boolean).join(" ").trim();
+  return getRosenBaseAddress(row);
 }
 
 function getGroupRecipientName(group: OrderGroup) {
-  return cleanText(group.first.customer_name || group.first.youtube_nickname || "");
+  return getRosenRecipientNickname(group.first);
 }
 
 function buildRosenShippingKey(group: OrderGroup) {
@@ -156,11 +162,7 @@ function buildRosenOrderFormGroups(rows: OrderRow[]): OrderGroup[] {
 }
 
 function buildRosenItemTextFromRow(row: OrderRow) {
-  const productName = cleanText(row.product_name) || "상품명없음";
-  const optionText = [row.color, row.size].map((value) => cleanText(value)).filter(Boolean).join(" / ");
-  const qty = Math.max(1, Number(row.qty || 0));
-
-  return optionText ? `${productName}(${optionText}) x${qty}개` : `${productName} x${qty}개`;
+  return buildRosenItemTextFromOrderRow(row);
 }
 
 function getRosenItemName(group: OrderGroup) {
@@ -223,7 +225,7 @@ function buildRosenUploadRow(group: OrderGroup): RosenUploadExcelRow {
   return {
     recipientName: getGroupRecipientName(group),
     internalKey: buildRosenShippingKey(group),
-    address: combineOrderAddress(group.first),
+    address: buildRosenRecipientAddress(group.first),
     phone,
     mobilePhone: phone,
     parcelQty: "1",
