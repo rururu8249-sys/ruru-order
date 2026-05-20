@@ -10,6 +10,7 @@ import { formatDateLabel, money } from "@/lib/admin-v2/formatters";
 import { buildItemSummary, isBankPaid, isBankUnpaid, orderBaseAmount, shortOrderCode } from "@/lib/admin-v2/orderHelpers";
 import PaymentMatchTopActions from "@/components/admin-v2/payment/parts/PaymentMatchTopActions";
 import PaymentMatchSyncStatus from "@/components/admin-v2/payment/parts/PaymentMatchSyncStatus";
+import AutoMatchPreviewBox from "@/components/admin-v2/payment/parts/AutoMatchPreviewBox";
 
 type Props = {
   deposits: DepositRow[];
@@ -385,123 +386,23 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
               onSync={runBankdaSync}
             />
         </div>
-        <div className="mb-3 rounded-xl border border-blue-200 bg-blue-50 p-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <div className="text-[13px] font-black text-blue-900">
-                저장된 입금내역 {depositsForDisplay.length.toLocaleString()}건
-              </div>
-              <div className="mt-1 text-[11px] font-bold text-blue-700">
-                뱅크다에서 가져와 DB에 저장된 입금내역입니다. 안 보이면 [입금내역 다시 불러오기]를 누르세요.
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setAutoSyncEnabled((value) => !value)}
-                className={`rounded-lg px-3 py-2 text-[12px] font-black active:scale-[0.98] ${
-                  autoSyncEnabled ? "bg-emerald-600 text-white" : "bg-neutral-200 text-neutral-700"
-                }`}
-              >
-                {autoSyncEnabled ? "5분 자동조회 ON" : "5분 자동조회 OFF"}
-              </button>
-
-              <button
-                type="button"
-                onClick={forceLoadServerDeposits}
-                disabled={serverDepositLoading}
-                className="rounded-lg bg-blue-600 px-3 py-2 text-[12px] font-black text-white active:scale-[0.98] disabled:bg-neutral-300"
-              >
-                {serverDepositLoading ? "불러오는중..." : "입금내역 다시 불러오기"}
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-3 rounded-lg bg-white px-3 py-2 text-[11px] font-black text-blue-800">
-            자동조회 상태: {autoSyncEnabled ? "ON" : "OFF"}
-            {autoSyncLoading ? " · 조회중..." : ""}
-            {lastAutoSyncLabel ? ` · 마지막 ${lastAutoSyncLabel}` : ""}
-            {" · "}
-            {lastAutoSyncMessage}
-          </div>
-
-          {depositsForDisplay.length > 0 && (
-            <div className="mt-3 max-h-56 overflow-y-auto rounded-lg bg-white">
-              {depositsForDisplay.slice(0, 50).map((deposit) => (
-                <div
-                  key={deposit.id}
-                  className="grid grid-cols-[1fr_110px_90px] gap-2 border-b border-neutral-100 px-3 py-2 text-[12px] font-bold"
-                >
-                  <div className="truncate">{deposit.depositor_name || "-"}</div>
-                  <div className="text-right">{Number(deposit.amount || 0).toLocaleString()}원</div>
-                  <div className="text-right text-neutral-500">{deposit.match_status || "미확인"}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <PaymentMatchSyncStatus
+          autoSyncEnabled={autoSyncEnabled}
+          autoSyncLoading={autoSyncLoading}
+          lastAutoSyncLabel={lastAutoSyncLabel}
+          lastAutoSyncMessage={lastAutoSyncMessage}
+          serverDepositCount={depositsForDisplay.length}
+          onToggleAutoSync={() => setAutoSyncEnabled((value) => !value)}
+          onReloadList={forceLoadServerDeposits}
+          serverDepositLoading={serverDepositLoading}
+        />
 
         {previewResult && (
-          <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <div className="text-[13px] font-black text-amber-950">자동매칭 미리보기 결과</div>
-                <div className="mt-1 text-[11px] font-bold text-amber-800">
-                  실제 입금확인은 처리하지 않았습니다. 닉네임 완전일치 + 금액 완전일치 + 1:1 단일 후보만 표시합니다.
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <div className="rounded-lg bg-white px-3 py-2 text-[12px] font-black text-amber-900">
-                  후보 {(previewResult.summary?.auto_match_preview_count ?? 0).toLocaleString()}건
-                </div>
-
-                <button
-                  type="button"
-                  onClick={runAutoMatchExecute}
-                  disabled={autoRunLoading || (previewResult.summary?.auto_match_preview_count ?? 0) <= 0}
-                  className="rounded-lg bg-emerald-600 px-3 py-2 text-[12px] font-black text-white active:scale-[0.98] disabled:bg-neutral-300"
-                >
-                  {autoRunLoading ? "실행중..." : "자동매칭 실행"}
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-3 grid gap-2 md:grid-cols-6">
-              <SummaryTile label="검사 주문" value={`${previewResult.summary?.checked_orders ?? 0}건`} />
-              <SummaryTile label="검사 입금" value={`${previewResult.summary?.checked_deposits ?? 0}건`} />
-              <SummaryTile label="미입금 후보" value={`${previewResult.summary?.eligible_unpaid_orders ?? 0}건`} />
-              <SummaryTile label="미확인 입금" value={`${previewResult.summary?.eligible_unmatched_deposits ?? 0}건`} />
-              <SummaryTile label="자동후보" value={`${previewResult.summary?.auto_match_preview_count ?? 0}건`} strong />
-              <SummaryTile label="애매/제외" value={`${(previewResult.summary?.ambiguous_count ?? 0) + (previewResult.summary?.excluded_count ?? 0)}건`} />
-            </div>
-
-            {(previewResult.candidates || []).length === 0 ? (
-              <div className="mt-3 rounded-lg bg-white p-3 text-[12px] font-black text-neutral-600">
-                자동처리 가능한 입금내역이 없습니다. 애매한 건은 자동처리하지 않고 수동매칭으로 남깁니다.
-              </div>
-            ) : (
-              <div className="mt-3 max-h-52 overflow-y-auto rounded-lg bg-white">
-                {(previewResult.candidates || []).slice(0, 30).map((candidate, index) => (
-                  <div
-                    key={`${candidate.order_id || index}-${candidate.deposit_id || index}`}
-                    className="grid grid-cols-[1fr_110px_1fr_110px] gap-2 border-b border-neutral-100 px-3 py-2 text-[12px] font-bold"
-                  >
-                    <div className="truncate">
-                      주문: {candidate.order_nickname || "-"}
-                      <div className="text-[10px] text-neutral-500">{candidate.order_group_id || candidate.order_id || "-"}</div>
-                    </div>
-                    <div className="text-right font-black">{money(candidate.order_amount || 0)}</div>
-                    <div className="truncate">
-                      입금: {candidate.deposit_depositor || "-"}
-                      <div className="text-[10px] text-neutral-500">{candidate.deposit_time_text || "-"}</div>
-                    </div>
-                    <div className="text-right font-black">{money(candidate.deposit_amount || 0)}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <AutoMatchPreviewBox
+            previewResult={previewResult}
+            autoRunLoading={autoRunLoading}
+            onRun={runAutoMatchExecute}
+          />
         )}
 
         <div className="grid gap-2 md:grid-cols-4">
