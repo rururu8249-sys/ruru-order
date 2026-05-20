@@ -233,8 +233,6 @@ export default function ManualPaymentMatchDrawer(props: Props) {
       await props.onMatched?.();
 
       props.onClose();
-
-      window.location.reload();
     } finally {
       setSaving(false);
     }
