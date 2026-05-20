@@ -36,6 +36,7 @@ import type {
 import { ORDER_STATUS_OPTIONS, PAGE_SIZE, PAYMENT_FILTERS, TABS } from "@/lib/admin-v2/constants";
 import AdminSettingsQuickLinks from "@/components/admin-v2/settings/AdminSettingsQuickLinks";
 import AdminTodayDashboard from "@/components/admin-v2/today/AdminTodayDashboard";
+import AdminCustomerPanel from "@/components/admin-v2/customers/AdminCustomerPanel";
 import {
   buildRosenItemTextFromOrderRow,
   buildRosenRecipientAddress,
@@ -1278,7 +1279,7 @@ export function AdminV2Client() {
                   onApplyShippingDone={bulkMarkShippingDoneFromExcel}
                 />
               ) : activeTab === "customers" ? (
-                <CustomerPanel customers={customers} />
+                <AdminCustomerPanel customers={customers} />
               ) : activeTab === "deposits" ? (
                 <PaymentMatchPanel
                   deposits={deposits}
@@ -1897,28 +1898,6 @@ function SidePanel({ title, onMore, children }: { title: string; onMore?: () => 
 
 function EmptyLine({ text }: { text: string }) {
   return <div className="rounded-lg bg-neutral-50 p-3 text-center text-xs font-bold text-neutral-400">{text}</div>;
-}
-
-function CustomerPanel({ customers }: { customers: CustomerRow[] }) {
-  return (
-    <div className="grid gap-2 md:grid-cols-2">
-      {customers.map((customer) => {
-        const blocked = customer.is_blocked === true || customer.is_blocked === "true" || customer.is_blocked === "Y";
-        return (
-          <div key={customer.id} className="rounded-xl border border-neutral-200 bg-white p-3">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-base font-black">{customer.youtube_nickname || "-"}</div>
-                <div className="mt-1 text-[13px] font-bold text-neutral-500">{customer.customer_name || "-"} · {formatKoreanPhone(customer.customer_phone)}</div>
-              </div>
-              <span className={`rounded-full px-2 py-1 text-[11px] font-black ${blocked ? "bg-red-100 text-red-700" : "bg-neutral-100 text-neutral-600"}`}>{blocked ? "차단" : "정상"}</span>
-            </div>
-            <div className="mt-2 rounded-xl bg-neutral-50 p-2 text-xs font-semibold text-neutral-600">{customer.customer_memo || "메모 없음"}</div>
-          </div>
-        );
-      })}
-    </div>
-  );
 }
 
 function DepositPanel({ deposits }: { deposits: DepositRow[] }) {
