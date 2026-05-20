@@ -51,7 +51,7 @@ export default function OrderCustomerTopNav({
           주문조회
         </Link>
 
-        {isLoggedIn ? (
+        {isLoggedIn && (
           <>
             <button
               type="button"
@@ -68,16 +68,6 @@ export default function OrderCustomerTopNav({
             >
               로그아웃
             </button>
-          </>
-        ) : (
-          <>
-            <span className="rounded-2xl bg-blue-600 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-white shadow-[0_10px_20px_rgba(37,99,235,0.20)]">
-              주문시작
-            </span>
-
-            <span className="rounded-2xl bg-blue-50 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-blue-700 ring-1 ring-blue-100">
-              첫 주문
-            </span>
           </>
         )}
       </nav>

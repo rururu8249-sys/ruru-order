@@ -90,10 +90,10 @@ export default function CustomerTopNav({
           주문조회
         </Link>
 
-        {isLoggedIn ? (
+        {isLoggedIn && (
           <>
             <Link
-              href="/order"
+              href="/order?mode=edit"
               className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
             >
               정보수정
@@ -106,19 +106,6 @@ export default function CustomerTopNav({
             >
               로그아웃
             </button>
-          </>
-        ) : (
-          <>
-            <Link
-              href="/order"
-              className="rounded-2xl bg-blue-600 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-white shadow-[0_10px_20px_rgba(37,99,235,0.20)] active:scale-[0.98]"
-            >
-              주문시작
-            </Link>
-
-            <span className="rounded-2xl bg-blue-50 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-blue-700 ring-1 ring-blue-100">
-              첫 주문 환영
-            </span>
           </>
         )}
       </nav>

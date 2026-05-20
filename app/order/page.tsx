@@ -205,6 +205,7 @@ const blockCustomerCopyEvents = () => {
 };
 
 export default function OrderPage() {
+  const [isEditMode, setIsEditMode] = useState(false);
   const [broadcast, setBroadcast] = useState<any | null>(null);
   const [broadcastProducts, setBroadcastProducts] = useState<BroadcastProduct[]>([]);
   const [productSearchOpenIndex, setProductSearchOpenIndex] = useState<number | null>(null);
@@ -248,6 +249,7 @@ export default function OrderPage() {
   const isAutoLoggedIn =
     hasSavedInfo &&
     !isEditingCustomerInfo &&
+    !isEditMode &&
     Boolean(customerPhone && youtubeNickname && customerName);
 
   useEffect(() => {
@@ -255,6 +257,31 @@ export default function OrderPage() {
     loadBroadcast();
     loadSavedCustomerInfo();
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const nextMode = new URLSearchParams(window.location.search).get("mode");
+    if (nextMode !== "edit") return;
+
+    setIsEditMode(true);
+    setIsEditingCustomerInfo(true);
+    setCustomerMode("new");
+    setIsCustomerInfoOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isEditMode) return;
+    if (isEditingCustomerInfo) return;
+    if (!hasSavedInfo) return;
+    if (!customerPhone || !youtubeNickname || !customerName) return;
+
+    setIsEditMode(false);
+
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", "/order");
+    }
+  }, [isEditMode, isEditingCustomerInfo, hasSavedInfo, customerPhone, youtubeNickname, customerName]);
 
   useEffect(() => {
     return blockCustomerCopyEvents();
@@ -1231,8 +1258,9 @@ export default function OrderPage() {
     <OrderPageShell>
         <TopCustomerNav />
 
-        {!isAutoLoggedIn && <OrderCustomerInfoIntro />}
+        {!isAutoLoggedIn && <OrderCustomerInfoIntro mode={isEditingCustomerInfo ? "edit" : "check"} />}
 
+        {!isAutoLoggedIn && (
         <section className="mt-5 rounded-[34px] bg-white p-5 shadow-[0_18px_40px_rgba(30,64,175,0.10)] ring-1 ring-blue-100">
 
           {hasSavedInfo && !isEditingCustomerInfo ? (
@@ -1369,6 +1397,10 @@ export default function OrderPage() {
           )}
         </section>
 
+        )}
+
+        {isAutoLoggedIn && (
+          <>
         <section className="mt-4 rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-black">주문상품</h2>
 
@@ -1609,6 +1641,9 @@ export default function OrderPage() {
             </button>
           </div>
         </section>
+
+          </>
+        )}
 
         <footer className="py-8 text-center text-[11px] font-bold text-[#9b8d82]">
           {FOOTER_TEXT}
