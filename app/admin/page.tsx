@@ -2,6 +2,7 @@
 
 import AdminOrdersView from "@/components/admin/orders/AdminOrdersView";
 import AdminOrderFilterPanel from "@/components/admin/orders/AdminOrderFilterPanel";
+import AdminOrderTablePanel from "@/components/admin/orders/AdminOrderTablePanel";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -3344,7 +3345,7 @@ const selectedCustomerDetail = useMemo(() => {
                 </div>
               </AdminOrderFilterPanel>
 
-              <section className="bg-white rounded-[2rem] p-4 md:p-5 border shadow-sm">
+              <AdminOrderTablePanel>
                 {loadingOrders ? (
                   <div className="p-10 text-center font-black text-gray-500">
                     주문 불러오는 중...
@@ -3442,7 +3443,7 @@ const selectedCustomerDetail = useMemo(() => {
                     })}
                   </div>
                 )}
-              </section>
+              </AdminOrderTablePanel>
 
               {orderGroups.length > 0 && (
                 <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
