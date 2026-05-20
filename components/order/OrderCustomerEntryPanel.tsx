@@ -1,6 +1,10 @@
+"use client";
+
 // components/order/OrderCustomerEntryPanel.tsx
-// 목적: 주문 전 기존 고객 / 처음 주문 고객 진입 UI
-// 주의: UI 전용. Supabase, 주문저장, 금액계산 로직 없음.
+// 목적: 주문 전 기존고객/처음주문 선택 화면
+// 주의: UI 전용. 고객 저장, 주문 저장, 금액, 배송비, Supabase 로직 없음.
+
+import { useRef } from "react";
 
 type OrderCustomerEntryPanelProps = {
   loginName: string;
@@ -19,54 +23,103 @@ export default function OrderCustomerEntryPanel({
   onLoadCustomer,
   onStartNew,
 }: OrderCustomerEntryPanelProps) {
+  const lastActionAtRef = useRef(0);
+
+  const runMobileSafeAction = (action: () => void) => {
+    const now = Date.now();
+
+    // 모바일에서 pointerup + click 중복 실행 방지
+    if (now - lastActionAtRef.current < 450) return;
+
+    lastActionAtRef.current = now;
+    action();
+  };
+
+  const buttonBase =
+    "relative z-[80] pointer-events-auto touch-manipulation select-none transition-all duration-150 active:scale-[0.97]";
+
   return (
-    <section className="mt-5 rounded-[34px] bg-white p-5 shadow-[0_18px_40px_rgba(30,64,175,0.10)] ring-1 ring-blue-100">
-      <div className="rounded-[28px] bg-[#f8fbff] p-4 ring-1 ring-blue-100">
-        <h2 className="text-[22px] font-black tracking-[-0.05em] text-[#151923]">
-          기존 고객이신가요?
-        </h2>
+    <section className="relative z-[60] grid gap-4 pointer-events-auto">
+      <div className="relative z-[70] rounded-[28px] bg-white p-5 shadow-[0_14px_34px_rgba(30,64,175,0.08)] ring-1 ring-blue-100">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-[23px] ring-1 ring-blue-100">
+            👤
+          </div>
 
-        <div className="mt-4 grid gap-3">
-          <label className="grid gap-2">
-            <span className="text-[15px] font-black text-[#151923]">이름</span>
-            <input
-              value={loginName}
-              onChange={(event) => onLoginNameChange(event.target.value)}
-              placeholder="이름을 입력해주세요"
-              className="h-14 w-full rounded-2xl border border-blue-100 bg-white px-4 text-[16px] font-bold outline-none transition placeholder:text-slate-400 focus:border-blue-500"
-            />
-          </label>
+          <div>
+            <h2 className="text-[22px] font-black tracking-[-0.06em] text-[#151923]">
+              기존 고객이신가요?
+            </h2>
+          </div>
+        </div>
 
-          <label className="grid gap-2">
-            <span className="text-[15px] font-black text-[#151923]">전화번호</span>
-            <input
-              value={loginPhone}
-              onChange={(event) => onLoginPhoneChange(event.target.value)}
-              placeholder="- 없이 숫자만 입력해주세요"
-              inputMode="numeric"
-              className="h-14 w-full rounded-2xl border border-blue-100 bg-white px-4 text-[16px] font-bold outline-none transition placeholder:text-slate-400 focus:border-blue-500"
-            />
-          </label>
+        <div className="grid gap-3">
+          <input
+            value={loginName}
+            onChange={(event) => onLoginNameChange(event.target.value)}
+            placeholder="이름"
+            autoComplete="name"
+            className="relative z-[80] pointer-events-auto rounded-2xl border border-blue-100 bg-blue-50/40 p-4 text-[16px] font-bold outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
+          />
+
+          <input
+            value={loginPhone}
+            onChange={(event) => onLoginPhoneChange(event.target.value)}
+            placeholder="전화번호"
+            inputMode="tel"
+            autoComplete="tel"
+            className="relative z-[80] pointer-events-auto rounded-2xl border border-blue-100 bg-blue-50/40 p-4 text-[16px] font-bold outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
+          />
 
           <button
             type="button"
-            onClick={onLoadCustomer}
-            className="mt-1 h-14 rounded-2xl bg-blue-600 text-[18px] font-black text-white shadow-[0_12px_24px_rgba(37,99,235,0.22)] transition active:scale-[0.98]"
+            aria-label="정보 불러오기"
+            onPointerUp={(event) => {
+              if (event.pointerType !== "mouse") {
+                event.preventDefault();
+                runMobileSafeAction(onLoadCustomer);
+              }
+            }}
+            onTouchEnd={(event) => {
+              event.preventDefault();
+              runMobileSafeAction(onLoadCustomer);
+            }}
+            onClick={() => runMobileSafeAction(onLoadCustomer)}
+            className={`${buttonBase} mt-1 rounded-2xl bg-blue-600 p-4 text-[17px] font-black text-white shadow-[0_12px_26px_rgba(37,99,235,0.22)]`}
           >
             정보 불러오기
           </button>
         </div>
       </div>
 
-      <div className="mt-4 rounded-[28px] bg-white p-4 ring-1 ring-blue-100">
-        <h2 className="text-[22px] font-black tracking-[-0.05em] text-[#151923]">
-          처음 주문이신가요?
-        </h2>
+      <div className="relative z-[70] rounded-[28px] bg-white p-5 shadow-[0_14px_34px_rgba(30,64,175,0.08)] ring-1 ring-blue-100">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-50 text-[23px] ring-1 ring-slate-100">
+            ✍️
+          </div>
+
+          <div>
+            <h2 className="text-[22px] font-black tracking-[-0.06em] text-[#151923]">
+              처음 주문이신가요?
+            </h2>
+          </div>
+        </div>
 
         <button
           type="button"
-          onClick={onStartNew}
-          className="mt-4 h-14 w-full rounded-2xl bg-[#151923] text-[18px] font-black text-white shadow-[0_12px_24px_rgba(15,23,42,0.16)] transition active:scale-[0.98]"
+          aria-label="처음 주문 정보 입력하기"
+          onPointerUp={(event) => {
+            if (event.pointerType !== "mouse") {
+              event.preventDefault();
+              runMobileSafeAction(onStartNew);
+            }
+          }}
+          onTouchEnd={(event) => {
+            event.preventDefault();
+            runMobileSafeAction(onStartNew);
+          }}
+          onClick={() => runMobileSafeAction(onStartNew)}
+          className={`${buttonBase} w-full rounded-2xl bg-slate-950 p-4 text-[17px] font-black text-white shadow-[0_12px_26px_rgba(15,23,42,0.16)]`}
         >
           처음 주문 정보 입력하기
         </button>
