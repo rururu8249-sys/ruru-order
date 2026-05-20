@@ -8,6 +8,7 @@ import AdminOrderRow from "@/components/admin/orders/AdminOrderRow";
 import AdminOrderDetailPanel from "@/components/admin/orders/AdminOrderDetailPanel";
 import AdminOrderMoneyEditPanel from "@/components/admin/orders/AdminOrderMoneyEditPanel";
 import AdminOrderCustomerInfoPanel from "@/components/admin/orders/AdminOrderCustomerInfoPanel";
+import AdminOrderMemoPanel from "@/components/admin/orders/AdminOrderMemoPanel";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -3413,20 +3414,10 @@ const selectedCustomerDetail = useMemo(() => {
                       calculateOrderRowTotal={calculateOrderRowTotal}
                     />
 
-                    <div className="mt-5 grid md:grid-cols-2 gap-3">
-                      <InfoBox
-                        label="배송메모"
-                        value={selectedOrderDetail.first.request_memo || "-"}
-                      />
-                      <InfoBox
-                        label="특이사항"
-                        value={
-                          selectedOrderDetail.first.special_note ||
-                          selectedOrderDetail.first.memo ||
-                          "-"
-                        }
-                      />
-                    </div>
+                    <AdminOrderMemoPanel
+                      selectedOrderDetail={selectedOrderDetail}
+                      InfoBox={InfoBox}
+                    />
                   </div>
                 </div>
               )}
