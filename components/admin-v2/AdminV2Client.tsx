@@ -19,7 +19,7 @@ import AdminOrderBulkActionBar from "@/components/admin-v2/orders/AdminOrderBulk
 import AdminOrderAmountCell from "@/components/admin-v2/orders/AdminOrderAmountCell";
 import AdminOrderStatusCell from "@/components/admin-v2/orders/AdminOrderStatusCell";
 import AdminOrderDetailButton from "@/components/admin-v2/orders/AdminOrderDetailButton";
-import AdminOrderDetailBlock from "@/components/admin-v2/orders/AdminOrderDetailBlock";
+import AdminOrderDetailDrawer from "@/components/admin-v2/orders/AdminOrderDetailDrawer";
 
 import type {
   AdminTab,
@@ -492,7 +492,7 @@ export function AdminV2Client() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
-  const [openedOrderGroupIds, setOpenedOrderGroupIds] = useState<string[]>([]);
+  const [detailDrawerGroupId, setDetailDrawerGroupId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [manualMatchGroup, setManualMatchGroup] = useState<OrderGroup | null>(null);
 
@@ -751,9 +751,18 @@ export function AdminV2Client() {
 
   const totalPages = Math.max(1, Math.ceil(filteredOrderGroups.length / PAGE_SIZE));
   const pagedGroups = filteredOrderGroups.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const detailDrawerGroup =
+    filteredOrderGroups.find((group) => group.groupId === detailDrawerGroupId) || null;
+  const detailDrawerRowIds = new Set((detailDrawerGroup?.rows || []).map((row) => row.id));
+  const detailDrawerMoneyLogs = detailDrawerGroup
+    ? moneyEditLogs.filter((log) => detailDrawerRowIds.has(Number(log.order_id)))
+    : [];
+  const detailDrawerStatusLogs = detailDrawerGroup
+    ? statusChangeLogs.filter((log) => detailDrawerRowIds.has(Number(log.order_id)))
+    : [];
 
-  const toggleOrderDetail = (groupId: string) => {
-    setOpenedOrderGroupIds((prev) => prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId]);
+  const openOrderDetailDrawer = (groupId: string) => {
+    setDetailDrawerGroupId(groupId);
   };
 
   const loadDepositsFromServer = async () => {
@@ -1306,7 +1315,7 @@ export function AdminV2Client() {
 
                   <div className="grid gap-3 xl:grid-cols-[minmax(780px,1fr)_340px]">
                     <div className="min-w-0">
-                      <OrderWorkTable groups={pagedGroups} openedOrderGroupIds={openedOrderGroupIds} moneyEditLogs={moneyEditLogs} statusChangeLogs={statusChangeLogs} onToggle={toggleOrderDetail} onStatusChange={updateOrderStatus} onTrackingChange={updateOrderTracking} onFinalAmountChange={updateOrderFinalAmount} onOpenManualMatch={setManualMatchGroup} />
+                      <OrderWorkTable groups={pagedGroups} moneyEditLogs={moneyEditLogs} statusChangeLogs={statusChangeLogs} onOpenDetail={openOrderDetailDrawer} onStatusChange={updateOrderStatus} onTrackingChange={updateOrderTracking} onFinalAmountChange={updateOrderFinalAmount} onOpenManualMatch={setManualMatchGroup} />
                       <Pagination page={page} totalPages={totalPages} setPage={setPage} totalCount={filteredOrderGroups.length} />
                     </div>
                     {false ? <OperationSummary buyerRanking={sideSummary.buyerRanking} productRanking={sideSummary.productRanking} onMore={() => setActiveTab("settlement")} /> : null}
@@ -1317,6 +1326,15 @@ export function AdminV2Client() {
           )}
         </section>
       </div>
+
+      <AdminOrderDetailDrawer
+        group={detailDrawerGroup}
+        moneyEditLogs={detailDrawerMoneyLogs}
+        statusChangeLogs={detailDrawerStatusLogs}
+        onClose={() => setDetailDrawerGroupId(null)}
+        onTrackingChange={updateOrderTracking}
+        onFinalAmountChange={updateOrderFinalAmount}
+      />
 
       <ManualPaymentMatchDrawer
         group={manualMatchGroup}
@@ -1688,20 +1706,18 @@ function OperationSummary({
 
 function OrderWorkTable({
   groups,
-  openedOrderGroupIds,
   moneyEditLogs,
   statusChangeLogs,
-  onToggle,
+  onOpenDetail,
   onStatusChange,
   onTrackingChange,
   onFinalAmountChange,
   onOpenManualMatch,
 }: {
   groups: OrderGroup[];
-  openedOrderGroupIds: string[];
   moneyEditLogs: MoneyEditLogRow[];
   statusChangeLogs: StatusChangeLogRow[];
-  onToggle: (groupId: string) => void;
+  onOpenDetail: (groupId: string) => void;
   onStatusChange: (group: OrderGroup, status: string) => void;
   onTrackingChange: (group: OrderGroup, trackingCompany: string, trackingNumber: string) => Promise<void>;
   onFinalAmountChange: (row: OrderRow, nextAmount: number, reason: string) => Promise<void>;
@@ -1768,7 +1784,6 @@ function OrderWorkTable({
       />
 
       {groups.map((group) => {
-        const isOpen = openedOrderGroupIds.includes(group.groupId);
         const status = getOrderStatusValue(group.first);
         const paymentMeta = paymentStatusMeta(group.first);
         const rowIds = new Set(group.rows.map((row) => row.id));
@@ -1824,13 +1839,11 @@ function OrderWorkTable({
               }
               detailNode={
                 <AdminOrderDetailButton
-                  isOpen={isOpen}
-                  onClick={() => onToggle(group.groupId)}
+                  onClick={() => onOpenDetail(group.groupId)}
                 />
               }
             />
 
-            {isOpen ? <AdminOrderDetailBlock group={group} moneyEditLogs={groupMoneyLogs} statusChangeLogs={groupStatusLogs} onTrackingChange={onTrackingChange} onFinalAmountChange={onFinalAmountChange} /> : null}
           </div>
         );
       })}
