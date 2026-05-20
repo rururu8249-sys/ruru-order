@@ -1246,7 +1246,7 @@ export function AdminV2Client() {
                       <OrderWorkTable groups={pagedGroups} openedOrderGroupIds={openedOrderGroupIds} moneyEditLogs={moneyEditLogs} statusChangeLogs={statusChangeLogs} onToggle={toggleOrderDetail} onStatusChange={updateOrderStatus} onTrackingChange={updateOrderTracking} onFinalAmountChange={updateOrderFinalAmount} onOpenManualMatch={setManualMatchGroup} />
                       <Pagination page={page} totalPages={totalPages} setPage={setPage} totalCount={filteredOrderGroups.length} />
                     </div>
-                    <OperationSummary buyerRanking={sideSummary.buyerRanking} productRanking={sideSummary.productRanking} onMore={() => setActiveTab("settlement")} />
+                    {false ? <OperationSummary buyerRanking={sideSummary.buyerRanking} productRanking={sideSummary.productRanking} onMore={() => setActiveTab("settlement")} /> : null}
                   </div>
                 </>
               )}
