@@ -1172,65 +1172,7 @@ export default function OrderPage() {
             bankHolder={BANK_HOLDER}
           />
 
-          <section className="mt-4 rounded-[30px] bg-white p-5 shadow-[0_12px_26px_rgba(70,45,25,0.10)] ring-1 ring-black/5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-xl font-black tracking-[-0.05em]">주문내역</div>
-              <div className="rounded-full bg-[#f5f1eb] px-3 py-1 text-xs font-black text-[#7b6554]">
-                총 {done.totalQty}개
-              </div>
-            </div>
-
-            <div className="mt-3 grid gap-2">
-
-              {done.items.map((item, index) => (
-                <div key={index} className="rounded-2xl bg-gray-50 p-4">
-                  <div className="font-black">{itemLabel(item)}</div>
-                  <div className="mt-1 text-sm font-bold text-gray-500">
-                    {won(toNumber(item.product_price) * toNumber(item.qty))}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 rounded-[1.5rem] bg-gray-50 p-4">
-              <div className="flex justify-between text-sm font-bold text-gray-500">
-                <span>총수량</span>
-                <span>{done.totalQty}개</span>
-              </div>
-
-              <div className="mt-2 flex justify-between text-sm font-bold text-gray-500">
-                <span>상품금액</span>
-                <span>{won(done.productAmount)}</span>
-              </div>
-
-              <div className="mt-2 flex justify-between text-sm font-bold text-gray-500">
-                <span>배송비</span>
-                <span>{won(done.shippingFee)}</span>
-              </div>
-
-              {done.paymentMethod === "카드결제" && (
-                <div className="mt-2 flex justify-between text-sm font-bold text-blue-600">
-                  <span>카드추가금 {cardRateForCustomer}%</span>
-                  <span>{won(done.cardExtra)}</span>
-                </div>
-              )}
-
-              <div className="mt-4 flex justify-between border-t pt-4 text-xl font-black">
-                <span>총 결제금액</span>
-                <span>{won(done.totalAmount)}</span>
-              </div>
-            </div>
-          </section>
-
-          <button
-            type="button"
-            onClick={() => setDone(null)}
-            className={`${buttonBase} mt-4 w-full rounded-2xl bg-[#f05a45] p-4 font-black text-white shadow-lg shadow-orange-100`}
-          >
-            추가 주문하기
-          </button>
-
-          <footer className="py-8 text-center text-[11px] font-bold text-[#9b8d82]">
+        <footer className="py-8 text-center text-[11px] font-bold text-[#9b8d82]">
             {FOOTER_TEXT}
           </footer>
         </section>
