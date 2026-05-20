@@ -78,14 +78,14 @@ export default function CustomerTopNav({
       <nav className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Link
           href="/"
-          className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[14px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
+          className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
         >
           🏠 HOME
         </Link>
 
         <Link
           href="/myorder"
-          className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[14px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
+          className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
         >
           주문조회
         </Link>
@@ -94,7 +94,7 @@ export default function CustomerTopNav({
           <>
             <Link
               href="/order"
-              className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[14px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
+              className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
             >
               정보수정
             </Link>
@@ -102,7 +102,7 @@ export default function CustomerTopNav({
             <button
               type="button"
               onClick={handleLogout}
-              className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[14px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
+              className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
             >
               로그아웃
             </button>
@@ -111,7 +111,7 @@ export default function CustomerTopNav({
           <>
             <Link
               href="/order"
-              className="rounded-2xl bg-blue-600 px-3 py-3 text-center text-[14px] font-black tracking-[-0.04em] text-white shadow-[0_10px_20px_rgba(37,99,235,0.20)] active:scale-[0.98]"
+              className="rounded-2xl bg-blue-600 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-white shadow-[0_10px_20px_rgba(37,99,235,0.20)] active:scale-[0.98]"
             >
               주문시작
             </Link>

@@ -1,6 +1,8 @@
 // components/home/CustomerHomeMenu.tsx
 // 목적: 고객 HOME 하단 메뉴
-// 주의: 공구상품은 상단바가 아니라 이 HOME 메뉴 영역에 배치한다.
+// 주의:
+// - 주문조회는 상단바에 고정되어 있으므로 HOME 하단 메뉴에서는 제외
+// - 공구상품은 상단바가 아니라 이 HOME 메뉴 영역에 배치한다.
 
 import Link from "next/link";
 
@@ -14,15 +16,9 @@ type MenuItem = {
 
 const menuItems: MenuItem[] = [
   {
-    href: "/myorder",
-    title: "주문조회",
-    desc: "내 주문과 배송 상태 확인",
-    icon: "🔎",
-  },
-  {
     href: "/notice",
     title: "공지사항",
-    desc: "배송/입금/교환 안내",
+    desc: "배송·입금·교환 안내",
     icon: "📢",
   },
   {
@@ -33,15 +29,15 @@ const menuItems: MenuItem[] = [
   },
   {
     href: "https://band.us/@ruru8249",
-    title: "밴드",
-    desc: "배송공지 확인",
+    title: "루루동이 밴드",
+    desc: "이벤트·공지·채팅",
     icon: "🟢",
     external: true,
   },
   {
     href: "https://www.youtube.com/@%EB%A3%A8%EB%A3%A8%EB%8F%99%EC%9D%B4/streams",
     title: "유튜브",
-    desc: "라이브/다시보기",
+    desc: "라이브·다시보기",
     icon: "▶️",
     external: true,
   },
@@ -65,7 +61,7 @@ export default function CustomerHomeMenu() {
             카톡채널 문의
           </p>
           <p className="mt-1 break-keep text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-[#5f4a17]">
-            입금/배송/주문 문의는 카톡채널로 남겨주세요.
+            입금·배송·주문 문의는 카톡채널로 남겨주세요.
           </p>
         </div>
 

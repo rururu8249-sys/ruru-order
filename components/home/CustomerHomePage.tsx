@@ -47,23 +47,6 @@ export default function CustomerHomePage() {
 
         <CustomerHomeMenu />
 
-        <section className="mt-5 rounded-[28px] bg-white px-5 py-5 shadow-[0_10px_22px_rgba(30,64,175,0.06)] ring-1 ring-blue-100">
-          <div className="flex items-start gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-50 text-[26px] ring-1 ring-blue-100">
-              🚚
-            </div>
-
-            <div>
-              <p className="text-[18px] font-black tracking-[-0.06em] text-[#151923]">
-                배송 안내
-              </p>
-              <p className="mt-1 break-keep text-[13px] font-semibold leading-relaxed tracking-[-0.04em] text-slate-500">
-                택배 송장은 출고 당일 밴드에서 확인 가능하며, 택배사 문자도 함께 발송됩니다.
-              </p>
-            </div>
-          </div>
-        </section>
-
         <p className="mt-6 text-center text-[12px] font-bold tracking-[-0.03em] text-slate-400">
           Copyright since 2024 LULUDONGI. All rights reserved.
         </p>
