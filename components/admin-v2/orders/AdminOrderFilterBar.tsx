@@ -100,7 +100,7 @@ export default function AdminOrderFilterBar({
   dateOptions,
 }: AdminOrderFilterBarProps) {
   const mergedDateOptions: Option[] = [
-    { value: "전체", label: "방송 전체보기" },
+    { value: "all", label: "방송 전체보기" },
     ...dateOptions.filter((option) => option.value !== "전체"),
   ];
 
@@ -128,7 +128,7 @@ export default function AdminOrderFilterBar({
         </div>
 
         <select
-          value={dateFilter}
+          value={dateFilter === "전체" ? "all" : dateFilter}
           onChange={(event) => setDateFilter(event.target.value)}
           className="h-11 min-w-[220px] rounded-xl border border-neutral-200 bg-white px-3 text-[14px] font-black outline-none focus:border-blue-600"
         >

@@ -36,7 +36,7 @@ export default function AdminOrderStatusCell({
       <select
         value={status}
         onChange={(event) => onChange(event.target.value)}
-        className={`h-8 w-full rounded-md border px-1.5 text-center text-[11px] font-black outline-none ${className}`}
+        className={`h-8 w-full min-w-[84px] rounded-md border px-1.5 text-center text-[11px] font-black outline-none ${className}`}
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>

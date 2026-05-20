@@ -487,8 +487,8 @@ export function AdminV2Client() {
   const [loading, setLoading] = useState(true);
   const [keyword, setKeyword] = useState("");
   const [pendingKeyword, setPendingKeyword] = useState("");
-  const [statusFilter, setStatusFilter] = useState("전체");
-  const [paymentFilter, setPaymentFilter] = useState("전체");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("");
   const [openedOrderGroupIds, setOpenedOrderGroupIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);

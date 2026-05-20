@@ -26,7 +26,7 @@ export default function AdminOrderMainRow({
   detailNode,
 }: AdminOrderMainRowProps) {
   return (
-    <div className="grid w-full gap-1 border-t border-neutral-100 px-3 py-2 text-[13px] first:border-t-0 lg:grid-cols-[96px_120px_160px_minmax(420px,1fr)_108px_108px_112px_72px] lg:items-center">
+    <div className="grid w-full gap-1 border-t border-neutral-100 px-3 py-2 text-[13px] first:border-t-0 lg:grid-cols-[86px_108px_128px_minmax(300px,1fr)_88px_92px_96px_56px] lg:items-center">
       <div className="truncate font-black text-neutral-500" title={orderCode}>
         {orderCode}
       </div>
