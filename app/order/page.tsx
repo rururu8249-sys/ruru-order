@@ -274,17 +274,7 @@ export default function OrderPage() {
   }, [isEditMode, isEditingCustomerInfo, hasSavedInfo, customerPhone, youtubeNickname, customerName]);
 
   useEffect(() => {
-    const queryMode =
-      typeof window !== "undefined"
-        ? new URLSearchParams(window.location.search).get("mode")
-        : "";
-
     if (isEditingCustomerInfo) {
-      setIsCustomerInfoOpen(true);
-      return;
-    }
-
-    if (!hasSavedInfo && queryMode === "new") {
       setIsCustomerInfoOpen(true);
       return;
     }
@@ -296,11 +286,8 @@ export default function OrderPage() {
     }
 
     setIsCustomerInfoOpen(true);
-
-    if (customerMode !== "new") {
-      setCustomerMode("load");
-    }
-  }, [hasSavedInfo, isEditingCustomerInfo, customerMode]);
+    setCustomerMode("load");
+  }, [hasSavedInfo, isEditingCustomerInfo]);
 
   useEffect(() => {
     const cleanPhone = normalizePhone(customerPhone);
