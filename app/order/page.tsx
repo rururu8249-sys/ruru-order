@@ -39,6 +39,7 @@ import OrderGuideCard from "@/components/order/OrderGuideCard";
 import OrderPriceSummaryBox from "@/components/order/OrderPriceSummaryBox";
 import OrderCustomerInfoIntro from "@/components/order/OrderCustomerInfoIntro";
 import OrderProductInputGuideDetail from "@/components/order/OrderProductInputGuideDetail";
+import OrderCompletePaymentNotice from "@/components/order/OrderCompletePaymentNotice";
 
 declare global {
   interface Window {
@@ -1097,7 +1098,7 @@ export default function OrderPage() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-[13px] font-black tracking-[-0.04em] text-[#f05a45]">
-                    입금 먼저 확인해주세요
+                    입금정보를 확인해주세요
                   </div>
                   <h1 className="mt-1 text-[27px] font-black tracking-[-0.07em] text-[#241b17]">
                     입금계좌 안내
@@ -1125,7 +1126,7 @@ export default function OrderPage() {
               </button>
 
               <div className="mt-3 rounded-2xl bg-[#fff0f3] p-3 text-center text-sm font-black leading-relaxed text-[#e11d48]">
-                주문서 작성 후 10분 이내 입금 부탁드립니다.
+                입금 후 자동확인까지 10~30분 정도 걸릴 수 있습니다.
               </div>
 
               <div className="mt-3 rounded-2xl bg-green-50 px-4 py-3 text-center text-sm font-black text-green-700">
@@ -1142,7 +1143,7 @@ export default function OrderPage() {
               </h1>
 
               <div className="mt-4 rounded-2xl bg-blue-50 p-4 text-sm font-bold leading-relaxed text-blue-700">
-                카드결제는 카톡채널로 문의 부탁드립니다.
+                카드결제는 카톡채널로 문의해주세요. 부가세 +10%가 적용됩니다.
               </div>
 
               <div className="mt-3 rounded-2xl bg-green-50 px-4 py-3 text-center text-sm font-black text-green-700">
@@ -1160,6 +1161,16 @@ export default function OrderPage() {
             </div>
 
             <div className="mt-3 grid gap-2">
+              <OrderCompletePaymentNotice
+                nickname={done.nickname}
+                name={done.name}
+                paymentMethod={done.paymentMethod}
+                totalAmount={done.totalAmount}
+                bankName={BANK_NAME}
+                bankAccount={BANK_ACCOUNT}
+                bankHolder={BANK_HOLDER}
+              />
+
               {done.items.map((item, index) => (
                 <div key={index} className="rounded-2xl bg-gray-50 p-4">
                   <div className="font-black">{itemLabel(item)}</div>
@@ -1205,7 +1216,7 @@ export default function OrderPage() {
             onClick={() => setDone(null)}
             className={`${buttonBase} mt-4 w-full rounded-2xl bg-[#f05a45] p-4 font-black text-white shadow-lg shadow-orange-100`}
           >
-            다른 상품 추가 주문하기
+            추가 주문하기
           </button>
 
           <footer className="py-8 text-center text-[11px] font-bold text-[#9b8d82]">
