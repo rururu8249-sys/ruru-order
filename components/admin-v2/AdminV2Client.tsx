@@ -1238,14 +1238,7 @@ export function AdminV2Client() {
         </aside>
 
         <section className="min-w-0 flex-1 p-3">
-          <div className="w-full rounded-xl border border-neutral-200 bg-white">
-            <div>
-<div className="text-lg font-black">{TABS.find((tab) => tab.key === activeTab)?.label}</div>
-            </div>
-            
-          </div>
-
-          <div className="mb-3 grid grid-cols-3 gap-1.5 md:hidden">
+<div className="mb-3 grid grid-cols-3 gap-1.5 md:hidden">
             {TABS.map((tab) => (
               <button key={tab.key} type="button" onClick={() => setActiveTab(tab.key)} className={`rounded-lg px-2 py-2 text-xs font-black ${activeTab === tab.key ? "bg-neutral-950 text-white" : "bg-white text-neutral-700"}`}>
                 {tab.label}
@@ -1257,13 +1250,16 @@ export function AdminV2Client() {
             <div className="rounded-xl border border-neutral-200 bg-white p-8 text-center font-black text-neutral-500">불러오는 중...</div>
           ) : (
             <>
-              <SummaryCards summaryCards={summaryCards} />
+              {activeTab === "today" ? null : <SummaryCards summaryCards={summaryCards} />}
 
               {activeTab === "today" ? (
                 <AdminTodayDashboard
                   orders={orders}
+                  orderGroups={orderGroups}
                   customers={customers}
                   deposits={deposits}
+                  broadcasts={broadcasts}
+                  settings={settings}
                   onGoOrders={() => setActiveTab("orders")}
                   onGoShipping={() => setActiveTab("shipping")}
                   onGoCustomers={() => setActiveTab("customers")}
