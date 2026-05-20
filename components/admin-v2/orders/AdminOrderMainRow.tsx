@@ -26,30 +26,27 @@ export default function AdminOrderMainRow({
   detailNode,
 }: AdminOrderMainRowProps) {
   return (
-    <div className="grid gap-2 px-3 py-2.5 lg:grid-cols-[84px_124px_128px_minmax(250px,1fr)_82px_108px_106px_90px] lg:items-center">
-      <div className="text-[13px] font-black text-neutral-500">{orderCode}</div>
+    <div className="grid gap-1.5 px-3 py-2 text-[13px] lg:grid-cols-[76px_112px_124px_minmax(260px,1fr)_96px_104px_96px_72px] lg:items-center">
+      <div className="font-black text-neutral-500">{orderCode}</div>
 
-      <div className="text-[13px] font-bold text-neutral-500">{createdAtLabel}</div>
+      <div className="font-bold text-neutral-500">{createdAtLabel}</div>
 
       <div className="min-w-0">
-        <div className="truncate text-[15px] font-black">{nickname || "-"}</div>
-        <div className="truncate text-[12px] font-bold text-neutral-500">
+        <div className="truncate text-[14px] font-black">{nickname || "-"}</div>
+        <div className="truncate text-[11px] font-bold text-neutral-500">
           {customerLine || "-"}
         </div>
       </div>
 
       <div className="min-w-0">
-        <div className="truncate text-[15px] font-bold text-neutral-800">
+        <div className="truncate text-[14px] font-bold text-neutral-800">
           {itemSummary}
         </div>
       </div>
 
       {paymentNode}
-
       {amountNode}
-
       {statusNode}
-
       {detailNode}
     </div>
   );

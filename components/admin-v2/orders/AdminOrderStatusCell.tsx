@@ -29,7 +29,7 @@ export default function AdminOrderStatusCell({
       <select
         value={status}
         onChange={(event) => onChange(event.target.value)}
-        className={`h-8 w-full rounded-lg border px-2 text-center text-xs font-black outline-none ${className}`}
+        className={`h-8 w-full rounded-md border px-1.5 text-center text-[11px] font-black outline-none ${className}`}
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -40,7 +40,7 @@ export default function AdminOrderStatusCell({
 
       {statusLogCount > 0 ? (
         <div className="mt-0.5 text-center text-[10px] font-black text-blue-700">
-          상태변경 {statusLogCount}건
+          변경 {statusLogCount}
         </div>
       ) : null}
 
@@ -52,7 +52,7 @@ export default function AdminOrderStatusCell({
 
       {showShippedTimeMissing ? (
         <div className="mt-0.5 text-center text-[10px] font-black text-red-600">
-          출고시간없음
+          시간없음
         </div>
       ) : null}
     </div>

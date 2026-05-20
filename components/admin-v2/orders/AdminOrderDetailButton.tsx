@@ -13,9 +13,9 @@ export default function AdminOrderDetailButton({
     <button
       type="button"
       onClick={onClick}
-      className="h-8 rounded-lg border border-neutral-300 bg-white px-2 text-xs font-black text-neutral-700 hover:bg-neutral-50 active:scale-[0.98]"
+      className="h-8 rounded-md border border-neutral-300 bg-white px-2 text-[11px] font-black text-neutral-700 hover:bg-neutral-50 active:scale-[0.98]"
     >
-      {isOpen ? "상세닫기" : "상세보기"}
+      {isOpen ? "닫기" : "보기"}
     </button>
   );
 }
