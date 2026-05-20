@@ -40,7 +40,7 @@ export default function CustomerHomePage() {
 
   return (
     <main className="min-h-screen bg-[#f5f8ff] text-[#151923]">
-      <section className="mx-auto min-h-screen w-full max-w-[520px] px-5 pb-8 pt-5">
+      <section className="mx-auto min-h-screen w-full max-w-[480px] px-5 pb-8 pt-5">
         <CustomerTopNav />
 
         <CustomerHomeHero isLoggedIn={isLoggedIn} greetingName={greetingName} />

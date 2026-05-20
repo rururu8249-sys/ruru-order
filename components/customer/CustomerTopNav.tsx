@@ -1,9 +1,10 @@
 // components/customer/CustomerTopNav.tsx
 // 목적: 고객 페이지 공통 상단바
-// 규칙:
-// - 루루동이 LIVE / HOME / 주문조회 / 정보수정 / 로그아웃 / 인사말 / 포인트 0원 표시
+// 기준:
+// - 비로그인: 루루동이 LIVE / 안내문 / HOME만 표시
+// - 로그인: HOME / 주문조회 / 정보수정 / 로그아웃 / 포인트 표시
 // - 공구상품은 상단바에 넣지 않음
-// - 주문 저장, 금액, 카드수수료, Supabase, 입금매칭, 송장 로직 없음
+// - 주문 저장, 금액, Supabase, 입금매칭, 송장 로직 없음
 
 "use client";
 
@@ -32,6 +33,9 @@ type CustomerTopNavProps = {
   className?: string;
 };
 
+const navButtonClass =
+  "rounded-2xl bg-slate-50 px-4 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 transition active:scale-[0.98]";
+
 export default function CustomerTopNav({
   showGreeting = true,
   className = "",
@@ -56,15 +60,17 @@ export default function CustomerTopNav({
   };
 
   return (
-    <header className={`mb-5 rounded-[28px] bg-white/95 p-4 shadow-[0_12px_28px_rgba(30,64,175,0.08)] ring-1 ring-blue-100/70 ${className}`}>
+    <header
+      className={`mb-4 rounded-[24px] bg-white/95 px-4 py-4 shadow-[0_10px_24px_rgba(30,64,175,0.07)] ring-1 ring-blue-100/70 ${className}`}
+    >
       <div className="flex items-start justify-between gap-3">
-        <Link href="/" className="min-w-0 active:scale-[0.99]">
+        <Link href="/" className="min-w-0 transition active:scale-[0.99]">
           <p className="text-[15px] font-black tracking-[-0.04em] text-blue-700">
             루루동이 LIVE
           </p>
 
           {showGreeting && (
-            <p className="mt-1 truncate text-[18px] font-black tracking-[-0.06em] text-[#151923]">
+            <p className="mt-1 truncate text-[17px] font-black tracking-[-0.06em] text-[#151923]">
               {isLoggedIn
                 ? `${greetingName || "고객"}님 안녕하세요`
                 : "주문 전 정보를 확인해주세요"}
@@ -75,34 +81,22 @@ export default function CustomerTopNav({
         {isLoggedIn && <CustomerPointBadge className="shrink-0" />}
       </div>
 
-      <nav className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Link
-          href="/"
-          className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
-        >
+      <nav className={`mt-3 grid gap-2 ${isLoggedIn ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-1"}`}>
+        <Link href="/" className={navButtonClass}>
           🏠 HOME
         </Link>
 
         {isLoggedIn && (
           <>
-            <Link
-              href="/myorder"
-              className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
-            >
+            <Link href="/myorder" className={navButtonClass}>
               주문조회
             </Link>
-            <Link
-              href="/order?mode=edit"
-              className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
-            >
+
+            <Link href="/order?mode=edit" className={navButtonClass}>
               정보수정
             </Link>
 
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
-            >
+            <button type="button" onClick={handleLogout} className={navButtonClass}>
               로그아웃
             </button>
           </>

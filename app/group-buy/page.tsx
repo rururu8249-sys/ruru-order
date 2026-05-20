@@ -16,6 +16,7 @@
 
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
+import CommonCustomerTopNav from "@/components/customer/CustomerTopNav";
 import { useEffect, useMemo, useState } from "react";
 import GroupBuyPageHero from "@/components/group-buy/GroupBuyPageHero";
 import GroupBuyDeliveryNotice from "@/components/group-buy/GroupBuyDeliveryNotice";
@@ -752,13 +753,7 @@ export default function GroupBuyPage() {
       style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
     >
       <section className="mx-auto w-full max-w-[480px]">
-        <TopCustomerNav
-          onEdit={() => {
-            setIsEditingCustomer(true);
-            setCustomerMode("new");
-          }}
-          onLogout={logout}
-        />
+        <CommonCustomerTopNav />
 
         {completeMessage && (
           <section className="mb-4 rounded-[28px] border border-green-200 bg-green-50 p-5 shadow-sm">
