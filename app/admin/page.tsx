@@ -4,6 +4,7 @@ import AdminOrdersView from "@/components/admin/orders/AdminOrdersView";
 import AdminOrderFilterPanel from "@/components/admin/orders/AdminOrderFilterPanel";
 import AdminOrderTablePanel from "@/components/admin/orders/AdminOrderTablePanel";
 import AdminOrderPagination from "@/components/admin/orders/AdminOrderPagination";
+import AdminOrderRow from "@/components/admin/orders/AdminOrderRow";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -3357,91 +3358,21 @@ const selectedCustomerDetail = useMemo(() => {
                   </div>
                 ) : (
                   <div className="grid gap-2">
-                    {paginatedOrderGroups.map((group) => {
-                      const first = group.first;
-                      const statusValue = orderStatusValue(first);
-                      const canceled = statusValue === "주문취소" || isCanceledOrder(first);
-                      const orderCode =
-                        first.order_lookup_code ||
-                        first.order_group_id ||
-                        String(first.id || "").slice(0, 8);
-
-                      return (
-                        <div
-                          key={group.groupId}
-                          className={`rounded-2xl border px-3 py-3 shadow-sm ${
-                            canceled
-                              ? "border-red-200 bg-red-50/80 opacity-80"
-                              : "bg-white"
-                          }`}
-                        >
-                          <div className="grid grid-cols-[auto_110px_1fr_150px_auto] items-center gap-3">
-                            <input
-                              type="checkbox"
-                              checked={selectedOrderGroupIds.includes(group.groupId)}
-                              onChange={() => toggleOrderGroup(group.groupId)}
-                              className="h-5 w-5"
-                            />
-
-                            <button
-                              type="button"
-                              onClick={() => setSelectedOrderDetailGroupId(group.groupId)}
-                              className="rounded-xl bg-gray-950 px-3 py-2 text-xs font-black text-white active:scale-[0.98]"
-                            >
-                              {orderCode || "상세보기"}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => setSelectedOrderDetailGroupId(group.groupId)}
-                              className="min-w-0 text-left active:scale-[0.99]"
-                            >
-                              <div
-                                className={`truncate text-base font-black ${
-                                  canceled ? "text-red-700 line-through decoration-2" : ""
-                                }`}
-                              >
-                                {first.youtube_nickname || "닉네임없음"} / {" "}
-                                {first.customer_name || "이름없음"} / {" "}
-                                {first.customer_phone || "전화번호없음"}
-                              </div>
-
-                              <div
-                                className={`mt-1 truncate text-xs font-bold ${
-                                  canceled ? "text-red-500 line-through" : "text-gray-500"
-                                }`}
-                              >
-                                {group.rows.map((row) => orderItemLabel(row)).join(" / ")}
-                              </div>
-                            </button>
-
-                            <select
-                              value={statusValue}
-                              onChange={(event) =>
-                                updateOrderGroupStatus(group.groupId, event.target.value)
-                              }
-                              className={`rounded-2xl border px-4 py-3 font-black outline-none transition ${orderSelectStatusStyle(orderStatusValue(group.first))}`}
-                            >
-                              <option value="미설정">미설정</option>
-                              <option value="입금확인">입금확인</option>
-                              <option value="포장전">포장전</option>
-                              <option value="출고완료">출고완료</option>
-                              <option value="킵">킵</option>
-                              <option value="주문취소">주문취소</option>
-                            </select>
-
-                            <div className="text-right">
-                              <div className="text-xs font-black text-gray-500">
-                                {first.payment_method || "결제없음"} · {group.totalQty}개
-                              </div>
-                              <div className="text-base font-black text-rose-500">
-                                {money(group.totalAmount)}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {paginatedOrderGroups.map((group) => (
+                <AdminOrderRow
+                  key={group.groupId}
+                  group={group}
+                  orderStatusValue={orderStatusValue}
+                  isCanceledOrder={isCanceledOrder}
+                  selectedOrderGroupIds={selectedOrderGroupIds}
+                  toggleOrderGroup={toggleOrderGroup}
+                  setSelectedOrderDetailGroupId={setSelectedOrderDetailGroupId}
+                  orderItemLabel={orderItemLabel}
+                  updateOrderGroupStatus={updateOrderGroupStatus}
+                  money={money}
+                  orderSelectStatusStyle={orderSelectStatusStyle}
+                />
+              ))}
                   </div>
                 )}
               </AdminOrderTablePanel>
