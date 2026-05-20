@@ -3,6 +3,7 @@
 import AdminOrdersView from "@/components/admin/orders/AdminOrdersView";
 import AdminOrderFilterPanel from "@/components/admin/orders/AdminOrderFilterPanel";
 import AdminOrderTablePanel from "@/components/admin/orders/AdminOrderTablePanel";
+import AdminOrderPagination from "@/components/admin/orders/AdminOrderPagination";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -3445,68 +3446,13 @@ const selectedCustomerDetail = useMemo(() => {
                 )}
               </AdminOrderTablePanel>
 
-              {orderGroups.length > 0 && (
-                <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-                  <button
-                    type="button"
-                    aria-label="주문 페이지 이전"
-                    onClick={() => setOrderPage((prev) => Math.max(1, prev - 1))}
-                    disabled={orderPage <= 1}
-                    className="rounded-2xl border bg-white px-4 py-3 text-sm font-black disabled:opacity-30"
-                  >
-                    이전
-                  </button>
-
-                  {orderPage > 3 && (
-                    <button
-                      type="button"
-                      onClick={() => setOrderPage(1)}
-                      className="rounded-2xl border bg-white px-4 py-3 text-sm font-black"
-                    >
-                      1
-                    </button>
-                  )}
-
-                  {orderPage > 4 && <span className="px-2 font-black text-gray-400">...</span>}
-
-                  {orderPageNumbers.map((page) => (
-                    <button
-                      key={page}
-                      type="button"
-                      onClick={() => setOrderPage(page)}
-                      className={`rounded-2xl px-4 py-3 text-sm font-black ${
-                        page === orderPage
-                          ? "bg-gray-950 text-white"
-                          : "border bg-white text-gray-700"
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
-
-                  {orderPage < totalOrderPages - 3 && <span className="px-2 font-black text-gray-400">...</span>}
-
-                  {orderPage < totalOrderPages - 2 && (
-                    <button
-                      type="button"
-                      onClick={() => setOrderPage(totalOrderPages)}
-                      className="rounded-2xl border bg-white px-4 py-3 text-sm font-black"
-                    >
-                      {totalOrderPages}
-                    </button>
-                  )}
-
-                  <button
-                    type="button"
-                    aria-label="주문 페이지 다음"
-                    onClick={() => setOrderPage((prev) => Math.min(totalOrderPages, prev + 1))}
-                    disabled={orderPage >= totalOrderPages}
-                    className="rounded-2xl border bg-white px-4 py-3 text-sm font-black disabled:opacity-30"
-                  >
-                    다음
-                  </button>
-                </div>
-              )}
+              <AdminOrderPagination
+                orderCount={orderGroups.length}
+                orderPage={orderPage}
+                orderPageNumbers={orderPageNumbers}
+                totalOrderPages={totalOrderPages}
+                setOrderPage={setOrderPage}
+              />
 
               {selectedOrderDetail && (
                 <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/40 p-4">
