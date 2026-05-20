@@ -11,6 +11,7 @@ import ManualPaymentMatchDrawer from "@/components/admin-v2/payment/ManualPaymen
 import PaymentMatchPanel from "@/components/admin-v2/payment/PaymentMatchPanel";
 import AdminOrderPaymentCell from "@/components/admin-v2/orders/AdminOrderPaymentCell";
 import AdminOrderTableHeader from "@/components/admin-v2/orders/AdminOrderTableHeader";
+import AdminOrderMainRow from "@/components/admin-v2/orders/AdminOrderMainRow";
 
 import type {
   AdminTab,
@@ -1789,50 +1790,45 @@ function OrderWorkTable({
 
         return (
           <div key={group.groupId} className="border-t border-neutral-100 first:border-t-0">
-            <div className="grid gap-2 px-3 py-2.5 lg:grid-cols-[84px_124px_128px_minmax(250px,1fr)_82px_108px_106px_90px] lg:items-center">
-              <div className="text-[13px] font-black text-neutral-500">{shortOrderCode(group)}</div>
-              <div className="text-[13px] font-bold text-neutral-500">{formatDateLabel(group.first.created_at)}</div>
-              <div className="min-w-0">
-                <div className="truncate text-[15px] font-black">{group.first.youtube_nickname || "-"}</div>
-                <div className="truncate text-[12px] font-bold text-neutral-500">
-                  {group.first.customer_name || "-"} · {displayOrderPhone(group.first)}
+            <AdminOrderMainRow
+              orderCode={shortOrderCode(group)}
+              createdAtLabel={formatDateLabel(group.first.created_at)}
+              nickname={group.first.youtube_nickname || "-"}
+              customerLine={`${group.first.customer_name || "-"} · ${displayOrderPhone(group.first)}`}
+              itemSummary={buildItemSummary(group)}
+              amountText={money(group.totalAmount)}
+              paymentNode={
+                <AdminOrderPaymentCell
+                  paymentMethod={group.first.payment_method || "-"}
+                  paymentLabel={paymentMeta.label}
+                  paymentClassName={paymentMeta.className}
+                  isBankUnpaid={isBankUnpaid(group.first)}
+                  isBankPaid={isBankPaid(group.first)}
+                  onOpenManualMatch={() => onOpenManualMatch(group)}
+                />
+              }
+              statusNode={
+                <div>
+                  <select value={status} onChange={(event) => onStatusChange(group, event.target.value)} className={`h-8 w-full rounded-lg border px-2 text-center text-xs font-black outline-none ${selectClass(status)}`}>
+                    {ORDER_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                  {groupStatusLogs.length > 0 ? (
+                    <div className="mt-0.5 text-center text-[10px] font-black text-blue-700">상태변경 {groupStatusLogs.length}건</div>
+                  ) : null}
+                  {isShippedDone && !hasTrackingNumber ? (
+                    <div className="mt-0.5 text-center text-[10px] font-black text-red-600">송장없음</div>
+                  ) : null}
+                  {isShippedDone && !hasShippedAt ? (
+                    <div className="mt-0.5 text-center text-[10px] font-black text-red-600">출고시간없음</div>
+                  ) : null}
                 </div>
-              </div>
-              <div className="min-w-0">
-                <div className="truncate text-[15px] font-bold text-neutral-800">{buildItemSummary(group)}</div>
-              </div>
-              <AdminOrderPaymentCell
-                paymentMethod={group.first.payment_method || "-"}
-                paymentLabel={paymentMeta.label}
-                paymentClassName={paymentMeta.className}
-                isBankUnpaid={isBankUnpaid(group.first)}
-                isBankPaid={isBankPaid(group.first)}
-                onOpenManualMatch={() => onOpenManualMatch(group)}
-              />
-              <div className="text-left lg:text-right">
-                <div className="text-[15px] font-black">{money(group.totalAmount)}</div>
-                {groupMoneyLogs.length > 0 ? (
-                  <div className="mt-0.5 text-[10px] font-black text-red-600">금액수정 {groupMoneyLogs.length}건</div>
-                ) : null}
-              </div>
-              <div>
-                <select value={status} onChange={(event) => onStatusChange(group, event.target.value)} className={`h-8 w-full rounded-lg border px-2 text-center text-xs font-black outline-none ${selectClass(status)}`}>
-                  {ORDER_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
-                {groupStatusLogs.length > 0 ? (
-                  <div className="mt-0.5 text-center text-[10px] font-black text-blue-700">상태변경 {groupStatusLogs.length}건</div>
-                ) : null}
-                {isShippedDone && !hasTrackingNumber ? (
-                  <div className="mt-0.5 text-center text-[10px] font-black text-red-600">송장없음</div>
-                ) : null}
-                {isShippedDone && !hasShippedAt ? (
-                  <div className="mt-0.5 text-center text-[10px] font-black text-red-600">출고시간없음</div>
-                ) : null}
-              </div>
-              <button type="button" onClick={() => onToggle(group.groupId)} className="h-8 rounded-lg border border-neutral-300 bg-white px-2 text-xs font-black text-neutral-700 hover:bg-neutral-50">
-                {isOpen ? "상세닫기" : "상세보기"}
-              </button>
-            </div>
+              }
+              detailNode={
+                <button type="button" onClick={() => onToggle(group.groupId)} className="h-8 rounded-lg border border-neutral-300 bg-white px-2 text-xs font-black text-neutral-700 hover:bg-neutral-50">
+                  {isOpen ? "상세닫기" : "상세보기"}
+                </button>
+              }
+            />
 
             {isOpen ? <OrderDetailBlock group={group} moneyEditLogs={groupMoneyLogs} statusChangeLogs={groupStatusLogs} onTrackingChange={onTrackingChange} onFinalAmountChange={onFinalAmountChange} /> : null}
           </div>
