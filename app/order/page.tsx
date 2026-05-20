@@ -231,6 +231,24 @@ export default function OrderPage() {
     !isEditMode &&
     Boolean(customerPhone && youtubeNickname && customerName);
 
+  const currentOrderMode =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("mode")
+      : "";
+
+  const isNewCustomerEntryMode =
+    currentOrderMode === "new" || customerMode === "new";
+
+  const shouldShowEntryChoice =
+    !isAutoLoggedIn &&
+    !isEditingCustomerInfo &&
+    !isNewCustomerEntryMode &&
+    customerMode === "load";
+
+  const shouldShowCustomerInfoForm =
+    !isAutoLoggedIn &&
+    (isEditingCustomerInfo || isNewCustomerEntryMode);
+
   useEffect(() => {
     loadOrderSettings();
     loadBroadcast();
@@ -1206,7 +1224,7 @@ export default function OrderPage() {
           <OrderCustomerInfoIntro mode={isEditingCustomerInfo ? "edit" : "check"} />
         )}
 
-        {!isAutoLoggedIn && !isEditingCustomerInfo && customerMode === "load" && (
+        {shouldShowEntryChoice && (
           <OrderCustomerEntryPanel
             loginName={loginName}
             loginPhone={formatPhone(loginPhone)}
@@ -1217,7 +1235,7 @@ export default function OrderPage() {
           />
         )}
 
-        {!isAutoLoggedIn && (isEditingCustomerInfo || customerMode === "new") && (
+        {shouldShowCustomerInfoForm && (
           <OrderCustomerInfoFormCard
             isEdit={isEditingCustomerInfo}
             youtubeNickname={youtubeNickname}
