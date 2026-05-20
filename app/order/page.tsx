@@ -9,7 +9,7 @@
 // - 주문상품 모든 칸 필수: 상품명/색상/사이즈/수량/상품금액
 // - 색상/사이즈 없으면 고객이 "없음" 입력해야 제출 가능
 // - 상품금액 쉼표 자동
-// - 주문 완료 화면에서 주문내역 + 계좌 안내 + 계좌번호 복사
+// - 주문 완료 화면에서 새 입금/결제 안내 컴포넌트 사용
 // - 폭죽/오토바이 애니메이션 포함
 // - 무통장 계좌 안내는 주문서 작성 중간에 노출하지 않음
 // - 홈/로그아웃 상단 버튼 추가
@@ -1162,64 +1162,15 @@ export default function OrderPage() {
         <section className="mx-auto w-full max-w-md">
           <TopCustomerNav />
 
-          {done.paymentMethod === "무통장입금" ? (
-            <section className="rounded-[30px] bg-white p-5 shadow-[0_12px_26px_rgba(70,45,25,0.10)] ring-1 ring-black/5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-[13px] font-black tracking-[-0.04em] text-[#f05a45]">
-                    입금정보를 확인해주세요
-                  </div>
-                  <h1 className="mt-1 text-[27px] font-black tracking-[-0.07em] text-[#151923]">
-                    입금계좌 안내
-                  </h1>
-                </div>
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-[26px]">
-                  💳
-                </div>
-              </div>
-
-              <div className="mt-4 rounded-[24px] bg-[#fff8dc] p-5">
-                <div className="text-sm font-black text-[#9a5b00]">{BANK_NAME}</div>
-                <div className="mt-2 break-all text-[29px] font-black tracking-[-0.05em] text-[#111827]">
-                  {BANK_ACCOUNT}
-                </div>
-                <div className="mt-2 text-lg font-black text-[#151923]">{BANK_HOLDER}</div>
-              </div>
-
-              <button
-                type="button"
-                onClick={copyBankAccount}
-                className={`${buttonBase} mt-3 w-full rounded-2xl bg-gray-950 p-4 font-black text-white`}
-              >
-                {copyDone ? "✓ 계좌번호가 복사되었습니다" : "계좌번호 복사"}
-              </button>
-
-              <div className="mt-3 rounded-2xl bg-[#fff0f3] p-3 text-center text-sm font-black leading-relaxed text-[#e11d48]">
-                입금 후 자동확인까지 10~30분 정도 걸릴 수 있습니다.
-              </div>
-
-              <div className="mt-3 rounded-2xl bg-green-50 px-4 py-3 text-center text-sm font-black text-green-700">
-                ✓ {done.nickname || done.name}님 주문서가 정상 접수되었습니다
-              </div>
-            </section>
-          ) : (
-            <section className="rounded-[30px] bg-white p-5 text-center shadow-[0_12px_26px_rgba(70,45,25,0.10)] ring-1 ring-black/5">
-              <div className="text-[13px] font-black tracking-[-0.04em] text-[#2563eb]">
-                카드결제 안내
-              </div>
-              <h1 className="mt-1 text-[27px] font-black tracking-[-0.07em] text-[#151923]">
-                카톡채널 문의
-              </h1>
-
-              <div className="mt-4 rounded-2xl bg-blue-50 p-4 text-sm font-bold leading-relaxed text-blue-700">
-                카드결제는 카톡채널로 문의해주세요. 부가세 +10%가 적용됩니다.
-              </div>
-
-              <div className="mt-3 rounded-2xl bg-green-50 px-4 py-3 text-center text-sm font-black text-green-700">
-                ✓ {done.nickname || done.name}님 주문서가 정상 접수되었습니다
-              </div>
-            </section>
-          )}
+          <OrderCompletePaymentNotice
+            nickname={done.nickname}
+            name={done.name}
+            paymentMethod={done.paymentMethod}
+            totalAmount={done.totalAmount}
+            bankName={BANK_NAME}
+            bankAccount={BANK_ACCOUNT}
+            bankHolder={BANK_HOLDER}
+          />
 
           <section className="mt-4 rounded-[30px] bg-white p-5 shadow-[0_12px_26px_rgba(70,45,25,0.10)] ring-1 ring-black/5">
             <div className="flex items-center justify-between gap-3">
@@ -1230,15 +1181,6 @@ export default function OrderPage() {
             </div>
 
             <div className="mt-3 grid gap-2">
-              <OrderCompletePaymentNotice
-                nickname={done.nickname}
-                name={done.name}
-                paymentMethod={done.paymentMethod}
-                totalAmount={done.totalAmount}
-                bankName={BANK_NAME}
-                bankAccount={BANK_ACCOUNT}
-                bankHolder={BANK_HOLDER}
-              />
 
               {done.items.map((item, index) => (
                 <div key={index} className="rounded-2xl bg-gray-50 p-4">
