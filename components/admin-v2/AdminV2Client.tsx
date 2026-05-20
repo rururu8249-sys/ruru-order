@@ -34,6 +34,7 @@ import type {
   StatusChangeLogRow,
 } from "@/lib/admin-v2/types";
 import { ORDER_STATUS_OPTIONS, PAGE_SIZE, PAYMENT_FILTERS, TABS } from "@/lib/admin-v2/constants";
+import AdminSettingsQuickLinks from "@/components/admin-v2/settings/AdminSettingsQuickLinks";
 import {
   buildRosenItemTextFromOrderRow,
   buildRosenRecipientAddress,
@@ -2053,6 +2054,7 @@ function SettingsPanel({
 }) {
   return (
     <div className="grid gap-3 md:grid-cols-2">
+      <AdminSettingsQuickLinks />
       <SettingInput label="고객 카드추가 수수료율" desc="0~10% 사이 / 새 주문부터 적용" value={settingsSummary.customerCardRate} suffix="%" min={0} max={10} onSave={(value) => saveSetting("customer_card_extra_rate", String(value))} />
       <LockedSettingCard label="실제 카드업체 수수료율" desc="정산 사고 방지를 위해 7% 고정 / 관리자 수정 불가" value={7} suffix="%" />
       <SettingInput label="기본 배송비" desc="일반 주소 기본 배송비" value={settingsSummary.defaultShippingFee} suffix="원" min={0} max={50000} onSave={(value) => saveSetting("default_shipping_fee", String(value))} />
