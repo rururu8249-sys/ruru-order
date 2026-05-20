@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 // components/order/OrderCompletePaymentNotice.tsx
 // 목적: 주문완료 후 입금계좌 최상단 안내 + 주문상품/배송비/총액 확인 UI
 // 주의: UI 전용. 주문 저장, 주문번호 생성, 금액 계산, 입금매칭, Supabase 로직 없음.
@@ -235,6 +236,13 @@ export default function OrderCompletePaymentNotice({
           </div>
         </div>
       </section>
+      <Link
+        href="/myorder"
+        className="mt-3 flex w-full items-center justify-center rounded-[24px] bg-blue-600 px-5 py-5 text-[18px] font-black text-white shadow-[0_16px_34px_rgba(37,99,235,0.30)] transition-all duration-150 active:scale-[0.98]"
+      >
+        확인하고 주문조회로 이동
+      </Link>
+
     </section>
   );
 }
