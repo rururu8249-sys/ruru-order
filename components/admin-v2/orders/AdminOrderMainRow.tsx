@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { ADMIN_ORDER_GRID } from "@/components/admin-v2/orders/AdminOrderTableHeader";
 
 type AdminOrderMainRowProps = {
+  selectNode?: ReactNode;
   orderCode: string;
   createdAtLabel: string;
   nickname: string;
@@ -16,6 +17,7 @@ type AdminOrderMainRowProps = {
 };
 
 export default function AdminOrderMainRow({
+  selectNode,
   orderCode,
   createdAtLabel,
   nickname,
@@ -28,6 +30,8 @@ export default function AdminOrderMainRow({
 }: AdminOrderMainRowProps) {
   return (
     <div className={`grid w-full ${ADMIN_ORDER_GRID} border-t border-neutral-100 px-4 py-4 text-[14px] first:border-t-0 hover:bg-neutral-50 lg:items-center`}>
+      <div className="flex justify-center px-1">{selectNode}</div>
+
       <div className="min-w-0 px-2 text-center">
         <div className="truncate font-black text-neutral-500" title={orderCode}>
           {orderCode}

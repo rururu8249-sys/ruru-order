@@ -15,6 +15,7 @@ import AdminOrderTableHeader from "@/components/admin-v2/orders/AdminOrderTableH
 import AdminOrderTopSummary from "@/components/admin-v2/orders/AdminOrderTopSummary";
 import AdminOrderFilterBar from "@/components/admin-v2/orders/AdminOrderFilterBar";
 import AdminOrderMainRow from "@/components/admin-v2/orders/AdminOrderMainRow";
+import AdminOrderBulkActionBar from "@/components/admin-v2/orders/AdminOrderBulkActionBar";
 import AdminOrderAmountCell from "@/components/admin-v2/orders/AdminOrderAmountCell";
 import AdminOrderStatusCell from "@/components/admin-v2/orders/AdminOrderStatusCell";
 import AdminOrderDetailButton from "@/components/admin-v2/orders/AdminOrderDetailButton";
@@ -1699,9 +1700,65 @@ function OrderWorkTable({
   onFinalAmountChange: (row: OrderRow, nextAmount: number, reason: string) => Promise<void>;
   onOpenManualMatch: (group: OrderGroup) => void;
 }) {
+
+  const [selectedOrderGroupIds, setSelectedOrderGroupIds] = useState<string[]>([]);
+
+  const visibleGroupIds = groups.map((group) => group.groupId);
+  const selectedGroups = groups.filter((group) => selectedOrderGroupIds.includes(group.groupId));
+  const isAllVisibleSelected =
+    visibleGroupIds.length > 0 &&
+    visibleGroupIds.every((groupId) => selectedOrderGroupIds.includes(groupId));
+
+  const toggleSelectGroup = (groupId: string) => {
+    setSelectedOrderGroupIds((current) =>
+      current.includes(groupId)
+        ? current.filter((item) => item !== groupId)
+        : [...current, groupId]
+    );
+  };
+
+  const toggleSelectAllVisible = () => {
+    setSelectedOrderGroupIds((current) => {
+      if (isAllVisibleSelected) {
+        return current.filter((groupId) => !visibleGroupIds.includes(groupId));
+      }
+
+      return Array.from(new Set([...current, ...visibleGroupIds]));
+    });
+  };
+
+  const clearSelectedGroups = () => {
+    setSelectedOrderGroupIds([]);
+  };
+
+  const applyBulkStatus = (nextStatus: string) => {
+    if (!nextStatus) return;
+    selectedGroups.forEach((group) => onStatusChange(group, nextStatus));
+    clearSelectedGroups();
+  };
+
   return (
     <div className="w-full overflow-hidden rounded-xl border border-neutral-200 bg-white">
-      <AdminOrderTableHeader />
+      <AdminOrderBulkActionBar
+        selectedCount={selectedOrderGroupIds.length}
+        isAllSelected={isAllVisibleSelected}
+        onToggleAll={toggleSelectAllVisible}
+        onClear={clearSelectedGroups}
+        statusOptions={ORDER_STATUS_OPTIONS}
+        onApplyStatus={applyBulkStatus}
+      />
+
+      <AdminOrderTableHeader
+        selectNode={
+          <input
+            type="checkbox"
+            checked={isAllVisibleSelected}
+            onChange={toggleSelectAllVisible}
+            className="h-4 w-4 accent-blue-600"
+            aria-label="현재 목록 전체 선택"
+          />
+        }
+      />
 
       {groups.map((group) => {
         const isOpen = openedOrderGroupIds.includes(group.groupId);
@@ -1717,6 +1774,15 @@ function OrderWorkTable({
         return (
           <div key={group.groupId} className="border-t border-neutral-100 first:border-t-0">
             <AdminOrderMainRow
+              selectNode={
+                <input
+                  type="checkbox"
+                  checked={selectedOrderGroupIds.includes(group.groupId)}
+                  onChange={() => toggleSelectGroup(group.groupId)}
+                  className="h-4 w-4 accent-blue-600"
+                  aria-label={`${shortOrderCode(group)} 선택`}
+                />
+              }
               orderCode={shortOrderCode(group)}
               createdAtLabel={formatDateLabel(group.first.created_at)}
               nickname={group.first.youtube_nickname || "-"}
