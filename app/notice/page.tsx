@@ -18,6 +18,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import CustomerTopNav from "@/components/customer/CustomerTopNav";
+import NoticePageHero from "@/components/notice/NoticePageHero";
+import NoticeStateMessage from "@/components/notice/NoticeStateMessage";
+import NoticeCard from "@/components/notice/NoticeCard";
+import NoticeKakaoContactCard from "@/components/notice/NoticeKakaoContactCard";
 
 type Notice = {
   id: number;
@@ -103,94 +107,31 @@ export default function NoticePage() {
 
 
   return (
-    <main className="min-h-screen select-none bg-[#f8f1e8] px-4 py-6 text-[#241b17]" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
+    <main className="min-h-screen select-none bg-[#f5f8ff] px-4 py-6 text-[#151923]" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
       <section className="mx-auto w-full max-w-md">
         <CustomerTopNav />
-        <header className="mb-5 rounded-[34px] bg-[#fffaf3] px-5 py-6 shadow-[0_18px_40px_rgba(70,45,25,0.10)] ring-1 ring-white/70">
+        <NoticePageHero />
 
-          <div className="inline-flex rounded-full bg-[#fff1a8] px-3 py-1 text-[12px] font-black text-[#2b2416]">
-            📢 필독 공지
-          </div>
-
-          <h1 className="mt-3 text-[38px] font-black leading-tight tracking-[-0.07em] text-[#2b211c]">
-            공지사항
-          </h1>
-
-          <p className="mt-2 text-[15px] font-bold leading-relaxed tracking-[-0.04em] text-[#7b6554]">
-            주문 전 꼭 확인해야 하는 안내입니다.
-          </p>
-        </header>
-
-        {loading && (
-          <div className="rounded-[28px] border border-[#f1ecec] bg-white p-7 text-center text-[15px] font-black text-[#777] shadow-[0_14px_35px_rgba(30,20,20,0.06)]">
-            공지사항 불러오는 중...
-          </div>
-        )}
+        {loading && <NoticeStateMessage message="공지사항 불러오는 중..." />}
 
         {!loading && notices.length === 0 && (
-          <div className="rounded-[28px] border border-[#f1ecec] bg-white p-7 text-center text-[15px] font-black text-[#777] shadow-[0_14px_35px_rgba(30,20,20,0.06)]">
-            등록된 공지사항이 없습니다.
-          </div>
+          <NoticeStateMessage message="등록된 공지사항이 없습니다." />
         )}
 
         <div className="space-y-4">
           {notices.map((notice) => (
-            <article
-              key={notice.id}
-              className={`rounded-[30px] bg-white p-5 shadow-[0_14px_35px_rgba(30,20,20,0.07)] ${
-                notice.is_pinned
-                  ? "border-2 border-[#ff5d6d]"
-                  : "border border-[#f1ecec]"
-              }`}
-            >
-              <div className="mb-4 flex flex-wrap items-center gap-2">
-                {notice.is_pinned && (
-                  <div className="inline-flex rounded-full bg-gradient-to-r from-[#ff5d6d] to-[#ff405a] px-3 py-1 text-[12px] font-black text-white">
-                    상단고정
-                  </div>
-                )}
-
-                <div className="inline-flex rounded-full bg-[#f7f3f3] px-3 py-1 text-[12px] font-black text-[#5f5555]">
-                  {notice.category || "공지"}
-                </div>
-              </div>
-
-              <h2 className="text-[22px] font-black leading-snug tracking-[-0.05em] text-[#151515]">
-                {notice.title}
-              </h2>
-
-              <div className="mt-4 whitespace-pre-line text-[15px] font-semibold leading-[1.8] tracking-[-0.03em] text-[#4f5968]">
-                {notice.content}
-              </div>
-            </article>
+            <NoticeCard key={notice.id} notice={notice} />
           ))}
         </div>
 
-        <section className="mt-5 rounded-[30px] bg-gradient-to-br from-[#ff5d6d] via-[#ff4c62] to-[#ff405a] p-5 text-white shadow-[0_20px_42px_rgba(255,76,98,0.25)]">
-          <div className="text-[22px] font-black tracking-[-0.05em]">
-            문의가 필요하신가요?
-          </div>
-
-          <p className="mt-2 text-[14px] font-semibold leading-relaxed tracking-[-0.03em] text-white/85">
-            주문 관련 문의는 카톡채널로 유튜브 닉네임과 주문자 성함을 함께 남겨주세요.
-          </p>
-
-          <a
-            href={KAKAO_CHANNEL_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-4 block rounded-2xl bg-white px-4 py-4 text-center text-[16px] font-black text-[#ff4b60] transition active:scale-[0.98]"
-          >
-            카톡채널 문의하기
-          </a>
-        </section>
+        <NoticeKakaoContactCard kakaoUrl={KAKAO_CHANNEL_URL} />
 
         <footer className="py-8 text-center">
-          <p className="text-[15px] font-medium tracking-[-0.04em] text-[#5f5555]">
+          <p className="text-[15px] font-medium tracking-[-0.04em] text-slate-500">
             오늘도 루루동이와 함께 행복한 쇼핑 되세요!♡
           </p>
-          <div className="mx-auto mt-5 h-px w-full bg-[#eee5e5]" />
-          <p className="mt-4 text-[12px] text-[#aaa]">
+          <div className="mx-auto mt-5 h-px w-full bg-blue-100" />
+          <p className="mt-4 text-[12px] text-slate-400">
             copyright © since 2024 루루동이. All rights reserved.
           </p>
         </footer>
