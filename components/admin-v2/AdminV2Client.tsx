@@ -1322,6 +1322,7 @@ export function AdminV2Client() {
         group={manualMatchGroup}
         deposits={deposits}
         onClose={() => setManualMatchGroup(null)}
+        onMatched={loadData}
         onConfirm={handleManualPaymentConfirm}
       />
     </main>
