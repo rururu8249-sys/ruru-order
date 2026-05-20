@@ -12,6 +12,9 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import CustomerTopNav from "@/components/customer/CustomerTopNav";
+import MyOrderPageHero from "@/components/myorder/MyOrderPageHero";
+import MyOrderBankAccountCard from "@/components/myorder/MyOrderBankAccountCard";
+import MyOrderLookupForm from "@/components/myorder/MyOrderLookupForm";
 
 const FOOTER_TEXT = "© since 2024 루루동이 | All Rights Reserved.";
 const BANK_NAME = "새마을금고";
@@ -206,94 +209,32 @@ export default function MyOrderPage() {
       <section className="mx-auto w-full max-w-md">
         <CustomerTopNav />
 
-        <header className="mb-5 text-center">
-          <div className="text-sm font-black text-[#f05a45]">RURU ORDER</div>
-          <h1 className="mt-1 text-4xl font-black tracking-tight">주문조회</h1>
-          <p className="mt-2 text-sm font-bold text-[#7b6554]">
-            이름과 전화번호로 최근 7일 주문내역을 확인합니다.
-          </p>
-        </header>
+        <MyOrderPageHero isLoggedIn={isLoggedIn} customerName={customerName} />
 
         {isLoggedIn && (
-          <section className="mb-4 rounded-[30px] bg-white p-5 shadow-[0_12px_26px_rgba(70,45,25,0.10)] ring-1 ring-black/5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-[13px] font-black tracking-[-0.04em] text-[#f05a45]">
-                  입금계좌 확인
-                </div>
-                <h2 className="mt-1 text-[24px] font-black tracking-[-0.07em] text-[#241b17]">
-                  계좌번호 다시 보기
-                </h2>
-              </div>
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#fff7ec] text-[25px]">
-                💳
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-[24px] bg-[#fff8dc] p-5">
-              <div className="text-sm font-black text-[#9a5b00]">{BANK_NAME}</div>
-              <div className="mt-2 break-all text-[28px] font-black tracking-[-0.05em] text-[#111827]">
-                {BANK_ACCOUNT}
-              </div>
-              <div className="mt-2 text-lg font-black text-[#241b17]">{BANK_HOLDER}</div>
-            </div>
-
-            <button
-              type="button"
-              onClick={copyBankAccount}
-              className="mt-3 w-full rounded-2xl bg-gray-950 p-4 font-black text-white transition active:scale-[0.97]"
-            >
-              {copyDone ? "✓ 계좌번호가 복사되었습니다" : "계좌번호 복사"}
-            </button>
-
-            <p className="mt-3 rounded-2xl bg-[#fff0f3] p-3 text-center text-sm font-black leading-relaxed text-[#e11d48]">
-              입금 시 주문자명과 입금자명이 다르면 확인이 늦어질 수 있습니다.
-            </p>
-          </section>
+          <MyOrderBankAccountCard
+            bankName={BANK_NAME}
+            bankAccount={BANK_ACCOUNT}
+            bankHolder={BANK_HOLDER}
+            copyDone={copyDone}
+            onCopy={copyBankAccount}
+          />
         )}
 
         {!isLoggedIn && (
-          <section className="rounded-[28px] bg-white p-5 shadow-[0_12px_26px_rgba(70,45,25,0.10)] ring-1 ring-black/5">
-            <div className="mb-3">
-              <h2 className="text-[20px] font-black tracking-[-0.06em] text-[#241b17]">
-                주문조회 로그인
-              </h2>
-              <p className="mt-1 text-sm font-bold leading-relaxed text-[#7b6554]">
-                이름과 전화번호 확인 후 주문내역과 계좌번호를 볼 수 있습니다.
-              </p>
-            </div>
-
-            <div className="grid gap-3">
-              <input
-                value={customerName}
-                onChange={(event) => setCustomerName(event.target.value)}
-                placeholder="이름"
-                className="w-full rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-[#f05a45]"
-              />
-
-              <input
-                value={formatPhone(phone)}
-                onChange={(event) => setPhone(normalizePhone(event.target.value))}
-                placeholder="전화번호"
-                inputMode="numeric"
-                className="w-full rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-[#f05a45]"
-              />
-
-              <button
-                type="button"
-                onClick={() => loadOrders()}
-                disabled={loading}
-                className="rounded-2xl bg-gray-950 p-4 font-black text-white transition active:scale-[0.97] disabled:opacity-60"
-              >
-                {loading ? "조회중..." : "확인"}
-              </button>
-            </div>
-          </section>
+          <MyOrderLookupForm
+            customerName={customerName}
+            formattedPhone={formatPhone(phone)}
+            loading={loading}
+            onNameChange={setCustomerName}
+            onPhoneChange={(value) => setPhone(normalizePhone(value))}
+            onSubmit={() => loadOrders()}
+          />
         )}
 
         {isLoggedIn && (
           <section className="mt-4 rounded-[24px] bg-white/80 p-4 text-sm font-black text-[#6b5b50] shadow-[0_8px_18px_rgba(70,45,25,0.06)] ring-1 ring-black/5">
-            {customerName}님 주문내역을 자동으로 불러왔습니다.
+            {customerName}님 주문내역을 최근 7일 기준으로 불러왔습니다.
           </section>
         )}
 
