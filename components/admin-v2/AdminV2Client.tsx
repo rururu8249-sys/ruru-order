@@ -489,7 +489,7 @@ export function AdminV2Client() {
   const [pendingKeyword, setPendingKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState("all");
-  const [dateFilter, setDateFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState("all");
   const [openedOrderGroupIds, setOpenedOrderGroupIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [manualMatchGroup, setManualMatchGroup] = useState<OrderGroup | null>(null);
@@ -644,7 +644,12 @@ export function AdminV2Client() {
 
       const matchStatus = matchAliasFilter(statusFilterValues, status, statusAliasMap);
       const matchPayment = matchAliasFilter(paymentFilterValues, payment, paymentAliasMap);
-      const matchDate = !dateFilter || toDateKey(group.first.created_at) === dateFilter;
+      const isAllDateFilter =
+        !dateFilter ||
+        dateFilter === "all" ||
+        dateFilter === "전체" ||
+        dateFilter === "방송 전체보기";
+      const matchDate = isAllDateFilter || (!dateFilter || toDateKey(group.first.created_at) === dateFilter);
 
       const target = [
         group.groupId,

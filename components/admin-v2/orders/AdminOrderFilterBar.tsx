@@ -25,8 +25,8 @@ type MultiOption = {
 
 const STATUS_OPTIONS: MultiOption[] = [
   { value: "전체", label: "상태 전체" },
-  { value: "미결제", label: "미결제/확인대기" },
-  { value: "결제완료", label: "입금확인" },
+  { value: "미결제", label: "미결제" },
+  { value: "결제완료", label: "결제완료" },
   { value: "포장전", label: "출고준비" },
   { value: "포장완료", label: "포장완료" },
   { value: "출고완료", label: "출고완료" },
@@ -36,9 +36,9 @@ const STATUS_OPTIONS: MultiOption[] = [
 const PAYMENT_OPTIONS: MultiOption[] = [
   { value: "전체", label: "입금 전체" },
   { value: "무통장 미입금", label: "무통장 미입금" },
-  { value: "무통장 입금확인", label: "무통장 입금확인" },
-  { value: "카드 미결제", label: "카드 미결제/링크대기" },
-  { value: "카드 결제완료", label: "카드 결제완료" },
+  { value: "무통장 입금확인", label: "무통장완료" },
+  { value: "카드 미결제", label: "카드대기" },
+  { value: "카드 결제완료", label: "카드완료" },
 ];
 
 function splitFilter(value: string) {
