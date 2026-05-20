@@ -3294,9 +3294,6 @@ const selectedCustomerDetail = useMemo(() => {
                     <div className="text-sm font-black text-rose-500 mb-2">
                       ORDER MANAGER
                     </div>
-                    <h1 className="text-3xl md:text-5xl font-black">
-                      주문관리
-                    </h1>
                     <p className="text-gray-500 font-bold mt-3">
                       주문번호 클릭 → 상세내역 / 상태변경 / 금액수정
                     </p>
