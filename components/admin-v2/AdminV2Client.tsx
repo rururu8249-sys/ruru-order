@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import ManualPaymentMatchDrawer from "@/components/admin-v2/payment/ManualPaymentMatchDrawer";
 import PaymentMatchPanel from "@/components/admin-v2/payment/PaymentMatchPanel";
+import RosenExportOnlyNotice from "@/components/admin-v2/shipping/RosenExportOnlyNotice";
 import AdminOrderPaymentCell from "@/components/admin-v2/orders/AdminOrderPaymentCell";
 import AdminOrderTableHeader from "@/components/admin-v2/orders/AdminOrderTableHeader";
 import AdminOrderMainRow from "@/components/admin-v2/orders/AdminOrderMainRow";
@@ -444,7 +445,7 @@ function buildRosenShippingPreviewRows(rawRows: string[][], orders: OrderRow[]):
     }
 
     const status = blockingReasons.length > 0 ? "blocked" : checkReasons.length > 0 ? "check" : "ready";
-    const message = [...blockingReasons, ...checkReasons].join(" / ") || "출고완료 일괄반영 가능";
+    const message = [...blockingReasons, ...checkReasons].join(" / ") || "출고완료 일괄반영 사용안함 가능";
 
     return {
       rowNumber: candidate.rowNumber,
@@ -462,9 +463,9 @@ function buildRosenShippingPreviewRows(rawRows: string[][], orders: OrderRow[]):
 }
 
 function getShippingPreviewLabel(status: RosenShippingPreviewRow["status"]) {
-  if (status === "ready") return "정상반영";
+  if (status === "ready") return "다운로드가능";
   if (status === "check") return "확인필요";
-  return "미반영";
+  return "다운로드제외";
 }
 
 function getShippingPreviewClass(status: RosenShippingPreviewRow["status"]) {
@@ -997,125 +998,10 @@ export function AdminV2Client() {
   };
 
 
-  const bulkMarkShippingDoneFromExcel = async (previewRows: RosenShippingPreviewRow[]) => {
-    const readyRows = previewRows.filter((row) => row.status === "ready");
-    const orderIds = Array.from(new Set(readyRows.flatMap((row) => row.orderIds))).filter(Boolean);
-
-    if (orderIds.length === 0) {
-      alert("정상반영 가능한 주문이 없습니다.\n\n확인필요/미반영 항목을 먼저 확인해주세요.");
-      return;
-    }
-
-    const orderMap = new Map<number, OrderRow>();
-    orders.forEach((order) => orderMap.set(Number(order.id), order));
-
-    const currentRows = orderIds.map((id) => orderMap.get(id)).filter(Boolean) as OrderRow[];
-    const blockedNow = currentRows.filter(
-      (row) => isOrderCanceled(row) || getOrderStatusValue(row) !== "출고대기" || getOrderStatusValue(row) === "출고완료" || Boolean(row.shipped_at)
+  const bulkMarkShippingDoneFromExcel = async (_previewRows: RosenShippingPreviewRow[]) => {
+    alert(
+      "송장 업로드/재업로드/사이트 출고반영 기능은 사용하지 않습니다.\n\n로젠 송장은 사이트에서 다운로드만 하고, 실제 합배송/송장처리는 로젠 프로그램에서 진행해주세요."
     );
-
-    if (currentRows.length !== orderIds.length || blockedNow.length > 0) {
-      alert(
-        "미리보기 이후 주문 상태가 바뀐 항목이 있습니다.\n\n새로고침 후 다시 엑셀을 업로드해서 확인해주세요."
-      );
-      await loadData();
-      return;
-    }
-
-    const ok = confirm(
-      `정상반영 ${readyRows.length}줄 / 주문행 ${orderIds.length}건을 출고완료 처리할까요?\n\n송장번호는 저장하지 않습니다.\n출고완료 상태와 출고완료시간만 저장합니다.`
-    );
-
-    if (!ok) return;
-
-    const nowIso = new Date().toISOString();
-    const statusLogPayloads = currentRows.map((row) => {
-      const beforeStatus = getOrderStatusValue(row);
-
-      return {
-        order_id: row.id,
-        order_group_id: row.order_group_id,
-        order_lookup_code: row.order_lookup_code,
-        changed_by: "admin-v2",
-        change_source: "admin-v2-rosen-original-upload-shipped-bulk",
-        before_status: beforeStatus,
-        after_status: "출고완료",
-        before_order_manage_status: row.order_manage_status || beforeStatus,
-        after_order_manage_status: "출고완료",
-        payment_method: row.payment_method || "",
-        deposit_confirmed_at_before: row.deposit_confirmed_at || "",
-        deposit_confirmed_at_after: row.deposit_confirmed_at || "",
-        snapshot_before: {
-          id: row.id,
-          admin_order_status_v2: row.admin_order_status_v2,
-          order_manage_status: row.order_manage_status,
-          payment_method: row.payment_method,
-          deposit_confirmed_at: row.deposit_confirmed_at,
-          shipped_at: row.shipped_at,
-          tracking_company: row.tracking_company,
-          tracking_number: row.tracking_number,
-        },
-        snapshot_after: {
-          id: row.id,
-          admin_order_status_v2: "출고완료",
-          order_manage_status: "출고완료",
-          payment_method: row.payment_method,
-          deposit_confirmed_at: row.deposit_confirmed_at,
-          shipped_at: nowIso,
-          tracking_company: row.tracking_company,
-          tracking_number: row.tracking_number,
-        },
-      };
-    });
-
-    setOrders((prev) =>
-      prev.map((order) =>
-        orderIds.includes(order.id)
-          ? {
-              ...order,
-              admin_order_status_v2: "출고완료",
-              order_manage_status: "출고완료",
-              shipped_at: order.shipped_at || nowIso,
-            }
-          : order
-      )
-    );
-
-    const { error } = await supabase
-      .from("orders")
-      .update({
-        admin_order_status_v2: "출고완료",
-        order_manage_status: "출고완료",
-        shipped_at: nowIso,
-      })
-      .in("id", orderIds);
-
-    if (error) {
-      alert("출고완료 일괄반영 실패\n\n" + error.message);
-      await loadData();
-      return;
-    }
-
-    const { error: logError } = await supabase.rpc("insert_order_status_change_logs_for_admin_v2", {
-      p_logs: statusLogPayloads,
-    });
-
-    if (logError) {
-      alert("출고완료는 반영됐지만 상태변경이력 저장에 실패했습니다.\n\n" + logError.message);
-      await loadData();
-      return;
-    }
-
-    const { data: latestStatusLogs, error: latestStatusLogsError } = await supabase
-      .rpc("get_order_status_change_logs_for_admin_v2");
-
-    if (latestStatusLogsError) {
-      alert("상태변경이력 재조회에 실패했습니다.\n\n" + latestStatusLogsError.message);
-    } else {
-      setStatusChangeLogs((latestStatusLogs || []) as StatusChangeLogRow[]);
-    }
-
-    alert(`출고완료 일괄반영이 완료되었습니다.\n\n반영 주문행: ${orderIds.length}건`);
   };
 
   const updateOrderTracking = async (group: OrderGroup, trackingCompany: string, trackingNumber: string) => {
@@ -1467,7 +1353,7 @@ function ShippingPanel({
       const nextPreviewRows = buildRosenShippingPreviewRows(rows, orders);
 
       if (nextPreviewRows.length === 0) {
-        alert("읽을 수 있는 R 주문키가 없습니다.\n\n사이트에서 다운로드했던 로젠 업로드용 원본 xlsx/tsv 파일을 다시 올렸는지 확인해주세요.");
+        alert("읽을 수 있는 R 주문키가 없습니다.\n\n사이트에서 다운로드했던 로젠 송장 다운로드용 원본 xlsx/tsv 파일을 다시 올렸는지 확인해주세요.");
         return;
       }
 
@@ -1496,7 +1382,7 @@ function ShippingPanel({
           <div>
             <div className="text-[17px] font-black">🚚 송장관리 1차</div>
             <div className="mt-1 text-[12px] font-bold text-neutral-500">
-              public/templates/rozen_template.xlsx 원본 양식에 맞춰 로젠 업로드용 xlsx를 생성합니다. 송장관리에서는 어떤 기준으로도 합치지 않습니다. DB 주문행 1개를 로젠 엑셀 1줄로 그대로 내보냅니다. 같은 고객/전화/주소/order_lookup_code여도 사이트에서 합치지 않습니다. B열 R 주문키로 출고완료만 일괄반영하고, I열에는 해당 행의 상품명/옵션/수량만 넣습니다.
+              public/templates/rozen_template.xlsx 원본 양식에 맞춰 로젠 송장 다운로드용 xlsx를 생성합니다. 송장관리에서는 어떤 기준으로도 합치지 않습니다. DB 주문행 1개를 로젠 엑셀 1줄로 그대로 내보냅니다. 같은 고객/전화/주소/order_lookup_code여도 사이트에서 합치지 않습니다. 사이트에서는 DB 주문행 1개를 로젠 엑셀 1줄로 그대로 내보내며, 로젠 프로그램이 동일 수하인 자동합배송을 처리합니다.
             </div>
           </div>
           <div className="rounded-lg bg-emerald-50 px-2 py-1 text-[11px] font-black text-emerald-700">
@@ -1542,7 +1428,9 @@ function ShippingPanel({
         </div>
 
         <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[12px] font-bold text-amber-900">
-          ⚠️ 사이트에서는 송장을 절대 합치지 않습니다. 같은 고객/전화/주소/order_lookup_code라도 DB 주문행마다 각각 한 줄로 내려갑니다. 다운로드한 파일을 로젠에 업로드해서 송장 출력/실제 출고까지 끝낸 뒤, 그 파일을 아래에 다시 업로드하세요. TSV는 템플릿 A1부터 붙여넣기용입니다.
+          <RosenExportOnlyNotice />
+
+          ⚠️ 사이트에서는 송장을 절대 합치지 않습니다. 같은 고객/전화/주소/order_lookup_code라도 DB 주문행마다 각각 한 줄로 내려갑니다. 다운로드한 파일은 로젠 프로그램에서 송장 출력용으로만 사용하세요. 사이트에는 다시 업로드하지 않습니다. 동일 수하인 자동합배송은 로젠 프로그램이 처리합니다. TSV는 템플릿 A1부터 붙여넣기용입니다.
         </div>
       </div>
 
@@ -1551,7 +1439,7 @@ function ShippingPanel({
           <div>
             <div className="text-[15px] font-black">1차 출고완료 반영</div>
             <div className="mt-1 text-[12px] font-bold text-neutral-500">
-              처음 다운로드했던 로젠 업로드용 xlsx/tsv 파일을 다시 올리면 B열 R 주문키를 읽어 미리보기합니다.
+              처음 다운로드했던 로젠 송장 다운로드용 xlsx/tsv 파일을 다시 올리면 B열 R 주문키를 읽어 미리보기합니다.
             </div>
           </div>
           <label className="cursor-pointer rounded-lg border border-neutral-300 bg-white px-3 py-2 text-[13px] font-black text-neutral-800 hover:bg-neutral-50">
@@ -1578,9 +1466,9 @@ function ShippingPanel({
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-neutral-50 p-3">
               <div className="text-[13px] font-black text-neutral-700">파일: {previewFileName || "-"}</div>
               <div className="flex flex-wrap gap-1.5 text-[12px] font-black">
-                <span className="rounded-lg bg-emerald-50 px-2 py-1 text-emerald-700">정상반영 {previewSummary.ready}건</span>
+                <span className="rounded-lg bg-emerald-50 px-2 py-1 text-emerald-700">다운로드가능 {previewSummary.ready}건</span>
                 <span className="rounded-lg bg-amber-50 px-2 py-1 text-amber-800">확인필요 {previewSummary.check}건</span>
-                <span className="rounded-lg bg-red-50 px-2 py-1 text-red-700">미반영 {previewSummary.blocked}건</span>
+                <span className="rounded-lg bg-red-50 px-2 py-1 text-red-700">다운로드제외 {previewSummary.blocked}건</span>
               </div>
             </div>
 
@@ -1614,7 +1502,7 @@ function ShippingPanel({
 
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
               <div className="text-[12px] font-bold text-neutral-500">
-                정상반영 항목만 출고완료 처리합니다. 확인필요/미반영은 자동처리하지 않습니다.
+                다운로드가능 항목만 출고완료 처리합니다. 확인필요/다운로드제외은 자동처리하지 않습니다.
               </div>
               <button
                 type="button"
@@ -1622,7 +1510,7 @@ function ShippingPanel({
                 disabled={applying || previewSummary.ready === 0}
                 className="rounded-lg bg-neutral-950 px-4 py-2 text-[13px] font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
               >
-                {applying ? "반영중" : `정상반영 ${previewSummary.ready}건 출고완료 처리`}
+                {applying ? "반영중" : `다운로드가능 ${previewSummary.ready}건 출고완료 처리`}
               </button>
             </div>
           </div>
