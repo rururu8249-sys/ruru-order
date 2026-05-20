@@ -26,25 +26,31 @@ export default function AdminOrderMainRow({
   detailNode,
 }: AdminOrderMainRowProps) {
   return (
-    <div className="grid gap-1 px-3 py-2 text-[13px] lg:grid-cols-[70px_104px_112px_minmax(280px,1fr)_84px_96px_88px_62px] lg:items-center">
-      <div className="font-black text-neutral-500">{orderCode}</div>
+    <div className="grid w-full gap-1 border-t border-neutral-100 px-3 py-2 text-[13px] first:border-t-0 lg:grid-cols-[96px_120px_160px_minmax(420px,1fr)_108px_108px_112px_72px] lg:items-center">
+      <div className="truncate font-black text-neutral-500" title={orderCode}>
+        {orderCode}
+      </div>
 
-      <div className="font-bold text-neutral-500">{createdAtLabel}</div>
+      <div className="font-bold leading-tight text-neutral-500">
+        {createdAtLabel}
+      </div>
 
-      <div className="min-w-0" title={customerLine || ""}>
-        <div className="truncate text-[14px] font-black">{nickname || "-"}</div>
+      <div className="min-w-0" title={customerLine || nickname || ""}>
+        <div className="truncate text-[14px] font-black text-neutral-950">
+          {nickname || "-"}
+        </div>
       </div>
 
       <div className="min-w-0">
-        <div className="truncate text-[14px] font-bold text-neutral-800">
+        <div className="truncate text-[14px] font-bold text-neutral-800" title={itemSummary}>
           {itemSummary}
         </div>
       </div>
 
-      {paymentNode}
+      <div className="flex justify-center">{paymentNode}</div>
       {amountNode}
-      {statusNode}
-      {detailNode}
+      <div className="flex justify-center">{statusNode}</div>
+      <div className="flex justify-center">{detailNode}</div>
     </div>
   );
 }

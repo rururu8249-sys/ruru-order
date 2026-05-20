@@ -10,8 +10,8 @@ export default function AdminOrderAmountCell({
   warningText,
 }: AdminOrderAmountCellProps) {
   return (
-    <div className="text-left lg:text-right" title={warningText || ""}>
-      <div className="text-[14px] font-black">{amountText}</div>
+    <div className="text-right" title={warningText || ""}>
+      <div className="whitespace-nowrap text-[14px] font-black">{amountText}</div>
     </div>
   );
 }
