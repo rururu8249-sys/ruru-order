@@ -13,6 +13,7 @@ import RosenExportOnlyNotice from "@/components/admin-v2/shipping/RosenExportOnl
 import AdminOrderPaymentCell from "@/components/admin-v2/orders/AdminOrderPaymentCell";
 import AdminOrderTableHeader from "@/components/admin-v2/orders/AdminOrderTableHeader";
 import AdminOrderTopSummary from "@/components/admin-v2/orders/AdminOrderTopSummary";
+import AdminOrderFilterBar from "@/components/admin-v2/orders/AdminOrderFilterBar";
 import AdminOrderMainRow from "@/components/admin-v2/orders/AdminOrderMainRow";
 import AdminOrderAmountCell from "@/components/admin-v2/orders/AdminOrderAmountCell";
 import AdminOrderStatusCell from "@/components/admin-v2/orders/AdminOrderStatusCell";
@@ -1586,34 +1587,20 @@ function FilterBar({
   dateOptions: Array<{ value: string; label: string }>;
 }) {
   return (
-    <div className="mb-2 grid gap-2 rounded-xl border border-neutral-200 bg-white p-2 lg:grid-cols-[250px_138px_130px_minmax(220px,360px)_82px]">
-      <select value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} className="h-10 rounded-lg border border-neutral-200 px-3 text-[14px] font-black outline-none">
-        {dateOptions.length === 0 ? <option value="">방송/날짜 없음</option> : null}
-        {dateOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select>
-      <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-10 rounded-lg border border-neutral-200 px-3 text-[14px] font-black outline-none">
-        <option value="전체">전체상태</option>
-        {ORDER_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select>
-      <select value={paymentFilter} onChange={(event) => setPaymentFilter(event.target.value)} className="h-10 rounded-lg border border-neutral-200 px-3 text-[14px] font-black outline-none">
-        {PAYMENT_FILTERS.map((payment) => <option key={payment} value={payment}>{payment}</option>)}
-      </select>
-      <input
-        value={pendingKeyword}
-        onChange={(event) => setPendingKeyword(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") onSearch();
-        }}
-        placeholder="검색"
-        className="h-10 rounded-lg border border-neutral-200 px-3 text-[15px] font-bold outline-none focus:border-neutral-950"
-      />
-      <button type="button" onClick={onSearch} className="h-10 rounded-lg bg-neutral-950 px-3 text-[14px] font-black text-white">
-        검색
-      </button>
-    </div>
+    <AdminOrderFilterBar
+      pendingKeyword={pendingKeyword}
+      setPendingKeyword={setPendingKeyword}
+      onSearch={onSearch}
+      statusFilter={statusFilter}
+      setStatusFilter={setStatusFilter}
+      paymentFilter={paymentFilter}
+      setPaymentFilter={setPaymentFilter}
+      dateFilter={dateFilter}
+      setDateFilter={setDateFilter}
+      dateOptions={dateOptions}
+    />
   );
 }
-
 function OperationSummary({
   buyerRanking,
   productRanking,
