@@ -275,7 +275,7 @@ export default function OrderPage() {
     }
 
     setIsCustomerInfoOpen(true);
-    setCustomerMode("load");
+    setCustomerMode("new");
   }, [hasSavedInfo, isEditingCustomerInfo]);
 
   useEffect(() => {
@@ -1242,11 +1242,9 @@ export default function OrderPage() {
         />
         <OrderGuideCard />
 
-        <section className="rounded-[28px] bg-white p-5 shadow-[0_12px_26px_rgba(70,45,25,0.10)] ring-1 ring-black/5">
-          <div className="mb-4">
-            <h2 className="text-xl font-black">주문 전 정보 확인</h2>
-            <OrderCustomerInfoIntro />
-          </div>
+        <OrderCustomerInfoIntro />
+
+        <section className="mt-5 rounded-[34px] bg-white p-5 shadow-[0_18px_40px_rgba(30,64,175,0.10)] ring-1 ring-blue-100">
 
           {hasSavedInfo && !isEditingCustomerInfo ? (
             <OrderSavedCustomerSummary
@@ -1259,19 +1257,18 @@ export default function OrderPage() {
               onToggleDetail={() => setShowSavedCustomerDetail((value) => !value)}
             />
           ) : (
-            <div className="rounded-[1.5rem] bg-white p-3">
-              <div className="mb-3 rounded-2xl bg-blue-50 p-3 text-xs font-black leading-relaxed text-blue-800 ring-1 ring-blue-100">
-                💡 주문을 위한 최초 1회 정보 확인입니다. 확인 후 바로 상품 입력으로 이동해요.
-              </div>
-              <OrderCustomerModeSwitch
-                isEditing={isEditingCustomerInfo}
-                customerMode={customerMode}
-                onModeChange={setCustomerMode}
-              />
+            <div className="grid gap-4">
+              {(hasSavedInfo || isEditingCustomerInfo) && (
+                <OrderCustomerModeSwitch
+                  isEditing={isEditingCustomerInfo}
+                  customerMode={customerMode}
+                  onModeChange={setCustomerMode}
+                />
+              )}
 
 
               {customerMode === "load" && (
-                <div className="mt-4 rounded-[1.4rem] bg-white p-4">
+                <div className="mt-2 rounded-[28px] bg-white p-1">
                   <div className="text-sm font-black text-[#315f9f]">
                     저장된 정보 확인
                   </div>
@@ -1284,15 +1281,15 @@ export default function OrderPage() {
                       value={loginName}
                       onChange={(event) => setLoginName(event.target.value)}
                       placeholder="이름"
-                      className="w-full rounded-2xl border border-gray-200 bg-blue-50/40 p-4 font-bold outline-none focus:border-blue-400"
+                      className="w-full rounded-2xl border border-blue-100 bg-white p-4 text-[15px] font-bold outline-none focus:border-blue-500"
                     />
 
                     <input
                       value={formatPhone(loginPhone)}
                       onChange={(event) => setLoginPhone(normalizePhone(event.target.value))}
-                      placeholder="전화번호"
+                      placeholder="숫자만 입력해주세요"
                       inputMode="numeric"
-                      className="w-full rounded-2xl border border-gray-200 bg-blue-50/40 p-4 font-bold outline-none focus:border-blue-400"
+                      className="w-full rounded-2xl border border-blue-100 bg-white p-4 text-[15px] font-bold outline-none focus:border-blue-500"
                     />
 
                     <button
@@ -1307,35 +1304,35 @@ export default function OrderPage() {
               )}
 
               {customerMode === "new" && (
-                <div className="mt-4 rounded-[1.4rem] bg-white p-4">
+                <div className="mt-2 rounded-[28px] bg-white p-1">
                   <div className="mt-3 grid gap-3">
                     <input
                       id="youtubeNicknameInput"
                       value={youtubeNickname}
                       onChange={(event) => setYoutubeNickname(event.target.value)}
                       placeholder="유튜브 닉네임"
-                      className="w-full rounded-2xl border border-gray-200 bg-blue-50/40 p-4 font-bold outline-none focus:border-blue-400"
+                      className="w-full rounded-2xl border border-blue-100 bg-white p-4 text-[15px] font-bold outline-none focus:border-blue-500"
                     />
 
                     <input
                       value={customerName}
                       onChange={(event) => setCustomerName(event.target.value)}
                       placeholder="이름"
-                      className="w-full rounded-2xl border border-gray-200 bg-blue-50/40 p-4 font-bold outline-none focus:border-blue-400"
+                      className="w-full rounded-2xl border border-blue-100 bg-white p-4 text-[15px] font-bold outline-none focus:border-blue-500"
                     />
 
                     <input
                       value={formatPhone(customerPhone)}
                       onChange={(event) => setCustomerPhone(normalizePhone(event.target.value))}
-                      placeholder="전화번호"
+                      placeholder="숫자만 입력해주세요"
                       inputMode="numeric"
-                      className="w-full rounded-2xl border border-gray-200 bg-blue-50/40 p-4 font-bold outline-none focus:border-blue-400"
+                      className="w-full rounded-2xl border border-blue-100 bg-white p-4 text-[15px] font-bold outline-none focus:border-blue-500"
                     />
 
                     <button
                       type="button"
                       onClick={openAddressSearch}
-                      className={`${buttonBase} rounded-2xl bg-gray-950 p-4 font-black text-white`}
+                      className={`${buttonBase} rounded-2xl border border-blue-500 bg-white p-4 font-black text-blue-600`}
                     >
                       주소검색
                     </button>
@@ -1345,31 +1342,33 @@ export default function OrderPage() {
                     <input
                       value={address}
                       onChange={(event) => setAddress(event.target.value)}
-                      placeholder="주소"
-                      className="rounded-2xl border border-gray-200 bg-blue-50/40 p-4 font-bold"
+                      placeholder="주소를 검색해주세요"
+                      className="rounded-2xl border border-blue-100 bg-white p-4 text-[15px] font-bold outline-none focus:border-blue-500"
                     />
 
                     <input
                       id="detailAddressInput"
                       value={detailAddress}
                       onChange={(event) => setDetailAddress(event.target.value)}
-                      placeholder="상세주소"
-                      className="rounded-2xl border border-gray-200 bg-blue-50/40 p-4 font-bold"
+                      placeholder="상세주소를 입력해주세요"
+                      className="rounded-2xl border border-blue-100 bg-white p-4 text-[15px] font-bold outline-none focus:border-blue-500"
                     />
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={isEditingCustomerInfo ? cancelEditCustomerInfo : () => setCustomerMode("load")}
-                        className={`${buttonBase} rounded-2xl bg-[#f5f2f2] p-4 font-black text-[#5f5555]`}
-                      >
-                        취소
-                      </button>
+                    <div className={isEditingCustomerInfo ? "grid grid-cols-2 gap-2" : "grid"}>
+                      {isEditingCustomerInfo && (
+                        <button
+                          type="button"
+                          onClick={cancelEditCustomerInfo}
+                          className={`${buttonBase} rounded-2xl bg-slate-100 p-4 font-black text-slate-600`}
+                        >
+                          취소
+                        </button>
+                      )}
 
                       <button
                         type="button"
                         onClick={completeEditCustomerInfo}
-                        className={`${buttonBase} rounded-2xl bg-blue-600 p-4 font-black text-white`}
+                        className={`${buttonBase} rounded-2xl bg-blue-600 p-5 text-lg font-black text-white shadow-[0_12px_24px_rgba(37,99,235,0.22)]`}
                       >
                         확인
                       </button>
