@@ -83,15 +83,14 @@ export default function CustomerTopNav({
           🏠 HOME
         </Link>
 
-        <Link
-          href="/myorder"
-          className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
-        >
-          주문조회
-        </Link>
-
         {isLoggedIn && (
           <>
+            <Link
+              href="/myorder"
+              className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
+            >
+              주문조회
+            </Link>
             <Link
               href="/order?mode=edit"
               className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
