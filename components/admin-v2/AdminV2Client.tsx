@@ -12,6 +12,7 @@ import PaymentMatchPanel from "@/components/admin-v2/payment/PaymentMatchPanel";
 import RosenExportOnlyNotice from "@/components/admin-v2/shipping/RosenExportOnlyNotice";
 import AdminOrderPaymentCell from "@/components/admin-v2/orders/AdminOrderPaymentCell";
 import AdminOrderTableHeader from "@/components/admin-v2/orders/AdminOrderTableHeader";
+import AdminOrderTopSummary from "@/components/admin-v2/orders/AdminOrderTopSummary";
 import AdminOrderMainRow from "@/components/admin-v2/orders/AdminOrderMainRow";
 import AdminOrderAmountCell from "@/components/admin-v2/orders/AdminOrderAmountCell";
 import AdminOrderStatusCell from "@/components/admin-v2/orders/AdminOrderStatusCell";
@@ -1549,18 +1550,7 @@ function SummaryCards({
     canceledAmount: number;
   };
 }) {
-  return (
-    <div className="mb-3 grid grid-cols-2 gap-2 lg:grid-cols-4 xl:grid-cols-8">
-      <SummaryCard label="총 주문 상품개수" value={`${summaryCards.totalOrderProductQty}개`} />
-      <SummaryCard label="총 주문서 개수" value={`${summaryCards.totalOrderCount}건`} />
-      <SummaryCard label="📋 주문서 총 합계" value={money(summaryCards.totalOrderAmount)} />
-      <SummaryCard label="무통장 입금확인" value={`${summaryCards.bankPaid}명`} />
-      <SummaryCard label="무통장 미입금" value={`${summaryCards.bankUnpaid}명`} strong />
-      <SummaryCard label="카드 결제완료" value={`${summaryCards.cardPaid}명`} />
-      <SummaryCard label="카드 미결제/링크대기" value={`${summaryCards.cardUnpaid}명`} strong />
-      <SummaryCard label="취소금액" value={money(summaryCards.canceledAmount)} />
-    </div>
-  );
+  return <AdminOrderTopSummary summaryCards={summaryCards} />;
 }
 
 function SummaryCard({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
