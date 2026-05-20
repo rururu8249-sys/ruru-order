@@ -1070,6 +1070,69 @@ export function AdminV2Client() {
     );
   };
 
+
+  const softDeleteOrderGroups = async (targetGroups: OrderGroup[]) => {
+    if (targetGroups.length <= 0) {
+      alert("삭제 처리할 주문을 선택해주세요.");
+      return;
+    }
+
+    const targetRows = targetGroups.flatMap((group) => group.rows);
+    const ids = targetRows
+      .map((row) => Number(row.id))
+      .filter((id) => Number.isFinite(id));
+
+    if (ids.length <= 0) {
+      alert("삭제 처리할 주문 ID가 없습니다.");
+      return;
+    }
+
+    const riskRows = targetRows.filter((row) => {
+      const status = getOrderStatusValue(row);
+      const hasDeposit = Boolean(row.deposit_confirmed_at);
+      const hasShipping = Boolean(row.shipped_at) || Boolean(String(row.tracking_number || "").trim());
+
+      return (
+        ["입금확인", "출고대기", "출고완료", "킵", "픽업예정"].includes(status) ||
+        hasDeposit ||
+        hasShipping
+      );
+    });
+
+    if (riskRows.length > 0) {
+      const riskOk = window.confirm(
+        `선택한 주문 중 입금/출고/송장 정보가 있는 주문행 ${riskRows.length}개가 포함되어 있습니다.\\n\\n` +
+          "테스트 주문이 확실한 경우에만 진행하세요.\\n" +
+          "실제 삭제가 아니라 is_deleted=true 숨김 처리입니다.\\n\\n" +
+          "그래도 선택 주문을 숨김 처리할까요?"
+      );
+
+      if (!riskOk) return;
+    }
+
+    const ok = window.confirm(
+      `선택한 주문묶음 ${targetGroups.length}건 / 주문행 ${ids.length}개를 목록에서 숨김 처리할까요?\\n\\n` +
+        "삭제 후 주문관리/오늘할일/입금매칭/정산 목록에서 기본적으로 보이지 않습니다.\\n" +
+        "DB에서 완전 삭제하는 것은 아닙니다."
+    );
+
+    if (!ok) return;
+
+    const { error } = await supabase
+      .from("orders")
+      .update({ is_deleted: true })
+      .in("id", ids);
+
+    if (error) {
+      alert("선택 주문 삭제 처리 실패\\n\\n" + error.message);
+      return;
+    }
+
+    alert(`선택 주문 ${ids.length}개 행을 숨김 처리했습니다.`);
+    await loadData();
+  };
+
+
   const updateOrderTracking = async (group: OrderGroup, trackingCompany: string, trackingNumber: string) => {
     const cleanCompany = String(trackingCompany || "").trim() || "로젠";
     const cleanNumber = String(trackingNumber || "").trim().replace(/\s+/g, "");
@@ -1312,7 +1375,7 @@ export function AdminV2Client() {
 
                   <div className="grid gap-3 xl:grid-cols-[minmax(780px,1fr)_340px]">
                     <div className="min-w-0">
-                      <OrderWorkTable groups={pagedGroups} moneyEditLogs={moneyEditLogs} statusChangeLogs={statusChangeLogs} onOpenDetail={openOrderDetailDrawer} onStatusChange={updateOrderStatus} onTrackingChange={updateOrderTracking} onFinalAmountChange={updateOrderFinalAmount} onOpenManualMatch={setManualMatchGroup} />
+                      <OrderWorkTable groups={pagedGroups} moneyEditLogs={moneyEditLogs} statusChangeLogs={statusChangeLogs} onOpenDetail={openOrderDetailDrawer} onStatusChange={updateOrderStatus} onTrackingChange={updateOrderTracking} onFinalAmountChange={updateOrderFinalAmount} onOpenManualMatch={setManualMatchGroup} onSoftDeleteGroups={softDeleteOrderGroups} />
                       <Pagination page={page} totalPages={totalPages} setPage={setPage} totalCount={filteredOrderGroups.length} />
                     </div>
                     {false ? <OperationSummary buyerRanking={sideSummary.buyerRanking} productRanking={sideSummary.productRanking} onMore={() => setActiveTab("settlement")} /> : null}
@@ -1710,6 +1773,7 @@ function OrderWorkTable({
   onTrackingChange,
   onFinalAmountChange,
   onOpenManualMatch,
+  onSoftDeleteGroups,
 }: {
   groups: OrderGroup[];
   moneyEditLogs: MoneyEditLogRow[];
@@ -1719,7 +1783,8 @@ function OrderWorkTable({
   onTrackingChange: (group: OrderGroup, trackingCompany: string, trackingNumber: string) => Promise<void>;
   onFinalAmountChange: (row: OrderRow, nextAmount: number, reason: string) => Promise<void>;
   onOpenManualMatch: (group: OrderGroup) => void;
-}) {
+
+  onSoftDeleteGroups: (groups: OrderGroup[]) => Promise<void>;}) {
 
   const [selectedOrderGroupIds, setSelectedOrderGroupIds] = useState<string[]>([]);
 
@@ -1757,6 +1822,17 @@ function OrderWorkTable({
     clearSelectedGroups();
   };
 
+  const applySoftDeleteSelected = async () => {
+    if (selectedGroups.length <= 0) {
+      alert("삭제 처리할 주문을 선택해주세요.");
+      return;
+    }
+
+    await onSoftDeleteGroups(selectedGroups);
+    setSelectedOrderGroupIds([]);
+  };
+
+
   return (
     <div className="w-full overflow-hidden rounded-xl border border-neutral-200 bg-white">
       <AdminOrderBulkActionBar
@@ -1766,6 +1842,7 @@ function OrderWorkTable({
         onClear={clearSelectedGroups}
         statusOptions={ORDER_STATUS_OPTIONS}
         onApplyStatus={applyBulkStatus}
+        onSoftDelete={applySoftDeleteSelected}
       />
 
       <AdminOrderTableHeader

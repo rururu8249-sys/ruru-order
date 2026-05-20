@@ -12,6 +12,7 @@ type AdminOrderBulkActionBarProps = {
   onClear: () => void;
   statusOptions: StatusOption[];
   onApplyStatus: (nextStatus: string) => void;
+  onSoftDelete: () => void;
 };
 
 export default function AdminOrderBulkActionBar({
@@ -21,6 +22,7 @@ export default function AdminOrderBulkActionBar({
   onClear,
   statusOptions,
   onApplyStatus,
+  onSoftDelete,
 }: AdminOrderBulkActionBarProps) {
   return (
     <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-neutral-200 bg-white px-4 py-3">
@@ -64,8 +66,17 @@ export default function AdminOrderBulkActionBar({
         ))}
       </select>
 
+      <button
+        type="button"
+        onClick={onSoftDelete}
+        disabled={selectedCount <= 0}
+        className="h-9 rounded-xl border border-red-200 bg-red-50 px-3 text-[13px] font-black text-red-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400"
+      >
+        선택 삭제
+      </button>
+
       <div className="text-[12px] font-bold text-neutral-500">
-        체크한 주문만 일괄 변경됩니다.
+        체크한 주문만 일괄 변경됩니다. 삭제는 실제 삭제가 아니라 목록 숨김 처리입니다.
       </div>
     </div>
   );
