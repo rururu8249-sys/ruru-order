@@ -1234,7 +1234,7 @@ export function AdminV2Client() {
               <div className="text-[10px] font-black tracking-widest text-neutral-400">RURU ADMIN V2</div>
               <div className="text-lg font-black">{TABS.find((tab) => tab.key === activeTab)?.label}</div>
             </div>
-            <button type="button" onClick={loadData} className="rounded-lg bg-neutral-950 px-3 py-2 text-xs font-black text-white">새로고침</button>
+            
           </div>
 
           <div className="mb-3 grid grid-cols-3 gap-1.5 md:hidden">
@@ -1700,7 +1700,7 @@ function OrderWorkTable({
   onOpenManualMatch: (group: OrderGroup) => void;
 }) {
   return (
-    <div className="w-full max-w-none overflow-x-visible rounded-xl border border-neutral-200 bg-white">
+    <div className="w-full overflow-hidden rounded-xl border border-neutral-200 bg-white">
       <AdminOrderTableHeader />
 
       {groups.map((group) => {

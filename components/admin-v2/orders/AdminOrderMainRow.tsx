@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { ADMIN_ORDER_GRID } from "@/components/admin-v2/orders/AdminOrderTableHeader";
 
 type AdminOrderMainRowProps = {
   orderCode: string;
@@ -26,31 +27,46 @@ export default function AdminOrderMainRow({
   detailNode,
 }: AdminOrderMainRowProps) {
   return (
-    <div className="grid w-full gap-3 border-t border-neutral-100 px-5 py-4 text-[14px] first:border-t-0 hover:bg-neutral-50 lg:grid-cols-[96px_116px_132px_minmax(360px,1fr)_92px_96px_96px_60px] lg:items-center">
-      <div className="truncate text-center font-black text-neutral-500" title={orderCode}>
-        {orderCode}
+    <div className={`grid w-full ${ADMIN_ORDER_GRID} border-t border-neutral-100 px-4 py-4 text-[14px] first:border-t-0 hover:bg-neutral-50 lg:items-center`}>
+      <div className="min-w-0 px-2 text-center">
+        <div className="truncate font-black text-neutral-500" title={orderCode}>
+          {orderCode}
+        </div>
       </div>
 
-      <div className="text-center font-bold leading-snug text-neutral-500">
-        {createdAtLabel}
+      <div className="min-w-0 px-2 text-center">
+        <div className="font-bold leading-snug text-neutral-500">
+          {createdAtLabel}
+        </div>
       </div>
 
-      <div className="min-w-0 text-center" title={customerLine || nickname || ""}>
+      <div className="min-w-0 px-2 text-center" title={customerLine || nickname || ""}>
         <div className="truncate text-[15px] font-black text-neutral-950">
           {nickname || "-"}
         </div>
       </div>
 
-      <div className="min-w-0">
+      <div className="min-w-0 px-3">
         <div className="truncate text-[15px] font-bold text-neutral-800" title={itemSummary}>
           {itemSummary}
         </div>
       </div>
 
-      <div className="flex justify-center">{paymentNode}</div>
-      <div className="flex justify-end">{amountNode}</div>
-      <div className="flex justify-center">{statusNode}</div>
-      <div className="flex justify-center">{detailNode}</div>
+      <div className="min-w-0 px-2">
+        <div className="flex w-full justify-center">{paymentNode}</div>
+      </div>
+
+      <div className="min-w-0 px-2">
+        <div className="flex w-full justify-end">{amountNode}</div>
+      </div>
+
+      <div className="min-w-0 px-2">
+        <div className="flex w-full justify-center">{statusNode}</div>
+      </div>
+
+      <div className="min-w-0 px-2">
+        <div className="flex w-full justify-center">{detailNode}</div>
+      </div>
     </div>
   );
 }
