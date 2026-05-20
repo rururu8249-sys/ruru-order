@@ -665,11 +665,6 @@ export default function OrderPage() {
       return;
     }
 
-    if (!detailAddress.trim()) {
-      alert("상세주소를 입력해주세요.\n아파트/빌라/건물명, 동/호수까지 꼭 입력해주세요.");
-      return;
-    }
-
     try {
       await saveCustomer();
       setIsEditingCustomerInfo(false);
@@ -879,8 +874,13 @@ export default function OrderPage() {
     }
 
     if (!detailAddress.trim()) {
-      alert("상세주소를 입력해주세요.\n아파트/빌라/건물명, 동/호수까지 꼭 입력해주세요.");
-      return false;
+      const ok = confirm(
+        "상세주소가 비어 있습니다.\n\n아파트/빌라/오피스텔은 동·호수 누락 시 배송이 지연될 수 있습니다.\n\n정말 상세주소 없이 제출할까요?"
+      );
+
+      if (!ok) {
+        return false;
+      }
     }
 
     const validItems = items.filter(
