@@ -18,6 +18,7 @@ import AdminOrderStatusCell from "@/components/admin-v2/orders/AdminOrderStatusC
 import AdminOrderDetailButton from "@/components/admin-v2/orders/AdminOrderDetailButton";
 import AdminOrderDetailBox from "@/components/admin-v2/orders/AdminOrderDetailBox";
 import AdminOrderMemoSection from "@/components/admin-v2/orders/AdminOrderMemoSection";
+import AdminOrderDetailSummary from "@/components/admin-v2/orders/AdminOrderDetailSummary";
 
 import type {
   AdminTab,
@@ -1759,26 +1760,16 @@ function OrderDetailBlock({
 
   return (
     <div className="border-t border-neutral-100 bg-neutral-50 px-3 py-3">
-      <div className="grid gap-2 md:grid-cols-[1.1fr_1.4fr_1fr]">
-        <AdminOrderDetailBox title="고객정보">
-          <div>전화번호: {displayOrderPhone(first)}</div>
-          <div>주소: {address || "-"}</div>
-        </AdminOrderDetailBox>
-        <AdminOrderDetailBox title="상품요약">
-          {group.rows.map((row) => (
-            <div key={row.id}>
-              {buildProductSummaryFromRow(row)} · 현재 최종 {money(orderBaseAmount(row))}
-            </div>
-          ))}
-        </AdminOrderDetailBox>
-        <AdminOrderDetailBox title="관리정보">
-          <div>결제상태: {paymentMeta.label} · {paymentMeta.desc}</div>
-          <div>입금확인시간: {first.deposit_confirmed_at ? formatDateLabel(first.deposit_confirmed_at) : "미확인"}</div>
-          <div>출고완료시간: {first.shipped_at ? formatDateLabel(first.shipped_at) : "미처리"}</div>
-          <div>송장: {first.tracking_company || "로젠"} {first.tracking_number || "미등록"}</div>
-          <div>관리자메모: {adminMemo || "없음"}</div>
-        </AdminOrderDetailBox>
-      </div>
+      <AdminOrderDetailSummary
+        phoneText={displayOrderPhone(first)}
+        addressText={address || "-"}
+        productSummaries={group.rows.map((row) => `${buildProductSummaryFromRow(row)} · 현재 최종 ${money(orderBaseAmount(row))}`)}
+        paymentStatusText={`${paymentMeta.label} · ${paymentMeta.desc}`}
+        depositConfirmedText={first.deposit_confirmed_at ? formatDateLabel(first.deposit_confirmed_at) : "미확인"}
+        shippedAtText={first.shipped_at ? formatDateLabel(first.shipped_at) : "미처리"}
+        trackingText={`${first.tracking_company || "로젠"} ${first.tracking_number || "미등록"}`}
+        adminMemo={adminMemo || "없음"}
+      />
 
       <AdminOrderMemoSection
         shippingExcelMemo={shippingExcelMemo}
