@@ -1229,7 +1229,7 @@ export function AdminV2Client() {
         </aside>
 
         <section className="min-w-0 flex-1 p-3">
-          <div className="mb-3 flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-3 py-2">
+          <div className="w-full rounded-xl border border-neutral-200 bg-white">
             <div>
               <div className="text-[10px] font-black tracking-widest text-neutral-400">RURU ADMIN V2</div>
               <div className="text-lg font-black">{TABS.find((tab) => tab.key === activeTab)?.label}</div>
@@ -1700,7 +1700,7 @@ function OrderWorkTable({
   onOpenManualMatch: (group: OrderGroup) => void;
 }) {
   return (
-    <div className="w-full min-w-full overflow-x-auto rounded-xl border border-neutral-200 bg-white">
+    <div className="w-full max-w-none overflow-x-visible rounded-xl border border-neutral-200 bg-white">
       <AdminOrderTableHeader />
 
       {groups.map((group) => {

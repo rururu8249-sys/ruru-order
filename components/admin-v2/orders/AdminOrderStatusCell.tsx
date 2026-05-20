@@ -32,11 +32,11 @@ export default function AdminOrderStatusCell({
   ].filter(Boolean).join(" / ");
 
   return (
-    <div title={hiddenMeta}>
+    <div className="w-full text-center" title={hiddenMeta}>
       <select
         value={status}
         onChange={(event) => onChange(event.target.value)}
-        className={`h-9 w-full min-w-[96px] rounded-lg border px-2 text-center text-[12px] font-black outline-none ${className}`}
+        className={`h-8 w-full rounded-lg border px-1 text-center text-[11px] font-black outline-none ${className}`}
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
