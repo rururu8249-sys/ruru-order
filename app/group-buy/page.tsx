@@ -17,6 +17,8 @@
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import GroupBuyPageHero from "@/components/group-buy/GroupBuyPageHero";
+import GroupBuyDeliveryNotice from "@/components/group-buy/GroupBuyDeliveryNotice";
 
 declare global {
   interface Window {
@@ -746,7 +748,7 @@ export default function GroupBuyPage() {
 
   return (
     <main
-      className="min-h-screen select-none bg-[#fffafa] px-4 py-6 text-[#171717]"
+      className="min-h-screen select-none bg-[#f5f8ff] px-4 py-6 text-[#151923]"
       style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
     >
       <section className="mx-auto w-full max-w-[480px]">
@@ -810,51 +812,9 @@ export default function GroupBuyPage() {
             )}
           </section>
         )}
+        <GroupBuyPageHero />
 
-        <header className="mb-5 rounded-[32px] border border-[#f4e7e9] bg-white px-5 py-6 shadow-[0_16px_40px_rgba(30,20,20,0.06)]">
-          <div className="inline-flex rounded-full bg-[#fff1a8] px-3 py-1 text-[12px] font-black text-[#2b2416]">
-            🛍 상시 주문
-          </div>
-
-          <h1 className="mt-3 text-[38px] font-black leading-tight tracking-[-0.07em] text-[#151515]">
-            공구상품
-          </h1>
-
-          <p className="mt-2 text-[15px] font-bold leading-relaxed tracking-[-0.04em] text-[#7b6d6d]">
-            사진 확인 후 바로 주문하세요 🤍
-          </p>
-        </header>
-
-        <section className="mb-4 rounded-[28px] bg-[#fff2f4] p-5">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-[16px] font-black text-[#d7475b]">📌 배송비 안내</div>
-              <p className="mt-1 text-[13px] font-bold leading-relaxed text-[#d7475b]">
-                일반+일반 = 배송비 1회 / 일반+업체 = 배송비 2회
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowDeliveryGuideDetail((value) => !value)}
-              className="shrink-0 rounded-full bg-white px-3 py-2 text-xs font-black text-[#d7475b] transition active:scale-[0.97]"
-            >
-              {showDeliveryGuideDetail ? "내용닫기 ▲" : "내용보기 ▼"}
-            </button>
-          </div>
-
-          {showDeliveryGuideDetail && (
-            <div className="mt-3 rounded-[20px] bg-white p-4 text-[13px] font-bold leading-relaxed text-[#d7475b]">
-              • 일반배송 = 방송상품 + 합배송 가능 공구상품
-              <br />
-              • 업체배송 = 별도배송
-              <br />
-              • 일반+일반 배송비 1회
-              <br />
-              • 일반+업체 배송비 2회
-            </div>
-          )}
-        </section>
+        <GroupBuyDeliveryNotice />
 
         {loadingProducts ? (
           <section className="rounded-[30px] border border-[#f1ecec] bg-white p-6 text-center shadow-[0_14px_35px_rgba(30,20,20,0.07)]">
