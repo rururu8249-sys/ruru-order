@@ -35,6 +35,7 @@ import type {
 } from "@/lib/admin-v2/types";
 import { ORDER_STATUS_OPTIONS, PAGE_SIZE, PAYMENT_FILTERS, TABS } from "@/lib/admin-v2/constants";
 import AdminSettingsQuickLinks from "@/components/admin-v2/settings/AdminSettingsQuickLinks";
+import AdminTodayDashboard from "@/components/admin-v2/today/AdminTodayDashboard";
 import {
   buildRosenItemTextFromOrderRow,
   buildRosenRecipientAddress,
@@ -477,7 +478,7 @@ function getShippingPreviewClass(status: RosenShippingPreviewRow["status"]) {
 }
 
 export function AdminV2Client() {
-  const [activeTab, setActiveTab] = useState<AdminTab>("orders");
+  const [activeTab, setActiveTab] = useState<AdminTab>("today");
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [deposits, setDeposits] = useState<DepositRow[]>([]);
@@ -1248,7 +1249,17 @@ export function AdminV2Client() {
             <>
               <SummaryCards summaryCards={summaryCards} />
 
-              {activeTab === "shipping" ? (
+              {activeTab === "today" ? (
+                <AdminTodayDashboard
+                  orders={orders}
+                  customers={customers}
+                  deposits={deposits}
+                  onGoOrders={() => setActiveTab("orders")}
+                  onGoShipping={() => setActiveTab("shipping")}
+                  onGoCustomers={() => setActiveTab("customers")}
+                  onGoDeposits={() => setActiveTab("deposits")}
+                />
+              ) : activeTab === "shipping" ? (
                 <ShippingPanel
                   orderGroups={rosenShippingOrderGroups}
                   orders={orders}
