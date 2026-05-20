@@ -12,6 +12,8 @@ import PaymentMatchTopActions from "@/components/admin-v2/payment/parts/PaymentM
 import PaymentMatchSyncStatus from "@/components/admin-v2/payment/parts/PaymentMatchSyncStatus";
 import AutoMatchPreviewBox from "@/components/admin-v2/payment/parts/AutoMatchPreviewBox";
 import PaymentOrderRow from "@/components/admin-v2/payment/parts/PaymentOrderRow";
+import DepositListTable from "@/components/admin-v2/payment/parts/DepositListTable";
+import PaymentMatchToolbar from "@/components/admin-v2/payment/parts/PaymentMatchToolbar";
 
 type Props = {
   deposits: DepositRow[];
@@ -414,47 +416,15 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
         </div>
       </section>
 
-      <section className="rounded-xl border border-neutral-200 bg-white p-3">
-        <div className="grid gap-2 lg:grid-cols-[420px_1fr] lg:items-center">
-          <div className="flex flex-wrap gap-1.5">
-            <TabButton active={view === "unmatched"} onClick={() => setView("unmatched")}>미매칭 주문</TabButton>
-            <TabButton active={view === "paid"} onClick={() => setView("paid")}>입금확인 완료</TabButton>
-            <TabButton active={view === "deposits"} onClick={() => setView("deposits")}>입금내역</TabButton>
-            <TabButton active={view === "all"} onClick={() => setView("all")}>전체주문</TabButton>
-          </div>
-          <input
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-            placeholder="닉네임 / 이름 / 전화번호 / 입금자명 / 금액 검색"
-            className="h-10 rounded-lg border border-neutral-200 px-3 text-[14px] font-bold outline-none focus:border-neutral-950"
-          />
-        </div>
-      </section>
+      <PaymentMatchToolbar
+        view={view}
+        keyword={keyword}
+        onChangeView={setView}
+        onChangeKeyword={setKeyword}
+      />
 
       {view === "deposits" ? (
-        <section className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
-          <div className="grid grid-cols-[1fr_120px_120px] bg-neutral-950 px-3 py-2 text-[12px] font-black text-white">
-            <div>입금자명</div>
-            <div className="text-right">금액</div>
-            <div className="text-center">상태</div>
-          </div>
-          {filteredDeposits.length === 0 ? (
-            <EmptyBox text="입금내역이 없습니다." />
-          ) : (
-            <div className="divide-y divide-neutral-100">
-              {filteredDeposits.map((deposit) => (
-                <div key={deposit.id} className="grid grid-cols-[1fr_120px_120px] px-3 py-2 text-sm">
-                  <div>
-                    <div className="font-black">{deposit.depositor_name}</div>
-                    <div className="text-[11px] font-bold text-neutral-500">{formatDateLabel(deposit.deposited_time || deposit.created_at)}</div>
-                  </div>
-                  <div className="text-right font-black">{money(deposit.amount)}</div>
-                  <div className="text-center text-[12px] font-black text-neutral-500">{deposit.match_status || "-"}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+        <DepositListTable deposits={filteredDeposits} />
       ) : (
         <section className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
           <div className="hidden grid-cols-[86px_130px_130px_minmax(240px,1fr)_110px_100px_110px] bg-neutral-950 px-3 py-2 text-[12px] font-black text-white lg:grid">

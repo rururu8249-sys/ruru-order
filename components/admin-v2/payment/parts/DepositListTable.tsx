@@ -1,0 +1,86 @@
+"use client";
+
+type DepositRow = {
+  id: string | number;
+  depositor_name?: string | null;
+  amount?: number | string | null;
+  deposited_time?: string | null;
+  created_at?: string | null;
+  match_status?: string | null;
+};
+
+type DepositListTableProps = {
+  deposits: DepositRow[];
+};
+
+const money = (value: any) => `${Number(value || 0).toLocaleString()}원`;
+
+function formatDateLabel(value: any) {
+  if (!value) return "-";
+
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return String(value);
+
+  return date.toLocaleString("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function EmptyBox({ text }: { text: string }) {
+  return (
+    <div className="px-4 py-10 text-center text-sm font-bold text-neutral-500">
+      {text}
+    </div>
+  );
+}
+
+function statusLabel(value: any) {
+  const status = String(value || "").trim();
+
+  if (!status) return "미확인";
+  if (status === "자동입금확인") return "자동확인";
+  if (status === "수동입금확인") return "수동확인";
+
+  return status;
+}
+
+export default function DepositListTable({ deposits }: DepositListTableProps) {
+  return (
+    <section className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
+      <div className="grid grid-cols-[1fr_120px_120px] bg-neutral-950 px-3 py-2 text-[12px] font-black text-white">
+        <div>입금자명</div>
+        <div className="text-right">입금금액</div>
+        <div className="text-center">처리상태</div>
+      </div>
+
+      {deposits.length === 0 ? (
+        <EmptyBox text="표시할 입금내역이 없습니다." />
+      ) : (
+        <div className="divide-y divide-neutral-100">
+          {deposits.map((deposit) => (
+            <div
+              key={deposit.id}
+              className="grid grid-cols-[1fr_120px_120px] px-3 py-2 text-sm"
+            >
+              <div>
+                <div className="font-black">{deposit.depositor_name || "-"}</div>
+                <div className="text-[11px] font-bold text-neutral-500">
+                  {formatDateLabel(deposit.deposited_time || deposit.created_at)}
+                </div>
+              </div>
+
+              <div className="text-right font-black">{money(deposit.amount)}</div>
+
+              <div className="text-center text-[12px] font-black text-neutral-500">
+                {statusLabel(deposit.match_status)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
