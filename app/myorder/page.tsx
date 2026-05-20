@@ -17,6 +17,7 @@ import MyOrderBankAccountCard from "@/components/myorder/MyOrderBankAccountCard"
 import MyOrderLookupForm from "@/components/myorder/MyOrderLookupForm";
 import MyOrderResultCard from "@/components/myorder/MyOrderResultCard";
 import MyOrderEmptyState from "@/components/myorder/MyOrderEmptyState";
+import MyOrderPagination from "@/components/myorder/MyOrderPagination";
 
 const FOOTER_TEXT = "© since 2024 루루동이 | All Rights Reserved.";
 const BANK_NAME = "새마을금고";
@@ -122,6 +123,7 @@ export default function MyOrderPage() {
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
   const [orders, setOrders] = useState<any[]>([]);
+  const [orderPage, setOrderPage] = useState(1);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [copyDone, setCopyDone] = useState(false);
@@ -203,6 +205,15 @@ export default function MyOrderPage() {
     }
   };
 
+  const ORDERS_PER_PAGE = 4;
+  const totalOrderPages = Math.max(1, Math.ceil(orders.length / ORDERS_PER_PAGE));
+  const safeOrderPage = Math.min(orderPage, totalOrderPages);
+  const visibleOrders = orders.slice(
+    (safeOrderPage - 1) * ORDERS_PER_PAGE,
+    safeOrderPage * ORDERS_PER_PAGE
+  );
+
+
   return (
     <main
       className="min-h-screen select-none bg-[#f5f8ff] px-4 py-6 text-[#151923]"
@@ -254,7 +265,7 @@ export default function MyOrderPage() {
             </div>
 
             <div className="grid gap-4">
-              {orders.map((order) => {
+              {visibleOrders.map((order) => {
                 const label = getCustomerStatusLabel(order);
                 const optionText = [cleanOption(order.color), cleanOption(order.size)]
                   .filter(Boolean)
@@ -272,6 +283,12 @@ export default function MyOrderPage() {
                   />
                 );
               })}
+
+                <MyOrderPagination
+                  page={safeOrderPage}
+                  totalPages={totalOrderPages}
+                  onPageChange={setOrderPage}
+                />
             </div>
           </section>
         )}

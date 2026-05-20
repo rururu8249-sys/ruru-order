@@ -1,35 +1,61 @@
 "use client";
 
 // components/order/OrderCompletePaymentNotice.tsx
-// 목적: 주문완료 후 입금계좌 최상단 안내 UI
+// 목적: 주문완료 후 입금계좌 최상단 안내 + 주문상품/배송비/총액 확인 UI
 // 주의: UI 전용. 주문 저장, 주문번호 생성, 금액 계산, 입금매칭, Supabase 로직 없음.
 
-import Link from "next/link";
 import { useState } from "react";
+
+type OrderDoneItem = {
+  product_name?: string;
+  color?: string;
+  size?: string;
+  qty?: string | number;
+  product_price?: string | number;
+};
 
 type OrderCompletePaymentNoticeProps = {
   nickname: string;
   name: string;
   paymentMethod: "무통장입금" | "카드결제";
+  productAmount: number;
+  shippingFee: number;
   totalAmount: number;
   bankName: string;
   bankAccount: string;
   bankHolder: string;
+  items?: OrderDoneItem[];
+};
+
+const toNumber = (value: string | number | undefined) => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  return Number(String(value || "").replace(/[^0-9]/g, "")) || 0;
 };
 
 const won = (value: number) => `${Number(value || 0).toLocaleString()}원`;
+const clean = (value: unknown) => String(value || "").trim();
+
+const itemTitle = (item: OrderDoneItem) => {
+  const name = clean(item.product_name) || "상품명 확인";
+  const optionText = [clean(item.color), clean(item.size)].filter(Boolean).join(" / ");
+  return optionText ? `${name} (${optionText})` : name;
+};
 
 export default function OrderCompletePaymentNotice({
   nickname,
   name,
   paymentMethod,
+  productAmount,
+  shippingFee,
   totalAmount,
   bankName,
   bankAccount,
   bankHolder,
+  items = [],
 }: OrderCompletePaymentNoticeProps) {
   const [copyDone, setCopyDone] = useState(false);
-  const depositName = String(nickname || name || "").trim() || "현재 닉네임";
+  const depositName = clean(nickname || name) || "현재 닉네임";
+  const totalQty = items.reduce((sum, item) => sum + toNumber(item.qty), 0);
 
   const copyAccount = async () => {
     try {
@@ -109,9 +135,9 @@ export default function OrderCompletePaymentNotice({
           </button>
 
           <div className="mt-3 rounded-2xl bg-white/75 px-4 py-3 text-center text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-blue-800 ring-1 ring-blue-100">
-            입금자명은 <span className="font-black text-blue-700">{depositName}</span>
+            입금자명 <span className="font-black text-blue-700">{depositName}</span>
             <br />
-            이번 주문서 결제금액은 <span className="font-black text-blue-700">{won(totalAmount)}</span>
+            이번 주문서 결제금액 <span className="font-black text-blue-700">{won(totalAmount)}</span>
           </div>
 
           <div className="mt-3 rounded-2xl bg-red-50 px-4 py-3 text-center text-[13px] font-black leading-relaxed tracking-[-0.04em] text-red-600 ring-1 ring-red-100">
@@ -141,66 +167,74 @@ export default function OrderCompletePaymentNotice({
       )}
 
       <section className="rounded-[30px] bg-white p-5 shadow-[0_14px_35px_rgba(30,64,175,0.08)] ring-1 ring-blue-100">
-        <div className="mb-4 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-[22px] text-blue-600 ring-1 ring-blue-100">
-            ▣
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-[22px] text-blue-600 ring-1 ring-blue-100">
+              🛍️
+            </div>
+
+            <h2 className="text-[21px] font-black tracking-[-0.06em] text-[#151923]">
+              주문 상품
+            </h2>
           </div>
 
-          <h2 className="text-[21px] font-black tracking-[-0.06em] text-[#151923]">
-            주문 정보 요약
-          </h2>
+          <span className="rounded-full bg-blue-50 px-3 py-1.5 text-[12px] font-black text-blue-700 ring-1 ring-blue-100">
+            총 {totalQty || items.length}개
+          </span>
         </div>
 
-        <div className="divide-y divide-slate-100 border-y border-slate-100">
-          <div className="flex items-center justify-between gap-4 py-3">
-            <span className="text-[15px] font-bold text-slate-600">입금자명</span>
-            <span className="text-right text-[16px] font-black text-blue-600">
-              {depositName}
-            </span>
+        <div className="grid gap-3">
+          {items.length > 0 ? (
+            items.map((item, index) => {
+              const qty = toNumber(item.qty);
+              const amount = toNumber(item.product_price) * qty;
+
+              return (
+                <div
+                  key={`${itemTitle(item)}-${index}`}
+                  className="rounded-[22px] bg-slate-50 px-4 py-3 ring-1 ring-slate-100"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="break-keep text-[15px] font-black leading-relaxed tracking-[-0.04em] text-[#151923]">
+                        {itemTitle(item)}
+                      </div>
+                      <div className="mt-1 text-[13px] font-bold text-slate-500">
+                        수량 {qty || 0}개
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 text-right text-[15px] font-black text-blue-600">
+                      {won(amount)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="rounded-[22px] bg-slate-50 px-4 py-4 text-center text-[14px] font-bold text-slate-500 ring-1 ring-slate-100">
+              주문 상품 정보가 비어 있습니다.
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 rounded-[24px] bg-blue-50 p-4 ring-1 ring-blue-100">
+          <div className="flex items-center justify-between py-1 text-[14px] font-bold text-slate-600">
+            <span>상품금액</span>
+            <span>{won(productAmount)}</span>
           </div>
 
-          <div className="flex items-center justify-between gap-4 py-3">
-            <span className="text-[15px] font-bold text-slate-600">
-              이번 주문서 결제금액
-            </span>
-            <span className="text-right text-[18px] font-black text-[#151923]">
-              {won(totalAmount)}
-            </span>
+          <div className="flex items-center justify-between py-1 text-[14px] font-bold text-slate-600">
+            <span>배송비</span>
+            <span>{won(shippingFee)}</span>
           </div>
 
-          <div className="flex items-center justify-between gap-4 py-3">
-            <span className="text-[15px] font-bold text-slate-600">결제방식</span>
-            <span className="text-right text-[16px] font-black text-blue-600">
-              {paymentMethod}
-            </span>
+          <div className="mt-3 flex items-center justify-between border-t border-blue-100 pt-3 text-[18px] font-black text-[#151923]">
+            <span>이번 주문서 결제금액</span>
+            <span className="text-blue-600">{won(totalAmount)}</span>
           </div>
         </div>
       </section>
-
-      <div className="grid grid-cols-3 gap-2">
-        <Link
-          href="/myorder"
-          className="rounded-2xl border border-blue-500 bg-white px-2 py-4 text-center text-[14px] font-black text-blue-600 shadow-sm active:scale-[0.99]"
-        >
-          주문조회
-        </Link>
-
-        <a
-          href="https://pf.kakao.com/_RMxaqX"
-          target="_blank"
-          rel="noreferrer"
-          className="rounded-2xl bg-white px-2 py-4 text-center text-[14px] font-black text-[#151923] shadow-sm ring-1 ring-slate-100 active:scale-[0.99]"
-        >
-          카톡문의
-        </a>
-
-        <Link
-          href="/"
-          className="rounded-2xl bg-blue-600 px-2 py-4 text-center text-[14px] font-black text-white shadow-[0_10px_24px_rgba(37,99,235,0.22)] active:scale-[0.99]"
-        >
-          HOME
-        </Link>
-      </div>
     </section>
   );
 }

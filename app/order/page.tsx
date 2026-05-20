@@ -1166,10 +1166,13 @@ export default function OrderPage() {
             nickname={done.nickname}
             name={done.name}
             paymentMethod={done.paymentMethod}
+            productAmount={done.productAmount}
+            shippingFee={done.shippingFee}
             totalAmount={done.totalAmount}
             bankName={BANK_NAME}
             bankAccount={BANK_ACCOUNT}
             bankHolder={BANK_HOLDER}
+            items={done.items}
           />
 
         <footer className="py-8 text-center text-[11px] font-bold text-[#9b8d82]">
