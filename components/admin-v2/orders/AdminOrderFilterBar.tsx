@@ -18,21 +18,74 @@ type AdminOrderFilterBarProps = {
   dateOptions: Option[];
 };
 
-type QuickFilter = {
+type MultiOption = {
+  value: string;
   label: string;
-  status: string;
-  payment: string;
 };
 
-const QUICK_FILTERS: QuickFilter[] = [
-  { label: "전체보기", status: "전체", payment: "전체" },
-  { label: "미입금", status: "전체", payment: "무통장 미입금" },
-  { label: "입금확인", status: "전체", payment: "무통장 입금확인" },
-  { label: "카드결제완료", status: "전체", payment: "카드 결제완료" },
-  { label: "출고준비", status: "포장전", payment: "전체" },
-  { label: "출고완료", status: "출고완료", payment: "전체" },
-  { label: "취소/환불", status: "주문서 취소", payment: "전체" },
+const STATUS_OPTIONS: MultiOption[] = [
+  { value: "전체", label: "상태 전체" },
+  { value: "미결제", label: "미결제" },
+  { value: "결제완료", label: "결제완료" },
+  { value: "포장전", label: "출고준비" },
+  { value: "포장완료", label: "포장완료" },
+  { value: "출고완료", label: "출고완료" },
+  { value: "주문서 취소", label: "취소/환불" },
 ];
+
+const PAYMENT_OPTIONS: MultiOption[] = [
+  { value: "전체", label: "입금 전체" },
+  { value: "무통장 미입금", label: "무통장 미입금" },
+  { value: "무통장 입금확인", label: "무통장 입금확인" },
+  { value: "카드 미결제", label: "카드 미결제" },
+  { value: "카드 결제완료", label: "카드 결제완료" },
+];
+
+function splitFilter(value: string) {
+  const parts = value.split("||").map((item) => item.trim()).filter(Boolean);
+  return parts.length > 0 ? parts : ["전체"];
+}
+
+function hasActive(value: string, target: string) {
+  const values = splitFilter(value);
+  return values.includes(target) || (target === "전체" && values.includes("전체"));
+}
+
+function toggleMultiValue(current: string, target: string) {
+  if (target === "전체") return "전체";
+
+  const currentValues = splitFilter(current).filter((item) => item !== "전체");
+  const exists = currentValues.includes(target);
+  const nextValues = exists
+    ? currentValues.filter((item) => item !== target)
+    : [...currentValues, target];
+
+  return nextValues.length > 0 ? nextValues.join("||") : "전체";
+}
+
+function FilterChip({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`h-9 rounded-xl border px-3 text-[13px] font-black active:scale-[0.98] ${
+        active
+          ? "border-blue-600 bg-blue-50 text-blue-700"
+          : "border-neutral-200 bg-white text-neutral-700 hover:border-neutral-400"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
 
 export default function AdminOrderFilterBar({
   pendingKeyword,
@@ -46,18 +99,15 @@ export default function AdminOrderFilterBar({
   setDateFilter,
   dateOptions,
 }: AdminOrderFilterBarProps) {
-  const activeQuickLabel =
-    QUICK_FILTERS.find((item) => item.status === statusFilter && item.payment === paymentFilter)?.label || "";
-
-  const applyQuickFilter = (item: QuickFilter) => {
-    setStatusFilter(item.status);
-    setPaymentFilter(item.payment);
-  };
+  const mergedDateOptions: Option[] = [
+    { value: "전체", label: "방송 전체보기" },
+    ...dateOptions.filter((option) => option.value !== "전체"),
+  ];
 
   return (
-    <div className="mb-4 grid gap-3">
+    <div className="mb-4 grid gap-3 rounded-2xl border border-neutral-200 bg-white p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[280px] flex-1 max-w-[420px]">
+        <div className="relative min-w-[280px] flex-1 max-w-[460px]">
           <input
             value={pendingKeyword}
             onChange={(event) => setPendingKeyword(event.target.value)}
@@ -77,67 +127,50 @@ export default function AdminOrderFilterBar({
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {QUICK_FILTERS.map((item) => {
-            const active = activeQuickLabel === item.label;
-
-            return (
-              <button
-                key={item.label}
-                type="button"
-                onClick={() => applyQuickFilter(item)}
-                className={`h-11 rounded-xl border px-4 text-[14px] font-black active:scale-[0.98] ${
-                  active
-                    ? "border-blue-600 bg-white text-blue-700 shadow-sm"
-                    : "border-neutral-200 bg-white text-neutral-700 hover:border-neutral-400"
-                }`}
-              >
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-2">
         <select
           value={dateFilter}
           onChange={(event) => setDateFilter(event.target.value)}
-          className="h-10 rounded-xl border border-neutral-200 bg-white px-3 text-[13px] font-black outline-none focus:border-blue-600"
+          className="h-11 min-w-[220px] rounded-xl border border-neutral-200 bg-white px-3 text-[14px] font-black outline-none focus:border-blue-600"
         >
-          {dateOptions.map((option) => (
-            <option key={option.value} value={option.value}>
+          {mergedDateOptions.map((option) => (
+            <option key={`${option.value}-${option.label}`} value={option.value}>
               {option.label}
             </option>
           ))}
         </select>
 
-        <div className="flex flex-wrap gap-2">
-          <select
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-            className="h-10 rounded-xl border border-neutral-200 bg-white px-3 text-[13px] font-black outline-none focus:border-blue-600"
-          >
-            <option value="전체">상태 전체</option>
-            <option value="미결제">미결제</option>
-            <option value="결제완료">결제완료</option>
-            <option value="포장전">포장전</option>
-            <option value="포장완료">포장완료</option>
-            <option value="출고완료">출고완료</option>
-            <option value="주문서 취소">취소/환불</option>
-          </select>
+        <button
+          type="button"
+          onClick={onSearch}
+          className="h-11 rounded-xl bg-neutral-950 px-5 text-[14px] font-black text-white active:scale-[0.98]"
+        >
+          검색
+        </button>
+      </div>
 
-          <select
-            value={paymentFilter}
-            onChange={(event) => setPaymentFilter(event.target.value)}
-            className="h-10 rounded-xl border border-neutral-200 bg-white px-3 text-[13px] font-black outline-none focus:border-blue-600"
-          >
-            <option value="전체">입금 전체</option>
-            <option value="무통장 미입금">무통장 미입금</option>
-            <option value="무통장 입금확인">무통장 입금확인</option>
-            <option value="카드 미결제">카드 미결제</option>
-            <option value="카드 결제완료">카드 결제완료</option>
-          </select>
+      <div className="grid gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="w-16 text-[12px] font-black text-neutral-500">상태</div>
+          {STATUS_OPTIONS.map((option) => (
+            <FilterChip
+              key={option.value}
+              active={hasActive(statusFilter, option.value)}
+              label={option.label}
+              onClick={() => setStatusFilter(toggleMultiValue(statusFilter, option.value))}
+            />
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="w-16 text-[12px] font-black text-neutral-500">입금</div>
+          {PAYMENT_OPTIONS.map((option) => (
+            <FilterChip
+              key={option.value}
+              active={hasActive(paymentFilter, option.value)}
+              label={option.label}
+              onClick={() => setPaymentFilter(toggleMultiValue(paymentFilter, option.value))}
+            />
+          ))}
         </div>
       </div>
     </div>

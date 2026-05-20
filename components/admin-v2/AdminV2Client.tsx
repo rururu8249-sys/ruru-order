@@ -602,8 +602,16 @@ export function AdminV2Client() {
     return orderGroups.filter((group) => {
       const status = getOrderStatusValue(group.first);
       const payment = group.first.payment_method || "미설정";
-      const matchStatus = statusFilter === "전체" || status === statusFilter;
-      const matchPayment = paymentFilter === "전체" || payment === paymentFilter;
+      const statusFilterValues = statusFilter.split("||").filter(Boolean);
+      const paymentFilterValues = paymentFilter.split("||").filter(Boolean);
+      const matchStatus =
+        statusFilterValues.length === 0 ||
+        statusFilterValues.includes("전체") ||
+        statusFilterValues.includes(status);
+      const matchPayment =
+        paymentFilterValues.length === 0 ||
+        paymentFilterValues.includes("전체") ||
+        paymentFilterValues.includes(payment);
       const matchDate = !dateFilter || toDateKey(group.first.created_at) === dateFilter;
 
       const target = [
