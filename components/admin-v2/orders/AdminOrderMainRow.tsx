@@ -8,7 +8,7 @@ type AdminOrderMainRowProps = {
   nickname: string;
   customerLine: string;
   itemSummary: string;
-  amountText: string;
+  amountNode: ReactNode;
   paymentNode: ReactNode;
   statusNode: ReactNode;
   detailNode: ReactNode;
@@ -20,7 +20,7 @@ export default function AdminOrderMainRow({
   nickname,
   customerLine,
   itemSummary,
-  amountText,
+  amountNode,
   paymentNode,
   statusNode,
   detailNode,
@@ -46,9 +46,7 @@ export default function AdminOrderMainRow({
 
       {paymentNode}
 
-      <div className="text-left lg:text-right">
-        <div className="text-[15px] font-black">{amountText}</div>
-      </div>
+      {amountNode}
 
       {statusNode}
 

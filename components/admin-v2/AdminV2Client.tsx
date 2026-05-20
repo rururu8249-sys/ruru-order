@@ -12,6 +12,9 @@ import PaymentMatchPanel from "@/components/admin-v2/payment/PaymentMatchPanel";
 import AdminOrderPaymentCell from "@/components/admin-v2/orders/AdminOrderPaymentCell";
 import AdminOrderTableHeader from "@/components/admin-v2/orders/AdminOrderTableHeader";
 import AdminOrderMainRow from "@/components/admin-v2/orders/AdminOrderMainRow";
+import AdminOrderAmountCell from "@/components/admin-v2/orders/AdminOrderAmountCell";
+import AdminOrderStatusCell from "@/components/admin-v2/orders/AdminOrderStatusCell";
+import AdminOrderDetailButton from "@/components/admin-v2/orders/AdminOrderDetailButton";
 
 import type {
   AdminTab,
@@ -1796,7 +1799,12 @@ function OrderWorkTable({
               nickname={group.first.youtube_nickname || "-"}
               customerLine={`${group.first.customer_name || "-"} · ${displayOrderPhone(group.first)}`}
               itemSummary={buildItemSummary(group)}
-              amountText={money(group.totalAmount)}
+              amountNode={
+                <AdminOrderAmountCell
+                  amountText={money(group.totalAmount)}
+                  warningText={groupMoneyLogs.length > 0 ? `금액수정 ${groupMoneyLogs.length}건` : ""}
+                />
+              }
               paymentNode={
                 <AdminOrderPaymentCell
                   paymentMethod={group.first.payment_method || "-"}
@@ -1808,25 +1816,21 @@ function OrderWorkTable({
                 />
               }
               statusNode={
-                <div>
-                  <select value={status} onChange={(event) => onStatusChange(group, event.target.value)} className={`h-8 w-full rounded-lg border px-2 text-center text-xs font-black outline-none ${selectClass(status)}`}>
-                    {ORDER_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                  </select>
-                  {groupStatusLogs.length > 0 ? (
-                    <div className="mt-0.5 text-center text-[10px] font-black text-blue-700">상태변경 {groupStatusLogs.length}건</div>
-                  ) : null}
-                  {isShippedDone && !hasTrackingNumber ? (
-                    <div className="mt-0.5 text-center text-[10px] font-black text-red-600">송장없음</div>
-                  ) : null}
-                  {isShippedDone && !hasShippedAt ? (
-                    <div className="mt-0.5 text-center text-[10px] font-black text-red-600">출고시간없음</div>
-                  ) : null}
-                </div>
+                <AdminOrderStatusCell
+                  status={status}
+                  options={ORDER_STATUS_OPTIONS}
+                  className={selectClass(status)}
+                  statusLogCount={groupStatusLogs.length}
+                  showTrackingMissing={isShippedDone && !hasTrackingNumber}
+                  showShippedTimeMissing={isShippedDone && !hasShippedAt}
+                  onChange={(nextStatus) => onStatusChange(group, nextStatus)}
+                />
               }
               detailNode={
-                <button type="button" onClick={() => onToggle(group.groupId)} className="h-8 rounded-lg border border-neutral-300 bg-white px-2 text-xs font-black text-neutral-700 hover:bg-neutral-50">
-                  {isOpen ? "상세닫기" : "상세보기"}
-                </button>
+                <AdminOrderDetailButton
+                  isOpen={isOpen}
+                  onClick={() => onToggle(group.groupId)}
+                />
               }
             />
 
