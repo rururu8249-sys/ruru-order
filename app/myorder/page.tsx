@@ -15,6 +15,8 @@ import CustomerTopNav from "@/components/customer/CustomerTopNav";
 import MyOrderPageHero from "@/components/myorder/MyOrderPageHero";
 import MyOrderBankAccountCard from "@/components/myorder/MyOrderBankAccountCard";
 import MyOrderLookupForm from "@/components/myorder/MyOrderLookupForm";
+import MyOrderResultCard from "@/components/myorder/MyOrderResultCard";
+import MyOrderEmptyState from "@/components/myorder/MyOrderEmptyState";
 
 const FOOTER_TEXT = "© since 2024 루루동이 | All Rights Reserved.";
 const BANK_NAME = "새마을금고";
@@ -203,7 +205,7 @@ export default function MyOrderPage() {
 
   return (
     <main
-      className="min-h-screen select-none bg-[#f8f1e8] px-4 py-6 text-[#241b17]"
+      className="min-h-screen select-none bg-[#f5f8ff] px-4 py-6 text-[#151923]"
       style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
     >
       <section className="mx-auto w-full max-w-md">
@@ -233,65 +235,46 @@ export default function MyOrderPage() {
         )}
 
         {isLoggedIn && (
-          <section className="mt-4 rounded-[24px] bg-white/80 p-4 text-sm font-black text-[#6b5b50] shadow-[0_8px_18px_rgba(70,45,25,0.06)] ring-1 ring-black/5">
+          <section className="mt-4 rounded-[24px] bg-white p-4 text-sm font-black text-blue-700 shadow-[0_8px_18px_rgba(30,64,175,0.06)] ring-1 ring-blue-100">
             {customerName}님 주문내역을 최근 7일 기준으로 불러왔습니다.
           </section>
         )}
 
-        {searched && orders.length === 0 && (
-          <section className="mt-4 rounded-[1.5rem] border border-gray-100 bg-white p-5 text-center text-sm font-bold text-gray-500 shadow-sm">
-            최근 7일간 주문내역이 없습니다.
+        {searched && orders.length === 0 && <MyOrderEmptyState />}
+
+        {orders.length > 0 && (
+          <section className="mt-6">
+            <div className="mb-3 flex items-center gap-2">
+              <h2 className="text-[24px] font-black tracking-[-0.07em] text-[#151923]">
+                최근 주문내역
+              </h2>
+              <span className="rounded-full bg-blue-50 px-3 py-1 text-[12px] font-black text-blue-700 ring-1 ring-blue-100">
+                최근 7일
+              </span>
+            </div>
+
+            <div className="grid gap-4">
+              {orders.map((order) => {
+                const label = getCustomerStatusLabel(order);
+                const optionText = [cleanOption(order.color), cleanOption(order.size)]
+                  .filter(Boolean)
+                  .join(" / ");
+
+                return (
+                  <MyOrderResultCard
+                    key={order.id}
+                    order={order}
+                    label={label}
+                    statusClassName={getStatusClassName(label)}
+                    optionText={optionText}
+                    formattedDate={formatDate(order.created_at)}
+                    amountText={won(order.adjusted_total_price || order.total_price || 0)}
+                  />
+                );
+              })}
+            </div>
           </section>
         )}
-
-        <section className="mt-4 grid gap-4">
-          {orders.map((order) => {
-            const label = getCustomerStatusLabel(order);
-            const optionText = [cleanOption(order.color), cleanOption(order.size)]
-              .filter(Boolean)
-              .join(" / ");
-
-            return (
-              <article
-                key={order.id}
-                className="rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm"
-              >
-                <div className="mb-3 flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-xs font-black text-gray-400">
-                      {formatDate(order.created_at)}
-                    </div>
-                    <h2 className="mt-2 text-xl font-black">
-                      {order.product_name || "주문상품"}
-                    </h2>
-                    <p className="mt-1 text-sm font-bold text-gray-500">
-                      {optionText || "옵션 없음"} · {order.qty || 1}개
-                    </p>
-                  </div>
-
-                  <span className={`rounded-full px-3 py-1 text-xs font-black ${getStatusClassName(label)}`}>
-                    {label}
-                  </span>
-                </div>
-
-                <div className="mt-4 border-t border-gray-100 pt-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-gray-500">결제금액</span>
-                    <span className="text-xl font-black">
-                      {won(order.adjusted_total_price || order.total_price || 0)}
-                    </span>
-                  </div>
-
-                  {order.cancel_reason && (
-                    <div className="mt-3 rounded-2xl bg-red-50 p-3 text-sm font-bold text-red-600">
-                      취소 사유: {order.cancel_reason}
-                    </div>
-                  )}
-                </div>
-              </article>
-            );
-          })}
-        </section>
 
         <footer className="mt-8 border-t border-[#ead8c8] pt-5 text-center text-xs font-bold text-[#9b8d82]">
           {FOOTER_TEXT}
