@@ -1106,7 +1106,7 @@ export default function OrderPage() {
                     입금계좌 안내
                   </h1>
                 </div>
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#fff7ec] text-[26px]">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-[26px]">
                   💳
                 </div>
               </div>
@@ -1232,17 +1232,22 @@ export default function OrderPage() {
   return (
     <OrderPageShell>
         <TopCustomerNav />
-        <OrderHero
-          broadcastTitle={
-            broadcast?.broadcast_public_title ||
-            broadcast?.public_title ||
-            broadcast?.broadcast_name ||
-            ""
-          }
-        />
-        <OrderGuideCard />
 
-        <OrderCustomerInfoIntro />
+        {isAutoLoggedIn ? (
+          <>
+            <OrderHero
+              broadcastTitle={
+                broadcast?.broadcast_public_title ||
+                broadcast?.public_title ||
+                broadcast?.broadcast_name ||
+                ""
+              }
+            />
+            <OrderGuideCard />
+          </>
+        ) : (
+          <OrderCustomerInfoIntro />
+        )}
 
         <section className="mt-5 rounded-[34px] bg-white p-5 shadow-[0_18px_40px_rgba(30,64,175,0.10)] ring-1 ring-blue-100">
 
@@ -1383,9 +1388,9 @@ export default function OrderPage() {
         <section className="mt-4 rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-black">주문상품</h2>
 
-          <div className="mt-4 rounded-[1.4rem] bg-pink-50 p-4">
+          <div className="mt-4 rounded-[1.4rem] bg-blue-50 p-4">
             <div className="flex items-start justify-between gap-3">
-              <div className="text-sm font-black leading-relaxed text-pink-700">
+              <div className="text-sm font-black leading-relaxed text-blue-700">
                 ⚠️ 상품 1칸 = 상품 1개만 작성
                 <br />
                 💰 상품금액만 입력 · 택배비 제외
@@ -1394,7 +1399,7 @@ export default function OrderPage() {
               <button
                 type="button"
                 onClick={() => setShowProductGuideDetail((value) => !value)}
-                className={`${buttonBase} shrink-0 rounded-full bg-white px-3 py-2 text-xs font-black text-pink-700`}
+                className={`${buttonBase} shrink-0 rounded-full bg-white px-3 py-2 text-xs font-black text-blue-700`}
               >
                 {showProductGuideDetail ? "내용닫기 ▲" : "내용보기 ▼"}
               </button>
@@ -1444,8 +1449,8 @@ export default function OrderPage() {
                     />
 
                     {productSearchOpenIndex === index && broadcastProducts.length > 0 && (
-                      <div className="absolute left-0 right-0 top-[58px] z-40 max-h-72 overflow-auto rounded-3xl border border-pink-100 bg-white p-2 shadow-[0_18px_45px_rgba(30,20,20,0.15)]">
-                        <div className="px-3 py-2 text-xs font-black text-pink-500">
+                      <div className="absolute left-0 right-0 top-[58px] z-40 max-h-72 overflow-auto rounded-3xl border border-blue-100 bg-white p-2 shadow-[0_18px_45px_rgba(30,20,20,0.15)]">
+                        <div className="px-3 py-2 text-xs font-black text-blue-600">
                           오늘 방송상품 선택
                         </div>
 
@@ -1459,7 +1464,7 @@ export default function OrderPage() {
                               key={String(product.id)}
                               type="button"
                               onClick={() => selectBroadcastProduct(index, product)}
-                              className={`${buttonBase} mb-1 w-full rounded-2xl px-3 py-3 text-left hover:bg-pink-50`}
+                              className={`${buttonBase} mb-1 w-full rounded-2xl px-3 py-3 text-left hover:bg-blue-50`}
                             >
                               <div className="flex items-center justify-between gap-3">
                                 <div className="min-w-0">
@@ -1471,7 +1476,7 @@ export default function OrderPage() {
                                   </div>
                                 </div>
 
-                                <div className="shrink-0 text-sm font-black text-pink-500">
+                                <div className="shrink-0 text-sm font-black text-blue-600">
                                   {won(product.price)}
                                 </div>
                               </div>
@@ -1535,7 +1540,7 @@ export default function OrderPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl bg-[#fff7ec] px-3 py-2 text-xs font-black leading-relaxed text-[#8a5a36]">
+                  <div className="rounded-2xl bg-blue-50 px-3 py-2 text-xs font-black leading-relaxed text-blue-800">
                     💰 상품금액만 입력해주세요. 택배비는 자동으로 따로 계산됩니다.
                   </div>
 
@@ -1551,7 +1556,7 @@ export default function OrderPage() {
             <button
               type="button"
               onClick={addItem}
-              className={`${buttonBase} rounded-2xl border border-dashed border-pink-200 bg-pink-50 p-4 font-black text-pink-600`}
+              className={`${buttonBase} rounded-2xl border border-dashed border-blue-300 bg-blue-50 p-4 font-black text-blue-700`}
             >
               + 상품 추가하기
             </button>
@@ -1614,7 +1619,7 @@ export default function OrderPage() {
               type="button"
               onClick={submitOrder}
               disabled={submitting}
-              className={`${buttonBase} rounded-2xl bg-pink-500 p-5 text-lg font-black text-white shadow-lg shadow-pink-200 disabled:opacity-50`}
+              className={`${buttonBase} rounded-2xl bg-blue-500 p-5 text-lg font-black text-white shadow-lg shadow-blue-200 disabled:opacity-50`}
             >
               {submitting ? "제출 중..." : "주문서 제출하기"}
             </button>

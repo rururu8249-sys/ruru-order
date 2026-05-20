@@ -1,10 +1,9 @@
 // components/order/OrderCustomerTopNav.tsx
-// 새 파일 생성
-// 위치: /Users/ruru/Desktop/ruru-order-app/components/order/OrderCustomerTopNav.tsx
-// 목적: 주문서 페이지 상단 고객 네비게이션 UI 분리
+// 목적: 주문서 페이지 상단 고객 네비게이션 UI
 // 주의: 상태 변경 함수만 props로 받습니다. 주문 저장/금액/DB 로직 없음
 
 import Link from "next/link";
+import CustomerPointBadge from "@/components/customer/CustomerPointBadge";
 
 type OrderCustomerTopNavProps = {
   isLoggedIn: boolean;
@@ -20,38 +19,44 @@ export default function OrderCustomerTopNav({
   onLogout,
 }: OrderCustomerTopNavProps) {
   return (
-    <header className="mb-5 flex items-start justify-between gap-3">
-      <div className="min-h-[48px] pt-1">
-        {isLoggedIn ? (
-          <div className="leading-tight">
-            <p className="text-[20px] font-extrabold tracking-[-0.04em] text-[#1f1713]">
-              안녕하세요
-            </p>
-            <p className="mt-1 text-[20px] font-extrabold tracking-[-0.04em] text-[#1f1713]">
-              {greetingName || "고객"}님
-            </p>
-          </div>
-        ) : (
-          <p className="text-[20px] font-extrabold tracking-[-0.04em] text-[#1f1713]">
-            안녕하세요
+    <header className="mb-5 rounded-[28px] bg-white/95 p-4 shadow-[0_12px_28px_rgba(30,64,175,0.08)] ring-1 ring-blue-100/70">
+      <div className="flex items-start justify-between gap-3">
+        <Link href="/" className="min-w-0 active:scale-[0.99]">
+          <p className="text-[15px] font-black tracking-[-0.04em] text-blue-700">
+            루루동이 LIVE
           </p>
-        )}
+
+          <p className="mt-1 truncate text-[18px] font-black tracking-[-0.06em] text-[#151923]">
+            {isLoggedIn
+              ? `${greetingName || "고객"}님 안녕하세요`
+              : "주문 전 정보를 확인해주세요"}
+          </p>
+        </Link>
+
+        <CustomerPointBadge className="shrink-0" />
       </div>
 
-      <div className="flex flex-wrap justify-end gap-2">
+      <nav className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Link
           href="/"
-          className="rounded-2xl bg-white/95 px-3.5 py-2 text-sm font-extrabold text-[#241b17] shadow-[0_8px_20px_rgba(60,38,20,0.12)] ring-1 ring-black/5 active:scale-[0.98]"
+          className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
         >
           🏠 HOME
         </Link>
 
-        {isLoggedIn && (
+        <Link
+          href="/myorder"
+          className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
+        >
+          주문조회
+        </Link>
+
+        {isLoggedIn ? (
           <>
             <button
               type="button"
               onClick={onEditInfo}
-              className="rounded-2xl bg-white/95 px-3.5 py-2 text-sm font-extrabold text-[#241b17] shadow-[0_8px_20px_rgba(60,38,20,0.12)] ring-1 ring-black/5 active:scale-[0.98]"
+              className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
             >
               정보수정
             </button>
@@ -59,13 +64,23 @@ export default function OrderCustomerTopNav({
             <button
               type="button"
               onClick={onLogout}
-              className="rounded-2xl bg-white/95 px-3.5 py-2 text-sm font-extrabold text-[#241b17] shadow-[0_8px_20px_rgba(60,38,20,0.12)] ring-1 ring-black/5 active:scale-[0.98]"
+              className="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 active:scale-[0.98]"
             >
               로그아웃
             </button>
           </>
+        ) : (
+          <>
+            <span className="rounded-2xl bg-blue-600 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-white shadow-[0_10px_20px_rgba(37,99,235,0.20)]">
+              주문시작
+            </span>
+
+            <span className="rounded-2xl bg-blue-50 px-3 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-blue-700 ring-1 ring-blue-100">
+              첫 주문
+            </span>
+          </>
         )}
-      </div>
+      </nav>
     </header>
   );
 }
