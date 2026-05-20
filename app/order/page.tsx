@@ -34,8 +34,6 @@ import {
 } from "@/lib/admin-v2/combineShipping";
 import OrderPageShell from "@/components/order/OrderPageShell";
 import OrderCustomerTopNav from "@/components/order/OrderCustomerTopNav";
-import OrderHero from "@/components/order/OrderHero";
-import OrderGuideCard from "@/components/order/OrderGuideCard";
 import OrderPriceSummaryBox from "@/components/order/OrderPriceSummaryBox";
 import OrderCustomerInfoIntro from "@/components/order/OrderCustomerInfoIntro";
 import OrderProductInputGuideDetail from "@/components/order/OrderProductInputGuideDetail";
@@ -1233,21 +1231,7 @@ export default function OrderPage() {
     <OrderPageShell>
         <TopCustomerNav />
 
-        {isAutoLoggedIn ? (
-          <>
-            <OrderHero
-              broadcastTitle={
-                broadcast?.broadcast_public_title ||
-                broadcast?.public_title ||
-                broadcast?.broadcast_name ||
-                ""
-              }
-            />
-            <OrderGuideCard />
-          </>
-        ) : (
-          <OrderCustomerInfoIntro />
-        )}
+        {!isAutoLoggedIn && <OrderCustomerInfoIntro />}
 
         <section className="mt-5 rounded-[34px] bg-white p-5 shadow-[0_18px_40px_rgba(30,64,175,0.10)] ring-1 ring-blue-100">
 
