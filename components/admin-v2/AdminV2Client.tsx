@@ -84,7 +84,6 @@ import {
   shortOrderCode,
 } from "@/lib/admin-v2/orderHelpers";
 
-
 const ROSEN_SHIPPING_KEY_PREFIX = "R";
 const ROSEN_LEGACY_SHIPPING_KEY_PREFIX = "RURU|";
 const ROSEN_TEMPLATE_PATH = "/templates/rozen_template.xlsx";
@@ -755,7 +754,6 @@ export function AdminV2Client() {
     setOpenedOrderGroupIds((prev) => prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId]);
   };
 
-
   const loadDepositsFromServer = async () => {
     const response = await fetch("/api/admin-v2/deposits", {
       method: "GET",
@@ -1054,7 +1052,6 @@ export function AdminV2Client() {
     }
   };
 
-
   const bulkMarkShippingDoneFromExcel = async (_previewRows: RosenShippingPreviewRow[]) => {
     alert(
       "송장 업로드/재업로드/사이트 출고반영 기능은 사용하지 않습니다.\n\n로젠 송장은 사이트에서 다운로드만 하고, 실제 합배송/송장처리는 로젠 프로그램에서 진행해주세요."
@@ -1202,8 +1199,7 @@ export function AdminV2Client() {
       <div className="flex min-h-screen">
         <aside className="hidden w-56 shrink-0 bg-neutral-950 p-4 text-white md:flex md:flex-col">
           <div className="mb-5">
-            <div className="text-[10px] font-black tracking-[0.24em] text-neutral-500">RURU ADMIN V2</div>
-            <div className="mt-2 text-xl font-black">루루동이 운영센터</div>
+<div className="mt-2 text-xl font-black">루루동이 운영센터</div>
             <div className="mt-1 text-xs font-semibold text-neutral-400">실무형 주문 작업판</div>
           </div>
 
@@ -1232,8 +1228,7 @@ export function AdminV2Client() {
         <section className="min-w-0 flex-1 p-3">
           <div className="w-full rounded-xl border border-neutral-200 bg-white">
             <div>
-              <div className="text-[10px] font-black tracking-widest text-neutral-400">RURU ADMIN V2</div>
-              <div className="text-lg font-black">{TABS.find((tab) => tab.key === activeTab)?.label}</div>
+<div className="text-lg font-black">{TABS.find((tab) => tab.key === activeTab)?.label}</div>
             </div>
             
           </div>
@@ -1320,7 +1315,6 @@ export function AdminV2Client() {
     </main>
   );
 }
-
 
 function ShippingPanel({
   orderGroups,
@@ -1830,7 +1824,6 @@ function OrderWorkTable({
     </div>
   );
 }
-
 
 function DetailBox({ title, children }: { title: string; children: React.ReactNode }) {
   return (
