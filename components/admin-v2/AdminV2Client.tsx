@@ -1701,7 +1701,7 @@ function OrderWorkTable({
 }) {
   return (
     <div className="w-full min-w-full overflow-x-auto rounded-xl border border-neutral-200 bg-white">
-      <div className="w-full min-w-full"><AdminOrderTableHeader /></div>
+      <AdminOrderTableHeader />
 
       {groups.map((group) => {
         const isOpen = openedOrderGroupIds.includes(group.groupId);
