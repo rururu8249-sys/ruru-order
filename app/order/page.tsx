@@ -229,7 +229,7 @@ export default function OrderPage() {
   const [isCustomerInfoOpen, setIsCustomerInfoOpen] = useState(false);
   const [showSavedCustomerDetail, setShowSavedCustomerDetail] = useState(false);
   const [showProductGuideDetail, setShowProductGuideDetail] = useState(false);
-  const [customerMode, setCustomerMode] = useState<"load" | "new">("new");
+  const [customerMode, setCustomerMode] = useState<"load" | "new">("load");
   const [loginName, setLoginName] = useState("");
   const [loginPhone, setLoginPhone] = useState("");
 
@@ -299,22 +299,18 @@ export default function OrderPage() {
   useEffect(() => {
     if (isEditingCustomerInfo) {
       setIsCustomerInfoOpen(true);
-      setCustomerMode("new");
       return;
     }
 
-    const hasCompleteSavedInfo =
-      hasSavedInfo && Boolean(customerPhone && youtubeNickname && customerName);
-
-    if (hasCompleteSavedInfo) {
+    if (hasSavedInfo) {
       setIsCustomerInfoOpen(false);
       setCustomerMode("load");
       return;
     }
 
     setIsCustomerInfoOpen(true);
-    setCustomerMode("new");
-  }, [hasSavedInfo, isEditingCustomerInfo, customerPhone, youtubeNickname, customerName]);
+    setCustomerMode("load");
+  }, [hasSavedInfo, isEditingCustomerInfo]);
 
   useEffect(() => {
     const cleanPhone = normalizePhone(customerPhone);
@@ -607,6 +603,17 @@ export default function OrderPage() {
     loadSavedCustomerInfo();
     setIsCustomerInfoOpen(false);
     setCustomerMode("load");
+  };
+
+  const openNewCustomerInfoForm = () => {
+    setIsEditingCustomerInfo(false);
+    setShowSavedCustomerDetail(false);
+    setCustomerMode("new");
+    setIsCustomerInfoOpen(true);
+
+    window.setTimeout(() => {
+      document.getElementById("youtubeNicknameInput")?.focus();
+    }, 100);
   };
 
   const loadCustomerByNamePhone = async () => {
@@ -1230,10 +1237,7 @@ export default function OrderPage() {
             onLoginNameChange={setLoginName}
             onLoginPhoneChange={(value) => setLoginPhone(normalizePhone(value))}
             onLoadCustomer={loadCustomerByNamePhone}
-            onStartNew={() => {
-              setCustomerMode("new");
-              setIsCustomerInfoOpen(true);
-            }}
+            onStartNew={openNewCustomerInfoForm}
           />
         )}
 

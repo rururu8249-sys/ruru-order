@@ -4,8 +4,6 @@
 // 목적: 주문 전 기존고객/처음주문 선택 화면 V2
 // 주의: UI 전용. 주문 저장, 배송비, 합배송, 입금매칭, Supabase 로직 없음.
 
-import { useRef } from "react";
-
 type OrderEntryGateV2Props = {
   loginName: string;
   loginPhone: string;
@@ -23,17 +21,6 @@ export default function OrderEntryGateV2({
   onLoadCustomer,
   onStartNew,
 }: OrderEntryGateV2Props) {
-  const actionLockRef = useRef(0);
-
-  const runOnce = (action: () => void) => {
-    const now = Date.now();
-
-    if (now - actionLockRef.current < 500) return;
-
-    actionLockRef.current = now;
-    action();
-  };
-
   const buttonBase =
     "relative z-20 flex w-full items-center justify-center rounded-[22px] px-5 py-4 text-[17px] font-black transition-all duration-150 active:scale-[0.97]";
 
@@ -99,8 +86,7 @@ export default function OrderEntryGateV2({
 
               <button
                 type="button"
-                onClick={() => runOnce(onLoadCustomer)}
-                onTouchEnd={() => runOnce(onLoadCustomer)}
+                onClick={onLoadCustomer}
                 className={`${buttonBase} bg-blue-600 text-white shadow-[0_14px_28px_rgba(37,99,235,0.25)]`}
               >
                 정보 불러오기
@@ -126,8 +112,7 @@ export default function OrderEntryGateV2({
 
             <button
               type="button"
-              onClick={() => runOnce(onStartNew)}
-              onTouchEnd={() => runOnce(onStartNew)}
+              onClick={onStartNew}
               className={`${buttonBase} bg-slate-950 text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)]`}
             >
               처음 주문 정보 입력하기
