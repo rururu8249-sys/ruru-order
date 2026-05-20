@@ -427,14 +427,14 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
         <DepositListTable deposits={filteredDeposits} />
       ) : (
         <section className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
-          <div className="hidden grid-cols-[86px_130px_130px_minmax(240px,1fr)_110px_100px_110px] bg-neutral-950 px-3 py-2 text-[12px] font-black text-white lg:grid">
+          <div className="hidden grid-cols-[132px_86px_126px_130px_minmax(260px,1fr)_110px_90px] bg-neutral-950 px-3 py-2 text-[12px] font-black text-white lg:grid">
+            <div className="text-center">입금확인</div>
             <div>주문번호</div>
             <div>작성일</div>
             <div>고객</div>
             <div>주문내역</div>
             <div className="text-right">입금예정</div>
-            <div className="text-center">자동후보</div>
-            <div className="text-center">입금확인</div>
+            <div className="text-center">후보</div>
           </div>
 
           {filteredGroups.length === 0 ? (
