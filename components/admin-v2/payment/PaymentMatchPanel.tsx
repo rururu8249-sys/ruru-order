@@ -8,6 +8,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { DepositRow, OrderGroup } from "@/lib/admin-v2/types";
 import { formatDateLabel, money } from "@/lib/admin-v2/formatters";
 import { buildItemSummary, isBankPaid, isBankUnpaid, orderBaseAmount, shortOrderCode } from "@/lib/admin-v2/orderHelpers";
+import PaymentMatchTopActions from "@/components/admin-v2/payment/parts/PaymentMatchTopActions";
+import PaymentMatchSyncStatus from "@/components/admin-v2/payment/parts/PaymentMatchSyncStatus";
 
 type Props = {
   deposits: DepositRow[];
@@ -375,25 +377,13 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={runAutoMatchPreview}
-              disabled={previewLoading}
-              className="rounded-lg bg-neutral-950 px-4 py-2 text-[13px] font-black text-white shadow-sm active:scale-[0.98] disabled:bg-neutral-300"
-            >
-              {previewLoading ? "확인중..." : "자동매칭 미리보기"}
-            </button>
-
-            <button
-              type="button"
-              onClick={runBankdaSync}
-              disabled={syncing || autoSyncLoading}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-black text-white shadow-sm active:scale-[0.98] disabled:bg-neutral-300"
-            >
-              {syncing ? "가져오는중..." : "뱅크다 입금내역 가져오기"}
-            </button>
-          </div>
+          <PaymentMatchTopActions
+              previewLoading={previewLoading}
+              syncing={syncing}
+              autoSyncLoading={autoSyncLoading}
+              onPreview={runAutoMatchPreview}
+              onSync={runBankdaSync}
+            />
         </div>
         <div className="mb-3 rounded-xl border border-blue-200 bg-blue-50 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
