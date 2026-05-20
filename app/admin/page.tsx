@@ -1,6 +1,7 @@
 "use client";
 
 import AdminOrdersView from "@/components/admin/orders/AdminOrdersView";
+import AdminOrderFilterPanel from "@/components/admin/orders/AdminOrderFilterPanel";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -3271,7 +3272,7 @@ const selectedCustomerDetail = useMemo(() => {
 
           {activeMenu === "orders" && (
             <AdminOrdersView>
-<section className="bg-white rounded-[2rem] p-5 md:p-6 border shadow-sm">
+<AdminOrderFilterPanel>
                 <div className="grid md:grid-cols-[1fr_auto_auto_auto_auto_auto] gap-3">
                   <input
                     value={orderKeyword}
@@ -3341,7 +3342,7 @@ const selectedCustomerDetail = useMemo(() => {
                 <div className="mt-3 text-sm font-black text-gray-500">
                   총 {orderGroups.length}건 / {orderPage}페이지 / 선택 {selectedOrderGroupIds.length}건
                 </div>
-              </section>
+              </AdminOrderFilterPanel>
 
               <section className="bg-white rounded-[2rem] p-4 md:p-5 border shadow-sm">
                 {loadingOrders ? (
