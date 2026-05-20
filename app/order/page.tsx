@@ -40,6 +40,8 @@ import OrderPriceSummaryBox from "@/components/order/OrderPriceSummaryBox";
 import OrderCustomerInfoIntro from "@/components/order/OrderCustomerInfoIntro";
 import OrderProductInputGuideDetail from "@/components/order/OrderProductInputGuideDetail";
 import OrderCompletePaymentNotice from "@/components/order/OrderCompletePaymentNotice";
+import OrderSavedCustomerSummary from "@/components/order/OrderSavedCustomerSummary";
+import OrderCustomerModeSwitch from "@/components/order/OrderCustomerModeSwitch";
 
 declare global {
   interface Window {
@@ -1242,73 +1244,31 @@ export default function OrderPage() {
 
         <section className="rounded-[28px] bg-white p-5 shadow-[0_12px_26px_rgba(70,45,25,0.10)] ring-1 ring-black/5">
           <div className="mb-4">
-            <h2 className="text-xl font-black">주문자 정보</h2>
+            <h2 className="text-xl font-black">주문 전 정보 확인</h2>
             <OrderCustomerInfoIntro />
           </div>
 
           {hasSavedInfo && !isEditingCustomerInfo ? (
-            <div className="rounded-[1.5rem] bg-green-50 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-black text-green-700">
-                  ✅ {customerName || youtubeNickname}님 로그인중
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setShowSavedCustomerDetail((value) => !value)}
-                  className={`${buttonBase} shrink-0 rounded-full bg-white px-3 py-2 text-xs font-black text-green-700`}
-                >
-                  {showSavedCustomerDetail ? "내용닫기 ▲" : "내용보기 ▼"}
-                </button>
-              </div>
-
-              {showSavedCustomerDetail && (
-                <div className="mt-3 rounded-[1.2rem] bg-white p-3 text-xs font-bold leading-relaxed text-green-800">
-                  <div>닉네임: {maskNickname(youtubeNickname)}</div>
-                  <div>이름: {maskName(customerName)}</div>
-                  <div>전화번호: {maskPhone(customerPhone)}</div>
-                  <div>주소: {maskAddress(address, detailAddress)}</div>
-                </div>
-              )}
-            </div>
+            <OrderSavedCustomerSummary
+              customerLabel={customerName || youtubeNickname}
+              nickname={maskNickname(youtubeNickname)}
+              name={maskName(customerName)}
+              phone={maskPhone(customerPhone)}
+              address={maskAddress(address, detailAddress)}
+              showDetail={showSavedCustomerDetail}
+              onToggleDetail={() => setShowSavedCustomerDetail((value) => !value)}
+            />
           ) : (
-            <div className="rounded-[1.5rem] bg-[#fff7f8] p-3">
-              <div className="mb-3 rounded-2xl bg-[#fff1a8] p-3 text-xs font-black leading-relaxed text-[#2b2416]">
-                💡 최초 1회만 입력하면 다음 주문부터 자동 입력됩니다.
+            <div className="rounded-[1.5rem] bg-white p-3">
+              <div className="mb-3 rounded-2xl bg-blue-50 p-3 text-xs font-black leading-relaxed text-blue-800 ring-1 ring-blue-100">
+                💡 주문을 위한 최초 1회 정보 확인입니다. 확인 후 바로 상품 입력으로 이동해요.
               </div>
-              {isEditingCustomerInfo ? (
-                <div className="rounded-[1.2rem] bg-white p-2">
-                  <div className="rounded-[1rem] bg-[#ff4b60] px-3 py-3 text-center text-sm font-black text-white">
-                    정보수정
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-2 rounded-[1.2rem] bg-white p-2">
-                  <button
-                    type="button"
-                    onClick={() => setCustomerMode("load")}
-                    className={`${buttonBase} rounded-[1rem] px-3 py-3 text-sm font-black ${
-                      customerMode === "load"
-                        ? "bg-[#171717] text-white"
-                        : "bg-[#f5f2f2] text-[#5f5555]"
-                    }`}
-                  >
-                    기존 고객
-                  </button>
+              <OrderCustomerModeSwitch
+                isEditing={isEditingCustomerInfo}
+                customerMode={customerMode}
+                onModeChange={setCustomerMode}
+              />
 
-                  <button
-                    type="button"
-                    onClick={() => setCustomerMode("new")}
-                    className={`${buttonBase} rounded-[1rem] px-3 py-3 text-sm font-black ${
-                      customerMode === "new"
-                        ? "bg-[#ff4b60] text-white"
-                        : "bg-[#f5f2f2] text-[#5f5555]"
-                    }`}
-                  >
-                    신규/직접입력
-                  </button>
-                </div>
-              )}
 
               {customerMode === "load" && (
                 <div className="mt-4 rounded-[1.4rem] bg-white p-4">
@@ -1324,7 +1284,7 @@ export default function OrderPage() {
                       value={loginName}
                       onChange={(event) => setLoginName(event.target.value)}
                       placeholder="이름"
-                      className="w-full rounded-2xl border border-gray-200 bg-[#fffafa] p-4 font-bold outline-none focus:border-pink-300"
+                      className="w-full rounded-2xl border border-gray-200 bg-blue-50/40 p-4 font-bold outline-none focus:border-blue-400"
                     />
 
                     <input
@@ -1332,7 +1292,7 @@ export default function OrderPage() {
                       onChange={(event) => setLoginPhone(normalizePhone(event.target.value))}
                       placeholder="전화번호"
                       inputMode="numeric"
-                      className="w-full rounded-2xl border border-gray-200 bg-[#fffafa] p-4 font-bold outline-none focus:border-pink-300"
+                      className="w-full rounded-2xl border border-gray-200 bg-blue-50/40 p-4 font-bold outline-none focus:border-blue-400"
                     />
 
                     <button
@@ -1354,14 +1314,14 @@ export default function OrderPage() {
                       value={youtubeNickname}
                       onChange={(event) => setYoutubeNickname(event.target.value)}
                       placeholder="유튜브 닉네임"
-                      className="w-full rounded-2xl border border-gray-200 bg-[#fffafa] p-4 font-bold outline-none focus:border-pink-300"
+                      className="w-full rounded-2xl border border-gray-200 bg-blue-50/40 p-4 font-bold outline-none focus:border-blue-400"
                     />
 
                     <input
                       value={customerName}
                       onChange={(event) => setCustomerName(event.target.value)}
                       placeholder="이름"
-                      className="w-full rounded-2xl border border-gray-200 bg-[#fffafa] p-4 font-bold outline-none focus:border-pink-300"
+                      className="w-full rounded-2xl border border-gray-200 bg-blue-50/40 p-4 font-bold outline-none focus:border-blue-400"
                     />
 
                     <input
@@ -1369,17 +1329,8 @@ export default function OrderPage() {
                       onChange={(event) => setCustomerPhone(normalizePhone(event.target.value))}
                       placeholder="전화번호"
                       inputMode="numeric"
-                      className="w-full rounded-2xl border border-gray-200 bg-[#fffafa] p-4 font-bold outline-none focus:border-pink-300"
+                      className="w-full rounded-2xl border border-gray-200 bg-blue-50/40 p-4 font-bold outline-none focus:border-blue-400"
                     />
-
-                    <label className="flex items-center gap-2 rounded-2xl bg-[#fffafa] p-3 text-sm font-black text-gray-700">
-                      <input
-                        type="checkbox"
-                        checked={autoSaveInfo}
-                        onChange={(event) => setAutoSaveInfo(event.target.checked)}
-                      />
-                      다음 주문부터 고객정보 자동 불러오기
-                    </label>
 
                     <button
                       type="button"
@@ -1389,18 +1340,13 @@ export default function OrderPage() {
                       주소검색
                     </button>
 
-                    <input
-                      value={zipcode}
-                      onChange={(event) => setZipcode(event.target.value)}
-                      placeholder="우편번호"
-                      className="rounded-2xl border border-gray-200 bg-[#fffafa] p-4 font-bold"
-                    />
+                    <input type="hidden" value={zipcode} readOnly />
 
                     <input
                       value={address}
                       onChange={(event) => setAddress(event.target.value)}
                       placeholder="주소"
-                      className="rounded-2xl border border-gray-200 bg-[#fffafa] p-4 font-bold"
+                      className="rounded-2xl border border-gray-200 bg-blue-50/40 p-4 font-bold"
                     />
 
                     <input
@@ -1408,7 +1354,7 @@ export default function OrderPage() {
                       value={detailAddress}
                       onChange={(event) => setDetailAddress(event.target.value)}
                       placeholder="상세주소"
-                      className="rounded-2xl border border-gray-200 bg-[#fffafa] p-4 font-bold"
+                      className="rounded-2xl border border-gray-200 bg-blue-50/40 p-4 font-bold"
                     />
 
                     <div className="grid grid-cols-2 gap-2">
@@ -1423,7 +1369,7 @@ export default function OrderPage() {
                       <button
                         type="button"
                         onClick={completeEditCustomerInfo}
-                        className={`${buttonBase} rounded-2xl bg-[#ff4b60] p-4 font-black text-white`}
+                        className={`${buttonBase} rounded-2xl bg-blue-600 p-4 font-black text-white`}
                       >
                         확인
                       </button>
@@ -1648,7 +1594,7 @@ export default function OrderPage() {
               value={requestMemo}
               onChange={(event) => setRequestMemo(event.target.value)}
               placeholder="요청사항(선택) / 배송메모"
-              className="min-h-[100px] rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-pink-300"
+              className="min-h-[100px] rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-blue-400"
             />
 
             {alreadyPaidShipping && (
