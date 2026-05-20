@@ -5,6 +5,7 @@ import AdminOrderFilterPanel from "@/components/admin/orders/AdminOrderFilterPan
 import AdminOrderTablePanel from "@/components/admin/orders/AdminOrderTablePanel";
 import AdminOrderPagination from "@/components/admin/orders/AdminOrderPagination";
 import AdminOrderRow from "@/components/admin/orders/AdminOrderRow";
+import AdminOrderDetailPanel from "@/components/admin/orders/AdminOrderDetailPanel";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -3388,26 +3389,10 @@ const selectedCustomerDetail = useMemo(() => {
               {selectedOrderDetail && (
                 <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/40 p-4">
                   <div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-[2rem] bg-white p-6 shadow-2xl">
-                    <div className="mb-5 flex items-start justify-between gap-4">
-                      <div>
-                        <div className="text-sm font-black text-rose-500">
-                          주문 상세내역
-                        </div>
-                        <h2 className="mt-1 text-3xl font-black">
-                          {selectedOrderDetail.first.order_lookup_code ||
-                            selectedOrderDetail.first.order_group_id ||
-                            selectedOrderDetail.groupId}
-                        </h2>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setSelectedOrderDetailGroupId(null)}
-                        className="rounded-2xl bg-gray-100 px-4 py-3 font-black text-gray-700 active:scale-[0.98]"
-                      >
-                        닫기
-                      </button>
-                    </div>
+                                  <AdminOrderDetailPanel
+                selectedOrderDetail={selectedOrderDetail}
+                setSelectedOrderDetailGroupId={setSelectedOrderDetailGroupId}
+              />
 
                     <div className="grid md:grid-cols-2 gap-3">
                       <InfoBox label="주문시간" value={selectedOrderDetail.first.created_at || "-"} />
