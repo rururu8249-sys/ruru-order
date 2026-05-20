@@ -487,9 +487,9 @@ export function AdminV2Client() {
   const [loading, setLoading] = useState(true);
   const [keyword, setKeyword] = useState("");
   const [pendingKeyword, setPendingKeyword] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [paymentFilter, setPaymentFilter] = useState("all");
-  const [dateFilter, setDateFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [paymentFilter, setPaymentFilter] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<string>("all");
   const [openedOrderGroupIds, setOpenedOrderGroupIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [manualMatchGroup, setManualMatchGroup] = useState<OrderGroup | null>(null);
@@ -602,48 +602,58 @@ export function AdminV2Client() {
     return orderGroups.filter((group) => {
       const status = getOrderStatusValue(group.first);
       const payment = group.first.payment_method || "미설정";
-      const statusFilterValues = statusFilter.split("||").filter(Boolean);
-      const paymentFilterValues = paymentFilter.split("||").filter(Boolean);
+      const selectedStatusFilters = statusFilter
+        .split("||")
+        .map((item) => item.trim())
+        .filter(Boolean);
+      const selectedPaymentFilters = paymentFilter
+        .split("||")
+        .map((item) => item.trim())
+        .filter(Boolean);
 
-      const normalizeFilterText = (value: string) =>
-        String(value || "").replace(/\\s+/g, "").replace(/[()]/g, "");
+      const normalizeFilterText = (value: unknown) =>
+        String(value || "")
+          .replace(/\\s+/g, "")
+          .replace(/[()]/g, "")
+          .toLowerCase();
 
-      const matchAliasFilter = (
-        selectedValues: string[],
-        actualValue: string,
-        aliasMap: Record<string, string[]>
-      ) => {
-        if (selectedValues.length === 0 || selectedValues.includes("전체")) return true;
-
+      const includesAnyText = (actualValue: unknown, words: string[]) => {
         const normalizedActual = normalizeFilterText(actualValue);
-
-        return selectedValues.some((selectedValue) => {
-          if (selectedValue === actualValue) return true;
-          if (normalizeFilterText(selectedValue) === normalizedActual) return true;
-
-          const aliases = aliasMap[selectedValue] || [];
-          return aliases.some((alias) => normalizeFilterText(alias) === normalizedActual);
-        });
+        return words.some((word) => normalizedActual.includes(normalizeFilterText(word)));
       };
 
-      const statusAliasMap: Record<string, string[]> = {
-        미결제: ["미결제", "미입금", "입금대기", "확인대기", "미결제/확인대기"],
-        결제완료: ["결제완료", "입금확인", "무통장 입금확인", "무통장입금확인", "카드 결제완료", "카드결제완료"],
-        포장전: ["포장전", "출고준비", "출고대기", "미설정", "-"],
-        포장완료: ["포장완료", "포장"],
-        출고완료: ["출고완료", "배송완료"],
-        "주문서 취소": ["주문서 취소", "주문취소", "취소/환불", "취소", "환불", "취소완료"],
+      const getSimpleStatusBucket = () => {
+        if (includesAnyText(status, ["취소", "환불", "주문취소", "주문서취소"])) return "canceled";
+        if (includesAnyText(status, ["출고완료", "배송완료"])) return "shipped";
+        if (includesAnyText(status, ["출고준비", "출고대기", "포장전", "포장완료", "미설정", "-"])) return "ready";
+        if (includesAnyText(status, ["미결제", "미입금", "입금대기", "확인대기"])) return "unpaid";
+        if (includesAnyText(status, ["결제완료", "입금확인"])) return "paid";
+        if (includesAnyText(payment, ["미결제", "미입금", "입금대기", "링크대기"])) return "unpaid";
+        if (includesAnyText(payment, ["결제완료", "입금확인"])) return "paid";
+        return "ready";
       };
 
-      const paymentAliasMap: Record<string, string[]> = {
-        "무통장 미입금": ["무통장 미입금", "미입금", "입금대기", "미결제"],
-        "무통장 입금확인": ["무통장 입금확인", "무통장입금확인", "입금확인", "결제완료", "무통장입금"],
-        "카드 미결제": ["카드 미결제", "카드 미결제/링크대기", "링크대기", "카드대기"],
-        "카드 결제완료": ["카드 결제완료", "카드결제완료"],
+      const getSimplePaymentBucket = () => {
+        const methodText = `${group.first.payment_method || ""} ${payment || ""}`;
+        if (includesAnyText(methodText, ["카드", "링크"])) return "card";
+        if (includesAnyText(methodText, ["무통장", "입금", "계좌"])) return "bank";
+        return "bank";
       };
 
-      const matchStatus = matchAliasFilter(statusFilterValues, status, statusAliasMap);
-      const matchPayment = matchAliasFilter(paymentFilterValues, payment, paymentAliasMap);
+      const statusBucket = getSimpleStatusBucket();
+      const paymentBucket = getSimplePaymentBucket();
+
+      const matchStatus =
+        selectedStatusFilters.length === 0 ||
+        selectedStatusFilters.includes("all") ||
+        selectedStatusFilters.includes("전체") ||
+        selectedStatusFilters.includes(statusBucket);
+
+      const matchPayment =
+        selectedPaymentFilters.length === 0 ||
+        selectedPaymentFilters.includes("all") ||
+        selectedPaymentFilters.includes("전체") ||
+        selectedPaymentFilters.includes(paymentBucket);
       const isAllDateFilter =
         !dateFilter ||
         dateFilter === "all" ||

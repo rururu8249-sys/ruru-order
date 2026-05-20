@@ -18,49 +18,50 @@ type AdminOrderFilterBarProps = {
   dateOptions: Option[];
 };
 
-type MultiOption = {
+type ChipOption = {
   value: string;
   label: string;
 };
 
-const STATUS_OPTIONS: MultiOption[] = [
-  { value: "전체", label: "상태 전체" },
-  { value: "미결제", label: "미결제" },
-  { value: "결제완료", label: "결제완료" },
-  { value: "포장전", label: "출고준비" },
-  { value: "포장완료", label: "포장완료" },
-  { value: "출고완료", label: "출고완료" },
-  { value: "주문서 취소", label: "취소/환불" },
+const STATUS_OPTIONS: ChipOption[] = [
+  { value: "all", label: "상태 전체" },
+  { value: "unpaid", label: "미결제" },
+  { value: "paid", label: "결제완료" },
+  { value: "ready", label: "출고준비" },
+  { value: "shipped", label: "출고완료" },
+  { value: "canceled", label: "취소/환불" },
 ];
 
-const PAYMENT_OPTIONS: MultiOption[] = [
-  { value: "전체", label: "입금 전체" },
-  { value: "무통장 미입금", label: "무통장 미입금" },
-  { value: "무통장 입금확인", label: "무통장완료" },
-  { value: "카드 미결제", label: "카드대기" },
-  { value: "카드 결제완료", label: "카드완료" },
+const PAYMENT_OPTIONS: ChipOption[] = [
+  { value: "all", label: "입금 전체" },
+  { value: "bank", label: "무통장" },
+  { value: "card", label: "카드결제" },
 ];
 
 function splitFilter(value: string) {
-  const parts = value.split("||").map((item) => item.trim()).filter(Boolean);
-  return parts.length > 0 ? parts : ["전체"];
+  const parts = String(value || "all")
+    .split("||")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return parts.length > 0 ? parts : ["all"];
 }
 
-function hasActive(value: string, target: string) {
-  const values = splitFilter(value);
-  return values.includes(target) || (target === "전체" && values.includes("전체"));
+function hasActive(current: string, target: string) {
+  const values = splitFilter(current);
+  return values.includes(target) || (target === "all" && (values.includes("all") || values.includes("전체")));
 }
 
 function toggleMultiValue(current: string, target: string) {
-  if (target === "전체") return "전체";
+  if (target === "all") return "all";
 
-  const currentValues = splitFilter(current).filter((item) => item !== "전체");
+  const currentValues = splitFilter(current).filter((item) => item !== "all" && item !== "전체");
   const exists = currentValues.includes(target);
   const nextValues = exists
     ? currentValues.filter((item) => item !== target)
     : [...currentValues, target];
 
-  return nextValues.length > 0 ? nextValues.join("||") : "전체";
+  return nextValues.length > 0 ? nextValues.join("||") : "all";
 }
 
 function FilterChip({
@@ -101,7 +102,7 @@ export default function AdminOrderFilterBar({
 }: AdminOrderFilterBarProps) {
   const mergedDateOptions: Option[] = [
     { value: "all", label: "방송 전체보기" },
-    ...dateOptions.filter((option) => option.value !== "전체"),
+    ...dateOptions.filter((option) => option.value !== "all" && option.value !== "전체"),
   ];
 
   return (
