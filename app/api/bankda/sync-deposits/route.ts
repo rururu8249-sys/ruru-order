@@ -4,7 +4,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { fetchBankdaTransactions } from "@/lib/bankda/fetchBankdaTransactions";
-import { runAutoPaymentMatch } from "@/lib/admin-v2/autoPaymentMatch";
+
+const BANKDA_SYNC_TIMEOUT_MS = 25_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      setTimeout(() => reject(new Error(message)), ms);
+    }),
+  ]);
+}
+
 
 
 function getSupabaseAdmin() {
@@ -75,11 +86,15 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseAdmin();
     const body = await request.json().catch(() => null);
 
-    const { deposits, rawCount, raw } = await fetchBankdaTransactions({
-      datefrom: body?.datefrom,
-      dateto: body?.dateto,
-      accountnum: body?.accountnum,
-    });
+    const { deposits, rawCount, raw } = await withTimeout(
+      fetchBankdaTransactions({
+        datefrom: body?.datefrom,
+        dateto: body?.dateto,
+        accountnum: body?.accountnum,
+      }),
+      BANKDA_SYNC_TIMEOUT_MS,
+      "뱅크다 조회가 25초 이상 지연되어 중단했습니다. 잠시 후 다시 조회해주세요."
+    );
 
     const bankdaDescription = String((raw as any)?.response?.description || "");
 
@@ -131,20 +146,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    let autoMatchResult = {
-      matchedCount: 0,
-      scannedOrders: 0,
-      scannedDeposits: 0,
-      matched: [] as Array<any>,
-    };
-    let autoMatchError = "";
-
-    try {
-      autoMatchResult = await runAutoPaymentMatch(supabase);
-    } catch (error) {
-      autoMatchError = error instanceof Error ? error.message : String(error);
-    }
-
     return NextResponse.json({
       ok: true,
       rawCount,
@@ -152,10 +153,10 @@ export async function POST(request: NextRequest) {
       fetchedCount: deposits.length,
       insertedCount: insertRows.length,
       skippedCount: deposits.length - insertRows.length,
-      autoMatchedCount: autoMatchResult.matchedCount,
-      autoMatchScannedOrders: autoMatchResult.scannedOrders,
-      autoMatchScannedDeposits: autoMatchResult.scannedDeposits,
-      autoMatchError,
+      autoMatchedCount: 0,
+      autoMatchScannedOrders: 0,
+      autoMatchScannedDeposits: 0,
+      autoMatchError: "자동입금확인은 관리자 확인 버튼에서만 실행됩니다.",
     });
   } catch (error) {
     return NextResponse.json(
