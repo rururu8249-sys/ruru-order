@@ -1700,7 +1700,7 @@ function OrderWorkTable({
   onOpenManualMatch: (group: OrderGroup) => void;
 }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
+    <div className="w-full overflow-x-auto overflow-hidden rounded-xl border border-neutral-200 bg-white">
       <AdminOrderTableHeader />
 
       {groups.map((group) => {
