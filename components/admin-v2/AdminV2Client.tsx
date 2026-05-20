@@ -604,14 +604,46 @@ export function AdminV2Client() {
       const payment = group.first.payment_method || "미설정";
       const statusFilterValues = statusFilter.split("||").filter(Boolean);
       const paymentFilterValues = paymentFilter.split("||").filter(Boolean);
-      const matchStatus =
-        statusFilterValues.length === 0 ||
-        statusFilterValues.includes("전체") ||
-        statusFilterValues.includes(status);
-      const matchPayment =
-        paymentFilterValues.length === 0 ||
-        paymentFilterValues.includes("전체") ||
-        paymentFilterValues.includes(payment);
+
+      const normalizeFilterText = (value: string) =>
+        String(value || "").replace(/\\s+/g, "").replace(/[()]/g, "");
+
+      const matchAliasFilter = (
+        selectedValues: string[],
+        actualValue: string,
+        aliasMap: Record<string, string[]>
+      ) => {
+        if (selectedValues.length === 0 || selectedValues.includes("전체")) return true;
+
+        const normalizedActual = normalizeFilterText(actualValue);
+
+        return selectedValues.some((selectedValue) => {
+          if (selectedValue === actualValue) return true;
+          if (normalizeFilterText(selectedValue) === normalizedActual) return true;
+
+          const aliases = aliasMap[selectedValue] || [];
+          return aliases.some((alias) => normalizeFilterText(alias) === normalizedActual);
+        });
+      };
+
+      const statusAliasMap: Record<string, string[]> = {
+        미결제: ["미결제", "미입금", "입금대기", "확인대기", "미결제/확인대기"],
+        결제완료: ["결제완료", "입금확인", "무통장 입금확인", "무통장입금확인", "카드 결제완료", "카드결제완료"],
+        포장전: ["포장전", "출고준비", "출고대기", "미설정", "-"],
+        포장완료: ["포장완료", "포장"],
+        출고완료: ["출고완료", "배송완료"],
+        "주문서 취소": ["주문서 취소", "주문취소", "취소/환불", "취소", "환불", "취소완료"],
+      };
+
+      const paymentAliasMap: Record<string, string[]> = {
+        "무통장 미입금": ["무통장 미입금", "미입금", "입금대기", "미결제"],
+        "무통장 입금확인": ["무통장 입금확인", "무통장입금확인", "입금확인", "결제완료", "무통장입금"],
+        "카드 미결제": ["카드 미결제", "카드 미결제/링크대기", "링크대기", "카드대기"],
+        "카드 결제완료": ["카드 결제완료", "카드결제완료"],
+      };
+
+      const matchStatus = matchAliasFilter(statusFilterValues, status, statusAliasMap);
+      const matchPayment = matchAliasFilter(paymentFilterValues, payment, paymentAliasMap);
       const matchDate = !dateFilter || toDateKey(group.first.created_at) === dateFilter;
 
       const target = [
