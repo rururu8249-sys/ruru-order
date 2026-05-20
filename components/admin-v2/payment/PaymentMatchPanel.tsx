@@ -11,6 +11,7 @@ import { buildItemSummary, isBankPaid, isBankUnpaid, orderBaseAmount, shortOrder
 import PaymentMatchTopActions from "@/components/admin-v2/payment/parts/PaymentMatchTopActions";
 import PaymentMatchSyncStatus from "@/components/admin-v2/payment/parts/PaymentMatchSyncStatus";
 import AutoMatchPreviewBox from "@/components/admin-v2/payment/parts/AutoMatchPreviewBox";
+import PaymentOrderRow from "@/components/admin-v2/payment/parts/PaymentOrderRow";
 
 type Props = {
   deposits: DepositRow[];
@@ -462,8 +463,8 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
             <div>고객</div>
             <div>주문내역</div>
             <div className="text-right">입금예정</div>
-            <div className="text-center">후보</div>
-            <div className="text-center">작업</div>
+            <div className="text-center">자동후보</div>
+            <div className="text-center">입금확인</div>
           </div>
 
           {filteredGroups.length === 0 ? (
@@ -475,30 +476,18 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
                 const unpaid = isBankUnpaid(group.first);
 
                 return (
-                  <article key={group.groupId} className="grid gap-2 px-3 py-3 text-sm lg:grid-cols-[86px_130px_130px_minmax(240px,1fr)_110px_100px_110px] lg:items-center">
-                    <div className="font-black text-neutral-500">{shortOrderCode(group)}</div>
-                    <div className="text-[12px] font-bold text-neutral-500">{formatDateLabel(group.first.created_at)}</div>
-                    <div>
-                      <div className="font-black">{group.first.youtube_nickname || "-"}</div>
-                      <div className="text-[11px] font-bold text-neutral-500">{group.first.customer_name || "-"}</div>
-                    </div>
-                    <div className="break-keep font-bold text-neutral-700">{buildItemSummary(group)}</div>
-                    <div className="text-left font-black lg:text-right">{money(orderBaseAmount(group.first))}</div>
-                    <div className="text-left lg:text-center">
-                      <span className={`rounded-full px-2 py-1 text-[11px] font-black ${candidateCount > 0 ? "bg-emerald-100 text-emerald-700" : "bg-neutral-100 text-neutral-500"}`}>
-                        후보 {candidateCount}
-                      </span>
-                    </div>
-                    <div className="text-left lg:text-center">
-                      {unpaid ? (
-                        <button type="button" onClick={() => onOpenManualMatch(group)} className="rounded-lg bg-neutral-950 px-3 py-2 text-[12px] font-black text-white active:scale-[0.98]">
-                          매칭하기
-                        </button>
-                      ) : (
-                        <span className="rounded-lg bg-emerald-100 px-2 py-1 text-[11px] font-black text-emerald-700">입금확인</span>
-                      )}
-                    </div>
-                  </article>
+                  <PaymentOrderRow
+                    key={group.groupId}
+                    orderCode={shortOrderCode(group)}
+                    createdAtLabel={formatDateLabel(group.first.created_at)}
+                    nickname={group.first.youtube_nickname || "-"}
+                    customerName={group.first.customer_name || "-"}
+                    itemSummary={buildItemSummary(group)}
+                    expectedAmountText={money(orderBaseAmount(group.first))}
+                    candidateCount={candidateCount}
+                    unpaid={unpaid}
+                    onOpenManualMatch={() => onOpenManualMatch(group)}
+                  />
                 );
               })}
             </div>
