@@ -26,23 +26,23 @@ export default function AdminOrderMainRow({
   detailNode,
 }: AdminOrderMainRowProps) {
   return (
-    <div className="grid w-full gap-1 border-t border-neutral-100 px-3 py-2 text-[13px] first:border-t-0 lg:grid-cols-[78px_104px_120px_minmax(280px,1fr)_82px_88px_86px_54px] lg:items-center">
+    <div className="grid w-full gap-2 border-t border-neutral-100 px-4 py-3 text-[14px] first:border-t-0 hover:bg-neutral-50 lg:grid-cols-[92px_124px_140px_minmax(340px,1fr)_96px_104px_104px_64px] lg:items-center">
       <div className="truncate font-black text-neutral-500" title={orderCode}>
         {orderCode}
       </div>
 
-      <div className="font-bold leading-tight text-neutral-500">
+      <div className="font-bold leading-snug text-neutral-500">
         {createdAtLabel}
       </div>
 
       <div className="min-w-0" title={customerLine || nickname || ""}>
-        <div className="truncate text-[14px] font-black text-neutral-950">
+        <div className="truncate text-[15px] font-black text-neutral-950">
           {nickname || "-"}
         </div>
       </div>
 
       <div className="min-w-0">
-        <div className="truncate text-[14px] font-bold text-neutral-800" title={itemSummary}>
+        <div className="truncate text-[15px] font-bold text-neutral-800" title={itemSummary}>
           {itemSummary}
         </div>
       </div>

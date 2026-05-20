@@ -11,7 +11,7 @@ export default function AdminOrderAmountCell({
 }: AdminOrderAmountCellProps) {
   return (
     <div className="text-right" title={warningText || ""}>
-      <div className="whitespace-nowrap text-[14px] font-black">{amountText}</div>
+      <div className="whitespace-nowrap text-[15px] font-black">{amountText}</div>
     </div>
   );
 }

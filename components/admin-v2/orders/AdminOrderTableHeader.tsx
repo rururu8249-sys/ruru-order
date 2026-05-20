@@ -2,7 +2,7 @@
 
 export default function AdminOrderTableHeader() {
   return (
-    <div className="hidden w-full grid-cols-[78px_104px_120px_minmax(280px,1fr)_82px_88px_86px_54px] bg-neutral-900 px-3 py-2 text-[12px] font-black text-white lg:grid">
+    <div className="hidden w-full grid-cols-[92px_124px_140px_minmax(340px,1fr)_96px_104px_104px_64px] bg-neutral-900 px-4 py-3 text-[13px] font-black text-white lg:grid">
       <div>주문번호</div>
       <div>주문시간</div>
       <div>고객</div>
