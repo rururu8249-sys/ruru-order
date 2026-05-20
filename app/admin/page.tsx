@@ -7,6 +7,7 @@ import AdminOrderPagination from "@/components/admin/orders/AdminOrderPagination
 import AdminOrderRow from "@/components/admin/orders/AdminOrderRow";
 import AdminOrderDetailPanel from "@/components/admin/orders/AdminOrderDetailPanel";
 import AdminOrderMoneyEditPanel from "@/components/admin/orders/AdminOrderMoneyEditPanel";
+import AdminOrderCustomerInfoPanel from "@/components/admin/orders/AdminOrderCustomerInfoPanel";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -3395,14 +3396,11 @@ const selectedCustomerDetail = useMemo(() => {
                 setSelectedOrderDetailGroupId={setSelectedOrderDetailGroupId}
               />
 
-                    <div className="grid md:grid-cols-2 gap-3">
-                      <InfoBox label="주문시간" value={selectedOrderDetail.first.created_at || "-"} />
-                      <InfoBox label="결제방식" value={selectedOrderDetail.first.payment_method || "-"} />
-                      <InfoBox label="유튜브 닉네임" value={selectedOrderDetail.first.youtube_nickname || "-"} />
-                      <InfoBox label="주문자명" value={selectedOrderDetail.first.customer_name || "-"} />
-                      <InfoBox label="전화번호" value={selectedOrderDetail.first.customer_phone || "-"} />
-                      <InfoBox label="주소" value={fullAddress(selectedOrderDetail.first) || "-"} />
-                    </div>
+                    <AdminOrderCustomerInfoPanel
+                      selectedOrderDetail={selectedOrderDetail}
+                      InfoBox={InfoBox}
+                      fullAddress={fullAddress}
+                    />
 
                     <AdminOrderMoneyEditPanel
                       selectedOrderDetail={selectedOrderDetail}
