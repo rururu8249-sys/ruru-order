@@ -1,5 +1,6 @@
 "use client";
 
+import AdminOrdersView from "@/components/admin/orders/AdminOrdersView";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -3269,7 +3270,7 @@ const selectedCustomerDetail = useMemo(() => {
           )}
 
           {activeMenu === "orders" && (
-            <div className="grid gap-5">
+            <AdminOrdersView>
 <section className="bg-white rounded-[2rem] p-5 md:p-6 border shadow-sm">
                 <div className="grid md:grid-cols-[1fr_auto_auto_auto_auto_auto] gap-3">
                   <input
@@ -3619,7 +3620,7 @@ const selectedCustomerDetail = useMemo(() => {
                   </div>
                 </div>
               )}
-            </div>
+            </AdminOrdersView>
           )}
 
           {activeMenu === "deposits" && (
