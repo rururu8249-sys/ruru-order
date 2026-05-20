@@ -2313,26 +2313,8 @@ const selectedCustomerDetail = useMemo(() => {
         </aside>
 
         <section className="flex-1 p-4 md:p-8">
-          <div className="md:hidden bg-white rounded-3xl p-4 border shadow-sm mb-4">
-            <div className="font-black text-xl mb-3">루루동이 관리자</div>
-            <div className="grid grid-cols-3 gap-2">
-              {menuItems.map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => setActiveMenu(item.key)}
-                  className={`px-3 py-3 rounded-2xl text-sm font-black ${
-                    activeMenu === item.key
-                      ? "bg-gray-950 text-white"
-                      : "bg-gray-50 text-gray-800"
-                  }`}
-                >
-                  <div>{item.icon}</div>
-                  <div>{item.label}</div>
-                </button>
-              ))}
-            </div>
-          </div>
+          
+
 
           {activeMenu === "dashboard" && (
             <div className="grid gap-5">
