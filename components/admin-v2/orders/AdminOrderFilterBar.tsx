@@ -106,9 +106,9 @@ export default function AdminOrderFilterBar({
   ];
 
   return (
-    <div className="mb-4 grid gap-3 rounded-2xl border border-neutral-200 bg-white p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[280px] flex-1 max-w-[460px]">
+    <div className="mb-4 inline-grid w-fit max-w-full gap-3 rounded-2xl border border-neutral-200 bg-white p-3">
+      <div className="flex w-fit max-w-full flex-wrap items-center gap-2">
+        <div className="relative w-[420px] max-w-full">
           <input
             value={pendingKeyword}
             onChange={(event) => setPendingKeyword(event.target.value)}
@@ -131,7 +131,7 @@ export default function AdminOrderFilterBar({
         <select
           value={dateFilter === "전체" ? "all" : dateFilter}
           onChange={(event) => setDateFilter(event.target.value)}
-          className="h-11 min-w-[220px] rounded-xl border border-neutral-200 bg-white px-3 text-[14px] font-black outline-none focus:border-blue-600"
+          className="h-11 w-[260px] max-w-full rounded-xl border border-neutral-200 bg-white px-3 text-[14px] font-black outline-none focus:border-blue-600"
         >
           {mergedDateOptions.map((option) => (
             <option key={`${option.value}-${option.label}`} value={option.value}>
