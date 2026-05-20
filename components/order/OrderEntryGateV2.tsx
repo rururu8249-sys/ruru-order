@@ -1,5 +1,7 @@
 "use client";
 
+import { ORDER_PHONE_FORMAT_MAX_LENGTH } from "@/lib/order/phone";
+
 // components/order/OrderEntryGateV2.tsx
 // 목적: 주문 전 기존고객/처음주문 선택 화면 V2
 // 주의: UI 전용. 주문 저장, 배송비, 합배송, 입금매칭, Supabase 로직 없음.
@@ -81,6 +83,7 @@ export default function OrderEntryGateV2({
                 placeholder="전화번호"
                 inputMode="tel"
                 autoComplete="tel"
+                maxLength={ORDER_PHONE_FORMAT_MAX_LENGTH}
                 className="rounded-[20px] border border-blue-100 bg-white p-4 text-[16px] font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100/70"
               />
 

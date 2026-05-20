@@ -1,3 +1,4 @@
+import { ORDER_PHONE_FORMAT_MAX_LENGTH } from "@/lib/order/phone";
 // components/order/OrderCustomerInfoFormCard.tsx
 // 목적: 처음 주문 정보 입력 / 정보수정 입력폼 UI
 // 주의: UI 전용. Supabase, 주문저장, 금액계산 로직 없음.
@@ -76,6 +77,7 @@ export default function OrderCustomerInfoFormCard({
             onChange={(event) => onCustomerPhoneChange(event.target.value)}
             placeholder="- 없이 숫자만 입력해주세요"
             inputMode="numeric"
+            maxLength={ORDER_PHONE_FORMAT_MAX_LENGTH}
             className="h-14 w-full rounded-2xl border border-blue-100 bg-white px-4 text-[16px] font-bold outline-none transition placeholder:text-slate-400 focus:border-blue-500"
           />
         </div>

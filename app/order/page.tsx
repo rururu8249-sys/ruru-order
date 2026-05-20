@@ -25,6 +25,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { isRemoteAreaAddress } from "@/lib/order/shippingAddress";
+import { formatOrderPhone, normalizeOrderPhone } from "@/lib/order/phone";
 import {
   COMBINE_SHIPPING_SETTING_KEYS,
   DEFAULT_COMBINE_SHIPPING_SETTINGS,
@@ -96,13 +97,8 @@ const emptyItem: OrderItem = {
 };
 
 const onlyNumber = (value: string) => String(value || "").replace(/[^0-9]/g, "");
-const normalizePhone = (value: string) => onlyNumber(value);
-const formatPhone = (value: string) => {
-  const numbers = onlyNumber(value);
-  if (numbers.length <= 3) return numbers;
-  if (numbers.length <= 7) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
-  return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
-};
+const normalizePhone = (value: string) => normalizeOrderPhone(value);
+const formatPhone = (value: string) => formatOrderPhone(value);
 const toNumber = (value: any) => Number(String(value || "0").replace(/[^0-9]/g, "")) || 0;
 const moneyText = (value: any) => toNumber(value).toLocaleString();
 const won = (value: any) => `${Number(value || 0).toLocaleString()}원`;
