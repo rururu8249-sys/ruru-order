@@ -558,7 +558,7 @@ export default function OrderPage() {
 
 
   const logoutCustomerInfo = () => {
-    if (!confirm("이 기기에 저장된 고객정보를 삭제할까요?")) return;
+    if (!confirm("로그아웃할까요?\n\n즐거운 쇼핑 되셨길 바라요 😊\n좋은 하루 보내세요 💙")) return;
 
     [
       "ruru_customer_phone",
@@ -585,7 +585,7 @@ export default function OrderPage() {
     setIsCustomerInfoOpen(true);
     setCustomerMode("load");
 
-    alert("로그아웃되었습니다. 오늘도 좋은 하루 보내세요 :)");
+    
   };
 
   const startEditCustomerInfo = () => {
