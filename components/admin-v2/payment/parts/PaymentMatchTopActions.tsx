@@ -23,7 +23,7 @@ export default function PaymentMatchTopActions({
         disabled={previewLoading}
         className="rounded-lg bg-neutral-950 px-4 py-2 text-[13px] font-black text-white shadow-sm active:scale-[0.98] disabled:bg-neutral-300"
       >
-        {previewLoading ? "확인중..." : "자동후보 확인"}
+        {previewLoading ? "확인중..." : "후보 확인"}
       </button>
 
       <button
@@ -32,7 +32,7 @@ export default function PaymentMatchTopActions({
         disabled={syncing || autoSyncLoading}
         className="rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-black text-white shadow-sm active:scale-[0.98] disabled:bg-neutral-300"
       >
-        {syncing || autoSyncLoading ? "조회중..." : "입금내역 새로고침"}
+        {syncing || autoSyncLoading ? "조회중..." : "입금 새로고침"}
       </button>
     </div>
   );
