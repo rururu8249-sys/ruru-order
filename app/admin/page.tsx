@@ -3288,28 +3288,7 @@ const selectedCustomerDetail = useMemo(() => {
 
           {activeMenu === "orders" && (
             <div className="grid gap-5">
-              <section className="bg-white rounded-[2rem] p-6 border shadow-sm">
-                <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
-                  <div>
-                    <div className="text-sm font-black text-rose-500 mb-2">
-                      ORDER MANAGER
-                    </div>
-                    <p className="text-gray-500 font-bold mt-3">
-                      주문번호 클릭 → 상세내역 / 상태변경 / 금액수정
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={loadOrders}
-                    className="rounded-2xl bg-gray-950 px-5 py-4 font-black text-white active:scale-[0.98]"
-                  >
-                    주문 새로고침
-                  </button>
-                </div>
-              </section>
-
-              <section className="bg-white rounded-[2rem] p-5 md:p-6 border shadow-sm">
+<section className="bg-white rounded-[2rem] p-5 md:p-6 border shadow-sm">
                 <div className="grid md:grid-cols-[1fr_auto_auto_auto_auto_auto] gap-3">
                   <input
                     value={orderKeyword}
