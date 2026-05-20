@@ -37,6 +37,7 @@ import OrderCustomerTopNav from "@/components/order/OrderCustomerTopNav";
 import OrderHero from "@/components/order/OrderHero";
 import OrderGuideCard from "@/components/order/OrderGuideCard";
 import OrderPriceSummaryBox from "@/components/order/OrderPriceSummaryBox";
+import OrderCustomerInfoIntro from "@/components/order/OrderCustomerInfoIntro";
 
 declare global {
   interface Window {
@@ -636,7 +637,7 @@ export default function OrderPage() {
 
       void checkAlreadyPaidShipping(cleanPhone);
 
-      alert("확인되었습니다. 바로 주문 가능합니다.");
+      alert("확인되었습니다. 바로 상품 입력으로 이동했어요.");
     } catch (error: any) {
       alert("확인 중 오류가 발생했습니다.\n\n" + error.message);
     }
@@ -1230,9 +1231,7 @@ export default function OrderPage() {
         <section className="rounded-[28px] bg-white p-5 shadow-[0_12px_26px_rgba(70,45,25,0.10)] ring-1 ring-black/5">
           <div className="mb-4">
             <h2 className="text-xl font-black">주문자 정보</h2>
-            <p className="mt-1 text-xs font-bold text-[#f05a45]">
-              주문 전 정보 확인 후 작성해주세요.
-            </p>
+            <OrderCustomerInfoIntro />
           </div>
 
           {hasSavedInfo && !isEditingCustomerInfo ? (
@@ -1302,10 +1301,10 @@ export default function OrderPage() {
               {customerMode === "load" && (
                 <div className="mt-4 rounded-[1.4rem] bg-white p-4">
                   <div className="text-sm font-black text-[#315f9f]">
-                    기존 고객 정보 확인
+                    저장된 정보 확인
                   </div>
                   <p className="mt-1 text-xs font-bold leading-relaxed text-[#6b7280]">
-                    이름과 전화번호로 저장된 정보를 확인합니다.
+                    이름과 전화번호로 저장된 주문 정보를 확인합니다.
                   </p>
 
                   <div className="mt-3 grid gap-3">
