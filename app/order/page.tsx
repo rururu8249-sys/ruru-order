@@ -24,6 +24,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { isRemoteAreaAddress } from "@/lib/order/shippingAddress";
 import {
   COMBINE_SHIPPING_SETTING_KEYS,
   DEFAULT_COMBINE_SHIPPING_SETTINGS,
@@ -240,12 +241,17 @@ export default function OrderPage() {
   const [copyDone, setCopyDone] = useState(false);
   const [customerCardRate, setCustomerCardRate] = useState(10);
   const [defaultShippingFee, setDefaultShippingFee] = useState(4000);
+  const [remoteAreaShippingFee, setRemoteAreaShippingFee] = useState(6000);
   const [combineShippingSettings, setCombineShippingSettings] =
     useState<CombineShippingSettings>(DEFAULT_COMBINE_SHIPPING_SETTINGS);
   const [alreadyPaidShipping, setAlreadyPaidShipping] = useState(false);
 
   const actualCardFeeRate = 7;
-  const baseShippingFee = Number(broadcast?.shipping_fee ?? defaultShippingFee);
+  const isRemoteAreaShippingAddress = isRemoteAreaAddress(zipcode, address, detailAddress);
+  const generalShippingFee = Number(broadcast?.shipping_fee ?? defaultShippingFee);
+  const baseShippingFee = isRemoteAreaShippingAddress
+    ? Math.max(remoteAreaShippingFee, generalShippingFee)
+    : generalShippingFee;
   const shippingFee = alreadyPaidShipping ? 0 : baseShippingFee;
   const cardRateForCustomer = customerCardRate;
 
@@ -329,6 +335,7 @@ export default function OrderPage() {
       .in("key", [
         "customer_card_extra_rate",
         "default_shipping_fee",
+        "remote_area_shipping_fee",
         ...COMBINE_SHIPPING_SETTING_KEYS,
       ]);
 
@@ -345,9 +352,11 @@ export default function OrderPage() {
 
     const nextCustomerCardRate = Math.min(10, Math.max(0, readNumber("customer_card_extra_rate", 10)));
     const nextDefaultShippingFee = Math.max(0, readNumber("default_shipping_fee", 4000));
+    const nextRemoteAreaShippingFee = Math.max(nextDefaultShippingFee, readNumber("remote_area_shipping_fee", 6000));
 
     setCustomerCardRate(nextCustomerCardRate);
     setDefaultShippingFee(nextDefaultShippingFee);
+    setRemoteAreaShippingFee(nextRemoteAreaShippingFee);
     setCombineShippingSettings(parseCombineShippingSettings(data));
   };
 
@@ -1446,6 +1455,12 @@ export default function OrderPage() {
             {alreadyPaidShipping && (
               <div className="rounded-2xl bg-green-50 p-3 text-xs font-black leading-relaxed text-green-700">
                 ✅ 같은 전화번호의 기존 배송비 결제가 확인되어 이번 주문은 합배송 배송비 0원으로 적용됩니다.
+              </div>
+            )}
+
+            {!alreadyPaidShipping && isRemoteAreaShippingAddress && (
+              <div className="rounded-2xl bg-amber-50 p-3 text-xs font-black leading-relaxed text-amber-800 ring-1 ring-amber-100">
+                🏝️ 제주/도서/산간 배송지로 확인되어 배송비 {won(baseShippingFee)}가 적용됩니다.
               </div>
             )}
 
