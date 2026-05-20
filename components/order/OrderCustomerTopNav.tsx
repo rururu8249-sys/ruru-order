@@ -33,7 +33,7 @@ export default function OrderCustomerTopNav({
           </p>
         </Link>
 
-        <CustomerPointBadge className="shrink-0" />
+        {isLoggedIn && <CustomerPointBadge className="shrink-0" />}
       </div>
 
       <nav className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
