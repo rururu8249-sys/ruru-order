@@ -56,37 +56,26 @@ export default function AdminTodayYoutubeLivePanel() {
   };
 
   return (
-    <section className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
-      <div className="mb-3">
-        <h2 className="text-lg font-black tracking-[-0.04em] text-neutral-950">
-          유튜브 LIVE 채팅
-        </h2>
-        <p className="mt-1 text-xs font-bold text-neutral-500">
-          방송 화면과 채팅창을 오늘할일 관제탑에서 바로 확인합니다.
-        </p>
-      </div>
+    <div className="grid gap-3">
+      <AdminTodayYoutubeLiveLinkBox
+        liveUrl={liveUrl}
+        videoId={videoId}
+        setLiveUrl={setLiveUrl}
+        onSave={saveLiveUrl}
+        onOpenWatch={openYoutubeWatch}
+        onOpenChat={openYoutubeChat}
+      />
 
-      <div className="grid gap-3">
-        <AdminTodayYoutubeLiveLinkBox
-          liveUrl={liveUrl}
-          videoId={videoId}
-          setLiveUrl={setLiveUrl}
-          onSave={saveLiveUrl}
-          onOpenWatch={openYoutubeWatch}
-          onOpenChat={openYoutubeChat}
-        />
+      <AdminTodayYoutubeLiveEmbedBox
+        videoId={videoId}
+        onOpenWatch={openYoutubeWatch}
+        onOpenChat={openYoutubeChat}
+      />
 
-        <AdminTodayYoutubeLiveEmbedBox
-          videoId={videoId}
-          onOpenWatch={openYoutubeWatch}
-          onOpenChat={openYoutubeChat}
-        />
-
-        <AdminTodayYoutubeChatInputBox
-          chatText={chatText}
-          setChatText={setChatText}
-        />
-      </div>
-    </section>
+      <AdminTodayYoutubeChatInputBox
+        chatText={chatText}
+        setChatText={setChatText}
+      />
+    </div>
   );
 }

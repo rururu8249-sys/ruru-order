@@ -41,100 +41,67 @@ export default function AdminTodayYoutubeLiveEmbedBox({
     )}&embed_domain=${encodeURIComponent(embedDomain)}`;
   }, [videoId, embedDomain]);
 
-  return (
-    <section className="rounded-2xl border border-neutral-200 bg-white p-3">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <div className="text-sm font-black text-neutral-950">
-            방송 화면 / 라이브 채팅
-          </div>
-          <div className="mt-0.5 text-xs font-bold text-neutral-500">
-            왼쪽은 세로형 방송 화면, 오른쪽은 채팅창입니다.
-          </div>
-        </div>
+  if (!videoId) {
+    return (
+      <div className="rounded-2xl bg-neutral-50 p-6 text-center text-sm font-black text-neutral-400">
+        방송 링크 또는 영상ID를 입력하면 방송 화면과 채팅창이 표시됩니다.
+      </div>
+    );
+  }
 
-        <div className="flex flex-wrap gap-2">
+  return (
+    <div className="grid gap-3 xl:grid-cols-[minmax(230px,280px)_minmax(360px,1fr)] xl:items-start">
+      <div className="overflow-hidden rounded-2xl bg-black">
+        <div className="flex items-center justify-between bg-neutral-950 px-3 py-2">
+          <span className="text-xs font-black text-white">LIVE 영상</span>
           <button
             type="button"
             onClick={onOpenWatch}
-            className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black text-white active:scale-[0.98]"
+            className="rounded-full bg-red-600 px-2.5 py-1 text-[10px] font-black text-white active:scale-[0.98]"
           >
-            유튜브 새창
+            새창
           </button>
+        </div>
+
+        <div className="h-[360px] sm:h-[390px] 2xl:h-[430px]">
+          <iframe
+            src={videoSrc}
+            title="유튜브 LIVE 방송 화면"
+            className="h-full w-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl bg-neutral-50">
+        <div className="flex items-center justify-between bg-white px-3 py-2">
+          <span className="text-xs font-black text-neutral-950">LIVE 채팅</span>
           <button
             type="button"
             onClick={onOpenChat}
-            className="rounded-xl bg-neutral-950 px-3 py-2 text-xs font-black text-white active:scale-[0.98]"
+            className="rounded-full bg-neutral-100 px-2.5 py-1 text-[11px] font-black text-neutral-600 active:scale-[0.98]"
           >
-            채팅 새창
+            크게 보기
           </button>
         </div>
-      </div>
 
-      {!videoId ? (
-        <div className="rounded-2xl bg-neutral-50 p-6 text-center text-sm font-black text-neutral-400">
-          방송 링크 또는 영상ID를 입력하면 방송 화면과 채팅창이 표시됩니다.
+        <div className="h-[360px] sm:h-[390px] 2xl:h-[430px]">
+          {chatSrc ? (
+            <iframe
+              src={chatSrc}
+              title="유튜브 LIVE 채팅"
+              className="h-full w-full bg-white"
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-sm font-black text-neutral-400">
+              채팅창 도메인 준비 중입니다.
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="grid gap-3 xl:grid-cols-[minmax(236px,300px)_minmax(360px,1fr)] xl:items-start">
-          <div className="w-[236px] overflow-hidden rounded-2xl border border-neutral-200 bg-black sm:w-[258px] 2xl:w-[282px]">
-            <div className="flex items-center justify-between border-b border-white/10 bg-neutral-950 px-3 py-2">
-              <div className="text-xs font-black text-white">
-                LIVE 영상
-              </div>
-              <div className="rounded-full bg-red-600 px-2 py-1 text-[10px] font-black text-white">
-                컨트롤
-              </div>
-            </div>
-
-            <div className="h-[420px] sm:h-[460px] 2xl:h-[500px]">
-              <iframe
-                src={videoSrc}
-                title="유튜브 LIVE 방송 화면"
-                className="h-full w-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-                referrerPolicy="strict-origin-when-cross-origin"
-              />
-            </div>
-          </div>
-
-          <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-50">
-            <div className="flex items-center justify-between border-b border-neutral-200 bg-white px-3 py-2">
-              <div className="text-xs font-black text-neutral-950">
-                LIVE 채팅
-              </div>
-              <button
-                type="button"
-                onClick={onOpenChat}
-                className="rounded-full bg-neutral-100 px-2.5 py-1 text-[11px] font-black text-neutral-600 active:scale-[0.98]"
-              >
-                크게 보기
-              </button>
-            </div>
-
-            <div className="h-[420px] sm:h-[460px] 2xl:h-[500px]">
-              {chatSrc ? (
-                <iframe
-                  src={chatSrc}
-                  title="유튜브 LIVE 채팅"
-                  className="h-full w-full bg-white"
-                  referrerPolicy="strict-origin-when-cross-origin"
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-sm font-black text-neutral-400">
-                  채팅창 도메인 준비 중입니다.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="mt-2 rounded-xl bg-neutral-50 px-3 py-2 text-xs font-bold leading-relaxed text-neutral-500">
-        영상은 유튜브 기본 플레이어라 재생/일시정지/음소거/소리 조절은 영상 하단 컨트롤에서 가능합니다.
-        검은 여백은 유튜브 영상 비율에 따라 일부 남을 수 있습니다.
       </div>
-    </section>
+    </div>
   );
 }
