@@ -6,6 +6,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { DepositRow, OrderGroup } from "@/lib/admin-v2/types";
+import { matchesManualPaymentSearch } from "@/components/admin-v2/payment/manualPaymentMatchSearchUtils";
 
 type Props = {
   group?: OrderGroup | null;
@@ -15,10 +16,6 @@ type Props = {
   onMatched?: () => Promise<void> | void;
   onConfirm?: (group: OrderGroup, deposit: DepositRow) => Promise<void> | void;
 };
-
-function digitsOnly(value: unknown) {
-  return String(value ?? "").replace(/[^0-9]/g, "");
-}
 
 function normalizeText(value: unknown) {
   return String(value ?? "")
@@ -178,8 +175,6 @@ export default function ManualPaymentMatchDrawer(props: Props) {
 
   const depositsForDisplay = useMemo(() => {
     const word = normalizeText(keyword);
-    const nicknameNorm = normalizeText(nickname);
-    const customerNorm = normalizeText(customerName);
 
     return (serverDeposits || [])
       .filter((deposit) => {
@@ -187,8 +182,6 @@ export default function ManualPaymentMatchDrawer(props: Props) {
 
         if (showAll) return true;
 
-        const depositName = normalizeText(deposit.depositor_name);
-        const amountText = digitsOnly(deposit.amount);
         const amountMatch = Number(deposit.amount || 0) === expectedAmount;
         const nameMatch =
           getNameScore(deposit.depositor_name, nickname, customerName) > 0;
@@ -197,15 +190,11 @@ export default function ManualPaymentMatchDrawer(props: Props) {
           return amountMatch || nameMatch;
         }
 
-        return (
-          amountMatch ||
-          nameMatch ||
-          depositName.includes(word) ||
-          word.includes(depositName) ||
-          amountText.includes(digitsOnly(keyword)) ||
-          (nicknameNorm && depositName.includes(nicknameNorm)) ||
-          (customerNorm && depositName.includes(customerNorm))
-        );
+        return matchesManualPaymentSearch({
+          keyword,
+          depositName: deposit.depositor_name,
+          amount: deposit.amount,
+        });
       })
       .sort((a, b) => {
         const aAmount = Number(a.amount || 0) === expectedAmount ? 1 : 0;
@@ -320,9 +309,10 @@ export default function ManualPaymentMatchDrawer(props: Props) {
               value={keyword}
               onChange={(event) => {
                 setKeyword(event.target.value);
+                setSelectedDepositId(null);
                 setShowAll(false);
               }}
-              placeholder="입금자명 / 닉네임 / 이름 / 금액 검색"
+              placeholder="입금자명 또는 금액 검색"
               className="h-12 rounded-xl border border-neutral-200 px-4 text-base font-black outline-none focus:border-neutral-950"
             />
 
