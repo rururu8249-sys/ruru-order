@@ -31,6 +31,7 @@ export default function AdminTodayWorkQueue({
   onGoDeposits,
   onGoShipping,
   onOpenPaymentMatch,
+  onOpenOrderDetail,
 }: {
   activeTab: TodayWorkTab;
   setActiveTab: (value: TodayWorkTab) => void;
@@ -40,8 +41,10 @@ export default function AdminTodayWorkQueue({
   onGoDeposits: () => void;
   onGoShipping: () => void;
   onOpenPaymentMatch: (groupId: string) => void;
+  onOpenOrderDetail: (groupId: string) => void;
 }) {
   void onGoDeposits;
+  void onGoOrders;
 
   const [page, setPage] = useState(1);
   const [draftKeyword, setDraftKeyword] = useState("");
@@ -195,10 +198,10 @@ export default function AdminTodayWorkQueue({
                 <div className="flex flex-wrap justify-start gap-1.5 lg:justify-end">
                   <button
                     type="button"
-                    onClick={onGoOrders}
+                    onClick={() => onOpenOrderDetail(item.id)}
                     className="rounded-lg bg-neutral-950 px-3 py-2 text-xs font-black text-white active:scale-[0.98]"
                   >
-                    주문관리
+                    상세열기
                   </button>
 
                   {item.tab === "payment" ? (

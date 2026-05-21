@@ -41,6 +41,7 @@ type AdminTodayDashboardProps = {
   onGoCustomers: () => void;
   onGoDeposits: () => void;
   onOpenPaymentMatch: (group: OrderGroup) => void;
+  onOpenOrderDetail: (groupId: string) => void;
   onSaveCustomerMemo: (customer: CustomerRow, memoText: string) => Promise<void>;
 };
 
@@ -52,6 +53,7 @@ export default function AdminTodayDashboard({
   onGoShipping,
   onGoCustomers,
   onOpenPaymentMatch,
+  onOpenOrderDetail,
   onSaveCustomerMemo,
 }: AdminTodayDashboardProps) {
   const [activeWorkTab, setActiveWorkTab] = useState<TodayWorkTab>("all");
@@ -211,6 +213,7 @@ export default function AdminTodayDashboard({
           onGoDeposits={() => undefined}
           onGoShipping={onGoShipping}
           onOpenPaymentMatch={openPaymentMatchFromToday}
+          onOpenOrderDetail={onOpenOrderDetail}
         />
 
         <section className="grid gap-4">

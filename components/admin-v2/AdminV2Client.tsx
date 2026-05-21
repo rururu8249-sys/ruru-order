@@ -1350,6 +1350,7 @@ export function AdminV2Client() {
                   onGoCustomers={() => setActiveTab("customers")}
                   onGoDeposits={() => setActiveTab("deposits")}
                   onOpenPaymentMatch={(group) => setManualMatchGroup(group)}
+                  onOpenOrderDetail={openOrderDetailDrawer}
                   onSaveCustomerMemo={saveKakaoCustomerMemo}
                 />
               ) : activeTab === "shipping" ? (
