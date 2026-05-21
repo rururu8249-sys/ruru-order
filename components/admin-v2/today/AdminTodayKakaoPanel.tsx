@@ -21,6 +21,7 @@ import { buildKakaoCustomerOnlyConversation } from "@/components/admin-v2/today/
 import AdminTodayKakaoManualFields from "@/components/admin-v2/today/AdminTodayKakaoManualFields";
 import AdminTodayKakaoCustomerPicker from "@/components/admin-v2/today/AdminTodayKakaoCustomerPicker";
 import AdminTodayKakaoTimelineList from "@/components/admin-v2/today/AdminTodayKakaoTimelineList";
+import AdminTodayKakaoGptPromptPanel from "@/components/admin-v2/today/AdminTodayKakaoGptPromptPanel";
 import {
   buildKakaoConversationTimeline,
   buildKakaoTimelineMemo,
@@ -396,7 +397,16 @@ export default function AdminTodayKakaoPanel({
       <div className="mt-3 grid gap-3">
         <AdminTodayKakaoTimelineList items={timelineItems} registeringItemId={registeringTaskItemId} onRegisterTask={registerTodayTaskFromItem} />
 
-        <AdminTodayKakaoManualFields
+        
+        <AdminTodayKakaoGptPromptPanel
+          rawText={conversationText}
+          customerText={analysisSourceText}
+          timelineText={timelineMemoText}
+          kakaoDisplayName={kakaoDisplayName}
+          relatedProduct={relatedProduct}
+        />
+
+<AdminTodayKakaoManualFields
           kakaoDisplayName={kakaoDisplayName}
           setKakaoDisplayName={setKakaoDisplayName}
           manualIssueType={manualIssueType}
