@@ -15,6 +15,7 @@ import AdminOrderTableHeader from "@/components/admin-v2/orders/AdminOrderTableH
 import AdminOrderTopSummary from "@/components/admin-v2/orders/AdminOrderTopSummary";
 import AdminOrderFilterBar from "@/components/admin-v2/orders/AdminOrderFilterBar";
 import { getOrderPaymentFilterBuckets } from "@/components/admin-v2/orders/adminOrderPaymentFilterUtils";
+import { getOrderStatusFilterBuckets } from "@/components/admin-v2/orders/adminOrderStatusFilterUtils";
 import AdminOrderMainRow from "@/components/admin-v2/orders/AdminOrderMainRow";
 import AdminOrderBulkActionBar from "@/components/admin-v2/orders/AdminOrderBulkActionBar";
 import AdminOrderAmountCell from "@/components/admin-v2/orders/AdminOrderAmountCell";
@@ -626,18 +627,11 @@ export function AdminV2Client() {
         return words.some((word) => normalizedActual.includes(normalizeFilterText(word)));
       };
 
-      const getSimpleStatusBucket = () => {
-        if (includesAnyText(status, ["취소", "환불", "주문취소", "주문서취소"])) return "canceled";
-        if (includesAnyText(status, ["출고완료", "배송완료"])) return "shipped";
-        if (includesAnyText(status, ["출고준비", "출고대기", "포장전", "포장완료", "미설정", "-"])) return "ready";
-        if (includesAnyText(status, ["미결제", "미입금", "입금대기", "확인대기"])) return "unpaid";
-        if (includesAnyText(status, ["결제완료", "입금확인"])) return "paid";
-        if (includesAnyText(payment, ["미결제", "미입금", "입금대기", "링크대기"])) return "unpaid";
-        if (includesAnyText(payment, ["결제완료", "입금확인"])) return "paid";
-        return "ready";
-      };
 
-      const statusBucket = getSimpleStatusBucket();
+      const statusBuckets = getOrderStatusFilterBuckets(group.first, {
+        statusText: status,
+        paymentText: payment,
+      });
       const paymentBuckets = getOrderPaymentFilterBuckets(group.first, {
         statusText: status,
         paymentText: payment,
@@ -647,7 +641,9 @@ export function AdminV2Client() {
         selectedStatusFilters.length === 0 ||
         selectedStatusFilters.includes("all") ||
         selectedStatusFilters.includes("전체") ||
-        selectedStatusFilters.includes(statusBucket);
+        selectedStatusFilters.some((filter) =>
+          statusBuckets.some((bucket) => bucket === filter)
+        );
 
       const matchPayment =
         selectedPaymentFilters.length === 0 ||
