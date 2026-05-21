@@ -317,6 +317,7 @@ export function buildKakaoMemoText(params: {
   relatedProduct?: string;
   adminReplyText?: string;
   autoReplyText?: string;
+  timelineText?: string;
 }) {
   const nowText = new Intl.DateTimeFormat("ko-KR", {
     timeZone: "Asia/Seoul",
@@ -338,6 +339,9 @@ export function buildKakaoMemoText(params: {
     `관련상품: ${params.relatedProduct || "-"}`,
     `분류: ${params.analysis.label} / 위험도: ${params.analysis.riskLabel}`,
     `요약: ${params.analysis.summary}`,
+    "",
+    "순차 대화 기록:",
+    params.timelineText?.trim() || "-",
     "",
     "고객 메시지:",
     preview || "-",

@@ -19,6 +19,11 @@ import {
 import { buildKakaoCustomerOnlyConversation } from "@/components/admin-v2/today/kakaoConversationFilter";
 import AdminTodayKakaoManualFields from "@/components/admin-v2/today/AdminTodayKakaoManualFields";
 import AdminTodayKakaoCustomerPicker from "@/components/admin-v2/today/AdminTodayKakaoCustomerPicker";
+import AdminTodayKakaoTimelineList from "@/components/admin-v2/today/AdminTodayKakaoTimelineList";
+import {
+  buildKakaoConversationTimeline,
+  buildKakaoTimelineMemo,
+} from "@/components/admin-v2/today/kakaoConversationTimeline";
 
 const KAKAO_CHANNEL_URL = "https://pf.kakao.com/_RMxaqX";
 const KAKAO_CHANNEL_CHAT_URL = "https://business.kakao.com/_RMxaqX/chats?t_src=business_partnercenter&t_ch=lnb&t_obj=%EB%82%B4%EC%B1%84%ED%8C%85_%ED%81%B4%EB%A6%AD";
@@ -110,6 +115,13 @@ export default function AdminTodayKakaoPanel({
     [conversationText, adminSenderText, autoSenderText]
   );
 
+  const timelineItems = useMemo(
+    () => buildKakaoConversationTimeline(conversationText, adminSenderText, autoSenderText),
+    [conversationText, adminSenderText, autoSenderText]
+  );
+
+  const timelineMemoText = useMemo(() => buildKakaoTimelineMemo(timelineItems), [timelineItems]);
+
   const displayedCustomerText = manualCustomerText || filteredConversation.customerText;
 
   const analysisSourceText = useMemo(() => {
@@ -152,6 +164,7 @@ export default function AdminTodayKakaoPanel({
       relatedProduct,
       adminReplyText: filteredConversation.adminText,
       autoReplyText: filteredConversation.autoText,
+      timelineText: timelineMemoText,
     });
   }, [
     analysis,
@@ -162,6 +175,7 @@ export default function AdminTodayKakaoPanel({
     relatedProduct,
     filteredConversation.adminText,
     filteredConversation.autoText,
+    timelineMemoText,
   ]);
 
   const copyReply = async () => {
@@ -301,6 +315,8 @@ export default function AdminTodayKakaoPanel({
       </div>
 
       <div className="mt-3 grid gap-3">
+        <AdminTodayKakaoTimelineList items={timelineItems} />
+
         <AdminTodayKakaoManualFields
           kakaoDisplayName={kakaoDisplayName}
           setKakaoDisplayName={setKakaoDisplayName}
