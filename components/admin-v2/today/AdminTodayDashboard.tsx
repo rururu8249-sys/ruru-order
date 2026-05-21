@@ -19,6 +19,7 @@ import AdminTodayPersistentTasks from "@/components/admin-v2/today/AdminTodayPer
 import AdminTodayWorkQueue from "@/components/admin-v2/today/AdminTodayWorkQueue";
 import AdminTodayRankings from "@/components/admin-v2/today/AdminTodayRankings";
 import AdminTodayKakaoPanel from "@/components/admin-v2/today/AdminTodayKakaoPanel";
+import AdminTodayCollapsiblePanel from "@/components/admin-v2/today/AdminTodayCollapsiblePanel";
 import {
   buildBuyerRanking,
   buildMoneySummary,
@@ -110,7 +111,28 @@ export default function AdminTodayDashboard({
 
       <AdminTodayMoneySummary summary={moneySummary} />
 
-      <AdminTodayPersistentTasks />
+      <AdminTodayCollapsiblePanel
+
+
+        title="고객 이슈 처리 큐"
+
+
+        description="카톡/고객대화에서 등록한 반품·교환·환불·배송 이슈를 필요할 때 펼쳐서 확인합니다."
+
+
+        badge="처리 이슈"
+
+
+        defaultOpen={false}
+
+
+      >
+
+
+        <AdminTodayPersistentTasks />
+
+
+      </AdminTodayCollapsiblePanel>
 
       <div className="grid gap-4 2xl:grid-cols-[1.35fr_0.9fr]">
         <AdminTodayWorkQueue
@@ -127,10 +149,31 @@ export default function AdminTodayDashboard({
         <section className="grid gap-4">
           <AdminTodayRankings buyers={buyerRanking} products={productRanking} />
 
-          <AdminTodayKakaoPanel
+          <AdminTodayCollapsiblePanel
+
+
+            title="카톡 응대 업무"
+
+
+            description="대화 붙여넣기, 이슈태그 선택, 분석문구 복사, 오늘할일 등록은 필요할 때만 펼쳐서 사용합니다."
+
+
+            badge="카톡/메모"
+
+
+            defaultOpen={false}
+
+
+          >
+
+
+            <AdminTodayKakaoPanel
             customers={customers}
             onSaveCustomerMemo={onSaveCustomerMemo}
           />
+
+
+          </AdminTodayCollapsiblePanel>
 
           <section className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
