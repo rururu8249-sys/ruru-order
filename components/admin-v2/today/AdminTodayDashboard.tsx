@@ -201,40 +201,44 @@ export default function AdminTodayDashboard({
         }
       />
 
-      <AdminTodayCollapsiblePanel
-        title="유튜브 LIVE 채팅"
-        description="방송 화면과 채팅을 보면서 주문·입금·문의 처리를 같이 확인합니다."
-        badge="방송채팅"
-        defaultOpen={true}
-      >
-        <AdminTodayYoutubeLivePanel />
-      </AdminTodayCollapsiblePanel>
-
-      <AdminTodayControlSummaryBar
-        summary={moneySummary}
-        orderCount={todayGroups.length}
-        itemQuantity={itemQuantity}
-        issueCount={workCounts.issue}
-        periodLabel={periodLabel}
-        periodStorageReady={periodStorageReady}
-      />
-
-      <div className="grid gap-4 2xl:grid-cols-[1.35fr_0.9fr]">
-        <AdminTodayWorkQueue
-          activeTab={activeWorkTab}
-          setActiveTab={setActiveWorkTab}
-          counts={workCounts}
-          items={visibleWorkItems}
-          onGoOrders={onGoOrders}
-          onGoDeposits={() => undefined}
-          onGoShipping={onGoShipping}
-          onOpenPaymentMatch={openPaymentMatchFromToday}
-          onOpenOrderDetail={onOpenOrderDetail}
-        />
-
-        <section className="grid gap-4">
+      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1.58fr)_minmax(390px,0.82fr)] 2xl:items-start">
+        <main className="grid min-w-0 gap-4">
           <AdminTodayCollapsiblePanel
-            title="고객 이슈 처리 큐"
+            title="유튜브 LIVE 채팅"
+            description="방송 화면과 채팅을 보면서 주문·입금·문의 처리를 같이 확인합니다."
+            badge="방송채팅"
+            defaultOpen={true}
+          >
+            <div className="max-h-[520px] overflow-y-auto pr-1">
+              <AdminTodayYoutubeLivePanel />
+            </div>
+          </AdminTodayCollapsiblePanel>
+
+          <AdminTodayControlSummaryBar
+            summary={moneySummary}
+            orderCount={todayGroups.length}
+            itemQuantity={itemQuantity}
+            issueCount={workCounts.issue}
+            periodLabel={periodLabel}
+            periodStorageReady={periodStorageReady}
+          />
+
+          <AdminTodayWorkQueue
+            activeTab={activeWorkTab}
+            setActiveTab={setActiveWorkTab}
+            counts={workCounts}
+            items={visibleWorkItems}
+            onGoOrders={onGoOrders}
+            onGoDeposits={() => undefined}
+            onGoShipping={onGoShipping}
+            onOpenPaymentMatch={openPaymentMatchFromToday}
+            onOpenOrderDetail={onOpenOrderDetail}
+          />
+        </main>
+
+        <aside className="grid min-w-0 gap-4 2xl:sticky 2xl:top-4">
+          <AdminTodayCollapsiblePanel
+            title="고객 이슈 큐"
             description="반품·교환·환불·배송·주소확인 이슈는 해결 전까지 계속 표시합니다."
             badge="처리 이슈"
             defaultOpen={true}
@@ -253,7 +257,7 @@ export default function AdminTodayDashboard({
               onSaveCustomerMemo={onSaveCustomerMemo}
             />
           </AdminTodayCollapsiblePanel>
-        </section>
+        </aside>
       </div>
     </section>
   );
