@@ -15,15 +15,23 @@ export const TABS: Array<{ key: AdminTab; label: string; desc: string }> = [
 ];
 
 export const ORDER_STATUS_OPTIONS = [
-  { value: "미설정", label: "미결제/확인대기" },
-  { value: "입금확인", label: "입금확인" },
+  { value: "미설정", label: "미설정" },
+  { value: "수동입금확인", label: "수동입금확인" },
   { value: "출고대기", label: "출고대기" },
   { value: "출고완료", label: "출고완료" },
   { value: "킵", label: "킵" },
-  { value: "픽업예정", label: "픽업예정" },
-  { value: "주문취소", label: "주문취소" },
+  { value: "픽업", label: "픽업" },
 ];
 
 export const PAYMENT_FILTERS = ["전체", "무통장입금", "카드결제"];
-export const PAID_STATUSES = ["입금확인", "출고대기", "출고완료", "킵", "픽업예정"];
+export const PAID_STATUSES = [
+  "입금확인",
+  "자동입금확인",
+  "수동입금확인",
+  "출고대기",
+  "출고완료",
+  "킵",
+  "픽업",
+  "픽업예정",
+];
 export const PAGE_SIZE = 15;
