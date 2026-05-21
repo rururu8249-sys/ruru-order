@@ -50,7 +50,7 @@ export default function AdminTodayYoutubeLiveEmbedBox({
   }
 
   return (
-    <div className="grid gap-3 xl:grid-cols-[minmax(230px,280px)_minmax(360px,1fr)] xl:items-start">
+    <div className="grid gap-3 xl:grid-cols-[minmax(170px,220px)_minmax(320px,1fr)] xl:items-start">
       <div className="overflow-hidden rounded-2xl bg-black">
         <div className="flex items-center justify-between bg-neutral-950 px-3 py-2">
           <span className="text-xs font-black text-white">LIVE 영상</span>
@@ -63,7 +63,7 @@ export default function AdminTodayYoutubeLiveEmbedBox({
           </button>
         </div>
 
-        <div className="h-[360px] sm:h-[390px] 2xl:h-[430px]">
+        <div className="h-[240px] sm:h-[260px] 2xl:h-[290px]">
           <iframe
             src={videoSrc}
             title="유튜브 LIVE 방송 화면"
@@ -87,7 +87,7 @@ export default function AdminTodayYoutubeLiveEmbedBox({
           </button>
         </div>
 
-        <div className="h-[360px] sm:h-[390px] 2xl:h-[430px]">
+        <div className="h-[240px] sm:h-[260px] 2xl:h-[290px]">
           {chatSrc ? (
             <iframe
               src={chatSrc}

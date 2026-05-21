@@ -6,7 +6,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AdminTodayYoutubeLiveLinkBox from "@/components/admin-v2/today/AdminTodayYoutubeLiveLinkBox";
-import AdminTodayYoutubeChatInputBox from "@/components/admin-v2/today/AdminTodayYoutubeChatInputBox";
 import AdminTodayYoutubeLiveEmbedBox from "@/components/admin-v2/today/AdminTodayYoutubeLiveEmbedBox";
 import {
   YOUTUBE_LIVE_STORAGE_KEY,
@@ -15,7 +14,6 @@ import {
 
 export default function AdminTodayYoutubeLivePanel() {
   const [liveUrl, setLiveUrl] = useState("");
-  const [chatText, setChatText] = useState("");
 
   useEffect(() => {
     try {
@@ -70,11 +68,6 @@ export default function AdminTodayYoutubeLivePanel() {
         videoId={videoId}
         onOpenWatch={openYoutubeWatch}
         onOpenChat={openYoutubeChat}
-      />
-
-      <AdminTodayYoutubeChatInputBox
-        chatText={chatText}
-        setChatText={setChatText}
       />
     </div>
   );

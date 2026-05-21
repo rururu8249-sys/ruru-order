@@ -4,8 +4,12 @@
 // 목적: 주문관리 데이터를 오늘할일 업무 큐로 표시
 // 주의: UI/이동 버튼 전용. 주문상태 저장/입금매칭 저장 로직 없음.
 
+import { useEffect, useMemo, useState } from "react";
 import type { TodayWorkItem, TodayWorkTab } from "@/components/admin-v2/today/adminTodayUtils";
 import AdminTodayWorkTabs from "@/components/admin-v2/today/AdminTodayWorkTabs";
+import AdminTodayWorkPagination from "@/components/admin-v2/today/AdminTodayWorkPagination";
+
+const PAGE_SIZE = 4;
 
 const toneClass = {
   blue: "bg-blue-50 text-blue-700 border-blue-100",
@@ -37,8 +41,25 @@ export default function AdminTodayWorkQueue({
 }) {
   void onGoDeposits;
 
+  const [page, setPage] = useState(1);
+
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, items.length]);
+
+  const visibleItems = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return items.slice(start, start + PAGE_SIZE);
+  }, [items, page]);
+
+  const safeSetPage = (nextPage: number) => {
+    setPage(Math.min(totalPages, Math.max(1, nextPage)));
+  };
+
   return (
-    <section className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
+    <section className="flex h-full min-h-[520px] flex-col rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-black tracking-[-0.04em] text-neutral-950">
@@ -56,14 +77,14 @@ export default function AdminTodayWorkQueue({
         />
       </div>
 
-      <div className="max-h-[520px] overflow-y-auto rounded-2xl border border-neutral-100">
+      <div className="flex-1 rounded-2xl border border-neutral-100">
         {items.length === 0 ? (
           <div className="px-4 py-14 text-center text-sm font-black text-neutral-400">
             현재 표시할 업무가 없습니다.
           </div>
         ) : (
           <div className="divide-y divide-neutral-100">
-            {items.slice(0, 50).map((item) => (
+            {visibleItems.map((item) => (
               <div
                 key={item.id}
                 className="grid gap-3 px-4 py-3 lg:grid-cols-[112px_minmax(260px,1fr)_minmax(210px,300px)_auto] lg:items-center"
@@ -157,11 +178,11 @@ export default function AdminTodayWorkQueue({
         )}
       </div>
 
-      {items.length > 50 ? (
-        <div className="mt-3 rounded-xl bg-neutral-50 px-3 py-2 text-xs font-bold text-neutral-500">
-          현재 50건까지만 표시 중입니다. 다음 단계에서 페이지네이션을 붙이면 됩니다.
-        </div>
-      ) : null}
+      <AdminTodayWorkPagination
+        page={page}
+        totalPages={totalPages}
+        onChange={safeSetPage}
+      />
     </section>
   );
 }
