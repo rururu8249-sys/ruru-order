@@ -2,7 +2,7 @@
 
 // components/admin-v2/today/AdminTodayTaskCard.tsx
 // 목적: 오늘할일 지속 업무 1건 카드 표시
-// 주의: 완료 처리 버튼만 상위에서 전달받아 실행. 돈/입금/배송 로직 없음.
+// 주의: UI 전용. 주문/입금/배송/정산 로직 없음.
 
 import type { AdminTaskRow } from "@/lib/admin-v2/types";
 import { formatDateLabel } from "@/lib/admin-v2/formatters";
@@ -11,14 +11,31 @@ import {
   getAdminTaskTypeLabel,
 } from "@/components/admin-v2/today/adminTaskMeta";
 
+const makePreview = (body: string | null) => {
+  const clean = String(body || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(" / ");
+
+  if (!clean) return "상세 내용 없음";
+  if (clean.length <= 120) return clean;
+
+  return `${clean.slice(0, 120)}...`;
+};
+
 export default function AdminTodayTaskCard({
   task,
+  onOpenDetail,
   onResolve,
 }: {
   task: AdminTaskRow;
-  onResolve: (task: AdminTaskRow) => void | Promise<void>;
+  onOpenDetail: (task: AdminTaskRow) => void;
+  onResolve: (task: AdminTaskRow, note?: string) => void | Promise<void>;
 }) {
   const taskType = task.task_type || "general";
+  const preview = makePreview(task.body);
 
   return (
     <article className="rounded-2xl border border-neutral-100 bg-neutral-50 p-3">
@@ -47,13 +64,19 @@ export default function AdminTodayTaskCard({
         {task.related_product ? ` · ${task.related_product}` : ""}
       </div>
 
-      {task.body ? (
-        <div className="mt-2 max-h-[120px] overflow-y-auto whitespace-pre-wrap rounded-xl bg-white p-3 text-xs font-bold leading-relaxed text-neutral-700">
-          {task.body}
-        </div>
-      ) : null}
+      <div className="mt-2 rounded-xl bg-white px-3 py-2 text-xs font-bold leading-relaxed text-neutral-600">
+        {preview}
+      </div>
 
-      <div className="mt-3 flex justify-end">
+      <div className="mt-3 flex flex-wrap justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => onOpenDetail(task)}
+          className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs font-black text-neutral-700 active:scale-[0.98]"
+        >
+          상세보기
+        </button>
+
         <button
           type="button"
           onClick={() => onResolve(task)}

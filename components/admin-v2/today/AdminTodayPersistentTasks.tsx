@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AdminTaskRow } from "@/lib/admin-v2/types";
 import { supabase } from "@/lib/supabase";
 import AdminTodayTaskCard from "@/components/admin-v2/today/AdminTodayTaskCard";
+import AdminTodayTaskDetailDrawer from "@/components/admin-v2/today/AdminTodayTaskDetailDrawer";
 import {
   ADMIN_TASK_FILTERS,
   type AdminTaskFilter,
@@ -22,6 +23,7 @@ export default function AdminTodayPersistentTasks() {
   const [errorText, setErrorText] = useState("");
   const [activeFilter, setActiveFilter] = useState<AdminTaskFilter>("all");
   const [searchText, setSearchText] = useState("");
+  const [selectedTask, setSelectedTask] = useState<AdminTaskRow | null>(null);
 
   const loadTasks = useCallback(async () => {
     setLoading(true);
@@ -94,7 +96,7 @@ export default function AdminTodayPersistentTasks() {
     });
   }, [tasks, activeFilter, searchText]);
 
-  const resolveTask = async (task: AdminTaskRow) => {
+  const resolveTask = async (task: AdminTaskRow, note = "") => {
     const ok = window.confirm(`오늘할일을 완료 처리할까요?\n\n${task.title}`);
 
     if (!ok) return;
@@ -105,7 +107,7 @@ export default function AdminTodayPersistentTasks() {
         status: "done",
         resolved_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        resolved_note: "관리자 완료 처리",
+        resolved_note: note.trim() || "관리자 완료 처리",
       })
       .eq("id", task.id);
 
@@ -114,96 +116,106 @@ export default function AdminTodayPersistentTasks() {
       return;
     }
 
+    setSelectedTask(null);
     await loadTasks();
   };
 
   return (
-    <section className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-lg font-black tracking-[-0.04em] text-neutral-950">
-            해결 전까지 뜨는 업무
-          </h2>
-          <p className="mt-1 text-xs font-bold text-neutral-500">
-            직접 등록한 카톡문의·고객이슈만 완료 전까지 계속 표시합니다.
-          </p>
+    <>
+      <section className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-black tracking-[-0.04em] text-neutral-950">
+              해결 전까지 뜨는 업무
+            </h2>
+            <p className="mt-1 text-xs font-bold text-neutral-500">
+              직접 등록한 카톡문의·고객이슈만 완료 전까지 계속 표시합니다.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={loadTasks}
+            className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs font-black text-neutral-700 active:scale-[0.98]"
+          >
+            새로고침
+          </button>
         </div>
 
-        <button
-          type="button"
-          onClick={loadTasks}
-          className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs font-black text-neutral-700 active:scale-[0.98]"
-        >
-          새로고침
-        </button>
-      </div>
+        <div className="mb-3 flex flex-wrap gap-2">
+          {ADMIN_TASK_FILTERS.map((filter) => {
+            const isActive = activeFilter === filter.value;
+            const count = counts[filter.value] || 0;
 
-      <div className="mb-3 flex flex-wrap gap-2">
-        {ADMIN_TASK_FILTERS.map((filter) => {
-          const isActive = activeFilter === filter.value;
-          const count = counts[filter.value] || 0;
-
-          return (
-            <button
-              key={filter.value}
-              type="button"
-              onClick={() => setActiveFilter(filter.value)}
-              className={`rounded-full px-3 py-2 text-xs font-black active:scale-[0.98] ${
-                isActive
-                  ? "bg-neutral-950 text-white"
-                  : "border border-neutral-200 bg-white text-neutral-600"
-              }`}
-            >
-              {filter.label} {count}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mb-3">
-        <input
-          value={searchText}
-          onChange={(event) => setSearchText(event.target.value)}
-          placeholder="업무, 고객명, 닉네임, 상품명, 메모 검색"
-          className="h-11 w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 text-sm font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100/70"
-        />
-      </div>
-
-      {errorText ? (
-        <div className="rounded-2xl border border-red-100 bg-red-50 p-3 text-xs font-bold text-red-700">
-          admin_tasks 조회 실패: {errorText}
+            return (
+              <button
+                key={filter.value}
+                type="button"
+                onClick={() => setActiveFilter(filter.value)}
+                className={`rounded-full px-3 py-2 text-xs font-black active:scale-[0.98] ${
+                  isActive
+                    ? "bg-neutral-950 text-white"
+                    : "border border-neutral-200 bg-white text-neutral-600"
+                }`}
+              >
+                {filter.label} {count}
+              </button>
+            );
+          })}
         </div>
-      ) : null}
 
-      {loading ? (
-        <div className="rounded-2xl bg-neutral-50 p-6 text-center text-sm font-black text-neutral-400">
-          업무 불러오는 중...
+        <div className="mb-3">
+          <input
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            placeholder="업무, 고객명, 닉네임, 상품명, 메모 검색"
+            className="h-11 w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 text-sm font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100/70"
+          />
         </div>
-      ) : null}
 
-      {!loading && !errorText && tasks.length === 0 ? (
-        <div className="rounded-2xl bg-neutral-50 p-6 text-center text-sm font-black text-neutral-400">
-          해결 대기 업무가 없습니다.
-        </div>
-      ) : null}
+        {errorText ? (
+          <div className="rounded-2xl border border-red-100 bg-red-50 p-3 text-xs font-bold text-red-700">
+            admin_tasks 조회 실패: {errorText}
+          </div>
+        ) : null}
 
-      {!loading && !errorText && tasks.length > 0 && filteredTasks.length === 0 ? (
-        <div className="rounded-2xl bg-neutral-50 p-6 text-center text-sm font-black text-neutral-400">
-          현재 조건에 맞는 업무가 없습니다.
-        </div>
-      ) : null}
+        {loading ? (
+          <div className="rounded-2xl bg-neutral-50 p-6 text-center text-sm font-black text-neutral-400">
+            업무 불러오는 중...
+          </div>
+        ) : null}
 
-      {!loading && !errorText && filteredTasks.length > 0 ? (
-        <div className="grid max-h-[430px] gap-2 overflow-y-auto pr-1">
-          {filteredTasks.map((task) => (
-            <AdminTodayTaskCard
-              key={task.id}
-              task={task}
-              onResolve={resolveTask}
-            />
-          ))}
-        </div>
-      ) : null}
-    </section>
+        {!loading && !errorText && tasks.length === 0 ? (
+          <div className="rounded-2xl bg-neutral-50 p-6 text-center text-sm font-black text-neutral-400">
+            해결 대기 업무가 없습니다.
+          </div>
+        ) : null}
+
+        {!loading && !errorText && tasks.length > 0 && filteredTasks.length === 0 ? (
+          <div className="rounded-2xl bg-neutral-50 p-6 text-center text-sm font-black text-neutral-400">
+            현재 조건에 맞는 업무가 없습니다.
+          </div>
+        ) : null}
+
+        {!loading && !errorText && filteredTasks.length > 0 ? (
+          <div className="grid max-h-[430px] gap-2 overflow-y-auto pr-1">
+            {filteredTasks.map((task) => (
+              <AdminTodayTaskCard
+                key={task.id}
+                task={task}
+                onOpenDetail={setSelectedTask}
+                onResolve={resolveTask}
+              />
+            ))}
+          </div>
+        ) : null}
+      </section>
+
+      <AdminTodayTaskDetailDrawer
+        task={selectedTask}
+        onClose={() => setSelectedTask(null)}
+        onResolve={resolveTask}
+      />
+    </>
   );
 }
