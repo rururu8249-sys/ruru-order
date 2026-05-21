@@ -3,9 +3,7 @@
 // components/admin-v2/today/AdminTodayKakaoGptPromptPanel.tsx
 // 목적: OpenAI API 없이, 현재 쓰는 ChatGPT 창에 붙여넣을 분석문구를 자동 생성/복사
 // 주의: 유료 API 호출 없음. 주문/입금/배송/정산 상태 변경 없음.
-
-const KAKAO_CHAT_URL =
-  "https://business.kakao.com/_RMxaqX/chats?t_src=business_partnercenter&t_ch=lnb&t_obj=%EB%82%B4%EC%B1%84%ED%8C%85_%ED%81%B4%EB%A6%AD";
+// 카톡채널 열기 버튼은 카톡 응대 업무 상단에서만 관리합니다.
 
 const CHATGPT_URL = "https://chatgpt.com/";
 
@@ -105,10 +103,6 @@ export default function AdminTodayKakaoGptPromptPanel({
     }
   };
 
-  const openKakao = () => {
-    window.open(KAKAO_CHAT_URL, "_blank", "noopener,noreferrer");
-  };
-
   const openChatGpt = () => {
     window.open(CHATGPT_URL, "_blank", "noopener,noreferrer");
   };
@@ -121,20 +115,12 @@ export default function AdminTodayKakaoGptPromptPanel({
             무료 ChatGPT 분석 보조
           </div>
           <div className="mt-0.5 text-xs font-bold text-neutral-500">
-            API 비용 없이 분석문구를 복사해서 지금 쓰는 ChatGPT에 붙여넣습니다.
+            카톡 대화를 붙여넣은 뒤, 분석문구를 복사해서 ChatGPT에 붙여넣습니다.
           </div>
         </div>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-3">
-        <button
-          type="button"
-          onClick={openKakao}
-          className="rounded-xl bg-yellow-400 px-4 py-3 text-sm font-black text-neutral-950 active:scale-[0.98]"
-        >
-          카톡채널 열기
-        </button>
-
+      <div className="grid gap-2 sm:grid-cols-2">
         <button
           type="button"
           onClick={copyPrompt}
@@ -153,8 +139,8 @@ export default function AdminTodayKakaoGptPromptPanel({
       </div>
 
       <div className="mt-3 rounded-xl bg-neutral-50 p-3 text-xs font-bold leading-relaxed text-neutral-500">
-        최근 날짜가 맨 위에 오도록 정리, 고객/관리자/자동응답 구분, 상품 추가구매 오분류 방지,
-        오늘할일 등록 추천 여부까지 포함해서 복사됩니다.
+        카톡 채팅창은 위쪽 카톡 응대 업무의 [카톡채널 채팅 열기] 버튼에서만 엽니다.
+        이 박스는 분석문구 복사와 ChatGPT 열기만 담당합니다.
       </div>
     </section>
   );

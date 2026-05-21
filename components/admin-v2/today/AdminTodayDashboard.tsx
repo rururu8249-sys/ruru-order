@@ -134,14 +134,8 @@ export default function AdminTodayDashboard({
 
           <section className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-black tracking-[-0.04em] text-neutral-950">
-                  최근 입금내역
-                </h2>
-                <p className="mt-1 text-xs font-bold text-neutral-500">
-                  뱅크다/입금매칭 메뉴와 연결됩니다.
-                </p>
-              </div>
+              
+
               <button
                 type="button"
                 onClick={onGoDeposits}
