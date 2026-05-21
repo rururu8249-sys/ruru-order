@@ -138,7 +138,7 @@ export default function AdminTodayPersistentTasks() {
 
   const emptyText =
     viewMode === "open"
-      ? "해결 대기 업무가 없습니다."
+      ? "처리 대기 고객 이슈가 없습니다."
       : "완료된 업무 이력이 없습니다.";
 
   return (
@@ -147,10 +147,10 @@ export default function AdminTodayPersistentTasks() {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-black tracking-[-0.04em] text-neutral-950">
-              해결 전까지 뜨는 업무
+              고객 이슈 처리 큐
             </h2>
             <p className="mt-1 text-xs font-bold text-neutral-500">
-              직접 등록한 고객이슈만 완료 전까지 표시합니다.
+              카톡/고객대화에서 등록한 반품·교환·환불·배송 이슈를 완료 전까지 표시합니다.
             </p>
           </div>
 

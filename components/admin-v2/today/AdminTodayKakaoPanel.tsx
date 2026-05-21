@@ -22,6 +22,8 @@ import AdminTodayKakaoManualFields from "@/components/admin-v2/today/AdminTodayK
 import AdminTodayKakaoCustomerPicker from "@/components/admin-v2/today/AdminTodayKakaoCustomerPicker";
 import AdminTodayKakaoTimelineList from "@/components/admin-v2/today/AdminTodayKakaoTimelineList";
 import AdminTodayKakaoGptPromptPanel from "@/components/admin-v2/today/AdminTodayKakaoGptPromptPanel";
+import AdminTodayIssueTagSelector from "@/components/admin-v2/today/AdminTodayIssueTagSelector";
+import type { AdminIssueTag } from "@/components/admin-v2/today/adminIssueTags";
 import {
   buildKakaoConversationTimeline,
   buildKakaoTimelineMemo,
@@ -109,6 +111,7 @@ export default function AdminTodayKakaoPanel({
   const [kakaoDisplayName, setKakaoDisplayName] = useState("");
   const [manualIssueType, setManualIssueType] = useState<KakaoIssueType | "">("");
   const [relatedProduct, setRelatedProduct] = useState("");
+  const [selectedIssueTags, setSelectedIssueTags] = useState<AdminIssueTag[]>([]);
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | "">("");
   const [saving, setSaving] = useState(false);
@@ -215,6 +218,7 @@ export default function AdminTodayKakaoPanel({
     const itemAnalysis = item.analysis || analysis;
     const title = `${itemAnalysis.label} · ${customerLabel}`;
     const body = [
+      `선택태그: ${selectedIssueTags.length > 0 ? selectedIssueTags.join(", ") : "미선택"}`,
       `문의시점: ${item.dateLabel}`,
       `보낸사람: ${item.senderLabel}`,
       `카톡표시명: ${kakaoDisplayName || "-"}`,
@@ -249,6 +253,7 @@ export default function AdminTodayKakaoPanel({
       customer_nickname: selectedCustomer?.youtube_nickname || kakaoDisplayName || item.senderLabel || null,
       related_product: relatedProduct || null,
       raw_payload: {
+        issueTags: selectedIssueTags,
         kakaoDisplayName,
         relatedProduct,
         timelineItem: item,
@@ -262,6 +267,7 @@ export default function AdminTodayKakaoPanel({
       return;
     }
 
+    setSelectedIssueTags([]);
     window.dispatchEvent(new CustomEvent("ruru-admin-task-created"));
     alert("오늘할일에 등록했습니다. 처리완료 전까지 계속 표시됩니다.");
   };
@@ -398,6 +404,12 @@ export default function AdminTodayKakaoPanel({
         <AdminTodayKakaoTimelineList items={timelineItems} registeringItemId={registeringTaskItemId} onRegisterTask={registerTodayTaskFromItem} />
 
         
+
+        <AdminTodayIssueTagSelector
+          selectedTags={selectedIssueTags}
+          onChange={setSelectedIssueTags}
+        />
+
         <AdminTodayKakaoGptPromptPanel
           rawText={conversationText}
           customerText={analysisSourceText}

@@ -10,6 +10,10 @@ import {
   getAdminTaskToneClass,
   getAdminTaskTypeLabel,
 } from "@/components/admin-v2/today/adminTaskMeta";
+import {
+  extractIssueTagsFromTaskBody,
+  getIssueTagClass,
+} from "@/components/admin-v2/today/adminIssueTags";
 
 const makePreview = (body: string | null) => {
   const clean = String(body || "")
@@ -38,6 +42,7 @@ export default function AdminTodayTaskCard({
 }) {
   const taskType = task.task_type || "general";
   const preview = makePreview(task.body);
+  const issueTags = extractIssueTagsFromTaskBody(task.body);
 
   return (
     <article className="rounded-2xl border border-neutral-100 bg-neutral-50 p-3">
@@ -71,6 +76,19 @@ export default function AdminTodayTaskCard({
         {task.customer_nickname || task.customer_name || "고객 미연결"}
         {task.related_product ? ` · ${task.related_product}` : ""}
       </div>
+
+      {issueTags.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {issueTags.map((tag) => (
+            <span
+              key={`${task.id}-${tag}`}
+              className={`rounded-full border px-2 py-1 text-[11px] font-black ${getIssueTagClass(tag)}`}
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      ) : null}
 
       {!canResolve && task.resolved_at ? (
         <div className="mt-1 text-xs font-bold text-emerald-700">

@@ -11,6 +11,10 @@ import {
   getAdminTaskToneClass,
   getAdminTaskTypeLabel,
 } from "@/components/admin-v2/today/adminTaskMeta";
+import {
+  extractIssueTagsFromTaskBody,
+  getIssueTagClass,
+} from "@/components/admin-v2/today/adminIssueTags";
 
 export default function AdminTodayTaskDetailDrawer({
   task,
@@ -42,6 +46,7 @@ export default function AdminTodayTaskDetailDrawer({
   if (!task) return null;
 
   const taskType = task.task_type || "general";
+  const issueTags = extractIssueTagsFromTaskBody(task.body);
 
   const handleResolve = async () => {
     const ok = window.confirm(`이 업무를 완료 처리할까요?\n\n${task.title}`);
@@ -87,6 +92,24 @@ export default function AdminTodayTaskDetailDrawer({
             {task.customer_nickname || task.customer_name || "고객 미연결"}
             {task.related_product ? ` · ${task.related_product}` : ""}
           </div>
+
+          {issueTags.length > 0 ? (
+            <div className="mt-3">
+              <div className="mb-1 text-xs font-black text-neutral-500">
+                선택된 이슈
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {issueTags.map((tag) => (
+                  <span
+                    key={`${task.id}-detail-${tag}`}
+                    className={`rounded-full border px-2.5 py-1 text-xs font-black ${getIssueTagClass(tag)}`}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto bg-neutral-50 p-5">
