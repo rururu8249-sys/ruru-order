@@ -59,7 +59,7 @@ export default function AdminTodayDashboard({
 
   const todayGroups = useMemo(() => getTodayGroups(orderGroups), [orderGroups]);
   const moneySummary = useMemo(() => buildMoneySummary(todayGroups), [todayGroups]);
-  const allWorkItems = useMemo(() => buildWorkItems(todayGroups), [todayGroups]);
+  const allWorkItems = useMemo(() => buildWorkItems(orderGroups), [orderGroups]);
   const buyerRanking = useMemo(() => buildBuyerRanking(todayGroups), [todayGroups]);
   const productRanking = useMemo(() => buildProductRanking(todayGroups), [todayGroups]);
 
@@ -86,7 +86,7 @@ export default function AdminTodayDashboard({
   }, [allWorkItems, activeWorkTab]);
 
   const openPaymentMatchFromToday = (groupId: string) => {
-    const targetGroup = todayGroups.find((group) => group.groupId === groupId);
+    const targetGroup = orderGroups.find((group) => group.groupId === groupId);
 
     if (!targetGroup) {
       alert("입금매칭할 주문 정보를 찾지 못했습니다. 주문관리에서 다시 확인해주세요.");
