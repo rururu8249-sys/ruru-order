@@ -77,10 +77,54 @@ function isDepositConfirmed(deposit: DepositRow) {
   return Boolean(deposit.confirmed_at) || ["수동입금확인", "자동입금확인", "입금확인", "매칭완료", "처리완료", "완료"].includes(status);
 }
 
-function getDepositTimeLabel(value: unknown) {
-  const text = String(value || "").trim();
-  if (!text) return "-";
-  return text.slice(0, 8);
+function pad2(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function getKoreanWeekday(date: Date) {
+  return ["일", "월", "화", "수", "목", "금", "토"][date.getDay()] || "";
+}
+
+function makeLocalDate(value: string) {
+  const normalized = value.trim().replace(" ", "T");
+  const date = new Date(normalized);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+function getDepositTimeLabel(value: unknown, createdAt?: unknown) {
+  const raw = String(value || "").trim();
+  const createdRaw = String(createdAt || "").trim();
+
+  if (!raw && !createdRaw) return "-";
+
+  let timeText = "";
+  let dateSource = raw;
+
+  if (/^\d{2}:\d{2}$/.test(raw)) {
+    timeText = `${raw}:00`;
+    dateSource = createdRaw;
+  } else if (/^\d{2}:\d{2}:\d{2}$/.test(raw)) {
+    timeText = raw;
+    dateSource = createdRaw;
+  }
+
+  const parsedDate = makeLocalDate(dateSource || createdRaw || raw);
+
+  if (!timeText && parsedDate) {
+    timeText = `${pad2(parsedDate.getHours())}:${pad2(parsedDate.getMinutes())}:${pad2(parsedDate.getSeconds())}`;
+  }
+
+  if (!timeText && raw) {
+    timeText = raw.slice(0, 8);
+  }
+
+  if (!parsedDate) {
+    return timeText || raw || "-";
+  }
+
+  const dateText = `${parsedDate.getMonth() + 1}월 ${parsedDate.getDate()}일(${getKoreanWeekday(parsedDate)})`;
+
+  return `${dateText} ${timeText || "-"}`;
 }
 
 export default function ManualPaymentMatchDrawer(props: Props) {
@@ -362,7 +406,7 @@ export default function ManualPaymentMatchDrawer(props: Props) {
                         {deposit.depositor_name || "-"}
                       </div>
                       <div className="mt-0.5 text-xs font-bold text-neutral-400">
-                        입금시간 {getDepositTimeLabel(deposit.deposited_time)}
+                        입금일시 {getDepositTimeLabel(deposit.deposited_time, deposit.created_at)}
                       </div>
                     </div>
 

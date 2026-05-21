@@ -35,6 +35,8 @@ export default function AdminTodayWorkQueue({
   onGoShipping: () => void;
   onOpenPaymentMatch: (groupId: string) => void;
 }) {
+  void onGoDeposits;
+
   return (
     <section className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -46,7 +48,12 @@ export default function AdminTodayWorkQueue({
             오늘 미입금 주문과 수동매칭을 여기에서 바로 처리합니다.
           </p>
         </div>
-        <AdminTodayWorkTabs activeTab={activeTab} setActiveTab={setActiveTab} counts={counts} />
+
+        <AdminTodayWorkTabs
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          counts={counts}
+        />
       </div>
 
       <div className="max-h-[520px] overflow-y-auto rounded-2xl border border-neutral-100">
@@ -57,33 +64,65 @@ export default function AdminTodayWorkQueue({
         ) : (
           <div className="divide-y divide-neutral-100">
             {items.slice(0, 50).map((item) => (
-              <div key={item.id} className="grid gap-3 px-4 py-3 lg:grid-cols-[108px_minmax(320px,720px)_auto] lg:items-center lg:justify-start">
-                <div>
+              <div
+                key={item.id}
+                className="grid gap-3 px-4 py-3 lg:grid-cols-[112px_minmax(260px,1fr)_minmax(210px,300px)_auto] lg:items-center"
+              >
+                <div className="min-w-0">
                   <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${toneClass[item.tone]}`}>
                     {item.label}
                   </span>
-                  <div className="mt-1 text-[11px] font-bold text-neutral-400">
-                    {item.orderCode}
+                  <div className="mt-1 truncate text-[11px] font-black text-neutral-400">
+                    {item.orderCode || "-"}
                   </div>
                 </div>
 
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-black text-neutral-950">{item.nickname}</span>
-                    <span className="text-sm font-black text-neutral-700">{item.amountText}</span>
+                    <span className="truncate text-sm font-black text-neutral-950">
+                      {item.nickname || "닉네임 없음"}
+                    </span>
+                    <span className="text-sm font-black text-neutral-700">
+                      {item.amountText}
+                    </span>
                     <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-black text-neutral-600">
                       {item.statusText}
                     </span>
                   </div>
+
                   <div className="mt-1 truncate text-xs font-bold text-neutral-500">
-                    {item.product}
+                    {item.product || "상품명 없음"}
                   </div>
-                  <div className="mt-1 text-[11px] font-bold text-neutral-400">
+
+                  <div className="mt-1 text-[11px] font-bold text-neutral-400 lg:hidden">
                     {item.timeText}
                   </div>
                 </div>
 
-                <div className="flex flex-wrap justify-start gap-1.5 lg:pl-2">
+                <div className="rounded-2xl bg-neutral-50 px-3 py-2">
+                  <div className="grid gap-1 text-[11px] font-bold text-neutral-500">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-neutral-400">주문번호</span>
+                      <span className="truncate font-black text-neutral-700">
+                        {item.orderCode || "-"}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-neutral-400">주문일시</span>
+                      <span className="truncate font-black text-neutral-700">
+                        {item.timeText || "-"}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-neutral-400">처리구분</span>
+                      <span className="truncate font-black text-neutral-700">
+                        {item.label}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap justify-start gap-1.5 lg:justify-end">
                   <button
                     type="button"
                     onClick={onGoOrders}
@@ -91,6 +130,7 @@ export default function AdminTodayWorkQueue({
                   >
                     주문관리
                   </button>
+
                   {item.tab === "payment" ? (
                     <button
                       type="button"
@@ -100,6 +140,7 @@ export default function AdminTodayWorkQueue({
                       입금매칭
                     </button>
                   ) : null}
+
                   {item.tab === "shipping" ? (
                     <button
                       type="button"
