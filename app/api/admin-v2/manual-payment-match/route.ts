@@ -110,8 +110,8 @@ export async function POST(request: NextRequest) {
     const { error: updateOrdersError } = await supabase
       .from("orders")
       .update({
-        admin_order_status_v2: "입금확인",
-        order_manage_status: "입금확인",
+        admin_order_status_v2: "수동입금확인",
+        order_manage_status: "수동입금확인",
         deposit_confirmed_at: nowIso,
       })
       .in("id", ids);

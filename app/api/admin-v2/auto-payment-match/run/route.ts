@@ -333,8 +333,8 @@ export async function POST(request: NextRequest) {
       const orderUpdate = await supabase
         .from("orders")
         .update({
-          admin_order_status_v2: "입금확인",
-          order_manage_status: "입금확인",
+          admin_order_status_v2: "자동입금확인",
+          order_manage_status: "자동입금확인",
           deposit_confirmed_at: nowIso,
         })
         .in("id", candidate.order_ids);

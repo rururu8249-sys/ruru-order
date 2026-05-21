@@ -817,7 +817,7 @@ export function AdminV2Client() {
       return;
     }
 
-    const changedRows = group.rows.filter((row) => getOrderStatusValue(row) !== "입금확인");
+    const changedRows = group.rows.filter((row) => !String(getOrderStatusValue(row) || "").includes("입금확인"));
 
     const statusLogPayloads = changedRows.map((row) => {
       const beforeStatus = getOrderStatusValue(row);
@@ -829,9 +829,9 @@ export function AdminV2Client() {
         changed_by: "admin-v2",
         change_source: "admin-v2-manual-payment-match",
         before_status: beforeStatus,
-        after_status: "입금확인",
+        after_status: "수동입금확인",
         before_order_manage_status: row.order_manage_status || beforeStatus,
-        after_order_manage_status: "입금확인",
+        after_order_manage_status: "수동입금확인",
         payment_method: row.payment_method || "",
         deposit_confirmed_at_before: row.deposit_confirmed_at || "",
         deposit_confirmed_at_after: row.deposit_confirmed_at || nowIso,
@@ -845,8 +845,8 @@ export function AdminV2Client() {
         },
         snapshot_after: {
           id: row.id,
-          admin_order_status_v2: "입금확인",
-          order_manage_status: "입금확인",
+          admin_order_status_v2: "수동입금확인",
+          order_manage_status: "수동입금확인",
           payment_method: row.payment_method,
           deposit_confirmed_at: row.deposit_confirmed_at || nowIso,
           matched_deposit_id: deposit.id,
@@ -859,8 +859,8 @@ export function AdminV2Client() {
         ids.includes(order.id)
           ? {
               ...order,
-              admin_order_status_v2: "입금확인",
-              order_manage_status: "입금확인",
+              admin_order_status_v2: "수동입금확인",
+              order_manage_status: "수동입금확인",
               deposit_confirmed_at: order.deposit_confirmed_at || nowIso,
             }
           : order
@@ -870,8 +870,8 @@ export function AdminV2Client() {
     const { error: orderError } = await supabase
       .from("orders")
       .update({
-        admin_order_status_v2: "입금확인",
-        order_manage_status: "입금확인",
+        admin_order_status_v2: "수동입금확인",
+        order_manage_status: "수동입금확인",
         deposit_confirmed_at: nowIso,
       })
       .in("id", ids);

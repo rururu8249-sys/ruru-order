@@ -1,5 +1,7 @@
 "use client";
 
+import { paymentConfirmStatusLabel } from "@/lib/admin-v2/paymentConfirmStatus";
+
 type DepositRow = {
   id: string | number;
   depositor_name?: string | null;
@@ -41,8 +43,8 @@ function statusLabel(value: any) {
   const status = String(value || "").trim();
 
   if (!status) return "미확인";
-  if (status === "자동입금확인") return "자동확인";
-  if (status === "수동입금확인") return "수동확인";
+  if (status === "자동입금확인") return "자동입금확인";
+  if (status === "수동입금확인") return "수동입금확인";
 
   return status;
 }
