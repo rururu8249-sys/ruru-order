@@ -115,6 +115,26 @@ export default function AdminTodayDashboard({
     <section className="grid gap-4">
       <AdminTodayHeader broadcasts={broadcasts} />
 
+
+          <AdminTodayPeriodFilter
+            draftStartDate={draftPeriodStartDate}
+            draftEndDate={draftPeriodEndDate}
+            appliedLabel={periodLabel}
+            onDraftStartDateChange={setDraftPeriodStartDate}
+            onDraftEndDateChange={setDraftPeriodEndDate}
+            onApply={() => {
+              setPeriodStartDate(draftPeriodStartDate);
+              setPeriodEndDate(draftPeriodEndDate);
+            }}
+            onResetToday={() => {
+              setDraftPeriodStartDate(todayDateKey);
+              setDraftPeriodEndDate(todayDateKey);
+              setPeriodStartDate(todayDateKey);
+              setPeriodEndDate(todayDateKey);
+            }}
+          />
+
+
       <AdminTodayCollapsiblePanel
         title="오늘 핵심 현황 / 돈 흐름"
         description="주문·입금·배송·고객 숫자와 돈 흐름은 필요할 때 펼쳐서 확인합니다."
@@ -154,24 +174,6 @@ export default function AdminTodayDashboard({
               onClick={onGoCustomers}
             />
           </section>
-
-          <AdminTodayPeriodFilter
-            draftStartDate={draftPeriodStartDate}
-            draftEndDate={draftPeriodEndDate}
-            appliedLabel={periodLabel}
-            onDraftStartDateChange={setDraftPeriodStartDate}
-            onDraftEndDateChange={setDraftPeriodEndDate}
-            onApply={() => {
-              setPeriodStartDate(draftPeriodStartDate);
-              setPeriodEndDate(draftPeriodEndDate);
-            }}
-            onResetToday={() => {
-              setDraftPeriodStartDate(todayDateKey);
-              setDraftPeriodEndDate(todayDateKey);
-              setPeriodStartDate(todayDateKey);
-              setPeriodEndDate(todayDateKey);
-            }}
-          />
 
           <AdminTodayMoneySummary summary={moneySummary} />
         </div>
