@@ -925,7 +925,7 @@ export function AdminV2Client() {
       return;
     }
 
-    const shouldSaveDepositConfirmedAt = nextStatus === "입금확인";
+    const shouldSaveDepositConfirmedAt = ["입금확인", "자동입금확인", "수동입금확인"].includes(nextStatus);
     const shouldSaveShippedAt = nextStatus === "출고완료";
 
     if (shouldSaveShippedAt) {
@@ -1418,6 +1418,8 @@ export function AdminV2Client() {
         onClose={() => setDetailDrawerGroupId(null)}
         onTrackingChange={updateOrderTracking}
         onFinalAmountChange={updateOrderFinalAmount}
+        onStatusChange={updateOrderStatus}
+        onOpenManualMatch={setManualMatchGroup}
       />
 
       <ManualPaymentMatchDrawer

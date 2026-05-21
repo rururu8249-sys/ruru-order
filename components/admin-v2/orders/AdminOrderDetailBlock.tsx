@@ -36,12 +36,16 @@ export default function AdminOrderDetailBlock({
   statusChangeLogs,
   onTrackingChange,
   onFinalAmountChange,
+  onStatusChange,
+  onOpenManualMatch,
 }: {
   group: OrderGroup;
   moneyEditLogs: MoneyEditLogRow[];
   statusChangeLogs: StatusChangeLogRow[];
   onTrackingChange: (group: OrderGroup, trackingCompany: string, trackingNumber: string) => Promise<void>;
   onFinalAmountChange: (row: OrderRow, nextAmount: number, reason: string) => Promise<void>;
+  onStatusChange: (group: OrderGroup, nextStatus: string) => Promise<void>;
+  onOpenManualMatch: (group: OrderGroup) => void;
 }) {
   const first = group.first;
   const paymentMeta = paymentStatusMeta(first);
@@ -55,7 +59,11 @@ export default function AdminOrderDetailBlock({
 
   return (
     <div className="grid gap-3 bg-neutral-50 px-3 py-3">
-      <AdminOrderDetailPriorityPanel group={group} />
+      <AdminOrderDetailPriorityPanel
+        group={group}
+        onStatusChange={onStatusChange}
+        onOpenManualMatch={onOpenManualMatch}
+      />
       <AdminOrderDetailSummary
         phoneText={displayOrderPhone(first)}
         addressText={address || "-"}

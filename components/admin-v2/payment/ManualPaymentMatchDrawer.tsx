@@ -321,7 +321,7 @@ export default function ManualPaymentMatchDrawer(props: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/35">
+    <div className="fixed inset-0 z-[90] bg-black/35">
       <aside className="ml-auto flex h-full w-full max-w-3xl flex-col bg-white shadow-[0_24px_70px_rgba(0,0,0,0.28)]">
         <header className="shrink-0 border-b border-neutral-200 p-5">
           <div className="text-[12px] font-black tracking-widest text-neutral-400">

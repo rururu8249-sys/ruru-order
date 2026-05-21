@@ -29,6 +29,8 @@ type AdminOrderDetailDrawerProps = {
     nextAmount: number,
     reason: string
   ) => Promise<void>;
+  onStatusChange: (group: OrderGroup, nextStatus: string) => Promise<void>;
+  onOpenManualMatch: (group: OrderGroup) => void;
 };
 
 export default function AdminOrderDetailDrawer({
@@ -38,6 +40,8 @@ export default function AdminOrderDetailDrawer({
   onClose,
   onTrackingChange,
   onFinalAmountChange,
+  onStatusChange,
+  onOpenManualMatch,
 }: AdminOrderDetailDrawerProps) {
   useEffect(() => {
     if (!group) return;
@@ -107,6 +111,8 @@ export default function AdminOrderDetailDrawer({
             statusChangeLogs={statusChangeLogs}
             onTrackingChange={onTrackingChange}
             onFinalAmountChange={onFinalAmountChange}
+            onStatusChange={onStatusChange}
+            onOpenManualMatch={onOpenManualMatch}
           />
         </div>
 

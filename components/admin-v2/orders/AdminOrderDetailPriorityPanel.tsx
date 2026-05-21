@@ -1,9 +1,10 @@
 "use client";
 
 // components/admin-v2/orders/AdminOrderDetailPriorityPanel.tsx
-// 목적: 주문상세 최상단에서 지금 해야 할 일을 한눈에 보여줌
-// 주의: UI 표시 전용. 돈/입금/배송/정산 저장 로직 없음.
+// 목적: 주문상세 최상단에서 지금 해야 할 일과 처리 버튼을 한눈에 보여줌
+// 주의: UI 액션 연결 전용. 자동입금확인, 금액계산, 정산, 송장 로직 없음.
 
+import { useState } from "react";
 import type { OrderGroup } from "@/lib/admin-v2/types";
 import { money } from "@/lib/admin-v2/formatters";
 import {
@@ -16,6 +17,8 @@ import { getDeliveryStageStatusLabel } from "@/lib/admin-v2/statusDisplay";
 
 type Props = {
   group: OrderGroup;
+  onStatusChange: (group: OrderGroup, nextStatus: string) => Promise<void>;
+  onOpenManualMatch: (group: OrderGroup) => void;
 };
 
 function chipClass(tone: "danger" | "warn" | "good" | "blue" | "neutral") {
@@ -26,7 +29,13 @@ function chipClass(tone: "danger" | "warn" | "good" | "blue" | "neutral") {
   return "border-neutral-200 bg-neutral-100 text-neutral-700";
 }
 
-export default function AdminOrderDetailPriorityPanel({ group }: Props) {
+export default function AdminOrderDetailPriorityPanel({
+  group,
+  onStatusChange,
+  onOpenManualMatch,
+}: Props) {
+  const [savingAction, setSavingAction] = useState<string | null>(null);
+
   const first = group.first;
   const rawStatus = getOrderStatusValue(first);
   const paymentMeta = paymentStatusMeta(first);
@@ -44,15 +53,15 @@ export default function AdminOrderDetailPriorityPanel({ group }: Props) {
 
   if (canceled) {
     title = "주문서 취소 상태";
-    desc = "복구가 필요하면 취소 상태를 먼저 확인하세요.";
+    desc = "다시 진행해야 하면 결제 가능하게 복구하세요.";
     tone = "danger";
   } else if (bankUnpaid) {
     title = "입금확인 필요";
-    desc = "입금 매칭 또는 실제 확인 후 수동 결제완료 처리가 필요합니다.";
+    desc = "입금 매칭을 우선 권장합니다. 실제 확인이 끝난 경우에만 매칭없이 결제완료를 사용하세요.";
     tone = "warn";
   } else if (cardUnpaid) {
     title = "카드결제 확인 필요";
-    desc = "카드 결제 여부를 확인한 뒤 처리하세요.";
+    desc = "카드 결제 여부를 확인한 뒤 카드결제완료 처리하세요.";
     tone = "warn";
   } else if (!shipped) {
     title = hasTracking ? "출고완료 처리 필요" : "배송처리 필요";
@@ -66,10 +75,63 @@ export default function AdminOrderDetailPriorityPanel({ group }: Props) {
     tone = "good";
   }
 
+  const runStatusAction = async (actionKey: string, nextStatus: string, messageLines: string[]) => {
+    const ok = window.confirm(messageLines.join("\n"));
+    if (!ok) return;
+
+    setSavingAction(actionKey);
+    try {
+      await onStatusChange(group, nextStatus);
+    } finally {
+      setSavingAction(null);
+    }
+  };
+
+  const cancelOrder = () => {
+    runStatusAction("cancel", "주문취소", [
+      "이 주문서를 주문서 취소 상태로 변경할까요?",
+      "",
+      "중요: 주문상태만 변경합니다.",
+      "환불, 입금내역 연결 해제, 정산 차감은 자동 처리하지 않습니다.",
+      "돈 관련 처리는 별도로 확인해야 합니다.",
+    ]);
+  };
+
+  const restoreOrder = () => {
+    runStatusAction("restore", "미설정", [
+      "주문서 취소 상태를 다시 결제 가능 상태로 복구할까요?",
+      "",
+      "상태는 미설정으로 돌아갑니다.",
+      "기존 입금확인시간/입금내역/정산 이력은 자동 삭제하지 않습니다.",
+    ]);
+  };
+
+  const confirmWithoutDeposit = () => {
+    runStatusAction("manual-paid", "수동입금확인", [
+      "입금내역 매칭 없이 결제완료 처리할까요?",
+      "",
+      "주문상태는 결제완료(수동)으로 표시됩니다.",
+      "deposits 입금내역과는 연결하지 않습니다.",
+      "실제 결제/입금 확인이 끝난 경우에만 진행하세요.",
+    ]);
+  };
+
+  const confirmCardPaid = () => {
+    runStatusAction("card-paid", "카드결제완료", [
+      "카드결제완료 처리할까요?",
+      "",
+      "실제 카드결제 확인이 끝난 경우에만 진행하세요.",
+      "입금내역 매칭과는 별개로 처리됩니다.",
+    ]);
+  };
+
+  const buttonBase =
+    "h-12 rounded-xl px-4 text-[14px] font-black active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50";
+
   return (
     <section className={`rounded-2xl border p-4 shadow-sm ${chipClass(tone)}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="min-w-[260px] flex-1">
           <div className="text-[13px] font-black opacity-70">지금 해야 할 일</div>
           <div className="mt-1 text-[26px] font-black tracking-[-0.06em]">
             {title}
@@ -93,6 +155,79 @@ export default function AdminOrderDetailPriorityPanel({ group }: Props) {
             <span className="text-red-600">{money(group.totalAmount)}</span>
           </div>
         </div>
+      </div>
+
+      <div className="mt-4 grid gap-2 md:grid-cols-3">
+        {canceled ? (
+          <button
+            type="button"
+            onClick={restoreOrder}
+            disabled={savingAction !== null}
+            className={`${buttonBase} border border-emerald-300 bg-white text-emerald-700`}
+          >
+            {savingAction === "restore" ? "처리중..." : "🔄 결제 가능하게 복구하기"}
+          </button>
+        ) : bankUnpaid ? (
+          <>
+            <button
+              type="button"
+              onClick={() => onOpenManualMatch(group)}
+              disabled={savingAction !== null}
+              className={`${buttonBase} border border-blue-300 bg-white text-blue-700`}
+            >
+              입금 매칭하기
+            </button>
+            <button
+              type="button"
+              onClick={confirmWithoutDeposit}
+              disabled={savingAction !== null}
+              className={`${buttonBase} border border-slate-300 bg-white text-slate-800`}
+            >
+              {savingAction === "manual-paid" ? "처리중..." : "매칭없이 결제완료"}
+            </button>
+            <button
+              type="button"
+              onClick={cancelOrder}
+              disabled={savingAction !== null}
+              className={`${buttonBase} border border-red-200 bg-white text-red-600`}
+            >
+              {savingAction === "cancel" ? "처리중..." : "❌ 주문취소"}
+            </button>
+          </>
+        ) : cardUnpaid ? (
+          <>
+            <button
+              type="button"
+              onClick={confirmCardPaid}
+              disabled={savingAction !== null}
+              className={`${buttonBase} border border-blue-300 bg-white text-blue-700 md:col-span-2`}
+            >
+              {savingAction === "card-paid" ? "처리중..." : "카드결제완료 처리"}
+            </button>
+            <button
+              type="button"
+              onClick={cancelOrder}
+              disabled={savingAction !== null}
+              className={`${buttonBase} border border-red-200 bg-white text-red-600`}
+            >
+              {savingAction === "cancel" ? "처리중..." : "❌ 주문취소"}
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="rounded-xl bg-white/80 px-4 py-3 text-[13px] font-black text-neutral-700 md:col-span-2">
+              결제완료 상태입니다. 송장 입력은 아래 C. 입금 · 출고 영역에서 처리하세요.
+            </div>
+            <button
+              type="button"
+              onClick={cancelOrder}
+              disabled={savingAction !== null}
+              className={`${buttonBase} border border-red-200 bg-white text-red-600`}
+            >
+              {savingAction === "cancel" ? "처리중..." : "❌ 주문취소"}
+            </button>
+          </>
+        )}
       </div>
     </section>
   );
