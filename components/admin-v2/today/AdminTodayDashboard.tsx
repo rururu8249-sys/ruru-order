@@ -20,6 +20,7 @@ import AdminTodayWorkQueue from "@/components/admin-v2/today/AdminTodayWorkQueue
 import AdminTodayRankings from "@/components/admin-v2/today/AdminTodayRankings";
 import AdminTodayKakaoPanel from "@/components/admin-v2/today/AdminTodayKakaoPanel";
 import AdminTodayCollapsiblePanel from "@/components/admin-v2/today/AdminTodayCollapsiblePanel";
+import AdminTodayYoutubeLivePanel from "@/components/admin-v2/today/AdminTodayYoutubeLivePanel";
 import {
   buildBuyerRanking,
   buildMoneySummary,
@@ -173,6 +174,15 @@ export default function AdminTodayDashboard({
           />
 
 
+          </AdminTodayCollapsiblePanel>
+
+          <AdminTodayCollapsiblePanel
+            title="유튜브 LIVE 채팅"
+            description="방송 채팅창을 열고, 복사한 채팅을 검색/분석/오늘할일 등록합니다."
+            badge="방송채팅"
+            defaultOpen={false}
+          >
+            <AdminTodayYoutubeLivePanel />
           </AdminTodayCollapsiblePanel>
 
           <section className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
