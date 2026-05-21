@@ -1,7 +1,7 @@
 "use client";
 
 // components/admin-v2/today/AdminTodayKakaoPanel.tsx
-// 목적: 오늘할일에서 카톡채널 열기 + 대화 복붙 분석 + 고객메모 저장
+// 목적: 오늘할일에서 카톡 대화 붙여넣기 + 이슈태그 선택 + ChatGPT 분석문구 복사
 // 중요:
 // - 고객 메시지만 문의 분석
 // - 유혜원/한두희 답변은 고객으로 인식하지 않고 관리자 답변으로 기록
@@ -18,8 +18,6 @@ import {
   type KakaoIssueType,
 } from "@/components/admin-v2/today/kakaoSupportUtils";
 import { buildKakaoCustomerOnlyConversation } from "@/components/admin-v2/today/kakaoConversationFilter";
-import AdminTodayKakaoManualFields from "@/components/admin-v2/today/AdminTodayKakaoManualFields";
-import AdminTodayKakaoCustomerPicker from "@/components/admin-v2/today/AdminTodayKakaoCustomerPicker";
 import AdminTodayKakaoTimelineList from "@/components/admin-v2/today/AdminTodayKakaoTimelineList";
 import AdminTodayKakaoGptPromptPanel from "@/components/admin-v2/today/AdminTodayKakaoGptPromptPanel";
 import AdminTodayIssueTagSelector from "@/components/admin-v2/today/AdminTodayIssueTagSelector";
@@ -186,15 +184,6 @@ export default function AdminTodayKakaoPanel({
     timelineMemoText,
   ]);
 
-  const copyReply = async () => {
-    try {
-      await navigator.clipboard.writeText(analysis.recommendedReply);
-      alert("추천 답변을 복사했습니다.");
-    } catch {
-      alert("복사에 실패했습니다. 추천 답변을 직접 드래그해서 복사해주세요.");
-    }
-  };
-
 
   const registerTodayTaskFromItem = async (item: KakaoTimelineItem) => {
     if (item.role !== "customer") {
@@ -316,7 +305,7 @@ export default function AdminTodayKakaoPanel({
             카톡 응대 업무
           </h2>
           <p className="mt-1 text-xs font-bold text-neutral-500">
-            1) 대화 붙여넣기 → 2) 이슈태그 선택 → 3) 분석문구 복사 또는 필요 문의만 오늘할일 등록
+            카톡 대화 붙여넣기 → 이슈태그 선택 → ChatGPT 분석 또는 오늘할일 등록만 사용합니다.
           </p>
         </div>
 
@@ -353,7 +342,7 @@ export default function AdminTodayKakaoPanel({
             </div>
 
             <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-neutral-600">
-              고객 {filteredConversation.customerCount}줄 · 관리자 {filteredConversation.adminCount}줄 · 제외 {filteredConversation.autoCount}줄
+              고객 {filteredConversation.customerCount}줄 · 제외 {filteredConversation.autoCount}줄
             </span>
           </div>
 
@@ -382,129 +371,20 @@ export default function AdminTodayKakaoPanel({
         />
 
         <AdminTodayCollapsiblePanel
-          title="상세 기능 / 오늘할일 등록"
-          description="고객별 문의를 하나씩 오늘할일에 등록하거나, 고객 연결·메모 저장이 필요할 때만 펼쳐서 사용합니다."
-          badge={timelineItems.length > 0 ? `${timelineItems.length}개 분석` : "선택 사용"}
+          title="고객 문의별 오늘할일 등록"
+          description="ChatGPT 분석과 별개로, 처리해야 하는 고객 문의만 골라 오늘할일에 등록합니다."
+          badge={timelineItems.filter((item) => item.role === "customer").length > 0 ? `${timelineItems.filter((item) => item.role === "customer").length}개 문의` : "선택 사용"}
           defaultOpen={false}
         >
-          <div className="grid gap-3">
-            <div className="grid gap-3 xl:grid-cols-2">
-              <div>
-                <div className="mb-1 flex items-center justify-between gap-2">
-                  <span className="text-xs font-black text-neutral-500">분석 기준 대화</span>
-                  <span className="rounded-full bg-red-50 px-2 py-1 text-[11px] font-black text-red-600">
-                    고객 {filteredConversation.customerCount}줄 · 관리자답변 {filteredConversation.adminCount}줄 · 자동응답 제외 {filteredConversation.autoCount}줄
-                  </span>
-                </div>
-                <textarea
-                  value={displayedCustomerText}
-                  onChange={(event) => setManualCustomerText(event.target.value)}
-                  placeholder="고객 메시지만 남는 영역입니다. 필요하면 직접 수정하세요."
-                  className="h-28 w-full resize-none rounded-2xl border border-blue-100 bg-blue-50/40 p-3 text-sm font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100/70"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-3">
-                  <div className="mb-1 text-xs font-black text-blue-700">관리자 답변 이름/문구</div>
-                  <input
-                    value={adminSenderText}
-                    onChange={(event) => setAdminSenderText(event.target.value)}
-                    placeholder="예: 유혜원님이 보냄, 한두희님이 보냄"
-                    className="h-10 w-full rounded-xl border border-blue-100 bg-white px-3 text-xs font-bold outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div className="rounded-2xl border border-red-100 bg-red-50/40 p-3">
-                  <div className="mb-1 text-xs font-black text-red-700">자동응답 제외 이름/문구</div>
-                  <input
-                    value={autoSenderText}
-                    onChange={(event) => setAutoSenderText(event.target.value)}
-                    placeholder="예: 루루동이님이 보냄, 카나나 상담매니저가 보냄"
-                    className="h-10 w-full rounded-xl border border-red-100 bg-white px-3 text-xs font-bold outline-none focus:border-red-500"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <AdminTodayKakaoTimelineList
-              items={timelineItems}
-              registeringItemId={registeringTaskItemId}
-              onRegisterTask={registerTodayTaskFromItem}
-            />
-
-            <AdminTodayKakaoManualFields
-              kakaoDisplayName={kakaoDisplayName}
-              setKakaoDisplayName={setKakaoDisplayName}
-              manualIssueType={manualIssueType}
-              setManualIssueType={setManualIssueType}
-              relatedProduct={relatedProduct}
-              setRelatedProduct={setRelatedProduct}
-              detectedDateLabel={detectedDate.label}
-            />
-
-            <div className="grid gap-3 xl:grid-cols-[1fr_0.95fr]">
-              <div className="rounded-2xl border border-neutral-100 bg-neutral-50 p-3">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className={`rounded-full px-3 py-1 text-xs font-black ${analysis.toneClass}`}>
-                    {analysis.label}
-                  </span>
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-neutral-600">
-                    위험도 {analysis.riskLabel}
-                  </span>
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-neutral-600">
-                    {detectedDate.confidence === "auto"
-                      ? "날짜 자동인식"
-                      : detectedDate.confidence === "needs_check"
-                        ? "날짜 확인필요"
-                        : "저장시각 기준"}
-                  </span>
-                </div>
-
-                <div className="text-xs font-black text-neutral-400">요약</div>
-                <div className="mt-1 min-h-[40px] text-sm font-bold leading-relaxed text-neutral-800">
-                  {analysis.summary}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-neutral-100 bg-neutral-50 p-3">
-                <div className="mb-2 text-xs font-black text-neutral-400">추천 답변</div>
-                <div className="min-h-[58px] text-sm font-bold leading-relaxed text-neutral-800">
-                  {analysis.recommendedReply}
-                </div>
-                <button
-                  type="button"
-                  onClick={copyReply}
-                  className="mt-3 rounded-xl bg-neutral-950 px-3 py-2 text-xs font-black text-white active:scale-[0.98]"
-                >
-                  추천답변 복사
-                </button>
-              </div>
-            </div>
-
-            <AdminTodayKakaoCustomerPicker
-              matches={matches}
-              searchResults={searchResults}
-              selectedCustomerId={selectedCustomerId}
-              setSelectedCustomerId={setSelectedCustomerId}
-              customerSearch={customerSearch}
-              setCustomerSearch={setCustomerSearch}
-            />
-
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={saveMemo}
-                disabled={saving}
-                className="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-black text-white active:scale-[0.98] disabled:bg-neutral-300"
-              >
-                {saving ? "저장중" : "고객메모 저장"}
-              </button>
-            </div>
-          </div>
+          <AdminTodayKakaoTimelineList
+            items={timelineItems}
+            registeringItemId={registeringTaskItemId}
+            onRegisterTask={registerTodayTaskFromItem}
+          />
         </AdminTodayCollapsiblePanel>
       </div>
     </section>
   );
 }
+
 
