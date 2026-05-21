@@ -28,6 +28,7 @@ import {
 } from "@/lib/admin-v2/orderHelpers";
 import AdminOrderDetailSummary from "@/components/admin-v2/orders/AdminOrderDetailSummary";
 import AdminOrderMemoSection from "@/components/admin-v2/orders/AdminOrderMemoSection";
+import AdminOrderDetailPriorityPanel from "@/components/admin-v2/orders/AdminOrderDetailPriorityPanel";
 
 export default function AdminOrderDetailBlock({
   group,
@@ -53,7 +54,8 @@ export default function AdminOrderDetailBlock({
   const productSummary = group.rows.map((row) => buildProductSummaryFromRow(row)).join(" / ");
 
   return (
-    <div className="border-t border-neutral-100 bg-neutral-50 px-3 py-3">
+    <div className="grid gap-3 bg-neutral-50 px-3 py-3">
+      <AdminOrderDetailPriorityPanel group={group} />
       <AdminOrderDetailSummary
         phoneText={displayOrderPhone(first)}
         addressText={address || "-"}
@@ -103,86 +105,94 @@ export default function AdminOrderDetailBlock({
 
 function StatusChangeLogPanel({ logs }: { logs: StatusChangeLogRow[] }) {
   return (
-    <div className="mt-3 rounded-xl border border-neutral-200 bg-white p-3">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <div className="text-[15px] font-black">🔁 상태 변경이력</div>
-          <div className="mt-0.5 text-[12px] font-bold text-neutral-500">
-            주문 상태를 누가/언제/무엇에서 무엇으로 바꿨는지 확인합니다.
+    <details className="mt-3 rounded-xl border border-neutral-200 bg-white p-3">
+      <summary className="cursor-pointer list-none">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-[15px] font-black">🔁 상태 변경이력</div>
+            <div className="mt-0.5 text-[12px] font-bold text-neutral-500">
+              필요할 때만 펼쳐서 확인합니다.
+            </div>
+          </div>
+          <div className="rounded-lg bg-neutral-100 px-2 py-1 text-[11px] font-black text-neutral-600">
+            {logs.length}건
           </div>
         </div>
-        <div className="rounded-lg bg-neutral-100 px-2 py-1 text-[11px] font-black text-neutral-600">
-          {logs.length}건
-        </div>
-      </div>
+      </summary>
 
-      {logs.length === 0 ? (
-        <div className="rounded-xl bg-neutral-50 p-3 text-center text-[12px] font-bold text-neutral-400">
-          상태 변경이력이 없습니다.
-        </div>
-      ) : (
-        <div className="grid gap-1.5">
-          {logs.map((log) => (
-            <div key={log.id} className="grid gap-1 rounded-xl bg-neutral-50 p-2 text-[12px] font-bold text-neutral-700 md:grid-cols-[128px_1fr_160px] md:items-center">
-              <div className="font-black text-neutral-500">{formatDateLabel(log.changed_at)}</div>
-              <div>
-                <span className="font-black text-amber-700">{getOrderStatusLabel(log.before_status)}</span>
-                <span className="mx-1 text-neutral-400">→</span>
-                <span className="font-black text-blue-700">{getOrderStatusLabel(log.after_status)}</span>
-                <span className="ml-2 text-neutral-500">
-                  {log.payment_method || "-"}
-                  {log.deposit_confirmed_at_after ? ` · 입금확인 ${formatDateLabel(log.deposit_confirmed_at_after)}` : ""}
-                </span>
+      <div className="mt-3">
+        {logs.length === 0 ? (
+          <div className="rounded-xl bg-neutral-50 p-3 text-center text-[12px] font-bold text-neutral-400">
+            상태 변경이력이 없습니다.
+          </div>
+        ) : (
+          <div className="grid gap-1.5">
+            {logs.map((log) => (
+              <div key={log.id} className="grid gap-1 rounded-xl bg-neutral-50 p-2 text-[12px] font-bold text-neutral-700 md:grid-cols-[128px_1fr_160px] md:items-center">
+                <div className="font-black text-neutral-500">{formatDateLabel(log.changed_at)}</div>
+                <div>
+                  <span className="font-black text-amber-700">{getOrderStatusLabel(log.before_status)}</span>
+                  <span className="mx-1 text-neutral-400">→</span>
+                  <span className="font-black text-blue-700">{getOrderStatusLabel(log.after_status)}</span>
+                  <span className="ml-2 text-neutral-500">
+                    {log.payment_method || "-"}
+                    {log.deposit_confirmed_at_after ? ` · 입금확인 ${formatDateLabel(log.deposit_confirmed_at_after)}` : ""}
+                  </span>
+                </div>
+                <div className="text-neutral-500 md:text-right">
+                  {log.changed_by || "admin-v2"} · 주문ID {log.order_id || "-"}
+                </div>
               </div>
-              <div className="text-neutral-500 md:text-right">
-                {log.changed_by || "admin-v2"} · 주문ID {log.order_id || "-"}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </details>
   );
 }
 
 function MoneyEditLogPanel({ logs }: { logs: MoneyEditLogRow[] }) {
   return (
-    <div className="mt-3 rounded-xl border border-neutral-200 bg-white p-3">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <div className="text-[15px] font-black">🧾 금액 수정이력</div>
-          <div className="mt-0.5 text-[12px] font-bold text-neutral-500">
-            최종정산금액을 누가/언제/얼마에서 얼마로/왜 바꿨는지 확인합니다.
+    <details className="mt-3 rounded-xl border border-neutral-200 bg-white p-3">
+      <summary className="cursor-pointer list-none">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-[15px] font-black">🧾 금액 수정이력</div>
+            <div className="mt-0.5 text-[12px] font-bold text-neutral-500">
+              돈 관련 이력은 필요할 때만 펼쳐서 확인합니다.
+            </div>
+          </div>
+          <div className="rounded-lg bg-neutral-100 px-2 py-1 text-[11px] font-black text-neutral-600">
+            {logs.length}건
           </div>
         </div>
-        <div className="rounded-lg bg-neutral-100 px-2 py-1 text-[11px] font-black text-neutral-600">
-          {logs.length}건
-        </div>
-      </div>
+      </summary>
 
-      {logs.length === 0 ? (
-        <div className="rounded-xl bg-neutral-50 p-3 text-center text-[12px] font-bold text-neutral-400">
-          금액 수정이력이 없습니다.
-        </div>
-      ) : (
-        <div className="grid gap-1.5">
-          {logs.map((log) => (
-            <div key={log.id} className="grid gap-1 rounded-xl bg-neutral-50 p-2 text-[12px] font-bold text-neutral-700 md:grid-cols-[128px_1fr_160px] md:items-center">
-              <div className="font-black text-neutral-500">{formatDateLabel(log.changed_at)}</div>
-              <div>
-                <span className="font-black text-red-700">{money(log.before_numeric)}</span>
-                <span className="mx-1 text-neutral-400">→</span>
-                <span className="font-black text-blue-700">{money(log.after_numeric)}</span>
-                <span className="ml-2 text-neutral-500">사유: {log.reason || "-"}</span>
+      <div className="mt-3">
+        {logs.length === 0 ? (
+          <div className="rounded-xl bg-neutral-50 p-3 text-center text-[12px] font-bold text-neutral-400">
+            금액 수정이력이 없습니다.
+          </div>
+        ) : (
+          <div className="grid gap-1.5">
+            {logs.map((log) => (
+              <div key={log.id} className="grid gap-1 rounded-xl bg-neutral-50 p-2 text-[12px] font-bold text-neutral-700 md:grid-cols-[128px_1fr_160px] md:items-center">
+                <div className="font-black text-neutral-500">{formatDateLabel(log.changed_at)}</div>
+                <div>
+                  <span className="font-black text-red-700">{money(log.before_numeric)}</span>
+                  <span className="mx-1 text-neutral-400">→</span>
+                  <span className="font-black text-blue-700">{money(log.after_numeric)}</span>
+                  <span className="ml-2 text-neutral-500">사유: {log.reason || "-"}</span>
+                </div>
+                <div className="text-neutral-500 md:text-right">
+                  {log.changed_by || "admin-v2"} · 주문ID {log.order_id}
+                </div>
               </div>
-              <div className="text-neutral-500 md:text-right">
-                {log.changed_by || "admin-v2"} · 주문ID {log.order_id}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </details>
   );
 }
 

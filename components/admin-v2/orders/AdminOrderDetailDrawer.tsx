@@ -64,13 +64,13 @@ export default function AdminOrderDetailDrawer({
       onClick={onClose}
     >
       <aside
-        className="flex h-full w-full max-w-[980px] flex-col bg-neutral-50 shadow-[-18px_0_48px_rgba(15,23,42,0.24)]"
+        className="flex h-full w-full max-w-[1180px] flex-col bg-neutral-50 shadow-[-18px_0_48px_rgba(15,23,42,0.24)]"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white px-5 py-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-xs font-black text-blue-600">주문 상세</div>
+              <div className="text-xs font-black text-blue-600">주문 상세 · 빠른처리</div>
               <h2 className="mt-1 truncate text-2xl font-black tracking-[-0.05em] text-neutral-950">
                 {nickname}
               </h2>
@@ -113,7 +113,7 @@ export default function AdminOrderDetailDrawer({
         <footer className="border-t border-neutral-200 bg-white px-5 py-3">
           <div className="flex items-center justify-between gap-3">
             <div className="text-xs font-bold text-neutral-500">
-              목록은 유지되고, 상세 내용만 패널에서 확인합니다.
+              목록은 유지되고, 상세에서 지금 처리할 일을 먼저 확인합니다.
             </div>
 
             <button
