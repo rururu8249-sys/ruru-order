@@ -40,10 +40,10 @@ export default function AdminTodayWorkQueue({
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-black tracking-[-0.04em] text-neutral-950">
-            오늘 업무 큐
+            입금·주문 처리 큐
           </h2>
           <p className="mt-1 text-xs font-bold text-neutral-500">
-            주문관리 데이터를 업무별로 추려서 보여줍니다.
+            입금확인/입금매칭이 필요한 주문을 먼저 처리합니다.
           </p>
         </div>
         <AdminTodayWorkTabs activeTab={activeTab} setActiveTab={setActiveTab} counts={counts} />

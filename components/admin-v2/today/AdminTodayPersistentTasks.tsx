@@ -150,7 +150,7 @@ export default function AdminTodayPersistentTasks() {
               해결 전까지 뜨는 업무
             </h2>
             <p className="mt-1 text-xs font-bold text-neutral-500">
-              직접 등록한 업무는 완료 전까지 표시하고, 완료 후에는 이력에서 확인합니다.
+              직접 등록한 고객이슈만 완료 전까지 표시합니다.
             </p>
           </div>
 
@@ -212,25 +212,25 @@ export default function AdminTodayPersistentTasks() {
         ) : null}
 
         {loading ? (
-          <div className="rounded-2xl bg-neutral-50 p-6 text-center text-sm font-black text-neutral-400">
+          <div className="rounded-2xl bg-neutral-50 p-4 text-center text-sm font-black text-neutral-400">
             업무 불러오는 중...
           </div>
         ) : null}
 
         {!loading && !errorText && baseTasks.length === 0 ? (
-          <div className="rounded-2xl bg-neutral-50 p-6 text-center text-sm font-black text-neutral-400">
+          <div className="rounded-2xl bg-neutral-50 p-4 text-center text-sm font-black text-neutral-400">
             {emptyText}
           </div>
         ) : null}
 
         {!loading && !errorText && baseTasks.length > 0 && filteredTasks.length === 0 ? (
-          <div className="rounded-2xl bg-neutral-50 p-6 text-center text-sm font-black text-neutral-400">
+          <div className="rounded-2xl bg-neutral-50 p-4 text-center text-sm font-black text-neutral-400">
             현재 조건에 맞는 업무가 없습니다.
           </div>
         ) : null}
 
         {!loading && !errorText && filteredTasks.length > 0 ? (
-          <div className="grid max-h-[430px] gap-2 overflow-y-auto pr-1">
+          <div className="grid max-h-[300px] gap-2 overflow-y-auto pr-1">
             {filteredTasks.map((task) => (
               <AdminTodayTaskCard
                 key={task.id}

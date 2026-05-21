@@ -1,60 +1,130 @@
 "use client";
 
 // components/admin-v2/today/AdminTodayMoneySummary.tsx
-// 목적: 오늘할일 돈 흐름 요약 표시
-// 주의: 기존 orderHelpers 계산 결과만 표시. DB/정산 저장 로직 없음.
+// 목적: 오늘할일 관제탑 상단 금액 요약을 작고 빠르게 보이도록 압축
+// 주의: UI 표시 전용. 주문/입금/배송/정산 계산 로직 변경 없음.
 
-import { money } from "@/lib/admin-v2/formatters";
-import type { buildMoneySummary } from "@/components/admin-v2/today/adminTodayUtils";
+type Props = {
+  summary: Record<string, unknown>;
+};
 
-type MoneySummary = ReturnType<typeof buildMoneySummary>;
+const money = (value: unknown) => {
+  const numberValue = Number(value || 0);
+  return `${numberValue.toLocaleString("ko-KR")}원`;
+};
 
-function MoneyCard({
+const pickNumber = (summary: Record<string, unknown>, keys: string[]) => {
+  for (const key of keys) {
+    const value = summary[key];
+    if (typeof value === "number") return value;
+    if (typeof value === "string" && value.trim() !== "" && !Number.isNaN(Number(value))) {
+      return Number(value);
+    }
+  }
+
+  return 0;
+};
+
+function CompactMoneyCard({
   label,
   value,
   desc,
-  tone = "neutral",
+  tone,
 }: {
   label: string;
   value: number;
   desc: string;
-  tone?: "neutral" | "blue" | "emerald" | "amber" | "rose";
+  tone: "blue" | "emerald" | "amber" | "red";
 }) {
-  const toneClass =
-    tone === "blue"
-      ? "bg-blue-50 text-blue-700"
-      : tone === "emerald"
-        ? "bg-emerald-50 text-emerald-700"
-        : tone === "amber"
-          ? "bg-amber-50 text-amber-800"
-          : tone === "rose"
-            ? "bg-rose-50 text-rose-700"
-            : "bg-neutral-100 text-neutral-800";
+  const toneClass = {
+    blue: "bg-blue-50 text-blue-700",
+    emerald: "bg-emerald-50 text-emerald-700",
+    amber: "bg-amber-50 text-amber-700",
+    red: "bg-red-50 text-red-700",
+  }[tone];
 
   return (
-    <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 shadow-sm">
       <div className="text-xs font-black text-neutral-500">{label}</div>
-      <div className={`mt-2 inline-flex rounded-xl px-3 py-1.5 text-xl font-black ${toneClass}`}>
+      <div className={`mt-1 inline-flex rounded-xl px-2.5 py-1 text-lg font-black ${toneClass}`}>
         {money(value)}
       </div>
-      <div className="mt-2 text-xs font-bold text-neutral-500">{desc}</div>
+      <div className="mt-1 text-xs font-bold text-neutral-400">{desc}</div>
     </div>
   );
 }
 
-export default function AdminTodayMoneySummary({
-  summary,
+function MiniMoneyChip({
+  label,
+  value,
 }: {
-  summary: MoneySummary;
+  label: string;
+  value: number;
 }) {
   return (
-    <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-      <MoneyCard label="총 주문금액" value={summary.totalOrderAmount} desc="미입금 포함" tone="blue" />
-      <MoneyCard label="무통장 입금완료" value={summary.bankPaidAmount} desc="입금확인 완료" tone="emerald" />
-      <MoneyCard label="무통장 미입금" value={summary.bankUnpaidAmount} desc="입금확인 필요" tone="amber" />
-      <MoneyCard label="카드결제 완료" value={summary.cardPaidAmount} desc="카드 완료" tone="emerald" />
-      <MoneyCard label="카드 미결제" value={summary.cardUnpaidAmount} desc="카드 확인 필요" tone="amber" />
-      <MoneyCard label="주문취소" value={summary.canceledAmount} desc="매출 제외" tone="rose" />
+    <div className="flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 py-2 text-xs font-black">
+      <span className="text-neutral-500">{label}</span>
+      <span className="text-neutral-950">{money(value)}</span>
+    </div>
+  );
+}
+
+export default function AdminTodayMoneySummary({ summary }: Props) {
+  const totalOrderAmount = pickNumber(summary, ["totalOrderAmount", "totalAmount", "orderAmount"]);
+  const bankPaidAmount = pickNumber(summary, ["bankPaidAmount", "bankConfirmedAmount", "bankConfirmedOrderSales"]);
+  const bankUnpaidAmount = pickNumber(summary, ["bankUnpaidAmount", "bankPendingAmount", "unpaidBankAmount"]);
+  const cardPaidAmount = pickNumber(summary, ["cardPaidAmount", "cardConfirmedAmount", "cardOrderSales"]);
+  const cardUnpaidAmount = pickNumber(summary, ["cardUnpaidAmount", "cardPendingAmount"]);
+  const cancelAmount = pickNumber(summary, ["cancelAmount", "canceledAmount", "cancelledAmount", "refundAmount"]);
+
+  return (
+    <section className="rounded-3xl border border-neutral-200 bg-white p-3 shadow-sm">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-black tracking-[-0.03em] text-neutral-950">
+            오늘 돈 흐름
+          </h2>
+          <p className="mt-0.5 text-xs font-bold text-neutral-400">
+            입금확인과 미입금만 먼저 보이게 압축했습니다.
+          </p>
+        </div>
+
+        <div className="rounded-full bg-neutral-100 px-3 py-1.5 text-xs font-black text-neutral-600">
+          미입금 우선 확인
+        </div>
+      </div>
+
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+        <CompactMoneyCard
+          label="총 주문금액"
+          value={totalOrderAmount}
+          desc="미입금 포함"
+          tone="blue"
+        />
+        <CompactMoneyCard
+          label="무통장 입금완료"
+          value={bankPaidAmount}
+          desc="입금확인 완료"
+          tone="emerald"
+        />
+        <CompactMoneyCard
+          label="무통장 미입금"
+          value={bankUnpaidAmount}
+          desc="입금매칭 필요"
+          tone="amber"
+        />
+        <CompactMoneyCard
+          label="주문취소"
+          value={cancelAmount}
+          desc="매출 제외"
+          tone="red"
+        />
+      </div>
+
+      <div className="mt-2 flex flex-wrap gap-2">
+        <MiniMoneyChip label="카드완료" value={cardPaidAmount} />
+        <MiniMoneyChip label="카드미결제" value={cardUnpaidAmount} />
+      </div>
     </section>
   );
 }
