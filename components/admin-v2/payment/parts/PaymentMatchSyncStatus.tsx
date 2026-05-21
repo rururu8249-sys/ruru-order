@@ -28,7 +28,7 @@ export default function PaymentMatchSyncStatus({
           <div className="flex flex-wrap items-center gap-2 text-[12px] font-black text-neutral-900">
             <span>입금내역 {serverDepositCount.toLocaleString()}건</span>
             <span className={autoSyncEnabled ? "text-emerald-700" : "text-neutral-400"}>
-              {autoSyncEnabled ? "자동조회 켜짐" : "자동조회 꺼짐"}
+              {autoSyncEnabled ? "자동조회 + 정확매칭 자동확인 켜짐" : "자동조회 + 자동확인 꺼짐"}
             </span>
             {autoSyncLoading && <span className="text-blue-600">조회중</span>}
             {lastAutoSyncLabel && <span className="text-neutral-500">마지막 {lastAutoSyncLabel}</span>}

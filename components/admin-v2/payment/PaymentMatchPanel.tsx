@@ -14,6 +14,7 @@ import AutoMatchPreviewBox from "@/components/admin-v2/payment/parts/AutoMatchPr
 import PaymentOrderRow from "@/components/admin-v2/payment/parts/PaymentOrderRow";
 import DepositListTable from "@/components/admin-v2/payment/parts/DepositListTable";
 import PaymentMatchToolbar from "@/components/admin-v2/payment/parts/PaymentMatchToolbar";
+import useStrictAutoPaymentConfirm from "@/components/admin-v2/payment/useStrictAutoPaymentConfirm";
 
 type Props = {
   deposits: DepositRow[];
@@ -319,6 +320,21 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
 
     return () => window.clearInterval(timer);
   }, [autoSyncEnabled]);
+
+
+  useStrictAutoPaymentConfirm({
+    enabled: autoSyncEnabled,
+    previewResult,
+    autoRunLoading,
+    onMessage: setLastAutoSyncMessage,
+    onStart: () => setAutoRunLoading(true),
+    onFinish: () => setAutoRunLoading(false),
+    onAfterSuccess: async () => {
+      await forceLoadServerDeposits();
+      await runAutoMatchPreview();
+    },
+  });
+
 
   const summary = useMemo(() => ({
     unpaid: orderGroups.filter((group) => isBankUnpaid(group.first)).length,
