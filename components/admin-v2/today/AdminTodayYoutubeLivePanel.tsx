@@ -10,6 +10,7 @@ import AdminTodayYoutubeLiveLinkBox from "@/components/admin-v2/today/AdminToday
 import AdminTodayYoutubeChatInputBox from "@/components/admin-v2/today/AdminTodayYoutubeChatInputBox";
 import AdminTodayYoutubeChatSearchBox from "@/components/admin-v2/today/AdminTodayYoutubeChatSearchBox";
 import AdminTodayYoutubeChatActionBox from "@/components/admin-v2/today/AdminTodayYoutubeChatActionBox";
+import AdminTodayCollapsiblePanel from "@/components/admin-v2/today/AdminTodayCollapsiblePanel";
 import {
   CHATGPT_URL,
   YOUTUBE_LIVE_STORAGE_KEY,
@@ -178,21 +179,30 @@ export default function AdminTodayYoutubeLivePanel() {
           setChatText={setChatText}
         />
 
-        <AdminTodayYoutubeChatSearchBox
-          keyword={keyword}
-          nickname={nickname}
-          filteredLines={filteredLines}
-          setKeyword={setKeyword}
-          setNickname={setNickname}
-        />
+        <AdminTodayCollapsiblePanel
+          title="검색 / 분석 / 오늘할일 등록"
+          description="채팅을 붙여넣은 뒤 필요할 때만 펼쳐서 닉네임·단어 검색, ChatGPT 분석, 오늘할일 등록을 합니다."
+          badge={filteredLines.length > 0 ? `${filteredLines.length}줄` : "선택 사용"}
+          defaultOpen={false}
+        >
+          <div className="grid gap-3">
+            <AdminTodayYoutubeChatSearchBox
+              keyword={keyword}
+              nickname={nickname}
+              filteredLines={filteredLines}
+              setKeyword={setKeyword}
+              setNickname={setNickname}
+            />
 
-        <AdminTodayYoutubeChatActionBox
-          taskMemo={taskMemo}
-          saving={saving}
-          setTaskMemo={setTaskMemo}
-          onCopyGptPrompt={copyGptPrompt}
-          onRegisterTodayTask={registerTodayTask}
-        />
+            <AdminTodayYoutubeChatActionBox
+              taskMemo={taskMemo}
+              saving={saving}
+              setTaskMemo={setTaskMemo}
+              onCopyGptPrompt={copyGptPrompt}
+              onRegisterTodayTask={registerTodayTask}
+            />
+          </div>
+        </AdminTodayCollapsiblePanel>
       </div>
     </section>
   );
