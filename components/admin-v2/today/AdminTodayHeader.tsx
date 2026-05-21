@@ -7,11 +7,14 @@
 import type { BroadcastRow } from "@/lib/admin-v2/types";
 import { formatDateLabel } from "@/lib/admin-v2/formatters";
 import { getKstTodayInfo, getLatestBroadcast } from "@/components/admin-v2/today/adminTodayUtils";
+import type { ReactNode } from "react";
 
 export default function AdminTodayHeader({
   broadcasts,
+  periodControls,
 }: {
   broadcasts: BroadcastRow[];
+  periodControls?: ReactNode;
 }) {
   const today = getKstTodayInfo();
   const latestBroadcast = getLatestBroadcast(broadcasts);
@@ -30,6 +33,7 @@ export default function AdminTodayHeader({
             <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700">
               🔴 방송 LIVE 기준 준비
             </span>
+            {periodControls ? <div className="min-w-0 flex-1">{periodControls}</div> : null}
           </div>
 
           <p className="mt-2 text-sm font-bold text-neutral-500">

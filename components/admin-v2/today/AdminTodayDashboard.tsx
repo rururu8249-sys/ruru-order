@@ -113,9 +113,9 @@ export default function AdminTodayDashboard({
 
   return (
     <section className="grid gap-4">
-      <AdminTodayHeader broadcasts={broadcasts} />
-
-
+      <AdminTodayHeader
+        broadcasts={broadcasts}
+        periodControls={
           <AdminTodayPeriodFilter
             draftStartDate={draftPeriodStartDate}
             draftEndDate={draftPeriodEndDate}
@@ -133,6 +133,10 @@ export default function AdminTodayDashboard({
               setPeriodEndDate(todayDateKey);
             }}
           />
+        }
+      />
+
+
 
 
       <AdminTodayCollapsiblePanel
