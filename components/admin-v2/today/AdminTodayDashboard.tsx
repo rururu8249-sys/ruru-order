@@ -1,10 +1,10 @@
 "use client";
 
 // components/admin-v2/today/AdminTodayDashboard.tsx
-// 목적: admin-v2 첫 화면인 오늘할일 실무형 관제탑
+// 목적: 루루동이LIVE Control Center 실무형 관제탑
 // 주의: UI/조회/계산 전용. 주문 저장, 입금매칭 저장, 정산 저장, 배송비 계산 변경 없음.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   BroadcastRow,
   CustomerRow,
@@ -14,20 +14,58 @@ import type {
   SettingRow,
 } from "@/lib/admin-v2/types";
 import AdminTodayHeader from "@/components/admin-v2/today/AdminTodayHeader";
-import AdminTodayMoneySummary from "@/components/admin-v2/today/AdminTodayMoneySummary";
 import AdminTodayPersistentTasks from "@/components/admin-v2/today/AdminTodayPersistentTasks";
 import AdminTodayWorkQueue from "@/components/admin-v2/today/AdminTodayWorkQueue";
 import AdminTodayKakaoPanel from "@/components/admin-v2/today/AdminTodayKakaoPanel";
 import AdminTodayCollapsiblePanel from "@/components/admin-v2/today/AdminTodayCollapsiblePanel";
 import AdminTodayYoutubeLivePanel from "@/components/admin-v2/today/AdminTodayYoutubeLivePanel";
 import AdminTodayPeriodFilter from "@/components/admin-v2/today/AdminTodayPeriodFilter";
+import AdminTodayControlSummaryBar from "@/components/admin-v2/today/AdminTodayControlSummaryBar";
 import { filterOrderGroupsByPeriod, formatPeriodLabel, getTodayDateKey } from "@/components/admin-v2/today/adminTodayPeriodUtils";
 import {
   buildMoneySummary,
   buildWorkItems,
-  getTodayGroups,
   type TodayWorkTab,
 } from "@/components/admin-v2/today/adminTodayUtils";
+
+const TODAY_PERIOD_STORAGE_KEY = "ruru-admin-v2-today-period-v1";
+
+type StoredTodayPeriod = {
+  startDate?: string;
+  endDate?: string;
+};
+
+function readStoredTodayPeriod() {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.localStorage.getItem(TODAY_PERIOD_STORAGE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as StoredTodayPeriod;
+    const startDate = String(parsed.startDate || "").trim();
+    const endDate = String(parsed.endDate || "").trim();
+
+    if (!startDate || !endDate) return null;
+
+    return { startDate, endDate };
+  } catch {
+    return null;
+  }
+}
+
+function saveStoredTodayPeriod(startDate: string, endDate: string) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(
+      TODAY_PERIOD_STORAGE_KEY,
+      JSON.stringify({ startDate, endDate })
+    );
+  } catch {
+    // localStorage 저장 실패는 화면 동작을 막지 않습니다.
+  }
+}
 
 type AdminTodayDashboardProps = {
   orders: OrderRow[];
@@ -51,7 +89,6 @@ export default function AdminTodayDashboard({
   broadcasts,
   onGoOrders,
   onGoShipping,
-  onGoCustomers,
   onOpenPaymentMatch,
   onOpenOrderDetail,
   onSaveCustomerMemo,
@@ -63,6 +100,25 @@ export default function AdminTodayDashboard({
   const [periodEndDate, setPeriodEndDate] = useState(todayDateKey);
   const [draftPeriodStartDate, setDraftPeriodStartDate] = useState(todayDateKey);
   const [draftPeriodEndDate, setDraftPeriodEndDate] = useState(todayDateKey);
+  const [periodStorageReady, setPeriodStorageReady] = useState(false);
+
+  useEffect(() => {
+    const storedPeriod = readStoredTodayPeriod();
+
+    if (storedPeriod) {
+      setPeriodStartDate(storedPeriod.startDate);
+      setPeriodEndDate(storedPeriod.endDate);
+      setDraftPeriodStartDate(storedPeriod.startDate);
+      setDraftPeriodEndDate(storedPeriod.endDate);
+    }
+
+    setPeriodStorageReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!periodStorageReady) return;
+    saveStoredTodayPeriod(periodStartDate, periodEndDate);
+  }, [periodStorageReady, periodStartDate, periodEndDate]);
 
   const todayGroups = useMemo(
     () =>
@@ -77,6 +133,7 @@ export default function AdminTodayDashboard({
     () => formatPeriodLabel(periodStartDate, periodEndDate),
     [periodStartDate, periodEndDate]
   );
+
   const moneySummary = useMemo(() => buildMoneySummary(todayGroups), [todayGroups]);
   const allWorkItems = useMemo(() => buildWorkItems(todayGroups), [todayGroups]);
 
@@ -101,6 +158,12 @@ export default function AdminTodayDashboard({
     if (activeWorkTab === "all") return allWorkItems;
     return allWorkItems.filter((item) => item.tab === activeWorkTab);
   }, [allWorkItems, activeWorkTab]);
+
+  const itemQuantity = useMemo(() => {
+    return todayGroups
+      .flatMap((group) => group.rows)
+      .reduce((sum, row) => sum + (Number(row.qty || 1) || 1), 0);
+  }, [todayGroups]);
 
   const openPaymentMatchFromToday = (groupId: string) => {
     const targetGroup = orderGroups.find((group) => group.groupId === groupId);
@@ -138,70 +201,23 @@ export default function AdminTodayDashboard({
         }
       />
 
-
-
-
-      <AdminTodayCollapsiblePanel
-        title="오늘 핵심 현황 / 돈 흐름"
-        description="주문·입금·배송·고객 숫자와 돈 흐름은 필요할 때 펼쳐서 확인합니다."
-        badge="요약"
-        defaultOpen={false}
-      >
-        <div className="grid gap-3">
-          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-            <QuickCard
-              label="기간별 주문"
-              value={`${todayGroups.length}건`}
-              desc="선택 기간 기준 주문묶음"
-              onClick={onGoOrders}
-            />
-            <QuickCard
-              label="결제확인 필요"
-              value={`${workCounts.payment}건`}
-              desc="미결제"
-              onClick={() => setActiveWorkTab("payment")}
-            />
-            <QuickCard
-              label="배송처리"
-              value={`${workCounts.shipping}건`}
-              desc="포장/발송 확인"
-              onClick={() => setActiveWorkTab("shipping")}
-            />
-            <QuickCard
-              label="특이사항"
-              value={`${workCounts.issue}건`}
-              desc="메모 키워드 감지"
-              onClick={() => setActiveWorkTab("issue")}
-            />
-            <QuickCard
-              label="고객"
-              value={`${customers.length}명`}
-              desc="고객관리 이동"
-              onClick={onGoCustomers}
-            />
-          </section>
-
-          <AdminTodayMoneySummary summary={moneySummary} />
-        </div>
-      </AdminTodayCollapsiblePanel>
-
-      <AdminTodayCollapsiblePanel
-        title="고객 이슈 처리 큐"
-        description="카톡/고객대화에서 등록한 반품·교환·환불·배송 이슈를 필요할 때 펼쳐서 확인합니다."
-        badge="처리 이슈"
-        defaultOpen={false}
-      >
-        <AdminTodayPersistentTasks />
-      </AdminTodayCollapsiblePanel>
-
       <AdminTodayCollapsiblePanel
         title="유튜브 LIVE 채팅"
         description="방송 화면과 채팅을 보면서 주문·입금·문의 처리를 같이 확인합니다."
         badge="방송채팅"
-        defaultOpen={false}
+        defaultOpen={true}
       >
         <AdminTodayYoutubeLivePanel />
       </AdminTodayCollapsiblePanel>
+
+      <AdminTodayControlSummaryBar
+        summary={moneySummary}
+        orderCount={todayGroups.length}
+        itemQuantity={itemQuantity}
+        issueCount={workCounts.issue}
+        periodLabel={periodLabel}
+        periodStorageReady={periodStorageReady}
+      />
 
       <div className="grid gap-4 2xl:grid-cols-[1.35fr_0.9fr]">
         <AdminTodayWorkQueue
@@ -217,10 +233,18 @@ export default function AdminTodayDashboard({
         />
 
         <section className="grid gap-4">
+          <AdminTodayCollapsiblePanel
+            title="고객 이슈 처리 큐"
+            description="반품·교환·환불·배송·주소확인 이슈는 해결 전까지 계속 표시합니다."
+            badge="처리 이슈"
+            defaultOpen={true}
+          >
+            <AdminTodayPersistentTasks />
+          </AdminTodayCollapsiblePanel>
 
           <AdminTodayCollapsiblePanel
-            title="카톡 응대 업무"
-            description="대화 붙여넣기, 이슈태그 선택, 분석문구 복사, 오늘할일 등록은 필요할 때만 펼쳐서 사용합니다."
+            title="문의/이슈 등록"
+            description="카톡 복붙 또는 수동 입력으로 고객 이슈를 오늘할일 큐에 등록합니다."
             badge="카톡/메모"
             defaultOpen={false}
           >
@@ -232,31 +256,5 @@ export default function AdminTodayDashboard({
         </section>
       </div>
     </section>
-  );
-}
-
-function QuickCard({
-  label,
-  value,
-  desc,
-  onClick,
-}: {
-  label: string;
-  value: string;
-  desc: string;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-3xl border border-neutral-200 bg-white p-4 text-left shadow-sm transition hover:border-blue-200 hover:bg-blue-50/40 active:scale-[0.99]"
-    >
-      <div className="text-xs font-black text-neutral-500">{label}</div>
-      <div className="mt-2 text-2xl font-black tracking-[-0.04em] text-neutral-950">
-        {value}
-      </div>
-      <div className="mt-1 text-xs font-bold text-neutral-500">{desc}</div>
-    </button>
   );
 }
