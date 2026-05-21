@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DepositRow, OrderGroup } from "@/lib/admin-v2/types";
 import { matchesManualPaymentSearch } from "@/components/admin-v2/payment/manualPaymentMatchSearchUtils";
+import ManualPaymentSelectionSummary from "@/components/admin-v2/payment/ManualPaymentSelectionSummary";
 
 type Props = {
   group?: OrderGroup | null;
@@ -130,7 +131,7 @@ export default function ManualPaymentMatchDrawer(props: Props) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [keyword, setKeyword] = useState("");
-  const [selectedDepositId, setSelectedDepositId] = useState<number | null>(null);
+  const [selectedDepositIds, setSelectedDepositIds] = useState<number[]>([]);
   const [showAll, setShowAll] = useState(false);
 
   const first = group?.first || null;
@@ -190,11 +191,15 @@ export default function ManualPaymentMatchDrawer(props: Props) {
           return amountMatch || nameMatch;
         }
 
-        return matchesManualPaymentSearch({
-          keyword,
-          depositName: deposit.depositor_name,
-          amount: deposit.amount,
-        });
+        return (
+          amountMatch ||
+          nameMatch ||
+          matchesManualPaymentSearch({
+            keyword,
+            depositName: deposit.depositor_name,
+            amount: deposit.amount,
+          })
+        );
       })
       .sort((a, b) => {
         const aAmount = Number(a.amount || 0) === expectedAmount ? 1 : 0;
@@ -211,19 +216,47 @@ export default function ManualPaymentMatchDrawer(props: Props) {
       });
   }, [serverDeposits, keyword, expectedAmount, nickname, customerName, showAll]);
 
-  const selectedDeposit = useMemo(() => {
-    return serverDeposits.find((deposit) => Number(deposit.id) === Number(selectedDepositId)) || null;
-  }, [serverDeposits, selectedDepositId]);
+  const selectedDepositIdSet = useMemo(() => new Set(selectedDepositIds), [selectedDepositIds]);
+
+  const selectedDeposits = useMemo(() => {
+    return serverDeposits.filter((deposit) => selectedDepositIdSet.has(Number(deposit.id)));
+  }, [serverDeposits, selectedDepositIdSet]);
+
+  const selectedTotalAmount = useMemo(() => {
+    return selectedDeposits.reduce((sum, deposit) => sum + Number(deposit.amount || 0), 0);
+  }, [selectedDeposits]);
+
+  const amountDifference = selectedTotalAmount - expectedAmount;
+  const exactAmountMatched = expectedAmount > 0 && selectedDeposits.length > 0 && amountDifference === 0;
 
   if (!group || !first) {
     return null;
   }
 
   const confirmManualMatch = async () => {
-    if (!selectedDeposit) {
+    if (selectedDeposits.length === 0) {
       alert("매칭할 입금내역을 선택해주세요.");
       return;
     }
+
+    if (!exactAmountMatched) {
+      alert(
+        [
+          "선택합계와 입금예정금액이 일치하지 않습니다.",
+          "",
+          `입금예정금액: ${money(expectedAmount)}`,
+          `선택합계: ${money(selectedTotalAmount)}`,
+          `차액: ${money(amountDifference)}`,
+          "",
+          "1차 안전기준상 차액 0원일 때만 수동매칭할 수 있습니다.",
+        ].join("\n")
+      );
+      return;
+    }
+
+    const depositLines = selectedDeposits
+      .map((deposit, index) => `${index + 1}. ${deposit.depositor_name || "-"} / ${money(deposit.amount)} / ${getDepositTimeLabel(deposit.deposited_time, deposit.created_at)}`)
+      .join("\n");
 
     const ok = confirm(
       [
@@ -231,9 +264,12 @@ export default function ManualPaymentMatchDrawer(props: Props) {
         "",
         `주문고객: ${nickname || customerName || "-"}`,
         `주문금액: ${money(expectedAmount)}`,
+        `선택합계: ${money(selectedTotalAmount)}`,
         "",
-        `입금자명: ${selectedDeposit.depositor_name || "-"}`,
-        `입금금액: ${money(selectedDeposit.amount)}`,
+        "선택한 입금내역",
+        depositLines,
+        "",
+        "주의: 수동매칭 후 선택한 모든 입금내역이 이 주문에 연결됩니다.",
       ].join("\n")
     );
 
@@ -242,6 +278,8 @@ export default function ManualPaymentMatchDrawer(props: Props) {
     setSaving(true);
 
     try {
+      const depositIds = selectedDeposits.map((deposit) => Number(deposit.id)).filter((id) => Number.isFinite(id) && id > 0);
+
       const response = await fetch("/api/admin-v2/manual-payment-match", {
         method: "POST",
         headers: {
@@ -250,7 +288,10 @@ export default function ManualPaymentMatchDrawer(props: Props) {
         body: JSON.stringify({
           orderGroupId: group.groupId,
           orderIds: getOrderIds(group),
-          depositId: selectedDeposit.id,
+          depositIds,
+          depositId: depositIds[0] || null,
+          expectedAmount,
+          selectedTotalAmount,
         }),
       });
 
@@ -261,7 +302,15 @@ export default function ManualPaymentMatchDrawer(props: Props) {
         return;
       }
 
-      alert("수동매칭 완료\n\n주문상태는 결제완료(수동)으로 표시됩니다.");
+      alert(
+        [
+          "수동매칭 완료",
+          "",
+          `주문상태는 결제완료(수동)으로 표시됩니다.`,
+          `선택 입금내역: ${depositIds.length.toLocaleString()}건`,
+          `선택합계: ${money(selectedTotalAmount)}`,
+        ].join("\n")
+      );
 
       await props.onMatched?.();
 
@@ -309,7 +358,7 @@ export default function ManualPaymentMatchDrawer(props: Props) {
               value={keyword}
               onChange={(event) => {
                 setKeyword(event.target.value);
-                setSelectedDepositId(null);
+                setSelectedDepositIds([]);
                 setShowAll(false);
               }}
               placeholder="입금자명 또는 금액 검색"
@@ -340,6 +389,13 @@ export default function ManualPaymentMatchDrawer(props: Props) {
           <div className="mt-3 rounded-xl bg-amber-50 px-4 py-3 text-xs font-black leading-relaxed text-amber-800">
             수동매칭은 돈 관련 작업입니다. 입금자명과 금액을 반드시 확인하세요.
           </div>
+
+          <ManualPaymentSelectionSummary
+            expectedAmount={expectedAmount}
+            selectedTotalAmount={selectedTotalAmount}
+            selectedCount={selectedDeposits.length}
+            amountDifference={amountDifference}
+          />
         </header>
 
         <section className="min-h-0 flex-1 overflow-y-auto p-5">
@@ -361,7 +417,7 @@ export default function ManualPaymentMatchDrawer(props: Props) {
           ) : (
             <div className="overflow-hidden rounded-2xl border border-neutral-200">
               {depositsForDisplay.map((deposit) => {
-                const selected = Number(selectedDepositId) === Number(deposit.id);
+                const selected = selectedDepositIdSet.has(Number(deposit.id));
                 const amountMatch = Number(deposit.amount || 0) === expectedAmount;
                 const nameScore = getNameScore(deposit.depositor_name, nickname, customerName);
 
@@ -376,7 +432,14 @@ export default function ManualPaymentMatchDrawer(props: Props) {
                   <button
                     key={deposit.id}
                     type="button"
-                    onClick={() => setSelectedDepositId(Number(deposit.id))}
+                    onClick={() => {
+                      const id = Number(deposit.id);
+                      setSelectedDepositIds((prev) =>
+                        prev.includes(id)
+                          ? prev.filter((item) => item !== id)
+                          : [...prev, id]
+                      );
+                    }}
                     className={[
                       "grid w-full grid-cols-[38px_1fr_120px_100px_90px] items-center gap-2 border-b border-neutral-100 px-4 py-3 text-left transition active:scale-[0.995]",
                       selected ? "bg-blue-50" : "bg-white hover:bg-neutral-50",
@@ -442,10 +505,10 @@ export default function ManualPaymentMatchDrawer(props: Props) {
           <button
             type="button"
             onClick={confirmManualMatch}
-            disabled={saving || !selectedDeposit}
+            disabled={saving || !exactAmountMatched}
             className="h-13 rounded-xl bg-neutral-950 text-base font-black text-white active:scale-[0.98] disabled:bg-neutral-300"
           >
-            {saving ? "처리중..." : "수동매칭"}
+            {saving ? "처리중..." : exactAmountMatched ? "수동매칭" : "합계 확인 필요"}
           </button>
         </footer>
       </aside>
