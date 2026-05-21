@@ -1,5 +1,7 @@
 "use client";
 
+import { getCustomerOrderStatusLabel } from "@/lib/admin-v2/statusDisplay";
+
 // app/myorder/page.tsx
 // 전체 교체용
 // 파일 위치: /Users/ruru/Desktop/ruru-order-app/app/myorder/page.tsx
@@ -59,21 +61,17 @@ function cleanOption(value: any) {
 }
 
 function getCustomerStatusLabel(order: any) {
-  const manageStatus = String(order.order_manage_status || "");
+  const manageStatus = String(order.order_manage_status || order.admin_order_status_v2 || "");
   const refundType = String(order.refund_type || "");
 
-  if (manageStatus === "주문서취소") return "주문취소";
   if (manageStatus === "환불" && refundType === "부분환불") return "부분환불";
   if (manageStatus === "환불") return "환불완료";
-  if (manageStatus === "출고완료") return "배송출발";
-  if (manageStatus === "출고대기") return "출고준비중";
-  if (manageStatus === "주문확인완료") return "확인완료";
 
-  return order.order_status || "주문접수";
+  return getCustomerOrderStatusLabel(manageStatus || order.order_status);
 }
 
 function getStatusClassName(label: string) {
-  if (label === "주문취소") return "bg-red-100 text-red-700";
+  if (label === "주문서 취소") return "bg-red-100 text-red-700";
   if (label === "환불완료") return "bg-gray-200 text-gray-800";
   if (label === "부분환불") return "bg-orange-100 text-orange-700";
   if (label === "배송출발") return "bg-green-100 text-green-700";

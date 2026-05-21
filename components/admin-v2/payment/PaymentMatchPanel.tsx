@@ -425,8 +425,8 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
         )}
 
         <div className="grid gap-2 md:grid-cols-4">
-          <SummaryTile label="미입금 주문" value={`${summary.unpaid}건`} strong />
-          <SummaryTile label="입금확인 주문" value={`${summary.paid}건`} />
+          <SummaryTile label="미결제 주문" value={`${summary.unpaid}건`} strong />
+          <SummaryTile label="결제완료 주문" value={`${summary.paid}건`} />
           <SummaryTile label="미확인 입금내역" value={`${summary.unconfirmedDeposits}건`} strong />
           <SummaryTile label="처리완료 입금내역" value={`${summary.confirmedDeposits}건`} />
         </div>
@@ -444,7 +444,7 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
       ) : (
         <section className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
           <div className="hidden grid-cols-[132px_86px_126px_130px_minmax(260px,1fr)_110px_90px] bg-neutral-950 px-3 py-2 text-[12px] font-black text-white lg:grid">
-            <div className="text-center">입금확인</div>
+            <div className="text-center">주문상태</div>
             <div>주문번호</div>
             <div>작성일</div>
             <div>고객</div>

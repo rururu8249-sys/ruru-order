@@ -3,7 +3,8 @@
 // 리팩토링 1단계: 기존 판단 로직 그대로 분리. 계산 결과 변경 없음.
 
 import type { OrderGroup, OrderRow, SettingRow } from "./types";
-import { ORDER_STATUS_OPTIONS, PAID_STATUSES } from "./constants";
+import { PAID_STATUSES } from "./constants";
+import { getAdminOrderStatusDesc, getAdminOrderStatusLabel, getDeliveryStageStatusLabel, isCanceledStatus } from "./statusDisplay";
 
 export const readSettingNumber = (settings: SettingRow[], key: string, fallback: number) => {
   const found = settings.find((item) => item.key === key);
@@ -100,12 +101,11 @@ export const getOrderStatusValue = (row: Pick<OrderRow, "admin_order_status_v2" 
 };
 
 export const getOrderStatusLabel = (status: string | null | undefined) => {
-  const value = String(status || "미설정").trim() || "미설정";
-  return ORDER_STATUS_OPTIONS.find((option) => option.value === value)?.label || value;
+  return getDeliveryStageStatusLabel(status);
 };
 
 export const isOrderCanceled = (row: Pick<OrderRow, "admin_order_status_v2" | "order_manage_status">) => {
-  return getOrderStatusValue(row) === "주문취소";
+  return isCanceledStatus(getOrderStatusValue(row));
 };
 
 export const isOrderPaid = (row: Pick<OrderRow, "admin_order_status_v2" | "order_manage_status">) => {
@@ -143,54 +143,51 @@ export const paymentStatusMeta = (
 ) => {
   const paymentMethod = String(row.payment_method || "무통장입금");
   const status = getOrderStatusValue(row);
+  const label = getAdminOrderStatusLabel({ status, paymentMethod });
+  const desc = getAdminOrderStatusDesc({ status, paymentMethod });
 
-  if (status === "주문취소") {
+  if (isCanceledStatus(status)) {
     return {
-      label: "주문취소",
-      desc: "매출 제외",
+      label,
+      desc,
       className: "bg-red-100 text-red-700",
     };
   }
 
   if (PAID_STATUSES.includes(status)) {
     return {
-      label: paymentMethod === "카드결제" ? "카드 결제완료" : "무통장 입금확인",
-      desc: getOrderStatusLabel(status),
+      label,
+      desc,
       className: "bg-emerald-100 text-emerald-700",
     };
   }
 
   if (paymentMethod === "카드결제") {
     return {
-      label: "카드 미결제",
-      desc: "링크발송/결제확인 필요",
+      label,
+      desc,
       className: "bg-rose-100 text-rose-700",
     };
   }
 
-  if (paymentMethod === "무통장입금") {
-    return {
-      label: "무통장 미입금",
-      desc: "입금확인 필요",
-      className: "bg-amber-100 text-amber-800",
-    };
-  }
-
   return {
-    label: "결제확인 필요",
-    desc: paymentMethod || "결제수단 없음",
-    className: "bg-neutral-100 text-neutral-700",
+    label,
+    desc,
+    className: "bg-amber-100 text-amber-800",
   };
 };
 
 export const selectClass = (status?: string | null) => {
-  if (!status || status === "미설정") return "border-amber-300 bg-amber-50 text-amber-900";
-  if (status === "입금확인") return "border-emerald-300 bg-emerald-50 text-emerald-800";
-  if (status === "출고대기") return "border-amber-300 bg-amber-50 text-amber-800";
-  if (status === "출고완료") return "border-blue-300 bg-blue-50 text-blue-800";
-  if (status === "킵") return "border-violet-300 bg-violet-50 text-violet-800";
-  if (status === "픽업예정") return "border-cyan-300 bg-cyan-50 text-cyan-800";
-  if (status === "주문취소") return "border-red-300 bg-red-50 text-red-800";
+  const value = String(status || "미설정").trim() || "미설정";
+
+  if (value === "미설정") return "border-amber-300 bg-amber-50 text-amber-900";
+  if (["입금확인", "자동입금확인", "수동입금확인"].includes(value)) return "border-emerald-300 bg-emerald-50 text-emerald-800";
+  if (value === "출고대기") return "border-amber-300 bg-amber-50 text-amber-800";
+  if (value === "출고완료") return "border-blue-300 bg-blue-50 text-blue-800";
+  if (value === "킵") return "border-violet-300 bg-violet-50 text-violet-800";
+  if (value === "픽업" || value === "픽업예정") return "border-cyan-300 bg-cyan-50 text-cyan-800";
+  if (isCanceledStatus(value)) return "border-red-300 bg-red-50 text-red-800";
+
   return "border-neutral-300 bg-white text-neutral-700";
 };
 

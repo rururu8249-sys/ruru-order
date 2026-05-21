@@ -17,9 +17,9 @@ export default function AdminOrderTableHeader({ selectNode }: AdminOrderTableHea
       <div className="text-center">주문시간</div>
       <div className="text-center">고객</div>
       <div className="text-center">상품명</div>
-      <div className="text-center">입금</div>
+      <div className="text-center">주문상태</div>
       <div className="text-center">금액</div>
-      <div className="text-center">처리상태</div>
+      <div className="text-center">배송처리단계</div>
       <div className="text-center">상세</div>
     </div>
   );

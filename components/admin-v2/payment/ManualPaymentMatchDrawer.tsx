@@ -261,7 +261,7 @@ export default function ManualPaymentMatchDrawer(props: Props) {
         return;
       }
 
-      alert("수동매칭 완료\n\n주문 상태가 입금확인으로 변경되었습니다.");
+      alert("수동매칭 완료\n\n주문상태는 결제완료(수동)으로 표시됩니다.");
 
       await props.onMatched?.();
 

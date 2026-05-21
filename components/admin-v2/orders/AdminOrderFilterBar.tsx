@@ -28,7 +28,7 @@ const STATUS_OPTIONS: ChipOption[] = [
   { value: "unpaid", label: "미결제" },
   { value: "paid", label: "결제완료" },
   { value: "ready", label: "출고준비" },
-  { value: "shipped", label: "출고완료" },
+  { value: "shipped", label: "발송완료" },
   { value: "canceled", label: "취소/환불" },
 ];
 

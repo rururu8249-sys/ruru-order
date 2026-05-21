@@ -154,15 +154,15 @@ export default function AdminTodayDashboard({
               onClick={onGoOrders}
             />
             <QuickCard
-              label="입금확인 필요"
+              label="결제확인 필요"
               value={`${workCounts.payment}건`}
-              desc="미입금/미결제"
+              desc="미결제"
               onClick={() => setActiveWorkTab("payment")}
             />
             <QuickCard
-              label="배송/출고"
+              label="배송처리"
               value={`${workCounts.shipping}건`}
-              desc="출고 확인 필요"
+              desc="포장/발송 확인"
               onClick={() => setActiveWorkTab("shipping")}
             />
             <QuickCard

@@ -3,6 +3,7 @@
 // 송장관리 1차 추가: 로젠 원본 업로드 엑셀 재업로드로 출고완료만 반영. 상태값/돈 계산 기준 변경 없음.
 
 import type { AdminTab } from "./types";
+import { DELIVERY_STAGE_OPTIONS, PAID_STATUS_VALUES } from "./statusDisplay";
 
 export const TABS: Array<{ key: AdminTab; label: string; desc: string }> = [
   { key: "today", label: "오늘할일", desc: "주문·입금·출고 요약" },
@@ -14,24 +15,8 @@ export const TABS: Array<{ key: AdminTab; label: string; desc: string }> = [
   { key: "settings", label: "설정", desc: "배송비·수수료" },
 ];
 
-export const ORDER_STATUS_OPTIONS = [
-  { value: "미설정", label: "미설정" },
-  { value: "수동입금확인", label: "수동입금확인" },
-  { value: "출고대기", label: "출고대기" },
-  { value: "출고완료", label: "출고완료" },
-  { value: "킵", label: "킵" },
-  { value: "픽업", label: "픽업" },
-];
+export const ORDER_STATUS_OPTIONS = DELIVERY_STAGE_OPTIONS;
 
 export const PAYMENT_FILTERS = ["전체", "무통장입금", "카드결제"];
-export const PAID_STATUSES = [
-  "입금확인",
-  "자동입금확인",
-  "수동입금확인",
-  "출고대기",
-  "출고완료",
-  "킵",
-  "픽업",
-  "픽업예정",
-];
+export const PAID_STATUSES = PAID_STATUS_VALUES;
 export const PAGE_SIZE = 15;

@@ -8,9 +8,9 @@ import type { TodayWorkTab } from "@/components/admin-v2/today/adminTodayUtils";
 
 const TABS: Array<{ key: TodayWorkTab; label: string }> = [
   { key: "all", label: "전체" },
-  { key: "payment", label: "입금확인" },
+  { key: "payment", label: "결제확인" },
   { key: "new", label: "신규주문" },
-  { key: "shipping", label: "배송/출고" },
+  { key: "shipping", label: "배송처리" },
   { key: "issue", label: "특이사항" },
   { key: "canceled", label: "취소" },
 ];

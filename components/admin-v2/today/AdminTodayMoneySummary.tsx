@@ -85,12 +85,12 @@ export default function AdminTodayMoneySummary({ summary }: Props) {
             기간별 돈 흐름
           </h2>
           <p className="mt-0.5 text-xs font-bold text-neutral-400">
-            입금확인과 미입금만 먼저 보이게 압축했습니다.
+            결제완료와 미결제만 먼저 보이게 압축했습니다.
           </p>
         </div>
 
         <div className="rounded-full bg-neutral-100 px-3 py-1.5 text-xs font-black text-neutral-600">
-          미입금 우선 확인
+          미결제 우선 확인
         </div>
       </div>
 
@@ -98,23 +98,23 @@ export default function AdminTodayMoneySummary({ summary }: Props) {
         <CompactMoneyCard
           label="총 주문금액"
           value={totalOrderAmount}
-          desc="미입금 포함"
+          desc="미결제 포함"
           tone="blue"
         />
         <CompactMoneyCard
-          label="무통장 입금완료"
+          label="결제완료(무통장)"
           value={bankPaidAmount}
-          desc="입금확인 완료"
+          desc="무통장 확인"
           tone="emerald"
         />
         <CompactMoneyCard
-          label="무통장 미입금"
+          label="미결제"
           value={bankUnpaidAmount}
           desc="입금매칭 필요"
           tone="amber"
         />
         <CompactMoneyCard
-          label="주문취소"
+          label="주문서 취소"
           value={cancelAmount}
           desc="매출 제외"
           tone="red"
@@ -122,7 +122,7 @@ export default function AdminTodayMoneySummary({ summary }: Props) {
       </div>
 
       <div className="mt-2 flex flex-wrap gap-2">
-        <MiniMoneyChip label="카드완료" value={cardPaidAmount} />
+        <MiniMoneyChip label="카드결제완료" value={cardPaidAmount} />
         <MiniMoneyChip label="카드미결제" value={cardUnpaidAmount} />
       </div>
     </section>

@@ -8,7 +8,7 @@ export default function PaymentStatusBadge({ unpaid }: PaymentStatusBadgeProps) 
   if (unpaid) {
     return (
       <span className="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-black text-rose-700">
-        미입금
+        미결제
       </span>
     );
   }
