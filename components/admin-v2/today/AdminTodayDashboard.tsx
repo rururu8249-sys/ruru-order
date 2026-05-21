@@ -48,12 +48,10 @@ type AdminTodayDashboardProps = {
 export default function AdminTodayDashboard({
   orderGroups,
   customers,
-  deposits,
   broadcasts,
   onGoOrders,
   onGoShipping,
   onGoCustomers,
-  onGoDeposits,
   onOpenPaymentMatch,
   onSaveCustomerMemo,
 }: AdminTodayDashboardProps) {
@@ -102,37 +100,66 @@ export default function AdminTodayDashboard({
     <section className="grid gap-4">
       <AdminTodayHeader broadcasts={broadcasts} />
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        <QuickCard label="오늘 주문" value={`${todayGroups.length}건`} desc="당일 기준 주문묶음" onClick={onGoOrders} />
-        <QuickCard label="입금확인 필요" value={`${workCounts.payment}건`} desc="미입금/미결제" onClick={() => setActiveWorkTab("payment")} />
-        <QuickCard label="배송/출고" value={`${workCounts.shipping}건`} desc="출고 확인 필요" onClick={() => setActiveWorkTab("shipping")} />
-        <QuickCard label="특이사항" value={`${workCounts.issue}건`} desc="메모 키워드 감지" onClick={() => setActiveWorkTab("issue")} />
-        <QuickCard label="고객" value={`${customers.length}명`} desc="고객관리 이동" onClick={onGoCustomers} />
-      </section>
+      <AdminTodayCollapsiblePanel
+        title="오늘 핵심 현황 / 돈 흐름"
+        description="주문·입금·배송·고객 숫자와 돈 흐름은 필요할 때 펼쳐서 확인합니다."
+        badge="요약"
+        defaultOpen={false}
+      >
+        <div className="grid gap-3">
+          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <QuickCard
+              label="오늘 주문"
+              value={`${todayGroups.length}건`}
+              desc="당일 기준 주문묶음"
+              onClick={onGoOrders}
+            />
+            <QuickCard
+              label="입금확인 필요"
+              value={`${workCounts.payment}건`}
+              desc="미입금/미결제"
+              onClick={() => setActiveWorkTab("payment")}
+            />
+            <QuickCard
+              label="배송/출고"
+              value={`${workCounts.shipping}건`}
+              desc="출고 확인 필요"
+              onClick={() => setActiveWorkTab("shipping")}
+            />
+            <QuickCard
+              label="특이사항"
+              value={`${workCounts.issue}건`}
+              desc="메모 키워드 감지"
+              onClick={() => setActiveWorkTab("issue")}
+            />
+            <QuickCard
+              label="고객"
+              value={`${customers.length}명`}
+              desc="고객관리 이동"
+              onClick={onGoCustomers}
+            />
+          </section>
 
-      <AdminTodayMoneySummary summary={moneySummary} />
+          <AdminTodayMoneySummary summary={moneySummary} />
+        </div>
+      </AdminTodayCollapsiblePanel>
 
       <AdminTodayCollapsiblePanel
-
-
         title="고객 이슈 처리 큐"
-
-
         description="카톡/고객대화에서 등록한 반품·교환·환불·배송 이슈를 필요할 때 펼쳐서 확인합니다."
-
-
         badge="처리 이슈"
-
-
         defaultOpen={false}
-
-
       >
-
-
         <AdminTodayPersistentTasks />
+      </AdminTodayCollapsiblePanel>
 
-
+      <AdminTodayCollapsiblePanel
+        title="유튜브 LIVE 채팅"
+        description="방송 화면과 채팅을 보면서 주문·입금·문의 처리를 같이 확인합니다."
+        badge="방송채팅"
+        defaultOpen={false}
+      >
+        <AdminTodayYoutubeLivePanel />
       </AdminTodayCollapsiblePanel>
 
       <div className="grid gap-4 2xl:grid-cols-[1.35fr_0.9fr]">
@@ -142,7 +169,7 @@ export default function AdminTodayDashboard({
           counts={workCounts}
           items={visibleWorkItems}
           onGoOrders={onGoOrders}
-          onGoDeposits={onGoDeposits}
+          onGoDeposits={() => undefined}
           onGoShipping={onGoShipping}
           onOpenPaymentMatch={openPaymentMatchFromToday}
         />
@@ -151,63 +178,16 @@ export default function AdminTodayDashboard({
           <AdminTodayRankings buyers={buyerRanking} products={productRanking} />
 
           <AdminTodayCollapsiblePanel
-            title="유튜브 LIVE 채팅"
-            description="방송 채팅창을 열고, 복사한 채팅을 검색/분석/오늘할일 등록합니다."
-            badge="방송채팅"
-            defaultOpen={false}
-          >
-            <AdminTodayYoutubeLivePanel />
-          </AdminTodayCollapsiblePanel>
-
-          <AdminTodayCollapsiblePanel
-
-
             title="카톡 응대 업무"
-
-
             description="대화 붙여넣기, 이슈태그 선택, 분석문구 복사, 오늘할일 등록은 필요할 때만 펼쳐서 사용합니다."
-
-
             badge="카톡/메모"
-
-
             defaultOpen={false}
-
-
           >
-
-
             <AdminTodayKakaoPanel
-            customers={customers}
-            onSaveCustomerMemo={onSaveCustomerMemo}
-          />
-
-
+              customers={customers}
+              onSaveCustomerMemo={onSaveCustomerMemo}
+            />
           </AdminTodayCollapsiblePanel>
-
-
-          <section className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
-
-            <div className="grid max-h-[260px] gap-2 overflow-y-auto">
-              {deposits.slice(0, 8).length === 0 ? (
-                <div className="rounded-2xl bg-neutral-50 p-6 text-center text-sm font-black text-neutral-400">
-                  아직 입금내역이 없습니다.
-                </div>
-              ) : (
-                deposits.slice(0, 8).map((deposit) => (
-                  <div key={deposit.id} className="flex items-center justify-between rounded-2xl bg-neutral-50 px-3 py-2">
-                    <div>
-                      <div className="text-sm font-black text-neutral-950">{deposit.depositor_name || "입금자명 없음"}</div>
-                      <div className="text-xs font-bold text-neutral-500">{deposit.match_status || "-"}</div>
-                    </div>
-                    <div className="text-sm font-black text-neutral-950">
-                      {Number(deposit.amount || 0).toLocaleString()}원
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
         </section>
       </div>
     </section>
@@ -232,7 +212,9 @@ function QuickCard({
       className="rounded-3xl border border-neutral-200 bg-white p-4 text-left shadow-sm transition hover:border-blue-200 hover:bg-blue-50/40 active:scale-[0.99]"
     >
       <div className="text-xs font-black text-neutral-500">{label}</div>
-      <div className="mt-2 text-2xl font-black tracking-[-0.04em] text-neutral-950">{value}</div>
+      <div className="mt-2 text-2xl font-black tracking-[-0.04em] text-neutral-950">
+        {value}
+      </div>
       <div className="mt-1 text-xs font-bold text-neutral-500">{desc}</div>
     </button>
   );
