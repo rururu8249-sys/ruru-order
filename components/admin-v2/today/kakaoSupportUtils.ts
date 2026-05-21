@@ -3,6 +3,7 @@
 // 주의: 키워드 기반 분석. 카카오 API/상담톡 API/DB 저장 로직 없음.
 
 export type KakaoIssueType =
+  | "product"
   | "refund"
   | "exchange"
   | "return"
@@ -29,6 +30,7 @@ export type KakaoDetectedDate = {
 
 export const KAKAO_ISSUE_OPTIONS: Array<{ value: KakaoIssueType; label: string }> = [
   { value: "general", label: "일반문의" },
+  { value: "product", label: "상품/추가구매" },
   { value: "payment", label: "입금/결제" },
   { value: "shipping", label: "배송/송장" },
   { value: "address", label: "주소확인" },
@@ -120,6 +122,20 @@ export function getAnalysisByIssueType(issueType: KakaoIssueType, rawText: strin
   const compact = text.replace(/\s+/g, " ");
 
   const commonSummary = compact ? compact.slice(0, 110) : "카톡 대화를 붙여넣으면 자동으로 분류합니다.";
+
+  if (issueType === "product") {
+    return {
+      issueType: "product",
+      label: "상품/추가구매",
+      toneClass: "bg-pink-50 text-pink-700",
+      riskLabel: "구매의사 높음",
+      summary: commonSummary,
+      recommendedReply:
+        "확인해드릴게요 😊 원하시는 상품명/색상/사이즈 재고 가능 여부 확인 후 바로 안내드리겠습니다!",
+      memoTitle: "상품/추가구매 문의",
+    };
+  }
+
 
   if (issueType === "refund") {
     return {
@@ -231,11 +247,40 @@ export function analyzeKakaoConversation(rawText: string): KakaoAnalysisResult {
 
   if (!text) return getAnalysisByIssueType("general", text);
 
+  // 구매의사/추가구매/상품문의는 교환·환불보다 먼저 잡습니다.
+  // 예: "블랙 샀는데 실버도 갖고싶어요", "230 주문될까요?", "하나 더 사고 싶어요"
+  if (
+    includesAny(text, [
+      "갖고싶",
+      "가지고싶",
+      "사고싶",
+      "구매하고싶",
+      "주문될까요",
+      "주문 가능",
+      "주문가능",
+      "재고",
+      "있나요",
+      "가능할까요",
+      "하나 더",
+      "또 사고",
+      "추가구매",
+      "추가 구매",
+      "실버도",
+      "블랙도",
+      "화이트도",
+      "색상도",
+      "사이즈 있",
+      "사이즈있",
+    ])
+  ) {
+    return getAnalysisByIssueType("product", text);
+  }
+
   if (includesAny(text, ["환불", "돈 돌려", "취소해주세요", "취소 해주세요", "결제취소"])) {
     return getAnalysisByIssueType("refund", text);
   }
 
-  if (includesAny(text, ["교환", "사이즈 변경", "색상 변경", "바꿔", "변경 가능"])) {
+  if (includesAny(text, ["교환", "사이즈 교환", "색상 교환", "사이즈 변경", "색상 변경", "바꿔주세요", "교환 가능"])) {
     return getAnalysisByIssueType("exchange", text);
   }
 
