@@ -141,7 +141,7 @@ export default function AdminTodayDashboard({
                 onClick={onGoDeposits}
                 className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white active:scale-[0.98]"
               >
-                입금매칭
+                전체 입금관리
               </button>
             </div>
 

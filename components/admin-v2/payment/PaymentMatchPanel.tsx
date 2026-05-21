@@ -154,7 +154,7 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
     const gap = now - lastBankdaSyncAtRef.current;
 
     if (syncing || autoSyncInFlightRef.current) {
-      setLastAutoSyncMessage("이미 뱅크다 조회가 진행중입니다.");
+      setLastAutoSyncMessage("이미 전체/날짜별 입금내역 · 뱅크다 조회가 진행중입니다.");
       return;
     }
 
@@ -375,7 +375,7 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
       <section className="rounded-xl border border-neutral-200 bg-white p-3">
                 <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="text-[17px] font-black">입금매칭</div>
+            <div className="text-[17px] font-black">입금관리</div>
             <div className="mt-1 text-[12px] font-bold text-neutral-500">
               뱅크다에서 실제 입금내역을 가져온 뒤, 자동매칭이 안 된 건을 주문과 직접 연결합니다.
             </div>
