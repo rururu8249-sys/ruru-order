@@ -14,6 +14,7 @@ import AdminOrderPaymentCell from "@/components/admin-v2/orders/AdminOrderPaymen
 import AdminOrderTableHeader from "@/components/admin-v2/orders/AdminOrderTableHeader";
 import AdminOrderTopSummary from "@/components/admin-v2/orders/AdminOrderTopSummary";
 import AdminOrderFilterBar from "@/components/admin-v2/orders/AdminOrderFilterBar";
+import { getOrderPaymentFilterBuckets } from "@/components/admin-v2/orders/adminOrderPaymentFilterUtils";
 import AdminOrderMainRow from "@/components/admin-v2/orders/AdminOrderMainRow";
 import AdminOrderBulkActionBar from "@/components/admin-v2/orders/AdminOrderBulkActionBar";
 import AdminOrderAmountCell from "@/components/admin-v2/orders/AdminOrderAmountCell";
@@ -636,15 +637,11 @@ export function AdminV2Client() {
         return "ready";
       };
 
-      const getSimplePaymentBucket = () => {
-        const methodText = `${group.first.payment_method || ""} ${payment || ""}`;
-        if (includesAnyText(methodText, ["카드", "링크"])) return "card";
-        if (includesAnyText(methodText, ["무통장", "입금", "계좌"])) return "bank";
-        return "bank";
-      };
-
       const statusBucket = getSimpleStatusBucket();
-      const paymentBucket = getSimplePaymentBucket();
+      const paymentBuckets = getOrderPaymentFilterBuckets(group.first, {
+        statusText: status,
+        paymentText: payment,
+      });
 
       const matchStatus =
         selectedStatusFilters.length === 0 ||
@@ -656,7 +653,9 @@ export function AdminV2Client() {
         selectedPaymentFilters.length === 0 ||
         selectedPaymentFilters.includes("all") ||
         selectedPaymentFilters.includes("전체") ||
-        selectedPaymentFilters.includes(paymentBucket);
+        selectedPaymentFilters.some((filter) =>
+          paymentBuckets.some((bucket) => bucket === filter)
+        );
       const isAllDateFilter =
         !dateFilter ||
         dateFilter === "all" ||
