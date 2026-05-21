@@ -10,7 +10,7 @@ import AdminTodayWorkTabs from "@/components/admin-v2/today/AdminTodayWorkTabs";
 import AdminTodayWorkPagination from "@/components/admin-v2/today/AdminTodayWorkPagination";
 import useAutoTodayWorkPageSize from "@/components/admin-v2/today/useAutoTodayWorkPageSize";
 import AdminTodayWorkQueueFilterBar from "@/components/admin-v2/today/AdminTodayWorkQueueFilterBar";
-import { matchesTodayWorkQueueFilters } from "@/components/admin-v2/today/adminTodayWorkQueueFilterUtils";
+import { matchesTodayWorkQueueSearch } from "@/components/admin-v2/today/adminTodayWorkQueueFilterUtils";
 
 const toneClass = {
   blue: "bg-blue-50 text-blue-700 border-blue-100",
@@ -43,22 +43,15 @@ export default function AdminTodayWorkQueue({
   void onGoDeposits;
 
   const [page, setPage] = useState(1);
-  const [queueKeyword, setQueueKeyword] = useState("");
-  const [queueStartDate, setQueueStartDate] = useState("");
-  const [queueEndDate, setQueueEndDate] = useState("");
+  const [draftKeyword, setDraftKeyword] = useState("");
+  const [appliedKeyword, setAppliedKeyword] = useState("");
 
   const filteredItems = useMemo(() => {
-    return items.filter((item) =>
-      matchesTodayWorkQueueFilters(item, {
-        keyword: queueKeyword,
-        startDate: queueStartDate,
-        endDate: queueEndDate,
-      })
-    );
-  }, [items, queueKeyword, queueStartDate, queueEndDate]);
+    return items.filter((item) => matchesTodayWorkQueueSearch(item, appliedKeyword));
+  }, [items, appliedKeyword]);
 
   const { listRef, firstRowRef, pageSize } = useAutoTodayWorkPageSize({
-    triggerKey: `${activeTab}:${filteredItems.length}:${queueKeyword}:${queueStartDate}:${queueEndDate}`,
+    triggerKey: `${activeTab}:${filteredItems.length}:${appliedKeyword}`,
     fallback: 4,
     min: 3,
     max: 12,
@@ -100,29 +93,19 @@ export default function AdminTodayWorkQueue({
           setActiveTab={setActiveTab}
           counts={counts}
         />
-
           <AdminTodayWorkQueueFilterBar
-            keyword={queueKeyword}
-            startDate={queueStartDate}
-            endDate={queueEndDate}
+            draftKeyword={draftKeyword}
+            appliedKeyword={appliedKeyword}
             totalCount={items.length}
             filteredCount={filteredItems.length}
-            onKeywordChange={(value) => {
-              setQueueKeyword(value);
-              setPage(1);
-            }}
-            onStartDateChange={(value) => {
-              setQueueStartDate(value);
-              setPage(1);
-            }}
-            onEndDateChange={(value) => {
-              setQueueEndDate(value);
+            onDraftKeywordChange={setDraftKeyword}
+            onSearch={() => {
+              setAppliedKeyword(draftKeyword);
               setPage(1);
             }}
             onReset={() => {
-              setQueueKeyword("");
-              setQueueStartDate("");
-              setQueueEndDate("");
+              setDraftKeyword("");
+              setAppliedKeyword("");
               setPage(1);
             }}
           />

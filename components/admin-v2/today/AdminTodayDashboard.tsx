@@ -20,6 +20,8 @@ import AdminTodayWorkQueue from "@/components/admin-v2/today/AdminTodayWorkQueue
 import AdminTodayKakaoPanel from "@/components/admin-v2/today/AdminTodayKakaoPanel";
 import AdminTodayCollapsiblePanel from "@/components/admin-v2/today/AdminTodayCollapsiblePanel";
 import AdminTodayYoutubeLivePanel from "@/components/admin-v2/today/AdminTodayYoutubeLivePanel";
+import AdminTodayPeriodFilter from "@/components/admin-v2/today/AdminTodayPeriodFilter";
+import { filterOrderGroupsByPeriod, formatPeriodLabel, getTodayDateKey } from "@/components/admin-v2/today/adminTodayPeriodUtils";
 import {
   buildMoneySummary,
   buildWorkItems,
@@ -54,9 +56,27 @@ export default function AdminTodayDashboard({
 }: AdminTodayDashboardProps) {
   const [activeWorkTab, setActiveWorkTab] = useState<TodayWorkTab>("all");
 
-  const todayGroups = useMemo(() => getTodayGroups(orderGroups), [orderGroups]);
+  const todayDateKey = useMemo(() => getTodayDateKey(), []);
+  const [periodStartDate, setPeriodStartDate] = useState(todayDateKey);
+  const [periodEndDate, setPeriodEndDate] = useState(todayDateKey);
+  const [draftPeriodStartDate, setDraftPeriodStartDate] = useState(todayDateKey);
+  const [draftPeriodEndDate, setDraftPeriodEndDate] = useState(todayDateKey);
+
+  const todayGroups = useMemo(
+    () =>
+      filterOrderGroupsByPeriod(orderGroups, {
+        startDate: periodStartDate,
+        endDate: periodEndDate,
+      }),
+    [orderGroups, periodStartDate, periodEndDate]
+  );
+
+  const periodLabel = useMemo(
+    () => formatPeriodLabel(periodStartDate, periodEndDate),
+    [periodStartDate, periodEndDate]
+  );
   const moneySummary = useMemo(() => buildMoneySummary(todayGroups), [todayGroups]);
-  const allWorkItems = useMemo(() => buildWorkItems(orderGroups), [orderGroups]);
+  const allWorkItems = useMemo(() => buildWorkItems(todayGroups), [todayGroups]);
 
   const workCounts = useMemo(() => {
     const counts: Record<TodayWorkTab, number> = {
@@ -134,6 +154,24 @@ export default function AdminTodayDashboard({
               onClick={onGoCustomers}
             />
           </section>
+
+          <AdminTodayPeriodFilter
+            draftStartDate={draftPeriodStartDate}
+            draftEndDate={draftPeriodEndDate}
+            appliedLabel={periodLabel}
+            onDraftStartDateChange={setDraftPeriodStartDate}
+            onDraftEndDateChange={setDraftPeriodEndDate}
+            onApply={() => {
+              setPeriodStartDate(draftPeriodStartDate);
+              setPeriodEndDate(draftPeriodEndDate);
+            }}
+            onResetToday={() => {
+              setDraftPeriodStartDate(todayDateKey);
+              setDraftPeriodEndDate(todayDateKey);
+              setPeriodStartDate(todayDateKey);
+              setPeriodEndDate(todayDateKey);
+            }}
+          />
 
           <AdminTodayMoneySummary summary={moneySummary} />
         </div>
