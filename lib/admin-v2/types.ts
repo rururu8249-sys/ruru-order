@@ -118,6 +118,27 @@ export type BroadcastRow = {
   created_at: string | null;
 };
 
+
+export type AdminTaskRow = {
+  id: string;
+  created_at: string | null;
+  updated_at: string | null;
+  task_type: string;
+  title: string;
+  body: string | null;
+  source: string;
+  priority: string;
+  status: string;
+  customer_id: number | null;
+  customer_name: string | null;
+  customer_nickname: string | null;
+  related_product: string | null;
+  due_at: string | null;
+  resolved_at: string | null;
+  resolved_note: string | null;
+  raw_payload: Record<string, unknown> | null;
+};
+
 export type SettingRow = { key: string; value: string };
 
 export type OrderGroup = {

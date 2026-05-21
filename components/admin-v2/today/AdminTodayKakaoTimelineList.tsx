@@ -2,6 +2,7 @@
 
 // components/admin-v2/today/AdminTodayKakaoTimelineList.tsx
 // 목적: 카톡 대화를 시간순으로 고객문의/관리자답변/자동응답 제외로 보여줌
+// 주의: 고객 문의별로 직접 누른 것만 오늘할일에 등록함.
 
 import type { KakaoTimelineItem } from "@/components/admin-v2/today/kakaoConversationTimeline";
 
@@ -19,8 +20,12 @@ const roleLabel = {
 
 export default function AdminTodayKakaoTimelineList({
   items,
+  registeringItemId,
+  onRegisterTask,
 }: {
   items: KakaoTimelineItem[];
+  registeringItemId?: string;
+  onRegisterTask?: (item: KakaoTimelineItem) => Promise<void>;
 }) {
   const copyReply = async (text: string) => {
     try {
@@ -37,7 +42,7 @@ export default function AdminTodayKakaoTimelineList({
         <div>
           <div className="text-sm font-black text-neutral-950">순차 대화 분석</div>
           <div className="mt-0.5 text-xs font-bold text-neutral-500">
-            날짜/시간 흐름대로 고객 문의와 관리자 답변을 분리해서 봅니다.
+            필요한 고객 문의만 직접 오늘할일에 등록합니다.
           </div>
         </div>
 
@@ -95,13 +100,27 @@ export default function AdminTodayKakaoTimelineList({
                   <div className="whitespace-pre-wrap text-sm font-bold leading-relaxed text-neutral-800">
                     {item.analysis.recommendedReply}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => copyReply(item.analysis?.recommendedReply || "")}
-                    className="mt-2 rounded-lg bg-neutral-950 px-3 py-2 text-xs font-black text-white active:scale-[0.98]"
-                  >
-                    이 답변 복사
-                  </button>
+
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => copyReply(item.analysis?.recommendedReply || "")}
+                      className="rounded-lg bg-neutral-950 px-3 py-2 text-xs font-black text-white active:scale-[0.98]"
+                    >
+                      이 답변 복사
+                    </button>
+
+                    {onRegisterTask ? (
+                      <button
+                        type="button"
+                        onClick={() => onRegisterTask(item)}
+                        disabled={registeringItemId === item.id}
+                        className="rounded-lg bg-red-600 px-3 py-2 text-xs font-black text-white active:scale-[0.98] disabled:bg-neutral-300"
+                      >
+                        {registeringItemId === item.id ? "등록중" : "오늘할일 등록"}
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
             </article>

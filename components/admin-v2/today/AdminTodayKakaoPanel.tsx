@@ -9,6 +9,7 @@
 
 import { useMemo, useState } from "react";
 import type { CustomerRow } from "@/lib/admin-v2/types";
+import { supabase } from "@/lib/supabase";
 import {
   analyzeKakaoConversation,
   buildKakaoMemoText,
@@ -23,6 +24,7 @@ import AdminTodayKakaoTimelineList from "@/components/admin-v2/today/AdminTodayK
 import {
   buildKakaoConversationTimeline,
   buildKakaoTimelineMemo,
+  type KakaoTimelineItem,
 } from "@/components/admin-v2/today/kakaoConversationTimeline";
 
 const KAKAO_CHANNEL_URL = "https://pf.kakao.com/_RMxaqX";
@@ -109,6 +111,7 @@ export default function AdminTodayKakaoPanel({
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | "">("");
   const [saving, setSaving] = useState(false);
+  const [registeringTaskItemId, setRegisteringTaskItemId] = useState("");
 
   const filteredConversation = useMemo(
     () => buildKakaoCustomerOnlyConversation(conversationText, adminSenderText, autoSenderText),
@@ -186,6 +189,82 @@ export default function AdminTodayKakaoPanel({
       alert("복사에 실패했습니다. 추천 답변을 직접 드래그해서 복사해주세요.");
     }
   };
+
+
+  const registerTodayTaskFromItem = async (item: KakaoTimelineItem) => {
+    if (item.role !== "customer") {
+      alert("고객 문의만 오늘할일에 등록할 수 있습니다.");
+      return;
+    }
+
+    const cleanText = String(item.content || "").trim();
+
+    if (!cleanText) {
+      alert("등록할 고객 문의 내용이 없습니다.");
+      return;
+    }
+
+    const customerLabel =
+      selectedCustomer?.youtube_nickname ||
+      selectedCustomer?.customer_name ||
+      kakaoDisplayName ||
+      item.senderLabel ||
+      "고객 미확인";
+
+    const itemAnalysis = item.analysis || analysis;
+    const title = `${itemAnalysis.label} · ${customerLabel}`;
+    const body = [
+      `문의시점: ${item.dateLabel}`,
+      `보낸사람: ${item.senderLabel}`,
+      `카톡표시명: ${kakaoDisplayName || "-"}`,
+      `연결고객: ${selectedCustomer?.youtube_nickname || selectedCustomer?.customer_name || "-"}`,
+      `관련상품: ${relatedProduct || "-"}`,
+      `분류: ${itemAnalysis.label} / 위험도: ${itemAnalysis.riskLabel}`,
+      "",
+      "고객 메시지:",
+      cleanText,
+      "",
+      "추천답변:",
+      itemAnalysis.recommendedReply || "-",
+    ].join("\n");
+
+    const ok = window.confirm(
+      `이 카톡 문의를 오늘할일에 등록할까요?\n\n${title}\n\n등록 후 처리완료 전까지 계속 표시됩니다.`
+    );
+
+    if (!ok) return;
+
+    setRegisteringTaskItemId(item.id);
+
+    const { error } = await supabase.from("admin_tasks").insert({
+      task_type: itemAnalysis.issueType || "general",
+      title,
+      body,
+      source: "kakao",
+      priority: itemAnalysis.riskLabel === "높음" || itemAnalysis.riskLabel === "구매의사 높음" ? "high" : "normal",
+      status: "open",
+      customer_id: selectedCustomer?.id || null,
+      customer_name: selectedCustomer?.customer_name || null,
+      customer_nickname: selectedCustomer?.youtube_nickname || kakaoDisplayName || item.senderLabel || null,
+      related_product: relatedProduct || null,
+      raw_payload: {
+        kakaoDisplayName,
+        relatedProduct,
+        timelineItem: item,
+      },
+    });
+
+    setRegisteringTaskItemId("");
+
+    if (error) {
+      alert("오늘할일 등록 실패\n\n" + error.message);
+      return;
+    }
+
+    window.dispatchEvent(new CustomEvent("ruru-admin-task-created"));
+    alert("오늘할일에 등록했습니다. 처리완료 전까지 계속 표시됩니다.");
+  };
+
 
   const saveMemo = async () => {
     if (!analysisSourceText.trim() && !kakaoDisplayName.trim()) {
@@ -315,7 +394,7 @@ export default function AdminTodayKakaoPanel({
       </div>
 
       <div className="mt-3 grid gap-3">
-        <AdminTodayKakaoTimelineList items={timelineItems} />
+        <AdminTodayKakaoTimelineList items={timelineItems} registeringItemId={registeringTaskItemId} onRegisterTask={registerTodayTaskFromItem} />
 
         <AdminTodayKakaoManualFields
           kakaoDisplayName={kakaoDisplayName}

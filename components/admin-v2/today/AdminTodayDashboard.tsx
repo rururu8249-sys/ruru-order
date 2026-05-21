@@ -15,6 +15,7 @@ import type {
 } from "@/lib/admin-v2/types";
 import AdminTodayHeader from "@/components/admin-v2/today/AdminTodayHeader";
 import AdminTodayMoneySummary from "@/components/admin-v2/today/AdminTodayMoneySummary";
+import AdminTodayPersistentTasks from "@/components/admin-v2/today/AdminTodayPersistentTasks";
 import AdminTodayWorkQueue from "@/components/admin-v2/today/AdminTodayWorkQueue";
 import AdminTodayRankings from "@/components/admin-v2/today/AdminTodayRankings";
 import AdminTodayKakaoPanel from "@/components/admin-v2/today/AdminTodayKakaoPanel";
@@ -108,6 +109,8 @@ export default function AdminTodayDashboard({
       </section>
 
       <AdminTodayMoneySummary summary={moneySummary} />
+
+      <AdminTodayPersistentTasks />
 
       <div className="grid gap-4 2xl:grid-cols-[1.35fr_0.9fr]">
         <AdminTodayWorkQueue
