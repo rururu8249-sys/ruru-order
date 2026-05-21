@@ -1071,6 +1071,33 @@ export function AdminV2Client() {
   };
 
 
+
+  const saveKakaoCustomerMemo = async (customer: CustomerRow, memoText: string) => {
+    const cleanMemo = String(memoText || "").trim();
+
+    if (!customer?.id || !cleanMemo) {
+      alert("저장할 고객 또는 메모 내용이 없습니다.");
+      return;
+    }
+
+    const previousMemo = String(customer.customer_memo || "").trim();
+    const nextMemo = previousMemo ? `${previousMemo}\n\n${cleanMemo}` : cleanMemo;
+
+    const { error } = await supabase
+      .from("customers")
+      .update({ customer_memo: nextMemo })
+      .eq("id", customer.id);
+
+    if (error) {
+      alert("고객메모 저장 실패\n\n" + error.message);
+      return;
+    }
+
+    alert("고객메모에 카톡 응대 내용을 저장했습니다.");
+    await loadData();
+  };
+
+
   const softDeleteOrderGroups = async (targetGroups: OrderGroup[]) => {
     if (targetGroups.length <= 0) {
       alert("삭제 처리할 주문을 선택해주세요.");
@@ -1328,6 +1355,7 @@ export function AdminV2Client() {
                   onGoCustomers={() => setActiveTab("customers")}
                   onGoDeposits={() => setActiveTab("deposits")}
                   onOpenPaymentMatch={(group) => setManualMatchGroup(group)}
+                  onSaveCustomerMemo={saveKakaoCustomerMemo}
                 />
               ) : activeTab === "shipping" ? (
                 <ShippingPanel

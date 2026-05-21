@@ -17,6 +17,7 @@ import AdminTodayHeader from "@/components/admin-v2/today/AdminTodayHeader";
 import AdminTodayMoneySummary from "@/components/admin-v2/today/AdminTodayMoneySummary";
 import AdminTodayWorkQueue from "@/components/admin-v2/today/AdminTodayWorkQueue";
 import AdminTodayRankings from "@/components/admin-v2/today/AdminTodayRankings";
+import AdminTodayKakaoPanel from "@/components/admin-v2/today/AdminTodayKakaoPanel";
 import {
   buildBuyerRanking,
   buildMoneySummary,
@@ -38,6 +39,7 @@ type AdminTodayDashboardProps = {
   onGoCustomers: () => void;
   onGoDeposits: () => void;
   onOpenPaymentMatch: (group: OrderGroup) => void;
+  onSaveCustomerMemo: (customer: CustomerRow, memoText: string) => Promise<void>;
 };
 
 export default function AdminTodayDashboard({
@@ -50,6 +52,7 @@ export default function AdminTodayDashboard({
   onGoCustomers,
   onGoDeposits,
   onOpenPaymentMatch,
+  onSaveCustomerMemo,
 }: AdminTodayDashboardProps) {
   const [activeWorkTab, setActiveWorkTab] = useState<TodayWorkTab>("all");
 
@@ -120,6 +123,11 @@ export default function AdminTodayDashboard({
 
         <section className="grid gap-4">
           <AdminTodayRankings buyers={buyerRanking} products={productRanking} />
+
+          <AdminTodayKakaoPanel
+            customers={customers}
+            onSaveCustomerMemo={onSaveCustomerMemo}
+          />
 
           <section className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
