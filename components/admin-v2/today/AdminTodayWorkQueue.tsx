@@ -8,8 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { TodayWorkItem, TodayWorkTab } from "@/components/admin-v2/today/adminTodayUtils";
 import AdminTodayWorkTabs from "@/components/admin-v2/today/AdminTodayWorkTabs";
 import AdminTodayWorkPagination from "@/components/admin-v2/today/AdminTodayWorkPagination";
-
-const PAGE_SIZE = 4;
+import useAutoTodayWorkPageSize from "@/components/admin-v2/today/useAutoTodayWorkPageSize";
 
 const toneClass = {
   blue: "bg-blue-50 text-blue-700 border-blue-100",
@@ -43,16 +42,27 @@ export default function AdminTodayWorkQueue({
 
   const [page, setPage] = useState(1);
 
-  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const { listRef, firstRowRef, pageSize } = useAutoTodayWorkPageSize({
+    triggerKey: `${activeTab}:${items.length}`,
+    fallback: 4,
+    min: 3,
+    max: 12,
+  });
+
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
 
   useEffect(() => {
     setPage(1);
-  }, [activeTab, items.length]);
+  }, [activeTab, items.length, pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   const visibleItems = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return items.slice(start, start + PAGE_SIZE);
-  }, [items, page]);
+    const start = (page - 1) * pageSize;
+    return items.slice(start, start + pageSize);
+  }, [items, page, pageSize]);
 
   const safeSetPage = (nextPage: number) => {
     setPage(Math.min(totalPages, Math.max(1, nextPage)));
@@ -66,7 +76,7 @@ export default function AdminTodayWorkQueue({
             오늘 입금 빠른처리
           </h2>
           <p className="mt-1 text-xs font-bold text-neutral-500">
-            오늘 미입금 주문과 수동매칭을 여기에서 바로 처리합니다.
+            오른쪽 패널 높이에 맞춰 표시 개수와 페이지 수가 자동 조정됩니다.
           </p>
         </div>
 
@@ -77,16 +87,17 @@ export default function AdminTodayWorkQueue({
         />
       </div>
 
-      <div className="flex-1 rounded-2xl border border-neutral-100">
+      <div ref={listRef} className="flex-1 overflow-hidden rounded-2xl border border-neutral-100">
         {items.length === 0 ? (
           <div className="px-4 py-14 text-center text-sm font-black text-neutral-400">
             현재 표시할 업무가 없습니다.
           </div>
         ) : (
           <div className="divide-y divide-neutral-100">
-            {visibleItems.map((item) => (
+            {visibleItems.map((item, index) => (
               <div
                 key={item.id}
+                ref={index === 0 ? firstRowRef : undefined}
                 className="grid gap-3 px-4 py-3 lg:grid-cols-[112px_minmax(260px,1fr)_minmax(210px,300px)_auto] lg:items-center"
               >
                 <div className="min-w-0">
@@ -178,11 +189,17 @@ export default function AdminTodayWorkQueue({
         )}
       </div>
 
-      <AdminTodayWorkPagination
-        page={page}
-        totalPages={totalPages}
-        onChange={safeSetPage}
-      />
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="text-xs font-black text-neutral-400">
+          표시 {visibleItems.length}건 / 전체 {items.length}건 · 한 페이지 {pageSize}건
+        </div>
+
+        <AdminTodayWorkPagination
+          page={page}
+          totalPages={totalPages}
+          onChange={safeSetPage}
+        />
+      </div>
     </section>
   );
 }

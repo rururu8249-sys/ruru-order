@@ -63,7 +63,7 @@ export default function AdminTodayYoutubeLiveEmbedBox({
           </button>
         </div>
 
-        <div className="h-[240px] sm:h-[260px] 2xl:h-[290px]">
+        <div className="h-[252px] sm:h-[272px] 2xl:h-[302px]">
           <iframe
             src={videoSrc}
             title="유튜브 LIVE 방송 화면"
@@ -87,7 +87,7 @@ export default function AdminTodayYoutubeLiveEmbedBox({
           </button>
         </div>
 
-        <div className="h-[240px] sm:h-[260px] 2xl:h-[290px]">
+        <div className="h-[252px] sm:h-[272px] 2xl:h-[302px]">
           {chatSrc ? (
             <iframe
               src={chatSrc}
