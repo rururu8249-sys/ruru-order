@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import AdminTodayYoutubeLiveLinkBox from "@/components/admin-v2/today/AdminTodayYoutubeLiveLinkBox";
 import AdminTodayYoutubeChatInputBox from "@/components/admin-v2/today/AdminTodayYoutubeChatInputBox";
+import AdminTodayYoutubeLiveEmbedBox from "@/components/admin-v2/today/AdminTodayYoutubeLiveEmbedBox";
 import AdminTodayYoutubeChatSearchBox from "@/components/admin-v2/today/AdminTodayYoutubeChatSearchBox";
 import AdminTodayYoutubeChatActionBox from "@/components/admin-v2/today/AdminTodayYoutubeChatActionBox";
 import AdminTodayCollapsiblePanel from "@/components/admin-v2/today/AdminTodayCollapsiblePanel";
@@ -170,6 +171,12 @@ export default function AdminTodayYoutubeLivePanel() {
           videoId={videoId}
           setLiveUrl={setLiveUrl}
           onSave={saveLiveUrl}
+          onOpenWatch={openYoutubeWatch}
+          onOpenChat={openYoutubeChat}
+        />
+
+        <AdminTodayYoutubeLiveEmbedBox
+          videoId={videoId}
           onOpenWatch={openYoutubeWatch}
           onOpenChat={openYoutubeChat}
         />

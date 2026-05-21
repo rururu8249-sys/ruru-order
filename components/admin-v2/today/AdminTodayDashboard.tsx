@@ -151,6 +151,15 @@ export default function AdminTodayDashboard({
           <AdminTodayRankings buyers={buyerRanking} products={productRanking} />
 
           <AdminTodayCollapsiblePanel
+            title="유튜브 LIVE 채팅"
+            description="방송 채팅창을 열고, 복사한 채팅을 검색/분석/오늘할일 등록합니다."
+            badge="방송채팅"
+            defaultOpen={false}
+          >
+            <AdminTodayYoutubeLivePanel />
+          </AdminTodayCollapsiblePanel>
+
+          <AdminTodayCollapsiblePanel
 
 
             title="카톡 응대 업무"
@@ -176,27 +185,8 @@ export default function AdminTodayDashboard({
 
           </AdminTodayCollapsiblePanel>
 
-          <AdminTodayCollapsiblePanel
-            title="유튜브 LIVE 채팅"
-            description="방송 채팅창을 열고, 복사한 채팅을 검색/분석/오늘할일 등록합니다."
-            badge="방송채팅"
-            defaultOpen={false}
-          >
-            <AdminTodayYoutubeLivePanel />
-          </AdminTodayCollapsiblePanel>
 
           <section className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
-              
-
-              <button
-                type="button"
-                onClick={onGoDeposits}
-                className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white active:scale-[0.98]"
-              >
-                전체 입금관리
-              </button>
-            </div>
 
             <div className="grid max-h-[260px] gap-2 overflow-y-auto">
               {deposits.slice(0, 8).length === 0 ? (
