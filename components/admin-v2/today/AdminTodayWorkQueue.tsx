@@ -24,6 +24,7 @@ export default function AdminTodayWorkQueue({
   onGoOrders,
   onGoDeposits,
   onGoShipping,
+  onOpenPaymentMatch,
 }: {
   activeTab: TodayWorkTab;
   setActiveTab: (value: TodayWorkTab) => void;
@@ -32,6 +33,7 @@ export default function AdminTodayWorkQueue({
   onGoOrders: () => void;
   onGoDeposits: () => void;
   onGoShipping: () => void;
+  onOpenPaymentMatch: (groupId: string) => void;
 }) {
   return (
     <section className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
@@ -55,7 +57,7 @@ export default function AdminTodayWorkQueue({
         ) : (
           <div className="divide-y divide-neutral-100">
             {items.slice(0, 50).map((item) => (
-              <div key={item.id} className="grid gap-3 px-4 py-3 lg:grid-cols-[128px_1fr_148px] lg:items-center">
+              <div key={item.id} className="grid gap-3 px-4 py-3 lg:grid-cols-[108px_minmax(320px,720px)_auto] lg:items-center lg:justify-start">
                 <div>
                   <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${toneClass[item.tone]}`}>
                     {item.label}
@@ -81,7 +83,7 @@ export default function AdminTodayWorkQueue({
                   </div>
                 </div>
 
-                <div className="flex flex-wrap justify-start gap-1.5 lg:justify-end">
+                <div className="flex flex-wrap justify-start gap-1.5 lg:pl-2">
                   <button
                     type="button"
                     onClick={onGoOrders}
@@ -92,7 +94,7 @@ export default function AdminTodayWorkQueue({
                   {item.tab === "payment" ? (
                     <button
                       type="button"
-                      onClick={onGoDeposits}
+                      onClick={() => onOpenPaymentMatch(item.id)}
                       className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-black text-white active:scale-[0.98]"
                     >
                       입금매칭

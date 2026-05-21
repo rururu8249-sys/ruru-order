@@ -1327,6 +1327,7 @@ export function AdminV2Client() {
                   onGoShipping={() => setActiveTab("shipping")}
                   onGoCustomers={() => setActiveTab("customers")}
                   onGoDeposits={() => setActiveTab("deposits")}
+                  onOpenPaymentMatch={(group) => setManualMatchGroup(group)}
                 />
               ) : activeTab === "shipping" ? (
                 <ShippingPanel

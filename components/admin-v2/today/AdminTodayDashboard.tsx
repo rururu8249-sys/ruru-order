@@ -37,6 +37,7 @@ type AdminTodayDashboardProps = {
   onGoShipping: () => void;
   onGoCustomers: () => void;
   onGoDeposits: () => void;
+  onOpenPaymentMatch: (group: OrderGroup) => void;
 };
 
 export default function AdminTodayDashboard({
@@ -48,6 +49,7 @@ export default function AdminTodayDashboard({
   onGoShipping,
   onGoCustomers,
   onGoDeposits,
+  onOpenPaymentMatch,
 }: AdminTodayDashboardProps) {
   const [activeWorkTab, setActiveWorkTab] = useState<TodayWorkTab>("all");
 
@@ -79,6 +81,17 @@ export default function AdminTodayDashboard({
     return allWorkItems.filter((item) => item.tab === activeWorkTab);
   }, [allWorkItems, activeWorkTab]);
 
+  const openPaymentMatchFromToday = (groupId: string) => {
+    const targetGroup = todayGroups.find((group) => group.groupId === groupId);
+
+    if (!targetGroup) {
+      alert("입금매칭할 주문 정보를 찾지 못했습니다. 주문관리에서 다시 확인해주세요.");
+      return;
+    }
+
+    onOpenPaymentMatch(targetGroup);
+  };
+
   return (
     <section className="grid gap-4">
       <AdminTodayHeader broadcasts={broadcasts} />
@@ -102,6 +115,7 @@ export default function AdminTodayDashboard({
           onGoOrders={onGoOrders}
           onGoDeposits={onGoDeposits}
           onGoShipping={onGoShipping}
+          onOpenPaymentMatch={openPaymentMatchFromToday}
         />
 
         <section className="grid gap-4">
