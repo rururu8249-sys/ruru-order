@@ -10,6 +10,7 @@ import AdminTodayWorkTabs from "@/components/admin-v2/today/AdminTodayWorkTabs";
 import AdminTodayWorkPagination from "@/components/admin-v2/today/AdminTodayWorkPagination";
 import useAutoTodayWorkPageSize from "@/components/admin-v2/today/useAutoTodayWorkPageSize";
 import AdminTodayWorkQueueFilterBar from "@/components/admin-v2/today/AdminTodayWorkQueueFilterBar";
+import AdminTodayWorkItemStatusPills from "@/components/admin-v2/today/AdminTodayWorkItemStatusPills";
 import { matchesTodayWorkQueueSearch } from "@/components/admin-v2/today/adminTodayWorkQueueFilterUtils";
 
 const toneClass = {
@@ -81,10 +82,10 @@ export default function AdminTodayWorkQueue({
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-black tracking-[-0.04em] text-neutral-950">
-            오늘 입금 빠른처리
+            오늘할일 빠른처리
           </h2>
           <p className="mt-1 text-xs font-bold text-neutral-500">
-            오른쪽 패널 높이에 맞춰 표시 개수와 페이지 수가 자동 조정됩니다.
+            결제확인·배송처리·특이사항을 한곳에서 빠르게 확인합니다.
           </p>
         </div>
 
@@ -141,9 +142,10 @@ export default function AdminTodayWorkQueue({
                     <span className="text-sm font-black text-neutral-700">
                       {item.amountText}
                     </span>
-                    <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-black text-neutral-600">
-                      {item.statusText}
-                    </span>
+                    <AdminTodayWorkItemStatusPills
+                      orderStatusText={item.orderStatusText}
+                      deliveryStageText={item.deliveryStageText}
+                    />
                   </div>
 
                   <div className="mt-1 truncate text-xs font-bold text-neutral-500">
@@ -170,9 +172,21 @@ export default function AdminTodayWorkQueue({
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-neutral-400">처리구분</span>
+                      <span className="text-neutral-400">오늘할일</span>
                       <span className="truncate font-black text-neutral-700">
                         {item.label}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-neutral-400">주문상태</span>
+                      <span className="truncate font-black text-emerald-700">
+                        {item.orderStatusText}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-neutral-400">배송처리</span>
+                      <span className="truncate font-black text-blue-700">
+                        {item.deliveryStageText}
                       </span>
                     </div>
                   </div>

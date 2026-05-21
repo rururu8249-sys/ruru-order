@@ -19,6 +19,7 @@ import {
   shortOrderCode,
 } from "@/lib/admin-v2/orderHelpers";
 import { formatDateLabel, money, toDateKey } from "@/lib/admin-v2/formatters";
+import { getAdminOrderStatusLabel, getDeliveryStageStatusLabel } from "@/lib/admin-v2/statusDisplay";
 
 export type TodayWorkTab =
   | "all"
@@ -39,6 +40,8 @@ export type TodayWorkItem = {
   timeText: string;
   createdAt: string;
   statusText: string;
+  orderStatusText: string;
+  deliveryStageText: string;
   orderCode: string;
 };
 
@@ -121,83 +124,66 @@ export const buildWorkItems = (groups: OrderGroup[]) => {
     const amountText = money(groupGrossBaseAmount(group));
     const timeText = formatDateLabel(first.created_at);
     const orderCode = shortOrderCode(group);
+    const orderStatusText = getAdminOrderStatusLabel({
+      status,
+      paymentMethod: first.payment_method,
+    });
+    const deliveryStageText = getDeliveryStageStatusLabel(status);
 
-    if (isOrderCanceled(first)) {
-      return {
-        id: group.groupId,
-        tab: "canceled",
-        tone: "rose",
-        label: "주문서 취소",
-        nickname,
-        product,
-        amountText,
-        timeText,
-      createdAt: first.created_at || "",
-        statusText: status,
-        orderCode,
-      };
-    }
-
-    if (isBankUnpaid(first) || isCardUnpaid(first)) {
-      return {
-        id: group.groupId,
-        tab: "payment",
-        tone: "amber",
-        label: isCardUnpaid(first) ? "카드미결제" : "미결제",
-        nickname,
-        product,
-        amountText,
-        timeText,
-      createdAt: first.created_at || "",
-        statusText: status,
-        orderCode,
-      };
-    }
-
-    if (containsIssueKeyword(first)) {
-      return {
-        id: group.groupId,
-        tab: "issue",
-        tone: "violet",
-        label: "특이사항 확인",
-        nickname,
-        product,
-        amountText,
-        timeText,
-      createdAt: first.created_at || "",
-        statusText: status,
-        orderCode,
-      };
-    }
-
-    if (["입금확인", "출고대기", "미설정"].includes(status) && !first.shipped_at) {
-      return {
-        id: group.groupId,
-        tab: "shipping",
-        tone: "blue",
-        label: "배송처리 확인",
-        nickname,
-        product,
-        amountText,
-        timeText,
-      createdAt: first.created_at || "",
-        statusText: status,
-        orderCode,
-      };
-    }
-
-    return {
+    const baseItem = {
       id: group.groupId,
-      tab: "new",
-      tone: "emerald",
-      label: "신규주문",
       nickname,
       product,
       amountText,
       timeText,
       createdAt: first.created_at || "",
-      statusText: status,
+      statusText: orderStatusText,
+      orderStatusText,
+      deliveryStageText,
       orderCode,
+    };
+
+    if (isOrderCanceled(first)) {
+      return {
+        ...baseItem,
+        tab: "canceled",
+        tone: "rose",
+        label: "주문서 취소",
+      };
+    }
+
+    if (isBankUnpaid(first) || isCardUnpaid(first)) {
+      return {
+        ...baseItem,
+        tab: "payment",
+        tone: "amber",
+        label: isCardUnpaid(first) ? "카드미결제" : "미결제",
+      };
+    }
+
+    if (containsIssueKeyword(first)) {
+      return {
+        ...baseItem,
+        tab: "issue",
+        tone: "violet",
+        label: "특이사항 확인",
+      };
+    }
+
+    if (["입금확인", "자동입금확인", "수동입금확인", "출고대기", "미설정"].includes(status) && !first.shipped_at) {
+      return {
+        ...baseItem,
+        tab: "shipping",
+        tone: "blue",
+        label: "배송처리 필요",
+      };
+    }
+
+    return {
+      ...baseItem,
+      tab: "new",
+      tone: "emerald",
+      label: "신규주문",
     };
   });
 };
