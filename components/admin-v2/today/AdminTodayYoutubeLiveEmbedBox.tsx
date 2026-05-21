@@ -1,7 +1,7 @@
 "use client";
 
 // components/admin-v2/today/AdminTodayYoutubeLiveEmbedBox.tsx
-// 목적: 오늘할일 관제탑 안에서 유튜브 방송 화면과 라이브 채팅창을 읽기 전용으로 크게 표시
+// 목적: 오늘할일 관제탑 안에서 유튜브 방송 화면과 라이브 채팅창을 읽기 전용으로 표시
 // 주의: YouTube API/OAuth/채팅 글쓰기 없음. iframe 표시 전용.
 
 import { useEffect, useMemo, useState } from "react";
@@ -49,7 +49,7 @@ export default function AdminTodayYoutubeLiveEmbedBox({
             방송 화면 / 라이브 채팅
           </div>
           <div className="mt-0.5 text-xs font-bold text-neutral-500">
-            왼쪽은 방송 화면, 오른쪽은 채팅창입니다. 같은 높이로 맞춰서 방송 중 바로 확인합니다.
+            왼쪽은 세로형 방송 화면, 오른쪽은 채팅창입니다.
           </div>
         </div>
 
@@ -76,18 +76,18 @@ export default function AdminTodayYoutubeLiveEmbedBox({
           방송 링크 또는 영상ID를 입력하면 방송 화면과 채팅창이 표시됩니다.
         </div>
       ) : (
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.85fr)] xl:items-stretch">
-          <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-black">
+        <div className="grid gap-3 xl:grid-cols-[minmax(236px,300px)_minmax(360px,1fr)] xl:items-start">
+          <div className="w-[236px] overflow-hidden rounded-2xl border border-neutral-200 bg-black sm:w-[258px] 2xl:w-[282px]">
             <div className="flex items-center justify-between border-b border-white/10 bg-neutral-950 px-3 py-2">
               <div className="text-xs font-black text-white">
                 LIVE 영상
               </div>
-              <div className="rounded-full bg-red-600 px-2.5 py-1 text-[11px] font-black text-white">
-                재생/소리 조절은 영상 하단 컨트롤
+              <div className="rounded-full bg-red-600 px-2 py-1 text-[10px] font-black text-white">
+                컨트롤
               </div>
             </div>
 
-            <div className="h-[320px] sm:h-[420px] xl:h-[560px] 2xl:h-[640px]">
+            <div className="h-[420px] sm:h-[460px] 2xl:h-[500px]">
               <iframe
                 src={videoSrc}
                 title="유튜브 LIVE 방송 화면"
@@ -113,7 +113,7 @@ export default function AdminTodayYoutubeLiveEmbedBox({
               </button>
             </div>
 
-            <div className="h-[420px] xl:h-[560px] 2xl:h-[640px]">
+            <div className="h-[420px] sm:h-[460px] 2xl:h-[500px]">
               {chatSrc ? (
                 <iframe
                   src={chatSrc}
@@ -133,7 +133,7 @@ export default function AdminTodayYoutubeLiveEmbedBox({
 
       <div className="mt-2 rounded-xl bg-neutral-50 px-3 py-2 text-xs font-bold leading-relaxed text-neutral-500">
         영상은 유튜브 기본 플레이어라 재생/일시정지/음소거/소리 조절은 영상 하단 컨트롤에서 가능합니다.
-        채팅 입력은 안전상 넣지 않았습니다. 채팅이 안 보이면 [채팅 새창]을 사용하세요.
+        검은 여백은 유튜브 영상 비율에 따라 일부 남을 수 있습니다.
       </div>
     </section>
   );
