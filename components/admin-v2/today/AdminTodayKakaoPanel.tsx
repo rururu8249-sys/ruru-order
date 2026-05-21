@@ -2,7 +2,10 @@
 
 // components/admin-v2/today/AdminTodayKakaoPanel.tsx
 // 목적: 오늘할일에서 카톡채널 열기 + 대화 복붙 분석 + 고객메모 저장
-// 주의: 카카오 실제 채팅창 삽입 아님. 상담톡 API 연동 아님.
+// 중요:
+// - 고객 메시지만 문의 분석
+// - 유혜원/한두희 답변은 고객으로 인식하지 않고 관리자 답변으로 기록
+// - 루루동이/카나나/챗봇 자동응답은 분석 제외
 
 import { useMemo, useState } from "react";
 import type { CustomerRow } from "@/lib/admin-v2/types";
@@ -13,11 +16,15 @@ import {
   getAnalysisByIssueType,
   type KakaoIssueType,
 } from "@/components/admin-v2/today/kakaoSupportUtils";
+import { buildKakaoCustomerOnlyConversation } from "@/components/admin-v2/today/kakaoConversationFilter";
 import AdminTodayKakaoManualFields from "@/components/admin-v2/today/AdminTodayKakaoManualFields";
 import AdminTodayKakaoCustomerPicker from "@/components/admin-v2/today/AdminTodayKakaoCustomerPicker";
 
 const KAKAO_CHANNEL_URL = "https://pf.kakao.com/_RMxaqX";
 const KAKAO_CHANNEL_CHAT_URL = "https://business.kakao.com/_RMxaqX/chats?t_src=business_partnercenter&t_ch=lnb&t_obj=%EB%82%B4%EC%B1%84%ED%8C%85_%ED%81%B4%EB%A6%AD";
+
+const DEFAULT_ADMIN_SENDER_TEXT = "유혜원, 유혜원님이 보냄, 한두희, 한두희님이 보냄";
+const DEFAULT_AUTO_SENDER_TEXT = "루루동이님이 보냄, 카나나 상담매니저가 보냄, Kanana 상담매니저, 챗봇이 보냄, 카나나, 챗봇";
 
 const digitsOnly = (value: unknown) => String(value ?? "").replace(/[^0-9]/g, "");
 
@@ -88,6 +95,9 @@ export default function AdminTodayKakaoPanel({
   onSaveCustomerMemo: (customer: CustomerRow, memoText: string) => Promise<void>;
 }) {
   const [conversationText, setConversationText] = useState("");
+  const [manualCustomerText, setManualCustomerText] = useState("");
+  const [adminSenderText, setAdminSenderText] = useState(DEFAULT_ADMIN_SENDER_TEXT);
+  const [autoSenderText, setAutoSenderText] = useState(DEFAULT_AUTO_SENDER_TEXT);
   const [kakaoDisplayName, setKakaoDisplayName] = useState("");
   const [manualIssueType, setManualIssueType] = useState<KakaoIssueType | "">("");
   const [relatedProduct, setRelatedProduct] = useState("");
@@ -95,17 +105,29 @@ export default function AdminTodayKakaoPanel({
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | "">("");
   const [saving, setSaving] = useState(false);
 
-  const autoAnalysis = useMemo(() => analyzeKakaoConversation(conversationText), [conversationText]);
+  const filteredConversation = useMemo(
+    () => buildKakaoCustomerOnlyConversation(conversationText, adminSenderText, autoSenderText),
+    [conversationText, adminSenderText, autoSenderText]
+  );
+
+  const displayedCustomerText = manualCustomerText || filteredConversation.customerText;
+
+  const analysisSourceText = useMemo(() => {
+    return displayedCustomerText.trim();
+  }, [displayedCustomerText]);
+
+  const autoAnalysis = useMemo(() => analyzeKakaoConversation(analysisSourceText), [analysisSourceText]);
+
   const analysis = useMemo(() => {
     if (!manualIssueType) return autoAnalysis;
-    return getAnalysisByIssueType(manualIssueType, conversationText);
-  }, [autoAnalysis, manualIssueType, conversationText]);
+    return getAnalysisByIssueType(manualIssueType, analysisSourceText);
+  }, [autoAnalysis, manualIssueType, analysisSourceText]);
 
-  const detectedDate = useMemo(() => detectKakaoDate(conversationText), [conversationText]);
+  const detectedDate = useMemo(() => detectKakaoDate(analysisSourceText), [analysisSourceText]);
 
   const matches = useMemo(
-    () => findCustomerMatches(customers, conversationText, kakaoDisplayName),
-    [customers, conversationText, kakaoDisplayName]
+    () => findCustomerMatches(customers, analysisSourceText, kakaoDisplayName),
+    [customers, analysisSourceText, kakaoDisplayName]
   );
 
   const searchResults = useMemo(
@@ -122,14 +144,25 @@ export default function AdminTodayKakaoPanel({
   const memoText = useMemo(() => {
     return buildKakaoMemoText({
       analysis,
-      conversationText,
+      conversationText: analysisSourceText,
       customerName: selectedCustomer?.customer_name,
       nickname: selectedCustomer?.youtube_nickname,
       kakaoDisplayName,
       detectedDate,
       relatedProduct,
+      adminReplyText: filteredConversation.adminText,
+      autoReplyText: filteredConversation.autoText,
     });
-  }, [analysis, conversationText, selectedCustomer, kakaoDisplayName, detectedDate, relatedProduct]);
+  }, [
+    analysis,
+    analysisSourceText,
+    selectedCustomer,
+    kakaoDisplayName,
+    detectedDate,
+    relatedProduct,
+    filteredConversation.adminText,
+    filteredConversation.autoText,
+  ]);
 
   const copyReply = async () => {
     try {
@@ -141,8 +174,8 @@ export default function AdminTodayKakaoPanel({
   };
 
   const saveMemo = async () => {
-    if (!conversationText.trim() && !kakaoDisplayName.trim()) {
-      alert("카톡 대화 또는 카톡 이름/닉네임을 입력해주세요.");
+    if (!analysisSourceText.trim() && !kakaoDisplayName.trim()) {
+      alert("고객 메시지 또는 카톡 이름/닉네임을 입력해주세요.");
       return;
     }
 
@@ -161,6 +194,9 @@ export default function AdminTodayKakaoPanel({
     try {
       await onSaveCustomerMemo(selectedCustomer, memoText);
       setConversationText("");
+      setManualCustomerText("");
+      setAdminSenderText(DEFAULT_ADMIN_SENDER_TEXT);
+      setAutoSenderText(DEFAULT_AUTO_SENDER_TEXT);
       setKakaoDisplayName("");
       setManualIssueType("");
       setRelatedProduct("");
@@ -179,7 +215,7 @@ export default function AdminTodayKakaoPanel({
             카톡 응대 업무
           </h2>
           <p className="mt-1 text-xs font-bold text-neutral-500">
-            카톡 대화는 이름/닉네임만 남는 경우가 많아서 수동검색까지 같이 지원합니다.
+            고객 메시지는 분석하고, 유혜원/한두희 답변은 관리자 답변으로 기록하며, 루루동이/카나나/챗봇 자동응답은 제외합니다.
           </p>
         </div>
 
@@ -203,12 +239,66 @@ export default function AdminTodayKakaoPanel({
         </div>
       </div>
 
-      <textarea
-        value={conversationText}
-        onChange={(event) => setConversationText(event.target.value)}
-        placeholder="카톡채널 대화 내용을 여기에 붙여넣으세요."
-        className="h-28 w-full resize-none rounded-2xl border border-neutral-200 bg-neutral-50 p-3 text-sm font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100/70"
-      />
+      <div className="grid gap-3 xl:grid-cols-2">
+        <div>
+          <div className="mb-1 text-xs font-black text-neutral-500">원본 카톡 대화 붙여넣기</div>
+          <textarea
+            value={conversationText}
+            onChange={(event) => {
+              setConversationText(event.target.value);
+              setManualCustomerText("");
+            }}
+            placeholder="카톡채널 대화 원문 전체를 붙여넣으세요."
+            className="h-32 w-full resize-none rounded-2xl border border-neutral-200 bg-neutral-50 p-3 text-sm font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100/70"
+          />
+        </div>
+
+        <div>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <span className="text-xs font-black text-neutral-500">분석 기준 대화</span>
+            <span className="rounded-full bg-red-50 px-2 py-1 text-[11px] font-black text-red-600">
+              고객 {filteredConversation.customerCount}줄 · 관리자답변 {filteredConversation.adminCount}줄 · 자동응답 제외 {filteredConversation.autoCount}줄
+            </span>
+          </div>
+          <textarea
+            value={displayedCustomerText}
+            onChange={(event) => setManualCustomerText(event.target.value)}
+            placeholder="고객 메시지만 남는 영역입니다. 필요하면 직접 수정하세요."
+            className="h-32 w-full resize-none rounded-2xl border border-blue-100 bg-blue-50/40 p-3 text-sm font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100/70"
+          />
+          <div className="mt-1 text-[11px] font-bold text-neutral-500">
+            이 칸의 내용만 고객 요청으로 분석합니다. 관리자/챗봇 답변은 고객 요청으로 보지 않습니다.
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 xl:grid-cols-2">
+        <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-3">
+          <div className="mb-1 text-xs font-black text-blue-700">관리자 답변으로 기록할 이름/문구</div>
+          <input
+            value={adminSenderText}
+            onChange={(event) => setAdminSenderText(event.target.value)}
+            placeholder="예: 유혜원님이 보냄, 한두희님이 보냄"
+            className="h-10 w-full rounded-xl border border-blue-100 bg-white px-3 text-xs font-bold outline-none focus:border-blue-500"
+          />
+          <div className="mt-1 text-[11px] font-bold text-blue-600">
+            고객으로 분석하지 않고, 내가 답변한 내용으로 메모에 남깁니다.
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-red-100 bg-red-50/40 p-3">
+          <div className="mb-1 text-xs font-black text-red-700">완전 제외할 자동응답 이름/문구</div>
+          <input
+            value={autoSenderText}
+            onChange={(event) => setAutoSenderText(event.target.value)}
+            placeholder="예: 루루동이님이 보냄, 카나나 상담매니저가 보냄, 챗봇이 보냄"
+            className="h-10 w-full rounded-xl border border-red-100 bg-white px-3 text-xs font-bold outline-none focus:border-red-500"
+          />
+          <div className="mt-1 text-[11px] font-bold text-red-600">
+            카나나/챗봇/자동응답은 분석하지 않고 메모에서도 원문 제외 처리합니다.
+          </div>
+        </div>
+      </div>
 
       <div className="mt-3 grid gap-3">
         <AdminTodayKakaoManualFields
@@ -231,7 +321,11 @@ export default function AdminTodayKakaoPanel({
                 위험도 {analysis.riskLabel}
               </span>
               <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-neutral-600">
-                {detectedDate.confidence === "auto" ? "날짜 자동인식" : detectedDate.confidence === "needs_check" ? "날짜 확인필요" : "저장시각 기준"}
+                {detectedDate.confidence === "auto"
+                  ? "날짜 자동인식"
+                  : detectedDate.confidence === "needs_check"
+                    ? "날짜 확인필요"
+                    : "저장시각 기준"}
               </span>
             </div>
 

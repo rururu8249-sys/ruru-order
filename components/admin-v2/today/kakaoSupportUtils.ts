@@ -270,6 +270,8 @@ export function buildKakaoMemoText(params: {
   kakaoDisplayName?: string;
   detectedDate?: KakaoDetectedDate;
   relatedProduct?: string;
+  adminReplyText?: string;
+  autoReplyText?: string;
 }) {
   const nowText = new Intl.DateTimeFormat("ko-KR", {
     timeZone: "Asia/Seoul",
@@ -292,7 +294,13 @@ export function buildKakaoMemoText(params: {
     `분류: ${params.analysis.label} / 위험도: ${params.analysis.riskLabel}`,
     `요약: ${params.analysis.summary}`,
     "",
-    "원문:",
+    "고객 메시지:",
     preview || "-",
+    "",
+    "관리자 답변 기록:",
+    params.adminReplyText?.trim() || "-",
+    "",
+    "자동응답 제외:",
+    params.autoReplyText?.trim() ? "자동응답/챗봇 메시지 제외됨" : "-",
   ].join("\\n");
 }
