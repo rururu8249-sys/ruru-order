@@ -82,7 +82,7 @@ export default function AdminTodayMoneySummary({ summary }: Props) {
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-sm font-black tracking-[-0.03em] text-neutral-950">
-            오늘 돈 흐름
+            기간별 돈 흐름
           </h2>
           <p className="mt-0.5 text-xs font-bold text-neutral-400">
             입금확인과 미입금만 먼저 보이게 압축했습니다.

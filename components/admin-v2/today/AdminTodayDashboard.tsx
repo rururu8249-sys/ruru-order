@@ -17,14 +17,11 @@ import AdminTodayHeader from "@/components/admin-v2/today/AdminTodayHeader";
 import AdminTodayMoneySummary from "@/components/admin-v2/today/AdminTodayMoneySummary";
 import AdminTodayPersistentTasks from "@/components/admin-v2/today/AdminTodayPersistentTasks";
 import AdminTodayWorkQueue from "@/components/admin-v2/today/AdminTodayWorkQueue";
-import AdminTodayRankings from "@/components/admin-v2/today/AdminTodayRankings";
 import AdminTodayKakaoPanel from "@/components/admin-v2/today/AdminTodayKakaoPanel";
 import AdminTodayCollapsiblePanel from "@/components/admin-v2/today/AdminTodayCollapsiblePanel";
 import AdminTodayYoutubeLivePanel from "@/components/admin-v2/today/AdminTodayYoutubeLivePanel";
 import {
-  buildBuyerRanking,
   buildMoneySummary,
-  buildProductRanking,
   buildWorkItems,
   getTodayGroups,
   type TodayWorkTab,
@@ -60,8 +57,6 @@ export default function AdminTodayDashboard({
   const todayGroups = useMemo(() => getTodayGroups(orderGroups), [orderGroups]);
   const moneySummary = useMemo(() => buildMoneySummary(todayGroups), [todayGroups]);
   const allWorkItems = useMemo(() => buildWorkItems(orderGroups), [orderGroups]);
-  const buyerRanking = useMemo(() => buildBuyerRanking(todayGroups), [todayGroups]);
-  const productRanking = useMemo(() => buildProductRanking(todayGroups), [todayGroups]);
 
   const workCounts = useMemo(() => {
     const counts: Record<TodayWorkTab, number> = {
@@ -109,9 +104,9 @@ export default function AdminTodayDashboard({
         <div className="grid gap-3">
           <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <QuickCard
-              label="오늘 주문"
+              label="기간별 주문"
               value={`${todayGroups.length}건`}
-              desc="당일 기준 주문묶음"
+              desc="선택 기간 기준 주문묶음"
               onClick={onGoOrders}
             />
             <QuickCard
@@ -175,7 +170,6 @@ export default function AdminTodayDashboard({
         />
 
         <section className="grid gap-4">
-          <AdminTodayRankings buyers={buyerRanking} products={productRanking} />
 
           <AdminTodayCollapsiblePanel
             title="카톡 응대 업무"
