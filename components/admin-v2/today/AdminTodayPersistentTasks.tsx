@@ -1,7 +1,7 @@
 "use client";
 
 // components/admin-v2/today/AdminTodayPersistentTasks.tsx
-// 목적: 직접 등록한 카톡/고객/운영 이슈를 해결 전까지 오늘할일에 계속 표시
+// 목적: 직접 등록한 카톡/고객/운영 이슈를 해결 전까지 표시하고 완료 이력도 확인
 // 주의: 주문/입금/배송/정산 상태 변경 없음. admin_tasks만 조회/완료 처리.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -9,6 +9,9 @@ import type { AdminTaskRow } from "@/lib/admin-v2/types";
 import { supabase } from "@/lib/supabase";
 import AdminTodayTaskCard from "@/components/admin-v2/today/AdminTodayTaskCard";
 import AdminTodayTaskDetailDrawer from "@/components/admin-v2/today/AdminTodayTaskDetailDrawer";
+import AdminTodayTaskModeTabs, {
+  type AdminTaskViewMode,
+} from "@/components/admin-v2/today/AdminTodayTaskModeTabs";
 import {
   ADMIN_TASK_FILTERS,
   type AdminTaskFilter,
@@ -21,6 +24,7 @@ export default function AdminTodayPersistentTasks() {
   const [tasks, setTasks] = useState<AdminTaskRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState("");
+  const [viewMode, setViewMode] = useState<AdminTaskViewMode>("open");
   const [activeFilter, setActiveFilter] = useState<AdminTaskFilter>("all");
   const [searchText, setSearchText] = useState("");
   const [selectedTask, setSelectedTask] = useState<AdminTaskRow | null>(null);
@@ -32,9 +36,8 @@ export default function AdminTodayPersistentTasks() {
     const { data, error } = await supabase
       .from("admin_tasks")
       .select("*")
-      .is("resolved_at", null)
       .order("created_at", { ascending: false })
-      .limit(120);
+      .limit(240);
 
     setLoading(false);
 
@@ -57,21 +60,33 @@ export default function AdminTodayPersistentTasks() {
     return () => window.removeEventListener("ruru-admin-task-created", refresh);
   }, [loadTasks]);
 
-  const counts = useMemo(() => {
-    const result: Record<string, number> = { all: tasks.length };
+  const openTasks = useMemo(
+    () => tasks.filter((task) => !task.resolved_at),
+    [tasks]
+  );
 
-    tasks.forEach((task) => {
+  const resolvedTasks = useMemo(
+    () => tasks.filter((task) => Boolean(task.resolved_at)),
+    [tasks]
+  );
+
+  const baseTasks = viewMode === "open" ? openTasks : resolvedTasks;
+
+  const counts = useMemo(() => {
+    const result: Record<string, number> = { all: baseTasks.length };
+
+    baseTasks.forEach((task) => {
       const key = task.task_type || "general";
       result[key] = (result[key] || 0) + 1;
     });
 
     return result;
-  }, [tasks]);
+  }, [baseTasks]);
 
   const filteredTasks = useMemo(() => {
     const word = normalize(searchText);
 
-    return tasks.filter((task) => {
+    return baseTasks.filter((task) => {
       const taskType = task.task_type || "general";
 
       if (activeFilter !== "all" && taskType !== activeFilter) {
@@ -89,12 +104,13 @@ export default function AdminTodayPersistentTasks() {
           task.related_product,
           task.source,
           task.task_type,
+          task.resolved_note,
         ].join(" ")
       );
 
       return target.includes(word);
     });
-  }, [tasks, activeFilter, searchText]);
+  }, [baseTasks, activeFilter, searchText]);
 
   const resolveTask = async (task: AdminTaskRow, note = "") => {
     const ok = window.confirm(`오늘할일을 완료 처리할까요?\n\n${task.title}`);
@@ -120,6 +136,11 @@ export default function AdminTodayPersistentTasks() {
     await loadTasks();
   };
 
+  const emptyText =
+    viewMode === "open"
+      ? "해결 대기 업무가 없습니다."
+      : "완료된 업무 이력이 없습니다.";
+
   return (
     <>
       <section className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
@@ -129,7 +150,7 @@ export default function AdminTodayPersistentTasks() {
               해결 전까지 뜨는 업무
             </h2>
             <p className="mt-1 text-xs font-bold text-neutral-500">
-              직접 등록한 카톡문의·고객이슈만 완료 전까지 계속 표시합니다.
+              직접 등록한 업무는 완료 전까지 표시하고, 완료 후에는 이력에서 확인합니다.
             </p>
           </div>
 
@@ -141,6 +162,17 @@ export default function AdminTodayPersistentTasks() {
             새로고침
           </button>
         </div>
+
+        <AdminTodayTaskModeTabs
+          value={viewMode}
+          openCount={openTasks.length}
+          resolvedCount={resolvedTasks.length}
+          onChange={(nextMode) => {
+            setViewMode(nextMode);
+            setActiveFilter("all");
+            setSelectedTask(null);
+          }}
+        />
 
         <div className="mb-3 flex flex-wrap gap-2">
           {ADMIN_TASK_FILTERS.map((filter) => {
@@ -185,13 +217,13 @@ export default function AdminTodayPersistentTasks() {
           </div>
         ) : null}
 
-        {!loading && !errorText && tasks.length === 0 ? (
+        {!loading && !errorText && baseTasks.length === 0 ? (
           <div className="rounded-2xl bg-neutral-50 p-6 text-center text-sm font-black text-neutral-400">
-            해결 대기 업무가 없습니다.
+            {emptyText}
           </div>
         ) : null}
 
-        {!loading && !errorText && tasks.length > 0 && filteredTasks.length === 0 ? (
+        {!loading && !errorText && baseTasks.length > 0 && filteredTasks.length === 0 ? (
           <div className="rounded-2xl bg-neutral-50 p-6 text-center text-sm font-black text-neutral-400">
             현재 조건에 맞는 업무가 없습니다.
           </div>
@@ -203,6 +235,7 @@ export default function AdminTodayPersistentTasks() {
               <AdminTodayTaskCard
                 key={task.id}
                 task={task}
+                canResolve={viewMode === "open"}
                 onOpenDetail={setSelectedTask}
                 onResolve={resolveTask}
               />
@@ -213,6 +246,7 @@ export default function AdminTodayPersistentTasks() {
 
       <AdminTodayTaskDetailDrawer
         task={selectedTask}
+        canResolve={viewMode === "open"}
         onClose={() => setSelectedTask(null)}
         onResolve={resolveTask}
       />

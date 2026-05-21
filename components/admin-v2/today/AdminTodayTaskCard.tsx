@@ -27,10 +27,12 @@ const makePreview = (body: string | null) => {
 
 export default function AdminTodayTaskCard({
   task,
+  canResolve,
   onOpenDetail,
   onResolve,
 }: {
   task: AdminTaskRow;
+  canResolve: boolean;
   onOpenDetail: (task: AdminTaskRow) => void;
   onResolve: (task: AdminTaskRow, note?: string) => void | Promise<void>;
 }) {
@@ -53,8 +55,14 @@ export default function AdminTodayTaskCard({
         </span>
 
         <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-neutral-500">
-          {task.created_at ? formatDateLabel(task.created_at) : "시간 없음"}
+          {task.created_at ? formatDateLabel(task.created_at) : "등록시간 없음"}
         </span>
+
+        {!canResolve ? (
+          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700">
+            완료됨
+          </span>
+        ) : null}
       </div>
 
       <div className="text-sm font-black text-neutral-950">{task.title}</div>
@@ -63,6 +71,12 @@ export default function AdminTodayTaskCard({
         {task.customer_nickname || task.customer_name || "고객 미연결"}
         {task.related_product ? ` · ${task.related_product}` : ""}
       </div>
+
+      {!canResolve && task.resolved_at ? (
+        <div className="mt-1 text-xs font-bold text-emerald-700">
+          완료시간: {formatDateLabel(task.resolved_at)}
+        </div>
+      ) : null}
 
       <div className="mt-2 rounded-xl bg-white px-3 py-2 text-xs font-bold leading-relaxed text-neutral-600">
         {preview}
@@ -77,13 +91,15 @@ export default function AdminTodayTaskCard({
           상세보기
         </button>
 
-        <button
-          type="button"
-          onClick={() => onResolve(task)}
-          className="rounded-xl bg-neutral-950 px-3 py-2 text-xs font-black text-white active:scale-[0.98]"
-        >
-          처리완료
-        </button>
+        {canResolve ? (
+          <button
+            type="button"
+            onClick={() => onResolve(task)}
+            className="rounded-xl bg-neutral-950 px-3 py-2 text-xs font-black text-white active:scale-[0.98]"
+          >
+            처리완료
+          </button>
+        ) : null}
       </div>
     </article>
   );
