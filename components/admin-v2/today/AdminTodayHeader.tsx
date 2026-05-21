@@ -1,7 +1,7 @@
 "use client";
 
 // components/admin-v2/today/AdminTodayHeader.tsx
-// 목적: 오늘할일 상단 날짜/요일/LIVE 기준 표시
+// 목적: 루루동이LIVE Control Center 상단 날짜/요일/LIVE 기준 표시
 // 주의: UI 표시 전용. 방송 시작/종료 저장 로직 없음.
 
 import type { BroadcastRow } from "@/lib/admin-v2/types";
@@ -37,7 +37,7 @@ export default function AdminTodayHeader({
           </div>
 
           <p className="mt-2 text-sm font-bold text-neutral-500">
-            오늘 주문·입금·배송·고객이슈를 한 화면에서 확인합니다.
+            방송·채팅·주문·입금·배송·고객이슈를 한 화면에서 처리합니다.
           </p>
         </div>
 
