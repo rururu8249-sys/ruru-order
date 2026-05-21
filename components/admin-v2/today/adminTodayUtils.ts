@@ -37,6 +37,7 @@ export type TodayWorkItem = {
   product: string;
   amountText: string;
   timeText: string;
+  createdAt: string;
   statusText: string;
   orderCode: string;
 };
@@ -131,6 +132,7 @@ export const buildWorkItems = (groups: OrderGroup[]) => {
         product,
         amountText,
         timeText,
+      createdAt: first.created_at || "",
         statusText: status,
         orderCode,
       };
@@ -146,6 +148,7 @@ export const buildWorkItems = (groups: OrderGroup[]) => {
         product,
         amountText,
         timeText,
+      createdAt: first.created_at || "",
         statusText: status,
         orderCode,
       };
@@ -161,6 +164,7 @@ export const buildWorkItems = (groups: OrderGroup[]) => {
         product,
         amountText,
         timeText,
+      createdAt: first.created_at || "",
         statusText: status,
         orderCode,
       };
@@ -176,6 +180,7 @@ export const buildWorkItems = (groups: OrderGroup[]) => {
         product,
         amountText,
         timeText,
+      createdAt: first.created_at || "",
         statusText: status,
         orderCode,
       };
@@ -190,6 +195,7 @@ export const buildWorkItems = (groups: OrderGroup[]) => {
       product,
       amountText,
       timeText,
+      createdAt: first.created_at || "",
       statusText: status,
       orderCode,
     };

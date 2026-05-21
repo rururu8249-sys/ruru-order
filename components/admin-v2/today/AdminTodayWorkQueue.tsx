@@ -4,11 +4,13 @@
 // 목적: 주문관리 데이터를 오늘할일 업무 큐로 표시
 // 주의: UI/이동 버튼 전용. 주문상태 저장/입금매칭 저장 로직 없음.
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import type { TodayWorkItem, TodayWorkTab } from "@/components/admin-v2/today/adminTodayUtils";
 import AdminTodayWorkTabs from "@/components/admin-v2/today/AdminTodayWorkTabs";
 import AdminTodayWorkPagination from "@/components/admin-v2/today/AdminTodayWorkPagination";
 import useAutoTodayWorkPageSize from "@/components/admin-v2/today/useAutoTodayWorkPageSize";
+import AdminTodayWorkQueueFilterBar from "@/components/admin-v2/today/AdminTodayWorkQueueFilterBar";
+import { matchesTodayWorkQueueFilters } from "@/components/admin-v2/today/adminTodayWorkQueueFilterUtils";
 
 const toneClass = {
   blue: "bg-blue-50 text-blue-700 border-blue-100",
@@ -41,19 +43,32 @@ export default function AdminTodayWorkQueue({
   void onGoDeposits;
 
   const [page, setPage] = useState(1);
+  const [queueKeyword, setQueueKeyword] = useState("");
+  const [queueStartDate, setQueueStartDate] = useState("");
+  const [queueEndDate, setQueueEndDate] = useState("");
+
+  const filteredItems = useMemo(() => {
+    return items.filter((item) =>
+      matchesTodayWorkQueueFilters(item, {
+        keyword: queueKeyword,
+        startDate: queueStartDate,
+        endDate: queueEndDate,
+      })
+    );
+  }, [items, queueKeyword, queueStartDate, queueEndDate]);
 
   const { listRef, firstRowRef, pageSize } = useAutoTodayWorkPageSize({
-    triggerKey: `${activeTab}:${items.length}`,
+    triggerKey: `${activeTab}:${filteredItems.length}:${queueKeyword}:${queueStartDate}:${queueEndDate}`,
     fallback: 4,
     min: 3,
     max: 12,
   });
 
-  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
 
   useEffect(() => {
     setPage(1);
-  }, [activeTab, items.length, pageSize]);
+  }, [activeTab, filteredItems.length, pageSize]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -61,8 +76,8 @@ export default function AdminTodayWorkQueue({
 
   const visibleItems = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return items.slice(start, start + pageSize);
-  }, [items, page, pageSize]);
+    return filteredItems.slice(start, start + pageSize);
+  }, [filteredItems, page, pageSize]);
 
   const safeSetPage = (nextPage: number) => {
     setPage(Math.min(totalPages, Math.max(1, nextPage)));
@@ -85,6 +100,32 @@ export default function AdminTodayWorkQueue({
           setActiveTab={setActiveTab}
           counts={counts}
         />
+
+          <AdminTodayWorkQueueFilterBar
+            keyword={queueKeyword}
+            startDate={queueStartDate}
+            endDate={queueEndDate}
+            totalCount={items.length}
+            filteredCount={filteredItems.length}
+            onKeywordChange={(value) => {
+              setQueueKeyword(value);
+              setPage(1);
+            }}
+            onStartDateChange={(value) => {
+              setQueueStartDate(value);
+              setPage(1);
+            }}
+            onEndDateChange={(value) => {
+              setQueueEndDate(value);
+              setPage(1);
+            }}
+            onReset={() => {
+              setQueueKeyword("");
+              setQueueStartDate("");
+              setQueueEndDate("");
+              setPage(1);
+            }}
+          />
       </div>
 
       <div ref={listRef} className="flex-1 overflow-hidden rounded-2xl border border-neutral-100">
@@ -191,7 +232,7 @@ export default function AdminTodayWorkQueue({
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <div className="text-xs font-black text-neutral-400">
-          표시 {visibleItems.length}건 / 전체 {items.length}건 · 한 페이지 {pageSize}건
+          표시 {visibleItems.length}건 / 검색결과 {filteredItems.length}건 / 전체 {items.length}건 · 한 페이지 {pageSize}건
         </div>
 
         <AdminTodayWorkPagination
