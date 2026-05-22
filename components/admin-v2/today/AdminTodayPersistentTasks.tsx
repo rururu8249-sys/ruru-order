@@ -181,7 +181,7 @@ export default function AdminTodayPersistentTasks() {
               </span>
             </div>
             <p className="mt-1 text-xs font-bold text-neutral-500">
-              실제 이슈큐에 등록된 고객 이슈만 표시합니다.
+              실제 등록된 고객 이슈만 표시합니다.
             </p>
           </div>
 
@@ -293,7 +293,7 @@ export default function AdminTodayPersistentTasks() {
 
         {!loading && !errorText && filteredTasks.length > 0 ? (
           <>
-            <div className="grid max-h-[430px] gap-2 overflow-y-auto pr-1">
+            <div className="grid max-h-[360px] gap-2 overflow-y-auto pr-1">
               {visibleTasks.map((task) => (
                 <AdminTodayTaskCard
                   key={task.id}
