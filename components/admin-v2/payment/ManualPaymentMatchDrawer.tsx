@@ -154,10 +154,71 @@ export default function ManualPaymentMatchDrawer(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [group?.groupId]);
 
+  const refreshBankdaAndRunStrictAutoMatch = async () => {
+    try {
+      await fetch("/api/bankda/sync-deposits", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+        body: JSON.stringify({
+          source: "manual_payment_match_drawer",
+        }),
+      });
+    } catch {
+      // 뱅크다 조회 실패가 수동매칭 팝업 자체를 막으면 안 됩니다.
+    }
+
+    try {
+      const previewResponse = await fetch("/api/admin-v2/auto-payment-match/preview", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      const preview = await previewResponse.json().catch(() => null);
+
+      const candidateCount = Number(
+        preview?.summary?.auto_match_preview_count ??
+          preview?.summary?.candidate_count ??
+          preview?.candidates?.length ??
+          0
+      );
+
+      if (!previewResponse.ok || !preview?.ok || candidateCount <= 0) {
+        return;
+      }
+
+      const runBody = JSON.stringify({
+        confirmed: true,
+        source: "manual_payment_match_drawer",
+      });
+
+      const runResponse = await fetch("/api/admin-v2/auto-payment-match/run", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+        body: runBody,
+      });
+
+      if (!runResponse.ok) {
+        await fetch("/api/admin-v2/auto-payment-match/run", {
+          method: "POST",
+          cache: "no-store",
+        });
+      }
+    } catch {
+      // 엄격 자동입금확인 실패 시에도 수동매칭은 계속 가능해야 합니다.
+    }
+  };
+
   const loadDeposits = async () => {
     setLoading(true);
 
     try {
+      await refreshBankdaAndRunStrictAutoMatch();
       const response = await fetch("/api/admin-v2/deposits", {
         method: "GET",
         cache: "no-store",
