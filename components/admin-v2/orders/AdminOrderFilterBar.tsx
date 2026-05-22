@@ -151,9 +151,9 @@ export default function AdminOrderFilterBar({
   };
 
   return (
-    <div className="mb-4 grid w-full max-w-full gap-3 rounded-2xl border border-neutral-200 bg-white p-3">
-      <div className="grid gap-2 xl:grid-cols-[minmax(360px,1fr)_150px_150px_auto_auto] xl:items-end">
-        <div className="relative min-w-0">
+    <div className="mb-4 inline-grid w-fit max-w-full gap-3 rounded-2xl border border-neutral-200 bg-white p-3">
+      <div className="grid w-fit max-w-full gap-2 xl:grid-cols-[minmax(420px,620px)_150px_150px_auto_auto] xl:items-end">
+        <div className="relative min-w-0 xl:w-[620px]">
           <div className="mb-1 text-[12px] font-black text-neutral-500">검색</div>
           <input
             value={pendingKeyword}
