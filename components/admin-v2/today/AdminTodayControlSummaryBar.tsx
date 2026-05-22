@@ -69,7 +69,7 @@ export default function AdminTodayControlSummaryBar({
             danger={unpaidTotal > 0}
           />
           <MiniBadge
-            label="이슈"
+            label="특이사항"
             value={`${issueCount.toLocaleString()}건`}
             danger={issueCount > 0}
           />
@@ -119,9 +119,9 @@ export default function AdminTodayControlSummaryBar({
           />
 
           <SingleSummaryCard
-            title="고객이슈"
+            title="특이사항"
             value={`${issueCount.toLocaleString()}건`}
-            desc="미해결 문의"
+            desc="주문메모/특이사항"
             tone={issueCount > 0 ? "amber" : "neutral"}
           />
         </div>
@@ -134,7 +134,7 @@ export default function AdminTodayControlSummaryBar({
             label="주문"
             value={`${orderCount.toLocaleString()}건 / ${itemQuantity.toLocaleString()}개`}
           />
-          <CollapsedItem label="고객이슈" value={`${issueCount.toLocaleString()}건`} />
+          <CollapsedItem label="특이사항" value={`${issueCount.toLocaleString()}건`} />
         </div>
       )}
     </section>

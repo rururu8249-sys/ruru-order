@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
       raw_payload:
         body?.raw_payload && typeof body.raw_payload === "object"
           ? body.raw_payload
-          : null,
+          : {},
     };
 
     const { data, error } = await supabase
