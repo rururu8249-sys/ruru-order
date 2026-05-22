@@ -25,7 +25,7 @@ export default function AdminTodayHeader({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-black tracking-[-0.06em] text-neutral-950">
-              오늘할일
+              루루동이LIVE Control Center
             </h1>
             <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-black text-neutral-700">
               {today.label}
