@@ -373,7 +373,6 @@ export async function POST(request: NextRequest) {
         .from("deposits")
         .update({
           match_order_group_id: candidate.order_group_id,
-          match_customer_id: candidate.order_ids[0] || null,
           match_status: "자동입금확인",
           confirmed_at: nowIso,
           confirmed_note: "자동매칭: 닉네임 완전일치 + 금액 완전일치 + 1:1 단일 후보",
