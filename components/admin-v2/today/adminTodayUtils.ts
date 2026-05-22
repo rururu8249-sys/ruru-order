@@ -43,6 +43,11 @@ export type TodayWorkItem = {
   orderStatusText: string;
   deliveryStageText: string;
   orderCode: string;
+  productLines: string[];
+  itemQuantityText: string;
+  rowCountText: string;
+  memoPreview: string;
+  metaBadges: string[];
 };
 
 export const getKstTodayInfo = () => {
@@ -115,6 +120,83 @@ const containsIssueKeyword = (row: OrderRow) => {
   );
 };
 
+
+const compactWorkText = (value: unknown) =>
+  String(value ?? "").replace(/\s+/g, " ").trim();
+
+const readWorkField = (row: OrderRow, keys: string[]) => {
+  const source = row as unknown as Record<string, unknown>;
+
+  for (const key of keys) {
+    const value = source[key];
+    const text = compactWorkText(value);
+
+    if (text) return text;
+  }
+
+  return "";
+};
+
+const buildWorkProductLines = (rows: OrderRow[]) => {
+  const lines = rows
+    .map((row) => compactWorkText(buildProductSummaryFromRow(row)))
+    .filter(Boolean);
+
+  return lines.length > 0 ? lines.slice(0, 4) : ["상품명 없음"];
+};
+
+const getWorkQuantity = (row: OrderRow) => {
+  const source = row as unknown as Record<string, unknown>;
+  const raw = Number(source.qty ?? source.quantity ?? 0);
+  return Number.isFinite(raw) && raw > 0 ? raw : 0;
+};
+
+const buildWorkMemoPreview = (rows: OrderRow[]) => {
+  const memo = rows
+    .map((row) =>
+      [
+        row.memo,
+        row.admin_memo,
+        row.request_memo,
+        row.special_note,
+        readWorkField(row, ["item_memo", "product_memo", "order_item_memo"]),
+      ]
+        .map((value) => compactWorkText(value))
+        .filter(Boolean)
+        .join(" / ")
+    )
+    .filter(Boolean)
+    .join(" / ");
+
+  return memo.slice(0, 80);
+};
+
+const buildWorkMetaBadges = (group: OrderGroup) => {
+  const rows = group.rows;
+  const qty = rows.reduce((sum, row) => sum + getWorkQuantity(row), 0);
+  const memoPreview = buildWorkMemoPreview(rows);
+  const badges: string[] = [];
+
+  if (rows.length > 1) badges.push(`상품 ${rows.length.toLocaleString()}줄`);
+  if (qty > 0) badges.push(`총 ${qty.toLocaleString()}개`);
+  if (memoPreview) badges.push("메모있음");
+
+  const couponText = [
+    "coupon_code",
+    "coupon_name",
+    "coupon_title",
+    "coupon_text",
+    "applied_coupon",
+  ]
+    .map((key) => readWorkField(group.first, [key]))
+    .find(Boolean);
+
+  if (couponText) badges.push("쿠폰있음");
+
+  return badges.slice(0, 4);
+};
+
+
 export const buildWorkItems = (groups: OrderGroup[]) => {
   return groups.map<TodayWorkItem>((group) => {
     const first = group.first;
@@ -124,6 +206,10 @@ export const buildWorkItems = (groups: OrderGroup[]) => {
     const amountText = money(groupGrossBaseAmount(group));
     const timeText = formatDateLabel(first.created_at);
     const orderCode = shortOrderCode(group);
+    const productLines = buildWorkProductLines(group.rows);
+    const totalQuantity = group.rows.reduce((sum, row) => sum + getWorkQuantity(row), 0);
+    const memoPreview = buildWorkMemoPreview(group.rows);
+    const metaBadges = buildWorkMetaBadges(group);
     const orderStatusText = getAdminOrderStatusLabel({
       status,
       paymentMethod: first.payment_method,
@@ -141,6 +227,11 @@ export const buildWorkItems = (groups: OrderGroup[]) => {
       orderStatusText,
       deliveryStageText,
       orderCode,
+      productLines,
+      itemQuantityText: totalQuantity > 0 ? `${totalQuantity.toLocaleString()}개` : "-",
+      rowCountText: `${group.rows.length.toLocaleString()}줄`,
+      memoPreview,
+      metaBadges,
     };
 
     if (isOrderCanceled(first)) {

@@ -1,8 +1,8 @@
 "use client";
 
 // components/admin-v2/today/AdminTodayWorkTabs.tsx
-// 목적: 오늘할일 업무 탭 UI
-// 주의: UI 전용.
+// 목적: 오늘할일 빠른처리 탭
+// 주의: 화면 필터 전용. DB 저장/입금매칭/정산 로직 없음.
 
 import type { TodayWorkTab } from "@/components/admin-v2/today/adminTodayUtils";
 
@@ -25,21 +25,27 @@ export default function AdminTodayWorkTabs({
   counts: Record<TodayWorkTab, number>;
 }) {
   return (
-    <div className="flex flex-wrap gap-2">
-      {TABS.map((tab) => (
-        <button
-          key={tab.key}
-          type="button"
-          onClick={() => setActiveTab(tab.key)}
-          className={`rounded-xl px-3 py-2 text-xs font-black transition active:scale-[0.98] ${
-            activeTab === tab.key
-              ? "bg-neutral-950 text-white"
-              : "border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50"
-          }`}
-        >
-          {tab.label} {counts[tab.key] || 0}
-        </button>
-      ))}
+    <div className="flex w-full flex-nowrap items-center gap-1.5 overflow-x-auto pb-1">
+      {TABS.map((tab) => {
+        const active = activeTab === tab.key;
+        const count = counts[tab.key] || 0;
+
+        return (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setActiveTab(tab.key)}
+            className={[
+              "h-10 shrink-0 whitespace-nowrap rounded-2xl px-3 text-xs font-black active:scale-[0.98]",
+              active
+                ? "bg-neutral-950 text-white"
+                : "border border-neutral-200 bg-white text-neutral-700",
+            ].join(" ")}
+          >
+            {tab.label} {count.toLocaleString()}
+          </button>
+        );
+      })}
     </div>
   );
 }

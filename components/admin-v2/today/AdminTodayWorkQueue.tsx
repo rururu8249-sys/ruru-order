@@ -82,13 +82,13 @@ export default function AdminTodayWorkQueue({
 
   return (
     <section className="flex h-full min-h-[520px] flex-col rounded-3xl border border-neutral-200 bg-white p-3 shadow-sm">
-      <div className="mb-3 grid gap-2 xl:grid-cols-[minmax(220px,0.8fr)_minmax(420px,1fr)_minmax(420px,1.05fr)] xl:items-center">
+      <div className="mb-3 grid gap-2 xl:grid-cols-[minmax(210px,0.7fr)_minmax(540px,1.15fr)_minmax(390px,0.9fr)] xl:items-center">
         <div className="min-w-0">
           <h2 className="text-lg font-black tracking-[-0.04em] text-neutral-950">
             오늘할일 빠른처리
           </h2>
           <p className="mt-0.5 text-xs font-bold text-neutral-500">
-            입금확인 필요·배송처리·특이사항을 빠르게 확인합니다.
+            입금·배송·특이사항을 빠르게 처리합니다.
           </p>
         </div>
 
@@ -131,7 +131,7 @@ export default function AdminTodayWorkQueue({
               <div
                 key={item.id}
                 ref={index === 0 ? firstRowRef : undefined}
-                className="grid gap-3 px-3 py-3 lg:grid-cols-[108px_minmax(260px,1fr)_150px_minmax(220px,300px)_128px] lg:items-center"
+                className="grid gap-3 px-3 py-3 lg:grid-cols-[108px_minmax(560px,1fr)_minmax(240px,300px)_132px] lg:items-center"
               >
                 <div className="min-w-0">
                   <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${toneClass[item.tone]}`}>
@@ -143,13 +143,51 @@ export default function AdminTodayWorkQueue({
                 </div>
 
                 <div className="min-w-0">
-                  <div className="truncate text-base font-black tracking-[-0.03em] text-neutral-950">
-                    {item.nickname || "닉네임 없음"}
+                  <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-base font-black tracking-[-0.03em] text-neutral-950">
+                        {item.nickname || "닉네임 없음"}
+                      </div>
+                      <div className="mt-0.5 flex flex-wrap gap-1.5">
+                        {item.metaBadges.map((badge) => (
+                          <span
+                            key={badge}
+                            className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-black text-neutral-600"
+                          >
+                            {badge}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="text-right text-lg font-black tracking-[-0.04em] text-neutral-950">
+                      {item.amountText}
+                    </div>
                   </div>
 
-                  <div className="mt-1 truncate text-xs font-bold text-neutral-500">
-                    {item.product || "상품명 없음"}
+                  <div className="mt-2 grid gap-1 rounded-2xl bg-neutral-50 px-3 py-2">
+                    {item.productLines.map((line, lineIndex) => (
+                      <div
+                        key={`${item.id}-line-${lineIndex}`}
+                        className="flex min-w-0 items-center justify-between gap-2 text-xs font-bold"
+                      >
+                        <span className="min-w-0 truncate text-neutral-700">
+                          {line}
+                        </span>
+                        {lineIndex === 0 ? (
+                          <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-black text-neutral-500">
+                            {item.itemQuantityText}
+                          </span>
+                        ) : null}
+                      </div>
+                    ))}
                   </div>
+
+                  {item.memoPreview ? (
+                    <div className="mt-1 truncate rounded-xl bg-amber-50 px-2 py-1 text-[11px] font-black text-amber-700">
+                      메모: {item.memoPreview}
+                    </div>
+                  ) : null}
 
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     <AdminTodayWorkItemStatusPills
@@ -160,12 +198,6 @@ export default function AdminTodayWorkQueue({
 
                   <div className="mt-1 text-[11px] font-bold text-neutral-400 lg:hidden">
                     {item.timeText}
-                  </div>
-                </div>
-
-                <div className="min-w-0 text-left lg:text-right">
-                  <div className="text-base font-black tracking-[-0.03em] text-neutral-950">
-                    {item.amountText}
                   </div>
                 </div>
 

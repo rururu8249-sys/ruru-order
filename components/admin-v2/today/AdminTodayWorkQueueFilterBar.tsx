@@ -51,13 +51,13 @@ export default function AdminTodayWorkQueueFilterBar({
             if (event.key === "Enter") onSearch();
           }}
           placeholder="닉네임 / 이름 / 상품명 / 주문번호"
-          className="h-10 min-w-0 rounded-xl border border-neutral-200 bg-white px-3 text-sm font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100/70"
+          className="h-9 min-w-0 rounded-xl border border-neutral-200 bg-white px-3 text-sm font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100/70"
         />
 
         <button
           type="button"
           onClick={onSearch}
-          className="h-10 rounded-xl bg-neutral-950 px-4 text-xs font-black text-white active:scale-[0.98]"
+          className="h-9 rounded-xl bg-neutral-950 px-4 text-xs font-black text-white active:scale-[0.98]"
         >
           검색
         </button>
