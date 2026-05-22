@@ -21,6 +21,7 @@ import AdminTodayCollapsiblePanel from "@/components/admin-v2/today/AdminTodayCo
 import AdminTodayYoutubeLivePanel from "@/components/admin-v2/today/AdminTodayYoutubeLivePanel";
 import AdminTodayPeriodFilter from "@/components/admin-v2/today/AdminTodayPeriodFilter";
 import AdminTodayControlSummaryBar from "@/components/admin-v2/today/AdminTodayControlSummaryBar";
+import AdminTodayQuickIssueCreate from "@/components/admin-v2/today/AdminTodayQuickIssueCreate";
 import { filterOrderGroupsByPeriod, formatPeriodLabel, getTodayDateKey } from "@/components/admin-v2/today/adminTodayPeriodUtils";
 import {
   buildMoneySummary,
@@ -237,6 +238,8 @@ export default function AdminTodayDashboard({
         </main>
 
         <aside className="grid min-w-0 gap-4 2xl:sticky 2xl:top-4">
+          <AdminTodayQuickIssueCreate />
+
           <AdminTodayCollapsiblePanel
             title="고객 이슈 큐"
             description="반품·교환·환불·배송·주소확인 이슈는 해결 전까지 계속 표시합니다."
