@@ -53,7 +53,7 @@ export default function ManualPaymentSelectionSummary({
       <div className={`md:col-span-4 rounded-xl px-3 py-2 text-[12px] font-black ${exact ? "bg-white/70 text-emerald-700" : "bg-white/70 text-amber-800"}`}>
         {exact
           ? "선택합계가 입금예정금액과 정확히 일치합니다. 수동매칭 가능합니다."
-          : "선택합계와 입금예정금액이 같아야 수동매칭할 수 있습니다."}
+          : "금액이 달라도 관리자 확인 후 수동매칭할 수 있습니다. 차액을 꼭 확인하세요."}
       </div>
     </div>
   );

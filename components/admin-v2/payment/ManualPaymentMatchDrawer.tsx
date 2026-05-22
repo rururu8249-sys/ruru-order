@@ -147,6 +147,8 @@ export default function ManualPaymentMatchDrawer(props: Props) {
   useEffect(() => {
     if (group) {
       setKeyword(nickname || customerName || "");
+      setSelectedDepositIds([]);
+      setShowAll(false);
       void loadDeposits();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -239,21 +241,6 @@ export default function ManualPaymentMatchDrawer(props: Props) {
       return;
     }
 
-    if (!exactAmountMatched) {
-      alert(
-        [
-          "선택합계와 입금예정금액이 일치하지 않습니다.",
-          "",
-          `입금예정금액: ${money(expectedAmount)}`,
-          `선택합계: ${money(selectedTotalAmount)}`,
-          `차액: ${money(amountDifference)}`,
-          "",
-          "1차 안전기준상 차액 0원일 때만 수동매칭할 수 있습니다.",
-        ].join("\n")
-      );
-      return;
-    }
-
     const depositLines = selectedDeposits
       .map((deposit, index) => `${index + 1}. ${deposit.depositor_name || "-"} / ${money(deposit.amount)} / ${getDepositTimeLabel(deposit.deposited_time, deposit.created_at)}`)
       .join("\n");
@@ -265,6 +252,14 @@ export default function ManualPaymentMatchDrawer(props: Props) {
         `주문고객: ${nickname || customerName || "-"}`,
         `주문금액: ${money(expectedAmount)}`,
         `선택합계: ${money(selectedTotalAmount)}`,
+        ...(exactAmountMatched
+          ? []
+          : [
+              "",
+              `⚠️ 차액: ${money(amountDifference)}`,
+              "입금예정금액과 선택합계가 다릅니다.",
+              "그래도 관리자 판단으로 수동매칭 처리합니다.",
+            ]),
         "",
         "선택한 입금내역",
         depositLines,
@@ -401,7 +396,7 @@ export default function ManualPaymentMatchDrawer(props: Props) {
         <section className="min-h-0 flex-1 overflow-y-auto p-5">
           <div className="mb-3 flex items-center justify-between">
             <div className="text-sm font-black text-neutral-700">
-              입금내역 후보 {depositsForDisplay.length.toLocaleString()}건
+              미매칭 입금내역 {depositsForDisplay.length.toLocaleString()}건
             </div>
             <div className="text-xs font-bold text-neutral-400">
               저장된 전체 입금내역 {serverDeposits.length.toLocaleString()}건
@@ -505,10 +500,10 @@ export default function ManualPaymentMatchDrawer(props: Props) {
           <button
             type="button"
             onClick={confirmManualMatch}
-            disabled={saving || !exactAmountMatched}
+            disabled={saving || selectedDeposits.length === 0}
             className="h-13 rounded-xl bg-neutral-950 text-base font-black text-white active:scale-[0.98] disabled:bg-neutral-300"
           >
-            {saving ? "처리중..." : exactAmountMatched ? "수동매칭" : "합계 확인 필요"}
+            {saving ? "처리중..." : exactAmountMatched ? "수동매칭" : "금액 다름 · 그래도 수동매칭"}
           </button>
         </footer>
       </aside>

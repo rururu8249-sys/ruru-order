@@ -182,15 +182,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (selectedDepositTotal !== expectedAmount) {
-      return NextResponse.json(
-        {
-          ok: false,
-          message: `입금합계가 주문금액과 일치하지 않습니다. 주문금액 ${expectedAmount.toLocaleString()}원 / 선택합계 ${selectedDepositTotal.toLocaleString()}원`,
-        },
-        { status: 400 }
-      );
-    }
+    const amountDifference = selectedDepositTotal - expectedAmount;
 
     const nowIso = new Date().toISOString();
     const confirmedNote =

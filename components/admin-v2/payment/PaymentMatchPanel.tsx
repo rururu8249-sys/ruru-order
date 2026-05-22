@@ -295,7 +295,7 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
         setLastAutoSyncMessage("뱅크다 5분 제한 대기중");
       } else {
         setLastAutoSyncMessage(
-          `조회 ${fetched}건 · 신규 ${inserted}건 · 중복 ${skipped}건 · 자동후보검사 ${autoMatched}건`
+          `조회 ${fetched}건 · 신규 ${inserted}건 · 중복 ${skipped}건 · 자동확인 후보검사 ${autoMatched}건`
         );
       }
 
@@ -393,7 +393,7 @@ export default function PaymentMatchPanel({ deposits, orderGroups, onOpenManualM
           <div>
             <div className="text-[17px] font-black">입금관리</div>
             <div className="mt-1 text-[12px] font-bold text-neutral-500">
-              뱅크다에서 실제 입금내역을 가져온 뒤, 자동매칭이 안 된 건을 주문과 직접 연결합니다.
+              뱅크다에서 실제 들어온 입금내역을 가져와 확인하고, 필요한 건만 주문과 직접 연결합니다.
             </div>
           </div>
 
