@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import ManualPaymentMatchDrawer from "@/components/admin-v2/payment/ManualPaymentMatchDrawer";
 import AdminLiveSidebar from "./AdminLiveSidebar";
 import LiveHeader from "./LiveHeader";
 import LiveStatsCards from "./LiveStatsCards";
 import LiveBroadcastPanels from "./LiveBroadcastPanels";
 import LiveOrderTable, { type LiveOrderFilters } from "./LiveOrderTable";
 import LiveOrderDetailDrawer from "./LiveOrderDetailDrawer";
-import type { OrderRow } from "@/lib/admin-v2/types";
+import type { DepositRow, OrderGroup, OrderRow } from "@/lib/admin-v2/types";
 import type { LiveOrder } from "./types";
 import {
   buildAdminLiveOrderGroups,
@@ -114,11 +115,31 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
 
 export default function AdminLiveDashboard() {
   const [orders, setOrders] = useState<LiveOrder[]>([]);
+  const [orderGroups, setOrderGroups] = useState<OrderGroup[]>([]);
+  const [deposits, setDeposits] = useState<DepositRow[]>([]);
+  const [manualMatchGroup, setManualMatchGroup] = useState<OrderGroup | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string>("");
   const [videoRatio, setVideoRatio] = useState<VideoRatio>("vertical");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [filters, setFilters] = useState<LiveOrderFilters>(DEFAULT_FILTERS);
+
+  const loadDepositsFromServer = async () => {
+    const response = await fetch("/api/admin-v2/deposits", {
+      method: "GET",
+      cache: "no-store",
+    });
+
+    const result = await response.json().catch(() => null);
+
+    if (!response.ok || !result?.ok) {
+      console.warn("[admin-live] 입금내역 불러오기 실패", result);
+      setDeposits([]);
+      return;
+    }
+
+    setDeposits((result.deposits || []) as DepositRow[]);
+  };
 
   const loadOrders = async () => {
     setLoading(true);
@@ -133,14 +154,18 @@ export default function AdminLiveDashboard() {
 
     if (error) {
       setOrders([]);
+      setOrderGroups([]);
       setLoadError(error.message);
       setLoading(false);
       return;
     }
 
-    const groups = buildAdminLiveOrderGroups((data || []) as OrderRow[]);
-    const liveOrders = sortLiveOrdersByCreatedDesc(groups).map(toAdminLiveOrder);
+    const groups = sortLiveOrdersByCreatedDesc(
+      buildAdminLiveOrderGroups((data || []) as OrderRow[])
+    );
+    const liveOrders = groups.map(toAdminLiveOrder);
 
+    setOrderGroups(groups);
     setOrders(liveOrders);
     setSelectedOrderId((current) => {
       if (current && liveOrders.some((order) => order.id === current)) return current;
@@ -151,6 +176,7 @@ export default function AdminLiveDashboard() {
 
   useEffect(() => {
     void loadOrders();
+    void loadDepositsFromServer();
   }, []);
 
   const broadcastOptions = useMemo(() => {
@@ -216,6 +242,22 @@ export default function AdminLiveDashboard() {
     return filteredOrders.find((order) => order.id === selectedOrderId) || filteredOrders[0] || null;
   }, [filteredOrders, selectedOrderId]);
 
+  const openManualMatchForOrder = (order: LiveOrder) => {
+    const group = orderGroups.find((item) => item.groupId === order.groupId) || null;
+
+    if (!group) {
+      alert("수동매칭할 주문그룹을 찾지 못했습니다. 새로고침 후 다시 시도해주세요.");
+      return;
+    }
+
+    setManualMatchGroup(group);
+  };
+
+  const refreshAfterManualMatch = async () => {
+    await loadOrders();
+    await loadDepositsFromServer();
+  };
+
   const criteriaLabel = buildCriteriaLabel(filters);
 
   return (
@@ -241,6 +283,7 @@ export default function AdminLiveDashboard() {
                 allOrderCount={orders.length}
                 selectedOrderId={selectedOrder?.id || ""}
                 onSelectOrder={(order) => setSelectedOrderId(order.id)}
+                onOpenManualMatch={openManualMatchForOrder}
                 loading={loading}
                 filters={filters}
                 onFiltersChange={setFilters}
@@ -250,7 +293,10 @@ export default function AdminLiveDashboard() {
 
             <div className="col-span-12 xl:col-span-3">
               {selectedOrder ? (
-                <LiveOrderDetailDrawer order={selectedOrder} />
+                <LiveOrderDetailDrawer
+                  order={selectedOrder}
+                  onOpenManualMatch={openManualMatchForOrder}
+                />
               ) : (
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-black text-slate-400 shadow-sm">
                   선택된 주문이 없습니다.
@@ -258,6 +304,13 @@ export default function AdminLiveDashboard() {
               )}
             </div>
           </section>
+
+          <ManualPaymentMatchDrawer
+            group={manualMatchGroup}
+            deposits={deposits}
+            onClose={() => setManualMatchGroup(null)}
+            onMatched={refreshAfterManualMatch}
+          />
         </main>
       </div>
     </div>

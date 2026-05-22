@@ -8,9 +8,10 @@ function money(value: number) {
 
 type Props = {
   order: LiveOrder;
+  onOpenManualMatch?: (order: LiveOrder) => void;
 };
 
-export default function LiveOrderDetailDrawer({ order }: Props) {
+export default function LiveOrderDetailDrawer({ order, onOpenManualMatch }: Props) {
   const totalAmount = order.totalAmount || order.productAmount + order.shippingFee;
 
   return (
@@ -34,7 +35,11 @@ export default function LiveOrderDetailDrawer({ order }: Props) {
 
         {order.paymentStatus === "manual_match_needed" && (
           <div className="mt-2">
-            <button className="w-full rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-black text-white shadow-sm hover:bg-orange-600">
+            <button
+              type="button"
+              onClick={() => onOpenManualMatch?.(order)}
+              className="w-full rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-black text-white shadow-sm hover:bg-orange-600"
+            >
               입금매칭 열기
             </button>
           </div>

@@ -65,6 +65,7 @@ type Props = {
   allOrderCount: number;
   selectedOrderId: string;
   onSelectOrder: (order: LiveOrder) => void;
+  onOpenManualMatch?: (order: LiveOrder) => void;
   loading?: boolean;
   filters: LiveOrderFilters;
   onFiltersChange: (filters: LiveOrderFilters) => void;
@@ -76,6 +77,7 @@ export default function LiveOrderTable({
   allOrderCount,
   selectedOrderId,
   onSelectOrder,
+  onOpenManualMatch,
   loading = false,
   filters,
   onFiltersChange,
@@ -278,7 +280,11 @@ export default function LiveOrderTable({
                     <td className="px-3 py-2.5 text-right font-black text-slate-700">{money(order.shippingFee)}</td>
                     <td className="px-3 py-2.5 text-center">
                       {order.paymentStatus === "manual_match_needed" ? (
-                        <button className="rounded-lg border border-orange-300 bg-orange-50 px-3 py-1 text-xs font-black text-orange-700 hover:bg-orange-100">
+                        <button
+                          type="button"
+                          onClick={() => onOpenManualMatch?.(order)}
+                          className="rounded-lg border border-orange-300 bg-orange-50 px-3 py-1 text-xs font-black text-orange-700 hover:bg-orange-100"
+                        >
                           매칭하기
                         </button>
                       ) : (
