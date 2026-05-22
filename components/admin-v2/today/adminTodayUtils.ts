@@ -43,6 +43,7 @@ export type TodayWorkItem = {
   orderStatusText: string;
   deliveryStageText: string;
   orderCode: string;
+  fullOrderCode: string;
   productLines: string[];
   itemQuantityText: string;
   rowCountText: string;
@@ -142,7 +143,7 @@ const buildWorkProductLines = (rows: OrderRow[]) => {
     .map((row) => compactWorkText(buildProductSummaryFromRow(row)))
     .filter(Boolean);
 
-  return lines.length > 0 ? lines.slice(0, 4) : ["상품명 없음"];
+  return lines.length > 0 ? lines : ["상품명 없음"];
 };
 
 const getWorkQuantity = (row: OrderRow) => {
@@ -170,8 +171,8 @@ const buildWorkMemoPreview = (rows: OrderRow[]) => {
       return !productTexts.some((product) => {
         if (!product) return false;
 
-        const normalizedMemo = value.replace(/\\s+/g, "");
-        const normalizedProduct = product.replace(/\\s+/g, "");
+        const normalizedMemo = value.replace(/\s+/g, "");
+        const normalizedProduct = product.replace(/\s+/g, "");
 
         return (
           normalizedMemo === normalizedProduct ||
@@ -181,9 +182,7 @@ const buildWorkMemoPreview = (rows: OrderRow[]) => {
       });
     });
 
-  const unique = Array.from(new Set(cleaned));
-
-  return unique.join(" / ").slice(0, 80);
+  return Array.from(new Set(cleaned)).join(" / ").slice(0, 80);
 };
 
 const buildWorkMetaBadges = (group: OrderGroup) => {
@@ -221,6 +220,7 @@ export const buildWorkItems = (groups: OrderGroup[]) => {
     const amountText = money(groupGrossBaseAmount(group));
     const timeText = formatDateLabel(first.created_at);
     const orderCode = shortOrderCode(group);
+    const fullOrderCode = String(first.order_lookup_code || group.groupId || first.id || "-");
     const productLines = buildWorkProductLines(group.rows);
     const totalQuantity = group.rows.reduce((sum, row) => sum + getWorkQuantity(row), 0);
     const memoPreview = buildWorkMemoPreview(group.rows);
@@ -242,6 +242,7 @@ export const buildWorkItems = (groups: OrderGroup[]) => {
       orderStatusText,
       deliveryStageText,
       orderCode,
+      fullOrderCode,
       productLines,
       itemQuantityText: totalQuantity > 0 ? `${totalQuantity.toLocaleString()}개` : "-",
       rowCountText: `${group.rows.length.toLocaleString()}줄`,

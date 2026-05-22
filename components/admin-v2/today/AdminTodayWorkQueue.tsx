@@ -1,25 +1,31 @@
 "use client";
 
 // components/admin-v2/today/AdminTodayWorkQueue.tsx
-// 목적: 주문관리 데이터를 오늘할일 업무 큐로 표시
-// 주의: UI/이동 버튼 전용. 주문상태 저장/입금매칭 저장 로직 없음.
+// 목적: 주문관리 표 구조를 기반으로 오늘할일 업무 큐 표시
+// 주의: UI/이동 버튼 전용. 주문상태 저장/입금매칭 저장/돈계산/배송저장 로직 없음.
 
-import { useMemo, useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { TodayWorkItem, TodayWorkTab } from "@/components/admin-v2/today/adminTodayUtils";
 import AdminTodayWorkTabs from "@/components/admin-v2/today/AdminTodayWorkTabs";
 import AdminTodayWorkPagination from "@/components/admin-v2/today/AdminTodayWorkPagination";
-import useAutoTodayWorkPageSize from "@/components/admin-v2/today/useAutoTodayWorkPageSize";
 import AdminTodayWorkQueueFilterBar from "@/components/admin-v2/today/AdminTodayWorkQueueFilterBar";
-import AdminTodayWorkItemStatusPills from "@/components/admin-v2/today/AdminTodayWorkItemStatusPills";
 import { matchesTodayWorkQueueSearch } from "@/components/admin-v2/today/adminTodayWorkQueueFilterUtils";
 
-const toneClass = {
-  blue: "bg-blue-50 text-blue-700 border-blue-100",
-  amber: "bg-amber-50 text-amber-800 border-amber-100",
-  emerald: "bg-emerald-50 text-emerald-700 border-emerald-100",
-  rose: "bg-rose-50 text-rose-700 border-rose-100",
-  violet: "bg-violet-50 text-violet-700 border-violet-100",
-  neutral: "bg-neutral-100 text-neutral-700 border-neutral-200",
+const TODAY_ORDER_GRID =
+  "grid-cols-[0.9fr_1.45fr_1.1fr_1.05fr_minmax(320px,3fr)_0.9fr_0.9fr_0.95fr_0.75fr]";
+
+const statusClass = (label: string) => {
+  if (label.includes("취소")) return "bg-rose-100 text-rose-700";
+  if (label.includes("미결제") || label.includes("대기")) return "bg-amber-100 text-amber-800";
+  if (label.includes("완료") || label.includes("입금확인")) return "bg-emerald-100 text-emerald-700";
+  return "bg-neutral-100 text-neutral-700";
+};
+
+const deliveryClass = (label: string) => {
+  if (label.includes("발송완료") || label.includes("출고완료")) return "bg-indigo-100 text-indigo-700";
+  if (label.includes("포장") || label.includes("출고")) return "bg-blue-100 text-blue-700";
+  if (label.includes("미설정")) return "bg-neutral-100 text-neutral-600";
+  return "bg-neutral-100 text-neutral-700";
 };
 
 export default function AdminTodayWorkQueue({
@@ -43,8 +49,8 @@ export default function AdminTodayWorkQueue({
   onOpenPaymentMatch: (groupId: string) => void;
   onOpenOrderDetail: (groupId: string) => void;
 }) {
-  void onGoDeposits;
   void onGoOrders;
+  void onGoDeposits;
 
   const [page, setPage] = useState(1);
   const [draftKeyword, setDraftKeyword] = useState("");
@@ -54,18 +60,12 @@ export default function AdminTodayWorkQueue({
     return items.filter((item) => matchesTodayWorkQueueSearch(item, appliedKeyword));
   }, [items, appliedKeyword]);
 
-  const { listRef, firstRowRef, pageSize } = useAutoTodayWorkPageSize({
-    triggerKey: `${activeTab}:${filteredItems.length}:${appliedKeyword}`,
-    fallback: 7,
-    min: 5,
-    max: 12,
-  });
-
+  const pageSize = 8;
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
 
   useEffect(() => {
     setPage(1);
-  }, [activeTab, filteredItems.length, pageSize]);
+  }, [activeTab, filteredItems.length]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -74,21 +74,21 @@ export default function AdminTodayWorkQueue({
   const visibleItems = useMemo(() => {
     const start = (page - 1) * pageSize;
     return filteredItems.slice(start, start + pageSize);
-  }, [filteredItems, page, pageSize]);
+  }, [filteredItems, page]);
 
   const safeSetPage = (nextPage: number) => {
     setPage(Math.min(totalPages, Math.max(1, nextPage)));
   };
 
   return (
-    <section className="flex h-full min-h-[560px] flex-col rounded-3xl border border-neutral-200 bg-white shadow-sm">
-      <div className="grid gap-3 border-b border-neutral-100 p-3 xl:grid-cols-[minmax(210px,0.55fr)_minmax(520px,1fr)_minmax(390px,0.85fr)] xl:items-center">
+    <section className="rounded-xl border border-neutral-200 bg-white shadow-sm">
+      <div className="grid gap-3 border-b border-neutral-200 p-3 xl:grid-cols-[minmax(210px,0.55fr)_minmax(520px,1fr)_minmax(390px,0.85fr)] xl:items-center">
         <div className="min-w-0">
           <h2 className="text-lg font-black tracking-[-0.04em] text-neutral-950">
             오늘할일 빠른처리
           </h2>
           <p className="mt-0.5 text-xs font-bold text-neutral-500">
-            입금·배송·특이사항을 한 화면에서 처리합니다.
+            주문관리와 같은 표 구조로 입금·배송·특이사항을 처리합니다.
           </p>
         </div>
 
@@ -120,147 +120,139 @@ export default function AdminTodayWorkQueue({
         </div>
       </div>
 
-      <div ref={listRef} className="flex-1 overflow-hidden">
-        {items.length === 0 ? (
-          <div className="px-4 py-16 text-center text-sm font-black text-neutral-400">
-            현재 표시할 업무가 없습니다.
+      <div className="w-full overflow-x-auto">
+        <div className="min-w-[1420px]">
+          <div className={`hidden w-full ${TODAY_ORDER_GRID} bg-neutral-900 px-4 py-3 text-[13px] font-black text-white lg:grid`}>
+            <div className="text-center">주문상태</div>
+            <div className="text-center">주문번호</div>
+            <div className="text-center">주문시간</div>
+            <div className="text-center">고객</div>
+            <div className="text-center">주문내역</div>
+            <div className="text-center">입금</div>
+            <div className="text-center">금액</div>
+            <div className="text-center">배송처리</div>
+            <div className="text-center">상세</div>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <div className="min-w-[1260px]">
-              <div className="grid grid-cols-[112px_170px_180px_minmax(260px,1fr)_64px_140px_190px_minmax(130px,170px)_150px] border-b border-neutral-200 bg-neutral-50 px-3 py-2 text-[11px] font-black text-neutral-500">
-                <div>구분</div>
-                <div>주문번호 / 주문일시</div>
-                <div>고객닉네임</div>
-                <div>주문상품 / 주문옵션</div>
-                <div className="text-center">수량</div>
-                <div className="text-right">주문금액</div>
-                <div className="text-center">상태</div>
-                <div>주문 메모</div>
-                <div className="text-center">작업</div>
-              </div>
 
-              <div className="divide-y divide-neutral-100">
-                {visibleItems.map((item, index) => (
-                  <div
-                    key={item.id}
-                    ref={index === 0 ? firstRowRef : undefined}
-                    className="grid grid-cols-[112px_170px_180px_minmax(260px,1fr)_64px_140px_190px_minmax(130px,170px)_150px] items-center px-3 py-3 text-xs"
-                  >
-                    <div className="min-w-0">
-                      <span className={`inline-flex rounded-lg border px-2.5 py-1 text-[11px] font-black ${toneClass[item.tone]}`}>
-                        {item.label}
-                      </span>
-                    </div>
+          {visibleItems.length === 0 ? (
+            <div className="px-4 py-12 text-center text-sm font-black text-neutral-400">
+              현재 조건에 맞는 업무가 없습니다.
+            </div>
+          ) : (
+            visibleItems.map((item) => {
+              const fullOrderCode = item.fullOrderCode || item.orderCode || "-";
 
-                    <div className="min-w-0">
-                      <button
-                        type="button"
-                        onClick={() => onOpenOrderDetail(item.id)}
-                        className="block truncate text-left text-xs font-black text-blue-700 underline-offset-2 hover:underline"
-                      >
-                        {item.orderCode || "-"}
-                      </button>
-                      <div className="mt-0.5 text-[11px] font-bold text-neutral-400">
-                        {item.timeText || "-"}
-                      </div>
-                    </div>
-
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-black text-neutral-950">
-                        {item.nickname || "닉네임 없음"}
-                      </div>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {item.metaBadges.map((badge) => (
-                          <span
-                            key={badge}
-                            className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-black text-neutral-600"
-                          >
-                            {badge}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="min-w-0">
-                      <div className="grid gap-0.5">
-                        {item.productLines.slice(0, 3).map((line, lineIndex) => (
-                          <div
-                            key={`${item.id}-line-${lineIndex}`}
-                            className="truncate text-xs font-bold text-neutral-700"
-                          >
-                            {line}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="text-center text-sm font-black text-neutral-900">
-                      {item.itemQuantityText}
-                    </div>
-
-                    <div className="text-right text-sm font-black text-neutral-950">
-                      {item.amountText}
-                    </div>
-
-                    <div className="flex min-w-0 flex-wrap justify-center gap-1">
-                      <AdminTodayWorkItemStatusPills
-                        orderStatusText={item.orderStatusText}
-                        deliveryStageText={item.deliveryStageText}
-                      />
-                    </div>
-
-                    <div className="min-w-0">
-                      {item.memoPreview ? (
-                        <div className="truncate rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-black text-amber-700">
-                          {item.memoPreview}
-                        </div>
-                      ) : (
-                        <span className="text-xs font-bold text-neutral-300">-</span>
-                      )}
-                    </div>
-
-                    <div className="grid gap-1.5">
-                      {item.tab === "payment" ? (
-                        <button
-                          type="button"
-                          onClick={() => onOpenPaymentMatch(item.id)}
-                          className="h-8 rounded-lg bg-blue-600 px-2 text-[11px] font-black text-white active:scale-[0.98]"
-                        >
-                          입금매칭
-                        </button>
-                      ) : item.tab === "shipping" ? (
-                        <button
-                          type="button"
-                          onClick={onGoShipping}
-                          className="h-8 rounded-lg bg-blue-600 px-2 text-[11px] font-black text-white active:scale-[0.98]"
-                        >
-                          송장관리
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => onOpenOrderDetail(item.id)}
-                          className="h-8 rounded-lg bg-neutral-950 px-2 text-[11px] font-black text-white active:scale-[0.98]"
-                        >
-                          확인필요
-                        </button>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => onOpenOrderDetail(item.id)}
-                        className="h-8 rounded-lg border border-neutral-200 bg-white px-2 text-[11px] font-black text-neutral-700 active:scale-[0.98]"
-                      >
-                        상세보기
-                      </button>
+              return (
+                <div
+                  key={item.id}
+                  className={`grid w-full ${TODAY_ORDER_GRID} border-t border-neutral-100 px-4 py-4 text-[14px] first:border-t-0 hover:bg-neutral-50 lg:items-center`}
+                >
+                  <div className="min-w-0 px-2 text-center">
+                    <span className={`inline-flex max-w-full rounded-lg px-2.5 py-1 text-[11px] font-black ${statusClass(item.orderStatusText)}`}>
+                      {item.orderStatusText}
+                    </span>
+                    <div className="mt-1 text-[10px] font-black text-neutral-400">
+                      {item.label}
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+
+                  <div className="min-w-0 px-2 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onOpenOrderDetail(item.id)}
+                      className="whitespace-normal break-all text-center text-[12px] font-black leading-snug text-blue-700 underline-offset-2 hover:underline"
+                      title={fullOrderCode}
+                    >
+                      {fullOrderCode}
+                    </button>
+                  </div>
+
+                  <div className="min-w-0 px-2 text-center">
+                    <div className="whitespace-normal text-[12px] font-bold leading-snug text-neutral-500">
+                      {item.timeText || "-"}
+                    </div>
+                  </div>
+
+                  <div className="min-w-0 px-2 text-center">
+                    <div className="truncate text-[15px] font-black text-neutral-950" title={item.nickname || ""}>
+                      {item.nickname || "-"}
+                    </div>
+                  </div>
+
+                  <div className="min-w-0 px-3">
+                    <div className="grid gap-1">
+                      {item.productLines.map((line, index) => (
+                        <div
+                          key={`${item.id}-product-${index}`}
+                          className="whitespace-normal break-words text-[13px] font-bold leading-snug text-neutral-800"
+                        >
+                          {line}
+                        </div>
+                      ))}
+                    </div>
+
+                    {item.memoPreview ? (
+                      <div className="mt-1 rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-black text-amber-700">
+                        메모: {item.memoPreview}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="min-w-0 px-2 text-center">
+                    {item.tab === "payment" ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpenPaymentMatch(item.id)}
+                        className="rounded-lg bg-blue-600 px-3 py-2 text-[11px] font-black text-white active:scale-[0.98]"
+                      >
+                        입금매칭
+                      </button>
+                    ) : (
+                      <span className={`inline-flex rounded-lg px-2.5 py-1 text-[11px] font-black ${statusClass(item.orderStatusText)}`}>
+                        {item.orderStatusText}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="min-w-0 px-2 text-right">
+                    <div className="text-[15px] font-black tracking-[-0.03em] text-neutral-950">
+                      {item.amountText}
+                    </div>
+                    <div className="mt-0.5 text-[10px] font-bold text-neutral-400">
+                      총 {item.itemQuantityText}
+                    </div>
+                  </div>
+
+                  <div className="min-w-0 px-2 text-center">
+                    <span className={`inline-flex rounded-lg px-2.5 py-1 text-[11px] font-black ${deliveryClass(item.deliveryStageText)}`}>
+                      {item.deliveryStageText}
+                    </span>
+
+                    {item.tab === "shipping" ? (
+                      <button
+                        type="button"
+                        onClick={onGoShipping}
+                        className="mt-1 block w-full rounded-lg bg-blue-600 px-2 py-1.5 text-[11px] font-black text-white active:scale-[0.98]"
+                      >
+                        송장관리
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <div className="min-w-0 px-2 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onOpenOrderDetail(item.id)}
+                      className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-[11px] font-black text-neutral-700 active:scale-[0.98]"
+                    >
+                      상세보기
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-100 px-3 py-3">

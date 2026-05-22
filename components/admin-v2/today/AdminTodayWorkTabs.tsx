@@ -38,8 +38,8 @@ export default function AdminTodayWorkTabs({
             className={[
               "h-9 shrink-0 whitespace-nowrap rounded-xl px-3 text-xs font-black active:scale-[0.98]",
               active
-                ? "bg-neutral-950 text-white"
-                : "border border-neutral-200 bg-white text-neutral-700",
+                ? "bg-blue-600 text-white"
+                : "border border-neutral-200 bg-white text-neutral-700 hover:bg-blue-50",
             ].join(" ")}
           >
             {tab.label} {count.toLocaleString()}

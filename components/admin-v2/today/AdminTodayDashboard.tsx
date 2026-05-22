@@ -269,14 +269,12 @@ export default function AdminTodayDashboard({
             customers={customers}
             onSaveCustomerMemo={onSaveCustomerMemo}
           />
-
-          <AdminTodayBuyerRanking items={allWorkItems} />
         </aside>
       </div>
 
-      <div className="min-w-0">
-
-        <AdminTodayWorkQueue
+      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_440px] 2xl:items-start">
+        <div className="min-w-0">
+          <AdminTodayWorkQueue
           activeTab={activeWorkTab}
           setActiveTab={setActiveWorkTab}
           counts={workCounts}
@@ -287,6 +285,11 @@ export default function AdminTodayDashboard({
           onOpenPaymentMatch={openPaymentMatchFromToday}
           onOpenOrderDetail={onOpenOrderDetail}
         />
+        </div>
+
+        <aside className="min-w-0">
+          <AdminTodayBuyerRanking items={allWorkItems} />
+        </aside>
       </div>
     </section>
   );
