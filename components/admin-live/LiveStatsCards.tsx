@@ -2,6 +2,7 @@ import type { LiveOrder } from "./types";
 
 type Props = {
   orders: LiveOrder[];
+  criteriaLabel?: string;
 };
 
 function money(value: number) {
@@ -12,7 +13,7 @@ function isPaid(order: LiveOrder) {
   return ["paid", "auto_paid", "manual_paid", "card_paid"].includes(order.paymentStatus);
 }
 
-export default function LiveStatsCards({ orders }: Props) {
+export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 500건 전체" }: Props) {
   const totalAmount = orders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
 
   const bankPaid = orders.filter((order) => order.paymentMethod === "무통장입금" && isPaid(order));
@@ -65,7 +66,7 @@ export default function LiveStatsCards({ orders }: Props) {
           매출 요약
         </div>
         <div className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-500">
-          집계기준: 최근 주문 500건 전체 · 필터 연동 전
+          집계기준: {criteriaLabel}
         </div>
       </div>
 

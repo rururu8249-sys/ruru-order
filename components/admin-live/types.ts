@@ -22,12 +22,15 @@ export type LiveOrder = {
   orderNo: string;
   paymentStatus: LiveOrderPaymentStatus;
   paymentLabel: string;
+  createdAt: string | null;
   submittedAt: string;
   paidAt: string | null;
   nickname: string;
   name: string;
   phone: string;
   paymentMethod: "무통장입금" | "카드결제" | string;
+  broadcastId: string | null;
+  broadcastName: string | null;
   orderSummary: string;
   productAmount: number;
   shippingFee: number;
