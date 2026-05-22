@@ -131,6 +131,18 @@ export default function AdminTodayPersistentTasks() {
   const visibleTasks = filteredTasks.slice(pageStart, pageStart + PAGE_SIZE);
 
   const resolveTask = async (task: AdminTaskRow, note = "") => {
+    const taskId = String(
+      (task as unknown as { id?: string; task_id?: string; taskId?: string }).id ||
+        (task as unknown as { id?: string; task_id?: string; taskId?: string }).task_id ||
+        (task as unknown as { id?: string; task_id?: string; taskId?: string }).taskId ||
+        ""
+    ).trim();
+
+    if (!taskId) {
+      alert("고객 이슈 ID를 찾지 못했습니다. 새로고침 후 다시 시도해주세요.");
+      return;
+    }
+
     const ok = window.confirm(`고객 이슈를 해결완료 처리할까요?\n\n${task.title}`);
 
     if (!ok) return;
@@ -141,7 +153,8 @@ export default function AdminTodayPersistentTasks() {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        id: task.id,
+        id: taskId,
+        task_id: taskId,
         action: "resolve",
         resolved_note: note.trim() || "관리자 해결완료 처리",
       }),

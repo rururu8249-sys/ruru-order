@@ -12,7 +12,7 @@ import AdminTodayWorkQueueFilterBar from "@/components/admin-v2/today/AdminToday
 import { matchesTodayWorkQueueSearch } from "@/components/admin-v2/today/adminTodayWorkQueueFilterUtils";
 
 const TODAY_ORDER_GRID =
-  "grid-cols-[0.9fr_1.45fr_1.1fr_1.05fr_minmax(320px,3fr)_0.9fr_0.9fr_0.95fr_0.75fr]";
+  "grid-cols-[88px_116px_108px_minmax(210px,1.45fr)_50px_92px_96px_84px]";
 
 const statusClass = (label: string) => {
   if (label.includes("취소")) return "bg-rose-100 text-rose-700";
@@ -81,54 +81,59 @@ export default function AdminTodayWorkQueue({
   };
 
   return (
-    <section className="flex h-full min-h-[520px] flex-col rounded-xl border border-neutral-200 bg-white shadow-sm">
-      <div className="grid gap-3 border-b border-neutral-200 p-3 xl:grid-cols-[minmax(210px,0.55fr)_minmax(520px,1fr)_minmax(390px,0.85fr)] xl:items-center">
-        <div className="min-w-0">
-          <h2 className="text-lg font-black tracking-[-0.04em] text-neutral-950">
-            오늘할일 빠른처리
-          </h2>
-          <p className="mt-0.5 text-xs font-bold text-neutral-500">
-            주문관리와 같은 표 구조로 입금·배송·특이사항을 처리합니다.
-          </p>
-        </div>
+    <section className="flex h-full min-h-[520px] flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+      <div className="border-b border-neutral-200 p-3">
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div className="min-w-0">
+                <h2 className="text-lg font-black tracking-[-0.04em] text-neutral-950">
+                  오늘할일 빠른처리
+                </h2>
+                <p className="mt-0.5 text-xs font-bold text-neutral-500">
+                  주문관리와 같은 표 구조로 입금·배송·특이사항을 처리합니다.
+                </p>
+              </div>
+            </div>
 
-        <div className="min-w-0">
-          <AdminTodayWorkTabs
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            counts={counts}
-          />
-        </div>
+            <div className="mt-3 min-w-0">
+              <AdminTodayWorkTabs
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                counts={counts}
+              />
+            </div>
+          </div>
 
-        <div className="min-w-0">
-          <AdminTodayWorkQueueFilterBar
-            draftKeyword={draftKeyword}
-            appliedKeyword={appliedKeyword}
-            totalCount={items.length}
-            filteredCount={filteredItems.length}
-            onDraftKeywordChange={setDraftKeyword}
-            onSearch={() => {
-              setAppliedKeyword(draftKeyword);
-              setPage(1);
-            }}
-            onReset={() => {
-              setDraftKeyword("");
-              setAppliedKeyword("");
-              setPage(1);
-            }}
-          />
+          <div className="min-w-0">
+            <AdminTodayWorkQueueFilterBar
+              draftKeyword={draftKeyword}
+              appliedKeyword={appliedKeyword}
+              totalCount={items.length}
+              filteredCount={filteredItems.length}
+              onDraftKeywordChange={setDraftKeyword}
+              onSearch={() => {
+                setAppliedKeyword(draftKeyword);
+                setPage(1);
+              }}
+              onReset={() => {
+                setDraftKeyword("");
+                setAppliedKeyword("");
+                setPage(1);
+              }}
+            />
+          </div>
         </div>
       </div>
 
-      <div className="w-full overflow-x-auto">
-        <div className="min-w-[1420px]">
-          <div className={`hidden w-full ${TODAY_ORDER_GRID} bg-neutral-900 px-4 py-3 text-[13px] font-black text-white lg:grid`}>
+      <div className="w-full flex-1 overflow-hidden">
+        <div className="min-w-0">
+          <div className={`hidden w-full ${TODAY_ORDER_GRID} bg-neutral-900 px-3 py-2.5 text-[12px] font-black text-white lg:grid`}>
             <div className="text-center">주문상태</div>
-            <div className="text-center">주문번호</div>
             <div className="text-center">주문시간</div>
             <div className="text-center">고객</div>
             <div className="text-center">주문내역</div>
-            <div className="text-center">입금</div>
+            <div className="text-center">수량</div>
             <div className="text-center">금액</div>
             <div className="text-center">배송처리</div>
             <div className="text-center">상세</div>
@@ -145,46 +150,43 @@ export default function AdminTodayWorkQueue({
               return (
                 <div
                   key={item.id}
-                  className={`grid w-full ${TODAY_ORDER_GRID} border-t border-neutral-100 px-4 py-4 text-[14px] first:border-t-0 hover:bg-neutral-50 lg:items-center`}
+                  className={`grid w-full ${TODAY_ORDER_GRID} border-t border-neutral-100 px-3 py-3 text-[13px] first:border-t-0 hover:bg-neutral-50 lg:items-center`}
                 >
-                  <div className="min-w-0 px-2 text-center">
-                    <span className={`inline-flex max-w-full rounded-lg px-2.5 py-1 text-[11px] font-black ${statusClass(item.orderStatusText)}`}>
+                  <div className="min-w-0 px-1.5 text-center">
+                    <span className={`inline-flex max-w-full rounded-lg px-2 py-1 text-[10px] font-black leading-tight ${statusClass(item.orderStatusText)}`}>
                       {item.orderStatusText}
                     </span>
-                    <div className="mt-1 text-[10px] font-black text-neutral-400">
+                    <div className="mt-1 truncate text-[10px] font-black text-neutral-400">
                       {item.label}
                     </div>
                   </div>
 
-                  <div className="min-w-0 px-2 text-center">
-                    <button
-                      type="button"
-                      onClick={() => onOpenOrderDetail(item.id)}
-                      className="whitespace-normal break-all text-center text-[12px] font-black leading-snug text-blue-700 underline-offset-2 hover:underline"
-                      title={fullOrderCode}
-                    >
-                      {fullOrderCode}
-                    </button>
-                  </div>
-
-                  <div className="min-w-0 px-2 text-center">
-                    <div className="whitespace-normal text-[12px] font-bold leading-snug text-neutral-500">
+                  <div className="min-w-0 px-1.5 text-center">
+                    <div className="whitespace-normal text-[11px] font-bold leading-snug text-neutral-500">
                       {item.timeText || "-"}
                     </div>
                   </div>
 
-                  <div className="min-w-0 px-2 text-center">
-                    <div className="truncate text-[15px] font-black text-neutral-950" title={item.nickname || ""}>
+                  <div className="min-w-0 px-1.5 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onOpenOrderDetail(item.id)}
+                      className="block w-full truncate text-center text-[14px] font-black text-neutral-950 underline-offset-2 hover:underline"
+                      title={`${item.nickname || "-"} / ${fullOrderCode}`}
+                    >
                       {item.nickname || "-"}
+                    </button>
+                    <div className="mt-0.5 whitespace-normal break-all text-[10px] font-bold leading-tight text-blue-600">
+                      {fullOrderCode}
                     </div>
                   </div>
 
-                  <div className="min-w-0 px-3">
-                    <div className="grid gap-1">
+                  <div className="min-w-0 px-2">
+                    <div className="grid max-h-[84px] gap-0.5 overflow-y-auto pr-1">
                       {item.productLines.map((line, index) => (
                         <div
                           key={`${item.id}-product-${index}`}
-                          className="whitespace-normal break-words text-[13px] font-bold leading-snug text-neutral-800"
+                          className="whitespace-normal break-words text-[12px] font-bold leading-snug text-neutral-800"
                         >
                           {line}
                         </div>
@@ -192,39 +194,26 @@ export default function AdminTodayWorkQueue({
                     </div>
 
                     {item.memoPreview ? (
-                      <div className="mt-1 rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-black text-amber-700">
+                      <div className="mt-1 truncate rounded-lg bg-amber-50 px-2 py-1 text-[10px] font-black text-amber-700">
                         메모: {item.memoPreview}
                       </div>
                     ) : null}
                   </div>
 
-                  <div className="min-w-0 px-2 text-center">
-                    {item.tab === "payment" ? (
-                      <button
-                        type="button"
-                        onClick={() => onOpenPaymentMatch(item.id)}
-                        className="rounded-lg bg-blue-600 px-3 py-2 text-[11px] font-black text-white active:scale-[0.98]"
-                      >
-                        입금매칭
-                      </button>
-                    ) : (
-                      <span className={`inline-flex rounded-lg px-2.5 py-1 text-[11px] font-black ${statusClass(item.orderStatusText)}`}>
-                        {item.orderStatusText}
-                      </span>
-                    )}
+                  <div className="min-w-0 px-1 text-center">
+                    <div className="text-[13px] font-black text-neutral-900">
+                      {item.itemQuantityText}
+                    </div>
                   </div>
 
-                  <div className="min-w-0 px-2 text-right">
-                    <div className="text-[15px] font-black tracking-[-0.03em] text-neutral-950">
+                  <div className="min-w-0 px-1.5 text-right">
+                    <div className="text-[13px] font-black tracking-[-0.03em] text-neutral-950">
                       {item.amountText}
                     </div>
-                    <div className="mt-0.5 text-[10px] font-bold text-neutral-400">
-                      총 {item.itemQuantityText}
-                    </div>
                   </div>
 
-                  <div className="min-w-0 px-2 text-center">
-                    <span className={`inline-flex rounded-lg px-2.5 py-1 text-[11px] font-black ${deliveryClass(item.deliveryStageText)}`}>
+                  <div className="min-w-0 px-1.5 text-center">
+                    <span className={`inline-flex rounded-lg px-2 py-1 text-[10px] font-black leading-tight ${deliveryClass(item.deliveryStageText)}`}>
                       {item.deliveryStageText}
                     </span>
 
@@ -232,18 +221,28 @@ export default function AdminTodayWorkQueue({
                       <button
                         type="button"
                         onClick={onGoShipping}
-                        className="mt-1 block w-full rounded-lg bg-blue-600 px-2 py-1.5 text-[11px] font-black text-white active:scale-[0.98]"
+                        className="mt-1 block w-full rounded-lg bg-blue-600 px-2 py-1.5 text-[10px] font-black text-white active:scale-[0.98]"
                       >
                         송장관리
                       </button>
                     ) : null}
+
+                    {item.tab === "payment" ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpenPaymentMatch(item.id)}
+                        className="mt-1 block w-full rounded-lg bg-blue-600 px-2 py-1.5 text-[10px] font-black text-white active:scale-[0.98]"
+                      >
+                        입금매칭
+                      </button>
+                    ) : null}
                   </div>
 
-                  <div className="min-w-0 px-2 text-center">
+                  <div className="min-w-0 px-1.5 text-center">
                     <button
                       type="button"
                       onClick={() => onOpenOrderDetail(item.id)}
-                      className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-[11px] font-black text-neutral-700 active:scale-[0.98]"
+                      className="rounded-lg border border-neutral-200 bg-white px-2.5 py-2 text-[10px] font-black text-neutral-700 active:scale-[0.98]"
                     >
                       상세보기
                     </button>
