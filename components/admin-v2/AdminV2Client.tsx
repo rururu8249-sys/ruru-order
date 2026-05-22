@@ -652,12 +652,22 @@ export function AdminV2Client() {
         selectedPaymentFilters.some((filter) =>
           paymentBuckets.some((bucket) => bucket === filter)
         );
+      const groupDateKey = toDateKey(group.first.created_at);
+      const isRangeDateFilter = String(dateFilter || "").startsWith("range:");
+      const [, rangeStartDate = "", rangeEndDate = ""] = isRangeDateFilter
+        ? String(dateFilter || "").split(":")
+        : ["", "", ""];
       const isAllDateFilter =
         !dateFilter ||
         dateFilter === "all" ||
         dateFilter === "전체" ||
         dateFilter === "방송 전체보기";
-      const matchDate = isAllDateFilter || (!dateFilter || toDateKey(group.first.created_at) === dateFilter);
+      const matchDate = isAllDateFilter
+        ? true
+        : isRangeDateFilter
+          ? (!rangeStartDate || groupDateKey >= rangeStartDate) &&
+            (!rangeEndDate || groupDateKey <= rangeEndDate)
+          : groupDateKey === dateFilter;
 
       const target = [
         group.groupId,
@@ -677,7 +687,27 @@ export function AdminV2Client() {
   }, [orderGroups, keyword, statusFilter, paymentFilter, dateFilter]);
 
   const rosenShippingOrderGroups = useMemo(() => {
-    const dateRows = orders.filter((order) => !dateFilter || toDateKey(order.created_at) === dateFilter);
+    const isRangeDateFilter = String(dateFilter || "").startsWith("range:");
+    const [, rangeStartDate = "", rangeEndDate = ""] = isRangeDateFilter
+      ? String(dateFilter || "").split(":")
+      : ["", "", ""];
+
+    const dateRows = orders.filter((order) => {
+      const orderDateKey = toDateKey(order.created_at);
+
+      if (!dateFilter || dateFilter === "all" || dateFilter === "전체" || dateFilter === "방송 전체보기") {
+        return true;
+      }
+
+      if (isRangeDateFilter) {
+        return (
+          (!rangeStartDate || orderDateKey >= rangeStartDate) &&
+          (!rangeEndDate || orderDateKey <= rangeEndDate)
+        );
+      }
+
+      return orderDateKey === dateFilter;
+    });
 
     // 송장관리 전용: 어떤 기준으로도 합치지 않습니다.
     // DB 주문행 1개 = 로젠 엑셀 1줄입니다.
