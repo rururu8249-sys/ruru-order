@@ -17,17 +17,21 @@ export type LiveOrderItem = {
 
 export type LiveOrder = {
   id: string;
+  groupId: string;
+  rowIds: number[];
   orderNo: string;
   paymentStatus: LiveOrderPaymentStatus;
+  paymentLabel: string;
   submittedAt: string;
   paidAt: string | null;
   nickname: string;
   name: string;
   phone: string;
-  paymentMethod: "무통장입금" | "카드결제";
+  paymentMethod: "무통장입금" | "카드결제" | string;
   orderSummary: string;
   productAmount: number;
   shippingFee: number;
+  totalAmount: number;
   memo: string;
   items: LiveOrderItem[];
 };

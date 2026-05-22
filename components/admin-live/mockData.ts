@@ -1,6 +1,4 @@
-import type { LiveOrder } from "./types";
-
-export const liveOrders: LiveOrder[] = [
+export const liveOrders = [
   {
     id: "1",
     orderNo: "OD2026052303123",
