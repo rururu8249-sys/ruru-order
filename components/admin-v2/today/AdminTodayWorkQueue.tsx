@@ -51,6 +51,7 @@ export default function AdminTodayWorkQueue({
 }) {
   void onGoOrders;
   void onGoDeposits;
+  void onGoShipping;
 
   const [page, setPage] = useState(1);
   const [draftKeyword, setDraftKeyword] = useState("");
@@ -172,9 +173,14 @@ export default function AdminTodayWorkQueue({
                       type="button"
                       onClick={() => onOpenOrderDetail(item.id)}
                       className="block w-full truncate text-center text-[14px] font-black text-neutral-950 underline-offset-2 hover:underline"
-                      title={`${item.nickname || "-"} / ${fullOrderCode}`}
+                      title={`${item.nickname || "-"}${item.customerName ? ` / ${item.customerName}` : ""} / ${fullOrderCode}`}
                     >
                       {item.nickname || "-"}
+                      {item.customerName ? (
+                        <span className="ml-1 text-[11px] font-black text-neutral-500">
+                          {item.customerName}
+                        </span>
+                      ) : null}
                     </button>
                     <div className="mt-0.5 whitespace-normal break-all text-[10px] font-bold leading-tight text-blue-600">
                       {fullOrderCode}
@@ -216,16 +222,6 @@ export default function AdminTodayWorkQueue({
                     <span className={`inline-flex rounded-lg px-2 py-1 text-[10px] font-black leading-tight ${deliveryClass(item.deliveryStageText)}`}>
                       {item.deliveryStageText}
                     </span>
-
-                    {item.tab === "shipping" ? (
-                      <button
-                        type="button"
-                        onClick={onGoShipping}
-                        className="mt-1 block w-full rounded-lg bg-blue-600 px-2 py-1.5 text-[10px] font-black text-white active:scale-[0.98]"
-                      >
-                        송장관리
-                      </button>
-                    ) : null}
 
                     {item.tab === "payment" ? (
                       <button

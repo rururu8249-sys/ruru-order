@@ -35,6 +35,7 @@ export type TodayWorkItem = {
   tone: "blue" | "amber" | "emerald" | "rose" | "violet" | "neutral";
   label: string;
   nickname: string;
+  customerName: string;
   product: string;
   amountText: string;
   timeText: string;
@@ -219,6 +220,17 @@ export const buildWorkItems = (groups: OrderGroup[]) => {
     const product = buildProductSummaryFromRow(group.rows[0]);
     const amountText = money(groupGrossBaseAmount(group));
     const timeText = formatDateLabel(first.created_at);
+    const customerName = compactWorkText(
+      first.customer_name ||
+        readWorkField(first, [
+          "name",
+          "buyer_name",
+          "receiver_name",
+          "recipient_name",
+          "customer_name",
+        ])
+    );
+
     const orderCode = shortOrderCode(group);
     const fullOrderCode = String(first.order_lookup_code || group.groupId || first.id || "-");
     const productLines = buildWorkProductLines(group.rows);
@@ -234,6 +246,7 @@ export const buildWorkItems = (groups: OrderGroup[]) => {
     const baseItem = {
       id: group.groupId,
       nickname,
+      customerName,
       product,
       amountText,
       timeText,

@@ -166,8 +166,7 @@ export async function PATCH(request: NextRequest) {
     const supabase = getSupabaseAdmin();
     const body = await request.json().catch(() => null);
 
-    const rawId = body?.id ?? body?.task_id ?? body?.taskId ?? 0;
-    const id = Number(rawId || 0);
+    const id = cleanText(body?.id ?? body?.task_id ?? body?.taskId, 160);
     const action = cleanText(body?.action, 80);
     const resolvedNote = cleanText(body?.resolved_note, 2000);
 
