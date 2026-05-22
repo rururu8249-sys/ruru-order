@@ -239,7 +239,7 @@ export default function AdminTodayDashboard({
         }
       />
 
-      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_440px] 2xl:items-start">
+      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_440px] 2xl:items-stretch">
         <main className="grid min-w-0 gap-4">
           <AdminTodayCollapsiblePanel
             title="유튜브 LIVE 채팅"
@@ -261,25 +261,29 @@ export default function AdminTodayDashboard({
             periodStorageReady={periodStorageReady}
           />
 
-          <AdminTodayWorkQueue
-            activeTab={activeWorkTab}
-            setActiveTab={setActiveWorkTab}
-            counts={workCounts}
-            items={visibleWorkItems}
-            onGoOrders={onGoOrders}
-            onGoDeposits={() => undefined}
-            onGoShipping={onGoShipping}
-            onOpenPaymentMatch={openPaymentMatchFromToday}
-            onOpenOrderDetail={onOpenOrderDetail}
-          />
         </main>
 
-        <aside className="mt-4 min-w-0 2xl:mt-0 2xl:h-[calc(100vh-180px)] 2xl:overflow-hidden">
+        <aside className="mt-4 min-w-0 2xl:mt-0 2xl:h-full 2xl:min-h-0 2xl:overflow-hidden">
           <AdminTodayIssueControlPanel
             customers={customers}
             onSaveCustomerMemo={onSaveCustomerMemo}
           />
         </aside>
+      </div>
+
+      <div className="min-w-0">
+
+        <AdminTodayWorkQueue
+          activeTab={activeWorkTab}
+          setActiveTab={setActiveWorkTab}
+          counts={workCounts}
+          items={visibleWorkItems}
+          onGoOrders={onGoOrders}
+          onGoDeposits={() => undefined}
+          onGoShipping={onGoShipping}
+          onOpenPaymentMatch={openPaymentMatchFromToday}
+          onOpenOrderDetail={onOpenOrderDetail}
+        />
       </div>
     </section>
   );
