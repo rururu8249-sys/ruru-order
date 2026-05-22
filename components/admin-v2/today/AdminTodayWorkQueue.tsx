@@ -12,7 +12,7 @@ import AdminTodayWorkQueueFilterBar from "@/components/admin-v2/today/AdminToday
 import { matchesTodayWorkQueueSearch } from "@/components/admin-v2/today/adminTodayWorkQueueFilterUtils";
 
 const TODAY_ORDER_GRID =
-  "grid-cols-[88px_116px_108px_minmax(210px,1.45fr)_50px_92px_96px_84px]";
+  "grid-cols-[86px_112px_104px_82px_minmax(190px,1fr)_48px_86px_82px_76px]";
 
 const statusClass = (label: string) => {
   if (label.includes("취소")) return "bg-rose-100 text-rose-700";
@@ -132,7 +132,8 @@ export default function AdminTodayWorkQueue({
           <div className={`hidden w-full ${TODAY_ORDER_GRID} bg-neutral-900 px-3 py-2.5 text-[12px] font-black text-white lg:grid`}>
             <div className="text-center">주문상태</div>
             <div className="text-center">주문시간</div>
-            <div className="text-center">고객</div>
+            <div className="text-center">닉네임</div>
+            <div className="text-center">이름</div>
             <div className="text-center">주문내역</div>
             <div className="text-center">수량</div>
             <div className="text-center">금액</div>
@@ -173,17 +174,21 @@ export default function AdminTodayWorkQueue({
                       type="button"
                       onClick={() => onOpenOrderDetail(item.id)}
                       className="block w-full truncate text-center text-[14px] font-black text-neutral-950 underline-offset-2 hover:underline"
-                      title={`${item.nickname || "-"}${item.customerName ? ` / ${item.customerName}` : ""} / ${fullOrderCode}`}
+                      title={`${item.nickname || "-"} / ${fullOrderCode}`}
                     >
                       {item.nickname || "-"}
-                      {item.customerName ? (
-                        <span className="ml-1 text-[11px] font-black text-neutral-500">
-                          {item.customerName}
-                        </span>
-                      ) : null}
                     </button>
                     <div className="mt-0.5 whitespace-normal break-all text-[10px] font-bold leading-tight text-blue-600">
                       {fullOrderCode}
+                    </div>
+                  </div>
+
+                  <div className="min-w-0 px-1.5 text-center">
+                    <div
+                      className="truncate text-[13px] font-black text-neutral-600"
+                      title={item.customerName || ""}
+                    >
+                      {item.customerName || "-"}
                     </div>
                   </div>
 
