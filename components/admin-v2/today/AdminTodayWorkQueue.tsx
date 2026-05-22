@@ -56,10 +56,11 @@ export default function AdminTodayWorkQueue({
   const [page, setPage] = useState(1);
   const [draftKeyword, setDraftKeyword] = useState("");
   const [appliedKeyword, setAppliedKeyword] = useState("");
+  const [refreshTick, setRefreshTick] = useState(0);
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => matchesTodayWorkQueueSearch(item, appliedKeyword));
-  }, [items, appliedKeyword]);
+  }, [items, appliedKeyword, refreshTick]);
 
   const pageSize = 5;
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
@@ -82,7 +83,7 @@ export default function AdminTodayWorkQueue({
   };
 
   return (
-    <section className="flex h-full min-h-[520px] flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+    <section className="today-work-action-scope flex h-full min-h-[520px] flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
       <div className="border-b border-neutral-200 p-3">
         <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
           <div className="min-w-0">
@@ -95,6 +96,20 @@ export default function AdminTodayWorkQueue({
                   주문관리와 같은 표 구조로 입금·배송·특이사항을 처리합니다.
                 </p>
               </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setRefreshTick((value) => value + 1);
+                  setDraftKeyword("");
+                  setAppliedKeyword("");
+                  setPage(1);
+                }}
+                className="text-[13px] font-black text-neutral-500 transition-all duration-150 hover:text-blue-600 active:scale-[0.96]"
+                title="오늘할일 빠른처리 패널만 새로고침"
+              >
+                🔄 새로고침
+              </button>
             </div>
 
             <div className="mt-3 min-w-0">
@@ -152,7 +167,7 @@ export default function AdminTodayWorkQueue({
               return (
                 <div
                   key={item.id}
-                  className={`grid w-full ${TODAY_ORDER_GRID} border-t border-neutral-100 px-3 py-3 text-[13px] first:border-t-0 hover:bg-neutral-50 lg:items-center`}
+                  className={`grid w-full ${TODAY_ORDER_GRID} border-t border-neutral-100 px-3 py-3 text-[13px] first:border-t-0 transition-all duration-150 hover:-translate-y-0.5 hover:bg-blue-50/40 hover:shadow-sm active:translate-y-0 active:scale-[0.999] lg:items-center`}
                 >
                   <div className="min-w-0 px-1.5 text-center">
                     <span className={`inline-flex max-w-full rounded-lg px-2 py-1 text-[10px] font-black leading-tight ${statusClass(item.orderStatusText)}`}>
@@ -173,7 +188,7 @@ export default function AdminTodayWorkQueue({
                     <button
                       type="button"
                       onClick={() => onOpenOrderDetail(item.id)}
-                      className="block w-full truncate text-center text-[14px] font-black text-neutral-950 underline-offset-2 hover:underline"
+                      className="block w-full truncate rounded-lg px-1 py-1 text-center text-[14px] font-black text-neutral-950 underline-offset-2 transition-all duration-150 hover:bg-blue-50 hover:text-blue-700 hover:underline active:scale-[0.98]"
                       title={`${item.nickname || "-"} / ${fullOrderCode}`}
                     >
                       {item.nickname || "-"}
@@ -232,7 +247,7 @@ export default function AdminTodayWorkQueue({
                       <button
                         type="button"
                         onClick={() => onOpenPaymentMatch(item.id)}
-                        className="mt-1 block w-full rounded-lg bg-blue-600 px-2 py-1.5 text-[10px] font-black text-white active:scale-[0.98]"
+                        className="mt-1 block w-full rounded-lg bg-blue-600 px-2 py-1.5 text-[10px] font-black text-white transition-all duration-150 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md active:translate-y-0 active:scale-[0.97]"
                       >
                         입금매칭
                       </button>
@@ -243,7 +258,7 @@ export default function AdminTodayWorkQueue({
                     <button
                       type="button"
                       onClick={() => onOpenOrderDetail(item.id)}
-                      className="rounded-lg border border-neutral-200 bg-white px-2.5 py-2 text-[10px] font-black text-neutral-700 active:scale-[0.98]"
+                      className="rounded-lg border border-neutral-200 bg-white px-2.5 py-2 text-[10px] font-black text-neutral-700 transition-all duration-150 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 hover:shadow-md active:translate-y-0 active:scale-[0.97]"
                     >
                       상세보기
                     </button>

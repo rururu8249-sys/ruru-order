@@ -1,298 +1,309 @@
+// components/admin-v2/today/AdminTodayQuickIssueCreate.tsx
+// 목적: 오늘할일 오른쪽 상단 고객이슈 빠른등록
+// 주의: 주문/입금/배송/정산 상태 변경 없음. admin_tasks 등록만 수행.
+
 "use client";
 
-// components/admin-v2/today/AdminTodayQuickIssueCreate.tsx
-// 목적: 방송 중 고객을 검색/선택해서 admin_tasks에 빠르게 이슈 등록
-// 주의: admin_tasks 신규 등록만 수행. 주문/입금/배송/정산 상태 변경 없음.
-
 import { useMemo, useState } from "react";
-import type { CustomerRow } from "@/lib/admin-v2/types";
-import {
-  ADMIN_TASK_FILTERS,
-  getAdminTaskToneClass,
-  getAdminTaskTypeLabel,
-  type AdminTaskFilter,
-} from "@/components/admin-v2/today/adminTaskMeta";
-import { getIssueTagClass } from "@/components/admin-v2/today/adminIssueTags";
+import type { CustomerRow, OrderGroup } from "@/lib/admin-v2/types";
 
-const ISSUE_TAGS = [
-  "불량/주의",
-  "교환",
-  "환불/취소",
-  "반품",
-  "배송",
-  "주소확인",
-  "입금",
-  "상품/추가구매",
-  "기타",
-];
-
-const taskTypeOptions = ADMIN_TASK_FILTERS.filter((item) => item.value !== "all");
-
-const typeByTag: Record<string, AdminTaskFilter> = {
-  "불량/주의": "complaint",
-  교환: "exchange",
-  "환불/취소": "refund",
-  반품: "return",
-  배송: "shipping",
-  주소확인: "address",
-  입금: "payment",
-  "상품/추가구매": "product",
-  기타: "general",
+type Props = {
+  customers: CustomerRow[];
+  groups: OrderGroup[];
 };
 
-function readField(row: CustomerRow | null, keys: string[]) {
-  if (!row) return "";
+type Candidate = {
+  key: string;
+  nickname: string;
+  name: string;
+  phone: string;
+  orderNo: string;
+  product: string;
+  amount: number;
+  source: "order" | "customer";
+};
 
-  const source = row as unknown as Record<string, unknown>;
+const ISSUE_TYPES = [
+  { label: "교환", value: "exchange", taskType: "exchange" },
+  { label: "반품", value: "return", taskType: "return" },
+  { label: "환불", value: "refund", taskType: "refund" },
+  { label: "구매", value: "purchase", taskType: "product" },
+  { label: "진상", value: "complaint", taskType: "complaint" },
+  { label: "기타", value: "etc", taskType: "general" },
+];
 
-  for (const key of keys) {
-    const value = source[key];
-
-    if (value !== undefined && value !== null && String(value).trim()) {
-      return String(value).trim();
-    }
-  }
-
-  return "";
+function clean(value: unknown) {
+  return String(value ?? "").trim();
 }
 
-function normalize(value: unknown) {
-  return String(value ?? "").replace(/\s+/g, "").toLowerCase();
+function digits(value: unknown) {
+  return clean(value).replace(/\D/g, "");
 }
 
-function getCustomerNickname(row: CustomerRow | null) {
-  return readField(row, [
-    "youtube_nickname",
-    "customer_nickname",
-    "nickname",
-    "nick_name",
-    "name",
-  ]);
+function money(value: unknown) {
+  return `${Number(value || 0).toLocaleString("ko-KR")}원`;
 }
 
-function getCustomerName(row: CustomerRow | null) {
-  return readField(row, ["customer_name", "real_name", "name"]);
+function todayLabel() {
+  const date = new Date();
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const weekday = ["일", "월", "화", "수", "목", "금", "토"][date.getDay()];
+  return `${yyyy}.${mm}.${dd}(${weekday})`;
 }
 
-function getCustomerPhone(row: CustomerRow | null) {
-  return readField(row, ["phone", "phone_number", "customer_phone", "mobile"]);
+function groupOrderNo(group: OrderGroup) {
+  const anyGroup = group as unknown as Record<string, any>;
+  const first = (group.first || {}) as unknown as Record<string, any>;
+
+  return clean(
+    anyGroup.orderNumber ||
+      anyGroup.order_number ||
+      anyGroup.orderNo ||
+      first.order_number ||
+      first.order_no ||
+      first.order_id ||
+      group.groupId
+  );
 }
 
-function getCustomerAddress(row: CustomerRow | null) {
-  return readField(row, ["address", "customer_address", "shipping_address"]);
+function groupPhone(group: OrderGroup) {
+  const anyGroup = group as unknown as Record<string, any>;
+  const first = (group.first || {}) as unknown as Record<string, any>;
+
+  return clean(
+    anyGroup.phone ||
+      anyGroup.customer_phone ||
+      first.customer_phone ||
+      first.phone
+  );
 }
 
-export default function AdminTodayQuickIssueCreate({
-  customers,
-}: {
-  customers: CustomerRow[];
-}) {
-  const [taskType, setTaskType] = useState<AdminTaskFilter>("general");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [draftSearchText, setDraftSearchText] = useState("");
-  const [confirmedSearchText, setConfirmedSearchText] = useState("");
-  const [selectedCustomer, setSelectedCustomer] = useState<CustomerRow | null>(null);
-  const [memoText, setMemoText] = useState("");
+function customerKey(customer: CustomerRow) {
+  const anyCustomer = customer as unknown as Record<string, any>;
+  return clean(anyCustomer.id || `${customer.youtube_nickname}-${customer.customer_phone}-${customer.customer_name}`);
+}
+
+export default function AdminTodayQuickIssueCreate({ customers, groups }: Props) {
+  const [keyword, setKeyword] = useState("");
+  const [searched, setSearched] = useState(false);
+  const [selected, setSelected] = useState<Candidate | null>(null);
+  const [nickname, setNickname] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [memo, setMemo] = useState("");
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
-  const mainLabel = getAdminTaskTypeLabel(taskType);
+  const candidates = useMemo<Candidate[]>(() => {
+    const orderCandidates = groups.map((group) => {
+      const anyGroup = group as unknown as Record<string, any>;
+      const first = (group.first || {}) as unknown as Record<string, any>;
 
-  const matchedCustomers = useMemo(() => {
-    const word = normalize(confirmedSearchText);
-    if (!word) return [];
-
-    return customers
-      .filter((customer) => {
-        const target = normalize(
-          [
-            getCustomerNickname(customer),
-            getCustomerName(customer),
-            getCustomerPhone(customer),
-            getCustomerAddress(customer),
-          ].join(" ")
-        );
-
-        return target.includes(word);
-      })
-      .slice(0, 8);
-  }, [confirmedSearchText, customers]);
-
-  const selectedCustomerLabel = useMemo(() => {
-    if (!selectedCustomer) return "고객 미선택";
-
-    const nickname = getCustomerNickname(selectedCustomer);
-    const name = getCustomerName(selectedCustomer);
-    const phone = getCustomerPhone(selectedCustomer);
-
-    return [nickname, name, phone].filter(Boolean).join(" / ");
-  }, [selectedCustomer]);
-
-  const title = useMemo(() => {
-    const customer =
-      getCustomerNickname(selectedCustomer) ||
-      getCustomerName(selectedCustomer) ||
-      "고객 미지정";
-
-    return `${mainLabel} · ${customer}`;
-  }, [selectedCustomer, mainLabel]);
-
-  const runSearch = () => {
-    const word = draftSearchText.trim();
-    setConfirmedSearchText(word);
-
-    if (!word) {
-      setSelectedCustomer(null);
-    }
-  };
-
-  const toggleTag = (tag: string) => {
-    setSelectedTags((current) => {
-      if (current.includes(tag)) {
-        return current.filter((item) => item !== tag);
-      }
-
-      const next = [...current, tag];
-
-      if (current.length === 0) {
-        setTaskType(typeByTag[tag] || "general");
-      }
-
-      return next;
+      return {
+        key: `order-${group.groupId}`,
+        nickname: clean(first.youtube_nickname || first.nickname || first.customer_nickname || anyGroup.nickname || anyGroup.customer_nickname),
+        name: clean(first.customer_name),
+        phone: groupPhone(group),
+        orderNo: groupOrderNo(group),
+        product: clean(anyGroup.itemSummary || anyGroup.item_summary || anyGroup.orderSummary || anyGroup.order_summary || first.product_name || first.item_name || first.product || first.title),
+        amount: Number(anyGroup.totalAmount || anyGroup.total_amount || first.total_amount || first.final_amount || first.amount || 0),
+        source: "order" as const,
+      };
     });
+
+    const customerCandidates = customers.map((customer) => ({
+      key: `customer-${customerKey(customer)}`,
+      nickname: clean(customer.youtube_nickname),
+      name: clean(customer.customer_name),
+      phone: clean(customer.customer_phone),
+      orderNo: "",
+      product: "",
+      amount: 0,
+      source: "customer" as const,
+    }));
+
+    const map = new Map<string, Candidate>();
+
+    [...orderCandidates, ...customerCandidates].forEach((candidate) => {
+      const dedupeKey = `${candidate.nickname}-${digits(candidate.phone)}-${candidate.name}`;
+      if (!map.has(dedupeKey)) {
+        map.set(dedupeKey, candidate);
+      }
+    });
+
+    return Array.from(map.values()).filter((candidate) => candidate.nickname || candidate.name || candidate.phone);
+  }, [customers, groups]);
+
+  const filteredCandidates = useMemo(() => {
+    const word = keyword.trim().toLowerCase();
+    const number = digits(keyword);
+
+    if (!searched || (!word && !number)) {
+      return [];
+    }
+
+    return candidates
+      .filter((candidate) => {
+        const target = [
+          candidate.nickname,
+          candidate.name,
+          candidate.phone,
+          candidate.orderNo,
+          candidate.product,
+          candidate.amount,
+        ]
+          .join(" ")
+          .toLowerCase();
+
+        return target.includes(word) || (!!number && digits(target).includes(number));
+      })
+      .slice(0, 5);
+  }, [candidates, keyword, searched]);
+
+  const selectCandidate = (candidate: Candidate) => {
+    setSelected(candidate);
+    setNickname(candidate.nickname);
+    setName(candidate.name);
+    setPhone(candidate.phone);
   };
 
-  const resetForm = () => {
-    setTaskType("general");
-    setSelectedTags([]);
-    setDraftSearchText("");
-    setConfirmedSearchText("");
-    setSelectedCustomer(null);
-    setMemoText("");
+  const toggleType = (value: string) => {
+    setSelectedTypes((current) =>
+      current.includes(value) ? current.filter((item) => item !== value) : [...current, value]
+    );
   };
 
-  const submitIssue = async () => {
-    const memo = memoText.trim();
-
-    if (!selectedCustomer) {
-      alert("먼저 고객을 검색해서 선택해주세요.");
+  const saveIssue = async () => {
+    if (!nickname.trim() && !name.trim() && !phone.trim()) {
+      alert("고객을 검색해서 선택하거나 닉네임/이름/전화번호를 입력해주세요.");
       return;
     }
 
-    if (!memo && selectedTags.length === 0) {
-      alert("이슈 태그 또는 메모를 입력해주세요.");
+    if (selectedTypes.length === 0) {
+      alert("이슈 유형을 1개 이상 선택해주세요.");
       return;
     }
 
-    const nickname = getCustomerNickname(selectedCustomer);
-    const customerName = getCustomerName(selectedCustomer);
-    const phone = getCustomerPhone(selectedCustomer);
+    if (!memo.trim()) {
+      alert("고객이슈 내용을 입력해주세요.");
+      return;
+    }
 
+    const labels = ISSUE_TYPES.filter((item) => selectedTypes.includes(item.value)).map((item) => item.label);
+    const firstType = ISSUE_TYPES.find((item) => selectedTypes.includes(item.value)) || ISSUE_TYPES[ISSUE_TYPES.length - 1];
+
+    const title = `[고객이슈] ${nickname || name || phone} - ${labels.join(", ")}`;
     const body = [
-      selectedTags.length > 0 ? `[이슈태그] ${selectedTags.join(", ")}` : "",
-      `[고객] ${nickname || "-"} / ${customerName || "-"} / ${phone || "-"}`,
-      memo ? `[메모]\n${memo}` : "",
+      `자동날짜: ${todayLabel()}`,
+      `이슈유형: ${labels.join(", ")}`,
+      `닉네임: ${nickname || "-"}`,
+      `이름: ${name || "-"}`,
+      `전화번호: ${phone || "-"}`,
+      selected?.orderNo ? `주문번호: ${selected.orderNo}` : "",
+      selected?.product ? `상품명: ${selected.product}` : "",
+      selected?.amount ? `주문금액: ${money(selected.amount)}` : "",
+      "",
+      memo.trim(),
     ]
       .filter(Boolean)
-      .join("\n\n");
+      .join("\n");
 
     setSaving(true);
 
-    const response = await fetch("/api/admin-v2/admin-tasks", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        task_type: taskType,
-        title,
-        body,
-        customer_name: customerName || null,
-        customer_nickname: nickname || null,
-        related_product: null,
-        source: "manual",
-        priority:
-          taskType === "refund" || taskType === "complaint" || taskType === "return"
-            ? "high"
-            : "normal",
-      }),
-    });
+    try {
+      const response = await fetch("/api/admin-v2/admin-tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({
+          task_type: firstType.taskType,
+          title,
+          body,
+          customer_name: name.trim() || null,
+          customer_nickname: nickname.trim() || null,
+          related_product: selected?.product || null,
+          source: "today_customer_issue_quick_create",
+        }),
+      });
 
-    const result = await response.json().catch(() => null);
+      const result = await response.json().catch(() => null);
 
-    setSaving(false);
+      if (!response.ok || !result?.ok) {
+        alert("고객이슈 등록 실패\n\n" + (result?.message || "알 수 없는 오류"));
+        return;
+      }
 
-    if (!response.ok || !result?.ok) {
-      alert("고객 이슈 등록 실패\n\n" + (result?.message || "알 수 없는 오류"));
-      return;
+      window.dispatchEvent(new Event("ruru-admin-task-created"));
+      alert("고객이슈를 등록했습니다.");
+
+      setMemo("");
+      setSelectedTypes([]);
+      setSearched(false);
+      setKeyword("");
+    } finally {
+      setSaving(false);
     }
-
-    window.dispatchEvent(new Event("ruru-admin-task-created"));
-    resetForm();
-    alert("고객 이슈를 등록했습니다. 해결 전까지 고객 이슈 큐에 표시됩니다.");
   };
 
   return (
-    <section className="grid gap-3">
-      <div>
-        <div className="mb-1 text-[12px] font-black text-neutral-500">
-          고객 검색
-        </div>
+    <div className="relative overflow-hidden rounded-[24px] border border-yellow-200 bg-[#fff5bf] p-5 shadow-sm">
+      <div className="pointer-events-none absolute right-3 top-2 rotate-12 text-[34px] text-neutral-400">📎</div>
 
+      <div className="mb-4">
+        <div className="text-[18px] font-black tracking-[-0.03em] text-neutral-950">새 고객이슈 등록</div>
+        <div className="mt-1 text-[12px] font-bold text-neutral-500">
+          닉네임·이름·주문번호·전화번호·상품명으로 검색 후 선택합니다.
+        </div>
+      </div>
+
+      <div className="grid gap-2">
         <div className="grid grid-cols-[1fr_auto] gap-2">
           <input
-            value={draftSearchText}
-            onChange={(event) => setDraftSearchText(event.target.value)}
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter") runSearch();
+              if (event.key === "Enter") setSearched(true);
             }}
-            placeholder="닉네임 / 이름 / 전화번호 검색"
-            className="h-11 rounded-2xl border border-neutral-200 bg-neutral-50 px-3 text-sm font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100/70"
+            placeholder="닉네임, 이름, 주문번호, 전화번호, 상품명 검색"
+            className="h-11 rounded-xl border border-neutral-200 bg-white px-4 text-[13px] font-bold outline-none focus:border-neutral-950"
           />
           <button
             type="button"
-            onClick={runSearch}
-            className="h-11 rounded-2xl bg-neutral-950 px-4 text-xs font-black text-white active:scale-[0.98]"
+            onClick={() => setSearched(true)}
+            className="h-11 rounded-xl bg-neutral-950 px-5 text-[13px] font-black text-white"
           >
-            검색
+            확인
           </button>
         </div>
 
-        {confirmedSearchText ? (
-          <div className="mt-2 rounded-2xl border border-neutral-200 bg-neutral-50 p-2">
-            <div className="mb-1 px-1 text-[11px] font-black text-neutral-500">
-              검색결과 {matchedCustomers.length.toLocaleString()}명
-            </div>
+        {searched ? (
+          <div className="rounded-2xl border border-yellow-200 bg-white/70 p-2">
+            <div className="mb-2 text-[12px] font-black text-neutral-600">추천 회원/주문 선택</div>
 
-            {matchedCustomers.length === 0 ? (
-              <div className="rounded-xl bg-white px-3 py-3 text-xs font-bold text-neutral-400">
-                비슷한 고객을 찾지 못했습니다.
+            {filteredCandidates.length === 0 ? (
+              <div className="rounded-xl bg-white px-3 py-3 text-center text-[12px] font-bold text-neutral-400">
+                검색 결과가 없습니다.
               </div>
             ) : (
-              <div className="grid max-h-44 gap-1.5 overflow-y-auto pr-1">
-                {matchedCustomers.map((customer, index) => {
-                  const selected = selectedCustomer === customer;
-                  const nickname = getCustomerNickname(customer);
-                  const name = getCustomerName(customer);
-                  const phone = getCustomerPhone(customer);
+              <div className="grid gap-1.5">
+                {filteredCandidates.map((candidate) => {
+                  const active = selected?.key === candidate.key;
 
                   return (
                     <button
-                      key={`${phone}-${nickname}-${name}-${index}`}
+                      key={candidate.key}
                       type="button"
-                      onClick={() => setSelectedCustomer(customer)}
-                      className={[
-                        "rounded-xl border px-3 py-2 text-left active:scale-[0.99]",
-                        selected
-                          ? "border-blue-400 bg-blue-50"
-                          : "border-neutral-200 bg-white",
-                      ].join(" ")}
+                      onClick={() => selectCandidate(candidate)}
+                      className={`grid grid-cols-[22px_1fr_1fr_120px] items-center gap-2 rounded-xl border px-3 py-2 text-left text-[12px] font-black ${
+                        active ? "border-neutral-950 bg-white text-neutral-950" : "border-neutral-200 bg-white/80 text-neutral-700"
+                      }`}
                     >
-                      <div className="text-sm font-black text-neutral-950">
-                        {nickname || name || "이름 없음"}
-                      </div>
-                      <div className="mt-0.5 text-[11px] font-bold text-neutral-500">
-                        {[name, phone].filter(Boolean).join(" / ") || "추가 정보 없음"}
-                      </div>
+                      <span className={`h-4 w-4 rounded-full border ${active ? "border-neutral-950 bg-neutral-950" : "border-neutral-300 bg-white"}`} />
+                      <span className="truncate">{candidate.nickname || "-"}</span>
+                      <span className="truncate">{candidate.name || "-"}</span>
+                      <span className="truncate text-right">{candidate.phone || "-"}</span>
                     </button>
                   );
                 })}
@@ -301,80 +312,68 @@ export default function AdminTodayQuickIssueCreate({
           </div>
         ) : null}
 
-        <div className="mt-2 rounded-2xl bg-neutral-950 px-3 py-2 text-xs font-black text-white">
-          선택 고객: {selectedCustomerLabel}
+        <div className="grid gap-2 rounded-2xl border border-yellow-200 bg-white/60 p-3">
+          <label className="grid grid-cols-[70px_1fr] items-center gap-2 text-[12px] font-black text-neutral-600">
+            닉네임
+            <input value={nickname} onChange={(event) => setNickname(event.target.value)} className="h-10 rounded-xl border border-neutral-200 bg-white px-3 font-bold text-neutral-950 outline-none" />
+          </label>
+          <label className="grid grid-cols-[70px_1fr] items-center gap-2 text-[12px] font-black text-neutral-600">
+            이름
+            <input value={name} onChange={(event) => setName(event.target.value)} className="h-10 rounded-xl border border-neutral-200 bg-white px-3 font-bold text-neutral-950 outline-none" />
+          </label>
+          <label className="grid grid-cols-[70px_1fr] items-center gap-2 text-[12px] font-black text-neutral-600">
+            전화번호
+            <input value={phone} onChange={(event) => setPhone(event.target.value)} className="h-10 rounded-xl border border-neutral-200 bg-white px-3 font-bold text-neutral-950 outline-none" />
+          </label>
         </div>
-      </div>
 
-      <div>
-        <div className="mb-1 text-[12px] font-black text-neutral-500">
-          이슈 태그 다중선택
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {ISSUE_TAGS.map((tag) => {
-            const active = selectedTags.includes(tag);
-            return (
-              <button
-                key={tag}
-                type="button"
-                onClick={() => toggleTag(tag)}
-                className={[
-                  "rounded-full border px-2.5 py-1.5 text-[11px] font-black active:scale-[0.98]",
-                  active
-                    ? getIssueTagClass(tag)
-                    : "border-neutral-200 bg-white text-neutral-500",
-                ].join(" ")}
+        <div>
+          <div className="mb-2 text-[13px] font-black text-neutral-800">이슈 유형 / 복수 선택 가능</div>
+          <div className="grid grid-cols-3 gap-2">
+            {ISSUE_TYPES.map((type) => (
+              <label
+                key={type.value}
+                className={`flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border text-[13px] font-black ${
+                  selectedTypes.includes(type.value)
+                    ? "border-neutral-950 bg-neutral-950 text-white"
+                    : "border-neutral-200 bg-white text-neutral-700"
+                }`}
               >
-                {tag}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div>
-        <div className="mb-1 flex items-center justify-between gap-2">
-          <span className="text-[12px] font-black text-neutral-500">
-            처리 메모
-          </span>
-          <select
-            value={taskType}
-            onChange={(event) => setTaskType(event.target.value as AdminTaskFilter)}
-            className={`h-8 rounded-full border px-3 text-[11px] font-black outline-none ${getAdminTaskToneClass(taskType)}`}
-          >
-            {taskTypeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
+                <input
+                  type="checkbox"
+                  checked={selectedTypes.includes(type.value)}
+                  onChange={() => toggleType(type.value)}
+                  className="h-4 w-4 accent-neutral-950"
+                />
+                {type.label}
+              </label>
             ))}
-          </select>
+          </div>
         </div>
 
-        <textarea
-          value={memoText}
-          onChange={(event) => setMemoText(event.target.value)}
-          placeholder="예: 교환 요청 / 환불 확인 필요 / 주소 다시 받아야 함 / 배송 누락 확인"
-          className="h-24 w-full resize-none rounded-2xl border border-neutral-200 bg-neutral-50 p-3 text-sm font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100/70"
-        />
-      </div>
+        <label className="grid gap-2">
+          <span className="text-[13px] font-black text-neutral-800">고객이슈 내용</span>
+          <textarea
+            value={memo}
+            onChange={(event) => setMemo(event.target.value.slice(0, 500))}
+            placeholder="고객이슈 내용을 입력하세요..."
+            className="min-h-[110px] rounded-xl border border-neutral-200 bg-white p-3 text-[13px] font-bold outline-none focus:border-neutral-950"
+          />
+          <div className="text-right text-[11px] font-bold text-neutral-400">{memo.length} / 500</div>
+        </label>
 
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          onClick={resetForm}
-          className="h-10 rounded-xl border border-neutral-200 bg-white text-xs font-black text-neutral-600 active:scale-[0.98]"
-        >
-          초기화
-        </button>
-        <button
-          type="button"
-          onClick={submitIssue}
-          disabled={saving}
-          className="h-10 rounded-xl bg-neutral-950 text-xs font-black text-white active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-neutral-300"
-        >
-          {saving ? "등록중" : "고객 이슈 등록"}
-        </button>
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-[13px] font-black text-neutral-700">📅 자동 날짜: {todayLabel()}</div>
+          <button
+            type="button"
+            onClick={saveIssue}
+            disabled={saving}
+            className="h-12 rounded-xl bg-neutral-950 px-6 text-[14px] font-black text-white disabled:bg-neutral-300"
+          >
+            {saving ? "등록중..." : "고객이슈 등록"}
+          </button>
+        </div>
       </div>
-    </section>
+    </div>
   );
 }

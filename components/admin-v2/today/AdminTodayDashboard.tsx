@@ -20,7 +20,7 @@ import AdminTodayYoutubeLivePanel from "@/components/admin-v2/today/AdminTodayYo
 import AdminTodayPeriodFilter from "@/components/admin-v2/today/AdminTodayPeriodFilter";
 import AdminTodayControlSummaryBar from "@/components/admin-v2/today/AdminTodayControlSummaryBar";
 import AdminTodayIssueControlPanel from "@/components/admin-v2/today/AdminTodayIssueControlPanel";
-import AdminTodayRankingColumn from "@/components/admin-v2/today/AdminTodayRankingColumn";
+import AdminTodayOrderBriefPanel from "@/components/admin-v2/today/AdminTodayOrderBriefPanel";
 import { filterOrderGroupsByPeriod, formatPeriodLabel, getTodayDateKey } from "@/components/admin-v2/today/adminTodayPeriodUtils";
 import {
   buildMoneySummary,
@@ -267,6 +267,7 @@ export default function AdminTodayDashboard({
         <aside className="mt-4 grid min-w-0 content-start gap-4 2xl:mt-0">
           <AdminTodayIssueControlPanel
             customers={customers}
+            groups={todayGroups}
             onSaveCustomerMemo={onSaveCustomerMemo}
           />
         </aside>
@@ -288,7 +289,7 @@ export default function AdminTodayDashboard({
         </div>
 
         <aside className="min-w-0 2xl:h-full">
-          <AdminTodayRankingColumn groups={todayGroups} />
+          <AdminTodayOrderBriefPanel groups={todayGroups} />
         </aside>
       </div>
     </section>
