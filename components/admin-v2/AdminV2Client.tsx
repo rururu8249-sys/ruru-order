@@ -1321,6 +1321,40 @@ export function AdminV2Client() {
     await loadData();
   };
 
+
+  const downloadOrderSimpleExcel = async () => {
+    const targetGroups = filteredOrderGroups;
+
+    if (targetGroups.length === 0) {
+      alert("엑셀로 내보낼 주문이 없습니다.\n\n기간/검색/상태 필터를 확인해주세요.");
+      return;
+    }
+
+    const XLSX = await import("xlsx");
+
+    const rows = targetGroups.map((group) => ({
+      닉네임: group.first.youtube_nickname || "",
+      주문내역: buildItemSummary(group),
+      수량: group.totalQty,
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(rows, {
+      header: ["닉네임", "주문내역", "수량"],
+    });
+
+    worksheet["!cols"] = [
+      { wch: 18 },
+      { wch: 70 },
+      { wch: 10 },
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "주문관리");
+
+    const dateStamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    XLSX.writeFile(workbook, `ruru_order_simple_${dateStamp}.xlsx`);
+  };
+
   return (
     <main className="min-h-screen bg-neutral-100 text-neutral-950">
       <div className="flex min-h-screen">
@@ -1376,7 +1410,7 @@ export function AdminV2Client() {
                   broadcasts={broadcasts}
                   settings={settings}
                   onGoOrders={() => setActiveTab("orders")}
-                  onGoShipping={() => setActiveTab("shipping")}
+                  onGoShipping={() => setActiveTab("orders")}
                   onGoCustomers={() => setActiveTab("customers")}
                   onGoDeposits={() => setActiveTab("deposits")}
                   onOpenPaymentMatch={(group) => setManualMatchGroup(group)}
@@ -1415,6 +1449,23 @@ export function AdminV2Client() {
                 <SettingsPanel settingsSummary={settingsSummary} saveSetting={saveSetting} />
               ) : (
                 <>
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-end gap-3">
+                        <h1 className="text-[30px] font-black tracking-[-0.04em] text-neutral-950">주문관리</h1>
+                        <div className="pb-1 text-[14px] font-bold text-neutral-500">주문 목록 · 결제상태 · 송장 내보내기</div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={downloadOrderSimpleExcel}
+                      className="h-12 rounded-2xl bg-emerald-600 px-6 text-[15px] font-black text-white shadow-sm active:scale-[0.98]"
+                    >
+                      ⬇ 송장/피킹용 엑셀 다운로드
+                    </button>
+                  </div>
+
                   <FilterBar
                     pendingKeyword={pendingKeyword}
                     setPendingKeyword={setPendingKeyword}
@@ -1428,12 +1479,9 @@ export function AdminV2Client() {
                     dateOptions={dateOptions}
                   />
 
-                  <div className="grid gap-3 xl:grid-cols-[minmax(780px,1fr)_340px]">
-                    <div className="min-w-0">
-                      <OrderWorkTable groups={pagedGroups} moneyEditLogs={moneyEditLogs} statusChangeLogs={statusChangeLogs} onOpenDetail={openOrderDetailDrawer} onStatusChange={updateOrderStatus} onTrackingChange={updateOrderTracking} onFinalAmountChange={updateOrderFinalAmount} onOpenManualMatch={setManualMatchGroup} onSoftDeleteGroups={softDeleteOrderGroups} />
-                      <Pagination page={page} totalPages={totalPages} setPage={setPage} totalCount={filteredOrderGroups.length} />
-                    </div>
-                    {false ? <OperationSummary buyerRanking={sideSummary.buyerRanking} productRanking={sideSummary.productRanking} onMore={() => setActiveTab("settlement")} /> : null}
+                  <div className="min-w-0">
+                    <OrderWorkTable groups={pagedGroups} moneyEditLogs={moneyEditLogs} statusChangeLogs={statusChangeLogs} onOpenDetail={openOrderDetailDrawer} onStatusChange={updateOrderStatus} onTrackingChange={updateOrderTracking} onFinalAmountChange={updateOrderFinalAmount} onOpenManualMatch={setManualMatchGroup} onSoftDeleteGroups={softDeleteOrderGroups} />
+                    <Pagination page={page} totalPages={totalPages} setPage={setPage} totalCount={filteredOrderGroups.length} />
                   </div>
                 </>
               )}
@@ -1891,7 +1939,7 @@ function OrderWorkTable({
 
 
   return (
-    <div className="w-full overflow-hidden rounded-xl border border-neutral-200 bg-white">
+    <div className="w-full overflow-hidden rounded-[22px] border border-neutral-200 bg-white shadow-sm">
       <AdminOrderBulkActionBar
         selectedCount={selectedOrderGroupIds.length}
         isAllSelected={isAllVisibleSelected}

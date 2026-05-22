@@ -27,18 +27,30 @@ type ChipOption = {
   label: string;
 };
 
+const PERIOD_OPTIONS: ChipOption[] = [
+  { value: "today", label: "오늘" },
+  { value: "yesterday", label: "어제" },
+  { value: "7days", label: "7일" },
+  { value: "30days", label: "30일" },
+  { value: "custom", label: "직접선택" },
+];
+
 const STATUS_OPTIONS: ChipOption[] = [
-  { value: "all", label: "상태 전체" },
-  { value: "unpaid", label: "미결제" },
-  { value: "paid", label: "결제완료" },
+  { value: "all", label: "전체" },
   { value: "ready", label: "출고준비" },
   { value: "shipped", label: "발송완료" },
-  { value: "canceled", label: "취소/환불" },
+  { value: "canceled", label: "취소·환불" },
 ];
 
 const PAYMENT_OPTIONS: ChipOption[] = [
-  { value: "all", label: "입금 전체" },
-  { value: "bank", label: "무통장" },
+  { value: "all", label: "전체" },
+  { value: "paid", label: "결제완료" },
+  { value: "unpaid", label: "미결제" },
+];
+
+const METHOD_OPTIONS: ChipOption[] = [
+  { value: "all", label: "전체" },
+  { value: "bank", label: "무통장입금" },
   { value: "card", label: "카드결제" },
 ];
 
@@ -98,6 +110,42 @@ function makeDateRangeValue(startDate: string, endDate: string) {
   return `range:${startDate}:${endDate}`;
 }
 
+function getDateKey(offsetDays: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  return date.toISOString().slice(0, 10);
+}
+
+function getRangeFromPeriod(period: string) {
+  if (period === "today") {
+    const today = getDateKey(0);
+    return makeDateRangeValue(today, today);
+  }
+
+  if (period === "yesterday") {
+    const yesterday = getDateKey(-1);
+    return makeDateRangeValue(yesterday, yesterday);
+  }
+
+  if (period === "7days") {
+    return makeDateRangeValue(getDateKey(-6), getDateKey(0));
+  }
+
+  if (period === "30days") {
+    return makeDateRangeValue(getDateKey(-29), getDateKey(0));
+  }
+
+  return "";
+}
+
+function isPeriodActive(dateFilter: string, period: string) {
+  if (period === "custom") {
+    return String(dateFilter || "").startsWith("range:");
+  }
+
+  return getRangeFromPeriod(period) === dateFilter;
+}
+
 function FilterChip({
   active,
   label,
@@ -111,10 +159,10 @@ function FilterChip({
     <button
       type="button"
       onClick={onClick}
-      className={`h-9 rounded-xl border px-3 text-[13px] font-black active:scale-[0.98] ${
+      className={`h-11 min-w-[68px] rounded-xl border px-4 text-[14px] font-black active:scale-[0.98] ${
         active
-          ? "border-blue-600 bg-blue-50 text-blue-700"
-          : "border-neutral-200 bg-white text-neutral-700 hover:border-neutral-400"
+          ? "border-neutral-950 bg-neutral-950 text-white shadow-sm"
+          : "border-neutral-200 bg-white text-neutral-800 hover:border-neutral-400"
       }`}
     >
       {label}
@@ -146,96 +194,157 @@ export default function AdminOrderFilterBar({
     setDateFilter(makeDateRangeValue(startDate, value));
   };
 
-  const resetDateRange = () => {
+  const resetFilters = () => {
     setDateFilter("all");
+    setStatusFilter("all");
+    setPaymentFilter("all");
+    setPendingKeyword("");
   };
 
   return (
-    <div className="mb-4 inline-grid w-fit max-w-full gap-3 rounded-2xl border border-neutral-200 bg-white p-3">
-      <div className="grid w-fit max-w-full gap-2 xl:grid-cols-[minmax(420px,620px)_150px_150px_auto_auto] xl:items-end">
-        <div className="relative min-w-0 xl:w-[620px]">
-          <div className="mb-1 text-[12px] font-black text-neutral-500">검색</div>
-          <input
-            value={pendingKeyword}
-            onChange={(event) => setPendingKeyword(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") onSearch();
-            }}
-            className="h-11 w-full rounded-xl border border-neutral-200 bg-white pl-4 pr-11 text-[14px] font-bold outline-none focus:border-blue-600"
-            placeholder="주문자명, 닉네임, 상품명, 주문번호 검색"
-          />
+    <section className="mb-4 rounded-[22px] border border-neutral-200 bg-white shadow-sm">
+      <div className="grid gap-5 p-5">
+        <div className="grid gap-4 xl:grid-cols-[minmax(520px,760px)_minmax(320px,1fr)_auto_auto] xl:items-end">
+          <div>
+            <div className="mb-2 text-[12px] font-black text-neutral-500">기간</div>
+
+            <div className="flex w-full flex-wrap items-center gap-3 rounded-[999px] border border-neutral-200 bg-white px-4 py-3 shadow-sm">
+              <div className="shrink-0 text-[18px] font-black text-neutral-800">기간설정</div>
+
+              <input
+                type="date"
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+                className="h-12 min-w-[175px] rounded-[999px] border border-neutral-200 bg-white px-5 text-[16px] font-black text-neutral-900 outline-none focus:border-neutral-950"
+                aria-label="시작일"
+              />
+
+              <span className="shrink-0 text-[18px] font-black text-neutral-400">~</span>
+
+              <input
+                type="date"
+                value={endDate}
+                onChange={(event) => setEndDate(event.target.value)}
+                className="h-12 min-w-[175px] rounded-[999px] border border-neutral-200 bg-white px-5 text-[16px] font-black text-neutral-900 outline-none focus:border-neutral-950"
+                aria-label="종료일"
+              />
+
+              <button
+                type="button"
+                onClick={onSearch}
+                className="h-12 rounded-[999px] bg-neutral-950 px-7 text-[16px] font-black text-white active:scale-[0.98]"
+              >
+                확인
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const today = getDateKey(0);
+                  setDateFilter(makeDateRangeValue(today, today));
+                  setPendingKeyword(pendingKeyword);
+                }}
+                className="h-12 rounded-[999px] border border-neutral-200 bg-white px-7 text-[16px] font-black text-neutral-800 active:scale-[0.98]"
+              >
+                오늘
+              </button>
+
+            </div>
+          </div>
+
+          <div className="relative min-w-0">
+            <div className="mb-2 text-[12px] font-black text-neutral-500">키워드 검색</div>
+            <input
+              value={pendingKeyword}
+              onChange={(event) => setPendingKeyword(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") onSearch();
+              }}
+              className="h-12 w-full rounded-2xl border border-neutral-200 bg-white pl-4 pr-11 text-[14px] font-bold outline-none focus:border-neutral-950"
+              placeholder="주문번호, 닉네임, 상품명 검색"
+            />
+            <button
+              type="button"
+              onClick={onSearch}
+              className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-lg text-[16px] font-black text-neutral-500 hover:bg-neutral-100"
+              aria-label="검색"
+            >
+              🔍
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={onSearch}
-            className="absolute bottom-1.5 right-2 flex h-8 w-8 items-center justify-center rounded-lg text-[16px] font-black text-neutral-500 hover:bg-neutral-100"
-            aria-label="검색"
+            className="h-12 rounded-2xl bg-neutral-950 px-7 text-[14px] font-black text-white active:scale-[0.98]"
           >
-            🔍
+            검색
+          </button>
+
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="h-12 rounded-2xl border border-neutral-200 bg-white px-5 text-[13px] font-black text-neutral-700 active:scale-[0.98]"
+          >
+            초기화
           </button>
         </div>
 
-        <label className="grid gap-1">
-          <span className="text-[12px] font-black text-neutral-500">시작일</span>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(event) => setStartDate(event.target.value)}
-            className="h-11 rounded-xl border border-neutral-200 bg-white px-3 text-[14px] font-black outline-none focus:border-blue-600"
-          />
-        </label>
+        <div className="grid gap-4 border-t border-neutral-100 pt-4 xl:grid-cols-[1fr_1fr_1fr_1fr]">
+          <div>
+            <div className="mb-2 text-[12px] font-black text-neutral-500">결제상태</div>
+            <div className="flex flex-wrap gap-1.5">
+              {PAYMENT_OPTIONS.map((option) => (
+                <FilterChip
+                  key={option.value}
+                  active={hasActive(paymentFilter, option.value)}
+                  label={option.label}
+                  onClick={() => setPaymentFilter(toggleMultiValue(paymentFilter, option.value))}
+                />
+              ))}
+            </div>
+          </div>
 
-        <label className="grid gap-1">
-          <span className="text-[12px] font-black text-neutral-500">종료일</span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(event) => setEndDate(event.target.value)}
-            className="h-11 rounded-xl border border-neutral-200 bg-white px-3 text-[14px] font-black outline-none focus:border-blue-600"
-          />
-        </label>
+          <div>
+            <div className="mb-2 text-[12px] font-black text-neutral-500">주문상태</div>
+            <div className="flex flex-wrap gap-1.5">
+              {STATUS_OPTIONS.map((option) => (
+                <FilterChip
+                  key={option.value}
+                  active={hasActive(statusFilter, option.value)}
+                  label={option.label}
+                  onClick={() => setStatusFilter(toggleMultiValue(statusFilter, option.value))}
+                />
+              ))}
+            </div>
+          </div>
 
-        <button
-          type="button"
-          onClick={onSearch}
-          className="h-11 rounded-xl bg-neutral-950 px-5 text-[14px] font-black text-white active:scale-[0.98]"
-        >
-          검색
-        </button>
+          <div>
+            <div className="mb-2 text-[12px] font-black text-neutral-500">입금방법</div>
+            <div className="flex flex-wrap gap-1.5">
+              {METHOD_OPTIONS.map((option) => (
+                <FilterChip
+                  key={option.value}
+                  active={hasActive(paymentFilter, option.value)}
+                  label={option.label}
+                  onClick={() => setPaymentFilter(toggleMultiValue(paymentFilter, option.value))}
+                />
+              ))}
+            </div>
+          </div>
 
-        <button
-          type="button"
-          onClick={resetDateRange}
-          className="h-11 rounded-xl border border-neutral-200 bg-white px-4 text-[13px] font-black text-neutral-700 active:scale-[0.98]"
-        >
-          기간초기화
-        </button>
-      </div>
-
-      <div className="grid gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="w-16 text-[12px] font-black text-neutral-500">상태</div>
-          {STATUS_OPTIONS.map((option) => (
-            <FilterChip
-              key={option.value}
-              active={hasActive(statusFilter, option.value)}
-              label={option.label}
-              onClick={() => setStatusFilter(toggleMultiValue(statusFilter, option.value))}
-            />
-          ))}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="w-16 text-[12px] font-black text-neutral-500">입금</div>
-          {PAYMENT_OPTIONS.map((option) => (
-            <FilterChip
-              key={option.value}
-              active={hasActive(paymentFilter, option.value)}
-              label={option.label}
-              onClick={() => setPaymentFilter(toggleMultiValue(paymentFilter, option.value))}
-            />
-          ))}
+          <div>
+            <div className="mb-2 text-[12px] font-black text-neutral-500">정렬</div>
+            <select className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3 text-[14px] font-black outline-none focus:border-neutral-950">
+              <option>주문일시 최신순</option>
+              <option>주문일시 오래된순</option>
+              <option>금액 높은순</option>
+              <option>금액 낮은순</option>
+              <option>닉네임 가나다순</option>
+            </select>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

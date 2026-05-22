@@ -8,7 +8,6 @@ import { DELIVERY_STAGE_OPTIONS, PAID_STATUS_VALUES } from "./statusDisplay";
 export const TABS: Array<{ key: AdminTab; label: string; desc: string }> = [
   { key: "today", label: "오늘할일", desc: "주문·입금·출고 요약" },
   { key: "orders", label: "주문관리", desc: "상태·금액·상세 관리" },
-  { key: "shipping", label: "송장관리", desc: "로젠 엑셀·출고반영" },
   { key: "customers", label: "고객관리", desc: "메모·차단·특이사항" },
   { key: "deposits", label: "입금관리", desc: "전체/날짜별 입금내역" },
   { key: "settlement", label: "매출정산", desc: "매출·수수료·차액" },
