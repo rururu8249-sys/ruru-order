@@ -36,7 +36,7 @@ export default function AdminTodayWorkTabs({
             type="button"
             onClick={() => setActiveTab(tab.key)}
             className={[
-              "h-10 shrink-0 whitespace-nowrap rounded-2xl px-3 text-xs font-black active:scale-[0.98]",
+              "h-9 shrink-0 whitespace-nowrap rounded-xl px-3 text-xs font-black active:scale-[0.98]",
               active
                 ? "bg-neutral-950 text-white"
                 : "border border-neutral-200 bg-white text-neutral-700",

@@ -152,23 +152,38 @@ const getWorkQuantity = (row: OrderRow) => {
 };
 
 const buildWorkMemoPreview = (rows: OrderRow[]) => {
-  const memo = rows
-    .map((row) =>
-      [
-        row.memo,
-        row.admin_memo,
-        row.request_memo,
-        row.special_note,
-        readWorkField(row, ["item_memo", "product_memo", "order_item_memo"]),
-      ]
-        .map((value) => compactWorkText(value))
-        .filter(Boolean)
-        .join(" / ")
-    )
-    .filter(Boolean)
-    .join(" / ");
+  const productTexts = rows
+    .map((row) => compactWorkText(buildProductSummaryFromRow(row)))
+    .filter(Boolean);
 
-  return memo.slice(0, 80);
+  const memoCandidates = rows.flatMap((row) => [
+    row.admin_memo,
+    row.request_memo,
+    row.special_note,
+    readWorkField(row, ["customer_memo", "delivery_memo", "shipping_memo", "admin_note", "note"]),
+  ]);
+
+  const cleaned = memoCandidates
+    .map((value) => compactWorkText(value))
+    .filter(Boolean)
+    .filter((value) => {
+      return !productTexts.some((product) => {
+        if (!product) return false;
+
+        const normalizedMemo = value.replace(/\\s+/g, "");
+        const normalizedProduct = product.replace(/\\s+/g, "");
+
+        return (
+          normalizedMemo === normalizedProduct ||
+          normalizedMemo.includes(normalizedProduct) ||
+          normalizedProduct.includes(normalizedMemo)
+        );
+      });
+    });
+
+  const unique = Array.from(new Set(cleaned));
+
+  return unique.join(" / ").slice(0, 80);
 };
 
 const buildWorkMetaBadges = (group: OrderGroup) => {

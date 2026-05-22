@@ -20,6 +20,7 @@ import AdminTodayYoutubeLivePanel from "@/components/admin-v2/today/AdminTodayYo
 import AdminTodayPeriodFilter from "@/components/admin-v2/today/AdminTodayPeriodFilter";
 import AdminTodayControlSummaryBar from "@/components/admin-v2/today/AdminTodayControlSummaryBar";
 import AdminTodayIssueControlPanel from "@/components/admin-v2/today/AdminTodayIssueControlPanel";
+import AdminTodayBuyerRanking from "@/components/admin-v2/today/AdminTodayBuyerRanking";
 import { filterOrderGroupsByPeriod, formatPeriodLabel, getTodayDateKey } from "@/components/admin-v2/today/adminTodayPeriodUtils";
 import {
   buildMoneySummary,
@@ -268,6 +269,8 @@ export default function AdminTodayDashboard({
             customers={customers}
             onSaveCustomerMemo={onSaveCustomerMemo}
           />
+
+          <AdminTodayBuyerRanking items={visibleWorkItems} />
         </aside>
       </div>
 
