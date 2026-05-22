@@ -6,7 +6,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AdminTaskRow } from "@/lib/admin-v2/types";
-import { supabase } from "@/lib/supabase";
 import AdminTodayTaskCard from "@/components/admin-v2/today/AdminTodayTaskCard";
 import AdminTodayTaskDetailDrawer from "@/components/admin-v2/today/AdminTodayTaskDetailDrawer";
 import AdminTodayTaskModeTabs, {
@@ -34,20 +33,20 @@ export default function AdminTodayPersistentTasks() {
     setLoading(true);
     setErrorText("");
 
-    const { data, error } = await supabase
-      .from("admin_tasks")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(240);
+    const response = await fetch("/api/admin-v2/admin-tasks", {
+      method: "GET",
+    });
+
+    const result = await response.json().catch(() => null);
 
     setLoading(false);
 
-    if (error) {
-      setErrorText(error.message);
+    if (!response.ok || !result?.ok) {
+      setErrorText(result?.message || "고객 이슈 조회 실패");
       return;
     }
 
-    setTasks((data || []) as AdminTaskRow[]);
+    setTasks((result.tasks || []) as AdminTaskRow[]);
   }, []);
 
   useEffect(() => {
@@ -118,18 +117,22 @@ export default function AdminTodayPersistentTasks() {
 
     if (!ok) return;
 
-    const { error } = await supabase
-      .from("admin_tasks")
-      .update({
-        status: "done",
-        resolved_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+    const response = await fetch("/api/admin-v2/admin-tasks", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        id: task.id,
+        action: "resolve",
         resolved_note: note.trim() || "관리자 해결완료 처리",
-      })
-      .eq("id", task.id);
+      }),
+    });
 
-    if (error) {
-      alert("해결완료 처리 실패\n\n" + error.message);
+    const result = await response.json().catch(() => null);
+
+    if (!response.ok || !result?.ok) {
+      alert("해결완료 처리 실패\n\n" + (result?.message || "알 수 없는 오류"));
       return;
     }
 

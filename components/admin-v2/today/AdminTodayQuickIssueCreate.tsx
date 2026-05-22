@@ -6,7 +6,6 @@
 
 import { useMemo, useState } from "react";
 import type { CustomerRow } from "@/lib/admin-v2/types";
-import { supabase } from "@/lib/supabase";
 import {
   ADMIN_TASK_FILTERS,
   getAdminTaskToneClass,
@@ -198,25 +197,32 @@ export default function AdminTodayQuickIssueCreate({
 
     setSaving(true);
 
-    const { error } = await supabase.from("admin_tasks").insert({
-      task_type: taskType,
-      title,
-      body,
-      customer_name: customerName || null,
-      customer_nickname: nickname || null,
-      related_product: null,
-      source: "manual",
-      status: "open",
-      priority:
-        taskType === "refund" || taskType === "complaint" || taskType === "return"
-          ? "high"
-          : "normal",
+    const response = await fetch("/api/admin-v2/admin-tasks", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        task_type: taskType,
+        title,
+        body,
+        customer_name: customerName || null,
+        customer_nickname: nickname || null,
+        related_product: null,
+        source: "manual",
+        priority:
+          taskType === "refund" || taskType === "complaint" || taskType === "return"
+            ? "high"
+            : "normal",
+      }),
     });
+
+    const result = await response.json().catch(() => null);
 
     setSaving(false);
 
-    if (error) {
-      alert("고객 이슈 등록 실패\n\n" + error.message);
+    if (!response.ok || !result?.ok) {
+      alert("고객 이슈 등록 실패\n\n" + (result?.message || "알 수 없는 오류"));
       return;
     }
 

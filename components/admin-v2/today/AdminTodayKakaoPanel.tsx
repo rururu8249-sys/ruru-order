@@ -231,7 +231,12 @@ export default function AdminTodayKakaoPanel({
 
     setRegisteringTaskItemId(item.id);
 
-    const { error } = await supabase.from("admin_tasks").insert({
+    const response = await fetch("/api/admin-v2/admin-tasks", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
       task_type: itemAnalysis.issueType || "general",
       title,
       body,
@@ -248,12 +253,13 @@ export default function AdminTodayKakaoPanel({
         relatedProduct,
         timelineItem: item,
       },
+      }),
     });
 
-    setRegisteringTaskItemId("");
+    const result = await response.json().catch(() => null);
 
-    if (error) {
-      alert("오늘할일 등록 실패\n\n" + error.message);
+    if (!response.ok || !result?.ok) {
+      alert("오늘할일 등록 실패\\n\\n" + (result?.message || "알 수 없는 오류"));
       return;
     }
 
