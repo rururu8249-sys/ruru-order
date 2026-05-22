@@ -166,59 +166,36 @@ export default function ManualPaymentMatchDrawer(props: Props) {
           source: "manual_payment_match_drawer",
         }),
       });
-    } catch {
-      // 뱅크다 조회 실패가 수동매칭 팝업 자체를 막으면 안 됩니다.
+    } catch (error) {
+      console.warn("[manual-drawer] bankda sync failed", error);
     }
 
     try {
-      const previewResponse = await fetch("/api/admin-v2/auto-payment-match/preview", {
-        method: "GET",
-        cache: "no-store",
-      });
-
-      const preview = await previewResponse.json().catch(() => null);
-
-      const candidateCount = Number(
-        preview?.summary?.auto_match_preview_count ??
-          preview?.summary?.candidate_count ??
-          preview?.candidates?.length ??
-          0
-      );
-
-      if (!previewResponse.ok || !preview?.ok || candidateCount <= 0) {
-        return;
-      }
-
-      const runBody = JSON.stringify({
-        confirmed: true,
-        source: "manual_payment_match_drawer",
-      });
-
-      const runResponse = await fetch("/api/admin-v2/auto-payment-match/run", {
+      const runResponse = await fetch("/api/admin-v2/auto-payment-match/strict-run", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         cache: "no-store",
-        body: runBody,
+        body: JSON.stringify({
+          source: "manual_payment_match_drawer",
+        }),
       });
 
-      if (!runResponse.ok) {
-        const runError = await runResponse.json().catch(() => null);
-        console.warn("[manual-drawer] strict auto payment run failed", runError);
+      const runResult = await runResponse.json().catch(() => null);
 
-        const fallbackResponse = await fetch("/api/admin-v2/auto-payment-match/run", {
-          method: "POST",
-          cache: "no-store",
-        });
-
-        if (!fallbackResponse.ok) {
-          const fallbackError = await fallbackResponse.json().catch(() => null);
-          console.warn("[manual-drawer] strict auto payment fallback failed", fallbackError);
-        }
+      if (!runResponse.ok || !runResult?.ok) {
+        console.warn("[manual-drawer] strict auto payment failed", runResult);
+        return;
       }
-    } catch {
-      // 엄격 자동입금확인 실패 시에도 수동매칭은 계속 가능해야 합니다.
+
+      const matchedCount = Number(runResult?.matched_count || runResult?.summary?.matched_count || 0);
+
+      if (matchedCount > 0) {
+        window.dispatchEvent(new CustomEvent("ruru:admin-today-refresh"));
+      }
+    } catch (error) {
+      console.warn("[manual-drawer] strict auto payment error", error);
     }
   };
 
