@@ -1,13 +1,11 @@
-// components/admin-v2/payment/ManualPaymentMatchDrawer.tsx
-// 목적: 주문관리에서 미입금 주문의 입금내역을 직접 선택해 수동매칭하는 팝업
-// UX 기준: 상단 닫기/X 없음. 하단 [취소] [수동매칭]만 사용.
-
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import type { DepositRow, OrderGroup } from "@/lib/admin-v2/types";
 import { matchesManualPaymentSearch } from "@/components/admin-v2/payment/manualPaymentMatchSearchUtils";
-import ManualPaymentSelectionSummary from "@/components/admin-v2/payment/ManualPaymentSelectionSummary";
+import ManualPaymentOrderSummary from "@/components/admin-v2/payment/ManualPaymentOrderSummary";
+import ManualPaymentAmountSummary from "@/components/admin-v2/payment/ManualPaymentAmountSummary";
+import ManualPaymentDepositRow from "@/components/admin-v2/payment/ManualPaymentDepositRow";
 
 type Props = {
   group?: OrderGroup | null;
@@ -158,13 +156,9 @@ export default function ManualPaymentMatchDrawer(props: Props) {
     try {
       await fetch("/api/bankda/sync-deposits", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
-        body: JSON.stringify({
-          source: "manual_payment_match_drawer",
-        }),
+        body: JSON.stringify({ source: "manual_payment_match_drawer" }),
       });
     } catch (error) {
       console.warn("[manual-drawer] bankda sync failed", error);
@@ -173,13 +167,9 @@ export default function ManualPaymentMatchDrawer(props: Props) {
     try {
       const runResponse = await fetch("/api/admin-v2/auto-payment-match/strict-run", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
-        body: JSON.stringify({
-          source: "manual_payment_match_drawer",
-        }),
+        body: JSON.stringify({ source: "manual_payment_match_drawer" }),
       });
 
       const runResult = await runResponse.json().catch(() => null);
@@ -230,12 +220,10 @@ export default function ManualPaymentMatchDrawer(props: Props) {
     return (serverDeposits || [])
       .filter((deposit) => {
         if (isDepositConfirmed(deposit)) return false;
-
         if (showAll) return true;
 
         const amountMatch = Number(deposit.amount || 0) === expectedAmount;
-        const nameMatch =
-          getNameScore(deposit.depositor_name, nickname, customerName) > 0;
+        const nameMatch = getNameScore(deposit.depositor_name, nickname, customerName) > 0;
 
         if (!word) {
           return amountMatch || nameMatch;
@@ -279,9 +267,7 @@ export default function ManualPaymentMatchDrawer(props: Props) {
   const amountDifference = selectedTotalAmount - expectedAmount;
   const exactAmountMatched = expectedAmount > 0 && selectedDeposits.length > 0 && amountDifference === 0;
 
-  if (!group || !first) {
-    return null;
-  }
+  if (!group || !first) return null;
 
   const confirmManualMatch = async () => {
     if (selectedDeposits.length === 0) {
@@ -321,13 +307,13 @@ export default function ManualPaymentMatchDrawer(props: Props) {
     setSaving(true);
 
     try {
-      const depositIds = selectedDeposits.map((deposit) => Number(deposit.id)).filter((id) => Number.isFinite(id) && id > 0);
+      const depositIds = selectedDeposits
+        .map((deposit) => Number(deposit.id))
+        .filter((id) => Number.isFinite(id) && id > 0);
 
       const response = await fetch("/api/admin-v2/manual-payment-match", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderGroupId: group.groupId,
           orderIds: getOrderIds(group),
@@ -349,14 +335,13 @@ export default function ManualPaymentMatchDrawer(props: Props) {
         [
           "수동매칭 완료",
           "",
-          `주문상태는 결제완료(수동)으로 표시됩니다.`,
+          "주문상태는 결제완료(수동)으로 표시됩니다.",
           `선택 입금내역: ${depositIds.length.toLocaleString()}건`,
           `선택합계: ${money(selectedTotalAmount)}`,
         ].join("\n")
       );
 
       await props.onMatched?.();
-
       props.onClose();
     } finally {
       setSaving(false);
@@ -364,118 +349,105 @@ export default function ManualPaymentMatchDrawer(props: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-[90] bg-black/35">
-      <aside className="ml-auto flex h-full w-full max-w-3xl flex-col bg-white shadow-[0_24px_70px_rgba(0,0,0,0.28)]">
-        <header className="shrink-0 border-b border-neutral-200 p-5">
-          <div className="text-[12px] font-black tracking-widest text-neutral-400">
-            MANUAL PAYMENT MATCH
-          </div>
+    <div className="fixed inset-0 z-[90] bg-slate-950/35">
+      <aside className="ml-auto flex h-full w-full max-w-[760px] flex-col bg-white shadow-[0_24px_80px_rgba(15,23,42,0.28)]">
+        <header className="shrink-0 border-b border-slate-200 bg-white p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-[11px] font-black tracking-[0.18em] text-slate-400">MANUAL PAYMENT MATCH</div>
+              <h2 className="mt-1 text-2xl font-black tracking-[-0.04em] text-slate-950">수동 입금매칭</h2>
+            </div>
 
-          <h2 className="mt-1 text-2xl font-black tracking-[-0.04em]">
-            수동 입금매칭
-          </h2>
-
-          <div className="mt-4 grid gap-2 rounded-2xl bg-neutral-50 p-4 text-sm font-bold text-neutral-700 md:grid-cols-2">
-            <div>
-              주문번호: <span className="font-black text-neutral-950">{group.groupId}</span>
-            </div>
-            <div>
-              닉네임: <span className="font-black text-neutral-950">{nickname || "-"}</span>
-            </div>
-            <div>
-              이름: <span className="font-black text-neutral-950">{customerName || "-"}</span>
-            </div>
-            <div>
-              전화번호: <span className="font-black text-neutral-950">{phone || "-"}</span>
-            </div>
-            <div>
-              입금예정금액: <span className="font-black text-neutral-950">{money(expectedAmount)}</span>
-            </div>
-            <div>
-              상품수량: <span className="font-black text-neutral-950">{group.totalQty || group.rows.length}개</span>
+            <div className="rounded-2xl bg-orange-50 px-3 py-2 text-right text-xs font-black text-orange-700">
+              돈 관련 작업<br />입금자명·금액 확인
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-[1fr_92px_92px] gap-2">
-            <input
-              value={keyword}
-              onChange={(event) => {
-                setKeyword(event.target.value);
-                setSelectedDepositIds([]);
-                setShowAll(false);
-              }}
-              placeholder="입금자명 또는 금액 검색"
-              className="h-12 rounded-xl border border-neutral-200 px-4 text-base font-black outline-none focus:border-neutral-950"
+          <div className="mt-4 grid gap-3">
+            <ManualPaymentOrderSummary group={group} expectedAmount={expectedAmount} />
+
+            <div className="grid grid-cols-[1fr_92px_104px] gap-2">
+              <input
+                value={keyword}
+                onChange={(event) => {
+                  setKeyword(event.target.value);
+                  setSelectedDepositIds([]);
+                  setShowAll(false);
+                }}
+                placeholder="입금자명 또는 금액 검색"
+                className="h-12 rounded-2xl border border-slate-200 px-4 text-base font-black outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
+              />
+
+              <button
+                type="button"
+                onClick={() => {
+                  setKeyword("");
+                  setShowAll(true);
+                }}
+                className="h-12 rounded-2xl bg-slate-950 text-sm font-black text-white active:scale-[0.98]"
+              >
+                전체보기
+              </button>
+
+              <button
+                type="button"
+                onClick={loadDeposits}
+                disabled={loading}
+                className="h-12 rounded-2xl bg-blue-600 text-sm font-black text-white active:scale-[0.98] disabled:bg-slate-300"
+              >
+                {loading ? "로딩중" : "새로고침"}
+              </button>
+            </div>
+
+            <ManualPaymentAmountSummary
+              expectedAmount={expectedAmount}
+              selectedTotalAmount={selectedTotalAmount}
+              selectedCount={selectedDeposits.length}
+              amountDifference={amountDifference}
             />
-
-            <button
-              type="button"
-              onClick={() => {
-                setKeyword("");
-                setShowAll(true);
-              }}
-              className="h-12 rounded-xl bg-neutral-950 text-sm font-black text-white active:scale-[0.98]"
-            >
-              전체보기
-            </button>
-
-            <button
-              type="button"
-              onClick={loadDeposits}
-              disabled={loading}
-              className="h-12 rounded-xl bg-blue-600 text-sm font-black text-white active:scale-[0.98] disabled:bg-neutral-300"
-            >
-              {loading ? "로딩중" : "다시불러오기"}
-            </button>
           </div>
-
-          <div className="mt-3 rounded-xl bg-amber-50 px-4 py-3 text-xs font-black leading-relaxed text-amber-800">
-            수동매칭은 돈 관련 작업입니다. 입금자명과 금액을 반드시 확인하세요.
-          </div>
-
-          <ManualPaymentSelectionSummary
-            expectedAmount={expectedAmount}
-            selectedTotalAmount={selectedTotalAmount}
-            selectedCount={selectedDeposits.length}
-            amountDifference={amountDifference}
-          />
         </header>
 
-        <section className="min-h-0 flex-1 overflow-y-auto p-5">
+        <section className="min-h-0 flex-1 overflow-y-auto bg-slate-50 p-5">
           <div className="mb-3 flex items-center justify-between">
-            <div className="text-sm font-black text-neutral-700">
+            <div className="text-sm font-black text-slate-700">
               미매칭 입금내역 {depositsForDisplay.length.toLocaleString()}건
             </div>
-            <div className="text-xs font-bold text-neutral-400">
+            <div className="text-xs font-bold text-slate-400">
               저장된 전체 입금내역 {serverDeposits.length.toLocaleString()}건
             </div>
           </div>
 
           {depositsForDisplay.length === 0 ? (
-            <div className="rounded-2xl bg-neutral-50 px-4 py-16 text-center text-base font-black text-neutral-500">
-              표시할 미확인 입금내역이 없습니다.
-              <br />
-              검색어를 지우거나 전체보기를 눌러주세요.
+            <div className="rounded-3xl border border-dashed border-slate-200 bg-white px-4 py-16 text-center">
+              <div className="text-4xl">🧾</div>
+              <div className="mt-3 text-base font-black text-slate-600">표시할 미확인 입금내역이 없습니다.</div>
+              <div className="mt-2 text-sm font-bold leading-6 text-slate-400">
+                검색어를 지우거나 전체보기를 눌러주세요.<br />
+                방금 입금된 건은 새로고침으로 다시 확인할 수 있습니다.
+              </div>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-2xl border border-neutral-200">
+            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
               {depositsForDisplay.map((deposit) => {
                 const selected = selectedDepositIdSet.has(Number(deposit.id));
                 const amountMatch = Number(deposit.amount || 0) === expectedAmount;
                 const nameScore = getNameScore(deposit.depositor_name, nickname, customerName);
 
                 let tag = "확인필요";
-
                 if (amountMatch && nameScore >= 90) tag = "추천";
                 else if (amountMatch && nameScore > 0) tag = "이름유사";
                 else if (amountMatch) tag = "금액일치";
                 else if (nameScore > 0) tag = "이름유사";
 
                 return (
-                  <button
+                  <ManualPaymentDepositRow
                     key={deposit.id}
-                    type="button"
-                    onClick={() => {
+                    deposit={deposit}
+                    selected={selected}
+                    tag={tag}
+                    timeLabel={getDepositTimeLabel(deposit.deposited_time, deposit.created_at)}
+                    onToggle={() => {
                       const id = Number(deposit.id);
                       setSelectedDepositIds((prev) =>
                         prev.includes(id)
@@ -483,64 +455,19 @@ export default function ManualPaymentMatchDrawer(props: Props) {
                           : [...prev, id]
                       );
                     }}
-                    className={[
-                      "grid w-full grid-cols-[38px_1fr_120px_100px_90px] items-center gap-2 border-b border-neutral-100 px-4 py-3 text-left transition active:scale-[0.995]",
-                      selected ? "bg-blue-50" : "bg-white hover:bg-neutral-50",
-                    ].join(" ")}
-                  >
-                    <div
-                      className={[
-                        "flex h-6 w-6 items-center justify-center rounded-md border text-xs font-black",
-                        selected ? "border-blue-600 bg-blue-600 text-white" : "border-neutral-300 text-transparent",
-                      ].join(" ")}
-                    >
-                      ✓
-                    </div>
-
-                    <div>
-                      <div className="text-sm font-black text-neutral-950">
-                        {deposit.depositor_name || "-"}
-                      </div>
-                      <div className="mt-0.5 text-xs font-bold text-neutral-400">
-                        입금일시 {getDepositTimeLabel(deposit.deposited_time, deposit.created_at)}
-                      </div>
-                    </div>
-
-                    <div className="text-right text-sm font-black text-neutral-950">
-                      {money(deposit.amount)}
-                    </div>
-
-                    <div
-                      className={[
-                        "rounded-full px-2 py-1 text-center text-xs font-black",
-                        tag === "추천"
-                          ? "bg-blue-100 text-blue-700"
-                          : tag === "금액일치"
-                            ? "bg-green-100 text-green-700"
-                            : tag === "이름유사"
-                              ? "bg-amber-100 text-amber-700"
-                              : "bg-neutral-100 text-neutral-500",
-                      ].join(" ")}
-                    >
-                      {tag}
-                    </div>
-
-                    <div className="text-right text-xs font-black text-neutral-400">
-                      {deposit.match_status || "미확인"}
-                    </div>
-                  </button>
+                  />
                 );
               })}
             </div>
           )}
         </section>
 
-        <footer className="grid shrink-0 grid-cols-2 gap-2 border-t border-neutral-200 bg-white p-5">
+        <footer className="grid shrink-0 grid-cols-2 gap-2 border-t border-slate-200 bg-white p-5">
           <button
             type="button"
             onClick={props.onClose}
             disabled={saving}
-            className="h-13 rounded-xl border border-neutral-300 bg-white text-base font-black text-neutral-700 active:scale-[0.98] disabled:opacity-50"
+            className="h-13 rounded-2xl border border-slate-300 bg-white text-base font-black text-slate-700 active:scale-[0.98] disabled:opacity-50"
           >
             취소
           </button>
@@ -549,7 +476,7 @@ export default function ManualPaymentMatchDrawer(props: Props) {
             type="button"
             onClick={confirmManualMatch}
             disabled={saving || selectedDeposits.length === 0}
-            className="h-13 rounded-xl bg-neutral-950 text-base font-black text-white active:scale-[0.98] disabled:bg-neutral-300"
+            className="h-13 rounded-2xl bg-slate-950 text-base font-black text-white active:scale-[0.98] disabled:bg-slate-300"
           >
             {saving ? "처리중..." : exactAmountMatched ? "수동매칭" : "금액 다름 · 그래도 수동매칭"}
           </button>
