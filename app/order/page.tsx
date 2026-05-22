@@ -17,7 +17,7 @@
 // - 색상은 한글/영어/공백 허용, 사이즈는 한글/영어/숫자/공백 허용
 // - 고객페이지 기본 퍼가기 방지 적용
 // - 상품명은 자유 입력, 상품 1칸 1개 안내문 추가
-// - 상품금액 1,000원 미만 제출 금지
+// - 상품금액 1원 미만 제출 금지
 
 "use client";
 
@@ -986,8 +986,8 @@ export default function OrderPage() {
         return false;
       }
 
-      if (toNumber(item.product_price) < 1000) {
-        alert("상품금액은 1,000원 이상으로 입력해주세요.");
+      if (toNumber(item.product_price) < 1) {
+        alert("상품금액은 1원 이상으로 입력해주세요.");
         return false;
       }
     }
