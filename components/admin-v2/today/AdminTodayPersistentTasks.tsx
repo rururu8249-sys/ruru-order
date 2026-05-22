@@ -293,7 +293,7 @@ export default function AdminTodayPersistentTasks() {
 
         {!loading && !errorText && filteredTasks.length > 0 ? (
           <>
-            <div className="grid max-h-[360px] gap-2 overflow-y-auto pr-1">
+            <div className="grid max-h-[320px] gap-2 overflow-y-auto pr-1">
               {visibleTasks.map((task) => (
                 <AdminTodayTaskCard
                   key={task.id}
