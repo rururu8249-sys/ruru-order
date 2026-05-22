@@ -28,7 +28,7 @@ export default function AdminTodayIssueControlPanel({
   const [activeTab, setActiveTab] = useState<IssuePanelTab>("queue");
 
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
+    <section className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
       <div className="mb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -76,7 +76,7 @@ export default function AdminTodayIssueControlPanel({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+      <div className="max-h-[540px] overflow-y-auto pr-1">
       {activeTab === "create" ? (
         <AdminTodayQuickIssueCreate customers={customers} />
       ) : null}
