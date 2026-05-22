@@ -1,8 +1,8 @@
 "use client";
 
 // components/admin-v2/today/AdminTodayPersistentTasks.tsx
-// 목적: 직접 등록한 고객 이슈를 해결 전까지 표시하고 완료 이력도 확인
-// 주의: 주문/입금/배송/정산 상태 변경 없음. admin_tasks만 조회/완료 처리.
+// 목적: 고객 이슈 큐를 해결 전까지 표시하고, 많아지면 페이지/더보기로 관리
+// 주의: 주문/입금/배송/정산 상태 변경 없음. admin_tasks 서버 API만 사용.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AdminTaskRow } from "@/lib/admin-v2/types";
@@ -19,6 +19,8 @@ import {
 const normalize = (value: unknown) =>
   String(value ?? "").replace(/\s+/g, "").toLowerCase();
 
+const PAGE_SIZE = 4;
+
 export default function AdminTodayPersistentTasks() {
   const [tasks, setTasks] = useState<AdminTaskRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -28,6 +30,8 @@ export default function AdminTodayPersistentTasks() {
   const [draftSearchText, setDraftSearchText] = useState("");
   const [searchText, setSearchText] = useState("");
   const [selectedTask, setSelectedTask] = useState<AdminTaskRow | null>(null);
+  const [page, setPage] = useState(1);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const loadTasks = useCallback(async () => {
     setLoading(true);
@@ -57,8 +61,17 @@ export default function AdminTodayPersistentTasks() {
     };
 
     window.addEventListener("ruru-admin-task-created", refresh);
-    return () => window.removeEventListener("ruru-admin-task-created", refresh);
+    window.addEventListener("ruru-admin-task-updated", refresh);
+
+    return () => {
+      window.removeEventListener("ruru-admin-task-created", refresh);
+      window.removeEventListener("ruru-admin-task-updated", refresh);
+    };
   }, [loadTasks]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [viewMode, activeFilter, searchText]);
 
   const openTasks = useMemo(
     () => tasks.filter((task) => !task.resolved_at),
@@ -112,6 +125,11 @@ export default function AdminTodayPersistentTasks() {
     });
   }, [baseTasks, activeFilter, searchText]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredTasks.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageStart = (safePage - 1) * PAGE_SIZE;
+  const visibleTasks = filteredTasks.slice(pageStart, pageStart + PAGE_SIZE);
+
   const resolveTask = async (task: AdminTaskRow, note = "") => {
     const ok = window.confirm(`고객 이슈를 해결완료 처리할까요?\n\n${task.title}`);
 
@@ -138,6 +156,7 @@ export default function AdminTodayPersistentTasks() {
 
     setSelectedTask(null);
     await loadTasks();
+    window.dispatchEvent(new Event("ruru-admin-task-updated"));
   };
 
   const emptyText =
@@ -162,17 +181,26 @@ export default function AdminTodayPersistentTasks() {
               </span>
             </div>
             <p className="mt-1 text-xs font-bold text-neutral-500">
-              불량·교환·환불·배송·주소확인 이슈는 해결 전까지 계속 표시합니다.
+              실제 이슈큐에 등록된 고객 이슈만 표시합니다.
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={loadTasks}
-            className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs font-black text-neutral-700 active:scale-[0.98]"
-          >
-            새로고침
-          </button>
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={loadTasks}
+              className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs font-black text-neutral-700 active:scale-[0.98]"
+            >
+              새로고침
+            </button>
+            <button
+              type="button"
+              onClick={() => setMoreOpen(true)}
+              className="rounded-xl bg-neutral-950 px-3 py-2 text-xs font-black text-white active:scale-[0.98]"
+            >
+              더보기
+            </button>
+          </div>
         </div>
 
         <AdminTodayTaskModeTabs
@@ -182,9 +210,9 @@ export default function AdminTodayPersistentTasks() {
           onChange={(nextMode) => {
             setViewMode(nextMode);
             setActiveFilter("all");
-            setSelectedTask(null);
             setDraftSearchText("");
             setSearchText("");
+            setSelectedTask(null);
           }}
         />
 
@@ -264,23 +292,42 @@ export default function AdminTodayPersistentTasks() {
         ) : null}
 
         {!loading && !errorText && filteredTasks.length > 0 ? (
-          <div className="grid max-h-[520px] gap-2 overflow-y-auto pr-1">
-            {filteredTasks.map((task) => (
-              <AdminTodayTaskCard
-                key={task.id}
-                task={task}
-                canResolve={viewMode === "open"}
-                onOpenDetail={setSelectedTask}
-                onResolve={resolveTask}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid max-h-[430px] gap-2 overflow-y-auto pr-1">
+              {visibleTasks.map((task) => (
+                <AdminTodayTaskCard
+                  key={task.id}
+                  task={task}
+                  canResolve={viewMode === "open"}
+                  onOpenDetail={setSelectedTask}
+                  onResolve={resolveTask}
+                />
+              ))}
+            </div>
+
+            <IssuePagination
+              page={safePage}
+              totalPages={totalPages}
+              totalCount={filteredTasks.length}
+              onPageChange={setPage}
+            />
+          </>
         ) : null}
 
         <div className="mt-3 rounded-2xl bg-neutral-50 px-3 py-2 text-[11px] font-bold text-neutral-400">
           해결완료 처리된 이슈는 완료 이력으로 이동합니다.
         </div>
       </section>
+
+      {moreOpen ? (
+        <IssueMoreDrawer
+          tasks={filteredTasks}
+          viewMode={viewMode}
+          onClose={() => setMoreOpen(false)}
+          onOpenDetail={setSelectedTask}
+          onResolve={resolveTask}
+        />
+      ) : null}
 
       <AdminTodayTaskDetailDrawer
         task={selectedTask}
@@ -289,5 +336,121 @@ export default function AdminTodayPersistentTasks() {
         onResolve={resolveTask}
       />
     </>
+  );
+}
+
+function IssuePagination({
+  page,
+  totalPages,
+  totalCount,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  totalCount: number;
+  onPageChange: (page: number) => void;
+}) {
+  if (totalPages <= 1) {
+    return (
+      <div className="mt-3 text-center text-[11px] font-bold text-neutral-400">
+        총 {totalCount.toLocaleString()}건
+      </div>
+    );
+  }
+
+  const pages = Array.from({ length: totalPages }, (_, index) => index + 1).slice(0, 7);
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => onPageChange(Math.max(1, page - 1))}
+        disabled={page <= 1}
+        className="h-8 rounded-lg border border-neutral-200 bg-white px-2 text-xs font-black text-neutral-600 disabled:opacity-30"
+      >
+        이전
+      </button>
+
+      {pages.map((item) => (
+        <button
+          key={item}
+          type="button"
+          onClick={() => onPageChange(item)}
+          className={`h-8 min-w-8 rounded-lg px-2 text-xs font-black ${
+            item === page
+              ? "bg-neutral-950 text-white"
+              : "border border-neutral-200 bg-white text-neutral-600"
+          }`}
+        >
+          {item}
+        </button>
+      ))}
+
+      <button
+        type="button"
+        onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+        disabled={page >= totalPages}
+        className="h-8 rounded-lg border border-neutral-200 bg-white px-2 text-xs font-black text-neutral-600 disabled:opacity-30"
+      >
+        다음
+      </button>
+    </div>
+  );
+}
+
+function IssueMoreDrawer({
+  tasks,
+  viewMode,
+  onClose,
+  onOpenDetail,
+  onResolve,
+}: {
+  tasks: AdminTaskRow[];
+  viewMode: AdminTaskViewMode;
+  onClose: () => void;
+  onOpenDetail: (task: AdminTaskRow) => void;
+  onResolve: (task: AdminTaskRow, note?: string) => void | Promise<void>;
+}) {
+  return (
+    <div className="fixed inset-0 z-[90] bg-black/30">
+      <aside className="ml-auto flex h-full w-full max-w-3xl flex-col bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-4">
+          <div>
+            <h2 className="text-xl font-black tracking-[-0.05em] text-neutral-950">
+              고객 이슈 전체보기
+            </h2>
+            <p className="mt-1 text-xs font-bold text-neutral-500">
+              현재 조건 기준 {tasks.length.toLocaleString()}건을 한 번에 확인합니다.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-10 rounded-full bg-neutral-950 px-4 text-xs font-black text-white active:scale-[0.98]"
+          >
+            닫기
+          </button>
+        </div>
+
+        <div className="grid flex-1 gap-2 overflow-y-auto p-4">
+          {tasks.length === 0 ? (
+            <div className="rounded-2xl bg-neutral-50 p-6 text-center text-sm font-black text-neutral-400">
+              표시할 고객 이슈가 없습니다.
+            </div>
+          ) : (
+            tasks.map((task) => (
+              <AdminTodayTaskCard
+                key={`drawer-${task.id}`}
+                task={task}
+                canResolve={viewMode === "open"}
+                onOpenDetail={onOpenDetail}
+                onResolve={onResolve}
+              />
+            ))
+          )}
+        </div>
+      </aside>
+    </div>
   );
 }

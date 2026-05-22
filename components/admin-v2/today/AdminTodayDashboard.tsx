@@ -100,6 +100,8 @@ export default function AdminTodayDashboard({
   const [draftPeriodStartDate, setDraftPeriodStartDate] = useState(todayDateKey);
   const [draftPeriodEndDate, setDraftPeriodEndDate] = useState(todayDateKey);
   const [periodStorageReady, setPeriodStorageReady] = useState(false);
+  const [adminTaskOpenCount, setAdminTaskOpenCount] = useState(0);
+
 
   useEffect(() => {
     const storedPeriod = readStoredTodayPeriod();
@@ -118,6 +120,43 @@ export default function AdminTodayDashboard({
     if (!periodStorageReady) return;
     saveStoredTodayPeriod(periodStartDate, periodEndDate);
   }, [periodStorageReady, periodStartDate, periodEndDate]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadAdminTaskOpenCount = async () => {
+      const response = await fetch("/api/admin-v2/admin-tasks", {
+        method: "GET",
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (!mounted || !response.ok || !result?.ok) {
+        return;
+      }
+
+      const openCount = ((result.tasks || []) as Array<{ resolved_at?: string | null }>).filter(
+        (task) => !task.resolved_at
+      ).length;
+
+      setAdminTaskOpenCount(openCount);
+    };
+
+    loadAdminTaskOpenCount();
+
+    const refresh = () => {
+      loadAdminTaskOpenCount();
+    };
+
+    window.addEventListener("ruru-admin-task-created", refresh);
+    window.addEventListener("ruru-admin-task-updated", refresh);
+
+    return () => {
+      mounted = false;
+      window.removeEventListener("ruru-admin-task-created", refresh);
+      window.removeEventListener("ruru-admin-task-updated", refresh);
+    };
+  }, []);
 
   const todayGroups = useMemo(
     () =>
@@ -200,7 +239,7 @@ export default function AdminTodayDashboard({
         }
       />
 
-      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1.58fr)_minmax(390px,0.82fr)] 2xl:items-start">
+      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1.9fr)_minmax(360px,0.62fr)] 2xl:items-start">
         <main className="grid min-w-0 gap-4">
           <AdminTodayCollapsiblePanel
             title="유튜브 LIVE 채팅"
@@ -217,7 +256,7 @@ export default function AdminTodayDashboard({
             summary={moneySummary}
             orderCount={todayGroups.length}
             itemQuantity={itemQuantity}
-            issueCount={workCounts.issue}
+            issueCount={adminTaskOpenCount}
             periodLabel={periodLabel}
             periodStorageReady={periodStorageReady}
           />
@@ -235,7 +274,7 @@ export default function AdminTodayDashboard({
           />
         </main>
 
-        <aside className="min-w-0 2xl:sticky 2xl:top-4">
+        <aside className="min-w-0 2xl:sticky 2xl:top-4 2xl:max-h-[calc(100vh-2rem)] 2xl:overflow-y-auto">
           <AdminTodayIssueControlPanel
             customers={customers}
             onSaveCustomerMemo={onSaveCustomerMemo}

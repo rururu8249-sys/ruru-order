@@ -58,7 +58,7 @@ export default function AdminTodayControlSummaryBar({
           </div>
 
           <p className="mt-0.5 text-[12px] font-bold text-neutral-500">
-            총매출·입금·카드·주문·고객이슈를 한 줄로 확인합니다.
+            총매출·입금·카드·주문·이슈큐를 한 줄로 확인합니다.
           </p>
         </div>
 
@@ -69,7 +69,7 @@ export default function AdminTodayControlSummaryBar({
             danger={unpaidTotal > 0}
           />
           <MiniBadge
-            label="특이사항"
+            label="이슈큐"
             value={`${issueCount.toLocaleString()}건`}
             danger={issueCount > 0}
           />
@@ -119,9 +119,9 @@ export default function AdminTodayControlSummaryBar({
           />
 
           <SingleSummaryCard
-            title="특이사항"
+            title="이슈큐"
             value={`${issueCount.toLocaleString()}건`}
-            desc="주문메모/특이사항"
+            desc="미해결 고객이슈"
             tone={issueCount > 0 ? "amber" : "neutral"}
           />
         </div>
@@ -134,7 +134,7 @@ export default function AdminTodayControlSummaryBar({
             label="주문"
             value={`${orderCount.toLocaleString()}건 / ${itemQuantity.toLocaleString()}개`}
           />
-          <CollapsedItem label="특이사항" value={`${issueCount.toLocaleString()}건`} />
+          <CollapsedItem label="이슈큐" value={`${issueCount.toLocaleString()}건`} />
         </div>
       )}
     </section>

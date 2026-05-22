@@ -25,7 +25,7 @@ export default function AdminTodayIssueControlPanel({
   customers: CustomerRow[];
   onSaveCustomerMemo: (customer: CustomerRow, memoText: string) => Promise<void>;
 }) {
-  const [activeTab, setActiveTab] = useState<IssuePanelTab>("create");
+  const [activeTab, setActiveTab] = useState<IssuePanelTab>("queue");
 
   return (
     <section className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
