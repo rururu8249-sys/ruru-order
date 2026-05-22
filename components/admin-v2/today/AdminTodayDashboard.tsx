@@ -14,14 +14,12 @@ import type {
   SettingRow,
 } from "@/lib/admin-v2/types";
 import AdminTodayHeader from "@/components/admin-v2/today/AdminTodayHeader";
-import AdminTodayPersistentTasks from "@/components/admin-v2/today/AdminTodayPersistentTasks";
 import AdminTodayWorkQueue from "@/components/admin-v2/today/AdminTodayWorkQueue";
-import AdminTodayKakaoPanel from "@/components/admin-v2/today/AdminTodayKakaoPanel";
 import AdminTodayCollapsiblePanel from "@/components/admin-v2/today/AdminTodayCollapsiblePanel";
 import AdminTodayYoutubeLivePanel from "@/components/admin-v2/today/AdminTodayYoutubeLivePanel";
 import AdminTodayPeriodFilter from "@/components/admin-v2/today/AdminTodayPeriodFilter";
 import AdminTodayControlSummaryBar from "@/components/admin-v2/today/AdminTodayControlSummaryBar";
-import AdminTodayQuickIssueCreate from "@/components/admin-v2/today/AdminTodayQuickIssueCreate";
+import AdminTodayIssueControlPanel from "@/components/admin-v2/today/AdminTodayIssueControlPanel";
 import { filterOrderGroupsByPeriod, formatPeriodLabel, getTodayDateKey } from "@/components/admin-v2/today/adminTodayPeriodUtils";
 import {
   buildMoneySummary,
@@ -237,29 +235,11 @@ export default function AdminTodayDashboard({
           />
         </main>
 
-        <aside className="grid min-w-0 gap-4 2xl:sticky 2xl:top-4">
-          <AdminTodayQuickIssueCreate />
-
-          <AdminTodayCollapsiblePanel
-            title="고객 이슈 큐"
-            description="반품·교환·환불·배송·주소확인 이슈는 해결 전까지 계속 표시합니다."
-            badge="처리 이슈"
-            defaultOpen={true}
-          >
-            <AdminTodayPersistentTasks />
-          </AdminTodayCollapsiblePanel>
-
-          <AdminTodayCollapsiblePanel
-            title="문의/이슈 등록"
-            description="카톡 복붙 또는 수동 입력으로 고객 이슈를 오늘할일 큐에 등록합니다."
-            badge="카톡/메모"
-            defaultOpen={false}
-          >
-            <AdminTodayKakaoPanel
-              customers={customers}
-              onSaveCustomerMemo={onSaveCustomerMemo}
-            />
-          </AdminTodayCollapsiblePanel>
+        <aside className="min-w-0 2xl:sticky 2xl:top-4">
+          <AdminTodayIssueControlPanel
+            customers={customers}
+            onSaveCustomerMemo={onSaveCustomerMemo}
+          />
         </aside>
       </div>
     </section>

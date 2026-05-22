@@ -26,6 +26,7 @@ export default function AdminTodayPersistentTasks() {
   const [errorText, setErrorText] = useState("");
   const [viewMode, setViewMode] = useState<AdminTaskViewMode>("open");
   const [activeFilter, setActiveFilter] = useState<AdminTaskFilter>("all");
+  const [draftSearchText, setDraftSearchText] = useState("");
   const [searchText, setSearchText] = useState("");
   const [selectedTask, setSelectedTask] = useState<AdminTaskRow | null>(null);
 
@@ -179,6 +180,8 @@ export default function AdminTodayPersistentTasks() {
             setViewMode(nextMode);
             setActiveFilter("all");
             setSelectedTask(null);
+            setDraftSearchText("");
+            setSearchText("");
           }}
         />
 
@@ -204,13 +207,33 @@ export default function AdminTodayPersistentTasks() {
           })}
         </div>
 
-        <div className="mb-3">
+        <div className="mb-3 grid grid-cols-[1fr_auto_auto] gap-2">
           <input
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            placeholder="고객명, 닉네임, 주문번호, 상품명, 메모 검색"
+            value={draftSearchText}
+            onChange={(event) => setDraftSearchText(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") setSearchText(draftSearchText.trim());
+            }}
+            placeholder="고객명, 닉네임, 상품명, 메모 검색"
             className="h-10 w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 text-sm font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100/70"
           />
+          <button
+            type="button"
+            onClick={() => setSearchText(draftSearchText.trim())}
+            className="h-10 rounded-2xl bg-neutral-950 px-4 text-xs font-black text-white active:scale-[0.98]"
+          >
+            검색
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setDraftSearchText("");
+              setSearchText("");
+            }}
+            className="h-10 rounded-2xl border border-neutral-200 bg-white px-3 text-xs font-black text-neutral-600 active:scale-[0.98]"
+          >
+            초기화
+          </button>
         </div>
 
         {errorText ? (
