@@ -220,7 +220,7 @@ function buildOrderGroups(orders: AnyRow[]) {
   for (const [groupId, groupOrders] of map.entries()) {
     const firstOrder = groupOrders[0];
     const nickname = orderNickname(firstOrder);
-    const amount = orderAmount(firstOrder);
+    const amount = groupOrders.reduce((sum, order) => sum + orderAmount(order), 0);
     const orderIds = groupOrders.map((item) => Number(item.id)).filter((id) => Number.isFinite(id) && id > 0);
 
     if (!nickname || !amount || orderIds.length === 0) continue;
@@ -272,7 +272,7 @@ function buildCandidates(orders: AnyRow[], deposits: AnyRow[]) {
         deposit_id: depositId(deposit),
         deposit_depositor: depositName(deposit),
         deposit_amount: depositAmount(deposit),
-        reason: "닉네임 완전일치 + 금액 완전일치 + 주문그룹 1건/입금 1건",
+        reason: "닉네임 완전일치 + 주문그룹 합계금액 완전일치 + 주문그룹 1건/입금 1건",
       });
     } else if (keyDeposits.length > 0) {
       blocked.push({

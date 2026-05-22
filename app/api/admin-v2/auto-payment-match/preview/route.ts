@@ -129,6 +129,45 @@ function key(name: string, amount: number) {
   return `${name}__${amount}`;
 }
 
+type PreviewOrderGroup = {
+  order_group_id: string;
+  order_ids: string[];
+  first_order: AnyRow;
+  nickname: string;
+  amount: number;
+};
+
+function buildPreviewOrderGroups(orders: AnyRow[]) {
+  const map = new Map<string, AnyRow[]>();
+
+  for (const order of orders) {
+    const groupId = orderGroupId(order);
+    if (!groupId) continue;
+    map.set(groupId, [...(map.get(groupId) ?? []), order]);
+  }
+
+  const groups: PreviewOrderGroup[] = [];
+
+  for (const [groupId, groupOrders] of map.entries()) {
+    const firstOrder = groupOrders[0];
+    const nickname = orderName(firstOrder);
+    const amount = groupOrders.reduce((sum, order) => sum + orderAmount(order), 0);
+    const orderIds = groupOrders.map((order) => orderId(order)).filter(Boolean);
+
+    if (!nickname || !amount || amount <= 0 || orderIds.length === 0) continue;
+
+    groups.push({
+      order_group_id: groupId,
+      order_ids: orderIds,
+      first_order: firstOrder,
+      nickname,
+      amount,
+    });
+  }
+
+  return groups;
+}
+
 function isBankPaymentMethod(value: unknown) {
   const method = text(value || "무통장입금");
 
@@ -281,12 +320,14 @@ export async function GET() {
     }
   }
 
-  const ordersByKey = new Map<string, AnyRow[]>();
+  const eligibleOrderGroups = buildPreviewOrderGroups(eligibleOrders);
+
+  const ordersByKey = new Map<string, PreviewOrderGroup[]>();
   const depositsByKey = new Map<string, AnyRow[]>();
 
-  for (const order of eligibleOrders) {
-    const k = key(orderName(order), orderAmount(order));
-    ordersByKey.set(k, [...(ordersByKey.get(k) ?? []), order]);
+  for (const group of eligibleOrderGroups) {
+    const k = key(group.nickname, group.amount);
+    ordersByKey.set(k, [...(ordersByKey.get(k) ?? []), group]);
   }
 
   for (const deposit of eligibleDeposits) {
@@ -297,28 +338,30 @@ export async function GET() {
   const candidates: any[] = [];
   const ambiguous: any[] = [];
 
-  for (const [k, keyOrders] of ordersByKey.entries()) {
+  for (const [k, keyGroups] of ordersByKey.entries()) {
     const keyDeposits = depositsByKey.get(k) ?? [];
 
-    for (const order of keyOrders) {
+    for (const group of keyGroups) {
       if (keyDeposits.length === 0) {
         ambiguous.push({
-          type: "order",
-          id: orderId(order),
-          name: orderName(order),
-          amount: orderAmount(order),
-          reason: "닉네임+금액이 완전일치하는 미확인 입금내역 없음",
+          type: "order_group",
+          id: group.order_group_id,
+          order_ids: group.order_ids,
+          name: group.nickname,
+          amount: group.amount,
+          reason: "닉네임+주문그룹합계금액이 완전일치하는 미확인 입금내역 없음",
         });
         continue;
       }
 
-      if (keyOrders.length !== 1 || keyDeposits.length !== 1) {
+      if (keyGroups.length !== 1 || keyDeposits.length !== 1) {
         ambiguous.push({
-          type: "order",
-          id: orderId(order),
-          name: orderName(order),
-          amount: orderAmount(order),
-          reason: `1:1 단일 후보 아님 - 주문 ${keyOrders.length}건 / 입금 ${keyDeposits.length}건`,
+          type: "order_group",
+          id: group.order_group_id,
+          order_ids: group.order_ids,
+          name: group.nickname,
+          amount: group.amount,
+          reason: `1:1 단일 후보 아님 - 주문그룹 ${keyGroups.length}건 / 입금 ${keyDeposits.length}건`,
         });
         continue;
       }
@@ -326,16 +369,17 @@ export async function GET() {
       const deposit = keyDeposits[0];
 
       candidates.push({
-        order_id: orderId(order),
-        order_group_id: orderGroupId(order),
-        order_nickname: orderName(order),
-        order_amount: orderAmount(order),
-        order_status_text: orderStatus(order),
+        order_id: group.order_ids[0],
+        order_ids: group.order_ids,
+        order_group_id: group.order_group_id,
+        order_nickname: group.nickname,
+        order_amount: group.amount,
+        order_status_text: orderStatus(group.first_order),
         deposit_id: depositId(deposit),
         deposit_depositor: depositName(deposit),
         deposit_amount: depositAmount(deposit),
         deposit_time_text: depositTime(deposit),
-        reason: "닉네임 완전일치 + 금액 완전일치 + 주문 1건/입금 1건",
+        reason: "닉네임 완전일치 + 주문그룹 합계금액 완전일치 + 주문그룹 1건/입금 1건",
       });
     }
   }
@@ -344,11 +388,11 @@ export async function GET() {
     ok: true,
     mode: "preview_only_no_db_write",
     message: "자동매칭 미리보기입니다. 이 API는 orders/deposits 데이터를 수정하지 않습니다.",
-    rule: "닉네임 완전일치 + 금액 완전일치 + 주문 1건/입금 1건 단일 후보만 자동매칭 후보",
+    rule: "닉네임 완전일치 + 주문그룹 합계금액 완전일치 + 주문그룹 1건/입금 1건 단일 후보만 자동매칭 후보",
     summary: {
       checked_orders: orders.length,
       checked_deposits: deposits.length,
-      eligible_unpaid_orders: eligibleOrders.length,
+      eligible_unpaid_orders: eligibleOrderGroups.length,
       eligible_unmatched_deposits: eligibleDeposits.length,
       auto_match_preview_count: candidates.length,
       ambiguous_count: ambiguous.length,
