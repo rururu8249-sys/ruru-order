@@ -1,8 +1,8 @@
 "use client";
 
 // components/admin-v2/today/AdminTodayWorkQueueFilterBar.tsx
-// 목적: 오늘 입금 빠른처리 안쪽 검색 UI
-// 주의: 검색 전용. 날짜는 상단 기간설정에서만 관리.
+// 목적: 오늘할일 빠른처리 검색 UI
+// 주의: 검색 전용. 날짜는 상단 기간설정에서만 관리. DB 저장/입금매칭/정산 로직 없음.
 
 type Props = {
   draftKeyword: string;
@@ -24,40 +24,40 @@ export default function AdminTodayWorkQueueFilterBar({
   onReset,
 }: Props) {
   return (
-    <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <div className="text-sm font-black text-neutral-950">검색 필터</div>
-          <div className="mt-0.5 text-xs font-bold text-neutral-500">
-            검색결과 {filteredCount.toLocaleString()}건 / 기간 내 전체 {totalCount.toLocaleString()}건
-            {appliedKeyword ? ` · 검색어: ${appliedKeyword}` : ""}
+    <div className="grid min-w-0 gap-1.5 rounded-2xl border border-neutral-200 bg-neutral-50 p-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-xs font-black text-neutral-950">검색 필터</div>
+          <div className="truncate text-[11px] font-bold text-neutral-400">
+            검색결과 {filteredCount.toLocaleString()}건 / 전체 {totalCount.toLocaleString()}건
+            {appliedKeyword ? ` · "${appliedKeyword}"` : ""}
           </div>
         </div>
 
         <button
           type="button"
           onClick={onReset}
-          className="h-9 rounded-xl border border-neutral-200 bg-white px-3 text-xs font-black text-neutral-700 active:scale-[0.98]"
+          className="h-8 shrink-0 rounded-xl border border-neutral-200 bg-white px-3 text-[11px] font-black text-neutral-600 active:scale-[0.98]"
         >
           초기화
         </button>
       </div>
 
-      <div className="mt-3 grid gap-2 xl:grid-cols-[1fr_90px]">
+      <div className="grid grid-cols-[1fr_auto] gap-2">
         <input
           value={draftKeyword}
           onChange={(event) => onDraftKeywordChange(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") onSearch();
           }}
-          placeholder="닉네임 / 이름 / 상품명 / 주문번호 / 금액 검색"
-          className="h-11 rounded-xl border border-neutral-200 bg-white px-3 text-sm font-black outline-none focus:border-neutral-950"
+          placeholder="닉네임 / 이름 / 상품명 / 주문번호"
+          className="h-10 min-w-0 rounded-xl border border-neutral-200 bg-white px-3 text-sm font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100/70"
         />
 
         <button
           type="button"
           onClick={onSearch}
-          className="h-11 rounded-xl bg-neutral-950 px-4 text-sm font-black text-white active:scale-[0.98]"
+          className="h-10 rounded-xl bg-neutral-950 px-4 text-xs font-black text-white active:scale-[0.98]"
         >
           검색
         </button>

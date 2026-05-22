@@ -81,22 +81,26 @@ export default function AdminTodayWorkQueue({
   };
 
   return (
-    <section className="flex h-full min-h-[520px] flex-col rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
+    <section className="flex h-full min-h-[520px] flex-col rounded-3xl border border-neutral-200 bg-white p-3 shadow-sm">
+      <div className="mb-3 grid gap-2 xl:grid-cols-[minmax(220px,0.8fr)_minmax(420px,1fr)_minmax(420px,1.05fr)] xl:items-center">
+        <div className="min-w-0">
           <h2 className="text-lg font-black tracking-[-0.04em] text-neutral-950">
             오늘할일 빠른처리
           </h2>
-          <p className="mt-1 text-xs font-bold text-neutral-500">
-            결제확인·배송처리·특이사항을 한곳에서 빠르게 확인합니다.
+          <p className="mt-0.5 text-xs font-bold text-neutral-500">
+            입금확인 필요·배송처리·특이사항을 빠르게 확인합니다.
           </p>
         </div>
 
-        <AdminTodayWorkTabs
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          counts={counts}
-        />
+        <div className="min-w-0">
+          <AdminTodayWorkTabs
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            counts={counts}
+          />
+        </div>
+
+        <div className="min-w-0">
           <AdminTodayWorkQueueFilterBar
             draftKeyword={draftKeyword}
             appliedKeyword={appliedKeyword}
@@ -113,6 +117,7 @@ export default function AdminTodayWorkQueue({
               setPage(1);
             }}
           />
+        </div>
       </div>
 
       <div ref={listRef} className="flex-1 overflow-hidden rounded-2xl border border-neutral-100">
@@ -126,7 +131,7 @@ export default function AdminTodayWorkQueue({
               <div
                 key={item.id}
                 ref={index === 0 ? firstRowRef : undefined}
-                className="grid gap-3 px-4 py-3 lg:grid-cols-[112px_minmax(260px,1fr)_minmax(210px,300px)_auto] lg:items-center"
+                className="grid gap-3 px-3 py-3 lg:grid-cols-[108px_minmax(260px,1fr)_150px_minmax(220px,300px)_128px] lg:items-center"
               >
                 <div className="min-w-0">
                   <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${toneClass[item.tone]}`}>
@@ -138,21 +143,19 @@ export default function AdminTodayWorkQueue({
                 </div>
 
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="truncate text-sm font-black text-neutral-950">
-                      {item.nickname || "닉네임 없음"}
-                    </span>
-                    <span className="text-sm font-black text-neutral-700">
-                      {item.amountText}
-                    </span>
-                    <AdminTodayWorkItemStatusPills
-                      orderStatusText={item.orderStatusText}
-                      deliveryStageText={item.deliveryStageText}
-                    />
+                  <div className="truncate text-base font-black tracking-[-0.03em] text-neutral-950">
+                    {item.nickname || "닉네임 없음"}
                   </div>
 
                   <div className="mt-1 truncate text-xs font-bold text-neutral-500">
                     {item.product || "상품명 없음"}
+                  </div>
+
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    <AdminTodayWorkItemStatusPills
+                      orderStatusText={item.orderStatusText}
+                      deliveryStageText={item.deliveryStageText}
+                    />
                   </div>
 
                   <div className="mt-1 text-[11px] font-bold text-neutral-400 lg:hidden">
@@ -160,46 +163,26 @@ export default function AdminTodayWorkQueue({
                   </div>
                 </div>
 
-                <div className="rounded-2xl bg-neutral-50 px-3 py-2">
-                  <div className="grid gap-1 text-[11px] font-bold text-neutral-500">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-neutral-400">주문번호</span>
-                      <span className="truncate font-black text-neutral-700">
-                        {item.orderCode || "-"}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-neutral-400">주문일시</span>
-                      <span className="truncate font-black text-neutral-700">
-                        {item.timeText || "-"}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-neutral-400">오늘할일</span>
-                      <span className="truncate font-black text-neutral-700">
-                        {item.label}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-neutral-400">주문상태</span>
-                      <span className="truncate font-black text-emerald-700">
-                        {item.orderStatusText}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-neutral-400">배송처리</span>
-                      <span className="truncate font-black text-blue-700">
-                        {item.deliveryStageText}
-                      </span>
-                    </div>
+                <div className="min-w-0 text-left lg:text-right">
+                  <div className="text-base font-black tracking-[-0.03em] text-neutral-950">
+                    {item.amountText}
                   </div>
                 </div>
 
-                <div className="flex flex-wrap justify-start gap-1.5 lg:justify-end">
+                <div className="rounded-2xl bg-neutral-50 px-3 py-2">
+                  <div className="grid gap-1 text-[11px] font-bold text-neutral-500">
+                    <InfoLine label="주문번호" value={item.orderCode || "-"} />
+                    <InfoLine label="주문일시" value={item.timeText || "-"} />
+                    <InfoLine label="주문상태" value={item.orderStatusText || "-"} tone="emerald" />
+                    <InfoLine label="배송처리" value={item.deliveryStageText || "-"} tone="blue" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5 lg:grid-cols-1">
                   <button
                     type="button"
                     onClick={() => onOpenOrderDetail(item.id)}
-                    className="rounded-lg bg-neutral-950 px-3 py-2 text-xs font-black text-white active:scale-[0.98]"
+                    className="h-9 rounded-lg bg-neutral-950 px-3 text-xs font-black text-white active:scale-[0.98]"
                   >
                     상세열기
                   </button>
@@ -208,7 +191,7 @@ export default function AdminTodayWorkQueue({
                     <button
                       type="button"
                       onClick={() => onOpenPaymentMatch(item.id)}
-                      className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-black text-white active:scale-[0.98]"
+                      className="h-9 rounded-lg bg-blue-600 px-3 text-xs font-black text-white active:scale-[0.98]"
                     >
                       입금매칭
                     </button>
@@ -218,7 +201,7 @@ export default function AdminTodayWorkQueue({
                     <button
                       type="button"
                       onClick={onGoShipping}
-                      className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs font-black text-neutral-700 active:scale-[0.98]"
+                      className="h-9 rounded-lg border border-neutral-300 bg-white px-3 text-xs font-black text-neutral-700 active:scale-[0.98]"
                     >
                       송장관리
                     </button>
@@ -242,5 +225,31 @@ export default function AdminTodayWorkQueue({
         />
       </div>
     </section>
+  );
+}
+
+function InfoLine({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  tone?: "neutral" | "emerald" | "blue";
+}) {
+  const valueClass =
+    tone === "emerald"
+      ? "text-emerald-700"
+      : tone === "blue"
+        ? "text-blue-700"
+        : "text-neutral-700";
+
+  return (
+    <div className="grid grid-cols-[58px_minmax(0,1fr)] items-center gap-2">
+      <span className="text-neutral-400">{label}</span>
+      <span className={`truncate text-right font-black ${valueClass}`}>
+        {value}
+      </span>
+    </div>
   );
 }
