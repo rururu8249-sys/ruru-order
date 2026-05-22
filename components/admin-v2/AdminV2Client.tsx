@@ -1877,6 +1877,25 @@ function FilterBar({
   );
 }
 
+function getAppliedShippingFeeText(group: OrderGroup) {
+  const rows = group.rows || [];
+
+  const picked =
+    rows.find((row) => {
+      const adjusted = Number(row.adjusted_shipping_fee ?? 0);
+      const base = Number(row.shipping_fee ?? 0);
+      return adjusted > 0 || base > 0;
+    }) || group.first;
+
+  const applied = Number(
+    picked.adjusted_shipping_fee ??
+    picked.shipping_fee ??
+    0
+  );
+
+  return applied > 0 ? money(applied) : "0원";
+}
+
 function OrderWorkTable({
   groups,
   moneyEditLogs,
