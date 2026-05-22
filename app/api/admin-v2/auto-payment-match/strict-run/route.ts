@@ -76,7 +76,11 @@ function orderStatusText(order: AnyRow) {
 function isPaidOrder(order: AnyRow) {
   const status = orderStatusText(order);
 
-  return /자동입금확인|수동입금확인|입금확인|결제완료|카드결제완료|카드완료|출고대기|출고완료|배송완료|완료|paid|confirmed|complete/i.test(
+  // 중요:
+  // order_status의 "주문완료"는 고객이 주문서를 제출했다는 뜻이지,
+  // 입금확인이 완료됐다는 뜻이 아닙니다.
+  // 그래서 "완료" 단어 전체 매칭은 금지합니다.
+  return /자동입금확인|수동입금확인|입금확인|결제완료|카드결제완료|카드완료|출고대기|출고완료|배송완료|paid|confirmed|complete/i.test(
     status
   );
 }
@@ -157,9 +161,9 @@ function buildOrderPatch(order: AnyRow, deposit: AnyRow) {
   const now = new Date().toISOString();
   const patch: AnyRow = {};
 
-  if (hasColumn(order, "admin_order_status_v2")) patch.admin_order_status_v2 = "결제완료(무통장)";
-  if (hasColumn(order, "order_manage_status")) patch.order_manage_status = "결제완료(무통장)";
-  if (hasColumn(order, "payment_status")) patch.payment_status = "결제완료(무통장)";
+  if (hasColumn(order, "admin_order_status_v2")) patch.admin_order_status_v2 = "자동입금확인";
+  if (hasColumn(order, "order_manage_status")) patch.order_manage_status = "자동입금확인";
+  if (hasColumn(order, "payment_status")) patch.payment_status = "자동입금확인";
   if (hasColumn(order, "deposit_status")) patch.deposit_status = "자동입금확인";
   if (hasColumn(order, "payment_confirm_status")) patch.payment_confirm_status = "자동입금확인";
   if (hasColumn(order, "payment_confirm_type")) patch.payment_confirm_type = "자동입금확인";
