@@ -15,6 +15,7 @@ type AdminOrderMainRowProps = {
   customerLine: string;
   itemSummary: string;
   amountNode: ReactNode;
+  shippingFeeText: string;
   paymentNode: ReactNode;
   statusNode: ReactNode;
   detailNode: ReactNode;
@@ -47,6 +48,7 @@ export default function AdminOrderMainRow({
   customerLine,
   itemSummary,
   amountNode,
+  shippingFeeText,
   paymentNode,
   statusNode,
   detailNode,
@@ -57,6 +59,10 @@ export default function AdminOrderMainRow({
   return (
     <div className={`grid w-full ${ADMIN_ORDER_GRID} border-t border-neutral-100 bg-white px-5 py-3.5 text-[14px] first:border-t-0 hover:bg-neutral-50 lg:items-center`}>
       <div className="flex justify-center px-1">{selectNode}</div>
+
+      <div className="min-w-0 px-2">
+        <div className="flex w-full justify-center">{paymentNode}</div>
+      </div>
 
       <div className="min-w-0 px-2 text-center">
         <div className="truncate font-black text-neutral-700" title={orderCode}>
@@ -91,19 +97,11 @@ export default function AdminOrderMainRow({
       </div>
 
       <div className="min-w-0 px-2 text-center">
-        <span className="text-[13px] font-black text-neutral-700">-</span>
-      </div>
-
-      <div className="min-w-0 px-2">
-        <div className="flex w-full justify-center">{paymentNode}</div>
+        <span className="text-[13px] font-black text-neutral-800">{shippingFeeText}</span>
       </div>
 
       <div className="min-w-0 px-2">
         <div className="flex w-full justify-center">{statusNode}</div>
-      </div>
-
-      <div className="min-w-0 px-2 text-center">
-        <span className="text-[13px] font-black text-neutral-700">-</span>
       </div>
 
       <div className="min-w-0 px-2">

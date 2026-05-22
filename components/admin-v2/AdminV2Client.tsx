@@ -495,6 +495,7 @@ export function AdminV2Client() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
+  const [sortOption, setSortOption] = useState<string>("created_desc");
   const [detailDrawerGroupId, setDetailDrawerGroupId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [manualMatchGroup, setManualMatchGroup] = useState<OrderGroup | null>(null);
@@ -604,7 +605,7 @@ export function AdminV2Client() {
   const filteredOrderGroups = useMemo(() => {
     const word = keyword.trim().toLowerCase();
 
-    return orderGroups.filter((group) => {
+    const filtered = orderGroups.filter((group) => {
       const status = getOrderStatusValue(group.first);
       const payment = group.first.payment_method || "미설정";
       const selectedStatusFilters = statusFilter
@@ -684,7 +685,27 @@ export function AdminV2Client() {
 
       return matchStatus && matchPayment && matchDate && (!word || target.includes(word));
     });
-  }, [orderGroups, keyword, statusFilter, paymentFilter, dateFilter]);
+
+    return [...filtered].sort((a, b) => {
+      if (sortOption === "created_asc") {
+        return new Date(a.first.created_at || 0).getTime() - new Date(b.first.created_at || 0).getTime();
+      }
+
+      if (sortOption === "amount_desc") {
+        return Number(b.totalAmount || 0) - Number(a.totalAmount || 0);
+      }
+
+      if (sortOption === "amount_asc") {
+        return Number(a.totalAmount || 0) - Number(b.totalAmount || 0);
+      }
+
+      if (sortOption === "nickname_asc") {
+        return String(a.first.youtube_nickname || "").localeCompare(String(b.first.youtube_nickname || ""), "ko");
+      }
+
+      return new Date(b.first.created_at || 0).getTime() - new Date(a.first.created_at || 0).getTime();
+    });
+  }, [orderGroups, keyword, statusFilter, paymentFilter, dateFilter, sortOption]);
 
   const rosenShippingOrderGroups = useMemo(() => {
     const isRangeDateFilter = String(dateFilter || "").startsWith("range:");
@@ -1453,7 +1474,7 @@ export function AdminV2Client() {
                     <div>
                       <div className="flex items-end gap-3">
                         <h1 className="text-[30px] font-black tracking-[-0.04em] text-neutral-950">주문관리</h1>
-                        <div className="pb-1 text-[14px] font-bold text-neutral-500">주문 목록 · 결제상태 · 송장 내보내기</div>
+                        <div className="pb-1 text-[14px] font-bold text-neutral-500">주문 목록 · 주문상태 · 송장 내보내기</div>
                       </div>
                     </div>
 
@@ -1477,6 +1498,8 @@ export function AdminV2Client() {
                     dateFilter={dateFilter}
                     setDateFilter={setDateFilter}
                     dateOptions={dateOptions}
+                    sortOption={sortOption}
+                    setSortOption={setSortOption}
                   />
 
                   <div className="min-w-0">
@@ -1820,6 +1843,8 @@ function FilterBar({
   dateFilter,
   setDateFilter,
   dateOptions,
+  sortOption,
+  setSortOption,
 }: {
   pendingKeyword: string;
   setPendingKeyword: (value: string) => void;
@@ -1830,7 +1855,9 @@ function FilterBar({
   setPaymentFilter: (value: string) => void;
   dateFilter: string;
   setDateFilter: (value: string) => void;
-  dateOptions: Array<{ value: string; label: string }>;
+  dateOptions: { value: string; label: string }[];
+  sortOption: string;
+  setSortOption: (value: string) => void;
 }) {
   return (
     <AdminOrderFilterBar
@@ -1844,28 +1871,9 @@ function FilterBar({
       dateFilter={dateFilter}
       setDateFilter={setDateFilter}
       dateOptions={dateOptions}
+      sortOption={sortOption}
+      setSortOption={setSortOption}
     />
-  );
-}
-function OperationSummary({
-  buyerRanking,
-  productRanking,
-  onMore,
-}: {
-  buyerRanking: Array<{ name: string; amount: number; count: number }>;
-  productRanking: Array<{ name: string; qty: number; amount: number }>;
-  onMore: () => void;
-}) {
-  return (
-    <aside className="grid content-start gap-2">
-      <SidePanel title="👑 최대구매자 랭킹" onMore={onMore}>
-        <RankingList items={buyerRanking.map((item) => ({ title: item.name, sub: `${item.count}건`, right: money(item.amount) }))} />
-      </SidePanel>
-
-      <SidePanel title="👍 많이 팔린 상품" onMore={onMore}>
-        <RankingList items={productRanking.map((item) => ({ title: item.name, sub: "", right: `${item.qty}개` }))} />
-      </SidePanel>
-    </aside>
   );
 }
 
@@ -1995,6 +2003,7 @@ function OrderWorkTable({
                   warningText={groupMoneyLogs.length > 0 ? `금액수정 ${groupMoneyLogs.length}건` : ""}
                 />
               }
+              shippingFeeText={getAppliedShippingFeeText(group)}
               paymentNode={
                 <AdminOrderPaymentCell
                   paymentMethod={group.first.payment_method || "-"}

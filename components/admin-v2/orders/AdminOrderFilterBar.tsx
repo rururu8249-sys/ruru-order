@@ -20,6 +20,8 @@ type AdminOrderFilterBarProps = {
   dateFilter: string;
   setDateFilter: (value: string) => void;
   dateOptions: Option[];
+  sortOption: string;
+  setSortOption: (value: string) => void;
 };
 
 type ChipOption = {
@@ -48,11 +50,6 @@ const PAYMENT_OPTIONS: ChipOption[] = [
   { value: "unpaid", label: "미결제" },
 ];
 
-const METHOD_OPTIONS: ChipOption[] = [
-  { value: "all", label: "전체" },
-  { value: "bank", label: "무통장입금" },
-  { value: "card", label: "카드결제" },
-];
 
 function splitFilter(value: string) {
   const parts = String(value || "all")
@@ -181,6 +178,8 @@ export default function AdminOrderFilterBar({
   dateFilter,
   setDateFilter,
   dateOptions,
+  sortOption,
+  setSortOption,
 }: AdminOrderFilterBarProps) {
   void dateOptions;
 
@@ -290,9 +289,9 @@ export default function AdminOrderFilterBar({
           </button>
         </div>
 
-        <div className="grid gap-4 border-t border-neutral-100 pt-4 xl:grid-cols-[1fr_1fr_1fr_1fr]">
+        <div className="grid gap-4 border-t border-neutral-100 pt-4 xl:grid-cols-[1fr_1fr_1fr]">
           <div>
-            <div className="mb-2 text-[12px] font-black text-neutral-500">결제상태</div>
+            <div className="mb-2 text-[12px] font-black text-neutral-500">주문상태</div>
             <div className="flex flex-wrap gap-1.5">
               {PAYMENT_OPTIONS.map((option) => (
                 <FilterChip
@@ -306,7 +305,7 @@ export default function AdminOrderFilterBar({
           </div>
 
           <div>
-            <div className="mb-2 text-[12px] font-black text-neutral-500">주문상태</div>
+            <div className="mb-2 text-[12px] font-black text-neutral-500">배송처리</div>
             <div className="flex flex-wrap gap-1.5">
               {STATUS_OPTIONS.map((option) => (
                 <FilterChip
@@ -319,28 +318,19 @@ export default function AdminOrderFilterBar({
             </div>
           </div>
 
-          <div>
-            <div className="mb-2 text-[12px] font-black text-neutral-500">입금방법</div>
-            <div className="flex flex-wrap gap-1.5">
-              {METHOD_OPTIONS.map((option) => (
-                <FilterChip
-                  key={option.value}
-                  active={hasActive(paymentFilter, option.value)}
-                  label={option.label}
-                  onClick={() => setPaymentFilter(toggleMultiValue(paymentFilter, option.value))}
-                />
-              ))}
-            </div>
-          </div>
 
           <div>
             <div className="mb-2 text-[12px] font-black text-neutral-500">정렬</div>
-            <select className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3 text-[14px] font-black outline-none focus:border-neutral-950">
-              <option>주문일시 최신순</option>
-              <option>주문일시 오래된순</option>
-              <option>금액 높은순</option>
-              <option>금액 낮은순</option>
-              <option>닉네임 가나다순</option>
+            <select
+              value={sortOption}
+              onChange={(event) => setSortOption(event.target.value)}
+              className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3 text-[14px] font-black outline-none focus:border-neutral-950"
+            >
+              <option value="created_desc">주문일시 최신순</option>
+              <option value="created_asc">주문일시 오래된순</option>
+              <option value="amount_desc">금액 높은순</option>
+              <option value="amount_asc">금액 낮은순</option>
+              <option value="nickname_asc">닉네임 가나다순</option>
             </select>
           </div>
         </div>
