@@ -204,10 +204,18 @@ export default function ManualPaymentMatchDrawer(props: Props) {
       });
 
       if (!runResponse.ok) {
-        await fetch("/api/admin-v2/auto-payment-match/run", {
+        const runError = await runResponse.json().catch(() => null);
+        console.warn("[manual-drawer] strict auto payment run failed", runError);
+
+        const fallbackResponse = await fetch("/api/admin-v2/auto-payment-match/run", {
           method: "POST",
           cache: "no-store",
         });
+
+        if (!fallbackResponse.ok) {
+          const fallbackError = await fallbackResponse.json().catch(() => null);
+          console.warn("[manual-drawer] strict auto payment fallback failed", fallbackError);
+        }
       }
     } catch {
       // 엄격 자동입금확인 실패 시에도 수동매칭은 계속 가능해야 합니다.
@@ -219,6 +227,8 @@ export default function ManualPaymentMatchDrawer(props: Props) {
 
     try {
       await refreshBankdaAndRunStrictAutoMatch();
+      window.dispatchEvent(new CustomEvent("ruru:admin-today-refresh"));
+
       const response = await fetch("/api/admin-v2/deposits", {
         method: "GET",
         cache: "no-store",
