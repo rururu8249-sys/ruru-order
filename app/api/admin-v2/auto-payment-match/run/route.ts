@@ -100,6 +100,25 @@ function orderStatusText(order: AnyRow) {
     .join(" / ");
 }
 
+function isBankPaymentMethod(value: unknown) {
+  const method = text(value || "무통장입금");
+
+  if (!method) return true;
+
+  const normalized = method.replace(/\s+/g, "").toLowerCase();
+
+  return (
+    normalized === "무통장입금" ||
+    normalized === "무통장" ||
+    normalized === "계좌이체" ||
+    normalized === "계좌입금" ||
+    normalized === "bank" ||
+    normalized === "banktransfer" ||
+    normalized.includes("무통장") ||
+    normalized.includes("계좌")
+  );
+}
+
 function isEligibleOrder(order: AnyRow) {
   const nickname = orderNickname(order);
   const amount = orderAmount(order);
@@ -111,8 +130,8 @@ function isEligibleOrder(order: AnyRow) {
   if (!nickname) return { ok: false, reason: "유튜브 닉네임 없음" };
   if (!amount || amount <= 0) return { ok: false, reason: "입금예정금액 없음" };
 
-  if (method && method !== "무통장입금") {
-    return { ok: false, reason: `무통장입금 주문 아님: ${method}` };
+  if (!isBankPaymentMethod(method)) {
+    return { ok: false, reason: `무통장 주문 아님: ${method}` };
   }
 
   if (

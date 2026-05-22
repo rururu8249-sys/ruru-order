@@ -129,6 +129,25 @@ function key(name: string, amount: number) {
   return `${name}__${amount}`;
 }
 
+function isBankPaymentMethod(value: unknown) {
+  const method = text(value || "무통장입금");
+
+  if (!method) return true;
+
+  const normalized = method.replace(/\s+/g, "").toLowerCase();
+
+  return (
+    normalized === "무통장입금" ||
+    normalized === "무통장" ||
+    normalized === "계좌이체" ||
+    normalized === "계좌입금" ||
+    normalized === "bank" ||
+    normalized === "banktransfer" ||
+    normalized.includes("무통장") ||
+    normalized.includes("계좌")
+  );
+}
+
 function checkOrder(order: AnyRow) {
   const id = orderId(order);
   const name = orderName(order);
