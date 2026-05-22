@@ -18,13 +18,13 @@ export default function ManualPaymentDepositRow({ deposit, selected, tag, timeLa
       type="button"
       onClick={onToggle}
       className={[
-        "grid w-full grid-cols-[34px_1fr_120px_92px] items-center gap-3 border-b border-slate-100 px-4 py-3 text-left transition active:scale-[0.995]",
+        "grid w-full grid-cols-[32px_1fr_96px_76px] items-center gap-2 border-b border-slate-100 px-3 py-2.5 text-left transition active:scale-[0.995]",
         selected ? "bg-blue-50" : "bg-white hover:bg-slate-50",
       ].join(" ")}
     >
       <div
         className={[
-          "flex h-6 w-6 items-center justify-center rounded-lg border text-xs font-black",
+          "flex h-6 w-6 items-center justify-center rounded-xl border text-xs font-black",
           selected ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 text-transparent",
         ].join(" ")}
       >
@@ -33,14 +33,16 @@ export default function ManualPaymentDepositRow({ deposit, selected, tag, timeLa
 
       <div className="min-w-0">
         <div className="truncate text-sm font-black text-slate-950">{deposit.depositor_name || "-"}</div>
-        <div className="mt-0.5 text-xs font-bold text-slate-400">{timeLabel}</div>
+        <div className="mt-0.5 text-xs font-bold text-slate-400">입금일시 {timeLabel}</div>
       </div>
 
-      <div className="text-right text-sm font-black text-slate-950">{money(deposit.amount)}</div>
+      <div className="text-right text-sm font-black tracking-[-0.03em] text-slate-950">
+        {money(deposit.amount)}
+      </div>
 
       <div
         className={[
-          "rounded-full px-2 py-1 text-center text-xs font-black",
+          "rounded-full px-2 py-1 text-center text-[11px] font-black",
           tag === "추천"
             ? "bg-blue-100 text-blue-700"
             : tag === "금액일치"
