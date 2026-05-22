@@ -1,7 +1,7 @@
 "use client";
 
 // components/admin-v2/today/AdminTodayPersistentTasks.tsx
-// 목적: 직접 등록한 카톡/고객/운영 이슈를 해결 전까지 표시하고 완료 이력도 확인
+// 목적: 직접 등록한 고객 이슈를 해결 전까지 표시하고 완료 이력도 확인
 // 주의: 주문/입금/배송/정산 상태 변경 없음. admin_tasks만 조회/완료 처리.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -113,7 +113,7 @@ export default function AdminTodayPersistentTasks() {
   }, [baseTasks, activeFilter, searchText]);
 
   const resolveTask = async (task: AdminTaskRow, note = "") => {
-    const ok = window.confirm(`오늘할일을 완료 처리할까요?\n\n${task.title}`);
+    const ok = window.confirm(`고객 이슈를 해결완료 처리할까요?\n\n${task.title}`);
 
     if (!ok) return;
 
@@ -123,12 +123,12 @@ export default function AdminTodayPersistentTasks() {
         status: "done",
         resolved_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        resolved_note: note.trim() || "관리자 완료 처리",
+        resolved_note: note.trim() || "관리자 해결완료 처리",
       })
       .eq("id", task.id);
 
     if (error) {
-      alert("완료 처리 실패\n\n" + error.message);
+      alert("해결완료 처리 실패\n\n" + error.message);
       return;
     }
 
@@ -139,18 +139,26 @@ export default function AdminTodayPersistentTasks() {
   const emptyText =
     viewMode === "open"
       ? "처리 대기 고객 이슈가 없습니다."
-      : "완료된 업무 이력이 없습니다.";
+      : "완료된 고객 이슈 이력이 없습니다.";
 
   return (
     <>
       <section className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
           <div>
-            <h2 className="text-lg font-black tracking-[-0.04em] text-neutral-950">
-              고객 이슈 처리 큐
-            </h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-lg font-black tracking-[-0.04em] text-neutral-950">
+                고객 이슈 큐
+              </h2>
+              <span className="rounded-full bg-orange-50 px-2.5 py-1 text-[11px] font-black text-orange-700">
+                미해결 {openTasks.length.toLocaleString()}건
+              </span>
+              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-700">
+                완료 {resolvedTasks.length.toLocaleString()}건
+              </span>
+            </div>
             <p className="mt-1 text-xs font-bold text-neutral-500">
-              카톡/고객대화에서 등록한 반품·교환·환불·배송 이슈를 완료 전까지 표시합니다.
+              불량·교환·환불·배송·주소확인 이슈는 해결 전까지 계속 표시합니다.
             </p>
           </div>
 
@@ -174,7 +182,7 @@ export default function AdminTodayPersistentTasks() {
           }}
         />
 
-        <div className="mb-3 flex flex-wrap gap-2">
+        <div className="mb-3 flex flex-wrap gap-1.5">
           {ADMIN_TASK_FILTERS.map((filter) => {
             const isActive = activeFilter === filter.value;
             const count = counts[filter.value] || 0;
@@ -184,7 +192,7 @@ export default function AdminTodayPersistentTasks() {
                 key={filter.value}
                 type="button"
                 onClick={() => setActiveFilter(filter.value)}
-                className={`rounded-full px-3 py-2 text-xs font-black active:scale-[0.98] ${
+                className={`rounded-full px-2.5 py-1.5 text-[11px] font-black active:scale-[0.98] ${
                   isActive
                     ? "bg-neutral-950 text-white"
                     : "border border-neutral-200 bg-white text-neutral-600"
@@ -200,8 +208,8 @@ export default function AdminTodayPersistentTasks() {
           <input
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
-            placeholder="업무, 고객명, 닉네임, 상품명, 메모 검색"
-            className="h-11 w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 text-sm font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100/70"
+            placeholder="고객명, 닉네임, 주문번호, 상품명, 메모 검색"
+            className="h-10 w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 text-sm font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100/70"
           />
         </div>
 
@@ -213,7 +221,7 @@ export default function AdminTodayPersistentTasks() {
 
         {loading ? (
           <div className="rounded-2xl bg-neutral-50 p-4 text-center text-sm font-black text-neutral-400">
-            업무 불러오는 중...
+            고객 이슈 불러오는 중...
           </div>
         ) : null}
 
@@ -225,12 +233,12 @@ export default function AdminTodayPersistentTasks() {
 
         {!loading && !errorText && baseTasks.length > 0 && filteredTasks.length === 0 ? (
           <div className="rounded-2xl bg-neutral-50 p-4 text-center text-sm font-black text-neutral-400">
-            현재 조건에 맞는 업무가 없습니다.
+            현재 조건에 맞는 고객 이슈가 없습니다.
           </div>
         ) : null}
 
         {!loading && !errorText && filteredTasks.length > 0 ? (
-          <div className="grid max-h-[300px] gap-2 overflow-y-auto pr-1">
+          <div className="grid max-h-[520px] gap-2 overflow-y-auto pr-1">
             {filteredTasks.map((task) => (
               <AdminTodayTaskCard
                 key={task.id}
@@ -242,6 +250,10 @@ export default function AdminTodayPersistentTasks() {
             ))}
           </div>
         ) : null}
+
+        <div className="mt-3 rounded-2xl bg-neutral-50 px-3 py-2 text-[11px] font-bold text-neutral-400">
+          해결완료 처리된 이슈는 완료 이력으로 이동합니다.
+        </div>
       </section>
 
       <AdminTodayTaskDetailDrawer
