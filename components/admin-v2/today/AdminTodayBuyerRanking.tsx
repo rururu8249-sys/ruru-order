@@ -40,7 +40,7 @@ export default function AdminTodayBuyerRanking({
   }, [items]);
 
   return (
-    <section className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
+    <section className="flex h-full min-h-[520px] flex-col rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div>
           <h2 className="text-lg font-black tracking-[-0.04em] text-neutral-950">
@@ -59,7 +59,7 @@ export default function AdminTodayBuyerRanking({
         </button>
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid flex-1 content-start gap-2">
         {ranking.length === 0 ? (
           <div className="rounded-2xl bg-neutral-50 p-4 text-center text-sm font-black text-neutral-400">
             랭킹 데이터가 없습니다.

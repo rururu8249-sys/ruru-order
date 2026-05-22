@@ -240,7 +240,7 @@ export default function AdminTodayDashboard({
         }
       />
 
-      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_440px] 2xl:items-start">
+      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_440px] 2xl:items-stretch">
         <main className="grid min-w-0 gap-4">
           <AdminTodayCollapsiblePanel
             title="유튜브 LIVE 채팅"
@@ -272,8 +272,8 @@ export default function AdminTodayDashboard({
         </aside>
       </div>
 
-      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_440px] 2xl:items-start">
-        <div className="min-w-0">
+      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_440px] 2xl:items-stretch">
+        <div className="min-w-0 2xl:h-full">
           <AdminTodayWorkQueue
           activeTab={activeWorkTab}
           setActiveTab={setActiveWorkTab}
@@ -287,7 +287,7 @@ export default function AdminTodayDashboard({
         />
         </div>
 
-        <aside className="min-w-0">
+        <aside className="min-w-0 2xl:h-full">
           <AdminTodayBuyerRanking items={allWorkItems} />
         </aside>
       </div>

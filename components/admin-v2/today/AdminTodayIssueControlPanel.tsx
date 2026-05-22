@@ -28,7 +28,7 @@ export default function AdminTodayIssueControlPanel({
   const [activeTab, setActiveTab] = useState<IssuePanelTab>("queue");
 
   return (
-    <section className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
+    <section className="flex h-[760px] min-h-[760px] max-h-[760px] flex-col overflow-hidden rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm 2xl:h-full 2xl:min-h-[760px] 2xl:max-h-none">
       <div className="mb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>

@@ -60,7 +60,7 @@ export default function AdminTodayWorkQueue({
     return items.filter((item) => matchesTodayWorkQueueSearch(item, appliedKeyword));
   }, [items, appliedKeyword]);
 
-  const pageSize = 8;
+  const pageSize = 5;
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
 
   useEffect(() => {
@@ -81,7 +81,7 @@ export default function AdminTodayWorkQueue({
   };
 
   return (
-    <section className="rounded-xl border border-neutral-200 bg-white shadow-sm">
+    <section className="flex h-full min-h-[520px] flex-col rounded-xl border border-neutral-200 bg-white shadow-sm">
       <div className="grid gap-3 border-b border-neutral-200 p-3 xl:grid-cols-[minmax(210px,0.55fr)_minmax(520px,1fr)_minmax(390px,0.85fr)] xl:items-center">
         <div className="min-w-0">
           <h2 className="text-lg font-black tracking-[-0.04em] text-neutral-950">
