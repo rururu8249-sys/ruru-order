@@ -177,7 +177,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    if (action !== "resolve") {
+    if (!["resolve", "hide"].includes(action)) {
       return NextResponse.json(
         { ok: false, message: "지원하지 않는 처리 방식입니다." },
         { status: 400 }
@@ -186,14 +186,23 @@ export async function PATCH(request: NextRequest) {
 
     const nowIso = new Date().toISOString();
 
+    const updatePayload =
+      action === "hide"
+        ? {
+            status: "deleted",
+            updated_at: nowIso,
+            resolved_note: resolvedNote || "관리자 숨김삭제 처리",
+          }
+        : {
+            status: "done",
+            resolved_at: nowIso,
+            updated_at: nowIso,
+            resolved_note: resolvedNote || "관리자 해결완료 처리",
+          };
+
     const { data, error } = await supabase
       .from("admin_tasks")
-      .update({
-        status: "done",
-        resolved_at: nowIso,
-        updated_at: nowIso,
-        resolved_note: resolvedNote || "관리자 해결완료 처리",
-      })
+      .update(updatePayload)
       .eq("id", id)
       .select("*")
       .single();
