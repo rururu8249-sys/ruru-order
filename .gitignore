@@ -42,3 +42,4 @@ next-env.d.ts
 
 # local safety backups
 .backup_*/
+.env.vercel.production
