@@ -383,7 +383,7 @@ export default function AdminLiveDashboard() {
             onSaveBroadcast={saveBroadcast}
           />
           <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
-          <LiveBroadcastPanels videoRatio={videoRatio} />
+          <LiveBroadcastPanels videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} />
 
           {loadError && (
             <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700">

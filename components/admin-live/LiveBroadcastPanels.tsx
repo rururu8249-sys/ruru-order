@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { issueNotes, liveChatMessages } from "./mockData";
+import { useEffect, useMemo, useState } from "react";
+import { issueNotes } from "./mockData";
 
 type IssueStatusFilter = "open" | "all" | "resolved";
 type VideoRatio = "vertical" | "wide" | "auto";
 
 type Props = {
   videoRatio: VideoRatio;
+  youtubeUrl?: string | null;
 };
 
 type IssueNote = {
@@ -38,10 +39,48 @@ function videoSizeClass(videoRatio: VideoRatio) {
   return "aspect-[9/16] h-[330px] w-auto";
 }
 
-export default function LiveBroadcastPanels({ videoRatio }: Props) {
+function extractYoutubeVideoId(rawUrl?: string | null) {
+  const value = String(rawUrl || "").trim();
+  if (!value) return "";
+
+  try {
+    const url = new URL(value);
+
+    if (url.hostname.includes("youtu.be")) {
+      return url.pathname.replace("/", "").split("?")[0];
+    }
+
+    const watchId = url.searchParams.get("v");
+    if (watchId) return watchId;
+
+    const pathParts = url.pathname.split("/").filter(Boolean);
+    const liveIndex = pathParts.indexOf("live");
+    if (liveIndex >= 0 && pathParts[liveIndex + 1]) return pathParts[liveIndex + 1];
+
+    const embedIndex = pathParts.indexOf("embed");
+    if (embedIndex >= 0 && pathParts[embedIndex + 1]) return pathParts[embedIndex + 1];
+
+    return "";
+  } catch {
+    const match = value.match(/(?:v=|youtu\.be\/|live\/|embed\/)([a-zA-Z0-9_-]{6,})/);
+    return match?.[1] || "";
+  }
+}
+
+export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
   const [showMemoAdd, setShowMemoAdd] = useState(false);
   const [statusFilter, setStatusFilter] = useState<IssueStatusFilter>("open");
   const [notes, setNotes] = useState<IssueNote[]>(issueNotes);
+  const [embedDomain, setEmbedDomain] = useState("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setEmbedDomain(window.location.hostname);
+  }, []);
+
+  const videoId = useMemo(() => extractYoutubeVideoId(youtubeUrl), [youtubeUrl]);
+  const videoEmbedUrl = videoId ? `https://www.youtube.com/embed/${videoId}?playsinline=1&rel=0` : "";
+  const chatEmbedUrl = videoId && embedDomain ? `https://www.youtube.com/live_chat?v=${videoId}&embed_domain=${embedDomain}` : "";
 
   const filteredNotes = useMemo(() => {
     if (statusFilter === "all") return notes;
@@ -65,27 +104,23 @@ export default function LiveBroadcastPanels({ videoRatio }: Props) {
 
         <div className="flex h-[360px] items-center justify-center rounded-2xl bg-slate-100 p-2">
           <div className={`relative overflow-hidden rounded-[1.5rem] bg-slate-950 shadow-sm ${videoSizeClass(videoRatio)}`}>
-            <div className="absolute left-4 top-4 z-10 rounded-md bg-red-600 px-2 py-1 text-xs font-black text-white">
-              LIVE
-            </div>
-
-            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-amber-100 via-stone-100 to-slate-100">
-              <div className="w-[78%] rounded-[2rem] bg-white/70 p-6 text-center shadow-sm backdrop-blur">
-                <div className="text-5xl">👟</div>
-                <div className="mt-4 text-lg font-black text-slate-900">루루동이LIVE</div>
-                <div className="mt-2 text-xs font-bold text-slate-500">유튜브 라이브 영상 영역</div>
+            {videoEmbedUrl ? (
+              <iframe
+                title="YouTube live video"
+                src={videoEmbedUrl}
+                className="h-full w-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-amber-100 via-stone-100 to-slate-100">
+                <div className="w-[78%] rounded-[2rem] bg-white/70 p-6 text-center shadow-sm backdrop-blur">
+                  <div className="text-5xl">👟</div>
+                  <div className="mt-4 text-lg font-black text-slate-900">루루동이LIVE</div>
+                  <div className="mt-2 text-xs font-bold text-slate-500">유튜브 라이브 URL을 적용하면 영상이 표시됩니다.</div>
+                </div>
               </div>
-            </div>
-
-            <div className="absolute bottom-0 left-0 right-0 flex items-center gap-2 bg-black/70 px-3 py-2 text-white">
-              <span className="text-base">Ⅱ</span>
-              <span>🔊</span>
-              <div className="h-1 flex-1 rounded-full bg-white/25">
-                <div className="h-1 w-[54%] rounded-full bg-red-500" />
-              </div>
-              <span className="text-[11px] font-black text-red-400">● LIVE</span>
-              <span>⚙</span>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -93,27 +128,28 @@ export default function LiveBroadcastPanels({ videoRatio }: Props) {
       <div className="col-span-12 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-black text-slate-950">라이브 채팅</h2>
-          <span className="text-xs font-bold text-slate-500">👥 487</span>
+          <span className="text-xs font-bold text-slate-500">{chatEmbedUrl ? "YouTube Chat" : "URL 대기"}</span>
         </div>
 
-        <div className="h-[292px] space-y-1.5 overflow-y-auto pr-1">
-          {liveChatMessages.map(([name, message, time]) => (
-            <div key={`${name}-${time}`} className="grid grid-cols-[28px_1fr_52px] items-start gap-2 text-xs">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-[11px] font-black text-slate-500">
-                {name.slice(0, 1)}
+        <div className="h-[346px] overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
+          {chatEmbedUrl ? (
+            <iframe
+              title="YouTube live chat"
+              src={chatEmbedUrl}
+              className="h-full w-full bg-white"
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center p-6 text-center">
+              <div>
+                <div className="text-4xl">💬</div>
+                <div className="mt-3 text-sm font-black text-slate-700">라이브 채팅 연결 대기</div>
+                <div className="mt-2 text-xs font-bold leading-5 text-slate-400">
+                  방송 시작 후 유튜브 라이브 URL을 입력하고 적용하면<br />
+                  이 영역에 실제 채팅창이 표시됩니다.
+                </div>
               </div>
-              <div className="min-w-0">
-                <span className="mr-2 font-black text-slate-800">{name}</span>
-                <span className="text-slate-600">{message}</span>
-              </div>
-              <div className="text-right text-[11px] font-bold text-slate-400">{time}</div>
             </div>
-          ))}
-        </div>
-
-        <div className="mt-4 flex h-10 items-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-400">
-          메시지를 입력하세요...
-          <span className="ml-auto">☺</span>
+          )}
         </div>
       </div>
 
@@ -257,7 +293,7 @@ export default function LiveBroadcastPanels({ videoRatio }: Props) {
             />
 
             <div className="mb-3 rounded-xl bg-slate-50 px-3 py-2 text-xs font-black text-slate-500">
-              메모날짜: 2026.05.23 20:41 자동입력
+              메모날짜 자동입력
             </div>
 
             <div className="flex gap-2">
