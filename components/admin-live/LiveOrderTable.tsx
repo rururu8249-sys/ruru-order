@@ -362,7 +362,7 @@ export default function LiveOrderTable({
               {option.label}
             </option>
           ))}
-          <option value="none">방송없음</option>
+          <option value="none">공구·상시주문</option>
         </select>
 
         <select

@@ -95,7 +95,7 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
   const parts: string[] = [];
 
   if (filters.broadcast === "all") parts.push("방송 전체보기");
-  else if (filters.broadcast === "none") parts.push("방송없음");
+  else if (filters.broadcast === "none") parts.push("공구·상시주문");
   else parts.push("선택 방송");
 
   const dateLabelMap: Record<LiveOrderFilters["date"], string> = {
