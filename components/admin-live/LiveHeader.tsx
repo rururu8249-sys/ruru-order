@@ -1,37 +1,65 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { AdminLiveBroadcast } from "./liveBroadcastController";
+import { formatBroadcastTime } from "./liveBroadcastController";
 
 type VideoRatio = "vertical" | "wide" | "auto";
 
 type Props = {
   videoRatio: VideoRatio;
   onVideoRatioChange: (value: VideoRatio) => void;
+  activeBroadcast: AdminLiveBroadcast | null;
+  savingBroadcast?: boolean;
+  onStartBroadcast: (input: { title: string; youtubeUrl?: string }) => Promise<void> | void;
+  onEndBroadcast: () => Promise<void> | void;
+  onSaveBroadcast: (input: { title: string; youtubeUrl?: string }) => Promise<void> | void;
 };
 
-function nowLabel() {
-  return new Date().toLocaleString("ko-KR", {
+function todayLabel() {
+  return new Date().toLocaleDateString("ko-KR", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
+    weekday: "long",
   });
 }
 
-export default function LiveHeader({ videoRatio, onVideoRatioChange }: Props) {
-  const [title, setTitle] = useState("루루동이LIVE 여름 신발 특가 라이브");
+export default function LiveHeader({
+  videoRatio,
+  onVideoRatioChange,
+  activeBroadcast,
+  savingBroadcast = false,
+  onStartBroadcast,
+  onEndBroadcast,
+  onSaveBroadcast,
+}: Props) {
+  const [title, setTitle] = useState("루루동이LIVE");
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [titleSavedAt, setTitleSavedAt] = useState("");
   const [urlAppliedAt, setUrlAppliedAt] = useState("");
-  const [startedAt, setStartedAt] = useState("");
-  const [endedAt, setEndedAt] = useState("");
+
+  useEffect(() => {
+    if (!activeBroadcast) return;
+
+    setTitle(activeBroadcast.public_title || "루루동이LIVE");
+    setYoutubeUrl(activeBroadcast.youtube_live_url || "");
+  }, [activeBroadcast?.id]);
 
   const statusLabel = useMemo(() => {
-    if (startedAt && !endedAt) return "LIVE";
-    if (startedAt && endedAt) return "종료";
+    if (activeBroadcast) return "LIVE";
     return "대기";
-  }, [startedAt, endedAt]);
+  }, [activeBroadcast]);
+
+  const saveCurrentBroadcast = async () => {
+    await onSaveBroadcast({ title, youtubeUrl });
+    setTitleSavedAt(new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }));
+  };
+
+  const applyYoutubeUrl = async () => {
+    await onSaveBroadcast({ title, youtubeUrl });
+    setUrlAppliedAt(new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }));
+  };
 
   return (
     <header className="mb-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
@@ -40,40 +68,32 @@ export default function LiveHeader({ videoRatio, onVideoRatioChange }: Props) {
 
         <div className="hidden h-7 w-px bg-slate-200 md:block" />
 
-        <div className="text-xs font-black text-slate-500">📅 2026.05.23 금요일</div>
+        <div className="text-xs font-black text-slate-500">📅 {todayLabel()}</div>
 
         <div
           className={[
             "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-black",
-            statusLabel === "LIVE"
-              ? "bg-emerald-50 text-emerald-700"
-              : statusLabel === "종료"
-                ? "bg-slate-100 text-slate-600"
-                : "bg-amber-50 text-amber-700",
+            statusLabel === "LIVE" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700",
           ].join(" ")}
         >
-          <span
-            className={[
-              "h-2 w-2 rounded-full",
-              statusLabel === "LIVE" ? "bg-emerald-500" : statusLabel === "종료" ? "bg-slate-400" : "bg-amber-500",
-            ].join(" ")}
-          />
+          <span className={["h-2 w-2 rounded-full", statusLabel === "LIVE" ? "bg-emerald-500" : "bg-amber-500"].join(" ")} />
           {statusLabel}
         </div>
 
         <div className="ml-auto flex items-center gap-2">
           <button
-            onClick={() => {
-              setStartedAt(nowLabel());
-              setEndedAt("");
-            }}
-            className="h-9 rounded-xl bg-emerald-600 px-5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700"
+            type="button"
+            disabled={savingBroadcast || Boolean(activeBroadcast)}
+            onClick={() => onStartBroadcast({ title, youtubeUrl })}
+            className="h-9 rounded-xl bg-emerald-600 px-5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:bg-slate-300"
           >
             ▶ 방송시작
           </button>
           <button
-            onClick={() => setEndedAt(nowLabel())}
-            className="h-9 rounded-xl bg-red-600 px-5 text-sm font-black text-white shadow-sm transition hover:bg-red-700"
+            type="button"
+            disabled={savingBroadcast || !activeBroadcast}
+            onClick={onEndBroadcast}
+            className="h-9 rounded-xl bg-red-600 px-5 text-sm font-black text-white shadow-sm transition hover:bg-red-700 disabled:bg-slate-300"
           >
             ■ 방송종료
           </button>
@@ -85,7 +105,7 @@ export default function LiveHeader({ videoRatio, onVideoRatioChange }: Props) {
           <div className="mb-1 flex items-center justify-between">
             <label className="text-[11px] font-black text-slate-500">방송 제목</label>
             <span className="text-[10px] font-bold text-slate-400">
-              {titleSavedAt ? `저장 ${titleSavedAt}` : "저장 필요"}
+              {titleSavedAt ? `저장 ${titleSavedAt}` : activeBroadcast ? "방송중" : "저장 필요"}
             </span>
           </div>
           <div className="flex gap-2">
@@ -95,8 +115,10 @@ export default function LiveHeader({ videoRatio, onVideoRatioChange }: Props) {
               className="h-9 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
             />
             <button
-              onClick={() => setTitleSavedAt(nowLabel())}
-              className="h-9 shrink-0 rounded-xl bg-slate-900 px-3 text-xs font-black text-white hover:bg-slate-700"
+              type="button"
+              disabled={savingBroadcast || !activeBroadcast}
+              onClick={saveCurrentBroadcast}
+              className="h-9 shrink-0 rounded-xl bg-slate-900 px-3 text-xs font-black text-white hover:bg-slate-700 disabled:bg-slate-300"
             >
               저장
             </button>
@@ -118,8 +140,10 @@ export default function LiveHeader({ videoRatio, onVideoRatioChange }: Props) {
               className="h-9 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
             />
             <button
-              onClick={() => setUrlAppliedAt(nowLabel())}
-              className="h-9 shrink-0 rounded-xl bg-blue-600 px-3 text-xs font-black text-white hover:bg-blue-700"
+              type="button"
+              disabled={savingBroadcast || !activeBroadcast}
+              onClick={applyYoutubeUrl}
+              className="h-9 shrink-0 rounded-xl bg-blue-600 px-3 text-xs font-black text-white hover:bg-blue-700 disabled:bg-slate-300"
             >
               적용
             </button>
@@ -142,10 +166,10 @@ export default function LiveHeader({ videoRatio, onVideoRatioChange }: Props) {
 
       <div className="mt-2 grid grid-cols-1 gap-1.5 text-[11px] font-black text-slate-500 md:grid-cols-3">
         <div className="rounded-lg bg-slate-50 px-3 py-1.5">
-          시작시간 <span className="ml-1 text-slate-900">{startedAt || "방송시작 전"}</span>
+          시작시간 <span className="ml-1 text-slate-900">{activeBroadcast?.started_at ? formatBroadcastTime(activeBroadcast.started_at) : "방송시작 전"}</span>
         </div>
         <div className="rounded-lg bg-slate-50 px-3 py-1.5">
-          종료시간 <span className="ml-1 text-slate-900">{endedAt || (startedAt ? "방송중" : "-")}</span>
+          종료시간 <span className="ml-1 text-slate-900">{activeBroadcast?.ended_at ? formatBroadcastTime(activeBroadcast.ended_at) : activeBroadcast ? "방송중" : "-"}</span>
         </div>
         <div className="rounded-lg bg-slate-50 px-3 py-1.5">
           주문묶음 <span className="ml-1 text-blue-700">방송 시작~종료 시간 기준</span>

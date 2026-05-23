@@ -9,6 +9,15 @@ import LiveStatsCards from "./LiveStatsCards";
 import LiveBroadcastPanels from "./LiveBroadcastPanels";
 import LiveOrderTable, { type LiveOrderFilters } from "./LiveOrderTable";
 import LiveOrderDetailDrawer from "./LiveOrderDetailDrawer";
+import {
+  endAdminLiveBroadcast,
+  getActiveBroadcast,
+  isOrderInsideBroadcastTime,
+  loadAdminLiveBroadcasts,
+  startAdminLiveBroadcast,
+  updateAdminLiveBroadcast,
+  type AdminLiveBroadcast,
+} from "./liveBroadcastController";
 import type { DepositRow, OrderGroup, OrderRow } from "@/lib/admin-v2/types";
 import type { LiveOrder } from "./types";
 import {
@@ -115,6 +124,8 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
 
 export default function AdminLiveDashboard() {
   const [orders, setOrders] = useState<LiveOrder[]>([]);
+  const [broadcasts, setBroadcasts] = useState<AdminLiveBroadcast[]>([]);
+  const [savingBroadcast, setSavingBroadcast] = useState(false);
   const [orderGroups, setOrderGroups] = useState<OrderGroup[]>([]);
   const [deposits, setDeposits] = useState<DepositRow[]>([]);
   const [manualMatchGroup, setManualMatchGroup] = useState<OrderGroup | null>(null);
@@ -139,6 +150,16 @@ export default function AdminLiveDashboard() {
     }
 
     setDeposits((result.deposits || []) as DepositRow[]);
+  };
+
+  const loadBroadcasts = async () => {
+    try {
+      const rows = await loadAdminLiveBroadcasts();
+      setBroadcasts(rows);
+    } catch (error) {
+      console.warn("[admin-live] 방송 목록 불러오기 실패", error);
+      setBroadcasts([]);
+    }
   };
 
   const loadOrders = async () => {
@@ -177,32 +198,39 @@ export default function AdminLiveDashboard() {
   useEffect(() => {
     void loadOrders();
     void loadDepositsFromServer();
+    void loadBroadcasts();
   }, []);
 
+  const activeBroadcast = useMemo(() => getActiveBroadcast(broadcasts), [broadcasts]);
+
   const broadcastOptions = useMemo(() => {
-    const map = new Map<string, string>();
-
-    orders.forEach((order) => {
-      if (!order.broadcastId) return;
-      map.set(order.broadcastId, order.broadcastName || `방송 ${order.broadcastId.slice(0, 8)}`);
-    });
-
-    return Array.from(map.entries()).map(([value, label]) => ({
-      value,
-      label: `방송: ${label}`,
+    const options = broadcasts.map((broadcast) => ({
+      value: broadcast.id,
+      label: `방송: ${broadcast.public_title || broadcast.admin_subtitle || broadcast.id.slice(0, 8)}`,
     }));
-  }, [orders]);
+
+    return activeBroadcast
+      ? [{ value: "current", label: "현재 방송" }, ...options]
+      : options;
+  }, [broadcasts, activeBroadcast]);
 
   const filteredOrders = useMemo(() => {
     const keyword = normalizeText(filters.keyword);
 
     return orders.filter((order) => {
+      const selectedBroadcast =
+        filters.broadcast === "current"
+          ? activeBroadcast
+          : broadcasts.find((broadcast) => broadcast.id === filters.broadcast) || null;
+
       const matchBroadcast =
         filters.broadcast === "all"
           ? true
           : filters.broadcast === "none"
             ? !order.broadcastId
-            : order.broadcastId === filters.broadcast;
+            : selectedBroadcast
+              ? order.broadcastId === selectedBroadcast.id || isOrderInsideBroadcastTime(order.createdAt, selectedBroadcast)
+              : false;
 
       const matchKeyword =
         !keyword ||
@@ -224,7 +252,7 @@ export default function AdminLiveDashboard() {
         matchKeyword
       );
     });
-  }, [orders, filters]);
+  }, [orders, filters, broadcasts, activeBroadcast]);
 
   useEffect(() => {
     if (!filteredOrders.length) {
@@ -258,6 +286,85 @@ export default function AdminLiveDashboard() {
     await loadDepositsFromServer();
   };
 
+  const startBroadcast = async (input: { title: string; youtubeUrl?: string }) => {
+    const ok = confirm(
+      [
+        "방송을 시작할까요?",
+        "",
+        "기존 ON 방송이 있으면 종료 처리되고, 새 방송이 ON으로 생성됩니다.",
+        "주문 필터는 방송 시작시간 기준으로 묶입니다.",
+      ].join("\n")
+    );
+
+    if (!ok) return;
+
+    setSavingBroadcast(true);
+
+    try {
+      await startAdminLiveBroadcast(input);
+      await loadBroadcasts();
+      await loadOrders();
+      setFilters((prev) => ({ ...prev, broadcast: "current" }));
+    } catch (error) {
+      alert("방송시작 실패\n\n" + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      setSavingBroadcast(false);
+    }
+  };
+
+  const saveBroadcast = async (input: { title: string; youtubeUrl?: string }) => {
+    if (!activeBroadcast) {
+      alert("수정할 현재 방송이 없습니다. 먼저 방송을 시작해주세요.");
+      return;
+    }
+
+    setSavingBroadcast(true);
+
+    try {
+      await updateAdminLiveBroadcast({
+        broadcastId: activeBroadcast.id,
+        title: input.title,
+        youtubeUrl: input.youtubeUrl,
+      });
+      await loadBroadcasts();
+    } catch (error) {
+      alert("방송 저장 실패\n\n" + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      setSavingBroadcast(false);
+    }
+  };
+
+  const endBroadcast = async () => {
+    if (!activeBroadcast) {
+      alert("종료할 현재 방송이 없습니다.");
+      return;
+    }
+
+    const ok = confirm(
+      [
+        "현재 방송을 종료할까요?",
+        "",
+        activeBroadcast.public_title || "방송제목 없음",
+        "",
+        "종료시간이 저장되고 현재 방송 상태가 OFF로 바뀝니다.",
+      ].join("\n")
+    );
+
+    if (!ok) return;
+
+    setSavingBroadcast(true);
+
+    try {
+      await endAdminLiveBroadcast(activeBroadcast.id);
+      await loadBroadcasts();
+      await loadOrders();
+    } catch (error) {
+      alert("방송종료 실패\n\n" + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      setSavingBroadcast(false);
+    }
+  };
+
   const criteriaLabel = buildCriteriaLabel(filters);
 
   return (
@@ -266,7 +373,15 @@ export default function AdminLiveDashboard() {
         <AdminLiveSidebar />
 
         <main className="min-w-0 flex-1 overflow-x-hidden px-5 py-4">
-          <LiveHeader videoRatio={videoRatio} onVideoRatioChange={setVideoRatio} />
+          <LiveHeader
+            videoRatio={videoRatio}
+            onVideoRatioChange={setVideoRatio}
+            activeBroadcast={activeBroadcast}
+            savingBroadcast={savingBroadcast}
+            onStartBroadcast={startBroadcast}
+            onEndBroadcast={endBroadcast}
+            onSaveBroadcast={saveBroadcast}
+          />
           <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
           <LiveBroadcastPanels videoRatio={videoRatio} />
 
