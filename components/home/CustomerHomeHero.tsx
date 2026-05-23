@@ -16,7 +16,7 @@ export default function CustomerHomeHero({
   return (
     <section className="mt-5">
       <Link
-        href="/order"
+        href="/"
         className="group relative block overflow-hidden rounded-[34px] bg-blue-600 px-5 pb-7 pt-8 text-white shadow-[0_18px_36px_rgba(37,99,235,0.25)] ring-4 ring-white active:scale-[0.99]"
       >
         <div className="pointer-events-none absolute -left-12 -top-12 h-36 w-36 rounded-full bg-white/10" />
@@ -48,9 +48,7 @@ export default function CustomerHomeHero({
 
       <div className="mt-5 rounded-[24px] bg-white p-4 text-center shadow-[0_10px_24px_rgba(30,64,175,0.07)] ring-1 ring-blue-100">
         <p className="break-keep text-[15px] font-bold leading-relaxed tracking-[-0.04em] text-[#151923]">
-          주문을 위한 최초 1회 정보 확인입니다.
           <br />
-          한 번만 입력하면 로그아웃 전까지 바로 상품 입력으로 이동해요.
         </p>
 
         {isLoggedIn && (

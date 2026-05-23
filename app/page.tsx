@@ -1,9 +1,8 @@
 // app/page.tsx
-// 전체 교체
-// 위치: /Users/ruru/Desktop/ruru-order-app/app/page.tsx
+// 목적: 고객이 처음 접속하면 보이는 카카오 간편주문 시작 페이지
 
-import CustomerHomePage from "@/components/home/CustomerHomePage";
+import KakaoStartPage from "@/components/home/KakaoStartPage";
 
 export default function HomePage() {
-  return <CustomerHomePage />;
+  return <KakaoStartPage />;
 }

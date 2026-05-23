@@ -40,10 +40,10 @@ import OrderCustomerTopNav from "@/components/order/OrderCustomerTopNav";
 import OrderPriceSummaryBox from "@/components/order/OrderPriceSummaryBox";
 import OrderDepositConfirmModal from "@/components/order/OrderDepositConfirmModal";
 import OrderCustomerInfoIntro from "@/components/order/OrderCustomerInfoIntro";
-import OrderEntryGateV2 from "@/components/order/OrderEntryGateV2";
 import OrderCustomerInfoFormCard from "@/components/order/OrderCustomerInfoFormCard";
 import OrderProductInputGuideDetail from "@/components/order/OrderProductInputGuideDetail";
 import OrderCompletePaymentNotice from "@/components/order/OrderCompletePaymentNotice";
+import OrderKakaoNicknameNotice from "@/components/order/OrderKakaoNicknameNotice";
 
 declare global {
   interface Window {
@@ -228,6 +228,8 @@ export default function OrderPage() {
   const [customerMode, setCustomerMode] = useState<"load" | "new">("load");
   const [loginName, setLoginName] = useState("");
   const [loginPhone, setLoginPhone] = useState("");
+  const [kakaoNickname, setKakaoNickname] = useState("");
+  const [isKakaoLoginReturn, setIsKakaoLoginReturn] = useState(false);
 
   const [paymentMethod, setPaymentMethod] = useState<"무통장입금" | "카드결제">("무통장입금");
   const [items, setItems] = useState<OrderItem[]>([{ ...emptyItem }]);
@@ -253,6 +255,7 @@ export default function OrderPage() {
 
   const isAutoLoggedIn =
     hasSavedInfo &&
+    !isKakaoLoginReturn &&
     !isEditingCustomerInfo &&
     !isEditMode &&
     Boolean(customerPhone && youtubeNickname && customerName);
@@ -261,6 +264,79 @@ export default function OrderPage() {
     loadOrderSettings();
     loadBroadcast();
     loadSavedCustomerInfo();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const cameFromKakao = params.get("kakao") === "1";
+    const nextMode = params.get("mode");
+    const savedKakaoNickname = window.localStorage.getItem("ruru_kakao_nickname") || "";
+
+    if (savedKakaoNickname) {
+      setKakaoNickname(savedKakaoNickname);
+    }
+
+    if (cameFromKakao) {
+      const savedPhone = window.localStorage.getItem("ruru_customer_phone") || "";
+      const savedYoutubeNickname = window.localStorage.getItem("ruru_youtube_nickname") || "";
+      const savedName = window.localStorage.getItem("ruru_customer_name") || "";
+      const savedAddress = window.localStorage.getItem("ruru_customer_address") || "";
+      const savedDetailAddress = window.localStorage.getItem("ruru_customer_detail_address") || "";
+
+      const hasSavedYoutubeNickname = Boolean(savedYoutubeNickname.trim());
+      const hasSavedCustomerInfo = Boolean(
+        savedPhone.trim() &&
+        savedName.trim() &&
+        savedAddress.trim() &&
+        savedDetailAddress.trim()
+      );
+
+      if (hasSavedYoutubeNickname && hasSavedCustomerInfo) {
+        setIsKakaoLoginReturn(false);
+        setHasSavedInfo(true);
+        setIsEditingCustomerInfo(false);
+        setShowSavedCustomerDetail(false);
+        setCustomerMode("load");
+        setIsCustomerInfoOpen(false);
+        window.history.replaceState(null, "", "/order");
+        return;
+      }
+
+      if (hasSavedYoutubeNickname && !hasSavedCustomerInfo) {
+        setIsKakaoLoginReturn(false);
+        setHasSavedInfo(false);
+        setIsEditingCustomerInfo(true);
+        setShowSavedCustomerDetail(false);
+        setCustomerMode("new");
+        setIsCustomerInfoOpen(true);
+        window.history.replaceState(null, "", "/order");
+        return;
+      }
+
+      setIsKakaoLoginReturn(true);
+
+      if (!hasSavedCustomerInfo) {
+        setIsEditingCustomerInfo(false);
+        setShowSavedCustomerDetail(false);
+        setCustomerMode("new");
+        setIsCustomerInfoOpen(true);
+      }
+
+      window.history.replaceState(null, "", "/order");
+      return;
+    }
+
+    if (nextMode === "edit") return;
+
+    const savedPhone = window.localStorage.getItem("ruru_customer_phone") || "";
+    const savedYoutubeNickname = window.localStorage.getItem("ruru_youtube_nickname") || "";
+    const savedName = window.localStorage.getItem("ruru_customer_name") || "";
+
+    if (!(savedPhone && savedYoutubeNickname && savedName)) {
+      window.location.replace("/");
+    }
   }, []);
 
   useEffect(() => {
@@ -304,9 +380,15 @@ export default function OrderPage() {
       return;
     }
 
+    if (isKakaoLoginReturn) {
+      setIsCustomerInfoOpen(true);
+      setCustomerMode("new");
+      return;
+    }
+
     setIsCustomerInfoOpen(true);
     setCustomerMode("load");
-  }, [hasSavedInfo, isEditingCustomerInfo]);
+  }, [hasSavedInfo, isEditingCustomerInfo, isKakaoLoginReturn]);
 
   useEffect(() => {
     const cleanPhone = normalizePhone(customerPhone);
@@ -609,6 +691,80 @@ export default function OrderPage() {
 
     window.setTimeout(() => {
       document.getElementById("youtubeNicknameInput")?.focus();
+    }, 100);
+  };
+
+  const startKakaoLogin = () => {
+    if (typeof window === "undefined") return;
+
+    const restApiKey = process.env.NEXT_PUBLIC_KAKAO_REST_API_KEY || "";
+
+    if (!restApiKey) {
+      alert("카카오 로그인 설정값이 없습니다. 관리자에게 문의해주세요.");
+      return;
+    }
+
+    const redirectUri = `${window.location.origin}/auth/kakao/callback`;
+    const params = new URLSearchParams({
+      client_id: restApiKey,
+      redirect_uri: redirectUri,
+      response_type: "code",
+      scope: "profile_nickname,phone_number,shipping_address",
+    });
+
+    window.location.href = `https://kauth.kakao.com/oauth/authorize?${params.toString()}`;
+  };
+
+  const scrollToProductInput = () => {
+    window.setTimeout(() => {
+      const target =
+        document.getElementById("orderProductInputSection") ||
+        document.getElementById("firstProductNameInput");
+
+      target?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+
+      document.getElementById("firstProductNameInput")?.focus();
+    }, 150);
+  };
+
+  const confirmKakaoYoutubeNickname = () => {
+    const cleanNickname = youtubeNickname.trim();
+
+    if (!cleanNickname) {
+      alert("주문 확인에 사용할 유튜브 닉네임을 입력해주세요.");
+      return;
+    }
+
+    localStorage.setItem("ruru_youtube_nickname", cleanNickname);
+    setYoutubeNickname(cleanNickname);
+    setIsKakaoLoginReturn(false);
+
+    const hasRequiredCustomerInfo = Boolean(
+      customerName.trim() &&
+      normalizePhone(customerPhone).length >= 10 &&
+      address.trim() &&
+      detailAddress.trim()
+    );
+
+    if (hasRequiredCustomerInfo) {
+      setHasSavedInfo(true);
+      setIsEditingCustomerInfo(false);
+      setIsCustomerInfoOpen(false);
+      setCustomerMode("load");
+      scrollToProductInput();
+      return;
+    }
+
+    setHasSavedInfo(false);
+    setIsEditingCustomerInfo(true);
+    setCustomerMode("new");
+    setIsCustomerInfoOpen(true);
+
+    window.setTimeout(() => {
+      document.getElementById("customerNameInput")?.focus();
     }, 100);
   };
 
@@ -1224,16 +1380,14 @@ export default function OrderPage() {
 
   return (
     <OrderPageShell>
-        <TopCustomerNav />
+        {isAutoLoggedIn && <TopCustomerNav />}
 
-        {!isAutoLoggedIn && !isEditingCustomerInfo && customerMode === "load" && (
-          <OrderEntryGateV2
-            loginName={loginName}
-            loginPhone={formatPhone(loginPhone)}
-            onLoginNameChange={setLoginName}
-            onLoginPhoneChange={(value) => setLoginPhone(normalizePhone(value))}
-            onLoadCustomer={loadCustomerByNamePhone}
-            onStartNew={openNewCustomerInfoForm}
+        {isKakaoLoginReturn && !isAutoLoggedIn && (
+          <OrderKakaoNicknameNotice
+            kakaoNickname={kakaoNickname}
+            youtubeNickname={youtubeNickname}
+            onYoutubeNicknameChange={setYoutubeNickname}
+            onConfirm={confirmKakaoYoutubeNickname}
           />
         )}
 
@@ -1271,7 +1425,7 @@ export default function OrderPage() {
               </p>
             </section>
 
-        <section className="mt-4 rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm">
+        <section id="orderProductInputSection" className="mt-4 rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-black">주문상품</h2>
 
           <div className="mt-4 rounded-[1.4rem] bg-blue-50 p-4">
@@ -1330,6 +1484,7 @@ export default function OrderPage() {
                         setProductSearchOpenIndex(index);
                         setProductSearchText(event.target.value);
                       }}
+                      id={index === 0 ? "firstProductNameInput" : undefined}
                       placeholder="상품명"
                       className="w-full rounded-2xl border border-gray-200 bg-white p-4 font-bold"
                     />
