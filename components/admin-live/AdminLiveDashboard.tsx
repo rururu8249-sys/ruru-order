@@ -68,7 +68,7 @@ function formatMonthDay(value?: string | null) {
 
 function formatKoreanWeekday(value?: string | null) {
   const date = value ? new Date(value) : new Date();
-  const weekdays = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
+  const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
 
   if (!Number.isFinite(date.getTime())) {
     return weekdays[new Date().getDay()];
@@ -91,11 +91,11 @@ function formatBroadcastDisplayTitle(broadcast: AdminLiveBroadcast | null | unde
   const rawTitle = String(broadcast?.public_title || broadcast?.admin_subtitle || "").trim();
   const cleanedTitle = stripExistingBroadcastPrefix(rawTitle) || "방송";
 
-  return `${mmdd} ${weekday} ${cleanedTitle}`;
+  return `${mmdd}(${weekday}) ${cleanedTitle}`;
 }
 
 function todayAlwaysOrderLabel() {
-  return `${formatMonthDay()} 공구·상시주문`;
+  return `${formatMonthDay()}(${formatKoreanWeekday()}) 공구·상시주문`;
 }
 
 function isPaid(order: LiveOrder) {
@@ -267,11 +267,14 @@ export default function AdminLiveDashboard() {
           ? activeBroadcast
           : broadcasts.find((broadcast) => broadcast.id === filters.broadcast) || null;
 
+      const todayKey = toDateKey(new Date().toISOString());
+      const orderDateKey = toDateKey(order.createdAt);
+
       const matchBroadcast =
         filters.broadcast === "all"
           ? true
           : filters.broadcast === "none"
-            ? !order.broadcastId
+            ? !order.broadcastId && orderDateKey === todayKey
             : selectedBroadcast
               ? order.broadcastId === selectedBroadcast.id || isOrderInsideBroadcastTime(order.createdAt, selectedBroadcast)
               : false;

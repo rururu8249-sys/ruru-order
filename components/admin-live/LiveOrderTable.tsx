@@ -38,8 +38,9 @@ function todayAlwaysOrderLabel() {
   const now = new Date();
   const mm = String(now.getMonth() + 1).padStart(2, "0");
   const dd = String(now.getDate()).padStart(2, "0");
+  const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
 
-  return `${mm}${dd} 공구·상시주문`;
+  return `${mm}${dd}(${weekdays[now.getDay()]}) 공구·상시주문`;
 }
 
 function buildItemText(item: LiveOrder["items"][number]) {
