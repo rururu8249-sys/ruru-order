@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import ManualPaymentMatchDrawer from "@/components/admin-v2/payment/ManualPaymentMatchDrawer";
+import AdminLiveMenuPlaceholder from "./AdminLiveMenuPlaceholder";
 import AdminLiveSidebar from "./AdminLiveSidebar";
 import LiveHeader from "./LiveHeader";
 import LiveStatsCards from "./LiveStatsCards";
@@ -19,6 +20,7 @@ import {
   type AdminLiveBroadcast,
 } from "./liveBroadcastController";
 import type { DepositRow, OrderGroup, OrderRow } from "@/lib/admin-v2/types";
+import type { AdminLiveMenuKey } from "./adminLiveMenu";
 import type { LiveOrder } from "./types";
 import {
   buildAdminLiveOrderGroups,
@@ -166,6 +168,7 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
 }
 
 export default function AdminLiveDashboard() {
+  const [activeMenu, setActiveMenu] = useState<AdminLiveMenuKey>("broadcast");
   const [orders, setOrders] = useState<LiveOrder[]>([]);
   const [broadcasts, setBroadcasts] = useState<AdminLiveBroadcast[]>([]);
   const [savingBroadcast, setSavingBroadcast] = useState(false);
@@ -423,9 +426,11 @@ export default function AdminLiveDashboard() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <div className="flex min-h-screen">
-        <AdminLiveSidebar />
+        <AdminLiveSidebar activeMenu={activeMenu} onMenuChange={setActiveMenu} />
 
         <main className="min-w-0 flex-1 overflow-x-hidden px-5 py-4">
+          {activeMenu === "broadcast" ? (
+            <>
           <LiveHeader
             videoRatio={videoRatio}
             onVideoRatioChange={setVideoRatio}
@@ -473,6 +478,11 @@ export default function AdminLiveDashboard() {
               onClose={closeOrderDetail}
             />
           ) : null}
+
+            </>
+          ) : (
+            <AdminLiveMenuPlaceholder menuKey={activeMenu} />
+          )}
 
           <ManualPaymentMatchDrawer
             group={manualMatchGroup}

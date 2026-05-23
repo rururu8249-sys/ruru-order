@@ -1,15 +1,14 @@
+import { ADMIN_LIVE_MENUS, getAdminLiveMenu, type AdminLiveMenuKey } from "./adminLiveMenu";
 import LiveOpsStatusBox from "./LiveOpsStatusBox";
 
-const menus = [
-  { key: "broadcast", label: "방송", icon: "📡", desc: "라이브 컨트롤타워" },
-  { key: "orders", label: "주문관리", icon: "📋", desc: "주문 상세 관리" },
-  { key: "payments", label: "입금확인", icon: "₩", desc: "입금 확인 처리" },
-  { key: "customers", label: "고객관리", icon: "👤", desc: "고객·특이사항" },
-  { key: "settlement", label: "정산통계", icon: "◔", desc: "방송·날짜별 통계" },
-  { key: "settings", label: "설정", icon: "⚙", desc: "운영 설정" },
-];
 
-export default function AdminLiveSidebar() {
+type Props = {
+  activeMenu: AdminLiveMenuKey;
+  onMenuChange: (menuKey: AdminLiveMenuKey) => void;
+};
+
+export default function AdminLiveSidebar({ activeMenu, onMenuChange }: Props) {
+  const currentMenu = getAdminLiveMenu(activeMenu);
   return (
     <aside className="flex h-screen w-[220px] shrink-0 flex-col border-r border-slate-200 bg-white px-4 py-6">
       <div className="mb-8 flex items-center gap-2">
@@ -21,12 +20,13 @@ export default function AdminLiveSidebar() {
       </div>
 
       <nav className="space-y-1.5">
-        {menus.map((menu) => {
-          const active = menu.key === "broadcast";
+        {ADMIN_LIVE_MENUS.map((menu) => {
+          const active = menu.key === activeMenu;
           return (
             <button
               key={menu.key}
               type="button"
+              onClick={() => onMenuChange(menu.key)}
               className={[
                 "flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition",
                 active
@@ -52,10 +52,10 @@ export default function AdminLiveSidebar() {
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
           <div className="mb-1.5 flex items-center gap-2 text-sm font-black text-slate-800">
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-slate-500">!</span>
-            현재 화면
+            {currentMenu.label}
           </div>
           <p className="text-[11px] leading-5 text-slate-500">
-            방송 메뉴는 실시간 주문·입금확인 중심입니다. 주문관리/고객관리/정산통계는 별도 화면으로 확장합니다.
+            {currentMenu.sidebarNotice}
           </p>
         </div>
       </div>
