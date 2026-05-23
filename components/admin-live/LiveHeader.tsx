@@ -47,7 +47,7 @@ export default function LiveHeader({
   }, [activeBroadcast?.id]);
 
   const statusLabel = useMemo(() => {
-    if (activeBroadcast) return "LIVE";
+    if (activeBroadcast) return "방송중";
     return "대기";
   }, [activeBroadcast]);
 
@@ -73,10 +73,10 @@ export default function LiveHeader({
         <div
           className={[
             "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-black",
-            statusLabel === "LIVE" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700",
+            statusLabel === "방송중" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700",
           ].join(" ")}
         >
-          <span className={["h-2 w-2 rounded-full", statusLabel === "LIVE" ? "bg-emerald-500" : "bg-amber-500"].join(" ")} />
+          <span className={["h-2 w-2 rounded-full", statusLabel === "방송중" ? "bg-emerald-500" : "bg-amber-500"].join(" ")} />
           {statusLabel}
         </div>
 

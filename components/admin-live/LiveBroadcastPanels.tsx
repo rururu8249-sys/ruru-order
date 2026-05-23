@@ -676,7 +676,14 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-black text-slate-950">
             방송화면
-            <span className="rounded-md bg-red-600 px-2 py-0.5 text-[11px] text-white">LIVE</span>
+            <span
+              className={[
+                "rounded-md px-2 py-0.5 text-[11px] font-black",
+                videoEmbedUrl ? "bg-emerald-600 text-white" : "bg-amber-100 text-amber-700",
+              ].join(" ")}
+            >
+              {videoEmbedUrl ? "영상 연결" : "URL 대기"}
+            </span>
           </div>
           <div className="text-xs font-black text-slate-400">
             {videoRatio === "vertical" ? "9:16 세로" : videoRatio === "wide" ? "16:9 가로" : "자동"}
@@ -698,7 +705,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
                 <div className="w-[78%] rounded-[2rem] bg-white/70 p-6 text-center shadow-sm backdrop-blur">
                   <div className="text-5xl">👟</div>
                   <div className="mt-4 text-lg font-black text-slate-900">루루동이LIVE</div>
-                  <div className="mt-2 text-xs font-bold text-slate-500">유튜브 라이브 URL을 적용하면 영상이 표시됩니다.</div>
+                  <div className="mt-2 text-xs font-bold text-slate-500">유튜브 라이브 URL을 적용하면 방송화면이 표시됩니다.</div>
                 </div>
               </div>
             )}
@@ -709,7 +716,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
       <div className="col-span-12 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-black text-slate-950">라이브 채팅</h2>
-          <span className="text-xs font-bold text-slate-500">{chatEmbedUrl ? "YouTube Chat" : "URL 대기"}</span>
+          <span className="text-xs font-bold text-slate-500">{chatEmbedUrl ? "채팅 연결" : "URL 대기"}</span>
         </div>
 
         <div className="h-[346px] overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
@@ -725,7 +732,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
                 <div className="text-4xl">💬</div>
                 <div className="mt-3 text-sm font-black text-slate-700">라이브 채팅 연결 대기</div>
                 <div className="mt-2 text-xs font-bold leading-5 text-slate-400">
-                  방송 시작 후 유튜브 라이브 URL을 입력하고 적용하면<br />
+                  유튜브 라이브 URL을 입력하고 적용하면<br />
                   이 영역에 실제 채팅창이 표시됩니다.
                 </div>
               </div>
