@@ -212,6 +212,11 @@ export default function MyOrderPage() {
     safeOrderPage * ORDERS_PER_PAGE
   );
 
+  const depositNickname =
+    String(orders[0]?.youtube_nickname || "").trim() ||
+    String(orders[0]?.nickname || "").trim() ||
+    String(customerName || "").trim();
+
 
   return (
     <main
@@ -229,6 +234,7 @@ export default function MyOrderPage() {
             bankAccount={BANK_ACCOUNT}
             bankHolder={BANK_HOLDER}
             copyDone={copyDone}
+            depositNickname={depositNickname}
             onCopy={copyBankAccount}
           />
         )}
