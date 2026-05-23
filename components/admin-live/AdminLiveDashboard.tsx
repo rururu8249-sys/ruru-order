@@ -55,6 +55,49 @@ function normalizeText(value: unknown) {
   return String(value || "").replace(/\s+/g, "").toLowerCase();
 }
 
+function formatMonthDay(value?: string | null) {
+  const date = value ? new Date(value) : new Date();
+
+  if (!Number.isFinite(date.getTime())) {
+    const now = new Date();
+    return `${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  }
+
+  return `${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function formatKoreanWeekday(value?: string | null) {
+  const date = value ? new Date(value) : new Date();
+  const weekdays = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
+
+  if (!Number.isFinite(date.getTime())) {
+    return weekdays[new Date().getDay()];
+  }
+
+  return weekdays[date.getDay()];
+}
+
+function stripExistingBroadcastPrefix(title: string) {
+  return title
+    .replace(/^\d{4}\s*(일요일|월요일|화요일|수요일|목요일|금요일|토요일)\s*/u, "")
+    .replace(/^\d{4}\s*/u, "")
+    .trim();
+}
+
+function formatBroadcastDisplayTitle(broadcast: AdminLiveBroadcast | null | undefined) {
+  const baseDate = broadcast?.started_at || broadcast?.created_at || null;
+  const mmdd = formatMonthDay(baseDate);
+  const weekday = formatKoreanWeekday(baseDate);
+  const rawTitle = String(broadcast?.public_title || broadcast?.admin_subtitle || "").trim();
+  const cleanedTitle = stripExistingBroadcastPrefix(rawTitle) || "방송";
+
+  return `${mmdd} ${weekday} ${cleanedTitle}`;
+}
+
+function todayAlwaysOrderLabel() {
+  return `${formatMonthDay()} 공구·상시주문`;
+}
+
 function isPaid(order: LiveOrder) {
   return ["paid", "auto_paid", "manual_paid", "card_paid"].includes(order.paymentStatus);
 }
@@ -95,7 +138,7 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
   const parts: string[] = [];
 
   if (filters.broadcast === "all") parts.push("방송 전체보기");
-  else if (filters.broadcast === "none") parts.push("공구·상시주문");
+  else if (filters.broadcast === "none") parts.push(todayAlwaysOrderLabel());
   else parts.push("선택 방송");
 
   const dateLabelMap: Record<LiveOrderFilters["date"], string> = {
@@ -207,7 +250,7 @@ export default function AdminLiveDashboard() {
   const broadcastOptions = useMemo(() => {
     const options = broadcasts.map((broadcast) => ({
       value: broadcast.id,
-      label: `방송: ${broadcast.public_title || broadcast.admin_subtitle || broadcast.id.slice(0, 8)}`,
+      label: `방송: ${formatBroadcastDisplayTitle(broadcast)}`,
     }));
 
     return activeBroadcast

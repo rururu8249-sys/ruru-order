@@ -34,6 +34,14 @@ function normalizeText(value: unknown) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
 }
 
+function todayAlwaysOrderLabel() {
+  const now = new Date();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+
+  return `${mm}${dd} 공구·상시주문`;
+}
+
 function buildItemText(item: LiveOrder["items"][number]) {
   return normalizeText(`${item.productName} ${item.optionText}`);
 }
@@ -362,7 +370,7 @@ export default function LiveOrderTable({
               {option.label}
             </option>
           ))}
-          <option value="none">공구·상시주문</option>
+          <option value="none">{todayAlwaysOrderLabel()}</option>
         </select>
 
         <select
