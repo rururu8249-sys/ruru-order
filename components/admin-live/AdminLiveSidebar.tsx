@@ -3,7 +3,7 @@ import LiveOpsStatusBox from "./LiveOpsStatusBox";
 const menus = [
   { key: "broadcast", label: "방송", icon: "📡", desc: "라이브 컨트롤타워" },
   { key: "orders", label: "주문관리", icon: "📋", desc: "주문 상세 관리" },
-  { key: "payments", label: "입금확인", icon: "₩", desc: "입금·수동매칭" },
+  { key: "payments", label: "입금확인", icon: "₩", desc: "입금 확인 처리" },
   { key: "customers", label: "고객관리", icon: "👤", desc: "고객·특이사항" },
   { key: "settlement", label: "정산통계", icon: "◔", desc: "방송·날짜별 통계" },
   { key: "settings", label: "설정", icon: "⚙", desc: "운영 설정" },

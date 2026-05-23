@@ -154,9 +154,9 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
     all: "상태 전체보기",
     unpaid: "미입금",
     paid: "입금확인",
-    manual_match_needed: "수동매칭 필요",
+    manual_match_needed: "입금확인 필요",
     card_paid: "카드결제완료",
-    card_unpaid: "카드미결제",
+    card_unpaid: "카드 미결제",
   };
   parts.push(statusLabelMap[filters.status]);
 
