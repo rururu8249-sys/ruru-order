@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { LiveOrder } from "./types";
 
-const PAGE_SIZE = 10;
-
 export type LiveOrderDateFilter = "all" | "today" | "yesterday" | "7days" | "month";
 export type LiveOrderStatusFilter =
   | "all"
@@ -26,16 +24,119 @@ type BroadcastOption = {
   label: string;
 };
 
+type SortMode = "latest" | "nickname_asc" | "nickname_desc";
+
 function money(value: number) {
   return `₩${Number(value || 0).toLocaleString("ko-KR")}`;
 }
 
+function normalizeText(value: unknown) {
+  return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function buildItemText(item: LiveOrder["items"][number]) {
+  return normalizeText(`${item.productName} ${item.optionText}`);
+}
+
+function getTotalQty(order: LiveOrder) {
+  return (order.items || []).reduce((sum, item) => sum + Number(item.qty || 0), 0);
+}
+
 function compactOrderSummary(order: LiveOrder) {
-  const first = order.items[0];
-  if (!first) return order.orderSummary || "-";
-  const firstText = `${first.productName} ${first.optionText}`.replace(/\s+/g, " ").trim();
-  const extraCount = order.items.length - 1;
-  return extraCount > 0 ? `${firstText} 외 ${extraCount}개` : firstText;
+  const items = order.items || [];
+
+  if (!items.length) return order.orderSummary || "-";
+
+  const itemTexts = items.map(buildItemText).filter(Boolean);
+
+  if (itemTexts.length <= 1) {
+    return itemTexts[0] || order.orderSummary || "-";
+  }
+
+  const maxChars = 70;
+  const visible: string[] = [];
+  let usedLength = 0;
+
+  itemTexts.forEach((itemText) => {
+    const nextLength = usedLength + itemText.length + (visible.length > 0 ? 3 : 0);
+
+    if (nextLength <= maxChars) {
+      visible.push(itemText);
+      usedLength = nextLength;
+    }
+  });
+
+  if (visible.length === 0) {
+    return `${itemTexts[0]} 외 ${itemTexts.length - 1}개`;
+  }
+
+  const hiddenCount = itemTexts.length - visible.length;
+  const joined = visible.join("  |  ");
+
+  return hiddenCount > 0 ? `${joined} 외 ${hiddenCount}개` : joined;
+}
+
+function getVisibleOrderSummaryParts(order: LiveOrder) {
+  const items = order.items || [];
+
+  if (!items.length) {
+    return {
+      parts: [order.orderSummary || "-"],
+      hiddenCount: 0,
+    };
+  }
+
+  const itemTexts = items.map(buildItemText).filter(Boolean);
+
+  if (itemTexts.length <= 1) {
+    return {
+      parts: [itemTexts[0] || order.orderSummary || "-"],
+      hiddenCount: 0,
+    };
+  }
+
+  const maxChars = 70;
+  const visible: string[] = [];
+  let usedLength = 0;
+
+  itemTexts.forEach((itemText) => {
+    const nextLength = usedLength + itemText.length + (visible.length > 0 ? 3 : 0);
+
+    if (nextLength <= maxChars) {
+      visible.push(itemText);
+      usedLength = nextLength;
+    }
+  });
+
+  if (visible.length === 0) {
+    return {
+      parts: [itemTexts[0]],
+      hiddenCount: itemTexts.length - 1,
+    };
+  }
+
+  return {
+    parts: visible,
+    hiddenCount: itemTexts.length - visible.length,
+  };
+}
+
+function renderOrderSummary(order: LiveOrder) {
+  const { parts, hiddenCount } = getVisibleOrderSummaryParts(order);
+
+  return (
+    <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
+      {parts.map((part, index) => (
+        <span key={`${part}-${index}`} className="inline-flex min-w-0 items-center gap-2">
+          {index > 0 && <span className="shrink-0 font-black text-red-500">|</span>}
+          <span className="truncate">{part}</span>
+        </span>
+      ))}
+      {hiddenCount > 0 && (
+        <span className="shrink-0 font-black text-slate-500">외 {hiddenCount}개</span>
+      )}
+    </span>
+  );
 }
 
 function statusBadge(order: LiveOrder) {
@@ -66,6 +167,7 @@ type Props = {
   selectedOrderId: string;
   onSelectOrder: (order: LiveOrder) => void;
   onOpenManualMatch?: (order: LiveOrder) => void;
+  onRefresh?: () => void | Promise<void>;
   loading?: boolean;
   filters: LiveOrderFilters;
   onFiltersChange: (filters: LiveOrderFilters) => void;
@@ -78,6 +180,7 @@ export default function LiveOrderTable({
   selectedOrderId,
   onSelectOrder,
   onOpenManualMatch,
+  onRefresh,
   loading = false,
   filters,
   onFiltersChange,
@@ -85,10 +188,13 @@ export default function LiveOrderTable({
 }: Props) {
   const [page, setPage] = useState(1);
   const [pendingKeyword, setPendingKeyword] = useState(filters.keyword);
+  const [sortMode, setSortMode] = useState<SortMode>("latest");
+  const [pageSize, setPageSize] = useState(10);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     setPage(1);
-  }, [filters.broadcast, filters.date, filters.status, filters.keyword]);
+  }, [filters.broadcast, filters.date, filters.status, filters.keyword, sortMode, pageSize]);
 
   useEffect(() => {
     setPendingKeyword(filters.keyword);
@@ -111,9 +217,27 @@ export default function LiveOrderTable({
     };
   }, [orders]);
 
-  const totalPages = Math.max(1, Math.ceil(orders.length / PAGE_SIZE));
+  const sortedOrders = useMemo(() => {
+    const list = [...orders];
+
+    if (sortMode === "nickname_asc") {
+      return list.sort((a, b) => a.nickname.localeCompare(b.nickname, "ko-KR"));
+    }
+
+    if (sortMode === "nickname_desc") {
+      return list.sort((a, b) => b.nickname.localeCompare(a.nickname, "ko-KR"));
+    }
+
+    return list.sort((a, b) => {
+      const aTime = new Date(a.createdAt || 0).getTime() || 0;
+      const bTime = new Date(b.createdAt || 0).getTime() || 0;
+      return bTime - aTime;
+    });
+  }, [orders, sortMode]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedOrders.length / pageSize));
   const safePage = Math.min(page, totalPages);
-  const visibleOrders = orders.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const visibleOrders = sortedOrders.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const updateFilter = <K extends keyof LiveOrderFilters>(key: K, value: LiveOrderFilters[K]) => {
     onFiltersChange({
@@ -128,6 +252,8 @@ export default function LiveOrderTable({
 
   const resetFilters = () => {
     setPendingKeyword("");
+    setSortMode("latest");
+    setPageSize(10);
     onFiltersChange({
       broadcast: "all",
       date: "all",
@@ -136,31 +262,92 @@ export default function LiveOrderTable({
     });
   };
 
+  const toggleNicknameSort = () => {
+    setSortMode((current) => {
+      if (current === "latest") return "nickname_asc";
+      if (current === "nickname_asc") return "nickname_desc";
+      return "latest";
+    });
+  };
+
+  const sortLabel =
+    sortMode === "nickname_asc" ? "닉네임 ↑" : sortMode === "nickname_desc" ? "닉네임 ↓" : "최신순";
+
+  const refreshOrders = async () => {
+    if (!onRefresh) return;
+
+    setRefreshing(true);
+
+    try {
+      await onRefresh();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h2 className="mr-2 text-lg font-black text-slate-950">실시간 주문서</h2>
 
         {[
-          ["전체", counts.total, "bg-blue-600 text-white"],
-          ["미입금", counts.unpaid, "bg-slate-100 text-slate-600"],
-          ["입금확인", counts.paid, "bg-slate-100 text-slate-600"],
-          ["수동매칭", counts.manual, "bg-slate-100 text-slate-600"],
-        ].map(([label, count, cls]) => (
-          <button key={label} className={`rounded-full px-3 py-1.5 text-xs font-black ${cls}`}>
-            {label} <span className="ml-1 opacity-80">{count}</span>
-          </button>
-        ))}
+          ["전체", counts.total, "all"],
+          ["미입금", counts.unpaid, "unpaid"],
+          ["입금확인", counts.paid, "paid"],
+          ["수동매칭", counts.manual, "manual_match_needed"],
+        ].map(([label, count, status]) => {
+          const active = filters.status === status;
+
+          return (
+            <button
+              key={label}
+              type="button"
+              onClick={() => updateFilter("status", status as LiveOrderStatusFilter)}
+              className={[
+                "rounded-full px-3 py-1.5 text-xs font-black transition",
+                active
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-700",
+              ].join(" ")}
+            >
+              {label} <span className="ml-1 opacity-80">{count}</span>
+            </button>
+          );
+        })}
 
         <div className="ml-auto flex items-center gap-2">
-          <button className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600">닉네임 정렬 ˅</button>
-          <button className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600">페이지당 10건 ˅</button>
-          <button className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500">↻</button>
+          <button
+            type="button"
+            onClick={toggleNicknameSort}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-50"
+          >
+            {sortLabel}
+          </button>
+
+          <select
+            value={pageSize}
+            onChange={(event) => setPageSize(Number(event.target.value))}
+            className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-600 outline-none hover:bg-slate-50"
+          >
+            <option value={10}>페이지당 10건</option>
+            <option value={20}>페이지당 20건</option>
+            <option value={30}>페이지당 30건</option>
+          </select>
+
+          <button
+            type="button"
+            onClick={refreshOrders}
+            disabled={!onRefresh || refreshing}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40"
+            title="주문 새로고침"
+          >
+            {refreshing ? "…" : "↻"}
+          </button>
         </div>
       </div>
 
       <div className="mb-2 rounded-xl bg-blue-50 px-3 py-2 text-[11px] font-black text-blue-700">
-        현재 필터가 실제 주문서와 매출요약에 함께 적용됩니다. 검색은 Enter 또는 검색 버튼을 눌렀을 때만 적용됩니다.
+        상단 카운트 버튼과 필터가 실제 주문서와 매출요약에 함께 적용됩니다. 검색은 Enter 또는 검색 버튼을 눌렀을 때만 적용됩니다.
       </div>
 
       <div className="mb-3 grid grid-cols-1 gap-2 xl:grid-cols-[220px_150px_170px_1fr_74px_74px]">
@@ -234,27 +421,28 @@ export default function LiveOrderTable({
         <table className="w-full table-fixed border-collapse text-sm">
           <thead className="bg-slate-50 text-xs font-black text-slate-500">
             <tr>
-              <th className="w-[110px] px-3 py-3 text-left">입금확인</th>
-              <th className="w-[86px] px-3 py-3 text-left">제출시간</th>
-              <th className="w-[86px] px-3 py-3 text-left">입금시간</th>
-              <th className="w-[100px] px-3 py-3 text-left">닉네임</th>
-              <th className="w-[86px] px-3 py-3 text-left">이름</th>
-              <th className="px-3 py-3 text-left">주문내역</th>
-              <th className="w-[100px] px-3 py-3 text-right">상품금액</th>
-              <th className="w-[76px] px-3 py-3 text-right">배송비</th>
-              <th className="w-[94px] px-3 py-3 text-center">작업</th>
+              <th className="w-[120px] px-4 py-3 text-left">입금확인</th>
+              <th className="w-[96px] px-4 py-3 text-left">제출시간</th>
+              <th className="w-[96px] px-4 py-3 text-left">입금시간</th>
+              <th className="w-[150px] px-4 py-3 text-left">닉네임</th>
+              <th className="w-[120px] px-4 py-3 text-left">이름</th>
+              <th className="px-4 py-3 text-left">주문내역</th>
+              <th className="w-[82px] px-3 py-3 text-center">총수량</th>
+              <th className="w-[128px] px-4 py-3 text-right">상품금액</th>
+              <th className="w-[104px] px-4 py-3 text-right">배송비</th>
+              <th className="w-[76px] px-3 py-3 text-center">작업</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr>
-                <td colSpan={9} className="px-3 py-10 text-center text-sm font-black text-slate-400">
+                <td colSpan={10} className="px-3 py-10 text-center text-sm font-black text-slate-400">
                   실제 주문 데이터를 불러오는 중입니다.
                 </td>
               </tr>
             ) : visibleOrders.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-3 py-10 text-center text-sm font-black text-slate-400">
+                <td colSpan={10} className="px-3 py-10 text-center text-sm font-black text-slate-400">
                   표시할 주문이 없습니다.
                 </td>
               </tr>
@@ -263,22 +451,30 @@ export default function LiveOrderTable({
                 const selected = order.id === selectedOrderId;
                 return (
                   <tr key={order.id} className={selected ? "bg-blue-50/70" : "hover:bg-slate-50"}>
-                    <td className="px-3 py-2.5">{statusBadge(order)}</td>
-                    <td className="px-3 py-2.5 font-bold text-slate-600">{order.submittedAt}</td>
-                    <td className="px-3 py-2.5 font-bold text-slate-600">{order.paidAt || "-"}</td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-4 py-3">{statusBadge(order)}</td>
+                    <td className="px-4 py-3 font-bold text-slate-600">{order.submittedAt}</td>
+                    <td className="px-4 py-3 font-bold text-slate-600">{order.paidAt || "-"}</td>
+                    <td className="px-4 py-3">
                       <button
+                        type="button"
                         onClick={() => onSelectOrder(order)}
                         className="font-black text-blue-700 underline-offset-2 hover:underline"
                       >
                         {order.nickname}
                       </button>
                     </td>
-                    <td className="px-3 py-2.5 font-bold text-slate-700">{order.name}</td>
-                    <td className="truncate px-3 py-2.5 font-bold text-slate-700">{compactOrderSummary(order)}</td>
-                    <td className="px-3 py-2.5 text-right font-black text-slate-700">{money(order.productAmount)}</td>
-                    <td className="px-3 py-2.5 text-right font-black text-slate-700">{money(order.shippingFee)}</td>
-                    <td className="px-3 py-2.5 text-center">
+                    <td className="px-4 py-3 font-bold text-slate-700">{order.name}</td>
+                    <td className="min-w-0 px-4 py-3 font-bold text-slate-700" title={order.orderSummary || compactOrderSummary(order)}>
+                      {renderOrderSummary(order)}
+                    </td>
+                    <td className="px-3 py-3 text-center">
+                      <span className="inline-flex min-w-[54px] items-center justify-center rounded-lg bg-slate-100 px-2 py-1 text-xs font-black text-slate-700">
+                        총 {getTotalQty(order)}개
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right font-black text-slate-700">{money(order.productAmount)}</td>
+                    <td className="px-4 py-3 text-right font-black text-slate-700">{money(order.shippingFee)}</td>
+                    <td className="px-3 py-3 text-center">
                       {order.paymentStatus === "manual_match_needed" ? (
                         <button
                           type="button"
@@ -304,12 +500,13 @@ export default function LiveOrderTable({
           총 {orders.length}건 / 전체 {allOrderCount}건
         </div>
         <div className="mx-auto flex items-center gap-5 text-sm font-black">
-          <button onClick={() => setPage(Math.max(1, safePage - 1))} className="text-slate-400">‹</button>
+          <button type="button" onClick={() => setPage(Math.max(1, safePage - 1))} className="text-slate-400">‹</button>
           {Array.from({ length: Math.min(totalPages, 5) }).map((_, index) => {
             const pageNumber = index + 1;
             return (
               <button
                 key={pageNumber}
+                type="button"
                 onClick={() => setPage(pageNumber)}
                 className={
                   safePage === pageNumber
@@ -321,7 +518,7 @@ export default function LiveOrderTable({
               </button>
             );
           })}
-          <button onClick={() => setPage(Math.min(totalPages, safePage + 1))} className="text-slate-400">›</button>
+          <button type="button" onClick={() => setPage(Math.min(totalPages, safePage + 1))} className="text-slate-400">›</button>
         </div>
       </div>
     </section>

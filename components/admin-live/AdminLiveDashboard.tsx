@@ -130,6 +130,7 @@ export default function AdminLiveDashboard() {
   const [deposits, setDeposits] = useState<DepositRow[]>([]);
   const [manualMatchGroup, setManualMatchGroup] = useState<OrderGroup | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string>("");
+  const [orderDetailOpen, setOrderDetailOpen] = useState(false);
   const [videoRatio, setVideoRatio] = useState<VideoRatio>("vertical");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -257,6 +258,7 @@ export default function AdminLiveDashboard() {
   useEffect(() => {
     if (!filteredOrders.length) {
       setSelectedOrderId("");
+      setOrderDetailOpen(false);
       return;
     }
 
@@ -270,6 +272,10 @@ export default function AdminLiveDashboard() {
     return filteredOrders.find((order) => order.id === selectedOrderId) || filteredOrders[0] || null;
   }, [filteredOrders, selectedOrderId]);
 
+  const closeOrderDetail = () => {
+    setOrderDetailOpen(false);
+  };
+
   const openManualMatchForOrder = (order: LiveOrder) => {
     const group = orderGroups.find((item) => item.groupId === order.groupId) || null;
 
@@ -278,6 +284,7 @@ export default function AdminLiveDashboard() {
       return;
     }
 
+    setOrderDetailOpen(false);
     setManualMatchGroup(group);
   };
 
@@ -392,13 +399,17 @@ export default function AdminLiveDashboard() {
           )}
 
           <section className="grid grid-cols-12 gap-3">
-            <div className="col-span-12 xl:col-span-9">
+            <div className="col-span-12 xl:col-span-12">
               <LiveOrderTable
                 orders={filteredOrders}
                 allOrderCount={orders.length}
                 selectedOrderId={selectedOrder?.id || ""}
-                onSelectOrder={(order) => setSelectedOrderId(order.id)}
+                onSelectOrder={(order) => {
+                  setSelectedOrderId(order.id);
+                  setOrderDetailOpen(true);
+                }}
                 onOpenManualMatch={openManualMatchForOrder}
+                onRefresh={loadOrders}
                 loading={loading}
                 filters={filters}
                 onFiltersChange={setFilters}
@@ -406,19 +417,16 @@ export default function AdminLiveDashboard() {
               />
             </div>
 
-            <div className="col-span-12 xl:col-span-3">
-              {selectedOrder ? (
-                <LiveOrderDetailDrawer
-                  order={selectedOrder}
-                  onOpenManualMatch={openManualMatchForOrder}
-                />
-              ) : (
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-black text-slate-400 shadow-sm">
-                  선택된 주문이 없습니다.
-                </div>
-              )}
-            </div>
+
           </section>
+
+          {orderDetailOpen && selectedOrder ? (
+            <LiveOrderDetailDrawer
+              order={selectedOrder}
+              onOpenManualMatch={openManualMatchForOrder}
+              onClose={closeOrderDetail}
+            />
+          ) : null}
 
           <ManualPaymentMatchDrawer
             group={manualMatchGroup}

@@ -25,6 +25,7 @@ export type LiveOrder = {
   createdAt: string | null;
   submittedAt: string;
   paidAt: string | null;
+  paidAtFull: string | null;
   nickname: string;
   name: string;
   phone: string;

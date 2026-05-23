@@ -151,6 +151,7 @@ export function toAdminLiveOrder(group: OrderGroup): LiveOrder {
     createdAt: first.created_at,
     submittedAt: formatTime(first.created_at),
     paidAt: first.deposit_confirmed_at ? formatTime(first.deposit_confirmed_at) : null,
+    paidAtFull: first.deposit_confirmed_at || null,
     nickname: first.youtube_nickname || first.customer_name || "-",
     name: first.customer_name || "-",
     phone: first.customer_phone || first.phone || "-",

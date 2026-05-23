@@ -332,13 +332,13 @@ export default function ManualPaymentMatchDrawer(props: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-[90] bg-slate-950/35">
-      <aside className="ml-auto flex h-full w-full max-w-[620px] flex-col bg-white shadow-[0_24px_80px_rgba(15,23,42,0.28)]">
+    <div className="fixed inset-0 z-[90] bg-slate-950/30">
+      <aside className="fixed bottom-5 right-5 top-[118px] z-[95] flex w-[390px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
         <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-3">
           <div className="mb-3 flex items-start justify-between gap-4">
             <div>
               <div className="text-[10px] font-black tracking-[0.18em] text-slate-400">MANUAL PAYMENT MATCH</div>
-              <h2 className="mt-0.5 text-2xl font-black tracking-[-0.04em] text-slate-950">수동 입금매칭</h2>
+              <h2 className="mt-0.5 text-xl font-black tracking-[-0.04em] text-slate-950">수동 입금매칭</h2>
             </div>
 
             <div className="rounded-xl bg-orange-50 px-3 py-2 text-right text-[11px] font-black text-orange-700">
