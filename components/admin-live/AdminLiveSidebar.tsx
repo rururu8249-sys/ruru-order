@@ -4,8 +4,8 @@ const menus = [
   { key: "broadcast", label: "방송", icon: "📡", desc: "라이브 컨트롤타워" },
   { key: "orders", label: "주문관리", icon: "📋", desc: "주문 상세 관리" },
   { key: "payments", label: "입금확인", icon: "₩", desc: "입금·수동매칭" },
-  { key: "customers", label: "회원관리", icon: "👤", desc: "고객·특이사항" },
-  { key: "settlement", label: "정산", icon: "◔", desc: "방송·날짜별 정산" },
+  { key: "customers", label: "고객관리", icon: "👤", desc: "고객·특이사항" },
+  { key: "settlement", label: "정산통계", icon: "◔", desc: "방송·날짜별 통계" },
   { key: "settings", label: "설정", icon: "⚙", desc: "운영 설정" },
 ];
 
@@ -55,7 +55,7 @@ export default function AdminLiveSidebar() {
             현재 화면
           </div>
           <p className="text-[11px] leading-5 text-slate-500">
-            방송 메뉴는 실시간 주문·입금매칭 중심입니다. 주문관리/회원관리는 별도 화면으로 확장합니다.
+            방송 메뉴는 실시간 주문·입금확인 중심입니다. 주문관리/고객관리/정산통계는 별도 화면으로 확장합니다.
           </p>
         </div>
       </div>

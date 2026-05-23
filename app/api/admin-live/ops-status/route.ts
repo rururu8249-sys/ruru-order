@@ -35,7 +35,7 @@ function amount(row: Record<string, unknown>) {
 }
 
 function isAutoPaid(row: Record<string, unknown>) {
-  const status = clean(row.admin_order_status_v2 || row.order_manage_status || row.payment_status);
+  const status = clean(row.admin_order_status_v2 || row.order_manage_status);
   return status === "자동입금확인" || status === "자동입금확인완료" || status === "auto_paid";
 }
 
@@ -57,7 +57,7 @@ export async function GET() {
     const { data: orders, error: ordersError } = await supabase
       .from("orders")
       .select(
-        "id, order_group_id, order_lookup_code, created_at, youtube_nickname, customer_name, final_amount, adjusted_total_price, total_price, product_price, admin_order_status_v2, order_manage_status, payment_status, deposit_confirmed_at"
+        "id, order_group_id, order_lookup_code, created_at, youtube_nickname, customer_name, final_amount, adjusted_total_price, total_price, product_price, admin_order_status_v2, order_manage_status, deposit_confirmed_at"
       )
       .gte("created_at", since)
       .order("created_at", { ascending: false })

@@ -23,39 +23,39 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
 
   const stats = [
     {
-      label: "총매출 (미입금포함)",
+      label: "총 주문금액",
       amount: money(totalAmount),
       sub: `주문 ${orders.length}건`,
       icon: "📈",
-      color: "bg-violet-50 text-violet-700",
+      color: "bg-slate-50 text-slate-700",
     },
     {
-      label: "무통장입금",
+      label: "무통장 입금확인",
       amount: money(bankPaid.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)),
-      sub: `입금완료 ${bankPaid.length}건`,
+      sub: `입금확인 ${bankPaid.length}건`,
       icon: "🏦",
-      color: "bg-orange-50 text-orange-700",
+      color: "bg-emerald-50 text-emerald-700",
     },
     {
-      label: "무통장미입금",
+      label: "무통장 미입금",
       amount: money(bankUnpaid.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)),
       sub: `미입금 ${bankUnpaid.length}건`,
       icon: "⏱",
-      color: "bg-amber-50 text-amber-700",
+      color: "bg-red-50 text-red-700",
     },
     {
       label: "카드결제완료",
       amount: money(cardPaid.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)),
       sub: `결제완료 ${cardPaid.length}건`,
       icon: "💳",
-      color: "bg-emerald-50 text-emerald-700",
+      color: "bg-violet-50 text-violet-700",
     },
     {
-      label: "카드미결제",
+      label: "카드 미결제",
       amount: money(cardUnpaid.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)),
       sub: `미결제 ${cardUnpaid.length}건`,
       icon: "💳",
-      color: "bg-blue-50 text-blue-700",
+      color: "bg-red-50 text-red-700",
     },
   ];
 

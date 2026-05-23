@@ -467,8 +467,8 @@ export default function PaymentMatchPanel({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-end gap-3">
-            <h1 className="text-[30px] font-black tracking-[-0.04em] text-neutral-950">입금관리</h1>
-            <div className="pb-1 text-[14px] font-bold text-neutral-500">실제 들어온 입금내역 단순 조회</div>
+            <h1 className="text-[30px] font-black tracking-[-0.04em] text-neutral-950">입금확인</h1>
+            <div className="pb-1 text-[14px] font-bold text-neutral-500">입금내역을 주문과 비교해 자동·수동 입금확인을 처리합니다.</div>
           </div>
           <div className="mt-1 text-[12px] font-bold text-neutral-400">
             {lastAutoSyncLabel ? `최근 새로고침 ${lastAutoSyncLabel}` : lastAutoSyncMessage}
@@ -481,7 +481,7 @@ export default function PaymentMatchPanel({
           disabled={syncing || autoSyncLoading || serverDepositLoading}
           className="h-12 rounded-2xl bg-blue-600 px-6 text-[15px] font-black text-white shadow-sm active:scale-[0.98] disabled:bg-neutral-300"
         >
-          {syncing || autoSyncLoading || serverDepositLoading ? "조회중..." : "↻ 입금내역 새로고침"}
+          {syncing || autoSyncLoading || serverDepositLoading ? "조회중..." : "입금내역 새로고침"}
         </button>
       </div>
 
@@ -503,7 +503,7 @@ export default function PaymentMatchPanel({
             <input
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
-              placeholder="입금자명 또는 금액으로 검색"
+              placeholder="입금자명 / 금액 / 메모 검색"
               className="h-11 rounded-xl border border-neutral-200 bg-white px-4 text-sm font-bold outline-none focus:border-neutral-950"
             />
           </label>
@@ -589,8 +589,8 @@ export default function PaymentMatchPanel({
           <div>입금일시</div>
           <div>입금자명</div>
           <div className="text-right">입금금액</div>
-          <div className="text-center">연결주문</div>
-          <div className="text-center">기록메모</div>
+          <div className="text-center">연결 주문</div>
+          <div className="text-center">기록 메모</div>
           <div className="text-center">상세</div>
         </div>
 
