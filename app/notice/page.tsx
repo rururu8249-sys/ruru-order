@@ -21,7 +21,7 @@ import CustomerTopNav from "@/components/customer/CustomerTopNav";
 import NoticePageHero from "@/components/notice/NoticePageHero";
 import NoticeStateMessage from "@/components/notice/NoticeStateMessage";
 import NoticeCard from "@/components/notice/NoticeCard";
-import NoticeKakaoContactCard from "@/components/notice/NoticeKakaoContactCard";
+import NoticePagination from "@/components/notice/NoticePagination";
 
 type Notice = {
   id: number;
@@ -33,9 +33,6 @@ type Notice = {
   sort_order: number;
   created_at: string;
 };
-
-const KAKAO_CHANNEL_URL = "https://pf.kakao.com/_RMxaqX";
-
 
 const blockCustomerCopyEvents = () => {
   const block = (event: Event) => event.preventDefault();
@@ -79,6 +76,7 @@ export default function NoticePage() {
   }, []);
 
   const [notices, setNotices] = useState<Notice[]>([]);
+  const [noticePage, setNoticePage] = useState(1);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -98,6 +96,7 @@ export default function NoticePage() {
 
     if (!error) {
       setNotices(data || []);
+    setNoticePage(1);
     }
 
     setLoading(false);
@@ -105,6 +104,14 @@ export default function NoticePage() {
 
 
 
+
+  const NOTICES_PER_PAGE = 2;
+  const totalNoticePages = Math.max(1, Math.ceil(notices.length / NOTICES_PER_PAGE));
+  const safeNoticePage = Math.min(noticePage, totalNoticePages);
+  const visibleNotices = notices.slice(
+    (safeNoticePage - 1) * NOTICES_PER_PAGE,
+    safeNoticePage * NOTICES_PER_PAGE
+  );
 
   return (
     <main className="min-h-screen select-none bg-[#f5f8ff] px-4 py-6 text-[#151923]" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
@@ -119,12 +126,19 @@ export default function NoticePage() {
         )}
 
         <div className="space-y-4">
-          {notices.map((notice) => (
+          {visibleNotices.map((notice) => (
             <NoticeCard key={notice.id} notice={notice} />
           ))}
         </div>
 
-        <NoticeKakaoContactCard kakaoUrl={KAKAO_CHANNEL_URL} />
+        {notices.length > 0 && (
+          <NoticePagination
+            currentPage={safeNoticePage}
+            totalPages={totalNoticePages}
+            onPageChange={setNoticePage}
+          />
+        )}
+
 
         <footer className="py-8 text-center">
           <p className="text-[15px] font-medium tracking-[-0.04em] text-slate-500">

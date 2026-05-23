@@ -235,6 +235,10 @@ export default function OrderPage() {
   const [items, setItems] = useState<OrderItem[]>([{ ...emptyItem }]);
   const [submitting, setSubmitting] = useState(false);
   const [showDepositConfirmModal, setShowDepositConfirmModal] = useState(false);
+  const PRIVACY_CONSENT_VERSION = "2026-05-24-v1";
+  const PRIVACY_CONSENT_STORAGE_KEY = "ruru_privacy_consent_version";
+  const [hasPrivacyConsent, setHasPrivacyConsent] = useState(false);
+  const [privacyConsentChecked, setPrivacyConsentChecked] = useState(false);
   const [done, setDone] = useState<DoneData | null>(null);
   const [copyDone, setCopyDone] = useState(false);
   const [customerCardRate, setCustomerCardRate] = useState(10);
@@ -264,6 +268,16 @@ export default function OrderPage() {
     loadOrderSettings();
     loadBroadcast();
     loadSavedCustomerInfo();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const savedConsentVersion = window.localStorage.getItem(PRIVACY_CONSENT_STORAGE_KEY) || "";
+    if (savedConsentVersion === PRIVACY_CONSENT_VERSION) {
+      setHasPrivacyConsent(true);
+      setPrivacyConsentChecked(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -1153,11 +1167,21 @@ export default function OrderPage() {
       return false;
     }
 
+    if (!hasPrivacyConsent && !privacyConsentChecked) {
+      alert("개인정보 수집·이용 및 배송정보 제공 안내 확인이 필요합니다.");
+      return false;
+    }
+
     return true;
   };
 
   const submitOrder = async () => {
     if (!validate()) return;
+
+    if (!hasPrivacyConsent && privacyConsentChecked && typeof window !== "undefined") {
+      window.localStorage.setItem(PRIVACY_CONSENT_STORAGE_KEY, PRIVACY_CONSENT_VERSION);
+      setHasPrivacyConsent(true);
+    }
 
     setSubmitting(true);
 
@@ -1312,6 +1336,8 @@ export default function OrderPage() {
   };
 
   const handleSubmitOrderClick = () => {
+    if (!validate()) return;
+
     if (paymentMethod !== "무통장입금") {
       submitOrder();
       return;
@@ -1380,7 +1406,7 @@ export default function OrderPage() {
 
   return (
     <OrderPageShell>
-        {isAutoLoggedIn && <TopCustomerNav />}
+        {hasSavedInfo && <TopCustomerNav />}
 
         {isKakaoLoginReturn && !isAutoLoggedIn && (
           <OrderKakaoNicknameNotice
@@ -1416,24 +1442,13 @@ export default function OrderPage() {
 
         {isAutoLoggedIn && (
           <>
-            <section className="mb-4 rounded-[28px] bg-white px-5 py-4 shadow-[0_12px_28px_rgba(30,64,175,0.08)] ring-1 ring-blue-100">
-              <div className="text-[15px] font-black tracking-[-0.04em] text-blue-700">
-                바로 주문 가능
-              </div>
-              <p className="mt-1 text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
-                주문상품을 입력해주세요.
-              </p>
-            </section>
-
-        <section id="orderProductInputSection" className="mt-4 rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm">
+<section id="orderProductInputSection" className="mt-4 rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-black">주문상품</h2>
 
           <div className="mt-4 rounded-[1.4rem] bg-blue-50 p-4">
             <div className="flex items-start justify-between gap-3">
-              <div className="text-sm font-black leading-relaxed text-blue-700">
-                ⚠️ 상품 1칸 = 상품 1개만 작성
-                <br />
-                💰 상품금액만 입력 · 택배비 제외
+              <div className="break-keep text-sm font-black leading-relaxed text-blue-700">
+                ⚠️ 상품은 1칸에 1개씩 · 금액은 택배비 제외
               </div>
 
               <button
@@ -1581,10 +1596,6 @@ export default function OrderPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl bg-blue-50 px-3 py-2 text-xs font-black leading-relaxed text-blue-800">
-                    💰 상품금액만 입력해주세요. 택배비는 자동으로 따로 계산됩니다.
-                  </div>
-
                   {item.product_name && (
                     <div className="rounded-2xl bg-white p-3 text-sm font-black text-gray-600">
                       {itemLabel(item)} / {won(toNumber(item.product_price) * toNumber(item.qty))}
@@ -1644,7 +1655,7 @@ export default function OrderPage() {
 
             {alreadyPaidShipping && (
               <div className="rounded-2xl bg-green-50 p-3 text-xs font-black leading-relaxed text-green-700">
-                ✅ 같은 전화번호의 기존 배송비 결제가 확인되어 이번 주문은 합배송 배송비 0원으로 적용됩니다.
+                ✅ 합배송 가능 주문으로 확인되어 이번 주문서 배송비는 0원입니다.
               </div>
             )}
 
@@ -1661,6 +1672,22 @@ export default function OrderPage() {
               totalAmount={totalAmount}
               paymentMethod={paymentMethod}
             />
+
+            {!hasPrivacyConsent && (
+              <label className="flex cursor-pointer items-start gap-3 rounded-[22px] bg-blue-50 p-4 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-blue-900 ring-1 ring-blue-100 active:scale-[0.99]">
+                <input
+                  type="checkbox"
+                  checked={privacyConsentChecked}
+                  onChange={(event) => setPrivacyConsentChecked(event.target.checked)}
+                  className="mt-1 h-5 w-5 shrink-0 accent-blue-600"
+                />
+                <span>
+                  [필수] 개인정보 수집·이용 및 배송정보 제공 안내를 확인했습니다.
+                  <br />
+                  <span className="text-slate-500">최초 1회 동의 후 다음 주문부터는 다시 표시되지 않습니다.</span>
+                </span>
+              </label>
+            )}
 
             <button
               type="button"

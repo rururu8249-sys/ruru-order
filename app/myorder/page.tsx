@@ -186,6 +186,7 @@ export default function MyOrderPage() {
     setHasCustomerInfo(true);
 
     setOrders(data || []);
+    setOrderPage(1);
     setLoading(false);
   };
 
@@ -203,7 +204,7 @@ export default function MyOrderPage() {
     }
   };
 
-  const ORDERS_PER_PAGE = 4;
+  const ORDERS_PER_PAGE = 2;
   const totalOrderPages = Math.max(1, Math.ceil(orders.length / ORDERS_PER_PAGE));
   const safeOrderPage = Math.min(orderPage, totalOrderPages);
   const visibleOrders = orders.slice(
@@ -243,11 +244,6 @@ export default function MyOrderPage() {
           />
         )}
 
-        {isLoggedIn && (
-          <section className="mt-4 rounded-[24px] bg-white p-4 text-sm font-black text-blue-700 shadow-[0_8px_18px_rgba(30,64,175,0.06)] ring-1 ring-blue-100">
-            {customerName}님 주문내역을 최근 7일 기준으로 불러왔습니다.
-          </section>
-        )}
 
         {searched && orders.length === 0 && <MyOrderEmptyState />}
 

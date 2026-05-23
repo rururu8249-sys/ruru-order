@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-// components/order/OrderCompletePaymentNotice.tsx
-// 목적: 주문완료 후 입금계좌 최상단 안내 + 주문상품/배송비/총액 확인 UI
-// 주의: UI 전용. 주문 저장, 주문번호 생성, 금액 계산, 입금매칭, Supabase 로직 없음.
-
 import { useState } from "react";
+
+// components/order/OrderCompletePaymentNotice.tsx
+// 목적: 주문완료 후 입금계좌 안내 + 주문상품/배송비/총액 확인 UI
+// 주의: UI 전용. 주문 저장, 주문번호 생성, 금액 계산, 입금매칭, Supabase 로직 없음.
 
 type OrderDoneItem = {
   product_name?: string;
@@ -55,7 +55,6 @@ export default function OrderCompletePaymentNotice({
   items = [],
 }: OrderCompletePaymentNoticeProps) {
   const [copyDone, setCopyDone] = useState(false);
-  const depositName = clean(nickname || name) || "현재 닉네임";
   const totalQty = items.reduce((sum, item) => sum + toNumber(item.qty), 0);
 
   const copyAccount = async () => {
@@ -72,10 +71,10 @@ export default function OrderCompletePaymentNotice({
     <section className="mt-4 grid gap-4">
       <section className="px-2 pt-2 text-center">
         <h1 className="text-[31px] font-black leading-tight tracking-[-0.08em] text-[#151923]">
-          주문 완료 / 입금 안내
+          주문이 접수됐어요
         </h1>
         <p className="mt-2 text-[15px] font-bold tracking-[-0.04em] text-slate-600">
-          입금 정보를 먼저 확인해주세요.
+          아래 안내에 맞춰 입금을 진행해주세요.
         </p>
       </section>
 
@@ -88,17 +87,14 @@ export default function OrderCompletePaymentNotice({
               </div>
 
               <div>
-                <div className="text-[12px] font-black text-red-500">
-                  입금정보를 확인해주세요
-                </div>
-                <h2 className="mt-1 text-[24px] font-black tracking-[-0.07em] text-[#151923]">
+                <h2 className="text-[24px] font-black tracking-[-0.07em] text-[#151923]">
                   입금계좌 안내
                 </h2>
               </div>
             </div>
 
             <span className="shrink-0 rounded-full bg-blue-100 px-3 py-1.5 text-[12px] font-black text-blue-700">
-              입금 확인 후 준비
+              입금 후 준비
             </span>
           </div>
 
@@ -123,7 +119,9 @@ export default function OrderCompletePaymentNotice({
             </div>
 
             <div className="mt-5 rounded-2xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-center text-[14px] font-black leading-relaxed tracking-[-0.04em] text-yellow-800">
-              ⚠️ 반드시 <span className="text-orange-600">현재 닉네임</span>으로 입금해주세요
+              ⚠️ 닉네임과 금액이 다르면 자동확인이 늦어질 수 있습니다.
+              <br />
+              입금 후 보통 10~30분 정도 소요됩니다.
             </div>
           </div>
 
@@ -134,18 +132,6 @@ export default function OrderCompletePaymentNotice({
           >
             {copyDone ? "✓ 계좌번호가 복사되었습니다" : "계좌번호 복사"}
           </button>
-
-          <div className="mt-3 rounded-2xl bg-white/75 px-4 py-3 text-center text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-blue-800 ring-1 ring-blue-100">
-            입금자명 <span className="font-black text-blue-700">{depositName}</span>
-            <br />
-            이번 주문서 결제금액 <span className="font-black text-blue-700">{won(totalAmount)}</span>
-          </div>
-
-          <div className="mt-3 rounded-2xl bg-red-50 px-4 py-3 text-center text-[13px] font-black leading-relaxed tracking-[-0.04em] text-red-600 ring-1 ring-red-100">
-            닉네임이나 금액이 다르면 자동입금확인이 늦어질 수 있어요.
-            <br />
-            입금 후 보통 10~30분 정도 걸릴 수 있습니다.
-          </div>
         </section>
       ) : (
         <section className="rounded-[30px] bg-blue-50 p-5 shadow-[0_14px_35px_rgba(30,64,175,0.08)] ring-1 ring-blue-200">
@@ -231,18 +217,18 @@ export default function OrderCompletePaymentNotice({
           </div>
 
           <div className="mt-3 flex items-center justify-between border-t border-blue-100 pt-3 text-[18px] font-black text-[#151923]">
-            <span>이번 주문서 결제금액</span>
+            <span>결제금액</span>
             <span className="text-blue-600">{won(totalAmount)}</span>
           </div>
         </div>
       </section>
+
       <Link
         href="/myorder"
         className="mt-3 flex w-full items-center justify-center rounded-[24px] bg-blue-600 px-5 py-5 text-[18px] font-black text-white shadow-[0_16px_34px_rgba(37,99,235,0.30)] transition-all duration-150 active:scale-[0.98]"
       >
         확인하고 주문조회로 이동
       </Link>
-
     </section>
   );
 }

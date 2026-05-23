@@ -46,17 +46,6 @@ export default function CustomerHomeHero({
         </div>
       </Link>
 
-      <div className="mt-5 rounded-[24px] bg-white p-4 text-center shadow-[0_10px_24px_rgba(30,64,175,0.07)] ring-1 ring-blue-100">
-        <p className="break-keep text-[15px] font-bold leading-relaxed tracking-[-0.04em] text-[#151923]">
-          <br />
-        </p>
-
-        {isLoggedIn && (
-          <p className="mt-2 text-[13px] font-black text-blue-600">
-            {greetingName || "고객"}님, 바로 주문 가능합니다.
-          </p>
-        )}
-      </div>
     </section>
   );
 }

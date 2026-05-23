@@ -24,8 +24,8 @@ export default function OrderCustomerTopNav({
   return (
     <header className="mb-4 rounded-[24px] bg-white/95 px-4 py-4 shadow-[0_10px_24px_rgba(30,64,175,0.07)] ring-1 ring-blue-100/70">
       <div className="flex items-start justify-between gap-3">
-        <Link href="/home" className="min-w-0 transition active:scale-[0.99]">
-          <p className="text-[15px] font-black tracking-[-0.04em] text-blue-700">
+        <div className={"min-w-0 transition active:scale-[0.99]"}>
+<p className="text-[15px] font-black tracking-[-0.04em] text-blue-700">
             루루동이 LIVE
           </p>
 
@@ -34,7 +34,8 @@ export default function OrderCustomerTopNav({
               ? `${greetingName || "고객"}님 안녕하세요`
               : "주문 전 정보를 확인해주세요"}
           </p>
-        </Link>
+        
+</div>
 
         {isLoggedIn && <CustomerPointBadge className="shrink-0" />}
       </div>
