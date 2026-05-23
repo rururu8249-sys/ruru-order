@@ -12,6 +12,7 @@ import { getCustomerOrderStatusLabel } from "@/lib/admin-v2/statusDisplay";
 // - 고객 페이지 퍼가기 방지 유지
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import CustomerTopNav from "@/components/customer/CustomerTopNav";
 import MyOrderPageHero from "@/components/myorder/MyOrderPageHero";
@@ -127,31 +128,44 @@ export default function MyOrderPage() {
   const [copyDone, setCopyDone] = useState(false);
   const [hasCustomerInfo, setHasCustomerInfo] = useState(false);
 
+  const [isLegacyMode, setIsLegacyMode] = useState(false);
+
   useEffect(() => {
     return blockCustomerCopyEvents();
   }, []);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const legacyMode = params.get("legacy") === "1";
+    setIsLegacyMode(legacyMode);
+
     const savedName = localStorage.getItem("ruru_customer_name") || "";
     const savedPhone = localStorage.getItem("ruru_customer_phone") || "";
 
     if (savedName) setCustomerName(savedName);
     if (savedPhone) setPhone(savedPhone);
 
-    if (savedName && savedPhone) {
+    if (savedPhone) {
       setHasCustomerInfo(true);
 
       setTimeout(() => {
-        void loadOrders(savedName, savedPhone);
+        void loadOrders(savedName, savedPhone, legacyMode);
       }, 100);
     }
   }, []);
 
-  const loadOrders = async (nameValue = customerName, phoneValue = phone) => {
+  const loadOrders = async (
+    nameValue = customerName,
+    phoneValue = phone,
+    legacyOverride?: boolean
+  ) => {
     const name = String(nameValue || "").trim();
     const cleanPhone = normalizePhone(phoneValue);
 
-    if (!name) {
+    const useLegacyNameFilter =
+      typeof legacyOverride === "boolean" ? legacyOverride : isLegacyMode;
+
+    if (useLegacyNameFilter && !name) {
       alert("이름을 입력해주세요.");
       return;
     }
@@ -167,13 +181,17 @@ export default function MyOrderPage() {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("orders")
       .select("*")
-      .eq("customer_name", name)
       .eq("customer_phone", cleanPhone)
-      .gte("created_at", sevenDaysAgo.toISOString())
-      .order("created_at", { ascending: false });
+      .gte("created_at", sevenDaysAgo.toISOString());
+
+    if (useLegacyNameFilter) {
+      query = query.eq("customer_name", name);
+    }
+
+    const { data, error } = await query.order("created_at", { ascending: false });
 
     if (error) {
       setLoading(false);
@@ -181,7 +199,9 @@ export default function MyOrderPage() {
       return;
     }
 
-    localStorage.setItem("ruru_customer_name", name);
+    if (name) {
+      localStorage.setItem("ruru_customer_name", name);
+    }
     localStorage.setItem("ruru_customer_phone", cleanPhone);
     setHasCustomerInfo(true);
 
@@ -239,7 +259,7 @@ export default function MyOrderPage() {
           />
         )}
 
-        {!isLoggedIn && (
+        {isLegacyMode && !isLoggedIn && (
           <MyOrderLookupForm
             customerName={customerName}
             formattedPhone={formatPhone(phone)}
@@ -248,6 +268,23 @@ export default function MyOrderPage() {
             onPhoneChange={(value) => setPhone(normalizePhone(value))}
             onSubmit={() => loadOrders()}
           />
+        )}
+
+        {!isLegacyMode && !isLoggedIn && (
+          <section className="mt-4 rounded-[28px] bg-white p-5 text-center shadow-[0_10px_24px_rgba(30,64,175,0.08)] ring-1 ring-blue-100">
+            <h2 className="text-[22px] font-black tracking-[-0.06em] text-[#151923]">
+              카카오 간편주문 후 조회 가능
+            </h2>
+            <p className="mt-2 break-keep text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
+              주문조회는 카카오 간편주문에 저장된 전화번호 기준으로 확인됩니다.
+            </p>
+            <Link
+              href="/"
+              className="mt-4 flex min-h-[54px] w-full items-center justify-center rounded-[20px] bg-blue-600 px-4 py-3 text-[16px] font-black text-white shadow-[0_12px_26px_rgba(37,99,235,0.22)] transition active:scale-[0.98]"
+            >
+              카카오로 간편 주문 시작
+            </Link>
+          </section>
         )}
 
 
