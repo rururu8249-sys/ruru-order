@@ -44,9 +44,60 @@ function getDepositName(deposit: DepositRow) {
   return text(row.depositor || row.deposit_depositor || row.depositor_name || row.sender_name || row.name) || "-";
 }
 
-function getDepositTime(deposit: DepositRow) {
+function getDepositRawDateTime(deposit: DepositRow) {
   const row = deposit as any;
-  return text(row.deposited_time || row.created_at || row.deposit_time || row.deposited_at) || "-";
+  const candidates = [
+    row.deposited_at,
+    row.created_at,
+    row.deposit_datetime,
+    row.deposited_time,
+    row.deposit_time,
+  ];
+
+  return text(candidates.find((value) => text(value))) || "";
+}
+
+function getDepositTime(deposit: DepositRow) {
+  return getDepositRawDateTime(deposit) || "-";
+}
+
+function formatDepositDateTime(deposit: DepositRow) {
+  const row = deposit as any;
+  const raw = getDepositRawDateTime(deposit);
+
+  if (!raw) return "-";
+
+  const date = new Date(raw);
+
+  if (!Number.isFinite(date.getTime())) {
+    const dateText = text(row.deposited_date || row.deposit_date || row.date);
+    const timeText = text(row.deposited_time || row.deposit_time);
+
+    if (dateText && timeText) {
+      const combined = new Date(`${dateText} ${timeText}`);
+      if (Number.isFinite(combined.getTime())) {
+        return formatKoreanDateTime(combined);
+      }
+
+      return `${dateText} ${timeText}`;
+    }
+
+    return raw;
+  }
+
+  return formatKoreanDateTime(date);
+}
+
+function formatKoreanDateTime(date: Date) {
+  const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
+  const yyyy = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const weekday = weekdays[date.getDay()];
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mi = String(date.getMinutes()).padStart(2, "0");
+
+  return `${yyyy}년 ${month}월 ${day}일(${weekday}) ${hh}:${mi}`;
 }
 
 function getDepositMemo(deposit: DepositRow) {
@@ -343,7 +394,7 @@ export default function AdminLivePaymentPanel({ deposits, orderGroups }: Props) 
                 key={String((deposit as any).id || index)}
                 className="grid grid-cols-[150px_1fr_130px_130px_1fr] items-center border-t border-slate-100 px-4 py-3 text-sm"
               >
-                <div className="truncate font-bold text-slate-500">{getDepositTime(deposit)}</div>
+                <div className="truncate font-bold text-slate-500">{formatDepositDateTime(deposit)}</div>
                 <div className="truncate font-black text-slate-900">{getDepositName(deposit)}</div>
                 <div className="text-right font-black text-slate-900">{money(getDepositAmount(deposit))}</div>
                 <div className="text-center">{statusBadge(deposit)}</div>
