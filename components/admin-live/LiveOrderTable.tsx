@@ -484,10 +484,10 @@ export default function LiveOrderTable({
                     <td className="px-4 py-3 text-right font-black text-slate-700">{money(order.productAmount)}</td>
                     <td className="px-4 py-3 text-right font-black text-slate-700">{money(order.shippingFee)}</td>
                     <td className="px-3 py-3 text-center">
-                      {order.paymentStatus === "manual_match_needed" ? (
+                      {order.paymentStatus === "manual_match_needed" && onOpenManualMatch ? (
                         <button
                           type="button"
-                          onClick={() => onOpenManualMatch?.(order)}
+                          onClick={() => onOpenManualMatch(order)}
                           className="rounded-lg border border-orange-300 bg-orange-50 px-3 py-1 text-xs font-black text-orange-700 hover:bg-orange-100"
                         >
                           매칭하기

@@ -486,7 +486,22 @@ export default function AdminLiveDashboard() {
 
             </>
           ) : activeMenu === "orders" ? (
-            <AdminLiveOrdersPanel orders={orders} />
+            <AdminLiveOrdersPanel
+              orders={filteredOrders}
+              allOrderCount={orders.length}
+              selectedOrder={selectedOrder}
+              selectedOrderId={selectedOrder?.id || ""}
+              orderDetailOpen={orderDetailOpen}
+              filters={filters}
+              broadcastOptions={broadcastOptions}
+              onSelectOrder={(order) => {
+                setSelectedOrderId(order.id);
+                setOrderDetailOpen(true);
+              }}
+              onCloseOrderDetail={() => setOrderDetailOpen(false)}
+              onFiltersChange={setFilters}
+              onRefresh={loadOrders}
+            />
           ) : activeMenu === "payments" ? (
             <AdminLivePaymentPanel deposits={deposits} orderGroups={orderGroups} />
           ) : activeMenu === "customers" ? (

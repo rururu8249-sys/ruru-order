@@ -108,10 +108,10 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           </div>
         </section>
 
-        {order.paymentStatus === "manual_match_needed" && (
+        {order.paymentStatus === "manual_match_needed" && onOpenManualMatch && (
           <button
             type="button"
-            onClick={() => onOpenManualMatch?.(order)}
+            onClick={() => onOpenManualMatch(order)}
             className="mt-3 h-12 w-full rounded-2xl bg-orange-500 text-sm font-black text-white shadow-sm hover:bg-orange-600 active:scale-[0.99]"
           >
             입금확인 열기
