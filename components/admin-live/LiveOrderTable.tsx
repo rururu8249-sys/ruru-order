@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { LiveOrder } from "./types";
 
-export type LiveOrderDateFilter = "all" | "today" | "yesterday" | "7days" | "month";
+export type LiveOrderDateFilter = "all" | "today" | "yesterday" | "7days" | "month" | "custom";
 export type LiveOrderStatusFilter =
   | "all"
   | "unpaid"
@@ -15,6 +15,8 @@ export type LiveOrderStatusFilter =
 export type LiveOrderFilters = {
   broadcast: string;
   date: LiveOrderDateFilter;
+  customStartDate: string;
+  customEndDate: string;
   status: LiveOrderStatusFilter;
   keyword: string;
 };
@@ -203,7 +205,7 @@ export default function LiveOrderTable({
 
   useEffect(() => {
     setPage(1);
-  }, [filters.broadcast, filters.date, filters.status, filters.keyword, sortMode, pageSize]);
+  }, [filters.broadcast, filters.date, filters.customStartDate, filters.customEndDate, filters.status, filters.keyword, sortMode, pageSize]);
 
   useEffect(() => {
     setPendingKeyword(filters.keyword);
@@ -266,6 +268,8 @@ export default function LiveOrderTable({
     onFiltersChange({
       broadcast: "all",
       date: "all",
+      customStartDate: "",
+      customEndDate: "",
       status: "all",
       keyword: "",
     });
@@ -384,7 +388,27 @@ export default function LiveOrderTable({
           <option value="yesterday">어제</option>
           <option value="7days">최근 7일</option>
           <option value="month">이번 달</option>
+          <option value="custom">직접 선택</option>
         </select>
+
+        {filters.date === "custom" && (
+          <>
+            <input
+              type="date"
+              value={filters.customStartDate}
+              onChange={(event) => updateFilter("customStartDate", event.target.value)}
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+              aria-label="시작일"
+            />
+            <input
+              type="date"
+              value={filters.customEndDate}
+              onChange={(event) => updateFilter("customEndDate", event.target.value)}
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+              aria-label="종료일"
+            />
+          </>
+        )}
 
         <select
           value={filters.status}

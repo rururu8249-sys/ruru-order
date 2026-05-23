@@ -38,6 +38,8 @@ type VideoRatio = "vertical" | "wide" | "auto";
 const DEFAULT_FILTERS: LiveOrderFilters = {
   broadcast: "all",
   date: "all",
+  customStartDate: "",
+  customEndDate: "",
   status: "all",
   keyword: "",
 };
@@ -116,26 +118,66 @@ function matchesStatus(order: LiveOrder, status: LiveOrderFilters["status"]) {
   return order.paymentStatus === status;
 }
 
-function matchesDate(order: LiveOrder, dateFilter: LiveOrderFilters["date"]) {
+function localDateKey(value: string | null | undefined) {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function normalizeDateInput(value: string) {
+  const nextValue = String(value || "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(nextValue) ? nextValue : "";
+}
+
+function matchesDate(order: LiveOrder, filters: LiveOrderFilters) {
+  const dateFilter = filters.date;
+
   if (dateFilter === "all") return true;
 
-  const orderDateKey = toDateKey(order.createdAt);
+  const orderDateKey = localDateKey(order.createdAt);
   if (!orderDateKey) return false;
 
+  if (dateFilter === "custom") {
+    const startDate = normalizeDateInput(filters.customStartDate);
+    const endDate = normalizeDateInput(filters.customEndDate);
+
+    if (!startDate && !endDate) return true;
+    if (startDate && orderDateKey < startDate) return false;
+    if (endDate && orderDateKey > endDate) return false;
+
+    return true;
+  }
+
   const now = new Date();
-  const todayKey = toDateKey(now.toISOString());
-  const yesterdayKey = toDateKey(addDays(now, -1).toISOString());
+  const todayKey = localDateKey(now.toISOString());
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const yesterdayKey = localDateKey(yesterday.toISOString());
 
   if (dateFilter === "today") return orderDateKey === todayKey;
   if (dateFilter === "yesterday") return orderDateKey === yesterdayKey;
 
+  const orderDate = new Date(order.createdAt || orderDateKey);
+  if (!Number.isFinite(orderDate.getTime())) return false;
+
   if (dateFilter === "7days") {
-    const startKey = toDateKey(addDays(now, -6).toISOString());
-    return orderDateKey >= startKey && orderDateKey <= todayKey;
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(now.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    return orderDate >= sevenDaysAgo;
   }
 
   if (dateFilter === "month") {
-    return orderDateKey.slice(0, 7) === todayKey.slice(0, 7);
+    return orderDate.getFullYear() === now.getFullYear() && orderDate.getMonth() === now.getMonth();
   }
 
   return true;
@@ -154,6 +196,10 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
     yesterday: "어제",
     "7days": "최근 7일",
     month: "이번 달",
+    custom:
+      filters.customStartDate || filters.customEndDate
+        ? `직접 선택 ${filters.customStartDate || "시작일"}~${filters.customEndDate || "종료일"}`
+        : "직접 선택",
   };
   parts.push(dateLabelMap[filters.date]);
 
@@ -302,7 +348,7 @@ export default function AdminLiveDashboard() {
 
       return (
         matchBroadcast &&
-        matchesDate(order, filters.date) &&
+        matchesDate(order, filters) &&
         matchesStatus(order, filters.status) &&
         matchKeyword
       );
