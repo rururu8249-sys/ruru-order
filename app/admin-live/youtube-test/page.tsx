@@ -139,7 +139,7 @@ export default function YoutubeLiveTestPage() {
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-lg font-black">라이브 채팅 테스트</h2>
               <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
-                YouTube Chat
+                채팅 연결
               </span>
             </div>
 
