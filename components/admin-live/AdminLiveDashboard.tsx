@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import ManualPaymentMatchDrawer from "@/components/admin-v2/payment/ManualPaymentMatchDrawer";
+import AdminLiveCustomersPanel from "./AdminLiveCustomersPanel";
 import AdminLiveMenuPlaceholder from "./AdminLiveMenuPlaceholder";
 import AdminLiveOrdersPanel from "./AdminLiveOrdersPanel";
 import AdminLivePaymentPanel from "./AdminLivePaymentPanel";
@@ -486,6 +487,8 @@ export default function AdminLiveDashboard() {
             <AdminLiveOrdersPanel orders={orders} />
           ) : activeMenu === "payments" ? (
             <AdminLivePaymentPanel deposits={deposits} orderGroups={orderGroups} />
+          ) : activeMenu === "customers" ? (
+            <AdminLiveCustomersPanel orders={orders} />
           ) : (
             <AdminLiveMenuPlaceholder menuKey={activeMenu} />
           )}
