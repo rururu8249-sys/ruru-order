@@ -177,7 +177,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    if (!["resolve", "hide"].includes(action)) {
+    if (!["resolve", "hide", "update"].includes(action)) {
       return NextResponse.json(
         { ok: false, message: "지원하지 않는 처리 방식입니다." },
         { status: 400 }
@@ -193,12 +193,21 @@ export async function PATCH(request: NextRequest) {
             updated_at: nowIso,
             resolved_note: resolvedNote || "관리자 숨김삭제 처리",
           }
-        : {
-            status: "done",
-            resolved_at: nowIso,
-            updated_at: nowIso,
-            resolved_note: resolvedNote || "관리자 해결완료 처리",
-          };
+        : action === "update"
+          ? {
+              ...(body?.title !== undefined ? { title: cleanText(body?.title, 300) } : {}),
+              ...(body?.body !== undefined ? { body: cleanText(body?.body, 8000) } : {}),
+              ...(body?.task_type !== undefined ? { task_type: normalizeTaskType(body?.task_type) } : {}),
+              ...(body?.priority !== undefined ? { priority: normalizePriority(body?.priority) } : {}),
+              ...(body?.raw_payload && typeof body.raw_payload === "object" ? { raw_payload: body.raw_payload } : {}),
+              updated_at: nowIso,
+            }
+          : {
+              status: "done",
+              resolved_at: nowIso,
+              updated_at: nowIso,
+              resolved_note: resolvedNote || "관리자 해결완료 처리",
+            };
 
     const { data, error } = await supabase
       .from("admin_tasks")
@@ -217,7 +226,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       task: data,
-      message: "고객 이슈 해결완료 처리",
+      message: action === "update" ? "고객 이슈 수정 완료" : "고객 이슈 처리 완료",
     });
   } catch (error) {
     return NextResponse.json(

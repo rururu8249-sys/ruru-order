@@ -1,3 +1,4 @@
+import PresenceHeartbeat from "@/components/PresenceHeartbeat";
 // app/layout.tsx
 // 전체 교체용
 // 파일 위치: /Users/ruru/Desktop/ruru-order-app/app/layout.tsx
@@ -23,7 +24,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <body>{children}</body>
+      <body>
+        <PresenceHeartbeat />{children}</body>
     </html>
   );
 }

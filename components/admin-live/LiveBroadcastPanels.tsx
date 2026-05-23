@@ -184,9 +184,32 @@ function getTaskContent(task: AdminIssueTask) {
     .filter((line) => !line.startsWith("닉네임:"))
     .filter((line) => !line.startsWith("이름:"))
     .filter((line) => !line.startsWith("전화번호:"))
-    .filter((line) => !line.startsWith("고객ID:"));
+    .filter((line) => !line.startsWith("고객ID:"))
+    .filter((line) => !line.startsWith("수정날짜:"));
 
   return lines.join(" / ") || clean(task.title) || "내용 없음";
+}
+
+function buildEditedTaskBody(task: AdminIssueTask, editedMemo: string) {
+  const body = getTaskBody(task);
+  const metaLines = body
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter(
+      (line) =>
+        line.startsWith("자동날짜:") ||
+        line.startsWith("이슈유형:") ||
+        line.startsWith("닉네임:") ||
+        line.startsWith("이름:") ||
+        line.startsWith("전화번호:") ||
+        line.startsWith("고객ID:")
+    );
+
+  const updatedAtLine = `수정날짜: ${formatDate(new Date().toISOString())}`;
+  const safeMetaLines = metaLines.length > 0 ? metaLines : [`자동날짜: ${formatDate(task.created_at || new Date().toISOString())}`];
+
+  return [...safeMetaLines, updatedAtLine, "", editedMemo.trim()].join("\n");
 }
 
 function getIssueTypeMetas(task: AdminIssueTask) {
@@ -234,10 +257,12 @@ function CustomerIssueCard({
   task,
   onResolve,
   onHide,
+  onEdit,
 }: {
   task: AdminIssueTask;
   onResolve: (task: AdminIssueTask) => void;
   onHide: (task: AdminIssueTask) => void;
+  onEdit: (task: AdminIssueTask) => void;
 }) {
   const done = isResolved(task);
   const metas = getIssueTypeMetas(task);
@@ -283,6 +308,13 @@ function CustomerIssueCard({
         <span className="mr-auto text-[11px] font-bold text-slate-400">
           {formatDate(task.created_at || task.updated_at)}
         </span>
+        <button
+          type="button"
+          onClick={() => onEdit(task)}
+          className="rounded-lg border border-blue-200 bg-white px-2 py-1 text-[11px] font-black text-blue-600 hover:bg-blue-50"
+        >
+          수정
+        </button>
         {!done ? (
           <button
             type="button"
@@ -592,6 +624,52 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
     await loadTasks();
   };
 
+  const editIssueMemo = async (task: AdminIssueTask) => {
+    const id = taskId(task);
+
+    if (!id) {
+      alert("수정할 이슈 ID가 없습니다.");
+      return;
+    }
+
+    const currentMemo = getTaskContent(task);
+    const editedMemo = window.prompt("고객이슈 메모를 수정하세요.", currentMemo);
+
+    if (editedMemo === null) return;
+
+    const memo = editedMemo.trim();
+
+    if (!memo) {
+      alert("메모 내용은 비워둘 수 없습니다.");
+      return;
+    }
+
+    const response = await fetch("/api/admin-v2/admin-tasks", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({
+        id,
+        action: "update",
+        title: task.title || `[고객이슈] ${getTaskNickname(task)}`,
+        body: buildEditedTaskBody(task, memo),
+        task_type: task.task_type || task.type || "general",
+        priority: task.priority || "normal",
+        raw_payload: task.raw_payload || {},
+      }),
+    });
+
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok || !payload?.ok) {
+      alert("고객이슈 수정 실패\n\n" + (payload?.message || "알 수 없는 오류"));
+      return;
+    }
+
+    window.dispatchEvent(new Event("ruru-admin-task-updated"));
+    await loadTasks();
+  };
+
   return (
     <section className="mb-4 grid grid-cols-12 items-stretch gap-3">
       <div className="col-span-12 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-4">
@@ -707,6 +785,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
                 task={task}
                 onResolve={resolveTask}
                 onHide={hideResolvedTask}
+                onEdit={editIssueMemo}
               />
             ))
           )}

@@ -1,3 +1,5 @@
+import LiveOpsStatusBox from "./LiveOpsStatusBox";
+
 const menus = [
   { key: "broadcast", label: "방송", icon: "📡", desc: "라이브 컨트롤타워" },
   { key: "orders", label: "주문관리", icon: "📋", desc: "주문 상세 관리" },
@@ -44,14 +46,18 @@ export default function AdminLiveSidebar() {
         })}
       </nav>
 
-      <div className="mt-auto rounded-2xl border border-slate-200 bg-slate-50 p-4">
-        <div className="mb-2 flex items-center gap-2 text-sm font-black text-slate-800">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-slate-500">!</span>
-          현재 화면
+      <div className="mt-auto space-y-3">
+        <LiveOpsStatusBox />
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+          <div className="mb-1.5 flex items-center gap-2 text-sm font-black text-slate-800">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-slate-500">!</span>
+            현재 화면
+          </div>
+          <p className="text-[11px] leading-5 text-slate-500">
+            방송 메뉴는 실시간 주문·입금매칭 중심입니다. 주문관리/회원관리는 별도 화면으로 확장합니다.
+          </p>
         </div>
-        <p className="text-xs leading-5 text-slate-500">
-          방송 메뉴는 실시간 주문·입금매칭 중심입니다. 주문관리/회원관리는 다음 단계에서 별도 화면으로 확장합니다.
-        </p>
       </div>
     </aside>
   );
