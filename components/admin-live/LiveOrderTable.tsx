@@ -150,16 +150,16 @@ function renderOrderSummary(order: LiveOrder) {
 
 function statusBadge(order: LiveOrder) {
   if (order.paymentStatus === "manual_match_needed") {
-    return <span className="rounded-lg bg-orange-100 px-2 py-1 text-xs font-black text-orange-700">수동매칭 필요</span>;
+    return <span className="rounded-lg bg-orange-100 px-2 py-1 text-xs font-black text-orange-700">입금확인 필요</span>;
   }
   if (order.paymentStatus === "card_unpaid") {
-    return <span className="rounded-lg bg-rose-100 px-2 py-1 text-xs font-black text-rose-700">카드미결제</span>;
+    return <span className="rounded-lg bg-red-100 px-2 py-1 text-xs font-black text-red-700">카드 미결제</span>;
   }
   if (order.paymentStatus === "unpaid") {
     return <span className="rounded-lg bg-red-100 px-2 py-1 text-xs font-black text-red-700">미입금</span>;
   }
   if (order.paymentStatus === "card_paid") {
-    return <span className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-700">카드결제완료</span>;
+    return <span className="rounded-lg bg-violet-100 px-2 py-1 text-xs font-black text-violet-700">카드결제완료</span>;
   }
   if (order.paymentStatus === "auto_paid") {
     return <span className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-700">자동입금확인</span>;
@@ -303,7 +303,7 @@ export default function LiveOrderTable({
           ["전체", counts.total, "all"],
           ["미입금", counts.unpaid, "unpaid"],
           ["입금확인", counts.paid, "paid"],
-          ["수동매칭", counts.manual, "manual_match_needed"],
+          ["입금확인 필요", counts.manual, "manual_match_needed"],
         ].map(([label, count, status]) => {
           const active = filters.status === status;
 
@@ -394,9 +394,9 @@ export default function LiveOrderTable({
           <option value="all">상태: 전체보기</option>
           <option value="unpaid">미입금</option>
           <option value="paid">입금확인</option>
-          <option value="manual_match_needed">수동매칭 필요</option>
+          <option value="manual_match_needed">입금확인 필요</option>
           <option value="card_paid">카드결제완료</option>
-          <option value="card_unpaid">카드미결제</option>
+          <option value="card_unpaid">카드 미결제</option>
         </select>
 
         <input

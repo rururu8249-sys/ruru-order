@@ -43,7 +43,7 @@ type AdminIssueTask = {
 const ISSUE_TYPES = [
   { label: "교환", taskType: "exchange", className: "bg-blue-100 text-blue-700 border-blue-200" },
   { label: "반품", taskType: "return", className: "bg-violet-100 text-violet-700 border-violet-200" },
-  { label: "환불", taskType: "refund", className: "bg-cyan-100 text-cyan-700 border-cyan-200" },
+  { label: "환불", taskType: "refund", className: "bg-red-100 text-red-700 border-red-200" },
   { label: "구매", taskType: "product", className: "bg-green-100 text-green-700 border-green-200" },
   { label: "진상", taskType: "complaint", className: "bg-rose-100 text-rose-700 border-rose-200" },
   { label: "기타", taskType: "general", className: "bg-slate-100 text-slate-700 border-slate-200" },
@@ -736,7 +736,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
 
       <div className="relative col-span-12 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-3">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-black text-slate-950">회원 특이사항 · 고객이슈 {openCount}</h2>
+          <h2 className="text-sm font-black text-slate-950">고객 특이사항 · 고객이슈 {openCount}</h2>
           <button
             type="button"
             onClick={() => setShowMemoAdd((value) => !value)}

@@ -41,20 +41,22 @@ function formatFullDateTime(value: string | null | undefined, fallback?: string 
 }
 
 function getPaymentStatusLabel(order: LiveOrder) {
-  if (order.paymentStatus === "manual_match_needed") return "수동매칭 필요";
+  if (order.paymentStatus === "manual_match_needed") return "입금확인 필요";
   if (order.paymentStatus === "manual_paid") return "수동입금확인";
   if (order.paymentStatus === "auto_paid") return "자동입금확인";
   if (order.paymentStatus === "card_paid") return "카드결제완료";
-  if (order.paymentStatus === "card_unpaid") return "카드미결제";
+  if (order.paymentStatus === "card_unpaid") return "카드 미결제";
   if (order.paymentStatus === "unpaid") return "미입금";
   return "입금확인";
 }
 
 function getPaymentStatusClass(order: LiveOrder) {
   if (order.paymentStatus === "manual_match_needed") return "border-orange-200 bg-orange-50 text-orange-700";
-  if (["manual_paid", "auto_paid", "card_paid", "paid"].includes(order.paymentStatus)) {
+  if (order.paymentStatus === "manual_paid") return "border-blue-200 bg-blue-50 text-blue-700";
+  if (["auto_paid", "paid"].includes(order.paymentStatus)) {
     return "border-emerald-200 bg-emerald-50 text-emerald-700";
   }
+  if (order.paymentStatus === "card_paid") return "border-violet-200 bg-violet-50 text-violet-700";
   if (["unpaid", "card_unpaid"].includes(order.paymentStatus)) return "border-red-200 bg-red-50 text-red-700";
   return "border-slate-200 bg-slate-50 text-slate-600";
 }
@@ -112,7 +114,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             onClick={() => onOpenManualMatch?.(order)}
             className="mt-3 h-12 w-full rounded-2xl bg-orange-500 text-sm font-black text-white shadow-sm hover:bg-orange-600 active:scale-[0.99]"
           >
-            입금매칭 열기
+            입금확인 열기
           </button>
         )}
 
