@@ -7,6 +7,7 @@ import AdminLiveCustomersPanel from "./AdminLiveCustomersPanel";
 import AdminLiveMenuPlaceholder from "./AdminLiveMenuPlaceholder";
 import AdminLiveOrdersPanel from "./AdminLiveOrdersPanel";
 import AdminLivePaymentPanel from "./AdminLivePaymentPanel";
+import AdminLiveSettlementPanel from "./AdminLiveSettlementPanel";
 import AdminLiveSidebar from "./AdminLiveSidebar";
 import LiveHeader from "./LiveHeader";
 import LiveStatsCards from "./LiveStatsCards";
@@ -489,6 +490,8 @@ export default function AdminLiveDashboard() {
             <AdminLivePaymentPanel deposits={deposits} orderGroups={orderGroups} />
           ) : activeMenu === "customers" ? (
             <AdminLiveCustomersPanel orders={orders} />
+          ) : activeMenu === "settlement" ? (
+            <AdminLiveSettlementPanel orders={orders} />
           ) : (
             <AdminLiveMenuPlaceholder menuKey={activeMenu} />
           )}
