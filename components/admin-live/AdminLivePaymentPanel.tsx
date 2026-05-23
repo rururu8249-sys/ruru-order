@@ -1,8 +1,30 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import type { DepositRow, OrderGroup } from "@/lib/admin-v2/types";
 
 type Props = {
   deposits: DepositRow[];
   orderGroups: OrderGroup[];
+};
+
+type DepositStatusFilter = "all" | "confirmed" | "unmatched" | "auto" | "manual";
+type DepositDateFilter = "all" | "today" | "yesterday" | "7days" | "month" | "custom";
+
+type DepositFilters = {
+  keyword: string;
+  status: DepositStatusFilter;
+  date: DepositDateFilter;
+  customStartDate: string;
+  customEndDate: string;
+};
+
+const DEFAULT_FILTERS: DepositFilters = {
+  keyword: "",
+  status: "all",
+  date: "all",
+  customStartDate: "",
+  customEndDate: "",
 };
 
 function money(value: unknown) {
@@ -19,12 +41,17 @@ function getDepositAmount(deposit: DepositRow) {
 
 function getDepositName(deposit: DepositRow) {
   const row = deposit as any;
-  return text(row.depositor || row.deposit_depositor || row.sender_name || row.name) || "-";
+  return text(row.depositor || row.deposit_depositor || row.depositor_name || row.sender_name || row.name) || "-";
 }
 
 function getDepositTime(deposit: DepositRow) {
   const row = deposit as any;
-  return text(row.deposited_time || row.created_at || row.deposit_time) || "-";
+  return text(row.deposited_time || row.created_at || row.deposit_time || row.deposited_at) || "-";
+}
+
+function getDepositMemo(deposit: DepositRow) {
+  const row = deposit as any;
+  return text(row.memo || row.admin_memo || row.note || row.description || row.bkjukyo || "");
 }
 
 function getDepositStatus(deposit: DepositRow) {
@@ -66,6 +93,100 @@ function statusBadge(deposit: DepositRow) {
   return <span className="rounded-lg bg-orange-100 px-2 py-1 text-xs font-black text-orange-700">미매칭입금</span>;
 }
 
+function localDateKey(value: string | null | undefined) {
+  if (!value || value === "-") return "";
+
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function normalizeDateInput(value: string) {
+  const nextValue = String(value || "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(nextValue) ? nextValue : "";
+}
+
+function matchesDate(deposit: DepositRow, filters: DepositFilters) {
+  if (filters.date === "all") return true;
+
+  const depositDateKey = localDateKey(getDepositTime(deposit));
+  if (!depositDateKey) return false;
+
+  if (filters.date === "custom") {
+    const startDate = normalizeDateInput(filters.customStartDate);
+    const endDate = normalizeDateInput(filters.customEndDate);
+
+    if (!startDate && !endDate) return true;
+    if (startDate && depositDateKey < startDate) return false;
+    if (endDate && depositDateKey > endDate) return false;
+
+    return true;
+  }
+
+  const now = new Date();
+  const todayKey = localDateKey(now.toISOString());
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const yesterdayKey = localDateKey(yesterday.toISOString());
+
+  if (filters.date === "today") return depositDateKey === todayKey;
+  if (filters.date === "yesterday") return depositDateKey === yesterdayKey;
+
+  const depositDate = new Date(getDepositTime(deposit) || depositDateKey);
+  if (!Number.isFinite(depositDate.getTime())) return false;
+
+  if (filters.date === "7days") {
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(now.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    return depositDate >= sevenDaysAgo;
+  }
+
+  if (filters.date === "month") {
+    return depositDate.getFullYear() === now.getFullYear() && depositDate.getMonth() === now.getMonth();
+  }
+
+  return true;
+}
+
+function matchesStatus(deposit: DepositRow, status: DepositStatusFilter) {
+  if (status === "all") return true;
+
+  const depositStatus = getDepositStatus(deposit);
+
+  if (status === "confirmed") return isDepositConfirmed(deposit);
+  if (status === "unmatched") return !isDepositConfirmed(deposit);
+  if (status === "auto") return depositStatus === "자동입금확인";
+  if (status === "manual") return depositStatus === "수동입금확인";
+
+  return true;
+}
+
+function matchesKeyword(deposit: DepositRow, keyword: string) {
+  const q = keyword.trim().toLowerCase();
+  if (!q) return true;
+
+  const haystack = [
+    getDepositName(deposit),
+    String(getDepositAmount(deposit)),
+    money(getDepositAmount(deposit)),
+    getDepositStatus(deposit),
+    getDepositMemo(deposit),
+    getDepositTime(deposit),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return haystack.includes(q);
+}
+
 function SummaryCard({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -77,16 +198,35 @@ function SummaryCard({ label, value, sub }: { label: string; value: string; sub:
 }
 
 export default function AdminLivePaymentPanel({ deposits, orderGroups }: Props) {
-  const confirmedDeposits = deposits.filter(isDepositConfirmed);
-  const unmatchedDeposits = deposits.filter((deposit) => !isDepositConfirmed(deposit));
+  const [filters, setFilters] = useState<DepositFilters>(DEFAULT_FILTERS);
 
-  const totalAmount = deposits.reduce((sum, deposit) => sum + getDepositAmount(deposit), 0);
+  const filteredDeposits = useMemo(() => {
+    return [...deposits]
+      .filter((deposit) => matchesStatus(deposit, filters.status))
+      .filter((deposit) => matchesDate(deposit, filters))
+      .filter((deposit) => matchesKeyword(deposit, filters.keyword))
+      .sort((a, b) => getDepositTime(b).localeCompare(getDepositTime(a)));
+  }, [deposits, filters]);
+
+  const confirmedDeposits = filteredDeposits.filter(isDepositConfirmed);
+  const unmatchedDeposits = filteredDeposits.filter((deposit) => !isDepositConfirmed(deposit));
+
+  const totalAmount = filteredDeposits.reduce((sum, deposit) => sum + getDepositAmount(deposit), 0);
   const confirmedAmount = confirmedDeposits.reduce((sum, deposit) => sum + getDepositAmount(deposit), 0);
   const unmatchedAmount = unmatchedDeposits.reduce((sum, deposit) => sum + getDepositAmount(deposit), 0);
 
-  const latestDeposits = [...deposits]
-    .sort((a, b) => getDepositTime(b).localeCompare(getDepositTime(a)))
-    .slice(0, 10);
+  const visibleDeposits = filteredDeposits.slice(0, 80);
+
+  const updateFilter = <K extends keyof DepositFilters>(key: K, value: DepositFilters[K]) => {
+    setFilters((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  };
+
+  const resetFilters = () => {
+    setFilters(DEFAULT_FILTERS);
+  };
 
   return (
     <section className="grid gap-4">
@@ -96,17 +236,17 @@ export default function AdminLivePaymentPanel({ deposits, orderGroups }: Props) 
             <div className="text-[11px] font-black tracking-[0.18em] text-blue-500">PAYMENT CHECK</div>
             <h1 className="mt-1 text-3xl font-black tracking-[-0.05em] text-slate-950">입금확인</h1>
             <p className="mt-2 text-sm font-bold text-slate-500">
-              현재 연결은 읽기전용입니다. 자동입금확인·수동입금확인·뱅크다 새로고침은 아직 실행하지 않습니다.
+              검색·상태필터·기간필터까지 연결했습니다. 자동입금확인·수동입금확인·뱅크다 새로고침은 아직 실행하지 않습니다.
             </p>
           </div>
 
           <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
-            읽기전용 연결
+            조회/필터 연결
           </span>
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <SummaryCard label="전체 입금내역" value={`${deposits.length.toLocaleString("ko-KR")}건`} sub={money(totalAmount)} />
+          <SummaryCard label="표시 입금내역" value={`${filteredDeposits.length.toLocaleString("ko-KR")}건`} sub={money(totalAmount)} />
           <SummaryCard label="입금확인 완료" value={`${confirmedDeposits.length.toLocaleString("ko-KR")}건`} sub={money(confirmedAmount)} />
           <SummaryCard label="미매칭 입금" value={`${unmatchedDeposits.length.toLocaleString("ko-KR")}건`} sub={money(unmatchedAmount)} />
           <SummaryCard label="주문 그룹" value={`${orderGroups.length.toLocaleString("ko-KR")}건`} sub="현재 주문 데이터 기준" />
@@ -114,41 +254,107 @@ export default function AdminLivePaymentPanel({ deposits, orderGroups }: Props) 
       </div>
 
       <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-black text-slate-950">최근 입금내역</h2>
-          <div className="text-xs font-bold text-slate-400">최대 10건 표시</div>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-black text-slate-950">입금내역 조회</h2>
+            <div className="mt-1 text-xs font-bold text-slate-400">최대 80건 표시 · 조회 전용</div>
+          </div>
+
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-600 hover:bg-slate-50"
+          >
+            필터 초기화
+          </button>
+        </div>
+
+        <div className="mb-4 grid gap-2 xl:grid-cols-[1.2fr_150px_150px_150px_150px_auto]">
+          <input
+            value={filters.keyword}
+            onChange={(event) => updateFilter("keyword", event.target.value)}
+            placeholder="입금자명 / 금액 / 메모 검색"
+            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+          />
+
+          <select
+            value={filters.status}
+            onChange={(event) => updateFilter("status", event.target.value as DepositStatusFilter)}
+            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700"
+          >
+            <option value="all">상태: 전체보기</option>
+            <option value="confirmed">입금확인 완료</option>
+            <option value="unmatched">미매칭 입금</option>
+            <option value="auto">자동입금확인</option>
+            <option value="manual">수동입금확인</option>
+          </select>
+
+          <select
+            value={filters.date}
+            onChange={(event) => updateFilter("date", event.target.value as DepositDateFilter)}
+            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700"
+          >
+            <option value="all">날짜: 전체보기</option>
+            <option value="today">오늘</option>
+            <option value="yesterday">어제</option>
+            <option value="7days">최근 7일</option>
+            <option value="month">이번 달</option>
+            <option value="custom">직접 선택</option>
+          </select>
+
+          {filters.date === "custom" ? (
+            <>
+              <input
+                type="date"
+                value={filters.customStartDate}
+                onChange={(event) => updateFilter("customStartDate", event.target.value)}
+                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                aria-label="입금 시작일"
+              />
+              <input
+                type="date"
+                value={filters.customEndDate}
+                onChange={(event) => updateFilter("customEndDate", event.target.value)}
+                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                aria-label="입금 종료일"
+              />
+            </>
+          ) : (
+            <div className="hidden xl:block" />
+          )}
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-slate-200">
-          <div className="grid grid-cols-[150px_1fr_130px_130px] bg-slate-50 px-4 py-3 text-xs font-black text-slate-500">
+          <div className="grid grid-cols-[150px_1fr_130px_130px_1fr] bg-slate-50 px-4 py-3 text-xs font-black text-slate-500">
             <div>입금일시</div>
             <div>입금자명</div>
             <div className="text-right">입금금액</div>
             <div className="text-center">상태</div>
+            <div>메모</div>
           </div>
 
-          {latestDeposits.length === 0 ? (
+          {visibleDeposits.length === 0 ? (
             <div className="px-4 py-10 text-center text-sm font-bold text-slate-400">
-              표시할 입금내역이 없습니다.
+              조건에 맞는 입금내역이 없습니다.
             </div>
           ) : (
-            latestDeposits.map((deposit, index) => (
+            visibleDeposits.map((deposit, index) => (
               <div
                 key={String((deposit as any).id || index)}
-                className="grid grid-cols-[150px_1fr_130px_130px] items-center border-t border-slate-100 px-4 py-3 text-sm"
+                className="grid grid-cols-[150px_1fr_130px_130px_1fr] items-center border-t border-slate-100 px-4 py-3 text-sm"
               >
                 <div className="truncate font-bold text-slate-500">{getDepositTime(deposit)}</div>
                 <div className="truncate font-black text-slate-900">{getDepositName(deposit)}</div>
                 <div className="text-right font-black text-slate-900">{money(getDepositAmount(deposit))}</div>
                 <div className="text-center">{statusBadge(deposit)}</div>
+                <div className="truncate text-xs font-bold text-slate-500">{getDepositMemo(deposit) || "-"}</div>
               </div>
             ))
           )}
         </div>
 
         <div className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-xs font-black leading-5 text-amber-700">
-          다음 단계에서 실제 입금내역 새로고침, 자동입금확인, 수동입금확인을 순서대로 연결합니다.
-          자동입금확인은 닉네임 완전일치 + 금액 완전일치 + 1:1 단일 후보 조건을 그대로 유지해야 합니다.
+          현재 입금확인 메뉴는 조회/검색/필터 전용입니다. 자동입금확인, 수동입금확인, 뱅크다 새로고침 실행은 다음 단계에서 별도 검수 후 연결합니다.
         </div>
       </div>
     </section>
