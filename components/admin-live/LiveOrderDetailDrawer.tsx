@@ -317,6 +317,48 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               {paymentCancelAction ? "처리중..." : "입금확인 취소"}
             </button>
           ) : null}
+
+          {showCardStatusActions ? (
+            <>
+              {isCardUnpaid ? (
+                <button
+                  type="button"
+                  onClick={() => handleCardPaymentStatusChange("카드결제완료", "card-paid")}
+                  disabled={Boolean(cardStatusAction)}
+                  className="h-10 w-full rounded-xl bg-violet-600 text-[13px] font-black text-white shadow-sm hover:bg-violet-700 active:scale-[0.99] disabled:bg-slate-300"
+                >
+                  {cardStatusAction === "card-paid" ? "처리중..." : "카드결제완료 처리"}
+                </button>
+              ) : null}
+
+              {isCardPaid ? (
+                <>
+                  <div className="rounded-xl border border-purple-100 bg-purple-50 px-3 py-2 text-[11px] font-bold leading-4 text-purple-700">
+                    카드결제완료 주문입니다. 결제완료 처리를 잘못한 경우에는 [카드미결제로 되돌리기]를 사용하세요. 주문 자체를 없애야 하는 경우에만 [주문서 자체 취소]를 사용하세요.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleCardPaymentStatusChange("주문확인전", "card-unpaid")}
+                    disabled={Boolean(cardStatusAction)}
+                    className="h-10 w-full rounded-xl border border-rose-200 bg-rose-50 text-[13px] font-black text-rose-700 shadow-sm hover:bg-rose-100 active:scale-[0.99] disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    {cardStatusAction === "card-unpaid" ? "처리중..." : "카드미결제로 되돌리기"}
+                  </button>
+                </>
+              ) : null}
+            </>
+          ) : null}
+
+          {!isCanceled && orderForView.paymentStatus === "manual_match_needed" && onOpenManualMatch ? (
+            <button
+              type="button"
+              onClick={() => onOpenManualMatch(order)}
+              className="h-10 w-full rounded-xl bg-orange-500 text-[13px] font-black text-white shadow-sm hover:bg-orange-600 active:scale-[0.99]"
+            >
+              입금확인 열기
+            </button>
+          ) : null}
+
           {isCanceled ? (
             <button
               type="button"
@@ -340,47 +382,6 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             </>
           )}
         </div>
-
-        {showCardStatusActions ? (
-          <div className="mt-3 grid grid-cols-1 gap-2">
-            {isCardUnpaid ? (
-              <button
-                type="button"
-                onClick={() => handleCardPaymentStatusChange("카드결제완료", "card-paid")}
-                disabled={Boolean(cardStatusAction)}
-                className="h-10 w-full rounded-xl bg-violet-600 text-[13px] font-black text-white shadow-sm hover:bg-violet-700 active:scale-[0.99] disabled:bg-slate-300"
-              >
-                {cardStatusAction === "card-paid" ? "처리중..." : "카드결제완료 처리"}
-              </button>
-            ) : null}
-
-            {isCardPaid ? (
-              <>
-                <div className="rounded-xl border border-purple-100 bg-purple-50 px-3 py-2 text-[11px] font-bold leading-4 text-purple-700">
-                  카드결제완료 주문입니다. 결제완료 처리를 잘못한 경우에는 [카드미결제로 되돌리기]를 사용하세요. 주문 자체를 없애야 하는 경우에만 [주문서 자체 취소]를 사용하세요.
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleCardPaymentStatusChange("주문확인전", "card-unpaid")}
-                  disabled={Boolean(cardStatusAction)}
-                  className="h-10 w-full rounded-xl border border-rose-200 bg-rose-50 text-[13px] font-black text-rose-700 shadow-sm hover:bg-rose-100 active:scale-[0.99] disabled:bg-slate-100 disabled:text-slate-400"
-                >
-                  {cardStatusAction === "card-unpaid" ? "처리중..." : "카드미결제로 되돌리기"}
-                </button>
-              </>
-            ) : null}
-          </div>
-        ) : null}
-
-        {!isCanceled && orderForView.paymentStatus === "manual_match_needed" && onOpenManualMatch && (
-          <button
-            type="button"
-            onClick={() => onOpenManualMatch(order)}
-            className="mt-2 h-10 w-full rounded-xl bg-orange-500 text-[13px] font-black text-white shadow-sm hover:bg-orange-600 active:scale-[0.99]"
-          >
-            입금확인 열기
-          </button>
-        )}
 
         <section className="mt-3">
           <div className="mb-2 flex items-center justify-between">
