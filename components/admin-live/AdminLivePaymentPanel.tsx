@@ -293,7 +293,7 @@ export default function AdminLivePaymentPanel({ deposits, orderGroups, onRefresh
   };
 
   return (
-    <section className="grid gap-4">
+    <section className="mx-auto grid w-full max-w-[1320px] gap-4 px-1 xl:px-0">
       <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -344,18 +344,18 @@ export default function AdminLivePaymentPanel({ deposits, orderGroups, onRefresh
           </div>
         </div>
 
-        <div className="mb-4 grid gap-2 xl:grid-cols-[1.2fr_150px_150px_150px_150px_auto]">
+        <div className="mb-4 flex max-w-[1040px] flex-wrap items-center gap-2 xl:flex-nowrap">
           <input
             value={filters.keyword}
             onChange={(event) => updateFilter("keyword", event.target.value)}
             placeholder="입금자명 / 금액 / 메모 검색"
-            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+            className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50 md:w-[380px]"
           />
 
           <select
             value={filters.status}
             onChange={(event) => updateFilter("status", event.target.value as DepositStatusFilter)}
-            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700"
+            className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 md:w-[150px]"
           >
             <option value="all">상태: 전체보기</option>
             <option value="confirmed">입금확인 완료</option>
@@ -367,7 +367,7 @@ export default function AdminLivePaymentPanel({ deposits, orderGroups, onRefresh
           <select
             value={filters.date}
             onChange={(event) => updateFilter("date", event.target.value as DepositDateFilter)}
-            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700"
+            className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 md:w-[150px]"
           >
             <option value="all">날짜: 전체보기</option>
             <option value="today">오늘</option>
@@ -383,24 +383,22 @@ export default function AdminLivePaymentPanel({ deposits, orderGroups, onRefresh
                 type="date"
                 value={filters.customStartDate}
                 onChange={(event) => updateFilter("customStartDate", event.target.value)}
-                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50 md:w-[150px]"
                 aria-label="입금 시작일"
               />
               <input
                 type="date"
                 value={filters.customEndDate}
                 onChange={(event) => updateFilter("customEndDate", event.target.value)}
-                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50 md:w-[150px]"
                 aria-label="입금 종료일"
               />
             </>
-          ) : (
-            <div className="hidden xl:block" />
-          )}
+          ) : null}
         </div>
 
         <div className="overflow-x-auto rounded-2xl border border-slate-200">
-          <div className="grid min-w-[980px] grid-cols-[230px_minmax(160px,1fr)_140px_130px_minmax(180px,1fr)] bg-slate-50 px-4 py-3 text-xs font-black text-slate-500">
+          <div className="grid min-w-[1040px] grid-cols-[220px_250px_150px_170px_minmax(180px,1fr)] bg-slate-50 px-4 py-3 text-xs font-black text-slate-500">
             <div>입금일시</div>
             <div>입금자명</div>
             <div className="text-right">입금금액</div>
@@ -416,7 +414,7 @@ export default function AdminLivePaymentPanel({ deposits, orderGroups, onRefresh
             visibleDeposits.map((deposit, index) => (
               <div
                 key={String((deposit as any).id || index)}
-                className="grid min-w-[980px] grid-cols-[230px_minmax(160px,1fr)_140px_130px_minmax(180px,1fr)] items-center border-t border-slate-100 px-4 py-3 text-sm"
+                className="grid min-w-[1040px] grid-cols-[220px_250px_150px_170px_minmax(180px,1fr)] items-center border-t border-slate-100 px-4 py-3 text-sm"
               >
                 <div className="whitespace-nowrap font-black text-slate-700">{formatDepositDateTime(deposit)}</div>
                 <div className="truncate font-black text-slate-900">{getDepositName(deposit)}</div>
