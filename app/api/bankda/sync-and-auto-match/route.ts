@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 async function readJsonSafe(response: Response) {
   const text = await response.text();
 
@@ -8,9 +10,7 @@ async function readJsonSafe(response: Response) {
   try {
     return JSON.parse(text);
   } catch {
-    return {
-      raw: text,
-    };
+    return { raw: text };
   }
 }
 
@@ -30,9 +30,7 @@ async function handleSyncAndAutoMatch(request: NextRequest) {
 
   const syncResponse = await fetch(`${origin}/api/bankda/sync-deposits`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     cache: "no-store",
   });
 
@@ -53,12 +51,8 @@ async function handleSyncAndAutoMatch(request: NextRequest) {
 
   const autoResponse = await fetch(`${origin}/api/admin-v2/auto-payment-match/run`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      confirm: "RUN_AUTO_MATCH",
-    }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ confirm: "RUN_AUTO_MATCH" }),
     cache: "no-store",
   });
 
@@ -85,7 +79,10 @@ async function handleSyncAndAutoMatch(request: NextRequest) {
     ...(syncResult || {}),
     ok: true,
     mode: "bankda_sync_then_auto_match",
-    message: `뱅크다 동기화 완료 / 자동입금확인 ${autoSummary.success_count.toLocaleString("ko-KR")}건 처리`,
+    message:
+      autoSummary.success_count > 0
+        ? `자동입금확인 ${autoSummary.success_count.toLocaleString("ko-KR")}건 처리`
+        : "입금내역 자동조회 완료 · 자동입금 후보 없음",
     sync: syncResult,
     autoMatch: autoResult,
     autoMatchSummary: autoSummary,
