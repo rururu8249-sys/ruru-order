@@ -15,6 +15,7 @@ import {
 } from "@/lib/admin-v2/orderHelpers";
 import { getDeliveryStageStatusLabel } from "@/lib/admin-v2/statusDisplay";
 import AdminOrderPaymentCancelAction from "./AdminOrderPaymentCancelAction";
+import AdminOrderDangerActionGuide from "./AdminOrderDangerActionGuide";
 
 type Props = {
   group: OrderGroup;
@@ -58,11 +59,11 @@ export default function AdminOrderDetailPriorityPanel({
     tone = "danger";
   } else if (bankUnpaid) {
     title = "입금관리";
-    desc = "입금 매칭을 우선 권장합니다. 실제 확인이 끝난 경우에만 입금내역 없이 수동확인을 사용하세요.";
+    desc = "입금확인을 잘못 처리한 경우에는 입금확인 취소를 사용하세요. 새 입금 확인은 입금매칭 또는 입금내역 없이 수동확인을 사용하세요.";
     tone = "warn";
   } else if (cardUnpaid) {
     title = "카드결제 확인 필요";
-    desc = "카드 결제 여부를 확인한 뒤 카드결제완료 처리하세요.";
+    desc = "카드결제완료를 잘못 처리한 경우에는 카드미결제로 되돌리기를 사용하세요. 주문 자체를 없애야 할 때만 주문서 자체 취소를 사용하세요.";
     tone = "warn";
   } else if (!shipped) {
     title = hasTracking ? "출고완료 처리 필요" : "배송처리 필요";
@@ -188,13 +189,14 @@ export default function AdminOrderDetailPriorityPanel({
             >
               {savingAction === "manual-paid" ? "처리중..." : "입금내역 없이 수동확인"}
             </button>
+            <AdminOrderDangerActionGuide />
             <button
               type="button"
               onClick={cancelOrder}
               disabled={savingAction !== null}
               className={`${buttonBase} border border-red-200 bg-white text-red-600`}
             >
-              {savingAction === "cancel" ? "처리중..." : "주문서취소"}
+              {savingAction === "cancel" ? "처리중..." : "주문서 자체 취소"}
             </button>
           </>
         ) : cardUnpaid ? (
@@ -207,13 +209,14 @@ export default function AdminOrderDetailPriorityPanel({
             >
               {savingAction === "card-paid" ? "처리중..." : "카드결제완료 처리"}
             </button>
+            <AdminOrderDangerActionGuide />
             <button
               type="button"
               onClick={cancelOrder}
               disabled={savingAction !== null}
               className={`${buttonBase} border border-red-200 bg-white text-red-600`}
             >
-              {savingAction === "cancel" ? "처리중..." : "주문서취소"}
+              {savingAction === "cancel" ? "처리중..." : "주문서 자체 취소"}
             </button>
           </>
         ) : (
@@ -221,13 +224,14 @@ export default function AdminOrderDetailPriorityPanel({
             <div className="rounded-xl bg-white/80 px-4 py-3 text-[13px] font-black text-neutral-700 md:col-span-2">
               결제완료 상태입니다. 송장 입력은 아래 C. 입금 · 출고 영역에서 처리하세요.
             </div>
+            <AdminOrderDangerActionGuide />
             <button
               type="button"
               onClick={cancelOrder}
               disabled={savingAction !== null}
               className={`${buttonBase} border border-red-200 bg-white text-red-600`}
             >
-              {savingAction === "cancel" ? "처리중..." : "주문서취소"}
+              {savingAction === "cancel" ? "처리중..." : "주문서 자체 취소"}
             </button>
           </>
         )}

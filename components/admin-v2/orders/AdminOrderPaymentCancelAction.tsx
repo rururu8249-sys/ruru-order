@@ -107,7 +107,7 @@ export default function AdminOrderPaymentCancelAction({ group }: AdminOrderPayme
       </button>
 
       <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-bold leading-4 text-slate-500">
-        잘못 처리한 입금확인을 주문확인전 상태로 되돌립니다. 주문서취소와는 별도 기능입니다.
+        입금확인을 잘못 처리한 경우에만 사용하세요. 주문서 자체 취소와는 별도 기능이며, 돈 확인 상태만 주문확인전으로 되돌립니다.
       </div>
 
       {errorMessage ? (

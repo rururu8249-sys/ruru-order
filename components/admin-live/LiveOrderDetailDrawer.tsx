@@ -6,6 +6,7 @@ import type { LiveOrder, LiveOrderItem } from "./types";
 import { isLiveOrderCanceled, useLiveOrderCancelRestore } from "./useLiveOrderCancelRestore";
 import LiveOrderItemEditCard from "./LiveOrderItemEditCard";
 import type { LiveOrderItemEditSaveResult } from "./useLiveOrderItemEdit";
+import LiveOrderDangerActionGuide from "./LiveOrderDangerActionGuide";
 
 type Props = {
   order: LiveOrder;
@@ -294,7 +295,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 
           {["manual_paid", "auto_paid", "paid"].includes(orderForView.paymentStatus) ? (
             <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-bold leading-4 text-slate-500">
-              입금확인된 주문입니다. 주문서취소는 주문서를 폐기하는 기능이며 입금확인 기록은 자동으로 지우지 않습니다.
+              입금확인된 주문입니다. 입금확인을 잘못 처리한 경우에는 [입금확인 취소]를 사용하세요. 주문 자체를 없애야 하는 경우에만 [주문서 자체 취소]를 사용하세요.
             </div>
           ) : null}
 
@@ -326,14 +327,17 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               {savingAction === "restore" ? "처리중..." : "주문서복구"}
             </button>
           ) : (
-            <button
-              type="button"
-              onClick={cancelOrder}
-              disabled={Boolean(savingAction)}
-              className="h-10 w-full rounded-xl border border-red-200 bg-red-50 text-[13px] font-black text-red-700 shadow-sm hover:bg-red-100 active:scale-[0.99] disabled:bg-slate-100 disabled:text-slate-400"
-            >
-              {savingAction === "cancel" ? "처리중..." : "주문서취소"}
-            </button>
+            <>
+              <LiveOrderDangerActionGuide />
+              <button
+                type="button"
+                onClick={cancelOrder}
+                disabled={Boolean(savingAction)}
+                className="h-10 w-full rounded-xl border border-red-200 bg-red-50 text-[13px] font-black text-red-700 shadow-sm hover:bg-red-100 active:scale-[0.99] disabled:bg-slate-100 disabled:text-slate-400"
+              >
+                {savingAction === "cancel" ? "처리중..." : "주문서 자체 취소"}
+              </button>
+            </>
           )}
         </div>
 
@@ -351,14 +355,19 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             ) : null}
 
             {isCardPaid ? (
-              <button
-                type="button"
-                onClick={() => handleCardPaymentStatusChange("주문확인전", "card-unpaid")}
-                disabled={Boolean(cardStatusAction)}
-                className="h-10 w-full rounded-xl border border-rose-200 bg-rose-50 text-[13px] font-black text-rose-700 shadow-sm hover:bg-rose-100 active:scale-[0.99] disabled:bg-slate-100 disabled:text-slate-400"
-              >
-                {cardStatusAction === "card-unpaid" ? "처리중..." : "카드미결제로 되돌리기"}
-              </button>
+              <>
+                <div className="rounded-xl border border-purple-100 bg-purple-50 px-3 py-2 text-[11px] font-bold leading-4 text-purple-700">
+                  카드결제완료 주문입니다. 결제완료 처리를 잘못한 경우에는 [카드미결제로 되돌리기]를 사용하세요. 주문 자체를 없애야 하는 경우에만 [주문서 자체 취소]를 사용하세요.
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleCardPaymentStatusChange("주문확인전", "card-unpaid")}
+                  disabled={Boolean(cardStatusAction)}
+                  className="h-10 w-full rounded-xl border border-rose-200 bg-rose-50 text-[13px] font-black text-rose-700 shadow-sm hover:bg-rose-100 active:scale-[0.99] disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  {cardStatusAction === "card-unpaid" ? "처리중..." : "카드미결제로 되돌리기"}
+                </button>
+              </>
             ) : null}
           </div>
         ) : null}
