@@ -57,7 +57,7 @@ export default function AdminOrderDetailPriorityPanel({
     tone = "danger";
   } else if (bankUnpaid) {
     title = "입금관리";
-    desc = "입금 매칭을 우선 권장합니다. 실제 확인이 끝난 경우에만 입금내역 없이 수동확인를 사용하세요.";
+    desc = "입금 매칭을 우선 권장합니다. 실제 확인이 끝난 경우에만 입금내역 없이 수동확인을 사용하세요.";
     tone = "warn";
   } else if (cardUnpaid) {
     title = "카드결제 확인 필요";
