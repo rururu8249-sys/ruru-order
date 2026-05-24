@@ -7,7 +7,7 @@ type ExportMeta = {
 
 type WorkbookRow = Array<string | number | null>;
 
-const ROSEN_HEADER_COMBINED = [
+const ROSEN_HEADER_COMBINED: WorkbookRow = [
   "수하인명",
   null,
   "수하인주소",
@@ -22,7 +22,7 @@ const ROSEN_HEADER_COMBINED = [
   null,
 ];
 
-const ROSEN_HEADER_SPLIT = [
+const ROSEN_HEADER_SPLIT: WorkbookRow = [
   "수하인명",
   null,
   "수하인주소1",
@@ -165,18 +165,18 @@ function rosenRowCombined(order: LiveOrder): WorkbookRow {
   const phone = phoneText(order);
 
   return [
-    recipientName(order),
-    null,
-    recipientAddress(order),
-    phone,
-    phone,
-    1,
-    2750,
-    "010",
-    itemSummary(order),
-    null,
-    memoText(order),
-    null,
+    recipientName(order),   // A 수하인명
+    null,                   // B 빈칸
+    recipientAddress(order),// C 수하인주소
+    phone,                  // D 수하인전화번호
+    phone,                  // E 수하인핸드폰번호
+    1,                      // F 택배수량
+    2750,                   // G 택배운임
+    "010",                  // H 운임구분
+    itemSummary(order),     // I 품목명
+    null,                   // J 빈칸
+    memoText(order),        // K 배송메세지
+    null,                   // L 빈칸
   ];
 }
 
@@ -185,36 +185,38 @@ function rosenRowSplit(order: LiveOrder): WorkbookRow {
   const address = splitAddress(order);
 
   return [
-    recipientName(order),
-    null,
-    address.address1,
-    address.address2,
-    phone,
-    phone,
-    1,
-    2750,
-    "010",
-    itemSummary(order),
-    null,
-    memoText(order),
+    recipientName(order),   // A 수하인명
+    null,                   // B 빈칸
+    address.address1,       // C 수하인주소1
+    address.address2,       // D 수하인주소2
+    phone,                  // E 수하인전화번호
+    phone,                  // F 수하인핸드폰번호
+    1,                      // G 택배수량
+    2750,                   // H 택배운임
+    "010",                  // I 운임구분
+    itemSummary(order),     // J 품목명
+    null,                   // K 빈칸
+    memoText(order),        // L 배송메세지
   ];
 }
 
-function applyRosenSheetFormat(ws: XLSX.WorkSheet, columnCount: number, totalRows: number) {
+function applyRosenSheetFormat(ws: XLSX.WorkSheet, totalRows: number, totalCols: number) {
   ws["!autofilter"] = {
     ref: XLSX.utils.encode_range({
       s: { r: 0, c: 0 },
-      e: { r: Math.max(0, totalRows - 1), c: Math.max(0, columnCount - 1) },
+      e: { r: Math.max(0, totalRows - 1), c: Math.max(0, totalCols - 1) },
     }),
   };
 
-  ws["!cols"] = Array.from({ length: columnCount }).map((_, index) => {
+  ws["!cols"] = Array.from({ length: totalCols }).map((_, index) => {
     if (index === 0) return { wch: 18 };
-    if (index === 2) return { wch: 42 };
+    if (index === 2) return { wch: 46 };
     if (index === 3) return { wch: 26 };
     if (index === 4 || index === 5) return { wch: 18 };
-    if (index === 8 || index === 9) return { wch: 42 };
-    if (index === 10 || index === 11) return { wch: 28 };
+    if (index === 6) return { wch: 12 };
+    if (index === 7) return { wch: 12 };
+    if (index === 8 || index === 9) return { wch: 46 };
+    if (index === 10 || index === 11) return { wch: 30 };
     return { wch: 12 };
   });
 }
@@ -252,28 +254,20 @@ function writeWorkbook(wb: XLSX.WorkBook, fileName: string) {
   XLSX.writeFile(wb, fileName, { bookType: "xlsx" });
 }
 
+function appendSheet(wb: XLSX.WorkBook, sheetName: string, rows: WorkbookRow[]) {
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  applyRosenSheetFormat(ws, rows.length, 12);
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+}
+
 function appendRosenSheets(wb: XLSX.WorkBook, orders: LiveOrder[]) {
-  const combinedRows = orders.map(rosenRowCombined);
-  const splitRows = orders.map(rosenRowSplit);
+  const combinedRows: WorkbookRow[] = [ROSEN_HEADER_COMBINED, ...orders.map(rosenRowCombined)];
+  const splitRows: WorkbookRow[] = [ROSEN_HEADER_SPLIT, ...orders.map(rosenRowSplit)];
 
-  const combinedSheetRows: WorkbookRow[] = [ROSEN_HEADER_COMBINED, ...combinedRows];
-  const splitSheetRows: WorkbookRow[] = [ROSEN_HEADER_SPLIT, ...splitRows];
-
-  const combinedWs1 = XLSX.utils.aoa_to_sheet(combinedSheetRows);
-  applyRosenSheetFormat(combinedWs1, 12, combinedSheetRows.length);
-  XLSX.utils.book_append_sheet(wb, combinedWs1, "엑셀파일 첫행-제목없음");
-
-  const combinedWs2 = XLSX.utils.aoa_to_sheet(combinedSheetRows);
-  applyRosenSheetFormat(combinedWs2, 12, combinedSheetRows.length);
-  XLSX.utils.book_append_sheet(wb, combinedWs2, "엑셀파일첫행-제목있음");
-
-  const splitWs1 = XLSX.utils.aoa_to_sheet(splitSheetRows);
-  applyRosenSheetFormat(splitWs1, 12, splitSheetRows.length);
-  XLSX.utils.book_append_sheet(wb, splitWs1, "엑셀파일첫행-제목없음(주소1,2로분리)");
-
-  const splitWs2 = XLSX.utils.aoa_to_sheet(splitSheetRows);
-  applyRosenSheetFormat(splitWs2, 12, splitSheetRows.length);
-  XLSX.utils.book_append_sheet(wb, splitWs2, "엑셀파일첫행-제목있음(주소1,2로분리)");
+  appendSheet(wb, "주소통합_제목필터", combinedRows);
+  appendSheet(wb, "주소분리_제목필터", splitRows);
+  appendSheet(wb, "엑셀파일첫행-제목있음", combinedRows);
+  appendSheet(wb, "엑셀파일첫행-제목있음(주소1,2로분리)", splitRows);
 }
 
 function appendRosenCheckSheet(wb: XLSX.WorkBook, orders: LiveOrder[], meta: ExportMeta) {
