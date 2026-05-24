@@ -354,8 +354,8 @@ export default function LiveOrderTable({
   const visibleOrders = cancelViewFilteredOrders.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const exportableOrders = useMemo(
-    () => sortedOrders.filter((order) => order.paymentStatus !== "canceled"),
-    [sortedOrders]
+    () => cancelViewFilteredOrders.filter((order) => order.paymentStatus !== "canceled"),
+    [cancelViewFilteredOrders]
   );
   const canceledExportExcludedCount = cancelViewFilteredOrders.length - exportableOrders.length;
 
