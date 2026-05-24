@@ -71,6 +71,9 @@ function getPaymentStatusClass(order: LiveOrder) {
 
 export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClose, onAfterStatusChange }: Props) {
   const [cardStatusAction, setCardStatusAction] = useState<"" | "card-paid" | "card-unpaid">("");
+  const [paymentCancelAction, setPaymentCancelAction] = useState(false);
+  const [paymentCancelError, setPaymentCancelError] = useState("");
+
   const [localOrder, setLocalOrder] = useState(order);
   const [refreshingDetail, setRefreshingDetail] = useState(false);
 
@@ -132,6 +135,11 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const isCardOrder = String(orderForView.paymentMethod || "").includes("카드");
   const isCardPaid = orderForView.paymentStatus === "card_paid";
   const isCardUnpaid = orderForView.paymentStatus === "card_unpaid";
+
+  const canCancelPaymentConfirm =
+    ["paid", "auto_paid", "manual_paid"].includes(orderForView.paymentStatus) ||
+    (orderForView.paymentStatus === "canceled" && Boolean(orderForView.paidAtFull));
+
   const showCardStatusActions = !isCanceled && isCardOrder && (isCardPaid || isCardUnpaid);
 
   const { savingAction, cancelOrder, restoreOrder } = useLiveOrderCancelRestore({
@@ -139,6 +147,48 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     onAfterStatusChange,
     onClose,
   });
+
+  const handlePaymentConfirmCancel = async () => {
+    if (!canCancelPaymentConfirm || paymentCancelAction) return;
+
+    setPaymentCancelAction(true);
+    setPaymentCancelError("");
+
+    try {
+      const currentOrder = orderForView as any;
+
+      const response = await fetch("/api/admin-v2/payment-confirm-cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderGroupId:
+            currentOrder.groupId ||
+            currentOrder.orderGroupId ||
+            currentOrder.order_group_id ||
+            "",
+          orderLookupCode:
+            currentOrder.orderNumber ||
+            currentOrder.orderLookupCode ||
+            currentOrder.order_lookup_code ||
+            "",
+          orderIds: currentOrder.orderIds || currentOrder.order_ids || [],
+        }),
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || !result?.ok) {
+        setPaymentCancelError(result?.message || "입금확인 취소 실패");
+        return;
+      }
+
+      window.location.reload();
+    } catch (error) {
+      setPaymentCancelError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setPaymentCancelAction(false);
+    }
+  };
 
   const handleCardPaymentStatusChange = async (
     nextStatus: "카드결제완료" | "주문확인전",
@@ -247,9 +297,25 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               입금확인된 주문입니다. 주문서취소는 주문서를 폐기하는 기능이며 입금확인 기록은 자동으로 지우지 않습니다.
             </div>
           ) : null}
+
+          {paymentCancelError ? (
+            <div className="mt-2 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-[11px] font-black leading-4 text-red-700">
+              입금확인 취소 오류: {paymentCancelError}
+            </div>
+          ) : null}
         </section>
 
         <div className="mt-3 grid grid-cols-1 gap-2">
+          {canCancelPaymentConfirm ? (
+            <button
+              type="button"
+              onClick={handlePaymentConfirmCancel}
+              disabled={paymentCancelAction}
+              className="h-10 w-full rounded-xl border border-slate-300 bg-white text-[13px] font-black text-slate-700 shadow-sm hover:bg-slate-50 active:scale-[0.99] disabled:bg-slate-100 disabled:text-slate-400"
+            >
+              {paymentCancelAction ? "처리중..." : "입금확인 취소"}
+            </button>
+          ) : null}
           {isCanceled ? (
             <button
               type="button"
