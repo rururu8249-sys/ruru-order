@@ -88,42 +88,43 @@ function buildDepositPatch(sample: AnyRow) {
 }
 
 function depositLinkedToOrders(deposit: AnyRow, orders: AnyRow[]) {
-  const identifiers = new Set<string>();
+  const orderGroupIds = new Set(
+    orders
+      .map((order) => clean(order.order_group_id))
+      .filter(Boolean)
+  );
 
-  for (const order of orders) {
-    [
-      order.order_group_id,
-      order.order_lookup_code,
-      order.id,
-    ].forEach((value) => {
-      const text = clean(value);
-      if (text) identifiers.add(text);
-    });
-  }
+  const orderLookupCodes = new Set(
+    orders
+      .map((order) => clean(order.order_lookup_code))
+      .filter(Boolean)
+  );
 
-  if (identifiers.size === 0) return false;
+  const orderIds = new Set(
+    orders
+      .map((order) => clean(order.id))
+      .filter(Boolean)
+  );
 
-  const fields = [
+  const depositMatchedGroupIds = [
     deposit.match_order_group_id,
     deposit.matched_order_group_id,
-    deposit.order_group_id,
+  ]
+    .map(clean)
+    .filter(Boolean);
+
+  const depositMatchedOrderIds = [
     deposit.match_order_id,
     deposit.matched_order_id,
-    deposit.order_id,
-    deposit.confirmed_note,
-    deposit.match_note,
-  ];
+  ]
+    .map(clean)
+    .filter(Boolean);
 
-  return fields.some((value) => {
-    const text = clean(value);
-    if (!text) return false;
+  const groupMatched = depositMatchedGroupIds.some((groupId) => orderGroupIds.has(groupId));
+  const lookupMatched = depositMatchedGroupIds.some((groupId) => orderLookupCodes.has(groupId));
+  const orderIdMatched = depositMatchedOrderIds.some((orderId) => orderIds.has(orderId));
 
-    for (const id of identifiers) {
-      if (text === id || text.includes(id)) return true;
-    }
-
-    return false;
-  });
+  return groupMatched || lookupMatched || orderIdMatched;
 }
 
 export async function POST(request: Request) {
