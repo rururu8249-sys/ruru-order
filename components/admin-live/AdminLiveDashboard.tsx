@@ -32,6 +32,7 @@ import {
   sortLiveOrdersByCreatedDesc,
   toAdminLiveOrder,
 } from "./liveOrderAdapter";
+import { useAutoBankdaPaymentSync } from "./useAutoBankdaPaymentSync";
 
 type VideoRatio = "vertical" | "wide" | "auto";
 
@@ -219,6 +220,7 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
 }
 
 export default function AdminLiveDashboard() {
+  useAutoBankdaPaymentSync();
   const [activeMenu, setActiveMenu] = useState<AdminLiveMenuKey>("broadcast");
   const [orders, setOrders] = useState<LiveOrder[]>([]);
   const [broadcasts, setBroadcasts] = useState<AdminLiveBroadcast[]>([]);
