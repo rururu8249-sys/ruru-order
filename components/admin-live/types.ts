@@ -29,6 +29,9 @@ export type LiveOrder = {
   nickname: string;
   name: string;
   phone: string;
+  zipcode?: string | null;
+  address?: string | null;
+  detailAddress?: string | null;
   paymentMethod: "무통장입금" | "카드결제" | string;
   broadcastId: string | null;
   broadcastName: string | null;

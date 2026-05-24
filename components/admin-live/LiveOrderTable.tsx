@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { LiveOrder } from "./types";
+import { exportLiveOrdersForPicking, exportLiveOrdersForRosen } from "./adminLiveOrderExcelExport";
 
 export type LiveOrderDateFilter = "all" | "today" | "yesterday" | "7days" | "month" | "custom";
 export type LiveOrderStatusFilter =
@@ -202,6 +203,7 @@ export default function LiveOrderTable({
   const [sortMode, setSortMode] = useState<SortMode>("latest");
   const [pageSize, setPageSize] = useState(10);
   const [refreshing, setRefreshing] = useState(false);
+  const [exporting, setExporting] = useState<"" | "rozen" | "picking">("");
 
   useEffect(() => {
     setPage(1);
@@ -298,6 +300,66 @@ export default function LiveOrderTable({
     }
   };
 
+
+  const currentFilterLabel = useMemo(() => {
+    const broadcastLabel =
+      filters.broadcast === "all"
+        ? "방송: 전체보기"
+        : filters.broadcast === "none"
+          ? todayAlwaysOrderLabel()
+          : broadcastOptions.find((option) => option.value === filters.broadcast)?.label || "선택 방송";
+
+    const dateLabelMap: Record<LiveOrderDateFilter, string> = {
+      all: "날짜: 전체보기",
+      today: "오늘",
+      yesterday: "어제",
+      "7days": "최근 7일",
+      month: "이번 달",
+      custom:
+        filters.customStartDate || filters.customEndDate
+          ? `직접 선택 ${filters.customStartDate || "시작일"}~${filters.customEndDate || "종료일"}`
+          : "직접 선택",
+    };
+
+    const statusLabelMap: Record<LiveOrderStatusFilter, string> = {
+      all: "상태: 전체보기",
+      unpaid: "미입금",
+      paid: "입금확인",
+      manual_match_needed: "입금확인 필요",
+      card_paid: "카드결제완료",
+      card_unpaid: "카드 미결제",
+    };
+
+    return [
+      broadcastLabel,
+      dateLabelMap[filters.date],
+      statusLabelMap[filters.status],
+      filters.keyword ? `검색: ${filters.keyword}` : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }, [broadcastOptions, filters]);
+
+  const exportRosen = async () => {
+    setExporting("rozen");
+
+    try {
+      await exportLiveOrdersForRosen(sortedOrders, { filterLabel: currentFilterLabel });
+    } finally {
+      setExporting("");
+    }
+  };
+
+  const exportPicking = () => {
+    setExporting("picking");
+
+    try {
+      exportLiveOrdersForPicking(sortedOrders, { filterLabel: currentFilterLabel });
+    } finally {
+      setExporting("");
+    }
+  };
+
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -329,6 +391,26 @@ export default function LiveOrderTable({
         })}
 
         <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={exportRosen}
+            disabled={exporting !== "" || sortedOrders.length === 0}
+            className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            title="현재 필터 조건 그대로 로젠 송장 엑셀을 내보냅니다"
+          >
+            {exporting === "rozen" ? "내보내는중..." : "택배송장 내보내기"}
+          </button>
+
+          <button
+            type="button"
+            onClick={exportPicking}
+            disabled={exporting !== "" || sortedOrders.length === 0}
+            className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            title="현재 필터 조건 그대로 물건챙기기 엑셀을 내보냅니다"
+          >
+            {exporting === "picking" ? "내보내는중..." : "물건챙기기 엑셀"}
+          </button>
+
           <button
             type="button"
             onClick={toggleNicknameSort}
