@@ -250,6 +250,25 @@ export default function AdminLiveDashboard() {
     setDeposits((result.deposits || []) as DepositRow[]);
   };
 
+  const syncBankdaDepositsOnly = async () => {
+    const response = await fetch("/api/bankda/sync-deposits", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
+
+    const result = await response.json().catch(() => null);
+
+    if (!response.ok || !result?.ok) {
+      throw new Error(result?.message || "뱅크다 입금내역 조회에 실패했습니다.");
+    }
+
+    await loadDepositsFromServer();
+  };
+
+
   const loadBroadcasts = async () => {
     try {
       const rows = await loadAdminLiveBroadcasts();
@@ -553,6 +572,7 @@ export default function AdminLiveDashboard() {
               deposits={deposits}
               orderGroups={orderGroups}
               onRefresh={loadDepositsFromServer}
+              onBankdaSync={syncBankdaDepositsOnly}
             />
           ) : activeMenu === "customers" ? (
             <AdminLiveCustomersPanel orders={orders} />

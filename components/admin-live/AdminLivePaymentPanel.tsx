@@ -7,6 +7,7 @@ type Props = {
   deposits: DepositRow[];
   orderGroups: OrderGroup[];
   onRefresh?: () => Promise<void> | void;
+  onBankdaSync?: () => Promise<void> | void;
 };
 
 type DepositStatusFilter = "all" | "confirmed" | "unmatched" | "auto" | "manual";
@@ -249,9 +250,11 @@ function SummaryCard({ label, value, sub }: { label: string; value: string; sub:
   );
 }
 
-export default function AdminLivePaymentPanel({ deposits, orderGroups, onRefresh }: Props) {
+export default function AdminLivePaymentPanel({ deposits, orderGroups, onRefresh, onBankdaSync }: Props) {
   const [filters, setFilters] = useState<DepositFilters>(DEFAULT_FILTERS);
   const [refreshing, setRefreshing] = useState(false);
+  const [bankdaRefreshing, setBankdaRefreshing] = useState(false);
+  const [bankdaMessage, setBankdaMessage] = useState("");
 
   const filteredDeposits = useMemo(() => {
     return [...deposits]
@@ -292,6 +295,21 @@ export default function AdminLivePaymentPanel({ deposits, orderGroups, onRefresh
     }
   };
 
+  const handleBankdaSync = async () => {
+    if (!onBankdaSync || bankdaRefreshing) return;
+
+    try {
+      setBankdaRefreshing(true);
+      setBankdaMessage("");
+      await onBankdaSync();
+      setBankdaMessage("뱅크다 조회 완료 · 입금내역을 다시 불러왔습니다.");
+    } catch (error) {
+      setBankdaMessage(error instanceof Error ? error.message : "뱅크다 조회 중 오류가 발생했습니다.");
+    } finally {
+      setBankdaRefreshing(false);
+    }
+  };
+
   return (
     <section className="mx-auto grid w-full max-w-[1320px] gap-4 px-1 xl:px-0">
       <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -325,6 +343,15 @@ export default function AdminLivePaymentPanel({ deposits, orderGroups, onRefresh
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleBankdaSync}
+              disabled={!onBankdaSync || bankdaRefreshing}
+              className="h-10 rounded-xl bg-blue-600 px-4 text-xs font-black text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            >
+              {bankdaRefreshing ? "뱅크다 조회중" : "뱅크다 새로고침"}
+            </button>
+
             <button
               type="button"
               onClick={handleRefresh}
@@ -426,8 +453,14 @@ export default function AdminLivePaymentPanel({ deposits, orderGroups, onRefresh
           )}
         </div>
 
+        {bankdaMessage && (
+          <div className="mt-4 rounded-2xl bg-blue-50 px-4 py-3 text-xs font-black leading-5 text-blue-700">
+            {bankdaMessage}
+          </div>
+        )}
+
         <div className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-xs font-black leading-5 text-amber-700">
-          현재 입금확인 메뉴는 조회/검색/필터/입금내역 새로고침 전용입니다. 자동입금확인, 수동입금확인, 뱅크다 새로고침 실행은 다음 단계에서 별도 검수 후 연결합니다.
+          현재 입금확인 메뉴는 조회/검색/필터/입금내역 새로고침/뱅크다 새로고침 전용입니다. 자동입금확인, 수동입금확인은 실행하지 않습니다.
         </div>
       </div>
     </section>
