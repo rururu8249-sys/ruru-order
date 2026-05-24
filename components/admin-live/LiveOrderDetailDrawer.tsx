@@ -307,7 +307,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         </section>
 
         <div className="mt-3 grid grid-cols-1 gap-2">
-          {canCancelPaymentConfirm ? (
+          {!isCanceled && canCancelPaymentConfirm ? (
             <button
               type="button"
               onClick={handlePaymentConfirmCancel}
@@ -360,14 +360,32 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           ) : null}
 
           {isCanceled ? (
-            <button
-              type="button"
-              onClick={restoreOrder}
-              disabled={Boolean(savingAction)}
-              className="h-10 w-full rounded-xl bg-blue-600 text-[13px] font-black text-white shadow-sm hover:bg-blue-700 active:scale-[0.99] disabled:bg-slate-300"
-            >
-              {savingAction === "restore" ? "처리중..." : "주문서복구"}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={restoreOrder}
+                disabled={Boolean(savingAction)}
+                className="h-10 w-full rounded-xl bg-blue-600 text-[13px] font-black text-white shadow-sm hover:bg-blue-700 active:scale-[0.99] disabled:bg-slate-300"
+              >
+                {savingAction === "restore" ? "처리중..." : "주문서복구"}
+              </button>
+
+              {canCancelPaymentConfirm && !isCardOrder ? (
+                <>
+                  <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] font-bold leading-4 text-amber-800">
+                    주문서는 이미 취소된 상태입니다. 다만 입금확인 기록이 남아있어 정산에서 제외하려면 [취소주문 입금기록 정리]를 사용하세요.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handlePaymentConfirmCancel}
+                    disabled={paymentCancelAction}
+                    className="h-10 w-full rounded-xl border border-amber-200 bg-white text-[13px] font-black text-amber-800 shadow-sm hover:bg-amber-50 active:scale-[0.99] disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    {paymentCancelAction ? "처리중..." : "취소주문 입금기록 정리"}
+                  </button>
+                </>
+              ) : null}
+            </>
           ) : (
             <>
               <LiveOrderDangerActionGuide />

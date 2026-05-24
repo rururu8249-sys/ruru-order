@@ -38,6 +38,10 @@ function hasPaymentConfirmedRecord(rows: AnyRow[]) {
   });
 }
 
+function isCanceledOrder(rows: AnyRow[]) {
+  return rows.some((row) => /주문취소|주문서취소|취소/.test(statusText(row)));
+}
+
 function buildOrderIds(rows: AnyRow[]) {
   return Array.from(
     new Set(
@@ -56,10 +60,17 @@ export default function AdminOrderPaymentCancelAction({ group }: AdminOrderPayme
   const first = group.first || rows[0] || {};
   const orderIds = useMemo(() => buildOrderIds(rows), [rows]);
 
+  const isCanceled = isCanceledOrder(rows);
+
   const canCancelPaymentConfirm =
     rows.length > 0 &&
     !isCardPayment(first) &&
     hasPaymentConfirmedRecord(rows);
+
+  const buttonLabel = isCanceled ? "취소주문 입금기록 정리" : "입금확인 취소";
+  const guideText = isCanceled
+    ? "주문서는 이미 취소된 상태입니다. 다만 입금확인 기록이 남아있어 정산에서 제외하려면 이 버튼을 사용하세요."
+    : "입금확인을 잘못 처리한 경우에만 사용하세요. 주문서 자체 취소와는 별도 기능이며, 돈 확인 상태만 주문확인전으로 되돌립니다.";
 
   const runPaymentConfirmCancel = async () => {
     if (!canCancelPaymentConfirm || saving) return;
@@ -103,11 +114,11 @@ export default function AdminOrderPaymentCancelAction({ group }: AdminOrderPayme
         disabled={saving}
         className="h-10 rounded-xl border border-slate-300 bg-white text-[13px] font-black text-slate-700 shadow-sm hover:bg-slate-50 active:scale-[0.99] disabled:bg-slate-100 disabled:text-slate-400"
       >
-        {saving ? "처리중..." : "입금확인 취소"}
+        {saving ? "처리중..." : buttonLabel}
       </button>
 
       <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-bold leading-4 text-slate-500">
-        입금확인을 잘못 처리한 경우에만 사용하세요. 주문서 자체 취소와는 별도 기능이며, 돈 확인 상태만 주문확인전으로 되돌립니다.
+        {guideText}
       </div>
 
       {errorMessage ? (
