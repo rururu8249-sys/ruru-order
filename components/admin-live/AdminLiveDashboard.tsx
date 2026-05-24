@@ -33,6 +33,12 @@ import {
   toAdminLiveOrder,
 } from "./liveOrderAdapter";
 import { useAutoBankdaPaymentSync } from "./useAutoBankdaPaymentSync";
+import {
+  buildAlwaysOrderOptions,
+  getAlwaysOrderDateFromFilter,
+  getAlwaysOrderDateKey,
+  isAlwaysOrderLike,
+} from "./alwaysOrderDateUtils";
 
 type VideoRatio = "vertical" | "wide" | "auto";
 
@@ -325,20 +331,27 @@ export default function AdminLiveDashboard() {
   const activeBroadcast = useMemo(() => getActiveBroadcast(broadcasts), [broadcasts]);
 
   const broadcastOptions = useMemo(() => {
+    const todayDateKey = getAlwaysOrderDateKey(new Date().toISOString());
+    const alwaysOptions = buildAlwaysOrderOptions(orders as any[], todayDateKey);
+
     const options = broadcasts.map((broadcast) => ({
       value: broadcast.id,
       label: `방송: ${formatBroadcastDisplayTitle(broadcast)}`,
     }));
 
+    const mergedOptions = [...alwaysOptions, ...options];
+
     return activeBroadcast
-      ? [{ value: "current", label: "현재 방송" }, ...options]
-      : options;
-  }, [broadcasts, activeBroadcast]);
+      ? [{ value: "current", label: "현재 방송" }, ...mergedOptions]
+      : mergedOptions;
+  }, [broadcasts, activeBroadcast, orders]);
 
   const filteredOrders = useMemo(() => {
     const keyword = normalizeText(filters.keyword);
 
     return orders.filter((order) => {
+      const selectedAlwaysOrderDate = getAlwaysOrderDateFromFilter(filters.broadcast);
+
       const selectedBroadcast =
         filters.broadcast === "current"
           ? activeBroadcast
@@ -351,8 +364,10 @@ export default function AdminLiveDashboard() {
         filters.broadcast === "all"
           ? true
           : filters.broadcast === "none"
-            ? !order.broadcastId && orderDateKey === todayKey
-            : selectedBroadcast
+            ? isAlwaysOrderLike(order as any) && orderDateKey === todayKey
+            : selectedAlwaysOrderDate
+              ? isAlwaysOrderLike(order as any) && orderDateKey === selectedAlwaysOrderDate
+              : selectedBroadcast
               ? order.broadcastId === selectedBroadcast.id || isOrderInsideBroadcastTime(order.createdAt, selectedBroadcast)
               : false;
 
