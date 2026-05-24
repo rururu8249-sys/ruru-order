@@ -205,6 +205,50 @@ export default function PaymentMatchPanel({
     },
   });
 
+
+  // AUTO_RUN_AFTER_BANKDA_SYNC_PATCH
+  // 뱅크다 입금내역 동기화 직후, 닉네임+주문그룹 합계금액+1:1 후보만 자동입금확인 처리합니다.
+  // 상품명/옵션/구분자(|)는 자동입금확인 기준에 사용하지 않습니다.
+  const runAutoMatchAfterBankdaSync = async () => {
+    const response = await fetch("/api/admin-v2/auto-payment-match/run", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        confirm: "RUN_AUTO_MATCH",
+      }),
+    });
+
+    const result = await response.json().catch(() => null);
+
+    if (!response.ok || !result?.ok) {
+      setLastAutoSyncMessage(`자동입금확인 실패: ${result?.message || "알 수 없는 오류"}`);
+      return 0;
+    }
+
+    const successCount = Number(
+      result?.summary?.success_count ||
+        result?.success_count ||
+        result?.matched_count ||
+        0
+    );
+
+    const failedCount = Number(result?.summary?.failed_count || result?.failed_count || 0);
+
+    if (successCount > 0) {
+      setLastAutoSyncMessage(
+        failedCount > 0
+          ? `자동입금확인 ${successCount.toLocaleString("ko-KR")}건 완료 / 실패 ${failedCount.toLocaleString("ko-KR")}건`
+          : `자동입금확인 ${successCount.toLocaleString("ko-KR")}건 완료`
+      );
+    } else {
+      setLastAutoSyncMessage("자동입금확인 후보 없음");
+    }
+
+    return successCount;
+  };
+
   const forceLoadServerDeposits = async () => {
     setServerDepositLoading(true);
 
@@ -314,6 +358,9 @@ export default function PaymentMatchPanel({
         return;
       }
 
+      await forceLoadServerDeposits();
+
+      await runAutoMatchAfterBankdaSync();
       await forceLoadServerDeposits();
       await runAutoMatchPreview();
       setLastAutoSyncMessage("입금내역 자동조회 완료");
