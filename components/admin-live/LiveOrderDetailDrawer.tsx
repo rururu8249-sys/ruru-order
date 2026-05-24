@@ -4,6 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { LiveOrder, LiveOrderItem } from "./types";
 import { isLiveOrderCanceled, useLiveOrderCancelRestore } from "./useLiveOrderCancelRestore";
+import LiveOrderItemEditCard from "./LiveOrderItemEditCard";
 
 type Props = {
   order: LiveOrder;
@@ -260,23 +261,13 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               </div>
             ) : (
               items.map((item, index) => (
-                <div key={`${item.id}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-3">
-                  <div className="flex items-start gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-black leading-5 text-slate-950">
-                        {getItemName(item)}
-                      </div>
-                      <div className="mt-1 whitespace-pre-line text-xs font-bold leading-5 text-slate-500">
-                        {getItemOption(item)}
-                      </div>
-                    </div>
-
-                    <div className="shrink-0 text-right">
-                      <div className="text-sm font-black text-slate-950">{Number(item.qty || 1)}개</div>
-                      <div className="mt-1 text-sm font-black text-slate-950">{money(item.amount)}</div>
-                    </div>
-                  </div>
-                </div>
+                <LiveOrderItemEditCard
+                  key={`${item.id}-${index}`}
+                  item={item}
+                  index={index}
+                  disabled={isCanceled}
+                  onAfterSave={onAfterStatusChange}
+                />
               ))
             )}
           </div>

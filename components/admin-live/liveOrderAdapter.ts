@@ -22,6 +22,30 @@ function safeNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function parseItemChangeHistory(value: unknown) {
+  if (Array.isArray(value)) return value;
+
+  if (typeof value === "string" && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+}
+
+function getItemEditCounts(row: OrderRow) {
+  const history = parseItemChangeHistory((row as any).item_change_history);
+
+  return {
+    productEditCount: history.filter((entry: any) => entry?.product_changed || entry?.productChanged).length,
+    amountEditCount: history.filter((entry: any) => entry?.amount_changed || entry?.amountChanged).length,
+  };
+}
+
 function formatTime(value: string | null | undefined) {
   if (!value) return "-";
 
@@ -107,24 +131,39 @@ function getGroupProductAmount(group: OrderGroup) {
 }
 
 function buildItem(row: OrderRow): LiveOrderItem {
-  const optionParts = [row.color, row.size]
-    .map((value) => String(value || "").trim())
-    .filter((value) => value && value !== "없음");
+  const color = String(row.color || "").trim();
+  const size = String(row.size || "").trim();
+  const optionParts = [color, size].filter((value) => value && value !== "없음");
 
+  const qty = safeNumber(row.qty || 1) || 1;
   const shippingFee = safeNumber(row.adjusted_shipping_fee ?? row.shipping_fee ?? 0);
   const productAmount =
     row.adjusted_product_price !== null && row.adjusted_product_price !== undefined
       ? safeNumber(row.adjusted_product_price)
       : row.product_price !== null && row.product_price !== undefined
-        ? safeNumber(row.product_price)
+        ? safeNumber(row.product_price) * qty
         : Math.max(0, orderBaseAmount(row) - shippingFee);
+
+  const unitPrice =
+    row.product_price !== null && row.product_price !== undefined
+      ? safeNumber(row.product_price)
+      : qty > 0
+        ? Math.round(productAmount / qty)
+        : productAmount;
+
+  const editCounts = getItemEditCounts(row);
 
   return {
     id: String(row.id),
     productName: row.product_name || "상품명 없음",
     optionText: optionParts.join(" / ") || "옵션 없음",
-    qty: safeNumber(row.qty || 1) || 1,
+    color,
+    size,
+    qty,
+    unitPrice,
     amount: productAmount,
+    productEditCount: editCounts.productEditCount,
+    amountEditCount: editCounts.amountEditCount,
   };
 }
 

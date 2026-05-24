@@ -12,8 +12,13 @@ export type LiveOrderItem = {
   id: string;
   productName: string;
   optionText: string;
+  color?: string;
+  size?: string;
   qty: number;
+  unitPrice?: number;
   amount: number;
+  productEditCount?: number;
+  amountEditCount?: number;
 };
 
 export type LiveOrder = {
