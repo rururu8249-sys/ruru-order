@@ -26,6 +26,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { isRemoteAreaAddress } from "@/lib/order/shippingAddress";
 import { formatOrderPhone, normalizeOrderPhone } from "@/lib/order/phone";
+import { CUSTOMER_SESSION_VERSION_KEY, clearLegacyCustomerSessionIfNeeded } from "@/lib/customer/customerSession";
 import {
   COMBINE_SHIPPING_SETTING_KEYS,
   DEFAULT_COMBINE_SHIPPING_SETTINGS,
@@ -268,6 +269,7 @@ export default function OrderPage() {
   useEffect(() => {
     loadOrderSettings();
     loadBroadcast();
+    clearLegacyCustomerSessionIfNeeded();
     loadSavedCustomerInfo();
   }, []);
 

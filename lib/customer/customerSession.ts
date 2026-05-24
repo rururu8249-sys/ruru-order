@@ -13,7 +13,11 @@ export type SavedCustomerInfo = {
   detailAddress: string;
 };
 
+export const CUSTOMER_SESSION_VERSION_KEY = "ruru_customer_session_version";
+export const REQUIRED_CUSTOMER_SESSION_VERSION = "kakao_required_20260524";
+
 export const CUSTOMER_STORAGE_KEYS = [
+  "ruru_customer_session",
   "ruru_customer_phone",
   "ruru_youtube_nickname",
   "ruru_customer_name",
@@ -57,4 +61,36 @@ export const clearSavedCustomerInfo = () => {
   CUSTOMER_STORAGE_KEYS.forEach((key) => {
     window.localStorage.removeItem(key);
   });
+};
+
+export const markCustomerSessionVersionCurrent = () => {
+  if (typeof window === "undefined") return;
+
+  window.localStorage.setItem(CUSTOMER_SESSION_VERSION_KEY, REQUIRED_CUSTOMER_SESSION_VERSION);
+};
+
+export const isCustomerSessionVersionCurrent = () => {
+  if (typeof window === "undefined") return true;
+
+  return window.localStorage.getItem(CUSTOMER_SESSION_VERSION_KEY) === REQUIRED_CUSTOMER_SESSION_VERSION;
+};
+
+export const hasAnySavedCustomerStorage = () => {
+  if (typeof window === "undefined") return false;
+
+  return CUSTOMER_STORAGE_KEYS.some((key) => Boolean(window.localStorage.getItem(key)));
+};
+
+export const clearLegacyCustomerSessionIfNeeded = () => {
+  if (typeof window === "undefined") return false;
+
+  if (isCustomerSessionVersionCurrent()) return false;
+  if (!hasAnySavedCustomerStorage()) return false;
+
+  clearSavedCustomerInfo();
+  window.localStorage.removeItem("ruru_kakao_id");
+  window.localStorage.removeItem("ruru_kakao_nickname");
+  window.localStorage.removeItem(CUSTOMER_SESSION_VERSION_KEY);
+
+  return true;
 };

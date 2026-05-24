@@ -1,5 +1,6 @@
 "use client";
 
+import { clearLegacyCustomerSessionIfNeeded } from "@/lib/customer/customerSession";
 import { useEffect, useState } from "react";
 
 // components/home/KakaoStartPage.tsx
@@ -13,6 +14,8 @@ export default function KakaoStartPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    clearLegacyCustomerSessionIfNeeded();
 
     const savedYoutubeNickname = window.localStorage.getItem("ruru_youtube_nickname") || "";
     const savedName = window.localStorage.getItem("ruru_customer_name") || "";

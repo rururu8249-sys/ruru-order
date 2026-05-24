@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CUSTOMER_SESSION_VERSION_KEY, REQUIRED_CUSTOMER_SESSION_VERSION } from "@/lib/customer/customerSession";
 
 const setIfValue = (key: string, value: unknown) => {
   const text = String(value || "").trim();
@@ -46,6 +47,7 @@ export default function KakaoCallbackPage() {
       setIfValue("ruru_customer_zipcode", data.customer_zipcode);
       setIfValue("ruru_customer_address", data.customer_address);
       setIfValue("ruru_customer_detail_address", data.customer_detail_address);
+      localStorage.setItem(CUSTOMER_SESSION_VERSION_KEY, REQUIRED_CUSTOMER_SESSION_VERSION);
 
       setMessage("카카오 로그인 완료! 주문서로 이동합니다.");
 

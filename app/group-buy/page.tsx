@@ -14,6 +14,7 @@
 
 "use client";
 
+import { CUSTOMER_SESSION_VERSION_KEY, clearLegacyCustomerSessionIfNeeded } from "@/lib/customer/customerSession";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import CommonCustomerTopNav from "@/components/customer/CustomerTopNav";
@@ -318,6 +319,8 @@ export default function GroupBuyPage() {
       document.body.appendChild(script);
     }
 
+    clearLegacyCustomerSessionIfNeeded();
+
     const saved = localStorage.getItem("ruru_customer_session");
     if (saved) {
       try {
@@ -423,6 +426,9 @@ export default function GroupBuyPage() {
     localStorage.removeItem("ruru_customer_zipcode");
     localStorage.removeItem("ruru_customer_address");
     localStorage.removeItem("ruru_customer_detail_address");
+    localStorage.removeItem(CUSTOMER_SESSION_VERSION_KEY);
+    localStorage.removeItem("ruru_kakao_id");
+    localStorage.removeItem("ruru_kakao_nickname");
 
     setSession(null);
     setShowSavedCustomerDetail(false);
