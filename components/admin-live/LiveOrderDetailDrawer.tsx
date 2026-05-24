@@ -1,11 +1,14 @@
 "use client";
 
+import { useState } from "react";
+import { supabase } from "@/lib/supabase";
 import type { LiveOrder, LiveOrderItem } from "./types";
 
 type Props = {
   order: LiveOrder;
   onOpenManualMatch?: (order: LiveOrder) => void;
   onClose?: () => void;
+  onAfterStatusChange?: () => void | Promise<void>;
 };
 
 function money(value: unknown) {
@@ -61,11 +64,79 @@ function getPaymentStatusClass(order: LiveOrder) {
   return "border-slate-200 bg-slate-50 text-slate-600";
 }
 
-export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClose }: Props) {
+export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClose, onAfterStatusChange }: Props) {
+  const [cardStatusAction, setCardStatusAction] = useState<"" | "card-paid" | "card-unpaid">("");
   const items = Array.isArray(order.items) ? order.items : [];
   const productAmount = Number(order.productAmount || 0);
   const shippingFee = Number(order.shippingFee || 0);
   const totalAmount = Number(order.totalAmount || productAmount + shippingFee);
+
+  const isCardOrder = String(order.paymentMethod || "").includes("카드");
+  const isCardPaid = order.paymentStatus === "card_paid";
+  const isCardUnpaid = order.paymentStatus === "card_unpaid";
+  const showCardStatusActions = isCardOrder && (isCardPaid || isCardUnpaid);
+
+  const handleCardPaymentStatusChange = async (
+    nextStatus: "카드결제완료" | "주문확인전",
+    action: "card-paid" | "card-unpaid"
+  ) => {
+    if (!isCardOrder) {
+      alert("카드결제 주문에서만 처리할 수 있습니다.");
+      return;
+    }
+
+    const rowIds = items
+      .map((item) => Number(item.id))
+      .filter((id) => Number.isFinite(id));
+
+    if (rowIds.length === 0) {
+      alert("상태 변경할 주문 ID가 없습니다.");
+      return;
+    }
+
+    const confirmMessage =
+      nextStatus === "카드결제완료"
+        ? [
+            "카드결제완료 처리할까요?",
+            "",
+            "실제 카드결제가 확인된 경우에만 진행하세요.",
+            "주문상태만 카드결제완료로 변경합니다.",
+          ].join("\n")
+        : [
+            "카드결제완료 상태를 카드미결제로 되돌릴까요?",
+            "",
+            "주문상태는 주문확인전으로 돌아갑니다.",
+            "결제방식은 카드결제로 유지됩니다.",
+            "금액/상품/배송/송장/자동입금 로직은 변경하지 않습니다.",
+          ].join("\n");
+
+    if (!window.confirm(confirmMessage)) return;
+
+    setCardStatusAction(action);
+
+    try {
+      const { error } = await supabase
+        .from("orders")
+        .update({
+          admin_order_status_v2: nextStatus,
+          order_manage_status: nextStatus,
+        })
+        .in("id", rowIds);
+
+      if (error) {
+        alert("카드결제 상태 변경 실패\n\n" + error.message);
+        return;
+      }
+
+      alert(nextStatus === "카드결제완료" ? "카드결제완료 처리됐습니다." : "카드미결제로 되돌렸습니다.");
+
+      await onAfterStatusChange?.();
+      onClose?.();
+    } finally {
+      setCardStatusAction("");
+    }
+  };
+
 
   return (
     <aside className="fixed bottom-5 right-5 top-[118px] z-40 flex w-[390px] max-w-[calc(100vw-24px)] flex-col rounded-3xl border border-slate-200 bg-white shadow-2xl">
@@ -107,6 +178,32 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             {getPaymentStatusLabel(order)}
           </div>
         </section>
+
+        {showCardStatusActions ? (
+          <div className="mt-3 grid grid-cols-1 gap-2">
+            {isCardUnpaid ? (
+              <button
+                type="button"
+                onClick={() => handleCardPaymentStatusChange("카드결제완료", "card-paid")}
+                disabled={Boolean(cardStatusAction)}
+                className="h-12 w-full rounded-2xl bg-violet-600 text-sm font-black text-white shadow-sm hover:bg-violet-700 active:scale-[0.99] disabled:bg-slate-300"
+              >
+                {cardStatusAction === "card-paid" ? "처리중..." : "카드결제완료 처리"}
+              </button>
+            ) : null}
+
+            {isCardPaid ? (
+              <button
+                type="button"
+                onClick={() => handleCardPaymentStatusChange("주문확인전", "card-unpaid")}
+                disabled={Boolean(cardStatusAction)}
+                className="h-12 w-full rounded-2xl border border-rose-200 bg-rose-50 text-sm font-black text-rose-700 shadow-sm hover:bg-rose-100 active:scale-[0.99] disabled:bg-slate-100 disabled:text-slate-400"
+              >
+                {cardStatusAction === "card-unpaid" ? "처리중..." : "카드미결제로 되돌리기"}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         {order.paymentStatus === "manual_match_needed" && onOpenManualMatch && (
           <button

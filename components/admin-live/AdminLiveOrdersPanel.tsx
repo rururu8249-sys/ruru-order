@@ -104,7 +104,7 @@ export default function AdminLiveOrdersPanel({
       </div>
 
       {orderDetailOpen && selectedOrder ? (
-        <LiveOrderDetailDrawer order={selectedOrder} onClose={onCloseOrderDetail} />
+        <LiveOrderDetailDrawer order={selectedOrder} onClose={onCloseOrderDetail} onAfterStatusChange={onRefresh} />
       ) : null}
     </section>
   );
