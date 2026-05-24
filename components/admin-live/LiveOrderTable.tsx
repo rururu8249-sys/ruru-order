@@ -593,18 +593,16 @@ export default function LiveOrderTable({
 
         {filters.date === "custom" && (
           <>
-            <input
+            <input className="h-12 w-full sm:w-[150px] sm:min-w-[150px] sm:max-w-[150px] sm:flex-none rounded-2xl border border-slate-200 bg-white px-3 text-[14px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
               type="date"
               value={filters.customStartDate}
               onChange={(event) => updateFilter("customStartDate", event.target.value)}
-              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
               aria-label="시작일"
             />
-            <input
+            <input className="h-12 w-full sm:w-[150px] sm:min-w-[150px] sm:max-w-[150px] sm:flex-none rounded-2xl border border-slate-200 bg-white px-3 text-[14px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
               type="date"
               value={filters.customEndDate}
               onChange={(event) => updateFilter("customEndDate", event.target.value)}
-              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
               aria-label="종료일"
             />
           </>

@@ -214,7 +214,7 @@ export default function AdminOrderFilterBar({
                 type="date"
                 value={startDate}
                 onChange={(event) => setStartDate(event.target.value)}
-                className="h-12 min-w-[175px] rounded-[999px] border border-neutral-200 bg-white px-5 text-[16px] font-black text-neutral-900 outline-none focus:border-neutral-950"
+                className="h-12 w-full sm:w-[150px] sm:min-w-[150px] sm:max-w-[150px] sm:flex-none rounded-2xl border border-slate-200 bg-white px-3 text-[14px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
                 aria-label="시작일"
               />
 
@@ -224,7 +224,7 @@ export default function AdminOrderFilterBar({
                 type="date"
                 value={endDate}
                 onChange={(event) => setEndDate(event.target.value)}
-                className="h-12 min-w-[175px] rounded-[999px] border border-neutral-200 bg-white px-5 text-[16px] font-black text-neutral-900 outline-none focus:border-neutral-950"
+                className="h-12 w-full sm:w-[150px] sm:min-w-[150px] sm:max-w-[150px] sm:flex-none rounded-2xl border border-slate-200 bg-white px-3 text-[14px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
                 aria-label="종료일"
               />
 
