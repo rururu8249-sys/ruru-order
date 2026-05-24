@@ -26,7 +26,13 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { isRemoteAreaAddress } from "@/lib/order/shippingAddress";
 import { formatOrderPhone, normalizeOrderPhone } from "@/lib/order/phone";
-import { CUSTOMER_SESSION_VERSION_KEY, clearLegacyCustomerSessionIfNeeded } from "@/lib/customer/customerSession";
+import {
+  CUSTOMER_SESSION_VERSION_KEY,
+  YOUTUBE_NICKNAME_CONFIRM_VERSION_KEY,
+  clearLegacyCustomerSessionIfNeeded,
+  isYoutubeNicknameConfirmVersionCurrent,
+  markYoutubeNicknameConfirmVersionCurrent,
+} from "@/lib/customer/customerSession";
 import {
   COMBINE_SHIPPING_SETTING_KEYS,
   DEFAULT_COMBINE_SHIPPING_SETTINGS,
@@ -312,12 +318,14 @@ export default function OrderPage() {
         );
 
         if (hasSavedYoutubeNickname && hasSavedCustomerInfo) {
-          setIsKakaoLoginReturn(false);
+          const nicknameConfirmed = isYoutubeNicknameConfirmVersionCurrent();
+
           setHasSavedInfo(true);
           setIsEditingCustomerInfo(false);
           setShowSavedCustomerDetail(false);
           setCustomerMode("load");
           setIsCustomerInfoOpen(false);
+          setIsKakaoLoginReturn(!nicknameConfirmed);
           window.history.replaceState(null, "", "/order");
           return;
         }
@@ -326,20 +334,24 @@ export default function OrderPage() {
           const restored = await loadExistingCustomerByKakaoPhone(savedPhone);
 
           if (restored) {
-            setIsKakaoLoginReturn(false);
+            const nicknameConfirmed = isYoutubeNicknameConfirmVersionCurrent();
+
             setHasSavedInfo(true);
             setIsEditingCustomerInfo(false);
             setShowSavedCustomerDetail(false);
             setCustomerMode("load");
             setIsCustomerInfoOpen(false);
+            setIsKakaoLoginReturn(!nicknameConfirmed);
             window.history.replaceState(null, "", "/order");
 
-            setTimeout(() => {
-              document.getElementById("orderProductInputSection")?.scrollIntoView({
-                behavior: "smooth",
-                block: "start",
-              });
-            }, 250);
+            if (nicknameConfirmed) {
+              setTimeout(() => {
+                document.getElementById("orderProductInputSection")?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start",
+                });
+              }, 250);
+            }
             return;
           }
         }
@@ -909,6 +921,7 @@ export default function OrderPage() {
 
     setYoutubeNicknameError("");
     localStorage.setItem("ruru_youtube_nickname", cleanNickname);
+    markYoutubeNicknameConfirmVersionCurrent();
     setYoutubeNickname(cleanNickname);
     setIsKakaoLoginReturn(false);
 

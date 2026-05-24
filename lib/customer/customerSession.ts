@@ -15,6 +15,8 @@ export type SavedCustomerInfo = {
 
 export const CUSTOMER_SESSION_VERSION_KEY = "ruru_customer_session_version";
 export const REQUIRED_CUSTOMER_SESSION_VERSION = "kakao_required_20260524";
+export const YOUTUBE_NICKNAME_CONFIRM_VERSION_KEY = "ruru_youtube_nickname_confirm_version";
+export const REQUIRED_YOUTUBE_NICKNAME_CONFIRM_VERSION = "youtube_confirmed_20260524";
 
 export const CUSTOMER_STORAGE_KEYS = [
   "ruru_customer_session",
@@ -91,6 +93,25 @@ export const clearLegacyCustomerSessionIfNeeded = () => {
   window.localStorage.removeItem("ruru_kakao_id");
   window.localStorage.removeItem("ruru_kakao_nickname");
   window.localStorage.removeItem(CUSTOMER_SESSION_VERSION_KEY);
+  window.localStorage.removeItem(YOUTUBE_NICKNAME_CONFIRM_VERSION_KEY);
 
   return true;
+};
+
+export const markYoutubeNicknameConfirmVersionCurrent = () => {
+  if (typeof window === "undefined") return;
+
+  window.localStorage.setItem(
+    YOUTUBE_NICKNAME_CONFIRM_VERSION_KEY,
+    REQUIRED_YOUTUBE_NICKNAME_CONFIRM_VERSION,
+  );
+};
+
+export const isYoutubeNicknameConfirmVersionCurrent = () => {
+  if (typeof window === "undefined") return true;
+
+  return (
+    window.localStorage.getItem(YOUTUBE_NICKNAME_CONFIRM_VERSION_KEY) ===
+    REQUIRED_YOUTUBE_NICKNAME_CONFIRM_VERSION
+  );
 };

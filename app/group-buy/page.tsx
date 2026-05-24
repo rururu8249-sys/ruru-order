@@ -14,7 +14,13 @@
 
 "use client";
 
-import { CUSTOMER_SESSION_VERSION_KEY, clearLegacyCustomerSessionIfNeeded } from "@/lib/customer/customerSession";
+import {
+  CUSTOMER_SESSION_VERSION_KEY,
+  YOUTUBE_NICKNAME_CONFIRM_VERSION_KEY,
+  clearLegacyCustomerSessionIfNeeded,
+  isCustomerSessionVersionCurrent,
+  isYoutubeNicknameConfirmVersionCurrent,
+} from "@/lib/customer/customerSession";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import CommonCustomerTopNav from "@/components/customer/CustomerTopNav";
@@ -321,7 +327,10 @@ export default function GroupBuyPage() {
 
     clearLegacyCustomerSessionIfNeeded();
 
-    const saved = localStorage.getItem("ruru_customer_session");
+    const canUseSavedCustomerSession =
+      isCustomerSessionVersionCurrent() && isYoutubeNicknameConfirmVersionCurrent();
+
+    const saved = canUseSavedCustomerSession ? localStorage.getItem("ruru_customer_session") : null;
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as CustomerSession;
@@ -427,6 +436,7 @@ export default function GroupBuyPage() {
     localStorage.removeItem("ruru_customer_address");
     localStorage.removeItem("ruru_customer_detail_address");
     localStorage.removeItem(CUSTOMER_SESSION_VERSION_KEY);
+    localStorage.removeItem(YOUTUBE_NICKNAME_CONFIRM_VERSION_KEY);
     localStorage.removeItem("ruru_kakao_id");
     localStorage.removeItem("ruru_kakao_nickname");
 

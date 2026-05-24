@@ -1,6 +1,10 @@
 "use client";
 
-import { clearLegacyCustomerSessionIfNeeded } from "@/lib/customer/customerSession";
+import {
+  clearLegacyCustomerSessionIfNeeded,
+  isCustomerSessionVersionCurrent,
+  isYoutubeNicknameConfirmVersionCurrent,
+} from "@/lib/customer/customerSession";
 import { useEffect, useState } from "react";
 
 // components/home/KakaoStartPage.tsx
@@ -17,6 +21,8 @@ export default function KakaoStartPage() {
 
     clearLegacyCustomerSessionIfNeeded();
 
+    const kakaoSessionReady = isCustomerSessionVersionCurrent();
+    const youtubeNicknameConfirmed = isYoutubeNicknameConfirmVersionCurrent();
     const savedYoutubeNickname = window.localStorage.getItem("ruru_youtube_nickname") || "";
     const savedName = window.localStorage.getItem("ruru_customer_name") || "";
     const savedPhone = window.localStorage.getItem("ruru_customer_phone") || "";
