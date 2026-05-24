@@ -6,6 +6,7 @@ import type { DepositRow, OrderGroup } from "@/lib/admin-v2/types";
 type Props = {
   deposits: DepositRow[];
   orderGroups: OrderGroup[];
+  onRefresh?: () => Promise<void> | void;
 };
 
 type DepositStatusFilter = "all" | "confirmed" | "unmatched" | "auto" | "manual";
@@ -248,8 +249,9 @@ function SummaryCard({ label, value, sub }: { label: string; value: string; sub:
   );
 }
 
-export default function AdminLivePaymentPanel({ deposits, orderGroups }: Props) {
+export default function AdminLivePaymentPanel({ deposits, orderGroups, onRefresh }: Props) {
   const [filters, setFilters] = useState<DepositFilters>(DEFAULT_FILTERS);
+  const [refreshing, setRefreshing] = useState(false);
 
   const filteredDeposits = useMemo(() => {
     return [...deposits]
@@ -277,6 +279,17 @@ export default function AdminLivePaymentPanel({ deposits, orderGroups }: Props) 
 
   const resetFilters = () => {
     setFilters(DEFAULT_FILTERS);
+  };
+
+  const handleRefresh = async () => {
+    if (!onRefresh || refreshing) return;
+
+    try {
+      setRefreshing(true);
+      await onRefresh();
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   return (
@@ -311,13 +324,24 @@ export default function AdminLivePaymentPanel({ deposits, orderGroups }: Props) 
             <div className="mt-1 text-xs font-bold text-slate-400">최대 80건 표시 · 조회 전용</div>
           </div>
 
-          <button
-            type="button"
-            onClick={resetFilters}
-            className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-600 hover:bg-slate-50"
-          >
-            필터 초기화
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={!onRefresh || refreshing}
+              className="h-10 rounded-xl bg-slate-950 px-4 text-xs font-black text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+            >
+              {refreshing ? "새로고침중" : "입금내역 새로고침"}
+            </button>
+
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-600 hover:bg-slate-50"
+            >
+              필터 초기화
+            </button>
+          </div>
         </div>
 
         <div className="mb-4 grid gap-2 xl:grid-cols-[1.2fr_150px_150px_150px_150px_auto]">
@@ -405,7 +429,7 @@ export default function AdminLivePaymentPanel({ deposits, orderGroups }: Props) 
         </div>
 
         <div className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-xs font-black leading-5 text-amber-700">
-          현재 입금확인 메뉴는 조회/검색/필터 전용입니다. 자동입금확인, 수동입금확인, 뱅크다 새로고침 실행은 다음 단계에서 별도 검수 후 연결합니다.
+          현재 입금확인 메뉴는 조회/검색/필터/입금내역 새로고침 전용입니다. 자동입금확인, 수동입금확인, 뱅크다 새로고침 실행은 다음 단계에서 별도 검수 후 연결합니다.
         </div>
       </div>
     </section>

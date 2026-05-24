@@ -549,7 +549,11 @@ export default function AdminLiveDashboard() {
               onRefresh={loadOrders}
             />
           ) : activeMenu === "payments" ? (
-            <AdminLivePaymentPanel deposits={deposits} orderGroups={orderGroups} />
+            <AdminLivePaymentPanel
+              deposits={deposits}
+              orderGroups={orderGroups}
+              onRefresh={loadDepositsFromServer}
+            />
           ) : activeMenu === "customers" ? (
             <AdminLiveCustomersPanel orders={orders} />
           ) : activeMenu === "settlement" ? (
