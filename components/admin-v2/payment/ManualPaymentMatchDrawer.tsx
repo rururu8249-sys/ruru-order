@@ -119,6 +119,7 @@ export default function ManualPaymentMatchDrawer(props: Props) {
   const [serverDeposits, setServerDeposits] = useState<DepositRow[]>(props.deposits || []);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [actionError, setActionError] = useState("");
   const [keyword, setKeyword] = useState("");
   const [selectedDepositIds, setSelectedDepositIds] = useState<number[]>([]);
   const [showAll, setShowAll] = useState(false);
@@ -191,7 +192,7 @@ export default function ManualPaymentMatchDrawer(props: Props) {
       const result = await response.json().catch(() => null);
 
       if (!response.ok || !result?.ok) {
-        alert("입금내역 불러오기 실패\n\n" + (result?.message || "알 수 없는 오류"));
+        setActionError("입금내역 불러오기 실패: " + (result?.message || "알 수 없는 오류"));
         return;
       }
 
@@ -253,43 +254,38 @@ export default function ManualPaymentMatchDrawer(props: Props) {
   if (!group || !first) return null;
 
   const confirmManualMatch = async () => {
-    if (selectedDeposits.length === 0) {
-      alert("매칭할 입금내역을 선택해주세요.");
-      return;
-    }
-
-    const depositLines = selectedDeposits
-      .map((deposit, index) => `${index + 1}. ${deposit.depositor_name || "-"} / ${money(deposit.amount)} / ${getDepositTimeLabel(deposit.deposited_time, deposit.created_at)}`)
-      .join("\n");
-
-    const ok = confirm(
-      [
-        "선택한 입금내역으로 수동매칭할까요?",
-        "",
-        `주문고객: ${nickname || customerName || "-"}`,
-        `주문금액: ${money(expectedAmount)}`,
-        `선택합계: ${money(selectedTotalAmount)}`,
-        ...(exactAmountMatched
-          ? []
-          : [
-              "",
-              `⚠️ 차액: ${money(amountDifference)}`,
-              "입금예정금액과 선택합계가 다릅니다.",
-              "그래도 관리자 판단으로 수동매칭 처리합니다.",
-            ]),
-        "",
-        "선택한 입금내역",
-        depositLines,
-        "",
-        "주의: 수동매칭 후 선택한 모든 입금내역이 이 주문에 연결됩니다.",
-      ].join("\n")
-    );
-
-    if (!ok) return;
+    if (saving) return;
 
     setSaving(true);
+    setActionError("");
 
     try {
+      const orderIds = getOrderIds(group);
+      const hasSelectedDeposits = selectedDeposits.length > 0;
+
+      if (!hasSelectedDeposits) {
+        const response = await fetch("/api/admin-v2/manual-payment-confirm-without-deposit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderGroupId: group.groupId,
+            orderIds,
+            expectedAmount,
+          }),
+        });
+
+        const result = await response.json().catch(() => null);
+
+        if (!response.ok || !result?.ok) {
+          setActionError(result?.message || "입금내역 없이 수동확인 실패");
+          return;
+        }
+
+        await props.onMatched?.();
+        props.onClose();
+        return;
+      }
+
       const depositIds = selectedDeposits
         .map((deposit) => Number(deposit.id))
         .filter((id) => Number.isFinite(id) && id > 0);
@@ -299,7 +295,7 @@ export default function ManualPaymentMatchDrawer(props: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderGroupId: group.groupId,
-          orderIds: getOrderIds(group),
+          orderIds,
           depositIds,
           depositId: depositIds[0] || null,
           expectedAmount,
@@ -310,22 +306,14 @@ export default function ManualPaymentMatchDrawer(props: Props) {
       const result = await response.json().catch(() => null);
 
       if (!response.ok || !result?.ok) {
-        alert("수동매칭 실패\n\n" + (result?.message || "알 수 없는 오류"));
+        setActionError(result?.message || "수동매칭 실패");
         return;
       }
 
-      alert(
-        [
-          "수동매칭 완료",
-          "",
-          "주문상태는 결제완료(수동)으로 표시됩니다.",
-          `선택 입금내역: ${depositIds.length.toLocaleString()}건`,
-          `선택합계: ${money(selectedTotalAmount)}`,
-        ].join("\n")
-      );
-
       await props.onMatched?.();
       props.onClose();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : String(error));
     } finally {
       setSaving(false);
     }
@@ -341,8 +329,19 @@ export default function ManualPaymentMatchDrawer(props: Props) {
               <h2 className="mt-0.5 text-xl font-black tracking-[-0.04em] text-slate-950">수동 입금매칭</h2>
             </div>
 
-            <div className="rounded-xl bg-orange-50 px-3 py-2 text-right text-[11px] font-black text-orange-700">
-              돈 관련 작업<br />입금자명·금액 확인
+            <div className="flex items-start gap-2">
+              <div className="rounded-xl bg-orange-50 px-3 py-2 text-right text-[11px] font-black text-orange-700">
+                돈 관련 작업<br />입금자명·금액 확인
+              </div>
+              <button
+                type="button"
+                onClick={props.onClose}
+                disabled={saving}
+                aria-label="수동 입금매칭 닫기"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-xl font-black text-slate-400 shadow-sm active:scale-[0.97] disabled:opacity-50"
+              >
+                ×
+              </button>
             </div>
           </div>
 
@@ -445,23 +444,26 @@ export default function ManualPaymentMatchDrawer(props: Props) {
           )}
         </section>
 
-        <footer className="grid shrink-0 grid-cols-2 gap-2 border-t border-slate-200 bg-white p-3.5">
-          <button
-            type="button"
-            onClick={props.onClose}
-            disabled={saving}
-            className="h-12 rounded-xl border border-slate-300 bg-white text-base font-black text-slate-700 active:scale-[0.98] disabled:opacity-50"
-          >
-            취소
-          </button>
+        {actionError ? (
+          <div className="shrink-0 border-t border-red-100 bg-red-50 px-4 py-3 text-sm font-black leading-5 text-red-700">
+            수동입금 처리 오류: {actionError}
+          </div>
+        ) : null}
 
+        <footer className="shrink-0 border-t border-slate-200 bg-white p-3.5">
           <button
             type="button"
             onClick={confirmManualMatch}
-            disabled={saving || selectedDeposits.length === 0}
-            className="h-12 rounded-xl bg-slate-950 text-base font-black text-white active:scale-[0.98] disabled:bg-slate-300"
+            disabled={saving}
+            className="h-12 w-full rounded-xl bg-slate-950 text-base font-black text-white active:scale-[0.98] disabled:bg-slate-300"
           >
-            {saving ? "처리중..." : exactAmountMatched ? "수동매칭" : "금액 다름 · 그래도 수동매칭"}
+            {saving
+              ? "처리중..."
+              : selectedDeposits.length === 0
+                ? "입금내역 없이 수동확인"
+                : exactAmountMatched
+                  ? "수동매칭"
+                  : "금액 다름 · 수동매칭"}
           </button>
         </footer>
       </aside>
