@@ -229,6 +229,7 @@ export default function OrderPage() {
   const [loginName, setLoginName] = useState("");
   const [loginPhone, setLoginPhone] = useState("");
   const [kakaoNickname, setKakaoNickname] = useState("");
+  const [youtubeNicknameError, setYoutubeNicknameError] = useState("");
   const [isKakaoLoginReturn, setIsKakaoLoginReturn] = useState(false);
 
   const [paymentMethod, setPaymentMethod] = useState<"무통장입금" | "카드결제">("무통장입금");
@@ -293,52 +294,78 @@ export default function OrderPage() {
     }
 
     if (cameFromKakao) {
-      const savedPhone = window.localStorage.getItem("ruru_customer_phone") || "";
-      const savedYoutubeNickname = window.localStorage.getItem("ruru_youtube_nickname") || "";
-      const savedName = window.localStorage.getItem("ruru_customer_name") || "";
-      const savedAddress = window.localStorage.getItem("ruru_customer_address") || "";
-      const savedDetailAddress = window.localStorage.getItem("ruru_customer_detail_address") || "";
+      const handleKakaoReturn = async () => {
+        const savedPhone = window.localStorage.getItem("ruru_customer_phone") || "";
+        const savedYoutubeNickname = window.localStorage.getItem("ruru_youtube_nickname") || "";
+        const savedName = window.localStorage.getItem("ruru_customer_name") || "";
+        const savedAddress = window.localStorage.getItem("ruru_customer_address") || "";
+        const savedDetailAddress = window.localStorage.getItem("ruru_customer_detail_address") || "";
 
-      const hasSavedYoutubeNickname = Boolean(savedYoutubeNickname.trim());
-      const hasSavedCustomerInfo = Boolean(
-        savedPhone.trim() &&
-        savedName.trim() &&
-        savedAddress.trim() &&
-        savedDetailAddress.trim()
-      );
+        const hasSavedYoutubeNickname = Boolean(savedYoutubeNickname.trim());
+        const hasSavedCustomerInfo = Boolean(
+          savedPhone.trim() &&
+            savedName.trim() &&
+            savedAddress.trim() &&
+            savedDetailAddress.trim()
+        );
 
-      if (hasSavedYoutubeNickname && hasSavedCustomerInfo) {
-        setIsKakaoLoginReturn(false);
-        setHasSavedInfo(true);
-        setIsEditingCustomerInfo(false);
-        setShowSavedCustomerDetail(false);
-        setCustomerMode("load");
-        setIsCustomerInfoOpen(false);
+        if (hasSavedYoutubeNickname && hasSavedCustomerInfo) {
+          setIsKakaoLoginReturn(false);
+          setHasSavedInfo(true);
+          setIsEditingCustomerInfo(false);
+          setShowSavedCustomerDetail(false);
+          setCustomerMode("load");
+          setIsCustomerInfoOpen(false);
+          window.history.replaceState(null, "", "/order");
+          return;
+        }
+
+        if (!hasSavedYoutubeNickname && savedPhone.trim()) {
+          const restored = await loadExistingCustomerByKakaoPhone(savedPhone);
+
+          if (restored) {
+            setIsKakaoLoginReturn(false);
+            setHasSavedInfo(true);
+            setIsEditingCustomerInfo(false);
+            setShowSavedCustomerDetail(false);
+            setCustomerMode("load");
+            setIsCustomerInfoOpen(false);
+            window.history.replaceState(null, "", "/order");
+
+            setTimeout(() => {
+              document.getElementById("orderProductInputSection")?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              });
+            }, 250);
+            return;
+          }
+        }
+
+        if (hasSavedYoutubeNickname && !hasSavedCustomerInfo) {
+          setIsKakaoLoginReturn(false);
+          setHasSavedInfo(false);
+          setIsEditingCustomerInfo(true);
+          setShowSavedCustomerDetail(false);
+          setCustomerMode("new");
+          setIsCustomerInfoOpen(true);
+          window.history.replaceState(null, "", "/order");
+          return;
+        }
+
+        setIsKakaoLoginReturn(true);
+
+        if (!hasSavedCustomerInfo) {
+          setIsEditingCustomerInfo(false);
+          setShowSavedCustomerDetail(false);
+          setCustomerMode("new");
+          setIsCustomerInfoOpen(true);
+        }
+
         window.history.replaceState(null, "", "/order");
-        return;
-      }
+      };
 
-      if (hasSavedYoutubeNickname && !hasSavedCustomerInfo) {
-        setIsKakaoLoginReturn(false);
-        setHasSavedInfo(false);
-        setIsEditingCustomerInfo(true);
-        setShowSavedCustomerDetail(false);
-        setCustomerMode("new");
-        setIsCustomerInfoOpen(true);
-        window.history.replaceState(null, "", "/order");
-        return;
-      }
-
-      setIsKakaoLoginReturn(true);
-
-      if (!hasSavedCustomerInfo) {
-        setIsEditingCustomerInfo(false);
-        setShowSavedCustomerDetail(false);
-        setCustomerMode("new");
-        setIsCustomerInfoOpen(true);
-      }
-
-      window.history.replaceState(null, "", "/order");
+      void handleKakaoReturn();
       return;
     }
 
@@ -472,6 +499,86 @@ export default function OrderPage() {
     if (savedAddress) setAddress(savedAddress);
     if (savedDetailAddress) setDetailAddress(savedDetailAddress);
   };
+
+  const applyCustomerFromRow = (customer: any, fallbackPhone = "") => {
+    const nextNickname = String(customer?.youtube_nickname || "").trim();
+    const nextName = String(customer?.customer_name || "").trim();
+    const nextPhone = normalizePhone(customer?.customer_phone || fallbackPhone);
+    const nextZipcode = String(customer?.zipcode || "").trim();
+    const nextAddress = String(customer?.address || "").trim();
+    const nextDetailAddress = String(customer?.detail_address || "").trim();
+
+    if (nextNickname) {
+      setYoutubeNickname(nextNickname);
+      localStorage.setItem("ruru_youtube_nickname", nextNickname);
+    }
+
+    if (nextName) {
+      setCustomerName(nextName);
+      localStorage.setItem("ruru_customer_name", nextName);
+    }
+
+    if (nextPhone) {
+      setCustomerPhone(nextPhone);
+      localStorage.setItem("ruru_customer_phone", nextPhone);
+    }
+
+    if (nextZipcode) {
+      setZipcode(nextZipcode);
+      localStorage.setItem("ruru_customer_zipcode", nextZipcode);
+    }
+
+    if (nextAddress) {
+      setAddress(nextAddress);
+      localStorage.setItem("ruru_customer_address", nextAddress);
+    }
+
+    if (nextDetailAddress) {
+      setDetailAddress(nextDetailAddress);
+      localStorage.setItem("ruru_customer_detail_address", nextDetailAddress);
+    }
+
+    if (nextPhone || nextNickname || nextName || nextAddress) {
+      setHasSavedInfo(true);
+      setCustomerMode("load");
+    }
+
+    return Boolean(nextNickname && nextPhone);
+  };
+
+  const loadExistingCustomerByKakaoPhone = async (phoneValue: string) => {
+    const cleanPhone = normalizePhone(phoneValue);
+
+    if (cleanPhone.length < 10) return false;
+
+    const phoneValues = Array.from(
+      new Set([
+        cleanPhone,
+        cleanPhone.length === 11
+          ? `${cleanPhone.slice(0, 3)}-${cleanPhone.slice(3, 7)}-${cleanPhone.slice(7, 11)}`
+          : cleanPhone,
+      ]),
+    );
+
+    const { data, error } = await supabase
+      .from("customers")
+      .select("*")
+      .in("customer_phone", phoneValues)
+      .order("last_order_at", { ascending: false })
+      .limit(1);
+
+    if (error) {
+      console.error("카카오 기존 고객정보 조회 오류:", error.message);
+      return false;
+    }
+
+    const customer = data?.[0];
+
+    if (!customer) return false;
+
+    return applyCustomerFromRow(customer, cleanPhone);
+  };
+
 
   const loadBroadcast = async () => {
     const { data, error } = await supabase
@@ -744,14 +851,61 @@ export default function OrderPage() {
     }, 150);
   };
 
-  const confirmKakaoYoutubeNickname = () => {
+  const handleYoutubeNicknameChange = (value: string) => {
+    setYoutubeNickname(value);
+    setYoutubeNicknameError("");
+  };
+
+  const getDuplicateYoutubeNicknameMessage = async (nicknameValue: string, phoneValue: string) => {
+    const cleanNickname = nicknameValue.trim();
+    const cleanPhone = normalizePhone(phoneValue);
+
+    if (!cleanNickname) return "";
+
+    const { data, error } = await supabase
+      .from("customers")
+      .select("id, customer_phone, youtube_nickname")
+      .eq("youtube_nickname", cleanNickname)
+      .limit(3);
+
+    if (error) {
+      console.error("유튜브 닉네임 중복 확인 오류:", error.message);
+      return "";
+    }
+
+    const duplicated = (data || []).some((customer: any) => {
+      const existingPhone = normalizePhone(customer?.customer_phone || "");
+      return Boolean(existingPhone && cleanPhone && existingPhone !== cleanPhone);
+    });
+
+    if (!duplicated) return "";
+
+    return [
+      "이미 사용 중인 유튜브 닉네임입니다.",
+      "",
+      "주문 확인이 정확히 되도록",
+      "닉네임 뒤에 전화번호 끝 4자리를 붙여 입력해 주세요.",
+      "",
+      "예) 홍길동1234",
+    ].join("\n");
+  };
+
+  const confirmKakaoYoutubeNickname = async () => {
     const cleanNickname = youtubeNickname.trim();
 
     if (!cleanNickname) {
-      alert("주문 확인에 사용할 유튜브 닉네임을 입력해주세요.");
+      setYoutubeNicknameError("유튜브 라이브 채팅에 보이는 닉네임을 입력해 주세요.");
       return;
     }
 
+    const duplicateMessage = await getDuplicateYoutubeNicknameMessage(cleanNickname, customerPhone);
+
+    if (duplicateMessage) {
+      setYoutubeNicknameError(duplicateMessage);
+      return;
+    }
+
+    setYoutubeNicknameError("");
     localStorage.setItem("ruru_youtube_nickname", cleanNickname);
     setYoutubeNickname(cleanNickname);
     setIsKakaoLoginReturn(false);
@@ -781,6 +935,7 @@ export default function OrderPage() {
       document.getElementById("customerNameInput")?.focus();
     }, 100);
   };
+
 
   const loadCustomerByNamePhone = async () => {
     const cleanName = String(loginName || "").trim();
@@ -1412,7 +1567,8 @@ export default function OrderPage() {
           <OrderKakaoNicknameNotice
             kakaoNickname={kakaoNickname}
             youtubeNickname={youtubeNickname}
-            onYoutubeNicknameChange={setYoutubeNickname}
+            errorMessage={youtubeNicknameError}
+            onYoutubeNicknameChange={handleYoutubeNicknameChange}
             onConfirm={confirmKakaoYoutubeNickname}
           />
         )}
