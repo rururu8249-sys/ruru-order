@@ -316,7 +316,7 @@ export default function MyOrderPage() {
                     statusClassName={getStatusClassName(label)}
                     optionText={optionText}
                     formattedDate={formatDate(order.created_at)}
-                    amountText={won(order.adjusted_total_price || order.total_price || 0)}
+                    amountText={won(order.final_amount ?? order.adjusted_total_price ?? order.total_price ?? 0)}
                   />
                 );
               })}
