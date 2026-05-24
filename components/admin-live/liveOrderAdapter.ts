@@ -152,6 +152,7 @@ function buildItem(row: OrderRow): LiveOrderItem {
         : productAmount;
 
   const editCounts = getItemEditCounts(row);
+  const changeHistory = parseItemChangeHistory((row as any).item_change_history);
 
   return {
     id: String(row.id),
@@ -164,6 +165,7 @@ function buildItem(row: OrderRow): LiveOrderItem {
     amount: productAmount,
     productEditCount: editCounts.productEditCount,
     amountEditCount: editCounts.amountEditCount,
+    changeHistory,
   };
 }
 

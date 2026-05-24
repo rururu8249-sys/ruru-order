@@ -8,6 +8,34 @@ export type LiveOrderPaymentStatus =
   | "card_unpaid"
   | "canceled";
 
+export type LiveOrderItemChangeHistory = {
+  changed_at?: string;
+  source?: string;
+  row_id?: number;
+  product_changed?: boolean;
+  amount_changed?: boolean;
+  before?: {
+    product_name?: string;
+    color?: string;
+    size?: string;
+    qty?: number;
+    product_price?: number;
+    adjusted_product_price?: number;
+    adjusted_total_price?: number;
+    final_amount?: number | null;
+  };
+  after?: {
+    product_name?: string;
+    color?: string;
+    size?: string;
+    qty?: number;
+    product_price?: number;
+    adjusted_product_price?: number;
+    adjusted_total_price?: number;
+    final_amount?: number | null;
+  };
+};
+
 export type LiveOrderItem = {
   id: string;
   productName: string;
@@ -19,6 +47,7 @@ export type LiveOrderItem = {
   amount: number;
   productEditCount?: number;
   amountEditCount?: number;
+  changeHistory?: LiveOrderItemChangeHistory[];
 };
 
 export type LiveOrder = {
