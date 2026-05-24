@@ -98,6 +98,20 @@ export function getDepositMatchStatusLabel(value: unknown) {
 }
 
 export function getCustomerOrderStatusLabel(status: string | null | undefined) {
+  // CUSTOMER_PAYMENT_DONE_LABEL_PATCH
+  // 고객 주문조회 화면에서는 관리자 내부 상태값을 단순하게 통일 표시합니다.
+  // 자동입금확인/수동입금확인/입금확인/카드결제완료 모두 고객에게는 "입금확인완료"로 표시합니다.
+  const customerPaymentStatusText = String(status ?? "").trim();
+
+  if (
+    /자동입금확인|수동입금확인|입금확인|카드결제완료|카드완료|결제완료|paid|confirmed|complete/i.test(
+      customerPaymentStatusText
+    )
+  ) {
+    return "입금확인완료";
+  }
+
+
   const value = normalizeOrderStatus(status);
 
   if (isCanceledStatus(value)) return "주문서 취소";
