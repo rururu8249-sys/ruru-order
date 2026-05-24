@@ -334,7 +334,7 @@ export default function PaymentMatchPanel({
     setAutoSyncLoading(true);
 
     try {
-      const response = await fetch("/api/bankda/sync-deposits", {
+      const response = await fetch("/api/bankda/sync-and-auto-match", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

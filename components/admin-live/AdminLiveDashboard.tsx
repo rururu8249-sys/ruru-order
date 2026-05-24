@@ -251,7 +251,7 @@ export default function AdminLiveDashboard() {
   };
 
   const syncBankdaDepositsOnly = async () => {
-    const response = await fetch("/api/bankda/sync-deposits", {
+    const response = await fetch("/api/bankda/sync-and-auto-match", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

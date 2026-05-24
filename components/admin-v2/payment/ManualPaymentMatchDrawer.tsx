@@ -144,7 +144,7 @@ export default function ManualPaymentMatchDrawer(props: Props) {
 
   const refreshBankdaAndRunStrictAutoMatch = async () => {
     try {
-      await fetch("/api/bankda/sync-deposits", {
+      await fetch("/api/bankda/sync-and-auto-match", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
