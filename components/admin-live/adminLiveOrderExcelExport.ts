@@ -5,18 +5,36 @@ type ExportMeta = {
   filterLabel: string;
 };
 
-type WorkbookRow = Array<string | number>;
+type WorkbookRow = Array<string | number | null>;
 
-const FALLBACK_ROZEN_HEADERS = [
+const ROSEN_HEADER_COMBINED = [
   "수하인명",
-  "수하인전화",
+  null,
   "수하인주소",
+  "수하인전화번호",
+  "수하인핸드폰번호",
+  "택배수량",
+  "택배운임",
+  "운임구분",
   "품목명",
-  "수량",
-  "배송메모",
-  "주문번호",
-  "결제상태",
-  "방송명",
+  null,
+  "배송메세지",
+  null,
+];
+
+const ROSEN_HEADER_SPLIT = [
+  "수하인명",
+  null,
+  "수하인주소1",
+  "수하인주소2",
+  "수하인전화번호",
+  "수하인핸드폰번호",
+  "택배수량",
+  "택배운임",
+  "운임구분",
+  "품목명",
+  null,
+  "배송메세지",
 ];
 
 function clean(value: unknown) {
@@ -54,7 +72,8 @@ function paymentLabel(order: LiveOrder) {
 }
 
 function itemOption(item: LiveOrderItem) {
-  return clean(item.optionText).replace(/^옵션 없음$/u, "");
+  const value = clean(item.optionText);
+  return value === "옵션 없음" ? "" : value;
 }
 
 function itemName(item: LiveOrderItem) {
@@ -88,24 +107,109 @@ function recipientName(order: LiveOrder) {
   return clean(order.nickname || order.name || "");
 }
 
-function recipientAddress(order: LiveOrder) {
+function phoneText(order: LiveOrder) {
+  return clean(order.phone);
+}
+
+function baseAddress(order: LiveOrder) {
   const row = order as LiveOrder & {
-    zipcode?: string | null;
     address?: string | null;
     detailAddress?: string | null;
   };
 
-  const base = [row.address, row.detailAddress].map(clean).filter(Boolean).join(" ");
+  return [row.address, row.detailAddress].map(clean).filter(Boolean).join(" ");
+}
+
+function recipientAddress(order: LiveOrder) {
+  const address = baseAddress(order);
   const nickname = recipientName(order);
 
-  if (!base) return nickname ? `/${nickname}` : "";
-  if (!nickname) return base;
+  if (!address) return nickname ? `/${nickname}` : "";
+  if (!nickname) return address;
 
-  return `${base} /${nickname}`;
+  return `${address} /${nickname}`;
+}
+
+function splitAddress(order: LiveOrder) {
+  const row = order as LiveOrder & {
+    address?: string | null;
+    detailAddress?: string | null;
+  };
+
+  const nickname = recipientName(order);
+  const address1 = clean(row.address);
+  const detail = clean(row.detailAddress);
+  const address2Base = detail || "";
+  const address2 = nickname
+    ? [address2Base, `/${nickname}`].filter(Boolean).join(" ")
+    : address2Base;
+
+  if (!address1) {
+    return {
+      address1: recipientAddress(order),
+      address2: "",
+    };
+  }
+
+  return {
+    address1,
+    address2,
+  };
 }
 
 function memoText(order: LiveOrder) {
   return clean(order.memo);
+}
+
+function rosenRowCombined(order: LiveOrder): WorkbookRow {
+  const phone = phoneText(order);
+
+  return [
+    recipientName(order),
+    null,
+    recipientAddress(order),
+    phone,
+    phone,
+    1,
+    "",
+    "010",
+    itemSummary(order),
+    null,
+    memoText(order),
+    null,
+  ];
+}
+
+function rosenRowSplit(order: LiveOrder): WorkbookRow {
+  const phone = phoneText(order);
+  const address = splitAddress(order);
+
+  return [
+    recipientName(order),
+    null,
+    address.address1,
+    address.address2,
+    phone,
+    phone,
+    1,
+    "",
+    "010",
+    itemSummary(order),
+    null,
+    memoText(order),
+  ];
+}
+
+function applyRosenSheetFormat(ws: XLSX.WorkSheet, columnCount: number) {
+  ws["!cols"] = Array.from({ length: columnCount }).map((_, index) => {
+    if (index === 0) return { wch: 18 };
+    if (index === 2) return { wch: 42 };
+    if (index === 3) return { wch: 26 };
+    if (index === 4 || index === 5) return { wch: 18 };
+    if (index === 8 || index === 9) return { wch: 42 };
+    if (index === 10 || index === 11) return { wch: 28 };
+    return { wch: 12 };
+  });
 }
 
 function addSheetMetaRows(title: string, meta: ExportMeta, rowCount: number): WorkbookRow[] {
@@ -118,7 +222,7 @@ function addSheetMetaRows(title: string, meta: ExportMeta, rowCount: number): Wo
   ];
 }
 
-function applyBasicSheetStyle(ws: XLSX.WorkSheet, headerRowIndex: number, totalRows: number, totalCols: number) {
+function applyFilterSheetStyle(ws: XLSX.WorkSheet, headerRowIndex: number, totalRows: number, totalCols: number) {
   ws["!autofilter"] = {
     ref: XLSX.utils.encode_range({
       s: { r: headerRowIndex, c: 0 },
@@ -129,10 +233,11 @@ function applyBasicSheetStyle(ws: XLSX.WorkSheet, headerRowIndex: number, totalR
   ws["!cols"] = Array.from({ length: totalCols }).map((_, index) => {
     if (index === 0) return { wch: 18 };
     if (index === 1) return { wch: 18 };
-    if (index === 2) return { wch: 48 };
+    if (index === 2) return { wch: 18 };
     if (index === 3) return { wch: 44 };
-    if (index === 4) return { wch: 10 };
-    return { wch: 20 };
+    if (index === 5) return { wch: 42 };
+    if (index === 10) return { wch: 34 };
+    return { wch: 18 };
   });
 }
 
@@ -140,105 +245,31 @@ function writeWorkbook(wb: XLSX.WorkBook, fileName: string) {
   XLSX.writeFile(wb, fileName, { bookType: "xlsx" });
 }
 
-async function getRosenHeadersFromTemplate() {
-  try {
-    const response = await fetch("/templates/rozen_template.xlsx", {
-      method: "GET",
-      cache: "no-store",
-    });
+function appendRosenSheets(wb: XLSX.WorkBook, orders: LiveOrder[]) {
+  const combinedRows = orders.map(rosenRowCombined);
+  const splitRows = orders.map(rosenRowSplit);
 
-    if (!response.ok) return FALLBACK_ROZEN_HEADERS;
+  const noHeaderCombinedWs = XLSX.utils.aoa_to_sheet(combinedRows);
+  applyRosenSheetFormat(noHeaderCombinedWs, 12);
+  XLSX.utils.book_append_sheet(wb, noHeaderCombinedWs, "엑셀파일 첫행-제목없음");
 
-    const buffer = await response.arrayBuffer();
-    const workbook = XLSX.read(buffer, { type: "array" });
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
+  const headerCombinedRows: WorkbookRow[] = [ROSEN_HEADER_COMBINED, ...combinedRows];
+  const headerCombinedWs = XLSX.utils.aoa_to_sheet(headerCombinedRows);
+  applyRosenSheetFormat(headerCombinedWs, 12);
+  XLSX.utils.book_append_sheet(wb, headerCombinedWs, "엑셀파일첫행-제목있음");
 
-    if (!sheet) return FALLBACK_ROZEN_HEADERS;
+  const noHeaderSplitWs = XLSX.utils.aoa_to_sheet(splitRows);
+  applyRosenSheetFormat(noHeaderSplitWs, 12);
+  XLSX.utils.book_append_sheet(wb, noHeaderSplitWs, "엑셀파일첫행-제목없음(주소1,2로분리)");
 
-    const rows = XLSX.utils.sheet_to_json<WorkbookRow>(sheet, {
-      header: 1,
-      blankrows: false,
-    });
-
-    const headerRow = rows.find((row) => row.map(clean).filter(Boolean).length >= 3);
-    const headers = (headerRow || []).map(clean).filter(Boolean);
-
-    return headers.length >= 3 ? headers : FALLBACK_ROZEN_HEADERS;
-  } catch {
-    return FALLBACK_ROZEN_HEADERS;
-  }
+  const headerSplitRows: WorkbookRow[] = [ROSEN_HEADER_SPLIT, ...splitRows];
+  const headerSplitWs = XLSX.utils.aoa_to_sheet(headerSplitRows);
+  applyRosenSheetFormat(headerSplitWs, 12);
+  XLSX.utils.book_append_sheet(wb, headerSplitWs, "엑셀파일첫행-제목있음(주소1,2로분리)");
 }
 
-function rosenValueByHeader(header: string, order: LiveOrder) {
-  const h = clean(header).replace(/\s+/g, "").toLowerCase();
-
-  if (/(수하인|받는분|받는사람|수취인|수령인|고객명|성명|이름)/u.test(h)) {
-    return recipientName(order);
-  }
-
-  if (/(전화|휴대폰|핸드폰|연락처|수하인전화)/u.test(h)) {
-    return clean(order.phone);
-  }
-
-  if (/(우편|zipcode|zip)/u.test(h)) {
-    return clean((order as LiveOrder & { zipcode?: string | null }).zipcode);
-  }
-
-  if (/(주소|배송지)/u.test(h)) {
-    return recipientAddress(order);
-  }
-
-  if (/(품목|상품|상품명|내용품|물품|물건)/u.test(h)) {
-    return itemSummary(order);
-  }
-
-  if (/(수량|개수)/u.test(h)) {
-    return totalQty(order);
-  }
-
-  if (/(배송메모|배송요청|요청|메모|비고|특이)/u.test(h)) {
-    return memoText(order);
-  }
-
-  if (/(주문번호|주문코드|주문id|order)/u.test(h)) {
-    return clean(order.orderNo || order.groupId || order.id);
-  }
-
-  if (/(결제|입금|상태)/u.test(h)) {
-    return paymentLabel(order);
-  }
-
-  if (/(방송)/u.test(h)) {
-    return clean(order.broadcastName);
-  }
-
-  return "";
-}
-
-export async function exportLiveOrdersForRosen(orders: LiveOrder[], meta: ExportMeta) {
-  if (!orders.length) {
-    alert("내보낼 주문이 없습니다. 필터 조건을 확인해주세요.");
-    return;
-  }
-
-  const headers = await getRosenHeadersFromTemplate();
-  const dataRows = orders.map((order) => headers.map((header) => rosenValueByHeader(header, order)));
-
-  const rows: WorkbookRow[] = [
-    ...addSheetMetaRows("로젠택배 송장 내보내기", meta, orders.length),
-    headers,
-    ...dataRows,
-  ];
-
-  const headerRowIndex = 5;
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  applyBasicSheetStyle(ws, headerRowIndex, rows.length, headers.length);
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "택배송장");
-
-  const checkHeaders = [
+function appendRosenCheckSheet(wb: XLSX.WorkBook, orders: LiveOrder[], meta: ExportMeta) {
+  const headers = [
     "주문번호",
     "닉네임",
     "이름",
@@ -251,14 +282,14 @@ export async function exportLiveOrdersForRosen(orders: LiveOrder[], meta: Export
     "메모",
   ];
 
-  const checkRows: WorkbookRow[] = [
+  const rows: WorkbookRow[] = [
     ...addSheetMetaRows("택배송장 확인용", meta, orders.length),
-    checkHeaders,
+    headers,
     ...orders.map((order) => [
       clean(order.orderNo || order.groupId || order.id),
       recipientName(order),
       clean(order.name),
-      clean(order.phone),
+      phoneText(order),
       recipientAddress(order),
       itemSummary(order),
       totalQty(order),
@@ -268,9 +299,20 @@ export async function exportLiveOrdersForRosen(orders: LiveOrder[], meta: Export
     ]),
   ];
 
-  const checkWs = XLSX.utils.aoa_to_sheet(checkRows);
-  applyBasicSheetStyle(checkWs, 5, checkRows.length, checkHeaders.length);
-  XLSX.utils.book_append_sheet(wb, checkWs, "확인용");
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  applyFilterSheetStyle(ws, 5, rows.length, headers.length);
+  XLSX.utils.book_append_sheet(wb, ws, "관리자확인용");
+}
+
+export async function exportLiveOrdersForRosen(orders: LiveOrder[], meta: ExportMeta) {
+  if (!orders.length) {
+    alert("내보낼 주문이 없습니다. 필터 조건을 확인해주세요.");
+    return;
+  }
+
+  const wb = XLSX.utils.book_new();
+  appendRosenSheets(wb, orders);
+  appendRosenCheckSheet(wb, orders, meta);
 
   writeWorkbook(wb, `rozen_${safeFileDate()}.xlsx`);
 }
@@ -306,7 +348,7 @@ export function exportLiveOrdersForPicking(orders: LiveOrder[], meta: ExportMeta
         clean(order.submittedAt),
         recipientName(order),
         clean(order.name),
-        clean(order.phone),
+        phoneText(order),
         clean(order.orderSummary) || "상품명없음",
         "",
         1,
@@ -323,7 +365,7 @@ export function exportLiveOrdersForPicking(orders: LiveOrder[], meta: ExportMeta
         clean(order.submittedAt),
         recipientName(order),
         clean(order.name),
-        clean(order.phone),
+        phoneText(order),
         itemName(item),
         itemOption(item),
         itemQty(item),
@@ -341,7 +383,7 @@ export function exportLiveOrdersForPicking(orders: LiveOrder[], meta: ExportMeta
   ];
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  applyBasicSheetStyle(ws, 5, rows.length, headers.length);
+  applyFilterSheetStyle(ws, 5, rows.length, headers.length);
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "물건챙기기");
