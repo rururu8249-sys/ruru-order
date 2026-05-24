@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { LiveOrder } from "./types";
 import { exportLiveOrdersForPicking, exportLiveOrdersForRosen } from "./adminLiveOrderExcelExport";
+import { supabase } from "@/lib/supabase";
 
 export type LiveOrderDateFilter = "all" | "today" | "yesterday" | "7days" | "month" | "custom";
 export type LiveOrderStatusFilter =
@@ -186,6 +187,23 @@ type Props = {
   broadcastOptions: BroadcastOption[];
 };
 
+
+function getLiveOrderSelectionKey(order: LiveOrder) {
+  return String(order.id || order.orderNo || order.groupId || "").trim();
+}
+
+function getLiveOrderRowIds(order: LiveOrder) {
+  const items = Array.isArray(order.items) ? order.items : [];
+
+  return Array.from(
+    new Set(
+      items
+        .map((item) => Number(item.id))
+        .filter((id) => Number.isFinite(id) && id > 0)
+    )
+  );
+}
+
 export default function LiveOrderTable({
   orders,
   allOrderCount,
@@ -198,6 +216,66 @@ export default function LiveOrderTable({
   onFiltersChange,
   broadcastOptions,
 }: Props) {
+  const [selectedOrderKeys, setSelectedOrderKeys] = useState<string[]>([]);
+  const [deletingSelectedOrders, setDeletingSelectedOrders] = useState(false);
+
+  const selectedOrderKeySet = new Set(selectedOrderKeys);
+
+  const toggleOrderSelection = (order: LiveOrder, checked: boolean) => {
+    const key = getLiveOrderSelectionKey(order);
+    if (!key) return;
+
+    setSelectedOrderKeys((current) => {
+      const next = new Set(current);
+
+      if (checked) next.add(key);
+      else next.delete(key);
+
+      return Array.from(next);
+    });
+  };
+
+  const handleSoftDeleteSelectedOrders = async () => {
+    const selectedOrders = orders.filter((order) => selectedOrderKeySet.has(getLiveOrderSelectionKey(order)));
+    const rowIds = Array.from(new Set(selectedOrders.flatMap(getLiveOrderRowIds)));
+
+    if (rowIds.length === 0) {
+      alert("삭제할 주문서를 선택해주세요.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      [
+        `선택한 주문서 ${selectedOrders.length.toLocaleString("ko-KR")}건을 주문관리 목록에서 숨길까요?`,
+        "",
+        "DB 완전삭제가 아니라 is_deleted=true 처리입니다.",
+        "금액/입금/송장/자동입금 로직은 변경하지 않습니다.",
+      ].join("\n")
+    );
+
+    if (!confirmed) return;
+
+    setDeletingSelectedOrders(true);
+
+    try {
+      const { error } = await supabase
+        .from("orders")
+        .update({ is_deleted: true })
+        .in("id", rowIds);
+
+      if (error) {
+        alert("선택 주문서 삭제 실패\n\n" + error.message);
+        return;
+      }
+
+      alert("선택한 주문서를 주문관리 목록에서 숨김 처리했습니다.");
+      setSelectedOrderKeys([]);
+      await onRefresh?.();
+    } finally {
+      setDeletingSelectedOrders(false);
+    }
+  };
+
   const [page, setPage] = useState(1);
   const [pendingKeyword, setPendingKeyword] = useState(filters.keyword);
   const [sortMode, setSortMode] = useState<SortMode>("latest");
@@ -536,6 +614,32 @@ export default function LiveOrderTable({
         <table className="w-full table-fixed border-collapse text-sm">
           <thead className="bg-slate-50 text-xs font-black text-slate-500">
             <tr>
+                <th className="w-[48px] px-4 py-3 text-center">
+                  <input
+                    type="checkbox"
+                    aria-label="현재 페이지 전체 선택"
+                    checked={
+                      visibleOrders.length > 0 &&
+                      visibleOrders.every((order) => selectedOrderKeySet.has(getLiveOrderSelectionKey(order)))
+                    }
+                    onChange={(event) => {
+                      const visibleKeys = visibleOrders.map(getLiveOrderSelectionKey).filter(Boolean);
+
+                      setSelectedOrderKeys((current) => {
+                        const next = new Set(current);
+
+                        if (event.currentTarget.checked) {
+                          visibleKeys.forEach((key) => next.add(key));
+                        } else {
+                          visibleKeys.forEach((key) => next.delete(key));
+                        }
+
+                        return Array.from(next);
+                      });
+                    }}
+                    className="h-4 w-4 rounded border-slate-300"
+                  />
+                </th>
               <th className="w-[120px] px-4 py-3 text-left">입금확인</th>
               <th className="w-[96px] px-4 py-3 text-left">제출시간</th>
               <th className="w-[96px] px-4 py-3 text-left">입금시간</th>
@@ -566,6 +670,15 @@ export default function LiveOrderTable({
                 const selected = order.id === selectedOrderId;
                 return (
                   <tr key={order.id} className={selected ? "bg-blue-50/70" : "hover:bg-slate-50"}>
+                    <td className="px-4 py-3 text-center" onClick={(event) => event.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        aria-label="주문서 선택"
+                        checked={selectedOrderKeySet.has(getLiveOrderSelectionKey(order))}
+                        onChange={(event) => toggleOrderSelection(order, event.currentTarget.checked)}
+                        className="h-4 w-4 rounded border-slate-300"
+                      />
+                    </td>
                     <td className="px-4 py-3">{statusBadge(order)}</td>
                     <td className="px-4 py-3 font-bold text-slate-600">{order.submittedAt}</td>
                     <td className="px-4 py-3 font-bold text-slate-600">{order.paidAt || "-"}</td>
