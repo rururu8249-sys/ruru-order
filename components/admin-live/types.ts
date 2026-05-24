@@ -5,7 +5,8 @@ export type LiveOrderPaymentStatus =
   | "auto_paid"
   | "manual_paid"
   | "card_paid"
-  | "card_unpaid";
+  | "card_unpaid"
+  | "canceled";
 
 export type LiveOrderItem = {
   id: string;

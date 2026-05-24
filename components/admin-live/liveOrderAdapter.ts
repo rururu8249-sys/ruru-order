@@ -15,6 +15,7 @@ import {
   paymentStatusMeta,
 } from "@/lib/admin-v2/orderHelpers";
 import type { LiveOrder, LiveOrderItem, LiveOrderPaymentStatus } from "./types";
+import { isCanceledStatus } from "@/lib/admin-v2/statusDisplay";
 
 function safeNumber(value: unknown) {
   const parsed = Number(value ?? 0);
@@ -70,8 +71,11 @@ export function buildAdminLiveOrderGroups(orders: OrderRow[]): OrderGroup[] {
 
 function getPaymentStatus(group: OrderGroup): LiveOrderPaymentStatus {
   const first = group.first;
-  const status = String(first.admin_order_status_v2 || first.order_manage_status || "").trim();
+  const adminStatus = String(first.admin_order_status_v2 || "").trim();
+  const manageStatus = String(first.order_manage_status || "").trim();
+  const status = adminStatus || manageStatus;
 
+  if (isCanceledStatus(adminStatus) || isCanceledStatus(manageStatus)) return "canceled";
   if (isCardPaid(first)) return "card_paid";
   if (isCardUnpaid(first)) return "card_unpaid";
   if (status === "자동입금확인") return "auto_paid";

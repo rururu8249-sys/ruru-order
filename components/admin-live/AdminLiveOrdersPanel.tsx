@@ -50,17 +50,20 @@ export default function AdminLiveOrdersPanel({
   onFiltersChange,
   onRefresh,
 }: Props) {
-  const paidOrders = orders.filter((order) =>
+  const canceledOrders = orders.filter((order) => order.paymentStatus === "canceled");
+  const activeOrders = orders.filter((order) => order.paymentStatus !== "canceled");
+  const paidOrders = activeOrders.filter((order) =>
     ["paid", "auto_paid", "manual_paid", "card_paid"].includes(order.paymentStatus)
   );
-  const unpaidOrders = orders.filter((order) =>
+  const unpaidOrders = activeOrders.filter((order) =>
     ["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus)
   );
-  const manualNeededOrders = orders.filter((order) => order.paymentStatus === "manual_match_needed");
+  const manualNeededOrders = activeOrders.filter((order) => order.paymentStatus === "manual_match_needed");
 
-  const totalAmount = orders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
+  const totalAmount = activeOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
   const paidAmount = paidOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
   const unpaidAmount = unpaidOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
+  const canceledAmount = canceledOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
 
   return (
     <section className="grid gap-4">
@@ -80,10 +83,10 @@ export default function AdminLiveOrdersPanel({
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <SummaryCard label="현재 표시 주문" value={`${orders.length.toLocaleString("ko-KR")}건`} sub={money(totalAmount)} />
+          <SummaryCard label="현재 표시 주문" value={`${orders.length.toLocaleString("ko-KR")}건`} sub={`정상 ${activeOrders.length.toLocaleString("ko-KR")}건 · ${money(totalAmount)}`} />
           <SummaryCard label="입금확인 주문" value={`${paidOrders.length.toLocaleString("ko-KR")}건`} sub={money(paidAmount)} />
           <SummaryCard label="미입금 주문" value={`${unpaidOrders.length.toLocaleString("ko-KR")}건`} sub={money(unpaidAmount)} />
-          <SummaryCard label="입금확인 필요" value={`${manualNeededOrders.length.toLocaleString("ko-KR")}건`} sub="수동 확인은 아직 주문관리에서 실행하지 않음" />
+          <SummaryCard label="주문서취소" value={`${canceledOrders.length.toLocaleString("ko-KR")}건`} sub={money(canceledAmount)} />
         </div>
       </div>
 

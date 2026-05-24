@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { LiveOrder, LiveOrderItem } from "./types";
+import { isLiveOrderCanceled, useLiveOrderCancelRestore } from "./useLiveOrderCancelRestore";
 
 type Props = {
   order: LiveOrder;
@@ -44,6 +45,7 @@ function formatFullDateTime(value: string | null | undefined, fallback?: string 
 }
 
 function getPaymentStatusLabel(order: LiveOrder) {
+  if (order.paymentStatus === "canceled") return "주문서 취소";
   if (order.paymentStatus === "manual_match_needed") return "입금확인 필요";
   if (order.paymentStatus === "manual_paid") return "수동입금확인";
   if (order.paymentStatus === "auto_paid") return "자동입금확인";
@@ -54,6 +56,7 @@ function getPaymentStatusLabel(order: LiveOrder) {
 }
 
 function getPaymentStatusClass(order: LiveOrder) {
+  if (order.paymentStatus === "canceled") return "border-red-200 bg-red-50 text-red-700";
   if (order.paymentStatus === "manual_match_needed") return "border-orange-200 bg-orange-50 text-orange-700";
   if (order.paymentStatus === "manual_paid") return "border-blue-200 bg-blue-50 text-blue-700";
   if (["auto_paid", "paid"].includes(order.paymentStatus)) {
@@ -67,6 +70,7 @@ function getPaymentStatusClass(order: LiveOrder) {
 export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClose, onAfterStatusChange }: Props) {
   const [cardStatusAction, setCardStatusAction] = useState<"" | "card-paid" | "card-unpaid">("");
   const items = Array.isArray(order.items) ? order.items : [];
+  const isCanceled = isLiveOrderCanceled(order);
   const productAmount = Number(order.productAmount || 0);
   const shippingFee = Number(order.shippingFee || 0);
   const totalAmount = Number(order.totalAmount || productAmount + shippingFee);
@@ -74,7 +78,13 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const isCardOrder = String(order.paymentMethod || "").includes("카드");
   const isCardPaid = order.paymentStatus === "card_paid";
   const isCardUnpaid = order.paymentStatus === "card_unpaid";
-  const showCardStatusActions = isCardOrder && (isCardPaid || isCardUnpaid);
+  const showCardStatusActions = !isCanceled && isCardOrder && (isCardPaid || isCardUnpaid);
+
+  const { savingAction, cancelOrder, restoreOrder } = useLiveOrderCancelRestore({
+    order,
+    onAfterStatusChange,
+    onClose,
+  });
 
   const handleCardPaymentStatusChange = async (
     nextStatus: "카드결제완료" | "주문확인전",
@@ -179,6 +189,28 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           </div>
         </section>
 
+        <div className="mt-3 grid grid-cols-1 gap-2">
+          {isCanceled ? (
+            <button
+              type="button"
+              onClick={restoreOrder}
+              disabled={Boolean(savingAction)}
+              className="h-12 w-full rounded-2xl bg-blue-600 text-sm font-black text-white shadow-sm hover:bg-blue-700 active:scale-[0.99] disabled:bg-slate-300"
+            >
+              {savingAction === "restore" ? "처리중..." : "주문서복구"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={cancelOrder}
+              disabled={Boolean(savingAction)}
+              className="h-12 w-full rounded-2xl border border-red-200 bg-red-50 text-sm font-black text-red-700 shadow-sm hover:bg-red-100 active:scale-[0.99] disabled:bg-slate-100 disabled:text-slate-400"
+            >
+              {savingAction === "cancel" ? "처리중..." : "주문서취소"}
+            </button>
+          )}
+        </div>
+
         {showCardStatusActions ? (
           <div className="mt-3 grid grid-cols-1 gap-2">
             {isCardUnpaid ? (
@@ -205,7 +237,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           </div>
         ) : null}
 
-        {order.paymentStatus === "manual_match_needed" && onOpenManualMatch && (
+        {!isCanceled && order.paymentStatus === "manual_match_needed" && onOpenManualMatch && (
           <button
             type="button"
             onClick={() => onOpenManualMatch(order)}
