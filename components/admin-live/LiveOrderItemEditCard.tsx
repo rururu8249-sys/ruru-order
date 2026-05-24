@@ -5,6 +5,7 @@ import type { LiveOrderItem } from "./types";
 import {
   createInitialLiveOrderItemEditForm,
   type LiveOrderItemEditForm,
+  type LiveOrderItemEditSaveResult,
   useLiveOrderItemEdit,
 } from "./useLiveOrderItemEdit";
 
@@ -12,7 +13,7 @@ type Props = {
   item: LiveOrderItem;
   index: number;
   disabled?: boolean;
-  onAfterSave?: () => void | Promise<void>;
+  onAfterSave?: (result: LiveOrderItemEditSaveResult) => void | Promise<void>;
 };
 
 function money(value: unknown) {
@@ -83,71 +84,71 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
 
   if (editing) {
     return (
-      <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-3">
+      <div className="overflow-hidden rounded-2xl border border-blue-200 bg-blue-50/40 p-3">
         <div className="mb-2 flex items-center justify-between">
           <div className="text-xs font-black text-blue-700">#{index + 1} 상품 수정</div>
           {countText ? <div className="text-[11px] font-black text-slate-400">{countText}</div> : null}
         </div>
 
         <div className="grid grid-cols-1 gap-2">
-          <label className="grid gap-1">
+          <label className="grid min-w-0 gap-1">
             <span className="text-[11px] font-black text-slate-500">상품명</span>
             <input
               value={form.productName}
               onChange={(event) => setForm((prev) => updateForm(prev, "productName", event.target.value))}
-              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold outline-none focus:border-blue-400"
+              className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold outline-none focus:border-blue-400"
               placeholder="상품명"
             />
           </label>
 
-          <div className="grid grid-cols-2 gap-2">
-            <label className="grid gap-1">
+          <div className="grid grid-cols-1 gap-2">
+            <label className="grid min-w-0 gap-1">
               <span className="text-[11px] font-black text-slate-500">색상</span>
               <input
                 value={form.color}
                 onChange={(event) => setForm((prev) => updateForm(prev, "color", event.target.value))}
-                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold outline-none focus:border-blue-400"
+                className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold outline-none focus:border-blue-400"
                 placeholder="색상"
               />
             </label>
 
-            <label className="grid gap-1">
+            <label className="grid min-w-0 gap-1">
               <span className="text-[11px] font-black text-slate-500">사이즈</span>
               <input
                 value={form.size}
                 onChange={(event) => setForm((prev) => updateForm(prev, "size", event.target.value))}
-                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold outline-none focus:border-blue-400"
+                className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold outline-none focus:border-blue-400"
                 placeholder="사이즈"
               />
             </label>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <label className="grid gap-1">
+          <div className="grid grid-cols-1 gap-2">
+            <label className="grid min-w-0 gap-1">
               <span className="text-[11px] font-black text-slate-500">수량</span>
               <input
                 value={form.qty}
                 inputMode="numeric"
                 onChange={(event) => setForm((prev) => updateForm(prev, "qty", onlyNumber(event.target.value)))}
-                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold outline-none focus:border-blue-400"
+                className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold outline-none focus:border-blue-400"
                 placeholder="1"
               />
             </label>
 
-            <label className="grid gap-1">
+            <label className="grid min-w-0 gap-1">
               <span className="text-[11px] font-black text-slate-500">판매단가</span>
               <input
                 value={Number(form.unitPrice || 0).toLocaleString("ko-KR")}
                 inputMode="numeric"
                 onChange={(event) => setForm((prev) => updateForm(prev, "unitPrice", onlyNumber(event.target.value)))}
-                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold outline-none focus:border-blue-400"
+                className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold outline-none focus:border-blue-400"
                 placeholder="19000"
               />
             </label>
           </div>
         </div>
 
-        <div className="mt-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-600">
+        <div className="mt-2 overflow-hidden rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-600">
           수정 후 상품금액: <span className="text-blue-700">{money(previewProductTotal)}</span>
         </div>
 
@@ -174,11 +175,11 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-3">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-3">
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-black leading-5 text-slate-950">{getItemName(item)}</div>
-          <div className="mt-1 whitespace-pre-line text-xs font-bold leading-5 text-slate-500">
+          <div className="break-words text-sm font-black leading-5 text-slate-950">{getItemName(item)}</div>
+          <div className="mt-1 whitespace-pre-line break-words text-xs font-bold leading-5 text-slate-500">
             {getOptionText(item)}
           </div>
           {countText ? (

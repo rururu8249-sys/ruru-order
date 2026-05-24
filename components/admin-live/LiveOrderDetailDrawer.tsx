@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { LiveOrder, LiveOrderItem } from "./types";
 import { isLiveOrderCanceled, useLiveOrderCancelRestore } from "./useLiveOrderCancelRestore";
 import LiveOrderItemEditCard from "./LiveOrderItemEditCard";
+import type { LiveOrderItemEditSaveResult } from "./useLiveOrderItemEdit";
 
 type Props = {
   order: LiveOrder;
@@ -70,19 +71,75 @@ function getPaymentStatusClass(order: LiveOrder) {
 
 export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClose, onAfterStatusChange }: Props) {
   const [cardStatusAction, setCardStatusAction] = useState<"" | "card-paid" | "card-unpaid">("");
-  const items = Array.isArray(order.items) ? order.items : [];
-  const isCanceled = isLiveOrderCanceled(order);
-  const productAmount = Number(order.productAmount || 0);
-  const shippingFee = Number(order.shippingFee || 0);
-  const totalAmount = Number(order.totalAmount || productAmount + shippingFee);
+  const [localOrder, setLocalOrder] = useState(order);
+  const [refreshingDetail, setRefreshingDetail] = useState(false);
 
-  const isCardOrder = String(order.paymentMethod || "").includes("카드");
-  const isCardPaid = order.paymentStatus === "card_paid";
-  const isCardUnpaid = order.paymentStatus === "card_unpaid";
+  useEffect(() => {
+    setLocalOrder(order);
+  }, [order]);
+
+  const handleItemSaved = async (result: LiveOrderItemEditSaveResult) => {
+    setRefreshingDetail(true);
+
+    try {
+      setLocalOrder((previousOrder) => {
+        const previousItems = Array.isArray(previousOrder.items) ? previousOrder.items : [];
+        const previousItem = previousItems.find((item) => String(item.id) === String(result.rowId));
+        const previousProductAmount = Number(previousItem?.amount || 0);
+
+        const nextItems = previousItems.map((item) => {
+          if (String(item.id) !== String(result.rowId)) return item;
+
+          return {
+            ...item,
+            productName: result.productName,
+            color: result.color,
+            size: result.size,
+            optionText: [result.color, result.size].filter(Boolean).join(" / ") || "옵션 없음",
+            qty: result.qty,
+            unitPrice: result.unitPrice,
+            amount: result.productTotal,
+            productEditCount: Number(item.productEditCount || 0) + (result.productChanged ? 1 : 0),
+            amountEditCount: Number(item.amountEditCount || 0) + (result.amountChanged ? 1 : 0),
+          };
+        });
+
+        const nextTotalQty = nextItems.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+        const nextTotalAmount =
+          Number(previousOrder.totalAmount || 0) - previousProductAmount + Number(result.productTotal || 0);
+
+        return {
+          ...previousOrder,
+          items: nextItems,
+          totalQty: nextTotalQty,
+          totalAmount: nextTotalAmount,
+          itemSummary: nextItems
+            .map((item) => [item.productName, item.color, item.size].filter(Boolean).join(" / "))
+            .filter(Boolean)
+            .join(" | "),
+        };
+      });
+
+      await onAfterStatusChange?.();
+    } finally {
+      setRefreshingDetail(false);
+    }
+  };
+
+  const orderForView = localOrder;
+  const items = Array.isArray(orderForView.items) ? orderForView.items : [];
+  const isCanceled = isLiveOrderCanceled(orderForView);
+  const productAmount = Number(order.productAmount || 0);
+  const shippingFee = Number(orderForView.shippingFee || 0);
+  const totalAmount = Number(orderForView.totalAmount || productAmount + shippingFee);
+
+  const isCardOrder = String(orderForView.paymentMethod || "").includes("카드");
+  const isCardPaid = orderForView.paymentStatus === "card_paid";
+  const isCardUnpaid = orderForView.paymentStatus === "card_unpaid";
   const showCardStatusActions = !isCanceled && isCardOrder && (isCardPaid || isCardUnpaid);
 
   const { savingAction, cancelOrder, restoreOrder } = useLiveOrderCancelRestore({
-    order,
+    order: orderForView,
     onAfterStatusChange,
     onClose,
   });
@@ -176,17 +233,17 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         <section className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
           <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-            <Info label="닉네임" value={order.nickname || "-"} strong />
+            <Info label="닉네임" value={orderForView.nickname || "-"} strong />
             <Info label="이름" value={order.name || "-"} />
-            <Info label="연락처" value={order.phone || "-"} />
+            <Info label="연락처" value={orderForView.phone || "-"} />
             <Info label="주문번호" value={order.orderNo || "-"} />
-            <Info label="제출시간" value={formatFullDateTime(order.createdAt, order.submittedAt)} />
-            <Info label="입금시간" value={formatFullDateTime(order.paidAtFull, order.paidAt || "-")} />
-            <Info label="결제방법" value={order.paymentMethod || "-"} />
+            <Info label="제출시간" value={formatFullDateTime(order.createdAt, orderForView.submittedAt)} />
+            <Info label="입금시간" value={formatFullDateTime(orderForView.paidAtFull, orderForView.paidAt || "-")} />
+            <Info label="결제방법" value={orderForView.paymentMethod || "-"} />
           </div>
 
-          <div className={`mt-3 rounded-xl border px-3 py-2 text-xs font-black ${getPaymentStatusClass(order)}`}>
-            {getPaymentStatusLabel(order)}
+          <div className={`mt-3 rounded-xl border px-3 py-2 text-xs font-black ${getPaymentStatusClass(orderForView)}`}>
+            {getPaymentStatusLabel(orderForView)}
           </div>
         </section>
 
@@ -238,7 +295,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           </div>
         ) : null}
 
-        {!isCanceled && order.paymentStatus === "manual_match_needed" && onOpenManualMatch && (
+        {!isCanceled && orderForView.paymentStatus === "manual_match_needed" && onOpenManualMatch && (
           <button
             type="button"
             onClick={() => onOpenManualMatch(order)}
@@ -251,6 +308,11 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         <section className="mt-3">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-sm font-black text-slate-950">주문내역 ({items.length}건)</h3>
+            {refreshingDetail ? (
+              <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-700">
+                상세정보 갱신중...
+              </span>
+            ) : null}
             <span className="text-xs font-black text-slate-400">수량 / 금액</span>
           </div>
 
@@ -266,7 +328,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                   item={item}
                   index={index}
                   disabled={isCanceled}
-                  onAfterSave={onAfterStatusChange}
+                  onAfterSave={handleItemSaved}
                 />
               ))
             )}
@@ -286,7 +348,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         <section className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
           <h3 className="mb-2 text-sm font-black text-slate-950">배송메모 / 특이사항</h3>
           <div className="min-h-[74px] rounded-2xl bg-slate-50 p-3 text-sm font-bold leading-6 text-slate-600">
-            {order.memo || "-"}
+            {orderForView.memo || "-"}
           </div>
         </section>
       </div>

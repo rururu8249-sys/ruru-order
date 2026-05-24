@@ -12,6 +12,19 @@ export type LiveOrderItemEditForm = {
   unitPrice: string;
 };
 
+export type LiveOrderItemEditSaveResult = {
+  rowId: number;
+  productName: string;
+  color: string;
+  size: string;
+  qty: number;
+  unitPrice: number;
+  productTotal: number;
+  nextTotal: number;
+  productChanged: boolean;
+  amountChanged: boolean;
+};
+
 type SaveArgs = {
   item: LiveOrderItem;
   form: LiveOrderItemEditForm;
@@ -63,7 +76,7 @@ export function createInitialLiveOrderItemEditForm(item: LiveOrderItem): LiveOrd
   };
 }
 
-export function useLiveOrderItemEdit(onAfterSave?: () => void | Promise<void>) {
+export function useLiveOrderItemEdit(onAfterSave?: (result: LiveOrderItemEditSaveResult) => void | Promise<void>) {
   const [savingItemId, setSavingItemId] = useState<string | null>(null);
 
   const saveItem = async ({ item, form }: SaveArgs) => {
@@ -199,9 +212,22 @@ export function useLiveOrderItemEdit(onAfterSave?: () => void | Promise<void>) {
         return false;
       }
 
+      const result: LiveOrderItemEditSaveResult = {
+        rowId,
+        productName,
+        color,
+        size,
+        qty,
+        unitPrice,
+        productTotal,
+        nextTotal,
+        productChanged,
+        amountChanged,
+      };
+
       alert("상품/옵션/수량/금액 수정이 완료됐습니다.");
-      await onAfterSave?.();
-      return true;
+      await onAfterSave?.(result);
+      return result;
     } finally {
       setSavingItemId(null);
     }
