@@ -29,10 +29,21 @@ export default function MyOrderResultCard({
     ? "카드결제"
     : "무통장입금";
 
+  const paidLabels = [
+    "입금확인완료",
+    "입금확인",
+    "확인완료",
+    "배송출발",
+    "출고준비중",
+    "출고완료",
+    "결제완료",
+    "카드결제완료",
+  ];
+
   const paymentStatus =
-    label === "주문취소" || label === "환불완료"
+    label === "주문취소" || label === "주문서 취소" || label === "환불완료"
       ? label
-      : label === "확인완료" || label === "배송출발" || label === "출고준비중"
+      : paidLabels.includes(label)
         ? "입금확인"
         : "입금대기";
 
