@@ -62,6 +62,7 @@ function fullDateTime() {
 }
 
 function paymentLabel(order: LiveOrder) {
+  if (order.paymentStatus === "canceled") return "주문서취소";
   if (order.paymentStatus === "manual_match_needed") return "입금확인 필요";
   if (order.paymentStatus === "manual_paid") return "수동입금확인";
   if (order.paymentStatus === "auto_paid") return "자동입금확인";

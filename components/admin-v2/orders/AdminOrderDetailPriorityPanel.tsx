@@ -53,11 +53,11 @@ export default function AdminOrderDetailPriorityPanel({
 
   if (canceled) {
     title = "주문서 취소 상태";
-    desc = "다시 진행해야 하면 결제 가능하게 복구하세요.";
+    desc = "주문서가 폐기된 상태입니다. 다시 살릴 때만 주문서복구를 누르세요.";
     tone = "danger";
   } else if (bankUnpaid) {
-    title = "입금확인 필요";
-    desc = "입금 매칭을 우선 권장합니다. 실제 확인이 끝난 경우에만 매칭없이 결제완료를 사용하세요.";
+    title = "입금관리";
+    desc = "입금 매칭을 우선 권장합니다. 실제 확인이 끝난 경우에만 입금내역 없이 수동확인를 사용하세요.";
     tone = "warn";
   } else if (cardUnpaid) {
     title = "카드결제 확인 필요";
@@ -99,10 +99,10 @@ export default function AdminOrderDetailPriorityPanel({
 
   const restoreOrder = () => {
     runStatusAction("restore", "미설정", [
-      "주문서 취소 상태를 다시 결제 가능 상태로 복구할까요?",
+      "주문서취소 상태를 다시 주문서복구 처리할까요?",
       "",
       "상태는 미설정으로 돌아갑니다.",
-      "기존 입금확인시간/입금내역/정산 이력은 자동 삭제하지 않습니다.",
+      "주문서복구는 주문서를 다시 살리는 기능이며 입금확인 기록은 자동으로 변경하지 않습니다.",
     ]);
   };
 
@@ -165,7 +165,7 @@ export default function AdminOrderDetailPriorityPanel({
             disabled={savingAction !== null}
             className={`${buttonBase} border border-emerald-300 bg-white text-emerald-700`}
           >
-            {savingAction === "restore" ? "처리중..." : "🔄 결제 가능하게 복구하기"}
+            {savingAction === "restore" ? "처리중..." : "🔄 주문서복구"}
           </button>
         ) : bankUnpaid ? (
           <>
@@ -183,7 +183,7 @@ export default function AdminOrderDetailPriorityPanel({
               disabled={savingAction !== null}
               className={`${buttonBase} border border-slate-300 bg-white text-slate-800`}
             >
-              {savingAction === "manual-paid" ? "처리중..." : "매칭없이 결제완료"}
+              {savingAction === "manual-paid" ? "처리중..." : "입금내역 없이 수동확인"}
             </button>
             <button
               type="button"
@@ -191,7 +191,7 @@ export default function AdminOrderDetailPriorityPanel({
               disabled={savingAction !== null}
               className={`${buttonBase} border border-red-200 bg-white text-red-600`}
             >
-              {savingAction === "cancel" ? "처리중..." : "❌ 주문취소"}
+              {savingAction === "cancel" ? "처리중..." : "주문서취소"}
             </button>
           </>
         ) : cardUnpaid ? (
@@ -210,7 +210,7 @@ export default function AdminOrderDetailPriorityPanel({
               disabled={savingAction !== null}
               className={`${buttonBase} border border-red-200 bg-white text-red-600`}
             >
-              {savingAction === "cancel" ? "처리중..." : "❌ 주문취소"}
+              {savingAction === "cancel" ? "처리중..." : "주문서취소"}
             </button>
           </>
         ) : (
@@ -224,7 +224,7 @@ export default function AdminOrderDetailPriorityPanel({
               disabled={savingAction !== null}
               className={`${buttonBase} border border-red-200 bg-white text-red-600`}
             >
-              {savingAction === "cancel" ? "처리중..." : "❌ 주문취소"}
+              {savingAction === "cancel" ? "처리중..." : "주문서취소"}
             </button>
           </>
         )}

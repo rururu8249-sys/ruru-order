@@ -93,11 +93,18 @@ export function buildAdminLiveOrderGroups(orders: OrderRow[]): OrderGroup[] {
   });
 }
 
+
+function isCanceledStatusText(value: unknown) {
+  const text = String(value || "").trim();
+  return text === "주문취소" || text === "주문서취소" || text.includes("주문취소") || text.includes("주문서취소");
+}
+
 function getPaymentStatus(group: OrderGroup): LiveOrderPaymentStatus {
   const first = group.first;
   const adminStatus = String(first.admin_order_status_v2 || "").trim();
   const manageStatus = String(first.order_manage_status || "").trim();
   const status = adminStatus || manageStatus;
+  if (isCanceledStatusText(adminStatus) || isCanceledStatusText(manageStatus)) return "canceled";
 
   if (isCanceledStatus(adminStatus) || isCanceledStatus(manageStatus)) return "canceled";
   if (isCardPaid(first)) return "card_paid";

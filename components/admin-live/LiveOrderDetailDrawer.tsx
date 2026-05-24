@@ -47,7 +47,7 @@ function formatFullDateTime(value: string | null | undefined, fallback?: string 
 }
 
 function getPaymentStatusLabel(order: LiveOrder) {
-  if (order.paymentStatus === "canceled") return "주문서 취소";
+  if (order.paymentStatus === "canceled") return "주문서취소";
   if (order.paymentStatus === "manual_match_needed") return "입금확인 필요";
   if (order.paymentStatus === "manual_paid") return "수동입금확인";
   if (order.paymentStatus === "auto_paid") return "자동입금확인";
@@ -241,6 +241,12 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           <div className={`mt-3 rounded-xl border px-3 py-2 text-xs font-black ${getPaymentStatusClass(orderForView)}`}>
             {getPaymentStatusLabel(orderForView)}
           </div>
+
+          {["manual_paid", "auto_paid", "paid"].includes(orderForView.paymentStatus) ? (
+            <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-bold leading-4 text-slate-500">
+              입금확인된 주문입니다. 주문서취소는 주문서를 폐기하는 기능이며 입금확인 기록은 자동으로 지우지 않습니다.
+            </div>
+          ) : null}
         </section>
 
         <div className="mt-3 grid grid-cols-1 gap-2">

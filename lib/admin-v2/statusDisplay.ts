@@ -39,7 +39,7 @@ export function getAdminOrderStatusLabel(params: {
   const status = normalizeOrderStatus(params.status);
   const paymentMethod = String(params.paymentMethod || "무통장입금").trim();
 
-  if (isCanceledStatus(status)) return "주문서 취소";
+  if (isCanceledStatus(status)) return "주문서취소";
   if (paymentMethod === "카드결제" && !PAID_STATUS_VALUES.includes(status)) return "카드미결제";
   if (paymentMethod === "카드결제") return "카드결제완료";
   if (status === "수동입금확인") return "결제완료(수동)";
@@ -114,7 +114,7 @@ export function getCustomerOrderStatusLabel(status: string | null | undefined) {
 
   const value = normalizeOrderStatus(status);
 
-  if (isCanceledStatus(value)) return "주문서 취소";
+  if (isCanceledStatus(value)) return "주문서취소";
   if (value === "출고완료") return "배송출발";
   if (value === "출고대기") return "출고준비중";
   if (value === "픽업" || value === "픽업예정") return "픽업예정";

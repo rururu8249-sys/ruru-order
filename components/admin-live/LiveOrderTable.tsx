@@ -154,6 +154,10 @@ function renderOrderSummary(order: LiveOrder) {
 }
 
 function statusBadge(order: LiveOrder) {
+  if (order.paymentStatus === "canceled") {
+    return <span className="rounded-lg bg-red-100 px-2 py-1 text-xs font-black text-red-700">주문서취소</span>;
+  }
+
   if (order.paymentStatus === "manual_match_needed") {
     return <span className="rounded-lg bg-orange-100 px-2 py-1 text-xs font-black text-orange-700">입금확인 필요</span>;
   }
