@@ -29,6 +29,8 @@ const DEFAULT_FILTERS: DepositFilters = {
   customEndDate: "",
 };
 
+const PAGE_SIZE_OPTIONS = [10, 20, 30, 50];
+
 function money(value: unknown) {
   return `${Number(value || 0).toLocaleString("ko-KR")}원`;
 }
@@ -255,6 +257,8 @@ export default function AdminLivePaymentPanel({ deposits, orderGroups, onRefresh
   const [refreshing, setRefreshing] = useState(false);
   const [bankdaRefreshing, setBankdaRefreshing] = useState(false);
   const [bankdaMessage, setBankdaMessage] = useState("");
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const filteredDeposits = useMemo(() => {
     return [...deposits]
@@ -271,16 +275,30 @@ export default function AdminLivePaymentPanel({ deposits, orderGroups, onRefresh
   const confirmedAmount = confirmedDeposits.reduce((sum, deposit) => sum + getDepositAmount(deposit), 0);
   const unmatchedAmount = unmatchedDeposits.reduce((sum, deposit) => sum + getDepositAmount(deposit), 0);
 
-  const visibleDeposits = filteredDeposits.slice(0, 80);
+  const totalPages = Math.max(1, Math.ceil(filteredDeposits.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStartIndex = (safeCurrentPage - 1) * pageSize;
+  const pageEndIndex = pageStartIndex + pageSize;
+  const visibleDeposits = filteredDeposits.slice(pageStartIndex, pageEndIndex);
+  const visibleStartNumber = filteredDeposits.length === 0 ? 0 : pageStartIndex + 1;
+  const visibleEndNumber = Math.min(pageEndIndex, filteredDeposits.length);
 
   const updateFilter = <K extends keyof DepositFilters>(key: K, value: DepositFilters[K]) => {
+    setCurrentPage(1);
     setFilters((current) => ({
       ...current,
       [key]: value,
     }));
   };
 
+  const updatePageSize = (value: string) => {
+    const nextSize = Number(value);
+    setPageSize(PAGE_SIZE_OPTIONS.includes(nextSize) ? nextSize : 10);
+    setCurrentPage(1);
+  };
+
   const resetFilters = () => {
+    setCurrentPage(1);
     setFilters(DEFAULT_FILTERS);
   };
 
@@ -339,10 +357,27 @@ export default function AdminLivePaymentPanel({ deposits, orderGroups, onRefresh
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-black text-slate-950">입금내역 조회</h2>
-            <div className="mt-1 text-xs font-bold text-slate-400">최대 80건 표시 · 조회 전용</div>
+            <div className="mt-1 text-xs font-bold text-slate-400">
+              총 {filteredDeposits.length.toLocaleString("ko-KR")}건 중 {visibleStartNumber.toLocaleString("ko-KR")}~{visibleEndNumber.toLocaleString("ko-KR")}번째 표시 · 조회 전용
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <label className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-600">
+              <span>보기</span>
+              <select
+                value={pageSize}
+                onChange={(event) => updatePageSize(event.target.value)}
+                className="bg-transparent text-xs font-black text-slate-800 outline-none"
+              >
+                {PAGE_SIZE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}개
+                  </option>
+                ))}
+              </select>
+            </label>
+
             <button
               type="button"
               onClick={handleBankdaSync}
@@ -452,6 +487,38 @@ export default function AdminLivePaymentPanel({ deposits, orderGroups, onRefresh
             ))
           )}
         </div>
+
+        {filteredDeposits.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <div className="text-xs font-black text-slate-500">
+              총 {filteredDeposits.length.toLocaleString("ko-KR")}건 · {visibleStartNumber.toLocaleString("ko-KR")}~{visibleEndNumber.toLocaleString("ko-KR")}번째 · {safeCurrentPage.toLocaleString("ko-KR")} / {totalPages.toLocaleString("ko-KR")}페이지
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.max(1, safeCurrentPage - 1))}
+                disabled={safeCurrentPage <= 1}
+                className="h-9 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-300"
+              >
+                이전
+              </button>
+
+              <div className="min-w-[72px] text-center text-xs font-black text-slate-700">
+                {safeCurrentPage} / {totalPages}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.min(totalPages, safeCurrentPage + 1))}
+                disabled={safeCurrentPage >= totalPages}
+                className="h-9 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-300"
+              >
+                다음
+              </button>
+            </div>
+          </div>
+        )}
 
         {bankdaMessage && (
           <div className="mt-4 rounded-2xl bg-blue-50 px-4 py-3 text-xs font-black leading-5 text-blue-700">
