@@ -126,6 +126,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
   const unitPrice = Number(onlyNumber(form.unitPrice) || 0);
   const previewProductTotal = qty * unitPrice;
   const countText = editCountText(item);
+  const hasChangeHistory = Array.isArray(item.changeHistory) && item.changeHistory.length > 0;
 
   const cancelEdit = () => {
     setForm(createInitialLiveOrderItemEditForm(item));
@@ -142,7 +143,22 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
       <div className="overflow-hidden rounded-2xl border border-blue-200 bg-blue-50/40 p-3">
         <div className="mb-2 flex items-center justify-between">
           <div className="text-xs font-black text-blue-700">#{index + 1} 상품 수정</div>
-          {countText ? <div className="text-[11px] font-black text-slate-400">{countText}</div> : null}
+          {countText ? (
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
+              <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-black text-amber-700">
+                {countText}
+              </span>
+              {hasChangeHistory ? (
+                <button
+                  type="button"
+                  onClick={() => setShowHistory((prev) => !prev)}
+                  className="rounded-full border border-amber-200 bg-white px-2 py-1 text-[11px] font-black text-amber-700 hover:bg-amber-50"
+                >
+                  {showHistory ? "이력닫기" : "수정이력 보기"}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-1 gap-2">
@@ -207,6 +223,34 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
           수정 후 상품금액: <span className="text-blue-700">{money(previewProductTotal)}</span>
         </div>
 
+
+        {showHistory && hasChangeHistory ? (
+          <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50/50 p-3">
+            <div className="mb-2 text-[11px] font-black text-amber-700">최근 수정이력</div>
+            <div className="grid gap-2">
+              {[...(item.changeHistory || [])].slice(-5).reverse().map((entry: any, historyIndex) => {
+                const line = compactChangeLine(entry);
+
+                return (
+                  <div key={`${item.id}-editing-history-${historyIndex}`} className="rounded-xl bg-white p-2 text-[11px] leading-5 text-slate-600">
+                    <div className="mb-1 font-black text-slate-400">
+                      {formatHistoryDate(entry?.changed_at)}
+                      {entry?.product_changed ? " · 상품변경" : ""}
+                      {entry?.amount_changed ? " · 금액변경" : ""}
+                    </div>
+                    <div>
+                      <span className="font-black text-slate-400">전</span> {line.beforeText}
+                    </div>
+                    <div>
+                      <span className="font-black text-blue-600">후</span> {line.afterText}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
         <div className="mt-3 grid grid-cols-2 gap-2">
           <button
             type="button"
@@ -247,7 +291,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
                 onClick={() => setShowHistory((prev) => !prev)}
                 className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-black text-slate-500 hover:bg-slate-50"
               >
-                {showHistory ? "이력닫기" : "이력보기"}
+                {showHistory ? "이력닫기" : "수정이력 보기"}
               </button>
             </div>
           ) : null}
