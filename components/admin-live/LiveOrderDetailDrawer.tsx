@@ -84,9 +84,6 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     try {
       setLocalOrder((previousOrder) => {
         const previousItems = Array.isArray(previousOrder.items) ? previousOrder.items : [];
-        const previousItem = previousItems.find((item) => String(item.id) === String(result.rowId));
-        const previousProductAmount = Number(previousItem?.amount || 0);
-
         const nextItems = previousItems.map((item) => {
           if (String(item.id) !== String(result.rowId)) return item;
 
@@ -105,8 +102,8 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         });
 
         const nextTotalQty = nextItems.reduce((sum, item) => sum + Number(item.qty || 0), 0);
-        const nextTotalAmount =
-          Number(previousOrder.totalAmount || 0) - previousProductAmount + Number(result.productTotal || 0);
+        const nextProductAmount = nextItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+        const nextTotalAmount = nextProductAmount + Number(previousOrder.shippingFee || 0);
 
         return {
           ...previousOrder,
@@ -129,10 +126,9 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const orderForView = localOrder;
   const items = Array.isArray(orderForView.items) ? orderForView.items : [];
   const isCanceled = isLiveOrderCanceled(orderForView);
-  const productAmount = Number(order.productAmount || 0);
+  const productAmount = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
   const shippingFee = Number(orderForView.shippingFee || 0);
-  const totalAmount = Number(orderForView.totalAmount || productAmount + shippingFee);
-
+  const totalAmount = productAmount + shippingFee;
   const isCardOrder = String(orderForView.paymentMethod || "").includes("카드");
   const isCardPaid = orderForView.paymentStatus === "card_paid";
   const isCardUnpaid = orderForView.paymentStatus === "card_unpaid";
