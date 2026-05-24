@@ -14,6 +14,7 @@ import {
   paymentStatusMeta,
 } from "@/lib/admin-v2/orderHelpers";
 import { getDeliveryStageStatusLabel } from "@/lib/admin-v2/statusDisplay";
+import AdminOrderPaymentCancelAction from "./AdminOrderPaymentCancelAction";
 
 type Props = {
   group: OrderGroup;
@@ -158,6 +159,8 @@ export default function AdminOrderDetailPriorityPanel({
       </div>
 
       <div className="mt-4 grid gap-2 md:grid-cols-3">
+        <AdminOrderPaymentCancelAction group={group} />
+
         {canceled ? (
           <button
             type="button"
