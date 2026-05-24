@@ -71,6 +71,7 @@ function getPaymentStatusClass(order: LiveOrder) {
 
 export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClose, onAfterStatusChange }: Props) {
   const [cardStatusAction, setCardStatusAction] = useState<"" | "card-paid" | "card-unpaid">("");
+  const [manualConfirmAction, setManualConfirmAction] = useState<"" | "direct-manual">("");
   const [localOrder, setLocalOrder] = useState(order);
   const [refreshingDetail, setRefreshingDetail] = useState(false);
 
@@ -132,6 +133,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const isCardOrder = String(orderForView.paymentMethod || "").includes("카드");
   const isCardPaid = orderForView.paymentStatus === "card_paid";
   const isCardUnpaid = orderForView.paymentStatus === "card_unpaid";
+  const canDirectManualConfirm = !isCanceled && ["unpaid", "manual_match_needed"].includes(orderForView.paymentStatus);
   const showCardStatusActions = !isCanceled && isCardOrder && (isCardPaid || isCardUnpaid);
 
   const { savingAction, cancelOrder, restoreOrder } = useLiveOrderCancelRestore({
@@ -139,6 +141,70 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     onAfterStatusChange,
     onClose,
   });
+
+  const handleDirectManualConfirm = async () => {
+    if (!orderForView || manualConfirmAction) return;
+
+    const orderIds = (orderForView.items || [])
+      .map((item) => Number(item.id))
+      .filter((id) => Number.isFinite(id) && id > 0);
+
+    if (orderIds.length === 0) {
+      alert("수동확인 처리할 주문 ID를 찾지 못했습니다.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      [
+        "매칭없이 수동확인 처리할까요?",
+        "",
+        "입금내역을 선택하지 않고 주문상태만 수동입금확인으로 변경합니다.",
+        "금액이 맞지 않아도 운영자가 확인한 것으로 처리됩니다.",
+        "입금내역은 변경하지 않습니다.",
+      ].join("\n")
+    );
+
+    if (!confirmed) return;
+
+    setManualConfirmAction("direct-manual");
+
+    try {
+      const response = await fetch("/api/admin-v2/direct-manual-payment-confirm", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ orderIds }),
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.message || "매칭없이 수동확인 처리 실패");
+      }
+
+      const paidAt = result.deposit_confirmed_at || new Date().toISOString();
+
+      setLocalOrder((prev) =>
+        prev
+          ? {
+              ...prev,
+              paymentStatus: "manual_paid",
+              paidAt: "방금",
+              paidAtFull: paidAt,
+            }
+          : prev
+      );
+
+      await onAfterStatusChange?.();
+
+      alert("수동입금확인 처리됐습니다.");
+    } catch (error) {
+      alert("매칭없이 수동확인 실패\n\n" + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      setManualConfirmAction("");
+    }
+  };
 
   const handleCardPaymentStatusChange = async (
     nextStatus: "카드결제완료" | "주문확인전",
@@ -297,7 +363,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             onClick={() => onOpenManualMatch(order)}
             className="mt-3 h-12 w-full rounded-2xl bg-orange-500 text-sm font-black text-white shadow-sm hover:bg-orange-600 active:scale-[0.99]"
           >
-            입금확인 열기
+            입금내역 선택 수동확인
           </button>
         )}
 
