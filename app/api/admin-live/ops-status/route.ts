@@ -34,6 +34,71 @@ function amount(row: Record<string, unknown>) {
   );
 }
 
+
+function maskOpsNickname(value: unknown) {
+  const text = clean(value);
+  if (!text) return "고객";
+  const chars = Array.from(text);
+
+  if (chars.length <= 1) return `${chars[0] || "고객"}*`;
+  if (chars.length <= 3) return `${chars[0]}**`;
+
+  return `${chars.slice(0, 2).join("")}**`;
+}
+
+function rowQty(row: any) {
+  const qty = Number(row?.qty || 0);
+  return Number.isFinite(qty) && qty > 0 ? qty : 1;
+}
+
+function rowItemSummary(row: any) {
+  const product = clean(row?.product_name) || "상품명확인";
+  const option = [row?.color, row?.size].map(clean).filter(Boolean).join(" / ");
+  const qty = rowQty(row);
+
+  return option ? `${product} ${option} ${qty}개` : `${product} ${qty}개`;
+}
+
+function groupRecentOrders(rows: any[]) {
+  const map = new Map<string, any>();
+
+  rows.forEach((row) => {
+    const groupId = clean(row?.order_group_id || row?.order_lookup_code || row?.id);
+    if (!groupId) return;
+
+    const current = map.get(groupId);
+
+    if (!current) {
+      const nickname = clean(row?.youtube_nickname || row?.customer_name || "비회원 방문자");
+
+      map.set(groupId, {
+        id: groupId,
+        orderGroupId: groupId,
+        nickname,
+        maskedNickname: maskOpsNickname(nickname),
+        amount: amount(row),
+        createdAt: row?.created_at || null,
+        paidAt: row?.deposit_confirmed_at || null,
+        isAutoPaid: isAutoPaid(row),
+        itemSummaries: [rowItemSummary(row)],
+      });
+
+      return;
+    }
+
+    current.amount += amount(row);
+    current.itemSummaries.push(rowItemSummary(row));
+
+    if (!current.paidAt && row?.deposit_confirmed_at) current.paidAt = row.deposit_confirmed_at;
+    if (isAutoPaid(row)) current.isAutoPaid = true;
+  });
+
+  return Array.from(map.values()).map((group) => ({
+    ...group,
+    itemSummary: group.itemSummaries.join(" + "),
+  }));
+}
+
 function isAutoPaid(row: Record<string, unknown>) {
   const status = clean(row.admin_order_status_v2 || row.order_manage_status);
   return status === "자동입금확인" || status === "자동입금확인완료" || status === "auto_paid";
@@ -57,7 +122,7 @@ export async function GET() {
     const { data: orders, error: ordersError } = await supabase
       .from("orders")
       .select(
-        "id, order_group_id, order_lookup_code, created_at, youtube_nickname, customer_name, final_amount, adjusted_total_price, total_price, product_price, admin_order_status_v2, order_manage_status, deposit_confirmed_at"
+        "id, order_group_id, order_lookup_code, created_at, youtube_nickname, customer_name, final_amount, adjusted_total_price, total_price, product_price, product_name, color, size, qty, admin_order_status_v2, order_manage_status, deposit_confirmed_at"
       )
       .gte("created_at", since)
       .order("created_at", { ascending: false })
@@ -70,15 +135,7 @@ export async function GET() {
       );
     }
 
-    const recentOrders = (orders || []).map((row) => ({
-      id: String(row.id),
-      groupId: clean(row.order_group_id || row.order_lookup_code || row.id),
-      createdAt: row.created_at,
-      nickname: clean(row.youtube_nickname || row.customer_name || "고객"),
-      amount: amount(row as Record<string, unknown>),
-      isAutoPaid: isAutoPaid(row as Record<string, unknown>),
-      paidAt: row.deposit_confirmed_at || null,
-    }));
+    const recentOrders = groupRecentOrders((orders || []) as any[]);
 
     const autoPaidOrders = recentOrders.filter((row) => row.isAutoPaid);
 

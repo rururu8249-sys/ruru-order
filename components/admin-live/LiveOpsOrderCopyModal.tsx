@@ -12,6 +12,8 @@ type RecentOrder = {
   orderNo?: string | null;
   order_no?: string | null;
   nickname?: string | null;
+  maskedNickname?: string | null;
+  itemSummary?: string | null;
   name?: string | null;
   amount?: number | string | null;
   createdAt?: string | null;
@@ -45,12 +47,25 @@ function money(value: unknown) {
   return `${Number(value || 0).toLocaleString("ko-KR")}원`;
 }
 
+
+function maskNicknameForChat(value: unknown) {
+  const text = clean(value);
+  if (!text) return "고객";
+  const chars = Array.from(text);
+
+  if (chars.length <= 1) return `${chars[0] || "고객"}*`;
+  if (chars.length <= 3) return `${chars[0]}**`;
+
+  return `${chars.slice(0, 2).join("")}**`;
+}
+
 function customerName(order: RecentOrder) {
-  return clean(order.nickname || order.name) || "고객";
+  return clean(order.maskedNickname) || maskNicknameForChat(order.nickname || order.name);
 }
 
 function buildOrderText(order: RecentOrder) {
-  return `${customerName(order)}님 ${money(order.amount)}`;
+  const summary = clean(order.itemSummary) || "상품명확인";
+  return `${customerName(order)}님 → ${summary} · ${clean(order.itemSummary) || money(order.amount)}`;
 }
 
 function buildCopyText(orders: RecentOrder[]) {
@@ -217,7 +232,7 @@ export default function LiveOpsOrderCopyModal({ open, orders, onClose, onCopied 
           </div>
 
           <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-[13px] font-black leading-5 text-blue-800">
-            복사 형식: ✅ 주문서 완료! ㅣ 닉네임님 19,000원 ㅣ 닉네임님 25,000원
+            복사 형식: ✅ 주문서 완료! ㅣ 닉네**님 → 상품명 옵션 1개 · 19,000원
           </div>
         </div>
 

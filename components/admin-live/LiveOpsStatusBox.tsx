@@ -8,6 +8,8 @@ type RecentOrder = {
   groupId: string;
   createdAt: string;
   nickname: string;
+  maskedNickname?: string | null;
+  itemSummary?: string | null;
   amount: number;
   isAutoPaid: boolean;
   paidAt: string | null;
@@ -167,7 +169,7 @@ export default function LiveOpsStatusBox() {
             id: `order-${order.id}`,
             type: "order" as const,
             title: "새 주문서 제출",
-            body: `${order.nickname} · ${money(order.amount)}`,
+            body: `${order.maskedNickname || order.nickname} · ${order.itemSummary || "상품명확인"} · ${money(order.amount)}`,
             createdAt: order.createdAt,
           }));
 
