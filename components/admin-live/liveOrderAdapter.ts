@@ -166,6 +166,7 @@ export function toAdminLiveOrder(group: OrderGroup): LiveOrder {
     shippingFee: getGroupShippingFee(group),
     totalAmount: group.totalAmount,
     memo: getMemo(group),
+    deliveryMemo: getShippingRequestMemo(first) || "",
     items,
   };
 }

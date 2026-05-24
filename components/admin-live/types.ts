@@ -40,5 +40,6 @@ export type LiveOrder = {
   shippingFee: number;
   totalAmount: number;
   memo: string;
+  deliveryMemo?: string | null;
   items: LiveOrderItem[];
 };

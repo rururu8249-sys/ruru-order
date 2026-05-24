@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import type { LiveOrder, LiveOrderItem } from "./types";
 
 type ExportMeta = {
@@ -157,26 +157,28 @@ function splitAddress(order: LiveOrder) {
   };
 }
 
-function memoText(order: LiveOrder) {
-  return clean(order.memo);
+function deliveryMemoText(order: LiveOrder) {
+  // 로젠 K열 배송메세지는 고객이 주문서에 작성한 배송메모만 사용합니다.
+  // 상품명, 관리자메모, 특이사항, 과거 상품메모는 절대 넣지 않습니다.
+  return clean((order as LiveOrder & { deliveryMemo?: string | null }).deliveryMemo);
 }
 
 function rosenRowCombined(order: LiveOrder): WorkbookRow {
   const phone = phoneText(order);
 
   return [
-    recipientName(order),   // A 수하인명
-    null,                   // B 빈칸
-    recipientAddress(order),// C 수하인주소
-    phone,                  // D 수하인전화번호
-    phone,                  // E 수하인핸드폰번호
-    1,                      // F 택배수량
-    2750,                   // G 택배운임
-    "010",                  // H 운임구분
-    itemSummary(order),     // I 품목명
-    null,                   // J 빈칸
-    memoText(order),        // K 배송메세지
-    null,                   // L 빈칸
+    recipientName(order),
+    null,
+    recipientAddress(order),
+    phone,
+    phone,
+    1,
+    2750,
+    "010",
+    itemSummary(order),
+    null,
+    deliveryMemoText(order),
+    null,
   ];
 }
 
@@ -185,40 +187,19 @@ function rosenRowSplit(order: LiveOrder): WorkbookRow {
   const address = splitAddress(order);
 
   return [
-    recipientName(order),   // A 수하인명
-    null,                   // B 빈칸
-    address.address1,       // C 수하인주소1
-    address.address2,       // D 수하인주소2
-    phone,                  // E 수하인전화번호
-    phone,                  // F 수하인핸드폰번호
-    1,                      // G 택배수량
-    2750,                   // H 택배운임
-    "010",                  // I 운임구분
-    itemSummary(order),     // J 품목명
-    null,                   // K 빈칸
-    memoText(order),        // L 배송메세지
+    recipientName(order),
+    null,
+    address.address1,
+    address.address2,
+    phone,
+    phone,
+    1,
+    2750,
+    "010",
+    itemSummary(order),
+    null,
+    deliveryMemoText(order),
   ];
-}
-
-function applyRosenSheetFormat(ws: XLSX.WorkSheet, totalRows: number, totalCols: number) {
-  ws["!autofilter"] = {
-    ref: XLSX.utils.encode_range({
-      s: { r: 0, c: 0 },
-      e: { r: Math.max(0, totalRows - 1), c: Math.max(0, totalCols - 1) },
-    }),
-  };
-
-  ws["!cols"] = Array.from({ length: totalCols }).map((_, index) => {
-    if (index === 0) return { wch: 18 };
-    if (index === 2) return { wch: 46 };
-    if (index === 3) return { wch: 26 };
-    if (index === 4 || index === 5) return { wch: 18 };
-    if (index === 6) return { wch: 12 };
-    if (index === 7) return { wch: 12 };
-    if (index === 8 || index === 9) return { wch: 46 };
-    if (index === 10 || index === 11) return { wch: 30 };
-    return { wch: 12 };
-  });
 }
 
 function addSheetMetaRows(title: string, meta: ExportMeta, rowCount: number): WorkbookRow[] {
@@ -231,46 +212,116 @@ function addSheetMetaRows(title: string, meta: ExportMeta, rowCount: number): Wo
   ];
 }
 
-function applyFilterSheetStyle(ws: XLSX.WorkSheet, headerRowIndex: number, totalRows: number, totalCols: number) {
-  ws["!autofilter"] = {
-    ref: XLSX.utils.encode_range({
-      s: { r: headerRowIndex, c: 0 },
-      e: { r: Math.max(headerRowIndex, totalRows - 1), c: Math.max(0, totalCols - 1) },
-    }),
-  };
+function createWorkbook() {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "ruru-order-app";
+  workbook.created = new Date();
+  workbook.modified = new Date();
+  return workbook;
+}
 
-  ws["!cols"] = Array.from({ length: totalCols }).map((_, index) => {
-    if (index === 0) return { wch: 18 };
-    if (index === 1) return { wch: 18 };
-    if (index === 2) return { wch: 18 };
-    if (index === 3) return { wch: 44 };
-    if (index === 5) return { wch: 42 };
-    if (index === 10) return { wch: 34 };
-    return { wch: 18 };
+function setColumnWidths(sheet: ExcelJS.Worksheet, widths: number[]) {
+  widths.forEach((width, index) => {
+    sheet.getColumn(index + 1).width = width;
   });
 }
 
-function writeWorkbook(wb: XLSX.WorkBook, fileName: string) {
-  XLSX.writeFile(wb, fileName, { bookType: "xlsx" });
+function styleRosenSheet(sheet: ExcelJS.Worksheet, rowCount: number, columnCount: number, splitAddress: boolean) {
+  sheet.views = [{ state: "frozen", ySplit: 1 }];
+  sheet.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: Math.max(1, rowCount), column: columnCount },
+  };
+
+  setColumnWidths(
+    sheet,
+    splitAddress
+      ? [18, 8, 34, 26, 18, 18, 12, 12, 12, 48, 8, 34]
+      : [18, 8, 48, 18, 18, 12, 12, 12, 48, 8, 34, 8]
+  );
+
+  sheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+    row.height = rowNumber === 1 ? 22 : 24;
+
+    row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      const isLongTextColumn = splitAddress
+        ? [3, 4, 10, 12].includes(colNumber)
+        : [3, 9, 11].includes(colNumber);
+
+      cell.alignment = {
+        vertical: "middle",
+        horizontal: rowNumber === 1 ? "center" : isLongTextColumn ? "left" : "center",
+        wrapText: true,
+      };
+
+      if (rowNumber === 1) {
+        cell.font = { bold: true };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFEFF6FF" },
+        };
+      }
+
+      if (splitAddress) {
+        if ([5, 6, 9].includes(colNumber)) cell.numFmt = "@";
+      } else if ([4, 5, 8].includes(colNumber)) {
+        cell.numFmt = "@";
+      }
+    });
+  });
 }
 
-function appendSheet(wb: XLSX.WorkBook, sheetName: string, rows: WorkbookRow[]) {
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  applyRosenSheetFormat(ws, rows.length, 12);
-  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+function styleFilterSheet(sheet: ExcelJS.Worksheet, headerRowNumber: number, rowCount: number, columnCount: number) {
+  sheet.views = [{ state: "frozen", ySplit: headerRowNumber }];
+  sheet.autoFilter = {
+    from: { row: headerRowNumber, column: 1 },
+    to: { row: Math.max(headerRowNumber, rowCount), column: columnCount },
+  };
+
+  setColumnWidths(sheet, [18, 18, 16, 18, 44, 48, 10, 18, 24, 20, 34]);
+
+  sheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+    row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      cell.alignment = {
+        vertical: "middle",
+        horizontal: [5, 6, 11].includes(colNumber) ? "left" : "center",
+        wrapText: true,
+      };
+
+      if (rowNumber === headerRowNumber) {
+        cell.font = { bold: true };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFEFF6FF" },
+        };
+      }
+    });
+  });
 }
 
-function appendRosenSheets(wb: XLSX.WorkBook, orders: LiveOrder[]) {
+function addRows(sheet: ExcelJS.Worksheet, rows: WorkbookRow[]) {
+  rows.forEach((row) => sheet.addRow(row));
+}
+
+function appendRosenSheet(workbook: ExcelJS.Workbook, sheetName: string, rows: WorkbookRow[], splitAddress: boolean) {
+  const sheet = workbook.addWorksheet(sheetName);
+  addRows(sheet, rows);
+  styleRosenSheet(sheet, rows.length, 12, splitAddress);
+}
+
+function appendRosenSheets(workbook: ExcelJS.Workbook, orders: LiveOrder[]) {
   const combinedRows: WorkbookRow[] = [ROSEN_HEADER_COMBINED, ...orders.map(rosenRowCombined)];
   const splitRows: WorkbookRow[] = [ROSEN_HEADER_SPLIT, ...orders.map(rosenRowSplit)];
 
-  appendSheet(wb, "주소통합_제목필터", combinedRows);
-  appendSheet(wb, "주소분리_제목필터", splitRows);
-  appendSheet(wb, "엑셀파일첫행-제목있음", combinedRows);
-  appendSheet(wb, "엑셀파일첫행-제목있음(주소1,2로분리)", splitRows);
+  appendRosenSheet(workbook, "주소통합_제목필터", combinedRows, false);
+  appendRosenSheet(workbook, "주소분리_제목필터", splitRows, true);
+  appendRosenSheet(workbook, "엑셀파일첫행-제목있음", combinedRows, false);
+  appendRosenSheet(workbook, "엑셀파일첫행-제목있음(주소1,2로분리)", splitRows, true);
 }
 
-function appendRosenCheckSheet(wb: XLSX.WorkBook, orders: LiveOrder[], meta: ExportMeta) {
+function appendRosenCheckSheet(workbook: ExcelJS.Workbook, orders: LiveOrder[], meta: ExportMeta) {
   const headers = [
     "주문번호",
     "닉네임",
@@ -281,7 +332,7 @@ function appendRosenCheckSheet(wb: XLSX.WorkBook, orders: LiveOrder[], meta: Exp
     "총수량",
     "결제상태",
     "방송명",
-    "메모",
+    "배송메모",
   ];
 
   const rows: WorkbookRow[] = [
@@ -297,13 +348,29 @@ function appendRosenCheckSheet(wb: XLSX.WorkBook, orders: LiveOrder[], meta: Exp
       totalQty(order),
       paymentLabel(order),
       clean(order.broadcastName),
-      memoText(order),
+      deliveryMemoText(order),
     ]),
   ];
 
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  applyFilterSheetStyle(ws, 5, rows.length, headers.length);
-  XLSX.utils.book_append_sheet(wb, ws, "관리자확인용");
+  const sheet = workbook.addWorksheet("관리자확인용");
+  addRows(sheet, rows);
+  styleFilterSheet(sheet, 6, rows.length, headers.length);
+}
+
+async function writeWorkbook(workbook: ExcelJS.Workbook, fileName: string) {
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer as BlobPart], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.URL.revokeObjectURL(url);
 }
 
 export async function exportLiveOrdersForRosen(orders: LiveOrder[], meta: ExportMeta) {
@@ -312,14 +379,14 @@ export async function exportLiveOrdersForRosen(orders: LiveOrder[], meta: Export
     return;
   }
 
-  const wb = XLSX.utils.book_new();
-  appendRosenSheets(wb, orders);
-  appendRosenCheckSheet(wb, orders, meta);
+  const workbook = createWorkbook();
+  appendRosenSheets(workbook, orders);
+  appendRosenCheckSheet(workbook, orders, meta);
 
-  writeWorkbook(wb, `rozen_${safeFileDate()}.xlsx`);
+  await writeWorkbook(workbook, `rozen_${safeFileDate()}.xlsx`);
 }
 
-export function exportLiveOrdersForPicking(orders: LiveOrder[], meta: ExportMeta) {
+export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: ExportMeta) {
   if (!orders.length) {
     alert("내보낼 주문이 없습니다. 필터 조건을 확인해주세요.");
     return;
@@ -336,7 +403,7 @@ export function exportLiveOrdersForPicking(orders: LiveOrder[], meta: ExportMeta
     "수량",
     "결제상태",
     "주문번호",
-    "메모/특이사항",
+    "배송메모",
   ];
 
   const itemRows: WorkbookRow[] = [];
@@ -356,7 +423,7 @@ export function exportLiveOrdersForPicking(orders: LiveOrder[], meta: ExportMeta
         1,
         paymentLabel(order),
         clean(order.orderNo || order.groupId || order.id),
-        memoText(order),
+        deliveryMemoText(order),
       ]);
       return;
     }
@@ -373,7 +440,7 @@ export function exportLiveOrdersForPicking(orders: LiveOrder[], meta: ExportMeta
         itemQty(item),
         paymentLabel(order),
         clean(order.orderNo || order.groupId || order.id),
-        memoText(order),
+        deliveryMemoText(order),
       ]);
     });
   });
@@ -384,11 +451,10 @@ export function exportLiveOrdersForPicking(orders: LiveOrder[], meta: ExportMeta
     ...itemRows,
   ];
 
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  applyFilterSheetStyle(ws, 5, rows.length, headers.length);
+  const workbook = createWorkbook();
+  const sheet = workbook.addWorksheet("물건챙기기");
+  addRows(sheet, rows);
+  styleFilterSheet(sheet, 6, rows.length, headers.length);
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "물건챙기기");
-
-  writeWorkbook(wb, `pick_${safeFileDate()}.xlsx`);
+  await writeWorkbook(workbook, `pick_${safeFileDate()}.xlsx`);
 }

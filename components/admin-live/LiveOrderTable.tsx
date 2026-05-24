@@ -350,11 +350,11 @@ export default function LiveOrderTable({
     }
   };
 
-  const exportPicking = () => {
+  const exportPicking = async () => {
     setExporting("picking");
 
     try {
-      exportLiveOrdersForPicking(sortedOrders, { filterLabel: currentFilterLabel });
+      await exportLiveOrdersForPicking(sortedOrders, { filterLabel: currentFilterLabel });
     } finally {
       setExporting("");
     }
