@@ -65,7 +65,7 @@ function customerName(order: RecentOrder) {
 
 function buildOrderText(order: RecentOrder) {
   const summary = clean(order.itemSummary) || "상품명확인";
-  return `${customerName(order)}님 → ${summary} · ${clean(order.itemSummary) || money(order.amount)}`;
+  return `${customerName(order)}님 → ${summary} · ${money(order.amount)}`;
 }
 
 function buildCopyText(orders: RecentOrder[]) {
