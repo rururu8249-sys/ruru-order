@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { LiveOrder } from "./types";
 import { exportLiveOrdersForPicking, exportLiveOrdersForRosen } from "./adminLiveOrderExcelExport";
 import { supabase } from "@/lib/supabase";
+import LiveOrderCancelViewFilter, { type LiveOrderCancelViewFilterValue } from "./LiveOrderCancelViewFilter";
 
 export type LiveOrderDateFilter = "all" | "today" | "yesterday" | "7days" | "month" | "custom";
 export type LiveOrderStatusFilter =
@@ -282,6 +283,11 @@ export default function LiveOrderTable({
   const [pageSize, setPageSize] = useState(10);
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState<"" | "rozen" | "picking">("");
+  const [cancelViewFilter, setCancelViewFilter] = useState<LiveOrderCancelViewFilterValue>("all");
+
+  useEffect(() => {
+    setPage(1);
+  }, [cancelViewFilter]);
 
   useEffect(() => {
     setPage(1);
@@ -296,6 +302,7 @@ export default function LiveOrderTable({
       ["paid", "auto_paid", "manual_paid", "card_paid"].includes(order.paymentStatus)
     ).length;
     const manual = orders.filter((order) => order.paymentStatus === "manual_match_needed").length;
+    const canceled = orders.filter((order) => order.paymentStatus === "canceled").length;
     const unpaid = orders.filter((order) =>
       ["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus)
     ).length;
@@ -305,6 +312,7 @@ export default function LiveOrderTable({
       unpaid,
       paid,
       manual,
+      canceled,
     };
   }, [orders]);
 
@@ -326,15 +334,30 @@ export default function LiveOrderTable({
     });
   }, [orders, sortMode]);
 
-  const totalPages = Math.max(1, Math.ceil(sortedOrders.length / pageSize));
+  const cancelViewFilteredOrders = useMemo(() => {
+    if (cancelViewFilter === "active") {
+      return sortedOrders.filter((order) => order.paymentStatus !== "canceled");
+    }
+
+    if (cancelViewFilter === "canceled") {
+      return sortedOrders.filter((order) => order.paymentStatus === "canceled");
+    }
+
+    return sortedOrders;
+  }, [sortedOrders, cancelViewFilter]);
+
+  const cancelFilteredActiveCount = sortedOrders.filter((order) => order.paymentStatus !== "canceled").length;
+  const cancelFilteredCanceledCount = sortedOrders.length - cancelFilteredActiveCount;
+
+  const totalPages = Math.max(1, Math.ceil(cancelViewFilteredOrders.length / pageSize));
   const safePage = Math.min(page, totalPages);
-  const visibleOrders = sortedOrders.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const visibleOrders = cancelViewFilteredOrders.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const exportableOrders = useMemo(
     () => sortedOrders.filter((order) => order.paymentStatus !== "canceled"),
     [sortedOrders]
   );
-  const canceledExportExcludedCount = sortedOrders.length - exportableOrders.length;
+  const canceledExportExcludedCount = cancelViewFilteredOrders.length - exportableOrders.length;
 
   const updateFilter = <K extends keyof LiveOrderFilters>(key: K, value: LiveOrderFilters[K]) => {
     onFiltersChange({
@@ -454,6 +477,7 @@ export default function LiveOrderTable({
           ["미입금", counts.unpaid, "unpaid"],
           ["입금확인", counts.paid, "paid"],
           ["입금확인 필요", counts.manual, "manual_match_needed"],
+          ["주문서취소", counts.canceled, "canceled"],
         ].map(([label, count, status]) => {
           const active = filters.status === status;
 
