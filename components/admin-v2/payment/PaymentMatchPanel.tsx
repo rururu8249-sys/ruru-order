@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DepositRow, OrderGroup } from "@/lib/admin-v2/types";
+import { formatDepositDateTime as formatPaymentDepositDateTime, formatKoreanDateOnly, getPaymentDateKeyOffset, parsePaymentDepositDate, toPaymentDateKey } from "@/components/admin-v2/payment/paymentDateFormatUtils";
 import useStrictAutoPaymentConfirm from "@/components/admin-v2/payment/useStrictAutoPaymentConfirm";
 
 type Props = {
@@ -17,6 +18,7 @@ type Props = {
   orderGroups: OrderGroup[];
   onOpenManualMatch: (group: OrderGroup) => void;
   onSyncBankdaDeposits: () => Promise<void> | void;
+  variant?: "admin-v2" | "admin-live";
 };
 
 type AutoMatchPreviewCandidate = {
@@ -50,49 +52,19 @@ function digitsOnly(value: unknown) {
 }
 
 function parseDepositDate(deposit: DepositRow) {
-  const raw = String(deposit.deposited_time || deposit.created_at || "").trim();
-  if (!raw) return null;
-
-  const date = new Date(raw.replace(" ", "T"));
-  return Number.isFinite(date.getTime()) ? date : null;
+  return parsePaymentDepositDate(deposit);
 }
 
 function toDateKey(date: Date | null) {
-  if (!date) return "";
-
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-
-  return `${yyyy}-${mm}-${dd}`;
+  return toPaymentDateKey(date);
 }
 
 function getTodayKey(offset = 0) {
-  const date = new Date();
-  date.setDate(date.getDate() + offset);
-  return toDateKey(date);
+  return getPaymentDateKeyOffset(offset);
 }
 
 function formatDepositDateTime(deposit: DepositRow) {
-  const raw = String(deposit.deposited_time || "").trim();
-  const createdRaw = String(deposit.created_at || "").trim();
-  const date = parseDepositDate(deposit);
-
-  if (!date) {
-    if (createdRaw) return createdRaw;
-    if (raw) return raw;
-    return "-";
-  }
-
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  const hh = String(date.getHours()).padStart(2, "0");
-  const mi = String(date.getMinutes()).padStart(2, "0");
-  const ss = String(date.getSeconds()).padStart(2, "0");
-  const weekday = ["일", "월", "화", "수", "목", "금", "토"][date.getDay()];
-
-  return `${yyyy}-${mm}-${dd}(${weekday}) ${hh}:${mi}:${ss}`;
+  return formatPaymentDepositDateTime(deposit);
 }
 
 function isDepositConfirmed(deposit: DepositRow) {
@@ -158,10 +130,10 @@ function SummaryCard({
   sub?: string;
 }) {
   return (
-    <div className="rounded-[22px] border border-neutral-200 bg-white p-4 shadow-sm">
-      <div className="text-[12px] font-black text-neutral-500">{label}</div>
-      <div className="mt-2 text-[22px] font-black tracking-[-0.04em] text-neutral-950">{value}</div>
-      {sub ? <div className="mt-1 text-[11px] font-bold text-neutral-400">{sub}</div> : null}
+    <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="text-[12px] font-black text-slate-500">{label}</div>
+      <div className="mt-2 text-[22px] font-black tracking-[-0.04em] text-slate-950">{value}</div>
+      {sub ? <div className="mt-1 text-[11px] font-bold text-slate-400">{sub}</div> : null}
     </div>
   );
 }
@@ -171,9 +143,16 @@ export default function PaymentMatchPanel({
   orderGroups,
   onOpenManualMatch,
   onSyncBankdaDeposits,
+  variant = "admin-v2",
 }: Props) {
   void orderGroups;
   void onOpenManualMatch;
+  const isAdminLiveVariant = variant === "admin-live";
+  const sectionClassName = isAdminLiveVariant
+    ? "grid w-full gap-4"
+    : "mx-auto grid w-full max-w-[820px] gap-4";
+  const todayLabel = formatKoreanDateOnly(new Date());
+
 
   const [serverDeposits, setServerDeposits] = useState<DepositRow[]>(deposits || []);
   const [keyword, setKeyword] = useState("");
@@ -510,14 +489,14 @@ export default function PaymentMatchPanel({
   };
 
   return (
-    <section className="mx-auto grid w-full max-w-[820px] gap-4">
+    <section className={sectionClassName}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-end gap-3">
-            <h1 className="text-[30px] font-black tracking-[-0.04em] text-neutral-950">입금확인</h1>
-            <div className="pb-1 text-[14px] font-bold text-neutral-500">입금내역을 주문과 비교해 자동·수동 입금확인을 처리합니다.</div>
+            <h1 className="text-[30px] font-black tracking-[-0.04em] text-slate-950">입금확인</h1>
+            <div className="pb-1 text-[14px] font-bold text-slate-500">입금내역을 주문과 비교해 자동·수동 입금확인을 처리합니다.</div>
           </div>
-          <div className="mt-1 text-[12px] font-bold text-neutral-400">
+          <div className="mt-1 text-[12px] font-bold text-slate-400">
             {lastAutoSyncLabel ? `최근 새로고침 ${lastAutoSyncLabel}` : lastAutoSyncMessage}
           </div>
         </div>
@@ -535,7 +514,7 @@ export default function PaymentMatchPanel({
       <div className="grid gap-3 xl:grid-cols-4">
         <SummaryCard label="기간 총 입금액" value={money(periodTotalAmount)} sub={`${filteredDeposits.length.toLocaleString("ko-KR")}건`} />
         <SummaryCard label="선택 입금액" value={money(selectedTotalAmount)} sub={`선택 ${selectedDeposits.length.toLocaleString("ko-KR")}건`} />
-        <SummaryCard label="오늘 입금액" value={money(todayTotalAmount)} sub={getTodayKey(0)} />
+        <SummaryCard label="오늘 입금액" value={money(todayTotalAmount)} sub={todayLabel} />
         <SummaryCard
           label="전체 저장건수"
           value={`${depositsForDisplay.length.toLocaleString("ko-KR")}건`}
@@ -543,35 +522,35 @@ export default function PaymentMatchPanel({
         />
       </div>
 
-      <div className="rounded-[22px] border border-neutral-200 bg-white p-4 shadow-sm">
+      <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
         <div className="grid gap-3 xl:grid-cols-[minmax(260px,1fr)_180px_180px_auto_auto] xl:items-end">
           <label className="grid gap-2">
-            <span className="text-[12px] font-black text-neutral-500">검색</span>
+            <span className="text-[12px] font-black text-slate-500">검색</span>
             <input
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
               placeholder="입금자명 / 금액 / 메모 검색"
-              className="h-11 rounded-xl border border-neutral-200 bg-white px-4 text-sm font-bold outline-none focus:border-neutral-950"
+              className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold outline-none focus:border-neutral-950"
             />
           </label>
 
           <label className="grid gap-2">
-            <span className="text-[12px] font-black text-neutral-500">시작일</span>
+            <span className="text-[12px] font-black text-slate-500">시작일</span>
             <input
               type="date"
               value={startDate}
               onChange={(event) => setStartDate(event.target.value)}
-              className="h-11 rounded-xl border border-neutral-200 bg-white px-3 text-sm font-black outline-none focus:border-neutral-950"
+              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-neutral-950"
             />
           </label>
 
           <label className="grid gap-2">
-            <span className="text-[12px] font-black text-neutral-500">종료일</span>
+            <span className="text-[12px] font-black text-slate-500">종료일</span>
             <input
               type="date"
               value={endDate}
               onChange={(event) => setEndDate(event.target.value)}
-              className="h-11 rounded-xl border border-neutral-200 bg-white px-3 text-sm font-black outline-none focus:border-neutral-950"
+              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-neutral-950"
             />
           </label>
 
@@ -579,7 +558,7 @@ export default function PaymentMatchPanel({
             type="button"
             onClick={forceLoadServerDeposits}
             disabled={serverDepositLoading}
-            className="h-11 rounded-xl bg-neutral-950 px-6 text-sm font-black text-white disabled:bg-neutral-300"
+            className="h-11 rounded-xl bg-slate-950 px-6 text-sm font-black text-white disabled:bg-neutral-300"
           >
             조회
           </button>
@@ -587,22 +566,22 @@ export default function PaymentMatchPanel({
           <button
             type="button"
             onClick={resetFilters}
-            className="h-11 rounded-xl border border-neutral-200 bg-white px-5 text-sm font-black text-neutral-700"
+            className="h-11 rounded-xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-700"
           >
             초기화
           </button>
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" onClick={() => setQuickRange("today")} className="h-9 rounded-xl bg-neutral-950 px-4 text-[13px] font-black text-white">오늘</button>
-          <button type="button" onClick={() => setQuickRange("yesterday")} className="h-9 rounded-xl border border-neutral-200 bg-white px-4 text-[13px] font-black text-neutral-700">어제</button>
-          <button type="button" onClick={() => setQuickRange("7days")} className="h-9 rounded-xl border border-neutral-200 bg-white px-4 text-[13px] font-black text-neutral-700">7일</button>
-          <button type="button" onClick={() => setQuickRange("30days")} className="h-9 rounded-xl border border-neutral-200 bg-white px-4 text-[13px] font-black text-neutral-700">30일</button>
+          <button type="button" onClick={() => setQuickRange("today")} className="h-9 rounded-xl bg-slate-950 px-4 text-[13px] font-black text-white">오늘</button>
+          <button type="button" onClick={() => setQuickRange("yesterday")} className="h-9 rounded-xl border border-slate-200 bg-white px-4 text-[13px] font-black text-slate-700">어제</button>
+          <button type="button" onClick={() => setQuickRange("7days")} className="h-9 rounded-xl border border-slate-200 bg-white px-4 text-[13px] font-black text-slate-700">7일</button>
+          <button type="button" onClick={() => setQuickRange("30days")} className="h-9 rounded-xl border border-slate-200 bg-white px-4 text-[13px] font-black text-slate-700">30일</button>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-[22px] border border-neutral-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center gap-3 border-b border-neutral-200 px-5 py-4">
+      <div className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 px-5 py-4">
           <label className="flex cursor-pointer items-center gap-2">
             <input
               type="checkbox"
@@ -613,11 +592,11 @@ export default function PaymentMatchPanel({
             <span className="text-sm font-black">전체선택</span>
           </label>
 
-          <div className="rounded-xl bg-neutral-950 px-4 py-2 text-sm font-black text-white">
+          <div className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-black text-white">
             선택 {selectedDeposits.length.toLocaleString("ko-KR")}건
           </div>
 
-          <div className="rounded-xl border border-neutral-200 bg-white px-4 py-2 text-sm font-black text-neutral-800">
+          <div className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-neutral-800">
             선택 합계 {money(selectedTotalAmount)}
           </div>
 
@@ -625,13 +604,13 @@ export default function PaymentMatchPanel({
             type="button"
             onClick={() => setSelectedDepositIds([])}
             disabled={selectedDeposits.length === 0}
-            className="h-10 rounded-xl border border-neutral-200 bg-white px-4 text-[13px] font-black text-neutral-600 disabled:opacity-40"
+            className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-[13px] font-black text-slate-600 disabled:opacity-40"
           >
             선택 해제
           </button>
         </div>
 
-        <div className="grid grid-cols-[44px_1.5fr_1.1fr_0.9fr_1.1fr_1fr_0.7fr] border-b border-neutral-200 bg-neutral-50 px-5 py-3 text-[13px] font-black text-neutral-700">
+        <div className="grid grid-cols-[44px_1.5fr_1.1fr_0.9fr_1.1fr_1fr_0.7fr] border-b border-slate-200 bg-slate-50 px-5 py-3 text-[13px] font-black text-slate-700">
           <div />
           <div>입금일시</div>
           <div>입금자명</div>
@@ -642,15 +621,15 @@ export default function PaymentMatchPanel({
         </div>
 
         {filteredDeposits.length === 0 ? (
-          <div className="px-5 py-14 text-center text-sm font-black text-neutral-400">
+          <div className="px-5 py-14 text-center text-sm font-black text-slate-400">
             표시할 입금내역이 없습니다.
           </div>
         ) : (
-          <div className="divide-y divide-neutral-100">
+          <div className="divide-y divide-slate-100">
             {filteredDeposits.map((deposit) => (
               <div
                 key={deposit.id}
-                className="grid grid-cols-[44px_1.5fr_1.1fr_0.9fr_1.1fr_1fr_0.7fr] px-5 py-3 text-sm hover:bg-neutral-50"
+                className="grid grid-cols-[44px_1.5fr_1.1fr_0.9fr_1.1fr_1fr_0.7fr] px-5 py-3 text-sm hover:bg-slate-50"
               >
                 <div className="flex items-center">
                   <input
@@ -661,15 +640,15 @@ export default function PaymentMatchPanel({
                   />
                 </div>
 
-                <div className="font-bold text-neutral-700">{formatDepositDateTime(deposit)}</div>
-                <div className="font-black text-neutral-950">{deposit.depositor_name || "-"}</div>
-                <div className="text-right font-black text-neutral-950">+{money(deposit.amount)}</div>
-                <div className="text-center font-bold text-neutral-500">{getLinkedOrderText(deposit)}</div>
-                <div className="text-center font-bold text-neutral-500">{getMemoText(deposit)}</div>
+                <div className="font-bold text-slate-700">{formatDepositDateTime(deposit)}</div>
+                <div className="font-black text-slate-950">{deposit.depositor_name || "-"}</div>
+                <div className="text-right font-black text-slate-950">+{money(deposit.amount)}</div>
+                <div className="text-center font-bold text-slate-500">{getLinkedOrderText(deposit)}</div>
+                <div className="text-center font-bold text-slate-500">{getMemoText(deposit)}</div>
                 <div className="text-center">
                   <button
                     type="button"
-                    className="h-8 rounded-lg border border-neutral-200 bg-white px-3 text-xs font-black text-neutral-700"
+                    className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-slate-700"
                   >
                     보기
                   </button>
@@ -679,7 +658,7 @@ export default function PaymentMatchPanel({
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 px-5 py-3 text-[13px] font-bold text-neutral-500">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-5 py-3 text-[13px] font-bold text-slate-500">
           <div>
             표시 {filteredDeposits.length.toLocaleString("ko-KR")}건 / 전체 {depositsForDisplay.length.toLocaleString("ko-KR")}건
           </div>
@@ -689,7 +668,7 @@ export default function PaymentMatchPanel({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-neutral-200 bg-white p-3 text-[12px] font-bold text-neutral-500">
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 text-[12px] font-bold text-slate-500">
         자동입금확인 기준은 기존 그대로 유지됩니다. 닉네임 완전일치 + 금액 완전일치 + 1:1 단일 후보일 때만 처리됩니다.
       </div>
     </section>

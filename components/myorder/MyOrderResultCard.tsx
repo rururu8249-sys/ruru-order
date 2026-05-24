@@ -2,6 +2,8 @@
 // 목적: 고객 주문조회 결과 카드 UI
 // 주의: UI 전용. 주문조회 Supabase 로직, 상태 계산 로직 없음.
 
+import { formatMyOrderDateTime } from "@/components/myorder/myOrderDateFormat";
+
 type MyOrderResultCardProps = {
   order: any;
   label: string;
@@ -28,6 +30,14 @@ export default function MyOrderResultCard({
   const paymentLabel = String(order.payment_method || "").includes("카드")
     ? "카드결제"
     : "무통장입금";
+
+  const displayDate = formatMyOrderDateTime(
+    order.created_at ||
+      order.order_created_at ||
+      order.submitted_at ||
+      order.createdAt ||
+      formattedDate
+  );
 
   const paidLabels = [
     "입금확인완료",
@@ -74,7 +84,7 @@ export default function MyOrderResultCard({
 
             <div className="flex items-center justify-between gap-3">
               <span className="shrink-0 font-black text-[#151923]">주문일</span>
-              <span className="text-right">{formattedDate}</span>
+              <span className="text-right">{displayDate}</span>
             </div>
 
             <div className="flex items-start justify-between gap-3">

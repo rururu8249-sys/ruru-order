@@ -42,6 +42,7 @@ export default function AdminLivePaymentPanel({
       orderGroups={orderGroups}
       onOpenManualMatch={onOpenManualMatch}
       onSyncBankdaDeposits={syncBankdaAndRefresh}
+      variant="admin-live"
     />
   );
 }
