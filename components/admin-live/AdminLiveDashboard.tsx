@@ -575,6 +575,7 @@ export default function AdminLiveDashboard() {
               orderGroups={orderGroups}
               onRefresh={loadDepositsFromServer}
               onBankdaSync={syncBankdaDepositsOnly}
+              onOpenManualMatch={setManualMatchGroup}
             />
           ) : activeMenu === "customers" ? (
             <AdminLiveCustomersPanel orders={orders} />
