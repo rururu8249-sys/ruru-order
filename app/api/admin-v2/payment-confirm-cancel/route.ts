@@ -216,36 +216,6 @@ export async function POST(request: Request) {
       };
     });
 
-    const orderUpdateResults: AnyRow[] = [];
-
-    for (const order of targetOrders) {
-      const keepCanceled = isCanceledOrder(order);
-
-      const patch: AnyRow = {
-        deposit_confirmed_at: null,
-      };
-
-      if (!keepCanceled) {
-        patch.admin_order_status_v2 = RESTORE_UNPAID_STATUS;
-        patch.order_manage_status = RESTORE_UNPAID_STATUS;
-      }
-
-      const { data: updated, error: updateError } = await supabase
-        .from("orders")
-        .update(patch)
-        .eq("id", order.id)
-        .select("id, order_lookup_code, order_group_id, youtube_nickname, product_name, payment_method, admin_order_status_v2, order_manage_status, deposit_confirmed_at");
-
-      if (updateError) {
-        return NextResponse.json(
-          { ok: false, message: updateError.message },
-          { status: 500 }
-        );
-      }
-
-      orderUpdateResults.push(...(updated || []));
-    }
-
     const { data: deposits, error: depositError } = await supabase
       .from("deposits")
       .select("*")
@@ -296,6 +266,37 @@ export async function POST(request: Request) {
         note: "dryRun=true 요청은 orders/deposits update를 실행하지 않습니다.",
       });
     }
+
+    const orderUpdateResults: AnyRow[] = [];
+
+    for (const order of targetOrders) {
+      const keepCanceled = isCanceledOrder(order);
+
+      const patch: AnyRow = {
+        deposit_confirmed_at: null,
+      };
+
+      if (!keepCanceled) {
+        patch.admin_order_status_v2 = RESTORE_UNPAID_STATUS;
+        patch.order_manage_status = RESTORE_UNPAID_STATUS;
+      }
+
+      const { data: updated, error: updateError } = await supabase
+        .from("orders")
+        .update(patch)
+        .eq("id", order.id)
+        .select("id, order_lookup_code, order_group_id, youtube_nickname, product_name, payment_method, admin_order_status_v2, order_manage_status, deposit_confirmed_at");
+
+      if (updateError) {
+        return NextResponse.json(
+          { ok: false, message: updateError.message },
+          { status: 500 }
+        );
+      }
+
+      orderUpdateResults.push(...(updated || []));
+    }
+
 
     let clearedDepositCount = 0;
 
