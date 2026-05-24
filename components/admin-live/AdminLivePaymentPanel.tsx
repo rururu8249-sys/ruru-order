@@ -3,11 +3,19 @@
 import { useMemo, useState } from "react";
 import type { DepositRow, OrderGroup } from "@/lib/admin-v2/types";
 
+type BankdaSyncResult = {
+  fetchedCount?: number;
+  insertedCount?: number;
+  skippedCount?: number;
+  rawCount?: number;
+  bankdaDescription?: string;
+};
+
 type Props = {
   deposits: DepositRow[];
   orderGroups: OrderGroup[];
   onRefresh?: () => Promise<void> | void;
-  onBankdaSync?: () => Promise<void> | void;
+  onBankdaSync?: () => Promise<BankdaSyncResult | void> | void;
 };
 
 type DepositStatusFilter = "all" | "confirmed" | "unmatched" | "auto" | "manual";
@@ -256,7 +264,8 @@ export default function AdminLivePaymentPanel({ deposits, orderGroups, onRefresh
   const [filters, setFilters] = useState<DepositFilters>(DEFAULT_FILTERS);
   const [refreshing, setRefreshing] = useState(false);
   const [bankdaRefreshing, setBankdaRefreshing] = useState(false);
-  const [bankdaMessage, setBankdaMessage] = useState("");
+  const [bankdaResult, setBankdaResult] = useState<BankdaSyncResult | null>(null);
+  const [bankdaError, setBankdaError] = useState("");
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -318,11 +327,14 @@ export default function AdminLivePaymentPanel({ deposits, orderGroups, onRefresh
 
     try {
       setBankdaRefreshing(true);
-      setBankdaMessage("");
-      await onBankdaSync();
-      setBankdaMessage("뱅크다 조회 완료 · 입금내역을 다시 불러왔습니다.");
+      setBankdaResult(null);
+      setBankdaError("");
+
+      const result = await onBankdaSync();
+      setBankdaResult(result || {});
     } catch (error) {
-      setBankdaMessage(error instanceof Error ? error.message : "뱅크다 조회 중 오류가 발생했습니다.");
+      setBankdaResult(null);
+      setBankdaError(error instanceof Error ? error.message : "뱅크다 조회 중 오류가 발생했습니다.");
     } finally {
       setBankdaRefreshing(false);
     }
@@ -520,15 +532,44 @@ export default function AdminLivePaymentPanel({ deposits, orderGroups, onRefresh
           </div>
         )}
 
-        {bankdaMessage && (
-          <div className="mt-4 rounded-2xl bg-blue-50 px-4 py-3 text-xs font-black leading-5 text-blue-700">
-            {bankdaMessage}
-          </div>
-        )}
-
         <div className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-xs font-black leading-5 text-amber-700">
           현재 입금확인 메뉴는 조회/검색/필터/입금내역 새로고침/뱅크다 새로고침 전용입니다. 자동입금확인, 수동입금확인은 실행하지 않습니다.
         </div>
+
+        {(bankdaResult || bankdaError) && (
+          <div className="fixed bottom-6 right-6 z-50 w-[320px] max-w-[calc(100vw-32px)] rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-black text-slate-950">
+                  {bankdaError ? "뱅크다 조회 실패" : "뱅크다 조회 완료"}
+                </div>
+                <div className="mt-1 text-xs font-bold leading-5 text-slate-500">
+                  {bankdaError ? (
+                    bankdaError
+                  ) : (
+                    <>
+                      조회 {Number(bankdaResult?.fetchedCount || 0).toLocaleString("ko-KR")}건 · 신규 {Number(bankdaResult?.insertedCount || 0).toLocaleString("ko-KR")}건 · 중복 {Number(bankdaResult?.skippedCount || 0).toLocaleString("ko-KR")}건
+                      <br />
+                      입금내역을 다시 불러왔습니다.
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setBankdaResult(null);
+                  setBankdaError("");
+                }}
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-black text-slate-500 hover:bg-slate-200"
+                aria-label="뱅크다 조회 결과 닫기"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );

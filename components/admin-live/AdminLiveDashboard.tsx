@@ -266,6 +266,8 @@ export default function AdminLiveDashboard() {
     }
 
     await loadDepositsFromServer();
+
+    return result;
   };
 
 
