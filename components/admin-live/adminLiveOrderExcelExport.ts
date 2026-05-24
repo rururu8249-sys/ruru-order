@@ -171,7 +171,7 @@ function rosenRowCombined(order: LiveOrder): WorkbookRow {
     phone,
     phone,
     1,
-    "",
+    2750,
     "010",
     itemSummary(order),
     null,
@@ -192,7 +192,7 @@ function rosenRowSplit(order: LiveOrder): WorkbookRow {
     phone,
     phone,
     1,
-    "",
+    2750,
     "010",
     itemSummary(order),
     null,
@@ -200,7 +200,14 @@ function rosenRowSplit(order: LiveOrder): WorkbookRow {
   ];
 }
 
-function applyRosenSheetFormat(ws: XLSX.WorkSheet, columnCount: number) {
+function applyRosenSheetFormat(ws: XLSX.WorkSheet, columnCount: number, totalRows: number) {
+  ws["!autofilter"] = {
+    ref: XLSX.utils.encode_range({
+      s: { r: 0, c: 0 },
+      e: { r: Math.max(0, totalRows - 1), c: Math.max(0, columnCount - 1) },
+    }),
+  };
+
   ws["!cols"] = Array.from({ length: columnCount }).map((_, index) => {
     if (index === 0) return { wch: 18 };
     if (index === 2) return { wch: 42 };
@@ -249,23 +256,24 @@ function appendRosenSheets(wb: XLSX.WorkBook, orders: LiveOrder[]) {
   const combinedRows = orders.map(rosenRowCombined);
   const splitRows = orders.map(rosenRowSplit);
 
-  const noHeaderCombinedWs = XLSX.utils.aoa_to_sheet(combinedRows);
-  applyRosenSheetFormat(noHeaderCombinedWs, 12);
-  XLSX.utils.book_append_sheet(wb, noHeaderCombinedWs, "엑셀파일 첫행-제목없음");
+  const combinedSheetRows: WorkbookRow[] = [ROSEN_HEADER_COMBINED, ...combinedRows];
+  const splitSheetRows: WorkbookRow[] = [ROSEN_HEADER_SPLIT, ...splitRows];
 
-  const headerCombinedRows: WorkbookRow[] = [ROSEN_HEADER_COMBINED, ...combinedRows];
-  const headerCombinedWs = XLSX.utils.aoa_to_sheet(headerCombinedRows);
-  applyRosenSheetFormat(headerCombinedWs, 12);
-  XLSX.utils.book_append_sheet(wb, headerCombinedWs, "엑셀파일첫행-제목있음");
+  const combinedWs1 = XLSX.utils.aoa_to_sheet(combinedSheetRows);
+  applyRosenSheetFormat(combinedWs1, 12, combinedSheetRows.length);
+  XLSX.utils.book_append_sheet(wb, combinedWs1, "엑셀파일 첫행-제목없음");
 
-  const noHeaderSplitWs = XLSX.utils.aoa_to_sheet(splitRows);
-  applyRosenSheetFormat(noHeaderSplitWs, 12);
-  XLSX.utils.book_append_sheet(wb, noHeaderSplitWs, "엑셀파일첫행-제목없음(주소1,2로분리)");
+  const combinedWs2 = XLSX.utils.aoa_to_sheet(combinedSheetRows);
+  applyRosenSheetFormat(combinedWs2, 12, combinedSheetRows.length);
+  XLSX.utils.book_append_sheet(wb, combinedWs2, "엑셀파일첫행-제목있음");
 
-  const headerSplitRows: WorkbookRow[] = [ROSEN_HEADER_SPLIT, ...splitRows];
-  const headerSplitWs = XLSX.utils.aoa_to_sheet(headerSplitRows);
-  applyRosenSheetFormat(headerSplitWs, 12);
-  XLSX.utils.book_append_sheet(wb, headerSplitWs, "엑셀파일첫행-제목있음(주소1,2로분리)");
+  const splitWs1 = XLSX.utils.aoa_to_sheet(splitSheetRows);
+  applyRosenSheetFormat(splitWs1, 12, splitSheetRows.length);
+  XLSX.utils.book_append_sheet(wb, splitWs1, "엑셀파일첫행-제목없음(주소1,2로분리)");
+
+  const splitWs2 = XLSX.utils.aoa_to_sheet(splitSheetRows);
+  applyRosenSheetFormat(splitWs2, 12, splitSheetRows.length);
+  XLSX.utils.book_append_sheet(wb, splitWs2, "엑셀파일첫행-제목있음(주소1,2로분리)");
 }
 
 function appendRosenCheckSheet(wb: XLSX.WorkBook, orders: LiveOrder[], meta: ExportMeta) {
