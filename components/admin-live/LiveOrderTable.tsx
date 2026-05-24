@@ -330,6 +330,12 @@ export default function LiveOrderTable({
   const safePage = Math.min(page, totalPages);
   const visibleOrders = sortedOrders.slice((safePage - 1) * pageSize, safePage * pageSize);
 
+  const exportableOrders = useMemo(
+    () => sortedOrders.filter((order) => order.paymentStatus !== "canceled"),
+    [sortedOrders]
+  );
+  const canceledExportExcludedCount = sortedOrders.length - exportableOrders.length;
+
   const updateFilter = <K extends keyof LiveOrderFilters>(key: K, value: LiveOrderFilters[K]) => {
     onFiltersChange({
       ...filters,
@@ -422,7 +428,7 @@ export default function LiveOrderTable({
     setExporting("rozen");
 
     try {
-      await exportLiveOrdersForRosen(sortedOrders, { filterLabel: currentFilterLabel });
+      await exportLiveOrdersForRosen(exportableOrders, { filterLabel: currentFilterLabel });
     } finally {
       setExporting("");
     }
@@ -432,7 +438,7 @@ export default function LiveOrderTable({
     setExporting("picking");
 
     try {
-      await exportLiveOrdersForPicking(sortedOrders, { filterLabel: currentFilterLabel });
+      await exportLiveOrdersForPicking(exportableOrders, { filterLabel: currentFilterLabel });
     } finally {
       setExporting("");
     }
@@ -472,7 +478,7 @@ export default function LiveOrderTable({
           <button
             type="button"
             onClick={exportRosen}
-            disabled={exporting !== "" || sortedOrders.length === 0}
+            disabled={exporting !== "" || exportableOrders.length === 0}
             className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             title="현재 필터 조건 그대로 로젠 송장 엑셀을 내보냅니다"
           >
@@ -482,12 +488,18 @@ export default function LiveOrderTable({
           <button
             type="button"
             onClick={exportPicking}
-            disabled={exporting !== "" || sortedOrders.length === 0}
+            disabled={exporting !== "" || exportableOrders.length === 0}
             className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             title="현재 필터 조건 그대로 물건챙기기 엑셀을 내보냅니다"
           >
             {exporting === "picking" ? "내보내는중..." : "물건챙기기 엑셀"}
           </button>
+
+            {canceledExportExcludedCount > 0 ? (
+              <span className="rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-600">
+                취소 주문 {canceledExportExcludedCount.toLocaleString("ko-KR")}건은 엑셀 내보내기에서 자동 제외됩니다.
+              </span>
+            ) : null}
 
           <button
             type="button"
