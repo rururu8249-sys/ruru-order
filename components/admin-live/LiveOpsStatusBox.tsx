@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import LiveOpsOrderCopyModal, { liveOpsOrderCopyKey, loadLiveOpsCopiedOrderKeys } from "./LiveOpsOrderCopyModal";
 
 type RecentOrder = {
   id: string;
@@ -90,6 +91,24 @@ export default function LiveOpsStatusBox() {
   const [openVisitors, setOpenVisitors] = useState(false);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [autoPaidOrders, setAutoPaidOrders] = useState<RecentOrder[]>([]);
+  const [orderCopyModalOpen, setOrderCopyModalOpen] = useState(false);
+
+  const handleCopiedOrderNotices = (copiedKeys: string[]) => {
+    const copiedKeySet = new Set(copiedKeys);
+
+    setRecentOrders((current) =>
+      current.filter((order) => !copiedKeySet.has(liveOpsOrderCopyKey(order)))
+    );
+
+    setNotices((current) =>
+      current.filter((notice) => {
+        if (notice.title !== "새 주문서 제출") return true;
+        const noticeId = String(notice.id || "");
+        return !copiedKeys.some((key) => noticeId.includes(String(key)));
+      })
+    );
+  };
+
   const [activeVisitors, setActiveVisitors] = useState<ActiveVisitor[]>([]);
   const [presenceAvailable, setPresenceAvailable] = useState(true);
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -129,7 +148,10 @@ export default function LiveOpsStatusBox() {
       const payload = (await response.json().catch(() => null)) as OpsStatusPayload | null;
       if (!response.ok || !payload?.ok) return;
 
-      const nextOrders = payload.recentOrders || [];
+      const copiedOrderNoticeKeys = loadLiveOpsCopiedOrderKeys();
+      const nextOrders = (payload.recentOrders || []).filter(
+        (order: RecentOrder) => !copiedOrderNoticeKeys.has(liveOpsOrderCopyKey(order))
+      );
       const nextAutoPaid = payload.autoPaidOrders || [];
       const nextVisitors = payload.activeVisitors || [];
 
@@ -199,6 +221,12 @@ export default function LiveOpsStatusBox() {
 
   return (
     <div className="relative rounded-2xl border border-slate-200 bg-slate-50 p-3">
+      <LiveOpsOrderCopyModal
+        open={orderCopyModalOpen}
+        orders={recentOrders}
+        onClose={() => setOrderCopyModalOpen(false)}
+        onCopied={handleCopiedOrderNotices}
+      />
       <div className="mb-2 flex items-center justify-between">
         <div className="text-xs font-black text-slate-900">실시간 운영상황</div>
         <button
@@ -234,13 +262,21 @@ export default function LiveOpsStatusBox() {
           </div>
         ) : (
           notices.slice(0, 3).map((notice) => (
-            <div key={notice.id} className="rounded-xl bg-white px-3 py-2">
+            <button
+              key={notice.id}
+              type="button"
+              onClick={notice.title === "새 주문서 제출" ? () => setOrderCopyModalOpen(true) : undefined}
+              className={[
+                "w-full rounded-xl bg-white px-3 py-2 text-left",
+                notice.title === "새 주문서 제출" ? "cursor-pointer hover:bg-blue-50 active:scale-[0.99]" : "cursor-default",
+              ].join(" ")}
+            >
               <div className="text-[11px] font-black text-slate-800">
                 {notice.type === "order" ? "🧾 " : "✅ "}
                 {notice.title}
               </div>
               <div className="mt-0.5 truncate text-[11px] font-bold text-slate-500">{notice.body}</div>
-            </div>
+            </button>
           ))
         )}
       </div>
