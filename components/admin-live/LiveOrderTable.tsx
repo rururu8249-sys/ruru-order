@@ -563,8 +563,8 @@ export default function LiveOrderTable({
         상단 카운트 버튼과 필터가 실제 주문서와 매출요약에 함께 적용됩니다. 검색은 Enter 또는 검색 버튼을 눌렀을 때만 적용됩니다.
       </div>
 
-      <div className="mb-3 flex w-full flex-wrap items-center gap-3">
-        <select className="h-12 w-full flex-none rounded-2xl border border-slate-200 bg-white px-3 text-[14px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50 sm:w-[220px]"
+      <div className="mb-3 flex w-full flex-wrap items-center gap-2 xl:flex-nowrap">
+        <select className="h-11 w-full flex-none rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50 sm:w-[170px]"
           value={filters.broadcast}
           onChange={(event) => updateFilter("broadcast", event.target.value)}
         >
@@ -577,7 +577,7 @@ export default function LiveOrderTable({
           <option value="none">{todayAlwaysOrderLabel()}</option>
         </select>
 
-        <select className="h-12 w-full flex-none rounded-2xl border border-slate-200 bg-white px-3 text-[14px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50 sm:w-[170px]"
+        <select className="h-11 w-full flex-none rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50 sm:w-[120px]"
           value={filters.date}
           onChange={(event) => updateFilter("date", event.target.value as LiveOrderDateFilter)}
         >
@@ -591,13 +591,13 @@ export default function LiveOrderTable({
 
         {filters.date === "custom" && (
           <>
-            <input className="h-12 w-full flex-none sm:w-[150px] sm:min-w-[150px] sm:max-w-[150px] rounded-2xl border border-slate-200 bg-white px-3 text-[14px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
+            <input className="h-11 w-full flex-none sm:w-[120px] sm:min-w-[120px] sm:max-w-[120px] rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
               type="date"
               value={filters.customStartDate}
               onChange={(event) => updateFilter("customStartDate", event.target.value)}
               aria-label="시작일"
             />
-            <input className="h-12 w-full flex-none sm:w-[150px] sm:min-w-[150px] sm:max-w-[150px] rounded-2xl border border-slate-200 bg-white px-3 text-[14px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
+            <input className="h-11 w-full flex-none sm:w-[120px] sm:min-w-[120px] sm:max-w-[120px] rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
               type="date"
               value={filters.customEndDate}
               onChange={(event) => updateFilter("customEndDate", event.target.value)}
@@ -606,7 +606,7 @@ export default function LiveOrderTable({
           </>
         )}
 
-        <select className="h-12 w-full flex-none rounded-2xl border border-slate-200 bg-white px-3 text-[14px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50 sm:w-[170px]"
+        <select className="h-11 w-full flex-none rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50 sm:w-[128px]"
           value={filters.status}
           onChange={(event) => updateFilter("status", event.target.value as LiveOrderStatusFilter)}
         >
@@ -618,7 +618,7 @@ export default function LiveOrderTable({
           <option value="card_unpaid">카드 미결제</option>
         </select>
 
-        <input className="h-12 min-w-[260px] flex-1 rounded-2xl border border-slate-200 bg-white px-4 text-[14px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
+        <input className="h-11 min-w-[160px] flex-1 rounded-xl border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
           value={pendingKeyword}
           onChange={(event) => setPendingKeyword(event.target.value)}
           onKeyDown={(event) => {
@@ -627,14 +627,14 @@ export default function LiveOrderTable({
           placeholder="닉네임 / 이름 / 주문내역 검색"
         />
 
-        <button className="h-12 w-full flex-none rounded-2xl bg-blue-600 px-6 text-[14px] font-black text-white shadow-sm hover:bg-blue-700 active:scale-[0.99] sm:w-[130px]"
+        <button className="h-11 w-full flex-none rounded-xl bg-blue-600 px-3 text-[12px] font-black text-white shadow-sm hover:bg-blue-700 active:scale-[0.99] sm:w-[84px]"
           type="button"
           onClick={applyKeyword}
         >
           검색
         </button>
 
-        <button className="h-12 w-full flex-none rounded-2xl border border-slate-200 bg-white px-6 text-[14px] font-black text-slate-600 shadow-sm hover:bg-slate-50 active:scale-[0.99] sm:w-[130px]"
+        <button className="h-11 w-full flex-none rounded-xl border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-600 shadow-sm hover:bg-slate-50 active:scale-[0.99] sm:w-[84px]"
           type="button"
           onClick={resetFilters}
         >
