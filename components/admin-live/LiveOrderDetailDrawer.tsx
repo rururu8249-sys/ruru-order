@@ -203,12 +203,12 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 
 
   return (
-    <aside className="fixed bottom-5 right-5 top-[118px] z-40 flex w-[390px] max-w-[calc(100vw-24px)] flex-col rounded-3xl border border-slate-200 bg-white shadow-2xl">
+    <aside className="fixed bottom-5 right-5 top-[118px] z-40 flex w-[520px] max-w-[calc(100vw-24px)] flex-col rounded-3xl border border-slate-200 bg-white shadow-2xl">
       <header className="shrink-0 border-b border-slate-100 px-4 py-3">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <div className="text-[10px] font-black tracking-[0.18em] text-blue-500">ORDER DETAIL</div>
-            <h2 className="mt-0.5 text-xl font-black tracking-[-0.04em] text-slate-950">주문 상세</h2>
+            <h2 className="mt-0.5 text-lg font-black tracking-[-0.04em] text-slate-950">주문 상세</h2>
           </div>
 
           <button
@@ -249,7 +249,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               type="button"
               onClick={restoreOrder}
               disabled={Boolean(savingAction)}
-              className="h-12 w-full rounded-2xl bg-blue-600 text-sm font-black text-white shadow-sm hover:bg-blue-700 active:scale-[0.99] disabled:bg-slate-300"
+              className="h-10 w-full rounded-xl bg-blue-600 text-[13px] font-black text-white shadow-sm hover:bg-blue-700 active:scale-[0.99] disabled:bg-slate-300"
             >
               {savingAction === "restore" ? "처리중..." : "주문서복구"}
             </button>
@@ -258,7 +258,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               type="button"
               onClick={cancelOrder}
               disabled={Boolean(savingAction)}
-              className="h-12 w-full rounded-2xl border border-red-200 bg-red-50 text-sm font-black text-red-700 shadow-sm hover:bg-red-100 active:scale-[0.99] disabled:bg-slate-100 disabled:text-slate-400"
+              className="h-10 w-full rounded-xl border border-red-200 bg-red-50 text-[13px] font-black text-red-700 shadow-sm hover:bg-red-100 active:scale-[0.99] disabled:bg-slate-100 disabled:text-slate-400"
             >
               {savingAction === "cancel" ? "처리중..." : "주문서취소"}
             </button>
@@ -272,7 +272,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 type="button"
                 onClick={() => handleCardPaymentStatusChange("카드결제완료", "card-paid")}
                 disabled={Boolean(cardStatusAction)}
-                className="h-12 w-full rounded-2xl bg-violet-600 text-sm font-black text-white shadow-sm hover:bg-violet-700 active:scale-[0.99] disabled:bg-slate-300"
+                className="h-10 w-full rounded-xl bg-violet-600 text-[13px] font-black text-white shadow-sm hover:bg-violet-700 active:scale-[0.99] disabled:bg-slate-300"
               >
                 {cardStatusAction === "card-paid" ? "처리중..." : "카드결제완료 처리"}
               </button>
@@ -283,7 +283,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 type="button"
                 onClick={() => handleCardPaymentStatusChange("주문확인전", "card-unpaid")}
                 disabled={Boolean(cardStatusAction)}
-                className="h-12 w-full rounded-2xl border border-rose-200 bg-rose-50 text-sm font-black text-rose-700 shadow-sm hover:bg-rose-100 active:scale-[0.99] disabled:bg-slate-100 disabled:text-slate-400"
+                className="h-10 w-full rounded-xl border border-rose-200 bg-rose-50 text-[13px] font-black text-rose-700 shadow-sm hover:bg-rose-100 active:scale-[0.99] disabled:bg-slate-100 disabled:text-slate-400"
               >
                 {cardStatusAction === "card-unpaid" ? "처리중..." : "카드미결제로 되돌리기"}
               </button>
@@ -295,7 +295,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           <button
             type="button"
             onClick={() => onOpenManualMatch(order)}
-            className="mt-3 h-12 w-full rounded-2xl bg-orange-500 text-sm font-black text-white shadow-sm hover:bg-orange-600 active:scale-[0.99]"
+            className="mt-2 h-10 w-full rounded-xl bg-orange-500 text-[13px] font-black text-white shadow-sm hover:bg-orange-600 active:scale-[0.99]"
           >
             입금확인 열기
           </button>
@@ -336,7 +336,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           <PriceRow label="배송비" value={shippingFee} />
           <div className="my-2 h-px bg-slate-100" />
           <div className="flex items-center justify-between">
-            <span className="text-sm font-black text-slate-600">총 결제예정금액</span>
+            <span className="text-[13px] font-black text-slate-600">총 결제예정금액</span>
             <span className="text-2xl font-black tracking-[-0.05em] text-orange-600">{money(totalAmount)}</span>
           </div>
         </section>

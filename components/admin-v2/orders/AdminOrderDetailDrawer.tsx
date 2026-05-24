@@ -68,14 +68,14 @@ export default function AdminOrderDetailDrawer({
       onClick={onClose}
     >
       <aside
-        className="flex h-full w-full max-w-[1180px] flex-col bg-neutral-50 shadow-[-18px_0_48px_rgba(15,23,42,0.24)]"
+        className="flex h-full w-full max-w-[980px] flex-col bg-neutral-50 shadow-[-18px_0_48px_rgba(15,23,42,0.24)]"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white px-5 py-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-xs font-black text-blue-600">주문 상세 · 빠른처리</div>
-              <h2 className="mt-1 truncate text-2xl font-black tracking-[-0.05em] text-neutral-950">
+              <h2 className="mt-1 truncate text-xl font-black tracking-[-0.05em] text-neutral-950">
                 {nickname}
               </h2>
               <div className="mt-1 flex flex-wrap gap-2 text-xs font-bold text-neutral-500">
@@ -96,7 +96,7 @@ export default function AdminOrderDetailDrawer({
               <button
                 type="button"
                 onClick={onClose}
-                className="h-10 rounded-xl border border-neutral-300 bg-white px-4 text-sm font-black text-neutral-800 active:scale-[0.98]"
+                className="h-9 rounded-xl border border-neutral-300 bg-white px-3 text-[13px] font-black text-neutral-800 active:scale-[0.98]"
               >
                 닫기
               </button>
@@ -125,7 +125,7 @@ export default function AdminOrderDetailDrawer({
             <button
               type="button"
               onClick={onClose}
-              className="h-10 rounded-xl bg-neutral-950 px-5 text-sm font-black text-white active:scale-[0.98]"
+              className="h-9 rounded-xl bg-neutral-950 px-4 text-[13px] font-black text-white active:scale-[0.98]"
             >
               닫기
             </button>

@@ -126,12 +126,12 @@ export default function AdminOrderDetailPriorityPanel({
   };
 
   const buttonBase =
-    "h-12 rounded-xl px-4 text-[14px] font-black active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50";
+    "h-10 rounded-xl px-3 text-[13px] font-black active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
     <section className={`rounded-2xl border p-4 shadow-sm ${chipClass(tone)}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-[260px] flex-1">
+        <div className="min-w-[240px] flex-1">
           <div className="text-[13px] font-black opacity-70">지금 해야 할 일</div>
           <div className="mt-1 text-[26px] font-black tracking-[-0.06em]">
             {title}
@@ -141,7 +141,7 @@ export default function AdminOrderDetailPriorityPanel({
           </div>
         </div>
 
-        <div className="grid min-w-[260px] gap-1.5 rounded-2xl bg-white/80 p-3 text-[13px] font-black">
+        <div className="grid min-w-[240px] gap-1.5 rounded-2xl bg-white/80 p-3 text-[12px] font-black">
           <div className="flex justify-between gap-4">
             <span className="text-neutral-400">주문상태</span>
             <span>{paymentMeta.label}</span>
