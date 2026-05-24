@@ -7,6 +7,7 @@ type RequestBody = {
   orderGroupId?: string | null;
   orderLookupCode?: string | null;
   orderIds?: Array<number | string>;
+  dryRun?: boolean;
 };
 
 const RESTORE_UNPAID_STATUS = "주문확인전";
@@ -133,6 +134,7 @@ export async function POST(request: Request) {
     const orderIds = toNumberArray(body.orderIds);
     const orderGroupId = clean(body.orderGroupId);
     const orderLookupCode = clean(body.orderLookupCode);
+    const dryRun = body.dryRun === true;
 
     if (orderIds.length === 0 && !orderGroupId && !orderLookupCode) {
       return NextResponse.json(
@@ -190,6 +192,29 @@ export async function POST(request: Request) {
       );
     }
 
+    const plannedOrders = targetOrders.map((order) => {
+      const keepCanceled = isCanceledOrder(order);
+
+      return {
+        id: order.id,
+        order_lookup_code: order.order_lookup_code || null,
+        order_group_id: order.order_group_id || null,
+        youtube_nickname: order.youtube_nickname || null,
+        product_name: order.product_name || null,
+        before: {
+          admin_order_status_v2: order.admin_order_status_v2 || null,
+          order_manage_status: order.order_manage_status || null,
+          deposit_confirmed_at: order.deposit_confirmed_at || null,
+        },
+        after: {
+          admin_order_status_v2: keepCanceled ? order.admin_order_status_v2 || null : RESTORE_UNPAID_STATUS,
+          order_manage_status: keepCanceled ? order.order_manage_status || null : RESTORE_UNPAID_STATUS,
+          deposit_confirmed_at: null,
+        },
+        keepCanceled,
+      };
+    });
+
     const orderUpdateResults: AnyRow[] = [];
 
     for (const order of targetOrders) {
@@ -237,6 +262,39 @@ export async function POST(request: Request) {
     }
 
     const linkedDeposits = (deposits || []).filter((deposit) => depositLinkedToOrders(deposit, targetOrders));
+
+    const plannedDeposits = linkedDeposits.map((deposit) => ({
+      id: deposit.id,
+      before: {
+        match_order_group_id: deposit.match_order_group_id || null,
+        match_status: deposit.match_status || null,
+        confirmed_at: deposit.confirmed_at || null,
+        confirmed_note: deposit.confirmed_note || null,
+        match_note: deposit.match_note || null,
+      },
+      after: {
+        match_order_group_id: null,
+        match_status: "미확인",
+        confirmed_at: null,
+        confirmed_note: null,
+        match_note: null,
+      },
+    }));
+
+    if (dryRun) {
+      return NextResponse.json({
+        ok: true,
+        mode: "payment_confirm_cancel_dry_run",
+        dryRun: true,
+        message: "입금확인 취소 미리보기입니다. DB는 변경하지 않았습니다.",
+        restoredStatus: RESTORE_UNPAID_STATUS,
+        orderCount: plannedOrders.length,
+        linkedDepositCount: plannedDeposits.length,
+        plannedOrders,
+        plannedDeposits,
+        note: "dryRun=true 요청은 orders/deposits update를 실행하지 않습니다.",
+      });
+    }
 
     let clearedDepositCount = 0;
 
