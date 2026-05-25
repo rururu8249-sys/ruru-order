@@ -1,5 +1,6 @@
 "use client";
 
+import { showAdminToast } from "@/lib/adminToast";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { LiveOrder } from "./types";
@@ -42,7 +43,7 @@ export function useLiveOrderCancelRestore({
     const rowIds = getOrderRowIds(order);
 
     if (rowIds.length === 0) {
-      alert("상태 변경할 주문 ID가 없습니다.");
+      showAdminToast("상태 변경할 주문 ID가 없습니다.", "warning");
       return;
     }
 
@@ -85,11 +86,11 @@ export function useLiveOrderCancelRestore({
         .in("id", rowIds);
 
       if (error) {
-        alert((isCancel ? "주문서취소 실패" : "주문서복구 실패") + "\n\n" + error.message);
+        showAdminToast((isCancel ? "주문서취소 실패" : "주문서복구 실패") + "\n\n" + error.message, "error");
         return;
       }
 
-      alert(isCancel ? "주문서취소 처리됐습니다." : "주문서복구 처리됐습니다.");
+      showAdminToast(isCancel ? "주문서취소 처리됐습니다." : "주문서복구 처리됐습니다.", "success");
 
       await onAfterStatusChange?.();
       onClose?.();
