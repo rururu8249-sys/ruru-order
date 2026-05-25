@@ -207,8 +207,6 @@ export default function LiveOrderTable({
   onFiltersChange,
   broadcastOptions,
 }: Props) {
-  const [deletingSelectedOrders, setDeletingSelectedOrders] = useState(false);
-
   const [page, setPage] = useState(1);
   const [pendingKeyword, setPendingKeyword] = useState(filters.keyword);
   const [sortMode, setSortMode] = useState<SortMode>("latest");
@@ -574,30 +572,28 @@ export default function LiveOrderTable({
         <table className="w-full table-fixed border-collapse text-sm">
           <thead className="bg-slate-50 text-xs font-black text-slate-500">
             <tr>
-                <th className="w-[48px] px-4 py-3 text-center">
-                </th>
-              <th className="w-[120px] px-4 py-3 text-left">입금확인</th>
-              <th className="w-[96px] px-4 py-3 text-left">제출시간</th>
-              <th className="w-[96px] px-4 py-3 text-left">입금시간</th>
+              <th className="w-[124px] px-4 py-3 text-left">입금확인</th>
+              <th className="w-[88px] px-3 py-3 text-left">제출시간</th>
+              <th className="w-[88px] px-3 py-3 text-left">입금시간</th>
               <th className="w-[150px] px-4 py-3 text-left">닉네임</th>
-              <th className="w-[120px] px-4 py-3 text-left">이름</th>
+              <th className="w-[112px] px-4 py-3 text-left">이름</th>
               <th className="px-4 py-3 text-left">주문내역</th>
-              <th className="w-[82px] px-3 py-3 text-center">총수량</th>
-              <th className="w-[128px] px-4 py-3 text-right">상품금액</th>
-              <th className="w-[104px] px-4 py-3 text-right">배송비</th>
-              <th className="w-[76px] px-3 py-3 text-center">작업</th>
+              <th className="w-[76px] px-3 py-3 text-center">총수량</th>
+              <th className="w-[116px] px-3 py-3 text-right">상품금액</th>
+              <th className="w-[96px] px-3 py-3 text-right">배송비</th>
+              <th className="w-[72px] px-3 py-3 text-center">작업</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr>
-                <td colSpan={10} className="px-3 py-10 text-center text-sm font-black text-slate-400">
+                <td colSpan={9} className="px-3 py-10 text-center text-sm font-black text-slate-400">
                   실제 주문 데이터를 불러오는 중입니다.
                 </td>
               </tr>
             ) : visibleOrders.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-3 py-10 text-center text-sm font-black text-slate-400">
+                <td colSpan={9} className="px-3 py-10 text-center text-sm font-black text-slate-400">
                   표시할 주문이 없습니다.
                 </td>
               </tr>
@@ -606,11 +602,9 @@ export default function LiveOrderTable({
                 const selected = order.id === selectedOrderId;
                 return (
                   <tr key={order.id} className={selected ? "bg-blue-50/70" : "hover:bg-slate-50"}>
-                    <td className="px-4 py-3 text-center" onClick={(event) => event.stopPropagation()}>
-                    </td>
                     <td className="px-4 py-3">{statusBadge(order)}</td>
-                    <td className="px-4 py-3 font-bold text-slate-600">{order.submittedAt}</td>
-                    <td className="px-4 py-3 font-bold text-slate-600">{order.paidAt || "-"}</td>
+                    <td className="px-3 py-3 font-bold text-slate-600">{order.submittedAt}</td>
+                    <td className="px-3 py-3 font-bold text-slate-600">{order.paidAt || "-"}</td>
                     <td className="px-4 py-3">
                       <button
                         type="button"
@@ -629,8 +623,8 @@ export default function LiveOrderTable({
                         총 {getTotalQty(order)}개
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right font-black text-slate-700">{money(order.productAmount)}</td>
-                    <td className="px-4 py-3 text-right font-black text-slate-700">{money(order.shippingFee)}</td>
+                    <td className="px-3 py-3 text-right font-black text-slate-700">{money(order.productAmount)}</td>
+                    <td className="px-3 py-3 text-right font-black text-slate-700">{money(order.shippingFee)}</td>
                     <td className="px-3 py-3 text-center">
                       {order.paymentStatus === "manual_match_needed" && onOpenManualMatch ? (
                         <button
