@@ -1,5 +1,7 @@
 "use client";
 
+import { showAdminToast } from "@/lib/adminToast";
+
 import { useEffect, useMemo, useState } from "react";
 
 export const ORDER_COPY_DONE_STORAGE_KEY = "ruru_admin_live_ops_order_copy_done_ids_v1";
@@ -180,7 +182,7 @@ export default function LiveOpsOrderCopyModal({ open, orders, onClose, onCopied 
 
   const copySelected = async () => {
     if (!selectedOrders.length) {
-      alert("복사할 주문서 알림을 선택해주세요.");
+      showAdminToast("복사할 주문서 알림을 선택해주세요.");
       return;
     }
 
@@ -201,7 +203,7 @@ export default function LiveOpsOrderCopyModal({ open, orders, onClose, onCopied 
       setCopiedText(text);
       onCopied?.(copiedKeys);
     } catch {
-      alert("자동복사에 실패했습니다. 미리보기 문구를 직접 복사해주세요.");
+      showAdminToast("자동복사에 실패했습니다. 미리보기 문구를 직접 복사해주세요.");
       setCopiedText(text);
     } finally {
       setCopying(false);
