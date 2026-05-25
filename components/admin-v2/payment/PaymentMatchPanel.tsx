@@ -8,6 +8,8 @@
 
 "use client";
 
+import { showAdminToast } from "@/lib/adminToast";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DepositRow, OrderGroup } from "@/lib/admin-v2/types";
 import { formatDepositDateTime as formatPaymentDepositDateTime, formatKoreanDateOnly, getPaymentDateKeyOffset, parsePaymentDepositDate, toPaymentDateKey } from "@/components/admin-v2/payment/paymentDateFormatUtils";
@@ -240,7 +242,7 @@ export default function PaymentMatchPanel({
       const result = await response.json().catch(() => null);
 
       if (!response.ok || !result?.ok) {
-        alert("입금내역 조회 실패\n\n" + (result?.message || "알 수 없는 오류"));
+        showAdminToast("입금내역 조회 실패\n\n" + (result?.message || "알 수 없는 오류"), "error");
         return;
       }
 
