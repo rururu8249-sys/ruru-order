@@ -1,5 +1,7 @@
 "use client";
 
+import { showAdminToast } from "@/lib/adminToast";
+
 import { useEffect, useState } from "react";
 
 export default function AdminGate({
@@ -23,7 +25,7 @@ export default function AdminGate({
       localStorage.setItem("ruru_admin_login", "ok");
       setOk(true);
     } else {
-      alert("비밀번호가 틀렸습니다.");
+      showAdminToast("비밀번호가 틀렸습니다.");
     }
   };
 
