@@ -190,14 +190,14 @@ export default function PaymentMatchPanel(_props: Props) {
       <section className="flex flex-col gap-4 rounded-[34px] border border-slate-200 bg-gradient-to-br from-white via-white to-blue-50/40 p-6 shadow-[0_22px_60px_rgba(15,23,42,0.07)] lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-black tracking-[0.18em] text-rose-700">
+            <div className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-black tracking-[0.18em] text-blue-700">
               MG
             </div>
             <div className="text-xs font-black tracking-[0.18em] text-slate-500">
               SAEMAEUL GEUMGO
             </div>
             <div className="text-sm font-black text-slate-300">×</div>
-            <div className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-black tracking-[0.18em] text-blue-700">
+            <div className="inline-flex items-center rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-black tracking-[0.18em] text-orange-700">
               BANKDA
             </div>
           </div>

@@ -77,23 +77,12 @@ export default function DepositDetailModal({ row, onClose }: Props) {
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/35 px-4 py-4 backdrop-blur-sm">
       <div className="flex max-h-[calc(100dvh-32px)] w-full max-w-[680px] flex-col overflow-hidden rounded-[30px] bg-white shadow-[0_30px_100px_rgba(15,23,42,0.35)]">
         <div className="shrink-0 border-b border-slate-100 px-6 py-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
-                읽기전용 상세정보
-              </div>
-              <div className="mt-2 text-2xl font-black tracking-tight text-slate-950">입금 상세정보</div>
-              <div className="mt-1 text-sm font-bold text-slate-400">실제 은행 입금 1건에 대한 상세 기록입니다.</div>
+          <div>
+            <div className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
+              읽기전용 상세정보
             </div>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-slate-200 bg-white text-lg font-black text-slate-500 shadow-sm transition hover:bg-slate-50 hover:text-slate-800"
-              aria-label="닫기"
-            >
-              ×
-            </button>
+            <div className="mt-2 text-2xl font-black tracking-tight text-slate-950">입금 상세정보</div>
+            <div className="mt-1 text-sm font-bold text-slate-400">실제 은행 입금 1건에 대한 상세 기록입니다.</div>
           </div>
 
           <div className="mt-4 grid gap-2 md:grid-cols-3">
@@ -142,18 +131,11 @@ export default function DepositDetailModal({ row, onClose }: Props) {
         </div>
 
         <div className="shrink-0 border-t border-slate-100 bg-white px-6 py-4 shadow-[0_-10px_30px_rgba(15,23,42,0.06)]">
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-600 transition hover:bg-slate-100"
-            >
-              닫기
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-2xl bg-blue-600 px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
+              className="rounded-2xl bg-blue-600 px-7 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
             >
               확인
             </button>

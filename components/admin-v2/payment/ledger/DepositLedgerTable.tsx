@@ -22,6 +22,8 @@ type Props = {
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
+type PaginationItem = number | "ellipsis";
+
 function sortMark(active: boolean, direction: SortDirection) {
   if (!active) return <span className="text-[10px] text-slate-300">↕</span>;
   return <span className="text-[11px] text-blue-600">{direction === "asc" ? "↑" : "↓"}</span>;
@@ -70,6 +72,37 @@ function safePage(currentPage: number, pageCount: number) {
   return Math.min(Math.max(currentPage, 1), pageCount);
 }
 
+function buildPaginationItems(currentPage: number, pageCount: number): PaginationItem[] {
+  if (pageCount <= 7) {
+    return Array.from({ length: pageCount }, (_, index) => index + 1);
+  }
+
+  const pageSet = new Set<number>();
+  pageSet.add(1);
+  pageSet.add(pageCount);
+
+  for (let page = currentPage - 2; page <= currentPage + 2; page += 1) {
+    if (page > 1 && page < pageCount) {
+      pageSet.add(page);
+    }
+  }
+
+  const sortedPages = Array.from(pageSet).sort((a, b) => a - b);
+  const items: PaginationItem[] = [];
+
+  sortedPages.forEach((page, index) => {
+    const previous = sortedPages[index - 1];
+
+    if (previous && page - previous > 1) {
+      items.push("ellipsis");
+    }
+
+    items.push(page);
+  });
+
+  return items;
+}
+
 export default function DepositLedgerTable({
   rows,
   sortKey,
@@ -92,9 +125,9 @@ export default function DepositLedgerTable({
     return rows.slice(start, start + pageSize);
   }, [rows, normalizedPage, pageSize]);
 
-  const pageNumbers = useMemo(() => {
-    return Array.from({ length: pageCount }, (_, index) => index + 1);
-  }, [pageCount]);
+  const pageItems = useMemo(() => {
+    return buildPaginationItems(normalizedPage, pageCount);
+  }, [normalizedPage, pageCount]);
 
   const startCount = rows.length === 0 ? 0 : (normalizedPage - 1) * pageSize + 1;
   const endCount = Math.min(normalizedPage * pageSize, rows.length);
@@ -232,20 +265,33 @@ export default function DepositLedgerTable({
               이전
             </button>
 
-            {pageNumbers.map((page) => (
-              <button
-                key={page}
-                type="button"
-                onClick={() => setCurrentPage(page)}
-                className={`h-9 min-w-9 rounded-xl px-3 text-xs font-black transition ${
-                  normalizedPage === page
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
-                }`}
-              >
-                {page}
-              </button>
-            ))}
+            {pageItems.map((item, index) => {
+              if (item === "ellipsis") {
+                return (
+                  <span
+                    key={`ellipsis-${index}`}
+                    className="grid h-9 min-w-9 place-items-center rounded-xl px-2 text-xs font-black text-slate-300"
+                  >
+                    ...
+                  </span>
+                );
+              }
+
+              return (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setCurrentPage(item)}
+                  className={`h-9 min-w-9 rounded-xl px-3 text-xs font-black transition ${
+                    normalizedPage === item
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                  }`}
+                >
+                  {item}
+                </button>
+              );
+            })}
 
             <button
               type="button"
