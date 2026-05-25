@@ -54,6 +54,7 @@ import OrderKakaoNicknameNotice from "@/components/order/OrderKakaoNicknameNotic
 import CustomerBlockedNotice from "@/components/customer/CustomerBlockedNotice";
 import CustomerToastNotice from "@/components/customer/CustomerToastNotice";
 import CustomerManualAddressPanel from "@/components/customer/CustomerManualAddressPanel";
+import CustomerMissingDetailAddressPanel from "@/components/customer/CustomerMissingDetailAddressPanel";
 
 declare global {
   interface Window {
@@ -290,6 +291,7 @@ export default function OrderPage() {
     }
   };
   const [manualAddressOpen, setManualAddressOpen] = useState(false);
+  const [missingDetailAddressConfirmOpen, setMissingDetailAddressConfirmOpen] = useState(false);
   const [showDepositConfirmModal, setShowDepositConfirmModal] = useState(false);
   const PRIVACY_CONSENT_VERSION = "2026-05-24-v1";
   const PRIVACY_CONSENT_STORAGE_KEY = "ruru_privacy_consent_version";
@@ -1361,7 +1363,7 @@ export default function OrderPage() {
     }
   };
 
-  const validate = () => {
+  const validate = (options?: { allowMissingDetailAddress?: boolean }) => {
     const cleanPhone = normalizePhone(customerPhone);
 
     if (!youtubeNickname.trim()) {
@@ -1385,14 +1387,9 @@ export default function OrderPage() {
       return false;
     }
 
-    if (!detailAddress.trim()) {
-      const ok = confirm(
-        "상세주소가 비어 있습니다.\n\n아파트/빌라/오피스텔은 동·호수 누락 시 배송이 지연될 수 있습니다.\n\n정말 상세주소 없이 제출할까요?"
-      );
-
-      if (!ok) {
-        return false;
-      }
+    if (!detailAddress.trim() && !options?.allowMissingDetailAddress) {
+      setMissingDetailAddressConfirmOpen(true);
+      return false;
     }
 
     const validItems = items.filter(
@@ -1453,7 +1450,7 @@ export default function OrderPage() {
     return true;
   };
 
-  const submitOrder = async () => {
+  const submitOrder = async (options?: { allowMissingDetailAddress?: boolean }) => {
     const blockCheck = await refreshCustomerBlockStatus(customerPhone);
 
     if (blockCheck.blocked) {
@@ -1461,7 +1458,7 @@ export default function OrderPage() {
       return;
     }
 
-    if (!validate()) return;
+    if (!validate(options)) return;
 
     if (!hasPrivacyConsent && privacyConsentChecked && typeof window !== "undefined") {
       window.localStorage.setItem(PRIVACY_CONSENT_STORAGE_KEY, PRIVACY_CONSENT_VERSION);
@@ -1596,6 +1593,11 @@ export default function OrderPage() {
     }
 
     setSubmitting(false);
+  };
+
+  const submitOrderWithoutDetailAddress = async () => {
+    setMissingDetailAddressConfirmOpen(false);
+    await submitOrder({ allowMissingDetailAddress: true });
   };
 
   const copyBankAccount = async () => {
@@ -1987,6 +1989,12 @@ export default function OrderPage() {
               defaultValue={address}
               onClose={() => setManualAddressOpen(false)}
               onSubmit={applyManualAddress}
+            />
+
+            <CustomerMissingDetailAddressPanel
+              open={missingDetailAddressConfirmOpen}
+              onClose={() => setMissingDetailAddressConfirmOpen(false)}
+              onConfirm={submitOrderWithoutDetailAddress}
             />
 
             {customerBlockStatus.blocked ? (
