@@ -189,12 +189,27 @@ export default function PaymentMatchPanel(_props: Props) {
     <div className="mx-auto grid w-full max-w-[1440px] gap-5">
       <section className="flex flex-col gap-4 rounded-[34px] border border-slate-200 bg-gradient-to-br from-white via-white to-blue-50/40 p-6 shadow-[0_22px_60px_rgba(15,23,42,0.07)] lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <div className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
-            BANKDA DEPOSIT LEDGER
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-black tracking-[0.18em] text-rose-700">
+              MG
+            </div>
+            <div className="text-xs font-black tracking-[0.18em] text-slate-500">
+              SAEMAEUL GEUMGO
+            </div>
+            <div className="text-sm font-black text-slate-300">×</div>
+            <div className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-black tracking-[0.18em] text-blue-700">
+              BANKDA
+            </div>
           </div>
+
+          <div className="mt-2 text-[11px] font-black tracking-[0.22em] text-slate-400">
+            SAEMAEUL GEUMGO BANK DEPOSIT SYNC
+          </div>
+
           <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-950">입금내역</h1>
+
           <p className="mt-2 text-sm font-bold text-slate-500">
-            뱅크다에서 가져온 실제 은행 입금내역을 확인합니다. 연결/처리 정보는 상세 버튼에서만 표시합니다.
+            Saemaeul Geumgo deposit records synced through BANKDA. 연결/처리 정보는 상세 버튼에서만 표시합니다.
           </p>
         </div>
 
