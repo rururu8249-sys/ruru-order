@@ -56,9 +56,12 @@ export function formatDateLabel(value: unknown) {
   const key = toDateKey(value);
   if (!key) return "날짜없음";
 
-  const [, month, day] = key.split("-");
+  const [year, month, day] = key.split("-").map((part) => Number(part));
+  const weekdayNames = ["일", "월", "화", "수", "목", "금", "토"];
+  const date = new Date(year, month - 1, day);
+  const weekday = Number.isFinite(date.getTime()) ? weekdayNames[date.getDay()] : "";
 
-  return `${Number(month)}월 ${Number(day)}일`;
+  return `${month}월 ${day}일${weekday ? `(${weekday})` : ""}`;
 }
 
 export function rowStatusText(row: AnyRow) {
