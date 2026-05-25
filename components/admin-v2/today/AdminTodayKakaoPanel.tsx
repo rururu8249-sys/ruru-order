@@ -1,5 +1,6 @@
 "use client";
 
+import { showAdminToast } from "@/lib/adminToast";
 // components/admin-v2/today/AdminTodayKakaoPanel.tsx
 // 목적: 오늘할일에서 카톡 대화 붙여넣기 + 이슈태그 선택 + ChatGPT 분석문구 복사
 // 중요:
@@ -187,14 +188,14 @@ export default function AdminTodayKakaoPanel({
 
   const registerTodayTaskFromItem = async (item: KakaoTimelineItem) => {
     if (item.role !== "customer") {
-      alert("고객 문의만 오늘할일에 등록할 수 있습니다.");
+      showAdminToast("고객 문의만 오늘할일에 등록할 수 있습니다.");
       return;
     }
 
     const cleanText = String(item.content || "").trim();
 
     if (!cleanText) {
-      alert("등록할 고객 문의 내용이 없습니다.");
+      showAdminToast("등록할 고객 문의 내용이 없습니다.");
       return;
     }
 
@@ -259,24 +260,24 @@ export default function AdminTodayKakaoPanel({
     const result = await response.json().catch(() => null);
 
     if (!response.ok || !result?.ok) {
-      alert("오늘할일 등록 실패\\n\\n" + (result?.message || "알 수 없는 오류"));
+      showAdminToast("오늘할일 등록 실패\\n\\n" + (result?.message || "알 수 없는 오류"));
       return;
     }
 
     setSelectedIssueTags([]);
     window.dispatchEvent(new CustomEvent("ruru-admin-task-created"));
-    alert("오늘할일에 등록했습니다. 처리완료 전까지 계속 표시됩니다.");
+    showAdminToast("오늘할일에 등록했습니다. 처리완료 전까지 계속 표시됩니다.");
   };
 
 
   const saveMemo = async () => {
     if (!analysisSourceText.trim() && !kakaoDisplayName.trim()) {
-      alert("고객 메시지 또는 카톡 이름/닉네임을 입력해주세요.");
+      showAdminToast("고객 메시지 또는 카톡 이름/닉네임을 입력해주세요.");
       return;
     }
 
     if (!selectedCustomer) {
-      alert("연결할 고객을 선택해주세요. 닉네임/이름으로 직접 검색 후 선택할 수 있습니다.");
+      showAdminToast("연결할 고객을 선택해주세요. 닉네임/이름으로 직접 검색 후 선택할 수 있습니다.");
       return;
     }
 
@@ -392,5 +393,3 @@ export default function AdminTodayKakaoPanel({
     </section>
   );
 }
-
-

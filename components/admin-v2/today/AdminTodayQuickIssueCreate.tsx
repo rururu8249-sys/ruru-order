@@ -1,8 +1,10 @@
+"use client";
+
+import { showAdminToast } from "@/lib/adminToast";
 // components/admin-v2/today/AdminTodayQuickIssueCreate.tsx
 // 목적: 오늘할일 오른쪽 상단 고객이슈 빠른등록
 // 주의: 주문/입금/배송/정산 상태 변경 없음. admin_tasks 등록만 수행.
 
-"use client";
 
 import { useMemo, useState } from "react";
 import type { CustomerRow, OrderGroup } from "@/lib/admin-v2/types";
@@ -177,17 +179,17 @@ export default function AdminTodayQuickIssueCreate({ customers, groups }: Props)
 
   const saveIssue = async () => {
     if (!nickname.trim() && !name.trim() && !phone.trim()) {
-      alert("고객을 검색해서 선택하거나 닉네임/이름/전화번호를 입력해주세요.");
+      showAdminToast("고객을 검색해서 선택하거나 닉네임/이름/전화번호를 입력해주세요.");
       return;
     }
 
     if (selectedTypes.length === 0) {
-      alert("이슈 유형을 1개 이상 선택해주세요.");
+      showAdminToast("이슈 유형을 1개 이상 선택해주세요.");
       return;
     }
 
     if (!memo.trim()) {
-      alert("고객이슈 내용을 입력해주세요.");
+      showAdminToast("고객이슈 내용을 입력해주세요.");
       return;
     }
 
@@ -231,12 +233,12 @@ export default function AdminTodayQuickIssueCreate({ customers, groups }: Props)
       const result = await response.json().catch(() => null);
 
       if (!response.ok || !result?.ok) {
-        alert("고객이슈 등록 실패\n\n" + (result?.message || "알 수 없는 오류"));
+        showAdminToast("고객이슈 등록 실패\n\n" + (result?.message || "알 수 없는 오류"));
         return;
       }
 
       window.dispatchEvent(new Event("ruru-admin-task-created"));
-      alert("고객이슈를 등록했습니다.");
+      showAdminToast("고객이슈를 등록했습니다.");
 
       setMemo("");
       setSelectedTypes([]);
