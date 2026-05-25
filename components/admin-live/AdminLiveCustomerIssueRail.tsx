@@ -5,6 +5,7 @@
 // 주의: 주문/입금/배송/정산 상태 변경 없음. 고객이슈 admin_tasks 조회/등록/수정만 처리.
 
 import { useEffect, useMemo, useState } from "react";
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 import { CUSTOMER_TERMS } from "./adminLiveCustomerTerms";
 
@@ -329,10 +330,14 @@ function IssueCard({
   task,
   index,
   onEdit,
+  onResolve,
+  onHide,
 }: {
   task: AdminIssueTask;
   index: number;
   onEdit: (task: AdminIssueTask) => void;
+  onResolve: (task: AdminIssueTask) => void | Promise<void>;
+  onHide: (task: AdminIssueTask) => void | Promise<void>;
 }) {
   const done = isResolved(task);
   const rows = issueRows(task);
@@ -376,13 +381,34 @@ function IssueCard({
           <div className="mt-0.5 text-[11px] font-black text-slate-400">{dateLabel(task.created_at)}</div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => onEdit(task)}
-          className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-black text-slate-600 hover:bg-slate-50"
-        >
-          수정
-        </button>
+        <div className="flex shrink-0 flex-col gap-1.5">
+          <button
+            type="button"
+            onClick={() => onEdit(task)}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-black text-slate-600 hover:bg-slate-50"
+          >
+            수정
+          </button>
+
+          {done ? (
+            <button
+              type="button"
+              onClick={() => onHide(task)}
+              className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-[11px] font-black text-red-600 hover:bg-red-100"
+              title="DB 완전삭제가 아니라 해결목록 숨김 처리"
+            >
+              목록삭제
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onResolve(task)}
+              className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-[11px] font-black text-emerald-700 hover:bg-emerald-100"
+            >
+              해결완료
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="mt-3 rounded-2xl bg-white/70 px-3 py-2 ring-1 ring-white">
@@ -585,6 +611,78 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     }
   };
 
+  const resolveIssueTask = async (task: AdminIssueTask) => {
+    const id = clean(task.id);
+
+    if (!id) {
+      showAdminToast("해결 처리할 고객이슈 ID가 없습니다.");
+      return;
+    }
+
+    const ok = await showAdminConfirm("이 고객이슈를 해결완료 처리할까요?");
+    if (!ok) return;
+
+    const response = await fetch("/api/admin-v2/admin-tasks", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        id,
+        action: "resolve",
+        resolved_note: "고객관리에서 해결완료 처리",
+      }),
+    });
+
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok || !payload?.ok) {
+      showAdminToast("해결완료 처리 실패\n" + (payload?.message || "알 수 없는 오류"));
+      return;
+    }
+
+    setIssuePage(1);
+    setReloadKey((value) => value + 1);
+    window.dispatchEvent(new Event("ruru-admin-task-updated"));
+    showAdminToast("고객이슈를 해결완료 처리했습니다.");
+  };
+
+  const hideResolvedIssueTask = async (task: AdminIssueTask) => {
+    const id = clean(task.id);
+
+    if (!id) {
+      showAdminToast("목록삭제 처리할 고객이슈 ID가 없습니다.");
+      return;
+    }
+
+    const ok = await showAdminConfirm("해결완료 목록에서 이 고객이슈를 삭제할까요?\n\nDB 완전삭제가 아니라 목록 숨김 처리됩니다.");
+    if (!ok) return;
+
+    const response = await fetch("/api/admin-v2/admin-tasks", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        id,
+        action: "hide",
+        resolved_note: "고객관리에서 해결완료 목록 숨김삭제",
+      }),
+    });
+
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok || !payload?.ok) {
+      showAdminToast("목록삭제 처리 실패\n" + (payload?.message || "알 수 없는 오류"));
+      return;
+    }
+
+    setIssuePage(1);
+    setReloadKey((value) => value + 1);
+    window.dispatchEvent(new Event("ruru-admin-task-updated"));
+    showAdminToast("해결완료 목록에서 숨김 처리했습니다.");
+  };
+
   const saveEditedIssueMemo = async () => {
     const task = editingIssueTask;
 
@@ -709,7 +807,14 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           </div>
         ) : (
           pageTasks.map((task, index) => (
-            <IssueCard key={taskKey(task, index)} task={task} index={index} onEdit={openEdit} />
+            <IssueCard
+              key={taskKey(task, index)}
+              task={task}
+              index={index}
+              onEdit={openEdit}
+              onResolve={resolveIssueTask}
+              onHide={hideResolvedIssueTask}
+            />
           ))
         )}
       </div>
@@ -749,7 +854,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       </div>
 
       <div className="mt-4 rounded-2xl bg-blue-50 p-3 text-[12px] font-bold leading-relaxed text-blue-700">
-        고객이슈는 이 화면에서 메모 추가/수정이 가능합니다. 해결완료·삭제 처리는 기존 오늘할일/이슈 관리 흐름을 유지합니다.
+        고객이슈는 이 화면에서 메모 추가/수정/해결완료 처리가 가능합니다. 해결된 목록삭제는 DB 완전삭제가 아니라 숨김 처리입니다.
       </div>
 
       {showMemoAdd && (
