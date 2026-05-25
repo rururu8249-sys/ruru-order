@@ -51,6 +51,18 @@ type DirectPhoneBlock = {
   updated_at?: string;
 };
 
+type BlockedCustomerListItem =
+  | {
+      type: "phone";
+      key: string;
+      block: DirectPhoneBlock;
+    }
+  | {
+      type: "customer";
+      key: string;
+      customer: CustomerSummary;
+    };
+
 const CUSTOMER_PAGE_SIZE = 20;
 const DETAIL_ORDER_PAGE_SIZE = 6;
 
@@ -517,6 +529,8 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
   const [showBlockedCustomers, setShowBlockedCustomers] = useState(false);
   const [blockedCustomerKeywordDraft, setBlockedCustomerKeywordDraft] = useState("");
   const [blockedCustomerKeyword, setBlockedCustomerKeyword] = useState("");
+  const [blockedCustomerPageSize, setBlockedCustomerPageSize] = useState(10);
+  const [blockedCustomerPage, setBlockedCustomerPage] = useState(1);
   const [directPhoneBlocks, setDirectPhoneBlocks] = useState<DirectPhoneBlock[]>([]);
 
   useEffect(() => {
@@ -688,6 +702,30 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
       .includes(searchText);
   });
   const filteredBlockedTotalCount = filteredBlockedCustomers.length + filteredStandalonePhoneBlocks.length;
+  const blockedCustomerRows: BlockedCustomerListItem[] = [
+    ...filteredStandalonePhoneBlocks.map((block) => ({
+      type: "phone" as const,
+      key: `phone-block-${digitsOnly(block.phone)}`,
+      block,
+    })),
+    ...filteredBlockedCustomers.map((customer) => ({
+      type: "customer" as const,
+      key: `customer-${customer.key}`,
+      customer,
+    })),
+  ];
+  const blockedCustomerTotalPages = Math.max(1, Math.ceil(blockedCustomerRows.length / blockedCustomerPageSize));
+  const safeBlockedCustomerPage = Math.min(Math.max(1, blockedCustomerPage), blockedCustomerTotalPages);
+  const visibleBlockedCustomerRows = blockedCustomerRows.slice(
+    (safeBlockedCustomerPage - 1) * blockedCustomerPageSize,
+    safeBlockedCustomerPage * blockedCustomerPageSize
+  );
+  const visibleStandalonePhoneBlocks = visibleBlockedCustomerRows.flatMap((item) =>
+    item.type === "phone" ? [item.block] : []
+  );
+  const visibleBlockedCustomers = visibleBlockedCustomerRows.flatMap((item) =>
+    item.type === "customer" ? [item.customer] : []
+  );
   const attentionCustomers = customers.filter((customer) => customer.manualNeededCount > 0 || customer.unpaidCount > 0);
 
   const openDetail = (customer: CustomerSummary) => {
@@ -837,6 +875,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
             onClick={() => {
               setBlockedCustomerKeywordDraft("");
               setBlockedCustomerKeyword("");
+              setBlockedCustomerPage(1);
               setShowBlockedCustomers(true);
             }}
             className="text-left"
@@ -1028,6 +1067,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
                   setShowBlockedCustomers(false);
                   setBlockedCustomerKeywordDraft("");
                   setBlockedCustomerKeyword("");
+                  setBlockedCustomerPage(1);
                 }}
                 className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 hover:bg-slate-50"
               >
@@ -1043,6 +1083,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
                       setBlockedCustomerKeyword(blockedCustomerKeywordDraft);
+                      setBlockedCustomerPage(1);
                     }
                   }}
                   placeholder="닉네임 / 이름 / 전화번호 / 주소 / 차단사유 검색"
@@ -1051,7 +1092,10 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
 
                 <button
                   type="button"
-                  onClick={() => setBlockedCustomerKeyword(blockedCustomerKeywordDraft)}
+                  onClick={() => {
+                    setBlockedCustomerKeyword(blockedCustomerKeywordDraft);
+                    setBlockedCustomerPage(1);
+                  }}
                   className="h-11 rounded-xl bg-slate-900 px-3 text-sm font-black text-white hover:bg-slate-700"
                 >
                   검색
@@ -1062,6 +1106,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
                   onClick={() => {
                     setBlockedCustomerKeywordDraft("");
                     setBlockedCustomerKeyword("");
+                    setBlockedCustomerPage(1);
                   }}
                   className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-600 hover:bg-slate-50"
                 >
@@ -1069,8 +1114,48 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
                 </button>
               </div>
 
-              <div className="mt-2 text-xs font-black text-slate-400">
-                표시 {filteredBlockedTotalCount.toLocaleString("ko-KR")}명 / 전체 {blockedTotalCount.toLocaleString("ko-KR")}명
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs font-black text-slate-400">
+                  현재페이지 {visibleBlockedCustomerRows.length.toLocaleString("ko-KR")}명 · 검색결과{" "}
+                  {filteredBlockedTotalCount.toLocaleString("ko-KR")}명 / 전체 {blockedTotalCount.toLocaleString("ko-KR")}명
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={blockedCustomerPageSize}
+                    onChange={(event) => {
+                      setBlockedCustomerPageSize(Number(event.target.value));
+                      setBlockedCustomerPage(1);
+                    }}
+                    className="h-9 rounded-xl border border-slate-200 bg-white px-2 text-xs font-black text-slate-600"
+                  >
+                    <option value={10}>10개 보기</option>
+                    <option value={20}>20개 보기</option>
+                    <option value={50}>50개 보기</option>
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={() => setBlockedCustomerPage(Math.max(1, safeBlockedCustomerPage - 1))}
+                    disabled={safeBlockedCustomerPage <= 1}
+                    className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                  >
+                    이전
+                  </button>
+
+                  <div className="h-9 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white">
+                    {safeBlockedCustomerPage} / {blockedCustomerTotalPages}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setBlockedCustomerPage(Math.min(blockedCustomerTotalPages, safeBlockedCustomerPage + 1))}
+                    disabled={safeBlockedCustomerPage >= blockedCustomerTotalPages}
+                    className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                  >
+                    다음
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1085,7 +1170,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
                 </div>
               ) : (
                 <>
-                  {filteredStandalonePhoneBlocks.map((block) => (
+                  {visibleStandalonePhoneBlocks.map((block) => (
                     <div
                       key={`phone-block-${digitsOnly(block.phone)}`}
                       className="rounded-2xl border border-red-100 bg-red-50/60 p-4"
@@ -1130,7 +1215,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
                     </div>
                   ))}
 
-                  {filteredBlockedCustomers.map((customer) => (
+                  {visibleBlockedCustomers.map((customer) => (
                   <div
                     key={`blocked-${customer.key}`}
                     className="rounded-2xl border border-red-100 bg-red-50/60 p-4"
