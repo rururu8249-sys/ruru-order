@@ -1,5 +1,7 @@
 "use client";
 
+import { showAdminToast } from "@/lib/adminToast";
+
 // components/admin-v2/today/AdminTodayDashboard.tsx
 // 목적: 루루동이LIVE Control Center 실무형 관제탑
 // 주의: UI/조회/계산 전용. 주문 저장, 입금매칭 저장, 정산 저장, 배송비 계산 변경 없음.
@@ -208,7 +210,7 @@ export default function AdminTodayDashboard({
     const targetGroup = orderGroups.find((group) => group.groupId === groupId);
 
     if (!targetGroup) {
-      alert("입금매칭할 주문 정보를 찾지 못했습니다. 주문관리에서 다시 확인해주세요.");
+      showAdminToast("입금매칭할 주문 정보를 찾지 못했습니다. 주문관리에서 다시 확인해주세요.");
       return;
     }
 
