@@ -1894,7 +1894,7 @@ const selectedCustomerDetail = useMemo(() => {
 
   const hideSelectedOrders = async () => {
     if (selectedOrderGroupIds.length === 0) {
-      alert("숨길 주문을 먼저 체크해주세요.");
+      showAdminToast("숨길 주문을 먼저 체크해주세요.", "warning");
       return;
     }
 
@@ -1910,7 +1910,7 @@ const selectedCustomerDetail = useMemo(() => {
       .filter((id): id is string | number => id !== undefined);
 
     if (targetIds.length === 0) {
-      alert("숨길 주문 ID를 찾지 못했습니다.");
+      showAdminToast("숨길 주문 ID를 찾지 못했습니다.", "warning");
       return;
     }
 
@@ -1920,11 +1920,11 @@ const selectedCustomerDetail = useMemo(() => {
       .in("id", targetIds);
 
     if (error) {
-      alert("주문 숨김 실패\n\n" + error.message);
+      showAdminToast("주문 숨김 실패\n\n" + error.message, "error");
       return;
     }
 
-    alert("선택 주문을 숨김 처리했습니다.");
+    showAdminToast("선택 주문을 숨김 처리했습니다.", "success");
     setSelectedOrderGroupIds([]);
     await loadOrders();
   };
