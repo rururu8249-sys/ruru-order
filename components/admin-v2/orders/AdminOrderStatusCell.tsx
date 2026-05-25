@@ -1,5 +1,7 @@
 "use client";
 
+import { showAdminToast } from "@/lib/adminToast";
+
 import AdminOrderCriticalFlag from "@/components/admin-v2/orders/AdminOrderCriticalFlag";
 import {
   getDeliveryStageStatusLabel,
@@ -42,7 +44,7 @@ export default function AdminOrderStatusCell({
     if (nextStatus === stageValue) return;
 
     if (nextStatus === "미설정" && normalizedStatus !== "미설정") {
-      alert("배송처리단계를 미설정으로 되돌리는 작업은 결제상태에 영향이 있을 수 있어 상세에서만 처리해주세요.");
+      showAdminToast("배송처리단계를 미설정으로 되돌리는 작업은 결제상태에 영향이 있을 수 있어 상세에서만 처리해주세요.", "warning");
       return;
     }
 
