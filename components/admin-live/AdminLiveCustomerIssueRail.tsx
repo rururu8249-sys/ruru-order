@@ -218,7 +218,30 @@ function getIssueText(task: AdminIssueTask) {
 }
 
 function getFullMemo(task: AdminIssueTask) {
-  return cleanMultiline(task.body) || getIssueText(task);
+  const text = cleanMultiline(task.body);
+
+  if (!text) return getIssueText(task);
+
+  const metaPrefixes = [
+    "자동날짜:",
+    "이슈유형:",
+    "닉네임:",
+    "이름:",
+    "전화번호:",
+    "고객ID:",
+    "수정날짜:",
+    "주문내용:",
+  ];
+
+  const memoLines = text
+    .split(/\n+/)
+    .map((line) => clean(line))
+    .filter(Boolean)
+    .filter((line) => !metaPrefixes.some((prefix) => line.startsWith(prefix)))
+    .map((line) => line.replace(/^(내용|메모):\s*/, "").trim())
+    .filter(Boolean);
+
+  return memoLines.join("\n").trim() || getIssueText(task);
 }
 
 function pad2(value: number) {
@@ -626,7 +649,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   };
 
   return (
-    <aside className="flex h-full min-h-[calc(100vh-220px)] flex-col rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
+    <aside className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-[11px] font-black tracking-[0.18em] text-blue-500">CUSTOMER ISSUE</div>
@@ -675,7 +698,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
         ))}
       </div>
 
-      <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+      <div className="mt-4 max-h-[720px] space-y-3 overflow-y-auto pr-1">
         {loading ? (
           <div className="rounded-2xl bg-slate-50 p-6 text-center text-sm font-black text-slate-400">
             고객이슈 불러오는 중...
@@ -891,7 +914,10 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
                 <div className="text-[11px] font-black tracking-[0.18em] text-blue-500">EDIT CUSTOMER ISSUE</div>
                 <h3 className="mt-1 text-lg font-black text-slate-950">고객이슈 메모 수정</h3>
                 <p className="mt-1 text-xs font-bold text-slate-500">
-                  {getNickname(editingIssueTask)} · {formatPhone(getPhone(editingIssueTask))}
+                  {getNickname(editingIssueTask)} / {getName(editingIssueTask)}
+                </p>
+                <p className="mt-1 text-[11px] font-bold text-blue-600">
+                  고객정보는 수정하지 않고 이슈유형·우선순위·메모만 수정합니다.
                 </p>
               </div>
 
