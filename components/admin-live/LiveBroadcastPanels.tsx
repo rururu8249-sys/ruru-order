@@ -1,5 +1,7 @@
 "use client";
 
+import { showAdminToast } from "@/lib/adminToast";
+
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { CustomerRow } from "@/lib/admin-v2/types";
@@ -428,7 +430,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
     const keyword = customerKeyword.trim();
 
     if (keyword.length < 1) {
-      alert("검색어를 입력해주세요.");
+      showAdminToast("검색어를 입력해주세요.");
       return;
     }
 
@@ -454,7 +456,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
         .limit(8);
 
       if (error) {
-        alert("고객 검색 실패\n\n" + error.message);
+        showAdminToast("고객 검색 실패\n\n" + error.message);
         setCustomerResults([]);
         return;
       }
@@ -486,14 +488,14 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
 
   const saveIssueMemo = async () => {
     if (!selectedCustomer) {
-      alert("고객을 먼저 선택해주세요.");
+      showAdminToast("고객을 먼저 선택해주세요.");
       return;
     }
 
     const memo = memoText.trim();
 
     if (!memo) {
-      alert("메모 내용을 입력해주세요.");
+      showAdminToast("메모 내용을 입력해주세요.");
       return;
     }
 
@@ -545,7 +547,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
       const payload = await response.json().catch(() => null);
 
       if (!response.ok || !payload?.ok) {
-        alert("고객이슈 저장 실패\n\n" + (payload?.message || "알 수 없는 오류"));
+        showAdminToast("고객이슈 저장 실패\n\n" + (payload?.message || "알 수 없는 오류"));
         return;
       }
 
@@ -562,7 +564,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
     const id = taskId(task);
 
     if (!id) {
-      alert("해결 처리할 이슈 ID가 없습니다.");
+      showAdminToast("해결 처리할 이슈 ID가 없습니다.");
       return;
     }
 
@@ -583,7 +585,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
     const payload = await response.json().catch(() => null);
 
     if (!response.ok || !payload?.ok) {
-      alert("해결완료 처리 실패\n\n" + (payload?.message || "알 수 없는 오류"));
+      showAdminToast("해결완료 처리 실패\n\n" + (payload?.message || "알 수 없는 오류"));
       return;
     }
 
@@ -595,7 +597,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
     const id = taskId(task);
 
     if (!id) {
-      alert("삭제 처리할 이슈 ID가 없습니다.");
+      showAdminToast("삭제 처리할 이슈 ID가 없습니다.");
       return;
     }
 
@@ -616,7 +618,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
     const payload = await response.json().catch(() => null);
 
     if (!response.ok || !payload?.ok) {
-      alert("삭제 처리 실패\n\n" + (payload?.message || "알 수 없는 오류"));
+      showAdminToast("삭제 처리 실패\n\n" + (payload?.message || "알 수 없는 오류"));
       return;
     }
 
@@ -628,7 +630,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
     const id = taskId(task);
 
     if (!id) {
-      alert("수정할 이슈 ID가 없습니다.");
+      showAdminToast("수정할 이슈 ID가 없습니다.");
       return;
     }
 
@@ -640,7 +642,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
     const memo = editedMemo.trim();
 
     if (!memo) {
-      alert("메모 내용은 비워둘 수 없습니다.");
+      showAdminToast("메모 내용은 비워둘 수 없습니다.");
       return;
     }
 
@@ -662,7 +664,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
     const payload = await response.json().catch(() => null);
 
     if (!response.ok || !payload?.ok) {
-      alert("고객이슈 수정 실패\n\n" + (payload?.message || "알 수 없는 오류"));
+      showAdminToast("고객이슈 수정 실패\n\n" + (payload?.message || "알 수 없는 오류"));
       return;
     }
 
