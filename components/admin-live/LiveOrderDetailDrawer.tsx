@@ -16,7 +16,7 @@ type Props = {
 };
 
 function money(value: unknown) {
-  return `₩${Number(value || 0).toLocaleString()}`;
+  return `${Number(value || 0).toLocaleString()}원`;
 }
 
 function clean(value: unknown) {
@@ -29,6 +29,43 @@ function getItemName(item: LiveOrderItem) {
 
 function getItemOption(item: LiveOrderItem) {
   return clean(item.optionText) || "옵션 없음";
+}
+
+function getCustomerAddress(order: LiveOrder) {
+  const row = order as LiveOrder & {
+    address?: string | null;
+    detailAddress?: string | null;
+    detail_address?: string | null;
+    customerAddress?: string | null;
+    shippingAddress?: string | null;
+  };
+
+  const baseAddress = clean(row.address) || clean(row.customerAddress) || clean(row.shippingAddress);
+  const detailAddress = clean(row.detailAddress) || clean(row.detail_address);
+
+  return [baseAddress, detailAddress].filter(Boolean).join(" ");
+}
+
+function getCustomerDeliveryMemo(order: LiveOrder) {
+  const row = order as LiveOrder & {
+    deliveryMemo?: string | null;
+    requestMemo?: string | null;
+    request_memo?: string | null;
+    shippingMemo?: string | null;
+    shipping_memo?: string | null;
+    specialNote?: string | null;
+    special_note?: string | null;
+  };
+
+  return (
+    clean(row.deliveryMemo) ||
+    clean(row.requestMemo) ||
+    clean(row.request_memo) ||
+    clean(row.shippingMemo) ||
+    clean(row.shipping_memo) ||
+    clean(row.specialNote) ||
+    clean(row.special_note)
+  );
 }
 
 function formatFullDateTime(value: string | null | undefined, fallback?: string | null) {
@@ -142,6 +179,8 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     (orderForView.paymentStatus === "canceled" && Boolean(orderForView.paidAtFull));
 
   const showCardStatusActions = !isCanceled && isCardOrder && (isCardPaid || isCardUnpaid);
+  const customerAddressText = getCustomerAddress(orderForView);
+  const customerDeliveryMemoText = getCustomerDeliveryMemo(orderForView);
 
   const { savingAction, cancelOrder, restoreOrder } = useLiveOrderCancelRestore({
     order: orderForView,
@@ -278,6 +317,12 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        <section className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+          <div className="text-[11px] font-black text-slate-400">배송주소</div>
+          <div className="mt-1 whitespace-pre-wrap break-keep text-sm font-bold leading-5 text-slate-900">
+            {customerAddressText || "주소 정보 없음"}
+          </div>
+        </section>
         <section className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
           <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
             <Info label="닉네임" value={orderForView.nickname || "-"} strong />
@@ -444,7 +489,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         <section className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
           <h3 className="mb-2 text-sm font-black text-slate-950">배송메모 / 특이사항</h3>
           <div className="min-h-[74px] rounded-2xl bg-slate-50 p-3 text-sm font-bold leading-6 text-slate-600">
-            {orderForView.memo || "-"}
+            {customerDeliveryMemoText || "입력 없음"}
           </div>
         </section>
       </div>

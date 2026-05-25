@@ -28,11 +28,8 @@ export default function AdminOrderDetailSummary({
       <AdminOrderDetailBox title="고객정보">
         <div>전화번호: {phoneText || "-"}</div>
 
-        <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50/70 p-3">
-          <div className="text-[11px] font-black text-blue-500">배송주소</div>
-          <div className="mt-1 whitespace-pre-wrap break-keep text-[13px] font-black leading-5 text-slate-900">
-            {addressText || "-"}
-          </div>
+        <div className="mt-2">
+          배송주소: <span className="whitespace-pre-wrap break-keep font-bold text-slate-900">{addressText || "-"}</span>
         </div>
       </AdminOrderDetailBox>
 
