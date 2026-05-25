@@ -849,7 +849,7 @@ export function AdminV2Client() {
     await loadData();
     await loadDepositsFromServer();
 
-    alert(
+    showAdminToast(
       [
         "뱅크다 입금내역 새로고침 완료",
         "",
@@ -866,7 +866,7 @@ export function AdminV2Client() {
     const nowIso = new Date().toISOString();
 
     if (ids.length === 0) {
-      alert("입금확인 처리할 주문 ID가 없습니다.");
+      showAdminToast("입금확인 처리할 주문 ID가 없습니다.");
       return;
     }
 
@@ -930,7 +930,7 @@ export function AdminV2Client() {
       .in("id", ids);
 
     if (orderError) {
-      alert("수동 입금확인 처리 실패\n\n" + orderError.message);
+      showAdminToast("수동 입금확인 처리 실패\n\n" + orderError.message);
       await loadData();
       return;
     }
@@ -947,7 +947,7 @@ export function AdminV2Client() {
       .eq("id", deposit.id);
 
     if (depositError) {
-      alert("주문은 입금확인 처리됐지만 입금내역 연결 저장에 실패했습니다.\n\n" + depositError.message);
+      showAdminToast("주문은 입금확인 처리됐지만 입금내역 연결 저장에 실패했습니다.\n\n" + depositError.message);
       await loadData();
       return;
     }
@@ -958,14 +958,14 @@ export function AdminV2Client() {
       });
 
       if (logError) {
-        alert("입금확인은 처리됐지만 상태변경이력 저장에 실패했습니다.\n\n" + logError.message);
+        showAdminToast("입금확인은 처리됐지만 상태변경이력 저장에 실패했습니다.\n\n" + logError.message);
         await loadData();
         return;
       }
     }
 
     await loadData();
-    alert("수동 입금확인 처리가 완료되었습니다.");
+    showAdminToast("수동 입금확인 처리가 완료되었습니다.");
   };
 
   const updateOrderStatus = async (group: OrderGroup, nextStatus: string) => {
@@ -1087,7 +1087,7 @@ export function AdminV2Client() {
       .in("id", ids);
 
     if (error) {
-      alert("상태 변경 실패\n\n" + error.message);
+      showAdminToast("상태 변경 실패\n\n" + error.message);
       await loadData();
       return;
     }
@@ -1097,7 +1097,7 @@ export function AdminV2Client() {
     });
 
     if (logError) {
-      alert("상태는 변경됐지만 상태변경이력 저장에 실패했습니다.\n\n" + logError.message);
+      showAdminToast("상태는 변경됐지만 상태변경이력 저장에 실패했습니다.\n\n" + logError.message);
       await loadData();
       return;
     }
@@ -1106,14 +1106,14 @@ export function AdminV2Client() {
       .rpc("get_order_status_change_logs_for_admin_v2");
 
     if (latestStatusLogsError) {
-      alert("상태변경이력 재조회에 실패했습니다.\n\n" + latestStatusLogsError.message);
+      showAdminToast("상태변경이력 재조회에 실패했습니다.\n\n" + latestStatusLogsError.message);
     } else {
       setStatusChangeLogs((latestStatusLogs || []) as StatusChangeLogRow[]);
     }
   };
 
   const bulkMarkShippingDoneFromExcel = async (_previewRows: RosenShippingPreviewRow[]) => {
-    alert(
+    showAdminToast(
       "송장 업로드/재업로드/사이트 출고반영 기능은 사용하지 않습니다.\n\n로젠 송장은 사이트에서 다운로드만 하고, 실제 합배송/송장처리는 로젠 프로그램에서 진행해주세요."
     );
   };
@@ -1124,7 +1124,7 @@ export function AdminV2Client() {
     const cleanMemo = String(memoText || "").trim();
 
     if (!customer?.id || !cleanMemo) {
-      alert("저장할 고객 또는 메모 내용이 없습니다.");
+      showAdminToast("저장할 고객 또는 메모 내용이 없습니다.");
       return;
     }
 
@@ -1137,11 +1137,11 @@ export function AdminV2Client() {
       .eq("id", customer.id);
 
     if (error) {
-      alert("고객메모 저장 실패\n\n" + error.message);
+      showAdminToast("고객메모 저장 실패\n\n" + error.message);
       return;
     }
 
-    alert("고객메모에 카톡 응대 내용을 저장했습니다.");
+    showAdminToast("고객메모에 카톡 응대 내용을 저장했습니다.");
     await loadData();
   };
 
@@ -1150,12 +1150,12 @@ export function AdminV2Client() {
     const blockedGroups = targetGroups.filter((group) => !canSoftHideOrderGroup(group));
 
     if (blockedGroups.length > 0) {
-      alert("주문서취소 상태가 아닌 주문이 선택되어 있습니다.\n\n취소주문만 목록에서 숨김 처리할 수 있습니다.");
+      showAdminToast("주문서취소 상태가 아닌 주문이 선택되어 있습니다.\n\n취소주문만 목록에서 숨김 처리할 수 있습니다.");
       return;
     }
 
     if (targetGroups.length <= 0) {
-      alert("숨김 처리할 취소주문을 선택해주세요.");
+      showAdminToast("숨김 처리할 취소주문을 선택해주세요.");
       return;
     }
 
@@ -1165,7 +1165,7 @@ export function AdminV2Client() {
       .filter((id) => Number.isFinite(id));
 
     if (ids.length <= 0) {
-      alert("숨김 처리할 취소주문 ID가 없습니다.");
+      showAdminToast("숨김 처리할 취소주문 ID가 없습니다.");
       return;
     }
 
@@ -1206,11 +1206,11 @@ export function AdminV2Client() {
       .in("id", ids);
 
     if (error) {
-      alert("선택 취소주문 숨김 처리 실패\\n\\n" + error.message);
+      showAdminToast("선택 취소주문 숨김 처리 실패\\n\\n" + error.message);
       return;
     }
 
-    alert(`선택 취소주문 ${ids.length}개 행을 숨김 처리했습니다.`);
+    showAdminToast(`선택 취소주문 ${ids.length}개 행을 숨김 처리했습니다.`);
     await loadData();
   };
 
@@ -1220,12 +1220,12 @@ export function AdminV2Client() {
     const cleanNumber = String(trackingNumber || "").trim().replace(/\s+/g, "");
 
     if (!cleanCompany) {
-      alert("택배사를 입력해주세요.");
+      showAdminToast("택배사를 입력해주세요.");
       return;
     }
 
     if (cleanNumber.length < 4) {
-      alert("송장번호를 정확히 입력해주세요.");
+      showAdminToast("송장번호를 정확히 입력해주세요.");
       return;
     }
 
@@ -1257,12 +1257,12 @@ export function AdminV2Client() {
       .in("id", ids);
 
     if (error) {
-      alert("송장정보 저장 실패\n\n" + error.message);
+      showAdminToast("송장정보 저장 실패\n\n" + error.message);
       await loadData();
       return;
     }
 
-    alert("송장정보가 저장되었습니다.");
+    showAdminToast("송장정보가 저장되었습니다.");
   };
 
   const updateOrderFinalAmount = async (row: OrderRow, nextAmount: number, reason: string) => {
@@ -1270,17 +1270,17 @@ export function AdminV2Client() {
     const beforeAmount = orderBaseAmount(row);
 
     if (!Number.isFinite(nextAmount) || nextAmount < 0) {
-      alert("최종정산금액을 정확히 입력해주세요.");
+      showAdminToast("최종정산금액을 정확히 입력해주세요.");
       return;
     }
 
     if (!cleanReason || cleanReason.length < 2) {
-      alert("금액 수정 사유를 2글자 이상 입력해주세요.\n예: 부분환불, 금액오입력, 배송비조정");
+      showAdminToast("금액 수정 사유를 2글자 이상 입력해주세요.\n예: 부분환불, 금액오입력, 배송비조정");
       return;
     }
 
     if (beforeAmount === nextAmount) {
-      alert("현재 기준금액과 동일합니다. 수정할 금액을 다시 확인해주세요.");
+      showAdminToast("현재 기준금액과 동일합니다. 수정할 금액을 다시 확인해주세요.");
       return;
     }
 
@@ -1304,7 +1304,7 @@ export function AdminV2Client() {
     });
 
     if (error) {
-      alert(
+      showAdminToast(
         "금액 수정 실패\n\n" +
           error.message +
           "\n\n먼저 Supabase SQL Editor에서 money_log_sql_setup.sql을 실행했는지 확인해주세요."
@@ -1330,24 +1330,24 @@ export function AdminV2Client() {
       .rpc("get_order_money_edit_logs_for_admin_v2");
 
     if (latestLogsError) {
-      alert("금액수정은 저장됐지만 이력 재조회에 실패했습니다.\n\n" + latestLogsError.message);
+      showAdminToast("금액수정은 저장됐지만 이력 재조회에 실패했습니다.\n\n" + latestLogsError.message);
     } else {
       setMoneyEditLogs((latestLogs || []) as MoneyEditLogRow[]);
     }
 
-    alert("최종정산금액 수정 및 이력 저장이 완료되었습니다.");
+    showAdminToast("최종정산금액 수정 및 이력 저장이 완료되었습니다.");
   };
 
   const saveSetting = async (key: string, value: string) => {
     const { data, error: selectError } = await supabase.from("settings").select("id").eq("key", key).limit(1);
-    if (selectError) return alert("설정 확인 실패\n\n" + selectError.message);
+    if (selectError) return showAdminToast("설정 확인 실패\n\n" + selectError.message);
 
     const existing = data?.[0];
     const result = existing?.id
       ? await supabase.from("settings").update({ value }).eq("id", existing.id)
       : await supabase.from("settings").insert({ key, value });
 
-    if (result.error) return alert("설정 저장 실패\n\n" + result.error.message);
+    if (result.error) return showAdminToast("설정 저장 실패\n\n" + result.error.message);
     await loadData();
   };
 
@@ -1356,7 +1356,7 @@ export function AdminV2Client() {
     const targetGroups = filteredOrderGroups;
 
     if (targetGroups.length === 0) {
-      alert("엑셀로 내보낼 주문이 없습니다.\n\n기간/검색/상태 필터를 확인해주세요.");
+      showAdminToast("엑셀로 내보낼 주문이 없습니다.\n\n기간/검색/상태 필터를 확인해주세요.");
       return;
     }
 
@@ -1581,7 +1581,7 @@ function ShippingPanel({
 
   const getRosenDownloadRows = () => {
     if (downloadTargets.length === 0) {
-      alert("다운로드할 출고대기 주문이 없습니다.\n\n출고대기 상태, 수하인명, 전화번호, 주소를 확인해주세요.");
+      showAdminToast("다운로드할 출고대기 주문이 없습니다.\n\n출고대기 상태, 수하인명, 전화번호, 주소를 확인해주세요.");
       return null;
     }
 
@@ -1598,7 +1598,7 @@ function ShippingPanel({
       const blob = await buildRosenTemplateWorkbookBlob(excelRows);
       downloadBlobFile(`ruru_rosen_upload_${dateStamp}.xlsx`, blob);
     } catch (error) {
-      alert(
+      showAdminToast(
         "로젠 템플릿 xlsx 생성에 실패했습니다.\n\n" +
           (error instanceof Error ? error.message : String(error)) +
           "\n\n우선 복사용 TSV 파일로 내려받습니다. 로젠 템플릿을 열고 A1부터 붙여넣어주세요."
@@ -1632,14 +1632,14 @@ function ShippingPanel({
       const nextPreviewRows = buildRosenShippingPreviewRows(rows, orders);
 
       if (nextPreviewRows.length === 0) {
-        alert("읽을 수 있는 R 주문키가 없습니다.\n\n사이트에서 다운로드했던 로젠 송장 다운로드용 원본 xlsx/tsv 파일을 다시 올렸는지 확인해주세요.");
+        showAdminToast("읽을 수 있는 R 주문키가 없습니다.\n\n사이트에서 다운로드했던 로젠 송장 다운로드용 원본 xlsx/tsv 파일을 다시 올렸는지 확인해주세요.");
         return;
       }
 
       setPreviewRows(nextPreviewRows);
       setPreviewFileName(file.name);
     } catch (error) {
-      alert("엑셀 읽기 실패\n\n" + (error instanceof Error ? error.message : String(error)));
+      showAdminToast("엑셀 읽기 실패\n\n" + (error instanceof Error ? error.message : String(error)));
     }
   };
 
@@ -1965,7 +1965,7 @@ function OrderWorkTable({
 
   const applySoftDeleteSelected = async () => {
     if (selectedGroups.length <= 0) {
-      alert("숨김 처리할 취소주문을 선택해주세요.");
+      showAdminToast("숨김 처리할 취소주문을 선택해주세요.");
       return;
     }
 
@@ -2327,8 +2327,8 @@ function SettingInput({
 
   const save = () => {
     const parsed = Number(localValue);
-    if (!Number.isFinite(parsed)) return alert("숫자로 입력해주세요.");
-    if (parsed < min || parsed > max) return alert(`${min}~${max} 범위 안에서 입력해주세요.`);
+    if (!Number.isFinite(parsed)) return showAdminToast("숫자로 입력해주세요.");
+    if (parsed < min || parsed > max) return showAdminToast(`${min}~${max} 범위 안에서 입력해주세요.`);
     onSave(parsed);
   };
 
