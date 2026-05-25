@@ -1,6 +1,5 @@
 "use client";
 
-import { canSoftHideLiveOrder } from "./liveOrderSoftHideUtils";
 import { useEffect, useMemo, useState } from "react";
 import type { LiveOrder } from "./types";
 import { exportLiveOrdersForPicking, exportLiveOrdersForRosen } from "./adminLiveOrderExcelExport";
@@ -194,21 +193,7 @@ type Props = {
 };
 
 
-function getLiveOrderSelectionKey(order: LiveOrder) {
-  return String(order.id || order.orderNo || order.groupId || "").trim();
-}
 
-function getLiveOrderRowIds(order: LiveOrder) {
-  const items = Array.isArray(order.items) ? order.items : [];
-
-  return Array.from(
-    new Set(
-      items
-        .map((item) => Number(item.id))
-        .filter((id) => Number.isFinite(id) && id > 0)
-    )
-  );
-}
 
 export default function LiveOrderTable({
   orders,
@@ -222,77 +207,7 @@ export default function LiveOrderTable({
   onFiltersChange,
   broadcastOptions,
 }: Props) {
-  const [selectedOrderKeys, setSelectedOrderKeys] = useState<string[]>([]);
   const [deletingSelectedOrders, setDeletingSelectedOrders] = useState(false);
-
-  const selectedOrderKeySet = new Set(selectedOrderKeys);
-
-  const toggleOrderSelection = (order: LiveOrder, checked: boolean) => {
-    const key = getLiveOrderSelectionKey(order);
-    if (!key) return;
-
-    if (checked && !canSoftHideLiveOrder(order)) {
-      alert("주문서취소 상태인 주문만 숨김 선택할 수 있습니다.");
-      return;
-    }
-
-    setSelectedOrderKeys((current) => {
-      const next = new Set(current);
-
-      if (checked) next.add(key);
-      else next.delete(key);
-
-      return Array.from(next);
-    });
-  };
-
-  const handleSoftDeleteSelectedOrders = async () => {
-    const selectedOrders = orders.filter((order) => selectedOrderKeySet.has(getLiveOrderSelectionKey(order)));
-    const blockedOrders = selectedOrders.filter((order) => !canSoftHideLiveOrder(order));
-    const targetOrders = selectedOrders.filter(canSoftHideLiveOrder);
-    const rowIds = Array.from(new Set(targetOrders.flatMap(getLiveOrderRowIds)));
-
-    if (blockedOrders.length > 0) {
-      alert("주문서취소 상태가 아닌 주문이 선택되어 있습니다.\n\n취소주문만 목록에서 숨김 처리할 수 있습니다.");
-      return;
-    }
-
-    if (rowIds.length === 0) {
-      alert("숨김 처리할 취소주문을 선택해주세요.");
-      return;
-    }
-
-    const confirmed = window.confirm(
-      [
-        `선택한 취소주문 ${targetOrders.length.toLocaleString("ko-KR")}건을 주문관리 목록에서 숨길까요?`,
-        "",
-        "DB 완전삭제가 아니라 is_deleted=true 처리입니다.",
-        "금액/입금/송장/자동입금 로직은 변경하지 않습니다.",
-      ].join("\n")
-    );
-
-    if (!confirmed) return;
-
-    setDeletingSelectedOrders(true);
-
-    try {
-      const { error } = await supabase
-        .from("orders")
-        .update({ is_deleted: true })
-        .in("id", rowIds);
-
-      if (error) {
-        alert("선택 취소주문 숨김 처리 실패\n\n" + error.message);
-        return;
-      }
-
-      alert("선택한 취소주문을 주문관리 목록에서 숨김 처리했습니다.");
-      setSelectedOrderKeys([]);
-      await onRefresh?.();
-    } finally {
-      setDeletingSelectedOrders(false);
-    }
-  };
 
   const [page, setPage] = useState(1);
   const [pendingKeyword, setPendingKeyword] = useState(filters.keyword);
@@ -369,11 +284,6 @@ export default function LiveOrderTable({
   const totalPages = Math.max(1, Math.ceil(cancelViewFilteredOrders.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const visibleOrders = cancelViewFilteredOrders.slice((safePage - 1) * pageSize, safePage * pageSize);
-  const hideableVisibleOrders = visibleOrders.filter(canSoftHideLiveOrder);
-  const showCancelSoftHideControls = cancelViewFilter === "canceled";
-  const selectedHideableOrderCount = orders.filter(
-    (order) => selectedOrderKeySet.has(getLiveOrderSelectionKey(order)) && canSoftHideLiveOrder(order)
-  ).length;
 
   const exportableOrders = useMemo(
     () => cancelViewFilteredOrders.filter((order) => order.paymentStatus !== "canceled"),
@@ -660,55 +570,11 @@ export default function LiveOrderTable({
         </button>
       </div>
 
-      {showCancelSoftHideControls ? (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-3">
-          <div className="text-[12px] font-black text-red-700">
-            취소주문 정리 · 선택 {selectedHideableOrderCount.toLocaleString("ko-KR")}건
-            <span className="ml-2 font-bold text-red-500">
-              실제 삭제가 아니라 목록 숨김 처리입니다.
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleSoftDeleteSelectedOrders}
-            disabled={selectedHideableOrderCount <= 0}
-            className="h-10 rounded-xl bg-red-600 px-4 text-[13px] font-black text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-200"
-          >
-            선택 취소주문 숨김
-          </button>
-        </div>
-      ) : null}
-
       <div className="overflow-hidden rounded-xl border border-slate-200">
         <table className="w-full table-fixed border-collapse text-sm">
           <thead className="bg-slate-50 text-xs font-black text-slate-500">
             <tr>
                 <th className="w-[48px] px-4 py-3 text-center">
-                  <input
-                    type="checkbox"
-                    aria-label="현재 페이지 전체 선택"
-                    checked={
-                      hideableVisibleOrders.length > 0 &&
-                      hideableVisibleOrders.every((order) => selectedOrderKeySet.has(getLiveOrderSelectionKey(order)))
-                    }
-                    onChange={(event) => {
-                      const visibleKeys = hideableVisibleOrders.map(getLiveOrderSelectionKey).filter(Boolean);
-
-                      setSelectedOrderKeys((current) => {
-                        const next = new Set(current);
-
-                        if (event.currentTarget.checked) {
-                          visibleKeys.forEach((key) => next.add(key));
-                        } else {
-                          visibleKeys.forEach((key) => next.delete(key));
-                        }
-
-                        return Array.from(next);
-                      });
-                    }}
-                    className="h-4 w-4 rounded border-slate-300"
-                  />
                 </th>
               <th className="w-[120px] px-4 py-3 text-left">입금확인</th>
               <th className="w-[96px] px-4 py-3 text-left">제출시간</th>
@@ -741,17 +607,6 @@ export default function LiveOrderTable({
                 return (
                   <tr key={order.id} className={selected ? "bg-blue-50/70" : "hover:bg-slate-50"}>
                     <td className="px-4 py-3 text-center" onClick={(event) => event.stopPropagation()}>
-                      {showCancelSoftHideControls ? (
-                      <input
-                        type="checkbox"
-                        aria-label="취소주문 숨김 선택"
-                        checked={selectedOrderKeySet.has(getLiveOrderSelectionKey(order))}
-                        disabled={!canSoftHideLiveOrder(order)}
-                        title={canSoftHideLiveOrder(order) ? "취소주문 숨김 선택" : "주문서취소 상태만 숨김 선택 가능"}
-                        onChange={(event) => toggleOrderSelection(order, event.currentTarget.checked)}
-                        className="h-4 w-4 rounded border-slate-300"
-                      />
-                    ) : null}
                     </td>
                     <td className="px-4 py-3">{statusBadge(order)}</td>
                     <td className="px-4 py-3 font-bold text-slate-600">{order.submittedAt}</td>
