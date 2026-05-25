@@ -93,12 +93,78 @@ function orderName(order: LooseLiveOrder) {
   return readFirst(order, ["name", "customerName", "customer_name", "buyer_name"]) || "-";
 }
 
-function orderCreatedLabel(order: LooseLiveOrder) {
+function parseDateCandidate(value: unknown) {
+  const raw = clean(value);
+  if (!raw) return "";
+
+  const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const date = new Date(normalized);
+
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toISOString();
+}
+
+function orderCreatedRawValue(order: LooseLiveOrder) {
   return (
-    readFirst(order, ["submittedAt", "createdAt", "created_at", "orderDate", "order_date"]) ||
-    readFirst(order, ["paidAt", "depositConfirmedAt", "deposit_confirmed_at"]) ||
-    "-"
+    readFirst(order, [
+      "created_at",
+      "createdAt",
+      "order_date",
+      "orderDate",
+      "submitted_at",
+      "submittedAtRaw",
+      "createdDate",
+      "rawCreatedAt",
+    ]) ||
+    readFirst(order, [
+      "deposit_confirmed_at",
+      "depositConfirmedAt",
+      "paid_at",
+      "paidAtRaw",
+    ])
   );
+}
+
+function orderSubmittedTimeValue(order: LooseLiveOrder) {
+  return readFirst(order, ["submittedAt", "paidAt"]);
+}
+
+function weekdayKo(date: Date) {
+  return ["일", "월", "화", "수", "목", "금", "토"][date.getDay()] || "";
+}
+
+function formatOrderDateTime(value: unknown, fallbackTime = "") {
+  const raw = clean(value);
+
+  if (!raw) return fallbackTime || "-";
+
+  const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const date = new Date(normalized);
+
+  if (Number.isNaN(date.getTime())) {
+    return fallbackTime || raw || "-";
+  }
+
+  const yyyy = String(date.getFullYear());
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mi = String(date.getMinutes()).padStart(2, "0");
+  const day = weekdayKo(date);
+
+  return `${yyyy}.${mm}.${dd}(${day}) ${hh}:${mi}`;
+}
+
+function orderCreatedLabel(order: LooseLiveOrder) {
+  const rawDate = orderCreatedRawValue(order);
+  const fallbackTime = orderSubmittedTimeValue(order);
+
+  return formatOrderDateTime(rawDate, fallbackTime);
+}
+
+function orderCreatedSortValue(order: LooseLiveOrder) {
+  return parseDateCandidate(orderCreatedRawValue(order)) || orderSubmittedTimeValue(order);
 }
 
 function orderAmount(order: LooseLiveOrder) {
@@ -220,7 +286,7 @@ function CustomerDetailDrawer({
           <SummaryCard label={CUSTOMER_TERMS.customerStatus} value={customer.blocked ? CUSTOMER_TERMS.blocked : CUSTOMER_TERMS.normal} sub={customer.blockReason || "차단 정보 없음"} />
           <SummaryCard label={CUSTOMER_TERMS.orderCount} value={`${customer.orderCount.toLocaleString("ko-KR")}건`} sub="현재 주문 데이터 기준" />
           <SummaryCard label={CUSTOMER_TERMS.totalOrderAmount} value={money(customer.totalAmount)} sub="취소/정산 제외 전 표시합" />
-          <SummaryCard label={CUSTOMER_TERMS.latestOrder} value={customer.latestOrderAt || "-"} sub="가장 최근 주문" />
+          <SummaryCard label={CUSTOMER_TERMS.latestOrder} value={formatOrderDateTime(customer.latestOrderAt)} sub="가장 최근 주문" />
         </div>
 
         <section className="mt-5 rounded-[24px] border border-slate-200 bg-white p-4">
@@ -239,7 +305,7 @@ function CustomerDetailDrawer({
             <table className="w-full table-fixed border-collapse text-sm">
               <thead className="bg-slate-50 text-xs font-black text-slate-500">
                 <tr>
-                  <th className="w-[118px] px-3 py-3 text-left">주문일시</th>
+                  <th className="w-[178px] px-3 py-3 text-left">주문일시</th>
                   <th className="px-3 py-3 text-left">주문내역</th>
                   <th className="w-[112px] px-3 py-3 text-right">금액</th>
                   <th className="w-[108px] px-3 py-3 text-center">상태</th>
@@ -322,7 +388,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
       const key = buildCustomerKey(order);
       const current = map.get(key);
       const amount = orderAmount(order);
-      const latestOrderAt = orderCreatedLabel(order);
+      const latestOrderAt = orderCreatedSortValue(order);
       const phoneKey = digitsOnly(orderPhone(order));
       const override = phoneKey ? blockOverrides[phoneKey] : undefined;
       const orderBlocked = override ? override.blocked : isBlockedOrder(order);
@@ -595,7 +661,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
                   <th className="w-[150px] px-3 py-3 text-left">전화번호</th>
                   <th className="w-[82px] px-3 py-3 text-right">주문수</th>
                   <th className="w-[132px] px-3 py-3 text-right">{CUSTOMER_TERMS.totalOrderAmount}</th>
-                  <th className="w-[124px] px-3 py-3 text-left">{CUSTOMER_TERMS.latestOrder}</th>
+                  <th className="w-[178px] px-3 py-3 text-left">{CUSTOMER_TERMS.latestOrder}</th>
                   <th className="w-[112px] px-3 py-3 text-center">{CUSTOMER_TERMS.work}</th>
                 </tr>
               </thead>
@@ -625,7 +691,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
                       <td className="px-3 py-3 font-bold text-slate-600">{formatPhone(customer.phone)}</td>
                       <td className="px-3 py-3 text-right font-black text-slate-800">{customer.orderCount.toLocaleString("ko-KR")}건</td>
                       <td className="px-3 py-3 text-right font-black text-slate-950">{money(customer.totalAmount)}</td>
-                      <td className="px-3 py-3 font-bold text-slate-600">{customer.latestOrderAt || "-"}</td>
+                      <td className="px-3 py-3 font-bold text-slate-600">{formatOrderDateTime(customer.latestOrderAt)}</td>
                       <td className="px-3 py-3 text-center">
                         <button
                           type="button"
