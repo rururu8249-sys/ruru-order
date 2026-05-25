@@ -1,10 +1,13 @@
+"use client";
+
+import { showAdminToast } from "@/lib/adminToast";
+
 // app/admin-v2/pick-list/page.tsx
 // 전체 교체
 // 위치: /Users/ruru/Desktop/ruru-order-app/app/admin-v2/pick-list/page.tsx
 // 목적: 물건 챙김용 간단 리스트 + 조건별 출력
 // 주의: DB 읽기 전용입니다. 주문 저장/금액/정산/배송비 로직을 수정하지 않습니다.
 
-"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -257,12 +260,12 @@ export default function AdminPickListPage() {
     const endIso = fromDateTimeLocalValue(endLocal);
 
     if (!startIso || !endIso) {
-      alert("시작시간과 마감시간을 확인해주세요.");
+      showAdminToast("시작시간과 마감시간을 확인해주세요.");
       return;
     }
 
     if (new Date(startIso).getTime() >= new Date(endIso).getTime()) {
-      alert("마감시간은 시작시간보다 늦어야 합니다.");
+      showAdminToast("마감시간은 시작시간보다 늦어야 합니다.");
       return;
     }
 
@@ -281,7 +284,7 @@ export default function AdminPickListPage() {
     setLoading(false);
 
     if (error) {
-      alert("주문 불러오기 오류: " + error.message);
+      showAdminToast("주문 불러오기 오류: " + error.message);
       return;
     }
 
