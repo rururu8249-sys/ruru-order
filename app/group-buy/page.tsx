@@ -28,6 +28,7 @@ import { useEffect, useMemo, useState } from "react";
 import GroupBuyPageHero from "@/components/group-buy/GroupBuyPageHero";
 import GroupBuyDeliveryNotice from "@/components/group-buy/GroupBuyDeliveryNotice";
 import CustomerBlockedNotice from "@/components/customer/CustomerBlockedNotice";
+import CustomerToastNotice from "@/components/customer/CustomerToastNotice";
 
 declare global {
   interface Window {
@@ -320,6 +321,39 @@ export default function GroupBuyPage() {
     checking: false,
     message: "",
   });
+  const [customerNotice, setCustomerNotice] = useState<{
+    type: "info" | "success" | "warning" | "error";
+    message: string;
+  }>({
+    type: "info",
+    message: "",
+  });
+
+  const closeCustomerNotice = () => {
+    setCustomerNotice({ type: "info", message: "" });
+  };
+
+  const showCustomerNotice = (message: unknown, type?: "info" | "success" | "warning" | "error") => {
+    const text = String(message ?? "").trim();
+
+    if (!text) return;
+
+    const autoType =
+      type ||
+      (text.includes("완료") || text.includes("확인되었습니다") || text.includes("복사") || text.includes("저장되었습니다")
+        ? "success"
+        : text.includes("오류") || text.includes("실패") || text.includes("없습니다")
+          ? "error"
+          : "warning");
+
+    setCustomerNotice({ type: autoType, message: text });
+
+    if (typeof window !== "undefined") {
+      window.setTimeout(() => {
+        setCustomerNotice((current) => (current.message === text ? { type: "info", message: "" } : current));
+      }, 3200);
+    }
+  };
   const [completeMessage, setCompleteMessage] = useState("");
   const [completePaymentMethod, setCompletePaymentMethod] = useState<"무통장입금" | "카드결제">("무통장입금");
   const [completeTotalAmount, setCompleteTotalAmount] = useState(0);
@@ -451,7 +485,7 @@ export default function GroupBuyPage() {
       .order("id", { ascending: false });
 
     if (error) {
-      alert("공구상품 불러오기 실패\n\n" + error.message);
+      showCustomerNotice("공구상품 불러오기 실패\n\n" + error.message);
       setLoadingProducts(false);
       return;
     }
@@ -524,12 +558,12 @@ export default function GroupBuyPage() {
     setDetailAddress("");
     setRequestMemo("");
 
-    alert("로그아웃되었습니다. 오늘도 좋은 하루 보내세요 :)");
+    showCustomerNotice("로그아웃되었습니다. 오늘도 좋은 하루 보내세요 :)");
   };
 
   const openAddressSearch = () => {
     if (!window.daum?.Postcode) {
-      alert("주소검색을 불러오는 중입니다. 잠시 후 다시 눌러주세요.");
+      showCustomerNotice("주소검색을 불러오는 중입니다. 잠시 후 다시 눌러주세요.");
       return;
     }
 
@@ -546,12 +580,12 @@ export default function GroupBuyPage() {
     const phone = onlyNumber(loginPhone);
 
     if (!cleanName) {
-      alert("이름을 입력해주세요.");
+      showCustomerNotice("이름을 입력해주세요.");
       return;
     }
 
     if (phone.length < 10) {
-      alert("전화번호를 정확히 입력해주세요.");
+      showCustomerNotice("전화번호를 정확히 입력해주세요.");
       return;
     }
 
@@ -563,13 +597,13 @@ export default function GroupBuyPage() {
       .limit(1);
 
     if (error) {
-      alert("고객정보 확인 오류\n\n" + error.message);
+      showCustomerNotice("고객정보 확인 오류\n\n" + error.message);
       return;
     }
 
     const customer = data?.[0];
     if (!customer) {
-      alert("일치하는 고객정보가 없습니다.\n이름과 전화번호를 확인해주세요.");
+      showCustomerNotice("일치하는 고객정보가 없습니다.\n이름과 전화번호를 확인해주세요.");
       return;
     }
 
@@ -586,28 +620,28 @@ export default function GroupBuyPage() {
     saveSession(nextSession);
     setShowSavedCustomerDetail(false);
     setIsEditingCustomer(false);
-    alert("확인되었습니다. 바로 주문 가능합니다.");
+    showCustomerNotice("확인되었습니다. 바로 주문 가능합니다.");
   };
 
   const validateCustomerForm = () => {
     const phone = onlyNumber(customerPhone);
     if (!nickname.trim()) {
-      alert("유튜브 닉네임을 입력해주세요.");
+      showCustomerNotice("유튜브 닉네임을 입력해주세요.");
       return false;
     }
 
     if (!customerName.trim()) {
-      alert("주문자 이름을 입력해주세요.");
+      showCustomerNotice("주문자 이름을 입력해주세요.");
       return false;
     }
 
     if (phone.length < 10) {
-      alert("전화번호를 정확히 입력해주세요.");
+      showCustomerNotice("전화번호를 정확히 입력해주세요.");
       return false;
     }
 
     if (!zipcode || !address || !detailAddress.trim()) {
-      alert("주소검색 후 상세주소까지 입력해주세요.");
+      showCustomerNotice("주소검색 후 상세주소까지 입력해주세요.");
       return false;
     }
 
@@ -704,22 +738,22 @@ export default function GroupBuyPage() {
     if (!selectedProduct) return;
 
     if (getProductStockStatus(selectedProduct) === "품절") {
-      alert("품절 상품은 주문할 수 없습니다.");
+      showCustomerNotice("품절 상품은 주문할 수 없습니다.");
       return;
     }
 
     if (!optionText.trim()) {
-      alert("옵션/색상/사이즈를 입력해주세요.\n없으면 '없음'이라고 입력해주세요.");
+      showCustomerNotice("옵션/색상/사이즈를 입력해주세요.\n없으면 '없음'이라고 입력해주세요.");
       return;
     }
 
     if (!qty || Number(qty) <= 0) {
-      alert("수량을 입력해주세요.");
+      showCustomerNotice("수량을 입력해주세요.");
       return;
     }
 
     if (paymentMethod === "카드결제" && productAmount < 100000) {
-      alert("카드결제는 10만원 이상 구매 시 가능합니다.");
+      showCustomerNotice("카드결제는 10만원 이상 구매 시 가능합니다.");
       return;
     }
 
@@ -806,7 +840,7 @@ export default function GroupBuyPage() {
       setOpenedProductId(null);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error: any) {
-      alert("주문 저장 실패\n\n" + error.message);
+      showCustomerNotice("주문 저장 실패\n\n" + error.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -818,7 +852,7 @@ export default function GroupBuyPage() {
       setCopyDone(true);
       setTimeout(() => setCopyDone(false), 1800);
     } catch {
-      alert(BANK_ACCOUNT);
+      showCustomerNotice(BANK_ACCOUNT);
     }
   };
 
@@ -1143,9 +1177,9 @@ export default function GroupBuyPage() {
                                       onClick={async () => {
                                         try {
                                           await saveCustomerInfo();
-                                          alert("정보가 저장되었습니다.");
+                                          showCustomerNotice("정보가 저장되었습니다.");
                                         } catch (error: any) {
-                                          alert("정보 저장 실패\n\n" + error.message);
+                                          showCustomerNotice("정보 저장 실패\n\n" + error.message);
                                         }
                                       }}
                                       className="rounded-[20px] bg-[#ff4b60] px-4 py-4 text-[15px] font-black text-white"
@@ -1240,7 +1274,14 @@ export default function GroupBuyPage() {
                           </div>
                         </div>
 
-                                                {customerBlockStatus.blocked ? (
+                                                <CustomerToastNotice
+                          open={Boolean(customerNotice.message)}
+                          type={customerNotice.type}
+                          message={customerNotice.message}
+                          onClose={closeCustomerNotice}
+                        />
+
+                        {customerBlockStatus.blocked ? (
                           <div className="mb-4">
                             <CustomerBlockedNotice />
                           </div>

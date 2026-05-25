@@ -52,6 +52,7 @@ import OrderProductInputGuideDetail from "@/components/order/OrderProductInputGu
 import OrderCompletePaymentNotice from "@/components/order/OrderCompletePaymentNotice";
 import OrderKakaoNicknameNotice from "@/components/order/OrderKakaoNicknameNotice";
 import CustomerBlockedNotice from "@/components/customer/CustomerBlockedNotice";
+import CustomerToastNotice from "@/components/customer/CustomerToastNotice";
 
 declare global {
   interface Window {
@@ -254,6 +255,39 @@ export default function OrderPage() {
     checking: false,
     message: "",
   });
+  const [customerNotice, setCustomerNotice] = useState<{
+    type: "info" | "success" | "warning" | "error";
+    message: string;
+  }>({
+    type: "info",
+    message: "",
+  });
+
+  const closeCustomerNotice = () => {
+    setCustomerNotice({ type: "info", message: "" });
+  };
+
+  const showCustomerNotice = (message: unknown, type?: "info" | "success" | "warning" | "error") => {
+    const text = String(message ?? "").trim();
+
+    if (!text) return;
+
+    const autoType =
+      type ||
+      (text.includes("완료") || text.includes("확인되었습니다") || text.includes("복사") || text.includes("저장되었습니다")
+        ? "success"
+        : text.includes("오류") || text.includes("실패") || text.includes("없습니다")
+          ? "error"
+          : "warning");
+
+    setCustomerNotice({ type: autoType, message: text });
+
+    if (typeof window !== "undefined") {
+      window.setTimeout(() => {
+        setCustomerNotice((current) => (current.message === text ? { type: "info", message: "" } : current));
+      }, 3200);
+    }
+  };
   const [showDepositConfirmModal, setShowDepositConfirmModal] = useState(false);
   const PRIVACY_CONSENT_VERSION = "2026-05-24-v1";
   const PRIVACY_CONSENT_STORAGE_KEY = "ruru_privacy_consent_version";
@@ -901,7 +935,7 @@ export default function OrderPage() {
     const restApiKey = process.env.NEXT_PUBLIC_KAKAO_REST_API_KEY || "";
 
     if (!restApiKey) {
-      alert("카카오 로그인 설정값이 없습니다. 관리자에게 문의해주세요.");
+      showCustomerNotice("카카오 로그인 설정값이 없습니다. 관리자에게 문의해주세요.");
       return;
     }
 
@@ -1023,12 +1057,12 @@ export default function OrderPage() {
     const cleanPhone = normalizePhone(loginPhone);
 
     if (!cleanName) {
-      alert("이름을 입력해주세요.");
+      showCustomerNotice("이름을 입력해주세요.");
       return;
     }
 
     if (cleanPhone.length < 10) {
-      alert("전화번호를 정확히 입력해주세요.");
+      showCustomerNotice("전화번호를 정확히 입력해주세요.");
       return;
     }
 
@@ -1045,7 +1079,7 @@ export default function OrderPage() {
       const customer = data?.[0];
 
       if (!customer) {
-        alert("일치하는 고객정보가 없습니다.\n이름과 전화번호를 확인해주세요.");
+        showCustomerNotice("일치하는 고객정보가 없습니다.\n이름과 전화번호를 확인해주세요.");
         return;
       }
 
@@ -1078,9 +1112,9 @@ export default function OrderPage() {
 
       void checkAlreadyPaidShipping(cleanPhone);
 
-      alert("확인되었습니다. 바로 상품 입력으로 이동했어요.");
+      showCustomerNotice("확인되었습니다. 바로 상품 입력으로 이동했어요.");
     } catch (error: any) {
-      alert("확인 중 오류가 발생했습니다.\n\n" + error.message);
+      showCustomerNotice("확인 중 오류가 발생했습니다.\n\n" + error.message);
     }
   };
 
@@ -1088,22 +1122,22 @@ export default function OrderPage() {
     const cleanPhone = normalizePhone(customerPhone);
 
     if (!youtubeNickname.trim()) {
-      alert("유튜브 닉네임을 입력해주세요.");
+      showCustomerNotice("유튜브 닉네임을 입력해주세요.");
       return;
     }
 
     if (!customerName.trim()) {
-      alert("이름을 입력해주세요.");
+      showCustomerNotice("이름을 입력해주세요.");
       return;
     }
 
     if (cleanPhone.length < 10) {
-      alert("전화번호를 정확히 입력해주세요.");
+      showCustomerNotice("전화번호를 정확히 입력해주세요.");
       return;
     }
 
     if (!address.trim()) {
-      alert("주소를 입력해주세요.");
+      showCustomerNotice("주소를 입력해주세요.");
       return;
     }
 
@@ -1113,9 +1147,9 @@ export default function OrderPage() {
       setIsCustomerInfoOpen(false);
       setPin("");
       
-      alert("고객정보수정이 완료되었습니다.");
+      showCustomerNotice("고객정보수정이 완료되었습니다.");
     } catch (error: any) {
-      alert("고객정보 저장 오류: " + error.message);
+      showCustomerNotice("고객정보 저장 오류: " + error.message);
     }
   };
 
@@ -1323,23 +1357,23 @@ export default function OrderPage() {
     const cleanPhone = normalizePhone(customerPhone);
 
     if (!youtubeNickname.trim()) {
-      alert("유튜브 닉네임을 입력해주세요.");
+      showCustomerNotice("유튜브 닉네임을 입력해주세요.");
       return false;
     }
 
     if (!customerName.trim()) {
-      alert("이름을 입력해주세요.");
+      showCustomerNotice("이름을 입력해주세요.");
       return false;
     }
 
     if (cleanPhone.length < 10) {
-      alert("전화번호를 정확히 입력해주세요.");
+      showCustomerNotice("전화번호를 정확히 입력해주세요.");
       return false;
     }
 
 
     if (!address.trim()) {
-      alert("주소를 입력해주세요.");
+      showCustomerNotice("주소를 입력해주세요.");
       return false;
     }
 
@@ -1362,49 +1396,49 @@ export default function OrderPage() {
     );
 
     if (validItems.length === 0) {
-      alert("상품명을 입력해주세요.");
+      showCustomerNotice("상품명을 입력해주세요.");
       return false;
     }
 
     for (const item of validItems) {
       if (!item.product_name.trim()) {
-        alert("상품명을 입력해주세요.");
+        showCustomerNotice("상품명을 입력해주세요.");
         return false;
       }
 
       if (!String(item.color || "").trim()) {
-        alert("색상을 입력해주세요.\n색상이 없으면 '없음'이라고 입력해주세요.");
+        showCustomerNotice("색상을 입력해주세요.\n색상이 없으면 '없음'이라고 입력해주세요.");
         return false;
       }
 
       if (!String(item.size || "").trim()) {
-        alert("사이즈를 입력해주세요.\n사이즈가 없으면 '없음'이라고 입력해주세요.");
+        showCustomerNotice("사이즈를 입력해주세요.\n사이즈가 없으면 '없음'이라고 입력해주세요.");
         return false;
       }
 
       if (!toNumber(item.qty)) {
-        alert("수량을 입력해주세요.");
+        showCustomerNotice("수량을 입력해주세요.");
         return false;
       }
 
       if (!toNumber(item.product_price)) {
-        alert("상품금액을 입력해주세요.");
+        showCustomerNotice("상품금액을 입력해주세요.");
         return false;
       }
 
       if (toNumber(item.product_price) < 1) {
-        alert("상품금액은 1원 이상으로 입력해주세요.");
+        showCustomerNotice("상품금액은 1원 이상으로 입력해주세요.");
         return false;
       }
     }
 
     if (paymentMethod === "카드결제" && productAmount < 100000) {
-      alert("카드결제는 10만원 이상 구매 시 가능합니다.");
+      showCustomerNotice("카드결제는 10만원 이상 구매 시 가능합니다.");
       return false;
     }
 
     if (!hasPrivacyConsent && !privacyConsentChecked) {
-      alert("개인정보 수집·이용 및 배송정보 제공 안내 확인이 필요합니다.");
+      showCustomerNotice("개인정보 수집·이용 및 배송정보 제공 안내 확인이 필요합니다.");
       return false;
     }
 
@@ -1550,7 +1584,7 @@ export default function OrderPage() {
 
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error: any) {
-      alert("주문서 제출 오류: " + error.message);
+      showCustomerNotice("주문서 제출 오류: " + error.message);
     }
 
     setSubmitting(false);
@@ -1562,7 +1596,7 @@ export default function OrderPage() {
       setCopyDone(true);
       setTimeout(() => setCopyDone(false), 1800);
     } catch {
-      alert(BANK_ACCOUNT);
+      showCustomerNotice(BANK_ACCOUNT);
     }
   };
 
@@ -1933,7 +1967,14 @@ export default function OrderPage() {
               </label>
             )}
 
-                        {customerBlockStatus.blocked ? (
+                        <CustomerToastNotice
+              open={Boolean(customerNotice.message)}
+              type={customerNotice.type}
+              message={customerNotice.message}
+              onClose={closeCustomerNotice}
+            />
+
+            {customerBlockStatus.blocked ? (
               <CustomerBlockedNotice />
             ) : null}
 
