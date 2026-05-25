@@ -51,6 +51,7 @@ import OrderCustomerInfoFormCard from "@/components/order/OrderCustomerInfoFormC
 import OrderProductInputGuideDetail from "@/components/order/OrderProductInputGuideDetail";
 import OrderCompletePaymentNotice from "@/components/order/OrderCompletePaymentNotice";
 import OrderKakaoNicknameNotice from "@/components/order/OrderKakaoNicknameNotice";
+import CustomerBlockedNotice from "@/components/customer/CustomerBlockedNotice";
 
 declare global {
   interface Window {
@@ -88,6 +89,12 @@ type DoneData = {
   cardExtra: number;
   customerCardRate: number;
   totalAmount: number;
+};
+
+type CustomerBlockStatus = {
+  blocked: boolean;
+  checking: boolean;
+  message: string;
 };
 
 const BANK_NAME = "새마을금고";
@@ -242,6 +249,11 @@ export default function OrderPage() {
   const [paymentMethod, setPaymentMethod] = useState<"무통장입금" | "카드결제">("무통장입금");
   const [items, setItems] = useState<OrderItem[]>([{ ...emptyItem }]);
   const [submitting, setSubmitting] = useState(false);
+  const [customerBlockStatus, setCustomerBlockStatus] = useState<CustomerBlockStatus>({
+    blocked: false,
+    checking: false,
+    message: "",
+  });
   const [showDepositConfirmModal, setShowDepositConfirmModal] = useState(false);
   const PRIVACY_CONSENT_VERSION = "2026-05-24-v1";
   const PRIVACY_CONSENT_STORAGE_KEY = "ruru_privacy_consent_version";
@@ -272,12 +284,66 @@ export default function OrderPage() {
     !isEditMode &&
     Boolean(customerPhone && youtubeNickname && customerName);
 
+  const refreshCustomerBlockStatus = async (phoneValue: string) => {
+    const cleanPhone = normalizePhone(phoneValue);
+
+    if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+      const result = { blocked: false, checking: false, message: "" };
+      setCustomerBlockStatus(result);
+      return result;
+    }
+
+    setCustomerBlockStatus((current) => ({ ...current, checking: true }));
+
+    try {
+      const response = await fetch(`/api/customer-block-check?phone=${encodeURIComponent(cleanPhone)}`, {
+        cache: "no-store",
+      });
+
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.message || "차단 여부 확인 실패");
+      }
+
+      const result = {
+        blocked: Boolean(payload.blocked),
+        checking: false,
+        message: Boolean(payload.blocked) ? "현재 주문서 작성이 제한되어 있습니다." : "",
+      };
+
+      setCustomerBlockStatus(result);
+      return result;
+    } catch {
+      const result = { blocked: false, checking: false, message: "" };
+      setCustomerBlockStatus(result);
+      return result;
+    }
+  };
+
   useEffect(() => {
     loadOrderSettings();
     loadBroadcast();
     clearLegacyCustomerSessionIfNeeded();
     loadSavedCustomerInfo();
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const cleanPhone = normalizePhone(customerPhone);
+
+    if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+      setCustomerBlockStatus({ blocked: false, checking: false, message: "" });
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      refreshCustomerBlockStatus(cleanPhone);
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [customerPhone]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1346,6 +1412,13 @@ export default function OrderPage() {
   };
 
   const submitOrder = async () => {
+    const blockCheck = await refreshCustomerBlockStatus(customerPhone);
+
+    if (blockCheck.blocked) {
+      setShowDepositConfirmModal(false);
+      return;
+    }
+
     if (!validate()) return;
 
     if (!hasPrivacyConsent && privacyConsentChecked && typeof window !== "undefined") {
@@ -1860,13 +1933,17 @@ export default function OrderPage() {
               </label>
             )}
 
+                        {customerBlockStatus.blocked ? (
+              <CustomerBlockedNotice />
+            ) : null}
+
             <button
               type="button"
               onClick={handleSubmitOrderClick}
-              disabled={submitting}
+              disabled={submitting || customerBlockStatus.blocked}
               className={`${buttonBase} rounded-2xl bg-blue-500 p-5 text-lg font-black text-white shadow-lg shadow-blue-200 disabled:opacity-50`}
             >
-              {submitting ? "제출 중..." : "주문서 제출하기"}
+              {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : "주문서 제출하기"}
             </button>
           </div>
         </section>

@@ -27,6 +27,7 @@ import CommonCustomerTopNav from "@/components/customer/CustomerTopNav";
 import { useEffect, useMemo, useState } from "react";
 import GroupBuyPageHero from "@/components/group-buy/GroupBuyPageHero";
 import GroupBuyDeliveryNotice from "@/components/group-buy/GroupBuyDeliveryNotice";
+import CustomerBlockedNotice from "@/components/customer/CustomerBlockedNotice";
 
 declare global {
   interface Window {
@@ -57,6 +58,14 @@ type CustomerSession = {
   zipcode: string;
   address: string;
   detail_address: string;
+  is_blocked?: boolean | string | null;
+  block_reason?: string | null;
+};
+
+type CustomerBlockStatus = {
+  blocked: boolean;
+  checking: boolean;
+  message: string;
 };
 
 const NORMAL_SHIPPING_FEE = 4000;
@@ -306,11 +315,70 @@ export default function GroupBuyPage() {
   const [qty, setQty] = useState("1");
   const [optionText, setOptionText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [customerBlockStatus, setCustomerBlockStatus] = useState<CustomerBlockStatus>({
+    blocked: false,
+    checking: false,
+    message: "",
+  });
   const [completeMessage, setCompleteMessage] = useState("");
   const [completePaymentMethod, setCompletePaymentMethod] = useState<"무통장입금" | "카드결제">("무통장입금");
   const [completeTotalAmount, setCompleteTotalAmount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<"무통장입금" | "카드결제">("무통장입금");
   const [copyDone, setCopyDone] = useState(false);
+
+  const refreshCustomerBlockStatus = async (phoneValue: string) => {
+    const phone = onlyNumber(phoneValue);
+
+    if (phone.length < 10 || phone.length > 11) {
+      const result = { blocked: false, checking: false, message: "" };
+      setCustomerBlockStatus(result);
+      return result;
+    }
+
+    setCustomerBlockStatus((current) => ({ ...current, checking: true }));
+
+    try {
+      const response = await fetch(`/api/customer-block-check?phone=${encodeURIComponent(phone)}`, {
+        cache: "no-store",
+      });
+
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.message || "차단 여부 확인 실패");
+      }
+
+      const result = {
+        blocked: Boolean(payload.blocked),
+        checking: false,
+        message: Boolean(payload.blocked) ? "현재 주문서 작성이 제한되어 있습니다." : "",
+      };
+
+      setCustomerBlockStatus(result);
+      return result;
+    } catch {
+      const result = { blocked: false, checking: false, message: "" };
+      setCustomerBlockStatus(result);
+      return result;
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const phone = onlyNumber(customerPhone || session?.customer_phone || "");
+
+    if (phone.length < 10 || phone.length > 11) {
+      setCustomerBlockStatus({ blocked: false, checking: false, message: "" });
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      refreshCustomerBlockStatus(phone);
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [customerPhone, session?.customer_phone]);
 
   useEffect(() => {
     const cleanup = blockCustomerCopyEvents();
@@ -626,6 +694,13 @@ export default function GroupBuyPage() {
   };
 
   const submitGroupOrder = async () => {
+    const checkPhone = customerPhone || session?.customer_phone || "";
+    const blockCheck = await refreshCustomerBlockStatus(checkPhone);
+
+    if (blockCheck.blocked) {
+      return;
+    }
+
     if (!selectedProduct) return;
 
     if (getProductStockStatus(selectedProduct) === "품절") {
@@ -1165,12 +1240,18 @@ export default function GroupBuyPage() {
                           </div>
                         </div>
 
+                                                {customerBlockStatus.blocked ? (
+                          <div className="mb-4">
+                            <CustomerBlockedNotice />
+                          </div>
+                        ) : null}
+
                         <PressButton
-                          disabled={isSubmitting}
+                          disabled={isSubmitting || customerBlockStatus.blocked}
                           onClick={submitGroupOrder}
                           className="mt-4 w-full rounded-[22px] bg-gradient-to-br from-[#ff5d6d] via-[#ff4c62] to-[#ff405a] px-4 py-5 text-[18px] font-black text-white shadow-[0_12px_26px_rgba(255,76,98,0.22)]"
                         >
-                          {isSubmitting ? "주문 저장중..." : "주문완료신청"}
+                          {customerBlockStatus.blocked ? "주문 제한됨" : isSubmitting ? "주문 저장중..." : "주문완료신청"}
                         </PressButton>
                       </section>
                     )}
