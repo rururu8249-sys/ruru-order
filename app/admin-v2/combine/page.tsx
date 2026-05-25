@@ -7,6 +7,7 @@
 
 "use client";
 
+import { showAdminToast } from "@/lib/adminToast";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -67,7 +68,7 @@ export default function CombineShippingAdminPage() {
       .in("key", COMBINE_SHIPPING_SETTING_KEYS);
 
     if (error) {
-      alert("합배송 설정 불러오기 오류: " + error.message);
+      showAdminToast("합배송 설정 불러오기 오류: " + error.message, "error");
       setLoading(false);
       return;
     }
@@ -82,12 +83,12 @@ export default function CombineShippingAdminPage() {
 
   const saveSettings = async () => {
     if (!startLocal) {
-      alert(`${SETTING_LABELS.startAt}을 입력해주세요.`);
+      showAdminToast(`${SETTING_LABELS.startAt}을 입력해주세요.`, "warning");
       return;
     }
 
     if (!endLocal) {
-      alert(`${SETTING_LABELS.endAt}을 입력해주세요.`);
+      showAdminToast(`${SETTING_LABELS.endAt}을 입력해주세요.`, "warning");
       return;
     }
 
@@ -95,12 +96,12 @@ export default function CombineShippingAdminPage() {
     const endIso = fromDateTimeLocalValue(endLocal);
 
     if (!startIso || !endIso) {
-      alert("합배송 시간을 다시 확인해주세요.");
+      showAdminToast("합배송 시간을 다시 확인해주세요.", "warning");
       return;
     }
 
     if (new Date(startIso).getTime() >= new Date(endIso).getTime()) {
-      alert("합배송 마감 시간은 시작 시간보다 늦어야 합니다.");
+      showAdminToast("합배송 마감 시간은 시작 시간보다 늦어야 합니다.", "warning");
       return;
     }
 
@@ -119,11 +120,11 @@ export default function CombineShippingAdminPage() {
     setSaving(false);
 
     if (error) {
-      alert("저장 오류: " + error.message);
+      showAdminToast("저장 오류: " + error.message, "error");
       return;
     }
 
-    alert("시간지정 합배송 설정을 저장했습니다.");
+    showAdminToast("시간지정 합배송 설정을 저장했습니다.", "success");
   };
 
   const applyTonightDefault = () => {
@@ -157,11 +158,11 @@ export default function CombineShippingAdminPage() {
     setSaving(false);
 
     if (error) {
-      alert("종료 오류: " + error.message);
+      showAdminToast("종료 오류: " + error.message, "error");
       return;
     }
 
-    alert("시간지정 합배송을 종료했습니다.");
+    showAdminToast("시간지정 합배송을 종료했습니다.", "success");
   };
 
   return (
