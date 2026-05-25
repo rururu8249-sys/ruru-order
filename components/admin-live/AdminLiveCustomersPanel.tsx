@@ -7,6 +7,7 @@
 import { useMemo, useState } from "react";
 import type { LiveOrder } from "./types";
 import AdminLiveCustomerIssueRail from "./AdminLiveCustomerIssueRail";
+import AdminLivePhoneBlockPanel from "./AdminLivePhoneBlockPanel";
 import { CUSTOMER_TERMS } from "./adminLiveCustomerTerms";
 
 type Props = {
@@ -33,6 +34,11 @@ type CustomerSummary = {
 
 type SortMode = "latest" | "amount" | "orders" | "nickname";
 type StatusFilter = "all" | "normal" | "blocked" | "attention";
+
+type BlockOverride = {
+  blocked: boolean;
+  reason: string;
+};
 
 const CUSTOMER_PAGE_SIZE = 20;
 const DETAIL_ORDER_PAGE_SIZE = 6;
@@ -300,6 +306,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
   const [page, setPage] = useState(1);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerSummary | null>(null);
   const [detailPage, setDetailPage] = useState(1);
+  const [blockOverrides, setBlockOverrides] = useState<Record<string, BlockOverride>>({});
 
   const customers = useMemo<CustomerSummary[]>(() => {
     const map = new Map<string, CustomerSummary>();
@@ -309,6 +316,10 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
       const current = map.get(key);
       const amount = orderAmount(order);
       const latestOrderAt = orderCreatedLabel(order);
+      const phoneKey = digitsOnly(orderPhone(order));
+      const override = phoneKey ? blockOverrides[phoneKey] : undefined;
+      const orderBlocked = override ? override.blocked : isBlockedOrder(order);
+      const orderBlockReason = override ? override.reason : blockReason(order);
 
       if (!current) {
         map.set(key, {
@@ -322,8 +333,8 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
           unpaidCount: isUnpaid(order) ? 1 : 0,
           manualNeededCount: isManualNeeded(order) ? 1 : 0,
           latestOrderAt,
-          blocked: isBlockedOrder(order),
-          blockReason: blockReason(order),
+          blocked: orderBlocked,
+          blockReason: orderBlockReason,
           orders: [order],
         });
 
@@ -335,8 +346,8 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
       current.paidCount += isPaid(order) ? 1 : 0;
       current.unpaidCount += isUnpaid(order) ? 1 : 0;
       current.manualNeededCount += isManualNeeded(order) ? 1 : 0;
-      current.blocked = current.blocked || isBlockedOrder(order);
-      current.blockReason = current.blockReason || blockReason(order);
+      current.blocked = current.blocked || orderBlocked;
+      current.blockReason = current.blockReason || orderBlockReason;
       current.orders.push(order);
 
       if (!current.latestOrderAt || latestOrderAt > current.latestOrderAt) {
@@ -345,7 +356,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
     });
 
     return Array.from(map.values());
-  }, [orders]);
+  }, [blockOverrides, orders]);
 
   const filteredCustomers = useMemo(() => {
     const searchText = keyword.replace(/\s+/g, "").toLowerCase();
@@ -390,15 +401,59 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
     setDetailPage(1);
   };
 
-  const blockActionAlert = (customer: CustomerSummary) => {
-    alert(
-      [
-        `${customer.nickname} 고객의 ${customer.blocked ? "차단해제" : "차단"} 저장은 2차에서 연결합니다.`,
-        "",
-        "이번 1차 작업은 고객관리 화면 구조와 상세 확인 흐름을 먼저 안정화합니다.",
-        "차단 저장은 고객 DB 필드와 차단이력 저장 구조 확인 후 진행해야 합니다.",
-      ].join("\n")
-    );
+  const applyBlockResult = (result: { phone: string; blocked: boolean; reason: string }) => {
+    const phoneKey = digitsOnly(result.phone);
+    if (!phoneKey) return;
+
+    setBlockOverrides((current) => ({
+      ...current,
+      [phoneKey]: {
+        blocked: result.blocked,
+        reason: result.reason,
+      },
+    }));
+  };
+
+  const saveCustomerBlock = async (customer: CustomerSummary) => {
+    const phoneKey = digitsOnly(customer.phone);
+
+    if (!phoneKey) {
+      alert("전화번호가 없어 차단 처리할 수 없습니다.");
+      return;
+    }
+
+    const nextBlocked = !customer.blocked;
+    const reason = nextBlocked ? window.prompt("차단사유를 입력하세요.", customer.blockReason || "고객관리 차단") : "";
+
+    if (nextBlocked && reason === null) return;
+    if (!nextBlocked && !confirm(`${customer.nickname} 고객을 차단해제할까요?`)) return;
+
+    const response = await fetch("/api/admin-live/customer-block", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        phone: phoneKey,
+        blocked: nextBlocked,
+        reason: nextBlocked ? reason || "고객관리 차단" : "",
+      }),
+    });
+
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok || !payload?.ok) {
+      alert(payload?.message || "차단 처리 실패");
+      return;
+    }
+
+    applyBlockResult({
+      phone: phoneKey,
+      blocked: nextBlocked,
+      reason: nextBlocked ? reason || "고객관리 차단" : "",
+    });
+
+    alert(`${customer.nickname} 고객을 ${nextBlocked ? "차단" : "차단해제"}했습니다.`);
   };
 
   return (
@@ -425,6 +480,8 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
           <SummaryCard label="관리필요 고객" value={`${attentionCustomers.length.toLocaleString("ko-KR")}명`} sub="미입금/입금확인 필요" />
         </div>
       </div>
+
+      <AdminLivePhoneBlockPanel onSaved={applyBlockResult} />
 
       <div className="grid gap-5 xl:grid-cols-[minmax(760px,1fr)_390px]">
         <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
@@ -532,7 +589,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
                       <td className="px-3 py-3 text-center">
                         <button
                           type="button"
-                          onClick={() => blockActionAlert(customer)}
+                          onClick={() => saveCustomerBlock(customer)}
                           className={`rounded-xl px-3 py-1.5 text-xs font-black ${
                             customer.blocked
                               ? "bg-slate-100 text-slate-700 hover:bg-slate-200"
