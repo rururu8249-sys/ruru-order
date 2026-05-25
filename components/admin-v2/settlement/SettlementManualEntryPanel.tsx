@@ -191,9 +191,7 @@ export default function SettlementManualEntryPanel({
     <div className="grid gap-4 rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-xs font-black tracking-[0.22em] text-violet-600">MANUAL MONEY ENTRY</div>
-          <h3 className="mt-1 text-2xl font-black tracking-[-0.04em] text-slate-950">수동 정산 입력</h3>
-          <p className="mt-2 text-sm font-bold text-slate-500">
+          <p className="text-sm font-bold leading-6 text-slate-500">
             창고정산, 기타지출, 과거매출을 주문 데이터와 분리해서 빠르게 입력합니다.
           </p>
         </div>
@@ -258,7 +256,7 @@ export default function SettlementManualEntryPanel({
         <div className="grid gap-2">
           <span className="text-xs font-black text-slate-500">빠른 제목</span>
           <div className="flex flex-wrap gap-2">
-            {(entryType === "income" ? ["기타매출", "과거매출", "현장매출"] : ["창고정산", "택배비", "포장비", "사입비", "기타지출"]).map((quickTitle) => (
+            {(entryType === "income" ? ["기타매출", "과거매출"] : ["창고정산", "택배비", "알바비", "사입비", "기타지출"]).map((quickTitle) => (
               <button
                 key={quickTitle}
                 type="button"
