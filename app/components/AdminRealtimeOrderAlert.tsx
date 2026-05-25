@@ -1,3 +1,7 @@
+"use client";
+
+import { showAdminToast } from "@/lib/adminToast";
+
 // app/components/AdminRealtimeOrderAlert.tsx
 // 전체 교체용
 // 파일 위치:
@@ -16,7 +20,6 @@
 // - 처음 1회 "주문 알림켜기" 클릭 시 브라우저 알림 권한을 허용해야 합니다.
 // - Mac 시스템 설정에서 사용 중인 브라우저 알림이 허용되어 있어야 합니다.
 
-"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -184,7 +187,7 @@ export default function AdminRealtimeOrderAlert() {
         } catch {}
       }, 50);
     } catch {
-      alert("알림 활성화에 실패했습니다.");
+      showAdminToast("알림 활성화에 실패했습니다.");
     }
   };
 
