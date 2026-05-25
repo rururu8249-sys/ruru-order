@@ -1,5 +1,7 @@
 "use client";
 
+import { showCustomerToast } from "@/lib/customerToast";
+
 import Link from "next/link";
 import { useState } from "react";
 
@@ -63,7 +65,7 @@ export default function OrderCompletePaymentNotice({
       setCopyDone(true);
       window.setTimeout(() => setCopyDone(false), 1800);
     } catch {
-      alert(bankAccount);
+      showCustomerToast(bankAccount, "success");
     }
   };
 
