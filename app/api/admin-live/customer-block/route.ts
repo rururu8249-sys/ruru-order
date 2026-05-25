@@ -162,37 +162,24 @@ export async function POST(request: Request) {
   }
 
   const matchedCount = Array.isArray(data) ? data.length : 0;
-  let directBlockSaved = false;
 
-  if (matchedCount === 0) {
-    const { error: directError } = await supabase.from("customer_phone_blocks").upsert(
-      {
-        phone: phoneDigits,
-        is_blocked: blocked,
-        reason: blocked ? reason : "",
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "phone" }
-    );
+  const { error: directError } = await supabase.from("customer_phone_blocks").upsert(
+    {
+      phone: phoneDigits,
+      is_blocked: blocked,
+      reason: blocked ? reason : "",
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "phone" }
+  );
 
-    if (directError) {
-      if (isMissingPhoneBlockTableError(directError)) {
-        return NextResponse.json(
-          {
-            ok: false,
-            message:
-              "전화번호 전용 차단 테이블이 없습니다. Supabase SQL Editor에서 supabase/sql/customer_phone_blocks.sql 내용을 먼저 실행해주세요.",
-            phone: phoneDigits,
-            matchedCount,
-          },
-          { status: 500 }
-        );
-      }
-
+  if (directError) {
+    if (isMissingPhoneBlockTableError(directError)) {
       return NextResponse.json(
         {
           ok: false,
-          message: directError.message,
+          message:
+            "전화번호 전용 차단 테이블이 없습니다. Supabase SQL Editor에서 supabase/sql/customer_phone_blocks.sql 내용을 먼저 실행해주세요.",
           phone: phoneDigits,
           matchedCount,
         },
@@ -200,23 +187,18 @@ export async function POST(request: Request) {
       );
     }
 
-    directBlockSaved = true;
+    return NextResponse.json(
+      {
+        ok: false,
+        message: directError.message,
+        phone: phoneDigits,
+        matchedCount,
+      },
+      { status: 500 }
+    );
   }
 
-  if (matchedCount > 0 && !blocked) {
-    await supabase
-      .from("customer_phone_blocks")
-      .upsert(
-        {
-          phone: phoneDigits,
-          is_blocked: false,
-          reason: "",
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "phone" }
-      )
-      .then(() => null);
-  }
+  const directBlockSaved = true;
 
   return NextResponse.json({
     ok: true,

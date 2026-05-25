@@ -571,6 +571,9 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
 
   const customers = useMemo<CustomerSummary[]>(() => {
     const map = new Map<string, CustomerSummary>();
+    const directPhoneBlockMap = new Map(
+      directPhoneBlocks.map((block) => [digitsOnly(block.phone), block.reason] as const).filter(([phone]) => Boolean(phone))
+    );
 
     (orders as LooseLiveOrder[]).forEach((order) => {
       const key = buildCustomerKey(order);
@@ -579,8 +582,9 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
       const latestOrderAt = orderCreatedSortValue(order);
       const phoneKey = digitsOnly(orderPhone(order));
       const override = phoneKey ? blockOverrides[phoneKey] : undefined;
-      const orderBlocked = override ? override.blocked : isBlockedOrder(order);
-      const orderBlockReason = override ? override.reason : blockReason(order);
+      const directBlockReason = phoneKey ? directPhoneBlockMap.get(phoneKey) : undefined;
+      const orderBlocked = override ? override.blocked : Boolean(directBlockReason) || isBlockedOrder(order);
+      const orderBlockReason = override ? override.reason : directBlockReason || blockReason(order);
 
       if (!current) {
         map.set(key, {
@@ -622,7 +626,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
     });
 
     return Array.from(map.values());
-  }, [blockOverrides, orders]);
+  }, [blockOverrides, directPhoneBlocks, orders]);
 
   const filteredCustomers = useMemo(() => {
     const searchText = keyword.replace(/\s+/g, "").toLowerCase();
