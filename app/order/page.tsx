@@ -300,13 +300,14 @@ export default function OrderPage() {
   const [done, setDone] = useState<DoneData | null>(null);
   const [copyDone, setCopyDone] = useState(false);
   const [customerCardRate, setCustomerCardRate] = useState(10);
+  const [actualCardFeeRate, setActualCardFeeRate] = useState(7);
+  const [cardPaymentMinAmount, setCardPaymentMinAmount] = useState(100000);
   const [defaultShippingFee, setDefaultShippingFee] = useState(4000);
   const [remoteAreaShippingFee, setRemoteAreaShippingFee] = useState(6000);
   const [combineShippingSettings, setCombineShippingSettings] =
     useState<CombineShippingSettings>(DEFAULT_COMBINE_SHIPPING_SETTINGS);
   const [alreadyPaidShipping, setAlreadyPaidShipping] = useState(false);
 
-  const actualCardFeeRate = 7;
   const isRemoteAreaShippingAddress = isRemoteAreaAddress(zipcode, address, detailAddress);
   const generalShippingFee = Number(broadcast?.shipping_fee ?? defaultShippingFee);
   const baseShippingFee = isRemoteAreaShippingAddress
@@ -571,6 +572,8 @@ export default function OrderPage() {
       .select("key,value")
       .in("key", [
         "customer_card_extra_rate",
+        "actual_card_fee_rate",
+        "card_payment_min_amount",
         "default_shipping_fee",
         "remote_area_shipping_fee",
         ...COMBINE_SHIPPING_SETTING_KEYS,
@@ -587,11 +590,15 @@ export default function OrderPage() {
       return Number.isFinite(parsed) ? parsed : fallback;
     };
 
-    const nextCustomerCardRate = Math.min(10, Math.max(0, readNumber("customer_card_extra_rate", 10)));
+    const nextCustomerCardRate = Math.min(20, Math.max(0, readNumber("customer_card_extra_rate", 10)));
+    const nextActualCardFeeRate = Math.min(20, Math.max(0, readNumber("actual_card_fee_rate", 7)));
+    const nextCardPaymentMinAmount = Math.max(0, Math.round(readNumber("card_payment_min_amount", 100000)));
     const nextDefaultShippingFee = Math.max(0, readNumber("default_shipping_fee", 4000));
     const nextRemoteAreaShippingFee = Math.max(nextDefaultShippingFee, readNumber("remote_area_shipping_fee", 6000));
 
     setCustomerCardRate(nextCustomerCardRate);
+    setActualCardFeeRate(nextActualCardFeeRate);
+    setCardPaymentMinAmount(nextCardPaymentMinAmount);
     setDefaultShippingFee(nextDefaultShippingFee);
     setRemoteAreaShippingFee(nextRemoteAreaShippingFee);
     setCombineShippingSettings(parseCombineShippingSettings(data));
@@ -1437,8 +1444,8 @@ export default function OrderPage() {
       }
     }
 
-    if (paymentMethod === "카드결제" && productAmount < 100000) {
-      showCustomerNotice("카드결제는 10만원 이상 구매 시 가능합니다.");
+    if (paymentMethod === "카드결제" && productAmount < cardPaymentMinAmount) {
+      showCustomerNotice(`카드결제는 ${cardPaymentMinAmount.toLocaleString()}원 이상 구매 시 가능합니다.`);
       return false;
     }
 
@@ -1928,7 +1935,7 @@ export default function OrderPage() {
 
             {paymentMethod === "카드결제" && (
               <div className="rounded-2xl bg-blue-50 p-3 text-xs font-bold leading-relaxed text-blue-700">
-                💳 카드결제는 10만원 이상 구매 시 가능합니다.
+                {`💳 카드결제는 ${cardPaymentMinAmount.toLocaleString()}원 이상 구매 시 가능합니다.`}
                 <br />
                 주문서 작성 후 카톡채널 문의 부탁드립니다.
               </div>

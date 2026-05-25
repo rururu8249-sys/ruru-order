@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import ManualPaymentMatchDrawer from "@/components/admin-v2/payment/ManualPaymentMatchDrawer";
 import PaymentMatchPanel from "@/components/admin-v2/payment/PaymentMatchPanel";
+import AdminSettlementPanel from "@/components/admin-v2/settlement/AdminSettlementPanel";
 import RosenExportOnlyNotice from "@/components/admin-v2/shipping/RosenExportOnlyNotice";
 import AdminOrderPaymentCell from "@/components/admin-v2/orders/AdminOrderPaymentCell";
 import AdminOrderTableHeader from "@/components/admin-v2/orders/AdminOrderTableHeader";
@@ -742,6 +743,7 @@ export function AdminV2Client() {
   const settingsSummary = useMemo(() => ({
     customerCardRate: readSettingNumber(settings, "customer_card_extra_rate", 10),
     actualCardRate: readSettingNumber(settings, "actual_card_fee_rate", 7),
+    cardPaymentMinAmount: readSettingNumber(settings, "card_payment_min_amount", 100000),
     defaultShippingFee: readSettingNumber(settings, "default_shipping_fee", 4000),
     remoteAreaShippingFee: readSettingNumber(settings, "remote_area_shipping_fee", 6000),
   }), [settings]);
@@ -1467,14 +1469,10 @@ export function AdminV2Client() {
                   onSyncBankdaDeposits={syncBankdaDeposits}
                 />
               ) : activeTab === "settlement" ? (
-                <SettlementPanel
+                <AdminSettlementPanel
                   orderGroups={filteredOrderGroups}
-                  deposits={deposits}
-                  actualCardRate={settingsSummary.actualCardRate}
-                  selectedDateKey={dateFilter}
-                  dateLabel={dateOptions.find((item) => item.value === dateFilter)?.label || "최근 기준"}
-                  buyerRanking={sideSummary.buyerRanking}
-                  productRanking={sideSummary.productRanking}
+                  broadcasts={broadcasts}
+                  settingsSummary={settingsSummary}
                 />
               ) : activeTab === "settings" ? (
                 <SettingsPanel settingsSummary={settingsSummary} saveSetting={saveSetting} />
