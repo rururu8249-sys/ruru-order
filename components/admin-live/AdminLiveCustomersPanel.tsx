@@ -330,7 +330,7 @@ function CustomerDetailDrawer({
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
           <div>
             <div className="text-[11px] font-black tracking-[0.18em] text-blue-500">CUSTOMER DETAIL</div>
-            <h2 className="mt-1 text-3xl font-black tracking-[-0.05em] text-slate-950">{customer.nickname}</h2>
+            <h2 className="mt-1 text-2xl font-black tracking-[-0.04em] text-slate-950">{customer.nickname}</h2>
             <p className="mt-1 text-sm font-bold text-slate-500">
               {customer.name} · {formatPhone(customer.phone)}
             </p>
@@ -369,14 +369,14 @@ function CustomerDetailDrawer({
             label={CUSTOMER_TERMS.customerStatus}
             value={customer.blocked ? CUSTOMER_TERMS.blocked : CUSTOMER_TERMS.normal}
             sub={customer.blockReason || "차단 정보 없음"}
-            valueClassName="whitespace-nowrap text-[22px]"
+            valueClassName="whitespace-nowrap text-[17px] leading-tight"
           />
           <SummaryCard
             icon="🧾"
             label={CUSTOMER_TERMS.orderCount}
             value={`${customer.orderCount.toLocaleString("ko-KR")}건`}
             sub="현재 주문 데이터 기준"
-            valueClassName="whitespace-nowrap text-[24px]"
+            valueClassName="whitespace-nowrap text-[18px] leading-tight"
           />
           <SummaryCard
             icon="💳"
@@ -390,7 +390,7 @@ function CustomerDetailDrawer({
             label={CUSTOMER_TERMS.latestOrder}
             value={formatOrderDateTime(customer.latestOrderAt)}
             sub="가장 최근 주문"
-            valueClassName="text-[17px] leading-[1.3] tracking-[-0.03em]"
+            valueClassName="text-[13px] leading-[1.25] tracking-[-0.02em]"
             subClassName="text-[12px]"
           />
         </div>
@@ -508,6 +508,8 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
   const [blockErrorMessage, setBlockErrorMessage] = useState("");
   const [blockStatusMessage, setBlockStatusMessage] = useState("");
   const [showBlockedCustomers, setShowBlockedCustomers] = useState(false);
+  const [blockedCustomerKeywordDraft, setBlockedCustomerKeywordDraft] = useState("");
+  const [blockedCustomerKeyword, setBlockedCustomerKeyword] = useState("");
 
   const customers = useMemo<CustomerSummary[]>(() => {
     const map = new Map<string, CustomerSummary>();
@@ -601,6 +603,24 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
 
   const normalCustomers = customers.filter((customer) => !customer.blocked);
   const blockedCustomers = customers.filter((customer) => customer.blocked);
+  const filteredBlockedCustomers = blockedCustomers.filter((customer) => {
+    const searchText = blockedCustomerKeyword.replace(/\s+/g, "").toLowerCase();
+
+    if (!searchText) return true;
+
+    return [
+      customer.nickname,
+      customer.name,
+      customer.phone,
+      formatPhone(customer.phone),
+      customer.address,
+      customer.blockReason,
+    ]
+      .join(" ")
+      .replace(/\s+/g, "")
+      .toLowerCase()
+      .includes(searchText);
+  });
   const attentionCustomers = customers.filter((customer) => customer.manualNeededCount > 0 || customer.unpaidCount > 0);
 
   const openDetail = (customer: CustomerSummary) => {
@@ -718,25 +738,31 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowBlockedCustomers(true)}
-              className="rounded-full border border-red-100 bg-red-50 px-4 py-2 text-xs font-black text-red-700 hover:bg-red-100"
-            >
-              차단 고객 보기 {blockedCustomers.length.toLocaleString("ko-KR")}명
-            </button>
-
-            <div className="rounded-full bg-blue-50 px-4 py-2 text-xs font-black text-blue-700">
-              차단 저장 연결
-            </div>
+          <div className="rounded-full bg-blue-50 px-4 py-2 text-xs font-black text-blue-700">
+            차단 저장 연결
           </div>
         </div>
 
         <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <SummaryCard icon="👥" label="전체 고객" value={`${customers.length.toLocaleString("ko-KR")}명`} sub="현재 주문 데이터 기준" />
           <SummaryCard icon="✅" label="정상 고객" value={`${normalCustomers.length.toLocaleString("ko-KR")}명`} sub="차단 제외" />
-          <SummaryCard icon="⛔" label="차단 고객" value={`${blockedCustomers.length.toLocaleString("ko-KR")}명`} sub="차단 표시 기준" />
+          <button
+            type="button"
+            onClick={() => {
+              setBlockedCustomerKeywordDraft("");
+              setBlockedCustomerKeyword("");
+              setShowBlockedCustomers(true);
+            }}
+            className="text-left"
+            title="차단 고객 목록 보기"
+          >
+            <SummaryCard
+              icon="⛔"
+              label="차단 고객"
+              value={`${blockedCustomers.length.toLocaleString("ko-KR")}명`}
+              sub="클릭하면 차단목록 확인"
+            />
+          </button>
           <SummaryCard icon="⚠️" label="관리필요 고객" value={`${attentionCustomers.length.toLocaleString("ko-KR")}명`} sub="미입금 / 입금확인 필요" />
         </div>
       </div>
@@ -912,11 +938,54 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
 
               <button
                 type="button"
-                onClick={() => setShowBlockedCustomers(false)}
+                onClick={() => {
+                  setShowBlockedCustomers(false);
+                  setBlockedCustomerKeywordDraft("");
+                  setBlockedCustomerKeyword("");
+                }}
                 className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 hover:bg-slate-50"
               >
                 닫기
               </button>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-3">
+              <div className="grid gap-2 md:grid-cols-[1fr_96px_96px]">
+                <input
+                  value={blockedCustomerKeywordDraft}
+                  onChange={(event) => setBlockedCustomerKeywordDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      setBlockedCustomerKeyword(blockedCustomerKeywordDraft);
+                    }
+                  }}
+                  placeholder="닉네임 / 이름 / 전화번호 / 주소 / 차단사유 검색"
+                  className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setBlockedCustomerKeyword(blockedCustomerKeywordDraft)}
+                  className="h-11 rounded-xl bg-slate-900 px-3 text-sm font-black text-white hover:bg-slate-700"
+                >
+                  검색
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBlockedCustomerKeywordDraft("");
+                    setBlockedCustomerKeyword("");
+                  }}
+                  className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-600 hover:bg-slate-50"
+                >
+                  초기화
+                </button>
+              </div>
+
+              <div className="mt-2 text-xs font-black text-slate-400">
+                표시 {filteredBlockedCustomers.length.toLocaleString("ko-KR")}명 / 전체 {blockedCustomers.length.toLocaleString("ko-KR")}명
+              </div>
             </div>
 
             <div className="mt-4 space-y-2">
@@ -924,8 +993,12 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-8 text-center text-sm font-black text-slate-400">
                   차단 고객이 없습니다.
                 </div>
+              ) : filteredBlockedCustomers.length === 0 ? (
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-8 text-center text-sm font-black text-slate-400">
+                  검색 결과가 없습니다.
+                </div>
               ) : (
-                blockedCustomers.map((customer) => (
+                filteredBlockedCustomers.map((customer) => (
                   <div
                     key={`blocked-${customer.key}`}
                     className="rounded-2xl border border-red-100 bg-red-50/60 p-4"
