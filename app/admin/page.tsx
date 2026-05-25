@@ -473,7 +473,7 @@ export default function AdminPage() {
       .limit(20);
 
     if (error) {
-      alert("방송 목록 불러오기 실패\n\n" + error.message);
+      showAdminToast("방송 목록 불러오기 실패\n\n" + error.message, "error");
       setLoadingBroadcasts(false);
       return;
     }
@@ -1685,7 +1685,7 @@ const selectedCustomerDetail = useMemo(() => {
 
   const startBroadcast = async () => {
     if (!broadcastTitle.trim()) {
-      alert("방송 제목을 입력해주세요.");
+      showAdminToast("방송 제목을 입력해주세요.", "warning");
       return;
     }
 
@@ -1736,10 +1736,10 @@ const selectedCustomerDetail = useMemo(() => {
       await upsertSetting("broadcast_status", "ON");
       await upsertSetting("current_broadcast_name", broadcastTitle.trim());
 
-      alert("방송 시작 처리 완료");
+      showAdminToast("방송 시작 처리 완료", "success");
       await loadBroadcasts();
     } catch (error: any) {
-      alert("방송 시작 실패\n\n" + error.message);
+      showAdminToast("방송 시작 실패\n\n" + error.message, "error");
     } finally {
       setSavingBroadcast(false);
     }
@@ -1747,12 +1747,12 @@ const selectedCustomerDetail = useMemo(() => {
 
   const saveActiveBroadcast = async () => {
     if (!activeBroadcast?.id) {
-      alert("현재 방송중인 방송이 없습니다.");
+      showAdminToast("현재 방송중인 방송이 없습니다.", "warning");
       return;
     }
 
     if (!broadcastTitle.trim()) {
-      alert("방송 제목을 입력해주세요.");
+      showAdminToast("방송 제목을 입력해주세요.", "warning");
       return;
     }
 
@@ -1775,10 +1775,10 @@ const selectedCustomerDetail = useMemo(() => {
       await saveBroadcastProducts(activeBroadcast.id);
       await upsertSetting("current_broadcast_name", broadcastTitle.trim());
 
-      alert("방송 설정 저장 완료");
+      showAdminToast("방송 설정 저장 완료", "success");
       await loadBroadcasts();
     } catch (error: any) {
-      alert("방송 설정 저장 실패\n\n" + error.message);
+      showAdminToast("방송 설정 저장 실패\n\n" + error.message, "error");
     } finally {
       setSavingBroadcast(false);
     }
@@ -1786,7 +1786,7 @@ const selectedCustomerDetail = useMemo(() => {
 
   const endBroadcast = async () => {
     if (!activeBroadcast?.id) {
-      alert("현재 방송중인 방송이 없습니다.");
+      showAdminToast("현재 방송중인 방송이 없습니다.", "warning");
       return;
     }
 
@@ -1812,13 +1812,13 @@ const selectedCustomerDetail = useMemo(() => {
       await upsertSetting("broadcast_status", "OFF");
       await upsertSetting("current_broadcast_name", "");
 
-      alert("방송 종료 처리 완료");
+      showAdminToast("방송 종료 처리 완료", "success");
       setBroadcastTitle("");
       setBroadcastSubtitle("");
       setSelectedBroadcastProductIds([]);
       await loadBroadcasts();
     } catch (error: any) {
-      alert("방송 종료 실패\n\n" + error.message);
+      showAdminToast("방송 종료 실패\n\n" + error.message, "error");
     } finally {
       setSavingBroadcast(false);
     }
@@ -1851,11 +1851,11 @@ const selectedCustomerDetail = useMemo(() => {
       .eq("id", broadcastId);
 
     if (error) {
-      alert("방송기록 숨김 실패\n\n" + error.message);
+      showAdminToast("방송기록 숨김 실패\n\n" + error.message, "error");
       return;
     }
 
-    alert("방송기록을 숨김 처리했습니다.");
+    showAdminToast("방송기록을 숨김 처리했습니다.", "success");
     await loadBroadcasts();
   };
 
