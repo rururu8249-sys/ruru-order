@@ -104,7 +104,7 @@ function attachLinkedOrders(deposit: AnyRow, maps: ReturnType<typeof buildOrderM
   };
 }
 
-async function selectDeposits(supabase: ReturnType<typeof createClient>) {
+async function selectDeposits(supabase: any) {
   const ordered = await supabase
     .from("deposits")
     .select("*")
@@ -149,7 +149,7 @@ export async function GET() {
       );
     }
 
-    const deposits = depositsResult.data ?? [];
+    const deposits: AnyRow[] = Array.isArray(depositsResult.data) ? (depositsResult.data as AnyRow[]) : [];
 
     const ordersResult = await supabase
       .from("orders")
@@ -168,10 +168,10 @@ export async function GET() {
       });
     }
 
-    const orders = ordersResult.data ?? [];
+    const orders: AnyRow[] = Array.isArray(ordersResult.data) ? (ordersResult.data as AnyRow[]) : [];
     const maps = buildOrderMaps(orders);
-    const enrichedDeposits = deposits.map((deposit) => attachLinkedOrders(deposit, maps));
-    const linkedDepositCount = enrichedDeposits.filter((deposit) => Array.isArray(deposit.linked_orders) && deposit.linked_orders.length > 0).length;
+    const enrichedDeposits = deposits.map((deposit: AnyRow) => attachLinkedOrders(deposit, maps));
+    const linkedDepositCount = enrichedDeposits.filter((deposit: AnyRow) => Array.isArray(deposit.linked_orders) && deposit.linked_orders.length > 0).length;
 
     return NextResponse.json({
       ok: true,
