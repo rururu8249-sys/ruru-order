@@ -256,87 +256,44 @@ function isBlockedCustomer(customer: CustomerRow) {
   return customer.is_blocked === true || customer.is_blocked === "true" || customer.is_blocked === "Y";
 }
 
-function CustomerIssueCard({
+function CustomerIssueSummaryRow({
   task,
-  onResolve,
-  onHide,
-  onEdit,
+  onDetail,
 }: {
   task: AdminIssueTask;
-  onResolve: (task: AdminIssueTask) => void;
-  onHide: (task: AdminIssueTask) => void;
-  onEdit: (task: AdminIssueTask) => void;
+  onDetail: () => void;
 }) {
-  const done = isResolved(task);
   const metas = getIssueTypeMetas(task);
+  const nickname = getTaskNickname(task);
+  const name = getTaskName(task);
+  const displayName = [nickname, name].filter((value) => value && value !== "-").join(" / ") || "-";
 
   return (
-    <div
-      className={[
-        "rounded-xl border p-2.5 shadow-sm",
-        done ? "border-slate-200 bg-slate-50 opacity-65" : "border-amber-200 bg-amber-50",
-      ].join(" ")}
+    <button
+      type="button"
+      onClick={onDetail}
+      className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2 text-left hover:bg-blue-50"
+      title="고객관리에서 자세히 보기"
     >
-      <div className="mb-2 flex flex-wrap items-center gap-1">
+      <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-black text-orange-700">
+        미해결
+      </span>
+
+      <div className="min-w-0 truncate text-[12px] font-black text-slate-900">
+        {displayName}
+      </div>
+
+      <div className="flex min-w-0 flex-wrap justify-end gap-1">
         {metas.map((meta) => (
-          <span key={meta.taskType} className={`rounded-md border px-2 py-0.5 text-[11px] font-black ${meta.className}`}>
+          <span
+            key={meta.taskType}
+            className={`rounded-md border px-2 py-0.5 text-[11px] font-black ${meta.className}`}
+          >
             {meta.label}
           </span>
         ))}
-        {done ? (
-          <span className="rounded-md bg-slate-200 px-2 py-0.5 text-[11px] font-black text-slate-600">
-            해결완료
-          </span>
-        ) : (
-          <span className="rounded-md bg-orange-100 px-2 py-0.5 text-[11px] font-black text-orange-700">
-            미해결
-          </span>
-        )}
       </div>
-
-      <div className="grid grid-cols-[52px_1fr] gap-y-0.5 text-[11px] font-black">
-        <div className="text-slate-400">닉네임</div>
-        <div className="truncate text-slate-900">{getTaskNickname(task)}</div>
-        <div className="text-slate-400">이름</div>
-        <div className="truncate text-slate-700">{getTaskName(task)}</div>
-        <div className="text-slate-400">전화</div>
-        <div className="truncate text-slate-700">{getTaskPhone(task)}</div>
-      </div>
-
-      <div className="mt-2 rounded-lg bg-white/65 px-2.5 py-2 text-xs font-bold leading-4 text-slate-700">
-        {getTaskContent(task)}
-      </div>
-
-      <div className="mt-2 flex items-center gap-2">
-        <span className="mr-auto text-[11px] font-bold text-slate-400">
-          {formatDate(task.created_at || task.updated_at)}
-        </span>
-        <button
-          type="button"
-          onClick={() => onEdit(task)}
-          className="rounded-lg border border-blue-200 bg-white px-2 py-1 text-[11px] font-black text-blue-600 hover:bg-blue-50"
-        >
-          수정
-        </button>
-        {!done ? (
-          <button
-            type="button"
-            onClick={() => onResolve(task)}
-            className="rounded-lg bg-slate-900 px-2 py-1 text-[11px] font-black text-white hover:bg-slate-700"
-          >
-            해결완료
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => onHide(task)}
-            className="rounded-lg border border-red-200 bg-white px-2 py-1 text-[11px] font-black text-red-600 hover:bg-red-50"
-          >
-            삭제
-          </button>
-        )}
-      </div>
-    </div>
+    </button>
   );
 }
 
@@ -410,25 +367,23 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
 
   const filteredTasks = useMemo(() => {
     return tasks
-      .filter((task) => {
-        const done = isResolved(task);
-
-        if (statusFilter === "open") return !done;
-        if (statusFilter === "resolved") return done;
-        return true;
-      })
+      .filter((task) => !isResolved(task))
       .sort((a, b) => {
         const aTime = new Date(String(a.created_at || a.updated_at || 0)).getTime() || 0;
         const bTime = new Date(String(b.created_at || b.updated_at || 0)).getTime() || 0;
         return bTime - aTime;
       });
-  }, [tasks, statusFilter]);
+  }, [tasks]);
 
-  const openCount = tasks.filter((task) => !isResolved(task)).length;
-  const resolvedCount = tasks.filter((task) => isResolved(task)).length;
-  const totalPages = Math.max(1, Math.ceil(filteredTasks.length / 3));
-  const safePage = Math.min(taskPage, totalPages);
-  const visibleTasks = filteredTasks.slice((safePage - 1) * 3, safePage * 3);
+  const openCount = filteredTasks.length;
+  const totalPages = Math.max(1, Math.ceil(filteredTasks.length / 8));
+  const safePage = Math.min(Math.max(1, taskPage), totalPages);
+  const visibleTasks = filteredTasks.slice((safePage - 1) * 8, safePage * 8);
+  const pageNumbers = Array.from({ length: Math.min(totalPages, 4) }, (_, index) => index + 1);
+
+  const goCustomerManagement = () => {
+    window.location.href = "/admin-live?panel=customers#customer-management";
+  };
 
   const searchCustomers = async () => {
     const keyword = customerKeyword.trim();
@@ -778,95 +733,69 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
       </div>
 
       <div className="relative col-span-12 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-3">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-black text-slate-950">고객 특이사항 · 고객이슈 {openCount}</h2>
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-black text-slate-950">고객 특이사항 · 고객이슈 {openCount}</h2>
+            <p className="mt-1 text-[11px] font-bold text-slate-400">
+              미해결 고객이슈만 한 줄로 요약 표시
+            </p>
+          </div>
+
           <button
             type="button"
-            onClick={() => {
-                setEditingIssueTask(null);
-                setEditingIssueMemo("");
-                setShowMemoAdd((value) => !value);
-              }}
-            className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-black text-slate-500 hover:bg-slate-50"
+            onClick={goCustomerManagement}
+            className="shrink-0 rounded-xl bg-blue-600 px-3 py-2 text-[11px] font-black text-white hover:bg-blue-700"
           >
-            + 메모 추가
+            고객관리로 이동
           </button>
         </div>
 
-        <div className="mb-3 flex gap-1 rounded-xl bg-slate-50 p-1">
-          {[
-            ["open", `미해결 ${openCount}`],
-            ["all", `전체 ${tasks.length}`],
-            ["resolved", `해결 ${resolvedCount}`],
-          ].map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => {
-                setStatusFilter(key as IssueStatusFilter);
-                setTaskPage(1);
-              }}
-              className={[
-                "flex-1 rounded-lg px-2 py-1.5 text-xs font-black",
-                statusFilter === key ? "bg-white text-blue-700 shadow-sm" : "text-slate-500 hover:text-slate-900",
-              ].join(" ")}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        <div className="h-[292px] space-y-2 overflow-y-auto pr-1">
+        <div className="h-[292px] space-y-1.5 overflow-y-auto pr-1">
           {taskLoading ? (
             <div className="rounded-2xl border border-dashed border-slate-200 p-5 text-center text-xs font-bold text-slate-400">
               고객이슈 불러오는 중...
             </div>
-          ) : visibleTasks.length === 0 ? (
+          ) : filteredTasks.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 p-5 text-center text-xs font-bold text-slate-400">
-              표시할 특이사항이 없습니다.
+              미해결 고객이슈가 없습니다.
             </div>
           ) : (
             visibleTasks.map((task) => (
-              <CustomerIssueCard
+              <CustomerIssueSummaryRow
                 key={taskId(task)}
                 task={task}
-                onResolve={resolveTask}
-                onHide={hideResolvedTask}
-                onEdit={editIssueMemo}
+                onDetail={goCustomerManagement}
               />
             ))
           )}
         </div>
 
-        <div className="mt-2 flex items-center justify-center gap-2 text-sm font-black">
-          <button
-            type="button"
-            onClick={() => setTaskPage(Math.max(1, safePage - 1))}
-            className="text-slate-300"
-          >
-            ‹
-          </button>
-          {Array.from({ length: Math.min(totalPages, 4) }, (_, index) => index + 1).map((pageNo) => (
+        {filteredTasks.length > 8 && (
+          <div className="mt-2 flex items-center justify-center gap-1.5 text-sm font-black">
+            {pageNumbers.map((pageNo) => (
+              <button
+                key={pageNo}
+                type="button"
+                onClick={() => setTaskPage(pageNo)}
+                className={[
+                  "flex h-7 min-w-7 items-center justify-center rounded-full px-2",
+                  safePage === pageNo ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200",
+                ].join(" ")}
+              >
+                {pageNo}
+              </button>
+            ))}
+
             <button
-              key={pageNo}
               type="button"
-              onClick={() => setTaskPage(pageNo)}
-              className={[
-                "flex h-7 w-7 items-center justify-center rounded-full",
-                safePage === pageNo ? "bg-blue-600 text-white" : "text-slate-500",
-              ].join(" ")}
+              onClick={() => setTaskPage(Math.min(totalPages, safePage + 1))}
+              disabled={safePage >= totalPages}
+              className="h-7 rounded-full bg-slate-100 px-3 text-xs font-black text-slate-500 hover:bg-slate-200 disabled:opacity-40"
             >
-              {pageNo}
+              다음
             </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => setTaskPage(Math.min(totalPages, safePage + 1))}
-            className="text-slate-400"
-          >
-            ›
-          </button>
-        </div>
+          </div>
+        )}
 
           {editingIssueTask && (
             <div className="absolute right-full top-10 z-40 mr-3 w-[350px] rounded-2xl border border-blue-200 bg-white p-3.5 shadow-2xl">
