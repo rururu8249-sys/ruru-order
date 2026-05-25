@@ -252,19 +252,19 @@ function SummaryCard({
   subClassName?: string;
 }) {
   return (
-    <div className="min-h-[180px] rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-      <div className={`flex items-center gap-2 text-[13px] font-black text-slate-500 ${labelClassName}`}>
-        {icon ? <span className="text-base">{icon}</span> : null}
+    <div className="min-h-[142px] rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+      <div className={`flex items-center gap-2 text-[12px] font-black text-slate-500 ${labelClassName}`}>
+        {icon ? <span className="text-[15px]">{icon}</span> : null}
         <span>{label}</span>
       </div>
 
       <div
-        className={`mt-3 break-keep text-[40px] font-black leading-[1.08] tracking-[-0.06em] text-slate-950 ${valueClassName}`}
+        className={`mt-2 break-keep text-[32px] font-black leading-[1.12] tracking-[-0.055em] text-slate-950 ${valueClassName}`}
       >
         {value}
       </div>
 
-      <div className={`mt-3 break-keep text-[13px] font-bold leading-relaxed text-slate-400 ${subClassName}`}>
+      <div className={`mt-2 break-keep text-[12px] font-bold leading-relaxed text-slate-400 ${subClassName}`}>
         {sub}
       </div>
     </div>
@@ -315,7 +315,7 @@ function CustomerDetailDrawer({
             label={CUSTOMER_TERMS.customerStatus}
             value={customer.blocked ? CUSTOMER_TERMS.blocked : CUSTOMER_TERMS.normal}
             sub={customer.blockReason || "차단 정보 없음"}
-            valueClassName="whitespace-nowrap text-[34px]"
+            valueClassName="whitespace-nowrap text-[28px]"
           />
           <SummaryCard
             icon="🧾"
@@ -329,14 +329,14 @@ function CustomerDetailDrawer({
             label={CUSTOMER_TERMS.totalOrderAmount}
             value={money(customer.totalAmount)}
             sub="취소/정산 제외 전 표시합"
-            valueClassName="whitespace-nowrap text-[32px]"
+            valueClassName="whitespace-nowrap text-[26px]"
           />
           <SummaryCard
             icon="🕒"
             label={CUSTOMER_TERMS.latestOrder}
             value={formatOrderDateTime(customer.latestOrderAt)}
             sub="가장 최근 주문"
-            valueClassName="text-[28px] leading-[1.2]"
+            valueClassName="text-[22px] leading-[1.25]"
             subClassName="text-[12px]"
           />
         </div>
@@ -344,8 +344,8 @@ function CustomerDetailDrawer({
         <section className="mt-5 rounded-[24px] border border-slate-200 bg-white p-4">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <h3 className="text-lg font-black text-slate-950">📦 {CUSTOMER_TERMS.orderHistory}</h3>
-              <p className="mt-1 text-xs font-bold text-slate-400">닉네임 클릭 상세에서 고객의 전체 주문을 페이지별로 확인합니다.</p>
+              <h3 className="text-[17px] font-black text-slate-950">📦 {CUSTOMER_TERMS.orderHistory}</h3>
+              <p className="mt-1 text-[12px] font-bold text-slate-400">닉네임 클릭 상세에서 고객의 전체 주문을 페이지별로 확인합니다.</p>
             </div>
 
             <div className="text-xs font-black text-slate-500">
