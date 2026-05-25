@@ -1044,7 +1044,14 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
           </div>
         </div>
 
-        <AdminLiveCustomerIssueRail />
+        <AdminLiveCustomerIssueRail
+          customerOptions={customers.map((customer) => ({
+            key: customer.key,
+            nickname: customer.nickname,
+            name: customer.name,
+            phone: customer.phone,
+          }))}
+        />
       </div>
 
       {showBlockedCustomers && (

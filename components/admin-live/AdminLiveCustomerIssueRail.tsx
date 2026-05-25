@@ -26,30 +26,38 @@ type AdminIssueTask = {
   raw_payload?: Record<string, unknown> | null;
 };
 
+type CustomerIssueCustomerOption = {
+  key: string;
+  nickname: string;
+  name: string;
+  phone: string;
+};
+
+type Props = {
+  customerOptions?: CustomerIssueCustomerOption[];
+};
+
 type IssueTab = "open" | "all" | "resolved";
 
 type IssueForm = {
   nickname: string;
   name: string;
   phone: string;
-  taskType: string;
+  taskTypes: string[];
   priority: string;
   memo: string;
 };
 
-const ISSUE_TYPE_OPTIONS = [
+const ISSUE_TYPE_OPTIONS: Array<[string, string]> = [
   ["exchange", "교환"],
-  ["refund", "환불"],
   ["return", "반품"],
-  ["shipping", "배송"],
-  ["payment", "입금"],
-  ["address", "주소"],
-  ["product", "상품"],
-  ["complaint", "불만"],
+  ["refund", "환불"],
+  ["purchase", "구매"],
+  ["bad_customer", "진상"],
   ["general", "기타"],
 ];
 
-const PRIORITY_OPTIONS = [
+const PRIORITY_OPTIONS: Array<[string, string]> = [
   ["normal", "보통"],
   ["high", "중요"],
   ["urgent", "긴급"],
@@ -58,6 +66,23 @@ const PRIORITY_OPTIONS = [
 
 function clean(value: unknown) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function cleanCompact(value: unknown) {
+  return clean(value).replace(/\s+/g, "").toLowerCase();
+}
+
+function digitsOnly(value: unknown) {
+  return clean(value).replace(/\D/g, "");
+}
+
+function formatPhone(value: unknown) {
+  const digits = digitsOnly(value);
+
+  if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+
+  return clean(value) || "-";
 }
 
 function cleanMultiline(value: unknown) {
@@ -118,6 +143,19 @@ function rawValue(task: AdminIssueTask, keys: string[]) {
   return "";
 }
 
+function rawArray(task: AdminIssueTask, key: string) {
+  const rawPayload = task.raw_payload || {};
+  const value = rawPayload[key];
+
+  if (!Array.isArray(value)) return [];
+
+  return value.map(clean).filter(Boolean);
+}
+
+function uniqueValues(values: string[]) {
+  return Array.from(new Set(values.map(clean).filter(Boolean)));
+}
+
 function getNickname(task: AdminIssueTask) {
   return (
     clean(task.customer_nickname) ||
@@ -135,8 +173,14 @@ function getPhone(task: AdminIssueTask) {
   return clean(task.customer_phone) || rawValue(task, ["phone", "customer_phone"]) || "-";
 }
 
-function getCustomerId(task: AdminIssueTask) {
-  return clean(task.customer_id) || rawValue(task, ["customer_id", "customerId", "id"]) || "-";
+function getIssueTypes(task: AdminIssueTask) {
+  const rawTypes = rawArray(task, "issue_types");
+  const single = clean(task.task_type);
+  const values = uniqueValues([...rawTypes, single]).filter((value) =>
+    ISSUE_TYPE_OPTIONS.some(([key]) => key === value)
+  );
+
+  return values.length > 0 ? values : ["general"];
 }
 
 function getIssueTypeLabel(value: unknown) {
@@ -177,20 +221,8 @@ function getFullMemo(task: AdminIssueTask) {
   return cleanMultiline(task.body) || getIssueText(task);
 }
 
-function getOrderSummary(task: AdminIssueTask) {
-  return (
-    rawValue(task, [
-      "order_summary",
-      "orderSummary",
-      "order_text",
-      "orderText",
-      "order_item",
-      "orderItem",
-      "product_name",
-      "productName",
-      "related_product",
-    ]) || "-"
-  );
+function pad2(value: number) {
+  return String(value).padStart(2, "0");
 }
 
 function dateLabel(value: unknown) {
@@ -202,30 +234,25 @@ function dateLabel(value: unknown) {
 
   if (Number.isNaN(date.getTime())) return text;
 
-  return date.toLocaleString("ko-KR", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
+
+  return `${date.getFullYear()}.${pad2(date.getMonth() + 1)}.${pad2(date.getDate())}(${weekdays[date.getDay()]}) ${pad2(
+    date.getHours()
+  )}:${pad2(date.getMinutes())}`;
 }
 
 function issueRows(task: AdminIssueTask) {
   return [
-    ["자동날짜", dateLabel(task.created_at)],
-    ["이슈유형", getIssueTypeLabel(task.task_type)],
     ["닉네임", getNickname(task)],
     ["이름", getName(task)],
-    ["전화번호", getPhone(task)],
-    ["고객ID", getCustomerId(task)],
-    ["주문내용", getOrderSummary(task)],
+    ["전화번호", formatPhone(getPhone(task))],
     ["메모", getIssueText(task)],
   ];
 }
 
 function IssueRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div className="grid grid-cols-[70px_1fr] gap-2 border-b border-slate-100 py-1.5 last:border-b-0">
+    <div className="grid grid-cols-[62px_1fr] gap-2 border-b border-slate-100 py-1.5 last:border-b-0">
       <div className="text-[11px] font-black text-slate-400">{label}</div>
       <div
         className={`min-w-0 break-words text-[12px] leading-5 ${
@@ -235,6 +262,42 @@ function IssueRow({ label, value, strong = false }: { label: string; value: stri
       >
         {value || "-"}
       </div>
+    </div>
+  );
+}
+
+function IssueTypeChips({
+  value,
+  onChange,
+}: {
+  value: string[];
+  onChange: (nextValue: string[]) => void;
+}) {
+  const selected = value.length > 0 ? value : ["general"];
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {ISSUE_TYPE_OPTIONS.map(([key, label]) => {
+        const active = selected.includes(key);
+
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => {
+              const next = active ? selected.filter((item) => item !== key) : [...selected, key];
+
+              onChange(next.length > 0 ? next : ["general"]);
+            }}
+            className={`h-9 rounded-xl px-3 text-sm font-black ${
+              active ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            {active ? "✓ " : ""}
+            {label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -250,6 +313,7 @@ function IssueCard({
 }) {
   const done = isResolved(task);
   const rows = issueRows(task);
+  const issueTypes = getIssueTypes(task);
 
   return (
     <article
@@ -268,9 +332,16 @@ function IssueCard({
             >
               {done ? CUSTOMER_TERMS.issueResolved : CUSTOMER_TERMS.issueOpen}
             </span>
-            <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-black text-slate-600 ring-1 ring-slate-100">
-              {getIssueTypeLabel(task.task_type)}
-            </span>
+
+            {issueTypes.map((type) => (
+              <span
+                key={type}
+                className="rounded-full bg-white px-2 py-0.5 text-[11px] font-black text-slate-600 ring-1 ring-slate-100"
+              >
+                {getIssueTypeLabel(type)}
+              </span>
+            ))}
+
             <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-black text-slate-500 ring-1 ring-slate-100">
               {getPriorityLabel(task.priority)}
             </span>
@@ -279,6 +350,7 @@ function IssueCard({
           <div className="mt-2 truncate text-[15px] font-black text-slate-950" title={getNickname(task)}>
             {getNickname(task)}
           </div>
+          <div className="mt-0.5 text-[11px] font-black text-slate-400">{dateLabel(task.created_at)}</div>
         </div>
 
         <button
@@ -304,13 +376,13 @@ function emptyIssueForm(): IssueForm {
     nickname: "",
     name: "",
     phone: "",
-    taskType: "general",
+    taskTypes: ["general"],
     priority: "normal",
     memo: "",
   };
 }
 
-export default function AdminLiveCustomerIssueRail() {
+export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Props) {
   const [activeTab, setActiveTab] = useState<IssueTab>("open");
   const [tasks, setTasks] = useState<AdminIssueTask[]>([]);
   const [loading, setLoading] = useState(false);
@@ -318,9 +390,13 @@ export default function AdminLiveCustomerIssueRail() {
   const [saving, setSaving] = useState(false);
   const [showMemoAdd, setShowMemoAdd] = useState(false);
   const [newIssueForm, setNewIssueForm] = useState<IssueForm>(() => emptyIssueForm());
+  const [customerSearchDraft, setCustomerSearchDraft] = useState("");
+  const [customerSearchKeyword, setCustomerSearchKeyword] = useState("");
+  const [issuePageSize, setIssuePageSize] = useState(10);
+  const [issuePage, setIssuePage] = useState(1);
   const [editingIssueTask, setEditingIssueTask] = useState<AdminIssueTask | null>(null);
   const [editingIssueMemo, setEditingIssueMemo] = useState("");
-  const [editingIssueType, setEditingIssueType] = useState("general");
+  const [editingIssueTypes, setEditingIssueTypes] = useState<string[]>(["general"]);
   const [editingIssuePriority, setEditingIssuePriority] = useState("normal");
 
   useEffect(() => {
@@ -373,21 +449,56 @@ export default function AdminLiveCustomerIssueRail() {
     return tasks;
   }, [activeTab, tasks]);
 
+  const issueTotalPages = Math.max(1, Math.ceil(visibleTasks.length / issuePageSize));
+  const safeIssuePage = Math.min(Math.max(1, issuePage), issueTotalPages);
+  const pageTasks = visibleTasks.slice((safeIssuePage - 1) * issuePageSize, safeIssuePage * issuePageSize);
+
+  const customerSearchResults = useMemo(() => {
+    const keyword = cleanCompact(customerSearchKeyword || customerSearchDraft);
+
+    if (!keyword) return [];
+
+    return customerOptions
+      .filter((customer) => {
+        const haystack = cleanCompact(`${customer.nickname} ${customer.name} ${customer.phone} ${formatPhone(customer.phone)}`);
+
+        return haystack.includes(keyword);
+      })
+      .slice(0, 8);
+  }, [customerOptions, customerSearchDraft, customerSearchKeyword]);
+
   const updateNewIssueForm = (patch: Partial<IssueForm>) => {
     setNewIssueForm((current) => ({ ...current, ...patch }));
+  };
+
+  const selectCustomer = (customer: CustomerIssueCustomerOption) => {
+    updateNewIssueForm({
+      nickname: customer.nickname,
+      name: customer.name,
+      phone: customer.phone,
+    });
+    setCustomerSearchDraft(`${customer.nickname} ${customer.name} ${formatPhone(customer.phone)}`);
+    setCustomerSearchKeyword("");
+  };
+
+  const closeAdd = () => {
+    setShowMemoAdd(false);
+    setNewIssueForm(emptyIssueForm());
+    setCustomerSearchDraft("");
+    setCustomerSearchKeyword("");
   };
 
   const openEdit = (task: AdminIssueTask) => {
     setEditingIssueTask(task);
     setEditingIssueMemo(getFullMemo(task));
-    setEditingIssueType(clean(task.task_type) || "general");
+    setEditingIssueTypes(getIssueTypes(task));
     setEditingIssuePriority(clean(task.priority) || "normal");
   };
 
   const closeEdit = () => {
     setEditingIssueTask(null);
     setEditingIssueMemo("");
-    setEditingIssueType("general");
+    setEditingIssueTypes(["general"]);
     setEditingIssuePriority("normal");
   };
 
@@ -405,6 +516,7 @@ export default function AdminLiveCustomerIssueRail() {
       const nickname = clean(newIssueForm.nickname);
       const name = clean(newIssueForm.name);
       const phone = clean(newIssueForm.phone);
+      const issueTypes = newIssueForm.taskTypes.length > 0 ? newIssueForm.taskTypes : ["general"];
       const titleName = nickname || name || phone || "수동메모";
 
       const response = await fetch("/api/admin-v2/admin-tasks", {
@@ -413,7 +525,7 @@ export default function AdminLiveCustomerIssueRail() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          task_type: newIssueForm.taskType || "general",
+          task_type: issueTypes[0] || "general",
           title: `[고객이슈] ${titleName}`,
           body: memo,
           customer_name: name,
@@ -424,6 +536,7 @@ export default function AdminLiveCustomerIssueRail() {
             nickname,
             name,
             phone,
+            issue_types: issueTypes,
             memo,
             source: "admin-live-customers",
           },
@@ -436,9 +549,9 @@ export default function AdminLiveCustomerIssueRail() {
         throw new Error(payload?.message || "고객이슈 메모 추가 실패");
       }
 
-      setShowMemoAdd(false);
-      setNewIssueForm(emptyIssueForm());
+      closeAdd();
       setActiveTab("open");
+      setIssuePage(1);
       setReloadKey((value) => value + 1);
       window.dispatchEvent(new Event("ruru-admin-task-updated"));
       showAdminToast("고객이슈 메모를 추가했습니다.");
@@ -468,6 +581,8 @@ export default function AdminLiveCustomerIssueRail() {
       return;
     }
 
+    const issueTypes = editingIssueTypes.length > 0 ? editingIssueTypes : ["general"];
+
     setSaving(true);
 
     try {
@@ -481,10 +596,11 @@ export default function AdminLiveCustomerIssueRail() {
           action: "update",
           title: clean(task.title) || `[고객이슈] ${getNickname(task)}`,
           body: memo,
-          task_type: editingIssueType || "general",
+          task_type: issueTypes[0] || "general",
           priority: editingIssuePriority || "normal",
           raw_payload: {
             ...(task.raw_payload || {}),
+            issue_types: issueTypes,
             memo,
             edited_from: "admin-live-customers",
           },
@@ -498,6 +614,7 @@ export default function AdminLiveCustomerIssueRail() {
       }
 
       closeEdit();
+      setIssuePage(1);
       setReloadKey((value) => value + 1);
       window.dispatchEvent(new Event("ruru-admin-task-updated"));
       showAdminToast("고객이슈 메모를 수정했습니다.");
@@ -545,7 +662,10 @@ export default function AdminLiveCustomerIssueRail() {
           <button
             key={key}
             type="button"
-            onClick={() => setActiveTab(key as IssueTab)}
+            onClick={() => {
+              setActiveTab(key as IssueTab);
+              setIssuePage(1);
+            }}
             className={`h-9 rounded-xl text-[12px] font-black ${
               activeTab === key ? "bg-white text-blue-700 shadow-sm" : "text-slate-500"
             }`}
@@ -555,7 +675,7 @@ export default function AdminLiveCustomerIssueRail() {
         ))}
       </div>
 
-      <div className="mt-4 max-h-[620px] space-y-3 overflow-y-auto pr-1">
+      <div className="mt-4 max-h-[720px] space-y-3 overflow-y-auto pr-1">
         {loading ? (
           <div className="rounded-2xl bg-slate-50 p-6 text-center text-sm font-black text-slate-400">
             고객이슈 불러오는 중...
@@ -565,10 +685,53 @@ export default function AdminLiveCustomerIssueRail() {
             표시할 고객이슈가 없습니다.
           </div>
         ) : (
-          visibleTasks.slice(0, 30).map((task, index) => (
+          pageTasks.map((task, index) => (
             <IssueCard key={taskKey(task, index)} task={task} index={index} onEdit={openEdit} />
           ))
         )}
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-slate-50 p-2">
+        <div className="text-xs font-black text-slate-400">
+          현재페이지 {pageTasks.length.toLocaleString("ko-KR")}건 · 전체 {visibleTasks.length.toLocaleString("ko-KR")}건
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={issuePageSize}
+            onChange={(event) => {
+              setIssuePageSize(Number(event.target.value));
+              setIssuePage(1);
+            }}
+            className="h-9 rounded-xl border border-slate-200 bg-white px-2 text-xs font-black text-slate-600"
+          >
+            <option value={10}>10개 보기</option>
+            <option value={20}>20개 보기</option>
+            <option value={50}>50개 보기</option>
+          </select>
+
+          <button
+            type="button"
+            onClick={() => setIssuePage(Math.max(1, safeIssuePage - 1))}
+            disabled={safeIssuePage <= 1}
+            className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+          >
+            이전
+          </button>
+
+          <div className="h-9 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white">
+            {safeIssuePage} / {issueTotalPages}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIssuePage(Math.min(issueTotalPages, safeIssuePage + 1))}
+            disabled={safeIssuePage >= issueTotalPages}
+            className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+          >
+            다음
+          </button>
+        </div>
       </div>
 
       <div className="mt-4 rounded-2xl bg-blue-50 p-3 text-[12px] font-bold leading-relaxed text-blue-700">
@@ -577,7 +740,7 @@ export default function AdminLiveCustomerIssueRail() {
 
       {showMemoAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4">
-          <div className="w-full max-w-[560px] rounded-[28px] border border-slate-200 bg-white p-5 shadow-2xl">
+          <div className="max-h-[92vh] w-full max-w-[620px] overflow-y-auto rounded-[28px] border border-slate-200 bg-white p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-[11px] font-black tracking-[0.18em] text-blue-500">ADD CUSTOMER ISSUE</div>
@@ -586,17 +749,70 @@ export default function AdminLiveCustomerIssueRail() {
 
               <button
                 type="button"
-                onClick={() => {
-                  setShowMemoAdd(false);
-                  setNewIssueForm(emptyIssueForm());
-                }}
+                onClick={closeAdd}
                 className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-50"
               >
                 닫기
               </button>
             </div>
 
-            <div className="mt-4 grid gap-2 md:grid-cols-2">
+            <div className="mt-4">
+              <div className="text-xs font-black text-slate-500">고객 검색</div>
+              <div className="mt-2 grid gap-2 md:grid-cols-[1fr_96px]">
+                <input
+                  value={customerSearchDraft}
+                  onChange={(event) => {
+                    setCustomerSearchDraft(event.target.value);
+                    setCustomerSearchKeyword("");
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      setCustomerSearchKeyword(customerSearchDraft);
+                    }
+                  }}
+                  placeholder="닉네임 / 이름 / 전화번호 검색"
+                  className="h-11 rounded-xl border border-slate-200 px-3 text-sm font-bold outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setCustomerSearchKeyword(customerSearchDraft)}
+                  className="h-11 rounded-xl bg-slate-900 px-3 text-sm font-black text-white hover:bg-slate-700"
+                >
+                  검색
+                </button>
+              </div>
+
+              <div className="mt-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-2">
+                {!clean(customerSearchDraft) ? (
+                  <div className="px-3 py-4 text-center text-xs font-black text-slate-400">
+                    닉네임·이름·전화번호를 검색하면 고객 추천이 표시됩니다.
+                  </div>
+                ) : customerSearchResults.length === 0 ? (
+                  <div className="px-3 py-4 text-center text-xs font-black text-slate-400">
+                    검색 결과가 없습니다. 직접 입력도 가능합니다.
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {customerSearchResults.map((customer) => (
+                      <button
+                        key={customer.key}
+                        type="button"
+                        onClick={() => selectCustomer(customer)}
+                        className="grid w-full grid-cols-[1fr_auto] gap-2 rounded-xl bg-white px-3 py-2 text-left text-xs font-bold text-slate-600 hover:bg-blue-50"
+                      >
+                        <span className="min-w-0 truncate">
+                          <b className="text-slate-950">{customer.nickname || "-"}</b> · {customer.name || "-"}
+                        </span>
+                        <span className="font-black text-blue-700">{formatPhone(customer.phone)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-2 md:grid-cols-3">
               <input
                 value={newIssueForm.nickname}
                 onChange={(event) => updateNewIssueForm({ nickname: event.target.value })}
@@ -615,20 +831,17 @@ export default function AdminLiveCustomerIssueRail() {
                 placeholder="전화번호"
                 className="h-11 rounded-xl border border-slate-200 px-3 text-sm font-bold outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
               />
-              <select
-                value={newIssueForm.taskType}
-                onChange={(event) => updateNewIssueForm({ taskType: event.target.value })}
-                className="h-11 rounded-xl border border-slate-200 px-3 text-sm font-black text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
-              >
-                {ISSUE_TYPE_OPTIONS.map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
             </div>
 
-            <div className="mt-2">
+            <div className="mt-4">
+              <div className="mb-2 text-xs font-black text-slate-500">이슈유형 다중선택</div>
+              <IssueTypeChips
+                value={newIssueForm.taskTypes}
+                onChange={(nextValue) => updateNewIssueForm({ taskTypes: nextValue })}
+              />
+            </div>
+
+            <div className="mt-3">
               <select
                 value={newIssueForm.priority}
                 onChange={(event) => updateNewIssueForm({ priority: event.target.value })}
@@ -646,16 +859,13 @@ export default function AdminLiveCustomerIssueRail() {
               value={newIssueForm.memo}
               onChange={(event) => updateNewIssueForm({ memo: event.target.value })}
               placeholder="고객이슈 내용을 입력하세요."
-              className="mt-2 min-h-[180px] w-full resize-none rounded-2xl border border-slate-200 p-3 text-sm font-bold leading-6 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+              className="mt-3 min-h-[180px] w-full resize-none rounded-2xl border border-slate-200 p-3 text-sm font-bold leading-6 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
             />
 
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setShowMemoAdd(false);
-                  setNewIssueForm(emptyIssueForm());
-                }}
+                onClick={closeAdd}
                 className="h-11 rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-600 hover:bg-slate-50"
               >
                 취소
@@ -681,7 +891,7 @@ export default function AdminLiveCustomerIssueRail() {
                 <div className="text-[11px] font-black tracking-[0.18em] text-blue-500">EDIT CUSTOMER ISSUE</div>
                 <h3 className="mt-1 text-lg font-black text-slate-950">고객이슈 메모 수정</h3>
                 <p className="mt-1 text-xs font-bold text-slate-500">
-                  {getNickname(editingIssueTask)} · {getPhone(editingIssueTask)}
+                  {getNickname(editingIssueTask)} · {formatPhone(getPhone(editingIssueTask))}
                 </p>
               </div>
 
@@ -694,23 +904,16 @@ export default function AdminLiveCustomerIssueRail() {
               </button>
             </div>
 
-            <div className="mt-4 grid gap-2 md:grid-cols-2">
-              <select
-                value={editingIssueType}
-                onChange={(event) => setEditingIssueType(event.target.value)}
-                className="h-11 rounded-xl border border-slate-200 px-3 text-sm font-black text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
-              >
-                {ISSUE_TYPE_OPTIONS.map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
+            <div className="mt-4">
+              <div className="mb-2 text-xs font-black text-slate-500">이슈유형 다중선택</div>
+              <IssueTypeChips value={editingIssueTypes} onChange={setEditingIssueTypes} />
+            </div>
 
+            <div className="mt-3">
               <select
                 value={editingIssuePriority}
                 onChange={(event) => setEditingIssuePriority(event.target.value)}
-                className="h-11 rounded-xl border border-slate-200 px-3 text-sm font-black text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-black text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
               >
                 {PRIORITY_OPTIONS.map(([value, label]) => (
                   <option key={value} value={value}>
@@ -723,7 +926,7 @@ export default function AdminLiveCustomerIssueRail() {
             <textarea
               value={editingIssueMemo}
               onChange={(event) => setEditingIssueMemo(event.target.value)}
-              className="mt-2 min-h-[220px] w-full resize-none rounded-2xl border border-slate-200 p-3 text-sm font-bold leading-6 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+              className="mt-3 min-h-[220px] w-full resize-none rounded-2xl border border-slate-200 p-3 text-sm font-bold leading-6 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
             />
 
             <div className="mt-4 grid grid-cols-2 gap-2">
