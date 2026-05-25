@@ -1,5 +1,6 @@
 "use client";
 
+import { canSoftHideLiveOrder } from "./liveOrderSoftHideUtils";
 import { useEffect, useMemo, useState } from "react";
 import type { LiveOrder } from "./types";
 import { exportLiveOrdersForPicking, exportLiveOrdersForRosen } from "./adminLiveOrderExcelExport";
@@ -230,6 +231,11 @@ export default function LiveOrderTable({
     const key = getLiveOrderSelectionKey(order);
     if (!key) return;
 
+    if (checked && !canSoftHideLiveOrder(order)) {
+      alert("주문서취소 상태인 주문만 숨김 선택할 수 있습니다.");
+      return;
+    }
+
     setSelectedOrderKeys((current) => {
       const next = new Set(current);
 
@@ -242,16 +248,23 @@ export default function LiveOrderTable({
 
   const handleSoftDeleteSelectedOrders = async () => {
     const selectedOrders = orders.filter((order) => selectedOrderKeySet.has(getLiveOrderSelectionKey(order)));
-    const rowIds = Array.from(new Set(selectedOrders.flatMap(getLiveOrderRowIds)));
+    const blockedOrders = selectedOrders.filter((order) => !canSoftHideLiveOrder(order));
+    const targetOrders = selectedOrders.filter(canSoftHideLiveOrder);
+    const rowIds = Array.from(new Set(targetOrders.flatMap(getLiveOrderRowIds)));
+
+    if (blockedOrders.length > 0) {
+      alert("주문서취소 상태가 아닌 주문이 선택되어 있습니다.\n\n취소주문만 목록에서 숨김 처리할 수 있습니다.");
+      return;
+    }
 
     if (rowIds.length === 0) {
-      alert("삭제할 주문서를 선택해주세요.");
+      alert("숨김 처리할 취소주문을 선택해주세요.");
       return;
     }
 
     const confirmed = window.confirm(
       [
-        `선택한 주문서 ${selectedOrders.length.toLocaleString("ko-KR")}건을 주문관리 목록에서 숨길까요?`,
+        `선택한 취소주문 ${targetOrders.length.toLocaleString("ko-KR")}건을 주문관리 목록에서 숨길까요?`,
         "",
         "DB 완전삭제가 아니라 is_deleted=true 처리입니다.",
         "금액/입금/송장/자동입금 로직은 변경하지 않습니다.",
@@ -269,11 +282,11 @@ export default function LiveOrderTable({
         .in("id", rowIds);
 
       if (error) {
-        alert("선택 주문서 삭제 실패\n\n" + error.message);
+        alert("선택 취소주문 숨김 처리 실패\n\n" + error.message);
         return;
       }
 
-      alert("선택한 주문서를 주문관리 목록에서 숨김 처리했습니다.");
+      alert("선택한 취소주문을 주문관리 목록에서 숨김 처리했습니다.");
       setSelectedOrderKeys([]);
       await onRefresh?.();
     } finally {
@@ -356,6 +369,7 @@ export default function LiveOrderTable({
   const totalPages = Math.max(1, Math.ceil(cancelViewFilteredOrders.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const visibleOrders = cancelViewFilteredOrders.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const hideableVisibleOrders = visibleOrders.filter(canSoftHideLiveOrder);
 
   const exportableOrders = useMemo(
     () => cancelViewFilteredOrders.filter((order) => order.paymentStatus !== "canceled"),
@@ -651,11 +665,11 @@ export default function LiveOrderTable({
                     type="checkbox"
                     aria-label="현재 페이지 전체 선택"
                     checked={
-                      visibleOrders.length > 0 &&
-                      visibleOrders.every((order) => selectedOrderKeySet.has(getLiveOrderSelectionKey(order)))
+                      hideableVisibleOrders.length > 0 &&
+                      hideableVisibleOrders.every((order) => selectedOrderKeySet.has(getLiveOrderSelectionKey(order)))
                     }
                     onChange={(event) => {
-                      const visibleKeys = visibleOrders.map(getLiveOrderSelectionKey).filter(Boolean);
+                      const visibleKeys = hideableVisibleOrders.map(getLiveOrderSelectionKey).filter(Boolean);
 
                       setSelectedOrderKeys((current) => {
                         const next = new Set(current);
@@ -707,6 +721,8 @@ export default function LiveOrderTable({
                         type="checkbox"
                         aria-label="주문서 선택"
                         checked={selectedOrderKeySet.has(getLiveOrderSelectionKey(order))}
+                        disabled={!canSoftHideLiveOrder(order)}
+                        title={canSoftHideLiveOrder(order) ? "취소주문 숨김 선택" : "주문서취소 상태만 숨김 선택 가능"}
                         onChange={(event) => toggleOrderSelection(order, event.currentTarget.checked)}
                         className="h-4 w-4 rounded border-slate-300"
                       />

@@ -83,11 +83,11 @@ export default function AdminOrderBulkActionBar({
           disabled={selectedCount <= 0}
           className="h-10 rounded-xl border border-red-200 bg-white px-4 text-[13px] font-black text-red-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          선택 삭제/숨김
+          선택 취소주문 숨김
         </button>
 
         <div className="ml-auto text-[12px] font-bold text-neutral-500">
-          선택 주문만 일괄 변경됩니다. 삭제는 실제 삭제가 아니라 목록 숨김 처리입니다.
+          숨김은 주문서취소 상태만 가능합니다. 실제 삭제가 아니라 목록 숨김 처리입니다.
         </div>
       </div>
     </div>

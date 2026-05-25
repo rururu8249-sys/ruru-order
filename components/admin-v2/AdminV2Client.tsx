@@ -1,5 +1,6 @@
 "use client";
 
+import { canSoftHideOrderGroup } from "@/lib/admin-v2/orderSoftHide";
 // components/admin-v2/AdminV2Client.tsx
 // admin-v2 실제 화면 클라이언트 컴포넌트
 // 리팩토링 1단계: 기존 기능 유지, page.tsx 몰빵 제거, 돈/상태/포맷 유틸 lib 분리.
@@ -1145,8 +1146,15 @@ export function AdminV2Client() {
 
 
   const softDeleteOrderGroups = async (targetGroups: OrderGroup[]) => {
+    const blockedGroups = targetGroups.filter((group) => !canSoftHideOrderGroup(group));
+
+    if (blockedGroups.length > 0) {
+      alert("주문서취소 상태가 아닌 주문이 선택되어 있습니다.\n\n취소주문만 목록에서 숨김 처리할 수 있습니다.");
+      return;
+    }
+
     if (targetGroups.length <= 0) {
-      alert("삭제 처리할 주문을 선택해주세요.");
+      alert("숨김 처리할 취소주문을 선택해주세요.");
       return;
     }
 
@@ -1156,7 +1164,7 @@ export function AdminV2Client() {
       .filter((id) => Number.isFinite(id));
 
     if (ids.length <= 0) {
-      alert("삭제 처리할 주문 ID가 없습니다.");
+      alert("숨김 처리할 취소주문 ID가 없습니다.");
       return;
     }
 
@@ -1177,15 +1185,15 @@ export function AdminV2Client() {
         `선택한 주문 중 입금/출고/송장 정보가 있는 주문행 ${riskRows.length}개가 포함되어 있습니다.\\n\\n` +
           "테스트 주문이 확실한 경우에만 진행하세요.\\n" +
           "실제 삭제가 아니라 is_deleted=true 숨김 처리입니다.\\n\\n" +
-          "그래도 선택 주문을 숨김 처리할까요?"
+          "그래도 선택 취소주문을 숨김 처리할까요?"
       );
 
       if (!riskOk) return;
     }
 
     const ok = window.confirm(
-      `선택한 주문묶음 ${targetGroups.length}건 / 주문행 ${ids.length}개를 목록에서 숨김 처리할까요?\\n\\n` +
-        "삭제 후 주문관리/오늘할일/입금매칭/정산 목록에서 기본적으로 보이지 않습니다.\\n" +
+      `선택한 취소주문묶음 ${targetGroups.length}건 / 주문행 ${ids.length}개를 목록에서 숨김 처리할까요?\\n\\n` +
+        "숨김 후 주문관리/오늘할일/입금매칭/정산 목록에서 기본적으로 보이지 않습니다.\\n" +
         "DB에서 완전 삭제하는 것은 아닙니다."
     );
 
@@ -1197,11 +1205,11 @@ export function AdminV2Client() {
       .in("id", ids);
 
     if (error) {
-      alert("선택 주문 삭제 처리 실패\\n\\n" + error.message);
+      alert("선택 취소주문 숨김 처리 실패\\n\\n" + error.message);
       return;
     }
 
-    alert(`선택 주문 ${ids.length}개 행을 숨김 처리했습니다.`);
+    alert(`선택 취소주문 ${ids.length}개 행을 숨김 처리했습니다.`);
     await loadData();
   };
 
@@ -1956,7 +1964,7 @@ function OrderWorkTable({
 
   const applySoftDeleteSelected = async () => {
     if (selectedGroups.length <= 0) {
-      alert("삭제 처리할 주문을 선택해주세요.");
+      alert("숨김 처리할 취소주문을 선택해주세요.");
       return;
     }
 
