@@ -1,5 +1,6 @@
 "use client";
 
+import { showAdminToast } from "@/lib/adminToast";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { LiveOrderItem } from "./types";
@@ -83,7 +84,7 @@ export function useLiveOrderItemEdit(onAfterSave?: (result: LiveOrderItemEditSav
     const rowId = Number(item.id);
 
     if (!Number.isFinite(rowId) || rowId <= 0) {
-      alert("수정할 주문 ID가 없습니다.");
+      showAdminToast("수정할 주문 ID가 없습니다.", "warning");
       return false;
     }
 
@@ -94,17 +95,17 @@ export function useLiveOrderItemEdit(onAfterSave?: (result: LiveOrderItemEditSav
     const unitPrice = toNumber(form.unitPrice);
 
     if (!productName) {
-      alert("상품명을 입력해주세요.");
+      showAdminToast("상품명을 입력해주세요.", "warning");
       return false;
     }
 
     if (!qty || qty <= 0) {
-      alert("수량은 1개 이상이어야 합니다.");
+      showAdminToast("수량은 1개 이상이어야 합니다.", "warning");
       return false;
     }
 
     if (unitPrice <= 0) {
-      alert("금액은 1원 이상이어야 합니다.");
+      showAdminToast("금액은 1원 이상이어야 합니다.", "warning");
       return false;
     }
 
@@ -130,7 +131,7 @@ export function useLiveOrderItemEdit(onAfterSave?: (result: LiveOrderItemEditSav
         .single();
 
       if (loadError || !current) {
-        alert("현재 주문값을 불러오지 못했습니다.\n\n" + (loadError?.message || ""));
+        showAdminToast("현재 주문값을 불러오지 못했습니다.\n\n" + (loadError?.message || ""), "error");
         return false;
       }
 
@@ -151,7 +152,7 @@ export function useLiveOrderItemEdit(onAfterSave?: (result: LiveOrderItemEditSav
         Number(current.adjusted_total_price || current.total_price || 0) !== nextTotal;
 
       if (!productChanged && !amountChanged) {
-        alert("변경된 내용이 없습니다.");
+        showAdminToast("변경된 내용이 없습니다.", "info");
         return false;
       }
 
@@ -208,7 +209,7 @@ export function useLiveOrderItemEdit(onAfterSave?: (result: LiveOrderItemEditSav
         .eq("id", rowId);
 
       if (updateError) {
-        alert("상품/금액 수정 실패\n\n" + updateError.message);
+        showAdminToast("상품/금액 수정 실패\n\n" + updateError.message, "error");
         return false;
       }
 
@@ -225,7 +226,7 @@ export function useLiveOrderItemEdit(onAfterSave?: (result: LiveOrderItemEditSav
         amountChanged,
       };
 
-      alert("상품/옵션/수량/금액 수정이 완료됐습니다.");
+      showAdminToast("상품/옵션/수량/금액 수정이 완료됐습니다.", "success");
       await onAfterSave?.(result);
       return result;
     } finally {
