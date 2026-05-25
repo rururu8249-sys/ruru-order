@@ -1,5 +1,6 @@
 "use client";
 
+import { showAdminToast } from "@/lib/adminToast";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { LiveOrder, LiveOrderItem } from "./types";
@@ -235,7 +236,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     action: "card-paid" | "card-unpaid"
   ) => {
     if (!isCardOrder) {
-      alert("카드결제 주문에서만 처리할 수 있습니다.");
+      showAdminToast("카드결제 주문에서만 처리할 수 있습니다.", "warning");
       return;
     }
 
@@ -244,7 +245,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       .filter((id) => Number.isFinite(id));
 
     if (rowIds.length === 0) {
-      alert("상태 변경할 주문 ID가 없습니다.");
+      showAdminToast("상태 변경할 주문 ID가 없습니다.", "warning");
       return;
     }
 
@@ -278,11 +279,11 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         .in("id", rowIds);
 
       if (error) {
-        alert("카드결제 상태 변경 실패\n\n" + error.message);
+        showAdminToast("카드결제 상태 변경 실패\n\n" + error.message, "error");
         return;
       }
 
-      alert(nextStatus === "카드결제완료" ? "카드결제완료 처리됐습니다." : "카드미결제로 되돌렸습니다.");
+      showAdminToast(nextStatus === "카드결제완료" ? "카드결제완료 처리됐습니다." : "카드미결제로 되돌렸습니다.", "success");
 
       await onAfterStatusChange?.();
       onClose?.();
