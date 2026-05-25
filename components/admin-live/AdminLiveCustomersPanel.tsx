@@ -22,6 +22,7 @@ type CustomerSummary = {
   nickname: string;
   name: string;
   phone: string;
+  address: string;
   orderCount: number;
   totalAmount: number;
   paidCount: number;
@@ -91,6 +92,37 @@ function orderNickname(order: LooseLiveOrder) {
 
 function orderName(order: LooseLiveOrder) {
   return readFirst(order, ["name", "customerName", "customer_name", "buyer_name"]) || "-";
+}
+
+function orderBaseAddress(order: LooseLiveOrder) {
+  return readFirst(order, [
+    "address",
+    "customerAddress",
+    "customer_address",
+    "shipping_address",
+    "receiver_address",
+    "delivery_address",
+    "road_address",
+    "base_address",
+  ]);
+}
+
+function orderDetailAddress(order: LooseLiveOrder) {
+  return readFirst(order, [
+    "detail_address",
+    "address_detail",
+    "customer_detail_address",
+    "detailAddress",
+    "shipping_detail_address",
+    "receiver_detail_address",
+  ]);
+}
+
+function orderFullAddress(order: LooseLiveOrder) {
+  const base = orderBaseAddress(order);
+  const detail = orderDetailAddress(order);
+
+  return [base, detail].filter(Boolean).join(" ").trim();
 }
 
 function parseDateCandidate(value: unknown) {
@@ -276,11 +308,15 @@ function CustomerDetailDrawer({
   page,
   setPage,
   onClose,
+  onBlockAction,
+  blockSaving,
 }: {
   customer: CustomerSummary | null;
   page: number;
   setPage: (value: number) => void;
   onClose: () => void;
+  onBlockAction: (customer: CustomerSummary) => void | Promise<void>;
+  blockSaving: boolean;
 }) {
   if (!customer) return null;
 
@@ -298,15 +334,33 @@ function CustomerDetailDrawer({
             <p className="mt-1 text-sm font-bold text-slate-500">
               {customer.name} · {formatPhone(customer.phone)}
             </p>
+            <p className="mt-2 max-w-[520px] break-keep text-[13px] font-bold leading-5 text-slate-500">
+              📍 {customer.address || "주소 정보 없음"}
+            </p>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 hover:bg-slate-50"
-          >
-            닫기
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onBlockAction(customer)}
+              disabled={blockSaving}
+              className={`rounded-xl px-4 py-2 text-sm font-black disabled:opacity-50 ${
+                customer.blocked
+                  ? "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  : "bg-red-600 text-white hover:bg-red-700"
+              }`}
+            >
+              {customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 hover:bg-slate-50"
+            >
+              닫기
+            </button>
+          </div>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-4">
@@ -315,28 +369,28 @@ function CustomerDetailDrawer({
             label={CUSTOMER_TERMS.customerStatus}
             value={customer.blocked ? CUSTOMER_TERMS.blocked : CUSTOMER_TERMS.normal}
             sub={customer.blockReason || "차단 정보 없음"}
-            valueClassName="whitespace-nowrap text-[28px]"
+            valueClassName="whitespace-nowrap text-[22px]"
           />
           <SummaryCard
             icon="🧾"
             label={CUSTOMER_TERMS.orderCount}
             value={`${customer.orderCount.toLocaleString("ko-KR")}건`}
             sub="현재 주문 데이터 기준"
-            valueClassName="whitespace-nowrap text-[34px]"
+            valueClassName="whitespace-nowrap text-[24px]"
           />
           <SummaryCard
             icon="💳"
             label={CUSTOMER_TERMS.totalOrderAmount}
             value={money(customer.totalAmount)}
             sub="취소/정산 제외 전 표시합"
-            valueClassName="whitespace-nowrap text-[26px]"
+            valueClassName="whitespace-nowrap text-[22px]"
           />
           <SummaryCard
             icon="🕒"
             label={CUSTOMER_TERMS.latestOrder}
             value={formatOrderDateTime(customer.latestOrderAt)}
             sub="가장 최근 주문"
-            valueClassName="text-[22px] leading-[1.25]"
+            valueClassName="text-[17px] leading-[1.3] tracking-[-0.03em]"
             subClassName="text-[12px]"
           />
         </div>
@@ -409,10 +463,31 @@ function CustomerDetailDrawer({
           </div>
 
           <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-            <h3 className="text-base font-black text-slate-950">🚫 차단 관리</h3>
-            <p className="mt-2 text-sm font-bold leading-relaxed text-slate-500">
-              현재는 조회 전용입니다. 차단/차단해제 저장은 DB 필드와 이력 테이블 확인 후 연결합니다.
-            </p>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-black text-slate-950">🚫 차단 관리</h3>
+                <p className="mt-2 text-sm font-bold leading-relaxed text-slate-500">
+                  현재 고객의 차단 상태와 사유를 확인하고, 필요 시 바로 차단/차단해제합니다.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => onBlockAction(customer)}
+                disabled={blockSaving}
+                className={`shrink-0 rounded-xl px-4 py-2 text-xs font-black disabled:opacity-50 ${
+                  customer.blocked
+                    ? "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    : "bg-red-600 text-white hover:bg-red-700"
+                }`}
+              >
+                {customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}
+              </button>
+            </div>
+
+            <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold leading-5 text-slate-500">
+              {customer.blocked ? customer.blockReason || "차단사유 없음" : "현재 차단되지 않은 고객입니다."}
+            </div>
           </div>
         </section>
       </aside>
@@ -432,6 +507,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
   const [blockSaving, setBlockSaving] = useState(false);
   const [blockErrorMessage, setBlockErrorMessage] = useState("");
   const [blockStatusMessage, setBlockStatusMessage] = useState("");
+  const [showBlockedCustomers, setShowBlockedCustomers] = useState(false);
 
   const customers = useMemo<CustomerSummary[]>(() => {
     const map = new Map<string, CustomerSummary>();
@@ -452,6 +528,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
           nickname: orderNickname(order),
           name: orderName(order),
           phone: orderPhone(order),
+          address: orderFullAddress(order),
           orderCount: 1,
           totalAmount: amount,
           paidCount: isPaid(order) ? 1 : 0,
@@ -475,6 +552,10 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
       current.blockReason = current.blockReason || orderBlockReason;
       current.orders.push(order);
 
+      if (!current.address) {
+        current.address = orderFullAddress(order);
+      }
+
       if (!current.latestOrderAt || latestOrderAt > current.latestOrderAt) {
         current.latestOrderAt = latestOrderAt;
       }
@@ -493,6 +574,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
           customer.name,
           customer.phone,
           formatPhone(customer.phone),
+          customer.address,
         ]
           .join(" ")
           .replace(/\s+/g, "")
@@ -537,6 +619,16 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
         reason: result.reason,
       },
     }));
+
+    setSelectedCustomer((current) => {
+      if (!current || digitsOnly(current.phone) !== phoneKey) return current;
+
+      return {
+        ...current,
+        blocked: result.blocked,
+        blockReason: result.reason,
+      };
+    });
   };
 
   const requestCustomerBlock = async (customer: CustomerSummary, blocked: boolean, reason: string) => {
@@ -626,8 +718,18 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
             </p>
           </div>
 
-          <div className="rounded-full bg-blue-50 px-4 py-2 text-xs font-black text-blue-700">
-            읽기전용 연결
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowBlockedCustomers(true)}
+              className="rounded-full border border-red-100 bg-red-50 px-4 py-2 text-xs font-black text-red-700 hover:bg-red-100"
+            >
+              차단 고객 보기 {blockedCustomers.length.toLocaleString("ko-KR")}명
+            </button>
+
+            <div className="rounded-full bg-blue-50 px-4 py-2 text-xs font-black text-blue-700">
+              차단 저장 연결
+            </div>
           </div>
         </div>
 
@@ -794,11 +896,91 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
         <AdminLiveCustomerIssueRail />
       </div>
 
+      {showBlockedCustomers && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4">
+          <div className="max-h-[84vh] w-full max-w-[720px] overflow-y-auto rounded-[28px] border border-slate-200 bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <div className="text-[11px] font-black tracking-[0.18em] text-red-500">BLOCKED CUSTOMERS</div>
+                <h2 className="mt-1 text-2xl font-black tracking-[-0.04em] text-slate-950">
+                  차단 고객 목록 {blockedCustomers.length.toLocaleString("ko-KR")}명
+                </h2>
+                <p className="mt-1 text-sm font-bold text-slate-500">
+                  현재 주문 데이터와 차단 저장 결과 기준으로 표시합니다.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowBlockedCustomers(false)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 hover:bg-slate-50"
+              >
+                닫기
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              {blockedCustomers.length === 0 ? (
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-8 text-center text-sm font-black text-slate-400">
+                  차단 고객이 없습니다.
+                </div>
+              ) : (
+                blockedCustomers.map((customer) => (
+                  <div
+                    key={`blocked-${customer.key}`}
+                    className="rounded-2xl border border-red-100 bg-red-50/60 p-4"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-base font-black text-slate-950">{customer.nickname}</div>
+                        <div className="mt-1 text-sm font-bold text-slate-600">
+                          {customer.name} · {formatPhone(customer.phone)}
+                        </div>
+                        <div className="mt-2 break-keep text-xs font-bold leading-5 text-slate-500">
+                          📍 {customer.address || "주소 정보 없음"}
+                        </div>
+                        <div className="mt-2 rounded-xl bg-white px-3 py-2 text-xs font-bold leading-5 text-red-700">
+                          {customer.blockReason || "차단사유 없음"}
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedCustomer(customer);
+                            setDetailPage(1);
+                            setShowBlockedCustomers(false);
+                          }}
+                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"
+                        >
+                          상세
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleCustomerBlockButton(customer)}
+                          disabled={blockSaving}
+                          className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white hover:bg-slate-700 disabled:opacity-50"
+                        >
+                          차단해제
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <CustomerDetailDrawer
         customer={selectedCustomer}
         page={detailPage}
         setPage={setDetailPage}
         onClose={() => setSelectedCustomer(null)}
+        onBlockAction={handleCustomerBlockButton}
+        blockSaving={blockSaving}
       />
 
       <AdminLiveCustomerBlockReasonModal
