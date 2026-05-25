@@ -1,5 +1,6 @@
 "use client";
 
+import { showAdminToast } from "@/lib/adminToast";
 import { canSoftHideOrderGroup } from "@/lib/admin-v2/orderSoftHide";
 // components/admin-v2/AdminV2Client.tsx
 // admin-v2 실제 화면 클라이언트 컴포넌트
@@ -514,23 +515,23 @@ export function AdminV2Client() {
       supabase.from("settings").select("key,value").order("key"),
     ]);
 
-    if (ordersResult.error) alert("주문 불러오기 실패\n\n" + ordersResult.error.message);
+    if (ordersResult.error) showAdminToast("주문 불러오기 실패\n\n" + ordersResult.error.message, "error");
     else setOrders((ordersResult.data || []) as OrderRow[]);
 
-    if (customersResult.error) alert("고객 불러오기 실패\n\n" + customersResult.error.message);
+    if (customersResult.error) showAdminToast("고객 불러오기 실패\n\n" + customersResult.error.message, "error");
     else setCustomers((customersResult.data || []) as CustomerRow[]);
 
     setDeposits((depositsResult.data || []) as DepositRow[]);
 
     if (moneyLogsResult.error) {
-      alert("금액수정이력 불러오기 실패\n\n" + moneyLogsResult.error.message);
+      showAdminToast("금액수정이력 불러오기 실패\n\n" + moneyLogsResult.error.message, "error");
       setMoneyEditLogs([]);
     } else {
       setMoneyEditLogs((moneyLogsResult.data || []) as MoneyEditLogRow[]);
     }
 
     if (statusLogsResult.error) {
-      alert("상태변경이력 불러오기 실패\n\n" + statusLogsResult.error.message);
+      showAdminToast("상태변경이력 불러오기 실패\n\n" + statusLogsResult.error.message, "error");
       setStatusChangeLogs([]);
     } else {
       setStatusChangeLogs((statusLogsResult.data || []) as StatusChangeLogRow[]);
@@ -822,7 +823,7 @@ export function AdminV2Client() {
     const result = await response.json().catch(() => null);
 
     if (!response.ok || !result?.ok) {
-      alert("입금내역 불러오기 실패\n\n" + (result?.message || "알 수 없는 오류"));
+      showAdminToast("입금내역 불러오기 실패\n\n" + (result?.message || "알 수 없는 오류"), "error");
       return;
     }
 
@@ -841,7 +842,7 @@ export function AdminV2Client() {
     const result = await response.json().catch(() => null);
 
     if (!response.ok || !result?.ok) {
-      alert("뱅크다 입금내역 새로고침 실패\n\n" + (result?.message || "알 수 없는 오류"));
+      showAdminToast("뱅크다 입금내역 새로고침 실패\n\n" + (result?.message || "알 수 없는 오류"), "error");
       return;
     }
 
