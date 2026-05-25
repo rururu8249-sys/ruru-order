@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { LedgerStatus, RawDepositRow } from "./depositLedgerTypes";
+import DepositLinkedOrderInfo from "./DepositLinkedOrderInfo";
 import {
   formatDepositDateTime,
   formatMoney,
@@ -74,7 +75,7 @@ export default function DepositDetailModal({ row, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/35 px-4 py-6 backdrop-blur-sm">
-      <div className="w-full max-w-2xl overflow-hidden rounded-[34px] bg-white shadow-[0_30px_100px_rgba(15,23,42,0.35)]">
+      <div className="w-full max-w-[760px] overflow-hidden rounded-[34px] bg-white shadow-[0_30px_100px_rgba(15,23,42,0.35)]">
         <div className="border-b border-slate-100 px-7 py-6">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -132,6 +133,8 @@ export default function DepositDetailModal({ row, onClose }: Props) {
             <DetailLine label="주문연결">{getSafeOrderConnection(row)}</DetailLine>
             <DetailLine label="은행메모">{getBankMemo(row)}</DetailLine>
           </div>
+
+          <DepositLinkedOrderInfo row={row} />
 
           <div className="mt-4 rounded-3xl border border-blue-100 bg-blue-50 px-5 py-4 text-xs font-bold leading-5 text-blue-800">
             메인 입금내역 목록은 은행앱처럼 단순 조회용으로 유지합니다. 주문 연결, 처리방식, 메모 같은 운영 정보는 이 상세정보에서만 확인합니다.
