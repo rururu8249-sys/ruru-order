@@ -4,6 +4,8 @@
 
 "use client";
 
+import { showAdminToast } from "@/lib/adminToast";
+
 import { useMemo, useState } from "react";
 
 type OrderTableProps = {
@@ -137,12 +139,12 @@ export default function OrderTable({
         : Number(onlyNumber(refundAmountText));
 
     if (refundType === "부분환불" && amount <= 0) {
-      alert("부분환불 금액을 입력해주세요.");
+      showAdminToast("부분환불 금액을 입력해주세요.", "warning");
       return;
     }
 
     if (!refundMemo.trim()) {
-      alert("환불 사유/메모를 입력해주세요.");
+      showAdminToast("환불 사유/메모를 입력해주세요.", "warning");
       return;
     }
 
