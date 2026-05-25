@@ -234,12 +234,39 @@ function statusBadge(customer: CustomerSummary) {
   return <span className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-700">{CUSTOMER_TERMS.normal}</span>;
 }
 
-function SummaryCard({ label, value, sub }: { label: string; value: string; sub: string }) {
+function SummaryCard({
+  icon = "",
+  label,
+  value,
+  sub,
+  valueClassName = "",
+  labelClassName = "",
+  subClassName = "",
+}: {
+  icon?: string;
+  label: string;
+  value: string;
+  sub: string;
+  valueClassName?: string;
+  labelClassName?: string;
+  subClassName?: string;
+}) {
   return (
-    <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="text-[12px] font-black text-slate-500">{label}</div>
-      <div className="mt-2 text-3xl font-black tracking-[-0.05em] text-slate-950">{value}</div>
-      <div className="mt-2 text-[12px] font-bold text-slate-400">{sub}</div>
+    <div className="min-h-[180px] rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+      <div className={`flex items-center gap-2 text-[13px] font-black text-slate-500 ${labelClassName}`}>
+        {icon ? <span className="text-base">{icon}</span> : null}
+        <span>{label}</span>
+      </div>
+
+      <div
+        className={`mt-3 break-keep text-[40px] font-black leading-[1.08] tracking-[-0.06em] text-slate-950 ${valueClassName}`}
+      >
+        {value}
+      </div>
+
+      <div className={`mt-3 break-keep text-[13px] font-bold leading-relaxed text-slate-400 ${subClassName}`}>
+        {sub}
+      </div>
     </div>
   );
 }
@@ -282,17 +309,42 @@ function CustomerDetailDrawer({
           </button>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <SummaryCard label={CUSTOMER_TERMS.customerStatus} value={customer.blocked ? CUSTOMER_TERMS.blocked : CUSTOMER_TERMS.normal} sub={customer.blockReason || "차단 정보 없음"} />
-          <SummaryCard label={CUSTOMER_TERMS.orderCount} value={`${customer.orderCount.toLocaleString("ko-KR")}건`} sub="현재 주문 데이터 기준" />
-          <SummaryCard label={CUSTOMER_TERMS.totalOrderAmount} value={money(customer.totalAmount)} sub="취소/정산 제외 전 표시합" />
-          <SummaryCard label={CUSTOMER_TERMS.latestOrder} value={formatOrderDateTime(customer.latestOrderAt)} sub="가장 최근 주문" />
+        <div className="mt-4 grid grid-cols-2 gap-4">
+          <SummaryCard
+            icon="👤"
+            label={CUSTOMER_TERMS.customerStatus}
+            value={customer.blocked ? CUSTOMER_TERMS.blocked : CUSTOMER_TERMS.normal}
+            sub={customer.blockReason || "차단 정보 없음"}
+            valueClassName="whitespace-nowrap text-[34px]"
+          />
+          <SummaryCard
+            icon="🧾"
+            label={CUSTOMER_TERMS.orderCount}
+            value={`${customer.orderCount.toLocaleString("ko-KR")}건`}
+            sub="현재 주문 데이터 기준"
+            valueClassName="whitespace-nowrap text-[34px]"
+          />
+          <SummaryCard
+            icon="💳"
+            label={CUSTOMER_TERMS.totalOrderAmount}
+            value={money(customer.totalAmount)}
+            sub="취소/정산 제외 전 표시합"
+            valueClassName="whitespace-nowrap text-[32px]"
+          />
+          <SummaryCard
+            icon="🕒"
+            label={CUSTOMER_TERMS.latestOrder}
+            value={formatOrderDateTime(customer.latestOrderAt)}
+            sub="가장 최근 주문"
+            valueClassName="text-[28px] leading-[1.2]"
+            subClassName="text-[12px]"
+          />
         </div>
 
         <section className="mt-5 rounded-[24px] border border-slate-200 bg-white p-4">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <h3 className="text-lg font-black text-slate-950">{CUSTOMER_TERMS.orderHistory}</h3>
+              <h3 className="text-lg font-black text-slate-950">📦 {CUSTOMER_TERMS.orderHistory}</h3>
               <p className="mt-1 text-xs font-bold text-slate-400">닉네임 클릭 상세에서 고객의 전체 주문을 페이지별로 확인합니다.</p>
             </div>
 
@@ -350,14 +402,14 @@ function CustomerDetailDrawer({
 
         <section className="mt-5 grid gap-3 md:grid-cols-2">
           <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-            <h3 className="text-base font-black text-slate-950">{CUSTOMER_TERMS.customerIssue}</h3>
+            <h3 className="text-base font-black text-slate-950">📝 {CUSTOMER_TERMS.customerIssue}</h3>
             <p className="mt-2 text-sm font-bold leading-relaxed text-slate-500">
               미해결 이슈 연결은 오른쪽 고객이슈 패널에서 먼저 확인합니다. 고객별 자동 연결은 2차에서 customer_id/전화번호 기준으로 붙입니다.
             </p>
           </div>
 
           <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-            <h3 className="text-base font-black text-slate-950">차단 관리</h3>
+            <h3 className="text-base font-black text-slate-950">🚫 차단 관리</h3>
             <p className="mt-2 text-sm font-bold leading-relaxed text-slate-500">
               현재는 조회 전용입니다. 차단/차단해제 저장은 DB 필드와 이력 테이블 확인 후 연결합니다.
             </p>
@@ -579,11 +631,11 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
           </div>
         </div>
 
-        <div className="mt-5 grid gap-3 md:grid-cols-4">
-          <SummaryCard label="전체 고객" value={`${customers.length.toLocaleString("ko-KR")}명`} sub="현재 주문 데이터 기준" />
-          <SummaryCard label="정상 고객" value={`${normalCustomers.length.toLocaleString("ko-KR")}명`} sub="차단 제외" />
-          <SummaryCard label="차단 고객" value={`${blockedCustomers.length.toLocaleString("ko-KR")}명`} sub="차단 표시 기준" />
-          <SummaryCard label="관리필요 고객" value={`${attentionCustomers.length.toLocaleString("ko-KR")}명`} sub="미입금/입금확인 필요" />
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <SummaryCard icon="👥" label="전체 고객" value={`${customers.length.toLocaleString("ko-KR")}명`} sub="현재 주문 데이터 기준" />
+          <SummaryCard icon="✅" label="정상 고객" value={`${normalCustomers.length.toLocaleString("ko-KR")}명`} sub="차단 제외" />
+          <SummaryCard icon="⛔" label="차단 고객" value={`${blockedCustomers.length.toLocaleString("ko-KR")}명`} sub="차단 표시 기준" />
+          <SummaryCard icon="⚠️" label="관리필요 고객" value={`${attentionCustomers.length.toLocaleString("ko-KR")}명`} sub="미입금 / 입금확인 필요" />
         </div>
       </div>
 
