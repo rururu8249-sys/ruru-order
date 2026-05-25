@@ -1,9 +1,12 @@
+"use client";
+
+import { showAdminToast } from "@/lib/adminToast";
+
 // app/admin/broadcasts/page.tsx
 // 새 파일 생성용
 // 방송 전 안전패치 버전
 // 기능: 방송목록 확인, 방송 삭제(주문 유지)
 
-"use client";
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -40,7 +43,7 @@ export default function AdminBroadcastsPage() {
 
   const login = () => {
     if (password !== ADMIN_PASSWORD) {
-      alert("관리자 비밀번호가 틀렸습니다.");
+      showAdminToast("관리자 비밀번호가 틀렸습니다.");
       return;
     }
 
@@ -66,11 +69,11 @@ export default function AdminBroadcastsPage() {
     ]);
 
     if (broadcastResult.error) {
-      alert("방송목록 불러오기 오류: " + broadcastResult.error.message);
+      showAdminToast("방송목록 불러오기 오류: " + broadcastResult.error.message);
     }
 
     if (orderResult.error) {
-      alert("주문목록 불러오기 오류: " + orderResult.error.message);
+      showAdminToast("주문목록 불러오기 오류: " + orderResult.error.message);
     }
 
     setBroadcasts(broadcastResult.data || []);
@@ -110,12 +113,12 @@ export default function AdminBroadcastsPage() {
       .eq("id", broadcast.id);
 
     if (error) {
-      alert("방송 삭제 오류: " + error.message);
+      showAdminToast("방송 삭제 오류: " + error.message);
       return;
     }
 
     await loadAll();
-    alert("방송을 목록에서 삭제했습니다. 주문은 유지됩니다.");
+    showAdminToast("방송을 목록에서 삭제했습니다. 주문은 유지됩니다.");
   };
 
   if (!isAuthed) {
