@@ -1,214 +1,232 @@
-import type { LiveOrder } from "./types";
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { showAdminToast } from "@/lib/adminToast";
+import AdminSettlementPanel from "@/components/admin-v2/settlement/AdminSettlementPanel";
+
+type LooseRow = Record<string, any>;
 
 type Props = {
-  orders: LiveOrder[];
+  orders: LooseRow[];
 };
 
-type SettlementRow = {
-  label: string;
-  count: number;
-  amount: number;
-  tone: "slate" | "emerald" | "red" | "orange" | "violet" | "blue";
-  desc: string;
+type SettingSummary = {
+  customerCardRate?: number;
+  actualCardRate?: number;
+  cardPaymentMinAmount?: number;
+  defaultShippingFee?: number;
 };
 
-function money(value: unknown) {
-  return `${Number(value || 0).toLocaleString("ko-KR")}원`;
+const SETTING_KEYS = [
+  "customer_card_extra_rate",
+  "actual_card_fee_rate",
+  "card_payment_min_amount",
+  "default_shipping_fee",
+] as const;
+
+function clean(value: unknown) {
+  return String(value ?? "").replace(/\s+/g, " ").trim();
 }
 
-function isPaid(order: LiveOrder) {
-  return ["paid", "auto_paid", "manual_paid", "card_paid"].includes(order.paymentStatus);
+function toNumber(value: unknown) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+
+  const text = clean(value).replace(/[^0-9.-]/g, "");
+  const number = Number(text);
+
+  return Number.isFinite(number) ? number : 0;
 }
 
-function isUnpaid(order: LiveOrder) {
-  return ["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus);
+function firstText(...values: unknown[]) {
+  for (const value of values) {
+    const text = clean(value);
+    if (text) return text;
+  }
+
+  return "";
 }
 
-function isBank(order: LiveOrder) {
-  return order.paymentMethod === "무통장입금";
+function firstNumber(...values: unknown[]) {
+  for (const value of values) {
+    const number = toNumber(value);
+    if (number > 0) return number;
+  }
+
+  return 0;
 }
 
-function isCard(order: LiveOrder) {
-  return order.paymentMethod === "카드결제";
+function mapPaymentStatus(order: LooseRow) {
+  const raw = firstText(
+    order.order_manage_status,
+    order.admin_order_status_v2,
+    order.payment_status,
+    order.deposit_status,
+    order.status,
+    order.paymentStatus,
+  );
+
+  if (/주문서취소|주문취소|취소|환불|cancel|refund/i.test(raw)) return raw || "주문서취소";
+  if (/manual_paid|manual_match_done|수동입금확인/i.test(raw)) return "수동입금확인";
+  if (/auto_paid|자동입금확인/i.test(raw)) return "자동입금확인";
+  if (/card_paid|card_done|카드결제완료|카드완료/i.test(raw)) return "카드결제완료";
+  if (/paid|confirmed|complete|입금확인|결제완료/i.test(raw)) return "입금확인";
+  if (/manual_match_needed|입금확인 필요|수동확인/i.test(raw)) return "입금확인 필요";
+  if (/unpaid|미입금|card_unpaid|카드 미결제/i.test(raw)) return "미입금";
+
+  return raw || "주문확인전";
 }
 
-function sumAmount(orders: LiveOrder[]) {
-  return orders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
+function mapPaymentMethod(order: LooseRow) {
+  const raw = firstText(order.payment_method, order.paymentMethod, order.pay_method, order.paymentType);
+
+  if (/카드|card/i.test(raw)) return "카드결제";
+  if (/무통장|입금|bank/i.test(raw)) return "무통장입금";
+
+  return raw || "무통장입금";
 }
 
-function sumShippingFee(orders: LiveOrder[]) {
-  return orders.reduce((sum, order) => sum + Number(order.shippingFee || 0), 0);
-}
+function normalizeLiveOrder(order: LooseRow, index: number) {
+  const amount = firstNumber(
+    order.final_amount,
+    order.finalAmount,
+    order.adjusted_total_price,
+    order.adjustedTotalPrice,
+    order.total_price,
+    order.totalPrice,
+    order.total_amount,
+    order.totalAmount,
+    order.order_amount,
+    order.orderAmount,
+    order.payment_amount,
+    order.paymentAmount,
+    order.amount,
+  );
 
-function toneClass(tone: SettlementRow["tone"]) {
-  const tones = {
-    slate: "bg-slate-100 text-slate-700",
-    emerald: "bg-emerald-100 text-emerald-700",
-    red: "bg-red-100 text-red-700",
-    orange: "bg-orange-100 text-orange-700",
-    violet: "bg-violet-100 text-violet-700",
-    blue: "bg-blue-100 text-blue-700",
+  const createdAt = firstText(
+    order.created_at,
+    order.createdAt,
+    order.order_created_at,
+    order.orderCreatedAt,
+    order.submittedAt,
+    order.date,
+  );
+
+  const shippingFee = firstNumber(
+    order.shipping_fee,
+    order.shippingFee,
+    order.adjusted_shipping_fee,
+    order.adjustedShippingFee,
+  );
+
+  return {
+    ...order,
+    id: firstText(order.id, order.order_id, order.orderId, order.groupId, order.order_lookup_code) || `admin-live-order-${index}`,
+    order_id: firstText(order.order_id, order.orderId, order.id),
+    order_lookup_code: firstText(order.order_lookup_code, order.orderLookupCode, order.orderNumber, order.groupId),
+    created_at: createdAt,
+    payment_method: mapPaymentMethod(order),
+    payment_status: mapPaymentStatus(order),
+    deposit_status: mapPaymentStatus(order),
+    status: mapPaymentStatus(order),
+    final_amount: firstNumber(order.final_amount, order.finalAmount) || amount,
+    adjusted_total_price: firstNumber(order.adjusted_total_price, order.adjustedTotalPrice) || amount,
+    total_price: firstNumber(order.total_price, order.totalPrice) || amount,
+    shipping_fee: shippingFee,
+    adjusted_shipping_fee: shippingFee,
+    refund_amount: firstNumber(order.refund_amount, order.refundAmount),
+    actual_card_fee_rate_applied: firstNumber(order.actual_card_fee_rate_applied, order.actualCardFeeRateApplied),
+    customer_card_extra_rate_applied: firstNumber(order.customer_card_extra_rate_applied, order.customerCardExtraRateApplied),
+    product_name: firstText(order.product_name, order.productName, order.orderSummary, order.title),
+    youtube_nickname: firstText(order.youtube_nickname, order.nickname, order.customerNickname),
+    customer_name: firstText(order.customer_name, order.customerName, order.name),
+    customer_phone: firstText(order.customer_phone, order.customerPhone, order.phone),
   };
-
-  return tones[tone];
 }
 
-function SummaryCard({ label, value, sub, tone }: { label: string; value: string; sub: string; tone: SettlementRow["tone"] }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between gap-2">
-        <div className="text-xs font-black text-slate-500">{label}</div>
-        <span className={`rounded-full px-2 py-1 text-[11px] font-black ${toneClass(tone)}`}>
-          조회
-        </span>
-      </div>
-      <div className="mt-2 text-2xl font-black tracking-[-0.04em] text-slate-950">{value}</div>
-      <div className="mt-1 text-xs font-bold text-slate-400">{sub}</div>
-    </div>
-  );
-}
+function readSettingNumber(rows: LooseRow[], key: string, fallback: number) {
+  const row = rows.find((item) => clean(item.key) === key);
+  const value = toNumber(row?.value);
 
-function SettlementTable({ rows }: { rows: SettlementRow[] }) {
-  return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200">
-      <div className="grid grid-cols-[170px_100px_150px_1fr] bg-slate-50 px-4 py-3 text-xs font-black text-slate-500">
-        <div>구분</div>
-        <div className="text-right">건수</div>
-        <div className="text-right">금액</div>
-        <div>설명</div>
-      </div>
-
-      {rows.map((row) => (
-        <div
-          key={row.label}
-          className="grid grid-cols-[170px_100px_150px_1fr] items-center border-t border-slate-100 px-4 py-3 text-sm"
-        >
-          <div>
-            <span className={`rounded-lg px-2 py-1 text-xs font-black ${toneClass(row.tone)}`}>
-              {row.label}
-            </span>
-          </div>
-          <div className="text-right font-black text-slate-700">{row.count.toLocaleString("ko-KR")}건</div>
-          <div className="text-right font-black text-slate-950">{money(row.amount)}</div>
-          <div className="truncate text-xs font-bold text-slate-500">{row.desc}</div>
-        </div>
-      ))}
-    </div>
-  );
+  return value > 0 || String(row?.value ?? "").trim() === "0" ? value : fallback;
 }
 
 export default function AdminLiveSettlementPanel({ orders }: Props) {
-  const paidOrders = orders.filter(isPaid);
-  const unpaidOrders = orders.filter(isUnpaid);
+  const [deposits, setDeposits] = useState<LooseRow[]>([]);
+  const [broadcasts, setBroadcasts] = useState<LooseRow[]>([]);
+  const [settings, setSettings] = useState<LooseRow[]>([]);
+  const [loadingMeta, setLoadingMeta] = useState(false);
 
-  const bankPaidOrders = orders.filter((order) => isBank(order) && isPaid(order));
-  const bankUnpaidOrders = orders.filter((order) => isBank(order) && !isPaid(order));
-  const cardPaidOrders = orders.filter((order) => isCard(order) && isPaid(order));
-  const cardUnpaidOrders = orders.filter((order) => isCard(order) && !isPaid(order));
-  const manualNeededOrders = orders.filter((order) => order.paymentStatus === "manual_match_needed");
+  useEffect(() => {
+    let alive = true;
 
-  const totalAmount = sumAmount(orders);
-  const paidAmount = sumAmount(paidOrders);
-  const unpaidAmount = sumAmount(unpaidOrders);
-  const shippingFeeAmount = sumShippingFee(orders);
+    async function loadSettlementMeta() {
+      setLoadingMeta(true);
 
-  const settlementRows: SettlementRow[] = [
-    {
-      label: "총 주문금액",
-      count: orders.length,
-      amount: totalAmount,
-      tone: "slate",
-      desc: "입금확인/미입금/카드결제 포함 전체 주문금액",
-    },
-    {
-      label: "입금확인",
-      count: paidOrders.length,
-      amount: paidAmount,
-      tone: "emerald",
-      desc: "입금확인, 자동입금확인, 수동입금확인, 카드결제완료 포함",
-    },
-    {
-      label: "미입금",
-      count: unpaidOrders.length,
-      amount: unpaidAmount,
-      tone: "red",
-      desc: "미입금, 입금확인 필요, 카드 미결제 포함",
-    },
-    {
-      label: "입금확인 필요",
-      count: manualNeededOrders.length,
-      amount: sumAmount(manualNeededOrders),
-      tone: "orange",
-      desc: "수동 확인이 필요한 주문",
-    },
-    {
-      label: "무통장 입금확인",
-      count: bankPaidOrders.length,
-      amount: sumAmount(bankPaidOrders),
-      tone: "emerald",
-      desc: "무통장입금 중 입금확인 완료",
-    },
-    {
-      label: "무통장 미입금",
-      count: bankUnpaidOrders.length,
-      amount: sumAmount(bankUnpaidOrders),
-      tone: "red",
-      desc: "무통장입금 중 아직 입금확인 전",
-    },
-    {
-      label: "카드결제완료",
-      count: cardPaidOrders.length,
-      amount: sumAmount(cardPaidOrders),
-      tone: "violet",
-      desc: "카드결제 완료 주문",
-    },
-    {
-      label: "카드 미결제",
-      count: cardUnpaidOrders.length,
-      amount: sumAmount(cardUnpaidOrders),
-      tone: "red",
-      desc: "카드결제 방식이지만 아직 결제 전",
-    },
-  ];
+      try {
+        const [depositsResult, broadcastsResult, settingsResult] = await Promise.all([
+          supabase.from("deposits").select("*").order("created_at", { ascending: false }).limit(500),
+          supabase.from("broadcasts").select("*").order("started_at", { ascending: false }).limit(120),
+          supabase.from("settings").select("key,value").in("key", [...SETTING_KEYS]),
+        ]);
+
+        if (!alive) return;
+
+        if (depositsResult.error) {
+          showAdminToast("정산 입금내역 불러오기 실패\n\n" + depositsResult.error.message, "error");
+        } else {
+          setDeposits((depositsResult.data || []) as LooseRow[]);
+        }
+
+        if (broadcastsResult.error) {
+          showAdminToast("정산 방송리스트 불러오기 실패\n\n" + broadcastsResult.error.message, "error");
+        } else {
+          setBroadcasts((broadcastsResult.data || []) as LooseRow[]);
+        }
+
+        if (settingsResult.error) {
+          showAdminToast("정산 설정값 불러오기 실패\n\n" + settingsResult.error.message, "error");
+        } else {
+          setSettings((settingsResult.data || []) as LooseRow[]);
+        }
+      } finally {
+        if (alive) setLoadingMeta(false);
+      }
+    }
+
+    loadSettlementMeta();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const settlementOrders = useMemo(() => {
+    return Array.isArray(orders) ? orders.map(normalizeLiveOrder) : [];
+  }, [orders]);
+
+  const settingsSummary: SettingSummary = useMemo(() => {
+    return {
+      customerCardRate: readSettingNumber(settings, "customer_card_extra_rate", 10),
+      actualCardRate: readSettingNumber(settings, "actual_card_fee_rate", 7),
+      cardPaymentMinAmount: readSettingNumber(settings, "card_payment_min_amount", 100000),
+      defaultShippingFee: readSettingNumber(settings, "default_shipping_fee", 4000),
+    };
+  }, [settings]);
 
   return (
     <section className="grid gap-4">
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="text-[11px] font-black tracking-[0.18em] text-blue-500">SETTLEMENT STATS</div>
-            <h1 className="mt-1 text-3xl font-black tracking-[-0.05em] text-slate-950">정산통계</h1>
-            <p className="mt-2 text-sm font-bold text-slate-500">
-              현재 연결은 읽기전용입니다. 정산 확정·금액 수정·환불 차감·엑셀 저장은 아직 실행하지 않습니다.
-            </p>
-          </div>
-
-          <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
-            읽기전용 연결
-          </span>
-        </div>
-
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <SummaryCard label="총 주문금액" value={money(totalAmount)} sub={`${orders.length.toLocaleString("ko-KR")}건`} tone="slate" />
-          <SummaryCard label="입금확인 금액" value={money(paidAmount)} sub={`${paidOrders.length.toLocaleString("ko-KR")}건`} tone="emerald" />
-          <SummaryCard label="미입금 금액" value={money(unpaidAmount)} sub={`${unpaidOrders.length.toLocaleString("ko-KR")}건`} tone="red" />
-          <SummaryCard label="배송비 합계" value={money(shippingFeeAmount)} sub="현재 주문 데이터 기준" tone="blue" />
-        </div>
+      <div className="rounded-[28px] border border-blue-100 bg-blue-50 px-5 py-4 text-sm font-bold leading-6 text-blue-800">
+        /admin-live 메인 관리자 기준 정산통계입니다. 주문 상태, 입금 상태, 배송비, 환불 로직은 변경하지 않고 조회·계산·표시만 합니다.
+        {loadingMeta ? <span className="ml-2 text-blue-500">정산 기준값 불러오는 중...</span> : null}
       </div>
 
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-black text-slate-950">결제·입금 상태별 통계</h2>
-          <div className="text-xs font-bold text-slate-400">조회 전용</div>
-        </div>
-
-        <SettlementTable rows={settlementRows} />
-
-        <div className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-xs font-black leading-5 text-amber-700">
-          이 화면은 현재 주문 데이터 기준의 조회용 통계입니다. 실제 정산 확정, 환불 차감, 카드수수료,
-          기타매출/지출 반영은 다음 단계에서 별도 검증 후 연결해야 합니다.
-        </div>
-      </div>
+      <AdminSettlementPanel
+        orders={settlementOrders}
+        deposits={deposits}
+        broadcasts={broadcasts}
+        settingsSummary={settingsSummary}
+      />
     </section>
   );
 }
