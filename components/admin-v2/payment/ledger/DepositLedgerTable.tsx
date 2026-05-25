@@ -79,18 +79,18 @@ export default function DepositLedgerTable({
         </div>
       </div>
 
-      <div className="overflow-auto">
-        <table className="min-w-[860px] w-full border-separate border-spacing-0">
+      <div className="overflow-auto px-4 pb-3">
+        <table className="mx-auto min-w-[820px] max-w-[980px] w-full border-separate border-spacing-0">
           <colgroup>
-            <col className="w-[280px]" />
-            <col className="w-[220px]" />
-            <col className="w-[180px]" />
-            <col className="w-[140px]" />
-            <col className="w-[110px]" />
+            <col className="w-[250px]" />
+            <col className="w-[210px]" />
+            <col className="w-[170px]" />
+            <col className="w-[130px]" />
+            <col className="w-[90px]" />
           </colgroup>
           <thead>
             <tr className="bg-slate-50">
-              <th className="px-5 py-3 text-left">
+              <th className="px-4 py-3 text-left">
                 <SortButton
                   label="입금일시"
                   sortName="time"
@@ -99,7 +99,7 @@ export default function DepositLedgerTable({
                   onSortChange={onSortChange}
                 />
               </th>
-              <th className="px-5 py-3 text-left">
+              <th className="px-4 py-3 text-left">
                 <SortButton
                   label="입금자명"
                   sortName="name"
@@ -108,7 +108,7 @@ export default function DepositLedgerTable({
                   onSortChange={onSortChange}
                 />
               </th>
-              <th className="px-5 py-3 text-right">
+              <th className="px-4 py-3 text-right">
                 <SortButton
                   label="입금금액"
                   sortName="amount"
@@ -117,8 +117,8 @@ export default function DepositLedgerTable({
                   onSortChange={onSortChange}
                 />
               </th>
-              <th className="px-5 py-3 text-center text-xs font-black text-slate-500">상태</th>
-              <th className="px-5 py-3 text-center text-xs font-black text-slate-500">상세</th>
+              <th className="px-4 py-3 text-center text-xs font-black text-slate-500">상태</th>
+              <th className="px-4 py-3 text-center text-xs font-black text-slate-500">상세</th>
             </tr>
           </thead>
 
@@ -137,19 +137,19 @@ export default function DepositLedgerTable({
 
                 return (
                   <tr key={rowKey} className="group border-b border-slate-100 transition hover:bg-blue-50/40">
-                    <td className="border-b border-slate-100 px-5 py-4 text-sm font-black text-slate-800">
+                    <td className="border-b border-slate-100 px-4 py-4 text-sm font-black text-slate-800">
                       {formatDepositDateTime(row)}
                     </td>
-                    <td className="border-b border-slate-100 px-5 py-4">
+                    <td className="border-b border-slate-100 px-4 py-4">
                       <div className="text-base font-black text-slate-950">{getDepositName(row) || "-"}</div>
                     </td>
-                    <td className="border-b border-slate-100 px-5 py-4 text-right text-base font-black tabular-nums text-slate-950">
+                    <td className="border-b border-slate-100 px-4 py-4 text-right text-base font-black tabular-nums text-slate-950">
                       {formatDepositMoney(row ? getDepositAmount(row) : 0)}
                     </td>
-                    <td className="border-b border-slate-100 px-5 py-4 text-center">
+                    <td className="border-b border-slate-100 px-4 py-4 text-center">
                       <StatusBadge status={status} />
                     </td>
-                    <td className="border-b border-slate-100 px-5 py-4 text-center">
+                    <td className="border-b border-slate-100 px-4 py-4 text-center">
                       <button
                         type="button"
                         onClick={() => onOpenDetail(row)}

@@ -186,7 +186,7 @@ export default function PaymentMatchPanel(_props: Props) {
   };
 
   return (
-    <div className="mx-auto grid w-full max-w-[1180px] gap-5">
+    <div className="mx-auto grid w-full max-w-[1440px] gap-5">
       <section className="flex flex-col gap-4 rounded-[34px] border border-slate-200 bg-gradient-to-br from-white via-white to-blue-50/40 p-6 shadow-[0_22px_60px_rgba(15,23,42,0.07)] lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
