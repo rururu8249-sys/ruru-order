@@ -354,6 +354,9 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
   const [selectedTypes, setSelectedTypes] = useState<string[]>(["general"]);
   const [memoText, setMemoText] = useState("");
   const [savingMemo, setSavingMemo] = useState(false);
+  const [editingIssueTask, setEditingIssueTask] = useState<AdminIssueTask | null>(null);
+  const [editingIssueMemo, setEditingIssueMemo] = useState("");
+  const [savingEditMemo, setSavingEditMemo] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -626,7 +629,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
     await loadTasks();
   };
 
-  const editIssueMemo = async (task: AdminIssueTask) => {
+  const editIssueMemo = (task: AdminIssueTask) => {
     const id = taskId(task);
 
     if (!id) {
@@ -634,42 +637,72 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
       return;
     }
 
-    const currentMemo = getTaskContent(task);
-    const editedMemo = window.prompt("고객이슈 메모를 수정하세요.", currentMemo);
+    setShowMemoAdd(false);
+    setEditingIssueTask(task);
+    setEditingIssueMemo(getTaskContent(task));
+  };
 
-    if (editedMemo === null) return;
+  const closeIssueMemoEditor = () => {
+    if (savingEditMemo) return;
 
-    const memo = editedMemo.trim();
+    setEditingIssueTask(null);
+    setEditingIssueMemo("");
+  };
+
+  const saveEditedIssueMemo = async () => {
+    const task = editingIssueTask;
+
+    if (!task) {
+      showAdminToast("수정할 고객이슈를 찾지 못했습니다.");
+      return;
+    }
+
+    const id = taskId(task);
+
+    if (!id) {
+      showAdminToast("수정할 이슈 ID가 없습니다.");
+      return;
+    }
+
+    const memo = editingIssueMemo.trim();
 
     if (!memo) {
       showAdminToast("메모 내용은 비워둘 수 없습니다.");
       return;
     }
 
-    const response = await fetch("/api/admin-v2/admin-tasks", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      cache: "no-store",
-      body: JSON.stringify({
-        id,
-        action: "update",
-        title: task.title || `[고객이슈] ${getTaskNickname(task)}`,
-        body: buildEditedTaskBody(task, memo),
-        task_type: task.task_type || task.type || "general",
-        priority: task.priority || "normal",
-        raw_payload: task.raw_payload || {},
-      }),
-    });
+    setSavingEditMemo(true);
 
-    const payload = await response.json().catch(() => null);
+    try {
+      const response = await fetch("/api/admin-v2/admin-tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({
+          id,
+          action: "update",
+          title: task.title || `[고객이슈] ${getTaskNickname(task)}`,
+          body: buildEditedTaskBody(task, memo),
+          task_type: task.task_type || task.type || "general",
+          priority: task.priority || "normal",
+          raw_payload: task.raw_payload || {},
+        }),
+      });
 
-    if (!response.ok || !payload?.ok) {
-      showAdminToast("고객이슈 수정 실패\n\n" + (payload?.message || "알 수 없는 오류"));
-      return;
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok || !payload?.ok) {
+        showAdminToast("고객이슈 수정 실패\n\n" + (payload?.message || "알 수 없는 오류"));
+        return;
+      }
+
+      window.dispatchEvent(new Event("ruru-admin-task-updated"));
+      await loadTasks();
+      setEditingIssueTask(null);
+      setEditingIssueMemo("");
+    } finally {
+      setSavingEditMemo(false);
     }
-
-    window.dispatchEvent(new Event("ruru-admin-task-updated"));
-    await loadTasks();
   };
 
   return (
@@ -748,7 +781,11 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
           <h2 className="text-sm font-black text-slate-950">고객 특이사항 · 고객이슈 {openCount}</h2>
           <button
             type="button"
-            onClick={() => setShowMemoAdd((value) => !value)}
+            onClick={() => {
+                setEditingIssueTask(null);
+                setEditingIssueMemo("");
+                setShowMemoAdd((value) => !value);
+              }}
             className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-black text-slate-500 hover:bg-slate-50"
           >
             + 메모 추가
@@ -830,6 +867,43 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
           </button>
         </div>
 
+          {editingIssueTask && (
+            <div className="absolute right-full top-10 z-40 mr-3 w-[350px] rounded-2xl border border-blue-200 bg-white p-3.5 shadow-2xl">
+              <div className="mb-3">
+                <h3 className="text-sm font-black text-slate-950">고객이슈 메모 수정</h3>
+                <div className="mt-1 text-[11px] font-bold text-slate-400">
+                  {getTaskNickname(editingIssueTask)} · {getTaskPhone(editingIssueTask)}
+                </div>
+              </div>
+
+              <label className="mb-1 block text-xs font-black text-slate-500">메모 내용</label>
+              <textarea
+                autoFocus
+                value={editingIssueMemo}
+                onChange={(event) => setEditingIssueMemo(event.target.value)}
+                className="h-36 w-full resize-none rounded-xl border border-slate-200 p-3 text-xs font-bold leading-5 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+              />
+
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={closeIssueMemoEditor}
+                  disabled={savingEditMemo}
+                  className="flex-1 rounded-xl border border-slate-200 bg-white py-2 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={saveEditedIssueMemo}
+                  disabled={savingEditMemo}
+                  className="flex-1 rounded-xl bg-blue-600 py-2 text-xs font-black text-white hover:bg-blue-700 disabled:bg-slate-300"
+                >
+                  {savingEditMemo ? "저장중" : "수정 저장"}
+                </button>
+              </div>
+            </div>
+          )}
         {showMemoAdd && (
           <div className="absolute right-full top-10 z-30 mr-3 w-[350px] rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xl">
             <div className="mb-3 flex items-center">
