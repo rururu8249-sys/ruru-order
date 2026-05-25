@@ -1,5 +1,7 @@
 "use client";
 
+import CustomerToastNotice from "@/components/customer/CustomerToastNotice";
+
 import { getCustomerOrderStatusLabel } from "@/lib/admin-v2/statusDisplay";
 
 // app/myorder/page.tsx
@@ -120,6 +122,23 @@ const blockCustomerCopyEvents = () => {
 
 export default function MyOrderPage() {
   const [customerName, setCustomerName] = useState("");
+
+  const [customerNotice, setCustomerNotice] = useState<{
+    message: string;
+    type: "info" | "success" | "warning" | "error";
+  }>({ message: "", type: "info" });
+
+  const showCustomerNotice = (
+    message: string,
+    type: "info" | "success" | "warning" | "error" = "warning"
+  ) => {
+    setCustomerNotice({ message, type });
+  };
+
+  const closeCustomerNotice = () => {
+    setCustomerNotice((current) => ({ ...current, message: "" }));
+  };
+
   const [phone, setPhone] = useState("");
   const [orders, setOrders] = useState<any[]>([]);
   const [orderPage, setOrderPage] = useState(1);
@@ -166,12 +185,12 @@ export default function MyOrderPage() {
       typeof legacyOverride === "boolean" ? legacyOverride : isLegacyMode;
 
     if (useLegacyNameFilter && !name) {
-      alert("이름을 입력해주세요.");
+      showCustomerNotice("이름을 입력해주세요.");
       return;
     }
 
     if (cleanPhone.length < 10) {
-      alert("전화번호를 정확히 입력해주세요.");
+      showCustomerNotice("전화번호를 정확히 입력해주세요.");
       return;
     }
 
@@ -195,7 +214,7 @@ export default function MyOrderPage() {
 
     if (error) {
       setLoading(false);
-      alert("주문조회 오류: " + error.message);
+      showCustomerNotice("주문조회 오류: " + error.message, "error");
       return;
     }
 
@@ -220,7 +239,7 @@ export default function MyOrderPage() {
       setCopyDone(true);
       setTimeout(() => setCopyDone(false), 1800);
     } catch {
-      alert(BANK_ACCOUNT);
+      showCustomerNotice(BANK_ACCOUNT, "success");
     }
   };
 
@@ -243,6 +262,13 @@ export default function MyOrderPage() {
       className="min-h-screen select-none bg-[#f5f8ff] px-4 py-6 text-[#151923]"
       style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
     >
+        <CustomerToastNotice
+          open={Boolean(customerNotice.message)}
+          type={customerNotice.type}
+          message={customerNotice.message}
+          onClose={closeCustomerNotice}
+        />
+
       <section className="mx-auto w-full max-w-md">
         <CustomerTopNav />
 
