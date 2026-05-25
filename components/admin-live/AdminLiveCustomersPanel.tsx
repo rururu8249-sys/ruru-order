@@ -894,7 +894,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
 
       <AdminLivePhoneBlockPanel onSaved={applyBlockResult} />
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(760px,1fr)_390px]">
+      <div className="grid items-stretch gap-5 xl:grid-cols-[minmax(760px,1fr)_390px]">
         <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
           <div className="grid gap-2 lg:grid-cols-[180px_180px_180px_1fr]">
             <select
