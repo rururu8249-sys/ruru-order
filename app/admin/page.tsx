@@ -1,5 +1,6 @@
 "use client";
 
+import { showAdminToast } from "@/lib/adminToast";
 import AdminOrdersView from "@/components/admin/orders/AdminOrdersView";
 import AdminOrderFilterPanel from "@/components/admin/orders/AdminOrderFilterPanel";
 import AdminOrderTablePanel from "@/components/admin/orders/AdminOrderTablePanel";
@@ -399,7 +400,7 @@ export default function AdminPage() {
       .order("id", { ascending: false });
 
     if (error) {
-      alert("상품 목록 불러오기 실패\n\n" + error.message);
+      showAdminToast("상품 목록 불러오기 실패\n\n" + error.message, "error");
       setLoadingProducts(false);
       return;
     }
@@ -1502,17 +1503,17 @@ const selectedCustomerDetail = useMemo(() => {
 
   const validateForm = () => {
     if (!form.product_name.trim()) {
-      alert("상품명을 입력해주세요.");
+      showAdminToast("상품명을 입력해주세요.", "warning");
       return false;
     }
 
     if (Number(form.price || 0) < 0) {
-      alert("금액은 0원 이상으로 입력해주세요.");
+      showAdminToast("금액은 0원 이상으로 입력해주세요.", "warning");
       return false;
     }
 
     if (Number(form.stock || 0) < 0) {
-      alert("재고는 0개 이상으로 입력해주세요.");
+      showAdminToast("재고는 0개 이상으로 입력해주세요.", "warning");
       return false;
     }
 
@@ -1547,18 +1548,18 @@ const selectedCustomerDetail = useMemo(() => {
           .eq("id", editingId);
 
         if (error) throw error;
-        alert("상품 수정 완료");
+        showAdminToast("상품 수정 완료", "success");
       } else {
         const { error } = await supabase.from("products").insert(payload);
 
         if (error) throw error;
-        alert("상품 등록 완료");
+        showAdminToast("상품 등록 완료", "success");
       }
 
       resetForm();
       await loadProducts();
     } catch (error: any) {
-      alert("상품 저장 실패\n\n" + error.message);
+      showAdminToast("상품 저장 실패\n\n" + error.message, "error");
     } finally {
       setSavingProduct(false);
     }
@@ -1579,7 +1580,7 @@ const selectedCustomerDetail = useMemo(() => {
       .eq("id", id);
 
     if (error) {
-      alert("변경 실패\n\n" + error.message);
+      showAdminToast("변경 실패\n\n" + error.message, "error");
       return;
     }
 
@@ -1608,7 +1609,7 @@ const selectedCustomerDetail = useMemo(() => {
 
   const applyBulkUpdate = async (type: "shipping" | "combine" | "status") => {
     if (selectedIds.length === 0) {
-      alert("먼저 변경할 상품을 체크해주세요.");
+      showAdminToast("먼저 변경할 상품을 체크해주세요.", "warning");
       return;
     }
 
@@ -1628,11 +1629,11 @@ const selectedCustomerDetail = useMemo(() => {
       .in("id", selectedIds);
 
     if (error) {
-      alert("일괄 변경 실패\n\n" + error.message);
+      showAdminToast("일괄 변경 실패\n\n" + error.message, "error");
       return;
     }
 
-    alert("일괄 변경 완료");
+    showAdminToast("일괄 변경 완료", "success");
     setSelectedIds([]);
     await loadProducts();
   };
