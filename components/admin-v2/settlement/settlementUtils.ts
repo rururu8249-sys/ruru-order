@@ -157,11 +157,14 @@ export function manualEntryAmount(entry: SettlementManualEntry) {
   return Math.max(0, toNumber(entry.amount));
 }
 
-export function manualEntryDateKey(entry: SettlementManualEntry) {
+export function manualEntryDateKey(entry?: SettlementManualEntry | null) {
+  if (!entry) return "";
   return toDateKey(entry.entry_date);
 }
 
-export function manualEntryBroadcastKey(entry: SettlementManualEntry) {
+export function manualEntryBroadcastKey(entry?: SettlementManualEntry | null) {
+  if (!entry) return "date:unknown";
+
   const explicit = cleanText(entry.broadcast_key);
   if (explicit) return explicit;
 
@@ -169,7 +172,8 @@ export function manualEntryBroadcastKey(entry: SettlementManualEntry) {
   return `date:${dateKey || "unknown"}`;
 }
 
-export function manualEntryLabel(entry: SettlementManualEntry) {
+export function manualEntryLabel(entry?: SettlementManualEntry | null) {
+  if (!entry) return "수동입력";
   return cleanText(entry.broadcast_label) || `${formatDateLabel(entry.entry_date)} · 수동입력`;
 }
 
@@ -451,14 +455,17 @@ export function buildBroadcastRows(
       const option = optionMap.get(key);
       const stats = calculateStats(groupRows, actualCardRate, groupManualEntries);
       const firstManualEntry = groupManualEntries[0];
+      const firstOrderRow = groupRows[0] || null;
+      const firstOrderDateKey = firstOrderRow ? orderDateKey(firstOrderRow) : "";
+      const firstManualDateKey = firstManualEntry ? manualEntryDateKey(firstManualEntry) : "";
 
       return {
         key,
         label:
           option?.label ||
           firstManualEntry?.broadcast_label ||
-          (firstManualEntry ? manualEntryLabel(firstManualEntry) : `${formatDateLabel(groupRows[0]?.created_at)} · 방송없음`),
-        dateKey: option?.dateKey || orderDateKey(groupRows[0]) || manualEntryDateKey(firstManualEntry || ({} as SettlementManualEntry)) || "",
+          (firstManualEntry ? manualEntryLabel(firstManualEntry) : `${formatDateLabel(firstOrderRow?.created_at)} · 방송없음`),
+        dateKey: option?.dateKey || firstOrderDateKey || firstManualDateKey || "",
         count: groupRows.length,
         totalOrderAmount: stats.totalOrderAmount,
         paidAmount: stats.paidAmount,
