@@ -382,7 +382,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
   const pageNumbers = Array.from({ length: Math.min(totalPages, 4) }, (_, index) => index + 1);
 
   const goCustomerManagement = () => {
-    window.location.href = "/admin-live?panel=customers#customer-management";
+    window.location.href = "/admin-live?panel=customers";
   };
 
   const searchCustomers = async () => {

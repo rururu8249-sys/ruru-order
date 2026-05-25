@@ -227,9 +227,40 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
   return parts.join(" · ");
 }
 
+const MENU_KEYS_FOR_URL: AdminLiveMenuKey[] = [
+  "broadcast",
+  "orders",
+  "payments",
+  "customers",
+  "settlement",
+  "settings",
+];
+
+function isMenuKeyForUrl(value: string | null): value is AdminLiveMenuKey {
+  return Boolean(value && MENU_KEYS_FOR_URL.includes(value as AdminLiveMenuKey));
+}
+
+function readMenuFromUrl(): AdminLiveMenuKey {
+  if (typeof window === "undefined") return "broadcast";
+
+  const params = new URLSearchParams(window.location.search);
+  const panel = params.get("panel");
+
+  return isMenuKeyForUrl(panel) ? panel : "broadcast";
+}
+
+function replacePanelInUrl(menu: AdminLiveMenuKey) {
+  if (typeof window === "undefined") return;
+
+  const url = new URL(window.location.href);
+  url.searchParams.set("panel", menu);
+
+  window.history.replaceState(null, "", `${url.pathname}?${url.searchParams.toString()}${url.hash}`);
+}
+
 export default function AdminLiveDashboard() {
   useAutoBankdaPaymentSync();
-  const [activeMenu, setActiveMenu] = useState<AdminLiveMenuKey>("broadcast");
+  const [activeMenu, setActiveMenu] = useState<AdminLiveMenuKey>(() => readMenuFromUrl());
   const [orders, setOrders] = useState<LiveOrder[]>([]);
   const [broadcasts, setBroadcasts] = useState<AdminLiveBroadcast[]>([]);
   const [savingBroadcast, setSavingBroadcast] = useState(false);
@@ -329,6 +360,10 @@ export default function AdminLiveDashboard() {
     void loadDepositsFromServer();
     void loadBroadcasts();
   }, []);
+
+  useEffect(() => {
+    replacePanelInUrl(activeMenu);
+  }, [activeMenu]);
 
   const activeBroadcast = useMemo(() => getActiveBroadcast(broadcasts), [broadcasts]);
 
@@ -517,7 +552,13 @@ export default function AdminLiveDashboard() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <div className="flex min-h-screen">
-        <AdminLiveSidebar activeMenu={activeMenu} onMenuChange={setActiveMenu} />
+        <AdminLiveSidebar
+          activeMenu={activeMenu}
+          onMenuChange={(nextMenu) => {
+            setActiveMenu(nextMenu);
+            replacePanelInUrl(nextMenu);
+          }}
+        />
 
         <main className="min-w-0 flex-1 overflow-x-hidden px-5 py-4">
           {activeMenu === "broadcast" ? (
