@@ -415,7 +415,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   const [newIssueForm, setNewIssueForm] = useState<IssueForm>(() => emptyIssueForm());
   const [customerSearchDraft, setCustomerSearchDraft] = useState("");
   const [customerSearchKeyword, setCustomerSearchKeyword] = useState("");
-  const [issuePageSize, setIssuePageSize] = useState(10);
+  const issuePageSize = 3;
   const [issuePage, setIssuePage] = useState(1);
   const [editingIssueTask, setEditingIssueTask] = useState<AdminIssueTask | null>(null);
   const [editingIssueMemo, setEditingIssueMemo] = useState("");
@@ -720,18 +720,9 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={issuePageSize}
-            onChange={(event) => {
-              setIssuePageSize(Number(event.target.value));
-              setIssuePage(1);
-            }}
-            className="h-9 rounded-xl border border-slate-200 bg-white px-2 text-xs font-black text-slate-600"
-          >
-            <option value={10}>10개 보기</option>
-            <option value={20}>20개 보기</option>
-            <option value={50}>50개 보기</option>
-          </select>
+          <div className="h-9 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600">
+            3개씩 보기
+          </div>
 
           <button
             type="button"
