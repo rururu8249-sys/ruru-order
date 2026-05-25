@@ -38,20 +38,26 @@ export function formatMoneyInput(value: string) {
 export function toDateKey(value: unknown) {
   const raw = cleanText(value);
   if (!raw) return "";
+
   const date = new Date(raw);
+
   if (!Number.isFinite(date.getTime())) {
     return raw.slice(0, 10);
   }
+
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, "0");
   const dd = String(date.getDate()).padStart(2, "0");
+
   return `${yyyy}-${mm}-${dd}`;
 }
 
 export function formatDateLabel(value: unknown) {
   const key = toDateKey(value);
   if (!key) return "날짜없음";
+
   const [, month, day] = key.split("-");
+
   return `${Number(month)}월 ${Number(day)}일`;
 }
 
@@ -74,6 +80,7 @@ export function isCanceled(row: AnyRow) {
 
 export function isPaymentDone(row: AnyRow) {
   const text = rowStatusText(row);
+
   return (
     /자동입금확인|수동입금확인|입금확인|카드결제완료|카드완료|결제완료|paid|confirmed|complete/i.test(text) ||
     Boolean(row.deposit_confirmed_at)
@@ -82,8 +89,10 @@ export function isPaymentDone(row: AnyRow) {
 
 export function paymentMethod(row: AnyRow): PaymentFilter {
   const raw = cleanText(row.payment_method || row.paymentMethod || row.pay_method);
+
   if (/카드|card/i.test(raw)) return "카드결제";
   if (/무통장|입금|bank/i.test(raw)) return "무통장입금";
+
   return "기타";
 }
 
@@ -101,8 +110,10 @@ export function orderGrossAmount(row: AnyRow) {
 
 export function orderNetAmount(row: AnyRow) {
   if (toNumber(row.final_amount) > 0) return toNumber(row.final_amount);
+
   const gross = orderGrossAmount(row);
   const refund = toNumber(row.refund_amount);
+
   return Math.max(0, gross - refund);
 }
 
@@ -121,28 +132,17 @@ export function orderActualCardFee(row: AnyRow, fallbackRate: number) {
   if (storedFee > 0) return storedFee;
 
   const appliedRate = toNumber(row.actual_card_fee_rate_applied) || fallbackRate;
+
   return Math.round(orderNetAmount(row) * (appliedRate / 100));
 }
 
-export function orderCustomerCardExtra(row: AnyRow) {
-  if (paymentMethod(row) !== "카드결제") return 0;
-
-  const storedExtra =
-    toNumber(row.card_extra) ||
-    toNumber(row.customer_card_extra) ||
-    toNumber(row.customer_card_extra_amount);
-
-  if (storedExtra > 0) return storedExtra;
-
-  const productAmount =
-    toNumber(row.product_amount) ||
-    toNumber(row.item_total) ||
-    Math.max(0, orderNetAmount(row) - toNumber(row.shipping_fee) - toNumber(row.adjusted_shipping_fee));
-
-  const appliedRate = toNumber(row.customer_card_extra_rate_applied);
-  if (appliedRate <= 0) return 0;
-
-  return Math.round(productAmount * (appliedRate / 100));
+export function orderWarehouseOtherExpense(row: AnyRow) {
+  return (
+    toNumber(row.warehouse_other_expense) ||
+    toNumber(row.manual_expense_amount) ||
+    toNumber(row.extra_expense_amount) ||
+    0
+  );
 }
 
 export function flattenOrders(orderGroups?: AnyRow[], orders?: AnyRow[]) {
@@ -152,8 +152,10 @@ export function flattenOrders(orderGroups?: AnyRow[], orders?: AnyRow[]) {
   if (Array.isArray(orderGroups)) {
     orderGroups.forEach((group) => {
       const rows = Array.isArray(group?.rows) ? group.rows : [group?.first].filter(Boolean);
+
       rows.forEach((row: AnyRow) => {
         const key = cleanText(row?.id || row?.order_id || `${row?.order_lookup_code}-${row?.product_name}`);
+
         if (key && seen.has(key)) return;
         if (key) seen.add(key);
         if (row) list.push(row);
@@ -164,6 +166,7 @@ export function flattenOrders(orderGroups?: AnyRow[], orders?: AnyRow[]) {
   if (Array.isArray(orders)) {
     orders.forEach((row) => {
       const key = cleanText(row?.id || row?.order_id || `${row?.order_lookup_code}-${row?.product_name}`);
+
       if (key && seen.has(key)) return;
       if (key) seen.add(key);
       if (row) list.push(row);
@@ -246,9 +249,7 @@ export function filterRows({
 
     if (startDate && dateKey < startDate) return false;
     if (endDate && dateKey > endDate) return false;
-
     if (selected.size > 0 && !selected.has(orderBroadcastKey(row))) return false;
-
     if (paymentFilter !== "전체" && paymentMethod(row) !== paymentFilter) return false;
 
     return true;
@@ -272,7 +273,8 @@ export function calculateStats(rows: AnyRow[], actualCardRate: number): Settleme
   const cardAmount = cardRows.reduce((sum, row) => sum + orderNetAmount(row), 0);
   const otherAmount = otherRows.reduce((sum, row) => sum + orderNetAmount(row), 0);
   const actualCardFee = cardRows.reduce((sum, row) => sum + orderActualCardFee(row, actualCardRate), 0);
-  const customerCardExtra = cardRows.reduce((sum, row) => sum + orderCustomerCardExtra(row), 0);
+  const warehouseOtherExpense = paidRows.reduce((sum, row) => sum + orderWarehouseOtherExpense(row), 0);
+  const totalExpense = actualCardFee + warehouseOtherExpense;
   const refundAmount = activeRows.reduce((sum, row) => sum + orderRefundAmount(row), 0);
   const canceledAmount = canceledRows.reduce((sum, row) => sum + orderGrossAmount(row), 0);
 
@@ -284,9 +286,9 @@ export function calculateStats(rows: AnyRow[], actualCardRate: number): Settleme
     cardAmount,
     otherAmount,
     actualCardFee,
-    customerCardExtra,
-    cardFeeMargin: customerCardExtra - actualCardFee,
-    netAmount: paidAmount - actualCardFee,
+    warehouseOtherExpense,
+    totalExpense,
+    netAmount: paidAmount - totalExpense,
     refundAmount,
     canceledAmount,
     orderCount: activeRows.length,
@@ -298,19 +300,21 @@ export function calculateStats(rows: AnyRow[], actualCardRate: number): Settleme
 }
 
 export function buildDailyTrend(rows: AnyRow[], actualCardRate: number) {
-  const map = new Map<string, { dateKey: string; sales: number; fee: number; net: number }>();
+  const map = new Map<string, { dateKey: string; sales: number; fee: number; expense: number; net: number }>();
 
   rows
     .filter((row) => !isCanceled(row) && isPaymentDone(row))
     .forEach((row) => {
       const dateKey = orderDateKey(row) || "unknown";
-      const current = map.get(dateKey) || { dateKey, sales: 0, fee: 0, net: 0 };
+      const current = map.get(dateKey) || { dateKey, sales: 0, fee: 0, expense: 0, net: 0 };
       const amount = orderNetAmount(row);
       const fee = orderActualCardFee(row, actualCardRate);
+      const expense = orderWarehouseOtherExpense(row);
 
       current.sales += amount;
       current.fee += fee;
-      current.net += amount - fee;
+      current.expense += expense;
+      current.net += amount - fee - expense;
 
       map.set(dateKey, current);
     });
@@ -333,6 +337,7 @@ export function buildBroadcastRows(rows: AnyRow[], options: SettlementBroadcastO
     .map(([key, groupRows]) => {
       const option = optionMap.get(key);
       const stats = calculateStats(groupRows, actualCardRate);
+
       return {
         key,
         label: option?.label || `${formatDateLabel(groupRows[0]?.created_at)} · 방송없음`,
@@ -343,7 +348,8 @@ export function buildBroadcastRows(rows: AnyRow[], options: SettlementBroadcastO
         bankAmount: stats.bankAmount,
         cardAmount: stats.cardAmount,
         actualCardFee: stats.actualCardFee,
-        customerCardExtra: stats.customerCardExtra,
+        warehouseOtherExpense: stats.warehouseOtherExpense,
+        totalExpense: stats.totalExpense,
         netAmount: stats.netAmount,
         unpaidAmount: stats.unpaidAmount,
       };

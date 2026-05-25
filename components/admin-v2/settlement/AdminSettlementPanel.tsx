@@ -1,8 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import { showAdminToast } from "@/lib/adminToast";
 import type { AnyRow, PaymentFilter, SettlementSettingsSummary } from "./settlementTypes";
 import {
   buildBroadcastOptions,
@@ -11,10 +9,8 @@ import {
   calculateStats,
   filterRows,
   flattenOrders,
-  formatMoneyInput,
   toNumber,
 } from "./settlementUtils";
-import SettlementSettingsCard from "./SettlementSettingsCard";
 import SettlementFilterBar from "./SettlementFilterBar";
 import SettlementSummaryCards from "./SettlementSummaryCards";
 import SettlementCharts from "./SettlementCharts";
@@ -28,12 +24,6 @@ type Props = {
   settingsSummary?: SettlementSettingsSummary;
 };
 
-const SETTING_KEYS = {
-  actualCardFeeRate: "actual_card_fee_rate",
-  customerCardExtraRate: "customer_card_extra_rate",
-  cardPaymentMinAmount: "card_payment_min_amount",
-} as const;
-
 function csvCell(value: unknown) {
   return `"${String(value ?? "").replace(/"/g, '""')}"`;
 }
@@ -45,12 +35,7 @@ export default function AdminSettlementPanel({
   broadcasts,
   settingsSummary,
 }: Props) {
-  const [actualCardFeeRate, setActualCardFeeRate] = useState(String(settingsSummary?.actualCardRate ?? 7));
-  const [customerCardExtraRate, setCustomerCardExtraRate] = useState(String(settingsSummary?.customerCardRate ?? 10));
-  const [cardPaymentMinAmount, setCardPaymentMinAmount] = useState(
-    formatMoneyInput(String(settingsSummary?.cardPaymentMinAmount ?? 100000)),
-  );
-  const [saving, setSaving] = useState(false);
+  const actualCardFeeRate = String(settingsSummary?.actualCardRate ?? 7);
 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -87,61 +72,30 @@ export default function AdminSettlementPanel({
     setSelectedBroadcastKeys([]);
   };
 
-  const saveSettings = async () => {
-    const actualFee = Math.min(20, Math.max(0, toNumber(actualCardFeeRate)));
-    const customerRate = Math.min(20, Math.max(0, toNumber(customerCardExtraRate)));
-    const minAmount = Math.max(0, Math.round(toNumber(cardPaymentMinAmount)));
-
-    setSaving(true);
-
-    try {
-      const { error } = await supabase.from("settings").upsert(
-        [
-          { key: SETTING_KEYS.actualCardFeeRate, value: String(actualFee) },
-          { key: SETTING_KEYS.customerCardExtraRate, value: String(customerRate) },
-          { key: SETTING_KEYS.cardPaymentMinAmount, value: String(minAmount) },
-        ],
-        { onConflict: "key" },
-      );
-
-      if (error) {
-        showAdminToast("정산 설정 저장 실패\n\n" + error.message, "error");
-        return;
-      }
-
-      setActualCardFeeRate(String(actualFee));
-      setCustomerCardExtraRate(String(customerRate));
-      setCardPaymentMinAmount(formatMoneyInput(String(minAmount)));
-      showAdminToast("정산 설정을 저장했습니다.", "success");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const exportSummaryCsv = () => {
     const summaryRows = [
       ["구분", "값", "메모"],
-      ["총 주문금액", stats.totalOrderAmount, "취소/환불 제외 주문 기준"],
-      ["입금/결제완료", stats.paidAmount, "무통장+카드 완료 기준"],
-      ["무통장 입금완료", stats.bankAmount, "입금확인 완료"],
-      ["카드 결제완료", stats.cardAmount, "카드 완료"],
+      ["총주문액", stats.totalOrderAmount, "취소/환불 제외 주문 기준"],
+      ["완료매출", stats.paidAmount, "무통장+카드 완료 기준"],
+      ["무통장", stats.bankAmount, "입금확인 완료"],
+      ["카드", stats.cardAmount, "카드 완료"],
       ["카드수수료", stats.actualCardFee, `카드 결제완료 × ${actualCardFeeRate}% 또는 주문 저장 수수료율`],
-      ["고객 카드추가금", stats.customerCardExtra, "주문서 고객 부과 카드 추가금"],
-      ["실수익", stats.netAmount, "입금/결제완료 - 카드수수료"],
-      ["미입금/확인필요", stats.unpaidAmount, "취소/환불 제외"],
-      ["수동 매출/지출", "다음 단계", "별도 DB와 수정이력 필요"],
+      ["창고정산/기타지출", stats.warehouseOtherExpense, "수동 지출 연결 예정"],
+      ["지출합계", stats.totalExpense, "카드수수료 + 창고정산/기타지출"],
+      ["미입금/확인필요", stats.unpaidAmount, "실수익 계산 제외"],
+      ["실수익", stats.netAmount, "완료매출 - 지출합계"],
     ];
 
     const broadcastHeader = [
       "방송/날짜",
       "주문건수",
-      "총 주문금액",
-      "입금/결제완료",
+      "총주문액",
+      "완료매출",
       "무통장",
       "카드",
       "카드수수료",
-      "카드추가금",
-      "미입금",
+      "창고정산/기타지출",
+      "미입금/확인필요",
       "실수익",
     ];
 
@@ -153,7 +107,7 @@ export default function AdminSettlementPanel({
       row.bankAmount,
       row.cardAmount,
       row.actualCardFee,
-      row.customerCardExtra,
+      row.warehouseOtherExpense,
       row.unpaidAmount,
       row.netAmount,
     ]);
@@ -179,9 +133,11 @@ export default function AdminSettlementPanel({
     const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
+
     link.href = url;
     link.download = `ruru_settlement_stats_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
+
     URL.revokeObjectURL(url);
   };
 
@@ -193,7 +149,7 @@ export default function AdminSettlementPanel({
             <div className="text-xs font-black tracking-[0.22em] text-blue-600">SETTLEMENT STATS</div>
             <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] text-slate-950">정산통계</h2>
             <p className="mt-2 text-sm font-bold text-slate-500">
-              방송별·기간별 매출, 결제수단, 카드수수료, 실수익을 조회 중심으로 확인합니다.
+              방송별·기간별 완료매출, 카드수수료, 창고정산/기타지출, 실수익을 조회 중심으로 확인합니다.
             </p>
           </div>
 
@@ -207,7 +163,8 @@ export default function AdminSettlementPanel({
         </div>
 
         <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs font-bold leading-5 text-blue-800">
-          기준: 주문금액은 final_amount → adjusted_total_price → total_price 순서로 계산합니다. 카드수수료는 주문 당시 저장된 actual_card_fee_rate_applied를 우선 사용하고, 없으면 현재 설정값을 적용합니다.
+          기준: 완료매출은 입금확인/카드완료 주문만 잡습니다. 미입금/확인필요는 실수익 계산에서 제외합니다.
+          카드수수료는 주문 당시 저장된 actual_card_fee_rate_applied를 우선 사용하고, 창고정산/기타지출은 다음 단계의 수동 지출 입력과 연결합니다.
         </div>
       </div>
 
@@ -230,19 +187,8 @@ export default function AdminSettlementPanel({
 
       <SettlementBroadcastTable rows={broadcastRows} />
 
-      <SettlementSettingsCard
-        actualCardFeeRate={actualCardFeeRate}
-        customerCardExtraRate={customerCardExtraRate}
-        cardPaymentMinAmount={cardPaymentMinAmount}
-        saving={saving}
-        onActualCardFeeRateChange={setActualCardFeeRate}
-        onCustomerCardExtraRateChange={setCustomerCardExtraRate}
-        onCardPaymentMinAmountChange={setCardPaymentMinAmount}
-        onSave={saveSettings}
-      />
-
       <div className="rounded-[30px] border border-orange-100 bg-orange-50 px-5 py-4 text-sm font-bold leading-6 text-orange-800">
-        수동 매출/지출 입력, 과거 데이터 추가, 수정이력은 별도 DB 테이블이 필요합니다. 다음 단계에서 주문 데이터와 분리해서 안전하게 추가합니다.
+        수동 매출/지출 입력, 창고정산/기타지출 반영, 과거 데이터 추가, 수정이력은 별도 DB 테이블이 필요합니다. 다음 단계에서 주문 데이터와 분리해서 안전하게 추가합니다.
       </div>
     </section>
   );

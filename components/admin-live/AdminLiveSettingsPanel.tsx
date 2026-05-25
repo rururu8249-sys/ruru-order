@@ -1,130 +1,302 @@
-type SettingSection = {
-  title: string;
-  desc: string;
-  items: string[];
-  tone: "blue" | "emerald" | "amber" | "violet" | "slate" | "red";
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { showAdminToast } from "@/lib/adminToast";
+
+type SettingKey =
+  | "customer_card_extra_rate"
+  | "actual_card_fee_rate"
+  | "card_payment_min_amount"
+  | "default_shipping_fee"
+  | "remote_area_shipping_fee";
+
+type SettingRow = {
+  key: string;
+  value: string | number | null;
 };
 
-function toneClass(tone: SettingSection["tone"]) {
-  const tones = {
-    blue: "bg-blue-50 text-blue-700 border-blue-100",
-    emerald: "bg-emerald-50 text-emerald-700 border-emerald-100",
-    amber: "bg-amber-50 text-amber-700 border-amber-100",
-    violet: "bg-violet-50 text-violet-700 border-violet-100",
-    slate: "bg-slate-50 text-slate-700 border-slate-200",
-    red: "bg-red-50 text-red-700 border-red-100",
-  };
-
-  return tones[tone];
-}
-
-const settingSections: SettingSection[] = [
-  {
-    title: "방송 운영 설정",
-    desc: "방송중/대기, 방송 제목, 유튜브 영상·채팅 연결 같은 운영값을 관리할 영역입니다.",
-    tone: "blue",
-    items: ["방송 시작/종료", "방송 제목", "유튜브 영상 URL", "유튜브 채팅 URL"],
-  },
-  {
-    title: "주문서 설정",
-    desc: "주문서 작성 가능 시간, 방송중 안내문, 주문서 차단 안내를 관리할 영역입니다.",
-    tone: "emerald",
-    items: ["주문서 ON/OFF", "주문 가능 시간", "방송중 아닐 때 안내문", "주문 제한 안내"],
-  },
-  {
-    title: "입금 안내 설정",
-    desc: "무통장 입금 안내 문구, 닉네임 입금 안내, 자동입금확인 조건 안내를 관리할 영역입니다.",
-    tone: "amber",
-    items: ["입금계좌 안내", "닉네임 입금 안내", "정확한 금액 안내", "자동입금확인 안내문"],
-  },
-  {
-    title: "알림 설정",
-    desc: "새 주문, 자동입금확인, 접속중 알림 등 방송 중 알림 방식을 관리할 영역입니다.",
-    tone: "violet",
-    items: ["새 주문 알림", "자동입금확인 알림", "접속중 알림", "소리 ON/OFF"],
-  },
-  {
-    title: "배송·운영 설정",
-    desc: "기본 배송비, 제주·산간 배송비, 송장 내보내기 기준을 관리할 영역입니다.",
-    tone: "slate",
-    items: ["기본 배송비", "제주·산간 배송비", "송장 내보내기 기준", "닉네임 주소 표기"],
-  },
-  {
-    title: "관리자 보안",
-    desc: "관리자 로그인, 세션, 접근 제한 같은 보안 관련 설정을 분리해서 관리할 영역입니다.",
-    tone: "red",
-    items: ["관리자 로그인", "세션 유지", "접근 제한", "보안 점검"],
-  },
+const SETTING_KEYS: SettingKey[] = [
+  "customer_card_extra_rate",
+  "actual_card_fee_rate",
+  "card_payment_min_amount",
+  "default_shipping_fee",
+  "remote_area_shipping_fee",
 ];
 
-export default function AdminLiveSettingsPanel() {
+const DEFAULTS: Record<SettingKey, number> = {
+  customer_card_extra_rate: 10,
+  actual_card_fee_rate: 7,
+  card_payment_min_amount: 100000,
+  default_shipping_fee: 4000,
+  remote_area_shipping_fee: 6000,
+};
+
+function clean(value: unknown) {
+  return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function toNumber(value: unknown) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+
+  const text = clean(value).replace(/[^0-9.-]/g, "");
+  const number = Number(text);
+
+  return Number.isFinite(number) ? number : 0;
+}
+
+function onlyDigits(value: string) {
+  return String(value || "").replace(/[^0-9]/g, "");
+}
+
+function formatMoneyInput(value: string | number) {
+  const digits = onlyDigits(String(value ?? ""));
+  if (!digits) return "";
+
+  return Number(digits).toLocaleString();
+}
+
+function readNumber(rows: SettingRow[], key: SettingKey) {
+  const row = rows.find((item) => item.key === key);
+  const value = toNumber(row?.value);
+
+  return value > 0 || clean(row?.value) === "0" ? value : DEFAULTS[key];
+}
+
+function SettingInput({
+  label,
+  desc,
+  value,
+  suffix,
+  onChange,
+}: {
+  label: string;
+  desc: string;
+  value: string;
+  suffix: string;
+  onChange: (value: string) => void;
+}) {
   return (
-    <section className="grid gap-4">
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+      <div className="text-sm font-black text-slate-900">{label}</div>
+      <div className="mt-1 text-xs font-bold leading-5 text-slate-400">{desc}</div>
+      <div className="mt-3 flex items-center gap-2">
+        <input
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-lg font-black outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+        />
+        <span className="text-sm font-black text-slate-500">{suffix}</span>
+      </div>
+    </div>
+  );
+}
+
+export default function AdminLiveSettingsPanel() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [customerCardRate, setCustomerCardRate] = useState(String(DEFAULTS.customer_card_extra_rate));
+  const [actualCardRate, setActualCardRate] = useState(String(DEFAULTS.actual_card_fee_rate));
+  const [cardMinAmount, setCardMinAmount] = useState(formatMoneyInput(DEFAULTS.card_payment_min_amount));
+  const [defaultShippingFee, setDefaultShippingFee] = useState(formatMoneyInput(DEFAULTS.default_shipping_fee));
+  const [remoteShippingFee, setRemoteShippingFee] = useState(formatMoneyInput(DEFAULTS.remote_area_shipping_fee));
+
+  useEffect(() => {
+    let alive = true;
+
+    async function loadSettings() {
+      setLoading(true);
+
+      try {
+        const { data, error } = await supabase.from("settings").select("key,value").in("key", SETTING_KEYS);
+
+        if (!alive) return;
+
+        if (error) {
+          showAdminToast("설정값 불러오기 실패\n\n" + error.message, "error");
+          return;
+        }
+
+        const rows = (data || []) as SettingRow[];
+
+        setCustomerCardRate(String(readNumber(rows, "customer_card_extra_rate")));
+        setActualCardRate(String(readNumber(rows, "actual_card_fee_rate")));
+        setCardMinAmount(formatMoneyInput(readNumber(rows, "card_payment_min_amount")));
+        setDefaultShippingFee(formatMoneyInput(readNumber(rows, "default_shipping_fee")));
+        setRemoteShippingFee(formatMoneyInput(readNumber(rows, "remote_area_shipping_fee")));
+      } finally {
+        if (alive) setLoading(false);
+      }
+    }
+
+    loadSettings();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const preview = useMemo(() => {
+    return {
+      customerCardRate: toNumber(customerCardRate),
+      actualCardRate: toNumber(actualCardRate),
+      cardMinAmount: toNumber(cardMinAmount),
+      defaultShippingFee: toNumber(defaultShippingFee),
+      remoteShippingFee: toNumber(remoteShippingFee),
+    };
+  }, [customerCardRate, actualCardRate, cardMinAmount, defaultShippingFee, remoteShippingFee]);
+
+  const saveSettings = async () => {
+    const nextCustomerCardRate = Math.min(20, Math.max(0, toNumber(customerCardRate)));
+    const nextActualCardRate = Math.min(20, Math.max(0, toNumber(actualCardRate)));
+    const nextCardMinAmount = Math.max(0, Math.round(toNumber(cardMinAmount)));
+    const nextDefaultShippingFee = Math.max(0, Math.round(toNumber(defaultShippingFee)));
+    const nextRemoteShippingFee = Math.max(nextDefaultShippingFee, Math.round(toNumber(remoteShippingFee)));
+
+    setSaving(true);
+
+    try {
+      const { error } = await supabase.from("settings").upsert(
+        [
+          { key: "customer_card_extra_rate", value: String(nextCustomerCardRate) },
+          { key: "actual_card_fee_rate", value: String(nextActualCardRate) },
+          { key: "card_payment_min_amount", value: String(nextCardMinAmount) },
+          { key: "default_shipping_fee", value: String(nextDefaultShippingFee) },
+          { key: "remote_area_shipping_fee", value: String(nextRemoteShippingFee) },
+        ],
+        { onConflict: "key" },
+      );
+
+      if (error) {
+        showAdminToast("설정 저장 실패\n\n" + error.message, "error");
+        return;
+      }
+
+      setCustomerCardRate(String(nextCustomerCardRate));
+      setActualCardRate(String(nextActualCardRate));
+      setCardMinAmount(formatMoneyInput(nextCardMinAmount));
+      setDefaultShippingFee(formatMoneyInput(nextDefaultShippingFee));
+      setRemoteShippingFee(formatMoneyInput(nextRemoteShippingFee));
+
+      showAdminToast("운영 설정을 저장했습니다.", "success");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="grid gap-5">
+      <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.06)]">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="text-[11px] font-black tracking-[0.18em] text-blue-500">OPERATION SETTINGS</div>
+            <div className="text-xs font-black tracking-[0.22em] text-blue-600">ADMIN LIVE SETTINGS</div>
             <h1 className="mt-1 text-3xl font-black tracking-[-0.05em] text-slate-950">설정</h1>
-            <p className="mt-2 text-sm font-bold text-slate-500">
-              현재 연결은 읽기전용입니다. 설정 저장·배송비 변경·입금계좌 변경·알림 설정 저장은 아직 실행하지 않습니다.
+            <p className="mt-2 text-sm font-bold leading-6 text-slate-500">
+              주문서·카드결제·배송비에 실제 적용되는 운영 설정입니다. 저장 후 새 주문부터 반영됩니다.
             </p>
           </div>
 
-          <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
-            읽기전용 연결
-          </span>
+          <button
+            type="button"
+            onClick={saveSettings}
+            disabled={saving || loading}
+            className="rounded-2xl bg-blue-600 px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-50"
+          >
+            {saving ? "저장중" : "설정 저장"}
+          </button>
         </div>
 
-        <div className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-xs font-black leading-5 text-amber-700">
-          설정은 방송 운영과 돈 흐름에 직접 영향을 줄 수 있으므로, 저장 기능은 다음 단계에서 항목별로 분리 검증 후 연결합니다.
+        <div className="mt-4 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3 text-xs font-bold leading-5 text-orange-800">
+          설정은 주문금액·카드결제·배송비에 영향을 줍니다. 기존 주문을 재계산하지 않고, 저장 이후 새 주문부터 적용되는 기준값입니다.
         </div>
       </div>
 
-      <div className="grid gap-3 xl:grid-cols-2">
-        {settingSections.map((section) => (
-          <div key={section.title} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-black text-slate-950">{section.title}</h2>
-                <p className="mt-2 text-sm font-bold leading-6 text-slate-500">{section.desc}</p>
-              </div>
-
-              <span className={`shrink-0 rounded-full border px-3 py-1 text-xs font-black ${toneClass(section.tone)}`}>
-                준비중
-              </span>
-            </div>
-
-            <div className="mt-4 grid gap-2 md:grid-cols-2">
-              {section.items.map((item) => (
-                <div
-                  key={item}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700"
-                >
-                  ✓ {item}
-                </div>
-              ))}
-            </div>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+          <div className="mb-4">
+            <h2 className="text-lg font-black text-slate-950">카드결제 설정</h2>
+            <p className="mt-1 text-xs font-bold text-slate-400">카드결제 최소금액과 수수료율을 관리합니다.</p>
           </div>
-        ))}
-      </div>
 
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-black text-slate-950">다음 연결 순서</h2>
-        <div className="mt-4 grid gap-2 md:grid-cols-3">
-          <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-black text-blue-700">
-            1. 설정 항목 확정
-          </div>
-          <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-black text-amber-700">
-            2. 저장 전 검증 로직 분리
-          </div>
-          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-700">
-            3. 항목별 저장 기능 연결
+          <div className="grid gap-3">
+            <SettingInput
+              label="고객 카드 부가세율"
+              desc="고객이 카드결제를 선택할 때 주문금액에 추가되는 비율입니다."
+              value={customerCardRate}
+              suffix="%"
+              onChange={(value) => setCustomerCardRate(onlyDigits(value))}
+            />
+            <SettingInput
+              label="실제 카드업체 수수료율"
+              desc="정산통계에서 카드수수료 지출로 계산되는 비율입니다."
+              value={actualCardRate}
+              suffix="%"
+              onChange={(value) => setActualCardRate(onlyDigits(value))}
+            />
+            <SettingInput
+              label="카드결제 최소금액"
+              desc="고객 주문서에서 카드결제를 선택할 수 있는 최소 주문금액입니다."
+              value={cardMinAmount}
+              suffix="원"
+              onChange={(value) => setCardMinAmount(formatMoneyInput(value))}
+            />
           </div>
         </div>
 
-        <p className="mt-4 text-xs font-black leading-5 text-slate-500">
-          지금 화면은 UI 구조 확인용입니다. settings DB, 주문 DB, 입금 DB, 정산 데이터는 변경하지 않습니다.
-        </p>
+        <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+          <div className="mb-4">
+            <h2 className="text-lg font-black text-slate-950">배송비 설정</h2>
+            <p className="mt-1 text-xs font-bold text-slate-400">주문서 배송비 계산에 적용되는 기준입니다.</p>
+          </div>
+
+          <div className="grid gap-3">
+            <SettingInput
+              label="기본 배송비"
+              desc="일반 지역 주문서에 적용되는 기본 배송비입니다."
+              value={defaultShippingFee}
+              suffix="원"
+              onChange={(value) => setDefaultShippingFee(formatMoneyInput(value))}
+            />
+            <SettingInput
+              label="제주/산간 배송비"
+              desc="제주/산간 주소로 감지될 때 적용되는 배송비입니다. 기본 배송비보다 낮게 저장되지 않습니다."
+              value={remoteShippingFee}
+              suffix="원"
+              onChange={(value) => setRemoteShippingFee(formatMoneyInput(value))}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-[30px] border border-blue-100 bg-blue-50 p-5">
+        <h2 className="text-lg font-black text-slate-950">현재 설정 미리보기</h2>
+        <div className="mt-4 grid gap-3 md:grid-cols-5">
+          <div className="rounded-2xl bg-white p-4">
+            <div className="text-xs font-black text-slate-400">고객 카드 부가세율</div>
+            <div className="mt-1 text-xl font-black text-slate-950">{preview.customerCardRate}%</div>
+          </div>
+          <div className="rounded-2xl bg-white p-4">
+            <div className="text-xs font-black text-slate-400">실제 카드수수료율</div>
+            <div className="mt-1 text-xl font-black text-slate-950">{preview.actualCardRate}%</div>
+          </div>
+          <div className="rounded-2xl bg-white p-4">
+            <div className="text-xs font-black text-slate-400">카드결제 최소금액</div>
+            <div className="mt-1 text-xl font-black text-slate-950">{preview.cardMinAmount.toLocaleString()}원</div>
+          </div>
+          <div className="rounded-2xl bg-white p-4">
+            <div className="text-xs font-black text-slate-400">기본 배송비</div>
+            <div className="mt-1 text-xl font-black text-slate-950">{preview.defaultShippingFee.toLocaleString()}원</div>
+          </div>
+          <div className="rounded-2xl bg-white p-4">
+            <div className="text-xs font-black text-slate-400">제주/산간 배송비</div>
+            <div className="mt-1 text-xl font-black text-slate-950">{preview.remoteShippingFee.toLocaleString()}원</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-[30px] border border-slate-200 bg-white px-5 py-4 text-sm font-bold leading-6 text-slate-500">
+        합배송 시간 설정, 주문서 작성 가능 시간, 알림 설정은 다음 설정 단계에서 분리해서 추가합니다.
       </div>
     </section>
   );

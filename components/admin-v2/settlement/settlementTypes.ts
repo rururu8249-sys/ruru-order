@@ -25,8 +25,8 @@ export type SettlementStats = {
   cardAmount: number;
   otherAmount: number;
   actualCardFee: number;
-  customerCardExtra: number;
-  cardFeeMargin: number;
+  warehouseOtherExpense: number;
+  totalExpense: number;
   netAmount: number;
   refundAmount: number;
   canceledAmount: number;
@@ -47,7 +47,8 @@ export type SettlementBroadcastRow = {
   bankAmount: number;
   cardAmount: number;
   actualCardFee: number;
-  customerCardExtra: number;
+  warehouseOtherExpense: number;
+  totalExpense: number;
   netAmount: number;
   unpaidAmount: number;
 };
