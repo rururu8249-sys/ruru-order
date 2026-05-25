@@ -1,5 +1,7 @@
 "use client";
 
+import { showAdminToast } from "@/lib/adminToast";
+
 import {
   clearLegacyCustomerSessionIfNeeded,
   isCustomerSessionVersionCurrent,
@@ -49,7 +51,7 @@ export default function KakaoStartPage() {
     const restApiKey = process.env.NEXT_PUBLIC_KAKAO_REST_API_KEY || "";
 
     if (!restApiKey) {
-      alert("카카오 로그인 설정값이 없습니다. 관리자에게 문의해주세요.");
+      showAdminToast("카카오 로그인 설정값이 없습니다. 관리자에게 문의해주세요.");
       return;
     }
 
