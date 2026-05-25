@@ -370,6 +370,10 @@ export default function LiveOrderTable({
   const safePage = Math.min(page, totalPages);
   const visibleOrders = cancelViewFilteredOrders.slice((safePage - 1) * pageSize, safePage * pageSize);
   const hideableVisibleOrders = visibleOrders.filter(canSoftHideLiveOrder);
+  const showCancelSoftHideControls = cancelViewFilter === "canceled";
+  const selectedHideableOrderCount = orders.filter(
+    (order) => selectedOrderKeySet.has(getLiveOrderSelectionKey(order)) && canSoftHideLiveOrder(order)
+  ).length;
 
   const exportableOrders = useMemo(
     () => cancelViewFilteredOrders.filter((order) => order.paymentStatus !== "canceled"),
@@ -656,6 +660,26 @@ export default function LiveOrderTable({
         </button>
       </div>
 
+      {showCancelSoftHideControls ? (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-3">
+          <div className="text-[12px] font-black text-red-700">
+            취소주문 정리 · 선택 {selectedHideableOrderCount.toLocaleString("ko-KR")}건
+            <span className="ml-2 font-bold text-red-500">
+              실제 삭제가 아니라 목록 숨김 처리입니다.
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleSoftDeleteSelectedOrders}
+            disabled={selectedHideableOrderCount <= 0}
+            className="h-10 rounded-xl bg-red-600 px-4 text-[13px] font-black text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-200"
+          >
+            선택 취소주문 숨김
+          </button>
+        </div>
+      ) : null}
+
       <div className="overflow-hidden rounded-xl border border-slate-200">
         <table className="w-full table-fixed border-collapse text-sm">
           <thead className="bg-slate-50 text-xs font-black text-slate-500">
@@ -717,15 +741,17 @@ export default function LiveOrderTable({
                 return (
                   <tr key={order.id} className={selected ? "bg-blue-50/70" : "hover:bg-slate-50"}>
                     <td className="px-4 py-3 text-center" onClick={(event) => event.stopPropagation()}>
+                      {showCancelSoftHideControls ? (
                       <input
                         type="checkbox"
-                        aria-label="주문서 선택"
+                        aria-label="취소주문 숨김 선택"
                         checked={selectedOrderKeySet.has(getLiveOrderSelectionKey(order))}
                         disabled={!canSoftHideLiveOrder(order)}
                         title={canSoftHideLiveOrder(order) ? "취소주문 숨김 선택" : "주문서취소 상태만 숨김 선택 가능"}
                         onChange={(event) => toggleOrderSelection(order, event.currentTarget.checked)}
                         className="h-4 w-4 rounded border-slate-300"
                       />
+                    ) : null}
                     </td>
                     <td className="px-4 py-3">{statusBadge(order)}</td>
                     <td className="px-4 py-3 font-bold text-slate-600">{order.submittedAt}</td>
