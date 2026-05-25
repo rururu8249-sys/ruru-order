@@ -53,6 +53,7 @@ import OrderCompletePaymentNotice from "@/components/order/OrderCompletePaymentN
 import OrderKakaoNicknameNotice from "@/components/order/OrderKakaoNicknameNotice";
 import CustomerBlockedNotice from "@/components/customer/CustomerBlockedNotice";
 import CustomerToastNotice from "@/components/customer/CustomerToastNotice";
+import CustomerManualAddressPanel from "@/components/customer/CustomerManualAddressPanel";
 
 declare global {
   interface Window {
@@ -288,6 +289,7 @@ export default function OrderPage() {
       }, 3200);
     }
   };
+  const [manualAddressOpen, setManualAddressOpen] = useState(false);
   const [showDepositConfirmModal, setShowDepositConfirmModal] = useState(false);
   const PRIVACY_CONSENT_VERSION = "2026-05-24-v1";
   const PRIVACY_CONSENT_STORAGE_KEY = "ruru_privacy_consent_version";
@@ -870,7 +872,6 @@ export default function OrderPage() {
 
 
   const logoutCustomerInfo = () => {
-    if (!confirm("로그아웃할까요?\n\n즐거운 쇼핑 되셨길 바라요 😊\n좋은 하루 보내세요 💙")) return;
 
     [
       "ruru_customer_phone",
@@ -898,7 +899,8 @@ export default function OrderPage() {
     setCustomerMode("load");
 
     
-  };
+      showCustomerNotice("로그아웃되었습니다. 오늘도 좋은 하루 보내세요 😊", "success");
+};
 
   const startEditCustomerInfo = () => {
     setIsEditingCustomerInfo(true);
@@ -1185,22 +1187,28 @@ export default function OrderPage() {
     });
   };
 
+  const applyManualAddress = (nextAddress: string) => {
+    const cleanAddress = nextAddress.trim();
+
+    if (!cleanAddress) {
+      showCustomerNotice("주소를 입력해주세요.", "warning");
+      return;
+    }
+
+    setAddress(cleanAddress);
+    setManualAddressOpen(false);
+
+    setTimeout(() => {
+      const detailInput = document.querySelector<HTMLInputElement>(
+        'input[placeholder*="상세주소"]'
+      );
+      detailInput?.focus();
+    }, 80);
+  };
+
   const openAddressSearch = async () => {
     const manualAddress = () => {
-      const typedAddress = window.prompt(
-        "주소검색창이 안 뜨면 주소를 직접 입력해주세요.\n\n예) 서울 강남구 테헤란로 123"
-      );
-
-      if (typedAddress && typedAddress.trim()) {
-        setAddress(typedAddress.trim());
-
-        setTimeout(() => {
-          const detailInput = document.querySelector<HTMLInputElement>(
-            "input[placeholder='상세주소를 입력해주세요']"
-          );
-          detailInput?.focus();
-        }, 100);
-      }
+      setManualAddressOpen(true);
     };
 
     try {
@@ -1972,6 +1980,13 @@ export default function OrderPage() {
               type={customerNotice.type}
               message={customerNotice.message}
               onClose={closeCustomerNotice}
+            />
+
+            <CustomerManualAddressPanel
+              open={manualAddressOpen}
+              defaultValue={address}
+              onClose={() => setManualAddressOpen(false)}
+              onSubmit={applyManualAddress}
             />
 
             {customerBlockStatus.blocked ? (
