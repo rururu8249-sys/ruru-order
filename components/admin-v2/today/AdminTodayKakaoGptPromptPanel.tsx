@@ -1,5 +1,7 @@
 "use client";
 
+import { showAdminToast } from "@/lib/adminToast";
+
 // components/admin-v2/today/AdminTodayKakaoGptPromptPanel.tsx
 // 목적: OpenAI API 없이, 현재 쓰는 ChatGPT 창에 붙여넣을 분석문구를 자동 생성/복사
 // 주의: 유료 API 호출 없음. 주문/입금/배송/정산 상태 변경 없음.
@@ -85,15 +87,15 @@ export default function AdminTodayKakaoGptPromptPanel({
 
   const copyPrompt = async () => {
     if (!rawText.trim() && !customerText.trim()) {
-      alert("카톡 대화 내용을 먼저 붙여넣어 주세요.");
+      showAdminToast("카톡 대화 내용을 먼저 붙여넣어 주세요.");
       return;
     }
 
     try {
       await navigator.clipboard.writeText(prompt);
-      alert("ChatGPT 분석문구를 복사했습니다.\n\nChatGPT 창에 붙여넣으면 됩니다.");
+      showAdminToast("ChatGPT 분석문구를 복사했습니다.\n\nChatGPT 창에 붙여넣으면 됩니다.");
     } catch {
-      alert("복사에 실패했습니다. 직접 복사해주세요.");
+      showAdminToast("복사에 실패했습니다. 직접 복사해주세요.");
     }
   };
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { showAdminToast } from "@/lib/adminToast";
+
 // components/admin-v2/today/AdminTodayYoutubeLivePanel.tsx
 // 목적: 오늘할일 관제탑 안에서 유튜브 라이브 방송 화면/채팅창을 안전하게 확인
 // 주의: YouTube API/OAuth/채팅 글쓰기 없음. 주문/입금/배송/정산 로직 없음.
@@ -29,15 +31,15 @@ export default function AdminTodayYoutubeLivePanel() {
   const saveLiveUrl = () => {
     try {
       window.localStorage.setItem(YOUTUBE_LIVE_STORAGE_KEY, liveUrl.trim());
-      alert("유튜브 방송 링크를 저장했습니다.");
+      showAdminToast("유튜브 방송 링크를 저장했습니다.");
     } catch {
-      alert("저장 실패. 브라우저 저장공간을 확인해주세요.");
+      showAdminToast("저장 실패. 브라우저 저장공간을 확인해주세요.");
     }
   };
 
   const openYoutubeWatch = () => {
     if (!videoId) {
-      alert("유튜브 라이브 URL 또는 영상ID를 먼저 입력해주세요.");
+      showAdminToast("유튜브 라이브 URL 또는 영상ID를 먼저 입력해주세요.");
       return;
     }
 
@@ -46,7 +48,7 @@ export default function AdminTodayYoutubeLivePanel() {
 
   const openYoutubeChat = () => {
     if (!videoId) {
-      alert("유튜브 라이브 URL 또는 영상ID를 먼저 입력해주세요.");
+      showAdminToast("유튜브 라이브 URL 또는 영상ID를 먼저 입력해주세요.");
       return;
     }
 
