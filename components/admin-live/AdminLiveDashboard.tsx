@@ -1,5 +1,6 @@
 "use client";
 
+import { showAdminToast } from "@/lib/adminToast";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import ManualPaymentMatchDrawer from "@/components/admin-v2/payment/ManualPaymentMatchDrawer";
@@ -418,7 +419,7 @@ export default function AdminLiveDashboard() {
     const group = orderGroups.find((item) => item.groupId === order.groupId) || null;
 
     if (!group) {
-      alert("수동매칭할 주문그룹을 찾지 못했습니다. 새로고침 후 다시 시도해주세요.");
+      showAdminToast("수동매칭할 주문그룹을 찾지 못했습니다. 새로고침 후 다시 시도해주세요.", "warning");
       return;
     }
 
@@ -451,7 +452,7 @@ export default function AdminLiveDashboard() {
       await loadOrders();
       setFilters((prev) => ({ ...prev, broadcast: "current" }));
     } catch (error) {
-      alert("방송시작 실패\n\n" + (error instanceof Error ? error.message : String(error)));
+      showAdminToast("방송시작 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
     } finally {
       setSavingBroadcast(false);
     }
@@ -459,7 +460,7 @@ export default function AdminLiveDashboard() {
 
   const saveBroadcast = async (input: { title: string; youtubeUrl?: string }) => {
     if (!activeBroadcast) {
-      alert("수정할 현재 방송이 없습니다. 먼저 방송을 시작해주세요.");
+      showAdminToast("수정할 현재 방송이 없습니다. 먼저 방송을 시작해주세요.", "warning");
       return;
     }
 
@@ -473,7 +474,7 @@ export default function AdminLiveDashboard() {
       });
       await loadBroadcasts();
     } catch (error) {
-      alert("방송 저장 실패\n\n" + (error instanceof Error ? error.message : String(error)));
+      showAdminToast("방송 저장 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
     } finally {
       setSavingBroadcast(false);
     }
@@ -481,7 +482,7 @@ export default function AdminLiveDashboard() {
 
   const endBroadcast = async () => {
     if (!activeBroadcast) {
-      alert("종료할 현재 방송이 없습니다.");
+      showAdminToast("종료할 현재 방송이 없습니다.", "warning");
       return;
     }
 
@@ -504,7 +505,7 @@ export default function AdminLiveDashboard() {
       await loadBroadcasts();
       await loadOrders();
     } catch (error) {
-      alert("방송종료 실패\n\n" + (error instanceof Error ? error.message : String(error)));
+      showAdminToast("방송종료 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
     } finally {
       setSavingBroadcast(false);
     }
