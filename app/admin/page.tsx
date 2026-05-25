@@ -2077,7 +2077,7 @@ const selectedCustomerDetail = useMemo(() => {
     );
 
     if (!phoneKey) {
-      alert("전화번호가 없어 차단 처리할 수 없습니다.");
+      showAdminToast("전화번호가 없어 차단 처리할 수 없습니다.", "warning");
       return;
     }
 
@@ -2108,7 +2108,7 @@ const selectedCustomerDetail = useMemo(() => {
     const groups = selectedOrderRowsForExport();
 
     if (groups.length === 0) {
-      alert("내보낼 주문이 없습니다.");
+      showAdminToast("내보낼 주문이 없습니다.", "warning");
       return;
     }
 
@@ -2169,7 +2169,7 @@ const selectedCustomerDetail = useMemo(() => {
         (window as any).AudioContext || (window as any).webkitAudioContext;
 
       if (!AudioContextClass) {
-        alert("이 브라우저에서는 알림음을 지원하지 않습니다.");
+        showAdminToast("이 브라우저에서는 알림음을 지원하지 않습니다.", "warning");
         return;
       }
 
@@ -2185,7 +2185,7 @@ const selectedCustomerDetail = useMemo(() => {
       localStorage.setItem("ruru_admin_order_sound", "ON");
       playOrderSound();
     } catch {
-      alert("알림음 켜기에 실패했습니다. 브라우저 소리 권한을 확인해주세요.");
+      showAdminToast("알림음 켜기에 실패했습니다. 브라우저 소리 권한을 확인해주세요.", "error");
     }
   };
 
@@ -3486,7 +3486,7 @@ const selectedCustomerDetail = useMemo(() => {
                       type="button"
                       onClick={() => {
                         saveConfirmedDepositReviewKeys([]);
-                        alert("확인완료 표시를 초기화했습니다.");
+                        showAdminToast("확인완료 표시를 초기화했습니다.", "success");
                       }}
                       className="rounded-2xl bg-red-50 p-4 font-black text-red-600 active:scale-[0.98]"
                     >
