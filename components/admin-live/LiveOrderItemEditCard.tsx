@@ -17,7 +17,7 @@ type Props = {
 };
 
 function money(value: unknown) {
-  return `₩${Number(value || 0).toLocaleString("ko-KR")}`;
+  return `${Number(value || 0).toLocaleString("ko-KR")}원`;
 }
 
 function clean(value: unknown) {

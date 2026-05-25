@@ -41,7 +41,7 @@ export const ADMIN_LIVE_MENUS: AdminLiveMenuItem[] = [
   {
     key: "payments",
     label: "입금확인",
-    icon: "₩",
+    icon: "원",
     desc: "입금 확인 처리",
     sidebarNotice: "입금확인 화면은 자동입금확인 조건을 유지한 상태로 별도 화면 연결 예정입니다.",
     readyTitle: "입금확인 화면 연결 준비중",

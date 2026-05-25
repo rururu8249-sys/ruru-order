@@ -41,7 +41,7 @@ export default function OrderDepositConfirmModal({
 
           <div className="text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] bg-blue-600 text-[32px] text-white shadow-[0_14px_28px_rgba(37,99,235,0.26)]">
-              ₩
+              
             </div>
 
             <h2 className="mt-4 break-keep text-[28px] font-black leading-[1.15] tracking-[-0.08em] text-[#151923] sm:text-[31px]">
@@ -61,7 +61,7 @@ export default function OrderDepositConfirmModal({
             <div className="rounded-[24px] bg-blue-50 p-3 ring-1 ring-blue-100">
               <div className="mb-1 flex items-center gap-2 text-[13px] font-black tracking-[-0.04em] text-blue-700">
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-[17px] text-white">
-                  ₩
+                  
                 </span>
                 현재 주문서 금액
               </div>

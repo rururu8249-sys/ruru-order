@@ -32,7 +32,7 @@ type BroadcastOption = {
 type SortMode = "latest" | "nickname_asc" | "nickname_desc";
 
 function money(value: number) {
-  return `₩${Number(value || 0).toLocaleString("ko-KR")}`;
+  return `${Number(value || 0).toLocaleString("ko-KR")}원`;
 }
 
 function normalizeText(value: unknown) {

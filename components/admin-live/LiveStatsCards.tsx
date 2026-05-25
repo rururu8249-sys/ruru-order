@@ -6,7 +6,7 @@ type Props = {
 };
 
 function money(value: number) {
-  return `₩${Number(value || 0).toLocaleString("ko-KR")}`;
+  return `${Number(value || 0).toLocaleString("ko-KR")}원`;
 }
 
 function isPaid(order: LiveOrder) {
