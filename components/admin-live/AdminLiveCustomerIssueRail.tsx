@@ -457,11 +457,13 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       try {
         const response = await fetch("/api/admin-v2/admin-tasks", { cache: "no-store" });
         const payload = await response.json().catch(() => null);
-        const rows = normalizePayload(payload).filter((task) => {
-          const haystack = [task.title, task.body, task.task_type].map(clean).join(" ");
+        const rows = normalizePayload(payload)
+          .filter((task) => {
+            const haystack = [task.title, task.body, task.task_type].map(clean).join(" ");
 
-          return haystack.includes("고객이슈") || haystack.includes("issue") || Boolean(task.customer_id);
-        });
+            return haystack.includes("고객이슈") || haystack.includes("issue") || Boolean(task.customer_id);
+          })
+          .filter((task) => clean(task.status).toLowerCase() !== "deleted");
 
         if (alive) setTasks(rows);
       } catch {
