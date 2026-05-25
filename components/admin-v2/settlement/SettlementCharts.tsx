@@ -19,11 +19,12 @@ export default function SettlementCharts({
   stats: SettlementStats;
 }) {
   const maxTrend = Math.max(...trend.map((item) => Math.max(item.sales, item.net, item.fee + item.expense)), 1);
-  const maxBar = Math.max(stats.bankAmount, stats.cardAmount, stats.actualCardFee, stats.warehouseOtherExpense, 1);
+  const maxBar = Math.max(stats.bankAmount, stats.cardAmount, stats.manualIncomeAmount, stats.actualCardFee, stats.warehouseOtherExpense, 1);
 
   const rows = [
     ["무통장", stats.bankAmount, "bg-emerald-500"],
     ["카드", stats.cardAmount, "bg-blue-500"],
+    ["기타매출", stats.manualIncomeAmount, "bg-sky-500"],
     ["카드수수료", stats.actualCardFee, "bg-rose-500"],
     ["창고정산/기타지출", stats.warehouseOtherExpense, "bg-violet-500"],
   ] as const;

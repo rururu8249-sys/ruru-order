@@ -3,6 +3,7 @@ import type {
   PaymentFilter,
   SettlementBroadcastOption,
   SettlementBroadcastRow,
+  SettlementManualEntry,
   SettlementStats,
 } from "./settlementTypes";
 
@@ -148,6 +149,60 @@ export function orderWarehouseOtherExpense(row: AnyRow) {
   );
 }
 
+export function isManualEntryActive(entry: SettlementManualEntry) {
+  return entry.is_active !== false && !entry.deleted_at;
+}
+
+export function manualEntryAmount(entry: SettlementManualEntry) {
+  return Math.max(0, toNumber(entry.amount));
+}
+
+export function manualEntryDateKey(entry: SettlementManualEntry) {
+  return toDateKey(entry.entry_date);
+}
+
+export function manualEntryBroadcastKey(entry: SettlementManualEntry) {
+  const explicit = cleanText(entry.broadcast_key);
+  if (explicit) return explicit;
+
+  const dateKey = manualEntryDateKey(entry);
+  return `date:${dateKey || "unknown"}`;
+}
+
+export function manualEntryLabel(entry: SettlementManualEntry) {
+  return cleanText(entry.broadcast_label) || `${formatDateLabel(entry.entry_date)} · 수동입력`;
+}
+
+export function filterManualEntries({
+  entries,
+  startDate,
+  endDate,
+  selectedBroadcastKeys,
+  paymentFilter,
+}: {
+  entries: SettlementManualEntry[];
+  startDate: string;
+  endDate: string;
+  selectedBroadcastKeys: string[];
+  paymentFilter: PaymentFilter;
+}) {
+  if (paymentFilter !== "전체") return [];
+
+  const selected = new Set(selectedBroadcastKeys);
+
+  return entries.filter((entry) => {
+    if (!isManualEntryActive(entry)) return false;
+
+    const dateKey = manualEntryDateKey(entry);
+
+    if (startDate && dateKey < startDate) return false;
+    if (endDate && dateKey > endDate) return false;
+    if (selected.size > 0 && !selected.has(manualEntryBroadcastKey(entry))) return false;
+
+    return true;
+  });
+}
+
 export function flattenOrders(orderGroups?: AnyRow[], orders?: AnyRow[]) {
   const list: AnyRow[] = [];
   const seen = new Set<string>();
@@ -259,24 +314,37 @@ export function filterRows({
   });
 }
 
-export function calculateStats(rows: AnyRow[], actualCardRate: number): SettlementStats {
+export function calculateStats(
+  rows: AnyRow[],
+  actualCardRate: number,
+  manualEntries: SettlementManualEntry[] = [],
+): SettlementStats {
   const activeRows = rows.filter((row) => !isCanceled(row));
   const canceledRows = rows.filter(isCanceled);
   const paidRows = activeRows.filter(isPaymentDone);
   const unpaidRows = activeRows.filter((row) => !isPaymentDone(row));
 
+  const activeManualEntries = manualEntries.filter(isManualEntryActive);
+  const manualIncomeEntries = activeManualEntries.filter((entry) => entry.entry_type === "income");
+  const manualExpenseEntries = activeManualEntries.filter((entry) => entry.entry_type === "expense");
+
   const bankRows = paidRows.filter((row) => paymentMethod(row) === "무통장입금");
   const cardRows = paidRows.filter((row) => paymentMethod(row) === "카드결제");
   const otherRows = paidRows.filter((row) => paymentMethod(row) === "기타");
 
-  const totalOrderAmount = activeRows.reduce((sum, row) => sum + orderNetAmount(row), 0);
-  const paidAmount = paidRows.reduce((sum, row) => sum + orderNetAmount(row), 0);
+  const orderTotalAmount = activeRows.reduce((sum, row) => sum + orderNetAmount(row), 0);
+  const orderPaidAmount = paidRows.reduce((sum, row) => sum + orderNetAmount(row), 0);
+  const manualIncomeAmount = manualIncomeEntries.reduce((sum, entry) => sum + manualEntryAmount(entry), 0);
+  const manualExpenseAmount = manualExpenseEntries.reduce((sum, entry) => sum + manualEntryAmount(entry), 0);
+
+  const totalOrderAmount = orderTotalAmount + manualIncomeAmount;
+  const paidAmount = orderPaidAmount + manualIncomeAmount;
   const unpaidAmount = unpaidRows.reduce((sum, row) => sum + orderNetAmount(row), 0);
   const bankAmount = bankRows.reduce((sum, row) => sum + orderNetAmount(row), 0);
   const cardAmount = cardRows.reduce((sum, row) => sum + orderNetAmount(row), 0);
   const otherAmount = otherRows.reduce((sum, row) => sum + orderNetAmount(row), 0);
   const actualCardFee = cardRows.reduce((sum, row) => sum + orderActualCardFee(row, actualCardRate), 0);
-  const warehouseOtherExpense = paidRows.reduce((sum, row) => sum + orderWarehouseOtherExpense(row), 0);
+  const warehouseOtherExpense = paidRows.reduce((sum, row) => sum + orderWarehouseOtherExpense(row), 0) + manualExpenseAmount;
   const totalExpense = actualCardFee + warehouseOtherExpense;
   const refundAmount = activeRows.reduce((sum, row) => sum + orderRefundAmount(row), 0);
   const canceledAmount = canceledRows.reduce((sum, row) => sum + orderGrossAmount(row), 0);
@@ -288,6 +356,7 @@ export function calculateStats(rows: AnyRow[], actualCardRate: number): Settleme
     bankAmount,
     cardAmount,
     otherAmount,
+    manualIncomeAmount,
     actualCardFee,
     warehouseOtherExpense,
     totalExpense,
@@ -299,10 +368,16 @@ export function calculateStats(rows: AnyRow[], actualCardRate: number): Settleme
     bankCount: bankRows.length,
     cardCount: cardRows.length,
     otherCount: otherRows.length,
+    manualIncomeCount: manualIncomeEntries.length,
+    manualExpenseCount: manualExpenseEntries.length,
   };
 }
 
-export function buildDailyTrend(rows: AnyRow[], actualCardRate: number) {
+export function buildDailyTrend(
+  rows: AnyRow[],
+  actualCardRate: number,
+  manualEntries: SettlementManualEntry[] = [],
+) {
   const map = new Map<string, { dateKey: string; sales: number; fee: number; expense: number; net: number }>();
 
   rows
@@ -322,34 +397,74 @@ export function buildDailyTrend(rows: AnyRow[], actualCardRate: number) {
       map.set(dateKey, current);
     });
 
+  manualEntries
+    .filter(isManualEntryActive)
+    .forEach((entry) => {
+      const dateKey = manualEntryDateKey(entry) || "unknown";
+      const current = map.get(dateKey) || { dateKey, sales: 0, fee: 0, expense: 0, net: 0 };
+      const amount = manualEntryAmount(entry);
+
+      if (entry.entry_type === "income") {
+        current.sales += amount;
+        current.net += amount;
+      } else {
+        current.expense += amount;
+        current.net -= amount;
+      }
+
+      map.set(dateKey, current);
+    });
+
   return Array.from(map.values()).sort((a, b) => a.dateKey.localeCompare(b.dateKey)).slice(-14);
 }
 
-export function buildBroadcastRows(rows: AnyRow[], options: SettlementBroadcastOption[], actualCardRate: number): SettlementBroadcastRow[] {
+export function buildBroadcastRows(
+  rows: AnyRow[],
+  options: SettlementBroadcastOption[],
+  actualCardRate: number,
+  manualEntries: SettlementManualEntry[] = [],
+): SettlementBroadcastRow[] {
   const optionMap = new Map(options.map((option) => [option.key, option]));
-  const grouped = new Map<string, AnyRow[]>();
+  const orderGrouped = new Map<string, AnyRow[]>();
+  const manualGrouped = new Map<string, SettlementManualEntry[]>();
 
   rows.forEach((row) => {
     const key = orderBroadcastKey(row);
-    const current = grouped.get(key) || [];
+    const current = orderGrouped.get(key) || [];
     current.push(row);
-    grouped.set(key, current);
+    orderGrouped.set(key, current);
   });
 
-  return Array.from(grouped.entries())
-    .map(([key, groupRows]) => {
+  manualEntries.filter(isManualEntryActive).forEach((entry) => {
+    const key = manualEntryBroadcastKey(entry);
+    const current = manualGrouped.get(key) || [];
+    current.push(entry);
+    manualGrouped.set(key, current);
+  });
+
+  const keys = Array.from(new Set([...orderGrouped.keys(), ...manualGrouped.keys()]));
+
+  return keys
+    .map((key) => {
+      const groupRows = orderGrouped.get(key) || [];
+      const groupManualEntries = manualGrouped.get(key) || [];
       const option = optionMap.get(key);
-      const stats = calculateStats(groupRows, actualCardRate);
+      const stats = calculateStats(groupRows, actualCardRate, groupManualEntries);
+      const firstManualEntry = groupManualEntries[0];
 
       return {
         key,
-        label: option?.label || `${formatDateLabel(groupRows[0]?.created_at)} · 방송없음`,
-        dateKey: option?.dateKey || orderDateKey(groupRows[0]) || "",
+        label:
+          option?.label ||
+          firstManualEntry?.broadcast_label ||
+          (firstManualEntry ? manualEntryLabel(firstManualEntry) : `${formatDateLabel(groupRows[0]?.created_at)} · 방송없음`),
+        dateKey: option?.dateKey || orderDateKey(groupRows[0]) || manualEntryDateKey(firstManualEntry || ({} as SettlementManualEntry)) || "",
         count: groupRows.length,
         totalOrderAmount: stats.totalOrderAmount,
         paidAmount: stats.paidAmount,
         bankAmount: stats.bankAmount,
         cardAmount: stats.cardAmount,
+        manualIncomeAmount: stats.manualIncomeAmount,
         actualCardFee: stats.actualCardFee,
         warehouseOtherExpense: stats.warehouseOtherExpense,
         totalExpense: stats.totalExpense,

@@ -1,12 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { AnyRow, PaymentFilter, SettlementSettingsSummary } from "./settlementTypes";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { showAdminToast } from "@/lib/adminToast";
+import type { AnyRow, PaymentFilter, SettlementManualEntry, SettlementSettingsSummary } from "./settlementTypes";
 import {
   buildBroadcastOptions,
   buildBroadcastRows,
   buildDailyTrend,
   calculateStats,
+  filterManualEntries,
   filterRows,
   flattenOrders,
   toNumber,
@@ -15,6 +18,7 @@ import SettlementFilterBar from "./SettlementFilterBar";
 import SettlementSummaryCards from "./SettlementSummaryCards";
 import SettlementCharts from "./SettlementCharts";
 import SettlementBroadcastTable from "./SettlementBroadcastTable";
+import SettlementManualEntryPanel from "./SettlementManualEntryPanel";
 
 type Props = {
   orderGroups?: AnyRow[];
@@ -41,6 +45,48 @@ export default function AdminSettlementPanel({
   const [endDate, setEndDate] = useState("");
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("전체");
   const [selectedBroadcastKeys, setSelectedBroadcastKeys] = useState<string[]>([]);
+  const [manualEntries, setManualEntries] = useState<SettlementManualEntry[]>([]);
+  const [manualEntriesLoading, setManualEntriesLoading] = useState(false);
+  const [manualEntryTableReady, setManualEntryTableReady] = useState(true);
+
+  const loadManualEntries = useCallback(async () => {
+    setManualEntriesLoading(true);
+
+    try {
+      const { data, error } = await supabase
+        .from("settlement_manual_entries")
+        .select("*")
+        .eq("is_active", true)
+        .order("entry_date", { ascending: false })
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        const message = String(error.message || "");
+        const missingTable =
+          message.includes("settlement_manual_entries") ||
+          message.includes("schema cache") ||
+          message.includes("does not exist");
+
+        setManualEntryTableReady(!missingTable);
+
+        if (!missingTable) {
+          showAdminToast("수동 매출/지출 불러오기 실패\n\n" + message, "error");
+        }
+
+        setManualEntries([]);
+        return;
+      }
+
+      setManualEntryTableReady(true);
+      setManualEntries((data || []) as SettlementManualEntry[]);
+    } finally {
+      setManualEntriesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadManualEntries();
+  }, [loadManualEntries]);
 
   const allRows = useMemo(() => flattenOrders(orderGroups, orders), [orderGroups, orders]);
 
@@ -58,12 +104,22 @@ export default function AdminSettlementPanel({
     });
   }, [allRows, startDate, endDate, selectedBroadcastKeys, paymentFilter]);
 
+  const manualEntriesInScope = useMemo(() => {
+    return filterManualEntries({
+      entries: manualEntries,
+      startDate,
+      endDate,
+      selectedBroadcastKeys,
+      paymentFilter,
+    });
+  }, [manualEntries, startDate, endDate, selectedBroadcastKeys, paymentFilter]);
+
   const actualRateNumber = toNumber(actualCardFeeRate);
-  const stats = useMemo(() => calculateStats(filteredRows, actualRateNumber), [filteredRows, actualRateNumber]);
-  const trend = useMemo(() => buildDailyTrend(filteredRows, actualRateNumber), [filteredRows, actualRateNumber]);
+  const stats = useMemo(() => calculateStats(filteredRows, actualRateNumber, manualEntriesInScope), [filteredRows, actualRateNumber, manualEntriesInScope]);
+  const trend = useMemo(() => buildDailyTrend(filteredRows, actualRateNumber, manualEntriesInScope), [filteredRows, actualRateNumber, manualEntriesInScope]);
   const broadcastRows = useMemo(() => {
-    return buildBroadcastRows(filteredRows, broadcastOptions, actualRateNumber);
-  }, [filteredRows, broadcastOptions, actualRateNumber]);
+    return buildBroadcastRows(filteredRows, broadcastOptions, actualRateNumber, manualEntriesInScope);
+  }, [filteredRows, broadcastOptions, actualRateNumber, manualEntriesInScope]);
 
   const resetFilters = () => {
     setStartDate("");
@@ -79,6 +135,7 @@ export default function AdminSettlementPanel({
       ["완료매출", stats.paidAmount, "무통장+카드 완료 기준"],
       ["무통장", stats.bankAmount, "입금확인 완료"],
       ["카드", stats.cardAmount, "카드 완료"],
+      ["기타매출", stats.manualIncomeAmount, "수동 매출 입력"],
       ["카드수수료", stats.actualCardFee, `카드 결제완료 × ${actualCardFeeRate}% 또는 주문 저장 수수료율`],
       ["창고정산/기타지출", stats.warehouseOtherExpense, "수동 지출 연결 예정"],
       ["지출합계", stats.totalExpense, "카드수수료 + 창고정산/기타지출"],
@@ -93,6 +150,7 @@ export default function AdminSettlementPanel({
       "완료매출",
       "무통장",
       "카드",
+      "기타매출",
       "카드수수료",
       "창고정산/기타지출",
       "미입금/확인필요",
@@ -106,6 +164,7 @@ export default function AdminSettlementPanel({
       row.paidAmount,
       row.bankAmount,
       row.cardAmount,
+      row.manualIncomeAmount,
       row.actualCardFee,
       row.warehouseOtherExpense,
       row.unpaidAmount,
@@ -183,12 +242,20 @@ export default function AdminSettlementPanel({
 
       <SettlementSummaryCards stats={stats} actualCardFeeRate={actualCardFeeRate} />
 
+      <SettlementManualEntryPanel
+        entries={manualEntriesInScope}
+        broadcastOptions={broadcastOptions}
+        loading={manualEntriesLoading}
+        tableReady={manualEntryTableReady}
+        onChanged={loadManualEntries}
+      />
+
       <SettlementCharts trend={trend} stats={stats} />
 
       <SettlementBroadcastTable rows={broadcastRows} />
 
       <div className="rounded-[30px] border border-orange-100 bg-orange-50 px-5 py-4 text-sm font-bold leading-6 text-orange-800">
-        수동 매출/지출 입력, 창고정산/기타지출 반영, 과거 데이터 추가, 수정이력은 별도 DB 테이블이 필요합니다. 다음 단계에서 주문 데이터와 분리해서 안전하게 추가합니다.
+        수동 입력은 주문/입금 데이터와 분리된 별도 테이블에 저장됩니다. 삭제는 완전삭제가 아니라 비활성 처리됩니다. 상세 모달과 수정이력 로그는 다음 단계에서 보강합니다.
       </div>
     </section>
   );

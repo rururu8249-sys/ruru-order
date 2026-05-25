@@ -81,7 +81,7 @@ export default function SettlementBroadcastTable({
       </div>
 
       <div className="overflow-auto">
-        <table className="min-w-[1080px] w-full border-separate border-spacing-0">
+        <table className="min-w-[1180px] w-full border-separate border-spacing-0">
           <thead>
             <tr className="bg-slate-50 text-xs font-black text-slate-500">
               <th className="px-4 py-3 text-left">방송/날짜</th>
@@ -90,6 +90,7 @@ export default function SettlementBroadcastTable({
               <th className="px-4 py-3 text-right">완료매출</th>
               <th className="px-4 py-3 text-right">무통장</th>
               <th className="px-4 py-3 text-right">카드</th>
+              <th className="px-4 py-3 text-right">기타매출</th>
               <th className="px-4 py-3 text-right">카드수수료</th>
               <th className="px-4 py-3 text-right">창고정산/기타지출</th>
               <th className="px-4 py-3 text-right">미입금/확인필요</th>
@@ -116,6 +117,7 @@ export default function SettlementBroadcastTable({
                   <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-blue-700">{won(row.paidAmount)}</td>
                   <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-emerald-700">{won(row.bankAmount)}</td>
                   <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-blue-700">{won(row.cardAmount)}</td>
+                  <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-sky-700">{won(row.manualIncomeAmount)}</td>
                   <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-rose-700">-{won(row.actualCardFee)}</td>
                   <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-violet-700">-{won(row.warehouseOtherExpense)}</td>
                   <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-orange-700">{won(row.unpaidAmount)}</td>
