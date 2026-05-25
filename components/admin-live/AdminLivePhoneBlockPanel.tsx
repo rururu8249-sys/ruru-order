@@ -2,7 +2,7 @@
 
 // components/admin-live/AdminLivePhoneBlockPanel.tsx
 // 목적: 고객관리에서 전화번호만 입력해 기존 고객 차단/차단해제
-// 주의: customers 테이블의 기존 고객만 처리. 주문/입금/배송/정산 로직 없음.
+// 주의: 브라우저 alert/confirm/prompt 사용 금지. 주문/입금/배송/정산 로직 없음.
 
 import { useState } from "react";
 
@@ -24,13 +24,8 @@ function digitsOnly(value: unknown) {
 function formatPhone(value: unknown) {
   const digits = digitsOnly(value);
 
-  if (digits.length === 11) {
-    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
-  }
-
-  if (digits.length === 10) {
-    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
-  }
+  if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
 
   return String(value ?? "").trim();
 }
@@ -39,23 +34,27 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
   const [phone, setPhone] = useState("");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
-  const [lastMessage, setLastMessage] = useState("");
+  const [message, setMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
   const submit = async (blocked: boolean) => {
     const phoneDigits = digitsOnly(phone);
+    const finalReason = blocked ? reason.trim() : "";
+
+    setMessage("");
+    setErrorMessage("");
 
     if (phoneDigits.length < 10 || phoneDigits.length > 11) {
-      alert("전화번호는 숫자 기준 10~11자리로 입력해주세요.");
+      setErrorMessage("전화번호는 숫자 기준 10~11자리로 입력해주세요.");
       return;
     }
 
-    const finalReason = blocked ? reason.trim() || "전화번호 직접 차단" : "";
-
-    if (blocked && !confirm(`${formatPhone(phoneDigits)} 번호를 차단할까요?`)) return;
-    if (!blocked && !confirm(`${formatPhone(phoneDigits)} 번호를 차단해제할까요?`)) return;
+    if (blocked && !finalReason) {
+      setErrorMessage("차단사유를 입력해주세요.");
+      return;
+    }
 
     setSaving(true);
-    setLastMessage("");
 
     try {
       const response = await fetch("/api/admin-live/customer-block", {
@@ -83,13 +82,13 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
         matchedCount: Number(payload.matchedCount || 0),
       });
 
-      setLastMessage(
+      setMessage(
         `${formatPhone(phoneDigits)} · ${blocked ? "차단" : "차단해제"} 완료 · ${Number(payload.matchedCount || 0).toLocaleString("ko-KR")}명 반영`
       );
 
       if (!blocked) setReason("");
     } catch (error) {
-      alert(error instanceof Error ? error.message : "전화번호 차단 처리 실패");
+      setErrorMessage(error instanceof Error ? error.message : "전화번호 차단 처리 실패");
     } finally {
       setSaving(false);
     }
@@ -106,9 +105,9 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
           </p>
         </div>
 
-        {lastMessage ? (
+        {message ? (
           <div className="rounded-xl bg-white px-3 py-2 text-[12px] font-black text-red-700 ring-1 ring-red-100">
-            {lastMessage}
+            {message}
           </div>
         ) : null}
       </div>
@@ -147,6 +146,12 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
           차단해제
         </button>
       </div>
+
+      {errorMessage ? (
+        <div className="mt-3 rounded-2xl bg-white px-3 py-2 text-[12px] font-black text-red-700 ring-1 ring-red-100">
+          {errorMessage}
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -30,9 +30,7 @@ function getSupabaseAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
 
-  if (!supabaseUrl || !serviceRoleKey) {
-    return null;
-  }
+  if (!supabaseUrl || !serviceRoleKey) return null;
 
   return createClient(supabaseUrl, serviceRoleKey, {
     auth: {
@@ -59,13 +57,23 @@ export async function POST(request: Request) {
   const phone = clean(body?.phone);
   const phoneDigits = digitsOnly(phone);
   const blocked = body?.blocked !== false;
-  const reason = clean(body?.reason) || (blocked ? "전화번호 직접 차단" : "");
+  const reason = clean(body?.reason);
 
   if (phoneDigits.length < 10 || phoneDigits.length > 11) {
     return NextResponse.json(
       {
         ok: false,
         message: "전화번호는 숫자 기준 10~11자리로 입력해주세요.",
+      },
+      { status: 400 }
+    );
+  }
+
+  if (blocked && !reason) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "차단사유를 입력해주세요.",
       },
       { status: 400 }
     );
@@ -80,7 +88,7 @@ export async function POST(request: Request) {
       }
     : {
         is_blocked: false,
-        block_reason: null,
+        block_reason: "",
       };
 
   const { data, error } = await supabase

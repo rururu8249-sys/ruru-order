@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 import type { LiveOrder } from "./types";
 import AdminLiveCustomerIssueRail from "./AdminLiveCustomerIssueRail";
 import AdminLivePhoneBlockPanel from "./AdminLivePhoneBlockPanel";
+import AdminLiveCustomerBlockReasonModal from "./AdminLiveCustomerBlockReasonModal";
 import { CUSTOMER_TERMS } from "./adminLiveCustomerTerms";
 
 type Props = {
@@ -39,6 +40,8 @@ type BlockOverride = {
   blocked: boolean;
   reason: string;
 };
+
+type BlockModalTarget = CustomerSummary;
 
 const CUSTOMER_PAGE_SIZE = 20;
 const DETAIL_ORDER_PAGE_SIZE = 6;
@@ -307,6 +310,10 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerSummary | null>(null);
   const [detailPage, setDetailPage] = useState(1);
   const [blockOverrides, setBlockOverrides] = useState<Record<string, BlockOverride>>({});
+  const [blockModalTarget, setBlockModalTarget] = useState<BlockModalTarget | null>(null);
+  const [blockSaving, setBlockSaving] = useState(false);
+  const [blockErrorMessage, setBlockErrorMessage] = useState("");
+  const [blockStatusMessage, setBlockStatusMessage] = useState("");
 
   const customers = useMemo<CustomerSummary[]>(() => {
     const map = new Map<string, CustomerSummary>();
@@ -414,46 +421,79 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
     }));
   };
 
-  const saveCustomerBlock = async (customer: CustomerSummary) => {
+  const requestCustomerBlock = async (customer: CustomerSummary, blocked: boolean, reason: string) => {
     const phoneKey = digitsOnly(customer.phone);
 
+    setBlockErrorMessage("");
+    setBlockStatusMessage("");
+
     if (!phoneKey) {
-      alert("전화번호가 없어 차단 처리할 수 없습니다.");
-      return;
+      setBlockErrorMessage("전화번호가 없어 차단 처리할 수 없습니다.");
+      return false;
     }
 
-    const nextBlocked = !customer.blocked;
-    const reason = nextBlocked ? window.prompt("차단사유를 입력하세요.", customer.blockReason || "고객관리 차단") : "";
+    if (blocked && !reason.trim()) {
+      setBlockErrorMessage("차단사유를 입력해주세요.");
+      return false;
+    }
 
-    if (nextBlocked && reason === null) return;
-    if (!nextBlocked && !confirm(`${customer.nickname} 고객을 차단해제할까요?`)) return;
+    setBlockSaving(true);
 
-    const response = await fetch("/api/admin-live/customer-block", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+    try {
+      const response = await fetch("/api/admin-live/customer-block", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          phone: phoneKey,
+          blocked,
+          reason: blocked ? reason.trim() : "",
+        }),
+      });
+
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.message || "차단 처리 실패");
+      }
+
+      applyBlockResult({
         phone: phoneKey,
-        blocked: nextBlocked,
-        reason: nextBlocked ? reason || "고객관리 차단" : "",
-      }),
-    });
+        blocked,
+        reason: blocked ? reason.trim() : "",
+      });
 
-    const payload = await response.json().catch(() => null);
+      setBlockStatusMessage(`${customer.nickname} 고객을 ${blocked ? "차단" : "차단해제"}했습니다.`);
+      return true;
+    } catch (error) {
+      setBlockErrorMessage(error instanceof Error ? error.message : "차단 처리 실패");
+      return false;
+    } finally {
+      setBlockSaving(false);
+    }
+  };
 
-    if (!response.ok || !payload?.ok) {
-      alert(payload?.message || "차단 처리 실패");
+  const handleCustomerBlockButton = async (customer: CustomerSummary) => {
+    setBlockErrorMessage("");
+    setBlockStatusMessage("");
+
+    if (customer.blocked) {
+      await requestCustomerBlock(customer, false, "");
       return;
     }
 
-    applyBlockResult({
-      phone: phoneKey,
-      blocked: nextBlocked,
-      reason: nextBlocked ? reason || "고객관리 차단" : "",
-    });
+    setBlockModalTarget(customer);
+  };
 
-    alert(`${customer.nickname} 고객을 ${nextBlocked ? "차단" : "차단해제"}했습니다.`);
+  const submitCustomerBlockReason = async (reason: string) => {
+    if (!blockModalTarget) return;
+
+    const ok = await requestCustomerBlock(blockModalTarget, true, reason);
+
+    if (ok) {
+      setBlockModalTarget(null);
+    }
   };
 
   return (
@@ -589,7 +629,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
                       <td className="px-3 py-3 text-center">
                         <button
                           type="button"
-                          onClick={() => saveCustomerBlock(customer)}
+                          onClick={() => handleCustomerBlockButton(customer)}
                           className={`rounded-xl px-3 py-1.5 text-xs font-black ${
                             customer.blocked
                               ? "bg-slate-100 text-slate-700 hover:bg-slate-200"
@@ -641,6 +681,23 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
         page={detailPage}
         setPage={setDetailPage}
         onClose={() => setSelectedCustomer(null)}
+      />
+
+      <AdminLiveCustomerBlockReasonModal
+        open={Boolean(blockModalTarget)}
+        nickname={blockModalTarget?.nickname || ""}
+        name={blockModalTarget?.name || ""}
+        phone={blockModalTarget?.phone || ""}
+        defaultReason={blockModalTarget?.blockReason || ""}
+        saving={blockSaving}
+        errorMessage={blockErrorMessage}
+        onClose={() => {
+          if (!blockSaving) {
+            setBlockModalTarget(null);
+            setBlockErrorMessage("");
+          }
+        }}
+        onSubmit={submitCustomerBlockReason}
       />
     </section>
   );
