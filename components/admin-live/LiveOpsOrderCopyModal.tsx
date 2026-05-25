@@ -171,13 +171,12 @@ export default function LiveOpsOrderCopyModal({ open, orders, onClose, onCopied 
   };
 
   const resetHidden = () => {
-    if (!window.confirm("복사완료로 숨긴 새 주문서 제출 알림을 다시 보이게 할까요?\n\n주문 DB는 변경되지 않습니다.")) return;
-
     const empty = new Set<string>();
     setDoneKeys(empty);
     setSelectedKeys(new Set());
     saveLiveOpsCopiedOrderKeys(empty);
     setCopiedText("");
+    showAdminToast("복사완료 숨김 알림을 다시 보이게 했습니다.", "success");
   };
 
   const copySelected = async () => {
