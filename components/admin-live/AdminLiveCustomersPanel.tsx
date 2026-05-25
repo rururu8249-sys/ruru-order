@@ -4,7 +4,7 @@
 // 목적: 실시간 관리자 고객관리 화면
 // 주의: 1차는 조회/화면 구성 전용. 고객 차단 저장, 메모 저장, 주문/입금/배송/정산 로직 없음.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { LiveOrder } from "./types";
 import AdminLiveCustomerIssueRail from "./AdminLiveCustomerIssueRail";
 import AdminLivePhoneBlockPanel from "./AdminLivePhoneBlockPanel";
@@ -43,6 +43,13 @@ type BlockOverride = {
 };
 
 type BlockModalTarget = CustomerSummary;
+
+type DirectPhoneBlock = {
+  phone: string;
+  reason: string;
+  created_at?: string;
+  updated_at?: string;
+};
 
 const CUSTOMER_PAGE_SIZE = 20;
 const DETAIL_ORDER_PAGE_SIZE = 6;
@@ -510,6 +517,43 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
   const [showBlockedCustomers, setShowBlockedCustomers] = useState(false);
   const [blockedCustomerKeywordDraft, setBlockedCustomerKeywordDraft] = useState("");
   const [blockedCustomerKeyword, setBlockedCustomerKeyword] = useState("");
+  const [directPhoneBlocks, setDirectPhoneBlocks] = useState<DirectPhoneBlock[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+
+    const loadDirectPhoneBlocks = async () => {
+      try {
+        const response = await fetch("/api/admin-live/customer-block", {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        const payload = await response.json().catch(() => null);
+
+        if (!alive || !payload?.ok || !Array.isArray(payload.blocks)) return;
+
+        setDirectPhoneBlocks(
+          payload.blocks
+            .filter((block: any) => digitsOnly(block?.phone))
+            .map((block: any) => ({
+              phone: digitsOnly(block.phone),
+              reason: clean(block.reason),
+              created_at: clean(block.created_at),
+              updated_at: clean(block.updated_at),
+            }))
+        );
+      } catch {
+        if (alive) setDirectPhoneBlocks([]);
+      }
+    };
+
+    loadDirectPhoneBlocks();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const customers = useMemo<CustomerSummary[]>(() => {
     const map = new Map<string, CustomerSummary>();
@@ -603,6 +647,13 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
 
   const normalCustomers = customers.filter((customer) => !customer.blocked);
   const blockedCustomers = customers.filter((customer) => customer.blocked);
+  const customerPhoneKeys = new Set(customers.map((customer) => digitsOnly(customer.phone)).filter(Boolean));
+  const standalonePhoneBlocks = directPhoneBlocks.filter((block) => {
+    const phoneKey = digitsOnly(block.phone);
+
+    return phoneKey && !customerPhoneKeys.has(phoneKey);
+  });
+  const blockedTotalCount = blockedCustomers.length + standalonePhoneBlocks.length;
   const filteredBlockedCustomers = blockedCustomers.filter((customer) => {
     const searchText = blockedCustomerKeyword.replace(/\s+/g, "").toLowerCase();
 
@@ -621,6 +672,22 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
       .toLowerCase()
       .includes(searchText);
   });
+  const filteredStandalonePhoneBlocks = standalonePhoneBlocks.filter((block) => {
+    const searchText = blockedCustomerKeyword.replace(/\s+/g, "").toLowerCase();
+
+    if (!searchText) return true;
+
+    return [
+      block.phone,
+      formatPhone(block.phone),
+      block.reason,
+    ]
+      .join(" ")
+      .replace(/\s+/g, "")
+      .toLowerCase()
+      .includes(searchText);
+  });
+  const filteredBlockedTotalCount = filteredBlockedCustomers.length + filteredStandalonePhoneBlocks.length;
   const attentionCustomers = customers.filter((customer) => customer.manualNeededCount > 0 || customer.unpaidCount > 0);
 
   const openDetail = (customer: CustomerSummary) => {
@@ -648,6 +715,25 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
         blocked: result.blocked,
         blockReason: result.reason,
       };
+    });
+
+    setDirectPhoneBlocks((current) => {
+      const rest = current.filter((block) => digitsOnly(block.phone) !== phoneKey);
+
+      if (!result.blocked) return rest;
+
+      const hasCustomer = customers.some((customer) => digitsOnly(customer.phone) === phoneKey);
+
+      if (hasCustomer) return rest;
+
+      return [
+        {
+          phone: phoneKey,
+          reason: result.reason,
+          updated_at: new Date().toISOString(),
+        },
+        ...rest,
+      ];
     });
   };
 
@@ -759,7 +845,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
             <SummaryCard
               icon="⛔"
               label="차단 고객"
-              value={`${blockedCustomers.length.toLocaleString("ko-KR")}명`}
+              value={`${blockedTotalCount.toLocaleString("ko-KR")}명`}
               sub="클릭하면 차단목록 확인"
             />
           </button>
@@ -929,7 +1015,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
               <div>
                 <div className="text-[11px] font-black tracking-[0.18em] text-red-500">BLOCKED CUSTOMERS</div>
                 <h2 className="mt-1 text-2xl font-black tracking-[-0.04em] text-slate-950">
-                  차단 고객 목록 {blockedCustomers.length.toLocaleString("ko-KR")}명
+                  차단 고객 목록 {blockedTotalCount.toLocaleString("ko-KR")}명
                 </h2>
                 <p className="mt-1 text-sm font-bold text-slate-500">
                   현재 주문 데이터와 차단 저장 결과 기준으로 표시합니다.
@@ -984,21 +1070,67 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
               </div>
 
               <div className="mt-2 text-xs font-black text-slate-400">
-                표시 {filteredBlockedCustomers.length.toLocaleString("ko-KR")}명 / 전체 {blockedCustomers.length.toLocaleString("ko-KR")}명
+                표시 {filteredBlockedTotalCount.toLocaleString("ko-KR")}명 / 전체 {blockedTotalCount.toLocaleString("ko-KR")}명
               </div>
             </div>
 
             <div className="mt-4 space-y-2">
-              {blockedCustomers.length === 0 ? (
+              {blockedTotalCount === 0 ? (
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-8 text-center text-sm font-black text-slate-400">
                   차단 고객이 없습니다.
                 </div>
-              ) : filteredBlockedCustomers.length === 0 ? (
+              ) : filteredBlockedTotalCount === 0 ? (
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-8 text-center text-sm font-black text-slate-400">
                   검색 결과가 없습니다.
                 </div>
               ) : (
-                filteredBlockedCustomers.map((customer) => (
+                <>
+                  {filteredStandalonePhoneBlocks.map((block) => (
+                    <div
+                      key={`phone-block-${digitsOnly(block.phone)}`}
+                      className="rounded-2xl border border-red-100 bg-red-50/60 p-4"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-base font-black text-slate-950">전화번호 전용 차단</div>
+                          <div className="mt-1 text-sm font-bold text-slate-600">
+                            {formatPhone(block.phone)}
+                          </div>
+                          <div className="mt-2 rounded-xl bg-white px-3 py-2 text-xs font-bold leading-5 text-red-700">
+                            {block.reason || "차단사유 없음"}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleCustomerBlockButton({
+                              key: `phone-block-${digitsOnly(block.phone)}`,
+                              nickname: "전화번호 전용",
+                              name: "-",
+                              phone: block.phone,
+                              address: "",
+                              orderCount: 0,
+                              totalAmount: 0,
+                              paidCount: 0,
+                              unpaidCount: 0,
+                              manualNeededCount: 0,
+                              latestOrderAt: "",
+                              blocked: true,
+                              blockReason: block.reason,
+                              orders: [],
+                            })
+                          }
+                          disabled={blockSaving}
+                          className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white hover:bg-slate-700 disabled:opacity-50"
+                        >
+                          차단해제
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {filteredBlockedCustomers.map((customer) => (
                   <div
                     key={`blocked-${customer.key}`}
                     className="rounded-2xl border border-red-100 bg-red-50/60 p-4"
@@ -1040,7 +1172,8 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
                       </div>
                     </div>
                   </div>
-                ))
+                  ))}
+                </>
               )}
             </div>
           </div>

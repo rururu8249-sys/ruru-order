@@ -26,6 +26,13 @@ function phoneVariants(phone: string) {
   return Array.from(variants);
 }
 
+function isMissingPhoneBlockTableError(error: any) {
+  const message = String(error?.message || "");
+  const code = String(error?.code || "");
+
+  return code === "42P01" || message.includes("customer_phone_blocks") || message.includes("does not exist");
+}
+
 function getSupabaseAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
@@ -37,6 +44,53 @@ function getSupabaseAdminClient() {
       persistSession: false,
       autoRefreshToken: false,
     },
+  });
+}
+
+export async function GET() {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    return NextResponse.json(
+      {
+        ok: false,
+        blocks: [],
+        message: "Supabase 관리자 환경변수가 없습니다.",
+      },
+      { status: 500 }
+    );
+  }
+
+  const { data, error } = await supabase
+    .from("customer_phone_blocks")
+    .select("phone, reason, is_blocked, created_at, updated_at")
+    .eq("is_blocked", true)
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    if (isMissingPhoneBlockTableError(error)) {
+      return NextResponse.json({
+        ok: true,
+        blocks: [],
+        tableReady: false,
+        message: "customer_phone_blocks 테이블이 아직 없습니다.",
+      });
+    }
+
+    return NextResponse.json(
+      {
+        ok: false,
+        blocks: [],
+        message: error.message,
+      },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({
+    ok: true,
+    tableReady: true,
+    blocks: Array.isArray(data) ? data : [],
   });
 }
 
@@ -107,16 +161,61 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!data || data.length === 0) {
-    return NextResponse.json(
+  const matchedCount = Array.isArray(data) ? data.length : 0;
+  let directBlockSaved = false;
+
+  if (matchedCount === 0) {
+    const { error: directError } = await supabase.from("customer_phone_blocks").upsert(
       {
-        ok: false,
-        message: "해당 전화번호로 등록된 고객을 찾지 못했습니다. 미주문 번호까지 차단하려면 차단전용 테이블 추가가 필요합니다.",
         phone: phoneDigits,
-        matchedCount: 0,
+        is_blocked: blocked,
+        reason: blocked ? reason : "",
+        updated_at: new Date().toISOString(),
       },
-      { status: 404 }
+      { onConflict: "phone" }
     );
+
+    if (directError) {
+      if (isMissingPhoneBlockTableError(directError)) {
+        return NextResponse.json(
+          {
+            ok: false,
+            message:
+              "전화번호 전용 차단 테이블이 없습니다. Supabase SQL Editor에서 supabase/sql/customer_phone_blocks.sql 내용을 먼저 실행해주세요.",
+            phone: phoneDigits,
+            matchedCount,
+          },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json(
+        {
+          ok: false,
+          message: directError.message,
+          phone: phoneDigits,
+          matchedCount,
+        },
+        { status: 500 }
+      );
+    }
+
+    directBlockSaved = true;
+  }
+
+  if (matchedCount > 0 && !blocked) {
+    await supabase
+      .from("customer_phone_blocks")
+      .upsert(
+        {
+          phone: phoneDigits,
+          is_blocked: false,
+          reason: "",
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "phone" }
+      )
+      .then(() => null);
   }
 
   return NextResponse.json({
@@ -124,7 +223,8 @@ export async function POST(request: Request) {
     phone: phoneDigits,
     blocked,
     reason: blocked ? reason : "",
-    matchedCount: data.length,
-    customers: data,
+    matchedCount,
+    directBlockSaved,
+    customers: data || [],
   });
 }

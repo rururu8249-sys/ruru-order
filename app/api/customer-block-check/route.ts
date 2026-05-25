@@ -30,6 +30,13 @@ function isBlockedValue(value: unknown) {
   return value === true || value === "true" || value === "Y" || value === "y" || value === 1 || value === "1";
 }
 
+function isMissingPhoneBlockTableError(error: any) {
+  const message = String(error?.message || "");
+  const code = String(error?.code || "");
+
+  return code === "42P01" || message.includes("customer_phone_blocks") || message.includes("does not exist");
+}
+
 function getSupabaseAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
@@ -69,11 +76,42 @@ export async function GET(request: Request) {
     });
   }
 
+  const { data: directData, error: directError } = await supabase
+    .from("customer_phone_blocks")
+    .select("phone, reason, is_blocked")
+    .eq("phone", phoneDigits)
+    .eq("is_blocked", true)
+    .limit(1);
+
+  if (directError && !isMissingPhoneBlockTableError(directError)) {
+    return NextResponse.json(
+      {
+        ok: false,
+        blocked: false,
+        message: directError.message,
+      },
+      { status: 500 }
+    );
+  }
+
+  if (Array.isArray(directData) && directData.some((row) => isBlockedValue(row?.is_blocked))) {
+    const reason = clean(directData[0]?.reason);
+
+    return NextResponse.json({
+      ok: true,
+      blocked: true,
+      phone: phoneDigits,
+      reason,
+      source: "phone_block",
+      message: "현재 주문서 작성이 제한되어 있습니다.",
+    });
+  }
+
   const variants = phoneVariants(phoneDigits);
 
   const { data, error } = await supabase
     .from("customers")
-    .select("id, customer_phone, is_blocked")
+    .select("id, customer_phone, is_blocked, block_reason")
     .in("customer_phone", variants)
     .limit(20);
 
@@ -88,11 +126,15 @@ export async function GET(request: Request) {
     );
   }
 
-  const blocked = Array.isArray(data) && data.some((row) => isBlockedValue(row?.is_blocked));
+  const blockedRow = Array.isArray(data) ? data.find((row) => isBlockedValue(row?.is_blocked)) : null;
+  const blocked = Boolean(blockedRow);
 
   return NextResponse.json({
     ok: true,
     blocked,
     phone: phoneDigits,
+    reason: blocked ? clean(blockedRow?.block_reason) : "",
+    source: blocked ? "customer" : "none",
+    message: blocked ? "현재 주문서 작성이 제한되어 있습니다." : "",
   });
 }

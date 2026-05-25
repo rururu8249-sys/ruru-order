@@ -11,6 +11,7 @@ type BlockResult = {
   blocked: boolean;
   reason: string;
   matchedCount?: number;
+  directBlockSaved?: boolean;
 };
 
 type Props = {
@@ -80,10 +81,15 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
         blocked,
         reason: finalReason,
         matchedCount: Number(payload.matchedCount || 0),
+        directBlockSaved: Boolean(payload.directBlockSaved),
       });
 
       setMessage(
-        `${formatPhone(phoneDigits)} · ${blocked ? "차단" : "차단해제"} 완료 · ${Number(payload.matchedCount || 0).toLocaleString("ko-KR")}명 반영`
+        `${formatPhone(phoneDigits)} · ${blocked ? "차단" : "차단해제"} 완료 · ${
+          Number(payload.matchedCount || 0) > 0
+            ? `${Number(payload.matchedCount || 0).toLocaleString("ko-KR")}명 반영`
+            : "전화번호 전용 차단 저장"
+        }`
       );
 
       if (!blocked) setReason("");
@@ -101,7 +107,7 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
           <div className="text-[11px] font-black tracking-[0.16em] text-red-500">PHONE BLOCK</div>
           <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-slate-950">전화번호 직접 차단</h2>
           <p className="mt-1 text-[12px] font-bold text-red-600">
-            기존 customers 테이블에 등록된 고객 전화번호만 차단/차단해제합니다.
+            주문 이력이 없는 번호도 전화번호 전용 차단으로 저장합니다.
           </p>
         </div>
 
