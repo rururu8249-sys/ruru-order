@@ -1,3 +1,7 @@
+"use client";
+
+import { showAdminToast } from "@/lib/adminToast";
+
 // app/admin/notice/page.tsx
 // 전체 교체용
 // 파일 위치:
@@ -17,7 +21,6 @@
 // - 관리자 공지관리 글씨 대비 강화
 // - 입력칸/카드/버튼 글씨 진하게 표시
 
-"use client";
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -79,7 +82,7 @@ export default function AdminNoticePage() {
 
   const login = () => {
     if (password !== ADMIN_PASSWORD) {
-      alert("관리자 비밀번호가 틀렸습니다.");
+      showAdminToast("관리자 비밀번호가 틀렸습니다.");
       return;
     }
 
@@ -125,7 +128,7 @@ export default function AdminNoticePage() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      alert("공지 불러오기 실패\n" + error.message);
+      showAdminToast("공지 불러오기 실패\n" + error.message);
       return;
     }
 
@@ -154,12 +157,12 @@ export default function AdminNoticePage() {
 
   const saveNotice = async () => {
     if (!noticeForm.title.trim()) {
-      alert("공지 제목을 입력해주세요.");
+      showAdminToast("공지 제목을 입력해주세요.");
       return;
     }
 
     if (!noticeForm.content.trim()) {
-      alert("공지 내용을 입력해주세요.");
+      showAdminToast("공지 내용을 입력해주세요.");
       return;
     }
 
@@ -185,20 +188,20 @@ export default function AdminNoticePage() {
         .eq("id", noticeForm.id);
 
       if (error) {
-        alert("공지 수정 실패\n" + error.message);
+        showAdminToast("공지 수정 실패\n" + error.message);
         return;
       }
 
-      alert("공지 수정 완료");
+      showAdminToast("공지 수정 완료");
     } else {
       const { error } = await supabase.from("notices").insert(payload);
 
       if (error) {
-        alert("공지 등록 실패\n" + error.message);
+        showAdminToast("공지 등록 실패\n" + error.message);
         return;
       }
 
-      alert("공지 등록 완료");
+      showAdminToast("공지 등록 완료");
     }
 
     setNoticeForm(emptyNotice);
@@ -216,7 +219,7 @@ export default function AdminNoticePage() {
     const { error } = await supabase.from("notices").delete().eq("id", id);
 
     if (error) {
-      alert("공지 삭제 실패\n" + error.message);
+      showAdminToast("공지 삭제 실패\n" + error.message);
       return;
     }
 
@@ -243,7 +246,7 @@ export default function AdminNoticePage() {
       .eq("id", notice.id);
 
     if (currentError) {
-      alert("순서 변경 실패\n" + currentError.message);
+      showAdminToast("순서 변경 실패\n" + currentError.message);
       return;
     }
 
@@ -253,7 +256,7 @@ export default function AdminNoticePage() {
       .eq("id", targetNotice.id);
 
     if (targetError) {
-      alert("순서 변경 실패\n" + targetError.message);
+      showAdminToast("순서 변경 실패\n" + targetError.message);
       return;
     }
 
@@ -262,12 +265,12 @@ export default function AdminNoticePage() {
 
   const savePopup = async () => {
     if (!popup.title.trim()) {
-      alert("팝업 제목을 입력해주세요.");
+      showAdminToast("팝업 제목을 입력해주세요.");
       return;
     }
 
     if (!popup.content.trim()) {
-      alert("팝업 내용을 입력해주세요.");
+      showAdminToast("팝업 내용을 입력해주세요.");
       return;
     }
 
@@ -283,11 +286,11 @@ export default function AdminNoticePage() {
       });
 
     if (error) {
-      alert("팝업 저장 실패\n" + error.message);
+      showAdminToast("팝업 저장 실패\n" + error.message);
       return;
     }
 
-    alert("팝업 공지 저장 완료");
+    showAdminToast("팝업 공지 저장 완료");
   };
 
   const inputClass =
