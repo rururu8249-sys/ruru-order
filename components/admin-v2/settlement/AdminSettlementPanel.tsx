@@ -219,7 +219,7 @@ export default function AdminSettlementPanel({
               onClick={() => setManualPanelOpen(true)}
               className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
             >
-              수동 매출/지출 관리
+              + 창고정산/기타입력
             </button>
 
             <button
@@ -263,11 +263,11 @@ export default function AdminSettlementPanel({
 
       {manualPanelOpen ? (
         <div className="fixed inset-0 z-[90] bg-slate-950/35 backdrop-blur-[2px]">
-          <div className="absolute right-0 top-0 flex h-full w-full max-w-[1080px] flex-col bg-slate-50 shadow-[0_30px_120px_rgba(15,23,42,0.45)]">
+          <div className="absolute right-0 top-0 flex h-full w-full max-w-[1040px] flex-col overflow-hidden bg-slate-50 shadow-[0_30px_120px_rgba(15,23,42,0.45)]">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
               <div>
                 <div className="text-xs font-black tracking-[0.22em] text-violet-600">MANUAL MONEY ENTRY</div>
-                <div className="mt-1 text-xl font-black text-slate-950">수동 매출/지출 관리</div>
+                <div className="mt-1 text-xl font-black text-slate-950">수동 정산 입력</div>
               </div>
 
               <button

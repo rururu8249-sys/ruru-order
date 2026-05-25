@@ -192,9 +192,9 @@ export default function SettlementManualEntryPanel({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-xs font-black tracking-[0.22em] text-violet-600">MANUAL MONEY ENTRY</div>
-          <h3 className="mt-1 text-2xl font-black tracking-[-0.04em] text-slate-950">수동 매출/지출 입력</h3>
+          <h3 className="mt-1 text-2xl font-black tracking-[-0.04em] text-slate-950">수동 정산 입력</h3>
           <p className="mt-2 text-sm font-bold text-slate-500">
-            창고정산, 기타지출, 과거 매출을 주문 데이터와 분리해서 입력합니다.
+            창고정산, 기타지출, 과거매출을 주문 데이터와 분리해서 빠르게 입력합니다.
           </p>
         </div>
 
@@ -216,88 +216,116 @@ export default function SettlementManualEntryPanel({
         </div>
       ) : null}
 
-      <div className="grid gap-3 xl:grid-cols-[0.8fr_1fr_1.2fr_1.1fr_1.4fr_auto]">
-        <label className="grid gap-1">
-          <span className="text-xs font-black text-slate-500">구분</span>
-          <select
-            value={entryType}
-            onChange={(event) => {
-              const nextType = event.target.value as SettlementManualEntryType;
-              setEntryType(nextType);
-              setTitle(nextType === "income" ? "기타매출" : "창고정산");
-            }}
-            className="h-12 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400"
-          >
-            <option value="expense">창고정산/기타지출</option>
-            <option value="income">기타매출</option>
-          </select>
-        </label>
+            <div className="grid gap-4 rounded-[26px] border border-slate-200 bg-slate-50 p-4">
+        <div className="grid gap-3 lg:grid-cols-[0.85fr_1fr_1fr]">
+          <label className="grid gap-1">
+            <span className="text-xs font-black text-slate-500">구분</span>
+            <select
+              value={entryType}
+              onChange={(event) => {
+                const nextType = event.target.value as SettlementManualEntryType;
+                setEntryType(nextType);
+                setTitle(nextType === "income" ? "기타매출" : "창고정산");
+              }}
+              className="h-12 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400"
+            >
+              <option value="expense">창고정산/기타지출</option>
+              <option value="income">기타매출</option>
+            </select>
+          </label>
 
-        <label className="grid gap-1">
-          <span className="text-xs font-black text-slate-500">날짜</span>
-          <input
-            type="date"
-            value={entryDate}
-            onChange={(event) => setEntryDate(event.target.value)}
-            className="h-12 rounded-2xl border border-slate-200 px-3 text-sm font-black outline-none focus:border-blue-400"
-          />
-        </label>
+          <label className="grid gap-1">
+            <span className="text-xs font-black text-slate-500">날짜</span>
+            <input
+              type="date"
+              value={entryDate}
+              onChange={(event) => setEntryDate(event.target.value)}
+              className="h-12 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400"
+            />
+          </label>
 
-        <label className="grid gap-1">
-          <span className="text-xs font-black text-slate-500">연결 방송</span>
-          <select
-            value={broadcastKey}
-            onChange={(event) => setBroadcastKey(event.target.value)}
-            className="h-12 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400"
-          >
-            <option value="">날짜 기준 자동 연결</option>
-            {broadcastOptions.slice(0, 120).map((option) => (
-              <option key={option.key} value={option.key}>
-                {option.label}
-              </option>
+          <label className="grid gap-1">
+            <span className="text-xs font-black text-slate-500">금액</span>
+            <input
+              value={amount}
+              onChange={(event) => setAmount(formatMoneyInput(event.target.value))}
+              placeholder="0"
+              className="h-12 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400"
+            />
+          </label>
+        </div>
+
+        <div className="grid gap-2">
+          <span className="text-xs font-black text-slate-500">빠른 제목</span>
+          <div className="flex flex-wrap gap-2">
+            {(entryType === "income" ? ["기타매출", "과거매출", "현장매출"] : ["창고정산", "택배비", "포장비", "사입비", "기타지출"]).map((quickTitle) => (
+              <button
+                key={quickTitle}
+                type="button"
+                onClick={() => setTitle(quickTitle)}
+                className={
+                  title === quickTitle
+                    ? "rounded-full bg-blue-600 px-4 py-2 text-xs font-black text-white shadow-sm"
+                    : "rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-600 hover:bg-slate-50"
+                }
+              >
+                {quickTitle}
+              </button>
             ))}
-          </select>
-        </label>
+          </div>
+        </div>
 
-        <label className="grid gap-1">
-          <span className="text-xs font-black text-slate-500">제목</span>
-          <input
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder="창고정산, 택배비, 기타매출"
-            className="h-12 rounded-2xl border border-slate-200 px-3 text-sm font-black outline-none focus:border-blue-400"
-          />
-        </label>
+        <div className="grid gap-3 lg:grid-cols-[0.9fr_1.1fr]">
+          <label className="grid gap-1">
+            <span className="text-xs font-black text-slate-500">제목</span>
+            <input
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="창고정산, 택배비, 기타매출"
+              className="h-12 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400"
+            />
+          </label>
 
-        <label className="grid gap-1">
-          <span className="text-xs font-black text-slate-500">금액</span>
-          <input
-            value={amount}
-            onChange={(event) => setAmount(formatMoneyInput(event.target.value))}
-            placeholder="0"
-            className="h-12 rounded-2xl border border-slate-200 px-3 text-sm font-black outline-none focus:border-blue-400"
-          />
-        </label>
+          <label className="grid gap-1">
+            <span className="text-xs font-black text-slate-500">연결 방송</span>
+            <select
+              value={broadcastKey}
+              onChange={(event) => setBroadcastKey(event.target.value)}
+              className="h-12 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400"
+            >
+              <option value="">날짜 기준 자동 연결</option>
+              {broadcastOptions.slice(0, 120).map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
 
-        <div className="flex items-end gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={saveEntry}
             disabled={saving || !tableReady}
-            className="h-12 rounded-2xl bg-blue-600 px-5 text-sm font-black text-white shadow-sm disabled:cursor-wait disabled:opacity-45"
+            className="h-12 min-w-[180px] rounded-2xl bg-blue-600 px-6 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-45"
           >
-            {saving ? "저장중" : editingId ? "수정저장" : "추가"}
+            {saving ? "저장중" : editingId ? "수정 저장" : "입력 추가"}
           </button>
 
           {editingId ? (
             <button
               type="button"
               onClick={resetForm}
-              className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-600 shadow-sm"
+              className="h-12 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-600 shadow-sm"
             >
-              취소
+              수정 취소
             </button>
           ) : null}
+
+          <div className="text-xs font-bold text-slate-400">
+            입력값은 주문/입금 데이터와 분리 저장됩니다.
+          </div>
         </div>
       </div>
 
@@ -306,7 +334,7 @@ export default function SettlementManualEntryPanel({
         <textarea
           value={memo}
           onChange={(event) => setMemo(event.target.value)}
-          placeholder="무슨 매출/지출인지 적어주세요."
+          placeholder="무슨 매출/지출인지 상세 메모를 적어주세요."
           className="min-h-[78px] rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold outline-none focus:border-blue-400"
         />
       </label>
