@@ -1996,7 +1996,7 @@ const selectedCustomerDetail = useMemo(() => {
       .in("id", ids);
 
     if (error) {
-      alert("주문상태 변경 실패\n\n" + error.message);
+      showAdminToast("주문상태 변경 실패\n\n" + error.message, "error");
       await loadOrders();
     }
   };
@@ -2053,10 +2053,10 @@ const selectedCustomerDetail = useMemo(() => {
         if (error) throw error;
       }
 
-      alert("금액 수정 저장 완료");
+      showAdminToast("금액 수정 저장 완료", "success");
       await loadOrders();
     } catch (error: any) {
-      alert("금액 수정 저장 실패\\n\\n" + error.message);
+      showAdminToast("금액 수정 저장 실패\\n\\n" + error.message, "error");
     }
   };
 
