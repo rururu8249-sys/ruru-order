@@ -1,5 +1,7 @@
 "use client";
 
+import { showAdminToast } from "@/lib/adminToast";
+
 // components/admin-v2/today/AdminTodayPersistentTasks.tsx
 // 목적: 고객 이슈 큐를 해결 전까지 표시하고, 많아지면 페이지/더보기로 관리
 // 주의: 주문/입금/배송/정산 상태 변경 없음. admin_tasks 서버 API만 사용.
@@ -139,7 +141,7 @@ export default function AdminTodayPersistentTasks() {
     ).trim();
 
     if (!taskId) {
-      alert("고객 이슈 ID를 찾지 못했습니다. 새로고침 후 다시 시도해주세요.");
+      showAdminToast("고객 이슈 ID를 찾지 못했습니다. 새로고침 후 다시 시도해주세요.");
       return;
     }
 
@@ -163,7 +165,7 @@ export default function AdminTodayPersistentTasks() {
     const result = await response.json().catch(() => null);
 
     if (!response.ok || !result?.ok) {
-      alert("해결완료 처리 실패\n\n" + (result?.message || "알 수 없는 오류"));
+      showAdminToast("해결완료 처리 실패\n\n" + (result?.message || "알 수 없는 오류"));
       return;
     }
 
