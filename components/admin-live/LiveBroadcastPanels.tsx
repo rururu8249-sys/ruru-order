@@ -1,5 +1,6 @@
 "use client";
 
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 
 import { useEffect, useMemo, useState } from "react";
@@ -571,7 +572,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
       return;
     }
 
-    const ok = confirm("이 고객이슈를 해결완료 처리할까요?");
+    const ok = await showAdminConfirm("이 고객이슈를 해결완료 처리할까요?");
     if (!ok) return;
 
     const response = await fetch("/api/admin-v2/admin-tasks", {
@@ -604,7 +605,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
       return;
     }
 
-    const ok = confirm("해결완료 목록에서 이 이슈를 삭제할까요?\n\nDB 완전삭제가 아니라 목록 숨김 처리됩니다.");
+    const ok = await showAdminConfirm("해결완료 목록에서 이 이슈를 삭제할까요?\n\nDB 완전삭제가 아니라 목록 숨김 처리됩니다.");
     if (!ok) return;
 
     const response = await fetch("/api/admin-v2/admin-tasks", {

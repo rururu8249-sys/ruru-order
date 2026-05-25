@@ -11,6 +11,7 @@ import PresenceHeartbeat from "@/components/PresenceHeartbeat";
 
 import type { Metadata } from "next";
 import "./globals.css";
+import AdminConfirmHost from "@/components/admin/AdminConfirmHost";
 
 export const metadata: Metadata = {
   title: "루루동이 집구석LIVE",
@@ -25,7 +26,8 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body>
-        <PresenceHeartbeat />{children}</body>
+        <PresenceHeartbeat />{children}
+        <AdminConfirmHost /></body>
     </html>
   );
 }

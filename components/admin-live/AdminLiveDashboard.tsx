@@ -1,5 +1,6 @@
 "use client";
 
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -433,7 +434,7 @@ export default function AdminLiveDashboard() {
   };
 
   const startBroadcast = async (input: { title: string; youtubeUrl?: string }) => {
-    const ok = confirm(
+    const ok = await showAdminConfirm(
       [
         "방송을 시작할까요?",
         "",
@@ -486,7 +487,7 @@ export default function AdminLiveDashboard() {
       return;
     }
 
-    const ok = confirm(
+    const ok = await showAdminConfirm(
       [
         "현재 방송을 종료할까요?",
         "",

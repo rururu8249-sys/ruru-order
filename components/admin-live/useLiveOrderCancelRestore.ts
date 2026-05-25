@@ -1,5 +1,6 @@
 "use client";
 
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -65,7 +66,7 @@ export function useLiveOrderCancelRestore({
           "필요하면 입금확인을 다시 처리하세요.",
         ].join("\n");
 
-    if (!window.confirm(confirmMessage)) return;
+    if (!(await showAdminConfirm(confirmMessage))) return;
 
     setSavingAction(nextStatus);
 

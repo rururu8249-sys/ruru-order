@@ -1,5 +1,6 @@
 "use client";
 
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -117,7 +118,7 @@ export function useLiveOrderItemEdit(onAfterSave?: (result: LiveOrderItemEditSav
       "배송비/카드수수료/입금확인 상태는 변경하지 않습니다.",
     ].join("\n");
 
-    if (!window.confirm(confirmMessage)) return false;
+    if (!(await showAdminConfirm(confirmMessage))) return false;
 
     setSavingItemId(String(item.id));
 

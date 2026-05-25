@@ -1,5 +1,6 @@
 "use client";
 
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 
 // app/admin/broadcasts/page.tsx
@@ -96,9 +97,9 @@ export default function AdminBroadcastsPage() {
     const title = `${broadcast.public_title || "방송제목 없음"} ${broadcast.admin_subtitle ? "/ " + broadcast.admin_subtitle : ""}`;
 
     if (
-      !confirm(
+      !(await showAdminConfirm(
         `방송을 목록에서 삭제할까요?\n\n${title}\n\n연결 주문 ${count}건은 삭제되지 않고 유지됩니다.`
-      )
+      ))
     ) {
       return;
     }

@@ -1,5 +1,6 @@
 "use client";
 
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 import AdminOrdersView from "@/components/admin/orders/AdminOrdersView";
 import AdminOrderFilterPanel from "@/components/admin/orders/AdminOrderFilterPanel";
@@ -1790,7 +1791,7 @@ const selectedCustomerDetail = useMemo(() => {
       return;
     }
 
-    const ok = window.confirm(
+    const ok = await showAdminConfirm(
       "방송을 종료할까요?\n\n종료하면 고객 주문서가 방송 OFF 상태로 바뀝니다."
     );
 
@@ -1839,7 +1840,7 @@ const selectedCustomerDetail = useMemo(() => {
   const hideBroadcast = async (broadcastId: string | number | undefined) => {
     if (!broadcastId) return;
 
-    const ok = window.confirm(
+    const ok = await showAdminConfirm(
       "이 방송기록을 관리자 화면에서 숨길까요?\n\n주문정보는 삭제하지 않습니다."
     );
 
@@ -1898,7 +1899,7 @@ const selectedCustomerDetail = useMemo(() => {
       return;
     }
 
-    const ok = window.confirm(
+    const ok = await showAdminConfirm(
       `선택한 주문 ${selectedOrderGroupIds.length}건을 관리자 화면에서 숨길까요?\n\n주문 데이터는 삭제하지 않고 숨김 처리만 합니다.`
     );
 

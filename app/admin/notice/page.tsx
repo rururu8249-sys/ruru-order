@@ -1,5 +1,6 @@
 "use client";
 
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 
 // app/admin/notice/page.tsx
@@ -214,7 +215,7 @@ export default function AdminNoticePage() {
   };
 
   const deleteNotice = async (id: number) => {
-    if (!confirm("공지글을 삭제할까요?")) return;
+    if (!(await showAdminConfirm("공지글을 삭제할까요?"))) return;
 
     const { error } = await supabase.from("notices").delete().eq("id", id);
 

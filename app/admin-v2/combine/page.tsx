@@ -7,6 +7,7 @@
 
 "use client";
 
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -136,7 +137,7 @@ export default function CombineShippingAdminPage() {
   };
 
   const forceEndNow = async () => {
-    if (!confirm("시간지정 합배송을 종료할까요?\n\n종료 후 새 주문은 기본 같은날 합배송 기준으로 다시 판단됩니다.")) {
+    if (!(await showAdminConfirm("시간지정 합배송을 종료할까요?\n\n종료 후 새 주문은 기본 같은날 합배송 기준으로 다시 판단됩니다."))) {
       return;
     }
 

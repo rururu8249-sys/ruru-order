@@ -1,5 +1,6 @@
 "use client";
 
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 
 // components/admin-v2/today/AdminTodayPersistentTasks.tsx
@@ -145,7 +146,7 @@ export default function AdminTodayPersistentTasks() {
       return;
     }
 
-    const ok = window.confirm(`고객 이슈를 해결완료 처리할까요?\n\n${task.title}`);
+    const ok = await showAdminConfirm(`고객 이슈를 해결완료 처리할까요?\n\n${task.title}`);
 
     if (!ok) return;
 

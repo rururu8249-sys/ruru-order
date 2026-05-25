@@ -1,5 +1,6 @@
 "use client";
 
+import { showAdminConfirm } from "@/lib/adminConfirm";
 // components/admin-v2/orders/AdminOrderDetailPriorityPanel.tsx
 // 목적: 주문상세 최상단에서 지금 해야 할 일과 처리 버튼을 한눈에 보여줌
 // 주의: UI 액션 연결 전용. 자동입금확인, 금액계산, 정산, 송장 로직 없음.
@@ -78,7 +79,7 @@ export default function AdminOrderDetailPriorityPanel({
   }
 
   const runStatusAction = async (actionKey: string, nextStatus: string, messageLines: string[]) => {
-    const ok = window.confirm(messageLines.join("\n"));
+    const ok = await showAdminConfirm(messageLines.join("\n"));
     if (!ok) return;
 
     setSavingAction(actionKey);

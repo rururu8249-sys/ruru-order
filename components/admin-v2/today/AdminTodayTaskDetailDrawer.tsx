@@ -1,5 +1,6 @@
 "use client";
 
+import { showAdminConfirm } from "@/lib/adminConfirm";
 // components/admin-v2/today/AdminTodayTaskDetailDrawer.tsx
 // 목적: 해결 전까지 뜨는 업무 상세 확인 + 완료메모 입력 / 완료 이력 확인
 // 주의: admin_tasks 완료 처리만 상위에서 실행. 주문/입금/배송/정산 로직 없음.
@@ -49,7 +50,7 @@ export default function AdminTodayTaskDetailDrawer({
   const issueTags = extractIssueTagsFromTaskBody(task.body);
 
   const handleResolve = async () => {
-    const ok = window.confirm(`이 업무를 완료 처리할까요?\n\n${task.title}`);
+    const ok = await showAdminConfirm(`이 업무를 완료 처리할까요?\n\n${task.title}`);
 
     if (!ok) return;
 

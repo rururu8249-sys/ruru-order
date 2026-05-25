@@ -1,5 +1,6 @@
 "use client";
 
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 // components/admin-v2/today/AdminTodayKakaoPanel.tsx
 // 목적: 오늘할일에서 카톡 대화 붙여넣기 + 이슈태그 선택 + ChatGPT 분석문구 복사
@@ -224,7 +225,7 @@ export default function AdminTodayKakaoPanel({
       itemAnalysis.recommendedReply || "-",
     ].join("\n");
 
-    const ok = window.confirm(
+    const ok = await showAdminConfirm(
       `이 카톡 문의를 오늘할일에 등록할까요?\n\n${title}\n\n등록 후 처리완료 전까지 계속 표시됩니다.`
     );
 
@@ -281,7 +282,7 @@ export default function AdminTodayKakaoPanel({
       return;
     }
 
-    const ok = window.confirm(
+    const ok = await showAdminConfirm(
       `${selectedCustomer.youtube_nickname || selectedCustomer.customer_name || "-"} 고객 메모에 카톡 분석 내용을 저장할까요?`
     );
 

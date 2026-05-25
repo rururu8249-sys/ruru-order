@@ -1,5 +1,6 @@
 "use client";
 
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -265,7 +266,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             "금액/상품/배송/송장/자동입금 로직은 변경하지 않습니다.",
           ].join("\n");
 
-    if (!window.confirm(confirmMessage)) return;
+    if (!(await showAdminConfirm(confirmMessage))) return;
 
     setCardStatusAction(action);
 

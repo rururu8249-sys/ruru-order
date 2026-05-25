@@ -1,5 +1,6 @@
 "use client";
 
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 import { canSoftHideOrderGroup } from "@/lib/admin-v2/orderSoftHide";
 // components/admin-v2/AdminV2Client.tsx
@@ -984,7 +985,7 @@ export function AdminV2Client() {
     if (shouldSaveShippedAt) {
       const hasTrackingNumber = group.rows.some((row) => String(row.tracking_number || "").trim());
       if (!hasTrackingNumber) {
-        const ok = confirm(
+        const ok = await showAdminConfirm(
           "송장번호가 아직 없습니다.\n\n그래도 출고완료로 변경할까요?\n출고시간은 저장되고, 송장번호는 나중에 상세보기에서 입력할 수 있습니다."
         );
         if (!ok) return;
@@ -1182,7 +1183,7 @@ export function AdminV2Client() {
     });
 
     if (riskRows.length > 0) {
-      const riskOk = window.confirm(
+      const riskOk = await showAdminConfirm(
         `선택한 주문 중 입금/출고/송장 정보가 있는 주문행 ${riskRows.length}개가 포함되어 있습니다.\\n\\n` +
           "테스트 주문이 확실한 경우에만 진행하세요.\\n" +
           "실제 삭제가 아니라 is_deleted=true 숨김 처리입니다.\\n\\n" +
@@ -1192,7 +1193,7 @@ export function AdminV2Client() {
       if (!riskOk) return;
     }
 
-    const ok = window.confirm(
+    const ok = await showAdminConfirm(
       `선택한 취소주문묶음 ${targetGroups.length}건 / 주문행 ${ids.length}개를 목록에서 숨김 처리할까요?\\n\\n` +
         "숨김 후 주문관리/오늘할일/입금매칭/정산 목록에서 기본적으로 보이지 않습니다.\\n" +
         "DB에서 완전 삭제하는 것은 아닙니다."
@@ -1230,7 +1231,7 @@ export function AdminV2Client() {
     }
 
     const ids = group.rows.map((row) => row.id).filter(Boolean);
-    const ok = confirm(
+    const ok = await showAdminConfirm(
       `송장정보를 저장할까요?\n\n택배사: ${cleanCompany}\n송장번호: ${cleanNumber}\n\n같은 주문묶음 ${ids.length}개 행에 동일하게 저장됩니다.`
     );
 
@@ -1284,7 +1285,7 @@ export function AdminV2Client() {
       return;
     }
 
-    const ok = confirm(
+    const ok = await showAdminConfirm(
       `최종정산금액을 수정할까요?
 
 이전: ${beforeAmount.toLocaleString()}원
