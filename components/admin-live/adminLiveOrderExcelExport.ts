@@ -1,3 +1,4 @@
+import { showAdminToast } from "@/lib/adminToast";
 import ExcelJS from "exceljs";
 import type { LiveOrder, LiveOrderItem } from "./types";
 
@@ -376,7 +377,7 @@ async function writeWorkbook(workbook: ExcelJS.Workbook, fileName: string) {
 
 export async function exportLiveOrdersForRosen(orders: LiveOrder[], meta: ExportMeta) {
   if (!orders.length) {
-    alert("내보낼 주문이 없습니다. 필터 조건을 확인해주세요.");
+    showAdminToast("내보낼 주문이 없습니다. 필터 조건을 확인해주세요.");
     return;
   }
 
@@ -389,7 +390,7 @@ export async function exportLiveOrdersForRosen(orders: LiveOrder[], meta: Export
 
 export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: ExportMeta) {
   if (!orders.length) {
-    alert("내보낼 주문이 없습니다. 필터 조건을 확인해주세요.");
+    showAdminToast("내보낼 주문이 없습니다. 필터 조건을 확인해주세요.");
     return;
   }
 
