@@ -64,6 +64,8 @@ function optionSummary(product: ProductRow) {
 export default function AdminLiveProductListPanel() {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(6);
 
   const loadProducts = async () => {
     setLoading(true);
@@ -82,6 +84,7 @@ export default function AdminLiveProductListPanel() {
       }
 
       setProducts((data || []) as ProductRow[]);
+      setCurrentPage(1);
     } catch (error) {
       const message = error instanceof Error ? error.message : "상품 목록 조회 실패";
       showAdminToast("등록상품 리스트 조회 실패\n\n" + message, "error");
@@ -121,17 +124,28 @@ export default function AdminLiveProductListPanel() {
     );
   }, [products]);
 
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(products.length / pageSize));
+  }, [products.length, pageSize]);
+
+  const safePage = Math.min(currentPage, totalPages);
+
+  const visibleProducts = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return products.slice(start, start + pageSize);
+  }, [products, safePage, pageSize]);
+
   const openQuickProductPanel = () => {
     window.dispatchEvent(new Event("ruru-open-quick-product-panel"));
     showAdminToast("다음 단계에서 빠른상품등록 사이드패널로 연결합니다.", "info");
   };
 
   return (
-    <div className="col-span-12 h-[348px] rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-4">
+    <div className="col-span-12 h-[392px] rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-sm font-black text-slate-950">등록상품 리스트</h2>
-          <p className="mt-1 truncate text-[11px] font-bold text-slate-400">
+          <p className="mt-0.5 truncate text-[10px] font-bold text-slate-400">
             노출 {counts.visible} · 고정 {counts.pinned} · 숨김 {counts.hidden} · 품절 {counts.soldout}
           </p>
         </div>
@@ -162,7 +176,31 @@ export default function AdminLiveProductListPanel() {
         <div className="text-center">관리</div>
       </div>
 
-      <div className="h-[254px] overflow-y-auto pr-1">
+      <div className="mb-2 mt-2 flex items-center justify-between gap-2 text-[10px] font-black text-slate-500">
+        <div>
+          {products.length === 0
+            ? "0개"
+            : `${(safePage - 1) * pageSize + 1}-${Math.min(safePage * pageSize, products.length)} / ${products.length}개`}
+        </div>
+
+        <label className="flex items-center gap-1">
+          <span>페이지당</span>
+          <select
+            value={pageSize}
+            onChange={(event) => {
+              setPageSize(Number(event.target.value));
+              setCurrentPage(1);
+            }}
+            className="rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-[10px] font-black text-slate-700 outline-none"
+          >
+            <option value={6}>6개</option>
+            <option value={10}>10개</option>
+            <option value={20}>20개</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="h-[260px] overflow-y-auto pr-1">
         {loading ? (
           <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 text-xs font-black text-slate-400">
             상품 목록 불러오는 중...
@@ -174,7 +212,7 @@ export default function AdminLiveProductListPanel() {
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {products.map((product, index) => {
+            {visibleProducts.map((product, index) => {
               const info = statusInfo(product);
 
               return (
@@ -183,7 +221,7 @@ export default function AdminLiveProductListPanel() {
                   className="grid grid-cols-[34px_minmax(0,1fr)_92px_50px] items-center gap-2 py-2"
                 >
                   <div className="text-center text-[11px] font-black text-slate-400">
-                    {index + 1}
+                    {(safePage - 1) * pageSize + index + 1}
                   </div>
 
                   <div className="flex min-w-0 items-center gap-2">
@@ -226,6 +264,30 @@ export default function AdminLiveProductListPanel() {
             })}
           </div>
         )}
+      </div>
+
+      <div className="mt-2 flex items-center justify-between gap-2 border-t border-slate-100 pt-2">
+        <button
+          type="button"
+          disabled={safePage <= 1}
+          onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+          className="rounded-xl bg-slate-100 px-3 py-1.5 text-[11px] font-black text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          이전
+        </button>
+
+        <div className="text-[11px] font-black text-slate-500">
+          {safePage} / {totalPages}
+        </div>
+
+        <button
+          type="button"
+          disabled={safePage >= totalPages}
+          onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+          className="rounded-xl bg-slate-100 px-3 py-1.5 text-[11px] font-black text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          다음
+        </button>
       </div>
     </div>
   );

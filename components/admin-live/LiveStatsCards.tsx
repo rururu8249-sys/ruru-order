@@ -70,7 +70,7 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-2 md:grid-cols-5">
+      <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 md:grid-cols-[repeat(3,minmax(0,200px))] xl:grid-cols-[repeat(5,minmax(0,200px))] justify-start">
         {stats.map((stat) => (
           <div key={stat.label} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
             <div className="flex items-center gap-3">
