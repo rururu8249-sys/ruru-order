@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import type { SettlementBroadcastOption, SettlementManualEntry, SettlementManualEntryType } from "./settlementTypes";
+import SettlementManualEntryDetailModal, { type SettlementManualEntryLog } from "./SettlementManualEntryDetailModal";
 import { formatMoneyInput, manualEntryBroadcastKey, manualEntryDateKey, manualEntryLabel, toNumber, won } from "./settlementUtils";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 50];
@@ -56,6 +57,9 @@ export default function SettlementManualEntryPanel({
   const [editingId, setEditingId] = useState("");
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
+  const [detailEntry, setDetailEntry] = useState<SettlementManualEntry | null>(null);
+  const [detailLogs, setDetailLogs] = useState<SettlementManualEntryLog[]>([]);
+  const [detailLogsLoading, setDetailLogsLoading] = useState(false);
 
   const sortedEntries = useMemo(() => {
     return [...entries].sort((a, b) => {
@@ -136,19 +140,30 @@ export default function SettlementManualEntryPanel({
     setSaving(true);
 
     try {
+      const originalEntry = editingId ? entries.find((entry) => String(entry.id || "") === editingId) || null : null;
+
       const query = editingId
         ? supabase.from("settlement_manual_entries").update(payload).eq("id", editingId).select("*").single()
         : supabase.from("settlement_manual_entries").insert(payload).select("*").single();
 
-      const { error } = await query;
+      const { data: savedEntry, error } = await query;
 
       if (error) {
         showAdminToast("수동 매출/지출 저장 실패\n\n" + error.message, "error");
         return;
       }
 
+      await writeEntryLog({
+        entryId: savedEntry?.id,
+        action: editingId ? "update" : "create",
+        beforeValue: originalEntry,
+        afterValue: savedEntry,
+        memo: editingId ? "수동 정산 입력 수정" : "수동 정산 신규 입력",
+      });
+
       showAdminToast(editingId ? "수동 입력 내역을 수정했습니다." : "수동 입력 내역을 추가했습니다.", "success");
       resetForm();
+      closeDetail();
       onChanged();
     } finally {
       setSaving(false);
@@ -164,11 +179,18 @@ export default function SettlementManualEntryPanel({
     setSaving(true);
 
     try {
+      const deletedAt = new Date().toISOString();
+      const afterValue = {
+        ...entry,
+        is_active: false,
+        deleted_at: deletedAt,
+      };
+
       const { error } = await supabase
         .from("settlement_manual_entries")
         .update({
           is_active: false,
-          deleted_at: new Date().toISOString(),
+          deleted_at: deletedAt,
         })
         .eq("id", entry.id);
 
@@ -177,11 +199,76 @@ export default function SettlementManualEntryPanel({
         return;
       }
 
+      await writeEntryLog({
+        entryId: entry.id,
+        action: "delete",
+        beforeValue: entry,
+        afterValue,
+        memo: "수동 정산 입력 삭제 처리",
+      });
+
       showAdminToast("수동 입력 내역을 삭제 처리했습니다.", "success");
+      closeDetail();
       onChanged();
     } finally {
       setSaving(false);
     }
+  };
+
+  const writeEntryLog = async ({
+    entryId,
+    action,
+    beforeValue,
+    afterValue,
+    memo: logMemo,
+  }: {
+    entryId?: string | null;
+    action: SettlementManualEntryLog["action"];
+    beforeValue?: any;
+    afterValue?: any;
+    memo?: string;
+  }) => {
+    if (!entryId) return;
+
+    try {
+      await supabase.from("settlement_manual_entry_logs").insert({
+        entry_id: entryId,
+        action,
+        before_value: beforeValue || null,
+        after_value: afterValue || null,
+        memo: logMemo || null,
+      });
+    } catch (error) {
+      console.warn("settlement manual entry log skipped", error);
+    }
+  };
+
+  const openDetail = async (entry: SettlementManualEntry) => {
+    setDetailEntry(entry);
+    setDetailLogs([]);
+    setDetailLogsLoading(true);
+
+    try {
+      if (!entry.id) return;
+
+      const { data, error } = await supabase
+        .from("settlement_manual_entry_logs")
+        .select("*")
+        .eq("entry_id", entry.id)
+        .order("created_at", { ascending: false });
+
+      if (!error) {
+        setDetailLogs((data || []) as SettlementManualEntryLog[]);
+      }
+    } finally {
+      setDetailLogsLoading(false);
+    }
+  };
+
+  const closeDetail = () => {
+    setDetailEntry(null);
+    setDetailLogs([]);
+    setDetailLogsLoading(false);
   };
 
   const totalIncome = entries.filter((entry) => entry.entry_type === "income").reduce((sum, entry) => sum + toNumber(entry.amount), 0);
@@ -413,6 +500,13 @@ export default function SettlementManualEntryPanel({
                       <div className="flex justify-end gap-2">
                         <button
                           type="button"
+                          onClick={() => openDetail(entry)}
+                          className="rounded-xl border border-blue-200 px-3 py-2 text-xs font-black text-blue-700 hover:bg-blue-50"
+                        >
+                          상세
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => startEdit(entry)}
                           className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-50"
                         >
@@ -493,6 +587,19 @@ export default function SettlementManualEntryPanel({
           </div>
         </div>
       </div>
+      {detailEntry ? (
+        <SettlementManualEntryDetailModal
+          entry={detailEntry}
+          logs={detailLogs}
+          loadingLogs={detailLogsLoading}
+          onClose={closeDetail}
+          onEdit={() => {
+            startEdit(detailEntry);
+            closeDetail();
+          }}
+          onDelete={() => deactivateEntry(detailEntry)}
+        />
+      ) : null}
     </div>
   );
 }
