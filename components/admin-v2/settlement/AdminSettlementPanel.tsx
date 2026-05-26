@@ -130,73 +130,97 @@ export default function AdminSettlementPanel({
   };
 
   const exportSummaryCsv = () => {
-    const summaryRows = [
-      ["구분", "값", "메모"],
-      ["총주문액", stats.totalOrderAmount, "취소/환불 제외 주문 기준"],
-      ["완료매출", stats.paidAmount, "무통장+카드 완료 기준"],
-      ["무통장", stats.bankAmount, "입금확인 완료"],
-      ["카드", stats.cardAmount, "카드 완료"],
-      ["기타매출", stats.manualIncomeAmount, "수동 매출 입력"],
-      ["카드수수료", stats.actualCardFee, `카드 결제완료 × ${actualCardFeeRate}% 또는 주문 저장 수수료율`],
-      ["창고정산/기타지출", stats.warehouseOtherExpense, "수동 지출 연결 예정"],
-      ["지출합계", stats.totalExpense, "카드수수료 + 창고정산/기타지출"],
-      ["미입금/확인필요", stats.unpaidAmount, "실수익 계산 제외"],
-      ["실수익", stats.netAmount, "완료매출 - 지출합계"],
-    ];
+    const escapeCsv = (value: unknown) => {
+      const textValue = String(value ?? "");
+      const escaped = textValue.replace(/"/g, '""');
 
-    const broadcastHeader = [
-      "방송/날짜",
-      "주문건수",
-      "총주문액",
-      "완료매출",
-      "무통장",
-      "카드",
-      "기타매출",
-      "카드수수료",
-      "창고정산/기타지출",
-      "미입금/확인필요",
-      "실수익",
-    ];
+      return `"${escaped}"`;
+    };
 
-    const broadcastCsvRows = broadcastRows.map((row) => [
-      row.label,
-      row.count,
-      row.totalOrderAmount,
-      row.paidAmount,
-      row.bankAmount,
-      row.cardAmount,
-      row.manualIncomeAmount,
-      row.actualCardFee,
-      row.warehouseOtherExpense,
-      row.unpaidAmount,
-      row.netAmount,
-    ]);
+    const numberValue = (value: unknown) => {
+      const number = Number(value || 0);
 
-    const csv = [
-      ["[정산 요약]"],
-      ...summaryRows,
+      return Number.isFinite(number) ? Math.round(number) : 0;
+    };
+
+    const entryTypeLabel = (value: string) => {
+      return value === "income" ? "기타매출" : "창고정산/기타지출";
+    };
+
+    const rows: Array<Array<string | number>> = [
+      ["루루동이 정산통계 내보내기"],
+      ["생성일시", new Date().toLocaleString("ko-KR")],
       [],
-      ["[방송별 정산]"],
-      broadcastHeader,
-      ...broadcastCsvRows,
-      [],
-      ["[필터]"],
+      ["조회조건"],
       ["시작일", startDate || "전체"],
       ["종료일", endDate || "전체"],
       ["결제수단", paymentFilter],
-      ["방송선택", selectedBroadcastKeys.length === 0 ? "전체보기" : `${selectedBroadcastKeys.length}개 선택`],
-      ["참고", `deposits 전달 ${Array.isArray(deposits) ? deposits.length : 0}건`],
-    ]
-      .map((row) => row.map(csvCell).join(","))
-      .join("\n");
+      ["선택 방송 수", selectedBroadcastKeys.length > 0 ? selectedBroadcastKeys.length : "전체"],
+      [],
+      ["정산 요약"],
+      ["항목", "금액", "건수/메모"],
+      ["총주문액", numberValue(stats.totalOrderAmount), `${stats.orderCount.toLocaleString()}건`],
+      ["완료매출", numberValue(stats.paidAmount), `${stats.paidCount.toLocaleString()}건`],
+      ["무통장", numberValue(stats.bankAmount), `${stats.bankCount.toLocaleString()}건`],
+      ["카드", numberValue(stats.cardAmount), `${stats.cardCount.toLocaleString()}건`],
+      ["기타매출", numberValue(stats.manualIncomeAmount), `${stats.manualIncomeCount.toLocaleString()}건`],
+      ["카드수수료", -numberValue(stats.actualCardFee), `카드 결제완료 기준 ${actualCardFeeRate}%`],
+      ["창고정산/기타지출", -numberValue(stats.warehouseOtherExpense), `${stats.manualExpenseCount.toLocaleString()}건`],
+      ["미입금/확인필요", numberValue(stats.unpaidAmount), "실수익 계산 제외"],
+      ["실수익", numberValue(stats.netAmount), "완료매출 + 기타매출 - 지출"],
+      [],
+      ["방송별 정산 리스트"],
+      [
+        "방송/날짜",
+        "날짜",
+        "주문건수",
+        "총주문액",
+        "완료매출",
+        "무통장",
+        "카드",
+        "기타매출",
+        "카드수수료",
+        "창고정산/기타지출",
+        "미입금/확인필요",
+        "실수익",
+      ],
+      ...broadcastRows.map((row) => [
+        row.label,
+        row.dateKey,
+        row.count,
+        numberValue(row.totalOrderAmount),
+        numberValue(row.paidAmount),
+        numberValue(row.bankAmount),
+        numberValue(row.cardAmount),
+        numberValue(row.manualIncomeAmount),
+        -numberValue(row.actualCardFee),
+        -numberValue(row.warehouseOtherExpense),
+        numberValue(row.unpaidAmount),
+        numberValue(row.netAmount),
+      ]),
+      [],
+      ["추가 정산 내역"],
+      ["날짜", "구분", "제목", "금액", "연결 방송", "메모"],
+      ...manualEntriesInScope.map((entry) => [
+        String(entry.entry_date || ""),
+        entryTypeLabel(entry.entry_type),
+        entry.title || "",
+        entry.entry_type === "expense" ? -numberValue(entry.amount) : numberValue(entry.amount),
+        entry.broadcast_label || "",
+        entry.memo || "",
+      ]),
+    ];
 
-    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+    const csv = rows.map((row) => row.map(escapeCsv).join(",")).join("\n");
+    const bom = "\ufeff";
+    const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
+    const anchor = document.createElement("a");
+    const exportDate = new Date().toISOString().slice(0, 10);
 
-    link.href = url;
-    link.download = `ruru_settlement_stats_${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
+    anchor.href = url;
+    anchor.download = `ruru_settlement_${exportDate}.csv`;
+    anchor.click();
 
     URL.revokeObjectURL(url);
   };
@@ -227,7 +251,7 @@ export default function AdminSettlementPanel({
               onClick={exportSummaryCsv}
               className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
             >
-              엑셀용 CSV 내보내기
+              정산 CSV 내보내기
             </button>
           </div>
         </div>
