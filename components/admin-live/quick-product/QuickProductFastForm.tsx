@@ -1,12 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import QuickProductImageDropzone from "./QuickProductImageDropzone";
 
+type ProductRow = Record<string, unknown>;
+
 type QuickProductFastFormProps = {
   activeBroadcastId: string | number | null;
+  initialProduct?: ProductRow | null;
   onClose?: () => void;
 };
 
@@ -22,6 +25,90 @@ const SIZE_PRESETS = ["FREE", "S-M-L", "XS-XL", "90-115", "신발 220-290"];
 
 function onlyNumber(value: string) {
   return String(value || "").replace(/[^0-9]/g, "");
+}
+
+function pickString(row: ProductRow | null | undefined, keys: string[], fallback = "") {
+  if (!row) return fallback;
+
+  for (const key of keys) {
+    const value = row[key];
+
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+
+  return fallback;
+}
+
+function pickNumber(row: ProductRow | null | undefined, keys: string[], fallback = 0) {
+  if (!row) return fallback;
+
+  for (const key of keys) {
+    const value = row[key];
+
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+
+    if (typeof value === "string") {
+      const parsed = Number(value.replace(/[^0-9.-]/g, ""));
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+
+  return fallback;
+}
+
+function pickBoolean(row: ProductRow | null | undefined, keys: string[], fallback = false) {
+  if (!row) return fallback;
+
+  for (const key of keys) {
+    const value = row[key];
+
+    if (typeof value === "boolean") return value;
+
+    if (typeof value === "string") {
+      const normalized = value.toLowerCase().trim();
+      if (["true", "1", "yes", "y", "on", "visible", "판매중", "노출"].includes(normalized)) return true;
+      if (["false", "0", "no", "n", "off", "hidden", "숨김"].includes(normalized)) return false;
+    }
+  }
+
+  return fallback;
+}
+
+function pickArray(row: ProductRow | null | undefined, keys: string[]) {
+  if (!row) return [];
+
+  for (const key of keys) {
+    const value = row[key];
+
+    if (Array.isArray(value)) {
+      return value.map((item) => String(item || "").trim()).filter(Boolean);
+    }
+
+    if (typeof value === "string" && value.trim()) {
+      return value
+        .split(/[,/|]+/g)
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+  }
+
+  return [];
+}
+
+function parseProductNote(row: ProductRow | null | undefined) {
+  const raw = pickString(row, ["product_note", "note", "memo"], "");
+
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw) as {
+      stock_mode?: "total" | "option";
+      stock_variants?: Array<{ color?: string; size?: string; stock?: number }>;
+    };
+  } catch {
+    return null;
+  }
 }
 
 function moneyNumber(value: string) {
@@ -86,6 +173,46 @@ function getMissingColumn(errorMessage: string) {
   return "";
 }
 
+
+async function updateProductSchemaSafe(productId: string, payload: Record<string, unknown>) {
+  const requiredColumns = new Set(["product_name"]);
+  const workingPayload = { ...payload };
+  const removedColumns: string[] = [];
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const { data, error } = await supabase
+      .from("products")
+      .update(workingPayload)
+      .eq("id", productId)
+      .select("id")
+      .single();
+
+    if (!error) {
+      return {
+        data,
+        removedColumns,
+      };
+    }
+
+    const missingColumn = getMissingColumn(error.message || "");
+
+    if (!missingColumn || !(missingColumn in workingPayload)) {
+      throw error;
+    }
+
+    if (requiredColumns.has(missingColumn)) {
+      throw new Error(
+        `products.${missingColumn} 컬럼이 없어서 상품명을 저장할 수 없습니다. Supabase products 스키마 확인이 필요합니다.`,
+      );
+    }
+
+    delete workingPayload[missingColumn];
+    removedColumns.push(missingColumn);
+  }
+
+  throw new Error("products 수정 재시도 횟수를 초과했습니다.");
+}
+
 async function insertProductSchemaSafe(payload: Record<string, unknown>) {
   const requiredColumns = new Set(["product_name"]);
   const workingPayload = { ...payload };
@@ -126,6 +253,7 @@ async function insertProductSchemaSafe(payload: Record<string, unknown>) {
 
 export default function QuickProductFastForm({
   activeBroadcastId,
+  initialProduct = null,
   onClose,
 }: QuickProductFastFormProps) {
   const [productType, setProductType] = useState<"broadcast" | "group_buy">("broadcast");
@@ -147,6 +275,48 @@ export default function QuickProductFastForm({
 
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const editingProductId = pickString(initialProduct, ["id", "product_id", "uuid"], "");
+  const isEditMode = Boolean(editingProductId);
+
+  useEffect(() => {
+    if (!initialProduct) return;
+
+    const productNote = parseProductNote(initialProduct);
+    const noteVariants = productNote?.stock_variants || [];
+
+    setProductType(
+      pickString(initialProduct, ["product_type", "type"], "broadcast") === "group_buy"
+        ? "group_buy"
+        : "broadcast",
+    );
+    setProductName(pickString(initialProduct, ["product_name", "name", "title"], ""));
+    setPriceText(String(pickNumber(initialProduct, ["price", "sale_price", "selling_price"], 0) || ""));
+    setShippingType(pickString(initialProduct, ["shipping_type", "delivery_type"], "normal"));
+    setIsVisible(pickBoolean(initialProduct, ["is_visible", "visible"], true));
+    setIsPinned(pickBoolean(initialProduct, ["is_pinned", "pinned"], false));
+    setCoverImages(pickArray(initialProduct, ["image_url", "cover_image_url", "main_image_url"]).slice(0, 1));
+    setDetailImages(pickArray(initialProduct, ["detail_image_urls", "detail_images", "images"]).slice(0, 5));
+    setColorText(pickArray(initialProduct, ["color_options", "colors"]).join(", "));
+    setSizeText(pickArray(initialProduct, ["size_options", "sizes"]).join(", "));
+    setDescription(pickString(initialProduct, ["product_description", "description", "detail_description"], ""));
+
+    if (noteVariants.length > 0) {
+      setStockMode("option");
+      setVariantRows(
+        noteVariants.map((row) => ({
+          key: `${row.color || "옵션없음"}__${row.size || "옵션없음"}`,
+          color: row.color || "옵션없음",
+          size: row.size || "옵션없음",
+          stock: Number(row.stock || 0),
+        })),
+      );
+    } else {
+      setStockMode("total");
+      setTotalStockText(String(pickNumber(initialProduct, ["stock", "total_stock"], 0) || 0));
+      setVariantRows([]);
+    }
+  }, [initialProduct]);
 
   const colors = useMemo(() => unique(splitOptions(colorText)), [colorText]);
   const sizes = useMemo(() => unique(splitOptions(sizeText)), [sizeText]);
@@ -251,10 +421,13 @@ export default function QuickProductFastForm({
         product_note: productNote,
       };
 
-      const result = await insertProductSchemaSafe(payload);
+      const result = isEditMode
+        ? await updateProductSchemaSafe(editingProductId, payload)
+        : await insertProductSchemaSafe(payload);
+
       const productId = result.data?.id;
 
-      if (productType === "broadcast" && activeBroadcastId && productId) {
+      if (!isEditMode && productType === "broadcast" && activeBroadcastId && productId) {
         const { error: linkError } = await supabase
           .from("broadcast_products")
           .insert({
@@ -585,7 +758,7 @@ export default function QuickProductFastForm({
           onClick={() => void saveProduct(false)}
           className="h-12 flex-1 rounded-xl border border-blue-200 bg-white text-sm font-black text-blue-600 disabled:opacity-50"
         >
-          {saving ? "저장중..." : "저장 후 계속등록"}
+          {saving ? "저장중..." : isEditMode ? "수정 저장" : "저장 후 계속등록"}
         </button>
 
         <button
@@ -594,7 +767,7 @@ export default function QuickProductFastForm({
           onClick={() => void saveProduct(true)}
           className="h-12 flex-1 rounded-xl bg-blue-600 text-sm font-black text-white disabled:opacity-50"
         >
-          저장 후 닫기
+          {isEditMode ? "수정 후 닫기" : "저장 후 닫기"}
         </button>
       </div>
     </div>

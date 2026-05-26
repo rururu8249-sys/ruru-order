@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { showAdminToast } from "@/lib/adminToast";
 
 type ProductRow = Record<string, unknown>;
 
@@ -100,22 +101,14 @@ function money(value: unknown) {
   return `${Number(value || 0).toLocaleString("ko-KR")}원`;
 }
 
-function getProductId(row: ProductRow, index: number) {
+function getProductId(row: ProductRow, index = 0) {
   return pickString(row, ["id", "product_id", "uuid", "code"], `product-${index}`);
 }
 
 function getProductName(row: ProductRow) {
   return pickString(
     row,
-    [
-      "product_name",
-      "name",
-      "title",
-      "display_name",
-      "item_name",
-      "goods_name",
-      "label",
-    ],
+    ["product_name", "name", "title", "display_name", "item_name", "goods_name", "label"],
     "상품명 없음",
   );
 }
@@ -123,14 +116,7 @@ function getProductName(row: ProductRow) {
 function getProductPrice(row: ProductRow) {
   return pickNumber(
     row,
-    [
-      "sale_price",
-      "selling_price",
-      "price",
-      "amount",
-      "product_price",
-      "unit_price",
-    ],
+    ["sale_price", "selling_price", "price", "amount", "product_price", "unit_price"],
     0,
   );
 }
@@ -169,6 +155,7 @@ function statusInfo(row: ProductRow) {
   if (isSoldout || /품절|sold/.test(raw)) {
     return {
       label: "품절",
+      isVisible: false,
       className: "bg-rose-50 text-rose-700 ring-rose-100",
     };
   }
@@ -176,35 +163,73 @@ function statusInfo(row: ProductRow) {
   if (!isVisible || /숨김|hidden|off|inactive/.test(raw)) {
     return {
       label: "숨김",
+      isVisible: false,
       className: "bg-slate-100 text-slate-500 ring-slate-200",
     };
   }
 
   return {
     label: "노출",
+    isVisible: true,
     className: "bg-emerald-50 text-emerald-700 ring-emerald-100",
   };
 }
 
 function optionSummary(row: ProductRow) {
-  const colors = pickArray(row, [
-    "color_options",
-    "colors",
-    "color_list",
-    "available_colors",
-  ]);
-
-  const sizes = pickArray(row, [
-    "size_options",
-    "sizes",
-    "size_list",
-    "available_sizes",
-  ]);
+  const colors = pickArray(row, ["color_options", "colors", "color_list", "available_colors"]);
+  const sizes = pickArray(row, ["size_options", "sizes", "size_list", "available_sizes"]);
 
   const colorText = colors.length ? colors.slice(0, 2).join(", ") : "색상없음";
   const sizeText = sizes.length ? sizes.slice(0, 3).join(", ") : "사이즈없음";
 
   return `${colorText} / ${sizeText}`;
+}
+
+function getMissingColumn(errorMessage: string) {
+  const patterns = [
+    /Could not find the '([^']+)' column/i,
+    /column "([^"]+)" does not exist/i,
+    /Could not find column '([^']+)'/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = errorMessage.match(pattern);
+
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  return "";
+}
+
+async function updateProductSchemaSafe(productId: string, payload: Record<string, unknown>) {
+  const workingPayload = { ...payload };
+  const removedColumns: string[] = [];
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const { error } = await supabase
+      .from("products")
+      .update(workingPayload)
+      .eq("id", productId);
+
+    if (!error) {
+      return {
+        removedColumns,
+      };
+    }
+
+    const missingColumn = getMissingColumn(error.message || "");
+
+    if (!missingColumn || !(missingColumn in workingPayload)) {
+      throw error;
+    }
+
+    delete workingPayload[missingColumn];
+    removedColumns.push(missingColumn);
+  }
+
+  throw new Error("products 수정 재시도 횟수를 초과했습니다.");
 }
 
 export default function AdminLiveProductListPanel({
@@ -215,6 +240,7 @@ export default function AdminLiveProductListPanel({
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [draggingId, setDraggingId] = useState("");
 
   const pageSize = 8;
 
@@ -257,7 +283,6 @@ export default function AdminLiveProductListPanel({
       setCurrentPage(1);
     } catch (error) {
       const message = error instanceof Error ? error.message : "상품 목록 조회 실패";
-
       console.warn("[AdminLiveProductListPanel] products load failed:", message);
       setProducts([]);
       setLoadError(message);
@@ -326,6 +351,76 @@ export default function AdminLiveProductListPanel({
     window.dispatchEvent(new Event("ruru-open-quick-product-panel"));
   };
 
+  const openEditProductPanel = (product: ProductRow) => {
+    window.dispatchEvent(
+      new CustomEvent("ruru-edit-quick-product", {
+        detail: product,
+      }),
+    );
+  };
+
+  const toggleVisible = async (product: ProductRow) => {
+    const productId = getProductId(product);
+    const info = statusInfo(product);
+    const nextVisible = !info.isVisible;
+
+    if (!productId || productId.startsWith("product-")) {
+      showAdminToast("상품 ID를 찾지 못해 상태 변경을 할 수 없습니다.", "error");
+      return;
+    }
+
+    try {
+      await updateProductSchemaSafe(productId, {
+        is_visible: nextVisible,
+        status: nextVisible ? "판매중" : "숨김",
+      });
+
+      showAdminToast(nextVisible ? "상품을 노출로 변경했습니다." : "상품을 숨김으로 변경했습니다.", "success");
+      await loadProducts();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "상태 변경 실패";
+      showAdminToast("상품 상태 변경 실패\n\n" + message, "error");
+    }
+  };
+
+  const saveReorder = async (nextProducts: ProductRow[]) => {
+    try {
+      for (let index = 0; index < nextProducts.length; index += 1) {
+        const productId = getProductId(nextProducts[index], index);
+
+        if (!productId || productId.startsWith("product-")) {
+          continue;
+        }
+
+        await updateProductSchemaSafe(productId, {
+          sort_order: index + 1,
+        });
+      }
+
+      showAdminToast("상품 순서를 저장했습니다.", "success");
+      window.dispatchEvent(new Event("ruru-live-product-updated"));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "순서 저장 실패";
+      showAdminToast("상품 순서 저장 실패\n\n" + message, "error");
+    }
+  };
+
+  const moveProduct = (fromId: string, toId: string) => {
+    if (!fromId || !toId || fromId === toId) return;
+
+    const fromIndex = products.findIndex((product, index) => getProductId(product, index) === fromId);
+    const toIndex = products.findIndex((product, index) => getProductId(product, index) === toId);
+
+    if (fromIndex < 0 || toIndex < 0) return;
+
+    const nextProducts = products.slice();
+    const [moved] = nextProducts.splice(fromIndex, 1);
+    nextProducts.splice(toIndex, 0, moved);
+
+    setProducts(nextProducts);
+    void saveReorder(nextProducts);
+  };
+
   const heightClass = fillHeight ? "h-full" : "h-[480px]";
 
   return (
@@ -363,7 +458,7 @@ export default function AdminLiveProductListPanel({
         </div>
       </div>
 
-      <div className="grid min-w-0 shrink-0 grid-cols-[34px_minmax(0,1fr)_82px_42px] border-y border-slate-100 py-2 text-[10px] font-black text-slate-400">
+      <div className="grid min-w-0 shrink-0 grid-cols-[34px_minmax(0,1fr)_82px_58px] border-y border-slate-100 py-2 text-[10px] font-black text-slate-400">
         <div>순서</div>
         <div>상품정보</div>
         <div className="text-center">상태</div>
@@ -376,7 +471,7 @@ export default function AdminLiveProductListPanel({
             ? "0개"
             : `${(safePage - 1) * pageSize + 1}-${Math.min(safePage * pageSize, products.length)} / ${products.length}개`}
         </div>
-        <div>기본 {pageSize}개</div>
+        <div>순서는 왼쪽 점을 잡고 이동</div>
       </div>
 
       <div className="mt-2 min-h-0 flex-1 overflow-y-auto pr-1">
@@ -397,17 +492,34 @@ export default function AdminLiveProductListPanel({
         ) : (
           <div className="divide-y divide-slate-100">
             {visibleProducts.map((product, index) => {
+              const realIndex = (safePage - 1) * pageSize + index;
+              const productId = getProductId(product, realIndex);
               const info = statusInfo(product);
               const imageUrl = getProductImage(product);
               const pinned = pickBoolean(product, ["is_pinned", "pinned"], false);
 
               return (
                 <div
-                  key={getProductId(product, index)}
-                  className="grid grid-cols-[34px_minmax(0,1fr)_82px_42px] items-center gap-2 py-2"
+                  key={productId}
+                  draggable
+                  onDragStart={() => setDraggingId(productId)}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    moveProduct(draggingId, productId);
+                    setDraggingId("");
+                  }}
+                  onDragEnd={() => setDraggingId("")}
+                  className={[
+                    "grid grid-cols-[34px_minmax(0,1fr)_82px_58px] items-center gap-2 py-2",
+                    draggingId === productId ? "opacity-40" : "",
+                  ].join(" ")}
                 >
-                  <div className="text-center text-[11px] font-black text-slate-400">
-                    {(safePage - 1) * pageSize + index + 1}
+                  <div
+                    title="꾹 잡고 순서 이동"
+                    className="cursor-grab text-center text-[13px] font-black text-slate-400 active:cursor-grabbing"
+                  >
+                    ⋮⋮
                   </div>
 
                   <div className="flex min-w-0 items-center gap-2">
@@ -437,13 +549,23 @@ export default function AdminLiveProductListPanel({
                   </div>
 
                   <div className="flex justify-center">
-                    <span className={`rounded-full px-2 py-1 text-[10px] font-black ring-1 ${info.className}`}>
+                    <button
+                      type="button"
+                      onClick={() => void toggleVisible(product)}
+                      className={`rounded-full px-2 py-1 text-[10px] font-black ring-1 ${info.className}`}
+                    >
                       {info.label}
-                    </span>
+                    </button>
                   </div>
 
-                  <div className="text-center text-[11px] font-black text-slate-400">
-                    -
+                  <div className="flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => openEditProductPanel(product)}
+                      className="rounded-lg bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600 hover:bg-slate-200"
+                    >
+                      수정
+                    </button>
                   </div>
                 </div>
               );

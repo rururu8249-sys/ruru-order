@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import QuickProductFastForm from "./quick-product/QuickProductFastForm";
 
+type ProductRow = Record<string, unknown>;
+
 type AdminLiveQuickProductDrawerProps = {
   activeBroadcastId: string | number | null;
 };
@@ -11,17 +13,32 @@ export default function AdminLiveQuickProductDrawer({
   activeBroadcastId,
 }: AdminLiveQuickProductDrawerProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<ProductRow | null>(null);
 
   useEffect(() => {
-    const openDrawer = () => setIsOpen(true);
-    const closeDrawer = () => setIsOpen(false);
+    const openDrawer = () => {
+      setEditingProduct(null);
+      setIsOpen(true);
+    };
+
+    const closeDrawer = () => {
+      setIsOpen(false);
+    };
+
+    const editDrawer = (event: Event) => {
+      const customEvent = event as CustomEvent<ProductRow>;
+      setEditingProduct(customEvent.detail || null);
+      setIsOpen(true);
+    };
 
     window.addEventListener("ruru-open-quick-product-panel", openDrawer);
     window.addEventListener("ruru-close-quick-product-panel", closeDrawer);
+    window.addEventListener("ruru-edit-quick-product", editDrawer);
 
     return () => {
       window.removeEventListener("ruru-open-quick-product-panel", openDrawer);
       window.removeEventListener("ruru-close-quick-product-panel", closeDrawer);
+      window.removeEventListener("ruru-edit-quick-product", editDrawer);
     };
   }, []);
 
@@ -55,9 +72,13 @@ export default function AdminLiveQuickProductDrawer({
       <aside className="absolute right-0 top-0 flex h-full w-full max-w-[780px] flex-col bg-slate-50 shadow-2xl">
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
           <div className="min-w-0">
-            <h2 className="text-lg font-black text-slate-950">빠른상품등록</h2>
+            <h2 className="text-lg font-black text-slate-950">
+              {editingProduct ? "상품수정" : "빠른상품등록"}
+            </h2>
             <p className="mt-1 text-xs font-bold text-slate-500">
-              등록상품 리스트 없이, 방송 중 바로 입력·저장하는 전용 폼입니다.
+              {editingProduct
+                ? "등록된 상품 내용을 빠르게 수정합니다."
+                : "등록상품 리스트 없이, 방송 중 바로 입력·저장하는 전용 폼입니다."}
             </p>
           </div>
 
@@ -71,7 +92,9 @@ export default function AdminLiveQuickProductDrawer({
         </div>
 
         <QuickProductFastForm
+          key={editingProduct ? String(editingProduct.id || "edit") : "new"}
           activeBroadcastId={activeBroadcastId}
+          initialProduct={editingProduct}
           onClose={() => setIsOpen(false)}
         />
       </aside>
