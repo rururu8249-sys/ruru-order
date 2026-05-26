@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import LiveProductRegistrationPanel from "./LiveProductRegistrationPanel";
+import QuickProductFastForm from "./quick-product/QuickProductFastForm";
 
 type AdminLiveQuickProductDrawerProps = {
   activeBroadcastId: string | number | null;
@@ -41,36 +41,6 @@ export default function AdminLiveQuickProductDrawer({
     };
   }, [isOpen]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    let count = 0;
-
-    const timer = window.setInterval(() => {
-      count += 1;
-
-      const root = document.querySelector("[data-ruru-quick-product-drawer]");
-      const buttons = Array.from(root?.querySelectorAll("button") || []);
-      const openButton = buttons.find((button) => {
-        const text = button.textContent || "";
-        return text.includes("열기") || text.includes("펼치기");
-      });
-
-      if (openButton instanceof HTMLButtonElement) {
-        openButton.click();
-        window.clearInterval(timer);
-      }
-
-      if (count >= 8) {
-        window.clearInterval(timer);
-      }
-    }, 120);
-
-    return () => {
-      window.clearInterval(timer);
-    };
-  }, [isOpen]);
-
   if (!isOpen) return null;
 
   return (
@@ -82,17 +52,12 @@ export default function AdminLiveQuickProductDrawer({
         className="absolute inset-0 bg-slate-950/35"
       />
 
-      <aside
-        data-ruru-quick-product-drawer
-        className="absolute right-0 top-0 flex h-full w-full max-w-[760px] flex-col bg-slate-50 shadow-2xl"
-      >
+      <aside className="absolute right-0 top-0 flex h-full w-full max-w-[780px] flex-col bg-slate-50 shadow-2xl">
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
           <div className="min-w-0">
-            <h2 className="text-lg font-black text-slate-950">
-              빠른상품등록
-            </h2>
+            <h2 className="text-lg font-black text-slate-950">빠른상품등록</h2>
             <p className="mt-1 text-xs font-bold text-slate-500">
-              방송 화면은 그대로 두고, 상품만 오른쪽 패널에서 빠르게 등록합니다.
+              등록상품 리스트 없이, 방송 중 바로 입력·저장하는 전용 폼입니다.
             </p>
           </div>
 
@@ -105,9 +70,10 @@ export default function AdminLiveQuickProductDrawer({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          <LiveProductRegistrationPanel activeBroadcastId={activeBroadcastId} />
-        </div>
+        <QuickProductFastForm
+          activeBroadcastId={activeBroadcastId}
+          onClose={() => setIsOpen(false)}
+        />
       </aside>
     </div>
   );
