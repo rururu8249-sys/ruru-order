@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { ChangeEvent, DragEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
-import QuickProductImageDropzone from "./QuickProductImageDropzone";
+import { resolveProductImageUrl } from "./productImageUrl";
 
 type ProductRow = Record<string, unknown>;
 
@@ -18,6 +18,15 @@ type VariantStockRow = {
   color: string;
   size: string;
   stock: number;
+};
+
+type CompactImageTileProps = {
+  label: string;
+  value: string[];
+  maxFiles: number;
+  uploadKind: "cover" | "detail";
+  compact?: boolean;
+  onChange: (nextValue: string[]) => void;
 };
 
 const COLOR_PRESETS = ["블랙", "화이트", "베이지", "네이비", "그레이"];
@@ -292,6 +301,181 @@ async function updateProductSchemaSafe(productId: string, payload: Record<string
   throw new Error("products 수정 재시도 횟수를 초과했습니다.");
 }
 
+function CompactImageTile({
+  label,
+  value,
+  maxFiles,
+  uploadKind,
+  compact = false,
+  onChange,
+}: CompactImageTileProps) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const uploadFiles = async (files: FileList | File[]) => {
+    const safeFiles = Array.from(files).filter((file) => file.type.startsWith("image/"));
+
+    if (safeFiles.length === 0) {
+      showAdminToast("이미지 파일만 등록할 수 있습니다.", "error");
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      const uploaded: string[] = [];
+
+      for (const file of safeFiles.slice(0, maxFiles)) {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("kind", uploadKind);
+
+        const response = await fetch("/api/admin-live/product-images/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok || payload?.ok === false) {
+          throw new Error(payload?.message || "이미지 업로드 실패");
+        }
+
+        uploaded.push(String(payload?.url || payload?.publicUrl || payload?.path || ""));
+      }
+
+      const nextValue = unique([...value, ...uploaded]).slice(0, maxFiles);
+      onChange(nextValue);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "이미지 업로드 실패";
+      showAdminToast("이미지 업로드 실패\n\n" + message, "error");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files) {
+      void uploadFiles(event.target.files);
+    }
+
+    event.target.value = "";
+  };
+
+  const handleDrop = (event: DragEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+
+    if (event.dataTransfer.files) {
+      void uploadFiles(event.dataTransfer.files);
+    }
+  };
+
+  const imageSlots = Array.from({ length: maxFiles }, (_, index) => value[index] || "");
+
+  return (
+    <div className="min-w-0">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="text-[11px] font-black text-slate-700">{label}</span>
+        <span className="text-[10px] font-black text-slate-400">
+          {value.length}/{maxFiles}
+        </span>
+      </div>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        multiple={maxFiles > 1}
+        className="hidden"
+        onChange={handleFileChange}
+      />
+
+      {compact ? (
+        <div className="grid grid-cols-5 gap-1.5">
+          {imageSlots.map((image, index) => (
+            <button
+              key={`${image || "empty"}-${index}`}
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={handleDrop}
+              className="relative flex h-[58px] items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-200 bg-slate-50 text-[10px] font-black text-slate-400 hover:border-blue-300"
+            >
+              {image ? (
+                <>
+                  <img
+                    src={resolveProductImageUrl(image)}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onChange(value.filter((_, removeIndex) => removeIndex !== index));
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.stopPropagation();
+                        onChange(value.filter((_, removeIndex) => removeIndex !== index));
+                      }
+                    }}
+                    className="absolute right-1 top-1 rounded-full bg-slate-950/70 px-1.5 py-0.5 text-[9px] text-white"
+                  >
+                    삭제
+                  </span>
+                </>
+              ) : index === value.length ? (
+                <span>{uploading ? "업로드" : "+ 추가"}</span>
+              ) : (
+                <span>사진 없음</span>
+              )}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={handleDrop}
+          className="relative flex h-[132px] w-full items-center justify-center overflow-hidden rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-xs font-black text-slate-400 hover:border-blue-300"
+        >
+          {value[0] ? (
+            <>
+              <img
+                src={resolveProductImageUrl(value[0])}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onChange([]);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.stopPropagation();
+                    onChange([]);
+                  }
+                }}
+                className="absolute right-2 top-2 rounded-full bg-slate-950/75 px-2 py-1 text-[10px] text-white"
+              >
+                삭제
+              </span>
+            </>
+          ) : (
+            <span>{uploading ? "업로드 중..." : "클릭/드래그"}</span>
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function QuickProductFastForm({
   activeBroadcastId,
   initialProduct = null,
@@ -509,319 +693,311 @@ export default function QuickProductFastForm({
     }
   };
 
+  const buttonClass = "h-8 rounded-xl px-3 text-[11px] font-black";
+  const inactiveButtonClass = "bg-slate-100 text-slate-600 hover:bg-slate-200";
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="grid min-h-0 flex-1 grid-rows-[190px_112px_72px_112px_minmax(128px,1fr)] gap-3 overflow-hidden px-6 py-4">
-        <div className="grid min-h-0 grid-cols-[220px_minmax(0,1fr)] gap-4">
-          <QuickProductImageDropzone
-            label="대표사진"
-            description="없으면 사진 없는 상품으로 저장"
-            value={coverImages}
-            maxFiles={1}
-            multiple={false}
-            uploadKind="cover"
-            onChange={(nextValue) => {
-              const next = Array.isArray(nextValue) ? nextValue : nextValue ? [nextValue] : [];
-              setCoverImages(next.slice(0, 1));
-            }}
-          />
+      <div className="min-h-0 flex-1 overflow-hidden px-5 py-4">
+        <div className="grid min-h-full grid-rows-[142px_66px_78px_112px_minmax(122px,1fr)] gap-3">
+          <section className="grid min-h-0 grid-cols-[140px_minmax(0,1fr)] gap-4">
+            <CompactImageTile
+              label="대표사진"
+              value={coverImages}
+              maxFiles={1}
+              uploadKind="cover"
+              onChange={setCoverImages}
+            />
 
-          <QuickProductImageDropzone
-            label="상세사진 최대 5장"
-            description="클릭 또는 드래그앤드롭"
-            value={detailImages}
-            maxFiles={5}
-            multiple
-            uploadKind="detail"
-            onChange={(nextValue) => {
-              const next = Array.isArray(nextValue) ? nextValue : nextValue ? [nextValue] : [];
-              setDetailImages(next.slice(0, 5));
-            }}
-          />
-        </div>
+            <div className="grid min-h-0 grid-rows-[40px_58px_1fr] gap-2">
+              <div className="grid grid-cols-[minmax(0,1fr)_150px] gap-2">
+                <label className="min-w-0">
+                  <span className="sr-only">상품명</span>
+                  <input
+                    value={productName}
+                    onChange={(event) => setProductName(event.target.value)}
+                    placeholder="상품명"
+                    className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm font-black outline-none focus:border-blue-400"
+                  />
+                </label>
 
-        <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_190px] gap-3">
-          <div className="min-w-0">
-            <label className="block">
-              <span className="text-xs font-black text-slate-700">상품명</span>
-              <input
-                value={productName}
-                onChange={(event) => setProductName(event.target.value)}
-                placeholder="상품명을 입력하세요."
-                className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm font-black outline-none focus:border-blue-400"
-              />
-            </label>
+                <label>
+                  <span className="sr-only">판매가</span>
+                  <div className="flex h-10 items-center rounded-xl border border-slate-200 px-3 focus-within:border-blue-400">
+                    <input
+                      value={formatNumberWithComma(priceText)}
+                      onChange={(event) => setPriceText(onlyNumber(event.target.value))}
+                      placeholder="55,000"
+                      className="min-w-0 flex-1 text-right text-sm font-black outline-none"
+                    />
+                    <span className="ml-1 text-xs font-black text-slate-400">원</span>
+                  </div>
+                </label>
+              </div>
 
-            <label className="mt-2 block">
-              <span className="text-xs font-black text-slate-700">상세설명</span>
               <textarea
                 value={description}
                 onChange={(event) => setDescription(normalizeTextareaText(event.target.value))}
-                placeholder="소재, 핏, 주의사항, 교환/환불 안내 등을 짧게 적어주세요."
-                className="mt-1 h-[54px] w-full resize-none rounded-xl border border-slate-200 p-3 text-xs font-bold leading-5 outline-none focus:border-blue-400"
+                placeholder="상세설명: 소재, 핏, 주의사항, 교환/환불 안내"
+                className="h-[58px] w-full resize-none rounded-xl border border-slate-200 p-2.5 text-xs font-bold leading-5 outline-none focus:border-blue-400"
               />
-            </label>
-          </div>
 
-          <label className="block">
-            <span className="text-xs font-black text-slate-700">판매가</span>
-            <div className="mt-1 flex h-10 items-center rounded-xl border border-slate-200 px-3 focus-within:border-blue-400">
-              <input
-                value={formatNumberWithComma(priceText)}
-                onChange={(event) => setPriceText(onlyNumber(event.target.value))}
-                placeholder="0"
-                className="min-w-0 flex-1 text-right text-sm font-black outline-none"
+              <CompactImageTile
+                label="상세사진 최대 5장"
+                value={detailImages}
+                maxFiles={5}
+                uploadKind="detail"
+                compact
+                onChange={setDetailImages}
               />
-              <span className="ml-1 text-xs font-black text-slate-400">원</span>
             </div>
+          </section>
 
-            <div className="mt-3 rounded-xl bg-blue-50 px-3 py-2 text-[11px] font-bold leading-4 text-blue-700">
-              금액은 자동으로 쉼표 표시됩니다.
-            </div>
-          </label>
-        </div>
-
-        <div className="grid min-h-0 grid-cols-4 gap-3">
-          <div>
-            <div className="mb-1 text-xs font-black text-slate-700">상품구분</div>
-            <div className="grid grid-cols-2 gap-1">
-              {[
-                ["broadcast", "방송"],
-                ["group_buy", "공구"],
-              ].map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setProductType(value as "broadcast" | "group_buy")}
-                  className={[
-                    "h-9 rounded-xl text-xs font-black",
-                    productType === value ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600",
-                  ].join(" ")}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-1 text-xs font-black text-slate-700">배송유형</div>
-            <div className="grid grid-cols-3 gap-1">
-              {[
-                ["normal", "일반"],
-                ["vendor", "업체"],
-                ["free", "무료"],
-              ].map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setShippingType(value)}
-                  className={[
-                    "h-9 rounded-xl text-xs font-black",
-                    shippingType === value ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600",
-                  ].join(" ")}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-1 text-xs font-black text-slate-700">상태</div>
-            <div className="grid grid-cols-2 gap-1">
-              <button
-                type="button"
-                onClick={() => setIsVisible(true)}
-                className={[
-                  "h-9 rounded-xl text-xs font-black",
-                  isVisible ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600",
-                ].join(" ")}
-              >
-                노출
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsVisible(false)}
-                className={[
-                  "h-9 rounded-xl text-xs font-black",
-                  !isVisible ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600",
-                ].join(" ")}
-              >
-                숨김
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-1 text-xs font-black text-slate-700">리스트</div>
-            <div className="grid grid-cols-2 gap-1">
-              <button
-                type="button"
-                onClick={() => setIsPinned(false)}
-                className={[
-                  "h-9 rounded-xl text-xs font-black",
-                  !isPinned ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600",
-                ].join(" ")}
-              >
-                일반
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsPinned(true)}
-                className={[
-                  "h-9 rounded-xl text-xs font-black",
-                  isPinned ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600",
-                ].join(" ")}
-              >
-                상단고정
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid min-h-0 grid-cols-2 gap-4">
-          <div className="min-w-0">
-            <div className="mb-1 flex items-center justify-between">
-              <span className="text-xs font-black text-slate-700">색상</span>
-              <span className="text-[10px] font-bold text-slate-400">쉼표로 여러 개</span>
-            </div>
-            <input
-              value={colorText}
-              onChange={(event) => setColorText(event.target.value)}
-              placeholder="예: 블랙, 베이지"
-              className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold outline-none focus:border-blue-400"
-            />
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {COLOR_PRESETS.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() => applyColorPreset(preset)}
-                  className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600 hover:bg-slate-200"
-                >
-                  {preset}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="min-w-0">
-            <div className="mb-1 flex items-center justify-between">
-              <span className="text-xs font-black text-slate-700">사이즈</span>
-              <span className="text-[10px] font-bold text-slate-400">프리셋 또는 직접입력</span>
-            </div>
-            <input
-              value={sizeText}
-              onChange={(event) => setSizeText(event.target.value)}
-              placeholder="예: FREE 또는 S, M, L"
-              className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold outline-none focus:border-blue-400"
-            />
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {SIZE_PRESETS.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() => applySizePreset(preset)}
-                  className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600 hover:bg-slate-200"
-                >
-                  {preset}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="min-h-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3">
-          <div className="mb-2 flex items-center justify-between gap-3">
+          <section className="grid min-h-0 grid-cols-[1fr_1.25fr_1fr_1fr] gap-2 rounded-2xl border border-slate-200 bg-white p-2.5">
             <div>
-              <div className="text-xs font-black text-slate-700">재고관리</div>
-              <div className="mt-0.5 text-[10px] font-bold text-slate-400">
-                기본은 총재고, 필요할 때 옵션별 재고를 사용합니다.
+              <div className="mb-1 text-[10px] font-black text-slate-500">상품구분</div>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => setProductType("broadcast")}
+                  className={[
+                    buttonClass,
+                    productType === "broadcast" ? "bg-blue-600 text-white" : inactiveButtonClass,
+                  ].join(" ")}
+                >
+                  방송
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProductType("group_buy")}
+                  className={[
+                    buttonClass,
+                    productType === "group_buy" ? "bg-blue-600 text-white" : inactiveButtonClass,
+                  ].join(" ")}
+                >
+                  공구
+                </button>
               </div>
             </div>
 
-            <div className="flex rounded-xl bg-slate-100 p-1">
-              <button
-                type="button"
-                onClick={() => setStockMode("total")}
-                className={[
-                  "rounded-lg px-3 py-1.5 text-[11px] font-black",
-                  stockMode === "total" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500",
-                ].join(" ")}
-              >
-                총재고
-              </button>
-              <button
-                type="button"
-                onClick={() => setStockMode("option")}
-                className={[
-                  "rounded-lg px-3 py-1.5 text-[11px] font-black",
-                  stockMode === "option" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500",
-                ].join(" ")}
-              >
-                옵션별
-              </button>
-            </div>
-          </div>
-
-          <div className="grid min-h-0 grid-cols-[260px_minmax(0,1fr)] gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-500">전체 재고수량</span>
-              <input
-                value={formatNumberWithComma(totalStockText)}
-                onChange={(event) => setTotalStockText(onlyNumber(event.target.value))}
-                disabled={stockMode === "option"}
-                className="h-10 w-24 rounded-xl border border-slate-200 px-3 text-right text-sm font-black outline-none focus:border-blue-400 disabled:bg-slate-50 disabled:text-slate-400"
-              />
-              <span className="text-xs font-black text-slate-400">개</span>
-            </div>
-
-            <div className="min-h-0 overflow-hidden rounded-xl border border-slate-100">
-              <div className="grid grid-cols-[1fr_1fr_90px] bg-slate-50 px-3 py-1.5 text-[10px] font-black text-slate-400">
-                <div>색상</div>
-                <div>사이즈</div>
-                <div className="text-right">재고</div>
-              </div>
-
-              <div className="max-h-[82px] overflow-y-auto">
-                {(stockMode === "option" ? resolvedVariantRows : resolvedVariantRows.slice(0, 3)).slice(0, 12).map((row) => (
-                  <div
-                    key={row.key}
-                    className="grid grid-cols-[1fr_1fr_90px] items-center border-t border-slate-100 px-3 py-1.5"
+            <div>
+              <div className="mb-1 text-[10px] font-black text-slate-500">배송유형</div>
+              <div className="flex gap-1">
+                {[
+                  ["normal", "일반"],
+                  ["vendor", "업체"],
+                  ["free", "무료"],
+                ].map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setShippingType(value)}
+                    className={[
+                      buttonClass,
+                      shippingType === value ? "bg-blue-600 text-white" : inactiveButtonClass,
+                    ].join(" ")}
                   >
-                    <div className="truncate text-xs font-bold text-slate-700">{row.color}</div>
-                    <div className="truncate text-xs font-bold text-slate-700">{row.size}</div>
-                    <input
-                      value={String(row.stock || "")}
-                      onChange={(event) => updateVariantStock(row.key, moneyNumber(event.target.value))}
-                      disabled={stockMode !== "option"}
-                      placeholder="0"
-                      className="h-7 rounded-lg border border-slate-200 px-2 text-right text-xs font-black outline-none focus:border-blue-400 disabled:bg-slate-50 disabled:text-slate-400"
-                    />
-                  </div>
+                    {label}
+                  </button>
                 ))}
-
-                {stockMode !== "option" ? (
-                  <div className="flex h-[72px] items-center justify-center text-[11px] font-bold text-slate-400">
-                    옵션별 재고는 옵션별 탭 선택 시 입력 가능합니다.
-                  </div>
-                ) : null}
               </div>
             </div>
-          </div>
 
-          <div className="mt-1 text-right text-xs font-black text-slate-600">
-            총재고 {totalStock.toLocaleString("ko-KR")}개
-          </div>
+            <div>
+              <div className="mb-1 text-[10px] font-black text-slate-500">상태</div>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => setIsVisible(true)}
+                  className={[
+                    buttonClass,
+                    isVisible ? "bg-emerald-600 text-white" : inactiveButtonClass,
+                  ].join(" ")}
+                >
+                  노출
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsVisible(false)}
+                  className={[
+                    buttonClass,
+                    !isVisible ? "bg-slate-800 text-white" : inactiveButtonClass,
+                  ].join(" ")}
+                >
+                  숨김
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-1 text-[10px] font-black text-slate-500">리스트</div>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => setIsPinned(false)}
+                  className={[
+                    buttonClass,
+                    !isPinned ? "bg-slate-800 text-white" : inactiveButtonClass,
+                  ].join(" ")}
+                >
+                  일반
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPinned(true)}
+                  className={[
+                    buttonClass,
+                    isPinned ? "bg-blue-600 text-white" : inactiveButtonClass,
+                  ].join(" ")}
+                >
+                  상단
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="grid min-h-0 grid-cols-2 gap-3">
+            <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-2.5">
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-[11px] font-black text-slate-700">색상</span>
+                <span className="text-[10px] font-bold text-slate-400">쉼표 여러 개</span>
+              </div>
+              <input
+                value={colorText}
+                onChange={(event) => setColorText(event.target.value)}
+                placeholder="예: 블랙, 베이지"
+                className="h-9 w-full rounded-xl border border-slate-200 px-3 text-xs font-bold outline-none focus:border-blue-400"
+              />
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {COLOR_PRESETS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => applyColorPreset(preset)}
+                    className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-600 hover:bg-slate-200"
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-2.5">
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-[11px] font-black text-slate-700">사이즈</span>
+                <span className="text-[10px] font-bold text-slate-400">프리셋 유지</span>
+              </div>
+              <input
+                value={sizeText}
+                onChange={(event) => setSizeText(event.target.value)}
+                placeholder="예: FREE 또는 S, M, L"
+                className="h-9 w-full rounded-xl border border-slate-200 px-3 text-xs font-bold outline-none focus:border-blue-400"
+              />
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {SIZE_PRESETS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => applySizePreset(preset)}
+                    className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-600 hover:bg-slate-200"
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="min-h-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-black text-slate-800">재고관리</div>
+                <div className="mt-0.5 text-[10px] font-bold text-slate-400">
+                  기본은 총재고, 필요할 때 옵션별 재고를 사용합니다.
+                </div>
+              </div>
+
+              <div className="flex rounded-xl bg-slate-100 p-1">
+                <button
+                  type="button"
+                  onClick={() => setStockMode("total")}
+                  className={[
+                    "rounded-lg px-3 py-1.5 text-[11px] font-black",
+                    stockMode === "total" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500",
+                  ].join(" ")}
+                >
+                  총재고
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStockMode("option")}
+                  className={[
+                    "rounded-lg px-3 py-1.5 text-[11px] font-black",
+                    stockMode === "option" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500",
+                  ].join(" ")}
+                >
+                  옵션별
+                </button>
+              </div>
+            </div>
+
+            <div className="grid min-h-0 grid-cols-[220px_minmax(0,1fr)] gap-3">
+              <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-3">
+                <span className="text-xs font-bold text-slate-500">전체 재고</span>
+                <input
+                  value={formatNumberWithComma(totalStockText)}
+                  onChange={(event) => setTotalStockText(onlyNumber(event.target.value))}
+                  disabled={stockMode === "option"}
+                  className="h-9 w-20 rounded-xl border border-slate-200 px-3 text-right text-sm font-black outline-none focus:border-blue-400 disabled:bg-white disabled:text-slate-400"
+                />
+                <span className="text-xs font-black text-slate-400">개</span>
+              </div>
+
+              <div className="min-h-0 overflow-hidden rounded-xl border border-slate-100">
+                <div className="grid grid-cols-[1fr_1fr_72px] bg-slate-50 px-3 py-1.5 text-[10px] font-black text-slate-400">
+                  <div>색상</div>
+                  <div>사이즈</div>
+                  <div className="text-right">재고</div>
+                </div>
+
+                <div className="max-h-[76px] overflow-y-auto">
+                  {stockMode === "option" && resolvedVariantRows.length > 0 ? (
+                    resolvedVariantRows.slice(0, 12).map((row) => (
+                      <div
+                        key={row.key}
+                        className="grid grid-cols-[1fr_1fr_72px] items-center border-t border-slate-100 px-3 py-1"
+                      >
+                        <div className="truncate text-[11px] font-bold text-slate-700">{row.color}</div>
+                        <div className="truncate text-[11px] font-bold text-slate-700">{row.size}</div>
+                        <input
+                          value={String(row.stock || "")}
+                          onChange={(event) => updateVariantStock(row.key, moneyNumber(event.target.value))}
+                          placeholder="0"
+                          className="h-7 rounded-lg border border-slate-200 px-2 text-right text-xs font-black outline-none focus:border-blue-400"
+                        />
+                      </div>
+                    ))
+                  ) : (
+                    <div className="flex h-[72px] items-center justify-center text-[11px] font-bold text-slate-400">
+                      옵션별 탭을 선택하면 색상/사이즈별 재고 입력
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-1 text-right text-xs font-black text-slate-600">
+              총재고 {totalStock.toLocaleString("ko-KR")}개
+            </div>
+          </section>
         </div>
       </div>
 
-      <div className="flex h-[76px] shrink-0 items-center gap-3 border-t border-slate-200 bg-white px-6">
+      <div className="flex h-[70px] shrink-0 items-center justify-end gap-2 border-t border-slate-200 bg-white px-5">
         <button
           type="button"
           onClick={onClose}
-          className="h-12 w-36 rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-600 hover:bg-slate-50"
+          className="h-11 w-[120px] rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-600 hover:bg-slate-50"
         >
           닫기
         </button>
@@ -830,7 +1006,7 @@ export default function QuickProductFastForm({
           type="button"
           disabled={saving}
           onClick={() => void saveProduct()}
-          className="h-12 flex-1 rounded-xl bg-blue-600 text-sm font-black text-white shadow-sm disabled:opacity-50"
+          className="h-11 w-[180px] rounded-xl bg-blue-600 text-sm font-black text-white shadow-sm disabled:opacity-50"
         >
           {saving ? "저장중..." : "저장"}
         </button>
