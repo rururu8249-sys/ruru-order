@@ -147,32 +147,71 @@ export default function AdminSettlementPanel({
       return value === "income" ? "기타매출" : "창고정산/기타지출";
     };
 
+    const weekdayNames = ["일", "월", "화", "수", "목", "금", "토"];
+
+    const formatKoreanDate = (value: unknown) => {
+      const raw = String(value || "").slice(0, 10);
+
+      if (!raw) return "전체";
+
+      const [yearText, monthText, dayText] = raw.split("-");
+      const year = Number(yearText);
+      const month = Number(monthText);
+      const day = Number(dayText);
+
+      if (!year || !month || !day) return raw;
+
+      const date = new Date(year, month - 1, day);
+      const weekday = Number.isFinite(date.getTime()) ? weekdayNames[date.getDay()] : "";
+
+      return `${year}년 ${month}월 ${day}일${weekday ? `(${weekday})` : ""}`;
+    };
+
+    const formatKoreanDateTime = (date = new Date()) => {
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+      const weekday = weekdayNames[date.getDay()] || "";
+      const hour = String(date.getHours()).padStart(2, "0");
+      const minute = String(date.getMinutes()).padStart(2, "0");
+
+      return `${year}년 ${month}월 ${day}일(${weekday}) ${hour}:${minute}`;
+    };
+
+    const reportPeriod =
+      startDate || endDate
+        ? `${formatKoreanDate(startDate)} ~ ${formatKoreanDate(endDate)}`
+        : "전체 기간";
+
+    const selectedBroadcastLabel =
+      selectedBroadcastKeys.length > 0 ? `${selectedBroadcastKeys.length.toLocaleString()}개 선택` : "전체보기";
+
     const rows: Array<Array<string | number>> = [
-      ["루루동이 정산통계 내보내기"],
-      ["생성일시", new Date().toLocaleString("ko-KR")],
+      ["루루동이 정산통계 보고서"],
+      ["조회기간", reportPeriod],
+      ["생성일시", formatKoreanDateTime()],
+      ["결제수단 조건", paymentFilter],
+      ["방송리스트 조건", selectedBroadcastLabel],
+      ["작성 기준", "/admin-live 정산통계 기준"],
+      ["주의", "세무 제출 전 실제 입금내역/카드정산/창고정산 자료와 최종 대조하세요."],
       [],
-      ["조회조건"],
-      ["시작일", startDate || "전체"],
-      ["종료일", endDate || "전체"],
-      ["결제수단", paymentFilter],
-      ["선택 방송 수", selectedBroadcastKeys.length > 0 ? selectedBroadcastKeys.length : "전체"],
+      ["1. 정산 요약"],
+      ["항목", "금액", "건수", "설명"],
+      ["총주문액", numberValue(stats.totalOrderAmount), `${stats.orderCount.toLocaleString()}건`, "취소/환불 제외 주문 기준"],
+      ["완료매출", numberValue(stats.paidAmount), `${stats.paidCount.toLocaleString()}건`, "입금확인 완료 + 카드결제 완료 기준"],
+      ["무통장", numberValue(stats.bankAmount), `${stats.bankCount.toLocaleString()}건`, "입금확인 완료"],
+      ["카드", numberValue(stats.cardAmount), `${stats.cardCount.toLocaleString()}건`, "카드결제 완료"],
+      ["기타매출", numberValue(stats.manualIncomeAmount), `${stats.manualIncomeCount.toLocaleString()}건`, "추가 정산 입력 기준"],
+      ["카드수수료", -numberValue(stats.actualCardFee), "", `카드 결제완료 기준 ${actualCardFeeRate}% 또는 주문 저장 수수료율`],
+      ["창고정산/기타지출", -numberValue(stats.warehouseOtherExpense), `${stats.manualExpenseCount.toLocaleString()}건`, "추가 정산 입력 기준"],
+      ["지출합계", -numberValue(stats.totalExpense), "", "카드수수료 + 창고정산/기타지출"],
+      ["미입금/확인필요", numberValue(stats.unpaidAmount), "", "실수익 계산 제외"],
+      ["실수익", numberValue(stats.netAmount), "", "완료매출 + 기타매출 - 카드수수료 - 창고정산/기타지출"],
       [],
-      ["정산 요약"],
-      ["항목", "금액", "건수/메모"],
-      ["총주문액", numberValue(stats.totalOrderAmount), `${stats.orderCount.toLocaleString()}건`],
-      ["완료매출", numberValue(stats.paidAmount), `${stats.paidCount.toLocaleString()}건`],
-      ["무통장", numberValue(stats.bankAmount), `${stats.bankCount.toLocaleString()}건`],
-      ["카드", numberValue(stats.cardAmount), `${stats.cardCount.toLocaleString()}건`],
-      ["기타매출", numberValue(stats.manualIncomeAmount), `${stats.manualIncomeCount.toLocaleString()}건`],
-      ["카드수수료", -numberValue(stats.actualCardFee), `카드 결제완료 기준 ${actualCardFeeRate}%`],
-      ["창고정산/기타지출", -numberValue(stats.warehouseOtherExpense), `${stats.manualExpenseCount.toLocaleString()}건`],
-      ["미입금/확인필요", numberValue(stats.unpaidAmount), "실수익 계산 제외"],
-      ["실수익", numberValue(stats.netAmount), "완료매출 + 기타매출 - 지출"],
-      [],
-      ["방송별 정산 리스트"],
+      ["2. 방송별 정산 리스트"],
       [
         "방송/날짜",
-        "날짜",
+        "정산날짜",
         "주문건수",
         "총주문액",
         "완료매출",
@@ -186,7 +225,7 @@ export default function AdminSettlementPanel({
       ],
       ...broadcastRows.map((row) => [
         row.label,
-        row.dateKey,
+        formatKoreanDate(row.dateKey),
         row.count,
         numberValue(row.totalOrderAmount),
         numberValue(row.paidAmount),
@@ -199,9 +238,10 @@ export default function AdminSettlementPanel({
         numberValue(row.netAmount),
       ]),
       [],
-      ["추가 정산 내역"],
-      ["날짜", "구분", "제목", "금액", "연결 방송", "메모"],
+      ["3. 추가 정산 내역"],
+      ["반영일자", "원본날짜", "구분", "제목", "금액", "연결 방송", "메모"],
       ...manualEntriesInScope.map((entry) => [
+        formatKoreanDate(entry.entry_date),
         String(entry.entry_date || ""),
         entryTypeLabel(entry.entry_type),
         entry.title || "",
@@ -209,6 +249,11 @@ export default function AdminSettlementPanel({
         entry.broadcast_label || "",
         entry.memo || "",
       ]),
+      [],
+      ["4. 참고"],
+      ["deposits 전달 건수", Array.isArray(deposits) ? deposits.length : 0],
+      ["카드수수료 기준", `${actualCardFeeRate}%`],
+      ["파일 생성 기준", "루루동이 /admin-live 정산통계"],
     ];
 
     const csv = rows.map((row) => row.map(escapeCsv).join(",")).join("\n");
@@ -219,7 +264,7 @@ export default function AdminSettlementPanel({
     const exportDate = new Date().toISOString().slice(0, 10);
 
     anchor.href = url;
-    anchor.download = `ruru_settlement_${exportDate}.csv`;
+    anchor.download = `ruru_settlement_report_${exportDate}.csv`;
     anchor.click();
 
     URL.revokeObjectURL(url);
