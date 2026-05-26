@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
+import { resolveProductImageUrl } from "./quick-product/productImageUrl";
 
 type ProductRow = Record<string, unknown>;
 
@@ -22,13 +23,8 @@ function pickString(row: ProductRow, keys: string[], fallback = "") {
   for (const key of keys) {
     const value = row[key];
 
-    if (typeof value === "string" && value.trim()) {
-      return value.trim();
-    }
-
-    if (typeof value === "number" && Number.isFinite(value)) {
-      return String(value);
-    }
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
   }
 
   return fallback;
@@ -38,16 +34,11 @@ function pickNumber(row: ProductRow, keys: string[], fallback = 0) {
   for (const key of keys) {
     const value = row[key];
 
-    if (typeof value === "number" && Number.isFinite(value)) {
-      return value;
-    }
+    if (typeof value === "number" && Number.isFinite(value)) return value;
 
     if (typeof value === "string") {
       const parsed = Number(value.replace(/[^0-9.-]/g, ""));
-
-      if (Number.isFinite(parsed)) {
-        return parsed;
-      }
+      if (Number.isFinite(parsed)) return parsed;
     }
   }
 
@@ -58,9 +49,7 @@ function pickBoolean(row: ProductRow, keys: string[], fallback = false) {
   for (const key of keys) {
     const value = row[key];
 
-    if (typeof value === "boolean") {
-      return value;
-    }
+    if (typeof value === "boolean") return value;
 
     if (typeof value === "string") {
       const normalized = value.toLowerCase().trim();
@@ -122,7 +111,7 @@ function getProductPrice(row: ProductRow) {
 }
 
 function getProductImage(row: ProductRow) {
-  return pickString(
+  const rawImage = pickString(
     row,
     [
       "image_url",
@@ -137,6 +126,8 @@ function getProductImage(row: ProductRow) {
     ],
     "",
   );
+
+  return resolveProductImageUrl(rawImage);
 }
 
 function getProductSort(row: ProductRow, fallback: number) {
@@ -195,9 +186,7 @@ function getMissingColumn(errorMessage: string) {
   for (const pattern of patterns) {
     const match = errorMessage.match(pattern);
 
-    if (match?.[1]) {
-      return match[1];
-    }
+    if (match?.[1]) return match[1];
   }
 
   return "";
@@ -213,17 +202,11 @@ async function updateProductSchemaSafe(productId: string, payload: Record<string
       .update(workingPayload)
       .eq("id", productId);
 
-    if (!error) {
-      return {
-        removedColumns,
-      };
-    }
+    if (!error) return { removedColumns };
 
     const missingColumn = getMissingColumn(error.message || "");
 
-    if (!missingColumn || !(missingColumn in workingPayload)) {
-      throw error;
-    }
+    if (!missingColumn || !(missingColumn in workingPayload)) throw error;
 
     delete workingPayload[missingColumn];
     removedColumns.push(missingColumn);
@@ -241,6 +224,7 @@ export default function AdminLiveProductListPanel({
   const [loadError, setLoadError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [draggingId, setDraggingId] = useState("");
+  const [previewImage, setPreviewImage] = useState("");
 
   const pageSize = 8;
 
@@ -254,24 +238,18 @@ export default function AdminLiveProductListPanel({
         .select("*")
         .limit(100);
 
-      if (error) {
-        throw new Error(error.message);
-      }
+      if (error) throw new Error(error.message);
 
       const rows = ((data || []) as ProductRow[]).slice().sort((a, b) => {
         const pinnedA = pickBoolean(a, ["is_pinned", "pinned"], false) ? 1 : 0;
         const pinnedB = pickBoolean(b, ["is_pinned", "pinned"], false) ? 1 : 0;
 
-        if (pinnedA !== pinnedB) {
-          return pinnedB - pinnedA;
-        }
+        if (pinnedA !== pinnedB) return pinnedB - pinnedA;
 
         const sortA = getProductSort(a, 999999);
         const sortB = getProductSort(b, 999999);
 
-        if (sortA !== sortB) {
-          return sortA - sortB;
-        }
+        if (sortA !== sortB) return sortA - sortB;
 
         const createdA = getProductCreatedAt(a);
         const createdB = getProductCreatedAt(b);
@@ -314,12 +292,7 @@ export default function AdminLiveProductListPanel({
 
         return acc;
       },
-      {
-        visible: 0,
-        hidden: 0,
-        soldout: 0,
-        pinned: 0,
-      },
+      { visible: 0, hidden: 0, soldout: 0, pinned: 0 },
     );
   }, [products]);
 
@@ -388,9 +361,7 @@ export default function AdminLiveProductListPanel({
       for (let index = 0; index < nextProducts.length; index += 1) {
         const productId = getProductId(nextProducts[index], index);
 
-        if (!productId || productId.startsWith("product-")) {
-          continue;
-        }
+        if (!productId || productId.startsWith("product-")) continue;
 
         await updateProductSchemaSafe(productId, {
           sort_order: index + 1,
@@ -523,7 +494,14 @@ export default function AdminLiveProductListPanel({
                   </div>
 
                   <div className="flex min-w-0 items-center gap-2">
-                    <div className="h-9 w-9 shrink-0 overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (imageUrl) setPreviewImage(imageUrl);
+                      }}
+                      className="h-9 w-9 shrink-0 overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200 hover:ring-blue-300"
+                      title={imageUrl ? "사진 크게 보기" : "사진 없음"}
+                    >
                       {imageUrl ? (
                         <img
                           src={imageUrl}
@@ -535,7 +513,7 @@ export default function AdminLiveProductListPanel({
                           🛍️
                         </div>
                       )}
-                    </div>
+                    </button>
 
                     <div className="min-w-0">
                       <p className="truncate text-[12px] font-black text-slate-900">
@@ -609,6 +587,44 @@ export default function AdminLiveProductListPanel({
           다음
         </button>
       </div>
+
+      {previewImage ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/70 p-6">
+          <button
+            type="button"
+            aria-label="이미지 미리보기 닫기"
+            onClick={() => setPreviewImage("")}
+            className="absolute inset-0"
+          />
+
+          <div className="relative max-h-[90vh] w-full max-w-[760px] overflow-hidden rounded-3xl bg-white p-3 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between gap-3 px-1">
+              <div>
+                <h3 className="text-sm font-black text-slate-950">상품사진 확인</h3>
+                <p className="mt-0.5 text-[11px] font-bold text-slate-400">
+                  등록된 대표사진을 크게 확인합니다.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setPreviewImage("")}
+                className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-200"
+              >
+                닫기
+              </button>
+            </div>
+
+            <div className="flex max-h-[78vh] items-center justify-center overflow-auto rounded-2xl bg-slate-50">
+              <img
+                src={previewImage}
+                alt=""
+                className="max-h-[78vh] max-w-full object-contain"
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

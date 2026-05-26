@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { showAdminToast } from "@/lib/adminToast";
+import { resolveProductImageUrl } from "./productImageUrl";
 
 type ImageValue = string | string[] | null;
 
@@ -262,9 +263,9 @@ export default function QuickProductImageDropzone({
                 key={index}
                 className="group relative aspect-square overflow-hidden rounded-xl bg-white ring-1 ring-slate-200"
               >
-                {src && isPreviewable(src) ? (
+                {src && isPreviewable(resolveProductImageUrl(src)) ? (
                   <img
-                    src={src}
+                    src={resolveProductImageUrl(src)}
                     alt=""
                     className="h-full w-full object-cover"
                   />
@@ -298,9 +299,9 @@ export default function QuickProductImageDropzone({
           </div>
         ) : (
           <div className="relative aspect-square overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
-            {images[0] && isPreviewable(images[0]) ? (
+            {images[0] && isPreviewable(resolveProductImageUrl(images[0])) ? (
               <img
-                src={images[0]}
+                src={resolveProductImageUrl(images[0])}
                 alt=""
                 className="h-full w-full object-cover"
               />
