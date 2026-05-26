@@ -1,5 +1,6 @@
 import { ADMIN_LIVE_MENUS, getAdminLiveMenu, type AdminLiveMenuKey } from "./adminLiveMenu";
 import LiveOpsStatusBox from "./LiveOpsStatusBox";
+import AdminLiveLogoutButton from "./AdminLiveLogoutButton";
 
 
 type Props = {
@@ -59,6 +60,7 @@ export default function AdminLiveSidebar({ activeMenu, onMenuChange }: Props) {
           </p>
         </div>
       </div>
+          <AdminLiveLogoutButton />
     </aside>
   );
 }
