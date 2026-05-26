@@ -231,6 +231,11 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
   const [loadError, setLoadError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedProduct, setSelectedProduct] = useState<ProductRow | null>(null);
+  const [showProductDetailList, setShowProductDetailList] = useState(false);
+  const [detailSearchText, setDetailSearchText] = useState("");
+  const [detailStatusFilter, setDetailStatusFilter] = useState<"all" | "visible" | "hidden" | "soldout">("all");
+  const [detailPageSize, setDetailPageSize] = useState<number>(20);
+  const [detailPage, setDetailPage] = useState<number>(1);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -270,6 +275,10 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
     };
   }, [loadProducts]);
 
+  useEffect(() => {
+    setDetailPage(1);
+  }, [detailSearchText, detailStatusFilter, detailPageSize]);
+
   const counts = useMemo(() => {
     return products.reduce<{ visible: number; hidden: number; soldout: number; pinned: number }>(
       (acc, product) => {
@@ -296,6 +305,38 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
   const pageStart = (safePage - 1) * DEFAULT_PAGE_SIZE;
   const visibleProducts = products.slice(pageStart, pageStart + DEFAULT_PAGE_SIZE);
 
+  const detailProducts = useMemo(() => {
+    const keyword = detailSearchText.trim().toLowerCase();
+
+    return products.filter((product) => {
+      const info = statusInfo(product);
+
+      if (detailStatusFilter === "visible" && info.label !== "노출") return false;
+      if (detailStatusFilter === "hidden" && info.label !== "숨김") return false;
+      if (detailStatusFilter === "soldout" && info.label !== "품절") return false;
+
+      if (!keyword) return true;
+
+      const haystack = [
+        productName(product),
+        String(productPrice(product)),
+        colorSummary(product),
+        sizeSummary(product),
+        productTypeLabel(product),
+        shippingLabel(product),
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(keyword);
+    });
+  }, [detailSearchText, detailStatusFilter, products]);
+
+  const detailTotalPages = Math.max(1, Math.ceil(detailProducts.length / detailPageSize));
+  const detailSafePage = Math.min(detailPage, detailTotalPages);
+  const detailPageStart = (detailSafePage - 1) * detailPageSize;
+  const detailVisibleProducts = detailProducts.slice(detailPageStart, detailPageStart + detailPageSize);
+
   const selectedImage = selectedProduct ? mainImage(selectedProduct) : "";
   const selectedStatus = selectedProduct ? statusInfo(selectedProduct) : null;
 
@@ -312,6 +353,14 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowProductDetailList(true)}
+                className="h-9 rounded-xl bg-slate-900 px-3 text-xs font-black text-white shadow-sm hover:bg-slate-800"
+              >
+                상세리스트
+              </button>
+
               <button
                 type="button"
                 onClick={openQuickProductCreate}
@@ -331,7 +380,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
             </div>
           </div>
 
-          <div className="mt-3 grid shrink-0 grid-cols-[52px_minmax(0,1fr)_76px_104px] border-y border-slate-100 py-2 text-[11px] font-black text-slate-400">
+          <div className="mt-3 grid shrink-0 grid-cols-[52px_minmax(0,1fr)_76px_64px] border-y border-slate-100 py-2 text-[11px] font-black text-slate-400">
             <div>순서</div>
             <div>상품정보</div>
             <div className="text-center">상태</div>
@@ -369,7 +418,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                   return (
                     <div
                       key={pickString(product, ["id", "product_id"], String(absoluteIndex))}
-                      className="grid grid-cols-[52px_minmax(0,1fr)_76px_104px] items-center gap-2 py-2.5"
+                      className="grid grid-cols-[52px_minmax(0,1fr)_76px_64px] items-center gap-2 py-2.5"
                     >
                       <div className="text-xs font-black text-slate-400">{absoluteIndex}</div>
 
@@ -403,15 +452,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                       </div>
 
                       <div className="flex justify-end gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedProduct(product)}
-                          className="h-8 rounded-lg bg-slate-100 px-2.5 text-[11px] font-black text-slate-600 hover:bg-slate-200"
-                        >
-                          상세
-                        </button>
-
-                        <button
+<button
                           type="button"
                           onClick={() => openQuickProductEdit(product)}
                           className="h-8 rounded-lg bg-slate-100 px-2.5 text-[11px] font-black text-slate-600 hover:bg-slate-200"
@@ -451,6 +492,183 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
           </div>
         </div>
       </div>
+
+      {showProductDetailList ? (
+        <div className="fixed inset-0 z-[115] flex items-center justify-center bg-slate-950/45 p-5">
+          <div className="flex max-h-[88vh] w-full max-w-[1180px] flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <h3 className="text-lg font-black text-slate-950">등록상품 전체 상세리스트</h3>
+                <p className="mt-1 text-xs font-bold text-slate-500">
+                  등록된 상품 전체를 검색·필터로 확인하고 개별 상세/수정을 처리합니다.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowProductDetailList(false)}
+                className="h-9 rounded-xl bg-slate-100 px-4 text-xs font-black text-slate-600 hover:bg-slate-200"
+              >
+                닫기
+              </button>
+            </div>
+
+            <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_160px_150px] gap-2 border-b border-slate-100 px-6 py-4">
+              <input
+                value={detailSearchText}
+                onChange={(event) => setDetailSearchText(event.target.value)}
+                placeholder="상품명 / 색상 / 사이즈 / 배송유형 검색"
+                className="h-11 rounded-xl border border-slate-200 px-4 text-sm font-bold outline-none focus:border-blue-400"
+              />
+
+              <select
+                value={detailStatusFilter}
+                onChange={(event) => setDetailStatusFilter(event.target.value as "all" | "visible" | "hidden" | "soldout")}
+                className="h-11 rounded-xl border border-slate-200 px-3 text-sm font-black outline-none"
+              >
+                <option value="all">상태 전체</option>
+                <option value="visible">노출만</option>
+                <option value="hidden">숨김만</option>
+                <option value="soldout">품절만</option>
+              </select>
+
+              <select
+                value={detailPageSize}
+                onChange={(event) => setDetailPageSize(Number(event.target.value))}
+                className="h-11 rounded-xl border border-slate-200 px-3 text-sm font-black outline-none"
+              >
+                <option value={10}>10개 보기</option>
+                <option value={20}>20개 보기</option>
+                <option value={50}>50개 보기</option>
+                <option value={100}>100개 보기</option>
+              </select>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+              <div className="mb-3 flex items-center justify-between text-xs font-black text-slate-500">
+                <span>
+                  {detailProducts.length === 0
+                    ? "0개"
+                    : `${detailPageStart + 1}-${Math.min(detailPageStart + detailPageSize, detailProducts.length)} / ${detailProducts.length}개`}
+                </span>
+                <span>전체 {products.length}개</span>
+              </div>
+
+              <div className="overflow-hidden rounded-2xl border border-slate-200">
+                <div className="grid grid-cols-[64px_minmax(0,1.5fr)_110px_90px_90px_90px_120px] bg-slate-50 px-4 py-3 text-xs font-black text-slate-400">
+                  <div>순서</div>
+                  <div>상품정보</div>
+                  <div className="text-right">판매가</div>
+                  <div className="text-center">상태</div>
+                  <div className="text-center">구분</div>
+                  <div className="text-center">재고</div>
+                  <div className="text-right">관리</div>
+                </div>
+
+                <div className="divide-y divide-slate-100">
+                  {detailVisibleProducts.length === 0 ? (
+                    <div className="flex h-[220px] items-center justify-center text-sm font-bold text-slate-400">
+                      조건에 맞는 등록상품이 없습니다.
+                    </div>
+                  ) : (
+                    detailVisibleProducts.map((product, index) => {
+                      const info = statusInfo(product);
+                      const image = mainImage(product);
+                      const absoluteIndex = detailPageStart + index + 1;
+
+                      return (
+                        <div
+                          key={pickString(product, ["id", "product_id"], String(absoluteIndex))}
+                          className="grid grid-cols-[64px_minmax(0,1.5fr)_110px_90px_90px_90px_120px] items-center px-4 py-3"
+                        >
+                          <div className="text-xs font-black text-slate-400">{absoluteIndex}</div>
+
+                          <button
+                            type="button"
+                            onClick={() => setSelectedProduct(product)}
+                            className="grid min-w-0 grid-cols-[48px_minmax(0,1fr)] items-center gap-3 text-left"
+                          >
+                            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
+                              {image ? (
+                                <img src={image} alt="" className="h-full w-full object-cover" />
+                              ) : (
+                                <span className="text-[10px] font-black text-slate-400">NO</span>
+                              )}
+                            </div>
+
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-black text-slate-950">{productName(product)}</div>
+                              <div className="mt-0.5 truncate text-xs font-bold text-slate-500">
+                                {colorSummary(product)} / {sizeSummary(product)} · {shippingLabel(product)}
+                              </div>
+                            </div>
+                          </button>
+
+                          <div className="text-right text-sm font-black text-slate-800">{money(productPrice(product))}</div>
+
+                          <div className="text-center">
+                            <span className={["inline-flex rounded-full px-2.5 py-1 text-xs font-black", info.className].join(" ")}>
+                              {info.label}
+                            </span>
+                          </div>
+
+                          <div className="text-center text-xs font-black text-slate-600">{productTypeLabel(product)}</div>
+                          <div className="text-center text-xs font-black text-slate-600">{stockSummary(product)}</div>
+
+                          <div className="flex justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedProduct(product)}
+                              className="h-8 rounded-lg bg-slate-100 px-2.5 text-[11px] font-black text-slate-600 hover:bg-slate-200"
+                            >
+                              개별상세
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowProductDetailList(false);
+                                openQuickProductEdit(product);
+                              }}
+                              className="h-8 rounded-lg bg-blue-600 px-2.5 text-[11px] font-black text-white hover:bg-blue-700"
+                            >
+                              수정
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex shrink-0 items-center justify-center gap-2 border-t border-slate-200 px-6 py-4">
+              <button
+                type="button"
+                disabled={detailSafePage <= 1}
+                onClick={() => setDetailPage((page) => Math.max(1, page - 1))}
+                className="h-9 rounded-xl bg-slate-100 px-4 text-xs font-black text-slate-400 disabled:opacity-50"
+              >
+                이전
+              </button>
+
+              <div className="flex h-9 min-w-9 items-center justify-center rounded-xl bg-blue-600 px-3 text-xs font-black text-white">
+                {detailSafePage}
+              </div>
+
+              <button
+                type="button"
+                disabled={detailSafePage >= detailTotalPages}
+                onClick={() => setDetailPage((page) => Math.min(detailTotalPages, page + 1))}
+                className="h-9 rounded-xl bg-slate-100 px-4 text-xs font-black text-slate-400 disabled:opacity-50"
+              >
+                다음
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {selectedProduct ? (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/45 p-5">
