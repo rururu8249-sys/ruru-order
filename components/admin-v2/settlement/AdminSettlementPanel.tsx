@@ -197,6 +197,14 @@ export default function AdminSettlementPanel({
       return Number.isFinite(number) ? Math.round(number) : 0;
     };
 
+    const moneyText = (value: unknown) => {
+      return `${numberValue(value).toLocaleString("ko-KR")}원`;
+    };
+
+    const countText = (value: unknown) => {
+      return `${numberValue(value).toLocaleString("ko-KR")}건`;
+    };
+
     const entryTypeLabel = (value: string) => {
       return value === "income" ? "기타매출" : "창고정산/기타지출";
     };
@@ -245,27 +253,26 @@ export default function AdminSettlementPanel({
       ["결제수단 조건", paymentFilter],
       ["방송리스트 조건", selectedBroadcastLabel],
       ["작성 기준", "/admin-live 정산통계 기준"],
-      ["주의", "세무 제출 전 실제 입금내역/카드정산/창고정산 자료와 최종 대조하세요."],
+      ["주의", "세무 제출 전 실제 입금내역·카드정산·창고정산 자료와 최종 대조하세요."],
       [],
       ["1. 정산 요약"],
       ["항목", "금액", "건수", "설명"],
-      ["총주문액", numberValue(stats.totalOrderAmount), `${stats.orderCount.toLocaleString()}건`, "취소/환불 제외 주문 기준"],
-      ["완료매출", numberValue(stats.paidAmount), `${stats.paidCount.toLocaleString()}건`, "입금확인 완료 + 카드결제 완료 기준"],
-      ["무통장", numberValue(stats.bankAmount), `${stats.bankCount.toLocaleString()}건`, "입금확인 완료"],
-      ["카드", numberValue(stats.cardAmount), `${stats.cardCount.toLocaleString()}건`, "카드결제 완료"],
-      ["기타매출", numberValue(stats.manualIncomeAmount), `${stats.manualIncomeCount.toLocaleString()}건`, "추가 정산 입력 기준"],
-      ["카드수수료", -numberValue(stats.actualCardFee), "", `카드 결제완료 기준 ${actualCardFeeRate}% 또는 주문 저장 수수료율`],
-      ["창고정산/기타지출", -numberValue(stats.warehouseOtherExpense), `${stats.manualExpenseCount.toLocaleString()}건`, "추가 정산 입력 기준"],
-      ["지출합계", -numberValue(stats.totalExpense), "", "카드수수료 + 창고정산/기타지출"],
-      ["미입금/확인필요", numberValue(stats.unpaidAmount), "", "실수익 계산 제외"],
-      ["실수익", numberValue(stats.netAmount), "", "완료매출 + 기타매출 - 카드수수료 - 창고정산/기타지출"],
+      ["총주문금액", moneyText(stats.totalOrderAmount), countText(stats.orderCount), "취소/환불 제외 주문 기준"],
+      ["완료매출", moneyText(stats.paidAmount), countText(stats.paidCount), "입금확인 완료 + 카드결제 완료 기준"],
+      ["무통장", moneyText(stats.bankAmount), countText(stats.bankCount), "입금확인 완료"],
+      ["카드", moneyText(stats.cardAmount), countText(stats.cardCount), "카드결제 완료"],
+      ["기타매출", moneyText(stats.manualIncomeAmount), countText(stats.manualIncomeCount), "추가 정산 입력 기준"],
+      ["카드수수료", moneyText(-numberValue(stats.actualCardFee)), "", `카드 결제완료 기준 ${actualCardFeeRate}% 또는 주문 저장 수수료율`],
+      ["창고정산/기타지출", moneyText(-numberValue(stats.warehouseOtherExpense)), countText(stats.manualExpenseCount), "추가 정산 입력 기준"],
+      ["지출합계", moneyText(-numberValue(stats.totalExpense)), "", "카드수수료 + 창고정산/기타지출"],
+      ["미입금/확인필요", moneyText(stats.unpaidAmount), "", "실수익 계산 제외"],
+      ["실수익", moneyText(stats.netAmount), "", "완료매출 + 기타매출 - 카드수수료 - 창고정산/기타지출"],
       [],
-      ["2. 방송별 정산 리스트"],
+      ["2. 일자별 정산 내역"],
       [
-        "방송/날짜",
-        "정산날짜",
+        "정산일자",
         "주문건수",
-        "총주문액",
+        "총주문금액",
         "완료매출",
         "무통장",
         "카드",
@@ -276,36 +283,34 @@ export default function AdminSettlementPanel({
         "실수익",
       ],
       ...broadcastRows.map((row) => [
-        row.label,
         formatKoreanDate(row.dateKey),
-        row.count,
-        numberValue(row.totalOrderAmount),
-        numberValue(row.paidAmount),
-        numberValue(row.bankAmount),
-        numberValue(row.cardAmount),
-        numberValue(row.manualIncomeAmount),
-        -numberValue(row.actualCardFee),
-        -numberValue(row.warehouseOtherExpense),
-        numberValue(row.unpaidAmount),
-        numberValue(row.netAmount),
+        countText(row.count),
+        moneyText(row.totalOrderAmount),
+        moneyText(row.paidAmount),
+        moneyText(row.bankAmount),
+        moneyText(row.cardAmount),
+        moneyText(row.manualIncomeAmount),
+        moneyText(-numberValue(row.actualCardFee)),
+        moneyText(-numberValue(row.warehouseOtherExpense)),
+        moneyText(row.unpaidAmount),
+        moneyText(row.netAmount),
       ]),
       [],
       ["3. 추가 정산 내역"],
-      ["반영일자", "원본날짜", "구분", "제목", "금액", "연결 방송", "메모"],
+      ["반영일자", "구분", "제목", "금액", "메모"],
       ...manualEntriesInScope.map((entry) => [
         formatKoreanDate(entry.entry_date),
-        String(entry.entry_date || ""),
         entryTypeLabel(entry.entry_type),
         entry.title || "",
-        entry.entry_type === "expense" ? -numberValue(entry.amount) : numberValue(entry.amount),
-        entry.broadcast_label || "",
+        entry.entry_type === "expense" ? moneyText(-numberValue(entry.amount)) : moneyText(entry.amount),
         entry.memo || "",
       ]),
       [],
       ["4. 참고"],
-      ["deposits 전달 건수", Array.isArray(deposits) ? deposits.length : 0],
+      ["deposits 전달 건수", countText(Array.isArray(deposits) ? deposits.length : 0)],
       ["카드수수료 기준", `${actualCardFeeRate}%`],
       ["파일 생성 기준", "루루동이 /admin-live 정산통계"],
+      ["산식", "실수익 = 완료매출 + 기타매출 - 카드수수료 - 창고정산/기타지출"],
     ];
 
     const csv = rows.map((row) => row.map(escapeCsv).join(",")).join("\n");

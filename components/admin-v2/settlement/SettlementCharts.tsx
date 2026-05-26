@@ -33,6 +33,8 @@ type BroadcastRankRow = {
   netAmount: number;
 };
 
+type RankTab = "sales" | "expense";
+
 function shortDateLabel(value: string) {
   const [, monthText, dayText] = String(value || "").split("-");
   const month = Number(monthText);
@@ -93,6 +95,16 @@ function expenseAmount(row: BroadcastRankRow) {
   return toNumber(row.actualCardFee) + toNumber(row.warehouseOtherExpense);
 }
 
+function expenseMainLabel(row: BroadcastRankRow) {
+  const cardFee = toNumber(row.actualCardFee);
+  const warehouseExpense = toNumber(row.warehouseOtherExpense);
+
+  if (warehouseExpense <= 0 && cardFee <= 0) return "지출 없음";
+  if (warehouseExpense >= cardFee) return "창고정산/기타지출";
+
+  return "카드수수료";
+}
+
 export default function SettlementCharts({
   trend,
   stats,
@@ -123,6 +135,7 @@ export default function SettlementCharts({
   }, [broadcastRows]);
 
   const [activeTrend, setActiveTrend] = useState<TrendRow | null>(null);
+  const [rankTab, setRankTab] = useState<RankTab>("sales");
 
   const selectedTrend = activeTrend || (trendRows.length === 1 ? trendRows[0] : null);
   const selectedTotalExpense = selectedTrend
@@ -142,6 +155,9 @@ export default function SettlementCharts({
 
   const chartModeLabel =
     trendRows.length <= 1 ? "단일일자" : trendRows.length <= 14 ? `최근 ${trendRows.length.toLocaleString()}일` : "기간 흐름";
+
+  const activeRows = rankTab === "sales" ? salesTopRows : expenseTopRows;
+  const activeEmptyText = rankTab === "sales" ? "매출 랭킹 데이터가 없습니다." : "지출 랭킹 데이터가 없습니다.";
 
   return (
     <div className="grid items-start gap-4 xl:grid-cols-[1.55fr_0.45fr]">
@@ -248,7 +264,7 @@ export default function SettlementCharts({
                     창고정산/기타지출 <span className="font-black text-violet-700">{won(selectedTrend.warehouseOtherExpense ?? selectedTrend.expense)}</span>
                   </div>
                   <div>
-                    실수익 <span className="font-black text-emerald-700">{won(selectedTrend.net)}</span>
+                    지출합계 <span className="font-black text-violet-700">{won(selectedTotalExpense)}</span>
                   </div>
                 </div>
               </div>
@@ -264,49 +280,60 @@ export default function SettlementCharts({
       <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.045)]">
         <div>
           <div className="text-lg font-black text-slate-950">매출·지출 TOP 요약</div>
-          <div className="mt-1 text-xs font-bold text-slate-400">{periodLabel}</div>
+          <div className="mt-1 text-xs font-bold text-slate-400">
+            {periodLabel} · 총 {toNumber(stats.orderCount).toLocaleString()}건
+          </div>
         </div>
 
-        <div className="mt-4 grid gap-4">
-          <div className="rounded-[22px] border border-amber-100 bg-amber-50/50 p-3">
-            <div className="text-sm font-black text-slate-950">👑 매출 TOP</div>
-            <div className="mt-3 grid gap-2">
-              {salesTopRows.length === 0 ? (
-                <div className="rounded-2xl bg-white px-3 py-3 text-xs font-bold text-slate-400">매출 랭킹 데이터가 없습니다.</div>
-              ) : (
-                salesTopRows.map((row, index) => (
-                  <div key={`${row.dateKey}-${row.label}-sales`} className="rounded-2xl bg-white px-3 py-2 shadow-sm">
-                    <div className="text-[11px] font-black text-amber-600">{index + 1}위</div>
-                    <div className="mt-1 line-clamp-2 text-xs font-black leading-5 text-slate-800">{rankTitle(row)}</div>
-                    <div className="mt-1 text-sm font-black tabular-nums text-slate-950">{won(rankAmount(row))}</div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+        <div className="mt-4 grid grid-cols-2 rounded-2xl bg-slate-100 p-1">
+          <button
+            type="button"
+            onClick={() => setRankTab("sales")}
+            className={`rounded-xl px-3 py-2 text-sm font-black transition ${
+              rankTab === "sales" ? "bg-white text-amber-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            👑 매출 TOP
+          </button>
+          <button
+            type="button"
+            onClick={() => setRankTab("expense")}
+            className={`rounded-xl px-3 py-2 text-sm font-black transition ${
+              rankTab === "expense" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            🧾 지출 TOP
+          </button>
+        </div>
 
-          <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-3">
-            <div className="text-sm font-black text-slate-950">🧾 지출 TOP</div>
-            <div className="mt-3 grid gap-2">
-              {expenseTopRows.length === 0 ? (
-                <div className="rounded-2xl bg-white px-3 py-3 text-xs font-bold text-slate-400">지출 랭킹 데이터가 없습니다.</div>
-              ) : (
-                expenseTopRows.map((row, index) => {
-                  const cardFee = toNumber(row.actualCardFee);
-                  const warehouseExpense = toNumber(row.warehouseOtherExpense);
-                  const mainExpenseLabel = warehouseExpense >= cardFee ? "창고정산/기타지출" : "카드수수료";
+        <div
+          className={`mt-4 rounded-[22px] border p-3 ${
+            rankTab === "sales" ? "border-amber-100 bg-amber-50/50" : "border-slate-200 bg-slate-50"
+          }`}
+        >
+          <div className="grid gap-2">
+            {activeRows.length === 0 ? (
+              <div className="rounded-2xl bg-white px-3 py-3 text-xs font-bold text-slate-400">{activeEmptyText}</div>
+            ) : (
+              activeRows.map((row, index) => {
+                const amount = rankTab === "sales" ? rankAmount(row) : expenseAmount(row);
+                const subLabel =
+                  rankTab === "sales"
+                    ? `주문 ${toNumber(row.count).toLocaleString()}건`
+                    : expenseMainLabel(row);
 
-                  return (
-                    <div key={`${row.dateKey}-${row.label}-expense`} className="rounded-2xl bg-white px-3 py-2 shadow-sm">
-                      <div className="text-[11px] font-black text-slate-500">{index + 1}위</div>
-                      <div className="mt-1 line-clamp-2 text-xs font-black leading-5 text-slate-800">{rankTitle(row)}</div>
-                      <div className="mt-1 text-sm font-black tabular-nums text-slate-950">{won(expenseAmount(row))}</div>
-                      <div className="mt-0.5 text-[11px] font-bold text-slate-400">{mainExpenseLabel}</div>
+                return (
+                  <div key={`${rankTab}-${row.dateKey}-${row.label}`} className="rounded-2xl bg-white px-3 py-2 shadow-sm">
+                    <div className={`text-[11px] font-black ${rankTab === "sales" ? "text-amber-600" : "text-slate-500"}`}>
+                      {index + 1}위
                     </div>
-                  );
-                })
-              )}
-            </div>
+                    <div className="mt-1 line-clamp-2 text-xs font-black leading-5 text-slate-800">{rankTitle(row)}</div>
+                    <div className="mt-1 text-sm font-black tabular-nums text-slate-950">{won(amount)}</div>
+                    <div className="mt-0.5 text-[11px] font-bold text-slate-400">{subLabel}</div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       </div>
