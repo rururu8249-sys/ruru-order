@@ -164,7 +164,7 @@ export default function AdminLiveProductListPanel({
     showAdminToast("빠른상품등록 패널을 열었습니다.", "info");
   };
 
-  const heightClass = fillHeight ? "h-full min-h-[610px]" : "h-[480px]";
+  const heightClass = fillHeight ? "h-full" : "h-[480px]";
 
   return (
     <div

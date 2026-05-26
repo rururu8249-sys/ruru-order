@@ -585,7 +585,7 @@ export default function AdminLiveDashboard() {
 
             </div>
 
-            <AdminLiveProductListPanel fillHeight className="min-w-0" />
+            <AdminLiveProductListPanel fillHeight className="min-w-0 self-stretch" />
 
           </div>
 {loadError && (
