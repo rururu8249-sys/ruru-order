@@ -25,7 +25,9 @@ function money(value: unknown) {
 }
 
 function safeArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.map((item) => String(item || "").trim()).filter(Boolean) : [];
+  return Array.isArray(value)
+    ? value.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
 }
 
 function statusInfo(product: ProductRow) {
@@ -65,7 +67,8 @@ export default function AdminLiveProductListPanel() {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(6);
+
+  const pageSize = 8;
 
   const loadProducts = async () => {
     setLoading(true);
@@ -77,7 +80,7 @@ export default function AdminLiveProductListPanel() {
         .order("is_pinned", { ascending: false })
         .order("sort_order", { ascending: true })
         .order("id", { ascending: false })
-        .limit(20);
+        .limit(100);
 
       if (error) {
         throw new Error(error.message);
@@ -126,22 +129,35 @@ export default function AdminLiveProductListPanel() {
 
   const totalPages = useMemo(() => {
     return Math.max(1, Math.ceil(products.length / pageSize));
-  }, [products.length, pageSize]);
+  }, [products.length]);
 
-  const safePage = Math.min(currentPage, totalPages);
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
 
   const visibleProducts = useMemo(() => {
     const start = (safePage - 1) * pageSize;
     return products.slice(start, start + pageSize);
-  }, [products, safePage, pageSize]);
+  }, [products, safePage]);
+
+  const pageNumbers = useMemo(() => {
+    const maxButtons = 5;
+    const half = Math.floor(maxButtons / 2);
+    let start = Math.max(1, safePage - half);
+    const end = Math.min(totalPages, start + maxButtons - 1);
+
+    if (end - start + 1 < maxButtons) {
+      start = Math.max(1, end - maxButtons + 1);
+    }
+
+    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+  }, [safePage, totalPages]);
 
   const openQuickProductPanel = () => {
     window.dispatchEvent(new Event("ruru-open-quick-product-panel"));
-    showAdminToast("다음 단계에서 빠른상품등록 사이드패널로 연결합니다.", "info");
+    showAdminToast("빠른상품등록 패널을 열었습니다.", "info");
   };
 
   return (
-    <div className="col-span-12 h-[392px] rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-4">
+    <div className="col-span-12 h-[460px] rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-sm font-black text-slate-950">등록상품 리스트</h2>
@@ -156,7 +172,7 @@ export default function AdminLiveProductListPanel() {
             onClick={openQuickProductPanel}
             className="rounded-xl bg-blue-600 px-3 py-2 text-[11px] font-black text-white hover:bg-blue-700"
           >
-            + 빠른상품등록
+            + 상품등록
           </button>
 
           <button
@@ -169,7 +185,7 @@ export default function AdminLiveProductListPanel() {
         </div>
       </div>
 
-      <div className="grid grid-cols-[34px_minmax(0,1fr)_92px_50px] border-y border-slate-100 py-2 text-[10px] font-black text-slate-400">
+      <div className="grid grid-cols-[34px_minmax(0,1fr)_82px_42px] border-y border-slate-100 py-2 text-[10px] font-black text-slate-400">
         <div>순서</div>
         <div>상품정보</div>
         <div className="text-center">상태</div>
@@ -182,25 +198,10 @@ export default function AdminLiveProductListPanel() {
             ? "0개"
             : `${(safePage - 1) * pageSize + 1}-${Math.min(safePage * pageSize, products.length)} / ${products.length}개`}
         </div>
-
-        <label className="flex items-center gap-1">
-          <span>페이지당</span>
-          <select
-            value={pageSize}
-            onChange={(event) => {
-              setPageSize(Number(event.target.value));
-              setCurrentPage(1);
-            }}
-            className="rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-[10px] font-black text-slate-700 outline-none"
-          >
-            <option value={6}>6개</option>
-            <option value={10}>10개</option>
-            <option value={20}>20개</option>
-          </select>
-        </label>
+        <div>기본 {pageSize}개씩 표시</div>
       </div>
 
-      <div className="h-[260px] overflow-y-auto pr-1">
+      <div className="h-[326px] overflow-y-auto pr-1">
         {loading ? (
           <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 text-xs font-black text-slate-400">
             상품 목록 불러오는 중...
@@ -208,7 +209,7 @@ export default function AdminLiveProductListPanel() {
         ) : products.length === 0 ? (
           <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 p-5 text-center text-xs font-bold leading-5 text-slate-400">
             등록된 상품이 없습니다.<br />
-            빠른상품등록으로 상품을 먼저 추가하세요.
+            + 상품등록으로 상품을 먼저 추가하세요.
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
@@ -218,7 +219,7 @@ export default function AdminLiveProductListPanel() {
               return (
                 <div
                   key={String(product.id)}
-                  className="grid grid-cols-[34px_minmax(0,1fr)_92px_50px] items-center gap-2 py-2"
+                  className="grid grid-cols-[34px_minmax(0,1fr)_82px_42px] items-center gap-2 py-2"
                 >
                   <div className="text-center text-[11px] font-black text-slate-400">
                     {(safePage - 1) * pageSize + index + 1}
@@ -266,25 +267,37 @@ export default function AdminLiveProductListPanel() {
         )}
       </div>
 
-      <div className="mt-2 flex items-center justify-between gap-2 border-t border-slate-100 pt-2">
+      <div className="mt-2 flex items-center justify-center gap-1.5 border-t border-slate-100 pt-2">
         <button
           type="button"
           disabled={safePage <= 1}
           onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-          className="rounded-xl bg-slate-100 px-3 py-1.5 text-[11px] font-black text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-lg bg-slate-100 px-2.5 py-1.5 text-[11px] font-black text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
         >
           이전
         </button>
 
-        <div className="text-[11px] font-black text-slate-500">
-          {safePage} / {totalPages}
-        </div>
+        {pageNumbers.map((pageNumber) => (
+          <button
+            key={pageNumber}
+            type="button"
+            onClick={() => setCurrentPage(pageNumber)}
+            className={[
+              "min-w-8 rounded-lg px-2.5 py-1.5 text-[11px] font-black",
+              pageNumber === safePage
+                ? "bg-blue-600 text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200",
+            ].join(" ")}
+          >
+            {pageNumber}
+          </button>
+        ))}
 
         <button
           type="button"
           disabled={safePage >= totalPages}
           onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-          className="rounded-xl bg-slate-100 px-3 py-1.5 text-[11px] font-black text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-lg bg-slate-100 px-2.5 py-1.5 text-[11px] font-black text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
         >
           다음
         </button>
