@@ -96,6 +96,38 @@ function pickArray(row: ProductRow | null | undefined, keys: string[]) {
   return [];
 }
 
+function pickImageArray(row: ProductRow | null | undefined, keys: string[]) {
+  if (!row) return [];
+
+  for (const key of keys) {
+    const value = row[key];
+
+    if (Array.isArray(value)) {
+      return value.map((item) => String(item || "").trim()).filter(Boolean);
+    }
+
+    if (typeof value === "string" && value.trim()) {
+      const trimmed = value.trim();
+
+      if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+        try {
+          const parsed = JSON.parse(trimmed);
+
+          if (Array.isArray(parsed)) {
+            return parsed.map((item) => String(item || "").trim()).filter(Boolean);
+          }
+        } catch {
+          return [trimmed];
+        }
+      }
+
+      return [trimmed];
+    }
+  }
+
+  return [];
+}
+
 function parseProductNote(row: ProductRow | null | undefined) {
   const raw = pickString(row, ["product_note", "note", "memo"], "");
 
@@ -295,8 +327,8 @@ export default function QuickProductFastForm({
     setShippingType(pickString(initialProduct, ["shipping_type", "delivery_type"], "normal"));
     setIsVisible(pickBoolean(initialProduct, ["is_visible", "visible"], true));
     setIsPinned(pickBoolean(initialProduct, ["is_pinned", "pinned"], false));
-    setCoverImages(pickArray(initialProduct, ["image_url", "cover_image_url", "main_image_url"]).slice(0, 1));
-    setDetailImages(pickArray(initialProduct, ["detail_image_urls", "detail_images", "images"]).slice(0, 5));
+    setCoverImages(pickImageArray(initialProduct, ["image_url", "cover_image_url", "main_image_url"]).slice(0, 1));
+    setDetailImages(pickImageArray(initialProduct, ["detail_image_urls", "detail_images", "images"]).slice(0, 5));
     setColorText(pickArray(initialProduct, ["color_options", "colors"]).join(", "));
     setSizeText(pickArray(initialProduct, ["size_options", "sizes"]).join(", "));
     setDescription(pickString(initialProduct, ["product_description", "description", "detail_description"], ""));
@@ -524,7 +556,15 @@ export default function QuickProductFastForm({
           </label>
         </div>
 
-        <div className="mt-4 grid grid-cols-3 gap-3">
+        <label className="mt-4 block">
+          <span className="text-xs font-black text-slate-700">상세설명</span>
+          <textarea
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="소재, 핏, 주의사항, 교환/환불 안내 등을 짧게 적어주세요."
+            className="mt-1 h-28 w-full resize-none rounded-xl border border-slate-200 p-3 text-sm font-bold leading-6 outline-none focus:border-blue-400"
+          />
+        </label>\n\n        <div className="mt-4 grid grid-cols-4 gap-3">
           <div>
             <div className="mb-1 text-xs font-black text-slate-700">상품구분</div>
             <div className="grid grid-cols-2 gap-1">
@@ -595,6 +635,32 @@ export default function QuickProductFastForm({
               </button>
             </div>
           </div>
+          <div>
+            <div className="mb-1 text-xs font-black text-slate-700">리스트</div>
+            <div className="grid grid-cols-2 gap-1">
+              <button
+                type="button"
+                onClick={() => setIsPinned(false)}
+                className={[
+                  "h-10 rounded-xl text-xs font-black",
+                  !isPinned ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600",
+                ].join(" ")}
+              >
+                일반
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsPinned(true)}
+                className={[
+                  "h-10 rounded-xl text-xs font-black",
+                  isPinned ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600",
+                ].join(" ")}
+              >
+                상단고정
+              </button>
+            </div>
+          </div>
+
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-4">
@@ -723,24 +789,9 @@ export default function QuickProductFastForm({
           </div>
         </div>
 
-        <label className="mt-4 block">
-          <span className="text-xs font-black text-slate-700">상세설명</span>
-          <textarea
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            placeholder="소재, 핏, 주의사항, 교환/환불 안내 등을 짧게 적어주세요."
-            className="mt-1 h-28 w-full resize-none rounded-xl border border-slate-200 p-3 text-sm font-bold leading-6 outline-none focus:border-blue-400"
-          />
-        </label>
 
-        <label className="mt-3 flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2">
-          <input
-            type="checkbox"
-            checked={isPinned}
-            onChange={(event) => setIsPinned(event.target.checked)}
-          />
-          <span className="text-xs font-black text-slate-600">등록상품 리스트 상단 고정</span>
-        </label>
+
+
       </div>
 
       <div className="flex shrink-0 items-center gap-2 border-t border-slate-200 bg-white px-5 py-4">
