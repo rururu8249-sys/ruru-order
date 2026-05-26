@@ -48,8 +48,8 @@ export default function AdminLiveQuickProductDrawer({
     <div className="fixed inset-0 z-[90]">
       <div className="absolute inset-0 bg-slate-950/35" />
 
-      <aside className="absolute right-0 top-0 flex h-full w-full max-w-[940px] flex-col bg-slate-50 shadow-2xl">
-        <div className="flex h-[68px] shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-6">
+      <aside className="absolute right-0 top-0 flex h-full w-full max-w-[960px] flex-col bg-slate-50 shadow-2xl">
+        <div className="flex h-[64px] shrink-0 items-center border-b border-slate-200 bg-white px-6">
           <div className="min-w-0">
             <h2 className="text-lg font-black text-slate-950">
               {editingProduct ? "상품수정" : "빠른상품등록"}
@@ -57,10 +57,6 @@ export default function AdminLiveQuickProductDrawer({
             <p className="mt-1 text-xs font-bold text-slate-500">
               방송 중 상품 등록·수정을 한 화면에서 빠르게 처리합니다.
             </p>
-          </div>
-
-          <div className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-black text-blue-600">
-            한 화면 입력
           </div>
         </div>
 

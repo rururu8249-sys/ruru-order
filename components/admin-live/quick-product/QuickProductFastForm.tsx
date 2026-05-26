@@ -20,12 +20,12 @@ type VariantStockRow = {
   stock: number;
 };
 
-type CompactImageTileProps = {
+type ImagePickerProps = {
   label: string;
   value: string[];
   maxFiles: number;
   uploadKind: "cover" | "detail";
-  compact?: boolean;
+  mode: "cover" | "detail";
   onChange: (nextValue: string[]) => void;
 };
 
@@ -301,16 +301,17 @@ async function updateProductSchemaSafe(productId: string, payload: Record<string
   throw new Error("products 수정 재시도 횟수를 초과했습니다.");
 }
 
-function CompactImageTile({
+function ImagePicker({
   label,
   value,
   maxFiles,
   uploadKind,
-  compact = false,
+  mode,
   onChange,
-}: CompactImageTileProps) {
+}: ImagePickerProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [showAllDetailImages, setShowAllDetailImages] = useState(false);
 
   const uploadFiles = async (files: FileList | File[]) => {
     const safeFiles = Array.from(files).filter((file) => file.type.startsWith("image/"));
@@ -341,7 +342,9 @@ function CompactImageTile({
           throw new Error(payload?.message || "이미지 업로드 실패");
         }
 
-        uploaded.push(String(payload?.url || payload?.publicUrl || payload?.path || ""));
+        const imageValue = String(payload?.url || payload?.publicUrl || payload?.path || "");
+
+        if (imageValue) uploaded.push(imageValue);
       }
 
       const nextValue = unique([...value, ...uploaded]).slice(0, maxFiles);
@@ -370,108 +373,124 @@ function CompactImageTile({
     }
   };
 
-  const imageSlots = Array.from({ length: maxFiles }, (_, index) => value[index] || "");
+  const removeImage = (index: number) => {
+    onChange(value.filter((_, removeIndex) => removeIndex !== index));
+  };
+
+  const visibleDetailCount = showAllDetailImages ? maxFiles : Math.min(2, maxFiles);
+  const detailSlots = Array.from({ length: visibleDetailCount }, (_, index) => value[index] || "");
+  const coverImage = value[0] || "";
+
+  if (mode === "cover") {
+    return (
+      <div className="min-w-0">
+        <div className="mb-1 flex items-center justify-between">
+          <span className="text-[11px] font-black text-slate-700">{label}</span>
+          <span className="text-[10px] font-black text-slate-400">{value.length}/{maxFiles}</span>
+        </div>
+
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={handleDrop}
+            className="flex h-[150px] w-full items-center justify-center overflow-hidden rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-xs font-black text-slate-400 hover:border-blue-300"
+          >
+            {coverImage ? (
+              <img
+                src={resolveProductImageUrl(coverImage)}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <span>{uploading ? "업로드 중..." : "클릭/드래그"}</span>
+            )}
+          </button>
+
+          {coverImage ? (
+            <button
+              type="button"
+              onClick={() => onChange([])}
+              className="absolute right-2 top-2 rounded-full bg-slate-950/75 px-2 py-1 text-[10px] font-black text-white"
+            >
+              삭제
+            </button>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-w-0">
-      <div className="mb-1 flex items-center justify-between gap-2">
+      <div className="mb-1 flex items-center justify-between">
         <span className="text-[11px] font-black text-slate-700">{label}</span>
-        <span className="text-[10px] font-black text-slate-400">
-          {value.length}/{maxFiles}
-        </span>
+        <span className="text-[10px] font-black text-slate-400">{value.length}/{maxFiles}</span>
       </div>
 
       <input
         ref={inputRef}
         type="file"
         accept="image/*"
-        multiple={maxFiles > 1}
+        multiple
         className="hidden"
         onChange={handleFileChange}
       />
 
-      {compact ? (
-        <div className="grid grid-cols-5 gap-1.5">
-          {imageSlots.map((image, index) => (
+      <div className={["grid gap-2", showAllDetailImages ? "grid-cols-5" : "grid-cols-3"].join(" ")}>
+        {detailSlots.map((image, index) => (
+          <div key={`${image || "empty"}-${index}`} className="relative">
             <button
-              key={`${image || "empty"}-${index}`}
               type="button"
               onClick={() => inputRef.current?.click()}
               onDragOver={(event) => event.preventDefault()}
               onDrop={handleDrop}
-              className="relative flex h-[58px] items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-200 bg-slate-50 text-[10px] font-black text-slate-400 hover:border-blue-300"
+              className="flex h-[64px] w-full items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-200 bg-slate-50 text-[10px] font-black text-slate-400 hover:border-blue-300"
             >
               {image ? (
-                <>
-                  <img
-                    src={resolveProductImageUrl(image)}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onChange(value.filter((_, removeIndex) => removeIndex !== index));
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.stopPropagation();
-                        onChange(value.filter((_, removeIndex) => removeIndex !== index));
-                      }
-                    }}
-                    className="absolute right-1 top-1 rounded-full bg-slate-950/70 px-1.5 py-0.5 text-[9px] text-white"
-                  >
-                    삭제
-                  </span>
-                </>
+                <img
+                  src={resolveProductImageUrl(image)}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
               ) : index === value.length ? (
                 <span>{uploading ? "업로드" : "+ 추가"}</span>
               ) : (
                 <span>사진 없음</span>
               )}
             </button>
-          ))}
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={handleDrop}
-          className="relative flex h-[132px] w-full items-center justify-center overflow-hidden rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-xs font-black text-slate-400 hover:border-blue-300"
-        >
-          {value[0] ? (
-            <>
-              <img
-                src={resolveProductImageUrl(value[0])}
-                alt=""
-                className="h-full w-full object-cover"
-              />
-              <span
-                role="button"
-                tabIndex={0}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onChange([]);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.stopPropagation();
-                    onChange([]);
-                  }
-                }}
-                className="absolute right-2 top-2 rounded-full bg-slate-950/75 px-2 py-1 text-[10px] text-white"
+
+            {image ? (
+              <button
+                type="button"
+                onClick={() => removeImage(index)}
+                className="absolute right-1 top-1 rounded-full bg-slate-950/75 px-1.5 py-0.5 text-[9px] font-black text-white"
               >
-                삭제
-              </span>
-            </>
-          ) : (
-            <span>{uploading ? "업로드 중..." : "클릭/드래그"}</span>
-          )}
-        </button>
-      )}
+                ×
+              </button>
+            ) : null}
+          </div>
+        ))}
+
+        {!showAllDetailImages && maxFiles > 2 ? (
+          <button
+            type="button"
+            onClick={() => setShowAllDetailImages(true)}
+            className="flex h-[64px] items-center justify-center rounded-xl border border-dashed border-blue-200 bg-blue-50 text-[11px] font-black text-blue-600"
+          >
+            +{maxFiles - 2}장 더
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -693,37 +712,38 @@ export default function QuickProductFastForm({
     }
   };
 
-  const buttonClass = "h-8 rounded-xl px-3 text-[11px] font-black";
-  const inactiveButtonClass = "bg-slate-100 text-slate-600 hover:bg-slate-200";
+  const choiceButton = "h-8 rounded-xl px-3 text-[11px] font-black";
+  const inactiveChoice = "bg-slate-100 text-slate-600 hover:bg-slate-200";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-hidden px-5 py-4">
-        <div className="grid min-h-full grid-rows-[142px_66px_78px_112px_minmax(122px,1fr)] gap-3">
-          <section className="grid min-h-0 grid-cols-[140px_minmax(0,1fr)] gap-4">
-            <CompactImageTile
+        <div className="grid h-full min-h-0 grid-rows-[250px_76px_92px_minmax(142px,1fr)] gap-3">
+          <section className="grid min-h-0 grid-cols-[170px_minmax(0,1fr)] gap-4 rounded-2xl border border-slate-200 bg-white p-3">
+            <ImagePicker
               label="대표사진"
               value={coverImages}
               maxFiles={1}
               uploadKind="cover"
+              mode="cover"
               onChange={setCoverImages}
             />
 
-            <div className="grid min-h-0 grid-rows-[40px_58px_1fr] gap-2">
-              <div className="grid grid-cols-[minmax(0,1fr)_150px] gap-2">
+            <div className="grid min-h-0 grid-rows-[42px_78px_92px] gap-2">
+              <div className="grid grid-cols-[minmax(0,1fr)_168px] gap-2">
                 <label className="min-w-0">
-                  <span className="sr-only">상품명</span>
+                  <span className="mb-1 block text-[10px] font-black text-slate-500">상품명</span>
                   <input
                     value={productName}
                     onChange={(event) => setProductName(event.target.value)}
                     placeholder="상품명"
-                    className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm font-black outline-none focus:border-blue-400"
+                    className="h-9 w-full rounded-xl border border-slate-200 px-3 text-sm font-black outline-none focus:border-blue-400"
                   />
                 </label>
 
                 <label>
-                  <span className="sr-only">판매가</span>
-                  <div className="flex h-10 items-center rounded-xl border border-slate-200 px-3 focus-within:border-blue-400">
+                  <span className="mb-1 block text-[10px] font-black text-slate-500">판매가</span>
+                  <div className="flex h-9 items-center rounded-xl border border-slate-200 px-3 focus-within:border-blue-400">
                     <input
                       value={formatNumberWithComma(priceText)}
                       onChange={(event) => setPriceText(onlyNumber(event.target.value))}
@@ -735,25 +755,28 @@ export default function QuickProductFastForm({
                 </label>
               </div>
 
-              <textarea
-                value={description}
-                onChange={(event) => setDescription(normalizeTextareaText(event.target.value))}
-                placeholder="상세설명: 소재, 핏, 주의사항, 교환/환불 안내"
-                className="h-[58px] w-full resize-none rounded-xl border border-slate-200 p-2.5 text-xs font-bold leading-5 outline-none focus:border-blue-400"
-              />
+              <label className="min-h-0">
+                <span className="mb-1 block text-[10px] font-black text-slate-500">상세설명</span>
+                <textarea
+                  value={description}
+                  onChange={(event) => setDescription(normalizeTextareaText(event.target.value))}
+                  placeholder="소재, 핏, 주의사항, 교환/환불 안내"
+                  className="h-[58px] w-full resize-none rounded-xl border border-slate-200 p-2.5 text-xs font-bold leading-5 outline-none focus:border-blue-400"
+                />
+              </label>
 
-              <CompactImageTile
+              <ImagePicker
                 label="상세사진 최대 5장"
                 value={detailImages}
                 maxFiles={5}
                 uploadKind="detail"
-                compact
+                mode="detail"
                 onChange={setDetailImages}
               />
             </div>
           </section>
 
-          <section className="grid min-h-0 grid-cols-[1fr_1.25fr_1fr_1fr] gap-2 rounded-2xl border border-slate-200 bg-white p-2.5">
+          <section className="grid min-h-0 grid-cols-[1fr_1.2fr_1fr_1fr] gap-2 rounded-2xl border border-slate-200 bg-white p-3">
             <div>
               <div className="mb-1 text-[10px] font-black text-slate-500">상품구분</div>
               <div className="flex gap-1">
@@ -761,8 +784,8 @@ export default function QuickProductFastForm({
                   type="button"
                   onClick={() => setProductType("broadcast")}
                   className={[
-                    buttonClass,
-                    productType === "broadcast" ? "bg-blue-600 text-white" : inactiveButtonClass,
+                    choiceButton,
+                    productType === "broadcast" ? "bg-blue-600 text-white" : inactiveChoice,
                   ].join(" ")}
                 >
                   방송
@@ -771,8 +794,8 @@ export default function QuickProductFastForm({
                   type="button"
                   onClick={() => setProductType("group_buy")}
                   className={[
-                    buttonClass,
-                    productType === "group_buy" ? "bg-blue-600 text-white" : inactiveButtonClass,
+                    choiceButton,
+                    productType === "group_buy" ? "bg-blue-600 text-white" : inactiveChoice,
                   ].join(" ")}
                 >
                   공구
@@ -793,8 +816,8 @@ export default function QuickProductFastForm({
                     type="button"
                     onClick={() => setShippingType(value)}
                     className={[
-                      buttonClass,
-                      shippingType === value ? "bg-blue-600 text-white" : inactiveButtonClass,
+                      choiceButton,
+                      shippingType === value ? "bg-blue-600 text-white" : inactiveChoice,
                     ].join(" ")}
                   >
                     {label}
@@ -810,8 +833,8 @@ export default function QuickProductFastForm({
                   type="button"
                   onClick={() => setIsVisible(true)}
                   className={[
-                    buttonClass,
-                    isVisible ? "bg-emerald-600 text-white" : inactiveButtonClass,
+                    choiceButton,
+                    isVisible ? "bg-emerald-600 text-white" : inactiveChoice,
                   ].join(" ")}
                 >
                   노출
@@ -820,8 +843,8 @@ export default function QuickProductFastForm({
                   type="button"
                   onClick={() => setIsVisible(false)}
                   className={[
-                    buttonClass,
-                    !isVisible ? "bg-slate-800 text-white" : inactiveButtonClass,
+                    choiceButton,
+                    !isVisible ? "bg-slate-800 text-white" : inactiveChoice,
                   ].join(" ")}
                 >
                   숨김
@@ -836,8 +859,8 @@ export default function QuickProductFastForm({
                   type="button"
                   onClick={() => setIsPinned(false)}
                   className={[
-                    buttonClass,
-                    !isPinned ? "bg-slate-800 text-white" : inactiveButtonClass,
+                    choiceButton,
+                    !isPinned ? "bg-slate-800 text-white" : inactiveChoice,
                   ].join(" ")}
                 >
                   일반
@@ -846,8 +869,8 @@ export default function QuickProductFastForm({
                   type="button"
                   onClick={() => setIsPinned(true)}
                   className={[
-                    buttonClass,
-                    isPinned ? "bg-blue-600 text-white" : inactiveButtonClass,
+                    choiceButton,
+                    isPinned ? "bg-blue-600 text-white" : inactiveChoice,
                   ].join(" ")}
                 >
                   상단
@@ -857,7 +880,7 @@ export default function QuickProductFastForm({
           </section>
 
           <section className="grid min-h-0 grid-cols-2 gap-3">
-            <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-2.5">
+            <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3">
               <div className="mb-1 flex items-center justify-between">
                 <span className="text-[11px] font-black text-slate-700">색상</span>
                 <span className="text-[10px] font-bold text-slate-400">쉼표 여러 개</span>
@@ -868,7 +891,7 @@ export default function QuickProductFastForm({
                 placeholder="예: 블랙, 베이지"
                 className="h-9 w-full rounded-xl border border-slate-200 px-3 text-xs font-bold outline-none focus:border-blue-400"
               />
-              <div className="mt-1.5 flex flex-wrap gap-1">
+              <div className="mt-2 flex flex-wrap gap-1">
                 {COLOR_PRESETS.map((preset) => (
                   <button
                     key={preset}
@@ -882,7 +905,7 @@ export default function QuickProductFastForm({
               </div>
             </div>
 
-            <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-2.5">
+            <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3">
               <div className="mb-1 flex items-center justify-between">
                 <span className="text-[11px] font-black text-slate-700">사이즈</span>
                 <span className="text-[10px] font-bold text-slate-400">프리셋 유지</span>
@@ -893,7 +916,7 @@ export default function QuickProductFastForm({
                 placeholder="예: FREE 또는 S, M, L"
                 className="h-9 w-full rounded-xl border border-slate-200 px-3 text-xs font-bold outline-none focus:border-blue-400"
               />
-              <div className="mt-1.5 flex flex-wrap gap-1">
+              <div className="mt-2 flex flex-wrap gap-1">
                 {SIZE_PRESETS.map((preset) => (
                   <button
                     key={preset}
@@ -913,7 +936,7 @@ export default function QuickProductFastForm({
               <div>
                 <div className="text-xs font-black text-slate-800">재고관리</div>
                 <div className="mt-0.5 text-[10px] font-bold text-slate-400">
-                  기본은 총재고, 필요할 때 옵션별 재고를 사용합니다.
+                  기본은 총재고, 옵션별은 필요할 때만 입력합니다.
                 </div>
               </div>
 
@@ -941,8 +964,8 @@ export default function QuickProductFastForm({
               </div>
             </div>
 
-            <div className="grid min-h-0 grid-cols-[220px_minmax(0,1fr)] gap-3">
-              <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-3">
+            <div className="grid min-h-0 grid-cols-[210px_minmax(0,1fr)] gap-3">
+              <div className="flex h-[68px] items-center gap-2 rounded-xl bg-slate-50 px-3">
                 <span className="text-xs font-bold text-slate-500">전체 재고</span>
                 <input
                   value={formatNumberWithComma(totalStockText)}
