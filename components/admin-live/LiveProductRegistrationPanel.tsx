@@ -1,9 +1,32 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { showAdminToast } from "@/lib/adminToast";
 
 type ProductKind = "broadcast" | "group";
 type DeliveryType = "normal" | "vendor";
+
+type LiveProductRegistrationPanelProps = {
+  activeBroadcastId?: string | number | null;
+};
+
+type ProductRow = {
+  id: string | number;
+  name?: string | null;
+  price?: number | null;
+  product_type?: string | null;
+  status?: string | null;
+  shipping_type?: string | null;
+  sort_order?: number | null;
+  is_pinned?: boolean | null;
+  color_options?: string[] | null;
+  size_options?: string[] | null;
+  size_option_enabled?: boolean | null;
+  delivery_group_key?: string | null;
+  product_description?: string | null;
+  detail_image_urls?: string[] | null;
+};
 
 const SIZE_PRESETS = {
   clothes: ["XS", "S", "M", "L", "XL", "XXL"],
@@ -39,17 +62,44 @@ function splitOptions(value: string): string[] {
   );
 }
 
-function formatNumberInput(value: string): string {
-  const onlyDigits = value.replace(/[^0-9]/g, "");
-  if (!onlyDigits) return "";
-  return Number(onlyDigits).toLocaleString("ko-KR");
+function onlyDigits(value: string): string {
+  return String(value || "").replace(/[^0-9]/g, "");
 }
 
-export default function LiveProductRegistrationPanel() {
+function formatNumberInput(value: string): string {
+  const digits = onlyDigits(value);
+  if (!digits) return "";
+  return Number(digits).toLocaleString("ko-KR");
+}
+
+function numberFromMoneyText(value: string): number {
+  const digits = onlyDigits(value);
+  return digits ? Number(digits) : 0;
+}
+
+
+function productKindLabel(kind: ProductKind) {
+  return kind === "broadcast" ? "방송상품" : "공구상품";
+}
+
+function deliveryTypeLabel(type: DeliveryType) {
+  return type === "vendor" ? "업체배송" : "일반배송";
+}
+
+function statusLabel(visible: boolean, soldOut: boolean) {
+  if (!visible) return "숨김";
+  if (soldOut) return "품절";
+  return "판매중";
+}
+
+export default function LiveProductRegistrationPanel({
+  activeBroadcastId,
+}: LiveProductRegistrationPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectOrderEnabled, setSelectOrderEnabled] = useState(true);
   const [productKind, setProductKind] = useState<ProductKind>("broadcast");
   const [deliveryType, setDeliveryType] = useState<DeliveryType>("normal");
+  const [name, setName] = useState("");
   const [priceText, setPriceText] = useState("");
   const [colors, setColors] = useState("");
   const [sizes, setSizes] = useState("");
@@ -61,9 +111,48 @@ export default function LiveProductRegistrationPanel() {
   const [pinned, setPinned] = useState(false);
   const [visible, setVisible] = useState(true);
   const [soldOut, setSoldOut] = useState(false);
+  const [deliveryGroupKey, setDeliveryGroupKey] = useState("");
+  const [productNote, setProductNote] = useState("");
+  const [productDescription, setProductDescription] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [recentProducts, setRecentProducts] = useState<ProductRow[]>([]);
 
   const parsedColors = useMemo(() => splitOptions(colors), [colors]);
-  const parsedSizes = useMemo(() => splitOptions(sizes), [sizes]);
+  const parsedSizes = useMemo(
+    () => (sizeOptionDisabled ? [] : splitOptions(sizes)),
+    [sizeOptionDisabled, sizes],
+  );
+
+
+  const loadRecentProducts = useCallback(async () => {
+    setLoadingProducts(true);
+
+    const { data, error } = await supabase
+      .from("products")
+      .select(
+        "id,name,price,product_type,status,shipping_type,sort_order,is_pinned,color_options,size_options,size_option_enabled,delivery_group_key,product_description,detail_image_urls",
+      )
+      .order("is_pinned", { ascending: false })
+      .order("sort_order", { ascending: true })
+      .order("id", { ascending: false })
+      .limit(12);
+
+    if (error) {
+      console.error("상품 목록 조회 실패", error.message);
+      showAdminToast("상품 목록 조회 실패\n\n" + error.message, "error");
+      setLoadingProducts(false);
+      return;
+    }
+
+    setRecentProducts((data || []) as ProductRow[]);
+    setLoadingProducts(false);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    loadRecentProducts();
+  }, [isOpen, loadRecentProducts]);
 
   const applyPreset = (key: keyof typeof SIZE_PRESETS) => {
     setSizeOptionDisabled(false);
@@ -95,6 +184,139 @@ export default function LiveProductRegistrationPanel() {
     });
   };
 
+  const resetForm = () => {
+    setName("");
+    setPriceText("");
+    setColors("");
+    setSizes("");
+    setSizeOptionDisabled(false);
+    setDeliveryType("normal");
+    setStockEnabled(false);
+    setPinned(false);
+    setVisible(true);
+    setSoldOut(false);
+    setDeliveryGroupKey("");
+    setProductNote("");
+    setProductDescription("");
+  };
+
+  const saveProduct = async () => {
+    const cleanName = name.trim();
+    const price = numberFromMoneyText(priceText);
+    const cleanDeliveryGroupKey = deliveryGroupKey.trim();
+
+    if (!cleanName) {
+      showAdminToast("상품명을 입력해주세요.", "warning");
+      return;
+    }
+
+    if (price < 1) {
+      showAdminToast("판매가는 1원 이상 입력해주세요.", "warning");
+      return;
+    }
+
+    if (productKind === "broadcast" && !activeBroadcastId) {
+      showAdminToast("현재 방송이 없어 방송상품 연결을 할 수 없습니다.\n방송 시작 후 등록해주세요.", "warning");
+      return;
+    }
+
+    if (deliveryType === "vendor" && !cleanDeliveryGroupKey) {
+      showAdminToast("업체배송은 배송그룹을 입력해주세요.\n예: vendor_lamer, vendor_a", "warning");
+      return;
+    }
+
+    const nextProductType = productKindLabel(productKind);
+    const nextShippingType = deliveryTypeLabel(deliveryType);
+    const nextStatus = statusLabel(visible, soldOut);
+    const colorOptions = parsedColors;
+    const sizeOptions = sizeOptionDisabled ? [] : parsedSizes;
+
+    setSaving(true);
+
+    try {
+      const { count } = await supabase
+        .from("products")
+        .select("id", { count: "exact", head: true });
+
+      const nextSortOrder = Number(count || 0) + 1;
+
+      const payload = {
+        name: cleanName,
+        price,
+        stock: stockEnabled ? 0 : 0,
+        status: nextStatus,
+        product_type: nextProductType,
+        shipping_type: nextShippingType,
+        sort_order: nextSortOrder,
+        color_options: colorOptions,
+        size_options: sizeOptions,
+        size_option_enabled: !sizeOptionDisabled,
+        is_pinned: pinned,
+        image_url: "",
+        image_path: null,
+        delivery_group_key: deliveryType === "vendor" ? cleanDeliveryGroupKey : null,
+        product_note: productNote.trim() || null,
+        product_description: productDescription.trim() || null,
+        detail_image_urls: [],
+      };
+
+      const { data: insertedProduct, error: productError } = await supabase
+        .from("products")
+        .insert(payload)
+        .select("id")
+        .single();
+
+      if (productError) {
+        throw new Error(productError.message);
+      }
+
+      if (productKind === "broadcast") {
+        const productId = insertedProduct?.id;
+
+        if (!productId) {
+          throw new Error("상품 ID를 확인하지 못했습니다.");
+        }
+
+        const { data: existingLink, error: linkCheckError } = await supabase
+          .from("broadcast_products")
+          .select("id")
+          .eq("broadcast_id", activeBroadcastId)
+          .eq("product_id", productId)
+          .limit(1);
+
+        if (linkCheckError) {
+          throw new Error(linkCheckError.message);
+        }
+
+        if (!existingLink || existingLink.length === 0) {
+          const { error: linkError } = await supabase.from("broadcast_products").insert({
+            broadcast_id: activeBroadcastId,
+            product_id: productId,
+          });
+
+          if (linkError) {
+            throw new Error(linkError.message);
+          }
+        }
+      }
+
+      showAdminToast(
+        productKind === "broadcast"
+          ? "방송상품을 저장하고 현재 방송에 연결했습니다."
+          : "공구상품을 저장했습니다.",
+        "success",
+      );
+
+      resetForm();
+      await loadRecentProducts();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "알 수 없는 오류";
+      showAdminToast("상품 저장 실패\n\n" + message, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <section className="rounded-[22px] border border-slate-200 bg-white shadow-sm">
       <button
@@ -108,7 +330,7 @@ export default function LiveProductRegistrationPanel() {
               방송상품 · 공구상품 등록
             </span>
             <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-black text-blue-700">
-              1차 UI
+              저장 연결
             </span>
             <span
               className={[
@@ -122,7 +344,7 @@ export default function LiveProductRegistrationPanel() {
             </span>
           </div>
           <p className="mt-1 text-[12px] font-bold text-slate-500">
-            방송 중 상품을 빠르게 등록하는 작업창입니다. 지금 단계는 저장 없이 화면 구조만 확인합니다.
+            상품을 products에 저장합니다. 방송상품은 현재 방송에도 함께 연결됩니다.
           </p>
         </div>
 
@@ -139,7 +361,7 @@ export default function LiveProductRegistrationPanel() {
                 선택형 주문서 사용
               </p>
               <p className="mt-0.5 text-[12px] font-bold text-slate-500">
-                ON이면 고객이 상품을 선택해서 담고, OFF면 기존 직접입력 주문서를 사용합니다.
+                현재는 관리자 저장 단계입니다. 고객 주문서 노출은 다음 단계에서 연결합니다.
               </p>
             </div>
 
@@ -192,6 +414,8 @@ export default function LiveProductRegistrationPanel() {
                     상품명
                   </span>
                   <input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
                     className="h-11 w-full rounded-xl border border-slate-200 px-3 text-[13px] font-bold outline-none focus:border-blue-400"
                     placeholder="예: 룰루레몬 밴딩 바지"
                   />
@@ -345,6 +569,7 @@ export default function LiveProductRegistrationPanel() {
                     ].join(" ")}
                     placeholder={sizeOptionDisabled ? "사이즈 옵션 없이 등록" : "S, M, L 또는 240, 245 / 필요시 120 추가 가능"}
                   />
+
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {sizeOptionDisabled ? (
                       <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-500">
@@ -382,20 +607,26 @@ export default function LiveProductRegistrationPanel() {
                   >
                     <option value="normal">일반배송</option>
                     <option value="vendor">업체배송</option>
-                    <option value="vendor">업체배송</option>
                   </select>
+                  <p className="mt-1 text-[11px] font-bold text-slate-400">
+                    업체배송은 타 상품과 합배송불가/배송비 별도 기준입니다.
+                  </p>
                 </label>
 
                 <label className="block">
                   <span className="mb-1 block text-[12px] font-black text-slate-600">
-                    사진
+                    업체배송 그룹
                   </span>
-                  <button
-                    type="button"
-                    className="h-11 w-full rounded-xl border border-dashed border-slate-300 bg-slate-50 text-[12px] font-black text-slate-500"
-                  >
-                    사진 없음 / 업로드는 2차
-                  </button>
+                  <input
+                    value={deliveryGroupKey}
+                    onChange={(event) => setDeliveryGroupKey(event.target.value)}
+                    disabled={deliveryType !== "vendor"}
+                    className={[
+                      "h-11 w-full rounded-xl border border-slate-200 px-3 text-[13px] font-bold outline-none focus:border-blue-400",
+                      deliveryType !== "vendor" ? "bg-slate-100 text-slate-400" : "",
+                    ].join(" ")}
+                    placeholder={deliveryType === "vendor" ? "예: vendor_lamer" : "일반배송은 입력 안 함"}
+                  />
                 </label>
 
                 <div>
@@ -443,6 +674,54 @@ export default function LiveProductRegistrationPanel() {
                 </div>
               </div>
 
+              <label className="mt-3 block">
+                <span className="mb-1 block text-[12px] font-black text-slate-600">
+                  상품 메모
+                </span>
+                <input
+                  value={productNote}
+                  onChange={(event) => setProductNote(event.target.value)}
+                  className="h-11 w-full rounded-xl border border-slate-200 px-3 text-[13px] font-bold outline-none focus:border-blue-400"
+                  placeholder="고객 노출용 짧은 안내 또는 관리자 메모"
+                />
+              </label>
+
+              <label className="mt-3 block">
+                <span className="mb-1 block text-[12px] font-black text-slate-600">
+                  상품상세설명
+                </span>
+                <textarea
+                  value={productDescription}
+                  onChange={(event) => setProductDescription(event.target.value)}
+                  className="min-h-[110px] w-full resize-y rounded-xl border border-slate-200 px-3 py-3 text-[13px] font-bold leading-relaxed outline-none focus:border-blue-400"
+                  placeholder="고객이 상품 상세에서 볼 설명을 입력하세요. 예: 소재, 핏, 주의사항, 교환/환불 안내 등"
+                />
+              </label>
+
+              <div className="mt-3 block">
+                <span className="mb-1 block text-[12px] font-black text-slate-600">
+                  상품상세사진
+                </span>
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center">
+                  <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-white text-lg shadow-sm">
+                    🖼️
+                  </div>
+                  <p className="text-[13px] font-black text-slate-700">
+                    상세사진 드래그앤드롭 / 파일선택 업로드 자리
+                  </p>
+                  <p className="mt-1 text-[11px] font-bold leading-relaxed text-slate-500">
+                    실제 업로드, 자동압축, 여러 장 저장, 완전삭제는 다음 단계에서 연결합니다.
+                  </p>
+                  <button
+                    type="button"
+                    disabled
+                    className="mt-3 rounded-xl bg-white px-4 py-2 text-[12px] font-black text-slate-400 ring-1 ring-slate-200"
+                  >
+                    파일 선택은 다음 단계
+                  </button>
+                </div>
+              </div>
+
               <div className="mt-3 flex items-center justify-between gap-3">
                 <label className="flex items-center gap-2 text-[12px] font-black text-slate-600">
                   <input
@@ -455,9 +734,11 @@ export default function LiveProductRegistrationPanel() {
 
                 <button
                   type="button"
-                  className="rounded-xl bg-blue-600 px-6 py-3 text-[13px] font-black text-white shadow-sm"
+                  onClick={saveProduct}
+                  disabled={saving}
+                  className="rounded-xl bg-blue-600 px-6 py-3 text-[13px] font-black text-white shadow-sm disabled:cursor-wait disabled:opacity-50"
                 >
-                  상품등록 UI 확인
+                  {saving ? "저장중..." : "상품 등록"}
                 </button>
               </div>
             </div>
@@ -466,56 +747,61 @@ export default function LiveProductRegistrationPanel() {
               <div className="mb-3 flex items-center justify-between">
                 <div>
                   <p className="text-[13px] font-black text-slate-900">
-                    등록상품 미리보기
+                    최근 등록상품
                   </p>
                   <p className="text-[11px] font-bold text-slate-500">
-                    실제 저장/정렬은 다음 단계에서 연결합니다.
+                    상단고정/노출순서 기준으로 표시합니다.
                   </p>
                 </div>
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600">
-                  샘플 3개
-                </span>
+                <button
+                  type="button"
+                  onClick={loadRecentProducts}
+                  className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600"
+                >
+                  새로고침
+                </button>
               </div>
 
               <div className="space-y-2">
-                {[
-                  "룰루레몬 밴딩 바지",
-                  "라메르 크림 100ml",
-                  "데일리 베이직 스니커즈",
-                ].map((name, index) => (
-                  <div
-                    key={name}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-[12px] font-black text-slate-900">
-                        {index === 0 ? "📌 " : ""}
-                        {name}
-                      </p>
-                      <p className="mt-0.5 text-[11px] font-bold text-slate-500">
-                        방송상품 · 노출중 · 일반배송
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 gap-1">
-                      <button
-                        type="button"
-                        className="rounded-lg bg-white px-2 py-1 text-[11px] font-black text-slate-500 ring-1 ring-slate-200"
-                      >
-                        ▲
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-lg bg-white px-2 py-1 text-[11px] font-black text-slate-500 ring-1 ring-slate-200"
-                      >
-                        ▼
-                      </button>
-                    </div>
+                {loadingProducts ? (
+                  <div className="rounded-xl bg-slate-50 px-3 py-6 text-center text-[12px] font-black text-slate-400">
+                    상품 목록 불러오는 중
                   </div>
-                ))}
+                ) : recentProducts.length ? (
+                  recentProducts.map((product) => (
+                    <div
+                      key={String(product.id)}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-[12px] font-black text-slate-900">
+                          {product.is_pinned ? "📌 " : ""}
+                          {product.name || "상품명 없음"}
+                        </p>
+                        <p className="mt-0.5 text-[11px] font-bold text-slate-500">
+                          {(product.product_type || "상품")} · {product.status || "-"} · {product.shipping_type || "-"}
+                        </p>
+                        <p className="mt-0.5 text-[11px] font-black text-blue-700">
+                          {Number(product.price || 0).toLocaleString("ko-KR")}원
+                        </p>
+                        <p className="mt-0.5 text-[10px] font-bold text-slate-400">
+                          상세설명 {product.product_description ? "있음" : "없음"} · 상세사진 {Array.isArray(product.detail_image_urls) ? product.detail_image_urls.length : 0}장
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-lg bg-white px-2 py-1 text-[11px] font-black text-slate-500 ring-1 ring-slate-200">
+                        #{product.sort_order || product.id}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-xl bg-slate-50 px-3 py-6 text-center text-[12px] font-black text-slate-400">
+                    등록된 상품이 없거나 조회되지 않았습니다.
+                  </div>
+                )}
               </div>
 
               <div className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-[11px] font-bold leading-relaxed text-amber-800">
-                1차는 화면 자리와 사용 흐름 확인 단계입니다. 주문/입금/정산 데이터에는 연결하지 않습니다.
+                고객 주문서 노출과 배송비 계산은 다음 단계에서 별도 연결합니다.
               </div>
             </div>
           </div>

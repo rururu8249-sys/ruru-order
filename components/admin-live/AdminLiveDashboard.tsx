@@ -575,7 +575,7 @@ export default function AdminLiveDashboard() {
           />
           <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
           <LiveBroadcastPanels videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} />
-          <LiveProductRegistrationPanel />
+          <LiveProductRegistrationPanel activeBroadcastId={activeBroadcast?.id || null} />
 
           {loadError && (
             <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700">
