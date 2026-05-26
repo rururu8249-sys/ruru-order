@@ -718,7 +718,7 @@ export default function QuickProductFastForm({
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-hidden px-5 py-4">
-        <div className="grid h-full min-h-0 grid-rows-[300px_72px_88px_minmax(240px,1fr)] gap-4">
+        <div className="grid min-h-0 content-start grid-rows-[300px_72px_118px_170px] gap-4">
           <section className="grid min-h-0 items-center grid-cols-[180px_minmax(0,1fr)] gap-4 rounded-2xl border border-slate-200 bg-white p-3">
             <ImagePicker
               label="대표사진"
@@ -923,7 +923,7 @@ export default function QuickProductFastForm({
             </div>
           </section>
 
-          <section className="grid h-full min-h-0 grid-cols-[260px_minmax(0,1fr)] gap-4">
+          <section className="grid h-[170px] min-h-0 grid-cols-[260px_minmax(0,1fr)] gap-4">
             <div className="min-h-0 rounded-2xl border border-slate-200 bg-white p-3">
               <ImagePicker
                 label="상세사진 최대 5장"
@@ -990,7 +990,7 @@ export default function QuickProductFastForm({
                   <div className="text-right">재고</div>
                 </div>
 
-                <div className="max-h-[150px] overflow-y-auto">
+                <div className="max-h-[86px] overflow-y-auto">
                   {stockMode === "option" && resolvedVariantRows.length > 0 ? (
                     resolvedVariantRows.slice(0, 12).map((row) => (
                       <div
