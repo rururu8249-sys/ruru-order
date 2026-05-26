@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
+import LiveProductImageUploader, { type UploadedProductImage } from "./LiveProductImageUploader";
 
 type ProductKind = "broadcast" | "group";
 type DeliveryType = "normal" | "vendor";
@@ -114,6 +115,8 @@ export default function LiveProductRegistrationPanel({
   const [deliveryGroupKey, setDeliveryGroupKey] = useState("");
   const [productNote, setProductNote] = useState("");
   const [productDescription, setProductDescription] = useState("");
+  const [coverImages, setCoverImages] = useState<UploadedProductImage[]>([]);
+  const [detailImages, setDetailImages] = useState<UploadedProductImage[]>([]);
   const [saving, setSaving] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [recentProducts, setRecentProducts] = useState<ProductRow[]>([]);
@@ -198,6 +201,8 @@ export default function LiveProductRegistrationPanel({
     setDeliveryGroupKey("");
     setProductNote("");
     setProductDescription("");
+    setCoverImages([]);
+    setDetailImages([]);
   };
 
   const saveProduct = async () => {
@@ -252,12 +257,12 @@ export default function LiveProductRegistrationPanel({
         size_options: sizeOptions,
         size_option_enabled: !sizeOptionDisabled,
         is_pinned: pinned,
-        image_url: "",
-        image_path: null,
+        image_url: coverImages[0]?.url || "",
+        image_path: coverImages[0]?.path || null,
         delivery_group_key: deliveryType === "vendor" ? cleanDeliveryGroupKey : null,
         product_note: productNote.trim() || null,
         product_description: productDescription.trim() || null,
-        detail_image_urls: [],
+        detail_image_urls: detailImages.map((image) => image.url),
       };
 
       const { data: insertedProduct, error: productError } = await supabase
@@ -698,29 +703,24 @@ export default function LiveProductRegistrationPanel({
                 />
               </label>
 
-              <div className="mt-3 block">
-                <span className="mb-1 block text-[12px] font-black text-slate-600">
-                  상품상세사진
-                </span>
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center">
-                  <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-white text-lg shadow-sm">
-                    🖼️
-                  </div>
-                  <p className="text-[13px] font-black text-slate-700">
-                    상세사진 드래그앤드롭 / 파일선택 업로드 자리
-                  </p>
-                  <p className="mt-1 text-[11px] font-bold leading-relaxed text-slate-500">
-                    실제 업로드, 자동압축, 여러 장 저장, 완전삭제는 다음 단계에서 연결합니다.
-                  </p>
-                  <button
-                    type="button"
-                    disabled
-                    className="mt-3 rounded-xl bg-white px-4 py-2 text-[12px] font-black text-slate-400 ring-1 ring-slate-200"
-                  >
-                    파일 선택은 다음 단계
-                  </button>
-                </div>
-              </div>
+              <LiveProductImageUploader
+                label="노출 썸네일 / 대표사진"
+                helpText="고객 상품리스트에 보이는 기본 사진"
+                kind="cover"
+                images={coverImages}
+                onChange={setCoverImages}
+                compact
+              />
+
+              <LiveProductImageUploader
+                label="상품상세사진"
+                helpText="상세페이지용 여러 장 사진"
+                kind="detail"
+                multiple
+                images={detailImages}
+                onChange={setDetailImages}
+                compact
+              />
 
               <div className="mt-3 flex items-center justify-between gap-3">
                 <label className="flex items-center gap-2 text-[12px] font-black text-slate-600">
