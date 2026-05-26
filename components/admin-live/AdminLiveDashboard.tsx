@@ -15,7 +15,6 @@ import AdminLiveSidebar from "./AdminLiveSidebar";
 import LiveHeader from "./LiveHeader";
 import LiveStatsCards from "./LiveStatsCards";
 import LiveBroadcastPanels from "./LiveBroadcastPanels";
-import LiveProductRegistrationPanel from "./LiveProductRegistrationPanel";
 import LiveOrderTable, { type LiveOrderFilters } from "./LiveOrderTable";
 import LiveOrderDetailDrawer from "./LiveOrderDetailDrawer";
 import {
@@ -575,7 +574,6 @@ export default function AdminLiveDashboard() {
           />
           <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
           <LiveBroadcastPanels videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} />
-          <LiveProductRegistrationPanel activeBroadcastId={activeBroadcast?.id || null} />
 {loadError && (
             <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700">
               주문 데이터 불러오기 실패: {loadError}

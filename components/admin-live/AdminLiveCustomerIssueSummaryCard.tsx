@@ -180,19 +180,19 @@ export default function AdminLiveCustomerIssueSummaryCard({
   return (
     <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-sm font-black text-amber-900">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-amber-600 shadow-sm">
+        <div className="flex min-w-0 items-center gap-2 text-sm font-black text-amber-900">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-amber-600 shadow-sm">
             !
           </span>
-          <span>고객이슈 {loading ? "확인중" : `${tasks.length}건`}</span>
+          <span className="truncate">고객이슈</span>
         </div>
 
         <button
           type="button"
           onClick={loadIssues}
-          className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-amber-700 ring-1 ring-amber-100"
+          className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-amber-700 ring-1 ring-amber-100"
         >
-          새로고침
+          {loading ? "확인중" : `${tasks.length}건`}
         </button>
       </div>
 
