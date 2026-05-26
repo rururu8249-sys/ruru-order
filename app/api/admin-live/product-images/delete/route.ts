@@ -12,11 +12,11 @@ function assertAdmin(request: NextRequest) {
   const expectedToken = process.env.ADMIN_SESSION_TOKEN;
   const sessionToken = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
 
-  if (!expectedToken || sessionToken !== expectedToken) {
-    return false;
-  }
-
-  return true;
+  return {
+    ok: Boolean(expectedToken && sessionToken === expectedToken),
+    hasExpectedToken: Boolean(expectedToken),
+    hasSessionCookie: Boolean(sessionToken),
+  };
 }
 
 function getSupabaseAdmin() {
@@ -36,8 +36,17 @@ function getSupabaseAdmin() {
 }
 
 export async function POST(request: NextRequest) {
-  if (!assertAdmin(request)) {
-    return jsonError("관리자 로그인 후 이용해주세요.", 401);
+  const adminAuth = assertAdmin(request);
+
+  if (!adminAuth.ok) {
+    return jsonError(
+      adminAuth.hasExpectedToken
+        ? adminAuth.hasSessionCookie
+          ? "관리자 로그인 정보가 일치하지 않습니다. /admin-login에서 다시 로그인 후 새로고침해주세요."
+          : "관리자 로그인 쿠키가 없습니다. /admin-login에서 다시 로그인 후 새로고침해주세요."
+        : "관리자 인증 환경변수가 없습니다. Vercel ADMIN_SESSION_TOKEN을 확인해주세요.",
+      401,
+    );
   }
 
   try {
