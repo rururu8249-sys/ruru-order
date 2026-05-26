@@ -27,6 +27,48 @@ function onlyNumber(value: string) {
   return String(value || "").replace(/[^0-9]/g, "");
 }
 
+function moneyNumber(value: string) {
+  return Number(onlyNumber(value) || 0);
+}
+
+function formatNumberWithComma(value: string | number) {
+  const digits = onlyNumber(String(value || ""));
+
+  if (!digits) return "";
+
+  return Number(digits).toLocaleString("ko-KR");
+}
+
+function normalizeTextareaText(value: string) {
+  return String(value || "")
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\t/g, "\t");
+}
+
+function splitOptions(value: string) {
+  return String(value || "")
+    .split(/[,/|]+/g)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function unique(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+function normalizePresetOptions(preset: string) {
+  if (preset === "S-M-L") return ["S", "M", "L"];
+  if (preset === "XS-XL") return ["XS", "S", "M", "L", "XL"];
+  if (preset === "90-115") return ["90", "95", "100", "105", "110", "115"];
+
+  if (preset === "신발 220-290") {
+    return Array.from({ length: 15 }, (_, index) => String(220 + index * 5));
+  }
+
+  return [preset];
+}
+
 function pickString(row: ProductRow | null | undefined, keys: string[], fallback = "") {
   if (!row) return fallback;
 
@@ -67,6 +109,7 @@ function pickBoolean(row: ProductRow | null | undefined, keys: string[], fallbac
 
     if (typeof value === "string") {
       const normalized = value.toLowerCase().trim();
+
       if (["true", "1", "yes", "y", "on", "visible", "판매중", "노출"].includes(normalized)) return true;
       if (["false", "0", "no", "n", "off", "hidden", "숨김"].includes(normalized)) return false;
     }
@@ -143,40 +186,15 @@ function parseProductNote(row: ProductRow | null | undefined) {
   }
 }
 
-function moneyNumber(value: string) {
-  return Number(onlyNumber(value) || 0);
-}
-
-function splitOptions(value: string) {
-  return String(value || "")
-    .split(/[,/|]+/g)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function unique(values: string[]) {
-  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
-}
-
-function normalizePresetOptions(preset: string) {
-  if (preset === "S-M-L") return ["S", "M", "L"];
-  if (preset === "XS-XL") return ["XS", "S", "M", "L", "XL"];
-  if (preset === "90-115") return ["90", "95", "100", "105", "110", "115"];
-  if (preset === "신발 220-290") {
-    return Array.from({ length: 15 }, (_, index) => String(220 + index * 5));
-  }
-  return [preset];
-}
-
 function buildVariantRows(colors: string[], sizes: string[], previous: VariantStockRow[]) {
   const safeColors = colors.length ? colors : ["옵션없음"];
   const safeSizes = sizes.length ? sizes : ["옵션없음"];
-
   const previousMap = new Map(previous.map((row) => [row.key, row.stock]));
 
   return safeColors.flatMap((color) =>
     safeSizes.map((size) => {
       const key = `${color}__${size}`;
+
       return {
         key,
         color,
@@ -197,52 +215,10 @@ function getMissingColumn(errorMessage: string) {
   for (const pattern of patterns) {
     const match = errorMessage.match(pattern);
 
-    if (match?.[1]) {
-      return match[1];
-    }
+    if (match?.[1]) return match[1];
   }
 
   return "";
-}
-
-
-async function updateProductSchemaSafe(productId: string, payload: Record<string, unknown>) {
-  const requiredColumns = new Set(["product_name"]);
-  const workingPayload = { ...payload };
-  const removedColumns: string[] = [];
-
-  for (let attempt = 0; attempt < 12; attempt += 1) {
-    const { data, error } = await supabase
-      .from("products")
-      .update(workingPayload)
-      .eq("id", productId)
-      .select("id")
-      .single();
-
-    if (!error) {
-      return {
-        data,
-        removedColumns,
-      };
-    }
-
-    const missingColumn = getMissingColumn(error.message || "");
-
-    if (!missingColumn || !(missingColumn in workingPayload)) {
-      throw error;
-    }
-
-    if (requiredColumns.has(missingColumn)) {
-      throw new Error(
-        `products.${missingColumn} 컬럼이 없어서 상품명을 저장할 수 없습니다. Supabase products 스키마 확인이 필요합니다.`,
-      );
-    }
-
-    delete workingPayload[missingColumn];
-    removedColumns.push(missingColumn);
-  }
-
-  throw new Error("products 수정 재시도 횟수를 초과했습니다.");
 }
 
 async function insertProductSchemaSafe(payload: Record<string, unknown>) {
@@ -258,10 +234,7 @@ async function insertProductSchemaSafe(payload: Record<string, unknown>) {
       .single();
 
     if (!error) {
-      return {
-        data,
-        removedColumns,
-      };
+      return { data, removedColumns };
     }
 
     const missingColumn = getMissingColumn(error.message || "");
@@ -281,6 +254,42 @@ async function insertProductSchemaSafe(payload: Record<string, unknown>) {
   }
 
   throw new Error("products 저장 재시도 횟수를 초과했습니다.");
+}
+
+async function updateProductSchemaSafe(productId: string, payload: Record<string, unknown>) {
+  const requiredColumns = new Set(["product_name"]);
+  const workingPayload = { ...payload };
+  const removedColumns: string[] = [];
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const { data, error } = await supabase
+      .from("products")
+      .update(workingPayload)
+      .eq("id", productId)
+      .select("id")
+      .single();
+
+    if (!error) {
+      return { data, removedColumns };
+    }
+
+    const missingColumn = getMissingColumn(error.message || "");
+
+    if (!missingColumn || !(missingColumn in workingPayload)) {
+      throw error;
+    }
+
+    if (requiredColumns.has(missingColumn)) {
+      throw new Error(
+        `products.${missingColumn} 컬럼이 없어서 상품명을 저장할 수 없습니다. Supabase products 스키마 확인이 필요합니다.`,
+      );
+    }
+
+    delete workingPayload[missingColumn];
+    removedColumns.push(missingColumn);
+  }
+
+  throw new Error("products 수정 재시도 횟수를 초과했습니다.");
 }
 
 export default function QuickProductFastForm({
@@ -331,7 +340,7 @@ export default function QuickProductFastForm({
     setDetailImages(pickImageArray(initialProduct, ["detail_image_urls", "detail_images", "images"]).slice(0, 5));
     setColorText(pickArray(initialProduct, ["color_options", "colors"]).join(", "));
     setSizeText(pickArray(initialProduct, ["size_options", "sizes"]).join(", "));
-    setDescription(pickString(initialProduct, ["product_description", "description", "detail_description"], ""));
+    setDescription(normalizeTextareaText(pickString(initialProduct, ["product_description", "description", "detail_description"], "")));
 
     if (noteVariants.length > 0) {
       setStockMode("option");
@@ -399,7 +408,7 @@ export default function QuickProductFastForm({
     setDescription("");
   };
 
-  const saveProduct = async (closeAfterSave: boolean) => {
+  const saveProduct = async () => {
     const name = productName.trim();
     const price = moneyNumber(priceText);
 
@@ -413,7 +422,7 @@ export default function QuickProductFastForm({
       return;
     }
 
-    if (productType === "broadcast" && !activeBroadcastId) {
+    if (productType === "broadcast" && !activeBroadcastId && !isEditMode) {
       showAdminToast("방송상품은 방송 시작 후 등록할 수 있습니다.", "error");
       return;
     }
@@ -446,7 +455,7 @@ export default function QuickProductFastForm({
         color_options: colors,
         size_options: sizes,
         size_option_enabled: colors.length > 0 || sizes.length > 0,
-        product_description: description.trim() || null,
+        product_description: normalizeTextareaText(description).trim() || null,
         detail_image_urls: detailImages,
         is_visible: isVisible,
         is_soldout: false,
@@ -484,14 +493,14 @@ export default function QuickProductFastForm({
           "success",
         );
       } else {
-        showAdminToast("상품 저장 완료", "success");
+        showAdminToast(isEditMode ? "상품 수정 완료" : "상품 저장 완료", "success");
       }
 
-      resetForm();
-
-      if (closeAfterSave) {
-        onClose?.();
+      if (!isEditMode) {
+        resetForm();
       }
+
+      onClose?.();
     } catch (error) {
       const message = error instanceof Error ? error.message : "상품 저장 실패";
       showAdminToast("상품 저장 실패\n\n" + message, "error");
@@ -501,9 +510,9 @@ export default function QuickProductFastForm({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-        <div className="grid grid-cols-[180px_minmax(0,1fr)] gap-4">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="grid min-h-0 flex-1 grid-rows-[190px_112px_72px_112px_minmax(128px,1fr)] gap-3 overflow-hidden px-6 py-4">
+        <div className="grid min-h-0 grid-cols-[220px_minmax(0,1fr)] gap-4">
           <QuickProductImageDropzone
             label="대표사진"
             description="없으면 사진 없는 상품으로 저장"
@@ -531,40 +540,48 @@ export default function QuickProductFastForm({
           />
         </div>
 
-        <div className="mt-4 grid grid-cols-[1fr_150px] gap-3">
-          <label className="block">
-            <span className="text-xs font-black text-slate-700">상품명</span>
-            <input
-              value={productName}
-              onChange={(event) => setProductName(event.target.value)}
-              placeholder="예: 알로 밴딩 바지"
-              className="mt-1 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold outline-none focus:border-blue-400"
-            />
-          </label>
+        <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_190px] gap-3">
+          <div className="min-w-0">
+            <label className="block">
+              <span className="text-xs font-black text-slate-700">상품명</span>
+              <input
+                value={productName}
+                onChange={(event) => setProductName(event.target.value)}
+                placeholder="상품명을 입력하세요."
+                className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm font-black outline-none focus:border-blue-400"
+              />
+            </label>
+
+            <label className="mt-2 block">
+              <span className="text-xs font-black text-slate-700">상세설명</span>
+              <textarea
+                value={description}
+                onChange={(event) => setDescription(normalizeTextareaText(event.target.value))}
+                placeholder="소재, 핏, 주의사항, 교환/환불 안내 등을 짧게 적어주세요."
+                className="mt-1 h-[54px] w-full resize-none rounded-xl border border-slate-200 p-3 text-xs font-bold leading-5 outline-none focus:border-blue-400"
+              />
+            </label>
+          </div>
 
           <label className="block">
             <span className="text-xs font-black text-slate-700">판매가</span>
-            <div className="mt-1 flex h-11 items-center rounded-xl border border-slate-200 px-3 focus-within:border-blue-400">
+            <div className="mt-1 flex h-10 items-center rounded-xl border border-slate-200 px-3 focus-within:border-blue-400">
               <input
-                value={priceText}
+                value={formatNumberWithComma(priceText)}
                 onChange={(event) => setPriceText(onlyNumber(event.target.value))}
                 placeholder="0"
                 className="min-w-0 flex-1 text-right text-sm font-black outline-none"
               />
               <span className="ml-1 text-xs font-black text-slate-400">원</span>
             </div>
+
+            <div className="mt-3 rounded-xl bg-blue-50 px-3 py-2 text-[11px] font-bold leading-4 text-blue-700">
+              금액은 자동으로 쉼표 표시됩니다.
+            </div>
           </label>
         </div>
 
-        <label className="mt-4 block">
-          <span className="text-xs font-black text-slate-700">상세설명</span>
-          <textarea
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            placeholder="소재, 핏, 주의사항, 교환/환불 안내 등을 짧게 적어주세요."
-            className="mt-1 h-28 w-full resize-none rounded-xl border border-slate-200 p-3 text-sm font-bold leading-6 outline-none focus:border-blue-400"
-          />
-        </label>\n\n        <div className="mt-4 grid grid-cols-4 gap-3">
+        <div className="grid min-h-0 grid-cols-4 gap-3">
           <div>
             <div className="mb-1 text-xs font-black text-slate-700">상품구분</div>
             <div className="grid grid-cols-2 gap-1">
@@ -577,7 +594,7 @@ export default function QuickProductFastForm({
                   type="button"
                   onClick={() => setProductType(value as "broadcast" | "group_buy")}
                   className={[
-                    "h-10 rounded-xl text-xs font-black",
+                    "h-9 rounded-xl text-xs font-black",
                     productType === value ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600",
                   ].join(" ")}
                 >
@@ -600,7 +617,7 @@ export default function QuickProductFastForm({
                   type="button"
                   onClick={() => setShippingType(value)}
                   className={[
-                    "h-10 rounded-xl text-xs font-black",
+                    "h-9 rounded-xl text-xs font-black",
                     shippingType === value ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600",
                   ].join(" ")}
                 >
@@ -617,7 +634,7 @@ export default function QuickProductFastForm({
                 type="button"
                 onClick={() => setIsVisible(true)}
                 className={[
-                  "h-10 rounded-xl text-xs font-black",
+                  "h-9 rounded-xl text-xs font-black",
                   isVisible ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600",
                 ].join(" ")}
               >
@@ -627,7 +644,7 @@ export default function QuickProductFastForm({
                 type="button"
                 onClick={() => setIsVisible(false)}
                 className={[
-                  "h-10 rounded-xl text-xs font-black",
+                  "h-9 rounded-xl text-xs font-black",
                   !isVisible ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600",
                 ].join(" ")}
               >
@@ -635,6 +652,7 @@ export default function QuickProductFastForm({
               </button>
             </div>
           </div>
+
           <div>
             <div className="mb-1 text-xs font-black text-slate-700">리스트</div>
             <div className="grid grid-cols-2 gap-1">
@@ -642,7 +660,7 @@ export default function QuickProductFastForm({
                 type="button"
                 onClick={() => setIsPinned(false)}
                 className={[
-                  "h-10 rounded-xl text-xs font-black",
+                  "h-9 rounded-xl text-xs font-black",
                   !isPinned ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600",
                 ].join(" ")}
               >
@@ -652,7 +670,7 @@ export default function QuickProductFastForm({
                 type="button"
                 onClick={() => setIsPinned(true)}
                 className={[
-                  "h-10 rounded-xl text-xs font-black",
+                  "h-9 rounded-xl text-xs font-black",
                   isPinned ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600",
                 ].join(" ")}
               >
@@ -660,20 +678,19 @@ export default function QuickProductFastForm({
               </button>
             </div>
           </div>
-
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-4">
-          <div>
-            <div className="mb-2 flex items-center justify-between">
+        <div className="grid min-h-0 grid-cols-2 gap-4">
+          <div className="min-w-0">
+            <div className="mb-1 flex items-center justify-between">
               <span className="text-xs font-black text-slate-700">색상</span>
               <span className="text-[10px] font-bold text-slate-400">쉼표로 여러 개</span>
             </div>
             <input
               value={colorText}
               onChange={(event) => setColorText(event.target.value)}
-              placeholder="블랙, 베이지"
-              className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold outline-none focus:border-blue-400"
+              placeholder="예: 블랙, 베이지"
+              className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold outline-none focus:border-blue-400"
             />
             <div className="mt-2 flex flex-wrap gap-1.5">
               {COLOR_PRESETS.map((preset) => (
@@ -681,7 +698,7 @@ export default function QuickProductFastForm({
                   key={preset}
                   type="button"
                   onClick={() => applyColorPreset(preset)}
-                  className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600"
+                  className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600 hover:bg-slate-200"
                 >
                   {preset}
                 </button>
@@ -689,16 +706,16 @@ export default function QuickProductFastForm({
             </div>
           </div>
 
-          <div>
-            <div className="mb-2 flex items-center justify-between">
+          <div className="min-w-0">
+            <div className="mb-1 flex items-center justify-between">
               <span className="text-xs font-black text-slate-700">사이즈</span>
-              <span className="text-[10px] font-bold text-slate-400">버튼 또는 직접입력</span>
+              <span className="text-[10px] font-bold text-slate-400">프리셋 또는 직접입력</span>
             </div>
             <input
               value={sizeText}
               onChange={(event) => setSizeText(event.target.value)}
-              placeholder="FREE 또는 S, M, L"
-              className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold outline-none focus:border-blue-400"
+              placeholder="예: FREE 또는 S, M, L"
+              className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold outline-none focus:border-blue-400"
             />
             <div className="mt-2 flex flex-wrap gap-1.5">
               {SIZE_PRESETS.map((preset) => (
@@ -706,7 +723,7 @@ export default function QuickProductFastForm({
                   key={preset}
                   type="button"
                   onClick={() => applySizePreset(preset)}
-                  className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600"
+                  className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600 hover:bg-slate-200"
                 >
                   {preset}
                 </button>
@@ -715,12 +732,12 @@ export default function QuickProductFastForm({
           </div>
         </div>
 
-        <div className="mt-4 rounded-2xl border border-slate-200 p-3">
-          <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="min-h-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3">
+          <div className="mb-2 flex items-center justify-between gap-3">
             <div>
               <div className="text-xs font-black text-slate-700">재고관리</div>
               <div className="mt-0.5 text-[10px] font-bold text-slate-400">
-                옵션별 재고를 쓰면 총재고는 자동 합산됩니다.
+                기본은 총재고, 필요할 때 옵션별 재고를 사용합니다.
               </div>
             </div>
 
@@ -748,77 +765,74 @@ export default function QuickProductFastForm({
             </div>
           </div>
 
-          {stockMode === "total" ? (
+          <div className="grid min-h-0 grid-cols-[260px_minmax(0,1fr)] gap-4">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-slate-500">전체 재고수량</span>
               <input
-                value={totalStockText}
+                value={formatNumberWithComma(totalStockText)}
                 onChange={(event) => setTotalStockText(onlyNumber(event.target.value))}
-                className="h-10 w-28 rounded-xl border border-slate-200 px-3 text-right text-sm font-black outline-none focus:border-blue-400"
+                disabled={stockMode === "option"}
+                className="h-10 w-24 rounded-xl border border-slate-200 px-3 text-right text-sm font-black outline-none focus:border-blue-400 disabled:bg-slate-50 disabled:text-slate-400"
               />
               <span className="text-xs font-black text-slate-400">개</span>
             </div>
-          ) : (
-            <div className="max-h-52 overflow-y-auto rounded-xl border border-slate-100">
-              <div className="grid grid-cols-[1fr_1fr_100px] bg-slate-50 px-3 py-2 text-[10px] font-black text-slate-400">
+
+            <div className="min-h-0 overflow-hidden rounded-xl border border-slate-100">
+              <div className="grid grid-cols-[1fr_1fr_90px] bg-slate-50 px-3 py-1.5 text-[10px] font-black text-slate-400">
                 <div>색상</div>
                 <div>사이즈</div>
                 <div className="text-right">재고</div>
               </div>
 
-              {resolvedVariantRows.map((row) => (
-                <div
-                  key={row.key}
-                  className="grid grid-cols-[1fr_1fr_100px] items-center border-t border-slate-100 px-3 py-2"
-                >
-                  <div className="text-xs font-bold text-slate-700">{row.color}</div>
-                  <div className="text-xs font-bold text-slate-700">{row.size}</div>
-                  <input
-                    value={String(row.stock || "")}
-                    onChange={(event) => updateVariantStock(row.key, moneyNumber(event.target.value))}
-                    placeholder="0"
-                    className="h-9 rounded-lg border border-slate-200 px-2 text-right text-xs font-black outline-none focus:border-blue-400"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
+              <div className="max-h-[82px] overflow-y-auto">
+                {(stockMode === "option" ? resolvedVariantRows : resolvedVariantRows.slice(0, 3)).slice(0, 12).map((row) => (
+                  <div
+                    key={row.key}
+                    className="grid grid-cols-[1fr_1fr_90px] items-center border-t border-slate-100 px-3 py-1.5"
+                  >
+                    <div className="truncate text-xs font-bold text-slate-700">{row.color}</div>
+                    <div className="truncate text-xs font-bold text-slate-700">{row.size}</div>
+                    <input
+                      value={String(row.stock || "")}
+                      onChange={(event) => updateVariantStock(row.key, moneyNumber(event.target.value))}
+                      disabled={stockMode !== "option"}
+                      placeholder="0"
+                      className="h-7 rounded-lg border border-slate-200 px-2 text-right text-xs font-black outline-none focus:border-blue-400 disabled:bg-slate-50 disabled:text-slate-400"
+                    />
+                  </div>
+                ))}
 
-          <div className="mt-2 text-right text-xs font-black text-slate-600">
-            총재고 {totalStock.toLocaleString()}개
+                {stockMode !== "option" ? (
+                  <div className="flex h-[72px] items-center justify-center text-[11px] font-bold text-slate-400">
+                    옵션별 재고는 옵션별 탭 선택 시 입력 가능합니다.
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-1 text-right text-xs font-black text-slate-600">
+            총재고 {totalStock.toLocaleString("ko-KR")}개
           </div>
         </div>
-
-
-
-
       </div>
 
-      <div className="flex shrink-0 items-center gap-2 border-t border-slate-200 bg-white px-5 py-4">
+      <div className="flex h-[76px] shrink-0 items-center gap-3 border-t border-slate-200 bg-white px-6">
         <button
           type="button"
           onClick={onClose}
-          className="h-12 w-28 rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-600"
+          className="h-12 w-36 rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-600 hover:bg-slate-50"
         >
-          취소
+          닫기
         </button>
 
         <button
           type="button"
           disabled={saving}
-          onClick={() => void saveProduct(false)}
-          className="h-12 flex-1 rounded-xl border border-blue-200 bg-white text-sm font-black text-blue-600 disabled:opacity-50"
+          onClick={() => void saveProduct()}
+          className="h-12 flex-1 rounded-xl bg-blue-600 text-sm font-black text-white shadow-sm disabled:opacity-50"
         >
-          {saving ? "저장중..." : isEditMode ? "수정 저장" : "저장 후 계속등록"}
-        </button>
-
-        <button
-          type="button"
-          disabled={saving}
-          onClick={() => void saveProduct(true)}
-          className="h-12 flex-1 rounded-xl bg-blue-600 text-sm font-black text-white disabled:opacity-50"
-        >
-          {isEditMode ? "수정 후 닫기" : "저장 후 닫기"}
+          {saving ? "저장중..." : "저장"}
         </button>
       </div>
     </div>
