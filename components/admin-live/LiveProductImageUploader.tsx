@@ -18,6 +18,7 @@ type LiveProductImageUploaderProps = {
   images: UploadedProductImage[];
   onChange: (images: UploadedProductImage[]) => void;
   compact?: boolean;
+  mode?: "bar" | "square";
 };
 
 const MAX_WIDTH = 1400;
@@ -69,6 +70,17 @@ async function compressImage(file: File): Promise<File> {
   }
 }
 
+async function readApiJson(response: Response) {
+  try {
+    return await response.json();
+  } catch {
+    return {
+      ok: false,
+      message: `서버 응답을 읽지 못했습니다. status=${response.status}`,
+    };
+  }
+}
+
 async function uploadOne(file: File, kind: "cover" | "detail"): Promise<UploadedProductImage> {
   const compressed = await compressImage(file);
 
@@ -79,9 +91,11 @@ async function uploadOne(file: File, kind: "cover" | "detail"): Promise<Uploaded
   const response = await fetch("/api/admin-live/product-images/upload", {
     method: "POST",
     body: formData,
+    credentials: "include",
+    cache: "no-store",
   });
 
-  const result = await response.json();
+  const result = await readApiJson(response);
 
   if (!response.ok || !result?.ok) {
     throw new Error(result?.message || "이미지 업로드 실패");
@@ -101,10 +115,12 @@ async function deleteOne(path: string) {
     headers: {
       "Content-Type": "application/json",
     },
+    credentials: "include",
+    cache: "no-store",
     body: JSON.stringify({ path }),
   });
 
-  const result = await response.json();
+  const result = await readApiJson(response);
 
   if (!response.ok || !result?.ok) {
     throw new Error(result?.message || "이미지 삭제 실패");
@@ -119,6 +135,7 @@ export default function LiveProductImageUploader({
   images,
   onChange,
   compact = true,
+  mode = "bar",
 }: LiveProductImageUploaderProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -147,7 +164,10 @@ export default function LiveProductImageUploader({
       showAdminToast("이미지를 업로드했습니다.", "success");
     } catch (error) {
       const message = error instanceof Error ? error.message : "알 수 없는 오류";
-      showAdminToast("이미지 업로드 실패\n\n" + message, "error");
+      const loginHint = message.includes("관리자 로그인")
+        ? "\n\n/admin-login에서 다시 로그인 후 새로고침해주세요."
+        : "";
+      showAdminToast("이미지 업로드 실패\n\n" + message + loginHint, "error");
     } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -163,11 +183,120 @@ export default function LiveProductImageUploader({
       showAdminToast("이미지를 완전 삭제했습니다.", "success");
     } catch (error) {
       const message = error instanceof Error ? error.message : "알 수 없는 오류";
-      showAdminToast("이미지 삭제 실패\n\n" + message, "error");
+      const loginHint = message.includes("관리자 로그인")
+        ? "\n\n/admin-login에서 다시 로그인 후 새로고침해주세요."
+        : "";
+      showAdminToast("이미지 삭제 실패\n\n" + message + loginHint, "error");
     } finally {
       setBusy(false);
     }
   };
+
+  const openPicker = () => inputRef.current?.click();
+
+  const dropHandlers = {
+    onDragEnter: (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      setDragging(true);
+    },
+    onDragOver: (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      setDragging(true);
+    },
+    onDragLeave: (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      setDragging(false);
+    },
+    onDrop: (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      setDragging(false);
+      if (event.dataTransfer.files?.length) {
+        addFiles(event.dataTransfer.files);
+      }
+    },
+  };
+
+  const fileInput = (
+    <input
+      ref={inputRef}
+      type="file"
+      accept="image/*"
+      multiple={multiple}
+      className="hidden"
+      onChange={(event) => {
+        if (event.target.files?.length) {
+          addFiles(event.target.files);
+        }
+      }}
+    />
+  );
+
+  if (mode === "square") {
+    return (
+      <div className="block">
+        <div className="mb-1.5 flex items-center justify-between gap-2">
+          <span className="text-[12px] font-black text-slate-700">{label}</span>
+          {images.length ? (
+            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-black text-blue-700">
+              {images.length}장
+            </span>
+          ) : null}
+        </div>
+
+        {fileInput}
+
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-2">
+          {images.map((image) => (
+            <div
+              key={image.path}
+              className="group relative aspect-square overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
+            >
+              <img
+                src={image.url}
+                alt="상품 이미지"
+                className="h-full w-full object-cover"
+              />
+              <div className="absolute inset-x-1 bottom-1 flex items-center justify-between gap-1 rounded-xl bg-white/95 px-1.5 py-1 shadow-sm">
+                <span className="min-w-0 truncate text-[9px] font-black text-slate-500">
+                  {Math.max(1, Math.round((image.size || 0) / 1024))}KB
+                </span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => removeImage(image)}
+                  className="rounded-lg bg-rose-50 px-1.5 py-0.5 text-[9px] font-black text-rose-700 disabled:opacity-50"
+                >
+                  삭제
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {(multiple || images.length === 0) ? (
+            <div
+              {...dropHandlers}
+              onClick={openPicker}
+              className={[
+                "flex aspect-square cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed p-2 text-center transition",
+                dragging ? "border-blue-400 bg-blue-50" : "border-slate-300 bg-slate-50 hover:bg-slate-100",
+                busy ? "cursor-wait opacity-60" : "",
+              ].join(" ")}
+            >
+              <div className="mb-1 flex h-9 w-9 items-center justify-center rounded-xl bg-white text-base shadow-sm">
+                🖼️
+              </div>
+              <p className="text-[11px] font-black text-slate-700">
+                {busy ? "처리중" : "사진 추가"}
+              </p>
+              <p className="mt-0.5 line-clamp-2 text-[9px] font-bold leading-snug text-slate-400">
+                {helpText}
+              </p>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="block">
@@ -182,26 +311,10 @@ export default function LiveProductImageUploader({
         ) : null}
       </div>
 
+      {fileInput}
+
       <div
-        onDragEnter={(event) => {
-          event.preventDefault();
-          setDragging(true);
-        }}
-        onDragOver={(event) => {
-          event.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={(event) => {
-          event.preventDefault();
-          setDragging(false);
-        }}
-        onDrop={(event) => {
-          event.preventDefault();
-          setDragging(false);
-          if (event.dataTransfer.files?.length) {
-            addFiles(event.dataTransfer.files);
-          }
-        }}
+        {...dropHandlers}
         className={[
           "rounded-xl border border-dashed transition",
           compact ? "px-3 py-3" : "px-4 py-5",
@@ -222,23 +335,10 @@ export default function LiveProductImageUploader({
             </p>
           </div>
 
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            multiple={multiple}
-            className="hidden"
-            onChange={(event) => {
-              if (event.target.files?.length) {
-                addFiles(event.target.files);
-              }
-            }}
-          />
-
           <button
             type="button"
             disabled={busy}
-            onClick={() => inputRef.current?.click()}
+            onClick={openPicker}
             className="shrink-0 rounded-lg bg-white px-3 py-2 text-[11px] font-black text-slate-700 ring-1 ring-slate-200 disabled:cursor-wait disabled:opacity-50"
           >
             {busy ? "처리중" : "선택"}
@@ -257,7 +357,7 @@ export default function LiveProductImageUploader({
               />
               <div className="min-w-0">
                 <p className="max-w-[90px] truncate text-[10px] font-bold text-slate-400">
-                  {Math.round((image.size || 0) / 1024)}KB
+                  {Math.max(1, Math.round((image.size || 0) / 1024))}KB
                 </p>
                 <button
                   type="button"

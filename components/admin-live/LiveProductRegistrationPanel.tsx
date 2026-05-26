@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import LiveProductImageUploader, { type UploadedProductImage } from "./LiveProductImageUploader";
+import LiveProductStockEditor from "./LiveProductStockEditor";
 
 type ProductKind = "broadcast" | "group";
 type DeliveryType = "normal" | "vendor";
@@ -16,11 +17,13 @@ type ProductRow = {
   id: string | number;
   name?: string | null;
   price?: number | null;
+  stock?: number | null;
   product_type?: string | null;
   status?: string | null;
   shipping_type?: string | null;
   sort_order?: number | null;
   is_pinned?: boolean | null;
+  image_url?: string | null;
   color_options?: string[] | null;
   size_options?: string[] | null;
   size_option_enabled?: boolean | null;
@@ -78,7 +81,6 @@ function numberFromMoneyText(value: string): number {
   return digits ? Number(digits) : 0;
 }
 
-
 function productKindLabel(kind: ProductKind) {
   return kind === "broadcast" ? "방송상품" : "공구상품";
 }
@@ -105,10 +107,8 @@ export default function LiveProductRegistrationPanel({
   const [colors, setColors] = useState("");
   const [sizes, setSizes] = useState("");
   const [sizeOptionDisabled, setSizeOptionDisabled] = useState(false);
-  const [customPresetName, setCustomPresetName] = useState("");
-  const [customPresetValues, setCustomPresetValues] = useState("");
-  const [customSizePresets, setCustomSizePresets] = useState<{ label: string; values: string[] }[]>([]);
   const [stockEnabled, setStockEnabled] = useState(false);
+  const [stockText, setStockText] = useState("");
   const [pinned, setPinned] = useState(false);
   const [visible, setVisible] = useState(true);
   const [soldOut, setSoldOut] = useState(false);
@@ -127,14 +127,13 @@ export default function LiveProductRegistrationPanel({
     [sizeOptionDisabled, sizes],
   );
 
-
   const loadRecentProducts = useCallback(async () => {
     setLoadingProducts(true);
 
     const { data, error } = await supabase
       .from("products")
       .select(
-        "id,name,price,product_type,status,shipping_type,sort_order,is_pinned,color_options,size_options,size_option_enabled,delivery_group_key,product_description,detail_image_urls",
+        "id,name,price,stock,product_type,status,shipping_type,sort_order,is_pinned,image_url,color_options,size_options,size_option_enabled,delivery_group_key,product_description,detail_image_urls",
       )
       .order("is_pinned", { ascending: false })
       .order("sort_order", { ascending: true })
@@ -162,23 +161,6 @@ export default function LiveProductRegistrationPanel({
     setSizes(SIZE_PRESETS[key].join(", "));
   };
 
-  const addCustomSizePreset = () => {
-    const label = customPresetName.trim() || "내 프리셋";
-    const values = splitOptions(customPresetValues);
-
-    if (!values.length) return;
-
-    setCustomSizePresets((current) => {
-      const withoutSameLabel = current.filter((preset) => preset.label !== label);
-      return [...withoutSameLabel, { label, values }];
-    });
-
-    setSizeOptionDisabled(false);
-    setSizes(values.join(", "));
-    setCustomPresetName("");
-    setCustomPresetValues("");
-  };
-
   const toggleSizeOptionDisabled = () => {
     setSizeOptionDisabled((current) => {
       const next = !current;
@@ -195,6 +177,7 @@ export default function LiveProductRegistrationPanel({
     setSizeOptionDisabled(false);
     setDeliveryType("normal");
     setStockEnabled(false);
+    setStockText("");
     setPinned(false);
     setVisible(true);
     setSoldOut(false);
@@ -209,6 +192,7 @@ export default function LiveProductRegistrationPanel({
     const cleanName = name.trim();
     const price = numberFromMoneyText(priceText);
     const cleanDeliveryGroupKey = deliveryGroupKey.trim();
+    const stockQuantity = stockEnabled ? numberFromMoneyText(stockText) : 0;
 
     if (!cleanName) {
       showAdminToast("상품명을 입력해주세요.", "warning");
@@ -248,7 +232,7 @@ export default function LiveProductRegistrationPanel({
       const payload = {
         name: cleanName,
         price,
-        stock: stockEnabled ? 0 : 0,
+        stock: stockQuantity,
         status: nextStatus,
         product_type: nextProductType,
         shipping_type: nextShippingType,
@@ -349,7 +333,7 @@ export default function LiveProductRegistrationPanel({
             </span>
           </div>
           <p className="mt-1 text-[12px] font-bold text-slate-500">
-            상품을 products에 저장합니다. 방송상품은 현재 방송에도 함께 연결됩니다.
+            상품 저장·사진 등록 전용입니다. 고객 주문서/배송비/정산 연결은 아직 건드리지 않습니다.
           </p>
         </div>
 
@@ -366,7 +350,7 @@ export default function LiveProductRegistrationPanel({
                 선택형 주문서 사용
               </p>
               <p className="mt-0.5 text-[12px] font-bold text-slate-500">
-                현재는 관리자 저장 단계입니다. 고객 주문서 노출은 다음 단계에서 연결합니다.
+                현재는 관리자 상품 저장 단계입니다. 고객 주문서 노출은 다음 단계에서 별도로 연결합니다.
               </p>
             </div>
 
@@ -386,66 +370,92 @@ export default function LiveProductRegistrationPanel({
 
           <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
             <div className="rounded-2xl border border-slate-200 p-4">
-              <div className="mb-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setProductKind("broadcast")}
-                  className={[
-                    "rounded-full px-3 py-1.5 text-[12px] font-black",
-                    productKind === "broadcast"
-                      ? "bg-blue-600 text-white"
-                      : "bg-slate-100 text-slate-600",
-                  ].join(" ")}
-                >
-                  방송상품
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setProductKind("group")}
-                  className={[
-                    "rounded-full px-3 py-1.5 text-[12px] font-black",
-                    productKind === "group"
-                      ? "bg-blue-600 text-white"
-                      : "bg-slate-100 text-slate-600",
-                  ].join(" ")}
-                >
-                  공구상품
-                </button>
-              </div>
-
-              <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
-                <label className="block">
-                  <span className="mb-1 block text-[12px] font-black text-slate-600">
-                    상품명
-                  </span>
-                  <input
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-[13px] font-bold outline-none focus:border-blue-400"
-                    placeholder="예: 룰루레몬 밴딩 바지"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-1 block text-[12px] font-black text-slate-600">
-                    판매가
-                  </span>
-                  <div className="flex h-11 items-center rounded-xl border border-slate-200 px-3 focus-within:border-blue-400">
-                    <input
-                      value={priceText}
-                      onChange={(event) => setPriceText(formatNumberInput(event.target.value))}
-                      className="min-w-0 flex-1 text-[13px] font-bold outline-none"
-                      inputMode="numeric"
-                      placeholder="0"
-                    />
-                    <span className="text-[12px] font-black text-slate-400">
-                      원
-                    </span>
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_170px]">
+                <div>
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setProductKind("broadcast")}
+                      className={[
+                        "rounded-full px-3 py-1.5 text-[12px] font-black",
+                        productKind === "broadcast"
+                          ? "bg-blue-600 text-white"
+                          : "bg-slate-100 text-slate-600",
+                      ].join(" ")}
+                    >
+                      방송상품
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setProductKind("group")}
+                      className={[
+                        "rounded-full px-3 py-1.5 text-[12px] font-black",
+                        productKind === "group"
+                          ? "bg-blue-600 text-white"
+                          : "bg-slate-100 text-slate-600",
+                      ].join(" ")}
+                    >
+                      공구상품
+                    </button>
                   </div>
-                </label>
+
+                  <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+                    <label className="block">
+                      <span className="mb-1 block text-[12px] font-black text-slate-600">
+                        상품명
+                      </span>
+                      <input
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-[13px] font-bold outline-none focus:border-blue-400"
+                        placeholder="예: 룰루레몬 밴딩 바지"
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-1 block text-[12px] font-black text-slate-600">
+                        판매가
+                      </span>
+                      <div className="flex h-11 items-center rounded-xl border border-slate-200 px-3 focus-within:border-blue-400">
+                        <input
+                          value={priceText}
+                          onChange={(event) => setPriceText(formatNumberInput(event.target.value))}
+                          className="min-w-0 flex-1 text-[13px] font-bold outline-none"
+                          inputMode="numeric"
+                          placeholder="0"
+                        />
+                        <span className="text-[12px] font-black text-slate-400">
+                          원
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+
+                  <label className="mt-3 block">
+                    <span className="mb-1 block text-[12px] font-black text-slate-600">
+                      상품 메모
+                    </span>
+                    <input
+                      value={productNote}
+                      onChange={(event) => setProductNote(event.target.value)}
+                      className="h-11 w-full rounded-xl border border-slate-200 px-3 text-[13px] font-bold outline-none focus:border-blue-400"
+                      placeholder="고객 노출용 짧은 안내 또는 관리자 메모"
+                    />
+                  </label>
+                </div>
+
+                <LiveProductImageUploader
+                  label="노출 썸네일"
+                  helpText="고객 리스트 대표사진"
+                  kind="cover"
+                  images={coverImages}
+                  onChange={setCoverImages}
+                  compact
+                  mode="square"
+                />
               </div>
 
-              <div className="mt-3 grid gap-3 lg:grid-cols-2">
+              <div className="mt-4 grid gap-3 lg:grid-cols-2">
                 <label className="block">
                   <span className="mb-1 block text-[12px] font-black text-slate-600">
                     색상 옵션
@@ -521,46 +531,6 @@ export default function LiveProductRegistrationPanel({
                     </button>
                   </div>
 
-                  {customSizePresets.length ? (
-                    <div className="mb-2 flex flex-wrap gap-1.5">
-                      {customSizePresets.map((preset) => (
-                        <button
-                          key={preset.label}
-                          type="button"
-                          onClick={() => {
-                            setSizeOptionDisabled(false);
-                            setSizes(preset.values.join(", "));
-                          }}
-                          className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-black text-amber-700"
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-
-                  <div className="mb-2 grid grid-cols-[0.7fr_1fr_auto] gap-1.5">
-                    <input
-                      value={customPresetName}
-                      onChange={(event) => setCustomPresetName(event.target.value)}
-                      className="h-9 rounded-xl border border-slate-200 px-2 text-[11px] font-bold outline-none focus:border-blue-400"
-                      placeholder="프리셋명"
-                    />
-                    <input
-                      value={customPresetValues}
-                      onChange={(event) => setCustomPresetValues(event.target.value)}
-                      className="h-9 rounded-xl border border-slate-200 px-2 text-[11px] font-bold outline-none focus:border-blue-400"
-                      placeholder="예: 25, 26, 27"
-                    />
-                    <button
-                      type="button"
-                      onClick={addCustomSizePreset}
-                      className="h-9 rounded-xl bg-slate-900 px-3 text-[11px] font-black text-white"
-                    >
-                      추가
-                    </button>
-                  </div>
-
                   <input
                     value={sizes}
                     onChange={(event) => {
@@ -572,7 +542,7 @@ export default function LiveProductRegistrationPanel({
                       "h-11 w-full rounded-xl border border-slate-200 px-3 text-[13px] font-bold outline-none focus:border-blue-400",
                       sizeOptionDisabled ? "bg-slate-100 text-slate-400" : "",
                     ].join(" ")}
-                    placeholder={sizeOptionDisabled ? "사이즈 옵션 없이 등록" : "S, M, L 또는 240, 245 / 필요시 120 추가 가능"}
+                    placeholder={sizeOptionDisabled ? "사이즈 옵션 없이 등록" : "S, M, L 또는 240, 245 / 필요시 직접 입력"}
                   />
 
                   <div className="mt-2 flex flex-wrap gap-1.5">
@@ -581,7 +551,7 @@ export default function LiveProductRegistrationPanel({
                         사이즈 옵션 없음
                       </span>
                     ) : parsedSizes.length ? (
-                      parsedSizes.slice(0, 16).map((size) => (
+                      parsedSizes.slice(0, 20).map((size) => (
                         <span
                           key={size}
                           className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-700"
@@ -591,7 +561,7 @@ export default function LiveProductRegistrationPanel({
                       ))
                     ) : (
                       <span className="text-[11px] font-bold text-slate-400">
-                        프리셋 적용 후 직접 추가/삭제 가능
+                        빠른 버튼 선택 후 필요하면 직접 수정
                       </span>
                     )}
                   </div>
@@ -679,59 +649,42 @@ export default function LiveProductRegistrationPanel({
                 </div>
               </div>
 
-              <label className="mt-3 block">
-                <span className="mb-1 block text-[12px] font-black text-slate-600">
-                  상품 메모
-                </span>
-                <input
-                  value={productNote}
-                  onChange={(event) => setProductNote(event.target.value)}
-                  className="h-11 w-full rounded-xl border border-slate-200 px-3 text-[13px] font-bold outline-none focus:border-blue-400"
-                  placeholder="고객 노출용 짧은 안내 또는 관리자 메모"
-                />
-              </label>
-
-              <label className="mt-3 block">
-                <span className="mb-1 block text-[12px] font-black text-slate-600">
-                  상품상세설명
-                </span>
-                <textarea
-                  value={productDescription}
-                  onChange={(event) => setProductDescription(event.target.value)}
-                  className="min-h-[110px] w-full resize-y rounded-xl border border-slate-200 px-3 py-3 text-[13px] font-bold leading-relaxed outline-none focus:border-blue-400"
-                  placeholder="고객이 상품 상세에서 볼 설명을 입력하세요. 예: 소재, 핏, 주의사항, 교환/환불 안내 등"
-                />
-              </label>
-
-              <LiveProductImageUploader
-                label="노출 썸네일 / 대표사진"
-                helpText="고객 상품리스트에 보이는 기본 사진"
-                kind="cover"
-                images={coverImages}
-                onChange={setCoverImages}
-                compact
-              />
-
-              <LiveProductImageUploader
-                label="상품상세사진"
-                helpText="상세페이지용 여러 장 사진"
-                kind="detail"
-                multiple
-                images={detailImages}
-                onChange={setDetailImages}
-                compact
-              />
-
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <label className="flex items-center gap-2 text-[12px] font-black text-slate-600">
-                  <input
-                    type="checkbox"
-                    checked={stockEnabled}
-                    onChange={(event) => setStockEnabled(event.target.checked)}
+              <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_260px]">
+                <label className="block">
+                  <span className="mb-1 block text-[12px] font-black text-slate-600">
+                    상품상세설명
+                  </span>
+                  <textarea
+                    value={productDescription}
+                    onChange={(event) => setProductDescription(event.target.value)}
+                    className="min-h-[160px] w-full resize-y rounded-xl border border-slate-200 px-3 py-3 text-[13px] font-bold leading-relaxed outline-none focus:border-blue-400"
+                    placeholder="고객이 상품 상세에서 볼 설명을 입력하세요. 예: 소재, 핏, 주의사항, 교환/환불 안내 등"
                   />
-                  재고관리 사용
                 </label>
 
+                <LiveProductImageUploader
+                  label="상품상세사진"
+                  helpText="상세용 여러 장 사진"
+                  kind="detail"
+                  multiple
+                  images={detailImages}
+                  onChange={setDetailImages}
+                  compact
+                  mode="square"
+                />
+              </div>
+
+              <LiveProductStockEditor
+                enabled={stockEnabled}
+                onEnabledChange={setStockEnabled}
+                stockText={stockText}
+                onStockTextChange={setStockText}
+                colorOptions={parsedColors}
+                sizeOptions={parsedSizes}
+                sizeOptionDisabled={sizeOptionDisabled}
+              />
+
+              <div className="mt-3 flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={saveProduct}
@@ -773,21 +726,38 @@ export default function LiveProductRegistrationPanel({
                       key={String(product.id)}
                       className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"
                     >
-                      <div className="min-w-0">
-                        <p className="truncate text-[12px] font-black text-slate-900">
-                          {product.is_pinned ? "📌 " : ""}
-                          {product.name || "상품명 없음"}
-                        </p>
-                        <p className="mt-0.5 text-[11px] font-bold text-slate-500">
-                          {(product.product_type || "상품")} · {product.status || "-"} · {product.shipping_type || "-"}
-                        </p>
-                        <p className="mt-0.5 text-[11px] font-black text-blue-700">
-                          {Number(product.price || 0).toLocaleString("ko-KR")}원
-                        </p>
-                        <p className="mt-0.5 text-[10px] font-bold text-slate-400">
-                          상세설명 {product.product_description ? "있음" : "없음"} · 상세사진 {Array.isArray(product.detail_image_urls) ? product.detail_image_urls.length : 0}장
-                        </p>
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-slate-200">
+                          {product.image_url ? (
+                            <img
+                              src={product.image_url}
+                              alt="최근 등록상품"
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-sm">
+                              🛍️
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="min-w-0">
+                          <p className="truncate text-[12px] font-black text-slate-900">
+                            {product.is_pinned ? "📌 " : ""}
+                            {product.name || "상품명 없음"}
+                          </p>
+                          <p className="mt-0.5 text-[11px] font-bold text-slate-500">
+                            {(product.product_type || "상품")} · {product.status || "-"} · {product.shipping_type || "-"}
+                          </p>
+                          <p className="mt-0.5 text-[11px] font-black text-blue-700">
+                            {Number(product.price || 0).toLocaleString("ko-KR")}원 · 재고 {Number(product.stock || 0).toLocaleString("ko-KR")}개
+                          </p>
+                          <p className="mt-0.5 text-[10px] font-bold text-slate-400">
+                            상세설명 {product.product_description ? "있음" : "없음"} · 상세사진 {Array.isArray(product.detail_image_urls) ? product.detail_image_urls.length : 0}장
+                          </p>
+                        </div>
                       </div>
+
                       <span className="shrink-0 rounded-lg bg-white px-2 py-1 text-[11px] font-black text-slate-500 ring-1 ring-slate-200">
                         #{product.sort_order || product.id}
                       </span>
