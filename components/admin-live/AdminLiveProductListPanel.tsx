@@ -169,7 +169,7 @@ export default function AdminLiveProductListPanel({
   return (
     <div
       className={[
-        "flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm",
+        "flex min-h-0 min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm",
         heightClass,
         className,
       ].join(" ")}

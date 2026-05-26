@@ -574,18 +574,27 @@ export default function AdminLiveDashboard() {
             onEndBroadcast={endBroadcast}
             onSaveBroadcast={saveBroadcast}
           />
-          <div className="grid items-stretch gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(360px,1fr)]">
+          <div className="grid w-full grid-cols-12 items-stretch gap-3">
 
-            <div className="min-w-0 space-y-3">
+            <div className="col-span-12 min-w-0 xl:col-span-8">
 
-          <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
-
-
-          <LiveBroadcastPanels videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} />
+              <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
 
             </div>
 
-            <AdminLiveProductListPanel fillHeight className="min-w-0 self-stretch" />
+
+            <div className="col-span-12 min-w-0 xl:col-span-4 xl:row-span-2">
+
+              <AdminLiveProductListPanel fillHeight className="h-full min-w-0" />
+
+            </div>
+
+
+            <div className="col-span-12 min-w-0 xl:col-span-8">
+
+              <LiveBroadcastPanels videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} />
+
+            </div>
 
           </div>
 {loadError && (
