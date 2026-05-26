@@ -1,6 +1,7 @@
 import { ADMIN_LIVE_MENUS, getAdminLiveMenu, type AdminLiveMenuKey } from "./adminLiveMenu";
 import LiveOpsStatusBox from "./LiveOpsStatusBox";
 import AdminLiveLogoutButton from "./AdminLiveLogoutButton";
+import AdminLiveCustomerIssueSummaryCard from "./AdminLiveCustomerIssueSummaryCard";
 
 
 type Props = {
@@ -49,6 +50,8 @@ export default function AdminLiveSidebar({ activeMenu, onMenuChange }: Props) {
 
       <div className="mt-auto space-y-3">
         <LiveOpsStatusBox />
+
+        <AdminLiveCustomerIssueSummaryCard onOpenCustomers={() => onMenuChange("customers")} />
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
           <div className="mb-1.5 flex items-center gap-2 text-sm font-black text-slate-800">
