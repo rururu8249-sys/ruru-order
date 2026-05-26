@@ -184,7 +184,7 @@ export default function SettlementCharts({
   return (
     <>
       <div className="grid items-stretch gap-4 xl:grid-cols-[1.55fr_0.45fr]">
-        <div className="flex h-auto min-h-[430px] flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.045)] xl:h-[430px]">
+        <div className="flex min-h-[430px] flex-col self-stretch overflow-hidden rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.045)]">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="text-lg font-black text-slate-950">기간별 매출·지출 흐름</div>
@@ -300,7 +300,7 @@ export default function SettlementCharts({
           )}
         </div>
 
-        <div className="flex h-auto min-h-[430px] flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.045)] xl:h-[430px]">
+        <div className="flex min-h-[430px] flex-col self-stretch overflow-hidden rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.045)]">
           <div>
             <div className="text-lg font-black text-slate-950">매출·지출 TOP 요약</div>
             <div className="mt-1 text-xs font-bold text-slate-400">
@@ -345,7 +345,7 @@ export default function SettlementCharts({
               </button>
             </div>
 
-            <div className="mt-3 grid gap-2 overflow-y-auto pr-1">
+            <div className="mt-3 grid gap-2 pr-1">
               {activeTopItems.length === 0 ? (
                 <div className="rounded-2xl bg-white px-3 py-3 text-xs font-bold text-slate-400">{activeEmptyText}</div>
               ) : (
