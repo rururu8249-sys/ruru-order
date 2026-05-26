@@ -574,7 +574,7 @@ export default function AdminLiveDashboard() {
             onEndBroadcast={endBroadcast}
             onSaveBroadcast={saveBroadcast}
           />
-          <div className="grid w-full grid-cols-12 grid-rows-[auto_480px] items-stretch gap-3">
+          <div className="mb-6 grid w-full grid-cols-12 grid-rows-[auto_480px] items-stretch gap-3">
 
             <div className="col-span-12 min-w-0 xl:col-span-8">
 
