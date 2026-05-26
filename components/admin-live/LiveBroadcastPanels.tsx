@@ -57,9 +57,9 @@ function clean(value: unknown) {
 }
 
 function videoSizeClass(videoRatio: VideoRatio) {
-  if (videoRatio === "wide") return "aspect-video h-[300px] w-full max-w-[540px]";
-  if (videoRatio === "auto") return "aspect-[4/5] h-[330px] w-auto";
-  return "aspect-[9/16] h-[330px] w-auto";
+  if (videoRatio === "wide") return "aspect-video h-[430px] w-full max-w-[760px]";
+  if (videoRatio === "auto") return "aspect-[4/5] h-[500px] w-auto";
+  return "aspect-[9/16] h-[500px] w-auto";
 }
 
 function extractYoutubeVideoId(rawUrl?: string | null) {
@@ -681,7 +681,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
           </div>
         </div>
 
-        <div className="flex h-[360px] items-center justify-center rounded-2xl bg-slate-100 p-2">
+        <div className="flex h-[540px] items-center justify-center overflow-hidden rounded-2xl bg-slate-100 p-1">
           <div className={`relative overflow-hidden rounded-[1.5rem] bg-slate-950 shadow-sm ${videoSizeClass(videoRatio)}`}>
             {videoEmbedUrl ? (
               <iframe
