@@ -1,36 +1,41 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { showAdminToast } from "@/lib/adminToast";
 import { resolveProductImageUrl } from "./quick-product/productImageUrl";
 
 type ProductRow = Record<string, unknown>;
 
 type AdminLiveProductListPanelProps = {
-  className?: string;
+  activeBroadcastId?: string | number | null;
   fillHeight?: boolean;
+  className?: string;
 };
 
-type ProductCounts = {
-  visible: number;
-  hidden: number;
-  soldout: number;
-  pinned: number;
+type StatusInfo = {
+  label: "노출" | "숨김" | "품절";
+  className: string;
 };
 
-function pickString(row: ProductRow, keys: string[], fallback = "") {
+const DEFAULT_PAGE_SIZE = 4;
+
+function pickString(row: ProductRow | null | undefined, keys: string[], fallback = "") {
+  if (!row) return fallback;
+
   for (const key of keys) {
     const value = row[key];
 
     if (typeof value === "string" && value.trim()) return value.trim();
     if (typeof value === "number" && Number.isFinite(value)) return String(value);
+    if (typeof value === "boolean") return value ? "true" : "false";
   }
 
   return fallback;
 }
 
-function pickNumber(row: ProductRow, keys: string[], fallback = 0) {
+function pickNumber(row: ProductRow | null | undefined, keys: string[], fallback = 0) {
+  if (!row) return fallback;
+
   for (const key of keys) {
     const value = row[key];
 
@@ -38,6 +43,7 @@ function pickNumber(row: ProductRow, keys: string[], fallback = 0) {
 
     if (typeof value === "string") {
       const parsed = Number(value.replace(/[^0-9.-]/g, ""));
+
       if (Number.isFinite(parsed)) return parsed;
     }
   }
@@ -45,29 +51,30 @@ function pickNumber(row: ProductRow, keys: string[], fallback = 0) {
   return fallback;
 }
 
-function pickBoolean(row: ProductRow, keys: string[], fallback = false) {
+function pickBoolean(row: ProductRow | null | undefined, keys: string[], fallback = false) {
+  if (!row) return fallback;
+
   for (const key of keys) {
     const value = row[key];
 
     if (typeof value === "boolean") return value;
 
+    if (typeof value === "number") return value === 1;
+
     if (typeof value === "string") {
       const normalized = value.toLowerCase().trim();
 
-      if (["true", "1", "yes", "y", "on", "visible", "판매중", "노출"].includes(normalized)) {
-        return true;
-      }
-
-      if (["false", "0", "no", "n", "off", "hidden", "숨김"].includes(normalized)) {
-        return false;
-      }
+      if (["true", "1", "yes", "y", "on", "visible", "판매중", "노출"].includes(normalized)) return true;
+      if (["false", "0", "no", "n", "off", "hidden", "숨김", "품절"].includes(normalized)) return false;
     }
   }
 
   return fallback;
 }
 
-function pickArray(row: ProductRow, keys: string[]) {
+function pickArray(row: ProductRow | null | undefined, keys: string[]) {
+  if (!row) return [];
+
   for (const key of keys) {
     const value = row[key];
 
@@ -76,7 +83,21 @@ function pickArray(row: ProductRow, keys: string[]) {
     }
 
     if (typeof value === "string" && value.trim()) {
-      return value
+      const trimmed = value.trim();
+
+      if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+        try {
+          const parsed = JSON.parse(trimmed);
+
+          if (Array.isArray(parsed)) {
+            return parsed.map((item) => String(item || "").trim()).filter(Boolean);
+          }
+        } catch {
+          return [trimmed];
+        }
+      }
+
+      return trimmed
         .split(/[,/|]+/g)
         .map((item) => item.trim())
         .filter(Boolean);
@@ -86,202 +107,171 @@ function pickArray(row: ProductRow, keys: string[]) {
   return [];
 }
 
-function money(value: unknown) {
+function productName(product: ProductRow) {
+  return pickString(product, ["product_name", "name", "title"], "상품명 없음");
+}
+
+function productPrice(product: ProductRow) {
+  return pickNumber(product, ["price", "sale_price", "selling_price"], 0);
+}
+
+function money(value: number) {
   return `${Number(value || 0).toLocaleString("ko-KR")}원`;
 }
 
-function getProductId(row: ProductRow, index = 0) {
-  return pickString(row, ["id", "product_id", "uuid", "code"], `product-${index}`);
+function mainImage(product: ProductRow) {
+  const direct = pickString(product, ["image_url", "cover_image_url", "main_image_url", "thumbnail_url"], "");
+
+  if (direct) return resolveProductImageUrl(direct);
+
+  const images = pickArray(product, ["images", "image_urls", "detail_image_urls"]);
+
+  if (images[0]) return resolveProductImageUrl(images[0]);
+
+  return "";
 }
 
-function getProductName(row: ProductRow) {
-  return pickString(
-    row,
-    ["product_name", "name", "title", "display_name", "item_name", "goods_name", "label"],
-    "상품명 없음",
-  );
+function colorSummary(product: ProductRow) {
+  const colors = pickArray(product, ["color_options", "colors"]);
+
+  return colors.length > 0 ? colors.join(", ") : "색상없음";
 }
 
-function getProductPrice(row: ProductRow) {
-  return pickNumber(
-    row,
-    ["sale_price", "selling_price", "price", "amount", "product_price", "unit_price"],
-    0,
-  );
+function sizeSummary(product: ProductRow) {
+  const sizes = pickArray(product, ["size_options", "sizes"]);
+
+  return sizes.length > 0 ? sizes.join(", ") : "사이즈없음";
 }
 
-function getProductImage(row: ProductRow) {
-  const rawImage = pickString(
-    row,
-    [
-      "image_url",
-      "cover_image_url",
-      "main_image_url",
-      "thumbnail_url",
-      "photo_url",
-      "image",
-      "public_url",
-      "publicUrl",
-      "url",
-    ],
-    "",
-  );
+function stockSummary(product: ProductRow) {
+  const stock = pickNumber(product, ["stock", "total_stock"], 0);
 
-  return resolveProductImageUrl(rawImage);
+  return `${stock.toLocaleString("ko-KR")}개`;
 }
 
-function getProductSort(row: ProductRow, fallback: number) {
-  return pickNumber(row, ["sort_order", "display_order", "order_no", "priority"], fallback);
+function productTypeLabel(product: ProductRow) {
+  const type = pickString(product, ["product_type", "type"], "broadcast");
+
+  if (type === "group_buy") return "공구";
+  return "방송";
 }
 
-function getProductCreatedAt(row: ProductRow) {
-  return pickString(row, ["created_at", "updated_at", "createdAt", "updatedAt"], "");
+function shippingLabel(product: ProductRow) {
+  const type = pickString(product, ["shipping_type", "delivery_type"], "normal");
+
+  if (type === "vendor") return "업체배송";
+  if (type === "free") return "무료배송";
+  return "일반배송";
 }
 
-function statusInfo(row: ProductRow) {
-  const raw = pickString(row, ["status", "display_status", "state", "visibility"], "").toLowerCase();
-  const isVisible = pickBoolean(row, ["is_visible", "visible", "is_active", "active", "is_displayed"], true);
-  const isSoldout = pickBoolean(row, ["is_soldout", "soldout", "sold_out"], false);
+function statusInfo(product: ProductRow): StatusInfo {
+  const status = pickString(product, ["status", "product_status"], "");
+  const isSoldout = pickBoolean(product, ["is_soldout", "soldout"], false);
+  const isVisible = pickBoolean(product, ["is_visible", "visible"], true);
 
-  if (isSoldout || /품절|sold/.test(raw)) {
+  if (isSoldout || status.includes("품절")) {
     return {
       label: "품절",
-      isVisible: false,
-      className: "bg-rose-50 text-rose-700 ring-rose-100",
+      className: "bg-rose-50 text-rose-700 ring-1 ring-rose-100",
     };
   }
 
-  if (!isVisible || /숨김|hidden|off|inactive/.test(raw)) {
+  if (!isVisible || status.includes("숨김")) {
     return {
       label: "숨김",
-      isVisible: false,
-      className: "bg-slate-100 text-slate-500 ring-slate-200",
+      className: "bg-slate-100 text-slate-500 ring-1 ring-slate-200",
     };
   }
 
   return {
     label: "노출",
-    isVisible: true,
-    className: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+    className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100",
   };
 }
 
-function optionSummary(row: ProductRow) {
-  const colors = pickArray(row, ["color_options", "colors", "color_list", "available_colors"]);
-  const sizes = pickArray(row, ["size_options", "sizes", "size_list", "available_sizes"]);
+function sortProducts(products: ProductRow[]) {
+  return [...products].sort((a, b) => {
+    const pinnedA = pickBoolean(a, ["is_pinned", "pinned"], false) ? 1 : 0;
+    const pinnedB = pickBoolean(b, ["is_pinned", "pinned"], false) ? 1 : 0;
 
-  const colorText = colors.length ? colors.slice(0, 2).join(", ") : "색상없음";
-  const sizeText = sizes.length ? sizes.slice(0, 3).join(", ") : "사이즈없음";
+    if (pinnedA !== pinnedB) return pinnedB - pinnedA;
 
-  return `${colorText} / ${sizeText}`;
+    const sortA = pickNumber(a, ["sort_order", "display_order"], 999999);
+    const sortB = pickNumber(b, ["sort_order", "display_order"], 999999);
+
+    if (sortA !== sortB) return sortA - sortB;
+
+    return pickString(b, ["created_at", "updated_at", "id"], "").localeCompare(
+      pickString(a, ["created_at", "updated_at", "id"], ""),
+    );
+  });
 }
 
-function getMissingColumn(errorMessage: string) {
-  const patterns = [
-    /Could not find the '([^']+)' column/i,
-    /column "([^"]+)" does not exist/i,
-    /Could not find column '([^']+)'/i,
-  ];
-
-  for (const pattern of patterns) {
-    const match = errorMessage.match(pattern);
-
-    if (match?.[1]) return match[1];
-  }
-
-  return "";
+function openQuickProductCreate() {
+  window.dispatchEvent(new Event("ruru-open-quick-product-panel"));
 }
 
-async function updateProductSchemaSafe(productId: string, payload: Record<string, unknown>) {
-  const workingPayload = { ...payload };
-  const removedColumns: string[] = [];
-
-  for (let attempt = 0; attempt < 12; attempt += 1) {
-    const { error } = await supabase
-      .from("products")
-      .update(workingPayload)
-      .eq("id", productId);
-
-    if (!error) return { removedColumns };
-
-    const missingColumn = getMissingColumn(error.message || "");
-
-    if (!missingColumn || !(missingColumn in workingPayload)) throw error;
-
-    delete workingPayload[missingColumn];
-    removedColumns.push(missingColumn);
-  }
-
-  throw new Error("products 수정 재시도 횟수를 초과했습니다.");
+function openQuickProductEdit(product: ProductRow) {
+  window.dispatchEvent(new CustomEvent("ruru-edit-quick-product", { detail: product }));
 }
 
-export default function AdminLiveProductListPanel({
-  className = "",
-  fillHeight = false,
-}: AdminLiveProductListPanelProps) {
+export default function AdminLiveProductListPanel(props: AdminLiveProductListPanelProps) {
+  const fillHeight = Boolean(props.fillHeight);
+  const className = props.className || "";
+  const panelClassName = [
+    "col-span-12 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-4",
+    fillHeight ? "h-full" : "h-[392px]",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [draggingId, setDraggingId] = useState("");
-  const [previewImage, setPreviewImage] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState<ProductRow | null>(null);
 
-  const pageSize = 8;
-
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     setLoading(true);
     setLoadError("");
 
     try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .limit(100);
+      const { data, error } = await supabase.from("products").select("*");
 
-      if (error) throw new Error(error.message);
+      if (error) {
+        setProducts([]);
+        setLoadError(error.message || "등록상품을 불러오지 못했습니다.");
+        return;
+      }
 
-      const rows = ((data || []) as ProductRow[]).slice().sort((a, b) => {
-        const pinnedA = pickBoolean(a, ["is_pinned", "pinned"], false) ? 1 : 0;
-        const pinnedB = pickBoolean(b, ["is_pinned", "pinned"], false) ? 1 : 0;
-
-        if (pinnedA !== pinnedB) return pinnedB - pinnedA;
-
-        const sortA = getProductSort(a, 999999);
-        const sortB = getProductSort(b, 999999);
-
-        if (sortA !== sortB) return sortA - sortB;
-
-        const createdA = getProductCreatedAt(a);
-        const createdB = getProductCreatedAt(b);
-
-        return createdB.localeCompare(createdA);
-      });
-
-      setProducts(rows);
+      setProducts(sortProducts((data || []) as ProductRow[]));
       setCurrentPage(1);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "상품 목록 조회 실패";
-      console.warn("[AdminLiveProductListPanel] products load failed:", message);
+      const message = error instanceof Error ? error.message : "등록상품을 불러오지 못했습니다.";
       setProducts([]);
       setLoadError(message);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadProducts();
-
-    const handler = () => loadProducts();
-    window.addEventListener("ruru-live-product-updated", handler);
-
-    return () => {
-      window.removeEventListener("ruru-live-product-updated", handler);
-    };
   }, []);
 
-  const counts = useMemo<ProductCounts>(() => {
-    return products.reduce<ProductCounts>(
+  useEffect(() => {
+    void loadProducts();
+
+    const reload = () => {
+      void loadProducts();
+    };
+
+    window.addEventListener("ruru-live-product-updated", reload);
+
+    return () => {
+      window.removeEventListener("ruru-live-product-updated", reload);
+    };
+  }, [loadProducts]);
+
+  const counts = useMemo(() => {
+    return products.reduce<{ visible: number; hidden: number; soldout: number; pinned: number }>(
       (acc, product) => {
         const info = statusInfo(product);
 
@@ -292,339 +282,290 @@ export default function AdminLiveProductListPanel({
 
         return acc;
       },
-      { visible: 0, hidden: 0, soldout: 0, pinned: 0 },
+      {
+        visible: 0,
+        hidden: 0,
+        soldout: 0,
+        pinned: 0,
+      },
     );
   }, [products]);
 
-  const totalPages = useMemo(() => {
-    return Math.max(1, Math.ceil(products.length / pageSize));
-  }, [products.length]);
+  const totalPages = Math.max(1, Math.ceil(products.length / DEFAULT_PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pageStart = (safePage - 1) * DEFAULT_PAGE_SIZE;
+  const visibleProducts = products.slice(pageStart, pageStart + DEFAULT_PAGE_SIZE);
 
-  const safePage = Math.min(Math.max(1, currentPage), totalPages);
-
-  const visibleProducts = useMemo(() => {
-    const start = (safePage - 1) * pageSize;
-    return products.slice(start, start + pageSize);
-  }, [products, safePage]);
-
-  const pageNumbers = useMemo(() => {
-    const maxButtons = 5;
-    const half = Math.floor(maxButtons / 2);
-    let start = Math.max(1, safePage - half);
-    const end = Math.min(totalPages, start + maxButtons - 1);
-
-    if (end - start + 1 < maxButtons) {
-      start = Math.max(1, end - maxButtons + 1);
-    }
-
-    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
-  }, [safePage, totalPages]);
-
-  const openQuickProductPanel = () => {
-    window.dispatchEvent(new Event("ruru-open-quick-product-panel"));
-  };
-
-  const openEditProductPanel = (product: ProductRow) => {
-    window.dispatchEvent(
-      new CustomEvent("ruru-edit-quick-product", {
-        detail: product,
-      }),
-    );
-  };
-
-  const toggleVisible = async (product: ProductRow) => {
-    const productId = getProductId(product);
-    const info = statusInfo(product);
-    const nextVisible = !info.isVisible;
-
-    if (!productId || productId.startsWith("product-")) {
-      showAdminToast("상품 ID를 찾지 못해 상태 변경을 할 수 없습니다.", "error");
-      return;
-    }
-
-    try {
-      await updateProductSchemaSafe(productId, {
-        is_visible: nextVisible,
-        status: nextVisible ? "판매중" : "숨김",
-      });
-
-      showAdminToast(nextVisible ? "상품을 노출로 변경했습니다." : "상품을 숨김으로 변경했습니다.", "success");
-      await loadProducts();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "상태 변경 실패";
-      showAdminToast("상품 상태 변경 실패\n\n" + message, "error");
-    }
-  };
-
-  const saveReorder = async (nextProducts: ProductRow[]) => {
-    try {
-      for (let index = 0; index < nextProducts.length; index += 1) {
-        const productId = getProductId(nextProducts[index], index);
-
-        if (!productId || productId.startsWith("product-")) continue;
-
-        await updateProductSchemaSafe(productId, {
-          sort_order: index + 1,
-        });
-      }
-
-      showAdminToast("상품 순서를 저장했습니다.", "success");
-      window.dispatchEvent(new Event("ruru-live-product-updated"));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "순서 저장 실패";
-      showAdminToast("상품 순서 저장 실패\n\n" + message, "error");
-    }
-  };
-
-  const moveProduct = (fromId: string, toId: string) => {
-    if (!fromId || !toId || fromId === toId) return;
-
-    const fromIndex = products.findIndex((product, index) => getProductId(product, index) === fromId);
-    const toIndex = products.findIndex((product, index) => getProductId(product, index) === toId);
-
-    if (fromIndex < 0 || toIndex < 0) return;
-
-    const nextProducts = products.slice();
-    const [moved] = nextProducts.splice(fromIndex, 1);
-    nextProducts.splice(toIndex, 0, moved);
-
-    setProducts(nextProducts);
-    void saveReorder(nextProducts);
-  };
-
-  const heightClass = fillHeight ? "h-full" : "h-[480px]";
+  const selectedImage = selectedProduct ? mainImage(selectedProduct) : "";
+  const selectedStatus = selectedProduct ? statusInfo(selectedProduct) : null;
 
   return (
-    <div
-      className={[
-        "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm",
-        heightClass,
-        className,
-      ].join(" ")}
-    >
-      <div className="mb-3 flex min-w-0 shrink-0 items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-sm font-black text-slate-950">등록상품 리스트</h2>
-          <p className="mt-0.5 truncate text-[10px] font-bold text-slate-400">
-            노출 {counts.visible} · 고정 {counts.pinned} · 숨김 {counts.hidden} · 품절 {counts.soldout}
-          </p>
-        </div>
+    <>
+      <div className={panelClassName}>
+        <div className="flex h-full min-h-0 flex-col">
+          <div className="flex shrink-0 items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-sm font-black text-slate-950">등록상품 리스트</h2>
+              <div className="mt-1 text-[11px] font-bold text-slate-400">
+                노출 {counts.visible} · 고정 {counts.pinned} · 숨김 {counts.hidden} · 품절 {counts.soldout}
+              </div>
+            </div>
 
-        <div className="flex shrink-0 items-center gap-1.5">
-          <button
-            type="button"
-            onClick={openQuickProductPanel}
-            className="rounded-xl bg-blue-600 px-3 py-2 text-[11px] font-black text-white hover:bg-blue-700"
-          >
-            + 상품등록
-          </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={openQuickProductCreate}
+                className="h-9 rounded-xl bg-blue-600 px-4 text-xs font-black text-white shadow-sm hover:bg-blue-700"
+              >
+                + 상품등록
+              </button>
 
-          <button
-            type="button"
-            onClick={loadProducts}
-            className="rounded-xl bg-slate-100 px-2.5 py-2 text-[11px] font-black text-slate-600 hover:bg-slate-200"
-          >
-            ↻
-          </button>
-        </div>
-      </div>
-
-      <div className="grid min-w-0 shrink-0 grid-cols-[34px_minmax(0,1fr)_82px_58px] border-y border-slate-100 py-2 text-[10px] font-black text-slate-400">
-        <div>순서</div>
-        <div>상품정보</div>
-        <div className="text-center">상태</div>
-        <div className="text-center">관리</div>
-      </div>
-
-      <div className="mt-2 flex shrink-0 items-center justify-between gap-2 text-[10px] font-black text-slate-500">
-        <div>
-          {products.length === 0
-            ? "0개"
-            : `${(safePage - 1) * pageSize + 1}-${Math.min(safePage * pageSize, products.length)} / ${products.length}개`}
-        </div>
-        <div>순서는 왼쪽 점을 잡고 이동</div>
-      </div>
-
-      <div className="mt-2 min-h-0 flex-1 overflow-y-auto pr-1">
-        {loading ? (
-          <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 text-xs font-black text-slate-400">
-            상품 목록 불러오는 중...
+              <button
+                type="button"
+                onClick={() => void loadProducts()}
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-xs font-black text-slate-500 hover:bg-slate-200"
+                aria-label="새로고침"
+              >
+                ↻
+              </button>
+            </div>
           </div>
-        ) : loadError ? (
-          <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-amber-200 bg-amber-50/50 p-5 text-center text-xs font-bold leading-5 text-amber-700">
-            등록상품 리스트를 조용히 대기 중입니다.<br />
-            저장 후 새로고침 버튼을 눌러주세요.
-          </div>
-        ) : products.length === 0 ? (
-          <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 p-5 text-center text-xs font-bold leading-5 text-slate-400">
-            등록된 상품이 없습니다.<br />
-            + 상품등록으로 상품을 먼저 추가하세요.
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {visibleProducts.map((product, index) => {
-              const realIndex = (safePage - 1) * pageSize + index;
-              const productId = getProductId(product, realIndex);
-              const info = statusInfo(product);
-              const imageUrl = getProductImage(product);
-              const pinned = pickBoolean(product, ["is_pinned", "pinned"], false);
 
-              return (
-                <div
-                  key={productId}
-                  draggable
-                  onDragStart={() => setDraggingId(productId)}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    moveProduct(draggingId, productId);
-                    setDraggingId("");
-                  }}
-                  onDragEnd={() => setDraggingId("")}
-                  className={[
-                    "grid grid-cols-[34px_minmax(0,1fr)_82px_58px] items-center gap-2 py-2",
-                    draggingId === productId ? "opacity-40" : "",
-                  ].join(" ")}
-                >
-                  <div
-                    title="꾹 잡고 순서 이동"
-                    className="cursor-grab text-center text-[13px] font-black text-slate-400 active:cursor-grabbing"
-                  >
-                    ⋮⋮
-                  </div>
+          <div className="mt-3 grid shrink-0 grid-cols-[52px_minmax(0,1fr)_76px_104px] border-y border-slate-100 py-2 text-[11px] font-black text-slate-400">
+            <div>순서</div>
+            <div>상품정보</div>
+            <div className="text-center">상태</div>
+            <div className="text-right">관리</div>
+          </div>
 
-                  <div className="flex min-w-0 items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (imageUrl) setPreviewImage(imageUrl);
-                      }}
-                      className="h-9 w-9 shrink-0 overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200 hover:ring-blue-300"
-                      title={imageUrl ? "사진 크게 보기" : "사진 없음"}
+          <div className="shrink-0 py-2 text-[11px] font-black text-slate-500">
+            {products.length === 0 ? "0개" : `${pageStart + 1}-${Math.min(pageStart + DEFAULT_PAGE_SIZE, products.length)} / ${products.length}개`}
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-hidden">
+            {loading ? (
+              <div className="flex h-full items-center justify-center text-xs font-bold text-slate-400">
+                등록상품을 불러오는 중입니다.
+              </div>
+            ) : loadError ? (
+              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 text-center text-xs font-bold leading-5 text-slate-400">
+                등록상품 리스트를 조용히 대기 중입니다.
+                <br />
+                스키마 확인 후 자동으로 표시됩니다.
+              </div>
+            ) : visibleProducts.length === 0 ? (
+              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 text-center text-xs font-bold leading-5 text-slate-400">
+                등록된 상품이 없습니다.
+                <br />
+                + 상품등록으로 상품을 먼저 추가하세요.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {visibleProducts.map((product, index) => {
+                  const info = statusInfo(product);
+                  const image = mainImage(product);
+                  const absoluteIndex = pageStart + index + 1;
+
+                  return (
+                    <div
+                      key={pickString(product, ["id", "product_id"], String(absoluteIndex))}
+                      className="grid grid-cols-[52px_minmax(0,1fr)_76px_104px] items-center gap-2 py-2.5"
                     >
-                      {imageUrl ? (
-                        <img
-                          src={imageUrl}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-xs">
-                          🛍️
+                      <div className="text-xs font-black text-slate-400">{absoluteIndex}</div>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedProduct(product)}
+                        className="grid min-w-0 grid-cols-[44px_minmax(0,1fr)] items-center gap-2 text-left"
+                      >
+                        <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
+                          {image ? (
+                            <img src={image} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <span className="text-[10px] font-black text-slate-400">NO</span>
+                          )}
                         </div>
-                      )}
-                    </button>
 
-                    <div className="min-w-0">
-                      <p className="truncate text-[12px] font-black text-slate-900">
-                        {pinned ? "📌 " : ""}
-                        {getProductName(product)}
-                      </p>
-                      <p className="mt-0.5 truncate text-[10px] font-bold text-slate-500">
-                        {money(getProductPrice(product))} · {optionSummary(product)}
-                      </p>
+                        <div className="min-w-0">
+                          <div className="truncate text-xs font-black text-slate-950">
+                            {productName(product)}
+                          </div>
+                          <div className="mt-0.5 truncate text-[11px] font-bold text-slate-500">
+                            {money(productPrice(product))} · {colorSummary(product)} / {sizeSummary(product)}
+                          </div>
+                        </div>
+                      </button>
+
+                      <div className="text-center">
+                        <span className={["inline-flex rounded-full px-2.5 py-1 text-[11px] font-black", info.className].join(" ")}>
+                          {info.label}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedProduct(product)}
+                          className="h-8 rounded-lg bg-slate-100 px-2.5 text-[11px] font-black text-slate-600 hover:bg-slate-200"
+                        >
+                          상세
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => openQuickProductEdit(product)}
+                          className="h-8 rounded-lg bg-slate-100 px-2.5 text-[11px] font-black text-slate-600 hover:bg-slate-200"
+                        >
+                          수정
+                        </button>
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="flex justify-center">
-                    <button
-                      type="button"
-                      onClick={() => void toggleVisible(product)}
-                      className={`rounded-full px-2 py-1 text-[10px] font-black ring-1 ${info.className}`}
-                    >
-                      {info.label}
-                    </button>
-                  </div>
-
-                  <div className="flex justify-center">
-                    <button
-                      type="button"
-                      onClick={() => openEditProductPanel(product)}
-                      className="rounded-lg bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600 hover:bg-slate-200"
-                    >
-                      수정
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            )}
           </div>
-        )}
+
+          <div className="mt-3 flex shrink-0 items-center justify-center gap-2 border-t border-slate-100 pt-3">
+            <button
+              type="button"
+              disabled={safePage <= 1}
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              className="h-8 rounded-xl bg-slate-100 px-4 text-xs font-black text-slate-400 disabled:opacity-50"
+            >
+              이전
+            </button>
+
+            <div className="flex h-8 min-w-8 items-center justify-center rounded-xl bg-blue-600 px-3 text-xs font-black text-white">
+              {safePage}
+            </div>
+
+            <button
+              type="button"
+              disabled={safePage >= totalPages}
+              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+              className="h-8 rounded-xl bg-slate-100 px-4 text-xs font-black text-slate-400 disabled:opacity-50"
+            >
+              다음
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div className="mt-2 flex shrink-0 items-center justify-center gap-1.5 border-t border-slate-100 pt-2">
-        <button
-          type="button"
-          disabled={safePage <= 1}
-          onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-          className="rounded-lg bg-slate-100 px-2.5 py-1.5 text-[11px] font-black text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          이전
-        </button>
-
-        {pageNumbers.map((pageNumber) => (
-          <button
-            key={pageNumber}
-            type="button"
-            onClick={() => setCurrentPage(pageNumber)}
-            className={[
-              "min-w-8 rounded-lg px-2.5 py-1.5 text-[11px] font-black",
-              pageNumber === safePage
-                ? "bg-blue-600 text-white"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200",
-            ].join(" ")}
-          >
-            {pageNumber}
-          </button>
-        ))}
-
-        <button
-          type="button"
-          disabled={safePage >= totalPages}
-          onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-          className="rounded-lg bg-slate-100 px-2.5 py-1.5 text-[11px] font-black text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          다음
-        </button>
-      </div>
-
-      {previewImage ? (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/70 p-6">
-          <button
-            type="button"
-            aria-label="이미지 미리보기 닫기"
-            onClick={() => setPreviewImage("")}
-            className="absolute inset-0"
-          />
-
-          <div className="relative max-h-[90vh] w-full max-w-[760px] overflow-hidden rounded-3xl bg-white p-3 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between gap-3 px-1">
+      {selectedProduct ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/45 p-5">
+          <div className="w-full max-w-[720px] overflow-hidden rounded-3xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
-                <h3 className="text-sm font-black text-slate-950">상품사진 확인</h3>
-                <p className="mt-0.5 text-[11px] font-bold text-slate-400">
-                  등록된 대표사진을 크게 확인합니다.
+                <h3 className="text-lg font-black text-slate-950">등록상품 상세보기</h3>
+                <p className="mt-1 text-xs font-bold text-slate-500">
+                  수정 없이 등록된 상품 정보를 확인합니다.
                 </p>
               </div>
 
               <button
                 type="button"
-                onClick={() => setPreviewImage("")}
-                className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-200"
+                onClick={() => setSelectedProduct(null)}
+                className="h-9 rounded-xl bg-slate-100 px-4 text-xs font-black text-slate-600 hover:bg-slate-200"
               >
                 닫기
               </button>
             </div>
 
-            <div className="flex max-h-[78vh] items-center justify-center overflow-auto rounded-2xl bg-slate-50">
-              <img
-                src={previewImage}
-                alt=""
-                className="max-h-[78vh] max-w-full object-contain"
-              />
+            <div className="grid grid-cols-[220px_minmax(0,1fr)] gap-5 p-6">
+              <div>
+                <div className="flex h-[220px] items-center justify-center overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
+                  {selectedImage ? (
+                    <img src={selectedImage} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-sm font-black text-slate-400">사진 없음</span>
+                  )}
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2 text-center">
+                  <div className="rounded-xl bg-slate-50 px-3 py-2">
+                    <div className="text-[10px] font-black text-slate-400">상품구분</div>
+                    <div className="mt-1 text-xs font-black text-slate-800">{productTypeLabel(selectedProduct)}</div>
+                  </div>
+
+                  <div className="rounded-xl bg-slate-50 px-3 py-2">
+                    <div className="text-[10px] font-black text-slate-400">배송유형</div>
+                    <div className="mt-1 text-xs font-black text-slate-800">{shippingLabel(selectedProduct)}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="min-w-0">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h4 className="truncate text-xl font-black text-slate-950">{productName(selectedProduct)}</h4>
+                    <div className="mt-1 text-lg font-black text-blue-600">{money(productPrice(selectedProduct))}</div>
+                  </div>
+
+                  {selectedStatus ? (
+                    <span className={["shrink-0 rounded-full px-3 py-1.5 text-xs font-black", selectedStatus.className].join(" ")}>
+                      {selectedStatus.label}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl border border-slate-200 p-3">
+                    <div className="text-[11px] font-black text-slate-400">색상</div>
+                    <div className="mt-1 text-sm font-black text-slate-800">{colorSummary(selectedProduct)}</div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 p-3">
+                    <div className="text-[11px] font-black text-slate-400">사이즈</div>
+                    <div className="mt-1 text-sm font-black text-slate-800">{sizeSummary(selectedProduct)}</div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 p-3">
+                    <div className="text-[11px] font-black text-slate-400">재고</div>
+                    <div className="mt-1 text-sm font-black text-slate-800">{stockSummary(selectedProduct)}</div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 p-3">
+                    <div className="text-[11px] font-black text-slate-400">리스트</div>
+                    <div className="mt-1 text-sm font-black text-slate-800">
+                      {pickBoolean(selectedProduct, ["is_pinned", "pinned"], false) ? "상단고정" : "일반"}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-[11px] font-black text-slate-400">상세설명</div>
+                  <div className="mt-2 max-h-[150px] overflow-y-auto whitespace-pre-wrap text-sm font-bold leading-6 text-slate-700">
+                    {pickString(selectedProduct, ["product_description", "description", "detail_description"], "상세설명 없음")}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-slate-200 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setSelectedProduct(null)}
+                className="h-11 w-[120px] rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-600 hover:bg-slate-50"
+              >
+                닫기
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const product = selectedProduct;
+                  setSelectedProduct(null);
+                  openQuickProductEdit(product);
+                }}
+                className="h-11 w-[150px] rounded-xl bg-blue-600 text-sm font-black text-white hover:bg-blue-700"
+              >
+                수정하기
+              </button>
             </div>
           </div>
         </div>
       ) : null}
-    </div>
+    </>
   );
 }
