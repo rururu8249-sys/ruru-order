@@ -61,9 +61,9 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
 
   return (
     <section className="mb-3">
-<div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-[repeat(3,minmax(0,190px))] xl:grid-cols-[repeat(5,minmax(0,190px))] justify-start">
+<div className="flex flex-wrap items-stretch justify-start gap-2">
         {stats.map((stat) => (
-          <div key={stat.label} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+          <div key={stat.label} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm w-[190px] min-h-[78px] shrink-0">
             <div className="flex items-center gap-3">
               <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-base ${stat.color}`}>
                 {stat.icon}

@@ -157,8 +157,8 @@ export default function AdminLiveProductListPanel() {
   };
 
   return (
-    <div className="col-span-12 h-[460px] rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
+    <div className="col-span-12 flex h-[480px] flex-col rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-4">
+      <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-sm font-black text-slate-950">등록상품 리스트</h2>
           <p className="mt-0.5 truncate text-[10px] font-bold text-slate-400">
@@ -185,23 +185,23 @@ export default function AdminLiveProductListPanel() {
         </div>
       </div>
 
-      <div className="grid grid-cols-[34px_minmax(0,1fr)_82px_42px] border-y border-slate-100 py-2 text-[10px] font-black text-slate-400">
+      <div className="grid shrink-0 grid-cols-[34px_minmax(0,1fr)_82px_42px] border-y border-slate-100 py-2 text-[10px] font-black text-slate-400">
         <div>순서</div>
         <div>상품정보</div>
         <div className="text-center">상태</div>
         <div className="text-center">관리</div>
       </div>
 
-      <div className="mb-2 mt-2 flex items-center justify-between gap-2 text-[10px] font-black text-slate-500">
+      <div className="mt-2 flex shrink-0 items-center justify-between gap-2 text-[10px] font-black text-slate-500">
         <div>
           {products.length === 0
             ? "0개"
             : `${(safePage - 1) * pageSize + 1}-${Math.min(safePage * pageSize, products.length)} / ${products.length}개`}
         </div>
-        <div>기본 {pageSize}개씩 표시</div>
+        <div>기본 {pageSize}개</div>
       </div>
 
-      <div className="h-[326px] overflow-y-auto pr-1">
+      <div className="mt-2 min-h-0 flex-1 overflow-y-auto pr-1">
         {loading ? (
           <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 text-xs font-black text-slate-400">
             상품 목록 불러오는 중...
@@ -267,7 +267,7 @@ export default function AdminLiveProductListPanel() {
         )}
       </div>
 
-      <div className="mt-2 flex items-center justify-center gap-1.5 border-t border-slate-100 pt-2">
+      <div className="mt-2 flex shrink-0 items-center justify-center gap-1.5 border-t border-slate-100 pt-2">
         <button
           type="button"
           disabled={safePage <= 1}
