@@ -100,7 +100,7 @@ export default function SettlementManualEntryPanel({
 
   const saveEntry = async () => {
     if (!tableReady) {
-      showAdminToast("수동 매출/지출 테이블이 아직 없습니다. Supabase SQL Editor에서 settlement_manual_entries.sql을 먼저 실행해주세요.", "error");
+      showAdminToast("정산 추가 입력 테이블이 아직 없습니다. Supabase SQL Editor에서 settlement_manual_entries.sql을 먼저 실행해주세요.", "error");
       return;
     }
 
@@ -123,7 +123,7 @@ export default function SettlementManualEntryPanel({
     }
 
     const nextBroadcastKey = broadcastKey || `date:${entryDate}`;
-    const nextBroadcastLabel = selectedBroadcast?.label || `${entryDate} · 수동입력`;
+    const nextBroadcastLabel = selectedBroadcast?.label || `${entryDate} · 정산추가`;
 
     const payload = {
       entry_type: entryType,
@@ -149,7 +149,7 @@ export default function SettlementManualEntryPanel({
       const { data: savedEntry, error } = await query;
 
       if (error) {
-        showAdminToast("수동 매출/지출 저장 실패\n\n" + error.message, "error");
+        showAdminToast("정산 추가 입력 저장 실패\n\n" + error.message, "error");
         return;
       }
 
@@ -158,10 +158,10 @@ export default function SettlementManualEntryPanel({
         action: editingId ? "update" : "create",
         beforeValue: originalEntry,
         afterValue: savedEntry,
-        memo: editingId ? "수동 정산 입력 수정" : "수동 정산 신규 입력",
+        memo: editingId ? "정산 추가 입력 수정" : "정산 추가 신규 입력",
       });
 
-      showAdminToast(editingId ? "수동 입력 내역을 수정했습니다." : "수동 입력 내역을 추가했습니다.", "success");
+      showAdminToast(editingId ? "추가 정산 내역을 수정했습니다." : "추가 정산 내역을 추가했습니다.", "success");
       resetForm();
       closeDetail();
       onChanged();
@@ -173,7 +173,7 @@ export default function SettlementManualEntryPanel({
   const deactivateEntry = async (entry: SettlementManualEntry) => {
     if (!entry.id) return;
 
-    const ok = window.confirm("이 수동 입력 내역을 목록에서 삭제 처리할까요?\n완전삭제가 아니라 비활성 처리됩니다.");
+    const ok = window.confirm("이 추가 정산 내역을 목록에서 삭제 처리할까요?\n완전삭제가 아니라 비활성 처리됩니다.");
     if (!ok) return;
 
     setSaving(true);
@@ -195,7 +195,7 @@ export default function SettlementManualEntryPanel({
         .eq("id", entry.id);
 
       if (error) {
-        showAdminToast("수동 입력 내역 삭제 처리 실패\n\n" + error.message, "error");
+        showAdminToast("추가 정산 내역 삭제 처리 실패\n\n" + error.message, "error");
         return;
       }
 
@@ -204,10 +204,10 @@ export default function SettlementManualEntryPanel({
         action: "delete",
         beforeValue: entry,
         afterValue,
-        memo: "수동 정산 입력 삭제 처리",
+        memo: "정산 추가 입력 삭제 처리",
       });
 
-      showAdminToast("수동 입력 내역을 삭제 처리했습니다.", "success");
+      showAdminToast("추가 정산 내역을 삭제 처리했습니다.", "success");
       closeDetail();
       onChanged();
     } finally {
@@ -295,7 +295,7 @@ export default function SettlementManualEntryPanel({
 
       {!tableReady ? (
         <div className="rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3 text-sm font-bold leading-6 text-orange-800">
-          settlement_manual_entries 테이블이 아직 없습니다. 먼저 Supabase SQL Editor에서
+          정산 추가 입력 테이블이 아직 없습니다. 먼저 Supabase SQL Editor에서
           <span className="mx-1 font-black">supabase/sql/settlement_manual_entries.sql</span>
           내용을 실행해야 저장이 가능합니다.
         </div>
@@ -409,7 +409,7 @@ export default function SettlementManualEntryPanel({
           ) : null}
 
           <div className="text-xs font-bold text-slate-400">
-            입력값은 주문/입금 데이터와 분리 저장됩니다.
+            주문서와 별도로 정산에만 반영됩니다.
           </div>
         </div>
       </div>
@@ -426,7 +426,7 @@ export default function SettlementManualEntryPanel({
 
       <div className="overflow-hidden rounded-[24px] border border-slate-200">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50 px-4 py-3">
-          <div className="text-sm font-black text-slate-800">수동 입력 내역</div>
+          <div className="text-sm font-black text-slate-800">추가 정산 내역</div>
           <div className="flex items-center gap-2">
             <select
               value={pageSize}
@@ -471,7 +471,7 @@ export default function SettlementManualEntryPanel({
               ) : visibleEntries.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-sm font-bold text-slate-400">
-                    수동 입력 내역이 없습니다.
+                    아직 추가한 정산 내역이 없습니다.
                   </td>
                 </tr>
               ) : (

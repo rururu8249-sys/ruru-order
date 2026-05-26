@@ -69,8 +69,8 @@ export default function SettlementManualEntryDetailModal({
       <div className="flex max-h-[calc(100dvh-32px)] w-full max-w-[720px] flex-col overflow-hidden rounded-[30px] bg-white shadow-[0_30px_100px_rgba(15,23,42,0.35)]">
         <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
           <div>
-            <div className="text-xs font-black tracking-[0.22em] text-violet-600">MANUAL ENTRY DETAIL</div>
-            <h3 className="mt-1 text-2xl font-black tracking-[-0.04em] text-slate-950">수동 정산 상세</h3>
+            <div className="text-xs font-black tracking-[0.22em] text-violet-600">SETTLEMENT ENTRY DETAIL</div>
+            <h3 className="mt-1 text-2xl font-black tracking-[-0.04em] text-slate-950">추가 정산 상세</h3>
           </div>
 
           <button

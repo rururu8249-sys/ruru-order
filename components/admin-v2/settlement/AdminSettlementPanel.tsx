@@ -71,7 +71,7 @@ export default function AdminSettlementPanel({
         setManualEntryTableReady(!missingTable);
 
         if (!missingTable) {
-          showAdminToast("수동 매출/지출 불러오기 실패\n\n" + message, "error");
+          showAdminToast("정산 추가 입력 불러오기 실패\n\n" + message, "error");
         }
 
         setManualEntries([]);
@@ -219,7 +219,7 @@ export default function AdminSettlementPanel({
               onClick={() => setManualPanelOpen(true)}
               className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
             >
-              + 창고정산/기타입력
+              + 정산 추가 입력
             </button>
 
             <button
@@ -258,7 +258,7 @@ export default function AdminSettlementPanel({
       <SettlementBroadcastTable rows={broadcastRows} />
 
       <div className="rounded-[30px] border border-orange-100 bg-orange-50 px-5 py-4 text-sm font-bold leading-6 text-orange-800">
-        수동 입력은 주문/입금 데이터와 분리된 별도 테이블에 저장됩니다. 삭제는 완전삭제가 아니라 비활성 처리됩니다. 상세 모달과 수정이력 로그는 다음 단계에서 보강합니다.
+        추가 정산 내역은 주문서와 별도로 정산에만 반영됩니다. 삭제는 완전삭제가 아니라 비활성 처리됩니다. 상세 모달과 수정이력 로그는 다음 단계에서 보강합니다.
       </div>
 
       {manualPanelOpen ? (
@@ -266,8 +266,8 @@ export default function AdminSettlementPanel({
           <div className="absolute right-0 top-0 flex h-full w-full max-w-[1040px] flex-col overflow-hidden bg-slate-50 shadow-[0_30px_120px_rgba(15,23,42,0.45)]">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
               <div>
-                <div className="text-xs font-black tracking-[0.22em] text-violet-600">MANUAL MONEY ENTRY</div>
-                <div className="mt-1 text-xl font-black text-slate-950">수동 정산 입력</div>
+                <div className="text-xs font-black tracking-[0.22em] text-violet-600">SETTLEMENT EXTRA ENTRY</div>
+                <div className="mt-1 text-xl font-black text-slate-950">정산 추가 입력</div>
               </div>
 
               <button

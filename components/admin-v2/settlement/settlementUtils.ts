@@ -173,8 +173,8 @@ export function manualEntryBroadcastKey(entry?: SettlementManualEntry | null) {
 }
 
 export function manualEntryLabel(entry?: SettlementManualEntry | null) {
-  if (!entry) return "수동입력";
-  return cleanText(entry.broadcast_label) || `${formatDateLabel(entry.entry_date)} · 수동입력`;
+  if (!entry) return "정산추가";
+  return cleanText(entry.broadcast_label) || `${formatDateLabel(entry.entry_date)} · 정산추가`;
 }
 
 export function filterManualEntries({
