@@ -663,7 +663,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
 
   return (
     <section className="mb-4 grid grid-cols-12 items-stretch gap-3">
-      <div className="col-span-12 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-4 max-h-[280px] overflow-hidden">
+      <div className="col-span-12 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-4 h-[348px] flex flex-col">
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-black text-slate-950">
             방송화면
@@ -681,7 +681,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
           </div>
         </div>
 
-        <div className="flex h-[540px] items-center justify-center overflow-hidden rounded-2xl bg-slate-100 p-1">
+        <div className="flex flex-1 min-h-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-100 p-1">
           <div className={`relative overflow-hidden rounded-[1.5rem] bg-slate-950 shadow-sm ${videoSizeClass(videoRatio)}`}>
             {videoEmbedUrl ? (
               <iframe
@@ -693,7 +693,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
               />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-amber-100 via-stone-100 to-slate-100">
-                <div className="w-[78%] rounded-[2rem] bg-white/70 p-6 text-center shadow-sm backdrop-blur max-h-[280px] overflow-hidden">
+                <div className="w-[78%] rounded-[2rem] bg-white/70 p-6 text-center shadow-sm backdrop-blur">
                   <div className="text-5xl">👟</div>
                   <div className="mt-4 text-lg font-black text-slate-900">루루동이LIVE</div>
                   <div className="mt-2 text-xs font-bold text-slate-500">유튜브 라이브 URL을 적용하면 방송화면이 표시됩니다.</div>
@@ -704,13 +704,13 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
         </div>
       </div>
 
-      <div className="col-span-12 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-5">
+      <div className="col-span-12 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-5 h-[348px] flex flex-col">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-black text-slate-950">라이브 채팅</h2>
           <span className="text-xs font-bold text-slate-500">{chatEmbedUrl ? "채팅 연결" : "URL 대기"}</span>
         </div>
 
-        <div className="h-[346px] overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
+        <div className="flex-1 min-h-0 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
           {chatEmbedUrl ? (
             <iframe
               title="YouTube live chat"

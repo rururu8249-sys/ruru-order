@@ -1,4 +1,4 @@
-import { ADMIN_LIVE_MENUS, getAdminLiveMenu, type AdminLiveMenuKey } from "./adminLiveMenu";
+import { ADMIN_LIVE_MENUS, type AdminLiveMenuKey } from "./adminLiveMenu";
 import LiveOpsStatusBox from "./LiveOpsStatusBox";
 import AdminLiveLogoutButton from "./AdminLiveLogoutButton";
 import AdminLiveCustomerIssueSummaryCard from "./AdminLiveCustomerIssueSummaryCard";
@@ -10,8 +10,7 @@ type Props = {
 };
 
 export default function AdminLiveSidebar({ activeMenu, onMenuChange }: Props) {
-  const currentMenu = getAdminLiveMenu(activeMenu);
-  return (
+return (
     <aside className="flex h-screen w-[220px] shrink-0 flex-col border-r border-slate-200 bg-white px-4 py-6">
       <div className="mb-8 flex items-center gap-2">
         <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-white">▶</div>
@@ -52,16 +51,6 @@ export default function AdminLiveSidebar({ activeMenu, onMenuChange }: Props) {
         <LiveOpsStatusBox />
 
         <AdminLiveCustomerIssueSummaryCard onOpenCustomers={() => onMenuChange("customers")} />
-
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-          <div className="mb-1.5 flex items-center gap-2 text-sm font-black text-slate-800">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-slate-500">!</span>
-            {currentMenu.label}
-          </div>
-          <p className="text-[11px] leading-5 text-slate-500">
-            {currentMenu.sidebarNotice}
-          </p>
-        </div>
       </div>
           <AdminLiveLogoutButton />
     </aside>
