@@ -35,6 +35,7 @@ import {
   toAdminLiveOrder,
 } from "./liveOrderAdapter";
 import { useAutoBankdaPaymentSync } from "./useAutoBankdaPaymentSync";
+import AdminLiveQuickProductDrawer from "./AdminLiveQuickProductDrawer";
 import {
   buildAlwaysOrderOptions,
   getAlwaysOrderDateFromFilter,
@@ -652,7 +653,9 @@ export default function AdminLiveDashboard() {
             onClose={() => setManualMatchGroup(null)}
             onMatched={refreshAfterManualMatch}
           />
-        </main>
+          <AdminLiveQuickProductDrawer activeBroadcastId={activeBroadcast?.id || null} />
+
+      </main>
       </div>
     </div>
   );
