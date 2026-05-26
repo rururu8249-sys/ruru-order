@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
+import AdminAuthSettingsPanel from "./AdminAuthSettingsPanel";
 
 type SettingKey =
   | "customer_card_extra_rate"
@@ -298,6 +299,8 @@ export default function AdminLiveSettingsPanel() {
       <div className="rounded-[30px] border border-slate-200 bg-white px-5 py-4 text-sm font-bold leading-6 text-slate-500">
         합배송 시간 설정, 주문서 작성 가능 시간, 알림 설정은 다음 설정 단계에서 분리해서 추가합니다.
       </div>
+    <AdminAuthSettingsPanel />
+
     </section>
   );
 }
