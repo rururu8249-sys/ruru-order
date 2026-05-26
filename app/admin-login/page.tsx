@@ -1,125 +1,144 @@
-// app/admin-login/page.tsx
-// 새 파일 생성
-// 위치: /Users/ruru/Desktop/ruru-order-app/app/admin-login/page.tsx
-// 목적: 관리자 보안 로그인 화면
-// 주의: 관리자 본체 / 주문 / 정산 / 송장 로직 없음
-
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 
 export default function AdminLoginPage() {
+  const [username, setUsername] = useState("ruru");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  const getNextPath = () => {
-    if (typeof window === "undefined") return "/admin-v2";
+  const nextPath = useMemo(() => {
+    if (typeof window === "undefined") return "/admin-live";
 
     const params = new URLSearchParams(window.location.search);
-    const next = params.get("next");
+    const next = params.get("next") || "/admin-live";
 
-    if (next && next.startsWith("/admin-v2")) {
-      return next;
-    }
-
-    return "/admin-v2";
-  };
+    return next.startsWith("/") ? next : "/admin-live";
+  }, []);
 
   const submitLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!password.trim()) {
-      setMessage("관리자 비밀번호를 입력해주세요.");
-      return;
-    }
-
-    setLoading(true);
     setMessage("");
+    setLoading(true);
 
     try {
       const response = await fetch("/api/admin-login", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          username: username.trim(),
           password,
+          remember,
         }),
       });
 
       const result = await response.json().catch(() => null);
 
-      if (!response.ok) {
-        setMessage(result?.message || "비밀번호가 올바르지 않습니다.");
-        setLoading(false);
-        return;
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.message || "로그인에 실패했습니다.");
       }
 
-      window.location.href = getNextPath();
-    } catch {
-      setMessage("로그인 처리 중 오류가 발생했습니다.");
+      window.location.href = nextPath;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "로그인 중 오류가 발생했습니다.";
+      setMessage(errorMessage);
+    } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-[#0b0d12] px-4 py-8 text-white">
-      <section className="mx-auto flex min-h-[calc(100vh-64px)] w-full max-w-md items-center">
-        <div className="w-full overflow-hidden rounded-[34px] border border-white/10 bg-[#11141d] shadow-[0_28px_80px_rgba(0,0,0,0.45)]">
-          <div className="border-b border-white/10 bg-gradient-to-br from-[#1b2130] to-[#0f1117] px-6 py-7">
-            <div className="inline-flex rounded-full border border-red-400/40 bg-red-500/10 px-3 py-1 text-xs font-black tracking-[0.18em] text-red-300">
-              WARNING
+    <main className="min-h-screen bg-slate-50 px-5 py-10">
+      <div className="mx-auto flex min-h-[calc(100vh-80px)] max-w-md items-center justify-center">
+        <section className="w-full rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-6 text-center">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-2xl">
+              🔐
             </div>
-
-            <h1 className="mt-4 text-[34px] font-black leading-tight tracking-[-0.06em]">
-              RURUDONG2
-              <br />
-              SECURITY
+            <h1 className="text-xl font-black text-slate-950">
+              루루동이 관리자 로그인
             </h1>
-
-            <p className="mt-3 text-sm font-bold leading-relaxed text-white/60">
-              관리자 전용 보안 페이지입니다.
-              <br />
-              허가된 사용자만 접근할 수 있습니다.
+            <p className="mt-2 text-sm font-bold leading-relaxed text-slate-500">
+              초기 아이디는 ruru, 초기 비밀번호는 기존 관리자 비밀번호입니다.
             </p>
           </div>
 
-          <form onSubmit={submitLogin} className="px-6 py-6">
-            <label className="text-sm font-black text-white/80">
-              관리자 비밀번호
+          <form onSubmit={submitLogin} className="space-y-4">
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-black text-slate-700">
+                관리자 아이디
+              </span>
+              <input
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                autoComplete="username"
+                className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
+                placeholder="ruru"
+              />
             </label>
 
-            <input
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              type="password"
-              autoComplete="current-password"
-              placeholder="비밀번호 입력"
-              className="mt-3 w-full rounded-2xl border border-white/10 bg-white px-4 py-4 text-base font-black text-[#111827] outline-none ring-0 placeholder:text-gray-400 focus:border-red-400"
-            />
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-black text-slate-700">
+                비밀번호
+              </span>
+              <div className="flex h-12 items-center rounded-2xl border border-slate-200 px-4 focus-within:border-blue-500">
+                <input
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  className="min-w-0 flex-1 text-sm font-bold text-slate-900 outline-none"
+                  placeholder="기존 관리자 비밀번호"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((value) => !value)}
+                  className="ml-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-600"
+                >
+                  {showPassword ? "숨김" : "보기"}
+                </button>
+              </div>
+            </label>
 
-            {message && (
-              <div className="mt-3 rounded-2xl bg-red-500/10 px-4 py-3 text-sm font-black leading-relaxed text-red-300">
+            <label className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3">
+              <span className="text-sm font-black text-slate-700">
+                자동로그인 유지
+              </span>
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(event) => setRemember(event.target.checked)}
+                className="h-4 w-4"
+              />
+            </label>
+
+            {message ? (
+              <div className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold leading-relaxed text-rose-700">
                 {message}
               </div>
-            )}
+            ) : null}
 
             <button
               type="submit"
               disabled={loading}
-              className="mt-4 w-full rounded-2xl bg-red-500 px-4 py-4 text-base font-black text-white shadow-[0_16px_34px_rgba(239,68,68,0.28)] transition active:scale-[0.98] disabled:opacity-60"
+              className="h-12 w-full rounded-2xl bg-blue-600 text-sm font-black text-white shadow-sm disabled:cursor-wait disabled:opacity-60"
             >
               {loading ? "확인 중..." : "관리자 로그인"}
             </button>
-
-            <div className="mt-4 rounded-2xl border border-yellow-300/20 bg-yellow-300/10 px-4 py-3 text-xs font-bold leading-relaxed text-yellow-100/80">
-              ⚠️ 관리자 페이지는 주문/입금/배송 정보가 포함되어 있습니다.
-              공용 PC에서는 사용 후 반드시 브라우저를 종료해주세요.
-            </div>
           </form>
-        </div>
-      </section>
+
+          <div className="mt-5 rounded-2xl bg-amber-50 px-4 py-3 text-xs font-bold leading-relaxed text-amber-800">
+            로그인 후 관리자 화면의 보안 설정에서 원하는 아이디/비밀번호로 변경하세요.
+          </div>
+        </section>
+      </div>
     </main>
   );
 }
