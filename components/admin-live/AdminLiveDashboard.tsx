@@ -574,7 +574,7 @@ export default function AdminLiveDashboard() {
             onEndBroadcast={endBroadcast}
             onSaveBroadcast={saveBroadcast}
           />
-          <div className="grid w-full grid-cols-12 items-stretch gap-3">
+          <div className="grid w-full grid-cols-12 grid-rows-[auto_480px] items-stretch gap-3">
 
             <div className="col-span-12 min-w-0 xl:col-span-8">
 
@@ -583,9 +583,9 @@ export default function AdminLiveDashboard() {
             </div>
 
 
-            <div className="col-span-12 min-w-0 xl:col-span-4 xl:row-span-2">
+            <div className="col-span-12 min-h-0 min-w-0 overflow-hidden xl:col-span-4 xl:row-span-2">
 
-              <AdminLiveProductListPanel fillHeight className="h-full min-w-0" />
+              <AdminLiveProductListPanel fillHeight className="h-full min-w-0 overflow-hidden" />
 
             </div>
 
