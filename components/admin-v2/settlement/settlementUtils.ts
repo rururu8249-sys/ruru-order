@@ -382,44 +382,57 @@ export function buildDailyTrend(
   actualCardRate: number,
   manualEntries: SettlementManualEntry[] = [],
 ) {
-  const map = new Map<string, { dateKey: string; sales: number; fee: number; expense: number; net: number }>();
+  const grouped = new Map<
+    string,
+    {
+      rows: AnyRow[];
+      manualEntries: SettlementManualEntry[];
+    }
+  >();
 
-  rows
-    .filter((row) => !isCanceled(row) && isPaymentDone(row))
-    .forEach((row) => {
-      const dateKey = orderDateKey(row) || "unknown";
-      const current = map.get(dateKey) || { dateKey, sales: 0, fee: 0, expense: 0, net: 0 };
-      const amount = orderNetAmount(row);
-      const fee = orderActualCardFee(row, actualCardRate);
-      const expense = orderWarehouseOtherExpense(row);
+  const ensureGroup = (dateKey: string) => {
+    const key = dateKey || "unknown";
 
-      current.sales += amount;
-      current.fee += fee;
-      current.expense += expense;
-      current.net += amount - fee - expense;
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        rows: [],
+        manualEntries: [],
+      });
+    }
 
-      map.set(dateKey, current);
+    return grouped.get(key)!;
+  };
+
+  rows.forEach((row) => {
+    ensureGroup(orderDateKey(row)).rows.push(row);
+  });
+
+  manualEntries.forEach((entry) => {
+    ensureGroup(manualEntryDateKey(entry)).manualEntries.push(entry);
+  });
+
+  return Array.from(grouped.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([dateKey, group]) => {
+      const stats = calculateStats(group.rows, actualCardRate, group.manualEntries);
+      const totalExpense = stats.actualCardFee + stats.warehouseOtherExpense;
+
+      return {
+        dateKey,
+        sales: stats.paidAmount,
+        fee: stats.actualCardFee,
+        expense: stats.warehouseOtherExpense,
+        net: stats.netAmount,
+        bank: stats.bankAmount,
+        card: stats.cardAmount,
+        manualIncome: stats.manualIncomeAmount,
+        warehouseOtherExpense: stats.warehouseOtherExpense,
+        unpaid: stats.unpaidAmount,
+        orderCount: stats.orderCount,
+        paidCount: stats.paidCount,
+        totalExpense,
+      };
     });
-
-  manualEntries
-    .filter(isManualEntryActive)
-    .forEach((entry) => {
-      const dateKey = manualEntryDateKey(entry) || "unknown";
-      const current = map.get(dateKey) || { dateKey, sales: 0, fee: 0, expense: 0, net: 0 };
-      const amount = manualEntryAmount(entry);
-
-      if (entry.entry_type === "income") {
-        current.sales += amount;
-        current.net += amount;
-      } else {
-        current.expense += amount;
-        current.net -= amount;
-      }
-
-      map.set(dateKey, current);
-    });
-
-  return Array.from(map.values()).sort((a, b) => a.dateKey.localeCompare(b.dateKey)).slice(-14);
 }
 
 export function buildBroadcastRows(

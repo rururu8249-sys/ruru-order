@@ -32,6 +32,56 @@ function csvCell(value: unknown) {
   return `"${String(value ?? "").replace(/"/g, '""')}"`;
 }
 
+function getLocalDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function getMonthStartKey(dateKey = getLocalDateKey()) {
+  const [yearText, monthText] = String(dateKey || getLocalDateKey()).split("-");
+  const year = Number(yearText) || new Date().getFullYear();
+  const month = Number(monthText) || new Date().getMonth() + 1;
+
+  return `${year}-${String(month).padStart(2, "0")}-01`;
+}
+
+function getEffectiveSettlementPeriod(startDate: string, endDate: string) {
+  const todayKey = getLocalDateKey();
+
+  if (startDate && endDate) {
+    return {
+      startDate,
+      endDate,
+      label: "선택기간 기준",
+    };
+  }
+
+  if (startDate && !endDate) {
+    return {
+      startDate,
+      endDate: todayKey,
+      label: "시작일~오늘 기준",
+    };
+  }
+
+  if (!startDate && endDate) {
+    return {
+      startDate: getMonthStartKey(endDate),
+      endDate,
+      label: "종료일 월 기준",
+    };
+  }
+
+  return {
+    startDate: getMonthStartKey(todayKey),
+    endDate: todayKey,
+    label: "기간 미설정 · 이번 달 자동조회",
+  };
+}
+
 export default function AdminSettlementPanel({
   orderGroups,
   orders,
@@ -95,15 +145,19 @@ export default function AdminSettlementPanel({
     return buildBroadcastOptions(allRows, broadcasts);
   }, [allRows, broadcasts]);
 
+  const effectivePeriod = useMemo(() => getEffectiveSettlementPeriod(startDate, endDate), [startDate, endDate]);
+  const effectiveStartDate = effectivePeriod.startDate;
+  const effectiveEndDate = effectivePeriod.endDate;
+
   const filteredRows = useMemo(() => {
     return filterRows({
       rows: allRows,
-      startDate,
-      endDate,
+      startDate: effectiveStartDate,
+      endDate: effectiveEndDate,
       selectedBroadcastKeys,
       paymentFilter,
     });
-  }, [allRows, startDate, endDate, selectedBroadcastKeys, paymentFilter]);
+  }, [allRows, effectiveStartDate, effectiveEndDate, selectedBroadcastKeys, paymentFilter]);
 
   const manualEntriesInScope = useMemo(() => {
     return filterManualEntries({
@@ -113,7 +167,7 @@ export default function AdminSettlementPanel({
       selectedBroadcastKeys,
       paymentFilter,
     });
-  }, [manualEntries, startDate, endDate, selectedBroadcastKeys, paymentFilter]);
+  }, [manualEntries, effectiveStartDate, effectiveEndDate, selectedBroadcastKeys, paymentFilter]);
 
   const actualRateNumber = toNumber(actualCardFeeRate);
   const stats = useMemo(() => calculateStats(filteredRows, actualRateNumber, manualEntriesInScope), [filteredRows, actualRateNumber, manualEntriesInScope]);
@@ -178,10 +232,7 @@ export default function AdminSettlementPanel({
       return `${year}년 ${month}월 ${day}일(${weekday}) ${hour}:${minute}`;
     };
 
-    const reportPeriod =
-      startDate || endDate
-        ? `${formatKoreanDate(startDate)} ~ ${formatKoreanDate(endDate)}`
-        : "전체 기간";
+    const reportPeriod = `${formatKoreanDate(effectiveStartDate)} ~ ${formatKoreanDate(effectiveEndDate)}`;
 
     const selectedBroadcastLabel =
       selectedBroadcastKeys.length > 0 ? `${selectedBroadcastKeys.length.toLocaleString()}개 선택` : "전체보기";
@@ -189,6 +240,7 @@ export default function AdminSettlementPanel({
     const rows: Array<Array<string | number>> = [
       ["루루동이 정산통계 보고서"],
       ["조회기간", reportPeriod],
+      ["조회 기준", effectivePeriod.label],
       ["생성일시", formatKoreanDateTime()],
       ["결제수단 조건", paymentFilter],
       ["방송리스트 조건", selectedBroadcastLabel],
@@ -322,7 +374,7 @@ export default function AdminSettlementPanel({
 
       <SettlementSummaryCards stats={stats} actualCardFeeRate={actualCardFeeRate} />
 
-      <SettlementCharts trend={trend} stats={stats} />
+      <SettlementCharts trend={trend} stats={stats} broadcastRows={broadcastRows} periodLabel={effectivePeriod.label} />
 
       <SettlementBroadcastTable rows={broadcastRows} />
 
