@@ -41,6 +41,36 @@ export default function AdminLiveQuickProductDrawer({
     };
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let count = 0;
+
+    const timer = window.setInterval(() => {
+      count += 1;
+
+      const root = document.querySelector("[data-ruru-quick-product-drawer]");
+      const buttons = Array.from(root?.querySelectorAll("button") || []);
+      const openButton = buttons.find((button) => {
+        const text = button.textContent || "";
+        return text.includes("열기") || text.includes("펼치기");
+      });
+
+      if (openButton instanceof HTMLButtonElement) {
+        openButton.click();
+        window.clearInterval(timer);
+      }
+
+      if (count >= 8) {
+        window.clearInterval(timer);
+      }
+    }, 120);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
@@ -52,7 +82,10 @@ export default function AdminLiveQuickProductDrawer({
         className="absolute inset-0 bg-slate-950/35"
       />
 
-      <aside className="absolute right-0 top-0 flex h-full w-full max-w-[640px] flex-col bg-slate-50 shadow-2xl">
+      <aside
+        data-ruru-quick-product-drawer
+        className="absolute right-0 top-0 flex h-full w-full max-w-[760px] flex-col bg-slate-50 shadow-2xl"
+      >
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
           <div className="min-w-0">
             <h2 className="text-lg font-black text-slate-950">

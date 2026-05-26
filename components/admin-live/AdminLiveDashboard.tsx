@@ -36,6 +36,7 @@ import {
 } from "./liveOrderAdapter";
 import { useAutoBankdaPaymentSync } from "./useAutoBankdaPaymentSync";
 import AdminLiveQuickProductDrawer from "./AdminLiveQuickProductDrawer";
+import AdminLiveProductListPanel from "./AdminLiveProductListPanel";
 import {
   buildAlwaysOrderOptions,
   getAlwaysOrderDateFromFilter,
@@ -573,8 +574,20 @@ export default function AdminLiveDashboard() {
             onEndBroadcast={endBroadcast}
             onSaveBroadcast={saveBroadcast}
           />
+          <div className="grid items-stretch gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(360px,1fr)]">
+
+            <div className="min-w-0 space-y-3">
+
           <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
+
+
           <LiveBroadcastPanels videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} />
+
+            </div>
+
+            <AdminLiveProductListPanel fillHeight className="min-w-0" />
+
+          </div>
 {loadError && (
             <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700">
               주문 데이터 불러오기 실패: {loadError}

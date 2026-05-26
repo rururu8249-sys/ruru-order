@@ -20,6 +20,11 @@ type ProductRow = {
   size_option_enabled?: boolean | null;
 };
 
+type AdminLiveProductListPanelProps = {
+  className?: string;
+  fillHeight?: boolean;
+};
+
 function money(value: unknown) {
   return `${Number(value || 0).toLocaleString("ko-KR")}원`;
 }
@@ -63,7 +68,10 @@ function optionSummary(product: ProductRow) {
   return `${colorText} / ${sizeText}`;
 }
 
-export default function AdminLiveProductListPanel() {
+export default function AdminLiveProductListPanel({
+  className = "",
+  fillHeight = false,
+}: AdminLiveProductListPanelProps) {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -156,9 +164,17 @@ export default function AdminLiveProductListPanel() {
     showAdminToast("빠른상품등록 패널을 열었습니다.", "info");
   };
 
+  const heightClass = fillHeight ? "h-full min-h-[610px]" : "h-[480px]";
+
   return (
-    <div className="col-span-12 flex h-[480px] flex-col rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-4">
-      <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
+    <div
+      className={[
+        "flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm",
+        heightClass,
+        className,
+      ].join(" ")}
+    >
+      <div className="mb-3 flex min-w-0 shrink-0 items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-sm font-black text-slate-950">등록상품 리스트</h2>
           <p className="mt-0.5 truncate text-[10px] font-bold text-slate-400">
@@ -185,7 +201,7 @@ export default function AdminLiveProductListPanel() {
         </div>
       </div>
 
-      <div className="grid shrink-0 grid-cols-[34px_minmax(0,1fr)_82px_42px] border-y border-slate-100 py-2 text-[10px] font-black text-slate-400">
+      <div className="grid min-w-0 shrink-0 grid-cols-[34px_minmax(0,1fr)_82px_42px] border-y border-slate-100 py-2 text-[10px] font-black text-slate-400">
         <div>순서</div>
         <div>상품정보</div>
         <div className="text-center">상태</div>

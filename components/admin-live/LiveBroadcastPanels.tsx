@@ -6,7 +6,6 @@ import { showAdminToast } from "@/lib/adminToast";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { CustomerRow } from "@/lib/admin-v2/types";
-import AdminLiveProductListPanel from "./AdminLiveProductListPanel";
 
 type IssueStatusFilter = "open" | "all" | "resolved";
 type VideoRatio = "vertical" | "wide" | "auto";
@@ -663,8 +662,8 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
   };
 
   return (
-    <section className="mb-4 grid grid-cols-12 items-stretch gap-3">
-      <div className="col-span-12 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-3 h-[480px] flex flex-col">
+    <section className="mb-4 grid w-full grid-cols-12 items-stretch gap-3">
+      <div className="col-span-12 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-4 h-[480px] flex flex-col">
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-black text-slate-950">
             방송화면
@@ -705,7 +704,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
         </div>
       </div>
 
-      <div className="col-span-12 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-5 h-[480px] flex flex-col">
+      <div className="col-span-12 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-8 h-[480px] flex flex-col">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-black text-slate-950">라이브 채팅</h2>
           <span className="text-xs font-bold text-slate-500">{chatEmbedUrl ? "채팅 연결" : "URL 대기"}</span>
@@ -732,8 +731,6 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
           )}
         </div>
       </div>
-
-            <AdminLiveProductListPanel />
-    </section>
+</section>
   );
 }
