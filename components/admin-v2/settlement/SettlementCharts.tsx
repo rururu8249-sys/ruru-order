@@ -200,9 +200,9 @@ export default function SettlementCharts({
               표시할 기간별 정산 데이터가 없습니다.
             </div>
           ) : (
-            <div className="mt-4 flex flex-1 flex-col rounded-[24px] bg-slate-50 p-3">
+            <div className="mt-4 flex flex-1 flex-col justify-center rounded-[24px] bg-slate-50 p-4">
               <div className="overflow-x-auto">
-                <div className="flex min-h-[178px] min-w-[520px] items-end gap-4 rounded-[22px] bg-white/60 px-3 pb-3 pt-4">
+                <div className="flex min-h-[250px] min-w-[520px] items-end gap-4 rounded-[22px] bg-white/60 px-3 pb-4 pt-6">
                   {trendRows.map((item) => {
                     const totalExpense = toNumber(item.totalExpense ?? toNumber(item.fee) + toNumber(item.expense));
                     const salesHeight = percent(item.sales, maxTrend);
@@ -222,7 +222,7 @@ export default function SettlementCharts({
                           isActive ? "bg-blue-50 shadow-[0_8px_24px_rgba(37,99,235,0.14)]" : "hover:bg-slate-50"
                         }`}
                       >
-                        <div className="flex h-[118px] items-end gap-1.5">
+                        <div className="flex h-[175px] items-end gap-1.5">
                           <div
                             className="w-3 rounded-t-full bg-blue-500 transition-all group-hover:brightness-110"
                             style={{ height: `${salesHeight}%` }}
@@ -246,7 +246,7 @@ export default function SettlementCharts({
                 </div>
               </div>
 
-              <div className="mt-3 flex flex-wrap gap-3 text-xs font-black text-slate-500">
+              <div className="mt-4 flex flex-wrap gap-3 text-xs font-black text-slate-500">
                 <span className="inline-flex items-center gap-1">
                   <span className="h-2 w-2 rounded-full bg-blue-500" />
                   완료매출
