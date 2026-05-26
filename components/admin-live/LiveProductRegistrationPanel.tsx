@@ -3,11 +3,11 @@
 import { useMemo, useState } from "react";
 
 type ProductKind = "broadcast" | "group";
-type DeliveryType = "normal" | "vendor" | "separate";
+type DeliveryType = "normal" | "vendor";
 
 const SIZE_PRESETS = {
-  clothes: ["XS", "S", "M", "L", "XL", "XXL", "XXXL"],
-  top: ["90", "95", "100", "105", "110"],
+  clothes: ["XS", "S", "M", "L", "XL", "XXL"],
+  top: ["90", "95", "100", "105", "110", "115"],
   shoes: [
     "220",
     "225",
@@ -25,6 +25,7 @@ const SIZE_PRESETS = {
     "285",
     "290",
   ],
+  free: ["FREE"],
 };
 
 function splitOptions(value: string): string[] {
@@ -38,13 +39,24 @@ function splitOptions(value: string): string[] {
   );
 }
 
+function formatNumberInput(value: string): string {
+  const onlyDigits = value.replace(/[^0-9]/g, "");
+  if (!onlyDigits) return "";
+  return Number(onlyDigits).toLocaleString("ko-KR");
+}
+
 export default function LiveProductRegistrationPanel() {
   const [isOpen, setIsOpen] = useState(false);
   const [selectOrderEnabled, setSelectOrderEnabled] = useState(true);
   const [productKind, setProductKind] = useState<ProductKind>("broadcast");
   const [deliveryType, setDeliveryType] = useState<DeliveryType>("normal");
+  const [priceText, setPriceText] = useState("");
   const [colors, setColors] = useState("");
   const [sizes, setSizes] = useState("");
+  const [sizeOptionDisabled, setSizeOptionDisabled] = useState(false);
+  const [customPresetName, setCustomPresetName] = useState("");
+  const [customPresetValues, setCustomPresetValues] = useState("");
+  const [customSizePresets, setCustomSizePresets] = useState<{ label: string; values: string[] }[]>([]);
   const [stockEnabled, setStockEnabled] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [visible, setVisible] = useState(true);
@@ -54,7 +66,33 @@ export default function LiveProductRegistrationPanel() {
   const parsedSizes = useMemo(() => splitOptions(sizes), [sizes]);
 
   const applyPreset = (key: keyof typeof SIZE_PRESETS) => {
+    setSizeOptionDisabled(false);
     setSizes(SIZE_PRESETS[key].join(", "));
+  };
+
+  const addCustomSizePreset = () => {
+    const label = customPresetName.trim() || "내 프리셋";
+    const values = splitOptions(customPresetValues);
+
+    if (!values.length) return;
+
+    setCustomSizePresets((current) => {
+      const withoutSameLabel = current.filter((preset) => preset.label !== label);
+      return [...withoutSameLabel, { label, values }];
+    });
+
+    setSizeOptionDisabled(false);
+    setSizes(values.join(", "));
+    setCustomPresetName("");
+    setCustomPresetValues("");
+  };
+
+  const toggleSizeOptionDisabled = () => {
+    setSizeOptionDisabled((current) => {
+      const next = !current;
+      if (next) setSizes("");
+      return next;
+    });
   };
 
   return (
@@ -165,6 +203,8 @@ export default function LiveProductRegistrationPanel() {
                   </span>
                   <div className="flex h-11 items-center rounded-xl border border-slate-200 px-3 focus-within:border-blue-400">
                     <input
+                      value={priceText}
+                      onChange={(event) => setPriceText(formatNumberInput(event.target.value))}
                       className="min-w-0 flex-1 text-[13px] font-bold outline-none"
                       inputMode="numeric"
                       placeholder="0"
@@ -215,14 +255,14 @@ export default function LiveProductRegistrationPanel() {
                       onClick={() => applyPreset("clothes")}
                       className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600"
                     >
-                      XS~XXXL
+                      XS~XXL
                     </button>
                     <button
                       type="button"
                       onClick={() => applyPreset("top")}
                       className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600"
                     >
-                      90~110
+                      90~115
                     </button>
                     <button
                       type="button"
@@ -231,15 +271,86 @@ export default function LiveProductRegistrationPanel() {
                     >
                       신발 220~290
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => applyPreset("free")}
+                      className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600"
+                    >
+                      FREE
+                    </button>
+                    <button
+                      type="button"
+                      onClick={toggleSizeOptionDisabled}
+                      className={[
+                        "rounded-full px-2.5 py-1 text-[11px] font-black",
+                        sizeOptionDisabled
+                          ? "bg-slate-900 text-white"
+                          : "bg-slate-100 text-slate-600",
+                      ].join(" ")}
+                    >
+                      사이즈 없음
+                    </button>
                   </div>
+
+                  {customSizePresets.length ? (
+                    <div className="mb-2 flex flex-wrap gap-1.5">
+                      {customSizePresets.map((preset) => (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => {
+                            setSizeOptionDisabled(false);
+                            setSizes(preset.values.join(", "));
+                          }}
+                          className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-black text-amber-700"
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  <div className="mb-2 grid grid-cols-[0.7fr_1fr_auto] gap-1.5">
+                    <input
+                      value={customPresetName}
+                      onChange={(event) => setCustomPresetName(event.target.value)}
+                      className="h-9 rounded-xl border border-slate-200 px-2 text-[11px] font-bold outline-none focus:border-blue-400"
+                      placeholder="프리셋명"
+                    />
+                    <input
+                      value={customPresetValues}
+                      onChange={(event) => setCustomPresetValues(event.target.value)}
+                      className="h-9 rounded-xl border border-slate-200 px-2 text-[11px] font-bold outline-none focus:border-blue-400"
+                      placeholder="예: 25, 26, 27"
+                    />
+                    <button
+                      type="button"
+                      onClick={addCustomSizePreset}
+                      className="h-9 rounded-xl bg-slate-900 px-3 text-[11px] font-black text-white"
+                    >
+                      추가
+                    </button>
+                  </div>
+
                   <input
                     value={sizes}
-                    onChange={(event) => setSizes(event.target.value)}
-                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-[13px] font-bold outline-none focus:border-blue-400"
-                    placeholder="S, M, L 또는 240, 245"
+                    onChange={(event) => {
+                      setSizeOptionDisabled(false);
+                      setSizes(event.target.value);
+                    }}
+                    disabled={sizeOptionDisabled}
+                    className={[
+                      "h-11 w-full rounded-xl border border-slate-200 px-3 text-[13px] font-bold outline-none focus:border-blue-400",
+                      sizeOptionDisabled ? "bg-slate-100 text-slate-400" : "",
+                    ].join(" ")}
+                    placeholder={sizeOptionDisabled ? "사이즈 옵션 없이 등록" : "S, M, L 또는 240, 245 / 필요시 120 추가 가능"}
                   />
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {parsedSizes.length ? (
+                    {sizeOptionDisabled ? (
+                      <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-500">
+                        사이즈 옵션 없음
+                      </span>
+                    ) : parsedSizes.length ? (
                       parsedSizes.slice(0, 16).map((size) => (
                         <span
                           key={size}
@@ -250,7 +361,7 @@ export default function LiveProductRegistrationPanel() {
                       ))
                     ) : (
                       <span className="text-[11px] font-bold text-slate-400">
-                        프리셋 또는 직접입력 가능
+                        프리셋 적용 후 직접 추가/삭제 가능
                       </span>
                     )}
                   </div>
@@ -271,7 +382,7 @@ export default function LiveProductRegistrationPanel() {
                   >
                     <option value="normal">일반배송</option>
                     <option value="vendor">업체배송</option>
-                    <option value="separate">합배송불가/별도배송</option>
+                    <option value="vendor">업체배송</option>
                   </select>
                 </label>
 
