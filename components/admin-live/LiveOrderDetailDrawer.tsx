@@ -171,6 +171,29 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const isCanceled = isLiveOrderCanceled(orderForView);
   const productAmount = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
   const shippingFee = Number(orderForView.shippingFee || 0);
+
+  const rawOrderForCardDisplay = order as any;
+  const paymentMethodForCardDisplay = String(
+    rawOrderForCardDisplay.paymentMethod ??
+      rawOrderForCardDisplay.payment_method ??
+      rawOrderForCardDisplay.payment_type ??
+      ""
+  );
+  const isCardPaymentDisplay = paymentMethodForCardDisplay.includes("카드");
+  const cardPaymentExtraAmount =
+    Number(rawOrderForCardDisplay.vat_amount ?? rawOrderForCardDisplay.vatAmount ?? 0) || 0;
+  const cardPaymentExpectedTotal =
+    Number(
+      rawOrderForCardDisplay.final_amount ??
+        rawOrderForCardDisplay.finalAmount ??
+        rawOrderForCardDisplay.adjusted_total_price ??
+        rawOrderForCardDisplay.adjustedTotalPrice ??
+        rawOrderForCardDisplay.total_price ??
+        rawOrderForCardDisplay.totalPrice ??
+        0
+    ) ||
+    productAmount + shippingFee + cardPaymentExtraAmount;
+
   const totalAmount = productAmount + shippingFee;
   const isCardOrder = String(orderForView.paymentMethod || "").includes("카드");
   const isCardPaid = orderForView.paymentStatus === "card_paid";
@@ -481,10 +504,13 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         <section className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
           <PriceRow label="상품금액" value={productAmount} />
           <PriceRow label="배송비" value={shippingFee} />
+          {isCardPaymentDisplay && cardPaymentExtraAmount > 0 ? (
+            <PriceRow label="카드추가금" value={cardPaymentExtraAmount} />
+          ) : null}
           <div className="my-2 h-px bg-slate-100" />
           <div className="flex items-center justify-between">
             <span className="text-[13px] font-black text-slate-600">총 결제예정금액</span>
-            <span className="text-2xl font-black tracking-[-0.05em] text-orange-600">{money(totalAmount)}</span>
+            <span className="text-2xl font-black tracking-[-0.05em] text-orange-600">{money(cardPaymentExpectedTotal)}</span>
           </div>
         </section>
 
