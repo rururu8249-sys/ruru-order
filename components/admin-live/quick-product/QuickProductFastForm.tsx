@@ -612,6 +612,14 @@ export default function QuickProductFastForm({
   };
 
   const saveProduct = async () => {
+    const wasPinned = pickBoolean(initialProduct, ["is_pinned", "pinned"], false);
+    const previousPinnedAt = pickString(initialProduct, ["pinned_at"], "");
+    const nextPinnedAt = isPinned
+      ? wasPinned
+        ? previousPinnedAt || new Date().toISOString()
+        : new Date().toISOString()
+      : null;
+
     const name = productName.trim();
     const price = moneyNumber(priceText);
 
@@ -654,6 +662,7 @@ export default function QuickProductFastForm({
         combine_shipping: shippingType === "vendor" ? "N" : "Y",
         sort_order: 0,
         is_pinned: isPinned,
+        pinned_at: nextPinnedAt,
         image_url: coverImages[0] || null,
         color_options: colors,
         size_options: sizes,

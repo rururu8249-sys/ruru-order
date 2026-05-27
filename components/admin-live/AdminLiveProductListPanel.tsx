@@ -156,6 +156,10 @@ function productTypeLabel(product: ProductRow) {
   return "방송";
 }
 
+function pinnedPrefix(product: ProductRow) {
+  return pickBoolean(product, ["is_pinned", "pinned"], false) ? "📌 " : "";
+}
+
 function shippingLabel(product: ProductRow) {
   const type = pickString(product, ["shipping_type", "delivery_type"], "normal");
 
@@ -195,6 +199,13 @@ function sortProducts(products: ProductRow[]) {
     const pinnedB = pickBoolean(b, ["is_pinned", "pinned"], false) ? 1 : 0;
 
     if (pinnedA !== pinnedB) return pinnedB - pinnedA;
+
+    if (pinnedA && pinnedB) {
+      const pinnedAtA = pickString(a, ["pinned_at"], "");
+      const pinnedAtB = pickString(b, ["pinned_at"], "");
+
+      if (pinnedAtA !== pinnedAtB) return pinnedAtB.localeCompare(pinnedAtA);
+    }
 
     const sortA = pickNumber(a, ["sort_order", "display_order"], 999999);
     const sortB = pickNumber(b, ["sort_order", "display_order"], 999999);
@@ -437,7 +448,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
 
                         <div className="min-w-0">
                           <div className="truncate text-xs font-black text-slate-950">
-                            {productName(product)}
+                            {pinnedPrefix(product)}{productName(product)}
                           </div>
                           <div className="mt-0.5 truncate text-[11px] font-bold text-slate-500">
                             {money(productPrice(product))} · {colorSummary(product)} / {sizeSummary(product)}
@@ -597,7 +608,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                             </div>
 
                             <div className="min-w-0">
-                              <div className="truncate text-sm font-black text-slate-950">{productName(product)}</div>
+                              <div className="truncate text-sm font-black text-slate-950">{pinnedPrefix(product)}{productName(product)}</div>
                               <div className="mt-0.5 truncate text-xs font-bold text-slate-500">
                                 {colorSummary(product)} / {sizeSummary(product)} · {shippingLabel(product)}
                               </div>
@@ -716,7 +727,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
               <div className="min-w-0">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h4 className="truncate text-xl font-black text-slate-950">{productName(selectedProduct)}</h4>
+                    <h4 className="truncate text-xl font-black text-slate-950">{pinnedPrefix(selectedProduct)}{productName(selectedProduct)}</h4>
                     <div className="mt-1 text-lg font-black text-blue-600">{money(productPrice(selectedProduct))}</div>
                   </div>
 
@@ -746,7 +757,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                   <div className="rounded-2xl border border-slate-200 p-3">
                     <div className="text-[11px] font-black text-slate-400">리스트</div>
                     <div className="mt-1 text-sm font-black text-slate-800">
-                      {pickBoolean(selectedProduct, ["is_pinned", "pinned"], false) ? "상단고정" : "일반"}
+                      {pickBoolean(selectedProduct, ["is_pinned", "pinned"], false) ? "📌 상단고정" : "일반"}
                     </div>
                   </div>
                 </div>
