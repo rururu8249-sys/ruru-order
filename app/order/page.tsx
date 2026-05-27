@@ -1050,13 +1050,10 @@ export default function OrderPage() {
         type: "info",
         message: [
           "저장된 주문자 정보",
-          `닉네임: ${nextNickname || "-"}`,
-          `이름: ${nextName || "-"}`,
+          `닉네임: ${nextNickname || "-"} / 이름: ${nextName || "-"}`,
           `전화번호: ${nextPhone || "-"}`,
           `주소: ${[nextAddress, nextDetailAddress].filter(Boolean).join(" ") || "-"}`,
           "주문자 정보가 다르면 상단메뉴 [정보수정]에서 변경해주세요.",
-          "이미 제출한 주문의 배송지 변경은 요청사항 또는 카톡채널로 남겨주세요.",
-          [nextAddress, nextDetailAddress].filter(Boolean).join(" "),
         ]
           .filter(Boolean)
           .join("\n"),
