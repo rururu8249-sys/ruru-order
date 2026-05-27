@@ -363,13 +363,7 @@ function ProductDetailSheet({
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-700"
-            >
-              닫기
-            </button>
+            
           </div>
         </div>
 
@@ -607,27 +601,6 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
                 className="mt-4 h-[52px] w-full rounded-2xl border border-slate-200 px-4 text-base font-black outline-none focus:border-blue-500"
               />
 
-              <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-                {[
-                  ["all", "전체"],
-                  ["normal", "일반배송"],
-                  ["vendor", "업체배송"],
-                  ["needsPrice", "금액입력필요"],
-                ].map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setFilterKey(key as FilterKey)}
-                    className={`shrink-0 rounded-full px-4 py-2 text-sm font-black ${
-                      filterKey === key
-                        ? "bg-blue-600 text-white"
-                        : "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
