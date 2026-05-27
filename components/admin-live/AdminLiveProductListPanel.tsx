@@ -557,11 +557,6 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
         alert(`상품 ${index + 1}의 상품명을 입력해주세요.`);
         return;
       }
-
-      if (row.price <= 0) {
-        alert(`상품 ${index + 1}의 금액을 입력해주세요.`);
-        return;
-      }
     }
 
     setSimpleFastSaving(true);
@@ -877,16 +872,16 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                   return (
                     <div
                       key={pickString(product, ["id", "product_id"], String(absoluteIndex))}
-                      className="grid grid-cols-[36px_minmax(0,1fr)_54px_112px] items-center gap-2 py-1.5"
+                      className="grid grid-cols-[36px_minmax(0,1fr)_54px_112px] items-center gap-2.5 py-3"
                     >
                       <div className="text-xs font-black text-slate-400">{absoluteIndex}</div>
 
                       <button
                         type="button"
                         onClick={() => setSelectedProduct(product)}
-                        className="grid min-w-0 grid-cols-[40px_minmax(0,1fr)] items-center gap-2 text-left"
+                        className="grid min-w-0 grid-cols-[42px_minmax(0,1fr)] items-center gap-2.5 text-left"
                       >
-                        <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
+                        <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
                           {image ? (
                             <img src={image} alt="" className="h-full w-full object-cover" />
                           ) : (
@@ -1000,7 +995,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
               <div>
                 <h3 className="text-lg font-black text-slate-950">빠른 상품등록</h3>
-                <p className="mt-1 text-xs font-bold text-slate-500">상품명과 금액만 넣고 바로 등록합니다.</p>
+                <p className="mt-1 text-xs font-bold text-slate-500">상품명만 넣어도 등록됩니다. 금액은 고객이 주문서에서 직접 입력할 수 있습니다.</p>
               </div>
 
               <button
@@ -1059,7 +1054,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                       </label>
 
                       <label className="block">
-                        <span className="mb-1 block text-[11px] font-black text-slate-500">금액</span>
+                        <span className="mb-1 block text-[11px] font-black text-slate-500">금액 선택</span>
                         <div className="grid h-11 grid-cols-[minmax(0,1fr)_28px] items-center rounded-xl border border-slate-200 bg-white px-3 focus-within:border-blue-500">
                           <input
                             value={row.priceText ? Number(row.priceText).toLocaleString("ko-KR") : ""}
@@ -1069,7 +1064,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                               })
                             }
                             inputMode="numeric"
-                            placeholder="0"
+                            placeholder="선택"
                             className="min-w-0 bg-transparent text-right text-sm font-black text-slate-900 outline-none"
                           />
                           <span className="text-right text-xs font-black text-slate-400">원</span>
@@ -1089,7 +1084,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
               </button>
 
               <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-bold leading-5 text-slate-500">
-                기본값: 방송상품 · 일반배송 · 등록ON · 추천ON · 색상없음 · 사이즈없음
+                기본값: 방송상품 · 일반배송 · 등록ON · 추천ON · 금액 미입력 시 고객 직접입력
               </div>
             </div>
 
