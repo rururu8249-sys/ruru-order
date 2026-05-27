@@ -463,6 +463,32 @@ function pickOrderProductImageUrl(product: any): string {
 }
 
 
+
+function OrderInputClearButton({
+  show,
+  label,
+  onClear,
+}: {
+  show: boolean;
+  label: string;
+  onClear: () => void;
+}) {
+  if (!show) return null;
+
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={onClear}
+      className="absolute right-3 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-slate-200 text-base font-black leading-none text-slate-500 active:scale-95"
+    >
+      ×
+    </button>
+  );
+}
+
+
 function readRegisteredProductOptionText(value: unknown): string {
   if (value == null) return "";
 
@@ -2277,7 +2303,8 @@ export default function OrderPage() {
 
                 <div className="grid gap-3">
                   <div data-ruru-product-search-area className="relative">
-                    <input
+                    <div className="relative [&>input]:pr-12">
+<input
                       value={item.product_name}
                       onFocus={() => {
                         if (broadcastProducts.length > 0) {
@@ -2294,6 +2321,12 @@ export default function OrderPage() {
                       placeholder="상품명"
                       className="w-full rounded-2xl border border-gray-200 bg-white p-4 font-bold"
                     />
+  <OrderInputClearButton
+    show={String(item.product_name ?? "").length > 0}
+    label="상품명 지우기"
+    onClear={() => updateItem(index, "product_name", "")}
+  />
+</div>
 
                     {productSearchOpenIndex === index && productSearchText.trim().length > 0 && broadcastProducts.length > 0 && (
                       <div className="absolute left-0 right-0 top-[58px] z-40 max-h-72 overflow-auto rounded-3xl border border-blue-100 bg-white p-2 shadow-[0_18px_45px_rgba(30,20,20,0.15)]">
@@ -2346,19 +2379,33 @@ export default function OrderPage() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
-                    <input
+                    <div className="relative [&>input]:pr-12">
+<input
                       value={item.color}
                       onChange={(event) => updateItem(index, "color", event.target.value)}
                       placeholder="색상"
                       className="rounded-2xl border border-gray-200 bg-white p-4 font-bold"
                     />
+  <OrderInputClearButton
+    show={String(item.color ?? "").length > 0}
+    label="색상 지우기"
+    onClear={() => updateItem(index, "color", "")}
+  />
+</div>
 
-                    <input
+                    <div className="relative [&>input]:pr-12">
+<input
                       value={item.size}
                       onChange={(event) => updateItem(index, "size", event.target.value)}
                       placeholder="사이즈"
                       className="rounded-2xl border border-gray-200 bg-white p-4 font-bold"
                     />
+  <OrderInputClearButton
+    show={String(item.size ?? "").length > 0}
+    label="사이즈 지우기"
+    onClear={() => updateItem(index, "size", "")}
+  />
+</div>
                     {(() => {
                       const colorSuggestions = getItemOptionSuggestions(item, "color");
                       const sizeSuggestions = getItemOptionSuggestions(item, "size");
