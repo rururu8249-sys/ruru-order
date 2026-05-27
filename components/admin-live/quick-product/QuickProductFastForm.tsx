@@ -190,6 +190,7 @@ function parseProductNote(row: ProductRow | null | undefined) {
     return JSON.parse(raw) as {
       stock_mode?: "total" | "option";
       stock_variants?: Array<{ color?: string; size?: string; stock?: number }>;
+      stock_management_enabled?: boolean;
       registered_order_enabled?: boolean;
       name_suggestion_enabled?: boolean;
       suggestion_keywords?: string[];
@@ -508,6 +509,7 @@ export default function QuickProductFastForm({
   const [productType, setProductType] = useState<"broadcast" | "group_buy">("broadcast");
   const [productName, setProductName] = useState("");
   const [priceText, setPriceText] = useState("");
+  const [stockManagementEnabled, setStockManagementEnabled] = useState(true);
   const [shippingType, setShippingType] = useState("normal");
   const [isVisible, setIsVisible] = useState(true);
   const [isPinned, setIsPinned] = useState(false);
@@ -536,6 +538,7 @@ export default function QuickProductFastForm({
 
     const productNote = parseProductNote(initialProduct);
     const noteVariants = productNote?.stock_variants || [];
+    setStockManagementEnabled(productNote?.stock_management_enabled !== false);
     setRegisteredOrderEnabled(productNote?.registered_order_enabled !== false);
     setNameSuggestionEnabled(productNote?.name_suggestion_enabled !== false);
     setSuggestionKeywordsText(Array.isArray(productNote?.suggestion_keywords) ? productNote.suggestion_keywords.join(", ") : "");
@@ -661,6 +664,7 @@ export default function QuickProductFastForm({
       const productNote = JSON.stringify({
         stock_mode: stockMode,
         stock_variants: variantStockPayload,
+        stock_management_enabled: stockManagementEnabled,
         registered_order_enabled: registeredOrderEnabled,
         name_suggestion_enabled: nameSuggestionEnabled,
         suggestion_keywords: suggestionKeywordsText
@@ -1034,7 +1038,25 @@ export default function QuickProductFastForm({
             <div className="flex h-full min-h-0 self-stretch flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-3">
             <div className="mb-2 flex items-center justify-between gap-3">
               <div>
-                <div className="text-xs font-black text-slate-800">재고관리</div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-xs font-black text-slate-800">재고관리</div>
+                  <div data-ruru-stock-management-toggle className="flex rounded-xl bg-slate-100 p-1 text-[11px] font-black">
+                    <button
+                      type="button"
+                      onClick={() => setStockManagementEnabled(true)}
+                      className={`rounded-lg px-3 py-1.5 ${stockManagementEnabled ? "bg-blue-600 text-white shadow-sm" : "text-slate-500"}`}
+                    >
+                      사용
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStockManagementEnabled(false)}
+                      className={`rounded-lg px-3 py-1.5 ${!stockManagementEnabled ? "bg-slate-900 text-white shadow-sm" : "text-slate-500"}`}
+                    >
+                      미사용
+                    </button>
+                  </div>
+                </div>
                 <div className="mt-0.5 text-[10px] font-bold text-slate-400">
                   기본은 총재고, 옵션별은 필요할 때만 입력합니다.
                 </div>

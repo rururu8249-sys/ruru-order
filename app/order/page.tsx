@@ -365,6 +365,26 @@ export default function OrderPage() {
   const [productSearchOpenIndex, setProductSearchOpenIndex] = useState<number | null>(null);
   const [productSearchText, setProductSearchText] = useState("");
 
+  useEffect(() => {
+    const handleProductSearchOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+
+      if (target?.closest("[data-ruru-product-search-area]")) {
+        return;
+      }
+
+      setProductSearchOpenIndex(null);
+      setProductSearchText("");
+    };
+
+    document.addEventListener("pointerdown", handleProductSearchOutsidePointerDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handleProductSearchOutsidePointerDown);
+    };
+  }, []);
+
+
   const [youtubeNickname, setYoutubeNickname] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -1483,11 +1503,19 @@ export default function OrderPage() {
   }, [broadcastProducts, productSearchText]);
 
   const selectBroadcastProduct = (index: number, product: BroadcastProduct) => {
+    const productPrice = Number(product.price || 0);
+
     updateItem(index, "product_name", product.product_name);
+
+    if (Number.isFinite(productPrice) && productPrice > 0) {
+      updateItem(index, "product_price", String(Math.round(productPrice)));
+    } else {
+      updateItem(index, "product_price", "");
+    }
+
     setProductSearchOpenIndex(null);
     setProductSearchText("");
   };
-
 
   const getItemOptionSuggestions = (item: OrderItem, field: "color" | "size") => {
     const product = findMatchedBroadcastProduct(item, broadcastProducts);
@@ -1983,7 +2011,7 @@ export default function OrderPage() {
                 </div>
 
                 <div className="grid gap-3">
-                  <div className="relative">
+                  <div data-ruru-product-search-area className="relative">
                     <input
                       value={item.product_name}
                       onFocus={() => {
