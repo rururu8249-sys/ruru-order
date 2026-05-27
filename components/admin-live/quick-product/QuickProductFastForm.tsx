@@ -190,6 +190,9 @@ function parseProductNote(row: ProductRow | null | undefined) {
     return JSON.parse(raw) as {
       stock_mode?: "total" | "option";
       stock_variants?: Array<{ color?: string; size?: string; stock?: number }>;
+      registered_order_enabled?: boolean;
+      name_suggestion_enabled?: boolean;
+      suggestion_keywords?: string[];
     };
   } catch {
     return null;
@@ -508,6 +511,9 @@ export default function QuickProductFastForm({
   const [shippingType, setShippingType] = useState("normal");
   const [isVisible, setIsVisible] = useState(true);
   const [isPinned, setIsPinned] = useState(false);
+  const [registeredOrderEnabled, setRegisteredOrderEnabled] = useState(true);
+  const [nameSuggestionEnabled, setNameSuggestionEnabled] = useState(true);
+  const [suggestionKeywordsText, setSuggestionKeywordsText] = useState("");
 
   const [coverImages, setCoverImages] = useState<string[]>([]);
   const [detailImages, setDetailImages] = useState<string[]>([]);
@@ -530,6 +536,9 @@ export default function QuickProductFastForm({
 
     const productNote = parseProductNote(initialProduct);
     const noteVariants = productNote?.stock_variants || [];
+    setRegisteredOrderEnabled(productNote?.registered_order_enabled !== false);
+    setNameSuggestionEnabled(productNote?.name_suggestion_enabled !== false);
+    setSuggestionKeywordsText(Array.isArray(productNote?.suggestion_keywords) ? productNote.suggestion_keywords.join(", ") : "");
 
     setProductType(
       pickString(initialProduct, ["product_type", "type"], "broadcast") === "group_buy"
@@ -652,6 +661,12 @@ export default function QuickProductFastForm({
       const productNote = JSON.stringify({
         stock_mode: stockMode,
         stock_variants: variantStockPayload,
+        registered_order_enabled: registeredOrderEnabled,
+        name_suggestion_enabled: nameSuggestionEnabled,
+        suggestion_keywords: suggestionKeywordsText
+          .split(",")
+          .map((keyword) => keyword.trim())
+          .filter(Boolean),
       });
 
       const payload: Record<string, unknown> = {
@@ -729,7 +744,7 @@ export default function QuickProductFastForm({
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-hidden px-5 py-4">
-        <div className="grid h-full min-h-0 grid-rows-[190px_76px_124px_minmax(0,1fr)] gap-3">
+        <div className="grid h-full min-h-0 grid-rows-[182px_76px_74px_124px_minmax(0,1fr)] gap-3">
           <section className="grid min-h-0 items-center grid-cols-[180px_minmax(0,1fr)] gap-4 rounded-2xl border border-slate-200 bg-white p-3">
             <ImagePicker
               label="대표사진"
@@ -879,6 +894,73 @@ export default function QuickProductFastForm({
                   상단
                 </button>
               </div>
+            </div>
+          </section>
+
+          <section className="grid min-h-0 grid-cols-[1fr_1fr_1.4fr] gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
+            <div className="flex h-full min-h-0 flex-col justify-center">
+              <div className="mb-1 text-[10px] font-black text-slate-500">등록상품 주문</div>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => setRegisteredOrderEnabled(true)}
+                  className={[
+                    choiceButton,
+                    registeredOrderEnabled ? "bg-blue-600 text-white" : inactiveChoice,
+                  ].join(" ")}
+                >
+                  사용
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRegisteredOrderEnabled(false)}
+                  className={[
+                    choiceButton,
+                    !registeredOrderEnabled ? "bg-slate-800 text-white" : inactiveChoice,
+                  ].join(" ")}
+                >
+                  미사용
+                </button>
+              </div>
+            </div>
+
+            <div className="flex h-full min-h-0 flex-col justify-center">
+              <div className="mb-1 text-[10px] font-black text-slate-500">상품명 자동추천</div>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => setNameSuggestionEnabled(true)}
+                  className={[
+                    choiceButton,
+                    nameSuggestionEnabled ? "bg-blue-600 text-white" : inactiveChoice,
+                  ].join(" ")}
+                >
+                  사용
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNameSuggestionEnabled(false)}
+                  className={[
+                    choiceButton,
+                    !nameSuggestionEnabled ? "bg-slate-800 text-white" : inactiveChoice,
+                  ].join(" ")}
+                >
+                  미사용
+                </button>
+              </div>
+            </div>
+
+            <div className="flex h-full min-h-0 flex-col justify-center">
+              <div className="mb-1 flex items-center justify-between text-[10px] font-black text-slate-500">
+                <span>추천 키워드</span>
+                <span className="text-[10px] font-bold text-slate-400">쉼표로 구분</span>
+              </div>
+              <input
+                value={suggestionKeywordsText}
+                onChange={(event) => setSuggestionKeywordsText(event.target.value)}
+                placeholder="예: 알로, 바지, 밴딩, 알로바지"
+                className="h-10 w-full rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-800 outline-none focus:border-blue-400"
+              />
             </div>
           </section>
 

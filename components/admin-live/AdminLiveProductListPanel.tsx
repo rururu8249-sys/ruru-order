@@ -320,6 +320,28 @@ function openQuickProductEdit(product: ProductRow) {
   window.dispatchEvent(new CustomEvent("ruru-edit-quick-product", { detail: product }));
 }
 
+
+function getProductNoteFlags(product: { product_note?: unknown }) {
+  const note = product.product_note;
+
+  if (!note || typeof note !== "object" || Array.isArray(note)) {
+    return {
+      registeredOrderEnabled: true,
+      nameSuggestionEnabled: true,
+    };
+  }
+
+  const productNote = note as {
+    registered_order_enabled?: boolean;
+    name_suggestion_enabled?: boolean;
+  };
+
+  return {
+    registeredOrderEnabled: productNote.registered_order_enabled !== false,
+    nameSuggestionEnabled: productNote.name_suggestion_enabled !== false,
+  };
+}
+
 export default function AdminLiveProductListPanel(props: AdminLiveProductListPanelProps) {
   const fillHeight = Boolean(props.fillHeight);
   const className = props.className || "";
