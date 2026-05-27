@@ -68,6 +68,8 @@ type OrderItem = {
   size: string;
   qty: string;
   product_price: string;
+  shipping_type?: string;
+  combine_shipping?: string;
 };
 
 type BroadcastProduct = {
@@ -128,6 +130,8 @@ const emptyItem: OrderItem = {
   size: "",
   qty: "",
   product_price: "",
+  shipping_type: "일반",
+  combine_shipping: "Y",
 };
 
 const onlyNumber = (value: string) => String(value || "").replace(/[^0-9]/g, "");
@@ -693,7 +697,44 @@ export default function OrderPage() {
   const baseShippingFee = isRemoteAreaShippingAddress
     ? Math.max(remoteAreaShippingFee, generalShippingFee)
     : generalShippingFee;
-  const shippingFee = alreadyPaidShipping ? 0 : baseShippingFee;
+  const isVendorShippingItem = (item: Pick<OrderItem, "shipping_type" | "combine_shipping">) => {
+    const shippingType = String(item.shipping_type || "").trim().toLowerCase();
+
+    return (
+      shippingType.includes("vendor") ||
+      shippingType.includes("company") ||
+      shippingType.includes("direct") ||
+      shippingType.includes("업체")
+    );
+  };
+
+  const getChargeableShippingItems = (targetItems: OrderItem[]) =>
+    targetItems.filter((item) =>
+      String(item.product_name || "").trim() &&
+      toNumber(item.qty) > 0 &&
+      toNumber(item.product_price) > 0
+    );
+
+  const calculateShippingFeeBreakdown = (
+    targetItems: OrderItem[],
+    paidGeneralShipping: boolean,
+  ) => {
+    const chargeableItems = getChargeableShippingItems(targetItems);
+    const hasVendorShipping = chargeableItems.some((item) => isVendorShippingItem(item));
+    const hasGeneralShipping = chargeableItems.some((item) => !isVendorShippingItem(item));
+
+    const normalShippingFee = hasGeneralShipping && !paidGeneralShipping ? baseShippingFee : 0;
+    const vendorShippingFee = hasVendorShipping ? baseShippingFee : 0;
+
+    return {
+      normalShippingFee,
+      vendorShippingFee,
+      totalShippingFee: normalShippingFee + vendorShippingFee,
+    };
+  };
+
+  const shippingFeeBreakdown = calculateShippingFeeBreakdown(items, alreadyPaidShipping);
+  const shippingFee = shippingFeeBreakdown.totalShippingFee;
   const cardRateForCustomer = customerCardRate;
 
   const isAutoLoggedIn =
@@ -1869,6 +1910,9 @@ export default function OrderPage() {
 
     updateItem(index, "product_name", product.product_name);
 
+    updateItem(index, "shipping_type", product.shipping_type || "일반");
+    updateItem(index, "combine_shipping", product.combine_shipping || "Y");
+
     if (Number.isFinite(productPrice) && productPrice > 0) {
       updateItem(index, "product_price", String(Math.round(productPrice)));
     } else {
@@ -2095,7 +2139,15 @@ export default function OrderPage() {
     try {
       const cleanPhone = normalizePhone(customerPhone);
       const paidShippingBeforeSubmit = await checkAlreadyPaidShipping(cleanPhone);
-      const appliedShippingFee = paidShippingBeforeSubmit ? 0 : baseShippingFee;
+      const validItems = items.filter(
+        (item) =>
+          item.product_name.trim() ||
+          item.color.trim() ||
+          item.size.trim() ||
+          item.product_price.trim()
+      );
+      const appliedShippingFeeBreakdown = calculateShippingFeeBreakdown(validItems, paidShippingBeforeSubmit);
+      const appliedShippingFee = appliedShippingFeeBreakdown.totalShippingFee;
       const appliedCardExtra =
         paymentMethod === "카드결제"
           ? Math.round((productAmount + appliedShippingFee) * (cardRateForCustomer / 100))
@@ -2112,14 +2164,6 @@ export default function OrderPage() {
 
       await saveCustomer();
 
-      const validItems = items.filter(
-        (item) =>
-          item.product_name.trim() ||
-          item.color.trim() ||
-          item.size.trim() ||
-          item.product_price.trim()
-      );
-
       const groupId = crypto.randomUUID();
       const lookupCode = `RURU-${Date.now().toString(36).toUpperCase()}`;
       const broadcastName =
@@ -2127,11 +2171,24 @@ export default function OrderPage() {
         broadcast?.public_title ||
         "현재 방송";
 
-      const orderRows = validItems.map((item, index) => {
+      const chargedShippingGroups = new Set<"normal" | "vendor">();
+
+      const orderRows = validItems.map((item) => {
         const qty = toNumber(item.qty);
         const price = toNumber(item.product_price);
         const itemTotal = price * qty;
-        const rowShippingFee = index === 0 ? appliedShippingFee : 0;
+        const rowShippingGroup = isVendorShippingItem(item) ? "vendor" : "normal";
+        let rowShippingFee = 0;
+
+        if (rowShippingGroup === "normal") {
+          if (!paidShippingBeforeSubmit && !chargedShippingGroups.has("normal")) {
+            rowShippingFee = baseShippingFee;
+          }
+        } else if (!chargedShippingGroups.has("vendor")) {
+          rowShippingFee = baseShippingFee;
+        }
+
+        chargedShippingGroups.add(rowShippingGroup);
         const rowCardExtra =
           paymentMethod === "카드결제"
             ? Math.round((itemTotal + rowShippingFee) * (cardRateForCustomer / 100))
@@ -2207,11 +2264,11 @@ export default function OrderPage() {
       setPaymentMethod("무통장입금");
       setPin("");
 
-      if (appliedShippingFee > 0) {
+      if (appliedShippingFeeBreakdown.normalShippingFee > 0) {
         markPaidShippingInThisBrowser(cleanPhone, markCombineSettings);
       }
 
-      setAlreadyPaidShipping(true);
+      setAlreadyPaidShipping(paidShippingBeforeSubmit || appliedShippingFeeBreakdown.normalShippingFee > 0);
 
       setIsEditingCustomerInfo(false);
       setIsCustomerInfoOpen(false);
