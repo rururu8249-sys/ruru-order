@@ -55,6 +55,7 @@ import CustomerBlockedNotice from "@/components/customer/CustomerBlockedNotice";
 import CustomerToastNotice from "@/components/customer/CustomerToastNotice";
 import CustomerManualAddressPanel from "@/components/customer/CustomerManualAddressPanel";
 import CustomerMissingDetailAddressPanel from "@/components/customer/CustomerMissingDetailAddressPanel";
+import GroupBuyQuickSelect, { type GroupBuyQuickSelectProduct } from "@/components/order/GroupBuyQuickSelect";
 
 declare global {
   interface Window {
@@ -80,6 +81,9 @@ type BroadcastProduct = {
   shipping_type: string;
   combine_shipping: string;
   product_note?: unknown;
+  image_url?: string;
+  thumbnail_url?: string;
+  main_image_url?: string;
 };
 
 type DoneData = {
@@ -393,6 +397,71 @@ function productDeliveryLabel(product: BroadcastProduct): string {
   return "일반배송";
 }
 
+
+function readOrderProductImageValue(value: unknown): string {
+  if (!value) {
+    return "";
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const imageUrl = readOrderProductImageValue(item);
+
+      if (imageUrl) {
+        return imageUrl;
+      }
+    }
+
+    return "";
+  }
+
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+
+    return (
+      readOrderProductImageValue(record.image_url) ||
+      readOrderProductImageValue(record.thumbnail_url) ||
+      readOrderProductImageValue(record.main_image_url) ||
+      readOrderProductImageValue(record.url) ||
+      ""
+    );
+  }
+
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  if (trimmed.startsWith("http") || trimmed.startsWith("/")) {
+    return trimmed;
+  }
+
+  try {
+    return readOrderProductImageValue(JSON.parse(trimmed));
+  } catch {
+    return "";
+  }
+}
+
+function pickOrderProductImageUrl(product: any): string {
+  return (
+    readOrderProductImageValue(product?.image_url) ||
+    readOrderProductImageValue(product?.thumbnail_url) ||
+    readOrderProductImageValue(product?.main_image_url) ||
+    readOrderProductImageValue(product?.product_image_url) ||
+    readOrderProductImageValue(product?.image_urls) ||
+    readOrderProductImageValue(product?.images) ||
+    readOrderProductImageValue(product?.product_images) ||
+    readOrderProductImageValue(product?.product_note) ||
+    ""
+  );
+}
+
 function normalizeOrderProductRow(product: any): BroadcastProduct {
   const price = Number(product?.price ?? product?.sale_price ?? product?.selling_price ?? 0);
 
@@ -404,6 +473,7 @@ function normalizeOrderProductRow(product: any): BroadcastProduct {
     status: String(product?.status ?? "판매중"),
     product_type: String(product?.product_type ?? ""),
     shipping_type: String(product?.shipping_type ?? product?.delivery_type ?? ""),
+    image_url: pickOrderProductImageUrl(product),
   } as BroadcastProduct;
 }
 
@@ -2116,59 +2186,10 @@ export default function OrderPage() {
           </div>
 
           <div className="mt-4 grid gap-4">
-            {quickGroupBuyProducts.length > 0 ? (
-              <section data-ruru-group-buy-quick-select className="mb-5 rounded-3xl border border-blue-100 bg-blue-50/60 p-4">
-                <div className="mb-3 flex items-end justify-between gap-3">
-                  <div>
-                    <div className="text-lg font-black text-gray-900">공구상품 빠른선택</div>
-                    <div className="mt-1 text-sm font-bold text-gray-500">검색어를 몰라도 바로 선택할 수 있어요.</div>
-                  </div>
-
-                  {quickGroupBuyProducts.length > 3 ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowAllGroupBuyQuickProducts((prev) => !prev)}
-                      className="shrink-0 rounded-2xl bg-white px-4 py-2 text-sm font-black text-blue-600 shadow-sm ring-1 ring-blue-100"
-                    >
-                      {showAllGroupBuyQuickProducts ? "접기" : `+ ${quickGroupBuyProducts.length - 3}개 더보기`}
-                    </button>
-                  ) : null}
-                </div>
-
-                <div className="grid gap-2">
-                  {visibleQuickGroupBuyProducts.map((product) => {
-                    const productPrice = Number(product.price || 0);
-                    const hasPrice = Number.isFinite(productPrice) && productPrice > 0;
-
-                    return (
-                      <button
-                        key={`quick-group-buy-${product.id}`}
-                        type="button"
-                        onClick={() => selectQuickGroupBuyProduct(product)}
-                        className="flex w-full items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 text-left shadow-sm ring-1 ring-blue-100 transition active:scale-[0.99]"
-                      >
-                        <div className="min-w-0">
-                          <div className="truncate text-base font-black text-gray-900">{product.product_name}</div>
-                          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-sm font-black">
-                            <span className={hasPrice ? "text-blue-600" : "text-gray-500"}>
-                              {hasPrice ? won(productPrice) : "금액 직접입력"}
-                            </span>
-                            <span className="text-gray-300">·</span>
-                            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-600">
-                              {productDeliveryLabel(product)}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="shrink-0 rounded-xl bg-blue-600 px-3 py-2 text-sm font-black text-white">
-                          선택
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-            ) : null}
+            <GroupBuyQuickSelect
+              products={quickGroupBuyProducts as GroupBuyQuickSelectProduct[]}
+              onSelect={(product) => selectQuickGroupBuyProduct(product as BroadcastProduct)}
+            />
 
             {items.map((item, index) => (
               <div key={index} className="rounded-[26px] border border-blue-100 bg-white p-4 shadow-[0_10px_22px_rgba(30,64,175,0.06)]">
