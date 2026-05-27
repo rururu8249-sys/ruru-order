@@ -495,7 +495,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
 
       {showProductDetailList ? (
         <div className="fixed inset-0 z-[115] flex items-start justify-center overflow-hidden bg-slate-950/45 px-5 pt-10">
-          <div className="flex h-[760px] max-h-[calc(100vh-80px)] min-h-[620px] w-full max-w-[1180px] flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+          <div className="flex h-[760px] max-h-[calc(100vh-80px)] min-h-[620px] w-full max-w-[980px] flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
             <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
                 <h3 className="text-lg font-black text-slate-950">등록상품 전체 상세리스트</h3>
@@ -513,7 +513,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
               </button>
             </div>
 
-            <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_160px_150px] gap-2 border-b border-slate-100 px-6 py-4">
+            <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_132px_124px] gap-2 border-b border-slate-100 px-6 py-4">
               <input
                 value={detailSearchText}
                 onChange={(event) => setDetailSearchText(event.target.value)}
@@ -555,7 +555,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
               </div>
 
               <div className="overflow-hidden rounded-2xl border border-slate-200">
-                <div className="grid grid-cols-[64px_minmax(0,1.5fr)_110px_90px_90px_90px_120px] bg-slate-50 px-4 py-3 text-xs font-black text-slate-400">
+                <div className="grid grid-cols-[46px_minmax(0,1.4fr)_92px_72px_70px_70px_104px] bg-slate-50 px-4 py-3 text-xs font-black text-slate-400">
                   <div>순서</div>
                   <div>상품정보</div>
                   <div className="text-right">판매가</div>
@@ -579,7 +579,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                       return (
                         <div
                           key={pickString(product, ["id", "product_id"], String(absoluteIndex))}
-                          className="grid grid-cols-[64px_minmax(0,1.5fr)_110px_90px_90px_90px_120px] items-center px-4 py-3"
+                          className="grid grid-cols-[46px_minmax(0,1.4fr)_92px_72px_70px_70px_104px] items-center px-4 py-3"
                         >
                           <div className="text-xs font-black text-slate-400">{absoluteIndex}</div>
 
