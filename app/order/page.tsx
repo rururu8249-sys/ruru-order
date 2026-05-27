@@ -1638,10 +1638,10 @@ export default function OrderPage() {
     return items.reduce((sum, item) => sum + toNumber(item.qty), 0);
   }, [items]);
 
+  const cardExtraBaseAmount = productAmount + shippingFee;
   const cardExtra = paymentMethod === "카드결제"
-    ? Math.round(productAmount * (cardRateForCustomer / 100))
+    ? Math.round(cardExtraBaseAmount * (cardRateForCustomer / 100))
     : 0;
-
   const totalAmount = productAmount + shippingFee + cardExtra;
 
   const filteredBroadcastProducts = useMemo(() => {
@@ -1899,7 +1899,11 @@ export default function OrderPage() {
       const cleanPhone = normalizePhone(customerPhone);
       const paidShippingBeforeSubmit = await checkAlreadyPaidShipping(cleanPhone);
       const appliedShippingFee = paidShippingBeforeSubmit ? 0 : baseShippingFee;
-      const appliedTotalAmount = productAmount + appliedShippingFee + cardExtra;
+      const appliedCardExtra =
+        paymentMethod === "카드결제"
+          ? Math.round((productAmount + appliedShippingFee) * (cardRateForCustomer / 100))
+          : 0;
+      const appliedTotalAmount = productAmount + appliedShippingFee + appliedCardExtra;
       const latestCombineSettings = await loadCombineShippingSettings();
       const latestLookupWindow = resolveCombineShippingLookupWindow(latestCombineSettings);
       const markCombineSettings: CombineShippingSettings = {
@@ -1933,7 +1937,7 @@ export default function OrderPage() {
         const rowShippingFee = index === 0 ? appliedShippingFee : 0;
         const rowCardExtra =
           paymentMethod === "카드결제"
-            ? Math.round(itemTotal * (cardRateForCustomer / 100))
+            ? Math.round((itemTotal + rowShippingFee) * (cardRateForCustomer / 100))
             : 0;
 
         return {
@@ -1996,7 +2000,7 @@ export default function OrderPage() {
         totalQty,
         productAmount,
         shippingFee: appliedShippingFee,
-        cardExtra,
+        cardExtra: appliedCardExtra,
         customerCardRate: cardRateForCustomer,
         totalAmount: appliedTotalAmount,
       });
