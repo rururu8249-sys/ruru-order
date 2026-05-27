@@ -779,7 +779,7 @@ export default function QuickProductFastForm({
             </div>
           </section>
 
-          <section className="grid min-h-0 grid-cols-[1fr_1.2fr_1fr_1fr] gap-2 rounded-2xl border border-slate-200 bg-white p-3">
+          <section className="grid min-h-0 items-center grid-cols-[1fr_1.2fr_1fr_1fr] gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-4">
             <div>
               <div className="mb-1 text-[10px] font-black text-slate-500">상품구분</div>
               <div className="flex gap-1">
