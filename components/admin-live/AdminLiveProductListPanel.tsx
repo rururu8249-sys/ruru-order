@@ -322,7 +322,22 @@ function openQuickProductEdit(product: ProductRow) {
 
 
 function getProductNoteFlags(product: { product_note?: unknown; productNote?: unknown; note?: unknown }) {
-  const note = product.product_note ?? product.productNote ?? product.note;
+  const rawNote = product.product_note ?? product.productNote ?? product.note;
+  let note: unknown = rawNote;
+
+  if (typeof rawNote === "string") {
+    const trimmed = rawNote.trim();
+
+    if (trimmed.length > 0) {
+      try {
+        note = JSON.parse(trimmed);
+      } catch {
+        note = null;
+      }
+    } else {
+      note = null;
+    }
+  }
 
   if (!note || typeof note !== "object" || Array.isArray(note)) {
     return {
@@ -341,7 +356,6 @@ function getProductNoteFlags(product: { product_note?: unknown; productNote?: un
     nameSuggestionEnabled: productNote.name_suggestion_enabled !== false,
   };
 }
-
 
 function ProductFeatureBadges({ product }: { product: ProductRow }) {
   const flags = getProductNoteFlags(product);
