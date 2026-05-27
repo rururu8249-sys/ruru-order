@@ -509,7 +509,7 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
     <>
       <section data-ruru-group-buy-quick-select className="mb-5 rounded-3xl border border-blue-100 bg-blue-50/70 p-4">
         <div className="mb-3">
-          <div className="text-lg font-black tracking-[-0.04em] text-gray-900">공구상품 빠른선택</div>
+          <div className="text-lg font-black tracking-[-0.04em] text-gray-900">등록상품 빠른선택</div>
           <div className="mt-1 text-sm font-bold tracking-[-0.04em] text-gray-500">
             검색어를 몰라도 바로 선택할 수 있어요.
           </div>
@@ -561,7 +561,7 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
 
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-2xl font-black tracking-[-0.05em] text-gray-950">공구상품 전체보기</div>
+                  <div className="text-2xl font-black tracking-[-0.05em] text-gray-950">등록상품 전체보기</div>
                   <div className="mt-1 text-sm font-bold tracking-[-0.04em] text-gray-500">
                     검색/필터 후 상품을 선택해주세요.
                   </div>
@@ -609,7 +609,7 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
               {filteredProducts.length === 0 ? (
                 <div className="rounded-3xl bg-slate-50 p-8 text-center text-sm font-black text-slate-500">
-                  검색된 공구상품이 없습니다.
+                  검색된 등록상품이 없습니다.
                 </div>
               ) : (
                 <>

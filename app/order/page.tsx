@@ -1009,7 +1009,7 @@ export default function OrderPage() {
       .limit(80);
 
     if (error) {
-      console.log("공구상품 빠른선택 불러오기 오류", error.message);
+      console.log("등록상품 빠른선택 불러오기 오류", error.message);
       setGroupBuyQuickProductsFromCatalog([]);
       return;
     }
