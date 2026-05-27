@@ -223,44 +223,86 @@ function PriceAndDelivery({ product }: { product: GroupBuyQuickSelectProduct }) 
 
 function QuickProductCard({
   product,
+  variant = "feature",
   onDetail,
   onSelect,
 }: {
   product: GroupBuyQuickSelectProduct;
+  variant?: "feature" | "mini";
   onDetail: () => void;
   onSelect: () => void;
 }) {
-  return (
-    <div className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-blue-100">
-      <button
-        type="button"
-        onClick={onDetail}
-        className="block w-full text-left"
-      >
-        <ProductThumbnail product={product} className="mb-2 aspect-square h-auto w-full" />
-
-        <div className="line-clamp-2 min-h-[34px] text-[13px] font-black leading-[17px] tracking-[-0.04em] text-gray-950">
-          {product.product_name}
-        </div>
-
-        <PriceAndDelivery product={product} />
-      </button>
-
-      <div className="mt-2 grid grid-cols-2 gap-1.5 border-t border-slate-100 pt-2">
+  if (variant === "mini") {
+    return (
+      <div data-ruru-quick-mini-card className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-blue-100">
         <button
           type="button"
           onClick={onDetail}
-          className="h-9 rounded-xl border border-slate-200 bg-white text-[12px] font-black text-slate-700"
+          className="block w-full text-left"
         >
-          상세보기
+          <ProductThumbnail product={product} className="mb-1.5 aspect-square h-auto w-full" />
+
+          <div className="line-clamp-1 text-[12px] font-black leading-4 tracking-[-0.04em] text-gray-950">
+            {product.product_name}
+          </div>
+
+          <div className="mt-0.5 truncate text-[12px] font-black text-blue-600">
+            {hasPrice(product) ? formatWon(product.price) : "직접입력"}
+          </div>
         </button>
+
         <button
           type="button"
           onClick={onSelect}
-          className="h-9 rounded-xl bg-blue-600 text-[12px] font-black text-white shadow-sm"
+          className="mt-1.5 h-8 w-full rounded-xl bg-blue-600 text-[12px] font-black text-white shadow-sm"
         >
           선택
         </button>
+      </div>
+    );
+  }
+
+  return (
+    <div data-ruru-quick-feature-card className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-blue-100">
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={onDetail}
+          className="shrink-0 text-left"
+        >
+          <ProductThumbnail product={product} className="h-[82px] w-[82px]" />
+        </button>
+
+        <div className="min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={onDetail}
+            className="block w-full text-left"
+          >
+            <div className="line-clamp-2 min-h-[34px] text-[13px] font-black leading-[17px] tracking-[-0.04em] text-gray-950">
+              {product.product_name}
+            </div>
+
+            <PriceAndDelivery product={product} />
+          </button>
+
+          <div className="mt-2 grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              onClick={onDetail}
+              className="h-9 rounded-xl border border-slate-200 bg-white text-[12px] font-black text-slate-700"
+            >
+              상세보기
+            </button>
+            <button
+              type="button"
+              onClick={onSelect}
+              className="h-9 rounded-xl bg-blue-600 text-[12px] font-black text-white shadow-sm"
+            >
+              선택
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -476,18 +518,31 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
         <div
           className={
             products.length > 2
-              ? "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_72px] gap-2"
-              : "grid grid-cols-2 gap-2"
+              ? "grid grid-cols-[minmax(0,2fr)_minmax(88px,1fr)_52px] gap-2"
+              : products.length > 1
+                ? "grid grid-cols-[minmax(0,2fr)_minmax(88px,1fr)] gap-2"
+                : "grid grid-cols-1"
           }
         >
-          {quickProducts.map((product) => (
+          {quickProducts[0] ? (
             <QuickProductCard
-              key={`quick-group-buy-${String(product.id)}`}
-              product={product}
-              onDetail={() => setDetailProduct(product)}
-              onSelect={() => handleSelect(product)}
+              key={`quick-group-buy-feature-${String(quickProducts[0].id)}`}
+              product={quickProducts[0]}
+              variant="feature"
+              onDetail={() => setDetailProduct(quickProducts[0])}
+              onSelect={() => handleSelect(quickProducts[0])}
             />
-          ))}
+          ) : null}
+
+          {quickProducts[1] ? (
+            <QuickProductCard
+              key={`quick-group-buy-mini-${String(quickProducts[1].id)}`}
+              product={quickProducts[1]}
+              variant="mini"
+              onDetail={() => setDetailProduct(quickProducts[1])}
+              onSelect={() => handleSelect(quickProducts[1])}
+            />
+          ) : null}
 
           {products.length > 2 ? (
             <button
@@ -497,10 +552,10 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
                 setCurrentPage(1);
                 setSheetOpen(true);
               }}
-              className="flex min-h-[154px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-200 bg-white/70 px-2 text-center text-[13px] font-black tracking-[-0.04em] text-blue-600"
+              className="flex min-h-[106px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-200 bg-white/70 px-1 text-center text-[12px] font-black tracking-[-0.04em] text-blue-600"
             >
-              <span className="text-2xl leading-none">+</span>
-              <span className="mt-2">더보기</span>
+              <span className="text-xl leading-none">+</span>
+              <span className="mt-1">더보기</span>
             </button>
           ) : null}
         </div>
