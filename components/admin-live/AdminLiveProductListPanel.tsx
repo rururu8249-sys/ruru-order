@@ -21,6 +21,12 @@ const DEFAULT_PAGE_SIZE = 4;
 
 type ProductListFilter = "visible" | "hidden" | "all";
 
+type SimpleFastCreateRow = {
+  productName: string;
+  priceText: string;
+  isVisible: boolean;
+};
+
 function pickString(row: ProductRow | null | undefined, keys: string[], fallback = "") {
   if (!row) return fallback;
 
@@ -119,6 +125,27 @@ function productPrice(product: ProductRow) {
 
 function money(value: number) {
   return `${Number(value || 0).toLocaleString("ko-KR")}원`;
+}
+
+function moneyNumber(value: string) {
+  return Number(String(value || "").replace(/[^0-9]/g, "")) || 0;
+}
+
+function missingProductColumn(message: string) {
+  const patterns = [
+    /Could not find the '([^']+)' column/i,
+    /Could not find column '([^']+)'/i,
+    /column "([^"]+)" of relation "products" does not exist/i,
+    /record "new" has no field "([^"]+)"/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+
+    if (match?.[1]) return match[1];
+  }
+
+  return "";
 }
 
 function productDetailImages(product: ProductRow) {
@@ -407,6 +434,11 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
   const [selectedProduct, setSelectedProduct] = useState<ProductRow | null>(null);
   const [previewImage, setPreviewImage] = useState("");
   const [showProductDetailList, setShowProductDetailList] = useState(false);
+  const [showSimpleFastCreate, setShowSimpleFastCreate] = useState(false);
+  const [simpleFastRows, setSimpleFastRows] = useState<SimpleFastCreateRow[]>([
+    { productName: "", priceText: "", isVisible: true },
+  ]);
+  const [simpleFastSaving, setSimpleFastSaving] = useState(false);
   const [detailSearchText, setDetailSearchText] = useState("");
   const [detailStatusFilter, setDetailStatusFilter] = useState<"all" | "visible" | "hidden" | "soldout">("all");
   const [detailPageSize, setDetailPageSize] = useState<number>(20);
@@ -453,6 +485,148 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
   useEffect(() => {
     setDetailPage(1);
   }, [detailSearchText, detailStatusFilter, detailPageSize]);
+
+  const resetSimpleFastRows = useCallback(() => {
+    setSimpleFastRows([{ productName: "", priceText: "", isVisible: true }]);
+  }, []);
+
+  const updateSimpleFastRow = (targetIndex: number, patch: Partial<SimpleFastCreateRow>) => {
+    setSimpleFastRows((rows) =>
+      rows.map((row, index) => (index === targetIndex ? { ...row, ...patch } : row)),
+    );
+  };
+
+  const addSimpleFastRow = () => {
+    setSimpleFastRows((rows) =>
+      rows.length >= 10 ? rows : [...rows, { productName: "", priceText: "", isVisible: true }],
+    );
+  };
+
+  const removeSimpleFastRow = (targetIndex: number) => {
+    setSimpleFastRows((rows) => {
+      if (rows.length <= 1) return rows;
+
+      return rows.filter((_, index) => index !== targetIndex);
+    });
+  };
+
+  const insertSimpleFastProductSchemaSafe = async (payload: Record<string, unknown>) => {
+    const requiredColumns = new Set(["product_name"]);
+    const workingPayload: Record<string, unknown> = { ...payload };
+
+    for (let attempt = 0; attempt < 24; attempt += 1) {
+      const { data, error } = await supabase.from("products").insert(workingPayload).select("id").single();
+
+      if (!error) {
+        return String((data as { id?: string | number } | null)?.id || "");
+      }
+
+      const missingColumn = missingProductColumn(error.message || "");
+
+      if (missingColumn && !requiredColumns.has(missingColumn) && missingColumn in workingPayload) {
+        delete workingPayload[missingColumn];
+        continue;
+      }
+
+      throw error;
+    }
+
+    throw new Error("products 저장 스키마 확인 중 반복 제한을 초과했습니다.");
+  };
+
+  const saveSimpleFastProducts = async () => {
+    if (simpleFastSaving) return;
+
+    const rows = simpleFastRows.map((row) => ({
+      productName: row.productName.trim(),
+      price: moneyNumber(row.priceText),
+      isVisible: row.isVisible,
+    }));
+
+    const filledRows = rows.filter((row) => row.productName || row.price > 0);
+
+    if (filledRows.length === 0) {
+      alert("빠른등록할 상품명을 입력해주세요.");
+      return;
+    }
+
+    for (let index = 0; index < filledRows.length; index += 1) {
+      const row = filledRows[index];
+
+      if (!row.productName) {
+        alert(`상품 ${index + 1}의 상품명을 입력해주세요.`);
+        return;
+      }
+
+      if (row.price <= 0) {
+        alert(`상품 ${index + 1}의 금액을 입력해주세요.`);
+        return;
+      }
+    }
+
+    setSimpleFastSaving(true);
+
+    try {
+      let createdCount = 0;
+
+      for (const row of filledRows) {
+        const productNote = {
+          stock_mode: "total",
+          stock_variants: [],
+          stock_management_enabled: false,
+          registered_order_enabled: true,
+          name_suggestion_enabled: true,
+          simple_fast_create: true,
+        };
+
+        const payload: Record<string, unknown> = {
+          product_name: row.productName,
+          price: row.price,
+          stock: 0,
+          status: row.isVisible ? "판매중" : "숨김",
+          product_type: "broadcast",
+          shipping_type: "normal",
+          combine_shipping: "Y",
+          sort_order: 0,
+          is_visible: row.isVisible,
+          is_soldout: false,
+          is_pinned: false,
+          color_options: [],
+          size_options: [],
+          size_option_enabled: false,
+          product_description: "",
+          detail_image_urls: [],
+          product_note: productNote,
+        };
+
+        const productId = await insertSimpleFastProductSchemaSafe(payload);
+
+        if (props.activeBroadcastId && productId) {
+          const { error: linkError } = await supabase.from("broadcast_products").insert({
+            broadcast_id: props.activeBroadcastId,
+            product_id: productId,
+            sort_order: 0,
+          });
+
+          if (linkError) {
+            alert("상품은 저장됐지만 방송 연결은 실패했습니다.\n\n" + linkError.message);
+          }
+        }
+
+        createdCount += 1;
+      }
+
+      window.dispatchEvent(new Event("ruru-live-product-updated"));
+      await loadProducts();
+      resetSimpleFastRows();
+      setShowSimpleFastCreate(false);
+      alert(`${createdCount}개 상품을 빠른등록했습니다.`);
+    } catch (error) {
+      alert("빠른등록 저장 실패\n\n" + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      setSimpleFastSaving(false);
+    }
+  };
 
   const counts = useMemo(() => {
     return products.reduce<{ visible: number; hidden: number; soldout: number; pinned: number }>(
@@ -613,10 +787,21 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
 
               <button
                 type="button"
-                onClick={openQuickProductCreate}
+                onClick={() => {
+                  resetSimpleFastRows();
+                  setShowSimpleFastCreate(true);
+                }}
                 className="h-9 rounded-xl bg-blue-600 px-4 text-xs font-black text-white shadow-sm hover:bg-blue-700"
               >
                 + 빠른등록
+              </button>
+
+              <button
+                type="button"
+                onClick={openQuickProductCreate}
+                className="h-9 rounded-xl bg-slate-900 px-4 text-xs font-black text-white shadow-sm hover:bg-slate-800"
+              >
+                + 상품등록
               </button>
 
               <button
@@ -630,14 +815,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
             </div>
           </div>
 
-          <div className="mt-3 grid shrink-0 grid-cols-[52px_minmax(0,1fr)_76px_64px] border-y border-slate-100 py-2 text-[11px] font-black text-slate-400">
-            <div>순서</div>
-            <div>상품정보</div>
-            <div className="text-center">상태</div>
-            <div className="text-right">관리</div>
-          </div>
-
-          <div className="shrink-0 py-2 text-[11px] font-black text-slate-500">
+<div className="shrink-0 py-2 text-[11px] font-black text-slate-500">
           <div className="mt-2 flex flex-wrap items-center gap-1.5 rounded-2xl border border-slate-200 bg-slate-50 p-1.5">
             {([
               { key: "visible", label: "노출상품", count: productListSummary.visible },
@@ -815,6 +993,128 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
           </div>
         </div>
       </div>
+
+      {showSimpleFastCreate ? (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/45 px-4 py-6">
+          <div className="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div>
+                <h3 className="text-lg font-black text-slate-950">빠른 상품등록</h3>
+                <p className="mt-1 text-xs font-bold text-slate-500">상품명과 금액만 넣고 바로 등록합니다.</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (simpleFastSaving) return;
+                  setShowSimpleFastCreate(false);
+                }}
+                className="h-9 rounded-xl bg-slate-100 px-4 text-xs font-black text-slate-600 hover:bg-slate-200"
+              >
+                닫기
+              </button>
+            </div>
+
+            <div className="max-h-[62vh] overflow-y-auto px-5 py-4">
+              <div className="space-y-3">
+                {simpleFastRows.map((row, index) => (
+                  <div key={index} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="text-sm font-black text-slate-900">상품 {index + 1}</div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => updateSimpleFastRow(index, { isVisible: !row.isVisible })}
+                          className={`h-8 rounded-xl px-3 text-xs font-black ${
+                            row.isVisible
+                              ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+                              : "bg-slate-200 text-slate-500"
+                          }`}
+                        >
+                          {row.isVisible ? "노출ON" : "노출OFF"}
+                        </button>
+
+                        {simpleFastRows.length > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => removeSimpleFastRow(index)}
+                            className="h-8 rounded-xl bg-rose-50 px-3 text-xs font-black text-rose-600"
+                          >
+                            삭제
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-[minmax(0,1fr)_180px] gap-2">
+                      <label className="block">
+                        <span className="mb-1 block text-[11px] font-black text-slate-500">상품명</span>
+                        <input
+                          value={row.productName}
+                          onChange={(event) => updateSimpleFastRow(index, { productName: event.target.value })}
+                          placeholder="예: 라메르크림 100ml"
+                          className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none focus:border-blue-500"
+                        />
+                      </label>
+
+                      <label className="block">
+                        <span className="mb-1 block text-[11px] font-black text-slate-500">금액</span>
+                        <div className="grid h-11 grid-cols-[minmax(0,1fr)_28px] items-center rounded-xl border border-slate-200 bg-white px-3 focus-within:border-blue-500">
+                          <input
+                            value={row.priceText ? Number(row.priceText).toLocaleString("ko-KR") : ""}
+                            onChange={(event) =>
+                              updateSimpleFastRow(index, {
+                                priceText: event.target.value.replace(/[^0-9]/g, ""),
+                              })
+                            }
+                            inputMode="numeric"
+                            placeholder="0"
+                            className="min-w-0 bg-transparent text-right text-sm font-black text-slate-900 outline-none"
+                          />
+                          <span className="text-right text-xs font-black text-slate-400">원</span>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={addSimpleFastRow}
+                className="mt-3 h-11 w-full rounded-2xl border border-dashed border-blue-300 bg-blue-50 text-sm font-black text-blue-700 hover:bg-blue-100"
+              >
+                + 상품 추가
+              </button>
+
+              <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-bold leading-5 text-slate-500">
+                기본값: 방송상품 · 일반배송 · 등록ON · 추천ON · 색상없음 · 사이즈없음
+              </div>
+            </div>
+
+            <div className="grid grid-cols-[1fr_1.4fr] gap-2 border-t border-slate-100 bg-white px-5 py-4">
+              <button
+                type="button"
+                disabled={simpleFastSaving}
+                onClick={() => setShowSimpleFastCreate(false)}
+                className="h-12 rounded-2xl bg-slate-100 text-sm font-black text-slate-600 disabled:opacity-50"
+              >
+                닫기
+              </button>
+
+              <button
+                type="button"
+                disabled={simpleFastSaving}
+                onClick={() => void saveSimpleFastProducts()}
+                className="h-12 rounded-2xl bg-blue-600 text-sm font-black text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+              >
+                {simpleFastSaving ? "저장 중..." : "빠른등록 저장"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {showProductDetailList ? (
         <div className="fixed inset-0 z-[115] flex items-start justify-center overflow-hidden bg-slate-950/45 px-5 pt-10">
