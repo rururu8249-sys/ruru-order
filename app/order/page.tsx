@@ -481,7 +481,7 @@ function OrderInputClearButton({
       aria-label={label}
       onMouseDown={(event) => event.preventDefault()}
       onClick={onClear}
-      className="absolute right-3 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-slate-200 text-base font-black leading-none text-slate-500 active:scale-95"
+      className="absolute right-2 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-slate-200 text-xs font-black leading-none text-slate-500 active:scale-95"
     >
       ×
     </button>
@@ -2303,7 +2303,7 @@ export default function OrderPage() {
 
                 <div className="grid gap-3">
                   <div data-ruru-product-search-area className="relative">
-                    <div className="relative [&>input]:pr-12">
+                    <div className="relative min-w-0 [&>input]:w-full [&>input]:min-w-0 [&>input]:pr-10">
 <input
                       value={item.product_name}
                       onFocus={() => {
@@ -2379,7 +2379,7 @@ export default function OrderPage() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="relative [&>input]:pr-12">
+                    <div className="relative min-w-0 [&>input]:w-full [&>input]:min-w-0 [&>input]:pr-10">
 <input
                       value={item.color}
                       onChange={(event) => updateItem(index, "color", event.target.value)}
@@ -2393,7 +2393,7 @@ export default function OrderPage() {
   />
 </div>
 
-                    <div className="relative [&>input]:pr-12">
+                    <div className="relative min-w-0 [&>input]:w-full [&>input]:min-w-0 [&>input]:pr-10">
 <input
                       value={item.size}
                       onChange={(event) => updateItem(index, "size", event.target.value)}
