@@ -507,8 +507,52 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
 
   return (
     <>
-      <section data-ruru-group-buy-quick-select className="mb-4 rounded-3xl border border-blue-100 bg-blue-50/70 p-3">
-        <div className="grid grid-cols-[minmax(0,2fr)_minmax(88px,1fr)_68px] gap-2">
+      <section data-ruru-group-buy-quick-select className="mb-4 rounded-3xl border border-blue-100 bg-blue-50/70 p-2">
+        <div
+          data-ruru-mobile-quick-row
+          className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_64px] gap-2 sm:hidden"
+        >
+          {quickProducts[0] ? (
+            <QuickProductCard
+              key={`quick-group-buy-mobile-first-${String(quickProducts[0].id)}`}
+              product={quickProducts[0]}
+              variant="mini"
+              onDetail={() => setDetailProduct(quickProducts[0])}
+              onSelect={() => handleSelect(quickProducts[0])}
+            />
+          ) : null}
+
+          {quickProducts[1] ? (
+            <QuickProductCard
+              key={`quick-group-buy-mobile-second-${String(quickProducts[1].id)}`}
+              product={quickProducts[1]}
+              variant="mini"
+              onDetail={() => setDetailProduct(quickProducts[1])}
+              onSelect={() => handleSelect(quickProducts[1])}
+            />
+          ) : null}
+
+          {products.length > 0 ? (
+            <button
+              data-ruru-quick-more-button
+              type="button"
+              onClick={() => {
+                setCurrentPage(1);
+                setSheetOpen(true);
+              }}
+              className="col-start-3 flex min-h-[124px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-200 bg-white/70 px-1 text-center text-[10px] font-black tracking-[-0.04em] text-blue-600"
+            >
+              <span className="text-xl leading-none">+</span>
+              <span className="mt-1">상품</span>
+              <span>더보기</span>
+            </button>
+          ) : null}
+        </div>
+
+        <div
+          data-ruru-desktop-quick-grid
+          className="hidden grid-cols-[minmax(0,2fr)_minmax(88px,1fr)_68px] gap-2 sm:grid"
+        >
           {quickProducts[0] ? (
             <QuickProductCard
               key={`quick-group-buy-feature-${String(quickProducts[0].id)}`}
@@ -537,10 +581,11 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
                 setCurrentPage(1);
                 setSheetOpen(true);
               }}
-              className="flex min-h-[96px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-200 bg-white/70 px-1 text-center text-[10px] font-black tracking-[-0.04em] text-blue-600"
+              className="col-start-3 flex min-h-[96px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-200 bg-white/70 px-1 text-center text-[10px] font-black tracking-[-0.04em] text-blue-600"
             >
               <span className="text-xl leading-none">+</span>
-              <span className="mt-1">상품</span><span>더보기</span>
+              <span className="mt-1">상품</span>
+              <span>더보기</span>
             </button>
           ) : null}
         </div>
