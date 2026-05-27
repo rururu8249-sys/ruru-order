@@ -507,14 +507,7 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
 
   return (
     <>
-      <section data-ruru-group-buy-quick-select className="mb-5 rounded-3xl border border-blue-100 bg-blue-50/70 p-4">
-        <div className="mb-3">
-          <div className="text-lg font-black tracking-[-0.04em] text-gray-900">등록상품 빠른선택</div>
-          <div className="mt-1 text-sm font-bold tracking-[-0.04em] text-gray-500">
-            검색어를 몰라도 바로 선택할 수 있어요.
-          </div>
-        </div>
-
+      <section data-ruru-group-buy-quick-select className="mb-4 rounded-3xl border border-blue-100 bg-blue-50/70 p-3">
         <div className="grid grid-cols-[minmax(0,2fr)_minmax(88px,1fr)_52px] gap-2">
           {quickProducts[0] ? (
             <QuickProductCard

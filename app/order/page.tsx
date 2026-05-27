@@ -2161,7 +2161,7 @@ export default function OrderPage() {
         {isAutoLoggedIn && (
           <>
 <section id="orderProductInputSection" className="mt-4 rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black">주문상품</h2>
+          <h2 className="text-xl font-black">방송상품.공구상품</h2>
 
           <div className="mt-4 rounded-[1.4rem] bg-blue-50 p-4">
             <div className="flex items-start justify-between gap-3">
