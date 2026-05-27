@@ -393,11 +393,27 @@ function productDeliveryLabel(product: BroadcastProduct): string {
   return "일반배송";
 }
 
+function normalizeOrderProductRow(product: any): BroadcastProduct {
+  const price = Number(product?.price ?? product?.sale_price ?? product?.selling_price ?? 0);
+
+  return {
+    id: product?.id,
+    product_name: String(product?.product_name ?? product?.name ?? ""),
+    price: Number.isFinite(price) ? price : 0,
+    product_note: product?.product_note ?? product?.note ?? product?.memo ?? "",
+    status: String(product?.status ?? "판매중"),
+    product_type: String(product?.product_type ?? ""),
+    shipping_type: String(product?.shipping_type ?? product?.delivery_type ?? ""),
+  } as BroadcastProduct;
+}
+
+
 
 export default function OrderPage() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [broadcast, setBroadcast] = useState<any | null>(null);
   const [broadcastProducts, setBroadcastProducts] = useState<BroadcastProduct[]>([]);
+  const [groupBuyQuickProductsFromCatalog, setGroupBuyQuickProductsFromCatalog] = useState<BroadcastProduct[]>([]);
   const [productSearchOpenIndex, setProductSearchOpenIndex] = useState<number | null>(null);
   const [productSearchText, setProductSearchText] = useState("");
   const [showAllGroupBuyQuickProducts, setShowAllGroupBuyQuickProducts] = useState(false);
@@ -914,7 +930,34 @@ export default function OrderPage() {
   };
 
 
+
+  const loadGroupBuyQuickProductsFromCatalog = async () => {
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .neq("status", "숨김")
+      .limit(80);
+
+    if (error) {
+      console.log("공구상품 빠른선택 불러오기 오류", error.message);
+      setGroupBuyQuickProductsFromCatalog([]);
+      return;
+    }
+
+    const nextProducts = (data || [])
+      .map((product: any) => normalizeOrderProductRow(product))
+      .filter((product) => product.product_name.trim())
+      .filter((product) => product.status !== "숨김")
+      .filter((product) => productIsGroupBuy(product))
+      .filter((product) => productRegisteredOrderEnabled(product))
+      .slice(0, 12);
+
+    setGroupBuyQuickProductsFromCatalog(nextProducts);
+  };
+
   const loadBroadcast = async () => {
+    await loadGroupBuyQuickProductsFromCatalog();
+
     const { data, error } = await supabase
       .from("broadcasts")
       .select("*")
@@ -1540,11 +1583,16 @@ export default function OrderPage() {
   }, [broadcastProducts, productSearchText]);
 
   const quickGroupBuyProducts = useMemo(() => {
-    return broadcastProducts
+    const mergedProducts = [...groupBuyQuickProductsFromCatalog, ...broadcastProducts];
+    const uniqueProducts = Array.from(
+      new Map(mergedProducts.map((product) => [String(product.id), product])).values(),
+    );
+
+    return uniqueProducts
       .filter((product) => productIsGroupBuy(product))
       .filter((product) => productRegisteredOrderEnabled(product))
       .slice(0, 12);
-  }, [broadcastProducts]);
+  }, [broadcastProducts, groupBuyQuickProductsFromCatalog]);
 
   const visibleQuickGroupBuyProducts = showAllGroupBuyQuickProducts
     ? quickGroupBuyProducts
