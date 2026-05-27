@@ -747,6 +747,24 @@ export default function OrderPage() {
     }
   }, []);
 
+  // 저장된 고객정보가 있으면 개인정보 동의 완료 처리
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const hasSavedCustomerInfo = Boolean(
+      youtubeNickname.trim() &&
+        customerName.trim() &&
+        customerPhone.trim()
+    );
+
+    if (!hasSavedCustomerInfo) return;
+
+    window.localStorage.setItem(PRIVACY_CONSENT_STORAGE_KEY, PRIVACY_CONSENT_VERSION);
+                      setHasPrivacyConsent(true);
+    setHasPrivacyConsent(true);
+    setPrivacyConsentChecked(true);
+  }, [youtubeNickname, customerName, customerPhone]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -1030,12 +1048,12 @@ export default function OrderPage() {
       setCustomerNotice({
         type: "info",
         message: [
-          "저장된 배송지",
+          "저장된 주문자 정보",
           `닉네임: ${nextNickname || "-"}`,
           `이름: ${nextName || "-"}`,
-          `전화번호: ${nextPhone || "-"}`,
+          `전화: ${nextPhone || "-"}`,
           `주소: ${[nextAddress, nextDetailAddress].filter(Boolean).join(" ") || "-"}`,
-          "주소가 다르면 주문 전 [정보수정]에서 변경해주세요.",
+          "정보가 다르면 상단 [정보수정]에서 변경해주세요.",
           "이미 제출한 주문의 배송지 변경은 요청사항 또는 카톡채널로 남겨주세요.",
           [nextAddress, nextDetailAddress].filter(Boolean).join(" "),
         ]
@@ -2273,7 +2291,7 @@ export default function OrderPage() {
           <div className="mt-4 rounded-[1.4rem] bg-blue-50 p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="break-keep text-sm font-black leading-relaxed text-blue-700">
-                ⚠️ 상품은 1칸에 1개씩 · 금액은 택배비 제외
+                ⚠️  · 
               </div>
 
               <button
