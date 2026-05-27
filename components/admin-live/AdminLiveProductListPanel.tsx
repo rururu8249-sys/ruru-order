@@ -321,8 +321,8 @@ function openQuickProductEdit(product: ProductRow) {
 }
 
 
-function getProductNoteFlags(product: { product_note?: unknown }) {
-  const note = product.product_note;
+function getProductNoteFlags(product: { product_note?: unknown; productNote?: unknown; note?: unknown }) {
+  const note = product.product_note ?? product.productNote ?? product.note;
 
   if (!note || typeof note !== "object" || Array.isArray(note)) {
     return {
@@ -340,6 +340,36 @@ function getProductNoteFlags(product: { product_note?: unknown }) {
     registeredOrderEnabled: productNote.registered_order_enabled !== false,
     nameSuggestionEnabled: productNote.name_suggestion_enabled !== false,
   };
+}
+
+
+function ProductFeatureBadges({ product }: { product: ProductRow }) {
+  const flags = getProductNoteFlags(product);
+
+  return (
+    <div data-ruru-product-feature-badges className="mt-1 flex flex-wrap gap-1">
+      <span
+        className={[
+          "rounded-full px-2 py-0.5 text-[10px] font-black",
+          flags.registeredOrderEnabled
+            ? "bg-blue-50 text-blue-700 ring-1 ring-blue-100"
+            : "bg-slate-100 text-slate-400 ring-1 ring-slate-200",
+        ].join(" ")}
+      >
+        {flags.registeredOrderEnabled ? "등록ON" : "등록OFF"}
+      </span>
+      <span
+        className={[
+          "rounded-full px-2 py-0.5 text-[10px] font-black",
+          flags.nameSuggestionEnabled
+            ? "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100"
+            : "bg-slate-100 text-slate-400 ring-1 ring-slate-200",
+        ].join(" ")}
+      >
+        {flags.nameSuggestionEnabled ? "추천ON" : "추천OFF"}
+      </span>
+    </div>
+  );
 }
 
 export default function AdminLiveProductListPanel(props: AdminLiveProductListPanelProps) {
@@ -551,6 +581,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                       className="grid grid-cols-[52px_minmax(0,1fr)_76px_64px] items-center gap-2 py-2.5"
                     >
                       <div className="text-xs font-black text-slate-400">{absoluteIndex}</div>
+                          <ProductFeatureBadges product={product} />
 
                       <button
                         type="button"
@@ -745,6 +776,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                           <div className="text-center text-xs font-black text-slate-600">{productTypeLabel(product)}</div>
                           <div className="text-center text-xs font-black text-slate-600">
                             <div>{stockSummary(product)}</div>
+                          <ProductFeatureBadges product={product} />
                             {variantStockCount(product) > 0 ? (
                               <div className="mt-0.5 text-[10px] font-black text-blue-600">
                                 옵션 {variantStockCount(product)}개
