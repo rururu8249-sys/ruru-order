@@ -494,8 +494,8 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
       </div>
 
       {showProductDetailList ? (
-        <div className="fixed inset-0 z-[115] flex items-center justify-center bg-slate-950/45 p-5">
-          <div className="flex max-h-[88vh] w-full max-w-[1180px] flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+        <div className="fixed inset-0 z-[115] flex items-start justify-center overflow-hidden bg-slate-950/45 px-5 pt-10">
+          <div className="flex h-[760px] max-h-[calc(100vh-80px)] min-h-[620px] w-full max-w-[1180px] flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
             <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
                 <h3 className="text-lg font-black text-slate-950">등록상품 전체 상세리스트</h3>
