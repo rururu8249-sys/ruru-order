@@ -40,7 +40,7 @@ export default function CustomerHomeHero({
 
         <div className="relative mt-5 flex items-center justify-center gap-2 text-[15px] font-black text-white/95">
           <span className="rounded-full bg-white/18 px-4 py-2">
-            빠른 주문 시작
+            주문서 작성(공구상품주문)
           </span>
           <span className="text-[28px] leading-none">›</span>
         </div>

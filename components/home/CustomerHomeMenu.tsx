@@ -22,10 +22,11 @@ const menuItems: MenuItem[] = [
     icon: "📢",
   },
   {
-    href: "/group-buy",
-    title: "공구상품",
-    desc: "진행 중인 상품 보기",
-    icon: "🛒",
+    href: "https://www.instagram.com/ruru8249_/",
+    title: "인스타그램",
+    desc: "루루동이 인스타 보기",
+    icon: "📸",
+    external: true,
   },
   {
     href: "https://band.us/@ruru8249",
