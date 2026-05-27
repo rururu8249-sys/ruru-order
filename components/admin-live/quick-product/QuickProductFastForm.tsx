@@ -779,8 +779,8 @@ export default function QuickProductFastForm({
             </div>
           </section>
 
-          <section className="grid min-h-0 items-center grid-cols-[1fr_1.2fr_1fr_1fr] gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-4">
-            <div>
+          <section className="grid min-h-0 items-center grid-cols-[1fr_1.2fr_1fr_1fr] gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
+            <div className="flex h-full min-h-0 flex-col justify-center">
               <div className="mb-1 text-[10px] font-black text-slate-500">상품구분</div>
               <div className="flex gap-1">
                 <button
@@ -806,7 +806,7 @@ export default function QuickProductFastForm({
               </div>
             </div>
 
-            <div>
+            <div className="flex h-full min-h-0 flex-col justify-center">
               <div className="mb-1 text-[10px] font-black text-slate-500">배송유형</div>
               <div className="flex gap-1">
                 {[
@@ -829,7 +829,7 @@ export default function QuickProductFastForm({
               </div>
             </div>
 
-            <div>
+            <div className="flex h-full min-h-0 flex-col justify-center">
               <div className="mb-1 text-[10px] font-black text-slate-500">상태</div>
               <div className="flex gap-1">
                 <button
@@ -855,7 +855,7 @@ export default function QuickProductFastForm({
               </div>
             </div>
 
-            <div>
+            <div className="flex h-full min-h-0 flex-col justify-center">
               <div className="mb-1 text-[10px] font-black text-slate-500">리스트</div>
               <div className="flex gap-1">
                 <button
