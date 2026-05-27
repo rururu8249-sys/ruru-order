@@ -936,7 +936,8 @@ export default function QuickProductFastForm({
 
           <section className="flex-col flex h-full grid h-[205px] min-h-0 grid-cols-[260px_minmax(0,1fr)] gap-4">
             <div className="min-h-0 rounded-2xl border border-slate-200 bg-white p-3">
-              <ImagePicker
+                            <div data-ruru-detail-photos-wrap className="self-start">
+<ImagePicker
                 label="상세사진 최대 5장"
                 value={detailImages}
                 maxFiles={5}
@@ -944,6 +945,7 @@ export default function QuickProductFastForm({
                 mode="detail"
                 onChange={setDetailImages}
               />
+              </div>
               <div className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-[10px] font-bold leading-4 text-slate-500">
                 기본 2칸만 표시하고 필요할 때 +3장 더로 확장합니다.
               </div>
