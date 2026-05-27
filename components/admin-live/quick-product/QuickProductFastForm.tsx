@@ -546,7 +546,7 @@ export default function QuickProductFastForm({
         : "broadcast",
     );
     setProductName(pickString(initialProduct, ["product_name", "name", "title"], ""));
-    setPriceText(String(pickNumber(initialProduct, ["price", "sale_price", "selling_price"], 0) || ""));
+    setPriceText(String(pickNumber(initialProduct, ["price", "sale_price", "selling_price"], 0)));
     setShippingType(pickString(initialProduct, ["shipping_type", "delivery_type"], "normal"));
     setIsVisible(pickBoolean(initialProduct, ["is_visible", "visible"], true));
     setIsPinned(pickBoolean(initialProduct, ["is_pinned", "pinned"], false));
@@ -639,7 +639,7 @@ export default function QuickProductFastForm({
       return;
     }
 
-    if (price <= 0) {
+    if (price < 0) {
       showAdminToast("판매가를 입력해주세요.", "error");
       return;
     }
@@ -744,8 +744,8 @@ export default function QuickProductFastForm({
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-hidden px-5 py-4">
-        <div className="grid h-full min-h-0 grid-rows-[176px_76px_86px_124px_minmax(0,1fr)] gap-3">
-          <section className="grid min-h-0 items-center grid-cols-[180px_minmax(0,1fr)] gap-4 rounded-2xl border border-slate-200 bg-white p-3">
+        <div className="grid h-full min-h-0 grid-rows-[206px_76px_86px_124px_minmax(0,1fr)] gap-3 overflow-hidden">
+          <section className="grid min-h-0 items-center grid-cols-[180px_minmax(0,1fr)] gap-4 rounded-2xl border border-slate-200 bg-white p-3 overflow-hidden">
             <ImagePicker
               label="대표사진"
               value={coverImages}
@@ -771,7 +771,7 @@ export default function QuickProductFastForm({
                   <span className="mb-1 block text-[10px] font-black text-slate-500">판매가</span>
                   <div className="flex h-9 items-center rounded-xl border border-slate-200 px-3 focus-within:border-blue-400">
                     <input
-                      value={formatNumberWithComma(priceText)}
+                      value={formatNumberWithComma(priceText || "0")}
                       onChange={(event) => setPriceText(onlyNumber(event.target.value))}
                       placeholder="55,000"
                       className="min-w-0 flex-1 text-right text-sm font-black outline-none"
@@ -787,7 +787,7 @@ export default function QuickProductFastForm({
                   value={description}
                   onChange={(event) => setDescription(normalizeTextareaText(event.target.value))}
                   placeholder="소재, 핏, 주의사항, 교환/환불 안내"
-                  className="h-[112px] w-full resize-none rounded-xl border border-slate-200 p-2.5 text-xs font-bold leading-5 outline-none focus:border-blue-400"
+                  className="h-[96px] max-h-[96px] w-full resize-none overflow-y-auto rounded-xl border border-slate-200 p-2.5 text-xs font-bold leading-5 outline-none focus:border-blue-400"
                 />
               </label>
 

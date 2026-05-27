@@ -132,6 +132,9 @@ const hideNone = (value: any) => {
 type ProductSuggestionNote = {
   name_suggestion_enabled?: boolean;
   suggestion_keywords?: string[];
+  stock_variants?: Array<{ color?: string; size?: string; stock?: number }>;
+  colors?: string[] | string;
+  sizes?: string[] | string;
 };
 
 function parseProductSuggestionNote(raw: unknown): ProductSuggestionNote | null {
@@ -290,6 +293,70 @@ const blockCustomerCopyEvents = () => {
     document.removeEventListener("keydown", blockKey);
   };
 };
+
+function splitProductOptionValue(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item): string[] => splitProductOptionValue(item));
+  }
+
+  if (typeof value !== "string") {
+    return [];
+  }
+
+  return value
+    .split(/[,.\/|·\n]+/g)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function uniqueOptionValues(values: string[]): string[] {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).slice(0, 8);
+}
+
+function getProductOptionSuggestions(product: BroadcastProduct, field: "color" | "size"): string[] {
+  const note = parseProductSuggestionNote(product.product_note);
+  const record = product as unknown as Record<string, unknown>;
+  const values: string[] = [];
+
+  if (Array.isArray(note?.stock_variants)) {
+    for (const variant of note.stock_variants) {
+      const value = field === "color" ? variant.color : variant.size;
+
+      if (typeof value === "string" && value.trim()) {
+        values.push(value.trim());
+      }
+    }
+  }
+
+  if (field === "color") {
+    values.push(...splitProductOptionValue(note?.colors));
+    values.push(...splitProductOptionValue(record.colors));
+    values.push(...splitProductOptionValue(record.color_options));
+    values.push(...splitProductOptionValue(record.color));
+  } else {
+    values.push(...splitProductOptionValue(note?.sizes));
+    values.push(...splitProductOptionValue(record.sizes));
+    values.push(...splitProductOptionValue(record.size_options));
+    values.push(...splitProductOptionValue(record.size));
+  }
+
+  return uniqueOptionValues(values);
+}
+
+function findMatchedBroadcastProduct(item: OrderItem, products: BroadcastProduct[]): BroadcastProduct | null {
+  const itemName = normalizeSuggestionText(item.product_name);
+
+  if (!itemName) {
+    return null;
+  }
+
+  return (
+    products.find((product) => normalizeSuggestionText(product.product_name) === itemName) ||
+    products.find((product) => normalizeSuggestionText(product.product_name).includes(itemName)) ||
+    null
+  );
+}
+
 
 export default function OrderPage() {
   const [isEditMode, setIsEditMode] = useState(false);
@@ -1421,6 +1488,13 @@ export default function OrderPage() {
     setProductSearchText("");
   };
 
+
+  const getItemOptionSuggestions = (item: OrderItem, field: "color" | "size") => {
+    const product = findMatchedBroadcastProduct(item, broadcastProducts);
+
+    return product ? getProductOptionSuggestions(product, field) : [];
+  };
+
   const updateItem = (index: number, key: keyof OrderItem, value: string) => {
     const safeValue =
       key === "color"
@@ -1992,6 +2066,55 @@ export default function OrderPage() {
                       placeholder="사이즈"
                       className="rounded-2xl border border-gray-200 bg-white p-4 font-bold"
                     />
+                    {(() => {
+                      const colorSuggestions = getItemOptionSuggestions(item, "color");
+                      const sizeSuggestions = getItemOptionSuggestions(item, "size");
+
+                      if (colorSuggestions.length === 0 && sizeSuggestions.length === 0) {
+                        return null;
+                      }
+
+                      return (
+                        <div data-ruru-option-suggestions className="col-span-2 -mt-1 space-y-2 rounded-2xl bg-blue-50/60 p-3">
+                          {colorSuggestions.length > 0 ? (
+                            <div>
+                              <div className="mb-1 text-[11px] font-black text-blue-600">색상 추천</div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {colorSuggestions.map((option) => (
+                                  <button
+                                    key={`color-${option}`}
+                                    type="button"
+                                    onClick={() => updateItem(index, "color", option)}
+                                    className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-gray-700 shadow-sm ring-1 ring-blue-100"
+                                  >
+                                    {option}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+
+                          {sizeSuggestions.length > 0 ? (
+                            <div>
+                              <div className="mb-1 text-[11px] font-black text-blue-600">사이즈 추천</div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {sizeSuggestions.map((option) => (
+                                  <button
+                                    key={`size-${option}`}
+                                    type="button"
+                                    onClick={() => updateItem(index, "size", option)}
+                                    className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-gray-700 shadow-sm ring-1 ring-blue-100"
+                                  >
+                                    {option}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })()}
+
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
