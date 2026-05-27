@@ -80,6 +80,19 @@ type BroadcastProduct = {
   shipping_type: string;
   combine_shipping: string;
   product_note?: unknown;
+  description?: string;
+  detail_description?: string;
+  product_description?: string;
+  detail_image_urls?: unknown;
+  images?: unknown;
+  product_images?: unknown;
+  is_pinned?: boolean;
+  pinned?: boolean;
+  pinned_at?: string;
+  sort_order?: number;
+  display_order?: number;
+  created_at?: string;
+  updated_at?: string;
   image_url?: string;
   thumbnail_url?: string;
   main_image_url?: string;
@@ -541,6 +554,19 @@ function normalizeOrderProductRow(product: any): BroadcastProduct {
     product_name: String(product?.product_name ?? product?.name ?? ""),
     price: Number.isFinite(price) ? price : 0,
     product_note: product?.product_note ?? product?.note ?? product?.memo ?? "",
+    description: String(product?.description ?? ""),
+    detail_description: String(product?.detail_description ?? ""),
+    product_description: String(product?.product_description ?? ""),
+    detail_image_urls: product?.detail_image_urls ?? product?.detailImageUrls ?? product?.detail_images ?? null,
+    images: product?.images ?? null,
+    product_images: product?.product_images ?? null,
+    is_pinned: Boolean(product?.is_pinned) || Boolean(product?.pinned),
+    pinned: Boolean(product?.pinned) || Boolean(product?.is_pinned),
+    pinned_at: String(product?.pinned_at ?? ""),
+    sort_order: Number(product?.sort_order ?? product?.display_order ?? 999999),
+    display_order: Number(product?.display_order ?? product?.sort_order ?? 999999),
+    created_at: String(product?.created_at ?? ""),
+    updated_at: String(product?.updated_at ?? ""),
     status: String(product?.status ?? "판매중"),
     product_type: String(product?.product_type ?? ""),
     shipping_type: String(product?.shipping_type ?? product?.delivery_type ?? ""),
@@ -1168,6 +1194,19 @@ export default function OrderPage() {
         product_name: product.product_name || "",
         price: Number(product.price || 0),
         product_note: product.product_note ?? null,
+        description: String(product.description ?? ""),
+        detail_description: String(product.detail_description ?? ""),
+        product_description: String(product.product_description ?? ""),
+        detail_image_urls: product.detail_image_urls ?? product.detailImageUrls ?? product.detail_images ?? null,
+        images: product.images ?? null,
+        product_images: product.product_images ?? null,
+        is_pinned: Boolean(product.is_pinned) || Boolean(product.pinned),
+        pinned: Boolean(product.pinned) || Boolean(product.is_pinned),
+        pinned_at: String(product.pinned_at ?? ""),
+        sort_order: Number(product.sort_order ?? product.display_order ?? 999999),
+        display_order: Number(product.display_order ?? product.sort_order ?? 999999),
+        created_at: String(product.created_at ?? ""),
+        updated_at: String(product.updated_at ?? ""),
         stock: Number(product.stock || 0),
         status: product.status || "판매중",
         product_type: product.product_type || "방송상품",
@@ -1753,12 +1792,49 @@ export default function OrderPage() {
 
   const quickGroupBuyProducts = useMemo(() => {
     const mergedProducts = [...groupBuyQuickProductsFromCatalog, ...broadcastProducts];
+
+    const readPinnedQuickProductValue = (value: unknown) => {
+      if (typeof value === "boolean") return value;
+
+      const text = String(value ?? "").trim().toLowerCase();
+
+      return ["true", "1", "y", "yes", "상단", "고정"].includes(text);
+    };
+
+    const readQuickProductSortNumber = (value: unknown) => {
+      const parsed = Number(value);
+
+      return Number.isFinite(parsed) ? parsed : 999999;
+    };
+
     const uniqueProducts = Array.from(
-      new Map(mergedProducts.map((product) => [String(product.id), product])).values(),
+      new Map(
+        mergedProducts
+          .filter((product) => product && product.status !== "숨김")
+          .map((product) => [String(product.id), product]),
+      ).values(),
     );
 
-    return uniqueProducts
-      .filter((product) => productRegisteredOrderEnabled(product));
+    return uniqueProducts.sort((a, b) => {
+      const pinnedA = readPinnedQuickProductValue(a.is_pinned) || readPinnedQuickProductValue(a.pinned) ? 1 : 0;
+      const pinnedB = readPinnedQuickProductValue(b.is_pinned) || readPinnedQuickProductValue(b.pinned) ? 1 : 0;
+
+      if (pinnedA !== pinnedB) return pinnedB - pinnedA;
+
+      if (pinnedA && pinnedB) {
+        const pinnedAtA = String(a.pinned_at || "");
+        const pinnedAtB = String(b.pinned_at || "");
+
+        if (pinnedAtA !== pinnedAtB) return pinnedAtB.localeCompare(pinnedAtA);
+      }
+
+      const sortA = readQuickProductSortNumber(a.sort_order ?? a.display_order);
+      const sortB = readQuickProductSortNumber(b.sort_order ?? b.display_order);
+
+      if (sortA !== sortB) return sortA - sortB;
+
+      return String(b.created_at || b.updated_at || b.id).localeCompare(String(a.created_at || a.updated_at || a.id));
+    });
   }, [broadcastProducts, groupBuyQuickProductsFromCatalog]);
 
   const visibleQuickGroupBuyProducts = showAllGroupBuyQuickProducts

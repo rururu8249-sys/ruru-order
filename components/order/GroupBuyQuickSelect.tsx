@@ -17,6 +17,13 @@ export type GroupBuyQuickSelectProduct = {
   detail_image_urls?: unknown;
   images?: unknown;
   product_images?: unknown;
+  is_pinned?: boolean | string | number | null;
+  pinned?: boolean | string | number | null;
+  pinned_at?: string | null;
+  sort_order?: number | string | null;
+  display_order?: number | string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 type Props = {
@@ -39,6 +46,7 @@ function formatWon(value: unknown) {
 }
 
 function getDeliveryLabel(product: GroupBuyQuickSelectProduct) {
+  const pinnedPrefix = isPinnedProduct(product) ? "📌 상단 · " : "";
   const value = String(product.shipping_type ?? "").trim().toLowerCase();
 
   if (
@@ -47,10 +55,10 @@ function getDeliveryLabel(product: GroupBuyQuickSelectProduct) {
     value.includes("direct") ||
     value.includes("업체")
   ) {
-    return "업체배송";
+    return `${pinnedPrefix}업체배송`;
   }
 
-  return "일반배송";
+  return `${pinnedPrefix}일반배송`;
 }
 
 function getImageUrl(product: GroupBuyQuickSelectProduct) {
@@ -59,6 +67,19 @@ function getImageUrl(product: GroupBuyQuickSelectProduct) {
 
 function hasPrice(product: GroupBuyQuickSelectProduct) {
   return toNumber(product.price) > 0;
+}
+
+function readBooleanFlag(value: unknown) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+
+  const text = String(value ?? "").trim().toLowerCase();
+
+  return ["true", "1", "y", "yes", "상단", "고정"].includes(text);
+}
+
+function isPinnedProduct(product: GroupBuyQuickSelectProduct) {
+  return readBooleanFlag(product.is_pinned) || readBooleanFlag(product.pinned);
 }
 
 function normalizeText(value: unknown) {
