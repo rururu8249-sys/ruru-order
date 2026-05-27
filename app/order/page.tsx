@@ -563,7 +563,7 @@ export default function OrderPage() {
     }, 350);
 
     return () => window.clearTimeout(timer);
-  }, [customerPhone, combineShippingSettings.enabled, combineShippingSettings.startAt, combineShippingSettings.endAt]);
+  }, [customerPhone, zipcode, address, detailAddress, combineShippingSettings.enabled, combineShippingSettings.startAt, combineShippingSettings.endAt]);
 
 
   const loadOrderSettings = async () => {
@@ -666,6 +666,19 @@ export default function OrderPage() {
     if (nextPhone || nextNickname || nextName || nextAddress) {
       setHasSavedInfo(true);
       setCustomerMode("load");
+    }
+
+    if (nextAddress || nextDetailAddress) {
+      setCustomerNotice({
+        type: "info",
+        message: [
+          "기존 저장 주소를 불러왔습니다.",
+          "주소가 다르면 반드시 정보수정 후 주문해주세요.",
+          [nextAddress, nextDetailAddress].filter(Boolean).join(" "),
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      });
     }
 
     return Boolean(nextNickname && nextPhone);
@@ -778,15 +791,52 @@ export default function OrderPage() {
     return nextSettings;
   };
 
+  const normalizeShippingAddressPart = (value: unknown) =>
+    String(value || "")
+      .replace(/\s+/g, " ")
+      .replace(/[-‐-‒–—―]/g, "-")
+      .trim();
+
+  const hashShippingAddressText = (value: string) => {
+    let hash = 0;
+
+    for (let index = 0; index < value.length; index += 1) {
+      hash = (hash * 31 + value.charCodeAt(index)) | 0;
+    }
+
+    return Math.abs(hash).toString(36);
+  };
+
+  const getShippingAddressSignature = (
+    zipcodeValue: unknown,
+    addressValue: unknown,
+    detailAddressValue: unknown,
+  ) => {
+    const normalized = [
+      normalizeShippingAddressPart(zipcodeValue),
+      normalizeShippingAddressPart(addressValue),
+      normalizeShippingAddressPart(detailAddressValue),
+    ]
+      .filter(Boolean)
+      .join("|");
+
+    return normalized ? hashShippingAddressText(normalized) : "";
+  };
+
+  const currentShippingAddressSignature = getShippingAddressSignature(zipcode, address, detailAddress);
+
   const getCombineShippingLocalKey = (
     phoneValue: string,
-    settings: CombineShippingSettings
+    settings: CombineShippingSettings,
+    addressSignature = currentShippingAddressSignature,
   ) => {
     const cleanPhone = normalizePhone(phoneValue);
+    const safeAddressSignature = addressSignature || "no-address";
 
     return [
-      "ruru_combine_shipping_paid",
+      "ruru_combine_shipping_paid_v2",
       cleanPhone,
+      safeAddressSignature,
       settings.startAt || "no_start",
       settings.endAt || "no_end",
     ].join(":");
@@ -794,11 +844,12 @@ export default function OrderPage() {
 
   const hasPaidShippingInThisBrowser = (
     phoneValue: string,
-    settings: CombineShippingSettings
+    settings: CombineShippingSettings,
+    addressSignature = currentShippingAddressSignature,
   ) => {
     if (typeof window === "undefined") return false;
 
-    const key = getCombineShippingLocalKey(phoneValue, settings);
+    const key = getCombineShippingLocalKey(phoneValue, settings, addressSignature);
     const savedValue = window.localStorage.getItem(key);
 
     if (savedValue !== "Y") return false;
@@ -812,7 +863,8 @@ export default function OrderPage() {
 
   const markPaidShippingInThisBrowser = (
     phoneValue: string,
-    settings: CombineShippingSettings
+    settings: CombineShippingSettings,
+    addressSignature = currentShippingAddressSignature,
   ) => {
     if (typeof window === "undefined") return;
 
@@ -820,16 +872,18 @@ export default function OrderPage() {
 
     if (cleanPhone.length < 10) return;
     if (!settings.startAt || !settings.endAt) return;
+    if (!addressSignature) return;
 
-    const key = getCombineShippingLocalKey(cleanPhone, settings);
+    const key = getCombineShippingLocalKey(cleanPhone, settings, addressSignature);
 
     window.localStorage.setItem(key, "Y");
   };
 
   const checkAlreadyPaidShipping = async (phoneValue = customerPhone) => {
     const cleanPhone = normalizePhone(phoneValue);
+    const addressSignature = currentShippingAddressSignature;
 
-    if (cleanPhone.length < 10) {
+    if (cleanPhone.length < 10 || !addressSignature) {
       setAlreadyPaidShipping(false);
       return false;
     }
@@ -843,21 +897,17 @@ export default function OrderPage() {
       endAt: lookupWindow.endAt,
     };
 
-    if (hasPaidShippingInThisBrowser(cleanPhone, settings)) {
+    if (hasPaidShippingInThisBrowser(cleanPhone, settings, addressSignature)) {
       setAlreadyPaidShipping(true);
       return true;
     }
 
-    const formattedPhone =
-      cleanPhone.length === 11
-        ? `${cleanPhone.slice(0, 3)}-${cleanPhone.slice(3, 7)}-${cleanPhone.slice(7, 11)}`
-        : cleanPhone;
-
-    const phoneValues = Array.from(new Set([cleanPhone, formattedPhone]));
+    const formattedPhone = formatOrderPhone(cleanPhone);
+    const phoneValues = Array.from(new Set([cleanPhone, formattedPhone].filter(Boolean)));
 
     const { data, error } = await supabase
       .from("orders")
-      .select("id, customer_phone, shipping_fee, adjusted_shipping_fee, order_manage_status, created_at")
+      .select("id, customer_phone, shipping_fee, adjusted_shipping_fee, order_manage_status, created_at, zipcode, address, detail_address")
       .in("customer_phone", phoneValues)
       .gte("created_at", settings.startAt)
       .lte("created_at", settings.endAt)
@@ -869,16 +919,25 @@ export default function OrderPage() {
       return false;
     }
 
-    const hasShipping = (data || []).some((order: any) => hasPaidShippingFee(order));
+    const hasShipping = (data || []).some((order: any) => {
+      if (!hasPaidShippingFee(order)) return false;
+
+      const orderAddressSignature = getShippingAddressSignature(
+        order.zipcode,
+        order.address,
+        order.detail_address,
+      );
+
+      return Boolean(orderAddressSignature && orderAddressSignature === addressSignature);
+    });
 
     if (hasShipping) {
-      markPaidShippingInThisBrowser(cleanPhone, settings);
+      markPaidShippingInThisBrowser(cleanPhone, settings, addressSignature);
     }
 
     setAlreadyPaidShipping(hasShipping);
     return hasShipping;
   };
-
 
   const logoutCustomerInfo = () => {
 
