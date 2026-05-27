@@ -1030,8 +1030,12 @@ export default function OrderPage() {
       setCustomerNotice({
         type: "info",
         message: [
-          "기존 저장 배송지를 불러왔습니다.",
-          "배송지가 다르면 주문 전에 반드시 정보수정에서 주소를 먼저 변경해주세요.",
+          "저장된 배송지",
+          `닉네임: ${nextNickname || "-"}`,
+          `이름: ${nextName || "-"}`,
+          `전화번호: ${nextPhone || "-"}`,
+          `주소: ${[nextAddress, nextDetailAddress].filter(Boolean).join(" ") || "-"}`,
+          "주소가 다르면 주문 전 [정보수정]에서 변경해주세요.",
           "이미 제출한 주문의 배송지 변경은 요청사항 또는 카톡채널로 남겨주세요.",
           [nextAddress, nextDetailAddress].filter(Boolean).join(" "),
         ]
@@ -2576,7 +2580,7 @@ export default function OrderPage() {
                 <span>
                   [필수] 개인정보 수집·이용 및 배송정보 제공 안내를 확인했습니다.
                   <br />
-                  <span className="text-slate-500">최초 1회 동의 후 다음 주문부터는 다시 표시되지 않습니다.</span>
+                  <span className="text-slate-500">한 번 동의하면 다음부터 다시 묻지 않습니다.</span>
                 </span>
               </label>
             )}
