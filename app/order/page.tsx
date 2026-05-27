@@ -1913,6 +1913,10 @@ export default function OrderPage() {
     updateItem(index, "shipping_type", product.shipping_type || "일반");
     updateItem(index, "combine_shipping", product.combine_shipping || "Y");
 
+    if (toNumber(items[index]?.qty) <= 0) {
+      updateItem(index, "qty", "1");
+    }
+
     if (Number.isFinite(productPrice) && productPrice > 0) {
       updateItem(index, "product_price", String(Math.round(productPrice)));
     } else {
@@ -1934,13 +1938,33 @@ export default function OrderPage() {
 
     const productPrice = Number(product.price || 0);
     const nextProductPrice = Number.isFinite(productPrice) && productPrice > 0 ? String(Math.round(productPrice)) : "";
+    const productColor = pickRegisteredProductOptionText(product, [
+      "color",
+      "colors",
+      "product_color",
+      "product_colors",
+      "color_option",
+      "color_options",
+      "option_color",
+    ]);
+    const productSize = pickRegisteredProductOptionText(product, [
+      "size",
+      "sizes",
+      "product_size",
+      "product_sizes",
+      "size_option",
+      "size_options",
+      "option_size",
+    ]);
 
     const nextItem: OrderItem = {
       product_name: product.product_name,
-      color: "",
-      size: "",
+      color: productColor || "없음",
+      size: productSize || "없음",
       qty: "1",
       product_price: nextProductPrice,
+      shipping_type: product.shipping_type || "일반",
+      combine_shipping: product.combine_shipping || "Y",
     };
 
     setItems((prev) => [...prev, nextItem]);
