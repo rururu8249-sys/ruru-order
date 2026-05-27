@@ -729,7 +729,7 @@ export default function QuickProductFastForm({
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-hidden px-5 py-4">
-        <div className="grid min-h-0 content-start grid-rows-[324px_72px_118px_205px] gap-4">
+        <div className="grid h-full min-h-0 grid-rows-[238px_64px_92px_minmax(334px,1fr)] gap-3">
           <section className="grid min-h-0 items-center grid-cols-[180px_minmax(0,1fr)] gap-4 rounded-2xl border border-slate-200 bg-white p-3">
             <ImagePicker
               label="대표사진"
@@ -772,7 +772,7 @@ export default function QuickProductFastForm({
                   value={description}
                   onChange={(event) => setDescription(normalizeTextareaText(event.target.value))}
                   placeholder="소재, 핏, 주의사항, 교환/환불 안내"
-                  className="h-[210px] w-full resize-none rounded-xl border border-slate-200 p-2.5 text-xs font-bold leading-5 outline-none focus:border-blue-400"
+                  className="h-[136px] w-full resize-none rounded-xl border border-slate-200 p-2.5 text-xs font-bold leading-5 outline-none focus:border-blue-400"
                 />
               </label>
 
@@ -982,7 +982,7 @@ export default function QuickProductFastForm({
               </div>
             </div>
 
-            <div className="grid min-h-0 grid-cols-[210px_minmax(0,1fr)] gap-3">
+            <div className="grid min-h-0 grid-cols-[178px_minmax(0,1fr)] gap-3">
               <div className="flex h-[58px] items-center gap-2 rounded-xl bg-slate-50 px-3">
                 <span className="text-xs font-bold text-slate-500">전체 재고</span>
                 <input
@@ -995,18 +995,18 @@ export default function QuickProductFastForm({
               </div>
 
               <div className="min-h-0 overflow-hidden rounded-xl border border-slate-100">
-                <div className="grid grid-cols-[1fr_1fr_72px] bg-slate-50 px-3 py-1.5 text-[10px] font-black text-slate-400">
+                <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_104px] bg-slate-50 px-3 py-1.5 text-[10px] font-black text-slate-400">
                   <div>색상</div>
                   <div>사이즈</div>
                   <div className="text-right">재고</div>
                 </div>
 
-                <div className="max-h-[118px] overflow-y-auto">
+                <div className="max-h-[240px] overflow-y-auto">
                   {stockMode === "option" && resolvedVariantRows.length > 0 ? (
                     resolvedVariantRows.slice(0, 12).map((row) => (
                       <div
                         key={row.key}
-                        className="grid grid-cols-[1fr_1fr_72px] items-center border-t border-slate-100 px-3 py-1"
+                        className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_104px] items-center border-t border-slate-100 px-3 py-1"
                       >
                         <div className="truncate text-[11px] font-bold text-slate-700">{row.color}</div>
                         <div className="truncate text-[11px] font-bold text-slate-700">{row.size}</div>
