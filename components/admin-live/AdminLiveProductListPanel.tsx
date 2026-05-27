@@ -17,7 +17,9 @@ type StatusInfo = {
   className: string;
 };
 
-const DEFAULT_PAGE_SIZE = 4;
+const DEFAULT_PAGE_SIZE = 5;
+
+type ProductListFilter = "visible" | "hidden" | "all";
 
 function pickString(row: ProductRow | null | undefined, keys: string[], fallback = "") {
   if (!row) return fallback;
@@ -401,6 +403,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [listFilter, setListFilter] = useState<ProductListFilter>("visible");
   const [selectedProduct, setSelectedProduct] = useState<ProductRow | null>(null);
   const [previewImage, setPreviewImage] = useState("");
   const [showProductDetailList, setShowProductDetailList] = useState(false);
@@ -472,10 +475,59 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
     );
   }, [products]);
 
-  const totalPages = Math.max(1, Math.ceil(products.length / DEFAULT_PAGE_SIZE));
+  const productListSummary = useMemo(() => {
+    const hidden = products.filter((product) => statusInfo(product).label === "숨김").length;
+    const soldout = products.filter((product) => statusInfo(product).label === "품절").length;
+    const visible = products.filter((product) => statusInfo(product).label !== "숨김").length;
+
+    return {
+      visible,
+      hidden,
+      soldout,
+      all: products.length,
+    };
+  }, [products]);
+
+  const listFilteredProducts = useMemo(() => {
+    if (listFilter === "hidden") {
+      return products.filter((product) => statusInfo(product).label === "숨김");
+    }
+
+    if (listFilter === "all") {
+      return products;
+    }
+
+    return products.filter((product) => statusInfo(product).label !== "숨김");
+  }, [listFilter, products]);
+
+  const totalPages = Math.max(1, Math.ceil(listFilteredProducts.length / DEFAULT_PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
   const pageStart = (safePage - 1) * DEFAULT_PAGE_SIZE;
-  const visibleProducts = products.slice(pageStart, pageStart + DEFAULT_PAGE_SIZE);
+  const visibleProducts = listFilteredProducts.slice(pageStart, pageStart + DEFAULT_PAGE_SIZE);
+
+  const paginationPages = useMemo(() => {
+    const pages: Array<number | "ellipsis"> = [];
+
+    if (totalPages <= 5) {
+      for (let page = 1; page <= totalPages; page += 1) pages.push(page);
+      return pages;
+    }
+
+    pages.push(1);
+
+    const start = Math.max(2, safePage - 1);
+    const end = Math.min(totalPages - 1, safePage + 1);
+
+    if (start > 2) pages.push("ellipsis");
+
+    for (let page = start; page <= end; page += 1) pages.push(page);
+
+    if (end < totalPages - 1) pages.push("ellipsis");
+
+    pages.push(totalPages);
+
+    return pages;
+  }, [safePage, totalPages]);
 
   const detailProducts = useMemo(() => {
     const keyword = detailSearchText.trim().toLowerCase();
@@ -562,7 +614,42 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
           </div>
 
           <div className="shrink-0 py-2 text-[11px] font-black text-slate-500">
-            {products.length === 0 ? "0개" : `${pageStart + 1}-${Math.min(pageStart + DEFAULT_PAGE_SIZE, products.length)} / ${products.length}개`}
+          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
+            {([
+              { key: "visible", label: "노출상품", count: productListSummary.visible },
+              { key: "hidden", label: "숨김상품", count: productListSummary.hidden },
+              { key: "all", label: "전체상품", count: productListSummary.all },
+            ] as const).map((filter) => (
+              <button
+                key={filter.key}
+                type="button"
+                onClick={() => {
+                  setListFilter(filter.key);
+                  setCurrentPage(1);
+                }}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-black transition ${
+                  listFilter === filter.key
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100"
+                }`}
+              >
+                <span>{filter.label}</span>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs ${
+                    listFilter === filter.key ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {filter.count}
+                </span>
+              </button>
+            ))}
+
+            <div className="ml-auto hidden text-xs font-black text-slate-500 md:block">
+              기본은 노출상품만 표시 · 한 페이지 5개
+            </div>
+          </div>
+
+            {listFilteredProducts.length === 0 ? "0개" : `${pageStart + 1}-${Math.min(pageStart + DEFAULT_PAGE_SIZE, listFilteredProducts.length)} / ${listFilteredProducts.length}개`}
           </div>
 
           <div className="min-h-0 flex-1 overflow-hidden">
@@ -627,6 +714,30 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                       </div>
 
                       <div className="flex justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!product.id) return;
+                              const currentStatus = String(product.status || "판매중");
+                              const nextStatus = currentStatus === "숨김" ? "판매중" : "숨김";
+                              const { error } = await supabase.from("products").update({ status: nextStatus }).eq("id", product.id);
+
+                              if (error) {
+                                alert("상품 노출 변경 실패\n" + error.message);
+                                return;
+                              }
+
+                              await loadProducts();
+                            }}
+                            className={`rounded-xl px-3 py-2 text-xs font-black transition ${
+                              String(product.status || "판매중") === "숨김"
+                                ? "bg-slate-100 text-slate-500 ring-1 ring-slate-200"
+                                : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+                            }`}
+                          >
+                            {String(product.status || "판매중") === "숨김" ? "노출OFF" : "노출ON"}
+                          </button>
+
 <button
                           type="button"
                           onClick={() => openQuickProductEdit(product)}
@@ -642,25 +753,42 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
             )}
           </div>
 
-          <div className="mt-3 flex shrink-0 items-center justify-center gap-2 border-t border-slate-100 pt-3">
+                    <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
             <button
               type="button"
               disabled={safePage <= 1}
               onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-              className="h-8 rounded-xl bg-slate-100 px-4 text-xs font-black text-slate-400 disabled:opacity-50"
+              className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-500 disabled:opacity-40"
             >
               이전
             </button>
 
-            <div className="flex h-8 min-w-8 items-center justify-center rounded-xl bg-blue-600 px-3 text-xs font-black text-white">
-              {safePage}
-            </div>
+            {paginationPages.map((pageItem, index) =>
+              pageItem === "ellipsis" ? (
+                <span key={`ellipsis-${index}`} className="px-2 text-sm font-black text-slate-400">
+                  ...
+                </span>
+              ) : (
+                <button
+                  key={pageItem}
+                  type="button"
+                  onClick={() => setCurrentPage(pageItem)}
+                  className={`h-10 min-w-10 rounded-xl px-3 text-sm font-black transition ${
+                    safePage === pageItem
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  {pageItem}
+                </button>
+              ),
+            )}
 
             <button
               type="button"
               disabled={safePage >= totalPages}
               onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-              className="h-8 rounded-xl bg-slate-100 px-4 text-xs font-black text-slate-400 disabled:opacity-50"
+              className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-500 disabled:opacity-40"
             >
               다음
             </button>
