@@ -759,13 +759,20 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
 
             <div className="grid grid-cols-[220px_minmax(0,1fr)] gap-5 p-6">
               <div>
-                <div className="flex h-[220px] items-center justify-center overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
+                <button
+                  type="button"
+                  disabled={!selectedImage}
+                  onClick={() => {
+                    if (selectedImage) setPreviewImage(selectedImage);
+                  }}
+                  className="flex h-[220px] w-full items-center justify-center overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200 hover:ring-blue-300 disabled:cursor-default disabled:hover:ring-slate-200"
+                >
                   {selectedImage ? (
                     <img src={selectedImage} alt="" className="h-full w-full object-cover" />
                   ) : (
                     <span className="text-sm font-black text-slate-400">사진 없음</span>
                   )}
-                </div>
+                </button>
 
                 <div className="mt-3 grid grid-cols-2 gap-2 text-center">
                   <div className="rounded-xl bg-slate-50 px-3 py-2">
