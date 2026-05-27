@@ -177,6 +177,66 @@ function sizeSummary(product: ProductRow) {
   return sizes.length > 0 ? sizes.join(", ") : "사이즈없음";
 }
 
+type ProductVariantStockRow = {
+  key: string;
+  color: string;
+  size: string;
+  stock: number;
+};
+
+function parseProductNote(product: ProductRow) {
+  const raw = product.product_note ?? product.productNote ?? product.note ?? null;
+
+  if (!raw) return null;
+
+  if (typeof raw === "object" && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>;
+  }
+
+  if (typeof raw === "string" && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw);
+
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function productVariantStocks(product: ProductRow): ProductVariantStockRow[] {
+  const note = parseProductNote(product);
+  const variants = note?.stock_variants;
+
+  if (!Array.isArray(variants)) return [];
+
+  return variants
+    .map((row, index) => {
+      if (!row || typeof row !== "object" || Array.isArray(row)) return null;
+
+      const item = row as Record<string, unknown>;
+      const color = pickString(item, ["color"], "옵션없음");
+      const size = pickString(item, ["size"], "옵션없음");
+      const stock = pickNumber(item, ["stock"], 0);
+
+      return {
+        key: `${color}__${size}__${index}`,
+        color,
+        size,
+        stock,
+      };
+    })
+    .filter((row): row is ProductVariantStockRow => Boolean(row));
+}
+
+function variantStockCount(product: ProductRow) {
+  return productVariantStocks(product).length;
+}
+
 function stockSummary(product: ProductRow) {
   const stock = pickNumber(product, ["stock", "total_stock"], 0);
 
@@ -385,6 +445,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
 
   const selectedImage = selectedProduct ? mainImage(selectedProduct) : "";
   const selectedDetailImages = selectedProduct ? productDetailImages(selectedProduct) : [];
+  const selectedVariantStocks = selectedProduct ? productVariantStocks(selectedProduct) : [];
   const selectedStatus = selectedProduct ? statusInfo(selectedProduct) : null;
 
   return (
@@ -660,7 +721,14 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                           </div>
 
                           <div className="text-center text-xs font-black text-slate-600">{productTypeLabel(product)}</div>
-                          <div className="text-center text-xs font-black text-slate-600">{stockSummary(product)}</div>
+                          <div className="text-center text-xs font-black text-slate-600">
+                            <div>{stockSummary(product)}</div>
+                            {variantStockCount(product) > 0 ? (
+                              <div className="mt-0.5 text-[10px] font-black text-blue-600">
+                                옵션 {variantStockCount(product)}개
+                              </div>
+                            ) : null}
+                          </div>
 
                           <div className="flex justify-end gap-1">
                             <button
@@ -824,6 +892,38 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                     </div>
                   </div>
                 </div>
+
+                {selectedVariantStocks.length > 0 ? (
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <div className="text-[11px] font-black text-slate-400">옵션별 재고</div>
+                      <div className="text-[10px] font-black text-slate-400">
+                        {selectedVariantStocks.length.toLocaleString("ko-KR")}개 옵션
+                      </div>
+                    </div>
+
+                    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                      <div className="grid grid-cols-[1fr_1fr_72px] bg-slate-50 px-3 py-1.5 text-[10px] font-black text-slate-400">
+                        <div>색상</div>
+                        <div>사이즈</div>
+                        <div className="text-right">재고</div>
+                      </div>
+
+                      <div className="max-h-[132px] overflow-y-auto">
+                        {selectedVariantStocks.map((row) => (
+                          <div
+                            key={row.key}
+                            className="grid grid-cols-[1fr_1fr_72px] items-center border-t border-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700"
+                          >
+                            <div className="truncate">{row.color}</div>
+                            <div className="truncate">{row.size}</div>
+                            <div className="text-right font-black">{row.stock.toLocaleString("ko-KR")}개</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <div className="text-[11px] font-black text-slate-400">상세설명</div>
