@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { showAdminToast } from "@/lib/adminToast";
 import { resolveProductImageUrl } from "./productImageUrl";
+import { compressProductImage } from "./compressProductImage";
 
 type ImageValue = string | string[] | null;
 
@@ -100,8 +101,9 @@ export default function QuickProductImageDropzone({
   };
 
   const uploadFile = async (file: File) => {
+    const optimizedFile = await compressProductImage(file, uploadKind);
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", optimizedFile);
     formData.append("kind", uploadKind);
     formData.append("type", uploadKind);
     formData.append("imageType", uploadKind);

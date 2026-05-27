@@ -4,6 +4,7 @@ import { ChangeEvent, DragEvent, useEffect, useMemo, useRef, useState } from "re
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import { resolveProductImageUrl } from "./productImageUrl";
+import { compressProductImage } from "./compressProductImage";
 
 type ProductRow = Record<string, unknown>;
 
@@ -327,8 +328,9 @@ function ImagePicker({
       const uploaded: string[] = [];
 
       for (const file of safeFiles.slice(0, maxFiles)) {
+        const optimizedFile = await compressProductImage(file, uploadKind);
         const formData = new FormData();
-        formData.append("file", file);
+        formData.append("file", optimizedFile);
         formData.append("kind", uploadKind);
 
         const response = await fetch("/api/admin-live/product-images/upload", {
