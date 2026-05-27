@@ -1,5 +1,3 @@
-type OrderProductInputGuideDetailProps = Record<string, unknown>;
-
-export default function OrderProductInputGuideDetail(_props: OrderProductInputGuideDetailProps) {
+export default function OrderProductInputGuideDetail() {
   return null;
 }
