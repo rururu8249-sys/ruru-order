@@ -240,7 +240,7 @@ function QuickProductCard({
           onClick={onDetail}
           className="block w-full text-left"
         >
-          <ProductThumbnail product={product} className="mb-1.5 aspect-square h-auto w-full" />
+          <ProductThumbnail product={product} className="mx-auto mb-1.5 h-12 w-12" />
 
           <div className="line-clamp-1 text-[12px] font-black leading-4 tracking-[-0.04em] text-gray-950">
             {product.product_name}
@@ -254,7 +254,7 @@ function QuickProductCard({
         <button
           type="button"
           onClick={onSelect}
-          className="mt-1.5 h-8 w-full rounded-xl bg-blue-600 text-[12px] font-black text-white shadow-sm"
+          className="mt-1 h-7 w-full rounded-xl bg-blue-600 text-[11px] font-black text-white shadow-sm"
         >
           선택
         </button>
@@ -270,7 +270,7 @@ function QuickProductCard({
           onClick={onDetail}
           className="shrink-0 text-left"
         >
-          <ProductThumbnail product={product} className="h-[82px] w-[82px]" />
+          <ProductThumbnail product={product} className="h-[72px] w-[72px]" />
         </button>
 
         <div className="min-w-0 flex-1">
@@ -290,14 +290,14 @@ function QuickProductCard({
             <button
               type="button"
               onClick={onDetail}
-              className="h-9 rounded-xl border border-slate-200 bg-white text-[12px] font-black text-slate-700"
+              className="h-8 rounded-xl border border-slate-200 bg-white text-[12px] font-black text-slate-700"
             >
               상세보기
             </button>
             <button
               type="button"
               onClick={onSelect}
-              className="h-9 rounded-xl bg-blue-600 text-[12px] font-black text-white shadow-sm"
+              className="h-8 rounded-xl bg-blue-600 text-[12px] font-black text-white shadow-sm"
             >
               선택
             </button>
@@ -515,15 +515,7 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
           </div>
         </div>
 
-        <div
-          className={
-            products.length > 2
-              ? "grid grid-cols-[minmax(0,2fr)_minmax(88px,1fr)_52px] gap-2"
-              : products.length > 1
-                ? "grid grid-cols-[minmax(0,2fr)_minmax(88px,1fr)] gap-2"
-                : "grid grid-cols-1"
-          }
-        >
+        <div className="grid grid-cols-[minmax(0,2fr)_minmax(88px,1fr)_52px] gap-2">
           {quickProducts[0] ? (
             <QuickProductCard
               key={`quick-group-buy-feature-${String(quickProducts[0].id)}`}
@@ -552,7 +544,7 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
                 setCurrentPage(1);
                 setSheetOpen(true);
               }}
-              className="flex min-h-[106px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-200 bg-white/70 px-1 text-center text-[12px] font-black tracking-[-0.04em] text-blue-600"
+              className="flex min-h-[96px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-200 bg-white/70 px-1 text-center text-[11px] font-black tracking-[-0.04em] text-blue-600"
             >
               <span className="text-xl leading-none">+</span>
               <span className="mt-1">더보기</span>
