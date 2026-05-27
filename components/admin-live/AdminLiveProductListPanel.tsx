@@ -17,7 +17,7 @@ type StatusInfo = {
   className: string;
 };
 
-const DEFAULT_PAGE_SIZE = 5;
+const DEFAULT_PAGE_SIZE = 4;
 
 type ProductListFilter = "visible" | "hidden" | "all";
 
@@ -561,6 +561,30 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
   const detailPageStart = (detailSafePage - 1) * detailPageSize;
   const detailVisibleProducts = detailProducts.slice(detailPageStart, detailPageStart + detailPageSize);
 
+  const detailPaginationPages = useMemo(() => {
+    const pages: Array<number | "ellipsis"> = [];
+
+    if (detailTotalPages <= 5) {
+      for (let page = 1; page <= detailTotalPages; page += 1) pages.push(page);
+      return pages;
+    }
+
+    pages.push(1);
+
+    const start = Math.max(2, detailSafePage - 1);
+    const end = Math.min(detailTotalPages - 1, detailSafePage + 1);
+
+    if (start > 2) pages.push("ellipsis");
+
+    for (let page = start; page <= end; page += 1) pages.push(page);
+
+    if (end < detailTotalPages - 1) pages.push("ellipsis");
+
+    pages.push(detailTotalPages);
+
+    return pages;
+  }, [detailSafePage, detailTotalPages]);
+
   const selectedImage = selectedProduct ? mainImage(selectedProduct) : "";
   const selectedDetailImages = selectedProduct ? productDetailImages(selectedProduct) : [];
   const selectedVariantStocks = selectedProduct ? productVariantStocks(selectedProduct) : [];
@@ -592,7 +616,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                 onClick={openQuickProductCreate}
                 className="h-9 rounded-xl bg-blue-600 px-4 text-xs font-black text-white shadow-sm hover:bg-blue-700"
               >
-                + 상품등록
+                + 빠른등록
               </button>
 
               <button
@@ -614,7 +638,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
           </div>
 
           <div className="shrink-0 py-2 text-[11px] font-black text-slate-500">
-          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 rounded-2xl border border-slate-200 bg-slate-50 p-1.5">
             {([
               { key: "visible", label: "노출상품", count: productListSummary.visible },
               { key: "hidden", label: "숨김상품", count: productListSummary.hidden },
@@ -627,7 +651,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                   setListFilter(filter.key);
                   setCurrentPage(1);
                 }}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-black transition ${
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
                   listFilter === filter.key
                     ? "bg-blue-600 text-white shadow-sm"
                     : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100"
@@ -635,7 +659,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
               >
                 <span>{filter.label}</span>
                 <span
-                  className={`rounded-full px-2 py-0.5 text-xs ${
+                  className={`rounded-full px-2 py-0.5 text-[11px] ${
                     listFilter === filter.key ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
                   }`}
                 >
@@ -643,10 +667,6 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                 </span>
               </button>
             ))}
-
-            <div className="ml-auto hidden text-xs font-black text-slate-500 md:block">
-              기본은 노출상품만 표시 · 한 페이지 5개
-            </div>
           </div>
 
             {listFilteredProducts.length === 0 ? "0개" : `${pageStart + 1}-${Math.min(pageStart + DEFAULT_PAGE_SIZE, listFilteredProducts.length)} / ${listFilteredProducts.length}개`}
@@ -667,7 +687,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
               <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 text-center text-xs font-bold leading-5 text-slate-400">
                 등록된 상품이 없습니다.
                 <br />
-                + 상품등록으로 상품을 먼저 추가하세요.
+                + 빠른등록으로 상품을 먼저 추가하세요.
               </div>
             ) : (
               <div className="divide-y divide-slate-100">
@@ -679,16 +699,16 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                   return (
                     <div
                       key={pickString(product, ["id", "product_id"], String(absoluteIndex))}
-                      className="grid grid-cols-[52px_minmax(0,1fr)_76px_64px] items-center gap-2 py-2.5"
+                      className="grid grid-cols-[36px_minmax(0,1fr)_54px_112px] items-center gap-2 py-1.5"
                     >
                       <div className="text-xs font-black text-slate-400">{absoluteIndex}</div>
 
                       <button
                         type="button"
                         onClick={() => setSelectedProduct(product)}
-                        className="grid min-w-0 grid-cols-[44px_minmax(0,1fr)] items-center gap-2 text-left"
+                        className="grid min-w-0 grid-cols-[40px_minmax(0,1fr)] items-center gap-2 text-left"
                       >
-                        <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
+                        <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
                           {image ? (
                             <img src={image} alt="" className="h-full w-full object-cover" />
                           ) : (
@@ -713,7 +733,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                         </span>
                       </div>
 
-                      <div className="flex justify-end gap-1">
+                      <div className="grid grid-cols-2 items-center gap-1">
                           <button
                             type="button"
                             onClick={async () => {
@@ -729,7 +749,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
 
                               await loadProducts();
                             }}
-                            className={`rounded-xl px-3 py-2 text-xs font-black transition ${
+                            className={`h-8 min-w-[54px] whitespace-nowrap rounded-lg px-2 text-[11px] font-black leading-none transition ${
                               String(product.status || "판매중") === "숨김"
                                 ? "bg-slate-100 text-slate-500 ring-1 ring-slate-200"
                                 : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
@@ -741,7 +761,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
 <button
                           type="button"
                           onClick={() => openQuickProductEdit(product)}
-                          className="h-8 rounded-lg bg-slate-100 px-2.5 text-[11px] font-black text-slate-600 hover:bg-slate-200"
+                          className="h-8 min-w-[44px] whitespace-nowrap rounded-lg bg-slate-100 px-2 text-[11px] font-black text-slate-600 hover:bg-slate-200"
                         >
                           수정
                         </button>
@@ -802,9 +822,6 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
             <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
                 <h3 className="text-lg font-black text-slate-950">등록상품 전체 상세리스트</h3>
-                <p className="mt-1 text-xs font-bold text-slate-500">
-                  등록된 상품 전체를 검색·필터로 확인하고 개별 상세/수정을 처리합니다.
-                </p>
               </div>
 
               <button
@@ -955,7 +972,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
               </div>
             </div>
 
-            <div className="flex shrink-0 items-center justify-center gap-2 border-t border-slate-200 px-6 py-4">
+            <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 border-t border-slate-200 px-6 py-4">
               <button
                 type="button"
                 disabled={detailSafePage <= 1}
@@ -965,9 +982,26 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                 이전
               </button>
 
-              <div className="flex h-9 min-w-9 items-center justify-center rounded-xl bg-blue-600 px-3 text-xs font-black text-white">
-                {detailSafePage}
-              </div>
+              {detailPaginationPages.map((pageItem, index) =>
+                pageItem === "ellipsis" ? (
+                  <span key={`detail-ellipsis-${index}`} className="px-2 text-xs font-black text-slate-400">
+                    ...
+                  </span>
+                ) : (
+                  <button
+                    key={pageItem}
+                    type="button"
+                    onClick={() => setDetailPage(pageItem)}
+                    className={`h-9 min-w-9 rounded-xl px-3 text-xs font-black transition ${
+                      detailSafePage === pageItem
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    {pageItem}
+                  </button>
+                ),
+              )}
 
               <button
                 type="button"
@@ -1008,9 +1042,6 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
                 <h3 className="text-lg font-black text-slate-950">등록상품 상세보기</h3>
-                <p className="mt-1 text-xs font-bold text-slate-500">
-                  수정 없이 등록된 상품 정보를 확인합니다.
-                </p>
               </div>
 
               <button
