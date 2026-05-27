@@ -1367,6 +1367,10 @@ export default function OrderPage() {
 
     
       showCustomerNotice("로그아웃되었습니다. 오늘도 좋은 하루 보내세요 😊", "success");
+
+    if (typeof window !== "undefined") {
+      window.location.replace("/home");
+    }
 };
 
   const startEditCustomerInfo = () => {
@@ -2574,7 +2578,13 @@ export default function OrderPage() {
                 <input
                   type="checkbox"
                   checked={privacyConsentChecked}
-                  onChange={(event) => setPrivacyConsentChecked(event.target.checked)}
+                  onChange={(event) => {
+                    const checked = event.target.checked;
+                    setPrivacyConsentChecked(checked);
+                    if (checked && typeof window !== "undefined") {
+                      window.localStorage.setItem(PRIVACY_CONSENT_STORAGE_KEY, PRIVACY_CONSENT_VERSION);
+                    }
+                  }}
                   className="mt-1 h-5 w-5 shrink-0 accent-blue-600"
                 />
                 <span>

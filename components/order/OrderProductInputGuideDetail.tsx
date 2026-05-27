@@ -31,13 +31,6 @@ export default function OrderProductInputGuideDetail({
         </div>
       )}
 
-      <div className="rounded-[1.2rem] bg-red-50 p-3 text-xs font-black leading-relaxed text-red-600 ring-1 ring-red-100">
-        상품 1개당 1칸씩 작성해주세요.
-        <br />
-        색상·사이즈가 없으면 “없음”으로 입력해주세요.
-        <br />
-        상품금액은 택배비를 제외한 상품 가격만 입력해주세요.
-      </div>
     </div>
   );
 }

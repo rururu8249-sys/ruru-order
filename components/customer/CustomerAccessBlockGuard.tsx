@@ -150,19 +150,7 @@ export default function CustomerAccessBlockGuard() {
   if (!shouldGuard) return null;
 
   if (state.checking) {
-    return (
-      <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black px-4 py-5 text-white">
-        <div className="flex min-h-dvh items-center justify-center">
-          <section className="w-full max-w-[360px] rounded-[24px] border border-yellow-400/70 bg-neutral-950 px-5 py-6 text-center shadow-2xl">
-            <div className="text-[11px] font-black tracking-[0.32em] text-yellow-300">RURU CHECK</div>
-            <h1 className="mt-3 text-[24px] font-black tracking-[-0.05em] text-white">루루동이 확인중</h1>
-            <p className="mt-3 text-[13px] font-bold leading-6 text-neutral-300">
-              고객정보와 접속 가능 상태를 확인하고 있습니다.
-            </p>
-          </section>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   if (!state.blocked) return null;
