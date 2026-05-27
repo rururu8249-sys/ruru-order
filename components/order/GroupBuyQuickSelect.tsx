@@ -223,25 +223,46 @@ function PriceAndDelivery({ product }: { product: GroupBuyQuickSelectProduct }) 
 
 function QuickProductCard({
   product,
+  onDetail,
   onSelect,
 }: {
   product: GroupBuyQuickSelectProduct;
+  onDetail: () => void;
   onSelect: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className="min-h-[132px] rounded-2xl bg-white p-2.5 text-left shadow-sm ring-1 ring-blue-100 transition active:scale-[0.99]"
-    >
-      <ProductThumbnail product={product} className="mb-2 h-14 w-full" />
+    <div className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-blue-100">
+      <button
+        type="button"
+        onClick={onDetail}
+        className="block w-full text-left"
+      >
+        <ProductThumbnail product={product} className="mb-2 aspect-square h-auto w-full" />
 
-      <div className="line-clamp-2 min-h-[36px] text-[13px] font-black leading-[18px] tracking-[-0.04em] text-gray-950">
-        {product.product_name}
+        <div className="line-clamp-2 min-h-[34px] text-[13px] font-black leading-[17px] tracking-[-0.04em] text-gray-950">
+          {product.product_name}
+        </div>
+
+        <PriceAndDelivery product={product} />
+      </button>
+
+      <div className="mt-2 grid grid-cols-2 gap-1.5 border-t border-slate-100 pt-2">
+        <button
+          type="button"
+          onClick={onDetail}
+          className="h-9 rounded-xl border border-slate-200 bg-white text-[12px] font-black text-slate-700"
+        >
+          상세보기
+        </button>
+        <button
+          type="button"
+          onClick={onSelect}
+          className="h-9 rounded-xl bg-blue-600 text-[12px] font-black text-white shadow-sm"
+        >
+          선택
+        </button>
       </div>
-
-      <PriceAndDelivery product={product} />
-    </button>
+    </div>
   );
 }
 
@@ -392,7 +413,7 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
   const [filterKey, setFilterKey] = useState<FilterKey>("all");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const quickProducts = products.slice(0, 3);
+  const quickProducts = products.slice(0, 2);
 
   const filteredProducts = useMemo(() => {
     const query = searchText.trim().toLowerCase();
@@ -452,27 +473,34 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div
+          className={
+            products.length > 2
+              ? "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_72px] gap-2"
+              : "grid grid-cols-2 gap-2"
+          }
+        >
           {quickProducts.map((product) => (
             <QuickProductCard
               key={`quick-group-buy-${String(product.id)}`}
               product={product}
+              onDetail={() => setDetailProduct(product)}
               onSelect={() => handleSelect(product)}
             />
           ))}
 
-          {products.length > 3 ? (
+          {products.length > 2 ? (
             <button
+              data-ruru-quick-more-button
               type="button"
               onClick={() => {
                 setCurrentPage(1);
                 setSheetOpen(true);
               }}
-              className="flex min-h-[132px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-200 bg-white/70 p-3 text-center text-base font-black tracking-[-0.04em] text-blue-600"
+              className="flex min-h-[154px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-200 bg-white/70 px-2 text-center text-[13px] font-black tracking-[-0.04em] text-blue-600"
             >
               <span className="text-2xl leading-none">+</span>
-              <span className="mt-2">공구상품</span>
-              <span>더보기</span>
+              <span className="mt-2">더보기</span>
             </button>
           ) : null}
         </div>
