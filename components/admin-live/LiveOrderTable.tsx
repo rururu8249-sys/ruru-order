@@ -623,8 +623,22 @@ export default function LiveOrderTable({
                         총 {getTotalQty(order)}개
                       </span>
                     </td>
-                    <td className="px-3 py-3 text-right font-black text-slate-700">{money(order.productAmount)}</td>
-                    <td className="px-3 py-3 text-right font-black text-slate-700">{money(order.shippingFee)}</td>
+                    <td className="px-3 py-3 text-right font-black text-slate-700">
+                      <div>{money(order.productAmount)}</div>
+                      {String((order as any).paymentMethod || "").includes("카드") && Number((order as any).cardPaymentTotalAmount || 0) > 0 ? (
+                        <div className="mt-1 text-[11px] font-black text-purple-700">
+                          카드총액 {money(Number((order as any).cardPaymentTotalAmount || 0))}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-3 text-right font-black text-slate-700">
+                      <div>{money(order.shippingFee)}</div>
+                      {String((order as any).paymentMethod || "").includes("카드") && Number((order as any).cardExtraAmount || 0) > 0 ? (
+                        <div className="mt-1 text-[11px] font-black text-purple-700">
+                          카드+ {money(Number((order as any).cardExtraAmount || 0))}
+                        </div>
+                      ) : null}
+                    </td>
                     <td className="px-3 py-3 text-center">
                       {order.paymentStatus === "manual_match_needed" && onOpenManualMatch ? (
                         <button

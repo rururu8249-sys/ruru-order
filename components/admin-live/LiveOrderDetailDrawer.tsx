@@ -181,15 +181,23 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   );
   const isCardPaymentDisplay = paymentMethodForCardDisplay.includes("카드");
   const cardPaymentExtraAmount =
-    Number(rawOrderForCardDisplay.vat_amount ?? rawOrderForCardDisplay.vatAmount ?? 0) || 0;
+    Number(
+      rawOrderForCardDisplay.cardExtraAmount ??
+        rawOrderForCardDisplay.card_extra_amount ??
+        rawOrderForCardDisplay.vat_amount ??
+        rawOrderForCardDisplay.vatAmount ??
+        0
+    ) || 0;
   const cardPaymentExpectedTotal =
     Number(
-      rawOrderForCardDisplay.final_amount ??
-        rawOrderForCardDisplay.finalAmount ??
+      rawOrderForCardDisplay.cardPaymentTotalAmount ??
+        rawOrderForCardDisplay.card_payment_total_amount ??
         rawOrderForCardDisplay.adjusted_total_price ??
         rawOrderForCardDisplay.adjustedTotalPrice ??
         rawOrderForCardDisplay.total_price ??
         rawOrderForCardDisplay.totalPrice ??
+        rawOrderForCardDisplay.final_amount ??
+        rawOrderForCardDisplay.finalAmount ??
         0
     ) ||
     productAmount + shippingFee + cardPaymentExtraAmount;

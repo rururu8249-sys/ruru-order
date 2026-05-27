@@ -117,6 +117,52 @@ function getPaymentStatus(group: OrderGroup): LiveOrderPaymentStatus {
   return "unpaid";
 }
 
+
+function isCardPaymentGroup(group: any) {
+  const first = Array.isArray(group?.rows) ? group.rows[0] : null;
+  const method = String(first?.payment_method ?? first?.paymentMethod ?? first?.payment_type ?? "");
+  return method.includes("카드");
+}
+
+function getGroupCardExtraAmount(group: any) {
+  const rows = Array.isArray(group?.rows) ? group.rows : [];
+  return rows.reduce((sum: number, row: any) => {
+    return sum + safeNumber(row.vat_amount ?? row.vatAmount ?? 0);
+  }, 0);
+}
+
+function getRowCardTotalAmount(row: any) {
+  return safeNumber(
+    row.adjusted_total_price ??
+      row.adjustedTotalPrice ??
+      row.total_price ??
+      row.totalPrice ??
+      row.final_amount ??
+      row.finalAmount ??
+      0
+  );
+}
+
+function getGroupCardPaymentTotalAmount(group: any) {
+  const rows = Array.isArray(group?.rows) ? group.rows : [];
+  const summedRowTotal = rows.reduce((sum: number, row: any) => {
+    return sum + getRowCardTotalAmount(row);
+  }, 0);
+
+  if (summedRowTotal > 0) return summedRowTotal;
+
+  return getGroupProductAmount(group) + getGroupShippingFee(group) + getGroupCardExtraAmount(group);
+}
+
+function getGroupDisplayTotalAmount(group: any) {
+  if (isCardPaymentGroup(group)) {
+    const cardTotal = getGroupCardPaymentTotalAmount(group);
+    if (cardTotal > 0) return cardTotal;
+  }
+
+  return safeNumber(group?.totalAmount ?? 0);
+}
+
 function getGroupShippingFee(group: OrderGroup) {
   return group.rows.reduce((sum, row) => {
     const fee = row.adjusted_shipping_fee ?? row.shipping_fee ?? 0;
@@ -216,7 +262,9 @@ export function toAdminLiveOrder(group: OrderGroup): LiveOrder {
     orderSummary: buildItemSummary(group),
     productAmount: getGroupProductAmount(group),
     shippingFee: getGroupShippingFee(group),
-    totalAmount: group.totalAmount,
+    totalAmount: getGroupDisplayTotalAmount(group),
+    cardExtraAmount: getGroupCardExtraAmount(group),
+    cardPaymentTotalAmount: getGroupCardPaymentTotalAmount(group),
     memo: getMemo(group),
     deliveryMemo: getShippingRequestMemo(first) || "",
     items,

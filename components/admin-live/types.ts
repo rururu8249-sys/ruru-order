@@ -74,6 +74,8 @@ export type LiveOrder = {
   productAmount: number;
   shippingFee: number;
   totalAmount: number;
+  cardExtraAmount?: number;
+  cardPaymentTotalAmount?: number;
   memo: string;
   deliveryMemo?: string | null;
   items: LiveOrderItem[];
