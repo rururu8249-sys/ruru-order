@@ -581,7 +581,6 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                       className="grid grid-cols-[52px_minmax(0,1fr)_76px_64px] items-center gap-2 py-2.5"
                     >
                       <div className="text-xs font-black text-slate-400">{absoluteIndex}</div>
-                          <ProductFeatureBadges product={product} />
 
                       <button
                         type="button"
@@ -603,6 +602,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                           <div className="mt-0.5 truncate text-[11px] font-bold text-slate-500">
                             {money(productPrice(product))} · {colorSummary(product)} / {sizeSummary(product)}
                           </div>
+                          <ProductFeatureBadges product={product} />
                         </div>
                       </button>
 
@@ -762,6 +762,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                               <div className="mt-0.5 truncate text-xs font-bold text-slate-500">
                                 {colorSummary(product)} / {sizeSummary(product)} · {shippingLabel(product)}
                               </div>
+                              <ProductFeatureBadges product={product} />
                             </div>
                           </button>
 
@@ -776,7 +777,6 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                           <div className="text-center text-xs font-black text-slate-600">{productTypeLabel(product)}</div>
                           <div className="text-center text-xs font-black text-slate-600">
                             <div>{stockSummary(product)}</div>
-                          <ProductFeatureBadges product={product} />
                             {variantStockCount(product) > 0 ? (
                               <div className="mt-0.5 text-[10px] font-black text-blue-600">
                                 옵션 {variantStockCount(product)}개
