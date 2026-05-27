@@ -672,8 +672,9 @@ export default function OrderPage() {
       setCustomerNotice({
         type: "info",
         message: [
-          "기존 저장 주소를 불러왔습니다.",
-          "주소가 다르면 반드시 정보수정 후 주문해주세요.",
+          "기존 저장 배송지를 불러왔습니다.",
+          "배송지가 다르면 주문 전에 반드시 정보수정에서 주소를 먼저 변경해주세요.",
+          "이미 제출한 주문의 배송지 변경은 요청사항 또는 카톡채널로 남겨주세요.",
           [nextAddress, nextDetailAddress].filter(Boolean).join(" "),
         ]
           .filter(Boolean)
