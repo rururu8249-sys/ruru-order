@@ -763,6 +763,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                                 {colorSummary(product)} / {sizeSummary(product)} · {shippingLabel(product)}
                               </div>
                               <ProductFeatureBadges product={product} />
+                              
                             </div>
                           </button>
 
