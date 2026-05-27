@@ -34,13 +34,13 @@ export default function CustomerHomeHero({
           <p className="mt-4 break-keep text-[16px] font-bold leading-relaxed tracking-[-0.04em] text-white/95">
             방송에서 접수 후
             <br />
-            주문서 작성 및 입금을 진행해주세요
+            방송·공구상품 주문서 작성 및 입금을 진행해주세요
           </p>
         </div>
 
         <div className="relative mt-5 flex items-center justify-center gap-2 text-[15px] font-black text-white/95">
           <span className="rounded-full bg-white/18 px-4 py-2">
-            주문서 작성(공구상품주문)
+            주문서 작성
           </span>
           <span className="text-[28px] leading-none">›</span>
         </div>

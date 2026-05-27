@@ -1412,7 +1412,7 @@ export default function OrderPage() {
     return broadcastProducts
       .filter((product) => productSuggestionEnabled(product))
       .filter((product) => productMatchesSuggestion(product, productSearchText))
-      .slice(0, 8);
+      .slice(0, 6);
   }, [broadcastProducts, productSearchText]);
 
   const selectBroadcastProduct = (index: number, product: BroadcastProduct) => {
@@ -1928,15 +1928,15 @@ export default function OrderPage() {
                       className="w-full rounded-2xl border border-gray-200 bg-white p-4 font-bold"
                     />
 
-                    {productSearchOpenIndex === index && broadcastProducts.length > 0 && (
+                    {productSearchOpenIndex === index && productSearchText.trim().length > 0 && broadcastProducts.length > 0 && (
                       <div className="absolute left-0 right-0 top-[58px] z-40 max-h-72 overflow-auto rounded-3xl border border-blue-100 bg-white p-2 shadow-[0_18px_45px_rgba(30,20,20,0.15)]">
                         <div className="px-3 py-2 text-xs font-black text-blue-600">
-                          상품명 자동추천
+                          추천 상품명
                         </div>
 
                         {filteredBroadcastProducts.length === 0 ? (
                           <div className="px-3 py-4 text-sm font-bold text-gray-500">
-                            추천 상품명이 없습니다. 직접 입력해주세요.
+                            추천 상품명이 없어요. 방송에서 안내된 상품명 그대로 입력해주세요.
                           </div>
                         ) : (
                           filteredBroadcastProducts.map((product) => (
