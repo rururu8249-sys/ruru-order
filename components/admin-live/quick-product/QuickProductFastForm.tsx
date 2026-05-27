@@ -986,7 +986,7 @@ export default function QuickProductFastForm({
               <div className="flex h-[58px] items-center gap-2 rounded-xl bg-slate-50 px-3">
                 <span className="text-xs font-bold text-slate-500">전체 재고</span>
                 <input
-                  value={formatNumberWithComma(totalStockText)}
+                  value={formatNumberWithComma(stockMode === "option" ? String(totalStock) : totalStockText)}
                   onChange={(event) => setTotalStockText(onlyNumber(event.target.value))}
                   disabled={stockMode === "option"}
                   className="h-9 w-20 rounded-xl border border-slate-200 px-3 text-right text-sm font-black outline-none focus:border-blue-400 disabled:bg-white disabled:text-slate-400"
