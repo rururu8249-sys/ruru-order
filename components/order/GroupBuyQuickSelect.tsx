@@ -232,6 +232,7 @@ function QuickProductCard({
   onDetail: () => void;
   onSelect: () => void;
 }) {
+  void onSelect;
   if (variant === "mini") {
     return (
       <div data-ruru-quick-mini-card className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-blue-100">
@@ -249,14 +250,6 @@ function QuickProductCard({
           <div className="mt-0.5 truncate text-[12px] font-black text-blue-600">
             {hasPrice(product) ? formatWon(product.price) : "직접입력"}
           </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={onSelect}
-          className="mt-1 h-7 w-full rounded-xl bg-blue-600 text-[11px] font-black text-white shadow-sm"
-        >
-          선택
         </button>
       </div>
     );
@@ -286,20 +279,13 @@ function QuickProductCard({
             <PriceAndDelivery product={product} />
           </button>
 
-          <div className="mt-2 grid grid-cols-2 gap-1.5">
+          <div className="mt-2 grid grid-cols-1 gap-1.5">
             <button
               type="button"
               onClick={onDetail}
               className="h-8 rounded-xl border border-slate-200 bg-white text-[12px] font-black text-slate-700"
             >
               상세보기
-            </button>
-            <button
-              type="button"
-              onClick={onSelect}
-              className="h-8 rounded-xl bg-blue-600 text-[12px] font-black text-white shadow-sm"
-            >
-              선택
             </button>
           </div>
         </div>

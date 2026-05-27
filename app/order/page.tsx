@@ -1004,7 +1004,7 @@ export default function OrderPage() {
   const loadGroupBuyQuickProductsFromCatalog = async () => {
     const { data, error } = await supabase
       .from("products")
-      .select("*")
+      .select("*, image_url, main_image_url, external_image_url, detail_image_urls, image_path")
       .neq("status", "숨김")
       .limit(80);
 
@@ -2357,7 +2357,7 @@ export default function OrderPage() {
                         onChange={(event) =>
                           updateItem(index, "product_price", onlyNumber(event.target.value))
                         }
-                        placeholder="상품금액"
+                        placeholder="금액"
                         inputMode="numeric"
                         className="w-full rounded-2xl border border-gray-200 bg-white p-4 pr-10 font-bold"
                       />
