@@ -462,6 +462,52 @@ function pickOrderProductImageUrl(product: any): string {
   );
 }
 
+
+function readRegisteredProductOptionText(value: unknown): string {
+  if (value == null) return "";
+
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value).trim();
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const text = readRegisteredProductOptionText(item);
+      if (text) return text;
+    }
+
+    return "";
+  }
+
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const priorityKeys = ["value", "label", "name", "text", "title", "option"];
+
+    for (const key of priorityKeys) {
+      const text = readRegisteredProductOptionText(record[key]);
+      if (text) return text;
+    }
+  }
+
+  return "";
+}
+
+function pickRegisteredProductOptionText(product: BroadcastProduct, keys: string[]): string {
+  const record = product as unknown as Record<string, unknown>;
+  const note = parseProductSuggestionNote(product.product_note) as Record<string, unknown>;
+  const sources = [record, note];
+
+  for (const source of sources) {
+    for (const key of keys) {
+      const text = readRegisteredProductOptionText(source[key]);
+      if (text) return text;
+    }
+  }
+
+  return "없음";
+}
+
+
 function normalizeOrderProductRow(product: any): BroadcastProduct {
   const price = Number(product?.price ?? product?.sale_price ?? product?.selling_price ?? 0);
 
@@ -1666,6 +1712,28 @@ export default function OrderPage() {
 
 
   const selectBroadcastProduct = (index: number, product: BroadcastProduct) => {
+    const productColor = pickRegisteredProductOptionText(product, [
+      "color",
+      "colors",
+      "product_color",
+      "product_colors",
+      "color_option",
+      "color_options",
+      "option_color",
+    ]);
+    const productSize = pickRegisteredProductOptionText(product, [
+      "size",
+      "sizes",
+      "product_size",
+      "product_sizes",
+      "size_option",
+      "size_options",
+      "option_size",
+    ]);
+
+    updateItem(index, "color", productColor || "없음");
+    updateItem(index, "size", productSize || "없음");
+
     const productPrice = Number(product.price || 0);
 
     updateItem(index, "product_name", product.product_name);

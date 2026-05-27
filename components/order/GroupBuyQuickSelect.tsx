@@ -235,7 +235,7 @@ function QuickProductCard({
   void onSelect;
   if (variant === "mini") {
     return (
-      <div data-ruru-quick-mini-card className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-blue-100">
+      <div data-ruru-quick-mini-card className="rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-blue-100">
         <button
           type="button"
           onClick={onDetail}
@@ -263,7 +263,7 @@ function QuickProductCard({
           onClick={onDetail}
           className="shrink-0 text-left"
         >
-          <ProductThumbnail product={product} className="h-[72px] w-[72px]" />
+          <ProductThumbnail product={product} className="h-[54px] w-[72px]" />
         </button>
 
         <div className="min-w-0 flex-1">
@@ -272,14 +272,14 @@ function QuickProductCard({
             onClick={onDetail}
             className="block w-full text-left"
           >
-            <div className="line-clamp-2 min-h-[34px] text-[13px] font-black leading-[17px] tracking-[-0.04em] text-gray-950">
+            <div className="line-clamp-2 min-h-[34px] text-[12px] font-black leading-[17px] tracking-[-0.04em] text-gray-950">
               {product.product_name}
             </div>
 
             <PriceAndDelivery product={product} />
           </button>
 
-          <div className="mt-2 grid grid-cols-1 gap-1.5">
+          <div className="mt-1 grid grid-cols-1 gap-1.5">
             <button
               type="button"
               onClick={onDetail}
@@ -493,10 +493,10 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
 
   return (
     <>
-      <section data-ruru-group-buy-quick-select className="mb-4 rounded-3xl border border-blue-100 bg-blue-50/70 p-2">
+      <section data-ruru-group-buy-quick-select className="mb-4 rounded-3xl border border-blue-100 bg-blue-50/70 p-1.5">
         <div
           data-ruru-mobile-quick-row
-          className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_64px] gap-2 sm:hidden"
+          className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_58px] gap-1.5 sm:hidden"
         >
           {quickProducts[0] ? (
             <QuickProductCard
@@ -526,7 +526,7 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
                 setCurrentPage(1);
                 setSheetOpen(true);
               }}
-              className="col-start-3 flex min-h-[124px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-200 bg-white/70 px-1 text-center text-[10px] font-black tracking-[-0.04em] text-blue-600"
+              className="col-start-3 flex min-h-[104px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-200 bg-white/70 px-1 text-center text-[10px] font-black tracking-[-0.04em] text-blue-600"
             >
               <span className="text-xl leading-none">+</span>
               <span className="mt-1">상품</span>
