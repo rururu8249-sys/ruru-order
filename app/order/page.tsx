@@ -791,11 +791,21 @@ export default function OrderPage() {
     return nextSettings;
   };
 
-  const normalizeShippingAddressPart = (value: unknown) =>
-    String(value || "")
+  const normalizeShippingAddressPart = (
+    value: unknown,
+    options: { removeParentheses?: boolean } = {},
+  ) => {
+    let nextValue = String(value || "");
+
+    if (options.removeParentheses) {
+      nextValue = nextValue.replace(/\([^)]*\)/g, " ");
+    }
+
+    return nextValue
       .replace(/\s+/g, " ")
       .replace(/[-‐-‒–—―]/g, "-")
       .trim();
+  };
 
   const hashShippingAddressText = (value: string) => {
     let hash = 0;
@@ -814,7 +824,7 @@ export default function OrderPage() {
   ) => {
     const normalized = [
       normalizeShippingAddressPart(zipcodeValue),
-      normalizeShippingAddressPart(addressValue),
+      normalizeShippingAddressPart(addressValue, { removeParentheses: true }),
       normalizeShippingAddressPart(detailAddressValue),
     ]
       .filter(Boolean)
