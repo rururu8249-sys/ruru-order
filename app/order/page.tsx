@@ -1019,8 +1019,7 @@ export default function OrderPage() {
       .filter((product) => product.product_name.trim())
       .filter((product) => product.status !== "숨김")
       .filter((product) => productIsGroupBuy(product))
-      .filter((product) => productRegisteredOrderEnabled(product))
-      .slice(0, 12);
+      .filter((product) => productRegisteredOrderEnabled(product));
 
     setGroupBuyQuickProductsFromCatalog(nextProducts);
   };
@@ -1660,8 +1659,7 @@ export default function OrderPage() {
 
     return uniqueProducts
       .filter((product) => productIsGroupBuy(product))
-      .filter((product) => productRegisteredOrderEnabled(product))
-      .slice(0, 12);
+      .filter((product) => productRegisteredOrderEnabled(product));
   }, [broadcastProducts, groupBuyQuickProductsFromCatalog]);
 
   const visibleQuickGroupBuyProducts = showAllGroupBuyQuickProducts
