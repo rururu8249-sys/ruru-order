@@ -729,7 +729,7 @@ export default function QuickProductFastForm({
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-hidden px-5 py-4">
-        <div className="grid h-full min-h-0 grid-rows-[218px_60px_82px_minmax(0,1fr)] gap-3">
+        <div className="grid h-full min-h-0 grid-rows-[206px_60px_124px_minmax(0,1fr)] gap-3">
           <section className="grid min-h-0 items-center grid-cols-[180px_minmax(0,1fr)] gap-4 rounded-2xl border border-slate-200 bg-white p-3">
             <ImagePicker
               label="대표사진"
