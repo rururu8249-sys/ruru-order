@@ -79,6 +79,7 @@ type BroadcastProduct = {
   product_type: string;
   shipping_type: string;
   combine_shipping: string;
+  product_note?: unknown;
 };
 
 type DoneData = {
@@ -126,6 +127,76 @@ const hideNone = (value: any) => {
   if (["없음", "없슴", "x", "X", "-", "none", "None", "NONE"].includes(text)) return "";
   return text;
 };
+
+
+type ProductSuggestionNote = {
+  name_suggestion_enabled?: boolean;
+  suggestion_keywords?: string[];
+};
+
+function parseProductSuggestionNote(raw: unknown): ProductSuggestionNote | null {
+  if (!raw) return null;
+
+  if (typeof raw === "object" && !Array.isArray(raw)) {
+    return raw as ProductSuggestionNote;
+  }
+
+  if (typeof raw !== "string") return null;
+
+  const trimmed = raw.trim();
+
+  if (!trimmed) return null;
+
+  try {
+    const parsed = JSON.parse(trimmed);
+
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as ProductSuggestionNote;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function normalizeSuggestionText(value: string) {
+  return value.replace(/\s+/g, "").toLowerCase();
+}
+
+function productSuggestionEnabled(product: BroadcastProduct) {
+  const note = parseProductSuggestionNote(product.product_note);
+
+  return note?.name_suggestion_enabled !== false;
+}
+
+function productSuggestionKeywords(product: BroadcastProduct) {
+  const note = parseProductSuggestionNote(product.product_note);
+
+  if (!Array.isArray(note?.suggestion_keywords)) {
+    return [];
+  }
+
+  return note.suggestion_keywords
+    .map((keyword) => String(keyword || "").trim())
+    .filter(Boolean);
+}
+
+function productMatchesSuggestion(product: BroadcastProduct, query: string) {
+  const normalizedQuery = normalizeSuggestionText(query);
+
+  if (!normalizedQuery) {
+    return false;
+  }
+
+  const targets = [
+    product.product_name,
+    ...productSuggestionKeywords(product),
+  ].map((target) => normalizeSuggestionText(String(target || "")));
+
+  return targets.some((target) => target.includes(normalizedQuery));
+}
+
 
 const itemLabel = (item: OrderItem) => {
   const qty = toNumber(item.qty);
@@ -764,6 +835,7 @@ export default function OrderPage() {
         id: product.id,
         product_name: product.product_name || "",
         price: Number(product.price || 0),
+        product_note: product.product_note ?? null,
         stock: Number(product.stock || 0),
         status: product.status || "판매중",
         product_type: product.product_type || "방송상품",
@@ -1337,27 +1409,14 @@ export default function OrderPage() {
   const totalAmount = productAmount + shippingFee + cardExtra;
 
   const filteredBroadcastProducts = useMemo(() => {
-    const word = productSearchText.trim().toLowerCase();
-
-    return broadcastProducts.filter((product) => {
-      if (!word) return true;
-      return String(product.product_name || "").toLowerCase().includes(word);
-    });
+    return broadcastProducts
+      .filter((product) => productSuggestionEnabled(product))
+      .filter((product) => productMatchesSuggestion(product, productSearchText))
+      .slice(0, 8);
   }, [broadcastProducts, productSearchText]);
 
   const selectBroadcastProduct = (index: number, product: BroadcastProduct) => {
-    setItems((prev) =>
-      prev.map((item, itemIndex) =>
-        itemIndex === index
-          ? {
-              ...item,
-              product_name: product.product_name,
-              product_price: String(product.price || ""),
-            }
-          : item
-      )
-    );
-
+    updateItem(index, "product_name", product.product_name);
     setProductSearchOpenIndex(null);
     setProductSearchText("");
   };
@@ -1872,12 +1931,12 @@ export default function OrderPage() {
                     {productSearchOpenIndex === index && broadcastProducts.length > 0 && (
                       <div className="absolute left-0 right-0 top-[58px] z-40 max-h-72 overflow-auto rounded-3xl border border-blue-100 bg-white p-2 shadow-[0_18px_45px_rgba(30,20,20,0.15)]">
                         <div className="px-3 py-2 text-xs font-black text-blue-600">
-                          오늘 방송상품 선택
+                          상품명 자동추천
                         </div>
 
                         {filteredBroadcastProducts.length === 0 ? (
                           <div className="px-3 py-4 text-sm font-bold text-gray-500">
-                            검색된 방송상품이 없습니다. 직접 입력해주세요.
+                            추천 상품명이 없습니다. 직접 입력해주세요.
                           </div>
                         ) : (
                           filteredBroadcastProducts.map((product) => (
@@ -1892,14 +1951,14 @@ export default function OrderPage() {
                                   <div className="truncate font-black text-gray-950">
                                     {product.product_name}
                                   </div>
-                                  <div className="mt-1 text-xs font-bold text-gray-500">
-                                    재고 {product.stock || 0}개 · {product.shipping_type}배송 · 합배송 {product.combine_shipping === "N" ? "불가" : "가능"}
-                                  </div>
+                                  {productSuggestionKeywords(product).length > 0 ? (
+                                    <div className="mt-1 truncate text-xs font-bold text-gray-500">
+                                      {productSuggestionKeywords(product).slice(0, 5).join(", ")}
+                                    </div>
+                                  ) : null}
                                 </div>
 
-                                <div className="shrink-0 text-sm font-black text-blue-600">
-                                  {won(product.price)}
-                                </div>
+
                               </div>
                             </button>
                           ))
