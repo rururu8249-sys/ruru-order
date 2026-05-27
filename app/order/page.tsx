@@ -135,6 +135,7 @@ type ProductSuggestionNote = {
   stock_variants?: Array<{ color?: string; size?: string; stock?: number }>;
   colors?: string[] | string;
   sizes?: string[] | string;
+  registered_order_enabled?: boolean;
 };
 
 function parseProductSuggestionNote(raw: unknown): ProductSuggestionNote | null {
@@ -358,12 +359,48 @@ function findMatchedBroadcastProduct(item: OrderItem, products: BroadcastProduct
 }
 
 
+function productIsGroupBuy(product: BroadcastProduct): boolean {
+  const typeValue = String(product.product_type ?? "").trim().toLowerCase();
+
+  return (
+    typeValue === "group_buy" ||
+    typeValue === "group-buy" ||
+    typeValue === "gonggu" ||
+    typeValue.includes("group") ||
+    typeValue.includes("공구")
+  );
+}
+
+function productRegisteredOrderEnabled(product: BroadcastProduct): boolean {
+  const note = parseProductSuggestionNote(product.product_note);
+
+  return note?.registered_order_enabled !== false;
+}
+
+function productDeliveryLabel(product: BroadcastProduct): string {
+  const record = product as unknown as Record<string, unknown>;
+  const shippingType = String(record.shipping_type ?? record.delivery_type ?? "").trim().toLowerCase();
+
+  if (
+    shippingType.includes("vendor") ||
+    shippingType.includes("company") ||
+    shippingType.includes("direct") ||
+    shippingType.includes("업체")
+  ) {
+    return "업체배송";
+  }
+
+  return "일반배송";
+}
+
+
 export default function OrderPage() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [broadcast, setBroadcast] = useState<any | null>(null);
   const [broadcastProducts, setBroadcastProducts] = useState<BroadcastProduct[]>([]);
   const [productSearchOpenIndex, setProductSearchOpenIndex] = useState<number | null>(null);
   const [productSearchText, setProductSearchText] = useState("");
+  const [showAllGroupBuyQuickProducts, setShowAllGroupBuyQuickProducts] = useState(false);
 
   useEffect(() => {
     const handleProductSearchOutsidePointerDown = (event: PointerEvent) => {
@@ -1502,6 +1539,18 @@ export default function OrderPage() {
       .slice(0, 6);
   }, [broadcastProducts, productSearchText]);
 
+  const quickGroupBuyProducts = useMemo(() => {
+    return broadcastProducts
+      .filter((product) => productIsGroupBuy(product))
+      .filter((product) => productRegisteredOrderEnabled(product))
+      .slice(0, 12);
+  }, [broadcastProducts]);
+
+  const visibleQuickGroupBuyProducts = showAllGroupBuyQuickProducts
+    ? quickGroupBuyProducts
+    : quickGroupBuyProducts.slice(0, 3);
+
+
   const selectBroadcastProduct = (index: number, product: BroadcastProduct) => {
     const productPrice = Number(product.price || 0);
 
@@ -1513,6 +1562,31 @@ export default function OrderPage() {
       updateItem(index, "product_price", "");
     }
 
+    setProductSearchOpenIndex(null);
+    setProductSearchText("");
+  };
+
+
+  const selectQuickGroupBuyProduct = (product: BroadcastProduct) => {
+    const emptyIndex = items.findIndex((item) => !item.product_name.trim());
+
+    if (emptyIndex >= 0) {
+      selectBroadcastProduct(emptyIndex, product);
+      return;
+    }
+
+    const productPrice = Number(product.price || 0);
+    const nextProductPrice = Number.isFinite(productPrice) && productPrice > 0 ? String(Math.round(productPrice)) : "";
+
+    const nextItem: OrderItem = {
+      product_name: product.product_name,
+      color: "",
+      size: "",
+      qty: "1",
+      product_price: nextProductPrice,
+    };
+
+    setItems((prev) => [...prev, nextItem]);
     setProductSearchOpenIndex(null);
     setProductSearchText("");
   };
@@ -1994,6 +2068,60 @@ export default function OrderPage() {
           </div>
 
           <div className="mt-4 grid gap-4">
+            {quickGroupBuyProducts.length > 0 ? (
+              <section data-ruru-group-buy-quick-select className="mb-5 rounded-3xl border border-blue-100 bg-blue-50/60 p-4">
+                <div className="mb-3 flex items-end justify-between gap-3">
+                  <div>
+                    <div className="text-lg font-black text-gray-900">공구상품 빠른선택</div>
+                    <div className="mt-1 text-sm font-bold text-gray-500">검색어를 몰라도 바로 선택할 수 있어요.</div>
+                  </div>
+
+                  {quickGroupBuyProducts.length > 3 ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllGroupBuyQuickProducts((prev) => !prev)}
+                      className="shrink-0 rounded-2xl bg-white px-4 py-2 text-sm font-black text-blue-600 shadow-sm ring-1 ring-blue-100"
+                    >
+                      {showAllGroupBuyQuickProducts ? "접기" : `+ ${quickGroupBuyProducts.length - 3}개 더보기`}
+                    </button>
+                  ) : null}
+                </div>
+
+                <div className="grid gap-2">
+                  {visibleQuickGroupBuyProducts.map((product) => {
+                    const productPrice = Number(product.price || 0);
+                    const hasPrice = Number.isFinite(productPrice) && productPrice > 0;
+
+                    return (
+                      <button
+                        key={`quick-group-buy-${product.id}`}
+                        type="button"
+                        onClick={() => selectQuickGroupBuyProduct(product)}
+                        className="flex w-full items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 text-left shadow-sm ring-1 ring-blue-100 transition active:scale-[0.99]"
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate text-base font-black text-gray-900">{product.product_name}</div>
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-sm font-black">
+                            <span className={hasPrice ? "text-blue-600" : "text-gray-500"}>
+                              {hasPrice ? won(productPrice) : "금액 직접입력"}
+                            </span>
+                            <span className="text-gray-300">·</span>
+                            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-600">
+                              {productDeliveryLabel(product)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 rounded-xl bg-blue-600 px-3 py-2 text-sm font-black text-white">
+                          선택
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
+
             {items.map((item, index) => (
               <div key={index} className="rounded-[26px] border border-blue-100 bg-white p-4 shadow-[0_10px_22px_rgba(30,64,175,0.06)]">
                 <div className="mb-3 flex items-center justify-between">
