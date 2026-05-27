@@ -119,6 +119,40 @@ function money(value: number) {
   return `${Number(value || 0).toLocaleString("ko-KR")}원`;
 }
 
+function productDetailImages(product: ProductRow) {
+  const raw =
+    product.detail_image_urls ??
+    product.detail_images ??
+    product.detailImages ??
+    product.images ??
+    null;
+
+  if (Array.isArray(raw)) {
+    return raw.map((item) => resolveProductImageUrl(String(item || "").trim())).filter(Boolean);
+  }
+
+  if (typeof raw === "string" && raw.trim()) {
+    const value = raw.trim();
+
+    try {
+      const parsed = JSON.parse(value);
+
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => resolveProductImageUrl(String(item || "").trim())).filter(Boolean);
+      }
+    } catch {
+      // 문자열 목록일 수 있으므로 쉼표 기준으로 처리합니다.
+    }
+
+    return value
+      .split(",")
+      .map((item) => resolveProductImageUrl(item.trim()))
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
 function mainImage(product: ProductRow) {
   const direct = pickString(product, ["image_url", "cover_image_url", "main_image_url", "thumbnail_url"], "");
 
@@ -242,6 +276,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
   const [loadError, setLoadError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedProduct, setSelectedProduct] = useState<ProductRow | null>(null);
+  const [previewImage, setPreviewImage] = useState("");
   const [showProductDetailList, setShowProductDetailList] = useState(false);
   const [detailSearchText, setDetailSearchText] = useState("");
   const [detailStatusFilter, setDetailStatusFilter] = useState<"all" | "visible" | "hidden" | "soldout">("all");
@@ -349,6 +384,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
   const detailVisibleProducts = detailProducts.slice(detailPageStart, detailPageStart + detailPageSize);
 
   const selectedImage = selectedProduct ? mainImage(selectedProduct) : "";
+  const selectedDetailImages = selectedProduct ? productDetailImages(selectedProduct) : [];
   const selectedStatus = selectedProduct ? statusInfo(selectedProduct) : null;
 
   return (
@@ -681,6 +717,26 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
         </div>
       ) : null}
 
+      {previewImage ? (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/70 p-6">
+          <div className="relative max-h-[90vh] max-w-[90vw] overflow-hidden rounded-3xl bg-white p-3 shadow-2xl">
+            <button
+              type="button"
+              onClick={() => setPreviewImage("")}
+              className="absolute right-4 top-4 z-10 h-9 rounded-xl bg-white/90 px-4 text-xs font-black text-slate-700 shadow-sm hover:bg-white"
+            >
+              닫기
+            </button>
+
+            <img
+              src={previewImage}
+              alt=""
+              className="max-h-[84vh] max-w-[84vw] rounded-2xl object-contain"
+            />
+          </div>
+        </div>
+      ) : null}
+
       {selectedProduct ? (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/45 p-5">
           <div className="w-full max-w-[720px] overflow-hidden rounded-3xl bg-white shadow-2xl">
@@ -766,6 +822,32 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                   <div className="text-[11px] font-black text-slate-400">상세설명</div>
                   <div className="mt-2 max-h-[150px] overflow-y-auto whitespace-pre-wrap text-sm font-bold leading-6 text-slate-700">
                     {pickString(selectedProduct, ["product_description", "description", "detail_description"], "상세설명 없음")}
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <div className="text-[11px] font-black text-slate-400">상세사진</div>
+                      <div className="text-[10px] font-black text-slate-400">{selectedDetailImages.length}장</div>
+                    </div>
+
+                    {selectedDetailImages.length > 0 ? (
+                      <div className="grid grid-cols-5 gap-2">
+                        {selectedDetailImages.slice(0, 5).map((imageUrl, imageIndex) => (
+                          <button
+                            key={`${imageUrl}-${imageIndex}`}
+                            type="button"
+                            onClick={() => setPreviewImage(imageUrl)}
+                            className="flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-slate-200 hover:ring-blue-300"
+                          >
+                            <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex h-16 items-center justify-center rounded-xl bg-white text-xs font-bold text-slate-400 ring-1 ring-slate-200">
+                        등록된 상세사진 없음
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
