@@ -562,8 +562,6 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
     setSimpleFastSaving(true);
 
     try {
-      let createdCount = 0;
-
       for (const row of filledRows) {
         const productNote = {
           stock_mode: "total",
@@ -608,19 +606,56 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
           }
         }
 
-        createdCount += 1;
       }
 
       window.dispatchEvent(new Event("ruru-live-product-updated"));
       await loadProducts();
       resetSimpleFastRows();
       setShowSimpleFastCreate(false);
-      alert(`${createdCount}개 상품을 빠른등록했습니다.`);
     } catch (error) {
       alert("빠른등록 저장 실패\n\n" + (error instanceof Error ? error.message : String(error)));
     } finally {
       setSimpleFastSaving(false);
     }
+  };
+
+  const deleteHiddenProduct = async (product: ProductRow) => {
+    const productId = pickString(product, ["id", "product_id"], "");
+    const productName = pickString(product, ["product_name", "name", "title"], "상품");
+    const info = statusInfo(product);
+
+    if (!productId) {
+      alert("삭제할 상품 ID를 찾지 못했습니다.");
+      return;
+    }
+
+    if (listFilter !== "hidden" || info.label !== "숨김") {
+      alert("숨김상품 탭의 숨김 상태 상품만 완전 삭제할 수 있습니다.");
+      return;
+    }
+
+    const ok = window.confirm(
+      `숨김상품 "${productName}"을 완전 삭제할까요?\n\n삭제 후 복구할 수 없습니다.`,
+    );
+
+    if (!ok) return;
+
+    const { error: linkError } = await supabase.from("broadcast_products").delete().eq("product_id", productId);
+
+    if (linkError) {
+      alert("상품 연결 삭제 실패\n\n" + linkError.message);
+      return;
+    }
+
+    const { error } = await supabase.from("products").delete().eq("id", productId);
+
+    if (error) {
+      alert("상품 삭제 실패\n\n" + error.message);
+      return;
+    }
+
+    window.dispatchEvent(new Event("ruru-live-product-updated"));
+    await loadProducts();
   };
 
   const counts = useMemo(() => {
@@ -872,14 +907,14 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                   return (
                     <div
                       key={pickString(product, ["id", "product_id"], String(absoluteIndex))}
-                      className="grid grid-cols-[36px_minmax(0,1fr)_54px_112px] items-center gap-2.5 py-3"
+                      className="grid grid-cols-[36px_minmax(0,1fr)_54px_176px] items-center gap-3 py-4"
                     >
                       <div className="text-xs font-black text-slate-400">{absoluteIndex}</div>
 
                       <button
                         type="button"
                         onClick={() => setSelectedProduct(product)}
-                        className="grid min-w-0 grid-cols-[42px_minmax(0,1fr)] items-center gap-2.5 text-left"
+                        className="grid min-w-0 grid-cols-[46px_minmax(0,1fr)] items-center gap-3 text-left"
                       >
                         <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
                           {image ? (
@@ -906,7 +941,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-2 items-center gap-1">
+                      <div className={`grid items-center gap-1 ${listFilter === "hidden" ? "grid-cols-3" : "grid-cols-2"}`}>
                           <button
                             type="button"
                             onClick={async () => {
@@ -930,6 +965,16 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                           >
                             {String(product.status || "판매중") === "숨김" ? "노출OFF" : "노출ON"}
                           </button>
+
+                          {listFilter === "hidden" ? (
+                            <button
+                              type="button"
+                              onClick={() => void deleteHiddenProduct(product)}
+                              className="h-8 min-w-[44px] whitespace-nowrap rounded-lg bg-rose-50 px-2 text-[11px] font-black text-rose-600 hover:bg-rose-100"
+                            >
+                              삭제
+                            </button>
+                          ) : null}
 
 <button
                           type="button"
