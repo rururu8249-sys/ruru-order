@@ -792,6 +792,7 @@ export default function OrderPage() {
           const restored = await loadExistingCustomerByKakaoPhone(savedPhone);
 
           if (restored) {
+            markYoutubeNicknameConfirmVersionCurrent();
             const nicknameConfirmed = isYoutubeNicknameConfirmVersionCurrent();
 
             setHasSavedInfo(true);
@@ -989,6 +990,10 @@ export default function OrderPage() {
     if (nextNickname) {
       setYoutubeNickname(nextNickname);
       localStorage.setItem("ruru_youtube_nickname", nextNickname);
+    }
+
+    if (nextNickname) {
+      markYoutubeNicknameConfirmVersionCurrent();
     }
 
     if (nextName) {
