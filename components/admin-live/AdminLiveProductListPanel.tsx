@@ -388,28 +388,40 @@ function getProductNoteFlags(product: { product_note?: unknown; productNote?: un
 
 function ProductFeatureBadges({ product }: { product: ProductRow }) {
   const flags = getProductNoteFlags(product);
+  const info = statusInfo(product);
+
+  const exposure =
+    info.label === "숨김"
+      ? {
+          label: "숨김",
+          className: "bg-slate-100 text-slate-500 ring-1 ring-slate-200",
+          desc: "카드/검색 제외",
+        }
+      : flags.registeredOrderEnabled
+        ? {
+            label: "카드+검색",
+            className: "bg-blue-50 text-blue-700 ring-1 ring-blue-100",
+            desc: "카드 표시 + 상품명 검색",
+          }
+        : flags.nameSuggestionEnabled
+          ? {
+              label: "검색만",
+              className: "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100",
+              desc: "카드 숨김 + 상품명 검색",
+            }
+          : {
+              label: "숨김",
+              className: "bg-slate-100 text-slate-500 ring-1 ring-slate-200",
+              desc: "카드/검색 제외",
+            };
 
   return (
     <div data-ruru-product-feature-badges className="mt-1 flex flex-wrap gap-1">
-      <span
-        className={[
-          "rounded-full px-2 py-0.5 text-[10px] font-black",
-          flags.registeredOrderEnabled
-            ? "bg-blue-50 text-blue-700 ring-1 ring-blue-100"
-            : "bg-slate-100 text-slate-400 ring-1 ring-slate-200",
-        ].join(" ")}
-      >
-        {flags.registeredOrderEnabled ? "등록ON" : "등록OFF"}
+      <span className={["rounded-full px-2 py-0.5 text-[10px] font-black", exposure.className].join(" ")}>
+        {exposure.label}
       </span>
-      <span
-        className={[
-          "rounded-full px-2 py-0.5 text-[10px] font-black",
-          flags.nameSuggestionEnabled
-            ? "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100"
-            : "bg-slate-100 text-slate-400 ring-1 ring-slate-200",
-        ].join(" ")}
-      >
-        {flags.nameSuggestionEnabled ? "추천ON" : "추천OFF"}
+      <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-400 ring-1 ring-slate-100">
+        {exposure.desc}
       </span>
     </div>
   );
@@ -567,8 +579,8 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
           stock_mode: "total",
           stock_variants: [],
           stock_management_enabled: false,
-          registered_order_enabled: true,
-          name_suggestion_enabled: true,
+          registered_order_enabled: false,
+          name_suggestion_enabled: row.isVisible !== false,
           simple_fast_create: true,
         };
 
@@ -1129,7 +1141,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
               </button>
 
               <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-bold leading-5 text-slate-500">
-                기본값: 방송상품 · 일반배송 · 등록ON · 추천ON · 금액 미입력 시 고객 직접입력
+                기본값: 방송상품 · 일반배송 · 검색만 · 금액 미입력 시 고객 직접입력
               </div>
             </div>
 

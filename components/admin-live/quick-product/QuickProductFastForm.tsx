@@ -513,7 +513,7 @@ export default function QuickProductFastForm({
   const [shippingType, setShippingType] = useState("normal");
   const [isVisible, setIsVisible] = useState(true);
   const [isPinned, setIsPinned] = useState(false);
-  const [registeredOrderEnabled, setRegisteredOrderEnabled] = useState(true);
+  const [registeredOrderEnabled, setRegisteredOrderEnabled] = useState(false);
   const [nameSuggestionEnabled, setNameSuggestionEnabled] = useState(true);
   const [suggestionKeywordsText, setSuggestionKeywordsText] = useState("");
 
@@ -532,6 +532,35 @@ export default function QuickProductFastForm({
 
   const editingProductId = pickString(initialProduct, ["id", "product_id", "uuid"], "");
   const isEditMode = Boolean(editingProductId);
+
+  const orderExposureMode =
+    !isVisible ? "hidden" : registeredOrderEnabled ? "card_and_search" : "search_only";
+
+  const applyOrderExposureMode = (mode: "card_and_search" | "search_only" | "hidden") => {
+    if (mode === "card_and_search") {
+      setIsVisible(true);
+      setRegisteredOrderEnabled(true);
+      setNameSuggestionEnabled(true);
+      return;
+    }
+
+    if (mode === "search_only") {
+      setIsVisible(true);
+      setRegisteredOrderEnabled(false);
+      setNameSuggestionEnabled(true);
+      return;
+    }
+
+    setIsVisible(false);
+    setRegisteredOrderEnabled(false);
+    setNameSuggestionEnabled(false);
+  };
+
+  const orderExposureOptions = [
+    { value: "card_and_search", label: "카드+검색", desc: "카드 표시 + 상품명 검색" },
+    { value: "search_only", label: "검색만", desc: "카드 숨김 + 상품명 검색" },
+    { value: "hidden", label: "숨김", desc: "카드/검색 모두 제외" },
+  ] as const;
 
   useEffect(() => {
     if (!initialProduct) return;
@@ -849,28 +878,22 @@ export default function QuickProductFastForm({
             </div>
 
             <div className="flex h-full min-h-0 flex-col items-center justify-center">
-              <div className="mb-1 text-[10px] font-black text-slate-500">상태</div>
-              <div className="flex justify-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setIsVisible(true)}
-                  className={[
-                    choiceButton,
-                    isVisible ? "bg-emerald-600 text-white" : inactiveChoice,
-                  ].join(" ")}
-                >
-                  노출
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsVisible(false)}
-                  className={[
-                    choiceButton,
-                    !isVisible ? "bg-slate-800 text-white" : inactiveChoice,
-                  ].join(" ")}
-                >
-                  숨김
-                </button>
+              <div className="mb-1 text-[10px] font-black text-slate-500">주문서 노출 방식</div>
+              <div className="grid w-full grid-cols-3 gap-1">
+                {orderExposureOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => applyOrderExposureMode(option.value)}
+                    className={[
+                      "h-9 rounded-xl px-2 text-[10px] font-black",
+                      orderExposureMode === option.value ? "bg-blue-600 text-white" : inactiveChoice,
+                    ].join(" ")}
+                    title={option.desc}
+                  >
+                    {option.label}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -901,62 +924,17 @@ export default function QuickProductFastForm({
             </div>
           </section>
 
-          <section className="grid min-h-0 items-center grid-cols-[154px_154px_minmax(0,1fr)] gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
-            <div className="flex h-full min-h-0 flex-col items-center justify-center">
-              <div className="mb-1 text-[10px] font-black text-slate-500">등록상품 주문</div>
-              <div className="flex justify-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setRegisteredOrderEnabled(true)}
-                  className={[
-                    choiceButton,
-                    registeredOrderEnabled ? "bg-blue-600 text-white" : inactiveChoice,
-                  ].join(" ")}
-                >
-                  사용
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRegisteredOrderEnabled(false)}
-                  className={[
-                    choiceButton,
-                    !registeredOrderEnabled ? "bg-slate-800 text-white" : inactiveChoice,
-                  ].join(" ")}
-                >
-                  미사용
-                </button>
+          <section className="grid min-h-0 items-center grid-cols-[220px_minmax(0,1fr)] gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2">
+            <div className="flex h-full min-h-0 flex-col justify-center">
+              <div className="text-[11px] font-black text-slate-700">추천 키워드</div>
+              <div className="mt-1 break-keep text-[10px] font-bold leading-relaxed text-slate-400">
+                선택 입력 · 상품명 자체 검색은 자동 적용
               </div>
             </div>
 
-            <div className="flex h-full min-h-0 flex-col items-center justify-center">
-              <div className="mb-1 text-[10px] font-black text-slate-500">상품명 자동추천</div>
-              <div className="flex justify-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setNameSuggestionEnabled(true)}
-                  className={[
-                    choiceButton,
-                    nameSuggestionEnabled ? "bg-blue-600 text-white" : inactiveChoice,
-                  ].join(" ")}
-                >
-                  사용
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setNameSuggestionEnabled(false)}
-                  className={[
-                    choiceButton,
-                    !nameSuggestionEnabled ? "bg-slate-800 text-white" : inactiveChoice,
-                  ].join(" ")}
-                >
-                  미사용
-                </button>
-              </div>
-            </div>
-
-            <div className="flex h-full min-h-0 flex-col items-center justify-center">
+            <div className="flex h-full min-h-0 flex-col justify-center">
               <div className="mb-1 flex items-center justify-between text-[10px] font-black text-slate-500">
-                <span>추천 키워드</span>
+                <span>추가 검색어</span>
                 <span className="text-[10px] font-bold text-slate-400">쉼표로 구분</span>
               </div>
               <input

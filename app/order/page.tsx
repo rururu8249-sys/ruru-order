@@ -1916,6 +1916,7 @@ export default function OrderPage() {
     const suggestionProducts = [...groupBuyQuickProductsFromCatalog, ...broadcastProducts];
 
     return suggestionProducts
+      .filter((product) => product && product.status !== "숨김")
       .filter((product) => productSuggestionEnabled(product))
       .filter((product) => productMatchesSuggestion(product, productSearchText))
       .slice(0, 6);
@@ -1942,6 +1943,7 @@ export default function OrderPage() {
       new Map(
         mergedProducts
           .filter((product) => product && product.status !== "숨김")
+          .filter((product) => productRegisteredOrderEnabled(product))
           .map((product) => [String(product.id), product]),
       ).values(),
     );
