@@ -95,6 +95,20 @@ export function isPaymentDone(row: AnyRow) {
   );
 }
 
+export function isSettlementUnpaid(row: AnyRow) {
+  if (isCanceled(row)) return false;
+  if (isPaymentDone(row)) return false;
+
+  const text = rowStatusText(row);
+  const method = paymentMethod(row);
+
+  return (
+    /입금확인\s*필요|확인필요|미입금|미결제|결제대기|주문확인전|대기|pending|unpaid/i.test(text) ||
+    method === "무통장입금" ||
+    method === "카드결제"
+  );
+}
+
 export function paymentMethod(row: AnyRow): PaymentFilter {
   const raw = cleanText(row.payment_method || row.paymentMethod || row.pay_method);
 
@@ -330,7 +344,7 @@ export function calculateStats(
   const activeRows = rows.filter((row) => !isCanceled(row));
   const canceledRows = rows.filter(isCanceled);
   const paidRows = activeRows.filter(isPaymentDone);
-  const unpaidRows = activeRows.filter((row) => !isPaymentDone(row));
+  const unpaidRows = activeRows.filter(isSettlementUnpaid);
 
   const activeManualEntries = manualEntries.filter(isManualEntryActive);
   const manualIncomeEntries = activeManualEntries.filter((entry) => entry.entry_type === "income");
