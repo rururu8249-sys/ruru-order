@@ -87,7 +87,7 @@ function CompactFilterButton({
     <button
       type="button"
       onClick={onClick}
-      className="h-9 rounded-xl border border-blue-100 bg-white px-3 text-xs font-black text-blue-700 shadow-sm transition hover:bg-blue-50"
+      className="h-9 rounded-full border border-blue-100 bg-white px-4 text-xs font-black text-blue-700 shadow-sm transition hover:bg-blue-50"
     >
       {label}
     </button>
@@ -109,14 +109,14 @@ function MoneyFlowCard({
 }) {
   const toneClass =
     tone === "green"
-      ? "border-emerald-100 bg-emerald-50/70"
+      ? "border-emerald-100 bg-emerald-50/80"
       : tone === "orange"
-        ? "border-orange-100 bg-orange-50/70"
+        ? "border-orange-100 bg-orange-50/80"
         : tone === "dark"
           ? "border-slate-200 bg-white"
-          : "border-blue-100 bg-blue-50/65";
+          : "border-blue-100 bg-blue-50/80";
 
-  const badgeClass =
+  const stepClass =
     tone === "green"
       ? "bg-emerald-600 text-white"
       : tone === "orange"
@@ -135,17 +135,15 @@ function MoneyFlowCard({
           : "text-slate-950";
 
   return (
-    <div className={`min-h-[124px] rounded-[24px] border px-4 py-4 shadow-[0_12px_26px_rgba(15,23,42,0.045)] ${toneClass}`}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className={`inline-flex h-8 min-w-8 items-center justify-center rounded-full px-3 text-xs font-black ${badgeClass}`}>
-            {step}
-          </div>
-          <div className="mt-4 text-xs font-black text-slate-500">{title}</div>
-          <div className={`mt-2 truncate text-[26px] font-black tracking-[-0.06em] ${valueClass}`}>{value}</div>
-          <div className="mt-2 truncate text-xs font-bold text-slate-400">{note}</div>
-        </div>
+    <div className={`rounded-[24px] border px-4 py-4 shadow-[0_12px_26px_rgba(15,23,42,0.045)] ${toneClass}`}>
+      <div className="flex items-center justify-between gap-3">
+        <span className={`flex h-8 min-w-8 items-center justify-center rounded-full px-3 text-xs font-black ${stepClass}`}>
+          {step}
+        </span>
+        <span className="truncate text-xs font-black text-slate-400">{note}</span>
       </div>
+      <div className="mt-4 text-sm font-black text-slate-500">{title}</div>
+      <div className={`mt-1 truncate text-[26px] font-black tracking-[-0.06em] ${valueClass}`}>{value}</div>
     </div>
   );
 }
@@ -161,9 +159,9 @@ function ActionCard({
 }) {
   const toneClass =
     tone === "orange"
-      ? "border-orange-100 bg-orange-50/65 text-orange-700"
+      ? "border-orange-100 bg-orange-50/75 text-orange-700"
       : tone === "blue"
-        ? "border-blue-100 bg-blue-50/65 text-blue-700"
+        ? "border-blue-100 bg-blue-50/75 text-blue-700"
         : "border-slate-200 bg-slate-50 text-slate-950";
 
   return (
@@ -274,34 +272,36 @@ export default function SettlementMoneyFlowDashboard({
 
   return (
     <div className="grid gap-4">
-      <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_14px_36px_rgba(15,23,42,0.05)]">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="text-[30px] font-black tracking-[-0.06em] text-slate-950">정산통계</h2>
-            <p className="mt-2 text-sm font-bold text-slate-500">
-              초보자도 돈 흐름을 한눈에 볼 수 있게 핵심만 먼저 보여드립니다.
-            </p>
-          </div>
+      <section className="overflow-hidden rounded-[34px] border border-blue-100 bg-white shadow-[0_18px_46px_rgba(37,99,235,0.08)]">
+        <div className="border-b border-blue-50 bg-gradient-to-r from-blue-50 via-white to-white px-5 py-4">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className="text-[30px] font-black tracking-[-0.06em] text-slate-950">정산통계</h2>
+              <p className="mt-1 text-sm font-bold text-slate-500">
+                주문 → 받은 돈 → 못 받은 돈 → 빠지는 돈 → 남는 돈 순서로 확인합니다.
+              </p>
+            </div>
 
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={onOpenManualPanel}
-              className="h-11 rounded-xl bg-blue-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
-            >
-              + 정산 추가 입력
-            </button>
-            <button
-              type="button"
-              onClick={onExportSummaryCsv}
-              className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
-            >
-              정산 CSV 내보내기
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={onOpenManualPanel}
+                className="h-10 rounded-full bg-blue-600 px-5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
+              >
+                + 정산 추가 입력
+              </button>
+              <button
+                type="button"
+                onClick={onExportSummaryCsv}
+                className="h-10 rounded-full border border-slate-200 bg-white px-5 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
+              >
+                정산 CSV 내보내기
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="mt-4 rounded-[24px] border border-blue-100 bg-blue-50/45 p-3">
+        <div className="grid gap-3 px-5 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap gap-2">
               <CompactFilterButton label="오늘" onClick={() => onQuickRange("today")} />
@@ -312,8 +312,8 @@ export default function SettlementMoneyFlowDashboard({
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <label className="flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-600">
-                <span className="text-xs text-slate-400">연도</span>
+              <label className="flex h-9 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 text-xs font-black text-slate-600">
+                <span className="text-slate-400">연도</span>
                 <select
                   value={selectedSettlementYear}
                   onChange={(event) => onYearFilter(event.target.value)}
@@ -325,8 +325,8 @@ export default function SettlementMoneyFlowDashboard({
                 </select>
               </label>
 
-              <label className="flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-600">
-                <span className="text-xs text-slate-400">월</span>
+              <label className="flex h-9 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 text-xs font-black text-slate-600">
+                <span className="text-slate-400">월</span>
                 <select
                   value={selectedSettlementMonth}
                   onChange={(event) => onMonthFilter(event.target.value)}
@@ -341,8 +341,8 @@ export default function SettlementMoneyFlowDashboard({
             </div>
           </div>
 
-          <div className="mt-4 grid gap-3 xl:grid-cols-[0.85fr_0.85fr_1.2fr_1fr_1fr_auto]">
-            <label className="grid gap-1 text-xs font-black text-slate-500">
+          <div className="grid gap-2 xl:grid-cols-[0.8fr_0.8fr_1.25fr_0.95fr_1fr_auto]">
+            <label className="grid gap-1 text-[11px] font-black text-slate-400">
               시작일
               <input
                 type="date"
@@ -352,7 +352,7 @@ export default function SettlementMoneyFlowDashboard({
               />
             </label>
 
-            <label className="grid gap-1 text-xs font-black text-slate-500">
+            <label className="grid gap-1 text-[11px] font-black text-slate-400">
               종료일
               <input
                 type="date"
@@ -362,7 +362,7 @@ export default function SettlementMoneyFlowDashboard({
               />
             </label>
 
-            <label className="grid gap-1 text-xs font-black text-slate-500">
+            <label className="grid gap-1 text-[11px] font-black text-slate-400">
               방송리스트
               <select
                 value={selectedBroadcastValue}
@@ -382,7 +382,7 @@ export default function SettlementMoneyFlowDashboard({
               </select>
             </label>
 
-            <label className="grid gap-1 text-xs font-black text-slate-500">
+            <label className="grid gap-1 text-[11px] font-black text-slate-400">
               결제수단
               <select
                 value={paymentFilter}
@@ -395,9 +395,9 @@ export default function SettlementMoneyFlowDashboard({
               </select>
             </label>
 
-            <div className="grid gap-1 text-xs font-black text-slate-500">
+            <div className="grid gap-1 text-[11px] font-black text-slate-400">
               조회 기준
-              <div className="flex h-11 items-center rounded-2xl border border-blue-100 bg-white px-3 text-sm font-black text-blue-700">
+              <div className="flex h-10 items-center rounded-xl border border-blue-100 bg-blue-50/70 px-3 text-sm font-black text-blue-700">
                 {effectivePeriodLabel}
               </div>
             </div>
@@ -412,15 +412,14 @@ export default function SettlementMoneyFlowDashboard({
               </button>
             </div>
           </div>
-
         </div>
       </section>
 
-      <section className="rounded-[32px] border border-blue-100 bg-white p-5 shadow-[0_16px_42px_rgba(37,99,235,0.08)]">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <section className="rounded-[34px] border border-blue-100 bg-white p-5 shadow-[0_18px_44px_rgba(37,99,235,0.08)]">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-xs font-black tracking-[0.25em] text-blue-600">MONEY FLOW</div>
-            <h3 className="mt-1 text-[24px] font-black tracking-[-0.06em] text-slate-950">돈 흐름 5단계</h3>
+            <h3 className="text-[25px] font-black tracking-[-0.06em] text-slate-950">돈 흐름 5단계</h3>
+            <p className="mt-1 text-xs font-bold text-slate-400">초보자는 이 순서만 보면 됩니다.</p>
           </div>
           <div className="rounded-full bg-blue-50 px-4 py-2 text-xs font-black text-blue-700">
             주문 → 받은 돈 → 못 받은 돈 → 빠지는 돈 → 남는 돈
@@ -434,25 +433,32 @@ export default function SettlementMoneyFlowDashboard({
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-        <div className="rounded-[28px] border border-blue-100 bg-blue-50/55 p-5 shadow-[0_12px_30px_rgba(37,99,235,0.05)]">
-          <div className="text-xs font-black tracking-[0.22em] text-blue-600">ONE LINE SUMMARY</div>
-          <h3 className="mt-1 text-xl font-black tracking-[-0.05em] text-slate-950">한 줄 요약</h3>
+      <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <div className="rounded-[30px] border border-blue-100 bg-blue-50/65 p-5 shadow-[0_14px_34px_rgba(37,99,235,0.06)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-xl font-black tracking-[-0.05em] text-slate-950">한 줄 요약</h3>
+              <p className="mt-1 text-xs font-bold text-blue-700">장사 처음 봐도 이해되는 돈 흐름</p>
+            </div>
+            <div className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-blue-700">
+              현재 실수익 {won(stats.netAmount)}
+            </div>
+          </div>
+
           <div className="mt-4 grid gap-2 text-sm font-bold leading-6 text-slate-700">
-            <p>① 이번 기간 주문서 총금액은 <span className="font-black text-slate-950">{won(stats.totalOrderAmount)}</span>입니다.</p>
-            <p>② 실제 결제가 끝난 금액은 <span className="font-black text-blue-700">{won(stats.paidAmount)}</span>입니다.</p>
+            <p>① 주문서 총금액은 <span className="font-black text-slate-950">{won(stats.totalOrderAmount)}</span>입니다.</p>
+            <p>② 결제완료 매출은 <span className="font-black text-blue-700">{won(stats.paidAmount)}</span>입니다.</p>
             <p>③ 아직 못 받은 금액은 <span className="font-black text-orange-700">{won(stats.unpaidAmount)}</span>입니다.</p>
             <p>④ 빠지는 돈을 빼면 현재 실수익은 <span className="font-black text-emerald-700">{won(stats.netAmount)}</span>입니다.</p>
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.045)]">
+        <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.045)]">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-xs font-black tracking-[0.22em] text-blue-600">TO DO</div>
-              <h3 className="mt-1 text-xl font-black tracking-[-0.05em] text-slate-950">지금 처리할 일</h3>
+              <h3 className="text-xl font-black tracking-[-0.05em] text-slate-950">지금 처리할 일</h3>
+              <p className="mt-1 text-xs font-bold text-slate-400">방송 끝나고 바로 확인</p>
             </div>
-            <div className="text-xs font-bold text-slate-400">방송 끝나고 바로 확인할 것</div>
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -464,17 +470,31 @@ export default function SettlementMoneyFlowDashboard({
         </div>
       </section>
 
-      <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_14px_36px_rgba(15,23,42,0.045)]">
+      <section className="rounded-[32px] border border-slate-200 bg-white p-5 shadow-[0_14px_38px_rgba(15,23,42,0.045)]">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-xs font-black tracking-[0.22em] text-blue-600">BROADCAST SETTLEMENT</div>
-            <h3 className="mt-1 text-2xl font-black tracking-[-0.05em] text-slate-950">방송별 정산</h3>
+            <h3 className="text-2xl font-black tracking-[-0.05em] text-slate-950">방송별 정산</h3>
             <p className="mt-1 text-xs font-bold text-slate-400">
-              방송 날짜별로 얼마 팔고, 아직 못 받은 돈과 현재 남은 돈을 확인합니다.
+              방송 날짜별로 얼마 팔고, 아직 못 받은 돈과 현재 남은 돈만 봅니다.
             </p>
           </div>
-          <div className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-600">
-            총 {broadcastRows.length.toLocaleString("ko-KR")}개
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-black text-slate-600">
+              총 {broadcastRows.length.toLocaleString("ko-KR")}개
+            </div>
+            <select
+              value={broadcastPageSize}
+              onChange={(event) => {
+                setBroadcastPageSize(Number(event.target.value));
+                setBroadcastCurrentPage(1);
+              }}
+              className="h-10 rounded-full border border-slate-200 bg-white px-3 text-xs font-black text-slate-600 outline-none"
+            >
+              <option value={10}>10개 보기</option>
+              <option value={20}>20개 보기</option>
+              <option value={30}>30개 보기</option>
+            </select>
           </div>
         </div>
 
@@ -524,24 +544,11 @@ export default function SettlementMoneyFlowDashboard({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={broadcastPageSize}
-              onChange={(event) => {
-                setBroadcastPageSize(Number(event.target.value));
-                setBroadcastCurrentPage(1);
-              }}
-              className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-600 outline-none"
-            >
-              <option value={10}>10개 보기</option>
-              <option value={20}>20개 보기</option>
-              <option value={30}>30개 보기</option>
-            </select>
-
             <button
               type="button"
               onClick={() => setBroadcastCurrentPage((page) => Math.max(1, page - 1))}
               disabled={safeBroadcastPage <= 1}
-              className="h-9 min-w-9 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
+              className="h-9 min-w-9 rounded-full border border-slate-200 bg-white px-3 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
             >
               &lt;
             </button>
@@ -556,7 +563,7 @@ export default function SettlementMoneyFlowDashboard({
                   key={pageItem}
                   type="button"
                   onClick={() => setBroadcastCurrentPage(pageItem)}
-                  className={`h-9 min-w-9 rounded-xl px-3 text-sm font-black shadow-sm transition ${
+                  className={`h-9 min-w-9 rounded-full px-3 text-sm font-black shadow-sm transition ${
                     pageItem === safeBroadcastPage
                       ? "bg-blue-600 text-white"
                       : "border border-slate-200 bg-white text-slate-600 hover:bg-blue-50"
@@ -571,14 +578,13 @@ export default function SettlementMoneyFlowDashboard({
               type="button"
               onClick={() => setBroadcastCurrentPage((page) => Math.min(broadcastPageCount, page + 1))}
               disabled={safeBroadcastPage >= broadcastPageCount}
-              className="h-9 min-w-9 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
+              className="h-9 min-w-9 rounded-full border border-slate-200 bg-white px-3 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
             >
               &gt;
             </button>
           </div>
         </div>
       </section>
-
     </div>
   );
 }
