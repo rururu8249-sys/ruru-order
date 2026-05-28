@@ -422,7 +422,7 @@ export default function LiveOpsStatusBox() {
           disabled={!recentOrders.length}
           className="flex w-full items-center justify-between rounded-xl border border-blue-100 bg-white px-3 py-2 text-left hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-45"
         >
-          <span className="text-[11px] font-black text-blue-800">📦 새 주문서 최대 2건 복사</span>
+          <span className="text-[11px] font-black text-blue-800">📦 새 주문서 복사</span>
           <span className="text-[11px] font-black text-blue-600">{Math.min(2, recentOrders.length)}건</span>
         </button>
 
@@ -432,7 +432,7 @@ export default function LiveOpsStatusBox() {
           disabled={!autoPaidOrders.length}
           className="flex w-full items-center justify-between rounded-xl border border-emerald-100 bg-white px-3 py-2 text-left hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-45"
         >
-          <span className="text-[11px] font-black text-emerald-800">💰 입금확인완료 최대 3건 복사</span>
+          <span className="text-[11px] font-black text-emerald-800">💰 입금확인완료 복사</span>
           <span className="text-[11px] font-black text-emerald-600">{Math.min(3, autoPaidOrders.length)}건</span>
         </button>
       </div>
