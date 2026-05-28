@@ -912,14 +912,14 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                   return (
                     <div
                       key={pickString(product, ["id", "product_id"], String(absoluteIndex))}
-                      className="grid grid-cols-[28px_44px_minmax(0,1fr)_76px_78px_92px] items-center gap-2 py-2.5"
+                      className="grid grid-cols-[28px_48px_minmax(0,1fr)_82px_82px_84px] items-center gap-3 py-3.5"
                     >
                       <div className="text-xs font-black text-slate-400">{absoluteIndex}</div>
 
                       <button
                         type="button"
                         onClick={() => setSelectedProduct(product)}
-                        className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200"
+                        className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200"
                       >
                         {image ? (
                           <img src={image} alt="" className="h-full w-full object-cover" />
@@ -932,24 +932,25 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                         type="button"
                         onClick={() => setSelectedProduct(product)}
                         className="min-w-0 text-left"
+                        title={productName(product)}
                       >
-                        <div className="truncate text-xs font-black text-slate-950">
+                        <div className="truncate text-[13px] font-black leading-tight text-slate-950">
                           {pinnedPrefix(product)}{productName(product)}
                         </div>
-                        <div className="mt-0.5 truncate text-[11px] font-bold text-slate-500">
+                        <div className="mt-1 truncate text-[11px] font-bold text-slate-500">
                           {colorSummary(product)} / {sizeSummary(product)}
                         </div>
                       </button>
 
-                      <div className="text-right text-[11px] font-black text-slate-700">
+                      <div className="text-center text-[12px] font-black text-slate-800">
                         {money(productPrice(product))}
                       </div>
 
-                      <div className="flex justify-center">
+                      <div className="flex items-center justify-center">
                         <ProductFeatureBadges product={product} />
                       </div>
 
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex items-center justify-center">
                           
 
                           {listFilter === "hidden" ? (
