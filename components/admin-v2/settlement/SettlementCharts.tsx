@@ -234,7 +234,7 @@ export default function SettlementCharts({
                             title={`현재 실수익 ${won(item.net)}`}
                           />
                           <div
-                            className="w-3 rounded-t-full bg-rose-400 transition-all group-hover:brightness-110"
+                            className="w-3 rounded-t-full bg-slate-400 transition-all group-hover:brightness-110"
                             style={{ height: `${expenseHeight}%` }}
                             title={`지출 ${won(totalExpense)}`}
                           />
@@ -256,7 +256,7 @@ export default function SettlementCharts({
                   현재 실수익
                 </span>
                 <span className="inline-flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-rose-400" />
+                  <span className="h-2 w-2 rounded-full bg-slate-400" />
                   지출
                 </span>
               </div>
@@ -281,7 +281,7 @@ export default function SettlementCharts({
                       추가 정산 수익 <span className="font-black text-sky-700">{won(selectedTrend.manualIncome || 0)}</span>
                     </div>
                     <div>
-                      카드 수수료 <span className="font-black text-rose-700">{won(selectedTrend.fee)}</span>
+                      카드 수수료 <span className="font-black text-slate-700">{won(selectedTrend.fee)}</span>
                     </div>
                     <div>
                       창고/기타 지출 <span className="font-black text-violet-700">{won(selectedTrend.warehouseOtherExpense ?? selectedTrend.expense)}</span>
@@ -313,7 +313,7 @@ export default function SettlementCharts({
               type="button"
               onClick={() => setRankTab("sales")}
               className={`rounded-xl px-3 py-2 text-sm font-black transition ${
-                rankTab === "sales" ? "bg-white text-amber-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                rankTab === "sales" ? "bg-white text-blue-700 shadow-sm" : "text-slate-500 hover:text-slate-800"
               }`}
             >
               👑 매출 TOP
@@ -331,7 +331,7 @@ export default function SettlementCharts({
 
           <div
             className={`mt-4 flex min-h-0 flex-1 flex-col rounded-[22px] border p-3 ${
-              rankTab === "sales" ? "border-amber-100 bg-amber-50/50" : "border-slate-200 bg-slate-50"
+              rankTab === "sales" ? "border-blue-100 bg-blue-50/50" : "border-slate-200 bg-slate-50"
             }`}
           >
             <div className="flex items-center justify-between gap-3">
@@ -351,7 +351,7 @@ export default function SettlementCharts({
               ) : (
                 activeTopItems.map((item) => (
                   <div key={item.id} className="rounded-2xl bg-white px-3 py-2 shadow-sm">
-                    <div className={`text-[11px] font-black ${rankTab === "sales" ? "text-amber-600" : "text-slate-500"}`}>
+                    <div className={`text-[11px] font-black ${rankTab === "sales" ? "text-blue-700" : "text-slate-500"}`}>
                       {item.rank}위
                     </div>
                     <div className="mt-1 line-clamp-2 text-xs font-black leading-5 text-slate-800">{item.title}</div>

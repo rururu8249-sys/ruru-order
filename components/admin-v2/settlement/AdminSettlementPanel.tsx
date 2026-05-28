@@ -104,6 +104,7 @@ export default function AdminSettlementPanel({
   const [broadcastEndReportsLoading, setBroadcastEndReportsLoading] = useState(false);
   const [broadcastEndReportsReady, setBroadcastEndReportsReady] = useState(true);
   const [manualPanelOpen, setManualPanelOpen] = useState(false);
+  const [settlementDetailOpen, setSettlementDetailOpen] = useState(false);
 
   const loadManualEntries = useCallback(async () => {
     setManualEntriesLoading(true);
@@ -421,18 +422,14 @@ export default function AdminSettlementPanel({
           </div>
         </div>
 
-        <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs font-bold leading-5 text-blue-800">
-          기준: 결제완료 매출은 입금확인완료/카드결제완료 주문만 잡습니다. 아직 못 받은 금액은 현재 실수익 계산에서 제외합니다.
-          카드 수수료는 주문 당시 저장된 카드 수수료율을 우선 사용하고, 창고/기타 지출은 다음 단계의 정산 추가 입력과 연결합니다.
-        </div>
-
-        <div className="mt-4 rounded-3xl border border-slate-200 bg-slate-50 p-4">
-          <div className="text-sm font-black text-slate-950">정산 보는 순서</div>
-          <div className="mt-3 grid gap-2 text-xs font-bold text-slate-600 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl bg-white px-3 py-3 shadow-sm ring-1 ring-slate-100">1. 결제완료 매출 확인</div>
-            <div className="rounded-2xl bg-white px-3 py-3 shadow-sm ring-1 ring-slate-100">2. 아직 못 받은 금액 확인</div>
-            <div className="rounded-2xl bg-white px-3 py-3 shadow-sm ring-1 ring-slate-100">3. 카드 수수료와 창고/기타 지출 확인</div>
-            <div className="rounded-2xl bg-white px-3 py-3 shadow-sm ring-1 ring-slate-100">4. 현재 실수익 확인</div>
+        <div className="mt-4 rounded-3xl border border-blue-100 bg-blue-50 px-5 py-4 text-sm font-bold leading-6 text-blue-900">
+          <div className="text-sm font-black text-blue-950">돈 흐름 한눈에 보기</div>
+          <div className="mt-2 text-[13px] leading-6">
+            이번 기간 주문서 총금액은 <span className="font-black text-slate-950">{won(stats.totalOrderAmount)}</span>이고,
+            실제로 결제가 끝난 금액은 <span className="font-black text-blue-700">{won(stats.paidAmount)}</span>입니다.
+            아직 못 받은 금액은 <span className="font-black text-orange-700">{won(stats.unpaidAmount)}</span>이고,
+            카드 수수료와 창고/기타 지출처럼 빠지는 돈은 <span className="font-black text-slate-950">{won(stats.totalExpense)}</span>입니다.
+            그래서 현재 실수익은 <span className="font-black text-emerald-700">{won(stats.netAmount)}</span>입니다.
           </div>
         </div>
       </div>
@@ -450,42 +447,71 @@ export default function AdminSettlementPanel({
         onReset={resetFilters}
       />
 
-      <div className="grid gap-3 xl:grid-cols-[1.45fr_0.95fr]">
-        <div className="rounded-[28px] border border-blue-100 bg-blue-50 p-5 shadow-[0_14px_38px_rgba(37,99,235,0.08)]">
-          <div className="text-xs font-black tracking-[0.18em] text-blue-600">PERIOD SUMMARY</div>
-          <div className="mt-2 text-xl font-black tracking-[-0.04em] text-slate-950">선택기간 한 줄 요약</div>
-          <div className="mt-3 grid gap-2 text-sm font-bold leading-6 text-slate-700">
-            <p>선택기간 결제완료 매출은 <span className="font-black text-blue-700">{won(stats.paidAmount)}</span>입니다.</p>
-            <p>아직 못 받은 금액은 <span className="font-black text-orange-600">{won(stats.unpaidAmount)}</span>이며, 현재 실수익 계산에서는 제외됩니다.</p>
-            <p>카드 수수료와 창고/기타 지출을 반영한 현재 실수익은 <span className="font-black text-emerald-700">{won(stats.netAmount)}</span>입니다.</p>
+      <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_14px_38px_rgba(15,23,42,0.06)]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-xs font-black tracking-[0.18em] text-blue-600">TO DO</div>
+            <div className="mt-2 text-xl font-black tracking-[-0.04em] text-slate-950">지금 처리할 일</div>
           </div>
+          <div className="text-xs font-bold text-slate-400">돈이 새지 않게 확인할 것만 모았습니다.</div>
         </div>
 
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_14px_38px_rgba(15,23,42,0.06)]">
-          <div className="text-xs font-black tracking-[0.18em] text-slate-400">CHECK POINT</div>
-          <div className="mt-2 text-xl font-black tracking-[-0.04em] text-slate-950">초보자 체크포인트</div>
-          <div className="mt-3 grid gap-2 text-xs font-bold leading-5 text-slate-600">
-            <div className="rounded-2xl bg-slate-50 px-3 py-2">결제완료 매출이 실제 받은 매출 기준입니다.</div>
-            <div className="rounded-2xl bg-slate-50 px-3 py-2">아직 못 받은 금액은 들어오기 전까지 현재 실수익에 넣지 않습니다.</div>
-            <div className="rounded-2xl bg-slate-50 px-3 py-2">창고/기타 지출은 정산 추가 입력에서 따로 관리합니다.</div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-blue-100 bg-blue-50/45 px-4 py-3">
+            <div className="text-xs font-black text-slate-500">결제완료 매출 확인</div>
+            <div className="mt-2 text-2xl font-black tracking-[-0.05em] text-blue-700">{stats.paidCount.toLocaleString()}건</div>
+          </div>
+          <div className="rounded-2xl border border-orange-100 bg-orange-50/45 px-4 py-3">
+            <div className="text-xs font-black text-slate-500">아직 못 받은 금액 확인</div>
+            <div className="mt-2 text-2xl font-black tracking-[-0.05em] text-orange-700">{won(stats.unpaidAmount)}</div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <div className="text-xs font-black text-slate-500">창고/기타 지출 입력</div>
+            <div className="mt-2 text-2xl font-black tracking-[-0.05em] text-slate-800">{stats.manualExpenseCount.toLocaleString()}건</div>
+          </div>
+          <div className="rounded-2xl border border-blue-100 bg-white px-4 py-3">
+            <div className="text-xs font-black text-slate-500">방송종료 요약 확인</div>
+            <div className="mt-2 text-2xl font-black tracking-[-0.05em] text-blue-700">{broadcastEndReportsInScope.length.toLocaleString()}건</div>
           </div>
         </div>
       </div>
 
       <SettlementSummaryCards stats={stats} actualCardFeeRate={actualCardFeeRate} />
 
-      <SettlementCharts trend={trend} stats={stats} broadcastRows={broadcastRows} periodLabel={effectivePeriod.label} />
-
       <SettlementBroadcastTable rows={broadcastRows} />
 
-      <SettlementBroadcastEndReportTable
-        rows={broadcastEndReportsInScope}
-        loading={broadcastEndReportsLoading}
-        tableReady={broadcastEndReportsReady}
-      />
+      <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+        <button
+          type="button"
+          onClick={() => setSettlementDetailOpen((current) => !current)}
+          className="flex w-full items-center justify-between gap-3 px-6 py-5 text-left transition hover:bg-slate-50"
+        >
+          <div>
+            <div className="text-lg font-black text-slate-950">세부 보기</div>
+            <div className="mt-1 text-xs font-bold text-slate-400">
+              차트, 매출·지출 TOP, 무통장/카드 상세, 기존회원/신규회원, 방송종료 요약은 필요할 때만 확인합니다.
+            </div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-blue-700 shadow-sm">
+            {settlementDetailOpen ? "접기" : "열기"}
+          </div>
+        </button>
 
-      <div className="rounded-[30px] border border-orange-100 bg-orange-50 px-5 py-4 text-sm font-bold leading-6 text-orange-800">
-        추가 정산 내역은 주문서와 별도로 정산에만 반영됩니다. 삭제는 완전삭제가 아니라 비활성 처리됩니다. 상세 모달과 수정이력 로그는 다음 단계에서 보강합니다.
+        {settlementDetailOpen ? (
+          <div className="grid gap-5 border-t border-slate-100 p-5">
+            <SettlementCharts trend={trend} stats={stats} broadcastRows={broadcastRows} periodLabel={effectivePeriod.label} />
+
+            <SettlementBroadcastEndReportTable
+              rows={broadcastEndReportsInScope}
+              loading={broadcastEndReportsLoading}
+              tableReady={broadcastEndReportsReady}
+            />
+
+            <div className="rounded-[24px] border border-blue-100 bg-blue-50 px-5 py-4 text-sm font-bold leading-6 text-blue-900">
+              추가 정산 내역은 주문서와 별도로 정산에만 반영됩니다. 삭제는 완전삭제가 아니라 비활성 처리됩니다. 상세 모달과 수정이력 로그는 다음 단계에서 보강합니다.
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {manualPanelOpen ? (
@@ -493,7 +519,7 @@ export default function AdminSettlementPanel({
           <div className="absolute right-0 top-0 flex h-full w-full max-w-[1040px] flex-col overflow-hidden bg-slate-50 shadow-[0_30px_120px_rgba(15,23,42,0.45)]">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
               <div>
-                <div className="text-xs font-black tracking-[0.22em] text-violet-600">SETTLEMENT EXTRA ENTRY</div>
+                <div className="text-xs font-black tracking-[0.22em] text-blue-600">SETTLEMENT EXTRA ENTRY</div>
                 <div className="mt-1 text-xl font-black text-slate-950">정산 추가 입력</div>
               </div>
 

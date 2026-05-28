@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import type { SettlementBroadcastRow } from "./settlementTypes";
 import { won } from "./settlementUtils";
 
@@ -21,6 +21,12 @@ function getVisiblePages(currentPage: number, pageCount: number) {
   return Array.from({ length: end - start + 1 }, (_, index) => start + index);
 }
 
+function numberValue(value: unknown) {
+  const number = Number(value || 0);
+
+  return Number.isFinite(number) ? Math.round(number) : 0;
+}
+
 export default function SettlementBroadcastTable({
   rows,
 }: {
@@ -28,6 +34,7 @@ export default function SettlementBroadcastTable({
 }) {
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
+  const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
 
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   const safePage = Math.min(page, pageCount);
@@ -81,49 +88,99 @@ export default function SettlementBroadcastTable({
       </div>
 
       <div className="overflow-auto">
-        <table className="min-w-[1180px] w-full border-separate border-spacing-0">
+        <table className="min-w-[940px] w-full border-separate border-spacing-0">
           <thead>
             <tr className="bg-slate-50 text-xs font-black text-slate-500">
-              <th className="px-4 py-3 text-left">방송/날짜</th>
-              <th className="px-4 py-3 text-right">주문</th>
-              <th className="px-4 py-3 text-right">주문서 총금액</th>
+              <th className="px-4 py-3 text-left">날짜/방송명</th>
+              <th className="px-4 py-3 text-right">주문서 수</th>
               <th className="px-4 py-3 text-right">결제완료 매출</th>
-              <th className="px-4 py-3 text-right">무통장 결제완료</th>
-              <th className="px-4 py-3 text-right">카드 결제완료</th>
-              <th className="px-4 py-3 text-right">추가 정산 수익</th>
-              <th className="px-4 py-3 text-right">카드 수수료</th>
-              <th className="px-4 py-3 text-right">창고/기타 지출</th>
               <th className="px-4 py-3 text-right">아직 못 받은 금액</th>
+              <th className="px-4 py-3 text-right">빠지는 돈</th>
               <th className="px-4 py-3 text-right">현재 실수익</th>
+              <th className="px-4 py-3 text-center">상세</th>
             </tr>
           </thead>
 
           <tbody>
             {visibleRows.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-4 py-16 text-center text-sm font-bold text-slate-400">
+                <td colSpan={7} className="px-4 py-16 text-center text-sm font-bold text-slate-400">
                   표시할 방송별 정산 내역이 없습니다.
                 </td>
               </tr>
             ) : (
-              visibleRows.map((row) => (
-                <tr key={row.key} className="border-b border-slate-100 hover:bg-blue-50/30">
-                  <td className="border-b border-slate-100 px-4 py-4">
-                    <div className="max-w-[260px] truncate text-sm font-black text-slate-900">{row.label}</div>
-                    <div className="mt-1 text-xs font-bold text-slate-400">{row.dateKey}</div>
-                  </td>
-                  <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black text-slate-700">{row.count.toLocaleString()}건</td>
-                  <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-slate-900">{won(row.totalOrderAmount)}</td>
-                  <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-blue-700">{won(row.paidAmount)}</td>
-                  <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-emerald-700">{won(row.bankAmount)}</td>
-                  <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-blue-700">{won(row.cardAmount)}</td>
-                  <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-sky-700">{won(row.manualIncomeAmount)}</td>
-                  <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-rose-700">-{won(row.actualCardFee)}</td>
-                  <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-violet-700">-{won(row.warehouseOtherExpense)}</td>
-                  <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-orange-700">{won(row.unpaidAmount)}</td>
-                  <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-slate-950">{won(row.netAmount)}</td>
-                </tr>
-              ))
+              visibleRows.map((row) => {
+                const totalExpense = numberValue(row.actualCardFee) + numberValue(row.warehouseOtherExpense);
+                const isExpanded = expandedRowKey === row.key;
+
+                return (
+                  <Fragment key={row.key}>
+                    <tr className="border-b border-slate-100 hover:bg-blue-50/30">
+                      <td className="border-b border-slate-100 px-4 py-4">
+                        <div className="max-w-[260px] truncate text-sm font-black text-slate-900">{row.label}</div>
+                        <div className="mt-1 text-xs font-bold text-slate-400">{row.dateKey}</div>
+                      </td>
+                      <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black text-slate-700">
+                        {row.count.toLocaleString()}건
+                      </td>
+                      <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-blue-700">
+                        {won(row.paidAmount)}
+                      </td>
+                      <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-orange-700">
+                        {won(row.unpaidAmount)}
+                      </td>
+                      <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-slate-700">
+                        -{won(totalExpense)}
+                      </td>
+                      <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-slate-950">
+                        {won(row.netAmount)}
+                      </td>
+                      <td className="border-b border-slate-100 px-4 py-4 text-center">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedRowKey(isExpanded ? null : row.key)}
+                          className="rounded-2xl border border-blue-100 bg-white px-3 py-2 text-xs font-black text-blue-700 shadow-sm transition hover:bg-blue-50"
+                        >
+                          {isExpanded ? "닫기" : "보기"}
+                        </button>
+                      </td>
+                    </tr>
+
+                    {isExpanded ? (
+                      <tr>
+                        <td colSpan={7} className="border-b border-blue-100 bg-blue-50/45 px-4 py-4">
+                          <div className="grid gap-3 text-xs font-bold text-slate-600 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                            <div className="rounded-2xl bg-white px-3 py-3 shadow-sm">
+                              <div className="text-slate-400">주문서 총금액</div>
+                              <div className="mt-1 font-black text-slate-950">{won(row.totalOrderAmount)}</div>
+                            </div>
+                            <div className="rounded-2xl bg-white px-3 py-3 shadow-sm">
+                              <div className="text-slate-400">무통장 결제완료</div>
+                              <div className="mt-1 font-black text-blue-700">{won(row.bankAmount)}</div>
+                            </div>
+                            <div className="rounded-2xl bg-white px-3 py-3 shadow-sm">
+                              <div className="text-slate-400">카드 결제완료</div>
+                              <div className="mt-1 font-black text-blue-700">{won(row.cardAmount)}</div>
+                            </div>
+                            <div className="rounded-2xl bg-white px-3 py-3 shadow-sm">
+                              <div className="text-slate-400">추가 정산 수익</div>
+                              <div className="mt-1 font-black text-slate-950">{won(row.manualIncomeAmount)}</div>
+                            </div>
+                            <div className="rounded-2xl bg-white px-3 py-3 shadow-sm">
+                              <div className="text-slate-400">카드 수수료</div>
+                              <div className="mt-1 font-black text-slate-950">-{won(row.actualCardFee)}</div>
+                            </div>
+                            <div className="rounded-2xl bg-white px-3 py-3 shadow-sm">
+                              <div className="text-slate-400">창고/기타 지출</div>
+                              <div className="mt-1 font-black text-slate-950">-{won(row.warehouseOtherExpense)}</div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })
             )}
           </tbody>
         </table>

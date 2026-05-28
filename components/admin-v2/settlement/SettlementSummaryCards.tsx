@@ -15,7 +15,7 @@ function StatCard({
   label: string;
   value: string;
   sub?: string;
-  tone?: "slate" | "blue" | "green" | "orange" | "red" | "violet";
+  tone?: "slate" | "blue" | "green" | "orange";
   strong?: boolean;
 }) {
   const toneClass =
@@ -25,11 +25,7 @@ function StatCard({
         ? "border-emerald-100 bg-emerald-50/45"
         : tone === "orange"
           ? "border-orange-100 bg-orange-50/45"
-          : tone === "red"
-            ? "border-rose-100 bg-rose-50/45"
-            : tone === "violet"
-              ? "border-violet-100 bg-violet-50/45"
-              : "border-slate-200 bg-white";
+          : "border-slate-200 bg-white";
 
   const iconClass =
     tone === "blue"
@@ -38,11 +34,7 @@ function StatCard({
         ? "bg-emerald-100 text-emerald-700"
         : tone === "orange"
           ? "bg-orange-100 text-orange-700"
-          : tone === "red"
-            ? "bg-rose-100 text-rose-700"
-            : tone === "violet"
-              ? "bg-violet-100 text-violet-700"
-              : "bg-slate-100 text-slate-700";
+          : "bg-slate-100 text-slate-700";
 
   return (
     <div
@@ -80,19 +72,18 @@ export default function SettlementSummaryCards({
 }) {
   return (
     <div className="grid gap-3">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon="✅" label="결제완료 매출" value={won(stats.paidAmount)} sub={`${stats.paidCount.toLocaleString()}건`} tone="blue" strong />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <StatCard icon="🧾" label="주문서 총금액" value={won(stats.totalOrderAmount)} sub={`${stats.orderCount.toLocaleString()}건`} />
+        <StatCard icon="💳" label="결제완료 매출" value={won(stats.paidAmount)} sub={`${stats.paidCount.toLocaleString()}건`} tone="blue" strong />
         <StatCard icon="⏳" label="아직 못 받은 금액" value={won(stats.unpaidAmount)} sub="현재 실수익 계산 제외" tone="orange" />
-        <StatCard icon="➖" label={`카드 수수료(${percentText(actualCardFeeRate)})`} value={`-${won(stats.actualCardFee)}`} sub="자동 지출" tone="red" />
-        <StatCard icon="📈" label="현재 실수익" value={won(stats.netAmount)} sub="결제완료 매출 + 추가 정산 수익 - 총 지출" tone="green" strong />
+        <StatCard icon="➖" label="빠지는 돈" value={`-${won(stats.totalExpense)}`} sub={`카드 수수료 ${percentText(actualCardFeeRate)} + 창고/기타 지출`} />
+        <StatCard icon="📈" label="현재 실수익" value={won(stats.netAmount)} sub="결제완료 매출 + 추가 정산 수익 - 빠지는 돈" tone="green" strong />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        <StatCard icon="💰" label="주문서 총금액" value={won(stats.totalOrderAmount)} sub={`${stats.orderCount.toLocaleString()}건`} />
-        <StatCard icon="🏦" label="무통장 결제완료" value={won(stats.bankAmount)} sub={`${stats.bankCount.toLocaleString()}건`} tone="green" />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <StatCard icon="🏦" label="무통장 결제완료" value={won(stats.bankAmount)} sub={`${stats.bankCount.toLocaleString()}건`} tone="blue" />
         <StatCard icon="💳" label="카드 결제완료" value={won(stats.cardAmount)} sub={`${stats.cardCount.toLocaleString()}건`} tone="blue" />
-        <StatCard icon="🧾" label="추가 정산 수익" value={won(stats.manualIncomeAmount)} sub={`${stats.manualIncomeCount.toLocaleString()}건`} tone="blue" />
-        <StatCard icon="📦" label="창고/기타 지출" value={`-${won(stats.warehouseOtherExpense)}`} sub={`${stats.manualExpenseCount.toLocaleString()}건`} tone="violet" />
+        <StatCard icon="➕" label="추가 정산 수익" value={won(stats.manualIncomeAmount)} sub={`${stats.manualIncomeCount.toLocaleString()}건`} />
       </div>
     </div>
   );
