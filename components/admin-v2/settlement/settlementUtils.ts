@@ -100,13 +100,7 @@ export function isSettlementUnpaid(row: AnyRow) {
   if (isPaymentDone(row)) return false;
 
   const text = rowStatusText(row);
-  const method = paymentMethod(row);
-
-  return (
-    /입금확인\s*필요|확인필요|미입금|미결제|결제대기|주문확인전|대기|pending|unpaid/i.test(text) ||
-    method === "무통장입금" ||
-    method === "카드결제"
-  );
+  return /입금확인\s*필요|확인필요|미입금|미결제|결제대기|주문확인전|대기|pending|unpaid/i.test(text);
 }
 
 export function paymentMethod(row: AnyRow): PaymentFilter {
