@@ -404,6 +404,36 @@ function buildLiveBroadcastEndSummary({
   };
 }
 
+
+function buildLiveBroadcastEndPreviewSummary(): LiveBroadcastEndSummary {
+  const endedAt = new Date();
+  const startedAt = new Date(endedAt.getTime() - 1000 * 60 * 194);
+
+  return {
+    title: "미리보기 방송종료 요약",
+    broadcastDateText: formatBroadcastEndDate(startedAt.toISOString()),
+    startTimeText: formatBroadcastEndTime(startedAt.toISOString()),
+    endTimeText: formatBroadcastEndTime(endedAt.toISOString()),
+    durationText: formatBroadcastEndDuration(startedAt.toISOString(), endedAt.toISOString()),
+    orderCount: 28,
+    activeOrderCount: 27,
+    canceledCount: 1,
+    paidCount: 24,
+    paidAmount: 1847000,
+    bankPaidCount: 19,
+    bankPaidAmount: 1462000,
+    cardPaidCount: 5,
+    cardPaidAmount: 385000,
+    unpaidCount: 3,
+    unpaidAmount: 214000,
+    buyerCount: 18,
+    existingMemberCount: 11,
+    newMemberCount: 7,
+    visitorText: "미리보기 샘플 · 실제 방문 기록 아님",
+    memberBasisText: "미리보기 샘플",
+  };
+}
+
 export default function AdminLiveDashboard() {
   useAutoBankdaPaymentSync();
   const [activeMenu, setActiveMenu] = useState<AdminLiveMenuKey>(() => readMenuFromUrl());
@@ -528,6 +558,17 @@ export default function AdminLiveDashboard() {
   useEffect(() => {
     replacePanelInUrl(activeMenu);
   }, [activeMenu]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const url = new URL(window.location.href);
+    const previewMode = url.searchParams.get("preview");
+
+    if (previewMode !== "end-summary") return;
+
+    setBroadcastEndSummary(buildLiveBroadcastEndPreviewSummary());
+  }, []);
 
   const activeBroadcast = useMemo(() => getActiveBroadcast(broadcasts), [broadcasts]);
 
