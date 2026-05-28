@@ -15,10 +15,7 @@ import {
   toNumber,
   won,
 } from "./settlementUtils";
-import SettlementFilterBar from "./SettlementFilterBar";
-import SettlementCharts from "./SettlementCharts";
-import SettlementBroadcastTable from "./SettlementBroadcastTable";
-import SettlementBroadcastEndReportTable from "./SettlementBroadcastEndReportTable";
+import SettlementMoneyFlowDashboard from "./SettlementMoneyFlowDashboard";
 import SettlementManualEntryPanel from "./SettlementManualEntryPanel";
 
 type Props = {
@@ -495,286 +492,38 @@ export default function AdminSettlementPanel({
     setEndDate(localDateKey(lastDay));
   };
 
-  const moneyFlowItems = [
-    {
-      step: "1",
-      label: "주문서 총금액",
-      value: won(stats.totalOrderAmount),
-      sub: `${stats.orderCount.toLocaleString()}건`,
-      icon: "🧾",
-      cardClass: "border-blue-100 bg-blue-50/40",
-      badgeClass: "bg-blue-600 text-white",
-      valueClass: "text-slate-950",
-    },
-    {
-      step: "2",
-      label: "결제완료 매출",
-      value: won(stats.paidAmount),
-      sub: `${stats.paidCount.toLocaleString()}건`,
-      icon: "💳",
-      cardClass: "border-blue-100 bg-white",
-      badgeClass: "bg-blue-600 text-white",
-      valueClass: "text-blue-700",
-    },
-    {
-      step: "3",
-      label: "아직 못 받은 금액",
-      value: won(stats.unpaidAmount),
-      sub: "현재 실수익 계산 제외",
-      icon: "⏳",
-      cardClass: "border-orange-100 bg-orange-50/40",
-      badgeClass: "bg-orange-500 text-white",
-      valueClass: "text-orange-700",
-    },
-    {
-      step: "4",
-      label: "빠지는 돈",
-      value: `-${won(stats.totalExpense)}`,
-      sub: `카드 수수료 ${actualCardFeeRate}% + 창고/기타 지출`,
-      icon: "➖",
-      cardClass: "border-slate-200 bg-white",
-      badgeClass: "bg-slate-700 text-white",
-      valueClass: "text-slate-950",
-    },
-    {
-      step: "5",
-      label: "현재 실수익",
-      value: won(stats.netAmount),
-      sub: "결제완료 매출 + 추가 정산 수익 - 빠지는 돈",
-      icon: "💰",
-      cardClass: "border-emerald-100 bg-emerald-50/50 ring-1 ring-emerald-100",
-      badgeClass: "bg-emerald-600 text-white",
-      valueClass: "text-emerald-700",
-    },
-  ];
-
   return (
     <section className="grid gap-5">
-      <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.06)]">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="text-xs font-black tracking-[0.22em] text-blue-600">SETTLEMENT STATS</div>
-            <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] text-slate-950">정산통계</h2>
-            <p className="mt-2 text-sm font-bold text-slate-500">
-              주문이 얼마 들어왔고, 실제 받은 돈과 아직 못 받은 돈, 빠지는 돈, 현재 실수익을 한눈에 봅니다.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setManualPanelOpen(true)}
-              className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
-            >
-              + 정산 추가 입력
-            </button>
-
-            <button
-              type="button"
-              onClick={exportSummaryCsv}
-              className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
-            >
-              정산 CSV 내보내기
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_14px_35px_rgba(15,23,42,0.05)]">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
-          <div className="flex flex-wrap gap-2">
-            {[
-              ["today", "오늘"],
-              ["week", "이번 주"],
-              ["month", "이번 달"],
-              ["lastMonth", "지난 달"],
-              ["year", "올해"],
-            ].map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => applyQuickRange(key)}
-                className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-black text-blue-700 transition hover:bg-blue-100"
-              >
-                {label}
-              </button>
-            ))}
-
-            <span className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-500">
-              직접 선택
-            </span>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <label className="flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-600">
-              <span className="text-xs text-slate-400">연도</span>
-              <select
-                value={selectedSettlementYear}
-                onChange={(event) => applyYearFilter(event.target.value)}
-                className="bg-transparent font-black outline-none"
-              >
-                {availableSettlementYears.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-600">
-              <span className="text-xs text-slate-400">월</span>
-              <select
-                value={selectedSettlementMonth}
-                onChange={(event) => applyMonthFilter(event.target.value)}
-                className="bg-transparent font-black outline-none"
-              >
-                <option value="all">전체</option>
-                {Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, "0")).map((month) => (
-                  <option key={month} value={month}>
-                    {Number(month)}월
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        </div>
-
-        <div className="pt-4">
-          <SettlementFilterBar
-            startDate={startDate}
-            endDate={endDate}
-            paymentFilter={paymentFilter}
-            broadcastOptions={broadcastOptions}
-            selectedBroadcastKeys={selectedBroadcastKeys}
-            onStartDateChange={setStartDate}
-            onEndDateChange={setEndDate}
-            onPaymentFilterChange={setPaymentFilter}
-            onSelectedBroadcastKeysChange={setSelectedBroadcastKeys}
-            onReset={resetFilters}
-          />
-        </div>
-      </div>
-
-      <div className="rounded-[34px] border border-blue-100 bg-white p-5 shadow-[0_18px_45px_rgba(37,99,235,0.08)]">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <div className="text-xs font-black tracking-[0.2em] text-blue-600">MONEY FLOW</div>
-            <div className="mt-1 text-2xl font-black tracking-[-0.04em] text-slate-950">돈 흐름 5단계</div>
-          </div>
-          <div className="rounded-full bg-blue-50 px-4 py-2 text-xs font-black text-blue-700">
-            초보자 기준 핵심만 표시
-          </div>
-        </div>
-
-        <div className="grid gap-3 xl:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr_auto_1.1fr]">
-          {moneyFlowItems.map((item, index) => (
-            <div key={item.label} className="contents">
-              <div
-                className={`min-h-[124px] rounded-[26px] border px-4 py-4 shadow-[0_12px_28px_rgba(15,23,42,0.045)] ${item.cardClass}`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className={`inline-flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-xs font-black ${item.badgeClass}`}>
-                      {item.step}
-                    </div>
-                    <div className="mt-3 text-sm font-black text-slate-500">{item.label}</div>
-                    <div className={`mt-2 truncate text-2xl font-black tracking-[-0.06em] ${item.valueClass}`}>{item.value}</div>
-                    <div className="mt-1 truncate text-[11px] font-bold text-slate-400">{item.sub}</div>
-                  </div>
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-lg shadow-sm">
-                    {item.icon}
-                  </div>
-                </div>
-              </div>
-
-              {index < moneyFlowItems.length - 1 ? (
-                <div className="hidden items-center justify-center text-2xl font-black text-blue-300 xl:flex">
-                  →
-                </div>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid gap-5 xl:grid-cols-[1fr_1.05fr]">
-        <div className="rounded-[30px] border border-blue-100 bg-blue-50/45 p-5 shadow-[0_14px_35px_rgba(37,99,235,0.06)]">
-          <div className="text-xs font-black tracking-[0.2em] text-blue-600">ONE LINE SUMMARY</div>
-          <div className="mt-2 text-xl font-black tracking-[-0.04em] text-slate-950">한 줄 요약</div>
-
-          <div className="mt-4 grid gap-2 text-sm font-bold leading-6 text-slate-700">
-            <p>① 이번 기간 주문서 총금액은 <span className="font-black text-slate-950">{won(stats.totalOrderAmount)}</span>입니다.</p>
-            <p>② 그중 실제로 결제가 끝난 금액은 <span className="font-black text-blue-700">{won(stats.paidAmount)}</span>입니다.</p>
-            <p>③ 아직 못 받은 금액은 <span className="font-black text-orange-700">{won(stats.unpaidAmount)}</span>입니다.</p>
-            <p>④ 카드 수수료와 창고/기타 지출을 빼면 현재 실수익은 <span className="font-black text-emerald-700">{won(stats.netAmount)}</span>입니다.</p>
-          </div>
-        </div>
-
-        <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_14px_35px_rgba(15,23,42,0.05)]">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-xs font-black tracking-[0.2em] text-blue-600">TO DO</div>
-              <div className="mt-2 text-xl font-black tracking-[-0.04em] text-slate-950">지금 처리할 일</div>
-            </div>
-            <div className="text-xs font-bold text-slate-400">방송 끝나고 바로 확인할 것</div>
-          </div>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-orange-100 bg-orange-50/45 px-4 py-3">
-              <div className="text-xs font-black text-slate-500">아직 못 받은 금액 확인</div>
-              <div className="mt-2 text-2xl font-black tracking-[-0.05em] text-orange-700">{won(stats.unpaidAmount)}</div>
-            </div>
-            <div className="rounded-2xl border border-blue-100 bg-blue-50/45 px-4 py-3">
-              <div className="text-xs font-black text-slate-500">결제완료 매출 확인</div>
-              <div className="mt-2 text-2xl font-black tracking-[-0.05em] text-blue-700">{stats.paidCount.toLocaleString()}건</div>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <div className="text-xs font-black text-slate-500">창고/기타 지출 입력</div>
-              <div className="mt-2 text-2xl font-black tracking-[-0.05em] text-slate-800">{stats.manualExpenseCount.toLocaleString()}건</div>
-            </div>
-            <div className="rounded-2xl border border-blue-100 bg-white px-4 py-3">
-              <div className="text-xs font-black text-slate-500">방송종료 요약 확인</div>
-              <div className="mt-2 text-2xl font-black tracking-[-0.05em] text-blue-700">{broadcastEndReportsInScope.length.toLocaleString()}건</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <SettlementBroadcastTable rows={broadcastRows} />
-
-      <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
-        <button
-          type="button"
-          onClick={() => setSettlementDetailOpen((current) => !current)}
-          className="flex w-full items-center justify-between gap-3 px-6 py-5 text-left transition hover:bg-slate-50"
-        >
-          <div>
-            <div className="text-lg font-black text-slate-950">세부 보기</div>
-            <div className="mt-1 text-xs font-bold text-slate-400">
-              차트, 무통장/카드 상세, 기존회원/신규회원, 방송종료 요약은 필요할 때만 확인합니다.
-            </div>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-blue-700 shadow-sm">
-            {settlementDetailOpen ? "접기" : "열기"}
-          </div>
-        </button>
-
-        {settlementDetailOpen ? (
-          <div className="grid gap-5 border-t border-slate-100 p-5">
-            <SettlementCharts trend={trend} stats={stats} broadcastRows={broadcastRows} periodLabel={effectivePeriod.label} />
-
-            <SettlementBroadcastEndReportTable
-              rows={broadcastEndReportsInScope}
-              loading={broadcastEndReportsLoading}
-              tableReady={broadcastEndReportsReady}
-            />
-
-            <div className="rounded-[24px] border border-blue-100 bg-blue-50 px-5 py-4 text-sm font-bold leading-6 text-blue-900">
-              추가 정산 내역은 주문서와 별도로 정산에만 반영됩니다. 삭제는 완전삭제가 아니라 비활성 처리됩니다. 상세 모달과 수정이력 로그는 다음 단계에서 보강합니다.
-            </div>
-          </div>
-        ) : null}
-      </div>
+      <SettlementMoneyFlowDashboard
+        stats={stats}
+        actualCardFeeRate={actualCardFeeRate}
+        startDate={startDate}
+        endDate={endDate}
+        paymentFilter={paymentFilter}
+        broadcastOptions={broadcastOptions}
+        selectedBroadcastKeys={selectedBroadcastKeys}
+        broadcastRows={broadcastRows}
+        trend={trend}
+        effectivePeriodLabel={effectivePeriod.label}
+        broadcastEndReportsInScope={broadcastEndReportsInScope}
+        broadcastEndReportsLoading={broadcastEndReportsLoading}
+        broadcastEndReportsReady={broadcastEndReportsReady}
+        settlementDetailOpen={settlementDetailOpen}
+        availableSettlementYears={availableSettlementYears}
+        selectedSettlementYear={selectedSettlementYear}
+        selectedSettlementMonth={selectedSettlementMonth}
+        onOpenManualPanel={() => setManualPanelOpen(true)}
+        onExportSummaryCsv={exportSummaryCsv}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
+        onPaymentFilterChange={setPaymentFilter}
+        onSelectedBroadcastKeysChange={setSelectedBroadcastKeys}
+        onResetFilters={resetFilters}
+        onQuickRange={applyQuickRange}
+        onYearFilter={applyYearFilter}
+        onMonthFilter={applyMonthFilter}
+        onToggleSettlementDetail={() => setSettlementDetailOpen((current) => !current)}
+      />
 
       {manualPanelOpen ? (
         <div className="fixed inset-0 z-[90] bg-slate-950/35 backdrop-blur-[2px]">
