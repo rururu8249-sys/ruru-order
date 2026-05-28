@@ -2469,7 +2469,8 @@ export default function OrderPage() {
         {isAutoLoggedIn && (
           <>
 <section id="orderProductInputSection" className="mt-4 rounded-[2rem] border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
-          <h2 className="text-xl font-black">방송상품.공구상품</h2>
+          <h2 className="text-xl font-black">함께 주문 가능 상품</h2>
+          <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">필요한 상품은 선택하고, 목록에 없으면 아래 상품명에 직접 적어주세요.</p>
 
 
 

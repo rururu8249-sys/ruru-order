@@ -546,6 +546,7 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
               <span className="text-xl leading-none">+</span>
               <span className="mt-1">상품</span>
               <span>더보기</span>
+              <span className="mt-1 text-[10px] font-black text-blue-500">총 {products.length.toLocaleString("ko-KR")}개</span>
             </button>
           ) : null}
         </div>
@@ -587,6 +588,7 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
               <span className="text-xl leading-none">+</span>
               <span className="mt-1">상품</span>
               <span>더보기</span>
+              <span className="mt-1 text-[10px] font-black text-blue-500">총 {products.length.toLocaleString("ko-KR")}개</span>
             </button>
           ) : null}
         </div>
@@ -600,9 +602,9 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
 
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-2xl font-black tracking-[-0.05em] text-gray-950">등록상품 전체보기</div>
+                  <div className="text-2xl font-black tracking-[-0.05em] text-gray-950">상품 선택하기</div>
                   <div className="mt-1 text-sm font-bold tracking-[-0.04em] text-gray-500">
-                    검색/필터 후 상품을 선택해주세요.
+                    필요한 상품만 선택해주세요. 목록에 없으면 주문서에 직접 입력하시면 됩니다.
                   </div>
                 </div>
 
