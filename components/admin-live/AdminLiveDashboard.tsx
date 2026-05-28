@@ -216,8 +216,8 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
 
   const statusLabelMap: Record<LiveOrderFilters["status"], string> = {
     all: "상태 전체보기",
-    unpaid: "미입금",
-    paid: "입금확인",
+    unpaid: "결제대기",
+    paid: "입금확인완료",
     manual_match_needed: "입금확인 필요",
     card_paid: "카드결제완료",
     card_unpaid: "카드 미결제",

@@ -150,8 +150,8 @@ export default function SettlementFilterBar({
             className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
           >
             <option value="전체">전체</option>
-            <option value="무통장입금">무통장</option>
-            <option value="카드결제">카드</option>
+            <option value="무통장입금">무통장입금</option>
+            <option value="카드결제">카드결제</option>
             <option value="기타">기타</option>
           </select>
         </label>

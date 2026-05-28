@@ -206,7 +206,7 @@ export default function AdminSettlementPanel({
     };
 
     const entryTypeLabel = (value: string) => {
-      return value === "income" ? "기타매출" : "창고정산/기타지출";
+      return value === "income" ? "기타매출" : "창고/기타 지출";
     };
 
     const weekdayNames = ["일", "월", "화", "수", "목", "금", "토"];
@@ -257,29 +257,29 @@ export default function AdminSettlementPanel({
       [],
       ["1. 정산 요약"],
       ["항목", "금액", "건수", "설명"],
-      ["총주문금액", moneyText(stats.totalOrderAmount), countText(stats.orderCount), "취소/환불 제외 주문 기준"],
-      ["완료매출", moneyText(stats.paidAmount), countText(stats.paidCount), "입금확인 완료 + 카드결제 완료 기준"],
-      ["무통장", moneyText(stats.bankAmount), countText(stats.bankCount), "입금확인 완료"],
-      ["카드", moneyText(stats.cardAmount), countText(stats.cardCount), "카드결제 완료"],
+      ["전체 주문금액(취소 제외)", moneyText(stats.totalOrderAmount), countText(stats.orderCount), "취소/환불 제외 주문 기준"],
+      ["완료매출", moneyText(stats.paidAmount), countText(stats.paidCount), "입금확인완료 + 카드결제완료 기준"],
+      ["무통장 완료매출", moneyText(stats.bankAmount), countText(stats.bankCount), "입금확인완료 기준"],
+      ["카드 완료매출", moneyText(stats.cardAmount), countText(stats.cardCount), "카드결제완료 기준"],
       ["기타매출", moneyText(stats.manualIncomeAmount), countText(stats.manualIncomeCount), "추가 정산 입력 기준"],
       ["카드수수료", moneyText(-numberValue(stats.actualCardFee)), "", `카드 결제완료 기준 ${actualCardFeeRate}% 또는 주문 저장 수수료율`],
-      ["창고정산/기타지출", moneyText(-numberValue(stats.warehouseOtherExpense)), countText(stats.manualExpenseCount), "추가 정산 입력 기준"],
-      ["지출합계", moneyText(-numberValue(stats.totalExpense)), "", "카드수수료 + 창고정산/기타지출"],
-      ["미입금/확인필요", moneyText(stats.unpaidAmount), "", "실수익 계산 제외"],
-      ["실수익", moneyText(stats.netAmount), "", "완료매출 + 기타매출 - 카드수수료 - 창고정산/기타지출"],
+      ["창고/기타 지출", moneyText(-numberValue(stats.warehouseOtherExpense)), countText(stats.manualExpenseCount), "추가 정산 입력 기준"],
+      ["총지출", moneyText(-numberValue(stats.totalExpense)), "", "카드수수료 + 창고/기타 지출"],
+      ["결제대기 금액", moneyText(stats.unpaidAmount), "", "실수익 계산 제외"],
+      ["실수익", moneyText(stats.netAmount), "", "완료매출 + 기타매출 - 카드수수료 - 창고/기타 지출"],
       [],
       ["2. 일자별 정산 내역"],
       [
         "정산일자",
         "주문건수",
-        "총주문금액",
+        "전체 주문금액(취소 제외)",
         "완료매출",
-        "무통장",
-        "카드",
+        "무통장 완료매출",
+        "카드 완료매출",
         "기타매출",
         "카드수수료",
-        "창고정산/기타지출",
-        "미입금/확인필요",
+        "창고/기타 지출",
+        "결제대기 금액",
         "실수익",
       ],
       ...broadcastRows.map((row) => [
@@ -310,7 +310,7 @@ export default function AdminSettlementPanel({
       ["deposits 전달 건수", countText(Array.isArray(deposits) ? deposits.length : 0)],
       ["카드수수료 기준", `${actualCardFeeRate}%`],
       ["파일 생성 기준", "루루동이 /admin-live 정산통계"],
-      ["산식", "실수익 = 완료매출 + 기타매출 - 카드수수료 - 창고정산/기타지출"],
+      ["산식", "실수익 = 완료매출 + 기타매출 - 카드수수료 - 창고/기타 지출"],
     ];
 
     const csv = rows.map((row) => row.map(escapeCsv).join(",")).join("\n");
@@ -335,7 +335,7 @@ export default function AdminSettlementPanel({
             <div className="text-xs font-black tracking-[0.22em] text-blue-600">SETTLEMENT STATS</div>
             <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] text-slate-950">정산통계</h2>
             <p className="mt-2 text-sm font-bold text-slate-500">
-              방송별·기간별 완료매출, 카드수수료, 창고정산/기타지출, 실수익을 조회 중심으로 확인합니다.
+              방송별·기간별 완료매출, 카드수수료, 창고/기타 지출, 실수익을 조회 중심으로 확인합니다.
             </p>
           </div>
 
@@ -359,8 +359,8 @@ export default function AdminSettlementPanel({
         </div>
 
         <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs font-bold leading-5 text-blue-800">
-          기준: 완료매출은 입금확인/카드완료 주문만 잡습니다. 미입금/확인필요는 실수익 계산에서 제외합니다.
-          카드수수료는 주문 당시 저장된 actual_card_fee_rate_applied를 우선 사용하고, 창고정산/기타지출은 다음 단계의 수동 지출 입력과 연결합니다.
+          기준: 완료매출은 입금확인완료/카드결제완료 주문만 잡습니다. 결제대기 금액은 실수익 계산에서 제외합니다.
+          카드수수료는 주문 당시 저장된 actual_card_fee_rate_applied를 우선 사용하고, 창고/기타 지출은 다음 단계의 정산 추가 입력과 연결합니다.
         </div>
       </div>
 

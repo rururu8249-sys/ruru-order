@@ -41,9 +41,9 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
       color: "bg-slate-50 text-slate-700",
     },
     {
-      label: "무통장 입금확인",
+      label: "무통장 입금확인완료",
       amount: money(bankPaid.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)),
-      sub: `입금확인 ${bankPaid.length}건`,
+      sub: `입금확인완료 ${bankPaid.length}건`,
       icon: "🏦",
       color: "bg-emerald-50 text-emerald-700",
     },

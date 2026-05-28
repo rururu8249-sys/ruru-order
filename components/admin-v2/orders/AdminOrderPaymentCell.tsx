@@ -24,9 +24,9 @@ export default function AdminOrderPaymentCell({
   onOpenManualMatch,
 }: AdminOrderPaymentCellProps) {
   const safePaymentMethod = paymentMethod || "";
-  const safePaymentLabel = paymentLabel || "미결제";
+  const safePaymentLabel = paymentLabel || "결제대기";
 
-  const displayLabel = isBankUnpaid ? "미결제" : safePaymentLabel;
+  const displayLabel = isBankUnpaid ? "무통장 미입금" : safePaymentLabel;
 
   const displayDesc = isBankUnpaid
     ? "입금 매칭 필요"

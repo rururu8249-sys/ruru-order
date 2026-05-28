@@ -80,16 +80,16 @@ export default function SettlementSummaryCards({
 }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-      <StatCard icon="💰" label="총주문액" value={won(stats.totalOrderAmount)} sub={`${stats.orderCount.toLocaleString()}건`} />
+      <StatCard icon="💰" label="전체 주문금액" value={won(stats.totalOrderAmount)} sub={`${stats.orderCount.toLocaleString()}건`} />
       <StatCard icon="✅" label="완료매출" value={won(stats.paidAmount)} sub={`${stats.paidCount.toLocaleString()}건`} tone="blue" />
-      <StatCard icon="🏦" label="무통장" value={won(stats.bankAmount)} sub={`${stats.bankCount.toLocaleString()}건`} tone="green" />
-      <StatCard icon="💳" label="카드" value={won(stats.cardAmount)} sub={`${stats.cardCount.toLocaleString()}건`} tone="blue" />
-      <StatCard icon="📈" label="실수익" value={won(stats.netAmount)} sub="완료매출 + 기타매출 - 지출" tone="green" strong />
+      <StatCard icon="🏦" label="무통장 완료매출" value={won(stats.bankAmount)} sub={`${stats.bankCount.toLocaleString()}건`} tone="green" />
+      <StatCard icon="💳" label="카드 완료매출" value={won(stats.cardAmount)} sub={`${stats.cardCount.toLocaleString()}건`} tone="blue" />
+      <StatCard icon="📈" label="실수익" value={won(stats.netAmount)} sub="완료매출 + 기타매출 - 총지출" tone="green" strong />
 
       <StatCard icon="🧾" label="기타매출" value={won(stats.manualIncomeAmount)} sub={`${stats.manualIncomeCount.toLocaleString()}건`} tone="blue" />
       <StatCard icon="➖" label={`카드수수료(${percentText(actualCardFeeRate)})`} value={`-${won(stats.actualCardFee)}`} sub="자동 지출" tone="red" />
-      <StatCard icon="📦" label="창고정산/기타지출" value={`-${won(stats.warehouseOtherExpense)}`} sub={`${stats.manualExpenseCount.toLocaleString()}건`} tone="violet" />
-      <StatCard icon="⏳" label="미입금/확인필요" value={won(stats.unpaidAmount)} sub="실수익 계산 제외" tone="orange" />
+      <StatCard icon="📦" label="창고/기타 지출" value={`-${won(stats.warehouseOtherExpense)}`} sub={`${stats.manualExpenseCount.toLocaleString()}건`} tone="violet" />
+      <StatCard icon="⏳" label="결제대기 금액" value={won(stats.unpaidAmount)} sub="실수익 계산 제외" tone="orange" />
     </div>
   );
 }

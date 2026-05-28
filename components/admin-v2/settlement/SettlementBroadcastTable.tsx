@@ -57,7 +57,7 @@ export default function SettlementBroadcastTable({
         <div>
           <div className="text-lg font-black text-slate-950">방송별 정산 리스트</div>
           <div className="mt-1 text-xs font-bold text-slate-400">
-            완료매출, 카드수수료, 창고정산/기타지출, 실수익을 방송 날짜 기준으로 묶어 보여줍니다.
+            완료매출, 카드수수료, 창고/기타 지출, 실수익을 방송 날짜 기준으로 묶어 보여줍니다.
           </div>
         </div>
 
@@ -86,14 +86,14 @@ export default function SettlementBroadcastTable({
             <tr className="bg-slate-50 text-xs font-black text-slate-500">
               <th className="px-4 py-3 text-left">방송/날짜</th>
               <th className="px-4 py-3 text-right">주문</th>
-              <th className="px-4 py-3 text-right">총주문액</th>
+              <th className="px-4 py-3 text-right">전체 주문금액</th>
               <th className="px-4 py-3 text-right">완료매출</th>
-              <th className="px-4 py-3 text-right">무통장</th>
-              <th className="px-4 py-3 text-right">카드</th>
+              <th className="px-4 py-3 text-right">무통장 완료매출</th>
+              <th className="px-4 py-3 text-right">카드 완료매출</th>
               <th className="px-4 py-3 text-right">기타매출</th>
               <th className="px-4 py-3 text-right">카드수수료</th>
-              <th className="px-4 py-3 text-right">창고정산/기타지출</th>
-              <th className="px-4 py-3 text-right">미입금/확인필요</th>
+              <th className="px-4 py-3 text-right">창고/기타 지출</th>
+              <th className="px-4 py-3 text-right">결제대기 금액</th>
               <th className="px-4 py-3 text-right">실수익</th>
             </tr>
           </thead>

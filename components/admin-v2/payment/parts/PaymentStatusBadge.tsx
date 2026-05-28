@@ -7,7 +7,7 @@ type PaymentStatusBadgeProps = {
 };
 
 export default function PaymentStatusBadge({ unpaid }: PaymentStatusBadgeProps) {
-  const label = unpaid ? "미입금" : "입금확인";
+  const label = unpaid ? "결제대기" : "입금확인완료";
   const tone = unpaid ? ADMIN_STATUS_TONES.unpaid : ADMIN_STATUS_TONES.autoPaid;
 
   return (

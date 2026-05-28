@@ -165,7 +165,7 @@ function statusBadge(order: LiveOrder) {
     return <span className="rounded-lg bg-red-100 px-2 py-1 text-xs font-black text-red-700">카드 미결제</span>;
   }
   if (order.paymentStatus === "unpaid") {
-    return <span className="rounded-lg bg-red-100 px-2 py-1 text-xs font-black text-red-700">미입금</span>;
+    return <span className="rounded-lg bg-red-100 px-2 py-1 text-xs font-black text-red-700">무통장 미입금</span>;
   }
   if (order.paymentStatus === "card_paid") {
     return <span className="rounded-lg bg-violet-100 px-2 py-1 text-xs font-black text-violet-700">카드결제완료</span>;
@@ -176,7 +176,7 @@ function statusBadge(order: LiveOrder) {
   if (order.paymentStatus === "manual_paid") {
     return <span className="rounded-lg bg-blue-100 px-2 py-1 text-xs font-black text-blue-700">수동입금확인</span>;
   }
-  return <span className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-700">입금확인</span>;
+  return <span className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-700">입금확인완료</span>;
 }
 
 type Props = {
@@ -360,8 +360,8 @@ export default function LiveOrderTable({
 
     const statusLabelMap: Record<LiveOrderStatusFilter, string> = {
       all: "상태: 전체보기",
-      unpaid: "미입금",
-      paid: "입금확인",
+      unpaid: "결제대기",
+      paid: "입금확인완료",
       manual_match_needed: "입금확인 필요",
       card_paid: "카드결제완료",
       card_unpaid: "카드 미결제",
@@ -404,8 +404,8 @@ export default function LiveOrderTable({
 
         {[
           ["전체", counts.total, "all"],
-          ["미입금", counts.unpaid, "unpaid"],
-          ["입금확인", counts.paid, "paid"],
+          ["결제대기", counts.unpaid, "unpaid"],
+          ["입금확인완료", counts.paid, "paid"],
           ["주문서취소", counts.canceled, "canceled"],
         ].map(([label, count, status]) => {
           const active = filters.status === status;
@@ -450,7 +450,7 @@ export default function LiveOrderTable({
 
             {canceledExportExcludedCount > 0 ? (
               <span className="rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-600">
-                취소 주문 {canceledExportExcludedCount.toLocaleString("ko-KR")}건은 엑셀 내보내기에서 자동 제외됩니다.
+                주문서취소 {canceledExportExcludedCount.toLocaleString("ko-KR")}건은 엑셀 내보내기에서 자동 제외됩니다.
               </span>
             ) : null}
 
@@ -536,8 +536,8 @@ export default function LiveOrderTable({
           onChange={(event) => updateFilter("status", event.target.value as LiveOrderStatusFilter)}
         >
           <option value="all">상태: 전체보기</option>
-          <option value="unpaid">미입금</option>
-          <option value="paid">입금확인</option>
+          <option value="unpaid">결제대기</option>
+          <option value="paid">입금확인완료</option>
           <option value="manual_match_needed">입금확인 필요</option>
           <option value="card_paid">카드결제완료</option>
           <option value="card_unpaid">카드 미결제</option>
@@ -571,7 +571,7 @@ export default function LiveOrderTable({
         <table className="w-full table-fixed border-collapse text-sm">
           <thead className="bg-slate-50 text-xs font-black text-slate-500">
             <tr>
-              <th className="w-[124px] px-4 py-3 text-left">입금확인</th>
+              <th className="w-[124px] px-4 py-3 text-left">결제상태</th>
               <th className="w-[88px] px-3 py-3 text-left">제출시간</th>
               <th className="w-[88px] px-3 py-3 text-left">입금시간</th>
               <th className="w-[150px] px-4 py-3 text-left">닉네임</th>
