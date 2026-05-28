@@ -22,6 +22,27 @@ function safeNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function isTruthyTestOrderFlag(value: unknown) {
+  return value === true || value === "true" || value === "t" || value === 1 || value === "1";
+}
+
+function cleanTestOrderText(value: unknown) {
+  return String(value ?? "").trim();
+}
+
+function firstTextFromGroupRows(group: OrderGroup, key: string) {
+  for (const row of group.rows || []) {
+    const value = cleanTestOrderText((row as any)[key]);
+    if (value) return value;
+  }
+
+  return null;
+}
+
+function groupHasTruthyFlag(group: OrderGroup, key: string) {
+  return (group.rows || []).some((row) => isTruthyTestOrderFlag((row as any)[key]));
+}
+
 function parseItemChangeHistory(value: unknown) {
   if (Array.isArray(value)) return value;
 
@@ -267,6 +288,13 @@ export function toAdminLiveOrder(group: OrderGroup): LiveOrder {
     cardPaymentTotalAmount: getGroupCardPaymentTotalAmount(group),
     memo: getMemo(group),
     deliveryMemo: getShippingRequestMemo(first) || "",
+    isTestOrder: groupHasTruthyFlag(group, "is_test_order"),
+    testOrderReason: firstTextFromGroupRows(group, "test_order_reason"),
+    operatorTestPhone: firstTextFromGroupRows(group, "operator_test_phone"),
+    excludeFromSettlement: groupHasTruthyFlag(group, "exclude_from_settlement"),
+    excludeFromPaymentMatch: groupHasTruthyFlag(group, "exclude_from_payment_match"),
+    excludeFromShipping: groupHasTruthyFlag(group, "exclude_from_shipping"),
+    excludeFromPicking: groupHasTruthyFlag(group, "exclude_from_picking"),
     items,
   };
 }

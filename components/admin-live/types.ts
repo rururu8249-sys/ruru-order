@@ -78,5 +78,12 @@ export type LiveOrder = {
   cardPaymentTotalAmount?: number;
   memo: string;
   deliveryMemo?: string | null;
+  isTestOrder?: boolean;
+  testOrderReason?: string | null;
+  operatorTestPhone?: string | null;
+  excludeFromSettlement?: boolean;
+  excludeFromPaymentMatch?: boolean;
+  excludeFromShipping?: boolean;
+  excludeFromPicking?: boolean;
   items: LiveOrderItem[];
 };

@@ -179,6 +179,28 @@ function statusBadge(order: LiveOrder) {
   return <span className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-700">입금확인완료</span>;
 }
 
+function testOrderBadge(order: LiveOrder) {
+  if (!order.isTestOrder) return null;
+
+  return (
+    <span
+      className="inline-flex shrink-0 items-center rounded-full border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-black text-red-700"
+      title={[
+        order.testOrderReason || "운영자 테스트 계정 주문",
+        order.operatorTestPhone ? `전화번호 ${order.operatorTestPhone}` : "",
+        order.excludeFromSettlement ? "정산제외 예정" : "",
+        order.excludeFromPaymentMatch ? "입금확인 제외 예정" : "",
+        order.excludeFromShipping ? "송장제외 예정" : "",
+        order.excludeFromPicking ? "피킹제외 예정" : "",
+      ]
+        .filter(Boolean)
+        .join(" · ")}
+    >
+      테스트 주문
+    </span>
+  );
+}
+
 type Props = {
   orders: LiveOrder[];
   allOrderCount: number;
@@ -601,7 +623,12 @@ export default function LiveOrderTable({
                 const selected = order.id === selectedOrderId;
                 return (
                   <tr key={order.id} className={selected ? "bg-blue-50/70" : "hover:bg-slate-50"}>
-                    <td className="px-4 py-3">{statusBadge(order)}</td>
+                    <td className="px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {statusBadge(order)}
+                      {testOrderBadge(order)}
+                    </div>
+                  </td>
                     <td className="px-3 py-3 font-bold text-slate-600">{order.submittedAt}</td>
                     <td className="px-3 py-3 font-bold text-slate-600">{order.paidAt || "-"}</td>
                     <td className="px-4 py-3">
