@@ -34,6 +34,43 @@ export type SettlementBroadcastOption = {
   count: number;
 };
 
+export type SettlementBroadcastEndReport = {
+  id: string;
+  broadcast_id: string;
+  broadcast_title?: string | null;
+  broadcast_date?: string | null;
+  started_at?: string | null;
+  ended_at?: string | null;
+  duration_minutes?: number | null;
+
+  order_count?: number | null;
+  active_order_count?: number | null;
+  canceled_count?: number | null;
+
+  paid_count?: number | null;
+  paid_amount?: number | null;
+
+  bank_paid_count?: number | null;
+  bank_paid_amount?: number | null;
+
+  card_paid_count?: number | null;
+  card_paid_amount?: number | null;
+
+  unpaid_count?: number | null;
+  unpaid_amount?: number | null;
+
+  buyer_count?: number | null;
+  existing_member_count?: number | null;
+  new_member_count?: number | null;
+
+  visitor_count?: number | null;
+  visitor_note?: string | null;
+  report_note?: string | null;
+
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 export type SettlementStats = {
   totalOrderAmount: number;
   paidAmount: number;

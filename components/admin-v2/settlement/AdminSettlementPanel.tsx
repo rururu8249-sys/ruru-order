@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
-import type { AnyRow, PaymentFilter, SettlementManualEntry, SettlementSettingsSummary } from "./settlementTypes";
+import type { AnyRow, PaymentFilter, SettlementBroadcastEndReport, SettlementManualEntry, SettlementSettingsSummary } from "./settlementTypes";
 import {
   buildBroadcastOptions,
   buildBroadcastRows,
@@ -19,6 +19,7 @@ import SettlementFilterBar from "./SettlementFilterBar";
 import SettlementSummaryCards from "./SettlementSummaryCards";
 import SettlementCharts from "./SettlementCharts";
 import SettlementBroadcastTable from "./SettlementBroadcastTable";
+import SettlementBroadcastEndReportTable from "./SettlementBroadcastEndReportTable";
 import SettlementManualEntryPanel from "./SettlementManualEntryPanel";
 
 type Props = {
@@ -99,6 +100,9 @@ export default function AdminSettlementPanel({
   const [manualEntries, setManualEntries] = useState<SettlementManualEntry[]>([]);
   const [manualEntriesLoading, setManualEntriesLoading] = useState(false);
   const [manualEntryTableReady, setManualEntryTableReady] = useState(true);
+  const [broadcastEndReports, setBroadcastEndReports] = useState<SettlementBroadcastEndReport[]>([]);
+  const [broadcastEndReportsLoading, setBroadcastEndReportsLoading] = useState(false);
+  const [broadcastEndReportsReady, setBroadcastEndReportsReady] = useState(true);
   const [manualPanelOpen, setManualPanelOpen] = useState(false);
 
   const loadManualEntries = useCallback(async () => {
@@ -136,9 +140,45 @@ export default function AdminSettlementPanel({
     }
   }, []);
 
+
+  const loadBroadcastEndReports = useCallback(async () => {
+    setBroadcastEndReportsLoading(true);
+
+    try {
+      const response = await fetch("/api/admin-live/broadcast-end-reports", {
+        method: "GET",
+      });
+
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok || payload?.ok !== true) {
+        const message = String(payload?.message || "방송종료 요약 리스트를 불러오지 못했습니다.");
+        const missingTable =
+          message.includes("broadcast_end_reports") ||
+          message.includes("schema cache") ||
+          message.includes("does not exist");
+
+        setBroadcastEndReportsReady(!missingTable);
+
+        if (!missingTable) {
+          showAdminToast("방송종료 요약 리스트 불러오기 실패\n\n" + message, "error");
+        }
+
+        setBroadcastEndReports([]);
+        return;
+      }
+
+      setBroadcastEndReportsReady(true);
+      setBroadcastEndReports(Array.isArray(payload.reports) ? payload.reports : []);
+    } finally {
+      setBroadcastEndReportsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadManualEntries();
-  }, [loadManualEntries]);
+    loadBroadcastEndReports();
+  }, [loadManualEntries, loadBroadcastEndReports]);
 
   const allRows = useMemo(() => flattenOrders(orderGroups, orders), [orderGroups, orders]);
 
@@ -169,6 +209,28 @@ export default function AdminSettlementPanel({
       paymentFilter,
     });
   }, [manualEntries, effectiveStartDate, effectiveEndDate, selectedBroadcastKeys, paymentFilter]);
+
+
+  const broadcastEndReportsInScope = useMemo(() => {
+    const selected = new Set(selectedBroadcastKeys);
+
+    return broadcastEndReports.filter((report) => {
+      const rawDateKey = String(report.broadcast_date || report.ended_at || report.created_at || "").slice(0, 10);
+      const dateKey = rawDateKey || "";
+
+      if (effectiveStartDate && dateKey && dateKey < effectiveStartDate) return false;
+      if (effectiveEndDate && dateKey && dateKey > effectiveEndDate) return false;
+
+      if (selected.size > 0) {
+        const dateKeyOption = `date:${dateKey}`;
+        const broadcastId = String(report.broadcast_id || "");
+
+        if (!selected.has(dateKeyOption) && !selected.has(broadcastId)) return false;
+      }
+
+      return true;
+    });
+  }, [broadcastEndReports, effectiveStartDate, effectiveEndDate, selectedBroadcastKeys]);
 
   const actualRateNumber = toNumber(actualCardFeeRate);
   const stats = useMemo(() => calculateStats(filteredRows, actualRateNumber, manualEntriesInScope), [filteredRows, actualRateNumber, manualEntriesInScope]);
@@ -415,6 +477,12 @@ export default function AdminSettlementPanel({
       <SettlementCharts trend={trend} stats={stats} broadcastRows={broadcastRows} periodLabel={effectivePeriod.label} />
 
       <SettlementBroadcastTable rows={broadcastRows} />
+
+      <SettlementBroadcastEndReportTable
+        rows={broadcastEndReportsInScope}
+        loading={broadcastEndReportsLoading}
+        tableReady={broadcastEndReportsReady}
+      />
 
       <div className="rounded-[30px] border border-orange-100 bg-orange-50 px-5 py-4 text-sm font-bold leading-6 text-orange-800">
         추가 정산 내역은 주문서와 별도로 정산에만 반영됩니다. 삭제는 완전삭제가 아니라 비활성 처리됩니다. 상세 모달과 수정이력 로그는 다음 단계에서 보강합니다.

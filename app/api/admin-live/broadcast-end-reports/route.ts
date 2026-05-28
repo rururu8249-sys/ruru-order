@@ -131,6 +131,48 @@ function assertAdminSession(request: NextRequest) {
   return { ok: true, status: 200, message: "" };
 }
 
+export async function GET(request: NextRequest) {
+  const auth = assertAdminSession(request);
+
+  if (!auth.ok) {
+    return jsonError(auth.message, auth.status);
+  }
+
+  try {
+    const supabase = createAdminSupabase();
+
+    const { data, error } = await supabase
+      .from("broadcast_end_reports")
+      .select("*")
+      .order("ended_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(300);
+
+    if (error) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: error.message,
+        },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      reports: data || [],
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: NextRequest) {
   const auth = assertAdminSession(request);
 
