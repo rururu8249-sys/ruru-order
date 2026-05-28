@@ -17,7 +17,7 @@ type StatusInfo = {
   className: string;
 };
 
-const DEFAULT_PAGE_SIZE = 4;
+const DEFAULT_PAGE_SIZE = 5;
 
 type ProductListFilter = "visible" | "hidden" | "all";
 
@@ -414,7 +414,7 @@ function ProductFeatureBadges({ product }: { product: ProductRow }) {
   return (
     <span
       data-ruru-product-feature-badges
-      className={["shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black", exposure.className].join(" ")}
+      className={["inline-flex h-7 min-w-[58px] shrink-0 items-center justify-center rounded-full px-2 text-[10px] font-black", exposure.className].join(" ")}
     >
       {exposure.label}
     </span>
@@ -912,38 +912,42 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                   return (
                     <div
                       key={pickString(product, ["id", "product_id"], String(absoluteIndex))}
-                      className="grid grid-cols-[36px_minmax(0,1fr)_104px] items-center gap-3 py-3"
+                      className="grid grid-cols-[28px_44px_minmax(0,1fr)_76px_78px_92px] items-center gap-2 py-2.5"
                     >
                       <div className="text-xs font-black text-slate-400">{absoluteIndex}</div>
 
                       <button
                         type="button"
                         onClick={() => setSelectedProduct(product)}
-                        className="grid min-w-0 grid-cols-[46px_minmax(0,1fr)] items-center gap-3 text-left"
+                        className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200"
                       >
-                        <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
-                          {image ? (
-                            <img src={image} alt="" className="h-full w-full object-cover" />
-                          ) : (
-                            <span className="text-[10px] font-black text-slate-400">NO</span>
-                          )}
-                        </div>
+                        {image ? (
+                          <img src={image} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="text-[10px] font-black text-slate-400">NO</span>
+                        )}
+                      </button>
 
-                        <div className="min-w-0">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <span className="min-w-0 truncate text-xs font-black text-slate-950">
-                              {pinnedPrefix(product)}{productName(product)}
-                            </span>
-                            <span className="shrink-0 text-[11px] font-black text-slate-700">
-                              {money(productPrice(product))}
-                            </span>
-                            <ProductFeatureBadges product={product} />
-                          </div>
-                          <div className="mt-0.5 truncate text-[11px] font-bold text-slate-500">
-                            {colorSummary(product)} / {sizeSummary(product)}
-                          </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedProduct(product)}
+                        className="min-w-0 text-left"
+                      >
+                        <div className="truncate text-xs font-black text-slate-950">
+                          {pinnedPrefix(product)}{productName(product)}
+                        </div>
+                        <div className="mt-0.5 truncate text-[11px] font-bold text-slate-500">
+                          {colorSummary(product)} / {sizeSummary(product)}
                         </div>
                       </button>
+
+                      <div className="text-right text-[11px] font-black text-slate-700">
+                        {money(productPrice(product))}
+                      </div>
+
+                      <div className="flex justify-center">
+                        <ProductFeatureBadges product={product} />
+                      </div>
 
                       <div className="flex items-center justify-end gap-1">
                           
