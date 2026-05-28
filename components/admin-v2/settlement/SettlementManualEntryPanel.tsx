@@ -7,7 +7,7 @@ import type { SettlementBroadcastOption, SettlementManualEntry, SettlementManual
 import SettlementManualEntryDetailModal, { type SettlementManualEntryLog } from "./SettlementManualEntryDetailModal";
 import { formatMoneyInput, manualEntryBroadcastKey, manualEntryDateKey, manualEntryLabel, toNumber, won } from "./settlementUtils";
 
-const PAGE_SIZE_OPTIONS = [10, 20, 30, 50];
+const PAGE_SIZE_OPTIONS = [5, 10, 20];
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
@@ -55,7 +55,7 @@ export default function SettlementManualEntryPanel({
   const [memo, setMemo] = useState("");
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState("");
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(5);
   const [page, setPage] = useState(1);
   const [detailEntry, setDetailEntry] = useState<SettlementManualEntry | null>(null);
   const [detailLogs, setDetailLogs] = useState<SettlementManualEntryLog[]>([]);
@@ -275,19 +275,19 @@ export default function SettlementManualEntryPanel({
   const totalExpense = entries.filter((entry) => entry.entry_type === "expense").reduce((sum, entry) => sum + toNumber(entry.amount), 0);
 
   return (
-    <div className="grid gap-4 rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+    <div className="grid gap-3 rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.045)]">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-bold leading-6 text-slate-500">
-            창고/기타 지출, 추가 정산 수익을 주문 데이터와 분리해서 빠르게 입력합니다.
+            주문서에 없는 창고/기타 지출과 추가 수익만 빠르게 입력합니다.
           </p>
         </div>
 
         <div className="flex gap-2">
-          <div className="rounded-2xl bg-blue-50 px-4 py-3 text-xs font-black text-blue-700">
+          <div className="rounded-full bg-blue-50 px-3 py-2 text-xs font-black text-blue-700">
             추가 정산 수익 {won(totalIncome)}
           </div>
-          <div className="rounded-2xl bg-violet-50 px-4 py-3 text-xs font-black text-violet-700">
+          <div className="rounded-full bg-violet-50 px-3 py-2 text-xs font-black text-violet-700">
             창고/기타 지출 -{won(totalExpense)}
           </div>
         </div>
@@ -300,8 +300,7 @@ export default function SettlementManualEntryPanel({
           내용을 실행해야 저장이 가능합니다.
         </div>
       ) : null}
-
-            <div className="grid gap-4 rounded-[26px] border border-slate-200 bg-slate-50 p-4">
+      <div className="grid gap-3 rounded-[22px] border border-slate-200 bg-slate-50 p-3">
         <div className="grid gap-3 lg:grid-cols-[0.85fr_1fr_1fr]">
           <label className="grid gap-1">
             <span className="text-xs font-black text-slate-500">구분</span>
@@ -312,7 +311,7 @@ export default function SettlementManualEntryPanel({
                 setEntryType(nextType);
                 setTitle(nextType === "income" ? "기타매출" : "창고정산");
               }}
-              className="h-12 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400"
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400"
             >
               <option value="expense">창고/기타 지출</option>
               <option value="income">추가 정산 수익</option>
@@ -325,7 +324,7 @@ export default function SettlementManualEntryPanel({
               type="date"
               value={entryDate}
               onChange={(event) => setEntryDate(event.target.value)}
-              className="h-12 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400"
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400"
             />
           </label>
 
@@ -335,7 +334,7 @@ export default function SettlementManualEntryPanel({
               value={amount}
               onChange={(event) => setAmount(formatMoneyInput(event.target.value))}
               placeholder="0"
-              className="h-12 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400"
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400"
             />
           </label>
         </div>
@@ -350,8 +349,8 @@ export default function SettlementManualEntryPanel({
                 onClick={() => setTitle(quickTitle)}
                 className={
                   title === quickTitle
-                    ? "rounded-full bg-blue-600 px-4 py-2 text-xs font-black text-white shadow-sm"
-                    : "rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-600 hover:bg-slate-50"
+                    ? "rounded-full bg-blue-600 px-3 py-1.5 text-xs font-black text-white shadow-sm"
+                    : "rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-600 hover:bg-slate-50"
                 }
               >
                 {quickTitle}
@@ -367,7 +366,7 @@ export default function SettlementManualEntryPanel({
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="창고정산, 택배비, 추가 정산 수익"
-              className="h-12 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400"
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400"
             />
           </label>
 
@@ -376,7 +375,7 @@ export default function SettlementManualEntryPanel({
             <select
               value={broadcastKey}
               onChange={(event) => setBroadcastKey(event.target.value)}
-              className="h-12 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400"
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400"
             >
               <option value="">날짜 기준 자동 연결</option>
               {broadcastOptions.slice(0, 120).map((option) => (
@@ -393,7 +392,7 @@ export default function SettlementManualEntryPanel({
             type="button"
             onClick={saveEntry}
             disabled={saving || !tableReady}
-            className="h-12 min-w-[180px] rounded-2xl bg-blue-600 px-6 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-45"
+            className="h-10 min-w-[150px] rounded-xl bg-blue-600 px-5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-45"
           >
             {saving ? "저장중" : editingId ? "수정 저장" : "입력 추가"}
           </button>
@@ -402,7 +401,7 @@ export default function SettlementManualEntryPanel({
             <button
               type="button"
               onClick={resetForm}
-              className="h-12 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-600 shadow-sm"
+              className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-600 shadow-sm"
             >
               수정 취소
             </button>
@@ -420,13 +419,13 @@ export default function SettlementManualEntryPanel({
           value={memo}
           onChange={(event) => setMemo(event.target.value)}
           placeholder="무슨 매출/지출인지 상세 메모를 적어주세요."
-          className="min-h-[78px] rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold outline-none focus:border-blue-400"
+          className="min-h-[62px] rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold outline-none focus:border-blue-400"
         />
       </label>
 
-      <div className="overflow-hidden rounded-[24px] border border-slate-200">
+      <div className="overflow-hidden rounded-[20px] border border-slate-200">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50 px-4 py-3">
-          <div className="text-sm font-black text-slate-800">추가 정산 내역</div>
+          <div className="text-sm font-black text-slate-800">최근 추가 정산 내역</div>
           <div className="flex items-center gap-2">
             <select
               value={pageSize}
@@ -434,7 +433,7 @@ export default function SettlementManualEntryPanel({
                 setPageSize(Number(event.target.value));
                 setPage(1);
               }}
-              className="h-9 rounded-xl border border-slate-200 bg-white px-2 text-xs font-black"
+              className="h-8 rounded-xl border border-slate-200 bg-white px-2 text-xs font-black"
             >
               {PAGE_SIZE_OPTIONS.map((size) => (
                 <option key={size} value={size}>
@@ -449,15 +448,15 @@ export default function SettlementManualEntryPanel({
         </div>
 
         <div className="overflow-auto">
-          <table className="min-w-[920px] w-full border-separate border-spacing-0">
+          <table className="min-w-[820px] w-full border-separate border-spacing-0">
             <thead>
               <tr className="bg-white text-xs font-black text-slate-500">
-                <th className="px-4 py-3 text-left">날짜/방송</th>
-                <th className="px-4 py-3 text-left">구분</th>
-                <th className="px-4 py-3 text-left">제목</th>
-                <th className="px-4 py-3 text-right">금액</th>
-                <th className="px-4 py-3 text-left">메모</th>
-                <th className="px-4 py-3 text-right">관리</th>
+                <th className="px-3 py-2.5 text-left">날짜/방송</th>
+                <th className="px-3 py-2.5 text-left">구분</th>
+                <th className="px-3 py-2.5 text-left">제목</th>
+                <th className="px-3 py-2.5 text-right">금액</th>
+                <th className="px-3 py-2.5 text-left">메모</th>
+                <th className="px-3 py-2.5 text-right">관리</th>
               </tr>
             </thead>
 
@@ -477,26 +476,26 @@ export default function SettlementManualEntryPanel({
               ) : (
                 visibleEntries.map((entry) => (
                   <tr key={entry.id} className="hover:bg-blue-50/30">
-                    <td className="border-t border-slate-100 px-4 py-3">
+                    <td className="border-t border-slate-100 px-3 py-2.5">
                       <div className="text-sm font-black text-slate-900">{manualEntryDateKey(entry) || "-"}</div>
                       <div className="mt-1 max-w-[260px] truncate text-xs font-bold text-slate-400">
                         {entry.broadcast_label || manualEntryLabel(entry)}
                       </div>
                     </td>
-                    <td className="border-t border-slate-100 px-4 py-3">
+                    <td className="border-t border-slate-100 px-3 py-2.5">
                       <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${entryTypeTone(entry.entry_type)}`}>
                         {entryTypeLabel(entry.entry_type)}
                       </span>
                     </td>
-                    <td className="border-t border-slate-100 px-4 py-3 text-sm font-black text-slate-800">{entry.title}</td>
-                    <td className="border-t border-slate-100 px-4 py-3 text-right text-sm font-black tabular-nums text-slate-950">
+                    <td className="border-t border-slate-100 px-3 py-2.5 text-sm font-black text-slate-800">{entry.title}</td>
+                    <td className="border-t border-slate-100 px-3 py-2.5 text-right text-sm font-black tabular-nums text-slate-950">
                       {entry.entry_type === "expense" ? "-" : ""}
                       {won(entry.amount)}
                     </td>
-                    <td className="border-t border-slate-100 px-4 py-3">
+                    <td className="border-t border-slate-100 px-3 py-2.5">
                       <div className="max-w-[260px] truncate text-xs font-bold text-slate-500">{entry.memo || "-"}</div>
                     </td>
-                    <td className="border-t border-slate-100 px-4 py-3 text-right">
+                    <td className="border-t border-slate-100 px-3 py-2.5 text-right">
                       <div className="flex justify-end gap-2">
                         <button
                           type="button"
@@ -540,7 +539,7 @@ export default function SettlementManualEntryPanel({
               type="button"
               onClick={() => setPage(1)}
               disabled={safePage === 1}
-              className="h-9 rounded-xl border border-slate-200 px-3 text-xs font-black disabled:opacity-40"
+              className="h-8 rounded-xl border border-slate-200 px-3 text-xs font-black disabled:opacity-40"
             >
               처음
             </button>
@@ -548,7 +547,7 @@ export default function SettlementManualEntryPanel({
               type="button"
               onClick={() => setPage(Math.max(1, safePage - 1))}
               disabled={safePage === 1}
-              className="h-9 rounded-xl border border-slate-200 px-3 text-xs font-black disabled:opacity-40"
+              className="h-8 rounded-xl border border-slate-200 px-3 text-xs font-black disabled:opacity-40"
             >
               이전
             </button>
@@ -572,7 +571,7 @@ export default function SettlementManualEntryPanel({
               type="button"
               onClick={() => setPage(Math.min(pageCount, safePage + 1))}
               disabled={safePage === pageCount}
-              className="h-9 rounded-xl border border-slate-200 px-3 text-xs font-black disabled:opacity-40"
+              className="h-8 rounded-xl border border-slate-200 px-3 text-xs font-black disabled:opacity-40"
             >
               다음
             </button>
@@ -580,7 +579,7 @@ export default function SettlementManualEntryPanel({
               type="button"
               onClick={() => setPage(pageCount)}
               disabled={safePage === pageCount}
-              className="h-9 rounded-xl border border-slate-200 px-3 text-xs font-black disabled:opacity-40"
+              className="h-8 rounded-xl border border-slate-200 px-3 text-xs font-black disabled:opacity-40"
             >
               마지막
             </button>
