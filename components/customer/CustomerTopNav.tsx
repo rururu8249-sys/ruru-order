@@ -11,6 +11,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import CustomerPointBadge from "@/components/customer/CustomerPointBadge";
+import CustomerTestAccountBadge from "@/components/customer/CustomerTestAccountBadge";
 import {
   clearSavedCustomerInfo,
   getCustomerGreetingName,
@@ -78,6 +79,7 @@ export default function CustomerTopNav({
         </Link>
 
         {isLoggedIn && <CustomerPointBadge className="shrink-0" />}
+        <CustomerTestAccountBadge />
       </div>
 
       <nav className={`mt-3 grid gap-2 ${isLoggedIn ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-1"}`}>

@@ -5,6 +5,7 @@
 import Link from "next/link";
 import CustomerPointBadge from "@/components/customer/CustomerPointBadge";
 
+import CustomerTestAccountBadge from "@/components/customer/CustomerTestAccountBadge";
 type OrderCustomerTopNavProps = {
   isLoggedIn: boolean;
   greetingName?: string;
@@ -38,6 +39,7 @@ export default function OrderCustomerTopNav({
 </div>
 
         {isLoggedIn && <CustomerPointBadge className="shrink-0" />}
+        <CustomerTestAccountBadge />
       </div>
 
       <nav className={`mt-3 grid gap-2 ${isLoggedIn ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-1"}`}>
