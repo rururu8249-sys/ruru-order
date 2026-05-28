@@ -434,6 +434,59 @@ function buildLiveBroadcastEndPreviewSummary(): LiveBroadcastEndSummary {
   };
 }
 
+
+async function saveLiveBroadcastEndReport({
+  broadcast,
+  summary,
+  endedAtIso,
+}: {
+  broadcast: AdminLiveBroadcast;
+  summary: LiveBroadcastEndSummary;
+  endedAtIso: string;
+}) {
+  const response = await fetch("/api/admin-live/broadcast-end-reports", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      broadcastId: broadcast.id,
+      broadcastTitle: summary.title,
+      startedAt: broadcast.started_at || broadcast.created_at || null,
+      endedAt: endedAtIso,
+
+      orderCount: summary.orderCount,
+      activeOrderCount: summary.activeOrderCount,
+      canceledCount: summary.canceledCount,
+
+      paidCount: summary.paidCount,
+      paidAmount: summary.paidAmount,
+
+      bankPaidCount: summary.bankPaidCount,
+      bankPaidAmount: summary.bankPaidAmount,
+
+      cardPaidCount: summary.cardPaidCount,
+      cardPaidAmount: summary.cardPaidAmount,
+
+      unpaidCount: summary.unpaidCount,
+      unpaidAmount: summary.unpaidAmount,
+
+      buyerCount: summary.buyerCount,
+      existingMemberCount: summary.existingMemberCount,
+      newMemberCount: summary.newMemberCount,
+
+      visitorCount: null,
+      visitorNote: summary.visitorText,
+    }),
+  });
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok || payload?.ok !== true) {
+    throw new Error(payload?.message || "방송종료 리포트 저장 실패");
+  }
+
+  return payload.report;
+}
+
 export default function AdminLiveDashboard() {
   useAutoBankdaPaymentSync();
   const [activeMenu, setActiveMenu] = useState<AdminLiveMenuKey>(() => readMenuFromUrl());
@@ -739,16 +792,32 @@ export default function AdminLiveDashboard() {
 
     if (!ok) return;
 
+    const endedAtIso = new Date().toISOString();
     const summary = buildLiveBroadcastEndSummary({
       broadcast: activeBroadcast,
       orders,
-      endedAtIso: new Date().toISOString(),
+      endedAtIso,
     });
 
     setSavingBroadcast(true);
 
     try {
       await endAdminLiveBroadcast(activeBroadcast.id);
+
+      try {
+        await saveLiveBroadcastEndReport({
+          broadcast: activeBroadcast,
+          summary,
+          endedAtIso,
+        });
+      } catch (reportError) {
+        showAdminToast(
+          "방송종료는 완료됐지만 요약 리포트 저장에 실패했습니다.\n\n" +
+            (reportError instanceof Error ? reportError.message : String(reportError)),
+          "warning"
+        );
+      }
+
       await loadBroadcasts();
       await loadOrders();
       setBroadcastEndSummary(summary);
