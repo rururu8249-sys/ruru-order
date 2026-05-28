@@ -13,15 +13,24 @@ function isPaid(order: LiveOrder) {
   return ["paid", "auto_paid", "manual_paid", "card_paid"].includes(order.paymentStatus);
 }
 
+function isCanceled(order: LiveOrder) {
+  return order.paymentStatus === "canceled";
+}
+
 export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 500건 전체" }: Props) {
   const totalOrderAmount = orders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
-  const paidOrders = orders.filter(isPaid);
+  const activeOrders = orders.filter((order) => !isCanceled(order));
+  const paidOrders = activeOrders.filter(isPaid);
   const paidAmount = paidOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
 
-  const bankPaid = orders.filter((order) => order.paymentMethod === "무통장입금" && isPaid(order));
-  const bankUnpaid = orders.filter((order) => order.paymentMethod === "무통장입금" && !isPaid(order));
-  const cardPaid = orders.filter((order) => order.paymentMethod === "카드결제" && isPaid(order));
-  const cardUnpaid = orders.filter((order) => order.paymentMethod === "카드결제" && !isPaid(order));
+  const bankPaid = activeOrders.filter((order) =>
+    order.paymentMethod === "무통장입금" && ["paid", "auto_paid", "manual_paid"].includes(order.paymentStatus)
+  );
+  const bankUnpaid = activeOrders.filter((order) =>
+    order.paymentMethod === "무통장입금" && ["unpaid", "manual_match_needed"].includes(order.paymentStatus)
+  );
+  const cardPaid = activeOrders.filter((order) => order.paymentMethod === "카드결제" && order.paymentStatus === "card_paid");
+  const cardUnpaid = activeOrders.filter((order) => order.paymentMethod === "카드결제" && order.paymentStatus === "card_unpaid");
 
   const stats = [
     {
