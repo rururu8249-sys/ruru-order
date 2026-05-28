@@ -403,7 +403,7 @@ function ProductFeatureBadges({ product }: { product: ProductRow }) {
           }
         : flags.nameSuggestionEnabled
           ? {
-              label: "검색만",
+              label: "검색",
               className: "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100",
             }
           : {
@@ -412,11 +412,12 @@ function ProductFeatureBadges({ product }: { product: ProductRow }) {
             };
 
   return (
-    <div data-ruru-product-feature-badges className="mt-1 flex flex-wrap gap-1">
-      <span className={["rounded-full px-2 py-0.5 text-[10px] font-black", exposure.className].join(" ")}>
-        {exposure.label}
-      </span>
-    </div>
+    <span
+      data-ruru-product-feature-badges
+      className={["shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black", exposure.className].join(" ")}
+    >
+      {exposure.label}
+    </span>
   );
 }
 
@@ -905,14 +906,13 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
             ) : (
               <div className="divide-y divide-slate-100">
                 {visibleProducts.map((product, index) => {
-                  const info = statusInfo(product);
                   const image = mainImage(product);
                   const absoluteIndex = pageStart + index + 1;
 
                   return (
                     <div
                       key={pickString(product, ["id", "product_id"], String(absoluteIndex))}
-                      className="grid grid-cols-[36px_minmax(0,1fr)_54px_176px] items-center gap-3 py-4"
+                      className="grid grid-cols-[36px_minmax(0,1fr)_104px] items-center gap-3 py-3"
                     >
                       <div className="text-xs font-black text-slate-400">{absoluteIndex}</div>
 
@@ -930,23 +930,22 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                         </div>
 
                         <div className="min-w-0">
-                          <div className="truncate text-xs font-black text-slate-950">
-                            {pinnedPrefix(product)}{productName(product)}
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="min-w-0 truncate text-xs font-black text-slate-950">
+                              {pinnedPrefix(product)}{productName(product)}
+                            </span>
+                            <span className="shrink-0 text-[11px] font-black text-slate-700">
+                              {money(productPrice(product))}
+                            </span>
+                            <ProductFeatureBadges product={product} />
                           </div>
                           <div className="mt-0.5 truncate text-[11px] font-bold text-slate-500">
-                            {money(productPrice(product))} · {colorSummary(product)} / {sizeSummary(product)}
+                            {colorSummary(product)} / {sizeSummary(product)}
                           </div>
-                          <ProductFeatureBadges product={product} />
                         </div>
                       </button>
 
-                      <div className="text-center">
-                        <span className={["inline-flex rounded-full px-2.5 py-1 text-[11px] font-black", info.className].join(" ")}>
-                          {info.label}
-                        </span>
-                      </div>
-
-                      <div className={`grid items-center gap-1 ${listFilter === "hidden" ? "grid-cols-3" : "grid-cols-2"}`}>
+                      <div className="flex items-center justify-end gap-1">
                           
 
                           {listFilter === "hidden" ? (
@@ -1102,7 +1101,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
               </button>
 
               <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-bold leading-5 text-slate-500">
-                기본값: 방송상품 · 일반배송 · 검색만 · 금액 미입력 시 고객 직접입력
+                기본값: 방송상품 · 일반배송 · 검색 · 금액 미입력 시 고객 직접입력
               </div>
             </div>
 

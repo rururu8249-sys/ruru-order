@@ -558,7 +558,7 @@ export default function QuickProductFastForm({
 
   const orderExposureOptions = [
     { value: "card_and_search", label: "카드+검색", desc: "카드 표시 + 상품명 검색" },
-    { value: "search_only", label: "검색만", desc: "카드 숨김 + 상품명 검색" },
+    { value: "search_only", label: "검색", desc: "카드 숨김 + 상품명 검색" },
     { value: "hidden", label: "숨김", desc: "카드/검색 모두 제외" },
   ] as const;
 
