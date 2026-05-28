@@ -1003,7 +1003,19 @@ export default function OrderPage() {
     }, 350);
 
     return () => window.clearTimeout(timer);
-  }, [customerPhone, zipcode, address, detailAddress, combineShippingSettings.enabled, combineShippingSettings.startAt, combineShippingSettings.endAt]);
+  }, [
+    customerPhone,
+    zipcode,
+    address,
+    detailAddress,
+    combineShippingSettings.enabled,
+    combineShippingSettings.startAt,
+    combineShippingSettings.endAt,
+    broadcast?.id,
+    broadcast?.status,
+    broadcast?.started_at,
+    broadcast?.created_at,
+  ]);
 
 
   const loadOrderSettings = async () => {
@@ -1320,6 +1332,34 @@ export default function OrderPage() {
 
   const currentShippingAddressSignature = getShippingAddressSignature(zipcode, address, detailAddress);
 
+  const resolveCurrentCombineShippingSettings = (sourceSettings: CombineShippingSettings): CombineShippingSettings => {
+    const activeBroadcastId = String(broadcast?.id || "").trim();
+    const activeBroadcastStatus = String(broadcast?.status || "").trim().toUpperCase();
+    const activeBroadcastStartAt = String(broadcast?.started_at || broadcast?.created_at || "").trim();
+
+    if (activeBroadcastId && activeBroadcastStatus === "ON" && activeBroadcastStartAt) {
+      const startedAtTime = new Date(activeBroadcastStartAt).getTime();
+
+      if (Number.isFinite(startedAtTime)) {
+        return {
+          ...sourceSettings,
+          enabled: true,
+          startAt: new Date(startedAtTime).toISOString(),
+          endAt: "2999-12-31T23:59:59.999Z",
+        };
+      }
+    }
+
+    const lookupWindow = resolveCombineShippingLookupWindow(sourceSettings);
+
+    return {
+      ...sourceSettings,
+      enabled: true,
+      startAt: lookupWindow.startAt,
+      endAt: lookupWindow.endAt,
+    };
+  };
+
   const getCombineShippingLocalKey = (
     phoneValue: string,
     settings: CombineShippingSettings,
@@ -1384,13 +1424,7 @@ export default function OrderPage() {
     }
 
     const loadedSettings = await loadCombineShippingSettings();
-    const lookupWindow = resolveCombineShippingLookupWindow(loadedSettings);
-    const settings: CombineShippingSettings = {
-      ...loadedSettings,
-      enabled: true,
-      startAt: lookupWindow.startAt,
-      endAt: lookupWindow.endAt,
-    };
+    const settings = resolveCurrentCombineShippingSettings(loadedSettings);
 
     if (hasPaidShippingInThisBrowser(cleanPhone, settings, addressSignature)) {
       setAlreadyPaidShipping(true);
@@ -2178,13 +2212,7 @@ export default function OrderPage() {
           : 0;
       const appliedTotalAmount = productAmount + appliedShippingFee + appliedCardExtra;
       const latestCombineSettings = await loadCombineShippingSettings();
-      const latestLookupWindow = resolveCombineShippingLookupWindow(latestCombineSettings);
-      const markCombineSettings: CombineShippingSettings = {
-        ...latestCombineSettings,
-        enabled: true,
-        startAt: latestLookupWindow.startAt,
-        endAt: latestLookupWindow.endAt,
-      };
+      const markCombineSettings = resolveCurrentCombineShippingSettings(latestCombineSettings);
 
       await saveCustomer();
 
