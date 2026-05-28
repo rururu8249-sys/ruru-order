@@ -330,12 +330,15 @@ export default function SettlementManualEntryPanel({
 
           <label className="grid gap-1">
             <span className="text-xs font-black text-slate-500">금액</span>
-            <input
+            <div className="relative">
+              <input
               value={amount}
               onChange={(event) => setAmount(formatMoneyInput(event.target.value))}
               placeholder="0"
-              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400"
-            />
+              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 pr-10 text-sm font-black outline-none focus:border-blue-400"
+              />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400">원</span>
+            </div>
           </label>
         </div>
 
@@ -448,7 +451,7 @@ export default function SettlementManualEntryPanel({
         </div>
 
         <div className="overflow-auto">
-          <table className="min-w-[820px] w-full border-separate border-spacing-0">
+          <table className="min-w-[760px] w-full border-separate border-spacing-0">
             <thead>
               <tr className="bg-white text-xs font-black text-slate-500">
                 <th className="px-3 py-2.5 text-left">날짜/방송</th>
@@ -463,13 +466,13 @@ export default function SettlementManualEntryPanel({
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm font-bold text-slate-400">
+                  <td colSpan={6} className="px-4 py-6 text-center text-sm font-bold text-slate-400">
                     불러오는 중...
                   </td>
                 </tr>
               ) : visibleEntries.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm font-bold text-slate-400">
+                  <td colSpan={6} className="px-4 py-6 text-center text-sm font-bold text-slate-400">
                     아직 추가한 정산 내역이 없습니다.
                   </td>
                 </tr>
