@@ -9,6 +9,7 @@ import type { LiveOrder } from "./types";
 import AdminLiveCustomerIssueRail from "./AdminLiveCustomerIssueRail";
 import AdminLivePhoneBlockPanel from "./AdminLivePhoneBlockPanel";
 import AdminLiveCustomerBlockReasonModal from "./AdminLiveCustomerBlockReasonModal";
+import AdminLiveCustomerPointPanel from "./AdminLiveCustomerPointPanel";
 import { CUSTOMER_TERMS } from "./adminLiveCustomerTerms";
 
 type Props = {
@@ -472,6 +473,8 @@ function CustomerDetailDrawer({
             </button>
           </div>
         </section>
+
+        <AdminLiveCustomerPointPanel customer={customer} />
 
         <section className="mt-5 grid gap-3 md:grid-cols-2">
           <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
