@@ -60,35 +60,53 @@ function outflowText(value: unknown) {
   return amount > 0 ? `-${won(amount)}` : "0원";
 }
 
-function MoneyCard({
-  step,
+function CompactFilterButton({
   label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="h-10 rounded-2xl border border-blue-100 bg-white px-4 text-sm font-black text-blue-700 shadow-sm transition hover:bg-blue-50"
+    >
+      {label}
+    </button>
+  );
+}
+
+function MoneyFlowCard({
+  step,
+  title,
   value,
-  sub,
+  note,
   tone,
 }: {
   step: string;
-  label: string;
+  title: string;
   value: string;
-  sub: string;
-  tone: "blue" | "orange" | "slate" | "green";
+  note: string;
+  tone: "blue" | "orange" | "dark" | "green";
 }) {
-  const box =
+  const toneClass =
     tone === "green"
-      ? "border-emerald-100 bg-emerald-50/60"
+      ? "border-emerald-100 bg-emerald-50/70"
       : tone === "orange"
-        ? "border-orange-100 bg-orange-50/55"
-        : tone === "slate"
+        ? "border-orange-100 bg-orange-50/70"
+        : tone === "dark"
           ? "border-slate-200 bg-white"
-          : "border-blue-100 bg-blue-50/55";
+          : "border-blue-100 bg-blue-50/65";
 
-  const badge =
+  const badgeClass =
     tone === "green"
       ? "bg-emerald-600 text-white"
       : tone === "orange"
         ? "bg-orange-500 text-white"
-        : tone === "slate"
-          ? "bg-slate-800 text-white"
+        : tone === "dark"
+          ? "bg-slate-900 text-white"
           : "bg-blue-600 text-white";
 
   const valueClass =
@@ -101,18 +119,22 @@ function MoneyCard({
           : "text-slate-950";
 
   return (
-    <div className={`rounded-[28px] border p-5 shadow-[0_16px_34px_rgba(15,23,42,0.055)] ${box}`}>
-      <div className={`inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-xs font-black ${badge}`}>
-        {step}
+    <div className={`min-h-[150px] rounded-[30px] border px-5 py-5 shadow-[0_18px_38px_rgba(15,23,42,0.06)] ${toneClass}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className={`inline-flex h-9 min-w-9 items-center justify-center rounded-full px-3 text-sm font-black ${badgeClass}`}>
+            {step}
+          </div>
+          <div className="mt-5 text-sm font-black text-slate-500">{title}</div>
+          <div className={`mt-2 truncate text-[30px] font-black tracking-[-0.07em] ${valueClass}`}>{value}</div>
+          <div className="mt-2 truncate text-xs font-bold text-slate-400">{note}</div>
+        </div>
       </div>
-      <div className="mt-4 text-sm font-black text-slate-500">{label}</div>
-      <div className={`mt-2 truncate text-[26px] font-black tracking-[-0.06em] ${valueClass}`}>{value}</div>
-      <div className="mt-1 truncate text-xs font-bold text-slate-400">{sub}</div>
     </div>
   );
 }
 
-function TodoCard({
+function ActionCard({
   label,
   value,
   tone,
@@ -121,15 +143,15 @@ function TodoCard({
   value: string;
   tone: "blue" | "orange" | "slate";
 }) {
-  const box =
+  const toneClass =
     tone === "orange"
-      ? "border-orange-100 bg-orange-50/55 text-orange-700"
+      ? "border-orange-100 bg-orange-50/65 text-orange-700"
       : tone === "blue"
-        ? "border-blue-100 bg-blue-50/55 text-blue-700"
-        : "border-slate-200 bg-slate-50 text-slate-900";
+        ? "border-blue-100 bg-blue-50/65 text-blue-700"
+        : "border-slate-200 bg-slate-50 text-slate-950";
 
   return (
-    <div className={`rounded-2xl border px-4 py-3 ${box}`}>
+    <div className={`rounded-[24px] border px-5 py-4 ${toneClass}`}>
       <div className="text-xs font-black text-slate-500">{label}</div>
       <div className="mt-2 text-2xl font-black tracking-[-0.05em]">{value}</div>
     </div>
@@ -166,7 +188,6 @@ export default function SettlementMoneyFlowDashboard({
   onMonthFilter,
   onToggleSettlementDetail,
 }: Props) {
-  const visibleBroadcastRows = broadcastRows.slice(0, 8);
   const selectedBroadcastValue =
     selectedBroadcastKeys.length === 0
       ? "__all__"
@@ -174,93 +195,83 @@ export default function SettlementMoneyFlowDashboard({
         ? selectedBroadcastKeys[0]
         : "__multiple__";
 
-  const moneyCards = [
+  const visibleBroadcastRows = broadcastRows.slice(0, 8);
+
+  const moneyFlowCards = [
     {
       step: "1",
-      label: "주문서 총금액",
+      title: "주문서 총금액",
       value: won(stats.totalOrderAmount),
-      sub: countText(stats.orderCount),
+      note: countText(stats.orderCount),
       tone: "blue" as const,
     },
     {
       step: "2",
-      label: "결제완료 매출",
+      title: "결제완료 매출",
       value: won(stats.paidAmount),
-      sub: countText(stats.paidCount),
+      note: countText(stats.paidCount),
       tone: "blue" as const,
     },
     {
       step: "3",
-      label: "아직 못 받은 금액",
+      title: "아직 못 받은 금액",
       value: won(stats.unpaidAmount),
-      sub: "현재 실수익 계산 제외",
+      note: "현재 실수익 계산 제외",
       tone: "orange" as const,
     },
     {
       step: "4",
-      label: "빠지는 돈",
+      title: "빠지는 돈",
       value: outflowText(stats.totalExpense),
-      sub: `카드 수수료 ${actualCardFeeRate}% + 창고/기타 지출`,
-      tone: "slate" as const,
+      note: `카드 수수료 ${actualCardFeeRate}% + 창고/기타 지출`,
+      tone: "dark" as const,
     },
     {
       step: "5",
-      label: "현재 실수익",
+      title: "현재 실수익",
       value: won(stats.netAmount),
-      sub: "실제로 남는 돈",
+      note: "실제로 남는 돈",
       tone: "green" as const,
     },
   ];
 
   return (
     <div className="grid gap-5">
-      <div className="rounded-[34px] border border-slate-200 bg-white p-6 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
+      <section className="rounded-[36px] border border-slate-200 bg-white p-6 shadow-[0_20px_55px_rgba(15,23,42,0.06)]">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="text-xs font-black tracking-[0.22em] text-blue-600">SETTLEMENT STATS</div>
-            <h2 className="mt-2 text-3xl font-black tracking-[-0.05em] text-slate-950">정산통계</h2>
+            <h2 className="text-[32px] font-black tracking-[-0.06em] text-slate-950">정산통계</h2>
             <p className="mt-2 text-sm font-bold text-slate-500">
-              주문이 얼마 들어왔고, 실제 받은 돈과 아직 못 받은 돈, 빠지는 돈, 현재 실수익만 먼저 봅니다.
+              초보자도 돈 흐름을 한눈에 볼 수 있게 핵심만 먼저 보여드립니다.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={onOpenManualPanel}
-              className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
+              className="h-12 rounded-2xl bg-blue-600 px-5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
             >
               + 정산 추가 입력
             </button>
             <button
               type="button"
               onClick={onExportSummaryCsv}
-              className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
+              className="h-12 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
             >
               정산 CSV 내보내기
             </button>
           </div>
         </div>
 
-        <div className="mt-5 rounded-[28px] border border-blue-100 bg-blue-50/55 p-4">
+        <div className="mt-5 rounded-[30px] border border-blue-100 bg-blue-50/45 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap gap-2">
-              {[
-                ["today", "오늘"],
-                ["week", "이번 주"],
-                ["month", "이번 달"],
-                ["lastMonth", "지난 달"],
-                ["year", "올해"],
-              ].map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => onQuickRange(key)}
-                  className="rounded-2xl border border-blue-100 bg-white px-4 py-2 text-sm font-black text-blue-700 transition hover:bg-blue-100"
-                >
-                  {label}
-                </button>
-              ))}
+              <CompactFilterButton label="오늘" onClick={() => onQuickRange("today")} />
+              <CompactFilterButton label="이번 주" onClick={() => onQuickRange("week")} />
+              <CompactFilterButton label="이번 달" onClick={() => onQuickRange("month")} />
+              <CompactFilterButton label="지난 달" onClick={() => onQuickRange("lastMonth")} />
+              <CompactFilterButton label="올해" onClick={() => onQuickRange("year")} />
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -272,9 +283,7 @@ export default function SettlementMoneyFlowDashboard({
                   className="bg-transparent font-black outline-none"
                 >
                   {availableSettlementYears.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
+                    <option key={year} value={year}>{year}</option>
                   ))}
                 </select>
               </label>
@@ -288,16 +297,14 @@ export default function SettlementMoneyFlowDashboard({
                 >
                   <option value="all">전체</option>
                   {Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, "0")).map((month) => (
-                    <option key={month} value={month}>
-                      {Number(month)}월
-                    </option>
+                    <option key={month} value={month}>{Number(month)}월</option>
                   ))}
                 </select>
               </label>
             </div>
           </div>
 
-          <div className="mt-4 grid gap-3 xl:grid-cols-[0.8fr_0.8fr_1fr_1fr_0.8fr_auto]">
+          <div className="mt-4 grid gap-3 xl:grid-cols-[0.85fr_0.85fr_1.2fr_1fr_1fr_auto]">
             <label className="grid gap-1 text-xs font-black text-slate-500">
               시작일
               <input
@@ -307,6 +314,7 @@ export default function SettlementMoneyFlowDashboard({
                 className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none"
               />
             </label>
+
             <label className="grid gap-1 text-xs font-black text-slate-500">
               종료일
               <input
@@ -316,6 +324,7 @@ export default function SettlementMoneyFlowDashboard({
                 className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none"
               />
             </label>
+
             <label className="grid gap-1 text-xs font-black text-slate-500">
               방송리스트
               <select
@@ -331,12 +340,11 @@ export default function SettlementMoneyFlowDashboard({
                   <option value="__multiple__">다중선택 {selectedBroadcastKeys.length.toLocaleString()}개</option>
                 ) : null}
                 {broadcastOptions.map((option) => (
-                  <option key={option.key} value={option.key}>
-                    {option.label}
-                  </option>
+                  <option key={option.key} value={option.key}>{option.label}</option>
                 ))}
               </select>
             </label>
+
             <label className="grid gap-1 text-xs font-black text-slate-500">
               결제수단
               <select
@@ -345,18 +353,18 @@ export default function SettlementMoneyFlowDashboard({
                 className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none"
               >
                 {(["전체", "무통장입금", "카드결제", "기타"] as PaymentFilter[]).map((value) => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
+                  <option key={value} value={value}>{value}</option>
                 ))}
               </select>
             </label>
+
             <div className="grid gap-1 text-xs font-black text-slate-500">
               조회 기준
               <div className="flex h-11 items-center rounded-2xl border border-blue-100 bg-white px-3 text-sm font-black text-blue-700">
                 {effectivePeriodLabel}
               </div>
             </div>
+
             <div className="flex items-end">
               <button
                 type="button"
@@ -388,27 +396,30 @@ export default function SettlementMoneyFlowDashboard({
             </div>
           </details>
         </div>
-      </div>
+      </section>
 
-      <div className="rounded-[36px] border border-blue-100 bg-white p-6 shadow-[0_20px_52px_rgba(37,99,235,0.09)]">
+      <section className="rounded-[38px] border border-blue-100 bg-white p-6 shadow-[0_22px_58px_rgba(37,99,235,0.1)]">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-xs font-black tracking-[0.24em] text-blue-600">MONEY FLOW</div>
-            <div className="mt-1 text-2xl font-black tracking-[-0.05em] text-slate-950">돈 흐름 5단계</div>
+            <div className="text-xs font-black tracking-[0.25em] text-blue-600">MONEY FLOW</div>
+            <h3 className="mt-1 text-[26px] font-black tracking-[-0.06em] text-slate-950">돈 흐름 5단계</h3>
           </div>
-          <div className="rounded-full bg-blue-50 px-4 py-2 text-xs font-black text-blue-700">초보자 기준 핵심만 표시</div>
+          <div className="rounded-full bg-blue-50 px-4 py-2 text-xs font-black text-blue-700">
+            주문 → 받은 돈 → 못 받은 돈 → 빠지는 돈 → 남는 돈
+          </div>
         </div>
+
         <div className="grid gap-3 xl:grid-cols-5">
-          {moneyCards.map((item) => (
-            <MoneyCard key={item.label} {...item} />
+          {moneyFlowCards.map((card) => (
+            <MoneyFlowCard key={card.title} {...card} />
           ))}
         </div>
-      </div>
+      </section>
 
-      <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
-        <div className="rounded-[32px] border border-blue-100 bg-blue-50/50 p-6 shadow-[0_16px_38px_rgba(37,99,235,0.06)]">
+      <section className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
+        <div className="rounded-[34px] border border-blue-100 bg-blue-50/55 p-6 shadow-[0_16px_40px_rgba(37,99,235,0.06)]">
           <div className="text-xs font-black tracking-[0.22em] text-blue-600">ONE LINE SUMMARY</div>
-          <div className="mt-2 text-2xl font-black tracking-[-0.05em] text-slate-950">한 줄 요약</div>
+          <h3 className="mt-2 text-2xl font-black tracking-[-0.05em] text-slate-950">한 줄 요약</h3>
           <div className="mt-5 grid gap-3 text-sm font-bold leading-6 text-slate-700">
             <p>① 이번 기간 주문서 총금액은 <span className="font-black text-slate-950">{won(stats.totalOrderAmount)}</span>입니다.</p>
             <p>② 실제 결제가 끝난 금액은 <span className="font-black text-blue-700">{won(stats.paidAmount)}</span>입니다.</p>
@@ -417,31 +428,32 @@ export default function SettlementMoneyFlowDashboard({
           </div>
         </div>
 
-        <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-[0_16px_38px_rgba(15,23,42,0.055)]">
+        <div className="rounded-[34px] border border-slate-200 bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.055)]">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-xs font-black tracking-[0.22em] text-blue-600">TO DO</div>
-              <div className="mt-2 text-2xl font-black tracking-[-0.05em] text-slate-950">지금 처리할 일</div>
+              <h3 className="mt-2 text-2xl font-black tracking-[-0.05em] text-slate-950">지금 처리할 일</h3>
             </div>
             <div className="text-xs font-bold text-slate-400">방송 끝나고 바로 확인할 것</div>
           </div>
+
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <TodoCard label="아직 못 받은 금액 확인" value={won(stats.unpaidAmount)} tone="orange" />
-            <TodoCard label="결제완료 매출 확인" value={countText(stats.paidCount)} tone="blue" />
-            <TodoCard label="창고/기타 지출 입력" value={countText(stats.manualExpenseCount)} tone="slate" />
-            <TodoCard label="방송종료 요약 확인" value={countText(broadcastEndReportsInScope.length)} tone="blue" />
+            <ActionCard label="아직 못 받은 금액 확인" value={won(stats.unpaidAmount)} tone="orange" />
+            <ActionCard label="결제완료 매출 확인" value={countText(stats.paidCount)} tone="blue" />
+            <ActionCard label="창고/기타 지출 입력" value={countText(stats.manualExpenseCount)} tone="slate" />
+            <ActionCard label="방송종료 요약 확인" value={countText(broadcastEndReportsInScope.length)} tone="blue" />
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="rounded-[34px] border border-slate-200 bg-white p-6 shadow-[0_18px_48px_rgba(15,23,42,0.055)]">
+      <section className="rounded-[36px] border border-slate-200 bg-white p-6 shadow-[0_18px_48px_rgba(15,23,42,0.055)]">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-xs font-black tracking-[0.22em] text-blue-600">BROADCAST SETTLEMENT</div>
-            <div className="mt-1 text-2xl font-black tracking-[-0.05em] text-slate-950">방송별 정산</div>
-            <div className="mt-1 text-xs font-bold text-slate-400">
+            <h3 className="mt-1 text-2xl font-black tracking-[-0.05em] text-slate-950">방송별 정산</h3>
+            <p className="mt-1 text-xs font-bold text-slate-400">
               방송 날짜별로 얼마 팔고, 아직 못 받은 돈과 현재 남은 돈을 확인합니다.
-            </div>
+            </p>
           </div>
           <div className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-600">
             총 {broadcastRows.length.toLocaleString("ko-KR")}개
@@ -471,7 +483,7 @@ export default function SettlementMoneyFlowDashboard({
                 visibleBroadcastRows.map((row) => (
                   <tr key={row.key} className="hover:bg-blue-50/30">
                     <td className="border-b border-slate-100 px-4 py-4">
-                      <div className="max-w-[300px] truncate text-sm font-black text-slate-950">{row.label}</div>
+                      <div className="max-w-[320px] truncate text-sm font-black text-slate-950">{row.label}</div>
                       <div className="mt-1 text-xs font-bold text-slate-400">{row.dateKey}</div>
                     </td>
                     <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black text-slate-700">{countText(row.count)}</td>
@@ -491,9 +503,9 @@ export default function SettlementMoneyFlowDashboard({
             최근 {visibleBroadcastRows.length.toLocaleString("ko-KR")}개만 먼저 표시합니다. 전체 상세는 CSV 또는 세부 보기에서 확인하세요.
           </div>
         ) : null}
-      </div>
+      </section>
 
-      <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+      <section className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
         <button
           type="button"
           onClick={onToggleSettlementDetail}
@@ -523,7 +535,7 @@ export default function SettlementMoneyFlowDashboard({
             </div>
           </div>
         ) : null}
-      </div>
+      </section>
     </div>
   );
 }
