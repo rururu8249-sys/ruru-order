@@ -15,6 +15,7 @@ import AdminLiveSidebar from "./AdminLiveSidebar";
 import LiveHeader from "./LiveHeader";
 import LiveStatsCards from "./LiveStatsCards";
 import LiveBroadcastPanels from "./LiveBroadcastPanels";
+import LiveBroadcastEndSummaryModal, { type LiveBroadcastEndSummary } from "./LiveBroadcastEndSummaryModal";
 import LiveOrderTable, { type LiveOrderFilters } from "./LiveOrderTable";
 import LiveOrderDetailDrawer from "./LiveOrderDetailDrawer";
 import {
@@ -260,6 +261,149 @@ function replacePanelInUrl(menu: AdminLiveMenuKey) {
   window.history.replaceState(null, "", `${url.pathname}?${url.searchParams.toString()}${url.hash}`);
 }
 
+
+const BROADCAST_END_PAID_STATUSES = ["paid", "auto_paid", "manual_paid", "card_paid"];
+
+function broadcastEndMoneyAmount(order: LiveOrder) {
+  if (order.paymentStatus === "card_paid" && Number(order.cardPaymentTotalAmount || 0) > 0) {
+    return Number(order.cardPaymentTotalAmount || 0);
+  }
+
+  return Number(order.totalAmount || 0);
+}
+
+function isBroadcastEndPaid(order: LiveOrder) {
+  return BROADCAST_END_PAID_STATUSES.includes(order.paymentStatus);
+}
+
+function isBroadcastEndCanceled(order: LiveOrder) {
+  return order.paymentStatus === "canceled";
+}
+
+function normalizeBroadcastEndPhone(value: unknown) {
+  return String(value ?? "").replace(/\D/g, "");
+}
+
+function formatBroadcastEndDate(value: string | null | undefined) {
+  if (!value) return "-";
+
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "-";
+
+  return date.toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+  });
+}
+
+function formatBroadcastEndTime(value: string | null | undefined) {
+  if (!value) return "-";
+
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "-";
+
+  return date.toLocaleTimeString("ko-KR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatBroadcastEndDuration(startValue: string | null | undefined, endValue: string | null | undefined) {
+  const startTime = startValue ? new Date(startValue).getTime() : NaN;
+  const endTime = endValue ? new Date(endValue).getTime() : NaN;
+
+  if (!Number.isFinite(startTime) || !Number.isFinite(endTime) || endTime < startTime) {
+    return "-";
+  }
+
+  const totalMinutes = Math.max(0, Math.round((endTime - startTime) / 60000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours <= 0) return `${minutes.toLocaleString("ko-KR")}분`;
+  return `${hours.toLocaleString("ko-KR")}시간 ${minutes.toLocaleString("ko-KR")}분`;
+}
+
+function isOrderInsideBroadcastEndSummary(order: LiveOrder, broadcast: AdminLiveBroadcast, endedAtIso: string) {
+  if (order.broadcastId && String(order.broadcastId) === String(broadcast.id)) return true;
+
+  const startValue = broadcast.started_at || broadcast.created_at || null;
+  const orderTime = order.createdAt ? new Date(order.createdAt).getTime() : NaN;
+  const startTime = startValue ? new Date(startValue).getTime() : NaN;
+  const endTime = new Date(endedAtIso).getTime();
+
+  if (!Number.isFinite(orderTime) || !Number.isFinite(startTime) || !Number.isFinite(endTime)) return false;
+
+  return orderTime >= startTime && orderTime <= endTime;
+}
+
+function buildLiveBroadcastEndSummary({
+  broadcast,
+  orders,
+  endedAtIso,
+}: {
+  broadcast: AdminLiveBroadcast;
+  orders: LiveOrder[];
+  endedAtIso: string;
+}): LiveBroadcastEndSummary {
+  const startValue = broadcast.started_at || broadcast.created_at || null;
+  const broadcastOrders = orders.filter((order) => isOrderInsideBroadcastEndSummary(order, broadcast, endedAtIso));
+  const activeOrders = broadcastOrders.filter((order) => !isBroadcastEndCanceled(order));
+  const canceledOrders = broadcastOrders.filter(isBroadcastEndCanceled);
+  const paidOrders = activeOrders.filter(isBroadcastEndPaid);
+  const unpaidOrders = activeOrders.filter((order) => !isBroadcastEndPaid(order));
+  const bankPaidOrders = paidOrders.filter((order) => order.paymentMethod === "무통장입금");
+  const cardPaidOrders = paidOrders.filter((order) => order.paymentMethod === "카드결제" || order.paymentStatus === "card_paid");
+
+  const currentPhones = Array.from(
+    new Set(activeOrders.map((order) => normalizeBroadcastEndPhone(order.phone)).filter(Boolean))
+  );
+
+  const startTime = startValue ? new Date(startValue).getTime() : NaN;
+  const previousPhones = new Set(
+    orders
+      .filter((order) => {
+        const orderTime = order.createdAt ? new Date(order.createdAt).getTime() : NaN;
+        return Number.isFinite(startTime) && Number.isFinite(orderTime) && orderTime < startTime;
+      })
+      .map((order) => normalizeBroadcastEndPhone(order.phone))
+      .filter(Boolean)
+  );
+
+  const existingMemberCount = currentPhones.filter((phone) => previousPhones.has(phone)).length;
+  const newMemberCount = Math.max(0, currentPhones.length - existingMemberCount);
+
+  const sum = (list: LiveOrder[]) => {
+    return list.reduce((total, order) => total + broadcastEndMoneyAmount(order), 0);
+  };
+
+  return {
+    title: broadcast.public_title || broadcast.admin_subtitle || "루루동이LIVE",
+    broadcastDateText: formatBroadcastEndDate(startValue || endedAtIso),
+    startTimeText: formatBroadcastEndTime(startValue),
+    endTimeText: formatBroadcastEndTime(endedAtIso),
+    durationText: formatBroadcastEndDuration(startValue, endedAtIso),
+    orderCount: broadcastOrders.length,
+    activeOrderCount: activeOrders.length,
+    canceledCount: canceledOrders.length,
+    paidCount: paidOrders.length,
+    paidAmount: sum(paidOrders),
+    bankPaidCount: bankPaidOrders.length,
+    bankPaidAmount: sum(bankPaidOrders),
+    cardPaidCount: cardPaidOrders.length,
+    cardPaidAmount: sum(cardPaidOrders),
+    unpaidCount: unpaidOrders.length,
+    unpaidAmount: sum(unpaidOrders),
+    buyerCount: currentPhones.length,
+    existingMemberCount,
+    newMemberCount,
+    visitorText: "방문 로그 설정 후 표시",
+    memberBasisText: "현재 불러온 주문 이력 기준",
+  };
+}
+
 export default function AdminLiveDashboard() {
   useAutoBankdaPaymentSync();
   const [activeMenu, setActiveMenu] = useState<AdminLiveMenuKey>(() => readMenuFromUrl());
@@ -275,6 +419,7 @@ export default function AdminLiveDashboard() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [filters, setFilters] = useState<LiveOrderFilters>(DEFAULT_FILTERS);
+  const [broadcastEndSummary, setBroadcastEndSummary] = useState<LiveBroadcastEndSummary | null>(null);
 
   const loadDepositsFromServer = async () => {
     const response = await fetch("/api/admin-v2/deposits", {
@@ -553,12 +698,19 @@ export default function AdminLiveDashboard() {
 
     if (!ok) return;
 
+    const summary = buildLiveBroadcastEndSummary({
+      broadcast: activeBroadcast,
+      orders,
+      endedAtIso: new Date().toISOString(),
+    });
+
     setSavingBroadcast(true);
 
     try {
       await endAdminLiveBroadcast(activeBroadcast.id);
       await loadBroadcasts();
       await loadOrders();
+      setBroadcastEndSummary(summary);
     } catch (error) {
       showAdminToast("방송종료 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
     } finally {
@@ -692,6 +844,18 @@ export default function AdminLiveDashboard() {
             onClose={() => setManualMatchGroup(null)}
             onMatched={refreshAfterManualMatch}
           />
+          {broadcastEndSummary ? (
+            <LiveBroadcastEndSummaryModal
+              summary={broadcastEndSummary}
+              onClose={() => setBroadcastEndSummary(null)}
+              onOpenSettlement={() => {
+                setBroadcastEndSummary(null);
+                setActiveMenu("settlement");
+                replacePanelInUrl("settlement");
+              }}
+            />
+          ) : null}
+
           <AdminLiveQuickProductDrawer activeBroadcastId={activeBroadcast?.id || null} />
 
       </main>
