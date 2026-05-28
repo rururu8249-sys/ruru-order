@@ -947,29 +947,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                       </div>
 
                       <div className={`grid items-center gap-1 ${listFilter === "hidden" ? "grid-cols-3" : "grid-cols-2"}`}>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (!product.id) return;
-                              const currentStatus = String(product.status || "판매중");
-                              const nextStatus = currentStatus === "숨김" ? "판매중" : "숨김";
-                              const { error } = await supabase.from("products").update({ status: nextStatus }).eq("id", product.id);
-
-                              if (error) {
-                                alert("상품 노출 변경 실패\n" + error.message);
-                                return;
-                              }
-
-                              await loadProducts();
-                            }}
-                            className={`h-8 min-w-[54px] whitespace-nowrap rounded-lg px-2 text-[11px] font-black leading-none transition ${
-                              String(product.status || "판매중") === "숨김"
-                                ? "bg-slate-100 text-slate-500 ring-1 ring-slate-200"
-                                : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
-                            }`}
-                          >
-                            {String(product.status || "판매중") === "숨김" ? "노출OFF" : "노출ON"}
-                          </button>
+                          
 
                           {listFilter === "hidden" ? (
                             <button
@@ -1068,17 +1046,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                       <div className="text-sm font-black text-slate-900">상품 {index + 1}</div>
 
                       <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => updateSimpleFastRow(index, { isVisible: !row.isVisible })}
-                          className={`h-8 rounded-xl px-3 text-xs font-black ${
-                            row.isVisible
-                              ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
-                              : "bg-slate-200 text-slate-500"
-                          }`}
-                        >
-                          {row.isVisible ? "노출ON" : "노출OFF"}
-                        </button>
+                        
 
                         {simpleFastRows.length > 1 ? (
                           <button
