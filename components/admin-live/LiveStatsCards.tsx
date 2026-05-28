@@ -14,7 +14,9 @@ function isPaid(order: LiveOrder) {
 }
 
 export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 500건 전체" }: Props) {
-  const totalAmount = orders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
+  const totalOrderAmount = orders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
+  const paidOrders = orders.filter(isPaid);
+  const paidAmount = paidOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
 
   const bankPaid = orders.filter((order) => order.paymentMethod === "무통장입금" && isPaid(order));
   const bankUnpaid = orders.filter((order) => order.paymentMethod === "무통장입금" && !isPaid(order));
@@ -23,9 +25,9 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
 
   const stats = [
     {
-      label: "총 주문금액",
-      amount: money(totalAmount),
-      sub: `주문 ${orders.length}건`,
+      label: "완료매출",
+      amount: money(paidAmount),
+      sub: `완료 ${paidOrders.length}건 · 전체 ${orders.length}건`,
       icon: "📈",
       color: "bg-slate-50 text-slate-700",
     },

@@ -342,7 +342,7 @@ export function calculateStats(
   const manualExpenseAmount = manualExpenseEntries.reduce((sum, entry) => sum + manualEntryAmount(entry), 0);
 
   const totalOrderAmount = orderTotalAmount + manualIncomeAmount;
-  const paidAmount = orderPaidAmount + manualIncomeAmount;
+  const paidAmount = orderPaidAmount;
   const unpaidAmount = unpaidRows.reduce((sum, row) => sum + orderNetAmount(row), 0);
   const bankAmount = bankRows.reduce((sum, row) => sum + orderNetAmount(row), 0);
   const cardAmount = cardRows.reduce((sum, row) => sum + orderNetAmount(row), 0);
@@ -364,7 +364,7 @@ export function calculateStats(
     actualCardFee,
     warehouseOtherExpense,
     totalExpense,
-    netAmount: paidAmount - totalExpense,
+    netAmount: paidAmount + manualIncomeAmount - totalExpense,
     refundAmount,
     canceledAmount,
     orderCount: activeRows.length,
