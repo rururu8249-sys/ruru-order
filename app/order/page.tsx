@@ -744,6 +744,60 @@ export default function OrderPage() {
     !isEditMode &&
     Boolean(customerPhone && youtubeNickname && customerName);
 
+  type OperatorTestOrderFlags = {
+    isTestOrder: boolean;
+    testOrderReason: string;
+    operatorTestPhone: string | null;
+    excludeFromSettlement: boolean;
+    excludeFromPaymentMatch: boolean;
+    excludeFromShipping: boolean;
+    excludeFromPicking: boolean;
+  };
+
+  const EMPTY_OPERATOR_TEST_ORDER_FLAGS: OperatorTestOrderFlags = {
+    isTestOrder: false,
+    testOrderReason: "",
+    operatorTestPhone: null,
+    excludeFromSettlement: false,
+    excludeFromPaymentMatch: false,
+    excludeFromShipping: false,
+    excludeFromPicking: false,
+  };
+
+  const getOperatorTestOrderFlags = async (phoneValue: string): Promise<OperatorTestOrderFlags> => {
+    const cleanPhone = normalizePhone(phoneValue);
+
+    if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+      return EMPTY_OPERATOR_TEST_ORDER_FLAGS;
+    }
+
+    try {
+      const response = await fetch(`/api/customer-test-account?phone=${encodeURIComponent(cleanPhone)}`, {
+        method: "GET",
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok || !payload?.ok || !payload?.isOperatorTestAccount) {
+        return EMPTY_OPERATOR_TEST_ORDER_FLAGS;
+      }
+
+      return {
+        isTestOrder: true,
+        testOrderReason: "운영자 테스트 계정 주문",
+        operatorTestPhone: cleanPhone,
+        excludeFromSettlement: Boolean(payload.excludeFromSettlement),
+        excludeFromPaymentMatch: Boolean(payload.excludeFromPaymentMatch),
+        excludeFromShipping: Boolean(payload.excludeFromShipping),
+        excludeFromPicking: Boolean(payload.excludeFromPicking),
+      };
+    } catch {
+      return EMPTY_OPERATOR_TEST_ORDER_FLAGS;
+    }
+  };
+
   const refreshCustomerBlockStatus = async (phoneValue: string) => {
     const cleanPhone = normalizePhone(phoneValue);
 
@@ -2196,6 +2250,7 @@ export default function OrderPage() {
 
     try {
       const cleanPhone = normalizePhone(customerPhone);
+      const operatorTestOrderFlags = await getOperatorTestOrderFlags(cleanPhone);
       const paidShippingBeforeSubmit = await checkAlreadyPaidShipping(cleanPhone);
       const validItems = items.filter(
         (item) =>
@@ -2289,6 +2344,14 @@ export default function OrderPage() {
           admin_status: "관리자 확인 전",
           order_manage_status: "주문확인전",
           shipping_status: "합배송중",
+
+          is_test_order: operatorTestOrderFlags.isTestOrder,
+          test_order_reason: operatorTestOrderFlags.isTestOrder ? operatorTestOrderFlags.testOrderReason : null,
+          operator_test_phone: operatorTestOrderFlags.isTestOrder ? operatorTestOrderFlags.operatorTestPhone : null,
+          exclude_from_settlement: operatorTestOrderFlags.excludeFromSettlement,
+          exclude_from_payment_match: operatorTestOrderFlags.excludeFromPaymentMatch,
+          exclude_from_shipping: operatorTestOrderFlags.excludeFromShipping,
+          exclude_from_picking: operatorTestOrderFlags.excludeFromPicking,
 
           memo: itemLabel(item),
           special_note: requestMemo.trim(),
