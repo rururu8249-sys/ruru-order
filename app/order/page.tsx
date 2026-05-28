@@ -1295,7 +1295,7 @@ export default function OrderPage() {
 
     const nextProducts = (data || [])
       .map((row: any) => row.products)
-      .filter((product: any) => product && product.status !== "숨김")
+      .filter((product: any) => product)
       .map((product: any) => ({
         id: product.id,
         product_name: product.product_name || "",
@@ -1913,11 +1913,13 @@ export default function OrderPage() {
   const totalAmount = productAmount + shippingFee + cardExtra;
 
   const filteredBroadcastProducts = useMemo(() => {
-    return broadcastProducts
+    const suggestionProducts = [...groupBuyQuickProductsFromCatalog, ...broadcastProducts];
+
+    return suggestionProducts
       .filter((product) => productSuggestionEnabled(product))
       .filter((product) => productMatchesSuggestion(product, productSearchText))
       .slice(0, 6);
-  }, [broadcastProducts, productSearchText]);
+  }, [broadcastProducts, groupBuyQuickProductsFromCatalog, productSearchText]);
 
   const quickGroupBuyProducts = useMemo(() => {
     const mergedProducts = [...groupBuyQuickProductsFromCatalog, ...broadcastProducts];
@@ -2565,7 +2567,7 @@ export default function OrderPage() {
 <input
                       value={item.product_name}
                       onFocus={() => {
-                        if (broadcastProducts.length > 0) {
+                        if (broadcastProducts.length + groupBuyQuickProductsFromCatalog.length > 0) {
                           setProductSearchOpenIndex(index);
                           setProductSearchText(item.product_name);
                         }
@@ -2586,7 +2588,7 @@ export default function OrderPage() {
   />
 </div>
 
-                    {productSearchOpenIndex === index && productSearchText.trim().length > 0 && broadcastProducts.length > 0 && (
+                    {productSearchOpenIndex === index && productSearchText.trim().length > 0 && broadcastProducts.length + groupBuyQuickProductsFromCatalog.length > 0 && (
                       <div className="absolute left-0 right-0 top-[58px] z-40 max-h-72 overflow-auto rounded-3xl border border-blue-100 bg-white p-2 shadow-[0_18px_45px_rgba(30,20,20,0.15)]">
                         <div className="px-3 py-2 text-xs font-black text-blue-600">
                           추천 상품명
