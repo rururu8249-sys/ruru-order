@@ -78,8 +78,12 @@ export default function CustomerTopNav({
           )}
         </Link>
 
-        {isLoggedIn && <CustomerPointBadge className="shrink-0" />}
-        <CustomerTestAccountBadge />
+        {isLoggedIn && (
+          <div className="flex shrink-0 flex-col items-end justify-start gap-1 self-start text-right">
+            <CustomerPointBadge />
+            <CustomerTestAccountBadge />
+          </div>
+        )}
       </div>
 
       <nav className={`mt-3 grid gap-2 ${isLoggedIn ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-1"}`}>

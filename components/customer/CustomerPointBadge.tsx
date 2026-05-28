@@ -9,7 +9,7 @@ type CustomerPointBadgeProps = {
 export default function CustomerPointBadge({ className = "" }: CustomerPointBadgeProps) {
   return (
     <div
-      className={`inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-2 text-[13px] font-black tracking-[-0.04em] text-blue-700 ring-1 ring-blue-100 ${className}`}
+      className={`inline-flex shrink-0 items-center justify-end gap-1 text-right text-[15px] font-black leading-tight tracking-[-0.04em] text-blue-700 whitespace-nowrap ${className}`}
     >
       <span>💰</span>
       <span>포인트 0원</span>

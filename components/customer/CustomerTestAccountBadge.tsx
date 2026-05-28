@@ -85,7 +85,7 @@ export default function CustomerTestAccountBadge() {
   if (state.loading || !state.visible) return null;
 
   return (
-    <div className="inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-slate-950 px-4 text-sm font-black text-white shadow-sm">
+    <div className="inline-flex shrink-0 items-center justify-end gap-1 text-right text-[15px] font-black leading-tight text-slate-950 whitespace-nowrap">
       💼 {state.label}
     </div>
   );
