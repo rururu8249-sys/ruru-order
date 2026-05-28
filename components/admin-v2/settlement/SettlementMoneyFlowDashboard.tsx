@@ -1,9 +1,5 @@
 "use client";
 
-import type { ComponentProps } from "react";
-import SettlementBroadcastEndReportTable from "./SettlementBroadcastEndReportTable";
-import SettlementCharts from "./SettlementCharts";
-import SettlementFilterBar from "./SettlementFilterBar";
 import type {
   PaymentFilter,
   SettlementBroadcastEndReport,
@@ -12,8 +8,6 @@ import type {
   SettlementStats,
 } from "./settlementTypes";
 import { won } from "./settlementUtils";
-
-type TrendRows = ComponentProps<typeof SettlementCharts>["trend"];
 
 type Props = {
   stats: SettlementStats;
@@ -24,7 +18,7 @@ type Props = {
   broadcastOptions: SettlementBroadcastOption[];
   selectedBroadcastKeys: string[];
   broadcastRows: SettlementBroadcastRow[];
-  trend: TrendRows;
+  trend: unknown;
   effectivePeriodLabel: string;
   broadcastEndReportsInScope: SettlementBroadcastEndReport[];
   broadcastEndReportsLoading: boolean;
@@ -188,6 +182,14 @@ export default function SettlementMoneyFlowDashboard({
   onMonthFilter,
   onToggleSettlementDetail,
 }: Props) {
+  void trend;
+  void effectivePeriodLabel;
+  void broadcastEndReportsInScope;
+  void broadcastEndReportsLoading;
+  void broadcastEndReportsReady;
+  void settlementDetailOpen;
+  void onToggleSettlementDetail;
+
   const selectedBroadcastValue =
     selectedBroadcastKeys.length === 0
       ? "__all__"
@@ -376,25 +378,6 @@ export default function SettlementMoneyFlowDashboard({
             </div>
           </div>
 
-          <details className="mt-3 rounded-2xl border border-slate-200 bg-white">
-            <summary className="cursor-pointer px-4 py-3 text-sm font-black text-slate-600">
-              상세 검색 열기
-            </summary>
-            <div className="border-t border-slate-100 p-3">
-              <SettlementFilterBar
-                startDate={startDate}
-                endDate={endDate}
-                paymentFilter={paymentFilter}
-                broadcastOptions={broadcastOptions}
-                selectedBroadcastKeys={selectedBroadcastKeys}
-                onStartDateChange={onStartDateChange}
-                onEndDateChange={onEndDateChange}
-                onPaymentFilterChange={onPaymentFilterChange}
-                onSelectedBroadcastKeysChange={onSelectedBroadcastKeysChange}
-                onReset={onResetFilters}
-              />
-            </div>
-          </details>
         </div>
       </section>
 
@@ -441,7 +424,7 @@ export default function SettlementMoneyFlowDashboard({
             <ActionCard label="아직 못 받은 금액 확인" value={won(stats.unpaidAmount)} tone="orange" />
             <ActionCard label="결제완료 매출 확인" value={countText(stats.paidCount)} tone="blue" />
             <ActionCard label="창고/기타 지출 입력" value={countText(stats.manualExpenseCount)} tone="slate" />
-            <ActionCard label="방송종료 요약 확인" value={countText(broadcastEndReportsInScope.length)} tone="blue" />
+            <ActionCard label="추가 정산 수익 확인" value={won(stats.manualIncomeAmount)} tone="blue" />
           </div>
         </div>
       </section>
@@ -500,42 +483,11 @@ export default function SettlementMoneyFlowDashboard({
 
         {broadcastRows.length > visibleBroadcastRows.length ? (
           <div className="mt-3 text-center text-xs font-bold text-slate-400">
-            최근 {visibleBroadcastRows.length.toLocaleString("ko-KR")}개만 먼저 표시합니다. 전체 상세는 CSV 또는 세부 보기에서 확인하세요.
+            최근 {visibleBroadcastRows.length.toLocaleString("ko-KR")}개만 먼저 표시합니다. 전체 내역은 CSV로 확인하세요.
           </div>
         ) : null}
       </section>
 
-      <section className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
-        <button
-          type="button"
-          onClick={onToggleSettlementDetail}
-          className="flex w-full items-center justify-between gap-3 px-6 py-5 text-left transition hover:bg-slate-50"
-        >
-          <div>
-            <div className="text-lg font-black text-slate-950">세부 보기</div>
-            <div className="mt-1 text-xs font-bold text-slate-400">
-              차트, 매출·지출 TOP, 방송종료 요약은 필요할 때만 확인합니다.
-            </div>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-blue-700 shadow-sm">
-            {settlementDetailOpen ? "접기" : "열기"}
-          </div>
-        </button>
-
-        {settlementDetailOpen ? (
-          <div className="grid gap-5 border-t border-slate-100 p-5">
-            <SettlementCharts trend={trend} stats={stats} broadcastRows={broadcastRows} periodLabel={effectivePeriodLabel} />
-            <SettlementBroadcastEndReportTable
-              rows={broadcastEndReportsInScope}
-              loading={broadcastEndReportsLoading}
-              tableReady={broadcastEndReportsReady}
-            />
-            <div className="rounded-[24px] border border-blue-100 bg-blue-50 px-5 py-4 text-sm font-bold leading-6 text-blue-900">
-              추가 정산 내역은 주문서와 별도로 정산에만 반영됩니다. 삭제는 완전삭제가 아니라 비활성 처리됩니다.
-            </div>
-          </div>
-        ) : null}
-      </section>
     </div>
   );
 }
