@@ -406,7 +406,6 @@ export default function LiveOrderTable({
           ["전체", counts.total, "all"],
           ["미입금", counts.unpaid, "unpaid"],
           ["입금확인", counts.paid, "paid"],
-          ["입금확인 필요", counts.manual, "manual_match_needed"],
           ["주문서취소", counts.canceled, "canceled"],
         ].map(([label, count, status]) => {
           const active = filters.status === status;

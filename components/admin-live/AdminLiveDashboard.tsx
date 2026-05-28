@@ -124,7 +124,7 @@ function isPaid(order: LiveOrder) {
 
 function matchesStatus(order: LiveOrder, status: LiveOrderFilters["status"]) {
   if (status === "all") return true;
-  if (status === "unpaid") return ["unpaid", "manual_match_needed"].includes(order.paymentStatus);
+  if (status === "unpaid") return ["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus);
   if (status === "paid") return isPaid(order);
   return order.paymentStatus === status;
 }
