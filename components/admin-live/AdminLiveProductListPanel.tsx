@@ -414,7 +414,7 @@ function ProductFeatureBadges({ product }: { product: ProductRow }) {
   return (
     <span
       data-ruru-product-feature-badges
-      className={["inline-flex h-7 min-w-[58px] shrink-0 items-center justify-center rounded-full px-2 text-[10px] font-black", exposure.className].join(" ")}
+      className={["inline-flex h-7 min-w-[52px] shrink-0 items-center justify-center rounded-full px-2 text-[10px] font-black", exposure.className].join(" ")}
     >
       {exposure.label}
     </span>
@@ -912,14 +912,14 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                   return (
                     <div
                       key={pickString(product, ["id", "product_id"], String(absoluteIndex))}
-                      className="grid grid-cols-[28px_48px_minmax(0,1fr)_82px_82px_84px] items-center gap-3 py-3.5"
+                      className="grid grid-cols-[24px_44px_minmax(0,1fr)_72px_70px_68px] items-center gap-2 py-3.5"
                     >
                       <div className="text-xs font-black text-slate-400">{absoluteIndex}</div>
 
                       <button
                         type="button"
                         onClick={() => setSelectedProduct(product)}
-                        className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200"
+                        className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200"
                       >
                         {image ? (
                           <img src={image} alt="" className="h-full w-full object-cover" />
@@ -942,7 +942,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                         </div>
                       </button>
 
-                      <div className="text-center text-[12px] font-black text-slate-800">
+                      <div className="text-right text-[12px] font-black text-slate-800">
                         {money(productPrice(product))}
                       </div>
 
