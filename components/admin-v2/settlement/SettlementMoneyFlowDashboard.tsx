@@ -251,7 +251,7 @@ export default function SettlementMoneyFlowDashboard({
       step: "3",
       title: "아직 못 받은 금액",
       value: won(stats.unpaidAmount),
-      note: "현재 실수익 계산 제외",
+      note: "아직 안 받은 돈은 제외",
       tone: "orange" as const,
     },
     {
@@ -441,7 +441,7 @@ export default function SettlementMoneyFlowDashboard({
               <p className="mt-1 text-sm font-black text-blue-700">이번 기간 돈 흐름을 문장으로 정리했습니다.</p>
             </div>
             <div className="rounded-full bg-white px-4 py-2 text-sm font-black text-blue-700 shadow-sm">
-              현재 실수익 {won(stats.netAmount)}
+              돈 흐름은 위 5단계 카드 기준
             </div>
           </div>
 
@@ -449,7 +449,7 @@ export default function SettlementMoneyFlowDashboard({
             <p>① 주문서 총금액은 <span className="font-black text-slate-950">{won(stats.totalOrderAmount)}</span>입니다.</p>
             <p>② 결제완료 매출은 <span className="font-black text-blue-700">{won(stats.paidAmount)}</span>입니다.</p>
             <p>③ 아직 못 받은 금액은 <span className="font-black text-orange-700">{won(stats.unpaidAmount)}</span>입니다.</p>
-            <p>④ 빠지는 돈을 빼면 현재 실수익은 <span className="font-black text-emerald-700">{won(stats.netAmount)}</span>입니다.</p>
+            <p>④ 마지막 초록색 카드가 실제로 남는 돈입니다.</p>
           </div>
         </div>
 
