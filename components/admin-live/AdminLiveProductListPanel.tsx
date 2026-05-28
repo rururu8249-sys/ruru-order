@@ -395,33 +395,26 @@ function ProductFeatureBadges({ product }: { product: ProductRow }) {
       ? {
           label: "숨김",
           className: "bg-slate-100 text-slate-500 ring-1 ring-slate-200",
-          desc: "카드/검색 제외",
         }
       : flags.registeredOrderEnabled
         ? {
             label: "카드+검색",
             className: "bg-blue-50 text-blue-700 ring-1 ring-blue-100",
-            desc: "카드 표시 + 상품명 검색",
           }
         : flags.nameSuggestionEnabled
           ? {
               label: "검색만",
               className: "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100",
-              desc: "카드 숨김 + 상품명 검색",
             }
           : {
               label: "숨김",
               className: "bg-slate-100 text-slate-500 ring-1 ring-slate-200",
-              desc: "카드/검색 제외",
             };
 
   return (
     <div data-ruru-product-feature-badges className="mt-1 flex flex-wrap gap-1">
       <span className={["rounded-full px-2 py-0.5 text-[10px] font-black", exposure.className].join(" ")}>
         {exposure.label}
-      </span>
-      <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-400 ring-1 ring-slate-100">
-        {exposure.desc}
       </span>
     </div>
   );

@@ -877,8 +877,8 @@ export default function QuickProductFastForm({
               </div>
             </div>
 
-            <div className="flex h-full min-h-0 flex-col items-center justify-center">
-              <div className="mb-1 text-[10px] font-black text-slate-500">주문서 노출 방식</div>
+            <div className="flex h-full min-h-0 flex-col justify-center">
+              <div className="mb-1 text-center text-[10px] font-black text-slate-500">주문서 노출</div>
               <div className="grid w-full grid-cols-3 gap-1">
                 {orderExposureOptions.map((option) => (
                   <button
@@ -886,7 +886,7 @@ export default function QuickProductFastForm({
                     type="button"
                     onClick={() => applyOrderExposureMode(option.value)}
                     className={[
-                      "h-9 rounded-xl px-2 text-[10px] font-black",
+                      "h-8 rounded-lg px-1 text-[10px] font-black leading-none",
                       orderExposureMode === option.value ? "bg-blue-600 text-white" : inactiveChoice,
                     ].join(" ")}
                     title={option.desc}
@@ -924,26 +924,18 @@ export default function QuickProductFastForm({
             </div>
           </section>
 
-          <section className="grid min-h-0 items-center grid-cols-[220px_minmax(0,1fr)] gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2">
-            <div className="flex h-full min-h-0 flex-col justify-center">
+          <section className="grid min-h-0 grid-cols-[120px_minmax(0,1fr)] items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
+            <div className="min-w-0">
               <div className="text-[11px] font-black text-slate-700">추천 키워드</div>
-              <div className="mt-1 break-keep text-[10px] font-bold leading-relaxed text-slate-400">
-                선택 입력 · 상품명 자체 검색은 자동 적용
-              </div>
+              <div className="mt-0.5 text-[10px] font-bold text-slate-400">선택 입력</div>
             </div>
 
-            <div className="flex h-full min-h-0 flex-col justify-center">
-              <div className="mb-1 flex items-center justify-between text-[10px] font-black text-slate-500">
-                <span>추가 검색어</span>
-                <span className="text-[10px] font-bold text-slate-400">쉼표로 구분</span>
-              </div>
-              <input
-                value={suggestionKeywordsText}
-                onChange={(event) => setSuggestionKeywordsText(event.target.value)}
-                placeholder="예: 알로, 바지, 밴딩, 알로바지"
-                className="h-10 w-full rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-800 outline-none focus:border-blue-400"
-              />
-            </div>
+            <input
+              value={suggestionKeywordsText}
+              onChange={(event) => setSuggestionKeywordsText(event.target.value)}
+              placeholder="예: 알로, 바지, 밴딩, 알로바지"
+              className="h-9 w-full rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-800 outline-none focus:border-blue-400"
+            />
           </section>
 
           <section className="grid min-h-0 grid-cols-2 gap-3">

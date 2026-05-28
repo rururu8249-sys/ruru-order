@@ -1247,8 +1247,7 @@ export default function OrderPage() {
     const nextProducts = (data || [])
       .map((product: any) => normalizeOrderProductRow(product))
       .filter((product) => product.product_name.trim())
-      .filter((product) => product.status !== "숨김")
-      .filter((product) => productRegisteredOrderEnabled(product));
+      .filter((product) => product.status !== "숨김");
 
     setGroupBuyQuickProductsFromCatalog(nextProducts);
   };
