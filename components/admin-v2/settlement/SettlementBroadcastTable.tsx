@@ -57,7 +57,7 @@ export default function SettlementBroadcastTable({
         <div>
           <div className="text-lg font-black text-slate-950">방송별 정산 리스트</div>
           <div className="mt-1 text-xs font-bold text-slate-400">
-            결제완료 매출, 카드 수수료, 창고/기타 지출, 현재 실수익을 방송 날짜 기준으로 묶어 보여줍니다.
+            방송 날짜별로 결제완료 매출, 아직 못 받은 금액, 현재 실수익을 한 줄씩 확인합니다.
           </div>
         </div>
 

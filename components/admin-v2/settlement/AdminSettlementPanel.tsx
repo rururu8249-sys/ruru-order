@@ -13,6 +13,7 @@ import {
   filterRows,
   flattenOrders,
   toNumber,
+  won,
 } from "./settlementUtils";
 import SettlementFilterBar from "./SettlementFilterBar";
 import SettlementSummaryCards from "./SettlementSummaryCards";
@@ -362,6 +363,16 @@ export default function AdminSettlementPanel({
           기준: 결제완료 매출은 입금확인완료/카드결제완료 주문만 잡습니다. 아직 못 받은 금액은 현재 실수익 계산에서 제외합니다.
           카드 수수료는 주문 당시 저장된 카드 수수료율을 우선 사용하고, 창고/기타 지출은 다음 단계의 정산 추가 입력과 연결합니다.
         </div>
+
+        <div className="mt-4 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+          <div className="text-sm font-black text-slate-950">정산 보는 순서</div>
+          <div className="mt-3 grid gap-2 text-xs font-bold text-slate-600 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl bg-white px-3 py-3 shadow-sm ring-1 ring-slate-100">1. 결제완료 매출 확인</div>
+            <div className="rounded-2xl bg-white px-3 py-3 shadow-sm ring-1 ring-slate-100">2. 아직 못 받은 금액 확인</div>
+            <div className="rounded-2xl bg-white px-3 py-3 shadow-sm ring-1 ring-slate-100">3. 카드 수수료와 창고/기타 지출 확인</div>
+            <div className="rounded-2xl bg-white px-3 py-3 shadow-sm ring-1 ring-slate-100">4. 현재 실수익 확인</div>
+          </div>
+        </div>
       </div>
 
       <SettlementFilterBar
@@ -376,6 +387,28 @@ export default function AdminSettlementPanel({
         onSelectedBroadcastKeysChange={setSelectedBroadcastKeys}
         onReset={resetFilters}
       />
+
+      <div className="grid gap-3 xl:grid-cols-[1.45fr_0.95fr]">
+        <div className="rounded-[28px] border border-blue-100 bg-blue-50 p-5 shadow-[0_14px_38px_rgba(37,99,235,0.08)]">
+          <div className="text-xs font-black tracking-[0.18em] text-blue-600">PERIOD SUMMARY</div>
+          <div className="mt-2 text-xl font-black tracking-[-0.04em] text-slate-950">선택기간 한 줄 요약</div>
+          <div className="mt-3 grid gap-2 text-sm font-bold leading-6 text-slate-700">
+            <p>선택기간 결제완료 매출은 <span className="font-black text-blue-700">{won(stats.paidAmount)}</span>입니다.</p>
+            <p>아직 못 받은 금액은 <span className="font-black text-orange-600">{won(stats.unpaidAmount)}</span>이며, 현재 실수익 계산에서는 제외됩니다.</p>
+            <p>카드 수수료와 창고/기타 지출을 반영한 현재 실수익은 <span className="font-black text-emerald-700">{won(stats.netAmount)}</span>입니다.</p>
+          </div>
+        </div>
+
+        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_14px_38px_rgba(15,23,42,0.06)]">
+          <div className="text-xs font-black tracking-[0.18em] text-slate-400">CHECK POINT</div>
+          <div className="mt-2 text-xl font-black tracking-[-0.04em] text-slate-950">초보자 체크포인트</div>
+          <div className="mt-3 grid gap-2 text-xs font-bold leading-5 text-slate-600">
+            <div className="rounded-2xl bg-slate-50 px-3 py-2">결제완료 매출이 실제 받은 매출 기준입니다.</div>
+            <div className="rounded-2xl bg-slate-50 px-3 py-2">아직 못 받은 금액은 들어오기 전까지 현재 실수익에 넣지 않습니다.</div>
+            <div className="rounded-2xl bg-slate-50 px-3 py-2">창고/기타 지출은 정산 추가 입력에서 따로 관리합니다.</div>
+          </div>
+        </div>
+      </div>
 
       <SettlementSummaryCards stats={stats} actualCardFeeRate={actualCardFeeRate} />
 
