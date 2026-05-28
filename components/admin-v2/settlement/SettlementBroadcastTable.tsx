@@ -62,9 +62,9 @@ export default function SettlementBroadcastTable({
     <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-4">
         <div>
-          <div className="text-lg font-black text-slate-950">방송별 정산 리스트</div>
+          <div className="text-lg font-black text-slate-950">방송별 정산</div>
           <div className="mt-1 text-xs font-bold text-slate-400">
-            방송 날짜별로 결제완료 매출, 아직 못 받은 금액, 현재 실수익을 한 줄씩 확인합니다.
+            방송 날짜별로 얼마 팔고, 아직 못 받은 돈과 현재 남은 돈을 확인합니다.
           </div>
         </div>
 
@@ -88,7 +88,7 @@ export default function SettlementBroadcastTable({
       </div>
 
       <div className="overflow-auto">
-        <table className="min-w-[940px] w-full border-separate border-spacing-0">
+        <table className="min-w-[900px] w-full border-separate border-spacing-0">
           <thead>
             <tr className="bg-slate-50 text-xs font-black text-slate-500">
               <th className="px-4 py-3 text-left">날짜/방송명</th>
