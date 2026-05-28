@@ -22,24 +22,21 @@ export default function AdminSettingsQuickLinks() {
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
-        <a
-          href="/admin-v2/combine"
-          className="group rounded-[20px] border border-blue-100 bg-blue-50/70 p-4 transition-all duration-150 hover:-translate-y-0.5 hover:bg-blue-50 hover:shadow-[0_12px_28px_rgba(37,99,235,0.10)] active:scale-[0.98]"
-        >
+        <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4 opacity-80">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="text-[17px] font-black text-slate-950">
-                합배송 시간 설정
+              <div className="text-[17px] font-black text-slate-700">
+                합배송 시간 설정 사용중단
               </div>
-              <div className="mt-1 text-[13px] font-bold leading-relaxed text-slate-600">
-                시작/마감 시간, 강제 종료, 오늘 밤 자동 입력
+              <div className="mt-1 text-[13px] font-bold leading-relaxed text-slate-500">
+                현재는 방송 ON 기준 자동합배송을 사용합니다. 직접 시간지정 설정은 사용하지 않습니다.
               </div>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-blue-600 shadow-sm ring-1 ring-blue-100 group-hover:bg-blue-600 group-hover:text-white">
-              →
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-sm ring-1 ring-slate-100">
+              중단
             </div>
           </div>
-        </a>
+        </div>
 
         <div className="rounded-[20px] border border-slate-100 bg-slate-50 p-4">
           <div className="text-[17px] font-black text-slate-950">

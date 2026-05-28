@@ -1,5 +1,5 @@
 // app/admin-v2/combine/page.tsx
-// 목적: 관리자 v2 시간지정 합배송 설정 페이지
+// 목적: 과거 수동 합배송 설정 페이지 - 현재 사용중단 안내용
 // 주의:
 // - 이 화면은 자정 넘김 방송/특정 시간대 묶음용 추가 설정입니다.
 // - 기본 같은 날짜 자동합배송 로직을 대체하지 않습니다.
@@ -21,7 +21,7 @@ import {
 } from "@/lib/admin-v2/combineShipping";
 
 const SETTING_LABELS = {
-  enabled: "시간지정 합배송 사용",
+  enabled: "과거 수동 합배송 설정",
   startAt: "합배송 시작 시간",
   endAt: "합배송 마감 시간",
 };
@@ -125,7 +125,7 @@ export default function CombineShippingAdminPage() {
       return;
     }
 
-    showAdminToast("시간지정 합배송 설정을 저장했습니다.", "success");
+    showAdminToast("현재 사용중단된 과거 수동 합배송 설정입니다.", "warning");
   };
 
   const applyTonightDefault = () => {
@@ -173,7 +173,7 @@ export default function CombineShippingAdminPage() {
           <div>
             <div className="text-[13px] font-black text-blue-600">루루동이 관리자</div>
             <h1 className="mt-1 text-[30px] font-black tracking-[-0.06em]">
-              시간지정 합배송 설정
+              과거 수동 합배송 설정
             </h1>
           </div>
 
@@ -202,15 +202,15 @@ export default function CombineShippingAdminPage() {
           <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="text-[13px] font-black text-blue-600">
-                자정 넘김 방송용 추가 설정
+                사용중단 안내
               </div>
               <h2 className="mt-1 text-[24px] font-black tracking-[-0.05em]">
-                시간지정 합배송 기준
+                현재 사용중단된 과거 설정
               </h2>
               <p className="mt-2 max-w-[920px] text-[14px] font-bold leading-relaxed text-slate-600">
                 평소에는 같은 날짜 안에서 같은 전화번호 고객 주문이 기본 자동합배송으로 판단됩니다.
                 <br />
-                이 화면은 방송이 밤 12시를 넘기거나, 특정 방송 시간대로 합배송을 묶어야 할 때만 사용하세요.
+                현재는 /admin-live 방송 ON 기준 자동합배송을 사용합니다. 이 화면에서 시간을 직접 저장하지 않습니다.
               </p>
             </div>
 
@@ -226,7 +226,7 @@ export default function CombineShippingAdminPage() {
           </div>
 
           <div className="mb-5 rounded-[22px] border border-blue-100 bg-blue-50 px-4 py-3 text-[14px] font-black leading-relaxed text-blue-800">
-            기본 같은날 자동합배송은 별도로 적용됩니다. 여기서는 “날짜가 넘어가는 방송”만 시간으로 묶어주는 보조 설정입니다.
+            사용중단: 현재는 방송 시작 후 방송 종료 전까지 자동 합배송 기준을 사용합니다. 이 페이지의 저장/종료 기능은 비활성화되었습니다.
           </div>
 
           {loading ? (
@@ -262,9 +262,9 @@ export default function CombineShippingAdminPage() {
                 <div>
                   <div className="text-[17px] font-black">{SETTING_LABELS.enabled}</div>
                   <div className="mt-1 text-[13px] font-bold leading-relaxed text-slate-500">
-                    방송이 밤 12시를 넘기거나 특정 시간 범위로 합배송을 묶어야 할 때만 켜주세요.
+                    현재는 방송 ON 상태에서 자동으로 방송 시작시간 기준 합배송을 사용합니다.
                     <br />
-                    평소 같은 날짜 주문은 기본 합배송 기준으로 처리됩니다.
+                    이 스위치는 더 이상 사용하지 않습니다.
                   </div>
                 </div>
 
@@ -272,7 +272,8 @@ export default function CombineShippingAdminPage() {
                   type="checkbox"
                   checked={enabled}
                   onChange={(event) => setEnabled(event.target.checked)}
-                  className="h-6 w-6 accent-blue-600"
+                  disabled={true}
+                  className="h-6 w-6 accent-blue-600 disabled:opacity-40"
                 />
               </label>
 
@@ -285,7 +286,8 @@ export default function CombineShippingAdminPage() {
                     type="datetime-local"
                     value={startLocal}
                     onChange={(event) => setStartLocal(event.target.value)}
-                    className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white p-4 font-black outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
+                    disabled={true}
+                    className="mt-2 w-full rounded-[18px] border border-slate-200 bg-slate-50 p-4 font-black text-slate-400 outline-none"
                   />
                 </div>
 
@@ -297,7 +299,8 @@ export default function CombineShippingAdminPage() {
                     type="datetime-local"
                     value={endLocal}
                     onChange={(event) => setEndLocal(event.target.value)}
-                    className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white p-4 font-black outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
+                    disabled={true}
+                    className="mt-2 w-full rounded-[18px] border border-slate-200 bg-slate-50 p-4 font-black text-slate-400 outline-none"
                   />
                 </div>
               </div>
@@ -312,27 +315,28 @@ export default function CombineShippingAdminPage() {
                 <button
                   type="button"
                   onClick={applyTonightDefault}
-                  className="rounded-[18px] border border-blue-100 bg-blue-50 p-4 text-sm font-black text-blue-700 transition active:scale-[0.98]"
+                  disabled={true}
+                  className="rounded-[18px] border border-slate-200 bg-slate-50 p-4 text-sm font-black text-slate-400 transition disabled:opacity-60"
                 >
-                  오늘 밤 방송 시간 자동입력
+                  현재 사용중단
                 </button>
 
                 <button
                   type="button"
                   onClick={saveSettings}
-                  disabled={saving || !isValidRange}
+                  disabled={true}
                   className="rounded-[18px] bg-blue-600 p-4 text-sm font-black text-white shadow-lg shadow-blue-100 transition active:scale-[0.98] disabled:opacity-50"
                 >
-                  {saving ? "저장 중..." : "시간지정 합배송 저장"}
+                  현재 사용중단
                 </button>
 
                 <button
                   type="button"
                   onClick={forceEndNow}
-                  disabled={saving}
+                  disabled={true}
                   className="rounded-[18px] border border-red-200 bg-white p-4 text-sm font-black text-red-600 transition active:scale-[0.98] disabled:opacity-50"
                 >
-                  시간지정 합배송 종료
+                  현재 사용중단
                 </button>
               </div>
             </div>
@@ -349,7 +353,7 @@ export default function CombineShippingAdminPage() {
               </div>
 
               <div className="rounded-2xl bg-blue-50 p-3 text-blue-700 ring-1 ring-blue-100">
-                시간지정: 방송이 자정을 넘기거나 특정 방송 시간으로 묶을 때만 사용합니다.
+                현재: 방송 ON 상태에서는 방송 시작 후 방송 종료 전까지 자동 합배송 기준을 사용합니다.
               </div>
 
               <div className="rounded-2xl bg-slate-50 p-3 text-slate-700 ring-1 ring-slate-100">
@@ -367,8 +371,7 @@ export default function CombineShippingAdminPage() {
               예시
             </div>
             <p className="mt-3 text-[13px] font-bold leading-relaxed text-blue-800">
-              토요일 밤 19:00 방송이 일요일 새벽 04:00까지 이어지면,
-              시간지정 합배송을 19:00 ~ 다음날 04:00으로 잡아두면 됩니다.
+              지금은 별도 시간지정 없이 /admin-live 방송 시작 후 방송 종료 전까지 같은 방송 기준으로 합배송을 판단합니다.
             </p>
           </section>
         </aside>

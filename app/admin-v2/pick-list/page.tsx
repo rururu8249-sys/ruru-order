@@ -437,12 +437,9 @@ export default function AdminPickListPage() {
           </div>
 
           <div className="flex gap-2">
-            <Link
-              href="/admin-v2/combine"
-              className="rounded-2xl bg-white px-4 py-3 text-sm font-black shadow-[0_8px_20px_rgba(60,38,20,0.12)] ring-1 ring-black/5 active:scale-[0.98]"
-            >
-              합배송 설정
-            </Link>
+            <div className="inline-flex items-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-500">
+              합배송 설정 사용중단
+            </div>
 
             <Link
               href="/admin-v2"
