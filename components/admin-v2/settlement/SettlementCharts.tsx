@@ -101,9 +101,9 @@ function expenseMainLabel(row: BroadcastRankRow) {
   const warehouseExpense = toNumber(row.warehouseOtherExpense);
 
   if (warehouseExpense <= 0 && cardFee <= 0) return "지출 없음";
-  if (warehouseExpense >= cardFee) return "창고정산/기타지출";
+  if (warehouseExpense >= cardFee) return "창고/기타 지출";
 
-  return "카드수수료";
+  return "카드 수수료";
 }
 
 function makeRankItems(rows: BroadcastRankRow[], rankTab: RankTab) {
@@ -112,7 +112,7 @@ function makeRankItems(rows: BroadcastRankRow[], rankTab: RankTab) {
     const amount = isSales ? rankAmount(row) : expenseAmount(row);
     const subLabel = isSales
       ? `주문 ${toNumber(row.count).toLocaleString()}건 · 무통장 ${won(row.bankAmount)} · 카드 ${won(row.cardAmount)}`
-      : `${expenseMainLabel(row)} · 카드수수료 ${won(row.actualCardFee)} · 창고정산/기타지출 ${won(row.warehouseOtherExpense)}`;
+      : `${expenseMainLabel(row)} · 카드 수수료 ${won(row.actualCardFee)} · 창고/기타 지출 ${won(row.warehouseOtherExpense)}`;
 
     return {
       id: `${rankTab}-${row.dateKey}-${row.label}-${index}`,
@@ -226,12 +226,12 @@ export default function SettlementCharts({
                           <div
                             className="w-3 rounded-t-full bg-blue-500 transition-all group-hover:brightness-110"
                             style={{ height: `${salesHeight}%` }}
-                            title={`완료매출 ${won(item.sales)}`}
+                            title={`결제완료 매출 ${won(item.sales)}`}
                           />
                           <div
                             className="w-3 rounded-t-full bg-emerald-500 transition-all group-hover:brightness-110"
                             style={{ height: `${netHeight}%` }}
-                            title={`실수익 ${won(item.net)}`}
+                            title={`현재 실수익 ${won(item.net)}`}
                           />
                           <div
                             className="w-3 rounded-t-full bg-rose-400 transition-all group-hover:brightness-110"
@@ -249,11 +249,11 @@ export default function SettlementCharts({
               <div className="mt-4 flex flex-wrap gap-3 text-xs font-black text-slate-500">
                 <span className="inline-flex items-center gap-1">
                   <span className="h-2 w-2 rounded-full bg-blue-500" />
-                  완료매출
+                  결제완료 매출
                 </span>
                 <span className="inline-flex items-center gap-1">
                   <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                  실수익
+                  현재 실수익
                 </span>
                 <span className="inline-flex items-center gap-1">
                   <span className="h-2 w-2 rounded-full bg-rose-400" />
@@ -269,7 +269,7 @@ export default function SettlementCharts({
                       주문 <span className="font-black text-slate-900">{toNumber(selectedTrend.orderCount).toLocaleString()}건</span>
                     </div>
                     <div>
-                      완료매출 <span className="font-black text-blue-700">{won(selectedTrend.sales)}</span>
+                      결제완료 매출 <span className="font-black text-blue-700">{won(selectedTrend.sales)}</span>
                     </div>
                     <div>
                       무통장 <span className="font-black text-emerald-700">{won(selectedTrend.bank || 0)}</span>
@@ -278,13 +278,13 @@ export default function SettlementCharts({
                       카드 <span className="font-black text-blue-700">{won(selectedTrend.card || 0)}</span>
                     </div>
                     <div>
-                      기타매출 <span className="font-black text-sky-700">{won(selectedTrend.manualIncome || 0)}</span>
+                      추가 정산 수익 <span className="font-black text-sky-700">{won(selectedTrend.manualIncome || 0)}</span>
                     </div>
                     <div>
-                      카드수수료 <span className="font-black text-rose-700">{won(selectedTrend.fee)}</span>
+                      카드 수수료 <span className="font-black text-rose-700">{won(selectedTrend.fee)}</span>
                     </div>
                     <div>
-                      창고정산/기타지출 <span className="font-black text-violet-700">{won(selectedTrend.warehouseOtherExpense ?? selectedTrend.expense)}</span>
+                      창고/기타 지출 <span className="font-black text-violet-700">{won(selectedTrend.warehouseOtherExpense ?? selectedTrend.expense)}</span>
                     </div>
                     <div>
                       지출합계 <span className="font-black text-violet-700">{won(selectedTotalExpense)}</span>

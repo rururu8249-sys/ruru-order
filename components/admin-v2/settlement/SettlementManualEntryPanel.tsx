@@ -14,7 +14,7 @@ function todayKey() {
 }
 
 function entryTypeLabel(value: SettlementManualEntryType) {
-  return value === "income" ? "기타매출" : "창고정산/기타지출";
+  return value === "income" ? "추가 정산 수익" : "창고/기타 지출";
 }
 
 function entryTypeTone(value: SettlementManualEntryType) {
@@ -279,16 +279,16 @@ export default function SettlementManualEntryPanel({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-bold leading-6 text-slate-500">
-            창고정산, 기타지출, 과거매출을 주문 데이터와 분리해서 빠르게 입력합니다.
+            창고/기타 지출, 추가 정산 수익을 주문 데이터와 분리해서 빠르게 입력합니다.
           </p>
         </div>
 
         <div className="flex gap-2">
           <div className="rounded-2xl bg-blue-50 px-4 py-3 text-xs font-black text-blue-700">
-            기타매출 {won(totalIncome)}
+            추가 정산 수익 {won(totalIncome)}
           </div>
           <div className="rounded-2xl bg-violet-50 px-4 py-3 text-xs font-black text-violet-700">
-            창고정산/기타지출 -{won(totalExpense)}
+            창고/기타 지출 -{won(totalExpense)}
           </div>
         </div>
       </div>
@@ -314,8 +314,8 @@ export default function SettlementManualEntryPanel({
               }}
               className="h-12 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400"
             >
-              <option value="expense">창고정산/기타지출</option>
-              <option value="income">기타매출</option>
+              <option value="expense">창고/기타 지출</option>
+              <option value="income">추가 정산 수익</option>
             </select>
           </label>
 
@@ -366,7 +366,7 @@ export default function SettlementManualEntryPanel({
             <input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="창고정산, 택배비, 기타매출"
+              placeholder="창고정산, 택배비, 추가 정산 수익"
               className="h-12 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400"
             />
           </label>

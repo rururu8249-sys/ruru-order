@@ -14,7 +14,7 @@ export type SettlementManualEntryLog = {
 };
 
 function entryTypeLabel(value: SettlementManualEntry["entry_type"]) {
-  return value === "income" ? "기타매출" : "창고정산/기타지출";
+  return value === "income" ? "추가 정산 수익" : "창고/기타 지출";
 }
 
 function actionLabel(value: SettlementManualEntryLog["action"]) {
@@ -43,7 +43,7 @@ function formatDateTime(value?: string | null) {
 function getValueSummary(value: any) {
   if (!value || typeof value !== "object") return "-";
 
-  const type = value.entry_type === "income" ? "기타매출" : value.entry_type === "expense" ? "창고정산/기타지출" : "-";
+  const type = value.entry_type === "income" ? "추가 정산 수익" : value.entry_type === "expense" ? "창고/기타 지출" : "-";
   const amount = Number(value.amount || 0);
 
   return `${type} / ${value.title || "-"} / ${won(amount)}`;
@@ -70,7 +70,7 @@ export default function SettlementManualEntryDetailModal({
         <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
           <div>
             <div className="text-xs font-black tracking-[0.22em] text-violet-600">SETTLEMENT ENTRY DETAIL</div>
-            <h3 className="mt-1 text-2xl font-black tracking-[-0.04em] text-slate-950">추가 정산 상세</h3>
+            <h3 className="mt-1 text-2xl font-black tracking-[-0.04em] text-slate-950">추가 정산 내역 상세</h3>
           </div>
 
           <button
