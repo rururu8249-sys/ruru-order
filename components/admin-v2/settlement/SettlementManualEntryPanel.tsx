@@ -279,7 +279,7 @@ export default function SettlementManualEntryPanel({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-bold leading-6 text-slate-500">
-            주문서에 없는 창고/기타 지출과 추가 수익만 빠르게 입력합니다.
+            주문서에 없는 추가 정산 수익과 창고/기타 지출만 빠르게 입력합니다.
           </p>
         </div>
 
@@ -309,7 +309,7 @@ export default function SettlementManualEntryPanel({
               onChange={(event) => {
                 const nextType = event.target.value as SettlementManualEntryType;
                 setEntryType(nextType);
-                setTitle(nextType === "income" ? "기타매출" : "창고정산");
+                setTitle(nextType === "income" ? "방송외입금" : "창고정산");
               }}
               className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400"
             >
@@ -342,7 +342,7 @@ export default function SettlementManualEntryPanel({
         <div className="grid gap-2">
           <span className="text-xs font-black text-slate-500">빠른 제목</span>
           <div className="flex flex-wrap gap-2">
-            {(entryType === "income" ? ["기타매출", "과거매출"] : ["창고정산", "택배비", "알바비", "사입비", "기타지출"]).map((quickTitle) => (
+            {(entryType === "income" ? ["방송외입금", "기타수익"] : ["창고정산", "택배비", "알바비", "사입비", "기타지출"]).map((quickTitle) => (
               <button
                 key={quickTitle}
                 type="button"
@@ -365,7 +365,7 @@ export default function SettlementManualEntryPanel({
             <input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="창고정산, 택배비, 추가 정산 수익"
+              placeholder="창고정산, 택배비, 방송외입금, 기타수익"
               className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-blue-400"
             />
           </label>
@@ -394,7 +394,7 @@ export default function SettlementManualEntryPanel({
             disabled={saving || !tableReady}
             className="h-10 min-w-[150px] rounded-xl bg-blue-600 px-5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-45"
           >
-            {saving ? "저장중" : editingId ? "수정 저장" : "입력 추가"}
+            {saving ? "반영중" : editingId ? "수정 저장" : "정산에 반영하기"}
           </button>
 
           {editingId ? (
@@ -418,7 +418,7 @@ export default function SettlementManualEntryPanel({
         <textarea
           value={memo}
           onChange={(event) => setMemo(event.target.value)}
-          placeholder="무슨 매출/지출인지 상세 메모를 적어주세요."
+          placeholder="무슨 추가 정산 수익/창고·기타 지출인지 메모를 적어주세요."
           className="min-h-[62px] rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold outline-none focus:border-blue-400"
         />
       </label>
