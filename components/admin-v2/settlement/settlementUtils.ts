@@ -85,6 +85,10 @@ export function isCanceled(row: AnyRow) {
 export function isPaymentDone(row: AnyRow) {
   const text = rowStatusText(row);
 
+  if (/입금확인\s*필요|확인필요|미입금|미결제|결제대기|주문확인전|대기|pending|unpaid/i.test(text)) {
+    return false;
+  }
+
   return (
     /자동입금확인|수동입금확인|입금확인|카드결제완료|카드완료|결제완료|paid|confirmed|complete/i.test(text) ||
     Boolean(row.deposit_confirmed_at)
