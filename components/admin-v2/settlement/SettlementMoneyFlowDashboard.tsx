@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import type {
   PaymentFilter,
   SettlementBroadcastEndReport,
@@ -54,6 +55,27 @@ function outflowText(value: unknown) {
   return amount > 0 ? `-${won(amount)}` : "0원";
 }
 
+function getVisiblePages(currentPage: number, pageCount: number): Array<number | "ellipsis"> {
+  if (pageCount <= 7) {
+    return Array.from({ length: pageCount }, (_, index) => index + 1);
+  }
+
+  const pages: Array<number | "ellipsis"> = [1];
+  const start = Math.max(2, currentPage - 1);
+  const end = Math.min(pageCount - 1, currentPage + 1);
+
+  if (start > 2) pages.push("ellipsis");
+
+  for (let page = start; page <= end; page += 1) {
+    pages.push(page);
+  }
+
+  if (end < pageCount - 1) pages.push("ellipsis");
+
+  pages.push(pageCount);
+  return pages;
+}
+
 function CompactFilterButton({
   label,
   onClick,
@@ -65,7 +87,7 @@ function CompactFilterButton({
     <button
       type="button"
       onClick={onClick}
-      className="h-10 rounded-2xl border border-blue-100 bg-white px-4 text-sm font-black text-blue-700 shadow-sm transition hover:bg-blue-50"
+      className="h-9 rounded-xl border border-blue-100 bg-white px-3 text-xs font-black text-blue-700 shadow-sm transition hover:bg-blue-50"
     >
       {label}
     </button>
@@ -113,14 +135,14 @@ function MoneyFlowCard({
           : "text-slate-950";
 
   return (
-    <div className={`min-h-[150px] rounded-[30px] border px-5 py-5 shadow-[0_18px_38px_rgba(15,23,42,0.06)] ${toneClass}`}>
+    <div className={`min-h-[124px] rounded-[24px] border px-4 py-4 shadow-[0_12px_26px_rgba(15,23,42,0.045)] ${toneClass}`}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <div className={`inline-flex h-9 min-w-9 items-center justify-center rounded-full px-3 text-sm font-black ${badgeClass}`}>
+          <div className={`inline-flex h-8 min-w-8 items-center justify-center rounded-full px-3 text-xs font-black ${badgeClass}`}>
             {step}
           </div>
-          <div className="mt-5 text-sm font-black text-slate-500">{title}</div>
-          <div className={`mt-2 truncate text-[30px] font-black tracking-[-0.07em] ${valueClass}`}>{value}</div>
+          <div className="mt-4 text-xs font-black text-slate-500">{title}</div>
+          <div className={`mt-2 truncate text-[26px] font-black tracking-[-0.06em] ${valueClass}`}>{value}</div>
           <div className="mt-2 truncate text-xs font-bold text-slate-400">{note}</div>
         </div>
       </div>
@@ -145,9 +167,9 @@ function ActionCard({
         : "border-slate-200 bg-slate-50 text-slate-950";
 
   return (
-    <div className={`rounded-[24px] border px-5 py-4 ${toneClass}`}>
+    <div className={`rounded-[20px] border px-4 py-3 ${toneClass}`}>
       <div className="text-xs font-black text-slate-500">{label}</div>
-      <div className="mt-2 text-2xl font-black tracking-[-0.05em]">{value}</div>
+      <div className="mt-1 text-xl font-black tracking-[-0.05em]">{value}</div>
     </div>
   );
 }
@@ -197,7 +219,20 @@ export default function SettlementMoneyFlowDashboard({
         ? selectedBroadcastKeys[0]
         : "__multiple__";
 
-  const visibleBroadcastRows = broadcastRows.slice(0, 8);
+  const [broadcastPageSize, setBroadcastPageSize] = useState(10);
+  const [broadcastCurrentPage, setBroadcastCurrentPage] = useState(1);
+  const broadcastPageCount = Math.max(1, Math.ceil(broadcastRows.length / broadcastPageSize));
+  const safeBroadcastPage = Math.min(Math.max(1, broadcastCurrentPage), broadcastPageCount);
+  const broadcastStartIndex = (safeBroadcastPage - 1) * broadcastPageSize;
+  const broadcastEndIndex = broadcastStartIndex + broadcastPageSize;
+  const visibleBroadcastRows = useMemo(
+    () => broadcastRows.slice(broadcastStartIndex, broadcastEndIndex),
+    [broadcastRows, broadcastStartIndex, broadcastEndIndex],
+  );
+  const broadcastPaginationPages = useMemo(
+    () => getVisiblePages(safeBroadcastPage, broadcastPageCount),
+    [safeBroadcastPage, broadcastPageCount],
+  );
 
   const moneyFlowCards = [
     {
@@ -238,11 +273,11 @@ export default function SettlementMoneyFlowDashboard({
   ];
 
   return (
-    <div className="grid gap-5">
-      <section className="rounded-[36px] border border-slate-200 bg-white p-6 shadow-[0_20px_55px_rgba(15,23,42,0.06)]">
+    <div className="grid gap-4">
+      <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_14px_36px_rgba(15,23,42,0.05)]">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="text-[32px] font-black tracking-[-0.06em] text-slate-950">정산통계</h2>
+            <h2 className="text-[30px] font-black tracking-[-0.06em] text-slate-950">정산통계</h2>
             <p className="mt-2 text-sm font-bold text-slate-500">
               초보자도 돈 흐름을 한눈에 볼 수 있게 핵심만 먼저 보여드립니다.
             </p>
@@ -252,21 +287,21 @@ export default function SettlementMoneyFlowDashboard({
             <button
               type="button"
               onClick={onOpenManualPanel}
-              className="h-12 rounded-2xl bg-blue-600 px-5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
+              className="h-11 rounded-xl bg-blue-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
             >
               + 정산 추가 입력
             </button>
             <button
               type="button"
               onClick={onExportSummaryCsv}
-              className="h-12 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
+              className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
             >
               정산 CSV 내보내기
             </button>
           </div>
         </div>
 
-        <div className="mt-5 rounded-[30px] border border-blue-100 bg-blue-50/45 p-4">
+        <div className="mt-4 rounded-[24px] border border-blue-100 bg-blue-50/45 p-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap gap-2">
               <CompactFilterButton label="오늘" onClick={() => onQuickRange("today")} />
@@ -313,7 +348,7 @@ export default function SettlementMoneyFlowDashboard({
                 type="date"
                 value={startDate}
                 onChange={(event) => onStartDateChange(event.target.value)}
-                className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none"
+                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none"
               />
             </label>
 
@@ -323,7 +358,7 @@ export default function SettlementMoneyFlowDashboard({
                 type="date"
                 value={endDate}
                 onChange={(event) => onEndDateChange(event.target.value)}
-                className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none"
+                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none"
               />
             </label>
 
@@ -335,7 +370,7 @@ export default function SettlementMoneyFlowDashboard({
                   const value = event.target.value;
                   onSelectedBroadcastKeysChange(value === "__all__" || value === "__multiple__" ? [] : [value]);
                 }}
-                className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none"
+                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none"
               >
                 <option value="__all__">전체보기</option>
                 {selectedBroadcastKeys.length > 1 ? (
@@ -352,7 +387,7 @@ export default function SettlementMoneyFlowDashboard({
               <select
                 value={paymentFilter}
                 onChange={(event) => onPaymentFilterChange(event.target.value as PaymentFilter)}
-                className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none"
+                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none"
               >
                 {(["전체", "무통장입금", "카드결제", "기타"] as PaymentFilter[]).map((value) => (
                   <option key={value} value={value}>{value}</option>
@@ -371,7 +406,7 @@ export default function SettlementMoneyFlowDashboard({
               <button
                 type="button"
                 onClick={onResetFilters}
-                className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50"
+                className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50"
               >
                 초기화
               </button>
@@ -381,11 +416,11 @@ export default function SettlementMoneyFlowDashboard({
         </div>
       </section>
 
-      <section className="rounded-[38px] border border-blue-100 bg-white p-6 shadow-[0_22px_58px_rgba(37,99,235,0.1)]">
+      <section className="rounded-[32px] border border-blue-100 bg-white p-5 shadow-[0_16px_42px_rgba(37,99,235,0.08)]">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-xs font-black tracking-[0.25em] text-blue-600">MONEY FLOW</div>
-            <h3 className="mt-1 text-[26px] font-black tracking-[-0.06em] text-slate-950">돈 흐름 5단계</h3>
+            <h3 className="mt-1 text-[24px] font-black tracking-[-0.06em] text-slate-950">돈 흐름 5단계</h3>
           </div>
           <div className="rounded-full bg-blue-50 px-4 py-2 text-xs font-black text-blue-700">
             주문 → 받은 돈 → 못 받은 돈 → 빠지는 돈 → 남는 돈
@@ -399,11 +434,11 @@ export default function SettlementMoneyFlowDashboard({
         </div>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-        <div className="rounded-[34px] border border-blue-100 bg-blue-50/55 p-6 shadow-[0_16px_40px_rgba(37,99,235,0.06)]">
+      <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+        <div className="rounded-[28px] border border-blue-100 bg-blue-50/55 p-5 shadow-[0_12px_30px_rgba(37,99,235,0.05)]">
           <div className="text-xs font-black tracking-[0.22em] text-blue-600">ONE LINE SUMMARY</div>
-          <h3 className="mt-2 text-2xl font-black tracking-[-0.05em] text-slate-950">한 줄 요약</h3>
-          <div className="mt-5 grid gap-3 text-sm font-bold leading-6 text-slate-700">
+          <h3 className="mt-1 text-xl font-black tracking-[-0.05em] text-slate-950">한 줄 요약</h3>
+          <div className="mt-4 grid gap-2 text-sm font-bold leading-6 text-slate-700">
             <p>① 이번 기간 주문서 총금액은 <span className="font-black text-slate-950">{won(stats.totalOrderAmount)}</span>입니다.</p>
             <p>② 실제 결제가 끝난 금액은 <span className="font-black text-blue-700">{won(stats.paidAmount)}</span>입니다.</p>
             <p>③ 아직 못 받은 금액은 <span className="font-black text-orange-700">{won(stats.unpaidAmount)}</span>입니다.</p>
@@ -411,16 +446,16 @@ export default function SettlementMoneyFlowDashboard({
           </div>
         </div>
 
-        <div className="rounded-[34px] border border-slate-200 bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.055)]">
+        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.045)]">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-xs font-black tracking-[0.22em] text-blue-600">TO DO</div>
-              <h3 className="mt-2 text-2xl font-black tracking-[-0.05em] text-slate-950">지금 처리할 일</h3>
+              <h3 className="mt-1 text-xl font-black tracking-[-0.05em] text-slate-950">지금 처리할 일</h3>
             </div>
             <div className="text-xs font-bold text-slate-400">방송 끝나고 바로 확인할 것</div>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <ActionCard label="아직 못 받은 금액 확인" value={won(stats.unpaidAmount)} tone="orange" />
             <ActionCard label="결제완료 매출 확인" value={countText(stats.paidCount)} tone="blue" />
             <ActionCard label="창고/기타 지출 입력" value={countText(stats.manualExpenseCount)} tone="slate" />
@@ -429,7 +464,7 @@ export default function SettlementMoneyFlowDashboard({
         </div>
       </section>
 
-      <section className="rounded-[36px] border border-slate-200 bg-white p-6 shadow-[0_18px_48px_rgba(15,23,42,0.055)]">
+      <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_14px_36px_rgba(15,23,42,0.045)]">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-xs font-black tracking-[0.22em] text-blue-600">BROADCAST SETTLEMENT</div>
@@ -447,33 +482,33 @@ export default function SettlementMoneyFlowDashboard({
           <table className="min-w-[920px] w-full border-separate border-spacing-0">
             <thead>
               <tr className="bg-slate-50 text-xs font-black text-slate-500">
-                <th className="px-4 py-3 text-left">날짜/방송명</th>
-                <th className="px-4 py-3 text-right">주문서 수</th>
-                <th className="px-4 py-3 text-right">결제완료 매출</th>
-                <th className="px-4 py-3 text-right">아직 못 받은 금액</th>
-                <th className="px-4 py-3 text-right">빠지는 돈</th>
-                <th className="px-4 py-3 text-right">현재 실수익</th>
+                <th className="px-4 py-2.5 text-left">날짜/방송명</th>
+                <th className="px-4 py-2.5 text-right">주문서 수</th>
+                <th className="px-4 py-2.5 text-right">결제완료 매출</th>
+                <th className="px-4 py-2.5 text-right">아직 못 받은 금액</th>
+                <th className="px-4 py-2.5 text-right">빠지는 돈</th>
+                <th className="px-4 py-2.5 text-right">현재 실수익</th>
               </tr>
             </thead>
             <tbody>
               {visibleBroadcastRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-16 text-center text-sm font-bold text-slate-400">
+                  <td colSpan={6} className="px-4 py-12 text-center text-sm font-bold text-slate-400">
                     표시할 방송별 정산 내역이 없습니다.
                   </td>
                 </tr>
               ) : (
                 visibleBroadcastRows.map((row) => (
                   <tr key={row.key} className="hover:bg-blue-50/30">
-                    <td className="border-b border-slate-100 px-4 py-4">
+                    <td className="border-b border-slate-100 px-4 py-3">
                       <div className="max-w-[320px] truncate text-sm font-black text-slate-950">{row.label}</div>
                       <div className="mt-1 text-xs font-bold text-slate-400">{row.dateKey}</div>
                     </td>
-                    <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black text-slate-700">{countText(row.count)}</td>
-                    <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black text-blue-700">{won(row.paidAmount)}</td>
-                    <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black text-orange-700">{won(row.unpaidAmount)}</td>
-                    <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black text-slate-700">{outflowText(row.totalExpense)}</td>
-                    <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black text-slate-950">{won(row.netAmount)}</td>
+                    <td className="border-b border-slate-100 px-4 py-3 text-right text-sm font-black text-slate-700">{countText(row.count)}</td>
+                    <td className="border-b border-slate-100 px-4 py-3 text-right text-sm font-black text-blue-700">{won(row.paidAmount)}</td>
+                    <td className="border-b border-slate-100 px-4 py-3 text-right text-sm font-black text-orange-700">{won(row.unpaidAmount)}</td>
+                    <td className="border-b border-slate-100 px-4 py-3 text-right text-sm font-black text-slate-700">{outflowText(row.totalExpense)}</td>
+                    <td className="border-b border-slate-100 px-4 py-3 text-right text-sm font-black text-slate-950">{won(row.netAmount)}</td>
                   </tr>
                 ))
               )}
@@ -481,11 +516,67 @@ export default function SettlementMoneyFlowDashboard({
           </table>
         </div>
 
-        {broadcastRows.length > visibleBroadcastRows.length ? (
-          <div className="mt-3 text-center text-xs font-bold text-slate-400">
-            최근 {visibleBroadcastRows.length.toLocaleString("ko-KR")}개만 먼저 표시합니다. 전체 내역은 CSV로 확인하세요.
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+          <div className="text-xs font-bold text-slate-400">
+            {broadcastRows.length === 0
+              ? "0개"
+              : `${(broadcastStartIndex + 1).toLocaleString("ko-KR")}-${Math.min(broadcastEndIndex, broadcastRows.length).toLocaleString("ko-KR")} / ${broadcastRows.length.toLocaleString("ko-KR")}개`}
           </div>
-        ) : null}
+
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={broadcastPageSize}
+              onChange={(event) => {
+                setBroadcastPageSize(Number(event.target.value));
+                setBroadcastCurrentPage(1);
+              }}
+              className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-600 outline-none"
+            >
+              <option value={10}>10개 보기</option>
+              <option value={20}>20개 보기</option>
+              <option value={30}>30개 보기</option>
+            </select>
+
+            <button
+              type="button"
+              onClick={() => setBroadcastCurrentPage((page) => Math.max(1, page - 1))}
+              disabled={safeBroadcastPage <= 1}
+              className="h-9 min-w-9 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              &lt;
+            </button>
+
+            {broadcastPaginationPages.map((pageItem, index) =>
+              pageItem === "ellipsis" ? (
+                <span key={`broadcast-ellipsis-${index}`} className="px-1 text-sm font-black text-slate-300">
+                  ...
+                </span>
+              ) : (
+                <button
+                  key={pageItem}
+                  type="button"
+                  onClick={() => setBroadcastCurrentPage(pageItem)}
+                  className={`h-9 min-w-9 rounded-xl px-3 text-sm font-black shadow-sm transition ${
+                    pageItem === safeBroadcastPage
+                      ? "bg-blue-600 text-white"
+                      : "border border-slate-200 bg-white text-slate-600 hover:bg-blue-50"
+                  }`}
+                >
+                  {pageItem}
+                </button>
+              ),
+            )}
+
+            <button
+              type="button"
+              onClick={() => setBroadcastCurrentPage((page) => Math.min(broadcastPageCount, page + 1))}
+              disabled={safeBroadcastPage >= broadcastPageCount}
+              className="h-9 min-w-9 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              &gt;
+            </button>
+          </div>
+        </div>
       </section>
 
     </div>
