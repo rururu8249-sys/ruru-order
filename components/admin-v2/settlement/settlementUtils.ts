@@ -85,7 +85,7 @@ export function isCanceled(row: AnyRow) {
 export function isPaymentDone(row: AnyRow) {
   const text = rowStatusText(row);
 
-  if (/입금확인\s*필요|확인필요|미입금|미결제|결제대기|주문확인전|대기|pending|unpaid/i.test(text)) {
+  if (/입금확인\s*필요|확인필요|미입금|미결제|결제대기|입금대기|주문확인전|pending|unpaid/i.test(text)) {
     return false;
   }
 
@@ -100,7 +100,7 @@ export function isSettlementUnpaid(row: AnyRow) {
   if (isPaymentDone(row)) return false;
 
   const text = rowStatusText(row);
-  return /입금확인\s*필요|확인필요|미입금|미결제|결제대기|주문확인전|대기|pending|unpaid/i.test(text);
+  return /입금확인\s*필요|확인필요|미입금|미결제|결제대기|입금대기|주문확인전|pending|unpaid/i.test(text);
 }
 
 export function paymentMethod(row: AnyRow): PaymentFilter {
