@@ -278,7 +278,7 @@ export default function SettlementMoneyFlowDashboard({
             <div>
               <h2 className="text-[29px] font-black tracking-[-0.06em] text-slate-950">정산통계</h2>
               <p className="mt-1 text-sm font-bold text-slate-500">
-                주문 → 받은 돈 → 못 받은 돈 → 빠지는 돈 → 남는 돈 순서로 확인합니다.
+                방송 정산에서 꼭 봐야 할 금액만 먼저 정리했습니다.
               </p>
             </div>
 
@@ -422,7 +422,7 @@ export default function SettlementMoneyFlowDashboard({
             <p className="mt-1 text-xs font-bold text-slate-400">초보자는 이 순서만 보면 됩니다.</p>
           </div>
           <div className="rounded-full bg-blue-50 px-3.5 py-1.5 text-xs font-black text-blue-700">
-            주문 → 받은 돈 → 못 받은 돈 → 빠지는 돈 → 남는 돈
+            주문 → 받은 돈 → 빠지는 돈 → 남는 돈
           </div>
         </div>
 
@@ -437,15 +437,15 @@ export default function SettlementMoneyFlowDashboard({
         <div className="rounded-[28px] border border-blue-100 bg-gradient-to-br from-blue-50/80 via-white to-white p-5 shadow-[0_12px_30px_rgba(37,99,235,0.055)]">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-xl font-black tracking-[-0.05em] text-slate-950">한 줄 요약</h3>
-              <p className="mt-1 text-xs font-bold text-blue-700">장사 처음 봐도 이해되는 돈 흐름</p>
+              <h3 className="text-[22px] font-black tracking-[-0.04em] text-slate-950">한 줄 요약</h3>
+              <p className="mt-1 text-sm font-black text-blue-700">이번 기간 돈 흐름을 문장으로 정리했습니다.</p>
             </div>
-            <div className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-blue-700">
+            <div className="rounded-full bg-white px-4 py-2 text-sm font-black text-blue-700 shadow-sm">
               현재 실수익 {won(stats.netAmount)}
             </div>
           </div>
 
-          <div className="mt-4 grid gap-2 text-sm font-bold leading-6 text-slate-700">
+          <div className="mt-4 grid gap-2.5 text-[15px] font-bold leading-7 text-slate-800">
             <p>① 주문서 총금액은 <span className="font-black text-slate-950">{won(stats.totalOrderAmount)}</span>입니다.</p>
             <p>② 결제완료 매출은 <span className="font-black text-blue-700">{won(stats.paidAmount)}</span>입니다.</p>
             <p>③ 아직 못 받은 금액은 <span className="font-black text-orange-700">{won(stats.unpaidAmount)}</span>입니다.</p>
