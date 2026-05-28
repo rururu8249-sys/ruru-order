@@ -361,6 +361,23 @@ export default function AdminLiveDashboard() {
     void loadOrders();
     void loadDepositsFromServer();
     void loadBroadcasts();
+
+    const refreshTimer = window.setInterval(() => {
+      void loadOrders();
+      void loadDepositsFromServer();
+    }, 15000);
+
+    const handleAutoBankdaSynced = () => {
+      void loadOrders();
+      void loadDepositsFromServer();
+    };
+
+    window.addEventListener("ruru-admin-live-auto-bankda-synced", handleAutoBankdaSynced);
+
+    return () => {
+      window.clearInterval(refreshTimer);
+      window.removeEventListener("ruru-admin-live-auto-bankda-synced", handleAutoBankdaSynced);
+    };
   }, []);
 
   useEffect(() => {

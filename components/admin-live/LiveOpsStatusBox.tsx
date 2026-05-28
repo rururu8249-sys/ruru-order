@@ -1,7 +1,12 @@
 "use client";
 
+import { showAdminToast } from "@/lib/adminToast";
 import { useEffect, useMemo, useRef, useState } from "react";
-import LiveOpsOrderCopyModal, { liveOpsOrderCopyKey, loadLiveOpsCopiedOrderKeys } from "./LiveOpsOrderCopyModal";
+import LiveOpsOrderCopyModal, {
+  ORDER_COPY_DONE_STORAGE_KEY,
+  liveOpsOrderCopyKey,
+  loadLiveOpsCopiedOrderKeys,
+} from "./LiveOpsOrderCopyModal";
 
 type RecentOrder = {
   id: string;
@@ -40,8 +45,102 @@ type Notice = {
   createdAt: string;
 };
 
+const AUTO_PAID_COPY_DONE_STORAGE_KEY = "ruru_admin_live_ops_auto_paid_copy_done_ids_v1";
+
+function clean(value: unknown) {
+  return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
 function money(value: unknown) {
   return `${Number(value || 0).toLocaleString("ko-KR")}원`;
+}
+
+function loadStringSet(storageKey: string) {
+  if (typeof window === "undefined") return new Set<string>();
+
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    const parsed = raw ? JSON.parse(raw) : [];
+
+    if (!Array.isArray(parsed)) return new Set<string>();
+    return new Set(parsed.map((item) => String(item)));
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function saveStringSet(storageKey: string, keys: Set<string>) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(Array.from(keys).slice(-500)));
+  } catch {
+    // 브라우저 저장 실패는 알림 복사 기능 자체를 막지 않습니다.
+  }
+}
+
+function loadLiveOpsCopiedAutoPaidKeys() {
+  return loadStringSet(AUTO_PAID_COPY_DONE_STORAGE_KEY);
+}
+
+function saveLiveOpsCopiedAutoPaidKeys(keys: Set<string>) {
+  saveStringSet(AUTO_PAID_COPY_DONE_STORAGE_KEY, keys);
+}
+
+function saveLiveOpsCopiedOrderKeys(keys: Set<string>) {
+  saveStringSet(ORDER_COPY_DONE_STORAGE_KEY, keys);
+}
+
+function liveOpsAutoPaidCopyKey(order: RecentOrder) {
+  return clean(`${order.id || order.groupId || order.nickname}-${order.amount}-${order.paidAt || order.createdAt || ""}`);
+}
+
+function maskNicknameForPayment(value: unknown) {
+  const text = clean(value);
+  if (!text) return "고객";
+  const chars = Array.from(text);
+
+  if (chars.length <= 1) return "*";
+  if (chars.length === 2) return `${chars[0]}*`;
+
+  return `${chars[0]}${"*".repeat(Math.max(1, chars.length - 2))}${chars[chars.length - 1]}`;
+}
+
+function buildRecentOrderCopyText(orders: RecentOrder[]) {
+  const body = orders
+    .slice(0, 2)
+    .map((order) => `${clean(order.nickname) || clean(order.maskedNickname) || "고객"}님 / ${clean(order.itemSummary) || "상품명확인"} / ${money(order.amount)}`)
+    .join(" ｜ ");
+
+  return `📦 새 주문서 접수완료 ｜ ${body} ｜ 주문내역과 금액 확인 후 결제 부탁드립니다 :)`;
+}
+
+function buildAutoPaidCopyText(orders: RecentOrder[]) {
+  const body = orders
+    .slice(0, 3)
+    .map((order) => `${maskNicknameForPayment(order.maskedNickname || order.nickname)}님 ${money(order.amount)}`)
+    .join(" ｜ ");
+
+  return `💰 입금확인완료 ｜ ${body} ｜ 입금 감사합니다 :)`;
+}
+
+async function copyToClipboard(text: string) {
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  textarea.style.top = "0";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  document.execCommand("copy");
+  textarea.remove();
 }
 
 function timeAgo(value: string) {
@@ -75,13 +174,13 @@ function playTone(type: "order" | "auto_paid") {
 
   oscillator.type = "sine";
   oscillator.frequency.value = type === "order" ? 720 : 980;
-  gain.gain.value = 0.045;
+  gain.gain.value = 0.09;
 
   oscillator.connect(gain);
   gain.connect(context.destination);
 
   oscillator.start();
-  oscillator.stop(context.currentTime + 0.16);
+  oscillator.stop(context.currentTime + 0.24);
 
   oscillator.onended = () => {
     void context.close();
@@ -109,6 +208,72 @@ export default function LiveOpsStatusBox() {
         return !copiedKeys.some((key) => noticeId.includes(String(key)));
       })
     );
+  };
+
+  const handleCopyRecentOrderNotices = async () => {
+    const targets = recentOrders.slice(0, 2);
+
+    if (!targets.length) {
+      showAdminToast("복사할 새 주문서 알림이 없습니다.");
+      return;
+    }
+
+    const copiedKeys = targets.map(liveOpsOrderCopyKey).filter(Boolean);
+    const copiedKeySet = new Set(copiedKeys);
+
+    try {
+      await copyToClipboard(buildRecentOrderCopyText(targets));
+
+      const nextDoneKeys = loadLiveOpsCopiedOrderKeys();
+      copiedKeys.forEach((key) => nextDoneKeys.add(key));
+      saveLiveOpsCopiedOrderKeys(nextDoneKeys);
+
+      handleCopiedOrderNotices(copiedKeys);
+      showAdminToast(`새 주문서 ${targets.length}건 복사완료`, "success");
+    } catch {
+      showAdminToast("새 주문서 자동복사에 실패했습니다. 다시 시도해주세요.", "error");
+      return;
+    }
+
+    setRecentOrders((current) =>
+      current.filter((order) => !copiedKeySet.has(liveOpsOrderCopyKey(order)))
+    );
+  };
+
+  const handleCopyAutoPaidNotices = async () => {
+    const targets = autoPaidOrders.slice(0, 3);
+
+    if (!targets.length) {
+      showAdminToast("복사할 입금확인완료 알림이 없습니다.");
+      return;
+    }
+
+    const copiedKeys = targets.map(liveOpsAutoPaidCopyKey).filter(Boolean);
+    const copiedIdSet = new Set(targets.map((order) => String(order.id || "")));
+
+    try {
+      await copyToClipboard(buildAutoPaidCopyText(targets));
+
+      const nextDoneKeys = loadLiveOpsCopiedAutoPaidKeys();
+      copiedKeys.forEach((key) => nextDoneKeys.add(key));
+      saveLiveOpsCopiedAutoPaidKeys(nextDoneKeys);
+
+      setAutoPaidOrders((current) =>
+        current.filter((order) => !copiedKeys.includes(liveOpsAutoPaidCopyKey(order)))
+      );
+
+      setNotices((current) =>
+        current.filter((notice) => {
+          if (notice.type !== "auto_paid") return true;
+          const noticeOrderId = String(notice.id || "").replace(/^auto-/, "");
+          return !copiedIdSet.has(noticeOrderId);
+        })
+      );
+
+      showAdminToast(`입금확인완료 ${targets.length}건 복사완료`, "success");
+    } catch {
+      showAdminToast("입금확인완료 자동복사에 실패했습니다. 다시 시도해주세요.", "error");
+    }
   };
 
   const [activeVisitors, setActiveVisitors] = useState<ActiveVisitor[]>([]);
@@ -151,10 +316,13 @@ export default function LiveOpsStatusBox() {
       if (!response.ok || !payload?.ok) return;
 
       const copiedOrderNoticeKeys = loadLiveOpsCopiedOrderKeys();
+      const copiedAutoPaidNoticeKeys = loadLiveOpsCopiedAutoPaidKeys();
       const nextOrders = (payload.recentOrders || []).filter(
         (order: RecentOrder) => !copiedOrderNoticeKeys.has(liveOpsOrderCopyKey(order))
       );
-      const nextAutoPaid = payload.autoPaidOrders || [];
+      const nextAutoPaid = (payload.autoPaidOrders || []).filter(
+        (order: RecentOrder) => !copiedAutoPaidNoticeKeys.has(liveOpsAutoPaidCopyKey(order))
+      );
       const nextVisitors = payload.activeVisitors || [];
 
       if (!initializedRef.current) {
@@ -179,8 +347,8 @@ export default function LiveOpsStatusBox() {
           .map((order) => ({
             id: `auto-${order.id}`,
             type: "auto_paid" as const,
-            title: "자동입금확인",
-            body: `${order.nickname} · ${money(order.amount)}`,
+            title: "입금확인완료",
+            body: `${maskNicknameForPayment(order.maskedNickname || order.nickname)}님 · ${money(order.amount)}`,
             createdAt: order.paidAt || order.createdAt,
           }));
 
@@ -192,8 +360,7 @@ export default function LiveOpsStatusBox() {
           if (soundOn) {
             const hasOrder = newOrderNotices.length > 0;
             const hasPaid = newAutoPaidNotices.length > 0;
-            if (hasOrder) playTone("order");
-            if (hasPaid) window.setTimeout(() => playTone("auto_paid"), hasOrder ? 220 : 0);
+            if (hasOrder || hasPaid) playTone(hasOrder ? "order" : "auto_paid");
           }
         }
 
@@ -244,8 +411,30 @@ export default function LiveOpsStatusBox() {
       </div>
 
       <div className="grid grid-cols-2 gap-1.5">
-        <MiniStat label="새 주문" value={recentOrders.length} />
-        <MiniStat label="자동입금" value={autoPaidOrders.length} />
+        <MiniStat label="새 주문서" value={recentOrders.length} />
+        <MiniStat label="입금확인완료" value={autoPaidOrders.length} />
+      </div>
+
+      <div className="mt-2 grid grid-cols-1 gap-1.5">
+        <button
+          type="button"
+          onClick={handleCopyRecentOrderNotices}
+          disabled={!recentOrders.length}
+          className="flex w-full items-center justify-between rounded-xl border border-blue-100 bg-white px-3 py-2 text-left hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          <span className="text-[11px] font-black text-blue-800">📦 새 주문서 최대 2건 복사</span>
+          <span className="text-[11px] font-black text-blue-600">{Math.min(2, recentOrders.length)}건</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={handleCopyAutoPaidNotices}
+          disabled={!autoPaidOrders.length}
+          className="flex w-full items-center justify-between rounded-xl border border-emerald-100 bg-white px-3 py-2 text-left hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          <span className="text-[11px] font-black text-emerald-800">💰 입금확인완료 최대 3건 복사</span>
+          <span className="text-[11px] font-black text-emerald-600">{Math.min(3, autoPaidOrders.length)}건</span>
+        </button>
       </div>
 
       <button

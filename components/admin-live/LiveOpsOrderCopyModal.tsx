@@ -65,13 +65,18 @@ function customerName(order: RecentOrder) {
   return clean(order.maskedNickname) || maskNicknameForChat(order.nickname || order.name);
 }
 
+function displayNicknameForOrder(order: RecentOrder) {
+  return clean(order.nickname || order.name) || customerName(order);
+}
+
 function buildOrderText(order: RecentOrder) {
   const summary = clean(order.itemSummary) || "상품명확인";
-  return `${customerName(order)}님 → ${summary} · ${money(order.amount)}`;
+  return `${displayNicknameForOrder(order)}님 / ${summary} / ${money(order.amount)}`;
 }
 
 function buildCopyText(orders: RecentOrder[]) {
-  return `✅ 주문서 완료! ㅣ ${orders.map(buildOrderText).join(" ㅣ ")}`;
+  const targets = orders.slice(0, 2);
+  return `📦 새 주문서 접수완료 ｜ ${targets.map(buildOrderText).join(" ｜ ")} ｜ 주문내역과 금액 확인 후 결제 부탁드립니다 :)`;
 }
 
 export function loadLiveOpsCopiedOrderKeys() {
@@ -134,7 +139,7 @@ export default function LiveOpsOrderCopyModal({ open, orders, onClose, onCopied 
   }, [orders, doneKeys]);
 
   const selectedOrders = useMemo(() => {
-    return visibleOrders.filter((order) => selectedKeys.has(liveOpsOrderCopyKey(order)));
+    return visibleOrders.filter((order) => selectedKeys.has(liveOpsOrderCopyKey(order))).slice(0, 2);
   }, [visibleOrders, selectedKeys]);
 
   const previewText = useMemo(() => {
@@ -150,6 +155,7 @@ export default function LiveOpsOrderCopyModal({ open, orders, onClose, onCopied 
       const next = new Set(current);
 
       if (next.has(key)) next.delete(key);
+      else if (next.size >= 2) showAdminToast("새 주문서 알림은 한 번에 최대 2건까지만 복사합니다.");
       else next.add(key);
 
       return next;
@@ -161,7 +167,7 @@ export default function LiveOpsOrderCopyModal({ open, orders, onClose, onCopied 
       if (allSelected) return new Set();
 
       const next = new Set<string>();
-      visibleOrders.forEach((order) => {
+      visibleOrders.slice(0, 2).forEach((order) => {
         const key = liveOpsOrderCopyKey(order);
         if (key) next.add(key);
       });
@@ -233,14 +239,14 @@ export default function LiveOpsOrderCopyModal({ open, orders, onClose, onCopied 
           </div>
 
           <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-[13px] font-black leading-5 text-blue-800">
-            복사 형식: ✅ 주문서 완료! ㅣ 닉네**님 → 상품명 옵션 1개 · 19,000원
+            복사 형식: 📦 새 주문서 접수완료 ｜ 닉네임님 / 상품명 옵션 x1개 / 19,000원 ｜ 주문내역과 금액 확인 후 결제 부탁드립니다 :)
           </div>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
           <div className="mb-3 flex items-center justify-between gap-2">
             <div className="text-sm font-black text-slate-700">
-              미복사 알림 {visibleOrders.length.toLocaleString("ko-KR")}건 · 선택 {selectedOrders.length.toLocaleString("ko-KR")}건
+              미복사 알림 {visibleOrders.length.toLocaleString("ko-KR")}건 · 선택 {selectedOrders.length.toLocaleString("ko-KR")}건 · 최대 2건 복사
             </div>
 
             <div className="flex items-center gap-2">
