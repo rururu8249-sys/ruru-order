@@ -84,7 +84,7 @@ export default function OrderCustomerInfoFormCard({
 
         <div className="grid gap-2">
           <FieldLabel>주소</FieldLabel>
-          <div className="grid grid-cols-[1fr_110px] gap-2">
+          <div className="grid grid-cols-[minmax(0,1fr)_100px] gap-2 min-[390px]:grid-cols-[minmax(0,1fr)_110px]">
             <input
               value={address}
               onChange={(event) => onAddressChange(event.target.value)}

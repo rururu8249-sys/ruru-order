@@ -371,8 +371,8 @@ function ProductDetailSheet({
   const mainImage = detailImages[0] || getImageUrl(product);
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-end bg-black/55 px-3 pb-0">
-      <div className="mx-auto flex max-h-[88vh] w-full max-w-[720px] flex-col overflow-hidden rounded-t-[32px] bg-white shadow-2xl">
+    <div className="fixed inset-0 z-[10000] flex items-end bg-black/55 px-2 pb-0 sm:px-3">
+      <div className="mx-auto flex max-h-[92dvh] w-full max-w-[720px] flex-col overflow-hidden rounded-t-[32px] bg-white shadow-2xl">
         <div className="shrink-0 border-b border-slate-100 p-5">
           <div className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-slate-200" />
 
@@ -428,7 +428,7 @@ function ProductDetailSheet({
           ) : null}
         </div>
 
-        <div className="shrink-0 grid grid-cols-[1fr_1.35fr] gap-3 border-t border-slate-100 bg-white p-4">
+        <div className="shrink-0 grid grid-cols-2 gap-2 border-t border-slate-100 bg-white p-3 sm:grid-cols-[1fr_1.35fr] sm:gap-3 sm:p-4">
           <button
             type="button"
             onClick={onClose}
@@ -593,8 +593,8 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
       </section>
 
       {sheetOpen ? (
-        <div className="fixed inset-0 z-[9999] flex items-end bg-black/45 px-3 pb-0">
-          <div className="mx-auto flex max-h-[88vh] w-full max-w-[760px] flex-col overflow-hidden rounded-t-[32px] bg-white shadow-2xl">
+        <div className="fixed inset-0 z-[9999] flex items-end bg-black/45 px-2 pb-0 sm:px-3">
+          <div className="mx-auto flex max-h-[92dvh] w-full max-w-[760px] flex-col overflow-hidden rounded-t-[32px] bg-white shadow-2xl">
             <div className="shrink-0 border-b border-slate-100 p-5">
               <div className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-slate-200" />
 

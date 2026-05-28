@@ -2404,7 +2404,7 @@ export default function OrderPage() {
 
   if (done) {
     return (
-      <main className="min-h-screen bg-[#f5f8ff] px-4 py-6 text-[#151923] select-none" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
+      <main className="min-h-screen bg-[#f5f8ff] px-3 py-4 text-[#151923] select-none sm:px-4 sm:py-6" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
         <section className="mx-auto w-full max-w-md">
           <TopCustomerNav />
 
@@ -2468,7 +2468,7 @@ export default function OrderPage() {
 
         {isAutoLoggedIn && (
           <>
-<section id="orderProductInputSection" className="mt-4 rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm">
+<section id="orderProductInputSection" className="mt-4 rounded-[2rem] border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
           <h2 className="text-xl font-black">방송상품.공구상품</h2>
 
 
@@ -2480,7 +2480,7 @@ export default function OrderPage() {
             />
 
             {items.map((item, index) => (
-              <div key={index} className="rounded-[26px] border border-blue-100 bg-white p-4 shadow-[0_10px_22px_rgba(30,64,175,0.06)]">
+              <div key={index} className="rounded-[26px] border border-blue-100 bg-white p-3.5 shadow-[0_10px_22px_rgba(30,64,175,0.06)] sm:p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <div className="font-black">상품 {index + 1}</div>
 
@@ -2572,7 +2572,7 @@ export default function OrderPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
                     <div className="relative min-w-0 [&>input]:w-full [&>input]:min-w-0 [&>input]:pr-10">
 <input
                       value={item.color}
@@ -2651,7 +2651,7 @@ export default function OrderPage() {
 
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
                     <input
                       value={item.qty}
                       onChange={(event) => updateItem(index, "qty", onlyNumber(event.target.value))}
@@ -2700,7 +2700,7 @@ export default function OrderPage() {
           <h2 className="text-xl font-black">결제방식 / 요청사항</h2>
 
           <div className="mt-4 grid gap-3">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
               {(["무통장입금", "카드결제"] as const).map((method) => (
                 <button
                   key={method}
