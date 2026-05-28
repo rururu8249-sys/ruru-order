@@ -4,7 +4,7 @@
 
 export default function MyOrderEmptyState() {
   return (
-    <section className="mt-4 rounded-[28px] bg-white p-7 text-center shadow-[0_12px_28px_rgba(30,64,175,0.08)] ring-1 ring-blue-100">
+    <section className="mt-4 rounded-[26px] bg-white p-5 text-center shadow-[0_12px_28px_rgba(30,64,175,0.08)] ring-1 ring-blue-100 min-[390px]:rounded-[28px] min-[390px]:p-7">
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-[30px] ring-1 ring-blue-100">
         🔎
       </div>

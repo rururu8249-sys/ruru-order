@@ -259,7 +259,7 @@ export default function MyOrderPage() {
 
   return (
     <main
-      className="min-h-screen select-none bg-[#f5f8ff] px-4 py-6 text-[#151923]"
+      className="min-h-screen select-none bg-[#f5f8ff] px-3 py-4 text-[#151923] sm:px-4 sm:py-6"
       style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
     >
         <CustomerToastNotice
@@ -297,7 +297,7 @@ export default function MyOrderPage() {
         )}
 
         {!isLegacyMode && !isLoggedIn && (
-          <section className="mt-4 rounded-[28px] bg-white p-5 text-center shadow-[0_10px_24px_rgba(30,64,175,0.08)] ring-1 ring-blue-100">
+          <section className="mt-4 rounded-[26px] bg-white p-4 text-center shadow-[0_10px_24px_rgba(30,64,175,0.08)] ring-1 ring-blue-100 min-[390px]:rounded-[28px] min-[390px]:p-5">
             <h2 className="text-[22px] font-black tracking-[-0.06em] text-[#151923]">
               카카오 간편주문 후 조회 가능
             </h2>
@@ -318,8 +318,8 @@ export default function MyOrderPage() {
 
         {orders.length > 0 && (
           <section className="mt-6">
-            <div className="mb-3 flex items-center gap-2">
-              <h2 className="text-[24px] font-black tracking-[-0.07em] text-[#151923]">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <h2 className="break-keep text-[22px] font-black leading-tight tracking-[-0.06em] text-[#151923] min-[390px]:text-[24px]">
                 최근 주문내역
               </h2>
               <span className="rounded-full bg-blue-50 px-3 py-1 text-[12px] font-black text-blue-700 ring-1 ring-blue-100">

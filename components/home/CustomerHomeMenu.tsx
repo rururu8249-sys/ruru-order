@@ -51,14 +51,14 @@ export default function CustomerHomeMenu() {
         href="https://pf.kakao.com/_RMxaqX"
         target="_blank"
         rel="noreferrer"
-        className="mt-5 flex items-center gap-4 rounded-[28px] bg-[#ffe04b] px-5 py-5 shadow-[0_12px_26px_rgba(30,64,175,0.08)] ring-1 ring-yellow-200 active:scale-[0.99]"
+        className="mt-5 flex items-center gap-3 rounded-[26px] bg-[#ffe04b] px-4 py-4 shadow-[0_12px_26px_rgba(30,64,175,0.08)] ring-1 ring-yellow-200 active:scale-[0.99] min-[390px]:gap-4 min-[390px]:rounded-[28px] min-[390px]:px-5 min-[390px]:py-5"
       >
         <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-white/70 text-[23px] font-black tracking-[-0.08em] text-[#3b2517]">
           TALK
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="text-[26px] font-black tracking-[-0.07em] text-[#241b17]">
+          <p className="break-keep text-[23px] font-black leading-tight tracking-[-0.06em] text-[#241b17] min-[390px]:text-[26px]">
             카톡채널 문의
           </p>
           <p className="mt-1 break-keep text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-[#5f4a17]">
@@ -69,20 +69,20 @@ export default function CustomerHomeMenu() {
         <div className="text-3xl font-black text-[#7d6415]">›</div>
       </a>
 
-      <section className="mt-5 grid grid-cols-2 gap-4">
+      <section className="mt-5 grid grid-cols-2 gap-3 min-[390px]:gap-4">
         {menuItems.map((item) => {
           const content = (
             <>
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-[28px] ring-1 ring-blue-100">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-[24px] ring-1 ring-blue-100 min-[390px]:mb-4 min-[390px]:h-14 min-[390px]:w-14 min-[390px]:text-[28px]">
                 {item.icon}
               </div>
 
-              <div className="flex items-end justify-between gap-2">
-                <div>
-                  <p className="text-[22px] font-black tracking-[-0.07em] text-[#151923]">
+              <div className="flex items-end justify-between gap-1.5 min-[390px]:gap-2">
+                <div className="min-w-0">
+                  <p className="break-keep text-[19px] font-black leading-tight tracking-[-0.055em] text-[#151923] min-[390px]:text-[22px]">
                     {item.title}
                   </p>
-                  <p className="mt-1 break-keep text-[13px] font-semibold leading-snug tracking-[-0.04em] text-slate-500">
+                  <p className="mt-1 break-keep text-[12px] font-semibold leading-snug tracking-[-0.035em] text-slate-500 min-[390px]:text-[13px]">
                     {item.desc}
                   </p>
                 </div>
@@ -101,7 +101,7 @@ export default function CustomerHomeMenu() {
                 href={item.href}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-[26px] bg-white p-5 shadow-[0_12px_26px_rgba(30,64,175,0.08)] ring-1 ring-blue-100 active:scale-[0.99]"
+                className="rounded-[24px] bg-white p-4 shadow-[0_12px_26px_rgba(30,64,175,0.08)] ring-1 ring-blue-100 active:scale-[0.99] min-[390px]:rounded-[26px] min-[390px]:p-5"
               >
                 {content}
               </a>
@@ -112,7 +112,7 @@ export default function CustomerHomeMenu() {
             <Link
               key={item.title}
               href={item.href}
-              className="rounded-[26px] bg-white p-5 shadow-[0_12px_26px_rgba(30,64,175,0.08)] ring-1 ring-blue-100 active:scale-[0.99]"
+              className="rounded-[24px] bg-white p-4 shadow-[0_12px_26px_rgba(30,64,175,0.08)] ring-1 ring-blue-100 active:scale-[0.99] min-[390px]:rounded-[26px] min-[390px]:p-5"
             >
               {content}
             </Link>

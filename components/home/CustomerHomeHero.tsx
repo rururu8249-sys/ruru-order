@@ -17,17 +17,17 @@ export default function CustomerHomeHero({
     <section className="mt-5">
       <Link
         href="/"
-        className="group relative block overflow-hidden rounded-[34px] bg-blue-600 px-5 pb-7 pt-8 text-white shadow-[0_18px_36px_rgba(37,99,235,0.25)] ring-4 ring-white active:scale-[0.99]"
+        className="group relative block overflow-hidden rounded-[30px] bg-blue-600 px-4 pb-6 pt-7 text-white shadow-[0_18px_36px_rgba(37,99,235,0.25)] ring-4 ring-white active:scale-[0.99] min-[390px]:rounded-[34px] min-[390px]:px-5 min-[390px]:pb-7 min-[390px]:pt-8"
       >
         <div className="pointer-events-none absolute -left-12 -top-12 h-36 w-36 rounded-full bg-white/10" />
         <div className="pointer-events-none absolute -bottom-14 -right-12 h-44 w-44 rounded-full bg-white/10" />
 
-        <div className="relative mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-white/20 text-[42px] shadow-inner ring-4 ring-white/30">
+        <div className="relative mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/20 text-[34px] shadow-inner ring-4 ring-white/30 min-[390px]:mb-5 min-[390px]:h-20 min-[390px]:w-20 min-[390px]:text-[42px]">
           📝
         </div>
 
         <div className="relative text-center">
-          <p className="text-[46px] font-black leading-none tracking-[-0.09em] sm:text-[52px]">
+          <p className="break-keep text-[40px] font-black leading-none tracking-[-0.08em] min-[390px]:text-[46px] sm:text-[52px]">
             주문서 작성
           </p>
 

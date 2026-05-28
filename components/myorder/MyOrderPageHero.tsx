@@ -15,12 +15,12 @@ export default function MyOrderPageHero({
   void customerName;
 
   return (
-    <section className="px-2 pb-3 pt-5 text-center">
-      <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white text-[36px] shadow-[0_12px_28px_rgba(30,64,175,0.08)] ring-1 ring-blue-100">
+    <section className="px-2 pb-2 pt-3 text-center min-[390px]:pb-3 min-[390px]:pt-5">
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white text-[30px] shadow-[0_12px_28px_rgba(30,64,175,0.08)] ring-1 ring-blue-100 min-[390px]:h-20 min-[390px]:w-20 min-[390px]:text-[36px]">
         🛍️
       </div>
 
-      <h1 className="mt-5 text-[34px] font-black leading-tight tracking-[-0.08em] text-[#151923]">
+      <h1 className="mt-4 break-keep text-[30px] font-black leading-tight tracking-[-0.07em] text-[#151923] min-[390px]:mt-5 min-[390px]:text-[34px]">
         주문조회
       </h1>
     </section>

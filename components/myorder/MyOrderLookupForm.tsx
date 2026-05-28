@@ -20,9 +20,9 @@ export default function MyOrderLookupForm({
   onSubmit,
 }: MyOrderLookupFormProps) {
   return (
-    <section className="rounded-[28px] bg-white p-5 shadow-[0_12px_28px_rgba(30,64,175,0.08)] ring-1 ring-blue-100">
+    <section className="rounded-[26px] bg-white p-4 shadow-[0_12px_28px_rgba(30,64,175,0.08)] ring-1 ring-blue-100 min-[390px]:rounded-[28px] min-[390px]:p-5">
       <div className="mb-4">
-        <h2 className="text-[22px] font-black tracking-[-0.06em] text-[#151923]">
+        <h2 className="break-keep text-[21px] font-black leading-tight tracking-[-0.055em] text-[#151923] min-[390px]:text-[22px]">
           최근 7일 주문조회
         </h2>
 
@@ -57,7 +57,7 @@ export default function MyOrderLookupForm({
           type="button"
           onClick={onSubmit}
           disabled={loading}
-          className="mt-1 rounded-2xl bg-blue-600 p-4 text-[18px] font-black text-white shadow-[0_12px_24px_rgba(37,99,235,0.22)] transition active:scale-[0.97] disabled:opacity-60"
+          className="mt-1 rounded-2xl bg-blue-600 p-3.5 text-[17px] font-black text-white shadow-[0_12px_24px_rgba(37,99,235,0.22)] transition active:scale-[0.97] disabled:opacity-60 min-[390px]:p-4 min-[390px]:text-[18px]"
         >
           {loading ? "조회중..." : "조회하기"}
         </button>

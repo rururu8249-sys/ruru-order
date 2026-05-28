@@ -22,13 +22,13 @@ export default function MyOrderBankAccountCard({
   const safeNickname = String(depositNickname || "").trim() || "주문서 닉네임";
 
   return (
-    <section className="mt-4 rounded-[28px] bg-white p-4 shadow-[0_10px_24px_rgba(30,64,175,0.08)] ring-1 ring-blue-100">
-      <div className="rounded-[24px] bg-blue-50 p-4 ring-1 ring-blue-100">
+    <section className="mt-4 rounded-[26px] bg-white p-3.5 shadow-[0_10px_24px_rgba(30,64,175,0.08)] ring-1 ring-blue-100 min-[390px]:rounded-[28px] min-[390px]:p-4">
+      <div className="rounded-[22px] bg-blue-50 p-3.5 ring-1 ring-blue-100 min-[390px]:rounded-[24px] min-[390px]:p-4">
         <p className="mb-4 text-[17px] font-black tracking-[-0.05em] text-blue-700">
           입금정보를 확인해주세요
         </p>
 
-        <div className="rounded-[20px] bg-white px-4 py-4 text-center text-[16px] font-black leading-relaxed tracking-[-0.04em] text-blue-700 ring-1 ring-blue-100">
+        <div className="rounded-[20px] bg-white px-3 py-3.5 text-center text-[15px] font-black leading-relaxed tracking-[-0.035em] text-blue-700 ring-1 ring-blue-100 min-[390px]:px-4 min-[390px]:py-4 min-[390px]:text-[16px]">
           <div>은행 {bankName}</div>
           <div className="mt-1">계좌 {bankAccount}</div>
           <div className="mt-1">예금주 {bankHolder}</div>
@@ -37,12 +37,12 @@ export default function MyOrderBankAccountCard({
         <button
           type="button"
           onClick={onCopy}
-          className="mt-4 flex min-h-[58px] w-full items-center justify-center rounded-[22px] bg-[#071120] px-4 py-4 text-center text-[18px] font-black tracking-[-0.04em] text-white shadow-[0_12px_26px_rgba(15,23,42,0.18)] transition active:scale-[0.98]"
+          className="mt-4 flex min-h-[54px] w-full items-center justify-center rounded-[20px] bg-[#071120] px-3 py-3.5 text-center text-[17px] font-black tracking-[-0.035em] text-white shadow-[0_12px_26px_rgba(15,23,42,0.18)] transition active:scale-[0.98] min-[390px]:min-h-[58px] min-[390px]:rounded-[22px] min-[390px]:px-4 min-[390px]:py-4 min-[390px]:text-[18px]"
         >
           {copyDone ? "✓ 계좌번호 복사 완료" : "계좌번호 복사"}
         </button>
 
-        <div className="mt-4 rounded-[20px] bg-white px-4 py-4 text-center text-[16px] font-black leading-relaxed tracking-[-0.05em] text-slate-700 ring-1 ring-blue-100">
+        <div className="mt-4 rounded-[20px] bg-white px-3 py-3.5 text-center text-[15px] font-black leading-relaxed tracking-[-0.04em] text-slate-700 ring-1 ring-blue-100 min-[390px]:px-4 min-[390px]:py-4 min-[390px]:text-[16px]">
           입금자명은 현재 닉네임{" "}
           <span className="text-blue-700">“{safeNickname}”</span> 로 입금!
           <br />

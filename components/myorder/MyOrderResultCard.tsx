@@ -67,17 +67,17 @@ export default function MyOrderResultCard({
           : "확인중";
 
   return (
-    <article className="rounded-[28px] bg-white p-5 shadow-[0_12px_28px_rgba(30,64,175,0.08)] ring-1 ring-blue-100">
-      <div className="flex items-start gap-4">
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[22px] bg-blue-50 text-[31px] ring-1 ring-blue-100">
+    <article className="rounded-[26px] bg-white p-4 shadow-[0_12px_28px_rgba(30,64,175,0.08)] ring-1 ring-blue-100 min-[390px]:rounded-[28px] min-[390px]:p-5">
+      <div className="flex items-start gap-3 min-[390px]:gap-4">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-blue-50 text-[24px] ring-1 ring-blue-100 min-[390px]:h-16 min-[390px]:w-16 min-[390px]:rounded-[22px] min-[390px]:text-[31px]">
           🛍️
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="grid gap-2 text-[14px] font-bold text-slate-600">
+          <div className="grid gap-2 text-[13px] font-bold text-slate-600 min-[390px]:text-[14px]">
             <div className="flex items-center justify-between gap-3">
               <span className="shrink-0 font-black text-[#151923]">주문번호</span>
-              <span className="truncate text-right font-black text-[#151923]" title={orderCode}>
+              <span className="min-w-0 truncate text-right font-black text-[#151923]" title={orderCode}>
                 {orderCode}
               </span>
             </div>
@@ -107,7 +107,7 @@ export default function MyOrderResultCard({
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="mt-4 grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
             <div className="rounded-2xl bg-blue-50 px-3 py-2 text-center ring-1 ring-blue-100">
               <div className="text-[11px] font-black text-slate-500">입금상태</div>
               <div className="mt-1 text-[13px] font-black text-blue-700">{paymentStatus}</div>
@@ -121,9 +121,9 @@ export default function MyOrderResultCard({
             </div>
           </div>
 
-          <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
+          <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
             <span className="text-[14px] font-bold text-slate-500">주문금액</span>
-            <span className="text-[22px] font-black tracking-[-0.05em] text-[#151923]">
+            <span className="shrink-0 text-[20px] font-black tracking-[-0.045em] text-[#151923] min-[390px]:text-[22px]">
               {amountText}
             </span>
           </div>
