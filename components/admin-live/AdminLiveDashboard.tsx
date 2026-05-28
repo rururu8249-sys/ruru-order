@@ -280,6 +280,10 @@ function isBroadcastEndCanceled(order: LiveOrder) {
   return order.paymentStatus === "canceled";
 }
 
+function isExcludedFromSettlement(order: LiveOrder) {
+  return order.excludeFromSettlement === true;
+}
+
 function normalizeBroadcastEndPhone(value: unknown) {
   return String(value ?? "").replace(/\D/g, "");
 }
@@ -349,7 +353,7 @@ function buildLiveBroadcastEndSummary({
   endedAtIso: string;
 }): LiveBroadcastEndSummary {
   const startValue = broadcast.started_at || broadcast.created_at || null;
-  const broadcastOrders = orders.filter((order) => isOrderInsideBroadcastEndSummary(order, broadcast, endedAtIso));
+  const broadcastOrders = orders.filter((order) => !isExcludedFromSettlement(order) && isOrderInsideBroadcastEndSummary(order, broadcast, endedAtIso));
   const activeOrders = broadcastOrders.filter((order) => !isBroadcastEndCanceled(order));
   const canceledOrders = broadcastOrders.filter(isBroadcastEndCanceled);
   const paidOrders = activeOrders.filter(isBroadcastEndPaid);
@@ -365,6 +369,7 @@ function buildLiveBroadcastEndSummary({
   const previousPhones = new Set(
     orders
       .filter((order) => {
+        if (isExcludedFromSettlement(order)) return false;
         const orderTime = order.createdAt ? new Date(order.createdAt).getTime() : NaN;
         return Number.isFinite(startTime) && Number.isFinite(orderTime) && orderTime < startTime;
       })

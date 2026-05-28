@@ -375,21 +375,33 @@ async function writeWorkbook(workbook: ExcelJS.Workbook, fileName: string) {
   window.URL.revokeObjectURL(url);
 }
 
+function isRosenExportExcluded(order: LiveOrder) {
+  return order.excludeFromShipping === true;
+}
+
+function isPickingExportExcluded(order: LiveOrder) {
+  return order.excludeFromPicking === true;
+}
+
 export async function exportLiveOrdersForRosen(orders: LiveOrder[], meta: ExportMeta) {
-  if (!orders.length) {
+  const exportOrders = orders.filter((order) => !isRosenExportExcluded(order));
+
+  if (!exportOrders.length) {
     showAdminToast("내보낼 주문이 없습니다. 필터 조건을 확인해주세요.");
     return;
   }
 
   const workbook = createWorkbook();
-  appendRosenSheets(workbook, orders);
-  appendRosenCheckSheet(workbook, orders, meta);
+  appendRosenSheets(workbook, exportOrders);
+  appendRosenCheckSheet(workbook, exportOrders, meta);
 
   await writeWorkbook(workbook, `rozen_${safeFileDate()}.xlsx`);
 }
 
 export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: ExportMeta) {
-  if (!orders.length) {
+  const exportOrders = orders.filter((order) => !isPickingExportExcluded(order));
+
+  if (!exportOrders.length) {
     showAdminToast("내보낼 주문이 없습니다. 필터 조건을 확인해주세요.");
     return;
   }
@@ -410,7 +422,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
 
   const itemRows: WorkbookRow[] = [];
 
-  orders.forEach((order) => {
+  exportOrders.forEach((order) => {
     const items = order.items || [];
 
     if (!items.length) {

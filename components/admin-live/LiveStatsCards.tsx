@@ -18,8 +18,9 @@ function isCanceled(order: LiveOrder) {
 }
 
 export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 500건 전체" }: Props) {
-  const totalOrderAmount = orders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
-  const activeOrders = orders.filter((order) => !isCanceled(order));
+  const settlementOrders = orders.filter((order) => order.excludeFromSettlement !== true);
+  const totalOrderAmount = settlementOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
+  const activeOrders = settlementOrders.filter((order) => !isCanceled(order));
   const paidOrders = activeOrders.filter(isPaid);
   const paidAmount = paidOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
 
@@ -36,7 +37,7 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
     {
       label: "결제완료 매출",
       amount: money(paidAmount),
-      sub: `결제완료 ${paidOrders.length}건 · 전체 ${orders.length}건`,
+      sub: `결제완료 ${paidOrders.length}건 · 전체 ${settlementOrders.length}건`,
       icon: "📈",
       color: "bg-slate-50 text-slate-700",
     },

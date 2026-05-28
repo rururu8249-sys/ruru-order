@@ -50,8 +50,10 @@ export default function AdminLiveOrdersPanel({
   onFiltersChange,
   onRefresh,
 }: Props) {
-  const canceledOrders = orders.filter((order) => order.paymentStatus === "canceled");
-  const activeOrders = orders.filter((order) => order.paymentStatus !== "canceled");
+  const settlementOrders = orders.filter((order) => order.excludeFromSettlement !== true);
+  const settlementExcludedCount = orders.length - settlementOrders.length;
+  const canceledOrders = settlementOrders.filter((order) => order.paymentStatus === "canceled");
+  const activeOrders = settlementOrders.filter((order) => order.paymentStatus !== "canceled");
   const paidOrders = activeOrders.filter((order) =>
     ["paid", "auto_paid", "manual_paid", "card_paid"].includes(order.paymentStatus)
   );
@@ -83,7 +85,7 @@ export default function AdminLiveOrdersPanel({
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <SummaryCard label="현재 표시 주문" value={`${orders.length.toLocaleString("ko-KR")}건`} sub={`정상 ${activeOrders.length.toLocaleString("ko-KR")}건 · ${money(totalAmount)}`} />
+          <SummaryCard label="현재 표시 주문" value={`${orders.length.toLocaleString("ko-KR")}건`} sub={`정상 ${activeOrders.length.toLocaleString("ko-KR")}건 · ${money(totalAmount)}${settlementExcludedCount > 0 ? ` · 테스트 제외 ${settlementExcludedCount.toLocaleString("ko-KR")}건` : ""}`} />
           <SummaryCard label="결제완료 주문" value={`${paidOrders.length.toLocaleString("ko-KR")}건`} sub={money(paidAmount)} />
           <SummaryCard label="아직 못 받은 주문" value={`${unpaidOrders.length.toLocaleString("ko-KR")}건`} sub={money(unpaidAmount)} />
           <SummaryCard label="주문서취소" value={`${canceledOrders.length.toLocaleString("ko-KR")}건`} sub={money(canceledAmount)} />

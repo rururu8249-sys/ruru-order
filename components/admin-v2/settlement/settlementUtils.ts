@@ -330,13 +330,19 @@ export function filterRows({
   });
 }
 
+function isExcludedFromSettlement(row: AnyRow) {
+  const raw = row.exclude_from_settlement ?? row.excludeFromSettlement;
+  return raw === true || raw === "true" || raw === "t" || raw === 1 || raw === "1";
+}
+
 export function calculateStats(
   rows: AnyRow[],
   actualCardRate: number,
   manualEntries: SettlementManualEntry[] = [],
 ): SettlementStats {
-  const activeRows = rows.filter((row) => !isCanceled(row));
-  const canceledRows = rows.filter(isCanceled);
+  const settlementRows = rows.filter((row) => !isExcludedFromSettlement(row));
+  const activeRows = settlementRows.filter((row) => !isCanceled(row));
+  const canceledRows = settlementRows.filter(isCanceled);
   const paidRows = activeRows.filter(isPaymentDone);
   const unpaidRows = activeRows.filter(isSettlementUnpaid);
 

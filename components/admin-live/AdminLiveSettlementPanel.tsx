@@ -202,7 +202,9 @@ export default function AdminLiveSettlementPanel({ orders }: Props) {
   }, []);
 
   const settlementOrders = useMemo(() => {
-    return Array.isArray(orders) ? orders.map(normalizeLiveOrder) : [];
+    return Array.isArray(orders)
+      ? orders.filter((order: any) => order?.excludeFromSettlement !== true && order?.exclude_from_settlement !== true).map(normalizeLiveOrder)
+      : [];
   }, [orders]);
 
   const settingsSummary: SettingSummary = useMemo(() => {
