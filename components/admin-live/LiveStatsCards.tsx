@@ -34,28 +34,28 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
 
   const stats = [
     {
-      label: "완료매출",
+      label: "결제완료 매출",
       amount: money(paidAmount),
-      sub: `완료 ${paidOrders.length}건 · 전체 ${orders.length}건`,
+      sub: `결제완료 ${paidOrders.length}건 · 전체 ${orders.length}건`,
       icon: "📈",
       color: "bg-slate-50 text-slate-700",
     },
     {
-      label: "무통장 입금확인완료",
+      label: "무통장 결제완료",
       amount: money(bankPaid.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)),
-      sub: `입금확인완료 ${bankPaid.length}건`,
+      sub: `결제완료 ${bankPaid.length}건`,
       icon: "🏦",
       color: "bg-emerald-50 text-emerald-700",
     },
     {
-      label: "무통장 미입금",
+      label: "미입금",
       amount: money(bankUnpaid.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)),
       sub: `미입금 ${bankUnpaid.length}건`,
       icon: "⏱",
       color: "bg-red-50 text-red-700",
     },
     {
-      label: "카드결제완료",
+      label: "카드 결제완료",
       amount: money(cardPaid.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)),
       sub: `결제완료 ${cardPaid.length}건`,
       icon: "💳",

@@ -84,8 +84,8 @@ export default function AdminLiveOrdersPanel({
 
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <SummaryCard label="현재 표시 주문" value={`${orders.length.toLocaleString("ko-KR")}건`} sub={`정상 ${activeOrders.length.toLocaleString("ko-KR")}건 · ${money(totalAmount)}`} />
-          <SummaryCard label="입금확인완료 주문" value={`${paidOrders.length.toLocaleString("ko-KR")}건`} sub={money(paidAmount)} />
-          <SummaryCard label="결제대기 주문" value={`${unpaidOrders.length.toLocaleString("ko-KR")}건`} sub={money(unpaidAmount)} />
+          <SummaryCard label="결제완료 주문" value={`${paidOrders.length.toLocaleString("ko-KR")}건`} sub={money(paidAmount)} />
+          <SummaryCard label="아직 못 받은 주문" value={`${unpaidOrders.length.toLocaleString("ko-KR")}건`} sub={money(unpaidAmount)} />
           <SummaryCard label="주문서취소" value={`${canceledOrders.length.toLocaleString("ko-KR")}건`} sub={money(canceledAmount)} />
         </div>
       </div>
