@@ -636,11 +636,28 @@ export default function QuickProductFastForm({
   }, [resolvedVariantRows, stockMode, totalStockText]);
 
   const applyColorPreset = (preset: string) => {
-    setColorText((current) => unique([...splitOptions(current), preset]).join(", "));
+    setColorText((current) => {
+      const currentOptions = splitOptions(current);
+      const isSelected = currentOptions.includes(preset);
+      const nextOptions = isSelected
+        ? currentOptions.filter((option) => option !== preset)
+        : unique([...currentOptions, preset]);
+
+      return nextOptions.join(", ");
+    });
   };
 
   const applySizePreset = (preset: string) => {
-    setSizeText((current) => unique([...splitOptions(current), ...normalizePresetOptions(preset)]).join(", "));
+    setSizeText((current) => {
+      const presetOptions = normalizePresetOptions(preset);
+      const currentOptions = splitOptions(current);
+      const isSelected = presetOptions.every((option) => currentOptions.includes(option));
+      const nextOptions = isSelected
+        ? currentOptions.filter((option) => !presetOptions.includes(option))
+        : unique([...currentOptions, ...presetOptions]);
+
+      return nextOptions.join(", ");
+    });
   };
 
   const updateVariantStock = (targetKey: string, stock: number) => {
@@ -1129,7 +1146,7 @@ export default function QuickProductFastForm({
 
                 <div className="min-h-0 flex-1 overflow-y-auto">
                   {stockMode === "option" && resolvedVariantRows.length > 0 ? (
-                    resolvedVariantRows.slice(0, 12).map((row) => (
+                    resolvedVariantRows.map((row) => (
                       <div
                         key={row.key}
                         className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_104px] items-center border-t border-slate-100 px-3 py-1"
