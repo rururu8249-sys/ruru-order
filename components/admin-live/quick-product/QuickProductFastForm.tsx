@@ -790,8 +790,8 @@ export default function QuickProductFastForm({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="min-h-0 flex-1 overflow-hidden px-5 py-4">
-        <div className="grid h-full min-h-0 grid-rows-[206px_76px_86px_124px_minmax(0,1fr)] gap-3 overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+        <div className="grid min-h-0 content-start gap-3 pb-3">
           <section className="grid min-h-0 items-center grid-cols-[180px_minmax(0,1fr)] gap-4 rounded-2xl border border-slate-200 bg-white p-3 overflow-hidden">
             <ImagePicker
               label="대표사진"
@@ -952,14 +952,7 @@ export default function QuickProductFastForm({
             />
           </section>
 
-          <section className="grid min-h-0 grid-cols-2 gap-3">
-            <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3">
-              <div className="mb-1 flex items-center justify-between">
-                <span className="text-[11px] font-black text-slate-700">색상</span>
-                <span className="text-[10px] font-bold text-slate-400">쉼표 여러 개</span>
-              </div>
-
-              <div data-ruru-quick-none-toggle className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div data-ruru-quick-none-toggle className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                 <div className="min-w-0">
                   <div className="text-xs font-black text-slate-700">색상/사이즈 없음입력</div>
                   <div className="mt-0.5 text-[11px] font-bold text-slate-400">ON이면 고객 주문서에 없음으로 자동입력</div>
@@ -977,6 +970,13 @@ export default function QuickProductFastForm({
                 >
                   {noneOptionAutofillEnabled ? "ON" : "OFF"}
                 </button>
+              </div>
+
+          <section className="grid min-h-0 grid-cols-2 gap-3">
+            <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3">
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-[11px] font-black text-slate-700">색상</span>
+                <span className="text-[10px] font-bold text-slate-400">쉼표 여러 개</span>
               </div>
 
               <input
@@ -1035,7 +1035,7 @@ export default function QuickProductFastForm({
             </div>
           </section>
 
-          <section className="grid h-full min-h-0 grid-cols-[260px_minmax(0,1fr)] items-start gap-4">
+          <section className="grid min-h-0 grid-cols-[260px_minmax(0,1fr)] items-start gap-4">
             <div className="self-start rounded-2xl border border-slate-200 bg-white p-3">
 <ImagePicker
                 label="상세사진 최대 5장"
@@ -1050,7 +1050,7 @@ export default function QuickProductFastForm({
               </div>
             </div>
 
-            <div className="flex h-full min-h-0 self-stretch flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-3">
+            <div className="flex min-h-[240px] self-stretch flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-3">
             <div className="mb-2 flex items-center justify-between gap-3">
               <div>
                 <div className="flex items-center justify-between gap-2">
