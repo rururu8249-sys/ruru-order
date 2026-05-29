@@ -16,6 +16,25 @@ export const dynamic = "force-dynamic";
 
 const DEFAULT_TITLE = "🎁 루루동이룰렛";
 
+type RouletteBroadcastRow = Record<string, unknown> & {
+  id: string | number;
+  title?: string | null;
+  broadcast_title?: string | null;
+  name?: string | null;
+  label?: string | null;
+  status?: string | null;
+  state?: string | null;
+  started_at?: string | null;
+  start_at?: string | null;
+  start_time?: string | null;
+  ended_at?: string | null;
+  end_at?: string | null;
+  end_time?: string | null;
+  closed_at?: string | null;
+  finished_at?: string | null;
+  created_at?: string | null;
+};
+
 type RouletteEventRow = {
   id: string;
   title: string;
@@ -74,6 +93,51 @@ function kstDateRangeUtc(dateText: string) {
   return {
     start: new Date(`${dateText}T00:00:00+09:00`).toISOString(),
     end: new Date(`${dateText}T23:59:59.999+09:00`).toISOString(),
+  };
+}
+
+function cleanBroadcastId(value: unknown) {
+  return String(value ?? "").trim();
+}
+
+function getBroadcastTitle(row: RouletteBroadcastRow) {
+  return cleanText(row.title || row.broadcast_title || row.name || row.label || "방송");
+}
+
+function getBroadcastStatus(row: RouletteBroadcastRow) {
+  return cleanText(row.status || row.state || "");
+}
+
+function getBroadcastStart(row: RouletteBroadcastRow) {
+  return cleanText(row.started_at || row.start_at || row.start_time || row.created_at);
+}
+
+function getBroadcastEnd(row: RouletteBroadcastRow) {
+  return cleanText(row.ended_at || row.end_at || row.end_time || row.closed_at || row.finished_at);
+}
+
+function makeBroadcastLabel(row: RouletteBroadcastRow) {
+  const title = getBroadcastTitle(row);
+  const startedAt = getBroadcastStart(row);
+  const dateLabel = startedAt ? new Date(startedAt).toLocaleString("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Seoul",
+  }) : "시간 없음";
+
+  return `${dateLabel} · ${title}`;
+}
+
+function sanitizeBroadcast(row: RouletteBroadcastRow) {
+  return {
+    id: String(row.id),
+    title: getBroadcastTitle(row),
+    label: makeBroadcastLabel(row),
+    status: getBroadcastStatus(row),
+    started_at: getBroadcastStart(row) || null,
+    ended_at: getBroadcastEnd(row) || null,
   };
 }
 
@@ -189,6 +253,79 @@ function sanitizeEventForOverlayProbe(event: RouletteEventRow) {
   };
 }
 
+async function fetchBroadcastRows(supabase: SupabaseAdminClient) {
+  const { data, error } = await supabase
+    .from("broadcasts")
+    .select("*")
+    .order("started_at", { ascending: false })
+    .limit(80);
+
+  if (error) {
+    throw new Error(error.message || "방송리스트 조회 실패");
+  }
+
+  return (Array.isArray(data) ? data : []) as RouletteBroadcastRow[];
+}
+
+async function fetchBroadcastById(supabase: SupabaseAdminClient, broadcastId: string) {
+  if (!broadcastId) return null;
+
+  const { data, error } = await supabase
+    .from("broadcasts")
+    .select("*")
+    .eq("id", broadcastId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message || "선택한 방송 조회 실패");
+  }
+
+  return data ? (data as RouletteBroadcastRow) : null;
+}
+
+async function fetchOrderRowsForBroadcast(supabase: SupabaseAdminClient, broadcastId: string) {
+  const broadcast = await fetchBroadcastById(supabase, broadcastId);
+
+  if (!broadcast) {
+    return [];
+  }
+
+  const start = getBroadcastStart(broadcast);
+  const end = getBroadcastEnd(broadcast) || new Date().toISOString();
+
+  if (!start) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select(
+      [
+        "id",
+        "created_at",
+        "youtube_nickname",
+        "customer_name",
+        "qty",
+        "total_price",
+        "adjusted_total_price",
+        "final_amount",
+        "admin_order_status_v2",
+        "order_manage_status",
+        "is_test_order",
+      ].join(", ")
+    )
+    .gte("created_at", start)
+    .lte("created_at", end)
+    .order("created_at", { ascending: false })
+    .limit(1000);
+
+  if (error) {
+    throw new Error(error.message || "방송 기준 룰렛 참여자 주문 조회 실패");
+  }
+
+  return (Array.isArray(data) ? data : []) as EventRouletteOrderLike[];
+}
+
 async function fetchOrderRowsForDate(supabase: SupabaseAdminClient, sourceDate: string) {
   const range = kstDateRangeUtc(sourceDate);
 
@@ -221,14 +358,34 @@ async function fetchOrderRowsForDate(supabase: SupabaseAdminClient, sourceDate: 
   return (Array.isArray(data) ? data : []) as EventRouletteOrderLike[];
 }
 
-async function buildParticipantsForRequest(supabase: SupabaseAdminClient, mode: EventRouletteMode, sourceDate: string) {
+async function buildParticipantsForRequest(
+  supabase: SupabaseAdminClient,
+  mode: EventRouletteMode,
+  sourceDate: string,
+  broadcastId = ""
+) {
   if (mode === "preview") {
     return buildRoulettePreviewParticipants();
   }
 
-  const rows = await fetchOrderRowsForDate(supabase, sourceDate);
+  const rows = broadcastId
+    ? await fetchOrderRowsForBroadcast(supabase, broadcastId)
+    : await fetchOrderRowsForDate(supabase, sourceDate);
 
   return buildRouletteParticipants(rows, mode);
+}
+
+async function handleBroadcasts(request: NextRequest) {
+  const authError = requireAdmin(request);
+  if (authError) return authError;
+
+  const supabase = getSupabaseAdmin();
+  const rows = await fetchBroadcastRows(supabase);
+
+  return json({
+    ok: true,
+    broadcasts: rows.map(sanitizeBroadcast),
+  });
 }
 
 async function handleParticipants(request: NextRequest) {
@@ -238,12 +395,14 @@ async function handleParticipants(request: NextRequest) {
   const supabase = getSupabaseAdmin();
   const mode = normalizeEventRouletteMode(request.nextUrl.searchParams.get("mode"));
   const sourceDate = normalizeDateText(request.nextUrl.searchParams.get("sourceDate"));
-  const participants = await buildParticipantsForRequest(supabase, mode, sourceDate);
+  const broadcastId = cleanBroadcastId(request.nextUrl.searchParams.get("broadcastId"));
+  const participants = await buildParticipantsForRequest(supabase, mode, sourceDate, broadcastId);
 
   return json({
     ok: true,
     mode,
     source_date: sourceDate,
+    broadcast_id: broadcastId || null,
     participant_count: participants.length,
     participants: participants.map(sanitizeParticipantForAdmin),
   });
@@ -310,8 +469,9 @@ async function createEvent(body: Record<string, unknown>) {
   const supabase = getSupabaseAdmin();
   const mode = normalizeEventRouletteMode(body.mode);
   const sourceDate = normalizeDateText(body.sourceDate);
+  const broadcastId = cleanBroadcastId(body.broadcastId);
   const title = cleanText(body.title) || DEFAULT_TITLE;
-  const participants = await buildParticipantsForRequest(supabase, mode, sourceDate);
+  const participants = await buildParticipantsForRequest(supabase, mode, sourceDate, broadcastId);
 
   if (participants.length <= 0) {
     return json({ ok: false, message: "룰렛 참여자가 없습니다." }, 400);
@@ -322,6 +482,7 @@ async function createEvent(body: Record<string, unknown>) {
       ok: true,
       mode,
       source_date: sourceDate,
+      broadcast_id: broadcastId || null,
       event: {
         title,
         mode,
@@ -487,6 +648,7 @@ export async function GET(request: NextRequest) {
     const action = request.nextUrl.searchParams.get("action") || "participants";
 
     if (action === "participants") return handleParticipants(request);
+    if (action === "broadcasts") return handleBroadcasts(request);
     if (action === "events") return handleEvents(request);
     if (action === "winners") return handleWinners(request);
 

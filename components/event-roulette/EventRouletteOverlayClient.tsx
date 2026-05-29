@@ -30,18 +30,37 @@ function normalizeToken(value: string) {
   return String(value || "").trim();
 }
 
+const ROULETTE_COLORS = ["#dbeafe", "#ede9fe", "#f8fafc", "#e0f2fe", "#f3e8ff", "#f1f5f9"];
+
 function segmentGradient(participants: OverlayParticipant[]) {
-  const list = participants.length > 0 ? participants.slice(0, 24) : [{ nickname: "READY" }];
+  const list = participants.length > 0 ? participants.slice(0, 48) : [{ nickname: "READY" }];
   const step = 360 / list.length;
-  const colors = ["#8b5cf6", "#ec4899", "#f97316", "#22c55e", "#06b6d4", "#6366f1"];
 
   return `conic-gradient(${list
     .map((_, index) => {
       const from = Math.round(index * step);
       const to = Math.round((index + 1) * step);
-      return `${colors[index % colors.length]} ${from}deg ${to}deg`;
+      return `${ROULETTE_COLORS[index % ROULETTE_COLORS.length]} ${from}deg ${to}deg`;
     })
     .join(", ")})`;
+}
+
+function splitRouletteTitle(value: string) {
+  const raw = String(value || "🎁 루루동이룰렛").trim();
+  const hasGift = raw.includes("🎁");
+  const clean = raw.replace(/🎁/g, "").trim();
+
+  if (clean === "루루동이룰렛") {
+    return {
+      gift: hasGift ? "🎁" : "",
+      lines: ["루루동이", "룰렛 이벤트"],
+    };
+  }
+
+  return {
+    gift: hasGift ? "🎁" : "",
+    lines: [clean || "루루동이룰렛"],
+  };
 }
 
 export default function EventRouletteOverlayClient({ initialToken }: { initialToken: string }) {
@@ -92,6 +111,7 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
 
   const participants = event?.participants || [];
   const visibleParticipants = useMemo(() => participants.slice(0, 48), [participants]);
+  const titleParts = useMemo(() => splitRouletteTitle(event?.title || "🎁 루루동이룰렛"), [event?.title]);
   const hasResult = event?.status === "result" && Boolean(event.winner_nickname);
   const gradient = useMemo(() => segmentGradient(visibleParticipants), [visibleParticipants]);
   const rotation = loadedAt % 360;
@@ -122,16 +142,19 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
         <section className="relative flex h-screen w-screen items-center justify-center bg-transparent">
           <div className="absolute left-1/2 top-[9%] z-20 h-0 w-0 -translate-x-1/2 border-x-[22px] border-t-[42px] border-x-transparent border-t-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]" />
 
-          <div className="relative flex aspect-square w-[min(78vw,78vh)] max-w-[760px] items-center justify-center overflow-hidden rounded-full shadow-[0_22px_80px_rgba(0,0,0,0.35)] ring-[10px] ring-white/95">
+          <div className="relative flex aspect-square w-[min(74vw,74vh)] max-w-[720px] items-center justify-center overflow-hidden rounded-full bg-slate-900/10 shadow-[0_22px_80px_rgba(0,0,0,0.28)] ring-[9px] ring-slate-500/70">
+            <div className="absolute left-1/2 top-0 z-30 h-0 w-0 -translate-x-1/2 -translate-y-[2px] border-x-[20px] border-t-[38px] border-x-transparent border-t-rose-500 drop-shadow-[0_4px_10px_rgba(0,0,0,0.35)]" />
+
             <div
-              className="absolute inset-0 rounded-full"
+              className="absolute inset-[3%] rounded-full"
               style={{
                 background: gradient,
                 transform: event?.status === "spinning" ? undefined : `rotate(${rotation}deg)`,
                 animation: event?.status === "spinning" ? "ruruRouletteSpin 4.5s cubic-bezier(.18,.82,.25,1) infinite" : undefined,
               }}
             >
-              <div className="absolute inset-[10%] rounded-full border-[3px] border-white/70" />
+              <div className="absolute inset-0 rounded-full ring-1 ring-slate-500/15" />
+              <div className="absolute inset-[16%] rounded-full border-[2px] border-slate-500/25" />
 
               {visibleParticipants.map((participant, index) => {
                 const total = Math.max(visibleParticipants.length, 1);
@@ -143,7 +166,10 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
                     className="absolute inset-0 flex items-start justify-center"
                     style={{ transform: `rotate(${angle}deg)` }}
                   >
-                    <div className="mt-[11%] max-w-[19%] truncate rounded-full bg-black/18 px-2 py-1 text-center text-[clamp(8px,1.25vw,14px)] font-black text-white drop-shadow-[0_2px_5px_rgba(0,0,0,0.75)]">
+                    <div
+                      className="mt-[9%] flex h-[34%] min-w-[22px] max-w-[30px] items-center justify-start overflow-hidden rounded-full bg-white/35 px-1 py-2 text-center text-[clamp(9px,1.5vw,15px)] font-black leading-none text-slate-800 drop-shadow-[0_2px_5px_rgba(255,255,255,0.45)]"
+                      style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
+                    >
                       {participant.nickname || "참여자"}
                     </div>
                   </div>
@@ -152,11 +178,16 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
             </div>
 
             <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-              <div className="flex h-[38%] w-[38%] flex-col items-center justify-center rounded-full bg-white text-center shadow-[0_12px_30px_rgba(0,0,0,0.22)] ring-1 ring-white">
-                <div className="-translate-y-1 px-3 text-[clamp(18px,3.8vw,42px)] font-black leading-[1.08] text-violet-700">
-                  {event?.title || "🎁 루루동이룰렛"}
+              <div className="flex h-[34%] w-[34%] flex-col items-center justify-center rounded-full bg-slate-950 text-center shadow-[0_12px_30px_rgba(0,0,0,0.30)] ring-[3px] ring-white/95">
+                {titleParts.gift ? (
+                  <div className="mb-1 text-[clamp(20px,3.3vw,38px)] leading-none">{titleParts.gift}</div>
+                ) : null}
+                <div className="flex flex-col items-center justify-center px-3 text-[clamp(18px,3.1vw,34px)] font-black leading-[1.14] text-white">
+                  {titleParts.lines.map((line) => (
+                    <span key={line}>{line}</span>
+                  ))}
                 </div>
-                <div className="mt-2 -translate-y-1 text-[clamp(12px,2vw,22px)] font-black text-slate-500">
+                <div className="mt-2 text-[clamp(12px,1.9vw,20px)] font-black text-slate-300">
                   {participants.length.toLocaleString("ko-KR")}명 참여
                 </div>
               </div>

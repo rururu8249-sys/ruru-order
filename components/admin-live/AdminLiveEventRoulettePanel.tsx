@@ -5,6 +5,15 @@ import { useEffect, useMemo, useState } from "react";
 
 type RouletteMode = "live" | "test" | "preview";
 
+type RouletteBroadcast = {
+  id: string;
+  title: string;
+  label: string;
+  status?: string;
+  started_at?: string | null;
+  ended_at?: string | null;
+};
+
 type RouletteParticipant = {
   nickname: string;
   order_count?: number;
@@ -45,6 +54,12 @@ type RouletteWinner = {
   is_test: boolean;
   memo?: string | null;
   created_at?: string;
+};
+
+type BroadcastsPayload = {
+  ok: boolean;
+  message?: string;
+  broadcasts?: RouletteBroadcast[];
 };
 
 type ParticipantsPayload = {
@@ -166,7 +181,9 @@ export default function AdminLiveEventRoulettePanel({
 }: AdminLiveEventRoulettePanelProps) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<RouletteMode>("test");
-  const [sourceDate, setSourceDate] = useState(todayText);
+  const [sourceDate] = useState(todayText);
+  const [broadcasts, setBroadcasts] = useState<RouletteBroadcast[]>([]);
+  const [broadcastId, setBroadcastId] = useState("");
   const [title, setTitle] = useState("🎁 루루동이룰렛");
   const [winnerNote, setWinnerNote] = useState("룰렛 당첨");
   const [participants, setParticipants] = useState<RouletteParticipant[]>([]);
@@ -178,7 +195,25 @@ export default function AdminLiveEventRoulettePanel({
 
   const overlayUrl = useMemo(() => buildOverlayUrl(currentEvent), [currentEvent]);
 
-  const loadParticipants = async (nextMode = mode, nextSourceDate = sourceDate) => {
+  const loadBroadcasts = async () => {
+    try {
+      const payload = await requestJson<BroadcastsPayload>("/api/admin-live/event-roulette?action=broadcasts");
+
+      if (!payload.ok) {
+        throw new Error(payload.message || "방송리스트 조회 실패");
+      }
+
+      const list = payload.broadcasts || [];
+      setBroadcasts(list);
+
+      return list;
+    } catch (error) {
+      showAdminToast("방송리스트 조회 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
+      return [];
+    }
+  };
+
+  const loadParticipants = async (nextMode = mode, nextSourceDate = sourceDate, nextBroadcastId = broadcastId) => {
     setLoading(true);
 
     try {
@@ -187,6 +222,10 @@ export default function AdminLiveEventRoulettePanel({
         mode: nextMode,
         sourceDate: nextSourceDate,
       });
+
+      if (nextBroadcastId) {
+        params.set("broadcastId", nextBroadcastId);
+      }
 
       const payload = await requestJson<ParticipantsPayload>(`/api/admin-live/event-roulette?${params.toString()}`);
 
@@ -219,8 +258,19 @@ export default function AdminLiveEventRoulettePanel({
   useEffect(() => {
     if (!open) return;
 
-    void loadParticipants();
-    void loadEventsAndWinners();
+    const bootstrap = async () => {
+      const list = await loadBroadcasts();
+      const nextBroadcastId = broadcastId || list[0]?.id || "";
+
+      if (nextBroadcastId) {
+        setBroadcastId(nextBroadcastId);
+      }
+
+      await loadParticipants(mode, sourceDate, nextBroadcastId);
+      await loadEventsAndWinners();
+    };
+
+    void bootstrap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -234,6 +284,7 @@ export default function AdminLiveEventRoulettePanel({
           action: "create_event",
           mode,
           sourceDate,
+          broadcastId,
           title,
         }),
       });
@@ -372,7 +423,7 @@ export default function AdminLiveEventRoulettePanel({
                         onChange={(event) => {
                           const nextMode = event.target.value as RouletteMode;
                           setMode(nextMode);
-                          void loadParticipants(nextMode, sourceDate);
+                          void loadParticipants(nextMode, sourceDate, broadcastId);
                         }}
                         className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-900 outline-none focus:border-violet-400"
                       >
@@ -382,15 +433,23 @@ export default function AdminLiveEventRoulettePanel({
                     </label>
 
                     <label className="block">
-                      <span className="text-xs font-black text-slate-500">주문 기준일</span>
-                      <input
-                        type="date"
-                        value={sourceDate}
+                      <span className="text-xs font-black text-slate-500">방송리스트</span>
+                      <select
+                        value={broadcastId}
                         onChange={(event) => {
-                          setSourceDate(event.target.value);
+                          const nextBroadcastId = event.target.value;
+                          setBroadcastId(nextBroadcastId);
+                          void loadParticipants(mode, sourceDate, nextBroadcastId);
                         }}
                         className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-900 outline-none focus:border-violet-400"
-                      />
+                      >
+                        <option value="">방송을 선택하세요</option>
+                        {broadcasts.map((broadcast) => (
+                          <option key={broadcast.id} value={broadcast.id}>
+                            {broadcast.label}
+                          </option>
+                        ))}
+                      </select>
                     </label>
 
                     <label className="block md:col-span-2">
@@ -416,7 +475,7 @@ export default function AdminLiveEventRoulettePanel({
                   <div className="mt-4 flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() => loadParticipants()}
+                      onClick={() => loadParticipants(mode, sourceDate, broadcastId)}
                       disabled={loading}
                       className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                     >
@@ -477,7 +536,7 @@ export default function AdminLiveEventRoulettePanel({
                     <div className="max-h-[360px] divide-y divide-slate-100 overflow-y-auto">
                       {participants.length === 0 ? (
                         <div className="px-4 py-8 text-center text-sm font-bold text-slate-400">
-                          참여자가 없습니다. 주문 기준일 또는 모드를 확인하세요.
+                          참여자가 없습니다. 방송리스트 또는 모드를 확인하세요.
                         </div>
                       ) : (
                         participants.slice(0, 80).map((item) => (
