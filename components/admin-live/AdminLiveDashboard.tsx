@@ -37,6 +37,7 @@ import {
 } from "./liveOrderAdapter";
 import { useAutoBankdaPaymentSync } from "./useAutoBankdaPaymentSync";
 import AdminLiveQuickProductDrawer from "./AdminLiveQuickProductDrawer";
+import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
 import AdminLiveProductListPanel from "./AdminLiveProductListPanel";
 import {
   buildAlwaysOrderOptions,
@@ -972,6 +973,7 @@ export default function AdminLiveDashboard() {
           ) : null}
 
           <AdminLiveQuickProductDrawer activeBroadcastId={activeBroadcast?.id || null} />
+          <AdminLiveEventRoulettePanel />
 
       </main>
       </div>
