@@ -154,12 +154,12 @@ function getGroupCardExtraAmount(group: any) {
 
 function getRowCardTotalAmount(row: any) {
   return safeNumber(
-    row.adjusted_total_price ??
+    row.final_amount ??
+      row.finalAmount ??
+      row.adjusted_total_price ??
       row.adjustedTotalPrice ??
       row.total_price ??
       row.totalPrice ??
-      row.final_amount ??
-      row.finalAmount ??
       0
   );
 }
