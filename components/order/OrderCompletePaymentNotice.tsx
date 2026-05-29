@@ -24,6 +24,8 @@ type OrderCompletePaymentNoticeProps = {
   productAmount: number;
   shippingFee: number;
   totalAmount: number;
+  pointUsedAmount?: number;
+  finalAmount?: number;
   bankName: string;
   bankAccount: string;
   bankHolder: string;
@@ -51,6 +53,8 @@ export default function OrderCompletePaymentNotice({
   productAmount,
   shippingFee,
   totalAmount,
+  pointUsedAmount = 0,
+  finalAmount,
   bankName,
   bankAccount,
   bankHolder,
@@ -58,6 +62,9 @@ export default function OrderCompletePaymentNotice({
 }: OrderCompletePaymentNoticeProps) {
   const [copyDone, setCopyDone] = useState(false);
   const totalQty = items.reduce((sum, item) => sum + toNumber(item.qty), 0);
+  const safePointUsedAmount = Math.max(0, Number(pointUsedAmount || 0));
+  const finalPaymentAmount = Math.max(0, Number(finalAmount ?? totalAmount ?? 0));
+  const isFullyPaidByPoints = safePointUsedAmount > 0 && finalPaymentAmount <= 0;
 
   const copyAccount = async () => {
     try {
@@ -80,7 +87,25 @@ export default function OrderCompletePaymentNotice({
         </p>
       </section>
 
-      {paymentMethod === "무통장입금" ? (
+      {isFullyPaidByPoints ? (
+        <section className="rounded-[30px] bg-emerald-50 p-5 shadow-[0_14px_35px_rgba(16,185,129,0.10)] ring-1 ring-emerald-200">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-[26px] text-emerald-600 ring-1 ring-emerald-100">
+              ✅
+            </div>
+
+            <h2 className="text-[24px] font-black tracking-[-0.07em] text-[#151923]">
+              포인트로 결제완료
+            </h2>
+          </div>
+
+          <div className="rounded-[24px] bg-white p-5 text-[14px] font-black leading-relaxed tracking-[-0.04em] text-emerald-800 ring-1 ring-emerald-100">
+            사용 포인트가 주문금액과 같아 추가 입금 없이 주문이 접수됐습니다.
+            <br />
+            주문조회에서 접수 내역을 확인해주세요.
+          </div>
+        </section>
+      ) : paymentMethod === "무통장입금" ? (
         <section className="rounded-[30px] bg-blue-50 p-5 shadow-[0_14px_35px_rgba(30,64,175,0.08)] ring-1 ring-blue-200">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -218,9 +243,16 @@ export default function OrderCompletePaymentNotice({
             <span>{won(shippingFee)}</span>
           </div>
 
+          {safePointUsedAmount > 0 && (
+            <div className="flex items-center justify-between py-1 text-[14px] font-black text-emerald-700">
+              <span>포인트 사용</span>
+              <span>-{won(safePointUsedAmount)}</span>
+            </div>
+          )}
+
           <div className="mt-3 flex items-center justify-between border-t border-blue-100 pt-3 text-[18px] font-black text-[#151923]">
-            <span>결제금액</span>
-            <span className="text-blue-600">{won(totalAmount)}</span>
+            <span>{safePointUsedAmount > 0 ? "최종 결제금액" : "결제금액"}</span>
+            <span className="text-blue-600">{won(finalPaymentAmount)}</span>
           </div>
         </div>
       </section>

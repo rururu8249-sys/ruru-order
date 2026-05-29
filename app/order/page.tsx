@@ -111,6 +111,8 @@ type DoneData = {
   cardExtra: number;
   customerCardRate: number;
   totalAmount: number;
+  pointUsedAmount: number;
+  finalAmount: number;
 };
 
 type CustomerBlockStatus = {
@@ -691,6 +693,9 @@ export default function OrderPage() {
   const [combineShippingSettings, setCombineShippingSettings] =
     useState<CombineShippingSettings>(DEFAULT_COMBINE_SHIPPING_SETTINGS);
   const [alreadyPaidShipping, setAlreadyPaidShipping] = useState(false);
+  const [customerPointBalance, setCustomerPointBalance] = useState(0);
+  const [customerPointLoading, setCustomerPointLoading] = useState(false);
+  const [pointUseInput, setPointUseInput] = useState("");
 
   const isRemoteAreaShippingAddress = isRemoteAreaAddress(zipcode, address, detailAddress);
   const generalShippingFee = Number(broadcast?.shipping_fee ?? defaultShippingFee);
@@ -1911,6 +1916,98 @@ export default function OrderPage() {
     : 0;
   const totalAmount = productAmount + shippingFee + cardExtra;
 
+  const selectedPointUseAmount = useMemo(() => {
+    const currentPoints = Math.max(0, Number(customerPointBalance || 0));
+    const requestedPoints = toNumber(pointUseInput);
+    const payableAmount = Math.max(0, Number(totalAmount || 0));
+
+    if (currentPoints < 1000) return 0;
+    if (requestedPoints <= 0) return 0;
+    if (payableAmount <= 0) return 0;
+
+    return Math.min(currentPoints, requestedPoints, payableAmount);
+  }, [customerPointBalance, pointUseInput, totalAmount]);
+
+  const finalPaymentAmount = Math.max(0, totalAmount - selectedPointUseAmount);
+
+  useEffect(() => {
+    let alive = true;
+    const cleanPhone = normalizePhone(customerPhone);
+
+    if (cleanPhone.length < 10) {
+      setCustomerPointBalance(0);
+      setCustomerPointLoading(false);
+      setPointUseInput("");
+
+      return () => {
+        alive = false;
+      };
+    }
+
+    const loadCustomerPoints = async () => {
+      setCustomerPointLoading(true);
+
+      try {
+        const response = await fetch(`/api/customer-points?phone=${encodeURIComponent(cleanPhone)}`, {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.message || "포인트 조회 실패");
+        }
+
+        const nextPoints = Math.max(0, Number(payload.current_points || 0));
+
+        if (!alive) return;
+
+        setCustomerPointBalance(nextPoints);
+
+        if (nextPoints < 1000) {
+          setPointUseInput("");
+        }
+      } catch {
+        if (!alive) return;
+
+        setCustomerPointBalance(0);
+        setPointUseInput("");
+      } finally {
+        if (alive) {
+          setCustomerPointLoading(false);
+        }
+      }
+    };
+
+    void loadCustomerPoints();
+
+    return () => {
+      alive = false;
+    };
+  }, [customerPhone]);
+
+  useEffect(() => {
+    setPointUseInput((current) => {
+      const currentText = String(current || "").trim();
+
+      if (!currentText) return current;
+
+      if (customerPointBalance < 1000 || totalAmount <= 0) {
+        return "";
+      }
+
+      const currentAmount = toNumber(currentText);
+      const maxUsableAmount = Math.min(customerPointBalance, totalAmount);
+
+      if (currentAmount > maxUsableAmount) {
+        return String(maxUsableAmount);
+      }
+
+      return String(currentAmount);
+    });
+  }, [customerPointBalance, totalAmount]);
+
   const filteredBroadcastProducts = useMemo(() => {
     const suggestionProducts = [...groupBuyQuickProductsFromCatalog, ...broadcastProducts];
 
@@ -2361,8 +2458,40 @@ export default function OrderPage() {
         };
       });
 
-      const { error } = await supabase.from("orders").insert(orderRows);
-      if (error) throw error;
+      const requestedPointUseAmount = toNumber(pointUseInput);
+      const appliedPointUseAmount =
+        customerPointBalance >= 1000
+          ? Math.min(requestedPointUseAmount, customerPointBalance, appliedTotalAmount)
+          : 0;
+
+      const orderSubmitResponse = await fetch("/api/customer-orders/submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+        body: JSON.stringify({
+          orderRows,
+          point_use_amount: appliedPointUseAmount,
+          customer_phone: cleanPhone,
+          youtube_nickname: youtubeNickname.trim(),
+          customer_name: customerName.trim(),
+        }),
+      });
+
+      const orderSubmitPayload = await orderSubmitResponse.json().catch(() => null);
+
+      if (!orderSubmitResponse.ok || !orderSubmitPayload?.ok) {
+        throw new Error(orderSubmitPayload?.message || "주문 저장 실패");
+      }
+
+      const savedPointUsedAmount = toNumber(orderSubmitPayload?.point_used_amount);
+      const savedPointOriginalAmount = toNumber(orderSubmitPayload?.point_original_amount) || appliedTotalAmount;
+      const savedFinalAmount = Math.max(0, savedPointOriginalAmount - savedPointUsedAmount);
+
+      if (savedPointUsedAmount > 0) {
+        setCustomerPointBalance((current) => Math.max(0, Number(current || 0) - savedPointUsedAmount));
+      }
 
       setDone({
         nickname: youtubeNickname.trim(),
@@ -2375,11 +2504,14 @@ export default function OrderPage() {
         cardExtra: appliedCardExtra,
         customerCardRate: cardRateForCustomer,
         totalAmount: appliedTotalAmount,
+        pointUsedAmount: savedPointUsedAmount,
+        finalAmount: savedFinalAmount,
       });
 
       setItems([{ ...emptyItem }]);
       setRequestMemo("");
       setPaymentMethod("무통장입금");
+      setPointUseInput("");
       setPin("");
 
       if (appliedShippingFeeBreakdown.normalShippingFee > 0) {
@@ -2481,6 +2613,8 @@ export default function OrderPage() {
             productAmount={done.productAmount}
             shippingFee={done.shippingFee}
             totalAmount={done.totalAmount}
+            pointUsedAmount={done.pointUsedAmount}
+            finalAmount={done.finalAmount}
             bankName={BANK_NAME}
             bankAccount={BANK_ACCOUNT}
             bankHolder={BANK_HOLDER}
@@ -2819,6 +2953,14 @@ export default function OrderPage() {
               cardExtra={cardExtra}
               totalAmount={totalAmount}
               paymentMethod={paymentMethod}
+              customerPointBalance={customerPointBalance}
+              customerPointLoading={customerPointLoading}
+              pointUseInput={pointUseInput}
+              pointUsedAmount={selectedPointUseAmount}
+              finalAmount={finalPaymentAmount}
+              showPointUse={customerPointBalance >= 1000 && totalAmount > 0}
+              onPointUseInputChange={(value) => setPointUseInput(onlyNumber(value))}
+              onUseAllPoints={() => setPointUseInput(String(Math.min(customerPointBalance, totalAmount)))}
             />
 
             {!hasPrivacyConsent && !hasSavedOrderCustomerInfo && (
