@@ -11,6 +11,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import CustomerPointBadge from "@/components/customer/CustomerPointBadge";
+import CustomerPointGiftPopup from "@/components/customer/CustomerPointGiftPopup";
 import CustomerTestAccountBadge from "@/components/customer/CustomerTestAccountBadge";
 import {
   clearSavedCustomerInfo,
@@ -81,6 +82,7 @@ export default function CustomerTopNav({
         {isLoggedIn && (
           <div className="flex shrink-0 flex-col items-end justify-start gap-1 self-start text-right">
             <CustomerPointBadge />
+            <CustomerPointGiftPopup />
             <CustomerTestAccountBadge />
           </div>
         )}
