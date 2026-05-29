@@ -30,8 +30,8 @@ type ImagePickerProps = {
   onChange: (nextValue: string[]) => void;
 };
 
-const COLOR_PRESETS = ["블랙", "화이트", "베이지", "네이비", "그레이"];
-const SIZE_PRESETS = ["FREE", "S-M-L", "XS-XL", "90-115", "신발 220-290"];
+const COLOR_PRESETS = ["블랙", "화이트"];
+const SIZE_PRESETS = ["FREE", "XS-XXL", "90-115", "신발 220-290"];
 
 function onlyNumber(value: string) {
   return String(value || "").replace(/[^0-9]/g, "");
@@ -68,8 +68,7 @@ function unique(values: string[]) {
 }
 
 function normalizePresetOptions(preset: string) {
-  if (preset === "S-M-L") return ["S", "M", "L"];
-  if (preset === "XS-XL") return ["XS", "S", "M", "L", "XL"];
+  if (preset === "XS-XXL") return ["XS", "S", "M", "L", "XL", "XXL"];
   if (preset === "90-115") return ["90", "95", "100", "105", "110", "115"];
 
   if (preset === "신발 220-290") {
@@ -1005,7 +1004,7 @@ export default function QuickProductFastForm({
               <input
                 value={colorText}
                 onChange={(event) => setColorText(event.target.value)}
-                placeholder="예: 블랙, 베이지"
+                placeholder="예: 블랙, 화이트"
                 className="h-9 w-full rounded-xl border border-slate-200 px-3 text-xs font-bold outline-none focus:border-blue-400"
               />
               <div className="mt-2 flex flex-wrap gap-1">
