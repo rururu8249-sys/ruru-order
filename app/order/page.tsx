@@ -1240,7 +1240,6 @@ export default function OrderPage() {
     const { data, error } = await supabase
       .from("products")
       .select("*, image_url, main_image_url, external_image_url, detail_image_urls, image_path")
-      .neq("status", "숨김")
       .limit(80);
 
     if (error) {
@@ -1252,7 +1251,7 @@ export default function OrderPage() {
     const nextProducts = (data || [])
       .map((product: any) => normalizeOrderProductRow(product))
       .filter((product) => product.product_name.trim())
-      .filter((product) => product.status !== "숨김");
+      .filter((product) => product.status !== "숨김" || productSuggestionEnabled(product));
 
     setGroupBuyQuickProductsFromCatalog(nextProducts);
   };
@@ -2012,7 +2011,7 @@ export default function OrderPage() {
     const suggestionProducts = [...groupBuyQuickProductsFromCatalog, ...broadcastProducts];
 
     return suggestionProducts
-      .filter((product) => product && product.status !== "숨김")
+      .filter((product) => product && product.product_name.trim())
       .filter((product) => productSuggestionEnabled(product))
       .filter((product) => productMatchesSuggestion(product, productSearchText))
       .slice(0, 6);
