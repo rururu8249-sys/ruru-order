@@ -7,7 +7,7 @@
 // - 저장된 고객정보 자동 입력
 // - [정보수정] 버튼 / [로그아웃] 버튼
 // - 주문상품 모든 칸 필수: 상품명/색상/사이즈/수량/상품금액
-// - 색상/사이즈 없으면 고객이 "없음" 입력해야 제출 가능
+// - 색상/사이즈가 없으면 빈값으로 제출 가능
 // - 상품금액 쉼표 자동
 // - 주문 완료 화면에서 새 입금/결제 안내 컴포넌트 사용
 // - 폭죽/오토바이 애니메이션 포함
@@ -20,6 +20,14 @@
 // - 상품금액 1원 미만 제출 금지
 
 "use client";
+const normalizeEmptyProductOptionValue = (value: unknown) => {
+  const text = typeof value === "string" ? value.trim() : "";
+
+  if (text === "없음" || text === "색상없음" || text === "사이즈없음" || text === "옵션없음") return "";
+
+  return text;
+};
+
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -2100,8 +2108,8 @@ export default function OrderPage() {
       "option_size",
     ]);
 
-    updateItem(index, "color", productColor || "없음");
-    updateItem(index, "size", productSize || "없음");
+    updateItem(index, "color", normalizeEmptyProductOptionValue(productColor));
+    updateItem(index, "size", normalizeEmptyProductOptionValue(productSize));
 
     const productPrice = Number(product.price || 0);
 
@@ -2156,8 +2164,8 @@ export default function OrderPage() {
 
     const nextItem: OrderItem = {
       product_name: product.product_name,
-      color: productColor || "없음",
-      size: productSize || "없음",
+      color: normalizeEmptyProductOptionValue(productColor),
+      size: normalizeEmptyProductOptionValue(productSize),
       qty: "1",
       product_price: nextProductPrice,
       shipping_type: product.shipping_type || "일반",
@@ -2302,12 +2310,12 @@ export default function OrderPage() {
       }
 
       if (!String(item.color || "").trim()) {
-        showCustomerNotice("색상을 입력해주세요.\n색상이 없으면 '없음'이라고 입력해주세요.");
+        showCustomerNotice("색상은 비워두셔도 됩니다.");
         return false;
       }
 
       if (!String(item.size || "").trim()) {
-        showCustomerNotice("사이즈를 입력해주세요.\n사이즈가 없으면 '없음'이라고 입력해주세요.");
+        showCustomerNotice("사이즈는 비워두셔도 됩니다.");
         return false;
       }
 

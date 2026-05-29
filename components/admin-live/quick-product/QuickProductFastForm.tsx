@@ -201,8 +201,8 @@ function parseProductNote(row: ProductRow | null | undefined) {
 }
 
 function buildVariantRows(colors: string[], sizes: string[], previous: VariantStockRow[]) {
-  const safeColors = colors.length ? colors : ["옵션없음"];
-  const safeSizes = sizes.length ? sizes : ["옵션없음"];
+  const safeColors = colors.length ? colors : [""];
+  const safeSizes = sizes.length ? sizes : [""];
   const previousMap = new Map(previous.map((row) => [row.key, row.stock]));
 
   return safeColors.flatMap((color) =>
@@ -592,9 +592,9 @@ export default function QuickProductFastForm({
       setStockMode("option");
       setVariantRows(
         noteVariants.map((row) => ({
-          key: `${row.color || "옵션없음"}__${row.size || "옵션없음"}`,
-          color: row.color || "옵션없음",
-          size: row.size || "옵션없음",
+          key: `${row.color || "__EMPTY_COLOR__"}__${row.size || "__EMPTY_SIZE__"}`,
+          color: row.color || "",
+          size: row.size || "",
           stock: Number(row.stock || 0),
         })),
       );
