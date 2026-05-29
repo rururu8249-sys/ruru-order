@@ -467,7 +467,6 @@ export default function LiveProductRegistrationPanel({
                     placeholder="블랙, 레드, 화이트"
                   />
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {parsedColors.length ? (
                     <button
                       type="button"
                       onClick={() => setColors("없음")}
@@ -482,7 +481,7 @@ export default function LiveProductRegistrationPanel({
                     >
                       색상 없음 OFF
                     </button>
-
+                    {parsedColors.length ? (
                       parsedColors.map((color) => (
                         <span
                           key={color}
