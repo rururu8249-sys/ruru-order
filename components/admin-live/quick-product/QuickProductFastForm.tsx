@@ -874,7 +874,6 @@ export default function QuickProductFastForm({
                 {[
                   ["normal", "일반"],
                   ["vendor", "업체"],
-                  ["free", "무료"],
                 ].map(([value, label]) => (
                   <button
                     key={value}
@@ -889,6 +888,11 @@ export default function QuickProductFastForm({
                   </button>
                 ))}
               </div>
+              {shippingType === "vendor" ? (
+                <div className="mt-1 text-center text-[10px] font-bold leading-4 text-orange-500">
+                  업체상품끼리 배송비 1회 · 일반상품과 함께 구매 시 별도
+                </div>
+              ) : null}
             </div>
 
             <div className="flex h-full min-h-0 flex-col justify-center">
@@ -936,20 +940,6 @@ export default function QuickProductFastForm({
                 </button>
               </div>
             </div>
-          </section>
-
-          <section className="grid min-h-0 grid-cols-[120px_minmax(0,1fr)] items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
-            <div className="min-w-0">
-              <div className="text-[11px] font-black text-slate-700">추천 키워드</div>
-              <div className="mt-0.5 text-[10px] font-bold text-slate-400">선택 입력</div>
-            </div>
-
-            <input
-              value={suggestionKeywordsText}
-              onChange={(event) => setSuggestionKeywordsText(event.target.value)}
-              placeholder="예: 알로, 바지, 밴딩, 알로바지"
-              className="h-9 w-full rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-800 outline-none focus:border-blue-400"
-            />
           </section>
 
           <div data-ruru-quick-none-toggle className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
@@ -1035,22 +1025,7 @@ export default function QuickProductFastForm({
             </div>
           </section>
 
-          <section className="grid min-h-0 grid-cols-[260px_minmax(0,1fr)] items-start gap-4">
-            <div className="self-start rounded-2xl border border-slate-200 bg-white p-3">
-<ImagePicker
-                label="상세사진 최대 5장"
-                value={detailImages}
-                maxFiles={5}
-                uploadKind="detail"
-                mode="detail"
-                onChange={setDetailImages}
-              />
-              <div className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-[10px] font-bold leading-4 text-slate-500">
-                기본 2칸만 표시하고 필요할 때 +3장 더로 확장합니다.
-              </div>
-            </div>
-
-            <div className="flex min-h-[240px] self-stretch flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-3">
+<section data-ruru-option-stock-card className="flex min-h-[260px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-3">
             <div className="mb-2 flex items-center justify-between gap-3">
               <div>
                 <div className="flex items-center justify-between gap-2">
@@ -1149,8 +1124,36 @@ export default function QuickProductFastForm({
             <div className="mt-1 text-right text-xs font-black text-slate-600">
               총재고 {totalStock.toLocaleString("ko-KR")}개
             </div>
-            </div>
           </section>
+
+<section data-ruru-detail-images-section className="rounded-2xl border border-slate-200 bg-white p-3">
+<ImagePicker
+                label="상세사진 최대 5장"
+                value={detailImages}
+                maxFiles={5}
+                uploadKind="detail"
+                mode="detail"
+                onChange={setDetailImages}
+              />
+              <div className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-[10px] font-bold leading-4 text-slate-500">
+                기본 2칸만 표시하고 필요할 때 +3장 더로 확장합니다.
+              </div>
+          </section>
+
+<section data-ruru-search-exposure-section className="grid min-h-0 grid-cols-[132px_minmax(0,1fr)] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3">
+            <div className="min-w-0">
+              <div className="text-[11px] font-black text-slate-700">검색 노출</div>
+              <div className="mt-0.5 text-[10px] font-bold text-slate-400">추천 키워드</div>
+            </div>
+
+            <input
+              value={suggestionKeywordsText}
+              onChange={(event) => setSuggestionKeywordsText(event.target.value)}
+              placeholder="예: 알로, 바지, 밴딩, 알로바지"
+              className="h-9 w-full rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-800 outline-none focus:border-blue-400"
+            />
+          </section>
+
         </div>
       </div>
 
