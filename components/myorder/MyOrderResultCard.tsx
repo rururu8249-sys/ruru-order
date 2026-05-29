@@ -13,6 +13,13 @@ type MyOrderResultCardProps = {
   amountText: string;
 };
 
+const toMoneyNumber = (value: unknown) => {
+  const amount = Number(value || 0);
+  return Number.isFinite(amount) ? Math.max(0, amount) : 0;
+};
+
+const pointWon = (value: unknown) => `${toMoneyNumber(value).toLocaleString("ko-KR")}원`;
+
 export default function MyOrderResultCard({
   order,
   label,
@@ -65,6 +72,21 @@ export default function MyOrderResultCard({
         : label === "주문취소" || label === "환불완료"
           ? label
           : "확인중";
+
+  const pointUsedAmount = toMoneyNumber(order.point_used_amount ?? order.pointUsedAmount);
+  const finalPaymentAmount = toMoneyNumber(
+    order.final_amount ??
+      order.finalAmount ??
+      order.adjusted_total_price ??
+      order.adjustedTotalPrice ??
+      order.total_price ??
+      order.totalPrice
+  );
+  const pointOriginalAmount = toMoneyNumber(
+    order.point_original_amount ??
+      order.pointOriginalAmount ??
+      (pointUsedAmount > 0 ? finalPaymentAmount + pointUsedAmount : finalPaymentAmount)
+  );
 
   return (
     <article className="rounded-[26px] bg-white p-4 shadow-[0_12px_28px_rgba(30,64,175,0.08)] ring-1 ring-blue-100 min-[390px]:rounded-[28px] min-[390px]:p-5">
@@ -121,11 +143,32 @@ export default function MyOrderResultCard({
             </div>
           </div>
 
-          <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
-            <span className="text-[14px] font-bold text-slate-500">주문금액</span>
-            <span className="shrink-0 text-[20px] font-black tracking-[-0.045em] text-[#151923] min-[390px]:text-[22px]">
-              {amountText}
-            </span>
+          <div className="mt-4 border-t border-slate-100 pt-4">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[14px] font-bold text-slate-500">
+                {pointUsedAmount > 0 ? "최종 결제금액" : "주문금액"}
+              </span>
+              <span className="shrink-0 text-[20px] font-black tracking-[-0.045em] text-[#151923] min-[390px]:text-[22px]">
+                {amountText}
+              </span>
+            </div>
+
+            {pointUsedAmount > 0 ? (
+              <div className="mt-3 rounded-2xl bg-emerald-50 px-3 py-2 text-[12px] font-black leading-relaxed text-emerald-800 ring-1 ring-emerald-100">
+                <div className="flex items-center justify-between gap-3">
+                  <span>상품금액</span>
+                  <span>{pointWon(pointOriginalAmount)}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-3 text-emerald-700">
+                  <span>포인트 사용</span>
+                  <span>-{pointWon(pointUsedAmount)}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-3 border-t border-emerald-100 pt-1 text-orange-700">
+                  <span>최종 결제금액</span>
+                  <span>{pointWon(finalPaymentAmount)}</span>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {order.cancel_reason && (
