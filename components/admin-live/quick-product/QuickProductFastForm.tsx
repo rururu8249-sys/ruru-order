@@ -792,11 +792,10 @@ export default function QuickProductFastForm({
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
         <div className="grid min-h-0 content-start gap-3 pb-4">
-          <div data-ruru-section-title="basic" className="flex items-center gap-2 px-1">
+          <div data-ruru-section-title="basic" className="flex items-center gap-2 px-1 py-0.5">
             <span className="rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-black text-white">01</span>
             <div>
               <div className="text-sm font-black text-slate-900">필수정보</div>
-              <div className="text-[11px] font-bold text-slate-400">상품명·가격·대표사진은 저장 전 필수 확인</div>
             </div>
           </div>
 
@@ -849,11 +848,10 @@ export default function QuickProductFastForm({
             </div>
           </section>
 
-          <div data-ruru-section-title="sale" className="flex items-center gap-2 px-1">
+          <div data-ruru-section-title="sale" className="flex items-center gap-2 px-1 py-0.5">
             <span className="rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-black text-white">02</span>
             <div>
               <div className="text-sm font-black text-slate-900">판매설정</div>
-              <div className="text-[11px] font-bold text-slate-400">방송·배송·노출 위치를 한 번에 확인</div>
             </div>
           </div>
 
@@ -953,11 +951,10 @@ export default function QuickProductFastForm({
             </div>
           </section>
 
-          <div data-ruru-section-title="option-stock" className="flex items-center gap-2 px-1">
+          <div data-ruru-section-title="option-stock" className="flex items-center gap-2 px-1 py-0.5">
             <span className="rounded-full bg-blue-600 px-2.5 py-1 text-[10px] font-black text-white">03</span>
             <div>
               <div className="text-sm font-black text-slate-900">옵션 · 재고</div>
-              <div className="text-[11px] font-bold text-slate-400">색상·사이즈 입력 후 바로 재고 확인</div>
             </div>
           </div>
 
@@ -1044,8 +1041,8 @@ export default function QuickProductFastForm({
             </div>
           </section>
 
-<section data-ruru-option-stock-card className="flex min-h-[260px] flex-col overflow-hidden rounded-2xl border border-blue-100 bg-white p-4 shadow-sm shadow-slate-100">
-            <div className="mb-3 flex items-start justify-between gap-3">
+<section data-ruru-option-stock-card className="flex min-h-[238px] flex-col overflow-hidden rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm shadow-slate-100">
+            <div className="mb-2.5 flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
                   <div className="text-xs font-black text-slate-800">재고관리</div>
@@ -1095,8 +1092,8 @@ export default function QuickProductFastForm({
               </div>
             </div>
 
-            <div className="grid min-h-0 flex-1 grid-cols-[188px_minmax(0,1fr)] gap-3">
-              <div className="flex h-[58px] items-center gap-2 rounded-xl bg-slate-50 px-3">
+            <div className="grid min-h-0 flex-1 grid-cols-[176px_minmax(0,1fr)] gap-3">
+              <div className="flex h-[54px] items-center gap-2 rounded-xl bg-slate-50 px-3">
                 <span className="text-xs font-bold text-slate-500">전체 재고</span>
                 <input
                   value={formatNumberWithComma(stockMode === "option" ? String(totalStock) : totalStockText)}
@@ -1145,11 +1142,10 @@ export default function QuickProductFastForm({
             </div>
           </section>
 
-          <div data-ruru-section-title="images" className="flex items-center gap-2 px-1">
+          <div data-ruru-section-title="images" className="flex items-center gap-2 px-1 py-0.5">
             <span className="rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-black text-white">04</span>
             <div>
               <div className="text-sm font-black text-slate-900">이미지</div>
-              <div className="text-[11px] font-bold text-slate-400">상세사진은 필요할 때만 추가</div>
             </div>
           </div>
 
@@ -1162,23 +1158,19 @@ export default function QuickProductFastForm({
                 mode="detail"
                 onChange={setDetailImages}
               />
-              <div className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-[10px] font-bold leading-4 text-slate-500">
-                상세사진은 필요할 때만 추가하세요.
-              </div>
           </section>
 
-          <div data-ruru-section-title="search" className="flex items-center gap-2 px-1">
+          <div data-ruru-section-title="search" className="flex items-center gap-2 px-1 py-0.5">
             <span className="rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-black text-white">05</span>
             <div>
               <div className="text-sm font-black text-slate-900">검색 노출</div>
-              <div className="text-[11px] font-bold text-slate-400">상품명 검색 보조 키워드</div>
             </div>
           </div>
 
-<section data-ruru-search-exposure-section className="grid min-h-0 grid-cols-[132px_minmax(0,1fr)] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3">
+<section data-ruru-search-exposure-section className="grid min-h-0 grid-cols-[120px_minmax(0,1fr)] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3">
             <div className="min-w-0">
-              <div className="text-[11px] font-black text-slate-700">검색 노출</div>
-              <div className="mt-0.5 text-[10px] font-bold text-slate-400">추천 키워드</div>
+              <div className="text-[11px] font-black text-slate-700">추천 키워드</div>
+              <div className="mt-0.5 text-[10px] font-bold text-slate-400">검색 보조</div>
             </div>
 
             <input
@@ -1193,7 +1185,7 @@ export default function QuickProductFastForm({
       </div>
 
       <div className="flex h-[70px] shrink-0 items-center justify-between gap-3 border-t border-slate-200 bg-white px-5">
-        <div data-ruru-save-summary className="min-w-0 text-xs font-black text-slate-500">
+        <div data-ruru-save-summary className="min-w-0 truncate text-xs font-black text-slate-500">
           <span className="text-slate-900">{productType === "broadcast" ? "방송상품" : "공구상품"}</span>
           <span className="mx-1 text-slate-300">·</span>
           <span>{shippingType === "vendor" ? "업체배송" : "일반배송"}</span>
