@@ -18,7 +18,7 @@ export default function OrderGuideCard() {
           <div className="mt-2 space-y-1 text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
             <p>• 방송에서 접수 후 주문서를 작성해주세요.</p>
             <p>• 상품명 / 색상 / 사이즈 / 수량 / 금액을 정확히 입력해주세요.</p>
-            <p>• 색상이나 사이즈가 없으면 비워두셔도 됩니다.</p>
+            <p>• 자동입력된 색상/사이즈는 제출 전 한 번만 확인해주세요.</p>
           </div>
         </div>
       </div>

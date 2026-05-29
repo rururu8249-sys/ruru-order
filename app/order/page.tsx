@@ -23,7 +23,10 @@
 const normalizeEmptyProductOptionValue = (value: unknown) => {
   const text = typeof value === "string" ? value.trim() : "";
 
-  if (text === "없음" || text === "색상없음" || text === "사이즈없음" || text === "옵션없음") return "";
+  if (!text) return "";
+  if (["없음", "없슴", "색상없음", "사이즈없음", "옵션없음", "x", "X", "-", "none", "None", "NONE"].includes(text)) {
+    return "없음";
+  }
 
   return text;
 };
@@ -2309,15 +2312,7 @@ export default function OrderPage() {
         return false;
       }
 
-      if (!String(item.color || "").trim()) {
-        showCustomerNotice("색상은 비워두셔도 됩니다.");
-        return false;
-      }
-
-      if (!String(item.size || "").trim()) {
-        showCustomerNotice("사이즈는 비워두셔도 됩니다.");
-        return false;
-      }
+      // 색상/사이즈는 옵션이 없는 상품도 있어 빈값 제출을 허용합니다.
 
       if (!toNumber(item.qty)) {
         showCustomerNotice("수량을 입력해주세요.");

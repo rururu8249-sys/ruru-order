@@ -468,6 +468,21 @@ export default function LiveProductRegistrationPanel({
                   />
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {parsedColors.length ? (
+                    <button
+                      type="button"
+                      onClick={() => setColors("없음")}
+                      className="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-black text-white"
+                    >
+                      색상 없음 자동입력 ON
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setColors("")}
+                      className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600"
+                    >
+                      색상 없음 OFF
+                    </button>
+
                       parsedColors.map((color) => (
                         <span
                           key={color}
@@ -519,15 +534,23 @@ export default function LiveProductRegistrationPanel({
                     </button>
                     <button
                       type="button"
-                      onClick={toggleSizeOptionDisabled}
-                      className={[
-                        "rounded-full px-2.5 py-1 text-[11px] font-black",
-                        sizeOptionDisabled
-                          ? "bg-slate-900 text-white"
-                          : "bg-slate-100 text-slate-600",
-                      ].join(" ")}
+                      onClick={() => {
+                        setSizeOptionDisabled(false);
+                        setSizes("없음");
+                      }}
+                      className="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-black text-white"
                     >
-                      사이즈 없음
+                      사이즈 없음 자동입력 ON
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSizeOptionDisabled(false);
+                        setSizes("");
+                      }}
+                      className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600"
+                    >
+                      사이즈 없음 OFF
                     </button>
                   </div>
 

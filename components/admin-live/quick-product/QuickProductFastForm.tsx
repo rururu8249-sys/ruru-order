@@ -951,6 +951,20 @@ export default function QuickProductFastForm({
                 className="h-9 w-full rounded-xl border border-slate-200 px-3 text-xs font-bold outline-none focus:border-blue-400"
               />
               <div className="mt-2 flex flex-wrap gap-1">
+                <button
+                  type="button"
+                  onClick={() => setColorText("없음")}
+                  className="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-black text-white"
+                >
+                  색상 없음 자동입력 ON
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setColorText("")}
+                  className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600"
+                >
+                  색상 없음 OFF
+                </button>
                 {COLOR_PRESETS.map((preset) => (
                   <button
                     key={preset}
@@ -976,6 +990,20 @@ export default function QuickProductFastForm({
                 className="h-9 w-full rounded-xl border border-slate-200 px-3 text-xs font-bold outline-none focus:border-blue-400"
               />
               <div className="mt-2 flex flex-wrap gap-1">
+                <button
+                  type="button"
+                  onClick={() => setSizeText("없음")}
+                  className="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-black text-white"
+                >
+                  사이즈 없음 자동입력 ON
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSizeText("")}
+                  className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600"
+                >
+                  사이즈 없음 OFF
+                </button>
                 {SIZE_PRESETS.map((preset) => (
                   <button
                     key={preset}
