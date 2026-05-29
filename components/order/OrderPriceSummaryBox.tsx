@@ -75,14 +75,14 @@ export default function OrderPriceSummaryBox({
               <span>{won(safePointBalance)}</span>
             </div>
 
-            <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
-              <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_96px]" data-ruru-point-input-layout>
+            <div className="mt-3 flex flex-col gap-3" data-ruru-point-input-stack>
+              <div className="w-full" data-ruru-point-input-layout>
                 <input
                   value={pointUseInput}
                   onChange={(event) => onPointUseInputChange?.(event.target.value)}
                   inputMode="numeric"
                   placeholder="직접입력"
-                  className="h-12 min-w-0 w-full rounded-2xl border border-blue-100 bg-white px-4 text-right text-base font-black tabular-nums text-slate-950 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
+                  className="h-14 min-w-0 w-full rounded-2xl border border-blue-100 bg-white px-4 text-center text-base font-black tabular-nums text-slate-950 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
                 />
                 <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[13px] font-black text-blue-500">
                   원
@@ -92,7 +92,7 @@ export default function OrderPriceSummaryBox({
               <button
                 type="button"
                 onClick={onUseAllPoints}
-                className="h-12 w-full rounded-2xl bg-blue-600 px-4 text-base font-black text-white shadow-sm transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                className="h-14 w-full rounded-2xl bg-blue-600 px-4 text-base font-black text-white shadow-sm transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 전액사용
               </button>

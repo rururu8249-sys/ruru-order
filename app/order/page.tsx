@@ -3028,6 +3028,7 @@ export default function OrderPage() {
           originalTotalAmount={totalAmount}
           pointUsedAmount={selectedPointUseAmount}
           finalAmount={finalPaymentAmount}
+          onClose={() => setShowDepositConfirmModal(false)}
           onConfirm={handleDepositConfirmSubmit}
         />
 

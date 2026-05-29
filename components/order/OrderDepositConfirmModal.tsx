@@ -13,6 +13,7 @@ type OrderDepositConfirmModalProps = {
   pointUsedAmount?: number;
   finalAmount?: number;
   onConfirm: (hideFor24Hours: boolean) => void;
+  onClose: () => void;
 };
 
 const formatWon = (value: number) => {
@@ -27,6 +28,7 @@ export default function OrderDepositConfirmModal({
   pointUsedAmount = 0,
   finalAmount,
   onConfirm,
+  onClose,
 }: OrderDepositConfirmModalProps) {
   const safeNickname = String(nickname || "").trim() || "현재 닉네임";
   const safeOriginalTotalAmount = Math.max(0, Number(originalTotalAmount ?? totalAmount ?? 0));
@@ -43,7 +45,17 @@ export default function OrderDepositConfirmModal({
       aria-modal="true"
     >
       <section className="flex max-h-[calc(100dvh-24px)] w-full max-w-[430px] flex-col overflow-hidden rounded-[30px] bg-white shadow-[0_30px_90px_rgba(15,23,42,0.42)] ring-1 ring-white/70">
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-5 sm:px-5">
+        <div className="relative min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-5 sm:px-5">
+        <button
+          type="button"
+          aria-label="입금확인 팝업 닫기"
+          data-ruru-deposit-modal-x-close
+          onClick={onClose}
+          className="absolute right-4 top-4 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-2xl font-black leading-none text-slate-500 shadow-sm transition active:scale-95"
+        >
+          ×
+        </button>
+
           <div className="mx-auto mb-3 flex w-fit items-center rounded-full bg-blue-50 px-4 py-2 text-[14px] font-black tracking-[-0.04em] text-blue-700 ring-1 ring-blue-100">
             주문서 제출 전 확인
           </div>
