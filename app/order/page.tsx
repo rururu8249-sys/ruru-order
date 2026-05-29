@@ -723,6 +723,12 @@ export default function OrderPage() {
       toNumber(item.product_price) > 0
     );
 
+  const isCanceledOrderForCombineShipping = (order: { order_manage_status?: unknown }) => {
+    const statusText = String(order?.order_manage_status || "").trim().toLowerCase();
+
+    return /주문서취소|주문취소|취소|환불|cancel|refund/.test(statusText);
+  };
+
   const calculateShippingFeeBreakdown = (
     targetItems: OrderItem[],
     paidGeneralShipping: boolean,
@@ -1485,11 +1491,8 @@ export default function OrderPage() {
 
     const loadedSettings = await loadCombineShippingSettings();
     const settings = resolveCurrentCombineShippingSettings(loadedSettings);
-
-    if (hasPaidShippingInThisBrowser(cleanPhone, settings, addressSignature)) {
-      setAlreadyPaidShipping(true);
-      return true;
-    }
+    // 주문취소 후 브라우저 캐시가 남을 수 있으므로 캐시만으로 합배송 가능 처리하지 않습니다.
+    // 실제 DB에서 취소 제외 활성 주문의 배송비 이력을 확인한 뒤 판단합니다.
 
     const formattedPhone = formatOrderPhone(cleanPhone);
     const phoneValues = Array.from(new Set([cleanPhone, formattedPhone].filter(Boolean)));
@@ -1508,7 +1511,11 @@ export default function OrderPage() {
       return false;
     }
 
-    const hasShipping = (data || []).some((order: any) => {
+    const activeCombineShippingOrders = (data || []).filter(
+      (order: any) => !isCanceledOrderForCombineShipping(order),
+    );
+
+    const hasShipping = activeCombineShippingOrders.some((order: any) => {
       if (!hasPaidShippingFee(order)) return false;
 
       const orderAddressSignature = getShippingAddressSignature(
