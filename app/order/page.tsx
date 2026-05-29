@@ -74,6 +74,7 @@ declare global {
 }
 
 type OrderItem = {
+  product_id?: string;
   product_name: string;
   color: string;
   size: string;
@@ -138,6 +139,7 @@ const BANK_HOLDER = "유혜원";
 const FOOTER_TEXT = "© since 2024 루루동이 | All Rights Reserved.";
 
 const emptyItem: OrderItem = {
+  product_id: "",
   product_name: "",
   color: "",
   size: "",
@@ -2116,6 +2118,7 @@ export default function OrderPage() {
 
     const productPrice = Number(product.price || 0);
 
+    updateItem(index, "product_id", String(product.id ?? ""));
     updateItem(index, "product_name", product.product_name);
 
     updateItem(index, "shipping_type", product.shipping_type || "일반");
@@ -2435,6 +2438,7 @@ export default function OrderPage() {
           detail_address: detailAddress.trim(),
           request_memo: requestMemo.trim(),
 
+          product_id: item.product_id ? item.product_id : null,
           product_name: item.product_name.trim(),
           color: String(item.color || "").trim(),
           size: String(item.size || "").trim(),
