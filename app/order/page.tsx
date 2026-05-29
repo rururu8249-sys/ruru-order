@@ -185,6 +185,10 @@ const normalizePhone = (value: string) => normalizeOrderPhone(value);
 const formatPhone = (value: string) => formatOrderPhone(value);
 const toNumber = (value: any) => Number(String(value || "0").replace(/[^0-9]/g, "")) || 0;
 const moneyText = (value: any) => toNumber(value).toLocaleString();
+const commaNumberText = (value: any) => {
+  const digits = onlyNumber(String(value || ""));
+  return digits ? Number(digits).toLocaleString() : "";
+};
 const won = (value: any) => `${Number(value || 0).toLocaleString()}원`;
 
 const hideNone = (value: any) => {
@@ -3123,7 +3127,7 @@ export default function OrderPage() {
               paymentMethod={paymentMethod}
               customerPointBalance={customerPointBalance}
               customerPointLoading={customerPointLoading}
-              pointUseInput={pointUseInput}
+              pointUseInput={commaNumberText(pointUseInput)}
               pointUsedAmount={selectedPointUseAmount}
               finalAmount={finalPaymentAmount}
               showPointUse={customerPointBalance >= 1000 && totalAmount > 0}
