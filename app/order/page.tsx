@@ -3024,7 +3024,10 @@ export default function OrderPage() {
         <OrderDepositConfirmModal
           open={showDepositConfirmModal}
           nickname={youtubeNickname || customerName}
-          totalAmount={totalAmount}
+          totalAmount={finalPaymentAmount}
+          originalTotalAmount={totalAmount}
+          pointUsedAmount={selectedPointUseAmount}
+          finalAmount={finalPaymentAmount}
           onConfirm={handleDepositConfirmSubmit}
         />
 

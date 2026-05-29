@@ -9,6 +9,9 @@ type OrderDepositConfirmModalProps = {
   open: boolean;
   nickname: string;
   totalAmount: number;
+  originalTotalAmount?: number;
+  pointUsedAmount?: number;
+  finalAmount?: number;
   onConfirm: (hideFor24Hours: boolean) => void;
 };
 
@@ -20,10 +23,16 @@ export default function OrderDepositConfirmModal({
   open,
   nickname,
   totalAmount,
+  originalTotalAmount,
+  pointUsedAmount = 0,
+  finalAmount,
   onConfirm,
 }: OrderDepositConfirmModalProps) {
   const safeNickname = String(nickname || "").trim() || "현재 닉네임";
-  const safeAmount = formatWon(totalAmount);
+  const safeOriginalTotalAmount = Math.max(0, Number(originalTotalAmount ?? totalAmount ?? 0));
+  const safePointUsedAmount = Math.max(0, Number(pointUsedAmount || 0));
+  const safeFinalAmount = Math.max(0, Number(finalAmount ?? totalAmount ?? 0));
+  const safeAmount = formatWon(safeFinalAmount);
 
   if (!open) return null;
 
@@ -63,7 +72,7 @@ export default function OrderDepositConfirmModal({
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-[17px] text-white">
                   원
                 </span>
-                현재 주문서 금액
+                최종 입금금액
               </div>
 
               <div className="break-all pl-10 text-[28px] font-black leading-tight tracking-[-0.05em] text-blue-700">
@@ -87,6 +96,22 @@ export default function OrderDepositConfirmModal({
 
           <div className="mt-4 rounded-[24px] bg-yellow-50 p-4 text-center ring-1 ring-yellow-100">
             <p className="break-keep text-[19px] font-black leading-relaxed tracking-[-0.06em] text-[#151923]">
+              {safePointUsedAmount > 0 ? (
+                <div className="mb-4 rounded-2xl border border-blue-100 bg-white/85 p-3 text-sm font-black text-slate-700">
+                  <div className="flex items-center justify-between gap-3">
+                    <span>주문서 총금액</span>
+                    <span className="text-slate-950">{formatWon(safeOriginalTotalAmount)}</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3 text-emerald-700">
+                    <span>포인트 차감</span>
+                    <span>-{formatWon(safePointUsedAmount)}</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3 border-t border-slate-100 pt-2 text-blue-700">
+                    <span>최종 입금금액</span>
+                    <span>{formatWon(safeFinalAmount)}</span>
+                  </div>
+                </div>
+              ) : null}
               입금자명은{" "}
               <span className="text-blue-700">{safeNickname}</span>
               <br />
@@ -97,6 +122,11 @@ export default function OrderDepositConfirmModal({
             <p className="mt-3 break-keep text-[15px] font-black leading-relaxed tracking-[-0.04em] text-slate-700">
               다르게 입금하면 자동확인이 안 될 수 있어요.
               <br />
+              {safeFinalAmount === 0 ? (
+                <span className="mt-2 block text-blue-700">
+                  포인트로 전액 결제되어 추가 입금금액은 0원입니다.
+                </span>
+              ) : null}
               자동 입금확인은 보통 10분 정도 소요됩니다.
             </p>
           </div>
