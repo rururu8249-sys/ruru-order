@@ -1058,7 +1058,7 @@ export default function QuickProductFastForm({
             </div>
           </section>
 
-<section data-ruru-option-stock-card className="flex min-h-[168px] flex-col overflow-hidden rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm shadow-slate-100">
+<section data-ruru-option-stock-card className="flex min-h-[168px] max-h-[360px] flex-col overflow-hidden rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm shadow-slate-100">
             <div className="mb-2.5 flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
@@ -1125,7 +1125,7 @@ export default function QuickProductFastForm({
                 </div>
               </div>
             ) : (
-              <div data-ruru-option-stock-mode className="grid min-h-[118px] flex-1 grid-cols-[176px_minmax(0,1fr)] gap-3">
+              <div data-ruru-option-stock-mode className="grid h-[246px] min-h-0 grid-cols-[176px_minmax(0,1fr)] gap-3 overflow-hidden">
               <div className="flex h-[54px] items-center gap-2 rounded-xl bg-slate-50 px-3">
                 <span className="text-xs font-bold text-slate-500">전체 재고</span>
                 <input
@@ -1137,19 +1137,19 @@ export default function QuickProductFastForm({
                 <span className="text-xs font-black text-slate-400">개</span>
               </div>
 
-              <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-slate-100">
-                <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_104px] bg-slate-50 px-3 py-1.5 text-[10px] font-black text-slate-400">
+              <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-slate-100 bg-white">
+                <div className="shrink-0 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_104px] bg-slate-50 px-3 py-1.5 text-[10px] font-black text-slate-400">
                   <div>색상</div>
                   <div>사이즈</div>
                   <div className="text-right">재고</div>
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto">
+                <div data-ruru-variant-stock-scroll className="min-h-0 flex-1 overflow-y-auto pr-1">
                   {stockMode === "option" && resolvedVariantRows.length > 0 ? (
                     resolvedVariantRows.map((row) => (
                       <div
                         key={row.key}
-                        className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_104px] items-center border-t border-slate-100 px-3 py-1"
+                        className="grid min-h-[34px] grid-cols-[minmax(0,1fr)_minmax(0,1fr)_104px] items-center border-t border-slate-100 px-3 py-1"
                       >
                         <div className="truncate text-[11px] font-bold text-slate-700">{row.color}</div>
                         <div className="truncate text-[11px] font-bold text-slate-700">{row.size}</div>
@@ -1171,8 +1171,8 @@ export default function QuickProductFastForm({
             </div>
             )}
             {stockMode === "option" ? (
-              <div className="mt-1 text-right text-xs font-black text-slate-600">
-                총재고 {totalStock.toLocaleString("ko-KR")}개
+              <div className="mt-1 shrink-0 text-right text-xs font-black text-slate-600">
+                총재고 {totalStock.toLocaleString("ko-KR")}개 · 옵션 {resolvedVariantRows.length.toLocaleString("ko-KR")}개
               </div>
             ) : null}
           </section>
