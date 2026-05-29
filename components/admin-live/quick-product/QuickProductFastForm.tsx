@@ -904,11 +904,6 @@ export default function QuickProductFastForm({
                   </button>
                 ))}
               </div>
-              {shippingType === "vendor" ? (
-                <div className="mt-1 text-center text-[10px] font-bold leading-4 text-orange-500">
-                  업체상품끼리 배송비 1회 · 일반상품과 함께 구매 시 별도
-                </div>
-              ) : null}
             </div>
 
             <div className="flex h-full min-h-0 flex-col justify-center">
