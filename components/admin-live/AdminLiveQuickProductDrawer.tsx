@@ -45,10 +45,10 @@ export default function AdminLiveQuickProductDrawer({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[90]">
+    <div className="fixed inset-0 z-[90] overflow-hidden">
       <div className="absolute inset-0 bg-slate-950/35" />
 
-      <aside className="absolute right-0 top-0 flex h-full w-full max-w-[960px] flex-col bg-slate-50 shadow-2xl">
+      <aside className="absolute right-0 top-0 flex h-full min-h-0 w-full max-w-[960px] flex-col overflow-hidden bg-slate-50 shadow-2xl">
         <div className="flex h-[64px] shrink-0 items-center border-b border-slate-200 bg-white px-6">
           <div className="min-w-0">
             <h2 className="text-lg font-black text-slate-950">
