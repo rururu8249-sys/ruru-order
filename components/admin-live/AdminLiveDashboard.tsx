@@ -1,5 +1,6 @@
 "use client";
 const LIVE_ORDER_AUTO_REFRESH_ENABLED = false;
+const LIVE_ORDER_BANKDA_EVENT_REFRESH_ENABLED = false;
 
 const maybeSetLiveOrderAutoRefreshInterval = (
   handler: Parameters<typeof window.setInterval>[0],
@@ -615,6 +616,8 @@ export default function AdminLiveDashboard() {
     }, 15000);
 
     const handleAutoBankdaSynced = () => {
+      if (!LIVE_ORDER_BANKDA_EVENT_REFRESH_ENABLED) return;
+
       void loadOrders();
       void loadDepositsFromServer();
     };
