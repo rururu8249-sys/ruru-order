@@ -81,17 +81,38 @@ export function useLiveOrderCancelRestore({
             order_manage_status: RESTORED_MANAGE_STATUS,
           };
 
-      const { error } = await supabase
-        .from("orders")
-        .update(patch)
-        .in("id", rowIds);
+      if (isCancel) {
+        const { data, error } = await (supabase as any).rpc("cancel_order_and_restore_points", {
+          p_order_ids: rowIds,
+          p_cancel_status: CANCELED_STATUS,
+          p_admin_memo: "admin-live 주문서취소 자동 포인트 복구",
+        });
 
-      if (error) {
-        showAdminToast((isCancel ? "주문서취소 실패" : "주문서복구 실패") + "\n\n" + error.message, "error");
-        return;
+        if (error) {
+          showAdminToast("주문서취소 실패\n\n" + error.message, "error");
+          return;
+        }
+
+        const restoredTotal = Number(data?.restored_total || 0);
+        const restoredText =
+          restoredTotal > 0
+            ? `\n포인트 ${restoredTotal.toLocaleString("ko-KR")}원 자동복구 완료`
+            : "";
+
+        showAdminToast(`주문서취소 처리됐습니다.${restoredText}`, "success");
+      } else {
+        const { error } = await supabase
+          .from("orders")
+          .update(patch)
+          .in("id", rowIds);
+
+        if (error) {
+          showAdminToast("주문서복구 실패\n\n" + error.message, "error");
+          return;
+        }
+
+        showAdminToast("주문서복구 처리됐습니다.", "success");
       }
-
-      showAdminToast(isCancel ? "주문서취소 처리됐습니다." : "주문서복구 처리됐습니다.", "success");
 
       await onAfterStatusChange?.();
       onClose?.();
