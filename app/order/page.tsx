@@ -819,22 +819,22 @@ export default function OrderPage() {
       }
 
       if (shippingFeeBreakdown.vendorShippingFee > 0 && paidShippingGroups.normal) {
-        return `기존 일반배송 주문과는 별도 출고되는 업체배송 상품이라 배송비 ${won(shippingFee)}가 추가 적용됩니다.`;
+        return `기존 일반배송 주문과는 별도 출고되는 업체배송 상품이라 배송비 ${won(shippingFee)}이 추가 적용됩니다.`;
       }
 
       if (shippingFeeBreakdown.normalShippingFee > 0 && paidShippingGroups.vendor) {
-        return `기존 업체배송 주문과는 별도 출고되는 일반배송 상품이라 배송비 ${won(shippingFee)}가 적용됩니다.`;
+        return `기존 업체배송 주문과는 별도 출고되는 일반배송 상품이라 배송비 ${won(shippingFee)}이 적용됩니다.`;
       }
 
       if (shippingFeeBreakdown.vendorShippingFee > 0) {
-        return `업체배송 상품 배송비 ${won(shippingFee)}가 적용됩니다.`;
+        return `업체배송 상품 배송비 ${won(shippingFee)}이 적용됩니다.`;
       }
 
       if (isRemoteAreaShippingAddress) {
-        return `제주/도서/산간 배송지 기준 배송비 ${won(shippingFee)}가 적용됩니다.`;
+        return `제주/도서/산간 배송지 기준 배송비 ${won(shippingFee)}이 적용됩니다.`;
       }
 
-      return `배송비 ${won(shippingFee)}가 적용됩니다.`;
+      return `배송비 ${won(shippingFee)}이 적용됩니다.`;
     }
 
     if (isFreeShippingEvent) {
