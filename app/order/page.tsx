@@ -133,6 +133,37 @@ type CustomerBlockStatus = {
   message: string;
 };
 
+type PaidShippingGroups = { normal: boolean; vendor: boolean };
+
+const EMPTY_PAID_SHIPPING_GROUPS: PaidShippingGroups = { normal: false, vendor: false };
+
+const normalizePaidShippingGroups = (value: boolean | PaidShippingGroups): PaidShippingGroups => {
+  if (typeof value === "boolean") {
+    return { normal: value, vendor: value };
+  }
+
+  return {
+    normal: Boolean(value?.normal),
+    vendor: Boolean(value?.vendor),
+  };
+};
+
+const resolveShippingGroupFromValue = (value: unknown): "normal" | "vendor" => {
+  const record = (value || {}) as Record<string, unknown>;
+  const shippingType = String(record.shipping_type ?? record.delivery_type ?? "").trim().toLowerCase();
+  const combineShipping = String(record.combine_shipping ?? "").trim().toUpperCase();
+
+  if (
+    shippingType.includes("vendor") ||
+    shippingType.includes("업체") ||
+    combineShipping === "N"
+  ) {
+    return "vendor";
+  }
+
+  return "normal";
+};
+
 const BANK_NAME = "새마을금고";
 const BANK_ACCOUNT = "9002186993725";
 const BANK_HOLDER = "유혜원";
@@ -744,14 +775,22 @@ export default function OrderPage() {
 
   const calculateShippingFeeBreakdown = (
     targetItems: OrderItem[],
-    paidGeneralShipping: boolean,
+    paidShippingBeforeSubmitValue: boolean | PaidShippingGroups,
   ) => {
+    const paidShippingGroups = normalizePaidShippingGroups(paidShippingBeforeSubmitValue);
     const chargeableItems = getChargeableShippingItems(targetItems);
-    const hasVendorShipping = chargeableItems.some((item) => isVendorShippingItem(item));
-    const hasGeneralShipping = chargeableItems.some((item) => !isVendorShippingItem(item));
 
-    const normalShippingFee = hasGeneralShipping && !paidGeneralShipping ? baseShippingFee : 0;
-    const vendorShippingFee = hasVendorShipping && !paidGeneralShipping ? baseShippingFee : 0;
+    const hasNormalShippingItem = chargeableItems.some(
+      (item) => resolveShippingGroupFromValue(item) === "normal",
+    );
+    const hasVendorShippingItem = chargeableItems.some(
+      (item) => resolveShippingGroupFromValue(item) === "vendor",
+    );
+
+    const normalShippingFee =
+      hasNormalShippingItem && !paidShippingGroups.normal ? baseShippingFee : 0;
+    const vendorShippingFee =
+      hasVendorShippingItem && !paidShippingGroups.vendor ? baseShippingFee : 0;
 
     return {
       normalShippingFee,
@@ -1493,26 +1532,24 @@ export default function OrderPage() {
     window.localStorage.setItem(key, "Y");
   };
 
-  const checkAlreadyPaidShipping = async (phoneValue = customerPhone) => {
+  const checkAlreadyPaidShippingGroups = async (phoneValue = customerPhone): Promise<PaidShippingGroups> => {
     const cleanPhone = normalizePhone(phoneValue);
     const addressSignature = currentShippingAddressSignature;
 
     if (cleanPhone.length < 10 || !addressSignature) {
       setAlreadyPaidShipping(false);
-      return false;
+      return { ...EMPTY_PAID_SHIPPING_GROUPS };
     }
 
     const loadedSettings = await loadCombineShippingSettings();
     const settings = resolveCurrentCombineShippingSettings(loadedSettings);
-    // 주문취소 후 브라우저 캐시가 남을 수 있으므로 캐시만으로 합배송 가능 처리하지 않습니다.
-    // 실제 DB에서 취소 제외 활성 주문의 배송비 이력을 확인한 뒤 판단합니다.
 
     const formattedPhone = formatOrderPhone(cleanPhone);
     const phoneValues = Array.from(new Set([cleanPhone, formattedPhone].filter(Boolean)));
 
     const { data, error } = await supabase
       .from("orders")
-      .select("id, customer_phone, shipping_fee, adjusted_shipping_fee, order_manage_status, created_at, zipcode, address, detail_address")
+      .select("id, product_id, customer_phone, shipping_fee, adjusted_shipping_fee, order_manage_status, created_at, zipcode, address, detail_address")
       .in("customer_phone", phoneValues)
       .gte("created_at", settings.startAt)
       .lte("created_at", settings.endAt)
@@ -1521,14 +1558,14 @@ export default function OrderPage() {
     if (error) {
       console.log("기존 배송비 확인 오류", error.message);
       setAlreadyPaidShipping(false);
-      return false;
+      return { ...EMPTY_PAID_SHIPPING_GROUPS };
     }
 
     const activeCombineShippingOrders = (data || []).filter(
       (order: any) => !isCanceledOrderForCombineShipping(order),
     );
 
-    const hasShipping = activeCombineShippingOrders.some((order: any) => {
+    const paidShippingOrders = activeCombineShippingOrders.filter((order: any) => {
       if (!hasPaidShippingFee(order)) return false;
 
       const orderAddressSignature = getShippingAddressSignature(
@@ -1540,12 +1577,52 @@ export default function OrderPage() {
       return Boolean(orderAddressSignature && orderAddressSignature === addressSignature);
     });
 
-    if (hasShipping) {
+    const productIds = Array.from(
+      new Set(
+        paidShippingOrders
+          .map((order: any) => String(order?.product_id || "").trim())
+          .filter(Boolean),
+      ),
+    );
+
+    const productShippingMap = new Map<string, Record<string, unknown>>();
+
+    if (productIds.length > 0) {
+      const { data: products, error: productError } = await supabase
+        .from("products")
+        .select("id, shipping_type, combine_shipping, product_type")
+        .in("id", productIds);
+
+      if (productError) {
+        console.log("배송비 상품유형 확인 오류", productError.message);
+      } else {
+        (products || []).forEach((product: any) => {
+          productShippingMap.set(String(product.id), product);
+        });
+      }
+    }
+
+    const groups: PaidShippingGroups = { ...EMPTY_PAID_SHIPPING_GROUPS };
+
+    paidShippingOrders.forEach((order: any) => {
+      const productId = String(order?.product_id || "").trim();
+      const product = productId ? productShippingMap.get(productId) : null;
+      const group = product ? resolveShippingGroupFromValue(product) : "normal";
+
+      groups[group] = true;
+    });
+
+    if (groups.normal || groups.vendor) {
       markPaidShippingInThisBrowser(cleanPhone, settings, addressSignature);
     }
 
-    setAlreadyPaidShipping(hasShipping);
-    return hasShipping;
+    setAlreadyPaidShipping(groups.normal || groups.vendor);
+    return groups;
+  };
+
+  const checkAlreadyPaidShipping = async (phoneValue = customerPhone) => {
+    const groups = await checkAlreadyPaidShippingGroups(phoneValue);
+    return groups.normal || groups.vendor;
   };
 
   const logoutCustomerInfo = () => {
@@ -2169,7 +2246,8 @@ export default function OrderPage() {
     ]);
 
     const nextItem: OrderItem = {
-      product_name: product.product_name,
+      product_id: String(product.id ?? ""),
+        product_name: product.product_name,
       color: normalizeEmptyProductOptionValue(productColor),
       size: normalizeEmptyProductOptionValue(productSize),
       qty: "1",
@@ -2366,7 +2444,8 @@ export default function OrderPage() {
     try {
       const cleanPhone = normalizePhone(customerPhone);
       const operatorTestOrderFlags = await getOperatorTestOrderFlags(cleanPhone);
-      const paidShippingBeforeSubmit = await checkAlreadyPaidShipping(cleanPhone);
+      const paidShippingGroupsBeforeSubmit = await checkAlreadyPaidShippingGroups(cleanPhone);
+      const paidShippingBeforeSubmit = paidShippingGroupsBeforeSubmit.normal || paidShippingGroupsBeforeSubmit.vendor;
       const validItems = items.filter(
         (item) =>
           item.product_name.trim() ||
@@ -2374,7 +2453,7 @@ export default function OrderPage() {
           item.size.trim() ||
           item.product_price.trim()
       );
-      const appliedShippingFeeBreakdown = calculateShippingFeeBreakdown(validItems, paidShippingBeforeSubmit);
+      const appliedShippingFeeBreakdown = calculateShippingFeeBreakdown(validItems, paidShippingGroupsBeforeSubmit);
       const appliedShippingFee = appliedShippingFeeBreakdown.totalShippingFee;
       const appliedCardExtra =
         paymentMethod === "카드결제"
@@ -2403,10 +2482,10 @@ export default function OrderPage() {
         let rowShippingFee = 0;
 
         if (rowShippingGroup === "normal") {
-          if (!paidShippingBeforeSubmit && !chargedShippingGroups.has("normal")) {
+          if (!paidShippingGroupsBeforeSubmit.normal && !chargedShippingGroups.has("normal")) {
             rowShippingFee = baseShippingFee;
           }
-        } else if (!paidShippingBeforeSubmit && !chargedShippingGroups.has("vendor")) {
+        } else if (!paidShippingGroupsBeforeSubmit.vendor && !chargedShippingGroups.has("vendor")) {
           rowShippingFee = baseShippingFee;
         }
 
@@ -2534,7 +2613,7 @@ export default function OrderPage() {
         markPaidShippingInThisBrowser(cleanPhone, markCombineSettings);
       }
 
-      setAlreadyPaidShipping(paidShippingBeforeSubmit || appliedShippingFeeBreakdown.normalShippingFee > 0);
+      setAlreadyPaidShipping(paidShippingBeforeSubmit || appliedShippingFeeBreakdown.totalShippingFee > 0);
 
       setIsEditingCustomerInfo(false);
       setIsCustomerInfoOpen(false);
