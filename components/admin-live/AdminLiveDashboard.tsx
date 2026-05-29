@@ -1,4 +1,18 @@
 "use client";
+const LIVE_ORDER_AUTO_REFRESH_ENABLED = false;
+
+const maybeSetLiveOrderAutoRefreshInterval = (
+  handler: Parameters<typeof window.setInterval>[0],
+  timeout?: number,
+): number | null => {
+  if (!LIVE_ORDER_AUTO_REFRESH_ENABLED) return null;
+  return window.setInterval(handler, timeout);
+};
+
+const clearLiveOrderAutoRefreshInterval = (intervalId: number | null) => {
+  if (intervalId !== null) window.clearInterval(intervalId);
+};
+
 
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
@@ -595,7 +609,7 @@ export default function AdminLiveDashboard() {
     void loadDepositsFromServer();
     void loadBroadcasts();
 
-    const refreshTimer = window.setInterval(() => {
+    const refreshTimer = maybeSetLiveOrderAutoRefreshInterval(() => {
       void loadOrders();
       void loadDepositsFromServer();
     }, 15000);
@@ -608,7 +622,7 @@ export default function AdminLiveDashboard() {
     window.addEventListener("ruru-admin-live-auto-bankda-synced", handleAutoBankdaSynced);
 
     return () => {
-      window.clearInterval(refreshTimer);
+      clearLiveOrderAutoRefreshInterval(refreshTimer);
       window.removeEventListener("ruru-admin-live-auto-bankda-synced", handleAutoBankdaSynced);
     };
   }, []);
