@@ -472,24 +472,23 @@ export default function LiveProductRegistrationPanel({
                 />
               </div>
 
-              <div data-ruru-live-none-toggle className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="min-w-0">
-                  <div className="text-xs font-black text-slate-700">색상/사이즈 없음입력</div>
-                  <div className="mt-0.5 text-[11px] font-bold text-slate-400">ON이면 고객 주문서에 없음으로 자동입력</div>
-                </div>
+              <div data-ruru-live-none-toggle className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
                 <button
                   type="button"
                   aria-pressed={noneOptionAutofillEnabled}
                   onClick={toggleNoneOptionAutofill}
                   className={[
-                    "shrink-0 rounded-full px-3.5 py-1.5 text-xs font-black transition active:scale-[0.98]",
+                    "rounded-full px-4 py-2 text-sm font-black transition active:scale-[0.98]",
                     noneOptionAutofillEnabled
                       ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-100"
-                      : "bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-100",
+                      : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100",
                   ].join(" ")}
                 >
-                  {noneOptionAutofillEnabled ? "ON" : "OFF"}
+                  {noneOptionAutofillEnabled ? "없음입력 ON" : "없음입력 OFF"}
                 </button>
+                <span className="text-xs font-bold text-slate-500">
+                  ON이면 고객 주문서에서 색상/사이즈가 없음으로 자동입력됩니다.
+                </span>
               </div>
 
               <div className="mt-4 grid gap-3 lg:grid-cols-2">
