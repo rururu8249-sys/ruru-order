@@ -135,6 +135,20 @@ function inventoryItemStatusInfo(item: LiveOrderItem) {
   return null;
 }
 
+function isInventoryLockedItem(item: LiveOrderItem) {
+  const restoreStatus = clean(item.inventoryRestoreStatus).toLowerCase();
+  const deductionStatus = clean(item.inventoryDeductionStatus).toLowerCase();
+
+  return (
+    restoreStatus === "restored_total" ||
+    restoreStatus === "restored_option" ||
+    Boolean(item.inventoryRestoredAt) ||
+    deductionStatus === "deducted_total" ||
+    deductionStatus === "deducted_option" ||
+    Boolean(item.inventoryDeductedAt)
+  );
+}
+
 
 function updateForm<K extends keyof LiveOrderItemEditForm>(
   form: LiveOrderItemEditForm,
@@ -159,6 +173,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
   const previewProductTotal = qty * unitPrice;
   const countText = editCountText(item);
   const hasChangeHistory = Array.isArray(item.changeHistory) && item.changeHistory.length > 0;
+  const inventoryLocked = isInventoryLockedItem(item);
 
   const cancelEdit = () => {
     setForm(createInitialLiveOrderItemEditForm(item));
@@ -295,10 +310,10 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
           <button
             type="button"
             onClick={submit}
-            disabled={saving}
+            disabled={saving || inventoryLocked}
             className="h-10 rounded-xl bg-blue-600 text-xs font-black text-white hover:bg-blue-700 disabled:bg-slate-300"
           >
-            {saving ? "저장중..." : "저장"}
+            {inventoryLocked ? "수정잠금" : saving ? "저장중..." : "저장"}
           </button>
         </div>
       </div>
@@ -346,10 +361,11 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
           <button
             type="button"
             onClick={() => setEditing(true)}
-            disabled={disabled}
+            disabled={disabled || inventoryLocked}
+            title={inventoryLocked ? "재고가 이미 연동된 주문은 재고 꼬임 방지를 위해 상품수정을 잠시 막아둡니다." : undefined}
             className="mt-2 rounded-xl bg-slate-950 px-2.5 py-1.5 text-[11px] font-black text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
           >
-            수정
+            {inventoryLocked ? "수정잠금" : "수정"}
           </button>
         </div>
       </div>
