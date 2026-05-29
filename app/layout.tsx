@@ -12,6 +12,7 @@ import PresenceHeartbeat from "@/components/PresenceHeartbeat";
 import type { Metadata } from "next";
 import "./globals.css";
 import AdminConfirmHost from "@/components/admin/AdminConfirmHost";
+import DeployChunkReloadGuard from "@/components/DeployChunkReloadGuard";
 
 import CustomerAccessBlockGuard from "@/components/customer/CustomerAccessBlockGuard";
 export const metadata: Metadata = {
@@ -27,6 +28,7 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body>
+        <DeployChunkReloadGuard />
         <CustomerAccessBlockGuard />
         <PresenceHeartbeat />{children}
         <AdminConfirmHost /></body>
