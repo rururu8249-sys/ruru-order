@@ -69,6 +69,11 @@ type EventsPayload = {
   events?: RouletteEvent[];
 };
 
+type AdminLiveEventRoulettePanelProps = {
+  buttonLabel?: string;
+  buttonClassName?: string;
+};
+
 type WinnersPayload = {
   ok: boolean;
   message?: string;
@@ -155,7 +160,10 @@ async function copyText(value: string) {
   }
 }
 
-export default function AdminLiveEventRoulettePanel() {
+export default function AdminLiveEventRoulettePanel({
+  buttonLabel = "🎁 이벤트 룰렛",
+  buttonClassName = "inline-flex items-center justify-center rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white shadow-sm ring-1 ring-violet-300 transition hover:bg-violet-700 disabled:opacity-50",
+}: AdminLiveEventRoulettePanelProps) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<RouletteMode>("test");
   const [sourceDate, setSourceDate] = useState(todayText);
@@ -309,9 +317,9 @@ export default function AdminLiveEventRoulettePanel() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed right-5 top-5 z-[60] rounded-full bg-violet-600 px-5 py-3 text-sm font-black text-white shadow-2xl shadow-violet-950/20 ring-1 ring-violet-300 transition hover:bg-violet-700"
+        className={buttonClassName}
       >
-        🎁 이벤트 룰렛
+        {buttonLabel}
       </button>
 
       {open ? (

@@ -5,6 +5,7 @@ import type { LiveOrder } from "./types";
 import { exportLiveOrdersForPicking, exportLiveOrdersForRosen } from "./adminLiveOrderExcelExport";
 import { supabase } from "@/lib/supabase";
 import LiveOrderCancelViewFilter, { type LiveOrderCancelViewFilterValue } from "./LiveOrderCancelViewFilter";
+import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
 
 export type LiveOrderDateFilter = "all" | "today" | "yesterday" | "7days" | "month" | "custom";
 export type LiveOrderStatusFilter =
@@ -469,6 +470,10 @@ export default function LiveOrderTable({
           >
             {exporting === "picking" ? "내보내는중..." : "물건챙기기 엑셀"}
           </button>
+          <AdminLiveEventRoulettePanel
+            buttonLabel="🎁 이벤트당첨자"
+            buttonClassName="inline-flex items-center justify-center rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white shadow-sm ring-1 ring-violet-300 transition hover:bg-violet-700"
+          />
 
             {canceledExportExcludedCount > 0 ? (
               <span className="rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-600">
