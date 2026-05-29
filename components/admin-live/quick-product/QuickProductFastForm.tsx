@@ -1041,7 +1041,7 @@ export default function QuickProductFastForm({
             </div>
           </section>
 
-<section data-ruru-option-stock-card className="flex min-h-[238px] flex-col overflow-hidden rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm shadow-slate-100">
+<section data-ruru-option-stock-card className="flex min-h-[168px] flex-col overflow-hidden rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm shadow-slate-100">
             <div className="mb-2.5 flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
@@ -1092,7 +1092,23 @@ export default function QuickProductFastForm({
               </div>
             </div>
 
-            <div className="grid min-h-0 flex-1 grid-cols-[176px_minmax(0,1fr)] gap-3">
+            {stockMode === "total" ? (
+              <div data-ruru-total-stock-mode className="flex min-h-[88px] items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3">
+                <div className="min-w-0">
+                  <div className="text-xs font-black text-slate-800">전체 재고</div>
+                  <div className="mt-0.5 text-[10px] font-bold text-slate-400">옵션별은 필요할 때만 사용</div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <input
+                    value={formatNumberWithComma(totalStockText)}
+                    onChange={(event) => setTotalStockText(onlyNumber(event.target.value))}
+                    className="h-10 w-24 rounded-xl border border-slate-200 bg-white px-3 text-right text-base font-black outline-none focus:border-blue-400"
+                  />
+                  <span className="text-xs font-black text-slate-400">개</span>
+                </div>
+              </div>
+            ) : (
+              <div data-ruru-option-stock-mode className="grid min-h-[118px] flex-1 grid-cols-[176px_minmax(0,1fr)] gap-3">
               <div className="flex h-[54px] items-center gap-2 rounded-xl bg-slate-50 px-3">
                 <span className="text-xs font-bold text-slate-500">전체 재고</span>
                 <input
@@ -1136,10 +1152,12 @@ export default function QuickProductFastForm({
                 </div>
               </div>
             </div>
-
-            <div className="mt-1 text-right text-xs font-black text-slate-600">
-              총재고 {totalStock.toLocaleString("ko-KR")}개
-            </div>
+            )}
+            {stockMode === "option" ? (
+              <div className="mt-1 text-right text-xs font-black text-slate-600">
+                총재고 {totalStock.toLocaleString("ko-KR")}개
+              </div>
+            ) : null}
           </section>
 
           <div data-ruru-section-title="images" className="flex items-center gap-2 px-1 py-0.5">
