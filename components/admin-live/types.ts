@@ -45,6 +45,12 @@ export type LiveOrderItem = {
   qty: number;
   unitPrice?: number;
   amount: number;
+  inventoryDeductionStatus?: string | null;
+  inventoryDeductionMemo?: string | null;
+  inventoryDeductedAt?: string | null;
+  inventoryRestoreStatus?: string | null;
+  inventoryRestoreMemo?: string | null;
+  inventoryRestoredAt?: string | null;
   productEditCount?: number;
   amountEditCount?: number;
   changeHistory?: LiveOrderItemChangeHistory[];

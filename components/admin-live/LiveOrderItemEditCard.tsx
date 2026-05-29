@@ -104,6 +104,38 @@ function editCountText(item: LiveOrderItem) {
   return `상품수정 ${productCount}회 · 금액수정 ${amountCount}회`;
 }
 
+function inventoryItemStatusInfo(item: LiveOrderItem) {
+  const restoreStatus = clean(item.inventoryRestoreStatus).toLowerCase();
+  const deductionStatus = clean(item.inventoryDeductionStatus).toLowerCase();
+
+  if (restoreStatus === "restored_total" || restoreStatus === "restored_option" || item.inventoryRestoredAt) {
+    return {
+      label: "재고복구완료",
+      memo: item.inventoryRestoreMemo || "주문취소 재고복구 완료",
+      className: "border-sky-200 bg-sky-50 text-sky-700",
+    };
+  }
+
+  if (deductionStatus === "deducted_total" || deductionStatus === "deducted_option" || item.inventoryDeductedAt) {
+    return {
+      label: deductionStatus === "deducted_total" ? "총재고 차감완료" : "옵션재고 차감완료",
+      memo: item.inventoryDeductionMemo || "재고차감 완료",
+      className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    };
+  }
+
+  if (deductionStatus.startsWith("skipped_")) {
+    return {
+      label: "재고차감 제외",
+      memo: item.inventoryDeductionMemo || "직접입력/재고관리 OFF 등으로 재고차감 제외",
+      className: "border-slate-200 bg-slate-50 text-slate-500",
+    };
+  }
+
+  return null;
+}
+
+
 function updateForm<K extends keyof LiveOrderItemEditForm>(
   form: LiveOrderItemEditForm,
   key: K,
@@ -300,6 +332,17 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
         <div className="shrink-0 text-right">
           <div className="text-sm font-black text-slate-950">{Number(item.qty || 1)}개</div>
           <div className="mt-1 text-sm font-black text-slate-950">{money(item.amount)}</div>
+          {(() => {
+            const inventoryInfo = inventoryItemStatusInfo(item);
+            if (!inventoryInfo) return null;
+
+            return (
+              <div className={`mt-2 rounded-xl border px-2 py-1 text-left text-[11px] font-black leading-relaxed ${inventoryInfo.className}`}>
+                <div>{inventoryInfo.label}</div>
+                <div className="mt-0.5 opacity-80">{inventoryInfo.memo}</div>
+              </div>
+            );
+          })()}
           <button
             type="button"
             onClick={() => setEditing(true)}

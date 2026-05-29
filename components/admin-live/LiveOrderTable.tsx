@@ -202,6 +202,60 @@ function testOrderBadge(order: LiveOrder) {
   );
 }
 
+function inventoryStatusBadge(order: LiveOrder) {
+  const items = order.items || [];
+  const restoredItem = items.find((item) => {
+    const status = normalizeText(item.inventoryRestoreStatus).toLowerCase();
+    return status === "restored_total" || status === "restored_option" || Boolean(item.inventoryRestoredAt);
+  });
+
+  if (restoredItem) {
+    return (
+      <span
+        className="inline-flex shrink-0 items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-black text-sky-700"
+        title={restoredItem.inventoryRestoreMemo || restoredItem.inventoryRestoreStatus || "주문취소 재고복구 완료"}
+      >
+        재고복구완료
+      </span>
+    );
+  }
+
+  const deductedItem = items.find((item) => {
+    const status = normalizeText(item.inventoryDeductionStatus).toLowerCase();
+    return status === "deducted_total" || status === "deducted_option" || Boolean(item.inventoryDeductedAt);
+  });
+
+  if (deductedItem) {
+    return (
+      <span
+        className="inline-flex shrink-0 items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-black text-emerald-700"
+        title={deductedItem.inventoryDeductionMemo || deductedItem.inventoryDeductionStatus || "재고차감 완료"}
+      >
+        재고차감완료
+      </span>
+    );
+  }
+
+  const skippedItem = items.find((item) => {
+    const status = normalizeText(item.inventoryDeductionStatus).toLowerCase();
+    return status.startsWith("skipped_");
+  });
+
+  if (skippedItem) {
+    return (
+      <span
+        className="inline-flex shrink-0 items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-black text-slate-500"
+        title={skippedItem.inventoryDeductionMemo || skippedItem.inventoryDeductionStatus || "재고차감 제외"}
+      >
+        재고차감제외
+      </span>
+    );
+  }
+
+  return null;
+}
+
+
 type Props = {
   orders: LiveOrder[];
   allOrderCount: number;
@@ -631,6 +685,7 @@ export default function LiveOrderTable({
                     <td className="px-4 py-3">
                     <div className="flex flex-wrap items-center gap-2">
                       {statusBadge(order)}
+                      {inventoryStatusBadge(order)}
                       {testOrderBadge(order)}
                     </div>
                   </td>

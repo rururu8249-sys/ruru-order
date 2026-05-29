@@ -46,6 +46,14 @@ export type OrderRow = {
   shipped_at: string | null;
   customer_id: number | null;
   deposit_confirmed_at: string | null;
+  inventory_deducted_at?: string | null;
+  inventory_ledger_id?: string | null;
+  inventory_deduction_status?: string | null;
+  inventory_deduction_memo?: string | null;
+  inventory_restored_at?: string | null;
+  inventory_restore_ledger_id?: string | null;
+  inventory_restore_status?: string | null;
+  inventory_restore_memo?: string | null;
   is_deleted: boolean | null;
 };
 
