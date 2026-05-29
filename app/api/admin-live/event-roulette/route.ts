@@ -1,0 +1,515 @@
+import { randomUUID } from "crypto";
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import {
+  buildRouletteParticipants,
+  buildRoulettePreviewParticipants,
+  calculateRouletteSpinDurationMs,
+  normalizeEventRouletteMode,
+  pickRouletteWinner,
+  type EventRouletteMode,
+  type EventRouletteOrderLike,
+  type EventRouletteParticipant,
+} from "@/lib/eventRoulette";
+
+export const dynamic = "force-dynamic";
+
+const DEFAULT_TITLE = "🎁 루루동이룰렛";
+
+type RouletteEventRow = {
+  id: string;
+  title: string;
+  overlay_token: string;
+  mode: EventRouletteMode;
+  is_test: boolean;
+  status: "idle" | "spinning" | "result" | "closed";
+  event_date: string | null;
+  source_date: string | null;
+  participant_snapshot: EventRouletteParticipant[] | null;
+  winner_nickname: string | null;
+  winner_note: string | null;
+  winner_order_ids: string[] | null;
+  spin_started_at: string | null;
+  spin_duration_ms: number | null;
+  result_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+function json(data: unknown, status = 200) {
+  return NextResponse.json(data, {
+    status,
+    headers: {
+      "Cache-Control": "no-store, max-age=0",
+    },
+  });
+}
+
+function cleanText(value: unknown) {
+  return String(value ?? "").trim();
+}
+
+function todayKstDateText() {
+  const now = new Date();
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+
+  return kst.toISOString().slice(0, 10);
+}
+
+function isValidDateText(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function normalizeDateText(value: unknown) {
+  const raw = cleanText(value);
+
+  if (isValidDateText(raw)) {
+    return raw;
+  }
+
+  return todayKstDateText();
+}
+
+function kstDateRangeUtc(dateText: string) {
+  return {
+    start: new Date(`${dateText}T00:00:00+09:00`).toISOString(),
+    end: new Date(`${dateText}T23:59:59.999+09:00`).toISOString(),
+  };
+}
+
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    "";
+
+  if (!url || !key) {
+    throw new Error("Supabase 환경변수가 없습니다.");
+  }
+
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+type SupabaseAdminClient = ReturnType<typeof getSupabaseAdmin>;
+
+function hasAdminAccess(request: NextRequest) {
+  const expectedToken = process.env.ADMIN_SESSION_TOKEN || process.env.ADMIN_TOKEN || "";
+
+  if (!expectedToken) {
+    return true;
+  }
+
+  const headerToken = request.headers.get("x-ruru-admin-token") || request.headers.get("x-admin-token") || "";
+  if (headerToken && headerToken === expectedToken) {
+    return true;
+  }
+
+  const cookieNames = [
+    "ruru_admin_session",
+    "ruru_admin_token",
+    "ruru_admin_auth",
+    "admin_session",
+    "admin_token",
+    "admin_auth",
+    "ADMIN_SESSION_TOKEN",
+  ];
+
+  return cookieNames.some((name) => request.cookies.get(name)?.value === expectedToken);
+}
+
+function requireAdmin(request: NextRequest) {
+  if (hasAdminAccess(request)) {
+    return null;
+  }
+
+  return json({ ok: false, message: "관리자 인증이 필요합니다." }, 401);
+}
+
+function sanitizeParticipantForAdmin(participant: EventRouletteParticipant) {
+  return {
+    nickname: participant.nickname,
+    order_count: participant.orderCount,
+    qty_sum: participant.qtySum,
+    amount_sum: participant.amountSum,
+    order_ids: participant.orderIds,
+    weight: participant.weight,
+  };
+}
+
+function sanitizeParticipantForOverlay(participant: EventRouletteParticipant) {
+  return {
+    nickname: participant.nickname,
+  };
+}
+
+function sanitizeEventForAdmin(event: RouletteEventRow) {
+  const participants = Array.isArray(event.participant_snapshot) ? event.participant_snapshot : [];
+
+  return {
+    id: event.id,
+    title: event.title,
+    overlay_token: event.overlay_token,
+    overlay_api_path: `/api/event-roulette/overlay?token=${encodeURIComponent(event.overlay_token)}`,
+    mode: event.mode,
+    is_test: event.is_test,
+    status: event.status,
+    event_date: event.event_date,
+    source_date: event.source_date,
+    participants: participants.map(sanitizeParticipantForAdmin),
+    participant_count: participants.length,
+    winner_nickname: event.winner_nickname,
+    winner_note: event.winner_note,
+    winner_order_ids: event.winner_order_ids || [],
+    spin_started_at: event.spin_started_at,
+    spin_duration_ms: event.spin_duration_ms,
+    result_at: event.result_at,
+    created_at: event.created_at,
+    updated_at: event.updated_at,
+  };
+}
+
+function sanitizeEventForOverlayProbe(event: RouletteEventRow) {
+  const participants = Array.isArray(event.participant_snapshot) ? event.participant_snapshot : [];
+
+  return {
+    title: event.title,
+    mode: event.mode,
+    is_test: event.is_test,
+    status: event.status,
+    participants: participants.map(sanitizeParticipantForOverlay),
+    winner_nickname: event.winner_nickname,
+    winner_note: event.winner_note,
+    spin_started_at: event.spin_started_at,
+    spin_duration_ms: event.spin_duration_ms,
+    result_at: event.result_at,
+  };
+}
+
+async function fetchOrderRowsForDate(supabase: SupabaseAdminClient, sourceDate: string) {
+  const range = kstDateRangeUtc(sourceDate);
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select(
+      [
+        "id",
+        "created_at",
+        "youtube_nickname",
+        "customer_name",
+        "qty",
+        "total_price",
+        "adjusted_total_price",
+        "final_amount",
+        "admin_order_status_v2",
+        "order_manage_status",
+        "is_test_order",
+      ].join(", ")
+    )
+    .gte("created_at", range.start)
+    .lte("created_at", range.end)
+    .order("created_at", { ascending: false })
+    .limit(1000);
+
+  if (error) {
+    throw new Error(error.message || "룰렛 참여자 주문 조회 실패");
+  }
+
+  return (Array.isArray(data) ? data : []) as EventRouletteOrderLike[];
+}
+
+async function buildParticipantsForRequest(supabase: SupabaseAdminClient, mode: EventRouletteMode, sourceDate: string) {
+  if (mode === "preview") {
+    return buildRoulettePreviewParticipants();
+  }
+
+  const rows = await fetchOrderRowsForDate(supabase, sourceDate);
+
+  return buildRouletteParticipants(rows, mode);
+}
+
+async function handleParticipants(request: NextRequest) {
+  const authError = requireAdmin(request);
+  if (authError) return authError;
+
+  const supabase = getSupabaseAdmin();
+  const mode = normalizeEventRouletteMode(request.nextUrl.searchParams.get("mode"));
+  const sourceDate = normalizeDateText(request.nextUrl.searchParams.get("sourceDate"));
+  const participants = await buildParticipantsForRequest(supabase, mode, sourceDate);
+
+  return json({
+    ok: true,
+    mode,
+    source_date: sourceDate,
+    participant_count: participants.length,
+    participants: participants.map(sanitizeParticipantForAdmin),
+  });
+}
+
+async function handleEvents(request: NextRequest) {
+  const authError = requireAdmin(request);
+  if (authError) return authError;
+
+  const supabase = getSupabaseAdmin();
+  const includeTest = request.nextUrl.searchParams.get("includeTest") === "true";
+
+  let query = supabase
+    .from("event_roulette_events")
+    .select(
+      "id, title, overlay_token, mode, is_test, status, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
+    )
+    .order("created_at", { ascending: false })
+    .limit(30);
+
+  if (!includeTest) {
+    query = query.eq("is_test", false);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    return json({ ok: false, message: error.message || "룰렛 이벤트 조회 실패" }, 500);
+  }
+
+  return json({
+    ok: true,
+    events: (Array.isArray(data) ? data : []).map((event) => sanitizeEventForAdmin(event as RouletteEventRow)),
+  });
+}
+
+async function handleWinners(request: NextRequest) {
+  const authError = requireAdmin(request);
+  if (authError) return authError;
+
+  const supabase = getSupabaseAdmin();
+  const includeTest = request.nextUrl.searchParams.get("includeTest") === "true";
+
+  let query = supabase
+    .from("event_roulette_winners")
+    .select("id, event_id, nickname, winner_note, winner_at, is_reward_done, reward_done_at, is_test, memo, created_at, updated_at")
+    .order("winner_at", { ascending: false })
+    .limit(100);
+
+  if (!includeTest) {
+    query = query.eq("is_test", false);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    return json({ ok: false, message: error.message || "룰렛 당첨자 조회 실패" }, 500);
+  }
+
+  return json({ ok: true, winners: data || [] });
+}
+
+async function createEvent(body: Record<string, unknown>) {
+  const supabase = getSupabaseAdmin();
+  const mode = normalizeEventRouletteMode(body.mode);
+  const sourceDate = normalizeDateText(body.sourceDate);
+  const title = cleanText(body.title) || DEFAULT_TITLE;
+  const participants = await buildParticipantsForRequest(supabase, mode, sourceDate);
+
+  if (participants.length <= 0) {
+    return json({ ok: false, message: "룰렛 참여자가 없습니다." }, 400);
+  }
+
+  if (mode === "preview") {
+    return json({
+      ok: true,
+      mode,
+      source_date: sourceDate,
+      event: {
+        title,
+        mode,
+        is_test: true,
+        status: "idle",
+        participants: participants.map(sanitizeParticipantForAdmin),
+        participant_count: participants.length,
+        spin_duration_ms: calculateRouletteSpinDurationMs(participants.length),
+      },
+      saved: false,
+    });
+  }
+
+  const overlayToken = `roulette_${randomUUID().replace(/-/g, "")}`;
+  const spinDurationMs = calculateRouletteSpinDurationMs(participants.length);
+
+  const { data, error } = await supabase
+    .from("event_roulette_events")
+    .insert({
+      title,
+      overlay_token: overlayToken,
+      mode,
+      is_test: mode === "test",
+      status: "idle",
+      event_date: sourceDate,
+      source_date: sourceDate,
+      participant_snapshot: participants,
+      spin_duration_ms: spinDurationMs,
+    })
+    .select(
+      "id, title, overlay_token, mode, is_test, status, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
+    )
+    .single();
+
+  if (error) {
+    return json({ ok: false, message: error.message || "룰렛 이벤트 생성 실패" }, 500);
+  }
+
+  return json({ ok: true, event: sanitizeEventForAdmin(data as RouletteEventRow), saved: true });
+}
+
+async function spinEvent(body: Record<string, unknown>) {
+  const supabase = getSupabaseAdmin();
+  const eventId = cleanText(body.eventId);
+  const winnerNote = cleanText(body.winnerNote) || "룰렛 당첨";
+
+  if (!eventId) {
+    return json({ ok: false, message: "eventId가 없습니다." }, 400);
+  }
+
+  const { data: eventData, error: eventError } = await supabase
+    .from("event_roulette_events")
+    .select(
+      "id, title, overlay_token, mode, is_test, status, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
+    )
+    .eq("id", eventId)
+    .single();
+
+  if (eventError || !eventData) {
+    return json({ ok: false, message: eventError?.message || "룰렛 이벤트를 찾지 못했습니다." }, 404);
+  }
+
+  const event = eventData as RouletteEventRow;
+  const participants = Array.isArray(event.participant_snapshot) ? event.participant_snapshot : [];
+
+  if (participants.length <= 0) {
+    return json({ ok: false, message: "룰렛 참여자가 없습니다." }, 400);
+  }
+
+  if (event.status === "result" && event.winner_nickname) {
+    return json({ ok: true, event: sanitizeEventForAdmin(event), already_result: true });
+  }
+
+  const picked = pickRouletteWinner(participants);
+  const now = new Date().toISOString();
+  const spinDurationMs = calculateRouletteSpinDurationMs(participants.length);
+
+  const { data: updatedEvent, error: updateError } = await supabase
+    .from("event_roulette_events")
+    .update({
+      status: "result",
+      winner_nickname: picked.winner.nickname,
+      winner_note: winnerNote,
+      winner_order_ids: picked.winner.orderIds || [],
+      spin_started_at: now,
+      spin_duration_ms: spinDurationMs,
+      result_at: now,
+      updated_at: now,
+    })
+    .eq("id", eventId)
+    .select(
+      "id, title, overlay_token, mode, is_test, status, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
+    )
+    .single();
+
+  if (updateError || !updatedEvent) {
+    return json({ ok: false, message: updateError?.message || "룰렛 결과 저장 실패" }, 500);
+  }
+
+  const { data: existingWinner } = await supabase
+    .from("event_roulette_winners")
+    .select("id")
+    .eq("event_id", eventId)
+    .maybeSingle();
+
+  if (!existingWinner) {
+    const { error: winnerError } = await supabase.from("event_roulette_winners").insert({
+      event_id: eventId,
+      nickname: picked.winner.nickname,
+      winner_note: winnerNote,
+      winner_at: now,
+      is_reward_done: false,
+      is_test: event.is_test,
+    });
+
+    if (winnerError) {
+      return json({ ok: false, message: winnerError.message || "룰렛 당첨자 저장 실패" }, 500);
+    }
+  }
+
+  return json({
+    ok: true,
+    event: sanitizeEventForAdmin(updatedEvent as RouletteEventRow),
+    overlay_event: sanitizeEventForOverlayProbe(updatedEvent as RouletteEventRow),
+    picked: {
+      nickname: picked.winner.nickname,
+      total_weight: picked.totalWeight,
+      random_value: picked.randomValue,
+    },
+  });
+}
+
+async function markRewardDone(body: Record<string, unknown>) {
+  const supabase = getSupabaseAdmin();
+  const winnerId = cleanText(body.winnerId);
+  const done = body.isRewardDone !== false;
+  const now = new Date().toISOString();
+
+  if (!winnerId) {
+    return json({ ok: false, message: "winnerId가 없습니다." }, 400);
+  }
+
+  const { data, error } = await supabase
+    .from("event_roulette_winners")
+    .update({
+      is_reward_done: done,
+      reward_done_at: done ? now : null,
+      updated_at: now,
+    })
+    .eq("id", winnerId)
+    .select("id, event_id, nickname, winner_note, winner_at, is_reward_done, reward_done_at, is_test, memo, created_at, updated_at")
+    .single();
+
+  if (error || !data) {
+    return json({ ok: false, message: error?.message || "지급완료 처리 실패" }, 500);
+  }
+
+  return json({ ok: true, winner: data });
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const action = request.nextUrl.searchParams.get("action") || "participants";
+
+    if (action === "participants") return handleParticipants(request);
+    if (action === "events") return handleEvents(request);
+    if (action === "winners") return handleWinners(request);
+
+    return json({ ok: false, message: "지원하지 않는 action입니다." }, 400);
+  } catch (error) {
+    return json({ ok: false, message: error instanceof Error ? error.message : String(error) }, 500);
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const authError = requireAdmin(request);
+  if (authError) return authError;
+
+  try {
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    const action = cleanText(body.action);
+
+    if (action === "create_event") return createEvent(body);
+    if (action === "spin_event") return spinEvent(body);
+    if (action === "mark_reward_done") return markRewardDone(body);
+
+    return json({ ok: false, message: "지원하지 않는 action입니다." }, 400);
+  } catch (error) {
+    return json({ ok: false, message: error instanceof Error ? error.message : String(error) }, 500);
+  }
+}
