@@ -698,7 +698,10 @@ export default function OrderPage() {
   const [pointUseInput, setPointUseInput] = useState("");
 
   const isRemoteAreaShippingAddress = isRemoteAreaAddress(zipcode, address, detailAddress);
-  const generalShippingFee = Number(broadcast?.shipping_fee ?? defaultShippingFee);
+  // 배송비 기준은 관리자 설정값(settings.default_shipping_fee)을 우선 적용합니다.
+  // 기존 broadcast.shipping_fee는 방송 생성 당시 값이 남아 설정 변경(예: 0원)을 막을 수 있어
+  // 고객 주문서 계산에서는 사용하지 않습니다.
+  const generalShippingFee = Math.max(0, Number(defaultShippingFee || 0));
   const baseShippingFee = isRemoteAreaShippingAddress
     ? Math.max(remoteAreaShippingFee, generalShippingFee)
     : generalShippingFee;
@@ -729,7 +732,7 @@ export default function OrderPage() {
     const hasGeneralShipping = chargeableItems.some((item) => !isVendorShippingItem(item));
 
     const normalShippingFee = hasGeneralShipping && !paidGeneralShipping ? baseShippingFee : 0;
-    const vendorShippingFee = hasVendorShipping ? baseShippingFee : 0;
+    const vendorShippingFee = hasVendorShipping && !paidGeneralShipping ? baseShippingFee : 0;
 
     return {
       normalShippingFee,
@@ -2390,7 +2393,7 @@ export default function OrderPage() {
           if (!paidShippingBeforeSubmit && !chargedShippingGroups.has("normal")) {
             rowShippingFee = baseShippingFee;
           }
-        } else if (!chargedShippingGroups.has("vendor")) {
+        } else if (!paidShippingBeforeSubmit && !chargedShippingGroups.has("vendor")) {
           rowShippingFee = baseShippingFee;
         }
 
