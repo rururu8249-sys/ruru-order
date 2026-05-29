@@ -737,6 +737,7 @@ export default function OrderPage() {
   const [combineShippingSettings, setCombineShippingSettings] =
     useState<CombineShippingSettings>(DEFAULT_COMBINE_SHIPPING_SETTINGS);
   const [alreadyPaidShipping, setAlreadyPaidShipping] = useState(false);
+  const [paidShippingGroups, setPaidShippingGroups] = useState<PaidShippingGroups>({ ...EMPTY_PAID_SHIPPING_GROUPS });
   const [customerPointBalance, setCustomerPointBalance] = useState(0);
   const [customerPointLoading, setCustomerPointLoading] = useState(false);
   const [pointUseInput, setPointUseInput] = useState("");
@@ -799,7 +800,7 @@ export default function OrderPage() {
     };
   };
 
-  const shippingFeeBreakdown = calculateShippingFeeBreakdown(items, alreadyPaidShipping);
+  const shippingFeeBreakdown = calculateShippingFeeBreakdown(items, paidShippingGroups);
   const shippingFee = shippingFeeBreakdown.totalShippingFee;
   const cardRateForCustomer = customerCardRate;
 
@@ -1538,6 +1539,7 @@ export default function OrderPage() {
 
     if (cleanPhone.length < 10 || !addressSignature) {
       setAlreadyPaidShipping(false);
+      setPaidShippingGroups({ ...EMPTY_PAID_SHIPPING_GROUPS });
       return { ...EMPTY_PAID_SHIPPING_GROUPS };
     }
 
@@ -1558,6 +1560,7 @@ export default function OrderPage() {
     if (error) {
       console.log("기존 배송비 확인 오류", error.message);
       setAlreadyPaidShipping(false);
+      setPaidShippingGroups({ ...EMPTY_PAID_SHIPPING_GROUPS });
       return { ...EMPTY_PAID_SHIPPING_GROUPS };
     }
 
@@ -1616,6 +1619,7 @@ export default function OrderPage() {
       markPaidShippingInThisBrowser(cleanPhone, settings, addressSignature);
     }
 
+    setPaidShippingGroups(groups);
     setAlreadyPaidShipping(groups.normal || groups.vendor);
     return groups;
   };
@@ -1643,6 +1647,8 @@ export default function OrderPage() {
     setAddress("");
     setDetailAddress("");
     setRequestMemo("");
+    setAlreadyPaidShipping(false);
+    setPaidShippingGroups({ ...EMPTY_PAID_SHIPPING_GROUPS });
     
     setLoginName("");
     setLoginPhone("");
@@ -2478,7 +2484,7 @@ export default function OrderPage() {
         const qty = toNumber(item.qty);
         const price = toNumber(item.product_price);
         const itemTotal = price * qty;
-        const rowShippingGroup = isVendorShippingItem(item) ? "vendor" : "normal";
+        const rowShippingGroup = resolveShippingGroupFromValue(item);
         let rowShippingFee = 0;
 
         if (rowShippingGroup === "normal") {
@@ -2609,11 +2615,17 @@ export default function OrderPage() {
       setPointUseInput("");
       setPin("");
 
-      if (appliedShippingFeeBreakdown.normalShippingFee > 0) {
+      const nextPaidShippingGroupsAfterSubmit: PaidShippingGroups = {
+        normal: paidShippingGroupsBeforeSubmit.normal || appliedShippingFeeBreakdown.normalShippingFee > 0,
+        vendor: paidShippingGroupsBeforeSubmit.vendor || appliedShippingFeeBreakdown.vendorShippingFee > 0,
+      };
+
+      if (appliedShippingFeeBreakdown.totalShippingFee > 0) {
         markPaidShippingInThisBrowser(cleanPhone, markCombineSettings);
       }
 
-      setAlreadyPaidShipping(paidShippingBeforeSubmit || appliedShippingFeeBreakdown.totalShippingFee > 0);
+      setPaidShippingGroups(nextPaidShippingGroupsAfterSubmit);
+      setAlreadyPaidShipping(nextPaidShippingGroupsAfterSubmit.normal || nextPaidShippingGroupsAfterSubmit.vendor);
 
       setIsEditingCustomerInfo(false);
       setIsCustomerInfoOpen(false);
