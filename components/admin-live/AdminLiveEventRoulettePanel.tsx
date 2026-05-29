@@ -162,7 +162,7 @@ async function copyText(value: string) {
 
 export default function AdminLiveEventRoulettePanel({
   buttonLabel = "🎁 이벤트 룰렛",
-  buttonClassName = "inline-flex items-center justify-center rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white shadow-sm ring-1 ring-violet-300 transition hover:bg-violet-700 disabled:opacity-50",
+  buttonClassName = "inline-flex h-10 items-center justify-center rounded-xl bg-violet-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-violet-700 disabled:opacity-50",
 }: AdminLiveEventRoulettePanelProps) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<RouletteMode>("test");
