@@ -785,13 +785,21 @@ export default function QuickProductFastForm({
     }
   };
 
-  const choiceButton = "h-8 rounded-xl px-3 text-[11px] font-black";
+  const choiceButton = "h-9 rounded-xl px-3.5 text-[12px] font-black transition active:scale-[0.98]";
   const inactiveChoice = "bg-slate-100 text-slate-600 hover:bg-slate-200";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-        <div className="grid min-h-0 content-start gap-3 pb-3">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
+        <div className="grid min-h-0 content-start gap-3 pb-4">
+          <div data-ruru-section-title="basic" className="flex items-center gap-2 px-1">
+            <span className="rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-black text-white">01</span>
+            <div>
+              <div className="text-sm font-black text-slate-900">필수정보</div>
+              <div className="text-[11px] font-bold text-slate-400">상품명·가격·대표사진은 저장 전 필수 확인</div>
+            </div>
+          </div>
+
           <section className="grid min-h-0 items-center grid-cols-[180px_minmax(0,1fr)] gap-4 rounded-2xl border border-slate-200 bg-white p-3 overflow-hidden">
             <ImagePicker
               label="대표사진"
@@ -840,6 +848,14 @@ export default function QuickProductFastForm({
 
             </div>
           </section>
+
+          <div data-ruru-section-title="sale" className="flex items-center gap-2 px-1">
+            <span className="rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-black text-white">02</span>
+            <div>
+              <div className="text-sm font-black text-slate-900">판매설정</div>
+              <div className="text-[11px] font-bold text-slate-400">방송·배송·노출 위치를 한 번에 확인</div>
+            </div>
+          </div>
 
           <section className="grid min-h-0 items-center grid-cols-[1fr_1.2fr_1fr_1fr] gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
             <div className="flex h-full min-h-0 flex-col items-center justify-center">
@@ -942,7 +958,15 @@ export default function QuickProductFastForm({
             </div>
           </section>
 
-          <div data-ruru-quick-none-toggle className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div data-ruru-section-title="option-stock" className="flex items-center gap-2 px-1">
+            <span className="rounded-full bg-blue-600 px-2.5 py-1 text-[10px] font-black text-white">03</span>
+            <div>
+              <div className="text-sm font-black text-slate-900">옵션 · 재고</div>
+              <div className="text-[11px] font-bold text-slate-400">색상·사이즈 입력 후 바로 재고 확인</div>
+            </div>
+          </div>
+
+          <div data-ruru-quick-none-toggle className="flex items-center justify-between gap-3 rounded-2xl border border-blue-100 bg-blue-50/50 px-4 py-3">
                 <div className="min-w-0">
                   <div className="text-xs font-black text-slate-700">색상/사이즈 없음입력</div>
                   <div className="mt-0.5 text-[11px] font-bold text-slate-400">ON이면 고객 주문서에 없음으로 자동입력</div>
@@ -962,11 +986,11 @@ export default function QuickProductFastForm({
                 </button>
               </div>
 
-          <section className="grid min-h-0 grid-cols-2 gap-3">
-            <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3">
+          <section className="grid min-h-0 grid-cols-2 gap-3 rounded-2xl border border-slate-200 bg-white p-3">
+            <div className="min-w-0 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100">
               <div className="mb-1 flex items-center justify-between">
                 <span className="text-[11px] font-black text-slate-700">색상</span>
-                <span className="text-[10px] font-bold text-slate-400">쉼표 여러 개</span>
+                <span className="text-[10px] font-bold text-slate-400">여러 개 가능</span>
               </div>
 
               <input
@@ -994,10 +1018,10 @@ export default function QuickProductFastForm({
               </div>
             </div>
 
-            <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3">
+            <div className="min-w-0 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100">
               <div className="mb-1 flex items-center justify-between">
                 <span className="text-[11px] font-black text-slate-700">사이즈</span>
-                <span className="text-[10px] font-bold text-slate-400">프리셋 유지</span>
+                <span className="text-[10px] font-bold text-slate-400">빠른 선택</span>
               </div>
               <input
                 value={sizeText}
@@ -1025,10 +1049,10 @@ export default function QuickProductFastForm({
             </div>
           </section>
 
-<section data-ruru-option-stock-card className="flex min-h-[260px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-3">
-            <div className="mb-2 flex items-center justify-between gap-3">
+<section data-ruru-option-stock-card className="flex min-h-[260px] flex-col overflow-hidden rounded-2xl border border-blue-100 bg-white p-4 shadow-sm shadow-slate-100">
+            <div className="mb-3 flex items-start justify-between gap-3">
               <div>
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
                   <div className="text-xs font-black text-slate-800">재고관리</div>
                   <div data-ruru-stock-management-toggle className="flex rounded-xl bg-slate-100 p-1 text-[11px] font-black">
                     <button
@@ -1048,7 +1072,7 @@ export default function QuickProductFastForm({
                   </div>
                 </div>
                 <div className="mt-0.5 text-[10px] font-bold text-slate-400">
-                  기본은 총재고, 옵션별은 필요할 때만 입력합니다.
+                  기본 총재고 · 필요 시 옵션별
                 </div>
               </div>
 
@@ -1076,7 +1100,7 @@ export default function QuickProductFastForm({
               </div>
             </div>
 
-            <div className="grid min-h-0 flex-1 grid-cols-[178px_minmax(0,1fr)] gap-3">
+            <div className="grid min-h-0 flex-1 grid-cols-[188px_minmax(0,1fr)] gap-3">
               <div className="flex h-[58px] items-center gap-2 rounded-xl bg-slate-50 px-3">
                 <span className="text-xs font-bold text-slate-500">전체 재고</span>
                 <input
@@ -1126,6 +1150,14 @@ export default function QuickProductFastForm({
             </div>
           </section>
 
+          <div data-ruru-section-title="images" className="flex items-center gap-2 px-1">
+            <span className="rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-black text-white">04</span>
+            <div>
+              <div className="text-sm font-black text-slate-900">이미지</div>
+              <div className="text-[11px] font-bold text-slate-400">상세사진은 필요할 때만 추가</div>
+            </div>
+          </div>
+
 <section data-ruru-detail-images-section className="rounded-2xl border border-slate-200 bg-white p-3">
 <ImagePicker
                 label="상세사진 최대 5장"
@@ -1136,9 +1168,17 @@ export default function QuickProductFastForm({
                 onChange={setDetailImages}
               />
               <div className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-[10px] font-bold leading-4 text-slate-500">
-                기본 2칸만 표시하고 필요할 때 +3장 더로 확장합니다.
+                상세사진은 필요할 때만 추가하세요.
               </div>
           </section>
+
+          <div data-ruru-section-title="search" className="flex items-center gap-2 px-1">
+            <span className="rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-black text-white">05</span>
+            <div>
+              <div className="text-sm font-black text-slate-900">검색 노출</div>
+              <div className="text-[11px] font-bold text-slate-400">상품명 검색 보조 키워드</div>
+            </div>
+          </div>
 
 <section data-ruru-search-exposure-section className="grid min-h-0 grid-cols-[132px_minmax(0,1fr)] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3">
             <div className="min-w-0">
@@ -1157,7 +1197,18 @@ export default function QuickProductFastForm({
         </div>
       </div>
 
-      <div className="flex h-[70px] shrink-0 items-center justify-end gap-2 border-t border-slate-200 bg-white px-5">
+      <div className="flex h-[70px] shrink-0 items-center justify-between gap-3 border-t border-slate-200 bg-white px-5">
+        <div data-ruru-save-summary className="min-w-0 text-xs font-black text-slate-500">
+          <span className="text-slate-900">{productType === "broadcast" ? "방송상품" : "공구상품"}</span>
+          <span className="mx-1 text-slate-300">·</span>
+          <span>{shippingType === "vendor" ? "업체배송" : "일반배송"}</span>
+          <span className="mx-1 text-slate-300">·</span>
+          <span>{orderExposureMode === "hidden" ? "숨김" : orderExposureMode === "card_and_search" ? "카드+검색" : "검색"}</span>
+          <span className="mx-1 text-slate-300">·</span>
+          <span>재고 {totalStock.toLocaleString("ko-KR")}개</span>
+        </div>
+
+        <div className="flex shrink-0 items-center justify-end gap-2">
         <button
           type="button"
           onClick={onClose}
@@ -1174,6 +1225,7 @@ export default function QuickProductFastForm({
         >
           {saving ? "저장중..." : "저장"}
         </button>
+        </div>
       </div>
     </div>
   );
