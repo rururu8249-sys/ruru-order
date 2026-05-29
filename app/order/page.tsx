@@ -802,6 +802,67 @@ export default function OrderPage() {
 
   const shippingFeeBreakdown = calculateShippingFeeBreakdown(items, paidShippingGroups);
   const shippingFee = shippingFeeBreakdown.totalShippingFee;
+  const chargeableShippingItemsForNotice = getChargeableShippingItems(items);
+  const hasNormalShippingItemForNotice = chargeableShippingItemsForNotice.some(
+    (item) => resolveShippingGroupFromValue(item) === "normal",
+  );
+  const hasVendorShippingItemForNotice = chargeableShippingItemsForNotice.some(
+    (item) => resolveShippingGroupFromValue(item) === "vendor",
+  );
+  const isFreeShippingEvent = baseShippingFee <= 0;
+  const shippingNoticeText = (() => {
+    if (chargeableShippingItemsForNotice.length <= 0) return "";
+
+    if (shippingFee > 0) {
+      if (shippingFeeBreakdown.normalShippingFee > 0 && shippingFeeBreakdown.vendorShippingFee > 0) {
+        return `일반배송과 업체배송이 함께 있어 배송비가 각각 적용됩니다. 총 배송비 ${won(shippingFee)}입니다.`;
+      }
+
+      if (shippingFeeBreakdown.vendorShippingFee > 0 && paidShippingGroups.normal) {
+        return `기존 일반배송 주문과는 별도 출고되는 업체배송 상품이라 배송비 ${won(shippingFee)}가 추가 적용됩니다.`;
+      }
+
+      if (shippingFeeBreakdown.normalShippingFee > 0 && paidShippingGroups.vendor) {
+        return `기존 업체배송 주문과는 별도 출고되는 일반배송 상품이라 배송비 ${won(shippingFee)}가 적용됩니다.`;
+      }
+
+      if (shippingFeeBreakdown.vendorShippingFee > 0) {
+        return `업체배송 상품 배송비 ${won(shippingFee)}가 적용됩니다.`;
+      }
+
+      if (isRemoteAreaShippingAddress) {
+        return `제주/도서/산간 배송지 기준 배송비 ${won(shippingFee)}가 적용됩니다.`;
+      }
+
+      return `배송비 ${won(shippingFee)}가 적용됩니다.`;
+    }
+
+    if (isFreeShippingEvent) {
+      return "무료배송 이벤트가 적용되어 이번 주문서 배송비는 0원입니다.";
+    }
+
+    if (hasNormalShippingItemForNotice && hasVendorShippingItemForNotice && paidShippingGroups.normal && paidShippingGroups.vendor) {
+      return "기존 일반배송/업체배송 주문과 각각 합배송되어 이번 주문서 배송비는 0원입니다.";
+    }
+
+    if (hasVendorShippingItemForNotice && paidShippingGroups.vendor && !hasNormalShippingItemForNotice) {
+      return "기존 업체배송 주문과 합배송되어 이번 주문서 배송비는 0원입니다.";
+    }
+
+    if (hasNormalShippingItemForNotice && paidShippingGroups.normal && !hasVendorShippingItemForNotice) {
+      return "기존 일반배송 주문과 합배송되어 이번 주문서 배송비는 0원입니다.";
+    }
+
+    if (hasVendorShippingItemForNotice && paidShippingGroups.vendor) {
+      return "기존 업체배송 주문과 합배송되어 이번 주문서 배송비는 0원입니다.";
+    }
+
+    if (hasNormalShippingItemForNotice && paidShippingGroups.normal) {
+      return "기존 일반배송 주문과 합배송되어 이번 주문서 배송비는 0원입니다.";
+    }
+
+    return "합배송/무료배송 조건으로 이번 주문서 배송비는 0원입니다.";
+  })();
   const cardRateForCustomer = customerCardRate;
 
   const isAutoLoggedIn =
@@ -3042,15 +3103,15 @@ export default function OrderPage() {
               className="min-h-[100px] rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-blue-400"
             />
 
-            {alreadyPaidShipping && (
-              <div className="rounded-2xl bg-green-50 p-3 text-xs font-black leading-relaxed text-green-700">
-                ✅ 합배송 가능 주문으로 확인되어 이번 주문서 배송비는 0원입니다.
-              </div>
-            )}
-
-            {!alreadyPaidShipping && isRemoteAreaShippingAddress && (
-              <div className="rounded-2xl bg-amber-50 p-3 text-xs font-black leading-relaxed text-amber-800 ring-1 ring-amber-100">
-                🏝️ 제주/도서/산간 배송지로 확인되어 배송비 {won(baseShippingFee)}가 적용됩니다.
+            {shippingNoticeText && (
+              <div
+                className={`rounded-2xl p-3 text-xs font-black leading-relaxed ${
+                  shippingFee > 0
+                    ? "bg-amber-50 text-amber-800 ring-1 ring-amber-100"
+                    : "bg-green-50 text-green-700"
+                }`}
+              >
+                {shippingFee > 0 ? "🚚" : "✅"} {shippingNoticeText}
               </div>
             )}
 
