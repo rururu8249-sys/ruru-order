@@ -472,7 +472,7 @@ export default function LiveOrderTable({
           </button>
           <AdminLiveEventRoulettePanel
             buttonLabel="🎁 이벤트당첨자"
-            buttonClassName="inline-flex h-9 items-center justify-center rounded-xl bg-violet-600 px-3 text-xs font-black text-white shadow-sm transition hover:bg-violet-700"
+            buttonClassName="inline-flex rounded-xl font-black disabled:bg-slate-300 items-center justify-center whitespace-nowrap h-8 px-3 text-xs transition bg-violet-600 text-white hover:bg-violet-700"
           />
 
             {canceledExportExcludedCount > 0 ? (

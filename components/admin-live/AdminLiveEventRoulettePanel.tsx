@@ -162,7 +162,7 @@ async function copyText(value: string) {
 
 export default function AdminLiveEventRoulettePanel({
   buttonLabel = "🎁 이벤트 룰렛",
-  buttonClassName = "inline-flex h-10 items-center justify-center rounded-xl bg-violet-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-violet-700 disabled:opacity-50",
+  buttonClassName = "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-xl bg-violet-600 px-3 text-xs font-black text-white shadow-sm transition hover:bg-violet-700",
 }: AdminLiveEventRoulettePanelProps) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<RouletteMode>("test");
@@ -344,7 +344,7 @@ export default function AdminLiveEventRoulettePanel({
               </div>
 
               <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
-                테스트/미리보기는 실제 운영 기록과 구분됩니다. 포인트 자동지급은 하지 않으며, 지급은 고객상세 포인트 버튼에서 직접 처리합니다.
+                테스트는 실제 운영 기록과 구분됩니다. 포인트 자동지급은 하지 않으며, 지급은 고객상세 포인트 버튼에서 직접 처리합니다.
               </div>
             </div>
 
@@ -377,7 +377,6 @@ export default function AdminLiveEventRoulettePanel({
                         className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-900 outline-none focus:border-violet-400"
                       >
                         <option value="test">테스트</option>
-                        <option value="preview">미리보기</option>
                         <option value="live">실제 운영</option>
                       </select>
                     </label>

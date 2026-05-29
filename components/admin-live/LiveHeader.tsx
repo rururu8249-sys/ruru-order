@@ -84,7 +84,7 @@ export default function LiveHeader({
         <div className="ml-auto flex items-center gap-2">
           <AdminLiveEventRoulettePanel
             buttonLabel="🎁 이벤트 룰렛"
-            buttonClassName="inline-flex h-10 items-center justify-center rounded-xl bg-violet-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-violet-700"
+            buttonClassName="inline-flex shrink-0 rounded-xl font-black disabled:bg-slate-300 items-center justify-center whitespace-nowrap h-9 px-3 text-xs transition bg-violet-600 text-white hover:bg-violet-700"
           />
           <button
             type="button"
