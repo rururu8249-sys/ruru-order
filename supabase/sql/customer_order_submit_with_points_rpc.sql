@@ -206,7 +206,7 @@ begin
     select
       row_value->>'order_group_id',
       row_value->>'order_lookup_code',
-      nullif(row_value->>'broadcast_id', '')::bigint,
+      nullif(row_value->>'broadcast_id', '')::uuid,
       row_value->>'broadcast_name',
       row_value->>'broadcast_public_title',
       row_value->>'broadcast_admin_subtitle',
@@ -289,7 +289,7 @@ begin
       v_point_balance_after,
       '주문서 포인트 사용',
       '고객 주문서 포인트 사용 자동 차감',
-      null,
+      coalesce(v_order_ids[1]::text, null),
       null,
       true,
       null,
