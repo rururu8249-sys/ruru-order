@@ -1,15 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { randomUUID } from "crypto";
 import { createClient } from "@supabase/supabase-js";
 
-import {
-  assertValidCustomerPointPhone,
-  buildCustomerPointBalancePayload,
-  buildCustomerPointChange,
-  buildCustomerPointLedgerPayload,
-  readCurrentCustomerPoints,
-  type CustomerPointBalanceRow,
-} from "@/lib/customerPoints";
+import { assertValidCustomerPointPhone } from "@/lib/customerPoints";
 
 export const dynamic = "force-dynamic";
 
@@ -61,63 +53,15 @@ function toWon(value: unknown): number {
   return amount;
 }
 
-function readRowOriginalAmount(row: AnyRow): number {
-  return toWon(row.final_amount ?? row.adjusted_total_price ?? row.total_price ?? 0);
+function text(value: unknown): string {
+  return String(value ?? "").trim();
 }
 
-function clampPointUse(input: {
-  currentPoints: number;
-  requestedPoints: number;
-  payableAmount: number;
-}) {
-  const currentPoints = toWon(input.currentPoints);
-  const requestedPoints = toWon(input.requestedPoints);
-  const payableAmount = toWon(input.payableAmount);
-
-  if (currentPoints < 1000) return 0;
-  if (requestedPoints <= 0) return 0;
-  if (payableAmount <= 0) return 0;
-
-  return Math.min(currentPoints, requestedPoints, payableAmount);
-}
-
-function distributePointUse(orderRows: AnyRow[], pointUsedAmount: number) {
-  let remaining = toWon(pointUsedAmount);
-
-  return orderRows.map((row) => {
-    const pointOriginalAmount = readRowOriginalAmount(row);
-    const rowPointUsedAmount = Math.min(pointOriginalAmount, remaining);
-    remaining -= rowPointUsedAmount;
-
-    const finalAmount = Math.max(0, pointOriginalAmount - rowPointUsedAmount);
-
-    return {
-      ...row,
-      point_original_amount: pointOriginalAmount,
-      point_used_amount: rowPointUsedAmount,
-      final_amount: finalAmount,
-    };
-  });
-}
-
-async function fetchPointBalance(supabase: ReturnType<typeof getSupabaseOrderSubmitClient>, phone: string) {
-  const { data, error } = await supabase
-    .from("customer_point_balances")
-    .select("*")
-    .eq("customer_phone", phone)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message || "포인트 잔액 조회 실패");
-  }
-
-  return (data || null) as CustomerPointBalanceRow | null;
+function firstOrderValue(orderRows: AnyRow[], key: string): unknown {
+  return orderRows[0]?.[key];
 }
 
 export async function POST(request: NextRequest) {
-  let insertedOrderIds: string[] = [];
-  let ledgerIdForRollback = "";
-
   try {
     const body = (await request.json().catch(() => null)) as OrderSubmitPayload | null;
 
@@ -131,117 +75,47 @@ export async function POST(request: NextRequest) {
       return jsonError("주문 상품이 없습니다.");
     }
 
-    const phone = assertValidCustomerPointPhone(body.customer_phone || body.customerPhone || orderRows[0]?.customer_phone || orderRows[0]?.phone);
-    const youtubeNickname = body.youtube_nickname || body.youtubeNickname || orderRows[0]?.youtube_nickname || "";
-    const customerName = body.customer_name || body.customerName || orderRows[0]?.customer_name || "";
-    const requestedPointUse = toWon(body.point_use_amount ?? body.pointUseAmount ?? 0);
+    const phone = assertValidCustomerPointPhone(
+      body.customer_phone ||
+        body.customerPhone ||
+        firstOrderValue(orderRows, "customer_phone") ||
+        firstOrderValue(orderRows, "phone")
+    );
+
+    const pointUseAmount = toWon(body.point_use_amount ?? body.pointUseAmount ?? 0);
+    const youtubeNickname = text(
+      body.youtube_nickname ||
+        body.youtubeNickname ||
+        firstOrderValue(orderRows, "youtube_nickname")
+    );
+    const customerName = text(
+      body.customer_name ||
+        body.customerName ||
+        firstOrderValue(orderRows, "customer_name")
+    );
 
     const supabase = getSupabaseOrderSubmitClient();
 
-    const previousBalance = await fetchPointBalance(supabase, phone);
-    const currentPoints = readCurrentCustomerPoints(previousBalance);
-    const payableBeforePoints = orderRows.reduce((sum, row) => sum + readRowOriginalAmount(row), 0);
-    const pointUsedAmount = clampPointUse({
-      currentPoints,
-      requestedPoints: requestedPointUse,
-      payableAmount: payableBeforePoints,
+    const { data, error } = await supabase.rpc("submit_customer_order_with_points", {
+      p_order_rows: orderRows,
+      p_point_use_amount: pointUseAmount,
+      p_customer_phone: phone,
+      p_youtube_nickname: youtubeNickname,
+      p_customer_name: customerName,
     });
 
-    const rowsForInsert = distributePointUse(orderRows, pointUsedAmount).map((row) => ({
-      ...row,
-      customer_phone: phone,
-      phone: phone,
-      point_balance_before: pointUsedAmount > 0 ? currentPoints : null,
-      point_balance_after: pointUsedAmount > 0 ? currentPoints - pointUsedAmount : null,
-      point_used_at: pointUsedAmount > 0 ? new Date().toISOString() : null,
-    }));
-
-    const { data: insertedRows, error: insertError } = await supabase
-      .from("orders")
-      .insert(rowsForInsert)
-      .select("id, order_group_id, final_amount, point_used_amount");
-
-    if (insertError) {
-      throw new Error(insertError.message || "주문 저장 실패");
+    if (error) {
+      throw new Error(error.message || "주문 저장 실패");
     }
 
-    insertedOrderIds = Array.isArray(insertedRows)
-      ? insertedRows.map((row) => String(row.id || "")).filter(Boolean)
-      : [];
-
-    if (pointUsedAmount > 0) {
-      const change = buildCustomerPointChange({
-        action: "deduct",
-        amount: pointUsedAmount,
-        currentPoints,
+    if (!data || typeof data !== "object") {
+      return NextResponse.json({
+        ok: true,
+        result: data,
       });
-
-      ledgerIdForRollback = randomUUID();
-
-      const ledgerPayload = {
-        ...buildCustomerPointLedgerPayload({
-          id: ledgerIdForRollback,
-          phone,
-          youtubeNickname,
-          customerName,
-          change,
-          reason: "주문서 포인트 사용",
-          adminMemo: "고객 주문서 포인트 사용 자동 차감",
-          customerVisible: true,
-          createdBy: "customer-order",
-        }),
-        related_order_id: insertedOrderIds[0] || null,
-      };
-
-      const balancePayload = {
-        ...buildCustomerPointBalancePayload({
-          phone,
-          youtubeNickname,
-          customerName,
-          previousBalance,
-          change,
-          adminMemo: "고객 주문서 포인트 사용 자동 차감",
-        }),
-        total_used_points: Math.max(0, Number(previousBalance?.total_used_points ?? 0)) + pointUsedAmount,
-        last_used_at: new Date().toISOString(),
-      };
-
-      const { error: ledgerError } = await supabase.from("customer_point_ledger").insert(ledgerPayload);
-
-      if (ledgerError) {
-        throw new Error(ledgerError.message || "포인트 사용 이력 저장 실패");
-      }
-
-      const { error: balanceError } = await supabase
-        .from("customer_point_balances")
-        .upsert(balancePayload, { onConflict: "customer_phone" });
-
-      if (balanceError) {
-        await supabase.from("customer_point_ledger").delete().eq("id", ledgerIdForRollback);
-        throw new Error(balanceError.message || "포인트 잔액 저장 실패");
-      }
-
-      const { error: orderPointLinkError } = await supabase
-        .from("orders")
-        .update({ point_ledger_id: ledgerIdForRollback })
-        .in("id", insertedOrderIds);
-
-      if (orderPointLinkError) {
-        await supabase.from("customer_point_ledger").delete().eq("id", ledgerIdForRollback);
-        throw new Error(orderPointLinkError.message || "주문 포인트 이력 연결 실패");
-      }
     }
 
-    return NextResponse.json({
-      ok: true,
-      inserted_count: insertedOrderIds.length,
-      order_ids: insertedOrderIds,
-      point_original_amount: payableBeforePoints,
-      point_used_amount: pointUsedAmount,
-      point_balance_before: pointUsedAmount > 0 ? currentPoints : null,
-      point_balance_after: pointUsedAmount > 0 ? currentPoints - pointUsedAmount : null,
-      point_ledger_id: pointUsedAmount > 0 ? ledgerIdForRollback : null,
-    });
+    return NextResponse.json(data);
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "주문 저장 실패", 400);
   }
