@@ -958,23 +958,21 @@ export default function QuickProductFastForm({
                 <span className="text-[11px] font-black text-slate-700">색상</span>
                 <span className="text-[10px] font-bold text-slate-400">쉼표 여러 개</span>
               </div>
-              <div data-ruru-quick-none-toggle className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+
+              <div data-ruru-quick-none-toggle className="mb-2 flex items-center justify-end">
                 <button
                   type="button"
                   aria-pressed={noneOptionAutofillEnabled}
                   onClick={toggleNoneOptionAutofill}
                   className={[
-                    "w-full rounded-xl px-4 py-2.5 text-sm font-black transition active:scale-[0.98]",
+                    "rounded-full px-2.5 py-1 text-[10px] font-black transition active:scale-[0.96]",
                     noneOptionAutofillEnabled
                       ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-100"
-                      : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100",
+                      : "bg-slate-100 text-slate-500 hover:bg-slate-200",
                   ].join(" ")}
                 >
                   {noneOptionAutofillEnabled ? "없음입력 ON" : "없음입력 OFF"}
                 </button>
-                <p className="mt-1 text-[11px] font-bold text-slate-500">
-                  ON이면 고객 주문서에서 색상/사이즈가 없음으로 자동입력됩니다.
-                </p>
               </div>
 
               <input

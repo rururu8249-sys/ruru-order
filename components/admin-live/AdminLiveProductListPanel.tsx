@@ -1104,25 +1104,27 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                 className="mt-3 h-11 w-full rounded-2xl border border-dashed border-blue-300 bg-blue-50 text-sm font-black text-blue-700 hover:bg-blue-100"
               >
                 + 상품 추가
-              </button>              <div data-ruru-simple-fast-none-toggle className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3">
+              </button>
+
+              <div data-ruru-simple-fast-none-toggle className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                <div className="min-w-0">
+                  <div className="text-xs font-black text-slate-700">색상/사이즈 없음입력</div>
+                  <div className="mt-0.5 text-[11px] font-bold text-slate-400">ON이면 고객 주문서에 없음으로 자동입력</div>
+                </div>
                 <button
                   type="button"
                   aria-pressed={simpleFastNoneOptionEnabled}
                   onClick={() => setSimpleFastNoneOptionEnabled((current) => !current)}
                   className={[
-                    "rounded-full px-4 py-2 text-sm font-black transition active:scale-[0.98]",
+                    "shrink-0 rounded-full px-3.5 py-1.5 text-xs font-black transition active:scale-[0.98]",
                     simpleFastNoneOptionEnabled
                       ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-100"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200",
+                      : "bg-slate-100 text-slate-500 hover:bg-slate-200",
                   ].join(" ")}
                 >
-                  {simpleFastNoneOptionEnabled ? "없음입력 ON" : "없음입력 OFF"}
+                  {simpleFastNoneOptionEnabled ? "ON" : "OFF"}
                 </button>
-                <span className="text-xs font-bold text-slate-500">
-                  ON이면 빠른등록 상품 선택 시 색상/사이즈가 없음으로 자동입력됩니다.
-                </span>
               </div>
-
 
 
               <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-bold leading-5 text-slate-500">
