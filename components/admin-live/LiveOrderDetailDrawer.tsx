@@ -203,6 +203,30 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     productAmount + shippingFee + cardPaymentExtraAmount;
 
   const totalAmount = productAmount + shippingFee;
+  const pointOriginalAmount =
+    Number(
+      (orderForView as any).pointOriginalAmount ??
+        (orderForView as any).point_original_amount ??
+        rawOrderForCardDisplay.pointOriginalAmount ??
+        rawOrderForCardDisplay.point_original_amount ??
+        0
+    ) || totalAmount;
+  const pointUsedAmount =
+    Number(
+      (orderForView as any).pointUsedAmount ??
+        (orderForView as any).point_used_amount ??
+        rawOrderForCardDisplay.pointUsedAmount ??
+        rawOrderForCardDisplay.point_used_amount ??
+        0
+    ) || 0;
+  const finalPaymentAmount =
+    Number(
+      (orderForView as any).finalAmount ??
+        (orderForView as any).final_amount ??
+        rawOrderForCardDisplay.finalAmount ??
+        rawOrderForCardDisplay.final_amount ??
+        0
+    ) || (pointUsedAmount > 0 ? Math.max(0, pointOriginalAmount - pointUsedAmount) : totalAmount);
   const isCardOrder = String(orderForView.paymentMethod || "").includes("카드");
   const isCardPaid = orderForView.paymentStatus === "card_paid";
   const isCardUnpaid = orderForView.paymentStatus === "card_unpaid";
@@ -515,10 +539,17 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           {isCardPaymentDisplay && cardPaymentExtraAmount > 0 ? (
             <PriceRow label="카드추가금" value={cardPaymentExtraAmount} />
           ) : null}
+          {pointUsedAmount > 0 ? (
+            <PriceRow label="포인트 사용" value={-pointUsedAmount} />
+          ) : null}
           <div className="my-2 h-px bg-slate-100" />
           <div className="flex items-center justify-between">
-            <span className="text-[13px] font-black text-slate-600">총 결제예정금액</span>
-            <span className="text-2xl font-black tracking-[-0.05em] text-orange-600">{money(cardPaymentExpectedTotal)}</span>
+            <span className="text-[13px] font-black text-slate-600">
+              {pointUsedAmount > 0 ? "최종 결제금액" : "총 결제예정금액"}
+            </span>
+            <span className="text-2xl font-black tracking-[-0.05em] text-orange-600">
+              {money(pointUsedAmount > 0 ? finalPaymentAmount : cardPaymentExpectedTotal)}
+            </span>
           </div>
         </section>
 

@@ -243,6 +243,41 @@ function buildItem(row: OrderRow): LiveOrderItem {
   };
 }
 
+
+function getGroupPointOriginalAmount(group: OrderGroup) {
+  const rows = Array.isArray(group?.rows) ? group.rows : [];
+
+  return rows.reduce((sum: number, row: any) => {
+    return sum + safeNumber(row.point_original_amount ?? row.pointOriginalAmount ?? 0);
+  }, 0);
+}
+
+function getGroupPointUsedAmount(group: OrderGroup) {
+  const rows = Array.isArray(group?.rows) ? group.rows : [];
+
+  return rows.reduce((sum: number, row: any) => {
+    return sum + safeNumber(row.point_used_amount ?? row.pointUsedAmount ?? 0);
+  }, 0);
+}
+
+function getGroupFinalAmount(group: OrderGroup) {
+  const rows = Array.isArray(group?.rows) ? group.rows : [];
+  const summedFinalAmount = rows.reduce((sum: number, row: any) => {
+    return sum + safeNumber(row.final_amount ?? row.finalAmount ?? 0);
+  }, 0);
+
+  if (summedFinalAmount > 0) return summedFinalAmount;
+
+  const pointOriginalAmount = getGroupPointOriginalAmount(group);
+  const pointUsedAmount = getGroupPointUsedAmount(group);
+
+  if (pointUsedAmount > 0) {
+    return Math.max(0, pointOriginalAmount - pointUsedAmount);
+  }
+
+  return 0;
+}
+
 function getMemo(group: OrderGroup) {
   const first = group.first;
   return (
@@ -284,6 +319,9 @@ export function toAdminLiveOrder(group: OrderGroup): LiveOrder {
     productAmount: getGroupProductAmount(group),
     shippingFee: getGroupShippingFee(group),
     totalAmount: getGroupDisplayTotalAmount(group),
+    pointOriginalAmount: getGroupPointOriginalAmount(group),
+    pointUsedAmount: getGroupPointUsedAmount(group),
+    finalAmount: getGroupFinalAmount(group),
     cardExtraAmount: getGroupCardExtraAmount(group),
     cardPaymentTotalAmount: getGroupCardPaymentTotalAmount(group),
     memo: getMemo(group),

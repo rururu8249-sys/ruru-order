@@ -651,6 +651,17 @@ export default function LiveOrderTable({
                     </td>
                     <td className="px-3 py-3 text-right font-black text-slate-700">
                       <div>{money(order.productAmount)}</div>
+                      {Number(order.pointUsedAmount || 0) > 0 ? (
+                        <div className="mt-1 space-y-0.5 text-[11px] font-black leading-tight">
+                          <div className="text-emerald-700">포인트 -{money(Number(order.pointUsedAmount || 0))}</div>
+                          <div className="text-orange-700">
+                            최종 {money(
+                              Number(order.finalAmount || 0) ||
+                                Math.max(0, Number(order.pointOriginalAmount || order.totalAmount || order.productAmount || 0) - Number(order.pointUsedAmount || 0))
+                            )}
+                          </div>
+                        </div>
+                      ) : null}
                       {String((order as any).paymentMethod || "").includes("카드") && Number((order as any).cardPaymentTotalAmount || 0) > 0 ? (
                         <div className="mt-1 text-[11px] font-black text-purple-700">
                           카드총액 {money(Number((order as any).cardPaymentTotalAmount || 0))}
