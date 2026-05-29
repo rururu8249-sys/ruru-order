@@ -2,6 +2,8 @@
 // 목적: 뱅크다 입금내역과 미입금 주문을 보수적으로 자동매칭
 // 조건: 입금자명=유튜브닉네임 완전일치 + 금액 완전일치 + 1:1 단일 후보만 처리
 
+import { filterPaymentMatchEligibleOrders } from "@/lib/admin-v2/paymentMatchTestOrderGuard";
+
 type AnyRow = Record<string, any>;
 
 const PAID_STATUSES = ["입금확인", "출고대기", "출고완료", "킵", "픽업예정"];
@@ -112,7 +114,8 @@ export async function runAutoPaymentMatch(supabase: any) {
     throw new Error(depositError.message);
   }
 
-  const orderGroups = groupOrders((rawOrders || []).filter(isUnpaidBankOrder))
+  const paymentMatchOrders: AnyRow[] = filterPaymentMatchEligibleOrders((rawOrders || []) as AnyRow[]);
+  const orderGroups = groupOrders(paymentMatchOrders.filter(isUnpaidBankOrder))
     .filter((group) => group.nickname && group.amount > 0);
 
   const deposits = (rawDeposits || [])

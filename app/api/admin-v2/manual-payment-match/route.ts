@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { isPaymentMatchExcludedOrder } from "@/lib/admin-v2/paymentMatchTestOrderGuard";
 
 function getSupabaseAdmin() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -145,6 +146,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { ok: false, message: "매칭할 주문을 찾을 수 없습니다." },
         { status: 404 }
+      );
+    }
+
+    const blockedTestOrderIds = orders
+      .filter(isPaymentMatchExcludedOrder)
+      .map((order) => order.id)
+      .filter(Boolean);
+
+    if (blockedTestOrderIds.length > 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "테스트 주문은 입금확인 처리 대상에서 제외됩니다.",
+          blocked: { testOrders: blockedTestOrderIds },
+        },
+        { status: 409 }
       );
     }
 

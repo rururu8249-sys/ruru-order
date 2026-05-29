@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { filterPaymentMatchEligibleOrders } from "@/lib/admin-v2/paymentMatchTestOrderGuard";
 
 export const dynamic = "force-dynamic";
 
@@ -232,7 +233,8 @@ export async function POST() {
       );
     }
 
-    const orders = ordersResult.data || [];
+    const rawOrdersForPaymentMatch = ordersResult.data || [];
+    const orders = filterPaymentMatchEligibleOrders(rawOrdersForPaymentMatch);
     const deposits = depositsResult.data || [];
 
     const eligibleOrders = orders.filter((order) => {
