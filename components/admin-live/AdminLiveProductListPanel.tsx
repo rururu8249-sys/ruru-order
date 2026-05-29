@@ -445,6 +445,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
     { productName: "", priceText: "", isVisible: true },
   ]);
   const [simpleFastSaving, setSimpleFastSaving] = useState(false);
+  const [simpleFastNoneOptionEnabled, setSimpleFastNoneOptionEnabled] = useState(false);
   const [detailSearchText, setDetailSearchText] = useState("");
   const [detailStatusFilter, setDetailStatusFilter] = useState<"all" | "visible" | "hidden" | "soldout">("all");
   const [detailPageSize, setDetailPageSize] = useState<number>(20);
@@ -590,9 +591,9 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
           is_visible: row.isVisible,
           is_soldout: false,
           is_pinned: false,
-          color_options: [],
-          size_options: [],
-          size_option_enabled: false,
+          color_options: simpleFastNoneOptionEnabled ? ["없음"] : [],
+          size_options: simpleFastNoneOptionEnabled ? ["없음"] : [],
+          size_option_enabled: simpleFastNoneOptionEnabled,
           product_description: "",
           detail_image_urls: [],
           product_note: productNote,
@@ -1103,7 +1104,26 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                 className="mt-3 h-11 w-full rounded-2xl border border-dashed border-blue-300 bg-blue-50 text-sm font-black text-blue-700 hover:bg-blue-100"
               >
                 + 상품 추가
-              </button>
+              </button>              <div data-ruru-simple-fast-none-toggle className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3">
+                <button
+                  type="button"
+                  aria-pressed={simpleFastNoneOptionEnabled}
+                  onClick={() => setSimpleFastNoneOptionEnabled((current) => !current)}
+                  className={[
+                    "rounded-full px-4 py-2 text-sm font-black transition active:scale-[0.98]",
+                    simpleFastNoneOptionEnabled
+                      ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-100"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200",
+                  ].join(" ")}
+                >
+                  {simpleFastNoneOptionEnabled ? "없음입력 ON" : "없음입력 OFF"}
+                </button>
+                <span className="text-xs font-bold text-slate-500">
+                  ON이면 빠른등록 상품 선택 시 색상/사이즈가 없음으로 자동입력됩니다.
+                </span>
+              </div>
+
+
 
               <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-bold leading-5 text-slate-500">
                 기본값: 방송상품 · 일반배송 · 검색 · 금액 미입력 시 고객 직접입력

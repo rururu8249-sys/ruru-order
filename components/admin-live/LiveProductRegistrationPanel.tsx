@@ -127,6 +127,23 @@ export default function LiveProductRegistrationPanel({
     [sizeOptionDisabled, sizes],
   );
 
+  const noneOptionAutofillEnabled =
+    colors.trim() === "없음" && !sizeOptionDisabled && sizes.trim() === "없음";
+
+  const toggleNoneOptionAutofill = () => {
+    if (noneOptionAutofillEnabled) {
+      setColors("");
+      setSizes("");
+      setSizeOptionDisabled(false);
+      return;
+    }
+
+    setColors("없음");
+    setSizes("없음");
+    setSizeOptionDisabled(false);
+  };
+
+
   const loadRecentProducts = useCallback(async () => {
     setLoadingProducts(true);
 
@@ -455,6 +472,25 @@ export default function LiveProductRegistrationPanel({
                 />
               </div>
 
+              <div data-ruru-live-none-toggle className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <button
+                  type="button"
+                  aria-pressed={noneOptionAutofillEnabled}
+                  onClick={toggleNoneOptionAutofill}
+                  className={[
+                    "rounded-full px-4 py-2 text-sm font-black transition active:scale-[0.98]",
+                    noneOptionAutofillEnabled
+                      ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-100"
+                      : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100",
+                  ].join(" ")}
+                >
+                  {noneOptionAutofillEnabled ? "없음입력 ON" : "없음입력 OFF"}
+                </button>
+                <span className="text-xs font-bold text-slate-500">
+                  ON이면 고객 주문서에서 색상/사이즈가 없음으로 자동입력됩니다.
+                </span>
+              </div>
+
               <div className="mt-4 grid gap-3 lg:grid-cols-2">
                 <label className="block">
                   <span className="mb-1 block text-[12px] font-black text-slate-600">
@@ -467,20 +503,6 @@ export default function LiveProductRegistrationPanel({
                     placeholder="블랙, 레드, 화이트"
                   />
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setColors("없음")}
-                      className="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-black text-white"
-                    >
-                      색상 없음 자동입력 ON
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setColors("")}
-                      className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600"
-                    >
-                      색상 없음 OFF
-                    </button>
                     {parsedColors.length ? (
                       parsedColors.map((color) => (
                         <span
@@ -530,26 +552,6 @@ export default function LiveProductRegistrationPanel({
                       className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600"
                     >
                       FREE
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSizeOptionDisabled(false);
-                        setSizes("없음");
-                      }}
-                      className="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-black text-white"
-                    >
-                      사이즈 없음 자동입력 ON
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSizeOptionDisabled(false);
-                        setSizes("");
-                      }}
-                      className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600"
-                    >
-                      사이즈 없음 OFF
                     </button>
                   </div>
 

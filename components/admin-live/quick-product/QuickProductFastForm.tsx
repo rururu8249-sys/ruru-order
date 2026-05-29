@@ -608,6 +608,20 @@ export default function QuickProductFastForm({
   const colors = useMemo(() => unique(splitOptions(colorText)), [colorText]);
   const sizes = useMemo(() => unique(splitOptions(sizeText)), [sizeText]);
 
+  const noneOptionAutofillEnabled = colorText.trim() === "없음" && sizeText.trim() === "없음";
+
+  const toggleNoneOptionAutofill = () => {
+    if (noneOptionAutofillEnabled) {
+      setColorText("");
+      setSizeText("");
+      return;
+    }
+
+    setColorText("없음");
+    setSizeText("없음");
+  };
+
+
   const resolvedVariantRows = useMemo(() => {
     if (stockMode !== "option") return [];
     return buildVariantRows(colors, sizes, variantRows);
@@ -944,6 +958,25 @@ export default function QuickProductFastForm({
                 <span className="text-[11px] font-black text-slate-700">색상</span>
                 <span className="text-[10px] font-bold text-slate-400">쉼표 여러 개</span>
               </div>
+              <div data-ruru-quick-none-toggle className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <button
+                  type="button"
+                  aria-pressed={noneOptionAutofillEnabled}
+                  onClick={toggleNoneOptionAutofill}
+                  className={[
+                    "w-full rounded-xl px-4 py-2.5 text-sm font-black transition active:scale-[0.98]",
+                    noneOptionAutofillEnabled
+                      ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-100"
+                      : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100",
+                  ].join(" ")}
+                >
+                  {noneOptionAutofillEnabled ? "없음입력 ON" : "없음입력 OFF"}
+                </button>
+                <p className="mt-1 text-[11px] font-bold text-slate-500">
+                  ON이면 고객 주문서에서 색상/사이즈가 없음으로 자동입력됩니다.
+                </p>
+              </div>
+
               <input
                 value={colorText}
                 onChange={(event) => setColorText(event.target.value)}
@@ -951,26 +984,17 @@ export default function QuickProductFastForm({
                 className="h-9 w-full rounded-xl border border-slate-200 px-3 text-xs font-bold outline-none focus:border-blue-400"
               />
               <div className="mt-2 flex flex-wrap gap-1">
-                <button
-                  type="button"
-                  onClick={() => setColorText("없음")}
-                  className="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-black text-white"
-                >
-                  색상 없음 자동입력 ON
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setColorText("")}
-                  className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600"
-                >
-                  색상 없음 OFF
-                </button>
                 {COLOR_PRESETS.map((preset) => (
                   <button
                     key={preset}
                     type="button"
                     onClick={() => applyColorPreset(preset)}
-                    className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-600 hover:bg-slate-200"
+                    className={[
+                      "rounded-full px-2.5 py-1 text-[11px] font-black transition active:scale-[0.96]",
+                      splitOptions(colorText).includes(preset)
+                        ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-100"
+                        : "bg-slate-100 text-slate-500 hover:bg-slate-200",
+                    ].join(" ")}
                   >
                     {preset}
                   </button>
@@ -990,26 +1014,17 @@ export default function QuickProductFastForm({
                 className="h-9 w-full rounded-xl border border-slate-200 px-3 text-xs font-bold outline-none focus:border-blue-400"
               />
               <div className="mt-2 flex flex-wrap gap-1">
-                <button
-                  type="button"
-                  onClick={() => setSizeText("없음")}
-                  className="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-black text-white"
-                >
-                  사이즈 없음 자동입력 ON
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSizeText("")}
-                  className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600"
-                >
-                  사이즈 없음 OFF
-                </button>
                 {SIZE_PRESETS.map((preset) => (
                   <button
                     key={preset}
                     type="button"
                     onClick={() => applySizePreset(preset)}
-                    className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-600 hover:bg-slate-200"
+                    className={[
+                      "rounded-full px-2.5 py-1 text-[11px] font-black transition active:scale-[0.96]",
+                      normalizePresetOptions(preset).some((option) => splitOptions(sizeText).includes(option))
+                        ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-100"
+                        : "bg-slate-100 text-slate-500 hover:bg-slate-200",
+                    ].join(" ")}
                   >
                     {preset}
                   </button>
