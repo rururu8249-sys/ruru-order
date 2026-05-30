@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type OverlayParticipant = {
   nickname: string;
@@ -103,6 +103,10 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
   const [revealedResultKey, setRevealedResultKey] = useState("");
   const [wheelRotation, setWheelRotation] = useState(0);
   const [isWheelDecelerating, setIsWheelDecelerating] = useState(false);
+  const activeSpinResultKeyRef = useRef("");
+  const visibleParticipantsRef = useRef<OverlayParticipant[]>([]);
+  const winnerNicknameRef = useRef("");
+  const spinTimersRef = useRef<number[]>([]);
 
   useEffect(() => {
     const html = document.documentElement;
@@ -178,7 +182,17 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
   const statusMessage = isRouletteSpinning ? "🔥 룰렛 추첨 중..." : message;
 
   useEffect(() => {
+    visibleParticipantsRef.current = visibleParticipants;
+    winnerNicknameRef.current = event?.winner_nickname || "";
+  }, [visibleParticipants, event?.winner_nickname]);
+
+  useEffect(() => {
+    spinTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    spinTimersRef.current = [];
+
     if (!resultKey) {
+      activeSpinResultKeyRef.current = "";
+
       if (revealedResultKey) {
         setRevealedResultKey("");
       }
@@ -187,26 +201,38 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
       return;
     }
 
-    if (revealedResultKey === resultKey) {
+    if (revealedResultKey === resultKey || activeSpinResultKeyRef.current === resultKey) {
       return;
     }
 
-    setIsWheelDecelerating(true);
-    setWheelRotation((currentRotation) =>
-      getWinnerStopRotation({
-        currentRotation,
-        participants: visibleParticipants,
-        winnerNickname: event?.winner_nickname || "",
-      }),
-    );
+    activeSpinResultKeyRef.current = resultKey;
+    setIsWheelDecelerating(false);
+
+    const startTimer = window.setTimeout(() => {
+      setIsWheelDecelerating(true);
+      setWheelRotation((currentRotation) =>
+        getWinnerStopRotation({
+          currentRotation,
+          participants: visibleParticipantsRef.current,
+          winnerNickname: winnerNicknameRef.current,
+        }),
+      );
+    }, 50);
 
     const revealTimer = window.setTimeout(() => {
       setRevealedResultKey(resultKey);
       setIsWheelDecelerating(false);
+      activeSpinResultKeyRef.current = "";
+      spinTimersRef.current = [];
     }, MIN_SPIN_DISPLAY_MS + RESULT_REVEAL_PAUSE_MS);
 
-    return () => window.clearTimeout(revealTimer);
-  }, [resultKey, revealedResultKey, event?.winner_nickname, visibleParticipants]);
+    spinTimersRef.current = [startTimer, revealTimer];
+
+    return () => {
+      spinTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+      spinTimersRef.current = [];
+    };
+  }, [resultKey]);
 
   if (!token) {
     return (
