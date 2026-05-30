@@ -724,7 +724,7 @@ export default function AdminLiveEventRoulettePanel({
                         </button>
                       </div>
                     ) : (
-                      <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm font-bold text-slate-400">
+                      <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-7 text-center text-sm font-bold text-slate-400">
                         아직 만든 룰렛이 없습니다.
                       </div>
                     )}
@@ -734,7 +734,7 @@ export default function AdminLiveEventRoulettePanel({
                     <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 px-5 py-4">
                       <div className="min-w-0">
                         <div className="text-lg font-black text-slate-950">당첨자 리스트</div>
-                        <div className="mt-1 truncate text-xs font-bold text-slate-400">잘못 만든 룰렛은 기록째 삭제됩니다. 운영 전체삭제는 없습니다.</div>
+                        <div className="mt-1 truncate text-xs font-bold text-slate-400">잘못 만든 룰렛만 개별 삭제됩니다. 운영 전체삭제는 없습니다.</div>
                       </div>
                       <button
                         type="button"
@@ -747,8 +747,8 @@ export default function AdminLiveEventRoulettePanel({
 
                     <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3">
                       {winners.length === 0 ? (
-                        <div className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm font-bold text-slate-400">
-                          당첨 기록이 없습니다.
+                        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-7 text-center text-sm font-bold text-slate-400">
+                          아직 당첨 기록이 없습니다.
                         </div>
                       ) : (
                         winners.slice(0, 80).map((winner) => (
@@ -794,13 +794,13 @@ export default function AdminLiveEventRoulettePanel({
                     </div>
 
                     <details className="shrink-0 border-t border-slate-100 bg-slate-50 px-4 py-3">
-                      <summary className="cursor-pointer select-none text-sm font-black text-slate-700 transition active:scale-[0.99]">
+                      <summary className="cursor-pointer select-none rounded-xl px-1 py-1 text-sm font-black text-slate-700 transition active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200">
                         최근 이벤트 · 최근 {Math.min(events.length, 20)}개
                       </summary>
 
                       <div className="mt-3 max-h-[150px] space-y-2 overflow-y-auto pr-1">
                         {events.length === 0 ? (
-                          <div className="rounded-2xl bg-white px-4 py-5 text-center text-sm font-bold text-slate-400">최근 이벤트 없음</div>
+                          <div className="rounded-2xl bg-slate-50 px-4 py-4 text-center text-sm font-bold text-slate-400">최근 이벤트 없음</div>
                         ) : (
                           events.slice(0, 20).map((event) => (
                             <div
