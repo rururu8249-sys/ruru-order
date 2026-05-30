@@ -31,9 +31,9 @@ function normalizeToken(value: string) {
 }
 
 const ROULETTE_COLORS = ["#fbcfe8", "#ddd6fe", "#bfdbfe", "#a7f3d0", "#fde68a", "#fed7aa", "#c7d2fe", "#bae6fd", "#bbf7d0", "#f5d0fe"];
-const MIN_SPIN_DISPLAY_MS = 6500;
-const RESULT_REVEAL_PAUSE_MS = 800;
-const WINNER_STOP_SPINS = 7;
+const MIN_SPIN_DISPLAY_MS = 10000;
+const RESULT_REVEAL_PAUSE_MS = 1200;
+const WINNER_STOP_SPINS = 14;
 
 function normalizeRouletteName(value: string | null | undefined) {
   return String(value || "").replace(/\s+/g, "").trim();
