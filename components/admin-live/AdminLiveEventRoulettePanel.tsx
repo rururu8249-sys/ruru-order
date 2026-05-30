@@ -471,15 +471,13 @@ export default function AdminLiveEventRoulettePanel({
       {open ? (
         <div
           className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/55 px-4 py-4 backdrop-blur-sm"
-          data-ruru-roulette-ui-shell="pixel-match-target"
+          data-ruru-roulette-ui-shell="pixel-match-target-v2-full"
         >
-          <div className="flex h-[min(92vh,900px)] w-[min(90vw,1220px)] flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
-            <div className="shrink-0 border-b border-slate-200 bg-white px-6 py-5">
+          <div className="flex h-[min(94vh,940px)] w-[min(92vw,1280px)] min-w-[1120px] flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
+            <div className="shrink-0 border-b border-slate-200 bg-white px-6 py-4">
               <div className="flex items-start justify-between gap-5">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-3">
-                    <div className="text-[28px] font-black leading-none tracking-tight text-slate-950">🎁 이벤트 룰렛</div>
-                  </div>
+                  <div className="text-[28px] font-black leading-none tracking-tight text-slate-950">🎁 이벤트 룰렛</div>
                   <div className="mt-2 text-sm font-bold text-slate-500">
                     방송 중 실시간으로 참여자를 추첨하는 룰렛 이벤트를 관리하세요.
                   </div>
@@ -527,9 +525,9 @@ export default function AdminLiveEventRoulettePanel({
                 </div>
               </div>
 
-              <div className="mt-5 grid gap-4 xl:grid-cols-[1fr_560px]">
+              <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_560px]">
                 <div
-                  className={`flex min-h-[54px] items-center rounded-2xl border px-4 py-3 text-sm font-black ${
+                  className={`flex min-h-[52px] items-center rounded-2xl border px-4 py-3 text-sm font-black ${
                     mode === "live"
                       ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                       : "border-amber-200 bg-amber-50 text-amber-800"
@@ -540,14 +538,12 @@ export default function AdminLiveEventRoulettePanel({
                     : "⚠ 현재 테스트 모드입니다. 실제 운영 기록과 구분되며, 테스트 기록은 정리할 수 있습니다."}
                 </div>
 
-                <div className="flex min-h-[54px] items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3">
+                <div className="flex min-h-[52px] items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3">
                   <div className="shrink-0 text-sm font-black text-slate-950">방송용 위젯주소</div>
                   <div className="min-w-0 flex-1 truncate rounded-xl bg-white px-3 py-2 text-sm font-bold text-slate-600 ring-1 ring-slate-100">
                     {overlayUrl || "고정 방송용 위젯주소를 준비중입니다."}
                   </div>
-                  <div className="shrink-0 text-base font-black text-slate-400" aria-hidden="true">
-                    🔗
-                  </div>
+                  <div className="shrink-0 text-base font-black text-slate-400" aria-hidden="true">🔗</div>
                   <button
                     type="button"
                     onClick={() => copyText(overlayUrl)}
@@ -562,7 +558,7 @@ export default function AdminLiveEventRoulettePanel({
 
             <div className="min-h-0 flex-1 overflow-hidden bg-slate-50 px-6 py-5">
               <div className="grid h-full min-h-0 gap-5 xl:grid-cols-[1.18fr_0.82fr]">
-                <div className="grid min-h-0 grid-rows-[280px_minmax(0,1fr)] gap-5">
+                <div className="grid min-h-0 grid-rows-[330px_minmax(0,1fr)] gap-5">
                   <section className="overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-sm">
                     <div className="grid h-full grid-cols-[minmax(0,1fr)_160px]">
                       <div className="min-w-0 p-5">
@@ -717,7 +713,7 @@ export default function AdminLiveEventRoulettePanel({
                   </section>
                 </div>
 
-                <aside className="grid min-h-0 grid-rows-[180px_minmax(0,1fr)_170px] gap-5">
+                <aside className="grid min-h-0 grid-rows-[170px_minmax(0,1fr)_145px] gap-5">
                   <section className="overflow-hidden rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-xl font-black text-slate-950">현재 룰렛</div>
