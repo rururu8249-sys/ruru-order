@@ -1294,13 +1294,14 @@ export default function AdminLiveDashboard() {
                         year: "numeric",
                         month: "2-digit",
                         day: "2-digit",
+                        weekday: "short",
                         hour: "2-digit",
                         minute: "2-digit",
                         hour12: false,
                       }).formatToParts(parsed);
 
                       const getPart = (type: string) => parts.find((part) => part.type === type)?.value || "";
-                      return `${getPart("year")}.${getPart("month")}.${getPart("day")} ${getPart("hour")}:${getPart("minute")}`;
+                      return `${getPart("year")}.${getPart("month")}.${getPart("day")}(${getPart("weekday")}) ${getPart("hour")}:${getPart("minute")}`;
                     }
 
                     const cleaned = raw
