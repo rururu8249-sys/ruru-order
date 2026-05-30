@@ -32,25 +32,6 @@ function normalizeToken(value: string) {
 
 const ROULETTE_COLORS = ["#fbcfe8", "#ddd6fe", "#bfdbfe", "#a7f3d0", "#fde68a", "#fed7aa", "#c7d2fe", "#bae6fd", "#bbf7d0", "#f5d0fe"];
 const MIN_SPIN_DISPLAY_MS = 6500;
-const RESULT_REVEAL_GRACE_MS = 500;
-
-function parseDateMs(value: string | null | undefined) {
-  if (!value) return 0;
-
-  const parsed = new Date(value).getTime();
-
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function safeSpinDurationMs(value: number | null | undefined) {
-  const numberValue = Number(value || 0);
-
-  if (!Number.isFinite(numberValue) || numberValue <= 0) {
-    return MIN_SPIN_DISPLAY_MS;
-  }
-
-  return Math.min(9000, Math.max(MIN_SPIN_DISPLAY_MS, numberValue));
-}
 
 function segmentGradient(participants: OverlayParticipant[]) {
   const list = participants.length > 0 ? participants.slice(0, 48) : [{ nickname: "READY" }];
@@ -88,9 +69,7 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
   const [event, setEvent] = useState<OverlayEvent | null>(null);
   const [message, setMessage] = useState("룰렛 준비중");
   const [loadedAt, setLoadedAt] = useState(0);
-  const [nowMs, setNowMs] = useState(() => Date.now());
-  const [lastResultKey, setLastResultKey] = useState("");
-  const [resultFirstSeenAtMs, setResultFirstSeenAtMs] = useState(0);
+  const [revealedResultKey, setRevealedResultKey] = useState("");
 
   useEffect(() => {
     const html = document.documentElement;
@@ -107,14 +86,6 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
       body.style.margin = "";
       body.style.overflow = "";
     };
-  }, []);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setNowMs(Date.now());
-    }, 250);
-
-    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -163,30 +134,32 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
   const gradient = useMemo(() => segmentGradient(visibleParticipants), [visibleParticipants]);
   const resultKey =
     event?.status === "result" && event.winner_nickname
-      ? `${event.result_at || ""}|${event.winner_nickname}|${event.winner_note || ""}`
+      ? `${event.updated_at || ""}|${event.result_at || ""}|${event.winner_nickname}|${event.winner_note || ""}`
       : "";
-  const shouldHoldResult =
-    Boolean(resultKey) &&
-    (resultKey !== lastResultKey || resultFirstSeenAtMs <= 0 || nowMs < resultFirstSeenAtMs + MIN_SPIN_DISPLAY_MS);
-  const isRouletteSpinning = event?.status === "spinning" || shouldHoldResult;
-  const hasResult = event?.status === "result" && Boolean(event.winner_nickname) && !shouldHoldResult;
+  const isPendingResult = Boolean(resultKey) && revealedResultKey !== resultKey;
+  const isRouletteSpinning = event?.status === "spinning" || isPendingResult;
+  const hasResult = event?.status === "result" && Boolean(event.winner_nickname) && revealedResultKey === resultKey;
   const rotation = loadedAt % 360;
   const statusMessage = isRouletteSpinning ? "룰렛이 돌아가는 중..." : message;
 
   useEffect(() => {
     if (!resultKey) {
-      if (lastResultKey) {
-        setLastResultKey("");
-        setResultFirstSeenAtMs(0);
+      if (revealedResultKey) {
+        setRevealedResultKey("");
       }
       return;
     }
 
-    if (resultKey !== lastResultKey) {
-      setLastResultKey(resultKey);
-      setResultFirstSeenAtMs(Date.now());
+    if (revealedResultKey === resultKey) {
+      return;
     }
-  }, [resultKey, lastResultKey]);
+
+    const timer = window.setTimeout(() => {
+      setRevealedResultKey(resultKey);
+    }, MIN_SPIN_DISPLAY_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [resultKey, revealedResultKey]);
 
   if (!token) {
     return (
