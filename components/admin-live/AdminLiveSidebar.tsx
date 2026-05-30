@@ -47,12 +47,6 @@ return (
         })}
       </nav>
 
-      <div className="mt-auto space-y-3">
-        <LiveOpsStatusBox />
-
-        <AdminLiveCustomerIssueSummaryCard onOpenCustomers={() => onMenuChange("customers")} />
-      </div>
-          <AdminLiveLogoutButton />
       {activeMenu === "broadcast" ? (
         <div
           className="mb-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm"
@@ -102,6 +96,13 @@ return (
           </div>
         </div>
       ) : null}
+
+      <div className="mt-4 space-y-3">
+        <LiveOpsStatusBox />
+
+        <AdminLiveCustomerIssueSummaryCard onOpenCustomers={() => onMenuChange("customers")} />
+      </div>
+          <AdminLiveLogoutButton />
 
     </aside>
   );
