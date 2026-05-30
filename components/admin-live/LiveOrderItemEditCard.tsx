@@ -137,15 +137,11 @@ function inventoryItemStatusInfo(item: LiveOrderItem) {
 
 function isInventoryLockedItem(item: LiveOrderItem) {
   const restoreStatus = clean(item.inventoryRestoreStatus).toLowerCase();
-  const deductionStatus = clean(item.inventoryDeductionStatus).toLowerCase();
 
   return (
     restoreStatus === "restored_total" ||
     restoreStatus === "restored_option" ||
-    Boolean(item.inventoryRestoredAt) ||
-    deductionStatus === "deducted_total" ||
-    deductionStatus === "deducted_option" ||
-    Boolean(item.inventoryDeductedAt)
+    Boolean(item.inventoryRestoredAt)
   );
 }
 
@@ -362,7 +358,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
             type="button"
             onClick={() => setEditing(true)}
             disabled={disabled || inventoryLocked}
-            title={inventoryLocked ? "재고가 이미 연동된 주문은 재고 꼬임 방지를 위해 상품수정을 잠시 막아둡니다." : undefined}
+            title={inventoryLocked ? "재고복구완료 주문은 상품수정할 수 없습니다." : undefined}
             className="mt-2 rounded-xl bg-slate-950 px-2.5 py-1.5 text-[11px] font-black text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
           >
             {inventoryLocked ? "수정잠금" : "수정"}

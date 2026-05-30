@@ -68,6 +68,32 @@ function valuesChanged(a: unknown, b: unknown) {
   return clean(a) !== clean(b);
 }
 
+function inventoryStatusText(value: unknown) {
+  return clean(value).toLowerCase();
+}
+
+function isInventoryRestoredItem(item: LiveOrderItem) {
+  const restoreStatus = inventoryStatusText(item.inventoryRestoreStatus);
+
+  return (
+    restoreStatus === "restored_total" ||
+    restoreStatus === "restored_option" ||
+    Boolean(item.inventoryRestoredAt)
+  );
+}
+
+function isInventoryLinkedEditableItem(item: LiveOrderItem) {
+  if (isInventoryRestoredItem(item)) return false;
+
+  const deductionStatus = inventoryStatusText(item.inventoryDeductionStatus);
+
+  return (
+    deductionStatus === "deducted_total" ||
+    deductionStatus === "deducted_option" ||
+    Boolean(item.inventoryDeductedAt)
+  );
+}
+
 export function createInitialLiveOrderItemEditForm(item: LiveOrderItem): LiveOrderItemEditForm {
   return {
     productName: clean(item.productName === "상품명 없음" ? "" : item.productName),
@@ -110,19 +136,79 @@ export function useLiveOrderItemEdit(onAfterSave?: (result: LiveOrderItemEditSav
       return false;
     }
 
-    const confirmMessage = [
-      "상품/옵션/수량/금액을 수정할까요?",
-      "",
-      "변경 전 값은 item_change_history에 누적됩니다.",
-      "상품금액과 총 결제예정금액은 수정값 기준으로 다시 계산됩니다.",
-      "배송비/카드수수료/입금확인 상태는 변경하지 않습니다.",
-    ].join("\n");
+    if (isInventoryRestoredItem(item)) {
+      showAdminToast("재고복구완료 주문은 상품수정할 수 없습니다.", "warning");
+      return false;
+    }
+
+    const inventoryLinkedEdit = isInventoryLinkedEditableItem(item);
+
+    const confirmMessage = inventoryLinkedEdit
+      ? [
+          "재고연동 상품수정을 진행할까요?",
+          "",
+          "기존 재고를 먼저 복구하고, 새 옵션/수량 기준으로 재고를 다시 차감합니다.",
+          "재고가 부족하면 저장되지 않습니다.",
+          "상품금액과 총 결제예정금액은 수정값 기준으로 다시 계산됩니다.",
+          "배송비/카드수수료/입금확인 상태는 변경하지 않습니다.",
+        ].join("\n")
+      : [
+          "상품/옵션/수량/금액을 수정할까요?",
+          "",
+          "변경 전 값은 item_change_history에 누적됩니다.",
+          "상품금액과 총 결제예정금액은 수정값 기준으로 다시 계산됩니다.",
+          "배송비/카드수수료/입금확인 상태는 변경하지 않습니다.",
+        ].join("\n");
 
     if (!(await showAdminConfirm(confirmMessage))) return false;
 
     setSavingItemId(String(item.id));
 
     try {
+      if (inventoryLinkedEdit) {
+        const productTotal = unitPrice * qty;
+
+        const { data: rpcData, error: rpcError } = await supabase.rpc(
+          "admin_update_inventory_linked_order_item",
+          {
+            p_order_id: rowId,
+            p_product_name: productName,
+            p_color: color,
+            p_size: size,
+            p_qty: qty,
+            p_unit_price: unitPrice,
+            p_admin_memo: "admin-live 주문상세 재고연동 상품수정",
+          },
+        );
+
+        const rpcResult = (rpcData || {}) as any;
+
+        if (rpcError || rpcResult?.ok !== true) {
+          showAdminToast(
+            "재고연동 상품수정 실패\n\n" + (rpcError?.message || rpcResult?.message || "알 수 없는 오류"),
+            "error",
+          );
+          return false;
+        }
+
+        const result: LiveOrderItemEditSaveResult = {
+          rowId,
+          productName,
+          color,
+          size,
+          qty,
+          unitPrice,
+          productTotal: Number(rpcResult.product_total_after ?? productTotal),
+          nextTotal: Number(rpcResult.total_after ?? productTotal),
+          productChanged: Boolean(rpcResult.product_changed),
+          amountChanged: Boolean(rpcResult.amount_changed),
+        };
+
+        showAdminToast("재고연동 상품수정이 완료됐습니다.", "success");
+        await onAfterSave?.(result);
+        return result;
+      }
+
       const { data: current, error: loadError } = await supabase
         .from("orders")
         .select(
