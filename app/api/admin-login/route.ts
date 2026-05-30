@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         ok: false,
-        message: "관리자 로그인 환경변수가 설정되지 않았습니다. Vercel 환경변수 RURU_ADMIN_ID, RURU_ADMIN_PASSWORD, ADMIN_SESSION_SECRET을 확인해주세요.",
+        message: "관리자 로그인 설정 확인이 필요합니다. 운영자에게 문의해주세요.",
       },
       { status: 500 },
     );
