@@ -440,6 +440,46 @@ export default function AdminLiveEventRoulettePanel({
     }
   };
 
+  const resetEventResultFromList = async (event: RouletteEvent) => {
+    if (!event?.id) {
+      showAdminToast("정리할 이벤트 ID가 없습니다.", "warning");
+      return;
+    }
+
+    const isLive = event.mode === "live";
+    const confirmMessage = isLive
+      ? `최근 이벤트의 운영 결과를 정리합니다.\n\n이벤트: ${event.title}\n당첨자: ${event.winner_nickname || "-"}\n\n최근 이벤트의 result 표시와 연결 당첨 기록이 정리됩니다.\n이미 지급/안내한 내용은 별도로 확인해야 합니다.\n\n정말 정리할까요?`
+      : `최근 이벤트의 테스트 결과를 정리할까요?\n\n${event.title}`;
+
+    if (!window.confirm(confirmMessage)) return;
+
+    try {
+      const payload = await requestJson<{ ok: boolean; message?: string }>("/api/admin-live/event-roulette", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "reset_event_result",
+          eventId: event.id,
+          allowLiveReset: isLive,
+          liveConfirmText: isLive ? "운영결과정리" : "",
+        }),
+      });
+
+      if (!payload.ok) {
+        throw new Error(payload.message || "최근 이벤트 결과 정리 실패");
+      }
+
+      if (currentEvent?.id && currentEvent.id === event.id) {
+        setCurrentEvent(null);
+      }
+
+      showAdminToast("최근 이벤트 결과를 정리했습니다.", "success");
+      await loadEventsAndWinners();
+    } catch (error) {
+      showAdminToast("최근 이벤트 결과 정리 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
+    }
+  };
+
+
   const deleteAllTestRecords = async () => {
     if (!window.confirm("테스트 룰렛 이벤트와 테스트 당첨 기록을 모두 삭제할까요?\n\n운영 기록은 삭제하지 않습니다.")) return;
 
@@ -814,22 +854,36 @@ export default function AdminLiveEventRoulettePanel({
                           <div className="rounded-2xl bg-white px-4 py-5 text-center text-sm font-bold text-slate-400">최근 이벤트 없음</div>
                         ) : (
                           events.slice(0, 20).map((event) => (
-                            <button
+                            <div
                               key={event.id || `${event.title}-${event.result_at}`}
-                              type="button"
-                              onClick={() => setCurrentEvent(event)}
-                              className="w-full rounded-2xl border border-slate-100 bg-white p-3 text-left transition hover:bg-slate-50 active:scale-[0.99] active:bg-slate-100"
+                              className="rounded-2xl border border-slate-100 bg-white p-3"
                             >
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="truncate text-sm font-black text-slate-900">{event.title}</div>
-                                <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-black ring-1 ${modeBadgeClass(event.mode)}`}>
-                                  {modeLabel(event.mode)}
-                                </span>
-                              </div>
-                              <div className="mt-1 truncate text-xs font-bold text-slate-500">
-                                {event.status} · {event.winner_nickname || "당첨 전"}
-                              </div>
-                            </button>
+                              <button
+                                type="button"
+                                onClick={() => setCurrentEvent(event)}
+                                className="w-full text-left transition active:scale-[0.99]"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="truncate text-sm font-black text-slate-900">{event.title}</div>
+                                  <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-black ring-1 ${modeBadgeClass(event.mode)}`}>
+                                    {modeLabel(event.mode)}
+                                  </span>
+                                </div>
+                                <div className="mt-1 truncate text-xs font-bold text-slate-500">
+                                  {event.status} · {event.winner_nickname || "당첨 전"}
+                                </div>
+                              </button>
+
+                              {event.status === "result" || event.winner_nickname ? (
+                                <button
+                                  type="button"
+                                  onClick={() => void resetEventResultFromList(event)}
+                                  className="mt-2 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98] active:bg-amber-200"
+                                >
+                                  최근 이벤트 결과 정리
+                                </button>
+                              ) : null}
+                            </div>
                           ))
                         )}
                       </div>
