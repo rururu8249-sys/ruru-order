@@ -364,92 +364,25 @@ export default function AdminLiveEventRoulettePanel({
     }
   };
 
-  const deleteWinnerRecord = async (winner: RouletteWinner) => {
-    if (!winner?.id) {
-      showAdminToast("삭제할 당첨 기록 ID가 없습니다.", "warning");
-      return;
-    }
-
-    const recordLabel = winner.is_test ? "테스트 당첨 기록" : "운영 당첨 기록";
-    const confirmMessage = winner.is_test
-      ? `테스트 당첨 기록을 삭제할까요?\n\n${winner.nickname}`
-      : `운영 당첨 기록을 삭제합니다.\n\n닉네임: ${winner.nickname}\n\n이 기록은 실제 운영 당첨 기록이며, 삭제하면 당첨자 리스트와 같은 방송 중복당첨 기준에서 빠집니다.\n포인트 지급/고객 안내 여부는 별도로 확인해야 합니다.\n\n정말 삭제할까요?`;
-
-    if (!window.confirm(confirmMessage)) return;
-
-    try {
-      const payload = await requestJson<{ ok: boolean; message?: string }>("/api/admin-live/event-roulette", {
-        method: "POST",
-        body: JSON.stringify({
-          action: "delete_winner",
-          winnerId: winner.id,
-          eventId: winner.event_id,
-          allowLiveDelete: !winner.is_test,
-          liveConfirmText: winner.is_test ? "" : "운영기록삭제",
-        }),
-      });
-
-      if (!payload.ok) {
-        throw new Error(payload.message || `${recordLabel} 삭제 실패`);
-      }
-
-      if (currentEvent?.id && currentEvent.id === winner.event_id) {
-        setCurrentEvent(null);
-      }
-
-      showAdminToast(`${recordLabel}을 삭제했습니다.`, "success");
-      await loadEventsAndWinners();
-    } catch (error) {
-      showAdminToast(`${recordLabel} 삭제 실패\n\n` + (error instanceof Error ? error.message : String(error)), "error");
-    }
-  };
-
-  const resetCurrentEventResult = async () => {
-    if (!currentEvent?.id) {
-      showAdminToast("정리할 현재 룰렛 ID가 없습니다.", "warning");
-      return;
-    }
-
-    const isLive = currentEvent.mode === "live";
-    const confirmMessage = isLive
-      ? `현재 운영 룰렛 결과를 정리합니다.\n\n당첨자 리스트와 최근 이벤트의 result 표시가 초기화됩니다.\n이미 지급/안내한 내용은 별도로 확인해야 합니다.\n\n정말 정리할까요?`
-      : `현재 테스트 룰렛 결과를 정리할까요?`;
-
-    if (!window.confirm(confirmMessage)) return;
-
-    try {
-      const payload = await requestJson<{ ok: boolean; message?: string }>("/api/admin-live/event-roulette", {
-        method: "POST",
-        body: JSON.stringify({
-          action: "reset_event_result",
-          eventId: currentEvent.id,
-          allowLiveReset: isLive,
-          liveConfirmText: isLive ? "운영결과정리" : "",
-        }),
-      });
-
-      if (!payload.ok) {
-        throw new Error(payload.message || "현재 룰렛 결과 정리 실패");
-      }
-
-      setCurrentEvent(null);
-      showAdminToast("현재 룰렛 결과를 정리했습니다.", "success");
-      await loadEventsAndWinners();
-    } catch (error) {
-      showAdminToast("현재 룰렛 결과 정리 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
-    }
-  };
-
-  const resetEventResultFromList = async (event: RouletteEvent) => {
+  const deleteRouletteEvent = async (
+    event: {
+      id?: string | null;
+      title?: string | null;
+      mode?: string | null;
+      is_test?: boolean | null;
+      winner_nickname?: string | null;
+    },
+    sourceLabel: string,
+  ) => {
     if (!event?.id) {
-      showAdminToast("정리할 이벤트 ID가 없습니다.", "warning");
+      showAdminToast("삭제할 룰렛 이벤트 ID가 없습니다.", "warning");
       return;
     }
 
-    const isLive = event.mode === "live";
+    const isLive = event.mode === "live" || event.is_test === false;
     const confirmMessage = isLive
-      ? `최근 이벤트의 운영 결과를 정리합니다.\n\n이벤트: ${event.title}\n당첨자: ${event.winner_nickname || "-"}\n\n최근 이벤트의 result 표시와 연결 당첨 기록이 정리됩니다.\n이미 지급/안내한 내용은 별도로 확인해야 합니다.\n\n정말 정리할까요?`
-      : `최근 이벤트의 테스트 결과를 정리할까요?\n\n${event.title}`;
+      ? `운영 룰렛 이벤트를 삭제합니다.\n\n이벤트: ${event.title || sourceLabel}\n당첨자: ${event.winner_nickname || "-"}\n\n이 룰렛 이벤트와 연결 당첨자 기록이 최근 이벤트/당첨자 리스트에서 모두 삭제됩니다.\n이미 지급/고객 안내한 내용은 별도로 확인해야 합니다.\n\n정말 삭제할까요?`
+      : `테스트 룰렛 이벤트를 삭제할까요?\n\n${event.title || sourceLabel}`;
 
     if (!window.confirm(confirmMessage)) return;
 
@@ -457,26 +390,44 @@ export default function AdminLiveEventRoulettePanel({
       const payload = await requestJson<{ ok: boolean; message?: string }>("/api/admin-live/event-roulette", {
         method: "POST",
         body: JSON.stringify({
-          action: "reset_event_result",
+          action: "delete_event",
           eventId: event.id,
-          allowLiveReset: isLive,
-          liveConfirmText: isLive ? "운영결과정리" : "",
+          allowLiveDelete: isLive,
+          liveConfirmText: isLive ? "운영이벤트삭제" : "",
         }),
       });
 
       if (!payload.ok) {
-        throw new Error(payload.message || "최근 이벤트 결과 정리 실패");
+        throw new Error(payload.message || "룰렛 이벤트 삭제 실패");
       }
 
       if (currentEvent?.id && currentEvent.id === event.id) {
         setCurrentEvent(null);
       }
 
-      showAdminToast("최근 이벤트 결과를 정리했습니다.", "success");
+      showAdminToast("룰렛 이벤트를 삭제했습니다.", "success");
       await loadEventsAndWinners();
     } catch (error) {
-      showAdminToast("최근 이벤트 결과 정리 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
+      showAdminToast("룰렛 이벤트 삭제 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
     }
+  };
+
+  const deleteWinnerRecord = async (winner: RouletteWinner) => {
+    if (!winner?.event_id) {
+      showAdminToast("연결된 룰렛 이벤트 ID가 없어 당첨자 기록만 삭제할 수 없습니다.", "warning");
+      return;
+    }
+
+    await deleteRouletteEvent(
+      {
+        id: winner.event_id,
+        title: `${winner.nickname} 당첨 룰렛`,
+        mode: winner.is_test ? "test" : "live",
+        is_test: winner.is_test,
+        winner_nickname: winner.nickname,
+      },
+      winner.is_test ? "테스트 당첨 룰렛" : "운영 당첨 룰렛",
+    );
   };
 
 
@@ -764,15 +715,13 @@ export default function AdminLiveEventRoulettePanel({
                           <div className="text-xs font-black text-slate-400">당첨내용</div>
                           <div className="mt-1 truncate text-base font-black text-slate-700">{currentEvent.winner_note || winnerNote || "-"}</div>
                         </div>
-                        {currentEvent.status === "result" || currentEvent.winner_nickname ? (
-                          <button
-                            type="button"
-                            onClick={() => void resetCurrentEventResult()}
-                            className="col-span-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98] active:bg-amber-200"
-                          >
-                            현재 결과 정리
-                          </button>
-                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => void deleteRouletteEvent(currentEvent, "현재 룰렛")}
+                          className="col-span-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98] active:bg-amber-200"
+                        >
+                          현재 룰렛 삭제
+                        </button>
                       </div>
                     ) : (
                       <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-10 text-center text-sm font-bold text-slate-400">
@@ -836,7 +785,7 @@ export default function AdminLiveEventRoulettePanel({
                                     : "border-amber-200 text-amber-700 hover:bg-amber-50 active:bg-amber-100"
                                 }`}
                               >
-                                {winner.is_test ? "테스트 삭제" : "운영 삭제"}
+                                "룰렛 삭제"
                               </button>
                             </div>
                           </div>
@@ -874,15 +823,13 @@ export default function AdminLiveEventRoulettePanel({
                                 </div>
                               </button>
 
-                              {event.status === "result" || event.winner_nickname ? (
-                                <button
-                                  type="button"
-                                  onClick={() => void resetEventResultFromList(event)}
-                                  className="mt-2 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98] active:bg-amber-200"
-                                >
-                                  최근 이벤트 결과 정리
-                                </button>
-                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => void deleteRouletteEvent(event, "최근 이벤트")}
+                                className="mt-2 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98] active:bg-amber-200"
+                              >
+                                룰렛 기록 삭제
+                              </button>
                             </div>
                           ))
                         )}

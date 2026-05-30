@@ -788,87 +788,67 @@ async function markRewardDone(body: Record<string, unknown>) {
   return json({ ok: true, winner: data });
 }
 
-async function resetRouletteEventResult(params: {
-  eventId: string;
-  isTest: boolean;
-}) {
-  const supabase = getSupabaseAdmin();
-
-  const { error: updateError } = await supabase
-    .from("event_roulette_events")
-    .update({
-      status: "idle",
-      winner_nickname: "",
-      winner_note: "",
-      winner_order_ids: [],
-      result_at: null,
-      spin_started_at: null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", params.eventId)
-    .eq("is_test", params.isTest);
-
-  return updateError;
-}
-
-async function resetEventResult(body: Record<string, unknown>) {
+async function deleteRouletteEvent(body: Record<string, unknown>) {
   const eventId = cleanText(body.eventId);
-  const allowLiveReset = body.allowLiveReset === true;
+  const allowLiveDelete = body.allowLiveDelete === true;
   const liveConfirmText = cleanText(body.liveConfirmText);
 
   if (!eventId) {
-    return json({ ok: false, message: "이벤트 ID가 없습니다." }, 400);
+    return json({ ok: false, message: "삭제할 룰렛 이벤트 ID가 없습니다." }, 400);
   }
 
   const supabase = getSupabaseAdmin();
 
   const { data: eventRow, error: lookupError } = await supabase
     .from("event_roulette_events")
-    .select("id, is_test, status, winner_nickname")
+    .select("id, is_test, mode, title, status, winner_nickname")
     .eq("id", eventId)
     .maybeSingle();
 
   if (lookupError) {
-    return json({ ok: false, message: lookupError.message || "이벤트 조회 실패" }, 500);
+    return json({ ok: false, message: lookupError.message || "룰렛 이벤트 조회 실패" }, 500);
   }
 
   if (!eventRow) {
-    return json({ ok: false, message: "정리할 이벤트를 찾지 못했습니다." }, 404);
+    return json({ ok: true, already_deleted: true, deleted_event_id: eventId });
   }
 
   const event = eventRow as {
     id: string;
     is_test: boolean;
+    mode: string | null;
+    title: string | null;
     status: string | null;
     winner_nickname: string | null;
   };
 
-  if (!event.is_test && (!allowLiveReset || liveConfirmText !== "운영결과정리")) {
-    return json({ ok: false, message: "운영 결과 정리 확인값이 없습니다." }, 400);
+  if (!event.is_test && (!allowLiveDelete || liveConfirmText !== "운영이벤트삭제")) {
+    return json({ ok: false, message: "운영 룰렛 이벤트 삭제 확인값이 없습니다." }, 400);
   }
 
-  const { error: deleteWinnersError } = await supabase
+  const { error: winnerDeleteError } = await supabase
     .from("event_roulette_winners")
     .delete()
     .eq("event_id", eventId)
     .eq("is_test", event.is_test);
 
-  if (deleteWinnersError) {
-    return json({ ok: false, message: deleteWinnersError.message || "연결 당첨 기록 삭제 실패" }, 500);
+  if (winnerDeleteError) {
+    return json({ ok: false, message: winnerDeleteError.message || "연결 당첨자 기록 삭제 실패" }, 500);
   }
 
-  const resetError = await resetRouletteEventResult({
-    eventId,
-    isTest: event.is_test,
-  });
+  const { error: eventDeleteError } = await supabase
+    .from("event_roulette_events")
+    .delete()
+    .eq("id", eventId)
+    .eq("is_test", event.is_test);
 
-  if (resetError) {
-    return json({ ok: false, message: resetError.message || "이벤트 결과 초기화 실패" }, 500);
+  if (eventDeleteError) {
+    return json({ ok: false, message: eventDeleteError.message || "룰렛 이벤트 삭제 실패" }, 500);
   }
 
   return json({
     ok: true,
-    reset_event_id: eventId,
+    deleted_event_id: eventId,
     is_test: event.is_test,
   });
 }
@@ -879,34 +859,32 @@ async function deleteWinnerRecord(body: Record<string, unknown>) {
   const allowLiveDelete = body.allowLiveDelete === true;
   const liveConfirmText = cleanText(body.liveConfirmText);
 
-  if (!winnerId && !eventIdFromBody) {
+  if (eventIdFromBody) {
+    return deleteRouletteEvent({
+      eventId: eventIdFromBody,
+      allowLiveDelete,
+      liveConfirmText: allowLiveDelete ? "운영이벤트삭제" : "",
+    });
+  }
+
+  if (!winnerId) {
     return json({ ok: false, message: "당첨 기록 ID 또는 이벤트 ID가 없습니다." }, 400);
   }
 
   const supabase = getSupabaseAdmin();
 
-  const { data: winnerRow, error: lookupError } = winnerId
-    ? await supabase
-        .from("event_roulette_winners")
-        .select("id, event_id, nickname, is_test, is_reward_done")
-        .eq("id", winnerId)
-        .maybeSingle()
-    : { data: null, error: null };
+  const { data: winnerRow, error: lookupError } = await supabase
+    .from("event_roulette_winners")
+    .select("id, event_id, nickname, is_test, is_reward_done")
+    .eq("id", winnerId)
+    .maybeSingle();
 
   if (lookupError) {
     return json({ ok: false, message: lookupError.message || "당첨 기록 조회 실패" }, 500);
   }
 
   if (!winnerRow) {
-    if (eventIdFromBody) {
-      return resetEventResult({
-        eventId: eventIdFromBody,
-        allowLiveReset: allowLiveDelete,
-        liveConfirmText: allowLiveDelete ? "운영결과정리" : "",
-      });
-    }
-
-    return json({ ok: false, message: "삭제할 당첨 기록을 찾지 못했습니다." }, 404);
+    return json({ ok: true, already_deleted: true, deleted_winner_id: winnerId });
   }
 
   const winner = winnerRow as {
@@ -921,6 +899,16 @@ async function deleteWinnerRecord(body: Record<string, unknown>) {
     return json({ ok: false, message: "운영 당첨 기록 삭제 확인값이 없습니다." }, 400);
   }
 
+  const eventId = cleanText(winner.event_id);
+
+  if (eventId) {
+    return deleteRouletteEvent({
+      eventId,
+      allowLiveDelete,
+      liveConfirmText: !winner.is_test ? "운영이벤트삭제" : "",
+    });
+  }
+
   const { error: deleteError } = await supabase
     .from("event_roulette_winners")
     .delete()
@@ -931,23 +919,10 @@ async function deleteWinnerRecord(body: Record<string, unknown>) {
     return json({ ok: false, message: deleteError.message || "당첨 기록 삭제 실패" }, 500);
   }
 
-  const eventId = cleanText(winner.event_id || eventIdFromBody);
-
-  if (eventId) {
-    const resetError = await resetRouletteEventResult({
-      eventId,
-      isTest: winner.is_test,
-    });
-
-    if (resetError) {
-      return json({ ok: false, message: resetError.message || "당첨 이벤트 초기화 실패" }, 500);
-    }
-  }
-
   return json({
     ok: true,
     deleted_winner_id: winner.id,
-    reset_event_id: eventId || null,
+    reset_event_id: null,
     is_test: winner.is_test,
   });
 }
@@ -1005,7 +980,7 @@ export async function POST(request: NextRequest) {
     if (action === "spin_event") return spinEvent(body);
     if (action === "mark_reward_done") return markRewardDone(body);
     if (action === "delete_winner") return deleteWinnerRecord(body);
-    if (action === "reset_event_result") return resetEventResult(body);
+    if (action === "delete_event") return deleteRouletteEvent(body);
     if (action === "delete_test_records") return deleteTestRecords();
 
     return json({ ok: false, message: "지원하지 않는 action입니다." }, 400);
