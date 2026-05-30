@@ -4,6 +4,8 @@ import type { EventRouletteParticipant } from "@/lib/eventRoulette";
 
 export const dynamic = "force-dynamic";
 
+const FIXED_OVERLAY_TOKEN = "roulette_luludongi_live";
+
 type OverlayEventRow = {
   title: string;
   mode: "live" | "test" | "preview";
@@ -67,6 +69,44 @@ export async function GET(request: NextRequest) {
     }
 
     const supabase = getSupabaseClient();
+    if (token === FIXED_OVERLAY_TOKEN) {
+      const { data, error } = await supabase
+        .from("event_roulette_events")
+        .select(
+          "title, mode, is_test, status, participant_snapshot, winner_nickname, winner_note, spin_started_at, spin_duration_ms, result_at, updated_at"
+        )
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        return json({ ok: false, message: error.message || "룰렛 overlay 조회 실패" }, 500);
+      }
+
+      if (!data) {
+        return json({ ok: false, message: "표시할 룰렛 이벤트가 없습니다." }, 404);
+      }
+
+      const event = data as OverlayEventRow;
+
+      return json({
+        ok: true,
+        event: {
+          title: cleanText(event.title) || "🎁 루루동이룰렛",
+          mode: event.mode,
+          is_test: event.is_test,
+          status: event.status,
+          participants: sanitizeParticipants(event.participant_snapshot),
+          winner_nickname: cleanText(event.winner_nickname),
+          winner_note: cleanText(event.winner_note),
+          spin_started_at: event.spin_started_at,
+          spin_duration_ms: event.spin_duration_ms,
+          result_at: event.result_at,
+          updated_at: event.updated_at,
+        },
+      });
+    }
+
     const { data, error } = await supabase
       .from("event_roulette_events")
       .select(

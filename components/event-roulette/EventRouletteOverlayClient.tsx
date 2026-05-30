@@ -70,6 +70,23 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
   const [loadedAt, setLoadedAt] = useState(0);
 
   useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+
+    html.style.background = "transparent";
+    body.style.background = "transparent";
+    body.style.margin = "0";
+    body.style.overflow = "hidden";
+
+    return () => {
+      html.style.background = "";
+      body.style.background = "";
+      body.style.margin = "";
+      body.style.overflow = "";
+    };
+  }, []);
+
+  useEffect(() => {
     if (!token) {
       setMessage("위젯주소 token이 없습니다.");
       return;
@@ -195,7 +212,7 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
           </div>
 
           {message ? (
-            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 rounded-full bg-black/45 px-6 py-3 text-xl font-black text-white backdrop-blur">
+            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 rounded-full bg-white/75 px-6 py-3 text-xl font-black text-slate-950 shadow-[0_8px_24px_rgba(15,23,42,0.16)] backdrop-blur">
               {message}
             </div>
           ) : null}

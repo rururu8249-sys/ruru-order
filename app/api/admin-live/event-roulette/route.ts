@@ -15,6 +15,7 @@ import {
 export const dynamic = "force-dynamic";
 
 const DEFAULT_TITLE = "🎁 루루동이룰렛";
+const FIXED_OVERLAY_TOKEN = "roulette_luludongi_live";
 
 type RouletteBroadcastRow = Record<string, unknown> & {
   id: string | number;
@@ -217,7 +218,7 @@ function sanitizeEventForAdmin(event: RouletteEventRow) {
     id: event.id,
     title: event.title,
     overlay_token: event.overlay_token,
-    overlay_api_path: `/api/event-roulette/overlay?token=${encodeURIComponent(event.overlay_token)}`,
+    overlay_api_path: `/api/event-roulette/overlay?token=${encodeURIComponent(FIXED_OVERLAY_TOKEN)}`,
     mode: event.mode,
     is_test: event.is_test,
     status: event.status,
@@ -643,6 +644,70 @@ async function markRewardDone(body: Record<string, unknown>) {
   return json({ ok: true, winner: data });
 }
 
+async function deleteWinnerRecord(body: Record<string, unknown>) {
+  const supabase = getSupabaseAdmin();
+  const winnerId = cleanText(body.winnerId);
+
+  if (!winnerId) {
+    return json({ ok: false, message: "winnerId가 없습니다." }, 400);
+  }
+
+  const { data: winner, error: loadError } = await supabase
+    .from("event_roulette_winners")
+    .select("id, event_id, nickname, is_test, is_reward_done")
+    .eq("id", winnerId)
+    .maybeSingle();
+
+  if (loadError) {
+    return json({ ok: false, message: loadError.message || "당첨 기록 조회 실패" }, 500);
+  }
+
+  if (!winner) {
+    return json({ ok: false, message: "삭제할 당첨 기록을 찾지 못했습니다." }, 404);
+  }
+
+  if (!winner.is_test) {
+    return json({ ok: false, message: "운영 당첨 기록은 여기서 삭제할 수 없습니다. 테스트 당첨 기록만 삭제 가능합니다." }, 400);
+  }
+
+  const { error } = await supabase
+    .from("event_roulette_winners")
+    .delete()
+    .eq("id", winnerId)
+    .eq("is_test", true);
+
+  if (error) {
+    return json({ ok: false, message: error.message || "테스트 당첨 기록 삭제 실패" }, 500);
+  }
+
+  return json({ ok: true, deleted_winner_id: winnerId });
+}
+
+async function deleteTestRecords() {
+  const supabase = getSupabaseAdmin();
+
+  const { error: winnerError } = await supabase
+    .from("event_roulette_winners")
+    .delete()
+    .eq("is_test", true);
+
+  if (winnerError) {
+    return json({ ok: false, message: winnerError.message || "테스트 당첨 기록 삭제 실패" }, 500);
+  }
+
+  const { error: eventError } = await supabase
+    .from("event_roulette_events")
+    .delete()
+    .eq("is_test", true);
+
+  if (eventError) {
+    return json({ ok: false, message: eventError.message || "테스트 룰렛 이벤트 삭제 실패" }, 500);
+  }
+
+  return json({ ok: true });
+}
+
+
 export async function GET(request: NextRequest) {
   try {
     const action = request.nextUrl.searchParams.get("action") || "participants";
@@ -669,6 +734,8 @@ export async function POST(request: NextRequest) {
     if (action === "create_event") return createEvent(body);
     if (action === "spin_event") return spinEvent(body);
     if (action === "mark_reward_done") return markRewardDone(body);
+    if (action === "delete_winner") return deleteWinnerRecord(body);
+    if (action === "delete_test_records") return deleteTestRecords();
 
     return json({ ok: false, message: "지원하지 않는 action입니다." }, 400);
   } catch (error) {

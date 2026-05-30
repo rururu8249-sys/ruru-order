@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 
 type RouletteMode = "live" | "test" | "preview";
 
+const FIXED_OVERLAY_TOKEN = "roulette_luludongi_live";
+
 type RouletteBroadcast = {
   id: string;
   title: string;
@@ -154,11 +156,10 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   return payload;
 }
 
-function buildOverlayUrl(event: RouletteEvent | null) {
+function buildOverlayUrl(_event: RouletteEvent | null) {
   if (typeof window === "undefined") return "";
-  if (!event?.overlay_token) return "";
 
-  return `${window.location.origin}/event-roulette/overlay?token=${encodeURIComponent(event.overlay_token)}`;
+  return `${window.location.origin}/event-roulette/overlay?token=${encodeURIComponent(FIXED_OVERLAY_TOKEN)}`;
 }
 
 async function copyText(value: string) {
@@ -363,6 +364,66 @@ export default function AdminLiveEventRoulettePanel({
     }
   };
 
+  const deleteWinnerRecord = async (winner: RouletteWinner) => {
+    if (!winner?.id) {
+      showAdminToast("삭제할 당첨 기록 ID가 없습니다.", "warning");
+      return;
+    }
+
+    if (!winner.is_test) {
+      showAdminToast("운영 당첨 기록은 삭제할 수 없습니다. 테스트 기록만 삭제 가능합니다.", "warning");
+      return;
+    }
+
+    if (!window.confirm(`테스트 당첨 기록을 삭제할까요?\n\n${winner.nickname}`)) return;
+
+    try {
+      const payload = await requestJson<{ ok: boolean; message?: string }>("/api/admin-live/event-roulette", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "delete_winner",
+          winnerId: winner.id,
+        }),
+      });
+
+      if (!payload.ok) {
+        throw new Error(payload.message || "테스트 당첨 기록 삭제 실패");
+      }
+
+      showAdminToast("테스트 당첨 기록을 삭제했습니다.", "success");
+      await loadEventsAndWinners();
+    } catch (error) {
+      showAdminToast("테스트 당첨 기록 삭제 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
+    }
+  };
+
+  const deleteAllTestRecords = async () => {
+    if (!window.confirm("테스트 룰렛 이벤트와 테스트 당첨 기록을 모두 삭제할까요?\n\n운영 기록은 삭제하지 않습니다.")) return;
+
+    try {
+      const payload = await requestJson<{ ok: boolean; message?: string }>("/api/admin-live/event-roulette", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "delete_test_records",
+        }),
+      });
+
+      if (!payload.ok) {
+        throw new Error(payload.message || "테스트 기록 삭제 실패");
+      }
+
+      if (currentEvent?.is_test) {
+        setCurrentEvent(null);
+      }
+
+      showAdminToast("테스트 룰렛 기록을 삭제했습니다.", "success");
+      await loadEventsAndWinners();
+    } catch (error) {
+      showAdminToast("테스트 기록 삭제 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
+    }
+  };
+
+
   return (
     <>
       <button
@@ -516,12 +577,12 @@ export default function AdminLiveEventRoulettePanel({
                         disabled={!overlayUrl}
                         className="rounded-2xl bg-white px-4 py-2 text-xs font-black text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
                       >
-                        위젯주소 복사
+                        고정주소 복사
                       </button>
                     </div>
 
                     <div className="mt-3 break-all rounded-xl bg-white px-3 py-3 text-xs font-bold text-slate-500 ring-1 ring-slate-100">
-                      {overlayUrl || "테스트/실제 운영 룰렛을 만든 뒤 위젯주소가 표시됩니다."}
+                      {overlayUrl || "고정 방송용 위젯주소를 준비중입니다."}
                     </div>
                   </div>
 
@@ -578,15 +639,24 @@ export default function AdminLiveEventRoulettePanel({
                   </section>
 
                   <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <div className="text-base font-black text-slate-950">당첨자 리스트</div>
-                      <button
-                        type="button"
-                        onClick={loadEventsAndWinners}
-                        className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600 hover:bg-slate-200"
-                      >
-                        새로고침
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void deleteAllTestRecords()}
+                          className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-black text-amber-700 hover:bg-amber-100"
+                        >
+                          테스트기록 삭제
+                        </button>
+                        <button
+                          type="button"
+                          onClick={loadEventsAndWinners}
+                          className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600 hover:bg-slate-200"
+                        >
+                          새로고침
+                        </button>
+                      </div>
                     </div>
 
                     <div className="mt-3 max-h-[360px] space-y-2 overflow-y-auto">
@@ -619,6 +689,15 @@ export default function AdminLiveEventRoulettePanel({
                             >
                               {winner.is_reward_done ? "지급완료됨" : "지급완료 체크"}
                             </button>
+                            {winner.is_test ? (
+                              <button
+                                type="button"
+                                onClick={() => void deleteWinnerRecord(winner)}
+                                className="mt-2 w-full rounded-xl border border-red-100 bg-white px-3 py-2 text-xs font-black text-red-600 hover:bg-red-50"
+                              >
+                                테스트 기록 삭제
+                              </button>
+                            ) : null}
                           </div>
                         ))
                       )}
