@@ -985,56 +985,6 @@ export default function AdminLiveDashboard() {
           }}
         />
 
-        {activeMenu === "broadcast" ? (
-          <div
-            className="fixed left-4 top-[560px] z-[60] w-[188px] rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-sm backdrop-blur"
-            data-ruru-quick-modal-dock="sidebar-mini"
-          >
-            <div className="mb-2 flex items-center justify-between">
-              <div>
-                <div className="text-[10px] font-black tracking-[0.18em] text-slate-400">QUICK</div>
-                <div className="text-sm font-black text-slate-950">빠른보기</div>
-              </div>
-              <div className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-600">방송중</div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-1.5">
-              <button
-                type="button"
-                onClick={() => setQuickModal("orders")}
-                className="h-11 rounded-xl border border-blue-100 bg-blue-50 text-xs font-black text-blue-700 transition hover:bg-blue-100 active:scale-[0.98]"
-              >
-                주문
-              </button>
-              <button
-                type="button"
-                onClick={() => setQuickModal("payments")}
-                className="h-11 rounded-xl border border-emerald-100 bg-emerald-50 text-xs font-black text-emerald-700 transition hover:bg-emerald-100 active:scale-[0.98]"
-              >
-                입금
-              </button>
-              <button
-                type="button"
-                onClick={() => setQuickModal("customers")}
-                className="h-11 rounded-xl border border-amber-100 bg-amber-50 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98]"
-              >
-                고객
-              </button>
-              <button
-                type="button"
-                onClick={() => setQuickModal("settlement")}
-                className="h-11 rounded-xl border border-violet-100 bg-violet-50 text-xs font-black text-violet-700 transition hover:bg-violet-100 active:scale-[0.98]"
-              >
-                정산
-              </button>
-            </div>
-
-            <div className="mt-2 rounded-xl bg-slate-50 px-2 py-2 text-[10px] font-bold leading-4 text-slate-500">
-              단독 메뉴 이동 없이 방송 중 필요한 내용만 확인
-            </div>
-          </div>
-        ) : null}
-
         <main className="min-w-0 flex-1 overflow-x-hidden px-5 py-4">
           {activeMenu === "broadcast" ? (
             <>
@@ -1051,11 +1001,11 @@ export default function AdminLiveDashboard() {
               <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
 
               <div className="mb-4 mt-4 grid w-full grid-cols-12 items-stretch gap-3">
-                <div className="col-span-12 min-h-[480px] min-w-0 xl:col-span-8">
+                <div className="col-span-12 h-[460px] min-h-0 min-w-0 overflow-hidden xl:col-span-8">
                   <LiveBroadcastPanels videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} />
                 </div>
 
-                <div className="col-span-12 min-h-[480px] min-w-0 xl:col-span-4">
+                <div className="col-span-12 h-[460px] min-h-0 min-w-0 overflow-hidden xl:col-span-4">
                   <AdminLiveProductListPanel fillHeight className="h-full min-w-0 overflow-hidden" />
                 </div>
               </div>
@@ -1203,25 +1153,7 @@ export default function AdminLiveDashboard() {
                           onClick={loadDepositsFromServer}
                           className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white"
                         >
-                          입금내역 새로고침
-                        </button>
-                        <button
-                          type="button"
-                          onClick={syncBankdaDepositsOnly}
-                          className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white"
-                        >
-                          Bankda 조회
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setQuickModal(null);
-                            setActiveMenu("payments");
-                            replacePanelInUrl("payments");
-                          }}
-                          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700"
-                        >
-                          입금확인 전체보기
+                          입금내역 조회
                         </button>
                       </>
                     ) : null}

@@ -53,6 +53,56 @@ return (
         <AdminLiveCustomerIssueSummaryCard onOpenCustomers={() => onMenuChange("customers")} />
       </div>
           <AdminLiveLogoutButton />
+      {activeMenu === "broadcast" ? (
+        <div
+          className="mb-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm"
+          data-ruru-quick-modal-dock="sidebar-inline"
+        >
+          <div className="mb-2 flex items-center justify-between">
+            <div>
+              <div className="text-[10px] font-black tracking-[0.18em] text-slate-400">QUICK</div>
+              <div className="text-sm font-black text-slate-950">빠른보기</div>
+            </div>
+            <div className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-600">방송중</div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("ruru-admin-live-open-panel", { detail: "orders" }))}
+              className="h-10 rounded-xl border border-blue-100 bg-blue-50 text-xs font-black text-blue-700 transition hover:bg-blue-100 active:scale-[0.98]"
+            >
+              주문
+            </button>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("ruru-admin-live-open-panel", { detail: "payments" }))}
+              className="h-10 rounded-xl border border-emerald-100 bg-emerald-50 text-xs font-black text-emerald-700 transition hover:bg-emerald-100 active:scale-[0.98]"
+            >
+              입금
+            </button>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("ruru-admin-live-open-panel", { detail: "customers" }))}
+              className="h-10 rounded-xl border border-amber-100 bg-amber-50 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98]"
+            >
+              고객
+            </button>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("ruru-admin-live-open-panel", { detail: "settlement" }))}
+              className="h-10 rounded-xl border border-violet-100 bg-violet-50 text-xs font-black text-violet-700 transition hover:bg-violet-100 active:scale-[0.98]"
+            >
+              정산
+            </button>
+          </div>
+
+          <div className="mt-2 rounded-xl bg-slate-50 px-2 py-2 text-[10px] font-bold leading-4 text-slate-500">
+            방송 중 필요한 내용만 빠르게 확인
+          </div>
+        </div>
+      ) : null}
+
     </aside>
   );
 }
