@@ -524,6 +524,8 @@ export default function AdminLiveDashboard() {
   const [filters, setFilters] = useState<LiveOrderFilters>(DEFAULT_FILTERS);
   const [broadcastEndSummary, setBroadcastEndSummary] = useState<LiveBroadcastEndSummary | null>(null);
   const [quickModal, setQuickModal] = useState<"orders" | "payments" | "customers" | "settlement" | null>(null);
+  const [quickModalSearch, setQuickModalSearch] = useState("");
+  const [quickModalPage, setQuickModalPage] = useState(1);
 
   const loadDepositsFromServer = async () => {
     const response = await fetch("/api/admin-v2/deposits", {
@@ -1110,23 +1112,36 @@ export default function AdminLiveDashboard() {
                     return `${Number.isFinite(numericValue) ? numericValue.toLocaleString("ko-KR") : "0"}원`;
                   };
 
+                  const textValue = (value: unknown) => String(value ?? "").toLowerCase();
+
                   const orderNickname = (order: any) =>
                     String(order?.nickname || order?.customer_nickname || order?.youtube_nickname || order?.buyer_nickname || "-");
 
                   const orderName = (order: any) =>
-                    String(order?.customer_name || order?.name || order?.buyer_name || "");
+                    String(order?.customer_name || order?.name || order?.buyer_name || order?.receiver_name || "");
 
                   const orderPhone = (order: any) =>
-                    String(order?.phone || order?.customer_phone || order?.buyer_phone || "");
+                    String(order?.phone || order?.customer_phone || order?.buyer_phone || order?.receiver_phone || "");
 
                   const orderMemo = (order: any) =>
-                    String(order?.order_memo || order?.memo || order?.product_name || order?.order_items_text || order?.order_text || "주문내역 확인 필요");
+                    String(
+                      order?.order_summary ||
+                        order?.items_summary ||
+                        order?.order_memo ||
+                        order?.memo ||
+                        order?.product_name ||
+                        order?.order_items_text ||
+                        order?.order_text ||
+                        "주문내역 확인 필요",
+                    );
 
                   const orderAmount = (order: any) =>
                     Number(
                       order?.final_amount ??
                         order?.total_amount ??
                         order?.order_total_amount ??
+                        order?.paid_amount ??
+                        order?.payment_amount ??
                         order?.product_amount ??
                         order?.product_price ??
                         0,
@@ -1152,25 +1167,20 @@ export default function AdminLiveDashboard() {
                     return text.includes("취소") || text.includes("cancel") || text.includes("CANCEL");
                   };
 
-                  const recentOrders = modalOrders.slice(0, 8);
-                  const unpaidOrders = modalAllOrders.filter((order: any) => !isPaidOrder(order) && !isCanceledOrder(order));
-                  const canceledOrders = modalAllOrders.filter((order: any) => isCanceledOrder(order));
-                  const paidOrders = modalAllOrders.filter((order: any) => isPaidOrder(order));
-                  const totalOrderAmount = modalAllOrders.reduce((sum: number, order: any) => sum + orderAmount(order), 0);
-                  const paidOrderAmount = paidOrders.reduce((sum: number, order: any) => sum + orderAmount(order), 0);
-                  const unpaidOrderAmount = unpaidOrders.reduce((sum: number, order: any) => sum + orderAmount(order), 0);
-
-                  const recentDeposits = modalDeposits.slice(0, 8);
                   const depositAmount = (deposit: any) =>
                     Number(deposit?.amount ?? deposit?.deposit_amount ?? deposit?.in_amount ?? deposit?.money ?? 0);
 
                   const depositName = (deposit: any) =>
-                    String(deposit?.depositor_name || deposit?.name || deposit?.sender_name || deposit?.deposit_name || "-");
+                    String(deposit?.depositor_name || deposit?.name || deposit?.sender_name || deposit?.deposit_name || deposit?.account_holder || "-");
 
                   const depositTime = (deposit: any) =>
-                    String(deposit?.deposited_at || deposit?.deposit_time || deposit?.created_at || deposit?.date || "");
+                    String(deposit?.deposited_at || deposit?.deposit_time || deposit?.created_at || deposit?.transaction_at || deposit?.date || "");
 
-                  const recentDepositAmount = recentDeposits.reduce((sum: number, deposit: any) => sum + depositAmount(deposit), 0);
+                  const modalSearch = quickModalSearch.trim().toLowerCase();
+                  const rowPerPage = 7;
+
+                  const filterBySearch = <T,>(rows: T[], picker: (row: T) => string) =>
+                    modalSearch ? rows.filter((row) => picker(row).toLowerCase().includes(modalSearch)) : rows;
 
                   const customerMap = new Map<string, { key: string; nickname: string; name: string; phone: string; count: number; amount: number; latestOrder: any }>();
                   modalAllOrders.forEach((order: any) => {
@@ -1191,7 +1201,49 @@ export default function AdminLiveDashboard() {
                     current.latestOrder = order;
                     customerMap.set(key, current);
                   });
-                  const recentCustomers = Array.from(customerMap.values()).slice(0, 8);
+
+                  const unpaidOrders = modalAllOrders.filter((order: any) => !isPaidOrder(order) && !isCanceledOrder(order));
+                  const canceledOrders = modalAllOrders.filter((order: any) => isCanceledOrder(order));
+                  const paidOrders = modalAllOrders.filter((order: any) => isPaidOrder(order));
+                  const totalOrderAmount = modalAllOrders.reduce((sum: number, order: any) => sum + orderAmount(order), 0);
+                  const paidOrderAmount = paidOrders.reduce((sum: number, order: any) => sum + orderAmount(order), 0);
+                  const unpaidOrderAmount = unpaidOrders.reduce((sum: number, order: any) => sum + orderAmount(order), 0);
+                  const recentDepositAmount = modalDeposits.slice(0, 20).reduce((sum: number, deposit: any) => sum + depositAmount(deposit), 0);
+
+                  const orderRows = filterBySearch(modalOrders, (order: any) =>
+                    [orderNickname(order), orderName(order), orderPhone(order), orderMemo(order), paymentText(order), money(orderAmount(order))].join(" "),
+                  );
+
+                  const depositRows = filterBySearch(modalDeposits, (deposit: any) =>
+                    [depositName(deposit), depositTime(deposit), money(depositAmount(deposit)), textValue(deposit?.status)].join(" "),
+                  );
+
+                  const customerRows = filterBySearch(Array.from(customerMap.values()), (customer) =>
+                    [customer.nickname, customer.name, customer.phone, `${customer.count}`, money(customer.amount)].join(" "),
+                  );
+
+                  const totalRows =
+                    quickModal === "orders"
+                      ? orderRows.length
+                      : quickModal === "payments"
+                        ? depositRows.length
+                        : quickModal === "customers"
+                          ? customerRows.length
+                          : 0;
+
+                  const totalPages = quickModal === "settlement" ? 1 : Math.max(1, Math.ceil(totalRows / rowPerPage));
+                  const activePage = Math.min(Math.max(quickModalPage, 1), totalPages);
+                  const pageStart = (activePage - 1) * rowPerPage;
+                  const pageEnd = pageStart + rowPerPage;
+                  const pagedOrders = orderRows.slice(pageStart, pageEnd);
+                  const pagedDeposits = depositRows.slice(pageStart, pageEnd);
+                  const pagedCustomers = customerRows.slice(pageStart, pageEnd);
+
+                  const pageNumbers = (() => {
+                    const count = Math.min(7, totalPages);
+                    const start = Math.max(1, Math.min(activePage - 3, totalPages - count + 1));
+                    return Array.from({ length: count }, (_, index) => start + index);
+                  })();
 
                   const modalTitle =
                     quickModal === "orders"
@@ -1204,6 +1256,8 @@ export default function AdminLiveDashboard() {
 
                   const goPanel = (panel: "orders" | "payments" | "customers" | "settlement") => {
                     setQuickModal(null);
+                    setQuickModalPage(1);
+                    setQuickModalSearch("");
                     setActiveMenu(panel);
                     replacePanelInUrl(panel);
                   };
@@ -1211,105 +1265,164 @@ export default function AdminLiveDashboard() {
                   const openOrderDetail = (order: any) => {
                     const orderId = String(order?.id || "");
                     if (!orderId) return;
+                    setQuickModal(null);
                     setSelectedOrderId(orderId);
                     setOrderDetailOpen(true);
                   };
 
+                  const openCustomerDetail = (customer: { latestOrder: any; nickname: string; name: string; phone: string }) => {
+                    setQuickModal(null);
+                    setQuickModalPage(1);
+                    setQuickModalSearch("");
+                    setActiveMenu("customers");
+                    replacePanelInUrl("customers");
+                    window.setTimeout(() => {
+                      window.dispatchEvent(
+                        new CustomEvent("ruru-admin-live-customer-detail", {
+                          detail: {
+                            nickname: customer.nickname,
+                            name: customer.name,
+                            phone: customer.phone,
+                            latestOrder: customer.latestOrder,
+                          },
+                        }),
+                      );
+                    }, 0);
+                  };
+
+                  const renderPagination = () => {
+                    if (quickModal === "settlement" || totalPages <= 1) return null;
+
+                    return (
+                      <div className="mt-4 flex items-center justify-center gap-1.5">
+                        <button
+                          type="button"
+                          disabled={activePage <= 1}
+                          onClick={() => setQuickModalPage(Math.max(1, activePage - 1))}
+                          className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-500 disabled:opacity-40"
+                        >
+                          이전
+                        </button>
+                        {pageNumbers.map((page) => (
+                          <button
+                            key={page}
+                            type="button"
+                            onClick={() => setQuickModalPage(page)}
+                            className={[
+                              "h-9 min-w-9 rounded-xl px-3 text-xs font-black",
+                              page === activePage ? "bg-blue-600 text-white" : "border border-slate-200 bg-white text-slate-600",
+                            ].join(" ")}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          disabled={activePage >= totalPages}
+                          onClick={() => setQuickModalPage(Math.min(totalPages, activePage + 1))}
+                          className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-500 disabled:opacity-40"
+                        >
+                          다음
+                        </button>
+                      </div>
+                    );
+                  };
+
+                  const openManualMatchAndClose = (order: any) => {
+                    setQuickModal(null);
+                    openManualMatchForOrder(order as any);
+                  };
+
                   return (
                     <div
-                      className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-4 py-6"
+                      className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-4 py-4"
                       data-ruru-quick-modal="mini"
                     >
-                      <div className="flex max-h-[86vh] w-full max-w-[1120px] flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
-                        <div className="flex items-start justify-between border-b border-slate-100 px-7 py-5">
-                          <div>
-                            <div className="text-[11px] font-black tracking-[0.34em] text-blue-600">BROADCAST QUICK MODAL</div>
-                            <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">{modalTitle}</h2>
-                            <p className="mt-1 text-sm font-bold text-slate-500">
-                              방송 화면은 그대로 두고, 지금 필요한 확인·처리만 빠르게 합니다.
-                            </p>
+                      <div className="flex h-[90vh] max-h-[90vh] w-full max-w-[880px] flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
+                        <div className="shrink-0 border-b border-slate-100 px-6 py-4">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <div className="text-[10px] font-black tracking-[0.34em] text-blue-600">QUICK MODAL</div>
+                              <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">{modalTitle}</h2>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setQuickModal(null);
+                                setQuickModalPage(1);
+                                setQuickModalSearch("");
+                              }}
+                              className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm hover:bg-slate-50"
+                            >
+                              닫기
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => setQuickModal(null)}
-                            className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm hover:bg-slate-50"
-                          >
-                            닫기
-                          </button>
                         </div>
 
-                        <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 p-5">
-                          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-                            {quickModal === "orders" ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => goPanel("orders")}
-                                  className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white"
-                                >
-                                  주문관리
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => goPanel("payments")}
-                                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700"
-                                >
-                                  입금확인
-                                </button>
-                              </>
-                            ) : null}
+                        <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 p-4">
+                          <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {quickModal === "orders" ? (
+                                <>
+                                  <button type="button" onClick={() => goPanel("orders")} className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white">
+                                    주문관리
+                                  </button>
+                                  <button type="button" onClick={() => goPanel("payments")} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700">
+                                    입금확인
+                                  </button>
+                                </>
+                              ) : null}
 
-                            {quickModal === "payments" ? (
-                              <button
-                                type="button"
-                                onClick={loadDepositsFromServer}
-                                className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white"
-                              >
-                                입금내역 조회
-                              </button>
-                            ) : null}
+                              {quickModal === "payments" ? (
+                                <button type="button" onClick={loadDepositsFromServer} className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white">
+                                  입금내역 조회
+                                </button>
+                              ) : null}
 
-                            {quickModal === "customers" ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => goPanel("customers")}
-                                  className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-black text-white"
-                                >
-                                  고객관리
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => goPanel("orders")}
-                                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700"
-                                >
-                                  주문관리
-                                </button>
-                              </>
-                            ) : null}
+                              {quickModal === "customers" ? (
+                                <>
+                                  <button type="button" onClick={() => goPanel("customers")} className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-black text-white">
+                                    고객관리
+                                  </button>
+                                  <button type="button" onClick={() => goPanel("orders")} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700">
+                                    주문관리
+                                  </button>
+                                </>
+                              ) : null}
 
-                            {quickModal === "settlement" ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => goPanel("settlement")}
-                                  className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-black text-white"
-                                >
-                                  정산통계
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => goPanel("orders")}
-                                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700"
-                                >
-                                  주문관리
-                                </button>
-                              </>
-                            ) : null}
+                              {quickModal === "settlement" ? (
+                                <>
+                                  <button type="button" onClick={() => goPanel("settlement")} className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-black text-white">
+                                    정산통계
+                                  </button>
+                                  <button type="button" onClick={() => goPanel("orders")} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700">
+                                    주문관리
+                                  </button>
+                                </>
+                              ) : null}
 
-                            <span className="ml-auto text-xs font-bold text-slate-400">
-                              빠른 처리용 · 세부 작업은 단독 페이지
-                            </span>
+                              <span className="ml-auto text-xs font-bold text-slate-400">빠른 처리용</span>
+                            </div>
+
+                            {quickModal !== "settlement" ? (
+                              <div className="mt-3">
+                                <input
+                                  value={quickModalSearch}
+                                  onChange={(event) => {
+                                    setQuickModalSearch(event.target.value);
+                                    setQuickModalPage(1);
+                                  }}
+                                  placeholder={
+                                    quickModal === "orders"
+                                      ? "닉네임 / 이름 / 주문내역 / 금액 검색"
+                                      : quickModal === "payments"
+                                        ? "입금자명 / 시간 / 금액 검색"
+                                        : "닉네임 / 이름 / 전화번호 검색"
+                                  }
+                                  className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-800 outline-none placeholder:text-slate-400 focus:border-blue-300 focus:bg-white"
+                                />
+                              </div>
+                            ) : null}
                           </div>
 
                           {quickModal === "orders" ? (
@@ -1317,9 +1430,9 @@ export default function AdminLiveDashboard() {
                               <div className="grid grid-cols-3 gap-3">
                                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                                   <div className="text-xs font-black text-slate-500">현재 표시 주문</div>
-                                  <div className="mt-2 text-3xl font-black text-slate-950">{modalOrders.length}건</div>
+                                  <div className="mt-2 text-3xl font-black text-slate-950">{orderRows.length}건</div>
                                 </div>
-                                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">
                                   <div className="text-xs font-black text-red-500">미입금/대기</div>
                                   <div className="mt-2 text-3xl font-black text-red-600">{unpaidOrders.length}건</div>
                                 </div>
@@ -1331,20 +1444,22 @@ export default function AdminLiveDashboard() {
 
                               <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                                 <div className="mb-3 flex items-center justify-between">
-                                  <h3 className="text-lg font-black text-slate-950">최근 주문 {recentOrders.length}건</h3>
-                                  <span className="text-xs font-bold text-slate-400">상세열기 / 입금매칭 바로 처리</span>
+                                  <h3 className="text-lg font-black text-slate-950">주문 목록</h3>
+                                  <span className="text-xs font-bold text-slate-400">
+                                    {activePage}/{totalPages} 페이지 · {totalRows}건
+                                  </span>
                                 </div>
                                 <div className="divide-y divide-slate-100">
-                                  {recentOrders.length > 0 ? (
-                                    recentOrders.map((order: any, index: number) => {
+                                  {pagedOrders.length > 0 ? (
+                                    pagedOrders.map((order: any, index: number) => {
                                       const paid = isPaidOrder(order);
                                       const canceled = isCanceledOrder(order);
 
                                       return (
-                                        <div key={String(order?.id || index)} className="flex items-center gap-3 py-3">
-                                          <div className="w-8 shrink-0 text-sm font-black text-slate-400">{index + 1}</div>
-                                          <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2">
+                                        <div key={String(order?.id || `${activePage}-${index}`)} className="grid grid-cols-[32px_1fr_120px_160px] items-center gap-3 py-3">
+                                          <div className="text-sm font-black text-slate-400">{pageStart + index + 1}</div>
+                                          <div className="min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2">
                                               <span className="font-black text-slate-950">{orderNickname(order)}</span>
                                               <span
                                                 className={[
@@ -1359,32 +1474,35 @@ export default function AdminLiveDashboard() {
                                                 {canceled ? "주문취소" : paid ? "입금확인" : "입금확인 필요"}
                                               </span>
                                             </div>
-                                            <div className="mt-1 truncate text-xs font-bold text-slate-500">{orderMemo(order)}</div>
+                                            <div className="mt-1 line-clamp-2 text-xs font-bold leading-5 text-slate-500">{orderMemo(order)}</div>
                                           </div>
-                                          <div className="w-28 text-right text-sm font-black text-slate-950">{money(orderAmount(order))}</div>
-                                          {!paid && !canceled ? (
+                                          <div className="text-right text-sm font-black text-slate-950">{money(orderAmount(order))}</div>
+                                          <div className="flex justify-end gap-2">
+                                            {!paid && !canceled ? (
+                                              <button
+                                                type="button"
+                                                onClick={() => openManualMatchAndClose(order)}
+                                                className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700"
+                                              >
+                                                입금매칭
+                                              </button>
+                                            ) : null}
                                             <button
                                               type="button"
-                                              onClick={() => openManualMatchForOrder(order as any)}
-                                              className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700"
+                                              onClick={() => openOrderDetail(order)}
+                                              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-blue-600"
                                             >
-                                              입금매칭
+                                              상세열기
                                             </button>
-                                          ) : null}
-                                          <button
-                                            type="button"
-                                            onClick={() => openOrderDetail(order)}
-                                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-blue-600"
-                                          >
-                                            상세 열기
-                                          </button>
+                                          </div>
                                         </div>
                                       );
                                     })
                                   ) : (
-                                    <div className="py-10 text-center text-sm font-bold text-slate-400">최근 주문이 없습니다.</div>
+                                    <div className="py-12 text-center text-sm font-bold text-slate-400">표시할 주문이 없습니다.</div>
                                   )}
                                 </div>
+                                {renderPagination()}
                               </div>
                             </div>
                           ) : null}
@@ -1394,45 +1512,42 @@ export default function AdminLiveDashboard() {
                               <div className="grid grid-cols-3 gap-3">
                                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                                   <div className="text-xs font-black text-slate-500">입금내역</div>
-                                  <div className="mt-2 text-3xl font-black text-slate-950">{modalDeposits.length}건</div>
+                                  <div className="mt-2 text-3xl font-black text-slate-950">{depositRows.length}건</div>
                                 </div>
-                                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
                                   <div className="text-xs font-black text-blue-500">매칭 대상 주문</div>
                                   <div className="mt-2 text-3xl font-black text-blue-600">{unpaidOrders.length}건</div>
                                 </div>
-                                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
                                   <div className="text-xs font-black text-emerald-500">최근 입금 합계</div>
-                                  <div className="mt-2 text-3xl font-black text-emerald-600">{money(recentDepositAmount)}</div>
+                                  <div className="mt-2 text-2xl font-black text-emerald-600">{money(recentDepositAmount)}</div>
                                 </div>
                               </div>
 
                               <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                                 <div className="mb-3 flex items-center justify-between">
-                                  <h3 className="text-lg font-black text-slate-950">최근 입금 {recentDeposits.length}건</h3>
-                                  <button
-                                    type="button"
-                                    onClick={loadDepositsFromServer}
-                                    className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white"
-                                  >
-                                    입금내역 조회
-                                  </button>
+                                  <h3 className="text-lg font-black text-slate-950">입금 목록</h3>
+                                  <span className="text-xs font-bold text-slate-400">
+                                    {activePage}/{totalPages} 페이지 · {totalRows}건
+                                  </span>
                                 </div>
                                 <div className="divide-y divide-slate-100">
-                                  {recentDeposits.length > 0 ? (
-                                    recentDeposits.map((deposit: any, index: number) => (
-                                      <div key={String(deposit?.id || index)} className="flex items-center gap-3 py-3">
-                                        <div className="w-8 shrink-0 text-sm font-black text-slate-400">{index + 1}</div>
-                                        <div className="min-w-0 flex-1">
+                                  {pagedDeposits.length > 0 ? (
+                                    pagedDeposits.map((deposit: any, index: number) => (
+                                      <div key={String(deposit?.id || `${activePage}-${index}`)} className="grid grid-cols-[32px_1fr_150px] items-center gap-3 py-3">
+                                        <div className="text-sm font-black text-slate-400">{pageStart + index + 1}</div>
+                                        <div className="min-w-0">
                                           <div className="font-black text-slate-950">{depositName(deposit)}</div>
                                           <div className="mt-1 truncate text-xs font-bold text-slate-500">{depositTime(deposit)}</div>
                                         </div>
-                                        <div className="w-36 text-right text-base font-black text-emerald-600">{money(depositAmount(deposit))}</div>
+                                        <div className="text-right text-base font-black text-emerald-600">{money(depositAmount(deposit))}</div>
                                       </div>
                                     ))
                                   ) : (
-                                    <div className="py-10 text-center text-sm font-bold text-slate-400">최근 입금내역이 없습니다.</div>
+                                    <div className="py-12 text-center text-sm font-bold text-slate-400">표시할 입금내역이 없습니다.</div>
                                   )}
                                 </div>
+                                {renderPagination()}
                               </div>
                             </div>
                           ) : null}
@@ -1442,70 +1557,67 @@ export default function AdminLiveDashboard() {
                               <div className="grid grid-cols-3 gap-3">
                                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                                   <div className="text-xs font-black text-slate-500">고객 후보</div>
-                                  <div className="mt-2 text-3xl font-black text-slate-950">{recentCustomers.length}명</div>
+                                  <div className="mt-2 text-3xl font-black text-slate-950">{customerRows.length}명</div>
                                 </div>
-                                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
                                   <div className="text-xs font-black text-blue-500">현재 주문 기준</div>
                                   <div className="mt-2 text-3xl font-black text-blue-600">{modalAllOrders.length}건</div>
                                 </div>
                                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                                  <div className="text-xs font-black text-slate-500">고객관리 화면</div>
-                                  <div className="mt-2 text-base font-black text-slate-950">상세 관리는 사이드 메뉴에서</div>
+                                  <div className="text-xs font-black text-slate-500">고객상세보기</div>
+                                  <div className="mt-2 text-sm font-black text-slate-950">클릭 시 모달 닫힘</div>
                                 </div>
                               </div>
 
                               <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                                 <div className="mb-3 flex items-center justify-between">
-                                  <h3 className="text-lg font-black text-slate-950">최근 고객 {recentCustomers.length}명</h3>
-                                  <button
-                                    type="button"
-                                    onClick={() => goPanel("customers")}
-                                    className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-black text-white"
-                                  >
-                                    고객관리
-                                  </button>
+                                  <h3 className="text-lg font-black text-slate-950">고객 목록</h3>
+                                  <span className="text-xs font-bold text-slate-400">
+                                    {activePage}/{totalPages} 페이지 · {totalRows}명
+                                  </span>
                                 </div>
                                 <div className="divide-y divide-slate-100">
-                                  {recentCustomers.length > 0 ? (
-                                    recentCustomers.map((customer: any, index: number) => (
-                                      <div key={customer.key || index} className="flex items-center gap-3 py-3">
-                                        <div className="w-8 shrink-0 text-sm font-black text-slate-400">{index + 1}</div>
-                                        <div className="min-w-0 flex-1">
+                                  {pagedCustomers.length > 0 ? (
+                                    pagedCustomers.map((customer, index) => (
+                                      <div key={customer.key || `${activePage}-${index}`} className="grid grid-cols-[32px_1fr_120px_110px] items-center gap-3 py-3">
+                                        <div className="text-sm font-black text-slate-400">{pageStart + index + 1}</div>
+                                        <div className="min-w-0">
                                           <div className="font-black text-slate-950">{customer.nickname}</div>
                                           <div className="mt-1 truncate text-xs font-bold text-slate-500">
-                                            {customer.name || "-"} · {customer.phone || "전화번호 확인 필요"} · 주문 {customer.count}건
+                                            {customer.name || "이름 확인 필요"} · {customer.phone || "전화번호 확인 필요"} · 주문 {customer.count}건
                                           </div>
                                         </div>
-                                        <div className="w-32 text-right text-sm font-black text-slate-950">{money(customer.amount)}</div>
+                                        <div className="text-right text-sm font-black text-slate-950">{money(customer.amount)}</div>
                                         <button
                                           type="button"
-                                          onClick={() => openOrderDetail(customer.latestOrder)}
+                                          onClick={() => openCustomerDetail(customer)}
                                           className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-blue-600"
                                         >
-                                          최근 주문
+                                          고객상세
                                         </button>
                                       </div>
                                     ))
                                   ) : (
-                                    <div className="py-10 text-center text-sm font-bold text-slate-400">최근 고객이 없습니다.</div>
+                                    <div className="py-12 text-center text-sm font-bold text-slate-400">표시할 고객이 없습니다.</div>
                                   )}
                                 </div>
+                                {renderPagination()}
                               </div>
                             </div>
                           ) : null}
 
                           {quickModal === "settlement" ? (
                             <div className="space-y-4">
-                              <div className="grid grid-cols-4 gap-3">
+                              <div className="grid grid-cols-2 gap-3">
                                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                                   <div className="text-xs font-black text-slate-500">현재 주문</div>
                                   <div className="mt-2 text-3xl font-black text-slate-950">{modalAllOrders.length}건</div>
                                 </div>
-                                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
                                   <div className="text-xs font-black text-blue-500">주문 총액</div>
                                   <div className="mt-2 text-2xl font-black text-blue-600">{money(totalOrderAmount)}</div>
                                 </div>
-                                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
                                   <div className="text-xs font-black text-emerald-500">결제완료 매출</div>
                                   <div className="mt-2 text-2xl font-black text-emerald-600">{money(paidOrderAmount)}</div>
                                 </div>
@@ -1516,9 +1628,9 @@ export default function AdminLiveDashboard() {
                               </div>
 
                               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                                <h3 className="text-lg font-black text-slate-950">정산 빠른보기 안내</h3>
+                                <h3 className="text-lg font-black text-slate-950">정산 빠른보기</h3>
                                 <p className="mt-2 text-sm font-bold leading-6 text-slate-600">
-                                  이 모달은 방송 중 금액 흐름을 빠르게 보는 용도입니다. 추가 정산 수익, 창고/기타 지출, 카드 수수료 계산은 정산통계 단독 페이지에서 처리합니다.
+                                  방송 중 금액 흐름 확인용입니다. 추가 정산 수익, 창고/기타 지출, 카드 수수료 계산은 정산통계 단독 페이지에서 처리합니다.
                                 </p>
                                 <button
                                   type="button"
