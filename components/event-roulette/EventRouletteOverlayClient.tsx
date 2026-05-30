@@ -32,6 +32,37 @@ function normalizeToken(value: string) {
 
 const ROULETTE_COLORS = ["#fbcfe8", "#ddd6fe", "#bfdbfe", "#a7f3d0", "#fde68a", "#fed7aa", "#c7d2fe", "#bae6fd", "#bbf7d0", "#f5d0fe"];
 const MIN_SPIN_DISPLAY_MS = 6500;
+const RESULT_REVEAL_PAUSE_MS = 800;
+const WINNER_STOP_SPINS = 7;
+
+function normalizeRouletteName(value: string | null | undefined) {
+  return String(value || "").replace(/\s+/g, "").trim();
+}
+
+function normalizeRotation(value: number) {
+  const result = value % 360;
+
+  return result < 0 ? result + 360 : result;
+}
+
+function getWinnerStopRotation(params: {
+  currentRotation: number;
+  participants: OverlayParticipant[];
+  winnerNickname: string;
+}) {
+  const list = params.participants.length > 0 ? params.participants.slice(0, 48) : [{ nickname: "READY" }];
+  const total = Math.max(list.length, 1);
+  const step = 360 / total;
+  const winnerName = normalizeRouletteName(params.winnerNickname);
+  const winnerIndex = list.findIndex((participant) => normalizeRouletteName(participant.nickname) === winnerName);
+  const safeIndex = winnerIndex >= 0 ? winnerIndex : 0;
+  const winnerCenterAngle = safeIndex * step + step / 2;
+  const targetModulo = normalizeRotation(360 - winnerCenterAngle);
+  const currentModulo = normalizeRotation(params.currentRotation);
+  const forwardDelta = normalizeRotation(targetModulo - currentModulo);
+
+  return params.currentRotation + WINNER_STOP_SPINS * 360 + forwardDelta;
+}
 
 function segmentGradient(participants: OverlayParticipant[]) {
   const list = participants.length > 0 ? participants.slice(0, 48) : [{ nickname: "READY" }];
@@ -70,6 +101,8 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
   const [message, setMessage] = useState("룰렛 준비중");
   const [loadedAt, setLoadedAt] = useState(0);
   const [revealedResultKey, setRevealedResultKey] = useState("");
+  const [wheelRotation, setWheelRotation] = useState(0);
+  const [isWheelDecelerating, setIsWheelDecelerating] = useState(false);
 
   useEffect(() => {
     const html = document.documentElement;
@@ -137,16 +170,20 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
       ? `${event.updated_at || ""}|${event.result_at || ""}|${event.winner_nickname}|${event.winner_note || ""}`
       : "";
   const isPendingResult = Boolean(resultKey) && revealedResultKey !== resultKey;
-  const isRouletteSpinning = event?.status === "spinning" || isPendingResult;
+  const isWaitingForResult = event?.status === "spinning" && !resultKey;
+  const isRouletteSpinning = isWaitingForResult || isPendingResult;
   const hasResult = event?.status === "result" && Boolean(event.winner_nickname) && revealedResultKey === resultKey;
-  const rotation = loadedAt % 360;
-  const statusMessage = isRouletteSpinning ? "룰렛이 돌아가는 중..." : message;
+  const idleRotation = loadedAt % 360;
+  const displayRotation = isWaitingForResult || isPendingResult || hasResult ? wheelRotation : idleRotation;
+  const statusMessage = isRouletteSpinning ? "🔥 룰렛 추첨 중..." : message;
 
   useEffect(() => {
     if (!resultKey) {
       if (revealedResultKey) {
         setRevealedResultKey("");
       }
+
+      setIsWheelDecelerating(false);
       return;
     }
 
@@ -154,12 +191,22 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
       return;
     }
 
-    const timer = window.setTimeout(() => {
-      setRevealedResultKey(resultKey);
-    }, MIN_SPIN_DISPLAY_MS);
+    setIsWheelDecelerating(true);
+    setWheelRotation((currentRotation) =>
+      getWinnerStopRotation({
+        currentRotation,
+        participants: visibleParticipants,
+        winnerNickname: event?.winner_nickname || "",
+      }),
+    );
 
-    return () => window.clearTimeout(timer);
-  }, [resultKey, revealedResultKey]);
+    const revealTimer = window.setTimeout(() => {
+      setRevealedResultKey(resultKey);
+      setIsWheelDecelerating(false);
+    }, MIN_SPIN_DISPLAY_MS + RESULT_REVEAL_PAUSE_MS);
+
+    return () => window.clearTimeout(revealTimer);
+  }, [resultKey, revealedResultKey, event?.winner_nickname, visibleParticipants]);
 
   if (!token) {
     return (
@@ -194,8 +241,12 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
               className="absolute inset-[3%] rounded-full"
               style={{
                 background: gradient,
-                transform: isRouletteSpinning ? undefined : `rotate(${rotation}deg)`,
-                animation: isRouletteSpinning ? "ruruRouletteSpin 4.8s cubic-bezier(.16,.9,.18,1) infinite" : undefined,
+                transform: `rotate(${displayRotation}deg)`,
+                transition: isWheelDecelerating
+                  ? `transform ${MIN_SPIN_DISPLAY_MS}ms cubic-bezier(.06,.82,.12,1)`
+                  : undefined,
+                willChange: isRouletteSpinning ? "transform" : undefined,
+                animation: isWaitingForResult ? "ruruRouletteFastSpin 0.42s linear infinite" : undefined,
               }}
             >
               <div className="absolute inset-0 rounded-full ring-1 ring-slate-500/15" />
@@ -253,15 +304,12 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
               overflow: hidden !important;
             }
 
-            @keyframes ruruRouletteSpin {
-              0% {
-                transform: rotate(0deg);
+            @keyframes ruruRouletteFastSpin {
+              from {
+                transform: rotate(0deg) translateZ(0);
               }
-              72% {
-                transform: rotate(1240deg);
-              }
-              100% {
-                transform: rotate(1440deg);
+              to {
+                transform: rotate(360deg) translateZ(0);
               }
             }
           `}</style>
