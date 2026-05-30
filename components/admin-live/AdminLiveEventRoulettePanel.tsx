@@ -470,8 +470,8 @@ export default function AdminLiveEventRoulettePanel({
 
       {open ? (
         <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/50 px-4 py-5 backdrop-blur-sm">
-          <div className="flex h-[min(94vh,900px)] w-full max-w-[1240px] flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-slate-50 shadow-2xl">
-            <div className="shrink-0 border-b border-slate-200 bg-white/95 px-6 py-4">
+          <div className="flex h-[min(92vh,880px)] w-full max-w-[1280px] flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-slate-50 shadow-2xl">
+            <div className="shrink-0 border-b border-slate-200 bg-white/95 px-6 py-3.5">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-3">
@@ -533,9 +533,9 @@ export default function AdminLiveEventRoulettePanel({
                 </div>
               </div>
 
-              <div className="mt-4 grid gap-3 xl:grid-cols-[1fr_600px]">
+              <div className="mt-3 grid gap-3 xl:grid-cols-[1fr_560px]">
                 <div
-                  className={`rounded-2xl border px-4 py-3 text-sm font-black ${
+                  className={`rounded-2xl border px-4 py-2.5 text-sm font-black ${
                     mode === "live"
                       ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                       : "border-amber-200 bg-amber-50 text-amber-800"
@@ -546,7 +546,7 @@ export default function AdminLiveEventRoulettePanel({
                     : "현재 테스트 모드입니다. 실제 운영 기록과 분리되며, 테스트 기록은 정리할 수 있습니다."}
                 </div>
 
-                <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5">
                   <div className="shrink-0 text-sm font-black text-slate-900">방송용 위젯주소</div>
                   <div className="min-w-0 flex-1 truncate rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-500 ring-1 ring-slate-100">
                     {overlayUrl || "고정 방송용 위젯주소를 준비중입니다."}
@@ -563,13 +563,13 @@ export default function AdminLiveEventRoulettePanel({
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-hidden px-6 py-5">
-              <div className="grid h-full min-h-0 gap-5 xl:grid-cols-[1.25fr_0.75fr]">
-                <div className="grid min-h-0 grid-rows-[auto_1fr] gap-5">
-                  <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="grid gap-4 lg:grid-cols-[1fr_180px]">
+            <div className="min-h-0 flex-1 overflow-hidden px-6 py-4">
+              <div className="grid h-full min-h-0 gap-4 xl:grid-cols-[1.42fr_0.82fr]">
+                <div className="grid min-h-0 grid-rows-[auto_1fr] gap-4">
+                  <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="grid gap-4 lg:grid-cols-[1fr_170px]">
                       <div className="space-y-4">
-                        <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                        <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
                           <div>
                             <div className="text-lg font-black text-slate-950">룰렛 준비</div>
                             <div className="mt-1 text-xs font-bold text-slate-400">
@@ -636,9 +636,9 @@ export default function AdminLiveEventRoulettePanel({
                         </div>
                       </div>
 
-                      <div className="flex min-h-[168px] flex-col items-center justify-center rounded-3xl bg-[radial-gradient(circle_at_50%_35%,#ffffff,#f5f3ff_52%,#1e1b4b_100%)] p-4 text-center shadow-inner ring-1 ring-violet-100">
-                        <div className="relative mb-3 flex h-24 w-24 items-center justify-center rounded-full bg-white/80 shadow-lg ring-4 ring-violet-200">
-                          <div className="absolute h-full w-full rounded-full border-[14px] border-violet-200 border-t-amber-300 border-r-rose-200" />
+                      <div className="flex min-h-[156px] flex-col items-center justify-center rounded-3xl bg-[radial-gradient(circle_at_50%_35%,#ffffff,#f5f3ff_52%,#1e1b4b_100%)] p-4 text-center shadow-inner ring-1 ring-violet-100">
+                        <div className="relative mb-3 flex h-20 w-20 items-center justify-center rounded-full bg-white/80 shadow-lg ring-4 ring-violet-200">
+                          <div className="absolute h-full w-full rounded-full border-[12px] border-violet-200 border-t-amber-300 border-r-rose-200" />
                           <div className="z-10 h-5 w-5 rounded-full bg-violet-600" />
                         </div>
                         <div className="text-sm font-black text-white drop-shadow">루루동이룰렛</div>
@@ -648,7 +648,7 @@ export default function AdminLiveEventRoulettePanel({
                   </section>
 
                   <section className="flex min-h-0 flex-col rounded-[24px] border border-slate-200 bg-white shadow-sm">
-                    <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-4">
+                    <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-3.5">
                       <div>
                         <div className="text-lg font-black text-slate-950">참여자 목록</div>
                         <div className="mt-1 text-xs font-bold text-slate-400">
@@ -662,7 +662,7 @@ export default function AdminLiveEventRoulettePanel({
 
                     <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto">
                       {participants.length === 0 ? (
-                        <div className="px-4 py-16 text-center text-sm font-bold text-slate-400">
+                        <div className="px-4 py-12 text-center text-sm font-bold text-slate-400">
                           참여자가 없습니다. 방송리스트를 선택하고 참여자 불러오기를 눌러주세요.
                         </div>
                       ) : (
@@ -686,7 +686,7 @@ export default function AdminLiveEventRoulettePanel({
                   </section>
                 </div>
 
-                <aside className="grid min-h-0 grid-rows-[176px_1fr] gap-4">
+                <aside className="grid min-h-0 grid-rows-[150px_1fr] gap-4">
                   <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="flex items-center justify-between">
                       <div className="text-lg font-black text-slate-950">현재 룰렛</div>
@@ -718,20 +718,20 @@ export default function AdminLiveEventRoulettePanel({
                         <button
                           type="button"
                           onClick={() => void deleteRouletteEvent(currentEvent, "현재 룰렛")}
-                          className="col-span-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98] active:bg-amber-200"
+                          className="col-span-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98] active:bg-amber-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-100"
                         >
                           현재 룰렛 기록 삭제
                         </button>
                       </div>
                     ) : (
-                      <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-7 text-center text-sm font-bold text-slate-400">
+                      <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5 text-center text-sm font-bold text-slate-400">
                         아직 만든 룰렛이 없습니다.
                       </div>
                     )}
                   </section>
 
                   <section className="flex min-h-0 flex-col overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
-                    <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 px-5 py-4">
+                    <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 px-5 py-3.5">
                       <div className="min-w-0">
                         <div className="text-lg font-black text-slate-950">당첨자 리스트</div>
                         <div className="mt-1 truncate text-xs font-bold text-slate-400">잘못 만든 룰렛만 개별 삭제됩니다. 운영 전체삭제는 없습니다.</div>
@@ -747,7 +747,7 @@ export default function AdminLiveEventRoulettePanel({
 
                     <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3">
                       {winners.length === 0 ? (
-                        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-7 text-center text-sm font-bold text-slate-400">
+                        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm font-bold text-slate-400">
                           아직 당첨 기록이 없습니다.
                         </div>
                       ) : (
@@ -793,14 +793,14 @@ export default function AdminLiveEventRoulettePanel({
                       )}
                     </div>
 
-                    <details className="shrink-0 border-t border-slate-100 bg-slate-50 px-4 py-3">
-                      <summary className="cursor-pointer select-none rounded-xl px-1 py-1 text-sm font-black text-slate-700 transition active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200">
+                    <details className="shrink-0 border-t border-slate-100 bg-slate-50 px-4 py-2.5">
+                      <summary className="cursor-pointer select-none rounded-xl px-1 py-1 text-sm font-black text-slate-700 transition hover:bg-slate-50 active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-100">
                         최근 이벤트 · 최근 {Math.min(events.length, 20)}개
                       </summary>
 
                       <div className="mt-3 max-h-[150px] space-y-2 overflow-y-auto pr-1">
                         {events.length === 0 ? (
-                          <div className="rounded-2xl bg-slate-50 px-4 py-4 text-center text-sm font-bold text-slate-400">최근 이벤트 없음</div>
+                          <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5 text-center text-sm font-bold text-slate-400">최근 이벤트 없음</div>
                         ) : (
                           events.slice(0, 20).map((event) => (
                             <div
@@ -826,7 +826,7 @@ export default function AdminLiveEventRoulettePanel({
                               <button
                                 type="button"
                                 onClick={() => void deleteRouletteEvent(event, "최근 이벤트")}
-                                className="mt-2 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98] active:bg-amber-200"
+                                className="mt-2 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98] active:bg-amber-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-100"
                               >
                                 이 룰렛 기록 삭제
                               </button>
