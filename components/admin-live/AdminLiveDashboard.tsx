@@ -27,7 +27,6 @@ import AdminLivePaymentPanel from "./AdminLivePaymentPanel";
 import AdminLiveSettlementPanel from "./AdminLiveSettlementPanel";
 import AdminLiveSettingsPanel from "./AdminLiveSettingsPanel";
 import AdminLiveSidebar from "./AdminLiveSidebar";
-import LiveHeader from "./LiveHeader";
 import LiveStatsCards from "./LiveStatsCards";
 import LiveBroadcastPanels from "./LiveBroadcastPanels";
 import LiveBroadcastEndSummaryModal, { type LiveBroadcastEndSummary } from "./LiveBroadcastEndSummaryModal";
@@ -53,6 +52,7 @@ import {
 import { useAutoBankdaPaymentSync } from "./useAutoBankdaPaymentSync";
 import AdminLiveQuickProductDrawer from "./AdminLiveQuickProductDrawer";
 import AdminLiveProductListPanel from "./AdminLiveProductListPanel";
+import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
 import {
   buildAlwaysOrderOptions,
   getAlwaysOrderDateFromFilter,
@@ -523,6 +523,8 @@ export default function AdminLiveDashboard() {
   const [loadError, setLoadError] = useState("");
   const [filters, setFilters] = useState<LiveOrderFilters>(DEFAULT_FILTERS);
   const [broadcastEndSummary, setBroadcastEndSummary] = useState<LiveBroadcastEndSummary | null>(null);
+  const [controlTitle, setControlTitle] = useState("루루동이LIVE");
+  const [controlYoutubeUrl, setControlYoutubeUrl] = useState("");
 
   const loadDepositsFromServer = async () => {
     const response = await fetch("/api/admin-v2/deposits", {
@@ -646,6 +648,13 @@ export default function AdminLiveDashboard() {
   }, []);
 
   const activeBroadcast = useMemo(() => getActiveBroadcast(broadcasts), [broadcasts]);
+  useEffect(() => {
+    if (!activeBroadcast) return;
+
+    setControlTitle(activeBroadcast.public_title || "루루동이LIVE");
+    setControlYoutubeUrl(activeBroadcast.youtube_live_url || "");
+  }, [activeBroadcast?.id]);
+
 
   const broadcastOptions = useMemo(() => {
     const todayDateKey = getAlwaysOrderDateKey(new Date().toISOString());
@@ -853,7 +862,10 @@ export default function AdminLiveDashboard() {
   const criteriaLabel = buildCriteriaLabel(filters);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div
+      className="min-h-screen bg-slate-100 text-slate-950"
+      data-ruru-controltower-shell="slide-panel-v1-fix-props"
+    >
       <div className="flex min-h-screen">
         <AdminLiveSidebar
           activeMenu={activeMenu}
@@ -864,69 +876,162 @@ export default function AdminLiveDashboard() {
         />
 
         <main className="min-w-0 flex-1 overflow-x-hidden px-5 py-4">
-          {activeMenu === "broadcast" ? (
-            <>
-          <LiveHeader
-            videoRatio={videoRatio}
-            onVideoRatioChange={setVideoRatio}
-            activeBroadcast={activeBroadcast}
-            savingBroadcast={savingBroadcast}
-            onStartBroadcast={startBroadcast}
-            onEndBroadcast={endBroadcast}
-            onSaveBroadcast={saveBroadcast}
-          />
-          <div className="mb-6 grid w-full grid-cols-12 grid-rows-[auto_480px] items-stretch gap-3">
+          <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-[25px] font-black tracking-tight text-slate-950">방송 컨트롤타워</h1>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
+                      {new Date().toLocaleDateString("ko-KR", {
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        weekday: "long",
+                      })}
+                    </span>
+                    <span
+                      className={[
+                        "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black",
+                        activeBroadcast ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700",
+                      ].join(" ")}
+                    >
+                      <span className={["h-2 w-2 rounded-full", activeBroadcast ? "bg-emerald-500" : "bg-amber-500"].join(" ")} />
+                      {activeBroadcast ? "방송중" : "대기중"}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs font-bold text-slate-500">
+                    방송 중 주문·입금·상품·고객 이슈를 한 화면에서 처리하는 운영 메인 화면입니다.
+                  </p>
+                </div>
+              </div>
 
-            <div className="col-span-12 min-w-0 xl:col-span-8">
-
-              <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
-
+              <div className="flex shrink-0 items-center gap-2">
+                <AdminLiveEventRoulettePanel
+                  buttonLabel="🎁 이벤트 룰렛"
+                  buttonClassName="h-10 rounded-2xl bg-violet-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98]"
+                />
+                <button
+                  type="button"
+                  disabled={savingBroadcast || Boolean(activeBroadcast)}
+                  onClick={() => startBroadcast({ title: controlTitle, youtubeUrl: controlYoutubeUrl })}
+                  className="h-10 rounded-2xl bg-emerald-600 px-5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.98] disabled:bg-slate-300"
+                >
+                  ▶ 방송시작
+                </button>
+                <button
+                  type="button"
+                  disabled={savingBroadcast || !activeBroadcast}
+                  onClick={endBroadcast}
+                  className="h-10 rounded-2xl bg-slate-800 px-5 text-sm font-black text-white shadow-sm transition hover:bg-slate-950 active:scale-[0.98] disabled:bg-slate-300"
+                >
+                  ■ 방송종료
+                </button>
+              </div>
             </div>
 
+            <div className="mt-4 grid grid-cols-12 gap-3">
+              <label className="col-span-12 min-w-0 lg:col-span-4">
+                <span className="mb-1 block text-[11px] font-black text-slate-500">방송 제목</span>
+                <input
+                  value={controlTitle}
+                  onChange={(event) => setControlTitle(event.target.value)}
+                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-950 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  placeholder="루루동이LIVE"
+                />
+              </label>
 
-            <div className="col-span-12 min-h-0 min-w-0 overflow-hidden xl:col-span-4 xl:row-span-2">
+              <label className="col-span-12 min-w-0 lg:col-span-4">
+                <span className="mb-1 block text-[11px] font-black text-slate-500">유튜브 라이브 URL</span>
+                <input
+                  value={controlYoutubeUrl}
+                  onChange={(event) => setControlYoutubeUrl(event.target.value)}
+                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-950 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  placeholder="https://www.youtube.com/watch?v=..."
+                />
+              </label>
 
-              <AdminLiveProductListPanel fillHeight className="h-full min-w-0 overflow-hidden" />
+              <div className="col-span-6 min-w-0 lg:col-span-1">
+                <span className="mb-1 block text-[11px] font-black text-slate-500">시작시간</span>
+                <div className="flex h-11 items-center rounded-2xl border border-slate-200 bg-slate-50 px-3 text-xs font-black text-slate-800">
+                  {activeBroadcast?.started_at
+                    ? new Date(activeBroadcast.started_at).toLocaleTimeString("ko-KR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "방송시작 전"}
+                </div>
+              </div>
 
+              <label className="col-span-6 min-w-0 lg:col-span-1">
+                <span className="mb-1 block text-[11px] font-black text-slate-500">화면비율</span>
+                <select
+                  value={videoRatio}
+                  onChange={(event) => setVideoRatio(event.target.value as VideoRatio)}
+                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="vertical">세로 9:16</option>
+                  <option value="wide">가로 16:9</option>
+                  <option value="auto">자동</option>
+                </select>
+              </label>
+
+              <div className="col-span-12 flex items-end gap-2 lg:col-span-2">
+                <button
+                  type="button"
+                  disabled={savingBroadcast || !activeBroadcast}
+                  onClick={() => saveBroadcast({ title: controlTitle, youtubeUrl: controlYoutubeUrl })}
+                  className="h-11 flex-1 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  저장
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveMenu("settings");
+                    replacePanelInUrl("settings");
+                  }}
+                  className="h-11 rounded-2xl bg-slate-100 px-4 text-sm font-black text-slate-700 transition hover:bg-slate-200 active:scale-[0.98]"
+                >
+                  설정
+                </button>
+              </div>
             </div>
-
-
-            <div className="col-span-12 min-w-0 xl:col-span-8">
-
-              <LiveBroadcastPanels videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} />
-
-            </div>
-
-          </div>
-{loadError && (
-            <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700">
-              주문 데이터 불러오기 실패: {loadError}
-            </div>
-          )}
-
-          <section className="grid grid-cols-12 gap-3">
-            <div className="col-span-12 xl:col-span-12">
-              <LiveOrderTable
-                orders={filteredOrders}
-                allOrderCount={orders.length}
-                selectedOrderId={selectedOrder?.id || ""}
-                onSelectOrder={(order) => {
-                  setSelectedOrderId(order.id);
-                  setOrderDetailOpen(true);
-                }}
-                onOpenManualMatch={openManualMatchForOrder}
-                onRefresh={loadOrders}
-                loading={loading}
-                filters={filters}
-                onFiltersChange={setFilters}
-                broadcastOptions={broadcastOptions}
-              />
-            </div>
-
-
           </section>
 
-          {orderDetailOpen && selectedOrder ? (
+          <section className="mt-4">
+            <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
+          </section>
+
+          <section className="mt-4 grid min-h-[500px] grid-cols-12 gap-4">
+            <div className="col-span-12 min-h-[500px] min-w-0 overflow-hidden xl:col-span-8">
+              <LiveBroadcastPanels videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || controlYoutubeUrl || ""} />
+            </div>
+
+            <aside className="col-span-12 min-h-[500px] min-w-0 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm xl:col-span-4">
+              <AdminLiveProductListPanel fillHeight className="h-full min-w-0 overflow-hidden" />
+            </aside>
+          </section>
+
+          <section className="mt-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
+            <LiveOrderTable
+              orders={filteredOrders}
+              allOrderCount={orders.length}
+              selectedOrderId={selectedOrder?.id || ""}
+              loading={loading}
+              filters={filters}
+              broadcastOptions={broadcastOptions}
+              onSelectOrder={(order) => {
+                setSelectedOrderId(order.id);
+                setOrderDetailOpen(true);
+              }}
+              onFiltersChange={setFilters}
+              onRefresh={loadOrders}
+              onOpenManualMatch={openManualMatchForOrder}
+            />
+          </section>
+
+          {selectedOrder && orderDetailOpen ? (
             <LiveOrderDetailDrawer
               order={selectedOrder}
               onOpenManualMatch={openManualMatchForOrder}
@@ -934,48 +1039,13 @@ export default function AdminLiveDashboard() {
             />
           ) : null}
 
-            </>
-          ) : activeMenu === "orders" ? (
-            <AdminLiveOrdersPanel
-              orders={filteredOrders}
-              allOrderCount={orders.length}
-              selectedOrder={selectedOrder}
-              selectedOrderId={selectedOrder?.id || ""}
-              orderDetailOpen={orderDetailOpen}
-              filters={filters}
-              broadcastOptions={broadcastOptions}
-              onSelectOrder={(order) => {
-                setSelectedOrderId(order.id);
-                setOrderDetailOpen(true);
-              }}
-              onCloseOrderDetail={() => setOrderDetailOpen(false)}
-              onFiltersChange={setFilters}
-              onRefresh={loadOrders}
-            />
-          ) : activeMenu === "payments" ? (
-            <AdminLivePaymentPanel
-              deposits={deposits}
-              orderGroups={orderGroups}
-              onRefresh={loadDepositsFromServer}
-              onBankdaSync={syncBankdaDepositsOnly}
-              onOpenManualMatch={setManualMatchGroup}
-            />
-          ) : activeMenu === "customers" ? (
-            <AdminLiveCustomersPanel orders={orders} />
-          ) : activeMenu === "settlement" ? (
-            <AdminLiveSettlementPanel orders={orders} />
-          ) : activeMenu === "settings" ? (
-            <AdminLiveSettingsPanel />
-          ) : (
-            <AdminLiveMenuPlaceholder menuKey={activeMenu} />
-          )}
-
           <ManualPaymentMatchDrawer
             group={manualMatchGroup}
             deposits={deposits}
             onClose={() => setManualMatchGroup(null)}
             onMatched={refreshAfterManualMatch}
           />
+
           {broadcastEndSummary ? (
             <LiveBroadcastEndSummaryModal
               summary={broadcastEndSummary}
@@ -989,8 +1059,80 @@ export default function AdminLiveDashboard() {
           ) : null}
 
           <AdminLiveQuickProductDrawer activeBroadcastId={activeBroadcast?.id || null} />
+        </main>
 
-      </main>
+        {activeMenu !== "broadcast" ? (
+          <aside
+            className="fixed inset-y-0 right-0 z-[80] flex w-[min(760px,calc(100vw-260px))] flex-col border-l border-slate-200 bg-white shadow-2xl"
+            data-ruru-controltower-slide-panel="right-drawer"
+          >
+            <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 px-5">
+              <div>
+                <div className="text-lg font-black text-slate-950">
+                  {activeMenu === "orders"
+                    ? "주문관리 빠른패널"
+                    : activeMenu === "payments"
+                    ? "입금확인 빠른패널"
+                    : activeMenu === "customers"
+                    ? "고객관리 빠른패널"
+                    : activeMenu === "settlement"
+                    ? "정산요약 빠른패널"
+                    : activeMenu === "settings"
+                    ? "방송 설정 빠른패널"
+                    : "빠른패널"}
+                </div>
+                <div className="mt-0.5 text-xs font-bold text-slate-400">방송 화면을 유지한 채 필요한 업무만 바로 확인합니다.</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveMenu("broadcast");
+                  replacePanelInUrl("broadcast");
+                }}
+                className="h-10 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:bg-slate-50 active:scale-[0.98]"
+              >
+                닫기
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 p-4">
+              {activeMenu === "orders" ? (
+                <AdminLiveOrdersPanel
+                  orders={filteredOrders}
+                  allOrderCount={orders.length}
+                  selectedOrder={selectedOrder}
+                  selectedOrderId={selectedOrder?.id || ""}
+                  orderDetailOpen={orderDetailOpen}
+                  filters={filters}
+                  broadcastOptions={broadcastOptions}
+                  onSelectOrder={(order) => {
+                    setSelectedOrderId(order.id);
+                    setOrderDetailOpen(true);
+                  }}
+                  onCloseOrderDetail={() => setOrderDetailOpen(false)}
+                  onFiltersChange={setFilters}
+                  onRefresh={loadOrders}
+                />
+              ) : activeMenu === "payments" ? (
+                <AdminLivePaymentPanel
+                  deposits={deposits}
+                  orderGroups={orderGroups}
+                  onRefresh={loadDepositsFromServer}
+                  onBankdaSync={syncBankdaDepositsOnly}
+                  onOpenManualMatch={setManualMatchGroup}
+                />
+              ) : activeMenu === "customers" ? (
+                <AdminLiveCustomersPanel orders={orders} />
+              ) : activeMenu === "settlement" ? (
+                <AdminLiveSettlementPanel orders={orders} />
+              ) : activeMenu === "settings" ? (
+                <AdminLiveSettingsPanel />
+              ) : (
+                <AdminLiveMenuPlaceholder menuKey={activeMenu} />
+              )}
+            </div>
+          </aside>
+        ) : null}
       </div>
     </div>
   );
