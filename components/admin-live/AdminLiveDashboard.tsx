@@ -527,6 +527,10 @@ export default function AdminLiveDashboard() {
   const [quickModalSearch, setQuickModalSearch] = useState("");
   const [quickModalPage, setQuickModalPage] = useState(1);
   const [quickModalCustomerDetail, setQuickModalCustomerDetail] = useState<any | null>(null);
+  const [quickPointAmount, setQuickPointAmount] = useState("");
+  const [quickPointMemo, setQuickPointMemo] = useState("");
+  const [quickPointSaving, setQuickPointSaving] = useState<"add" | "subtract" | null>(null);
+  const [quickPointMessage, setQuickPointMessage] = useState("");
 
   const loadDepositsFromServer = async () => {
     const response = await fetch("/api/admin-v2/deposits", {
@@ -1378,6 +1382,10 @@ export default function AdminLiveDashboard() {
                     setQuickModalPage(1);
                     setQuickModalSearch("");
                     setQuickModalCustomerDetail(null);
+                    setQuickPointAmount("");
+                    setQuickPointMemo("");
+                    setQuickPointSaving(null);
+                    setQuickPointMessage("");
                   };
 
                   const goPanel = (panel: "orders" | "payments" | "customers" | "settlement") => {
@@ -1469,6 +1477,67 @@ export default function AdminLiveDashboard() {
                     return <span className={`rounded-full px-2 py-1 text-[11px] font-black ${klass}`}>{label}</span>;
                   };
 
+                  const submitQuickPoint = async (mode: "add" | "subtract") => {
+                    if (!quickModalCustomerDetail || quickPointSaving) return;
+
+                    const amount = toNumber(quickPointAmount);
+                    if (amount <= 0) {
+                      setQuickPointMessage("포인트 금액을 1원 이상 입력해주세요.");
+                      return;
+                    }
+
+                    const signedAmount = mode === "add" ? amount : -amount;
+                    const memo = quickPointMemo.trim() || (mode === "add" ? "방송 중 빠른보기 포인트 지급" : "방송 중 빠른보기 포인트 회수");
+
+                    setQuickPointSaving(mode);
+                    setQuickPointMessage("");
+
+                    try {
+                      const response = await fetch("/api/admin-live/customer-points", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          action: mode === "add" ? "grant" : "revoke",
+                          type: mode === "add" ? "grant" : "revoke",
+                          mode,
+                          kind: mode,
+                          direction: mode,
+                          amount,
+                          point: amount,
+                          points: amount,
+                          point_amount: amount,
+                          delta: signedAmount,
+                          point_delta: signedAmount,
+                          change_amount: signedAmount,
+                          customer_id: quickModalCustomerDetail.customer_id || quickModalCustomerDetail.customerId || quickModalCustomerDetail.id || undefined,
+                          customerId: quickModalCustomerDetail.customer_id || quickModalCustomerDetail.customerId || quickModalCustomerDetail.id || undefined,
+                          nickname: quickModalCustomerDetail.nickname,
+                          customer_nickname: quickModalCustomerDetail.nickname,
+                          phone: quickModalCustomerDetail.phone,
+                          customer_phone: quickModalCustomerDetail.phone,
+                          name: quickModalCustomerDetail.name,
+                          customer_name: quickModalCustomerDetail.name,
+                          memo,
+                          reason: memo,
+                          note: memo,
+                        }),
+                      });
+
+                      const result = await response.json().catch(() => null);
+                      if (!response.ok || result?.ok === false || result?.success === false) {
+                        throw new Error(result?.message || result?.error || "포인트 처리에 실패했습니다.");
+                      }
+
+                      setQuickPointMessage(`포인트 ${mode === "add" ? "지급" : "회수"} 완료: ${money(amount)}`);
+                      setQuickPointAmount("");
+                      setQuickPointMemo("");
+                    } catch (error) {
+                      setQuickPointMessage(error instanceof Error ? error.message : "포인트 처리 중 오류가 발생했습니다.");
+                    } finally {
+                      setQuickPointSaving(null);
+                    }
+                  };
+
                   return (
                     <div
                       className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-4 py-4"
@@ -1549,16 +1618,71 @@ export default function AdminLiveDashboard() {
                                 <div className="mb-4 flex items-center justify-between gap-3">
                                   <div>
                                     <h3 className="text-lg font-black text-slate-950">🎁 포인트 관리</h3>
-                                    <p className="mt-1 text-xs font-bold text-slate-500">포인트 지급/회수는 고객관리의 기존 저장 로직으로 처리합니다.</p>
+                                    <p className="mt-1 text-xs font-bold text-slate-500">고객관리로 이동하지 않고 이 창에서 바로 지급/회수합니다.</p>
                                   </div>
-                                  <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-600">고객관리 연결</span>
+                                  <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-600">모달 안 처리</span>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                  <button type="button" onClick={() => goPanel("customers")} className="rounded-2xl bg-blue-600 px-4 py-4 text-sm font-black text-white shadow-sm">
-                                    포인트 지급
-                                  </button>
-                                  <button type="button" onClick={() => goPanel("customers")} className="rounded-2xl bg-slate-900 px-4 py-4 text-sm font-black text-white shadow-sm">
-                                    포인트 회수
+
+                                <div className="grid gap-3">
+                                  <label className="block">
+                                    <span className="text-xs font-black text-slate-500">포인트 금액</span>
+                                    <input
+                                      value={quickPointAmount}
+                                      onChange={(event) => {
+                                        const digits = event.target.value.replace(/[^0-9]/g, "");
+                                        setQuickPointAmount(digits ? Number(digits).toLocaleString("ko-KR") : "");
+                                        setQuickPointMessage("");
+                                      }}
+                                      placeholder="예: 10,000"
+                                      inputMode="numeric"
+                                      className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-black text-slate-950 outline-none focus:border-blue-300 focus:bg-white"
+                                    />
+                                  </label>
+
+                                  <label className="block">
+                                    <span className="text-xs font-black text-slate-500">메모</span>
+                                    <input
+                                      value={quickPointMemo}
+                                      onChange={(event) => {
+                                        setQuickPointMemo(event.target.value);
+                                        setQuickPointMessage("");
+                                      }}
+                                      placeholder="예: 방송 이벤트 지급 / 오지급 회수"
+                                      className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-950 outline-none focus:border-blue-300 focus:bg-white"
+                                    />
+                                  </label>
+
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                      type="button"
+                                      disabled={quickPointSaving !== null}
+                                      onClick={() => submitQuickPoint("add")}
+                                      className="rounded-2xl bg-blue-600 px-4 py-4 text-sm font-black text-white shadow-sm disabled:opacity-50"
+                                    >
+                                      {quickPointSaving === "add" ? "지급 중..." : "포인트 지급"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={quickPointSaving !== null}
+                                      onClick={() => submitQuickPoint("subtract")}
+                                      className="rounded-2xl bg-slate-900 px-4 py-4 text-sm font-black text-white shadow-sm disabled:opacity-50"
+                                    >
+                                      {quickPointSaving === "subtract" ? "회수 중..." : "포인트 회수"}
+                                    </button>
+                                  </div>
+
+                                  {quickPointMessage ? (
+                                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700">
+                                      {quickPointMessage}
+                                    </div>
+                                  ) : null}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => goPanel("customers")}
+                                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-black text-slate-600"
+                                  >
+                                    고객관리 전체 화면에서 자세히 보기
                                   </button>
                                 </div>
                               </div>
