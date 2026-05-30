@@ -383,6 +383,7 @@ export default function AdminLiveEventRoulettePanel({
         body: JSON.stringify({
           action: "delete_winner",
           winnerId: winner.id,
+          eventId: winner.event_id,
           allowLiveDelete: !winner.is_test,
           liveConfirmText: winner.is_test ? "" : "운영기록삭제",
         }),
@@ -400,6 +401,42 @@ export default function AdminLiveEventRoulettePanel({
       await loadEventsAndWinners();
     } catch (error) {
       showAdminToast(`${recordLabel} 삭제 실패\n\n` + (error instanceof Error ? error.message : String(error)), "error");
+    }
+  };
+
+  const resetCurrentEventResult = async () => {
+    if (!currentEvent?.id) {
+      showAdminToast("정리할 현재 룰렛 ID가 없습니다.", "warning");
+      return;
+    }
+
+    const isLive = currentEvent.mode === "live";
+    const confirmMessage = isLive
+      ? `현재 운영 룰렛 결과를 정리합니다.\n\n당첨자 리스트와 최근 이벤트의 result 표시가 초기화됩니다.\n이미 지급/안내한 내용은 별도로 확인해야 합니다.\n\n정말 정리할까요?`
+      : `현재 테스트 룰렛 결과를 정리할까요?`;
+
+    if (!window.confirm(confirmMessage)) return;
+
+    try {
+      const payload = await requestJson<{ ok: boolean; message?: string }>("/api/admin-live/event-roulette", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "reset_event_result",
+          eventId: currentEvent.id,
+          allowLiveReset: isLive,
+          liveConfirmText: isLive ? "운영결과정리" : "",
+        }),
+      });
+
+      if (!payload.ok) {
+        throw new Error(payload.message || "현재 룰렛 결과 정리 실패");
+      }
+
+      setCurrentEvent(null);
+      showAdminToast("현재 룰렛 결과를 정리했습니다.", "success");
+      await loadEventsAndWinners();
+    } catch (error) {
+      showAdminToast("현재 룰렛 결과 정리 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
     }
   };
 
@@ -687,6 +724,15 @@ export default function AdminLiveEventRoulettePanel({
                           <div className="text-xs font-black text-slate-400">당첨내용</div>
                           <div className="mt-1 truncate text-base font-black text-slate-700">{currentEvent.winner_note || winnerNote || "-"}</div>
                         </div>
+                        {currentEvent.status === "result" || currentEvent.winner_nickname ? (
+                          <button
+                            type="button"
+                            onClick={() => void resetCurrentEventResult()}
+                            className="col-span-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98] active:bg-amber-200"
+                          >
+                            현재 결과 정리
+                          </button>
+                        ) : null}
                       </div>
                     ) : (
                       <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-10 text-center text-sm font-bold text-slate-400">
