@@ -17,6 +17,7 @@ type OverlayEventRow = {
   spin_started_at: string | null;
   spin_duration_ms: number | null;
   result_at: string | null;
+  created_at: string | null;
   updated_at: string | null;
 };
 
@@ -73,8 +74,10 @@ export async function GET(request: NextRequest) {
       const { data, error } = await supabase
         .from("event_roulette_events")
         .select(
-          "title, mode, is_test, status, participant_snapshot, winner_nickname, winner_note, spin_started_at, spin_duration_ms, result_at, updated_at"
+          "title, mode, is_test, status, participant_snapshot, winner_nickname, winner_note, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
         )
+        .neq("status", "closed")
+        .order("created_at", { ascending: false })
         .order("updated_at", { ascending: false })
         .limit(1)
         .maybeSingle();
