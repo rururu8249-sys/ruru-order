@@ -1188,14 +1188,79 @@ export default function AdminLiveDashboard() {
                     return orderItemsAmount(order);
                   };
 
+                  const collectStatusText = (value: any, depth = 0): string => {
+                    if (value === null || value === undefined || depth > 4) return "";
+                    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+                    if (Array.isArray(value)) return value.map((item) => collectStatusText(item, depth + 1)).join(" ");
+                    if (typeof value === "object") {
+                      return Object.entries(value)
+                        .filter(([key]) => {
+                          const lowerKey = key.toLowerCase();
+                          return (
+                            lowerKey.includes("status") ||
+                            lowerKey.includes("cancel") ||
+                            lowerKey.includes("badge") ||
+                            lowerKey.includes("label") ||
+                            lowerKey.includes("payment") ||
+                            lowerKey.includes("deposit") ||
+                            lowerKey.includes("state") ||
+                            lowerKey.includes("reason") ||
+                            lowerKey.includes("type") ||
+                            lowerKey.includes("memo")
+                          );
+                        })
+                        .map(([, nested]) => collectStatusText(nested, depth + 1))
+                        .join(" ");
+                    }
+                    return "";
+                  };
+
                   const paymentText = (order: any) =>
-                    String(order?.payment_status || order?.deposit_status || order?.paymentStatus || order?.status || order?.order_status || "");
+                    String(order?.payment_status || order?.deposit_status || order?.paymentStatus || order?.depositStatus || order?.payment_status_label || order?.status || order?.order_status || "");
 
                   const orderStatusText = (order: any) =>
-                    String(order?.order_status || order?.status || order?.status_label || order?.order_status_label || paymentText(order) || "");
+                    [
+                      order?.order_status,
+                      order?.orderStatus,
+                      order?.status,
+                      order?.status_label,
+                      order?.statusLabel,
+                      order?.order_status_label,
+                      order?.orderStatusLabel,
+                      order?.paymentStatus,
+                      order?.depositStatus,
+                      order?.cancel_status,
+                      order?.cancelStatus,
+                      collectStatusText(order),
+                    ]
+                      .map((value) => String(value || ""))
+                      .join(" ");
+
+                  const isCanceledOrder = (order: any) => {
+                    const status = orderStatusText(order).toLowerCase().replace(/\s+/g, " ");
+
+                    return (
+                      order?.is_canceled === true ||
+                      order?.isCanceled === true ||
+                      order?.is_cancelled === true ||
+                      order?.isCancelled === true ||
+                      order?.cancelled === true ||
+                      order?.canceled === true ||
+                      Boolean(order?.cancelled_at || order?.canceled_at || order?.cancelAt || order?.canceledAt) ||
+                      status.includes("주문취소") ||
+                      status.includes("취소") ||
+                      status.includes("취소완료") ||
+                      status.includes("cancel") ||
+                      status.includes("cancelled") ||
+                      status.includes("canceled") ||
+                      status.includes("refund") ||
+                      status.includes("refunded")
+                    );
+                  };
 
                   const isPaidOrder = (order: any) => {
-                    const text = paymentText(order);
+                    if (isCanceledOrder(order)) return false;
+                    const text = `${paymentText(order)} ${orderStatusText(order)}`;
                     return (
                       text.includes("입금확인") ||
                       text.includes("결제완료") ||
@@ -1205,34 +1270,6 @@ export default function AdminLiveDashboard() {
                       text.includes("auto_paid") ||
                       text.includes("paid") ||
                       text.includes("PAID")
-                    );
-                  };
-
-                  const isCanceledOrder = (order: any) => {
-                    const status = [
-                      order?.order_status,
-                      order?.status,
-                      order?.status_label,
-                      order?.order_status_label,
-                      order?.cancel_status,
-                      order?.cancelled_at,
-                      order?.canceled_at,
-                      order?.deleted_at,
-                    ]
-                      .map((value) => String(value || ""))
-                      .join(" ")
-                      .toLowerCase();
-
-                    return (
-                      order?.is_canceled === true ||
-                      order?.is_cancelled === true ||
-                      order?.cancelled === true ||
-                      order?.canceled === true ||
-                      status.includes("주문취소") ||
-                      status.includes("취소") ||
-                      status.includes("cancel") ||
-                      status.includes("cancelled") ||
-                      status.includes("canceled")
                     );
                   };
 
@@ -1251,11 +1288,12 @@ export default function AdminLiveDashboard() {
                   const filterBySearch = <T,>(rows: T[], picker: (row: T) => string) =>
                     modalSearch ? rows.filter((row) => picker(row).toLowerCase().includes(modalSearch)) : rows;
 
-                  const customerMap = new Map<string, { key: string; nickname: string; name: string; phone: string; address: string; count: number; amount: number; latestOrder: any; latestAt: string }>();
+                  const customerMap = new Map<string, { key: string; nickname: string; name: string; phone: string; address: string; count: number; activeCount: number; cancelCount: number; amount: number; latestOrder: any; latestAt: string }>();
                   modalAllOrders.forEach((order: any) => {
                     const nickname = orderNickname(order);
                     const phone = orderPhone(order);
                     const key = `${nickname}-${phone || orderName(order)}`;
+                    const canceled = isCanceledOrder(order);
                     const current = customerMap.get(key) || {
                       key,
                       nickname,
@@ -1263,12 +1301,16 @@ export default function AdminLiveDashboard() {
                       phone,
                       address: orderAddress(order),
                       count: 0,
+                      activeCount: 0,
+                      cancelCount: 0,
                       amount: 0,
                       latestOrder: order,
                       latestAt: orderCreatedAt(order),
                     };
                     current.count += 1;
-                    current.amount += isCanceledOrder(order) ? 0 : orderAmount(order);
+                    current.activeCount += canceled ? 0 : 1;
+                    current.cancelCount += canceled ? 1 : 0;
+                    current.amount += canceled ? 0 : orderAmount(order);
                     current.latestOrder = order;
                     current.latestAt = orderCreatedAt(order) || current.latestAt;
                     current.address = current.address || orderAddress(order);
@@ -1283,14 +1325,10 @@ export default function AdminLiveDashboard() {
                     [orderNickname(order), orderName(order), orderPhone(order), orderMemo(order), paymentText(order), orderStatusText(order), money(orderAmount(order))].join(" "),
                   );
 
-                  const activePeriodOrderAmount = orderRows.reduce((sum: number, order: any) => {
-                    return sum + (isCanceledOrder(order) ? 0 : orderAmount(order));
-                  }, 0);
-
+                  const activePeriodOrderAmount = orderRows.reduce((sum: number, order: any) => sum + (isCanceledOrder(order) ? 0 : orderAmount(order)), 0);
                   const totalOrderAmount = modalAllOrders.reduce((sum: number, order: any) => sum + (isCanceledOrder(order) ? 0 : orderAmount(order)), 0);
                   const paidOrderAmount = paidOrders.reduce((sum: number, order: any) => sum + orderAmount(order), 0);
                   const unpaidOrderAmount = unpaidOrders.reduce((sum: number, order: any) => sum + orderAmount(order), 0);
-
                   const recentDepositAmount = modalDeposits.slice(0, 20).reduce((sum: number, deposit: any) => sum + depositAmount(deposit), 0);
 
                   const depositRows = filterBySearch(modalDeposits, (deposit: any) =>
@@ -1298,7 +1336,7 @@ export default function AdminLiveDashboard() {
                   );
 
                   const customerRows = filterBySearch(Array.from(customerMap.values()), (customer) =>
-                    [customer.nickname, customer.name, customer.phone, customer.address, `${customer.count}`, money(customer.amount)].join(" "),
+                    [customer.nickname, customer.name, customer.phone, customer.address, `${customer.count}`, `${customer.cancelCount}`, money(customer.amount)].join(" "),
                   );
 
                   const totalRows =
@@ -1356,7 +1394,7 @@ export default function AdminLiveDashboard() {
                     setOrderDetailOpen(true);
                   };
 
-                  const openCustomerDetail = (customer: { latestOrder: any; nickname: string; name: string; phone: string; address: string; count: number; amount: number; latestAt: string }) => {
+                  const openCustomerDetail = (customer: { latestOrder: any; nickname: string; name: string; phone: string; address: string; count: number; activeCount: number; cancelCount: number; amount: number; latestAt: string }) => {
                     setQuickModalCustomerDetail(customer);
                     setQuickModalPage(1);
                     setQuickModalSearch("");
@@ -1370,9 +1408,9 @@ export default function AdminLiveDashboard() {
                       })
                     : [];
 
-                  const customerDetailAmount = customerDetailOrders.reduce((sum: number, order: any) => {
-                    return sum + (isCanceledOrder(order) ? 0 : orderAmount(order));
-                  }, 0);
+                  const customerDetailAmount = customerDetailOrders.reduce((sum: number, order: any) => sum + (isCanceledOrder(order) ? 0 : orderAmount(order)), 0);
+                  const customerDetailCanceledCount = customerDetailOrders.filter((order: any) => isCanceledOrder(order)).length;
+                  const customerDetailActiveCount = customerDetailOrders.length - customerDetailCanceledCount;
 
                   const renderPagination = () => {
                     if (quickModal === "settlement" || totalPages <= 1 || quickModalCustomerDetail) return null;
@@ -1418,8 +1456,8 @@ export default function AdminLiveDashboard() {
                   };
 
                   const renderStatusBadge = (order: any) => {
-                    const paid = isPaidOrder(order);
                     const canceled = isCanceledOrder(order);
+                    const paid = isPaidOrder(order);
 
                     const label = canceled ? "주문취소" : paid ? "입금확인" : "입금확인 필요";
                     const klass = canceled
@@ -1494,6 +1532,7 @@ export default function AdminLiveDashboard() {
                                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                                   <div className="text-xs font-black text-slate-500">총 주문수</div>
                                   <div className="mt-2 text-3xl font-black text-slate-950">{customerDetailOrders.length}건</div>
+                                  <div className="mt-2 text-xs font-bold text-slate-400">정상 {customerDetailActiveCount}건 · 취소 {customerDetailCanceledCount}건</div>
                                 </div>
                                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                                   <div className="text-xs font-black text-slate-500">누적구매금액</div>
@@ -1503,6 +1542,24 @@ export default function AdminLiveDashboard() {
                                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                                   <div className="text-xs font-black text-slate-500">최근주문</div>
                                   <div className="mt-2 text-xl font-black text-slate-950">{quickModalCustomerDetail.latestAt || "확인 필요"}</div>
+                                </div>
+                              </div>
+
+                              <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+                                <div className="mb-4 flex items-center justify-between gap-3">
+                                  <div>
+                                    <h3 className="text-lg font-black text-slate-950">🎁 포인트 관리</h3>
+                                    <p className="mt-1 text-xs font-bold text-slate-500">포인트 지급/회수는 고객관리의 기존 저장 로직으로 처리합니다.</p>
+                                  </div>
+                                  <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-600">고객관리 연결</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <button type="button" onClick={() => goPanel("customers")} className="rounded-2xl bg-blue-600 px-4 py-4 text-sm font-black text-white shadow-sm">
+                                    포인트 지급
+                                  </button>
+                                  <button type="button" onClick={() => goPanel("customers")} className="rounded-2xl bg-slate-900 px-4 py-4 text-sm font-black text-white shadow-sm">
+                                    포인트 회수
+                                  </button>
                                 </div>
                               </div>
 
@@ -1604,9 +1661,9 @@ export default function AdminLiveDashboard() {
                                       <div className="text-xs font-black text-red-500">미입금/대기</div>
                                       <div className="mt-2 text-3xl font-black text-red-600">{unpaidOrders.length}건</div>
                                     </div>
-                                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                                      <div className="text-xs font-black text-slate-500">주문취소</div>
-                                      <div className="mt-2 text-3xl font-black text-slate-950">{canceledOrders.length}건</div>
+                                    <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">
+                                      <div className="text-xs font-black text-red-600">주문취소</div>
+                                      <div className="mt-2 text-3xl font-black text-red-600">{canceledOrders.length}건</div>
                                     </div>
                                   </div>
 
@@ -1622,7 +1679,7 @@ export default function AdminLiveDashboard() {
                                           const canceled = isCanceledOrder(order);
 
                                           return (
-                                            <div key={String(order?.id || `${activePage}-${index}`)} className="grid grid-cols-[32px_1fr_130px_160px] items-center gap-3 py-3">
+                                            <div key={String(order?.id || `${activePage}-${index}`)} className={["grid grid-cols-[32px_1fr_130px_160px] items-center gap-3 py-3", canceled ? "bg-red-50/40" : ""].join(" ")}>
                                               <div className="text-sm font-black text-slate-400">{pageStart + index + 1}</div>
                                               <div className="min-w-0">
                                                 <div className="flex flex-wrap items-center gap-2">
@@ -1631,7 +1688,7 @@ export default function AdminLiveDashboard() {
                                                 </div>
                                                 <div className="mt-1 line-clamp-2 text-xs font-bold leading-5 text-slate-500">{orderMemo(order)}</div>
                                               </div>
-                                              <div className="text-right text-sm font-black text-slate-950">{money(orderAmount(order))}</div>
+                                              <div className={["text-right text-sm font-black", canceled ? "text-red-500 line-through" : "text-slate-950"].join(" ")}>{money(orderAmount(order))}</div>
                                               <div className="flex justify-end gap-2">
                                                 {!paid && !canceled ? (
                                                   <button type="button" onClick={() => openManualMatchAndClose(order)} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700">입금매칭</button>
@@ -1718,12 +1775,15 @@ export default function AdminLiveDashboard() {
                                     <div className="divide-y divide-slate-100">
                                       {pagedCustomers.length > 0 ? (
                                         pagedCustomers.map((customer, index) => (
-                                          <div key={customer.key || `${activePage}-${index}`} className="grid grid-cols-[32px_1fr_120px_110px] items-center gap-3 py-3">
+                                          <div key={customer.key || `${activePage}-${index}`} className={["grid grid-cols-[32px_1fr_150px_110px] items-center gap-3 py-3", customer.cancelCount > 0 && customer.activeCount === 0 ? "bg-red-50/40" : ""].join(" ")}>
                                             <div className="text-sm font-black text-slate-400">{pageStart + index + 1}</div>
                                             <div className="min-w-0">
-                                              <div className="font-black text-slate-950">{customer.nickname}</div>
+                                              <div className="flex flex-wrap items-center gap-2">
+                                                <span className="font-black text-slate-950">{customer.nickname}</span>
+                                                {customer.cancelCount > 0 ? <span className="rounded-full bg-red-50 px-2 py-1 text-[11px] font-black text-red-600">취소 {customer.cancelCount}건</span> : null}
+                                              </div>
                                               <div className="mt-1 truncate text-xs font-bold text-slate-500">
-                                                {customer.name || "이름 확인 필요"} · {customer.phone || "전화번호 확인 필요"} · 주문 {customer.count}건
+                                                {customer.name || "이름 확인 필요"} · {customer.phone || "전화번호 확인 필요"} · 정상 {customer.activeCount}건 / 전체 {customer.count}건
                                               </div>
                                             </div>
                                             <div className="text-right text-sm font-black text-slate-950">{money(customer.amount)}</div>
