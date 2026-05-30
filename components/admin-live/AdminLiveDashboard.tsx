@@ -1283,8 +1283,39 @@ export default function AdminLiveDashboard() {
                   const depositName = (deposit: any) =>
                     String(deposit?.depositor_name || deposit?.name || deposit?.sender_name || deposit?.deposit_name || deposit?.account_holder || "-");
 
+                  const formatQuickModalDateTime = (value: unknown) => {
+                    const raw = String(value || "").trim();
+                    if (!raw) return "-";
+
+                    const parsed = new Date(raw);
+                    if (!Number.isNaN(parsed.getTime())) {
+                      const parts = new Intl.DateTimeFormat("ko-KR", {
+                        timeZone: "Asia/Seoul",
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: false,
+                      }).formatToParts(parsed);
+
+                      const getPart = (type: string) => parts.find((part) => part.type === type)?.value || "";
+                      return `${getPart("year")}.${getPart("month")}.${getPart("day")} ${getPart("hour")}:${getPart("minute")}`;
+                    }
+
+                    const cleaned = raw
+                      .replace("T", " ")
+                      .replace(/\.\d+/, "")
+                      .replace(/\+00:00$/, "")
+                      .replace(/Z$/, "");
+
+                    return cleaned.slice(0, 16);
+                  };
+
                   const depositTime = (deposit: any) =>
                     String(deposit?.deposited_at || deposit?.deposit_time || deposit?.created_at || deposit?.transaction_at || deposit?.date || "");
+
+                  const depositTimeText = (deposit: any) => formatQuickModalDateTime(depositTime(deposit));
 
                   const modalSearch = quickModalSearch.trim().toLowerCase();
                   const rowPerPage = 7;
@@ -1860,7 +1891,7 @@ export default function AdminLiveDashboard() {
                                             <div className="text-sm font-black text-slate-400">{pageStart + index + 1}</div>
                                             <div className="min-w-0">
                                               <div className="font-black text-slate-950">{depositName(deposit)}</div>
-                                              <div className="mt-1 truncate text-xs font-bold text-slate-500">{depositTime(deposit)}</div>
+                                              <div className="mt-1 truncate text-xs font-bold text-slate-500">{depositTimeText(deposit)}</div>
                                             </div>
                                             <div className="text-right text-base font-black text-emerald-600">{money(depositAmount(deposit))}</div>
                                           </div>
