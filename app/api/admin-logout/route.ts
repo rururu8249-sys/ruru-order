@@ -1,20 +1,19 @@
-import { NextRequest, NextResponse } from "next/server";
-import { clearAdminSessionCookie } from "@/lib/adminAuth";
+import { NextResponse } from "next/server";
+import { ADMIN_SESSION_COOKIE_NAME, getAdminSessionClearCookieOptions } from "@/lib/admin-auth";
 
-export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-export async function POST() {
-  return clearAdminSessionCookie(
-    NextResponse.json({
-      ok: true,
-    }),
-  );
+function createLogoutResponse() {
+  const response = NextResponse.json({ ok: true });
+  response.cookies.set(ADMIN_SESSION_COOKIE_NAME, "", getAdminSessionClearCookieOptions());
+  response.headers.set("Cache-Control", "no-store");
+  return response;
 }
 
-export async function GET(request: NextRequest) {
-  const loginUrl = request.nextUrl.clone();
-  loginUrl.pathname = "/admin-login";
-  loginUrl.search = "";
+export async function POST() {
+  return createLogoutResponse();
+}
 
-  return clearAdminSessionCookie(NextResponse.redirect(loginUrl));
+export async function GET() {
+  return createLogoutResponse();
 }

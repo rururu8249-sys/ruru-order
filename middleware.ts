@@ -1,34 +1,64 @@
-// middleware.ts
-// 새 파일 생성
-// 위치: /Users/ruru/Desktop/ruru-order-app/middleware.ts
-// 목적: /admin-v2 관리자 페이지 접근 전 비밀번호 로그인 여부 확인
-// 주의: AdminV2Client.tsx 관리자 본체는 건드리지 않습니다.
-
 import { NextRequest, NextResponse } from "next/server";
+import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 
-const ADMIN_COOKIE_NAME = "ruru_admin_session";
+const ADMIN_PAGE_PREFIXES = ["/admin", "/admin-live", "/admin-v2"];
+const ADMIN_API_PREFIXES = ["/api/admin-live", "/api/admin-v2", "/api/bankda"];
 
-export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+function startsWithPath(pathname: string, prefix: string) {
+  return pathname === prefix || pathname.startsWith(prefix + "/");
+}
 
-  if (!pathname.startsWith("/admin-v2")) {
+function isAdminPage(pathname: string) {
+  return ADMIN_PAGE_PREFIXES.some((prefix) => startsWithPath(pathname, prefix));
+}
+
+function isAdminApi(pathname: string) {
+  return ADMIN_API_PREFIXES.some((prefix) => startsWithPath(pathname, prefix));
+}
+
+export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  const shouldProtectPage = isAdminPage(pathname);
+  const shouldProtectApi = isAdminApi(pathname);
+
+  if (!shouldProtectPage && !shouldProtectApi) {
     return NextResponse.next();
   }
 
-  const sessionToken = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
-  const expectedToken = process.env.ADMIN_SESSION_TOKEN;
+  const session = await verifyAdminSessionFromRequest(request);
 
-  if (expectedToken && sessionToken === expectedToken) {
-    return NextResponse.next();
+  if (session) {
+    const response = NextResponse.next();
+    response.headers.set("Cache-Control", "no-store");
+    return response;
   }
 
-  const loginUrl = request.nextUrl.clone();
-  loginUrl.pathname = "/admin-login";
-  loginUrl.searchParams.set("next", pathname);
+  if (shouldProtectApi) {
+    return NextResponse.json(
+      { ok: false, message: "관리자 로그인이 필요합니다." },
+      { status: 401, headers: { "Cache-Control": "no-store" } },
+    );
+  }
 
-  return NextResponse.redirect(loginUrl);
+  const loginUrl = new URL("/admin-login", request.url);
+  loginUrl.searchParams.set("next", pathname + request.nextUrl.search);
+
+  const response = NextResponse.redirect(loginUrl);
+  response.headers.set("Cache-Control", "no-store");
+
+  return response;
 }
 
 export const config = {
-  matcher: ["/admin-v2/:path*", "/admin-live/:path*"],
+  matcher: [
+    "/admin",
+    "/admin/:path*",
+    "/admin-live",
+    "/admin-live/:path*",
+    "/admin-v2",
+    "/admin-v2/:path*",
+    "/api/admin-live/:path*",
+    "/api/admin-v2/:path*",
+    "/api/bankda/:path*",
+  ],
 };
