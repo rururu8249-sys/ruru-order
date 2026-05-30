@@ -975,7 +975,7 @@ export default function AdminLiveDashboard() {
       : "";
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-950" data-ruru-controltower-shell="broadcast-quick-modal-shell-v1">
+    <div className="min-h-screen bg-slate-100 text-slate-950" data-ruru-controltower-shell="broadcast-quick-modal-sidebar-dock-v2">
       <div className="flex min-h-screen">
         <AdminLiveSidebar
           activeMenu={activeMenu}
@@ -984,6 +984,56 @@ export default function AdminLiveDashboard() {
             replacePanelInUrl(nextMenu);
           }}
         />
+
+        {activeMenu === "broadcast" ? (
+          <div
+            className="fixed left-4 top-[560px] z-[60] w-[188px] rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-sm backdrop-blur"
+            data-ruru-quick-modal-dock="sidebar-mini"
+          >
+            <div className="mb-2 flex items-center justify-between">
+              <div>
+                <div className="text-[10px] font-black tracking-[0.18em] text-slate-400">QUICK</div>
+                <div className="text-sm font-black text-slate-950">빠른보기</div>
+              </div>
+              <div className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-600">방송중</div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => setQuickModal("orders")}
+                className="h-11 rounded-xl border border-blue-100 bg-blue-50 text-xs font-black text-blue-700 transition hover:bg-blue-100 active:scale-[0.98]"
+              >
+                주문
+              </button>
+              <button
+                type="button"
+                onClick={() => setQuickModal("payments")}
+                className="h-11 rounded-xl border border-emerald-100 bg-emerald-50 text-xs font-black text-emerald-700 transition hover:bg-emerald-100 active:scale-[0.98]"
+              >
+                입금
+              </button>
+              <button
+                type="button"
+                onClick={() => setQuickModal("customers")}
+                className="h-11 rounded-xl border border-amber-100 bg-amber-50 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98]"
+              >
+                고객
+              </button>
+              <button
+                type="button"
+                onClick={() => setQuickModal("settlement")}
+                className="h-11 rounded-xl border border-violet-100 bg-violet-50 text-xs font-black text-violet-700 transition hover:bg-violet-100 active:scale-[0.98]"
+              >
+                정산
+              </button>
+            </div>
+
+            <div className="mt-2 rounded-xl bg-slate-50 px-2 py-2 text-[10px] font-bold leading-4 text-slate-500">
+              단독 메뉴 이동 없이 방송 중 필요한 내용만 확인
+            </div>
+          </div>
+        ) : null}
 
         <main className="min-w-0 flex-1 overflow-x-hidden px-5 py-4">
           {activeMenu === "broadcast" ? (
@@ -997,48 +1047,6 @@ export default function AdminLiveDashboard() {
                 onEndBroadcast={endBroadcast}
                 onSaveBroadcast={saveBroadcast}
               />
-
-              <section className="mb-3 grid grid-cols-2 gap-2 lg:grid-cols-4" data-ruru-quick-modal-buttons="broadcast-only">
-                <button
-                  type="button"
-                  onClick={() => setQuickModal("orders")}
-                  className="rounded-2xl border border-blue-100 bg-white px-4 py-3 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-50 active:scale-[0.99]"
-                >
-                  <div className="text-xs font-black text-blue-600">ORDER MINI</div>
-                  <div className="mt-1 text-base font-black text-slate-950">주문 빠른보기</div>
-                  <div className="mt-1 text-xs font-bold text-slate-500">최근 주문·미입금·취소만 확인</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setQuickModal("payments")}
-                  className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-left shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 active:scale-[0.99]"
-                >
-                  <div className="text-xs font-black text-emerald-600">PAYMENT MINI</div>
-                  <div className="mt-1 text-base font-black text-slate-950">입금 빠른보기</div>
-                  <div className="mt-1 text-xs font-bold text-slate-500">최근 입금·미확인만 확인</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setQuickModal("customers")}
-                  className="rounded-2xl border border-amber-100 bg-white px-4 py-3 text-left shadow-sm transition hover:border-amber-300 hover:bg-amber-50 active:scale-[0.99]"
-                >
-                  <div className="text-xs font-black text-amber-600">CUSTOMER MINI</div>
-                  <div className="mt-1 text-base font-black text-slate-950">고객 빠른보기</div>
-                  <div className="mt-1 text-xs font-bold text-slate-500">고객·이슈·차단 참고</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setQuickModal("settlement")}
-                  className="rounded-2xl border border-violet-100 bg-white px-4 py-3 text-left shadow-sm transition hover:border-violet-300 hover:bg-violet-50 active:scale-[0.99]"
-                >
-                  <div className="text-xs font-black text-violet-600">SETTLEMENT MINI</div>
-                  <div className="mt-1 text-base font-black text-slate-950">정산 빠른보기</div>
-                  <div className="mt-1 text-xs font-bold text-slate-500">매출·미입금·취소 요약</div>
-                </button>
-              </section>
 
               <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
 
@@ -1160,6 +1168,122 @@ export default function AdminLiveDashboard() {
                 </div>
 
                 <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 p-5">
+                  <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                    {quickModal === "orders" ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuickModal(null);
+                            setActiveMenu("orders");
+                            replacePanelInUrl("orders");
+                          }}
+                          className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white"
+                        >
+                          주문관리 전체보기
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuickModal(null);
+                            setActiveMenu("payments");
+                            replacePanelInUrl("payments");
+                          }}
+                          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700"
+                        >
+                          입금확인으로 이동
+                        </button>
+                      </>
+                    ) : null}
+
+                    {quickModal === "payments" ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={loadDepositsFromServer}
+                          className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white"
+                        >
+                          입금내역 새로고침
+                        </button>
+                        <button
+                          type="button"
+                          onClick={syncBankdaDepositsOnly}
+                          className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white"
+                        >
+                          Bankda 조회
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuickModal(null);
+                            setActiveMenu("payments");
+                            replacePanelInUrl("payments");
+                          }}
+                          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700"
+                        >
+                          입금확인 전체보기
+                        </button>
+                      </>
+                    ) : null}
+
+                    {quickModal === "customers" ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuickModal(null);
+                            setActiveMenu("customers");
+                            replacePanelInUrl("customers");
+                          }}
+                          className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-black text-white"
+                        >
+                          고객관리 전체보기
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuickModal(null);
+                            setActiveMenu("payments");
+                            replacePanelInUrl("payments");
+                          }}
+                          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700"
+                        >
+                          입금확인으로 이동
+                        </button>
+                      </>
+                    ) : null}
+
+                    {quickModal === "settlement" ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuickModal(null);
+                            setActiveMenu("settlement");
+                            replacePanelInUrl("settlement");
+                          }}
+                          className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-black text-white"
+                        >
+                          정산통계 전체보기
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuickModal(null);
+                            setActiveMenu("orders");
+                            replacePanelInUrl("orders");
+                          }}
+                          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700"
+                        >
+                          주문관리로 이동
+                        </button>
+                      </>
+                    ) : null}
+
+                    <span className="ml-auto text-xs font-bold text-slate-400">
+                      모달은 빠른 처리용 · 상세 작업은 단독 페이지
+                    </span>
+                  </div>
                   {quickModal === "orders" ? (
                     <div className="space-y-4">
                       <div className="grid grid-cols-3 gap-3">
@@ -1359,7 +1483,7 @@ export default function AdminLiveDashboard() {
                           }}
                           className="mt-4 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white"
                         >
-                          정산통계 단독 페이지 열기
+                          정산통계 전체보기
                         </button>
                       </div>
                     </div>
