@@ -43,6 +43,7 @@ type RouletteEventRow = {
   mode: EventRouletteMode;
   is_test: boolean;
   status: "idle" | "spinning" | "result" | "closed";
+  broadcast_id: string | null;
   event_date: string | null;
   source_date: string | null;
   participant_snapshot: EventRouletteParticipant[] | null;
@@ -222,6 +223,7 @@ function sanitizeEventForAdmin(event: RouletteEventRow) {
     mode: event.mode,
     is_test: event.is_test,
     status: event.status,
+    broadcast_id: event.broadcast_id,
     event_date: event.event_date,
     source_date: event.source_date,
     participants: participants.map(sanitizeParticipantForAdmin),
@@ -376,6 +378,114 @@ async function buildParticipantsForRequest(
   return buildRouletteParticipants(rows, mode);
 }
 
+function normalizeWinnerNicknameForDedupe(value: unknown) {
+  return cleanText(value).replace(/\s+/g, "");
+}
+
+function filterParticipantsExcludingWinnerNicknames(
+  participants: EventRouletteParticipant[],
+  winnerNicknames: Set<string>
+) {
+  if (winnerNicknames.size <= 0) {
+    return participants;
+  }
+
+  return participants.filter((participant) => !winnerNicknames.has(normalizeWinnerNicknameForDedupe(participant.nickname)));
+}
+
+async function fetchPriorWinnerNicknameSet(
+  supabase: SupabaseAdminClient,
+  params: {
+    mode: EventRouletteMode;
+    isTest: boolean;
+    sourceDate: string | null;
+    broadcastId: string;
+    excludeEventId?: string;
+  }
+) {
+  const result = new Set<string>();
+
+  if (params.mode === "preview") {
+    return result;
+  }
+
+  let eventQuery = supabase
+    .from("event_roulette_events")
+    .select("id")
+    .eq("mode", params.mode)
+    .eq("is_test", params.isTest)
+    .in("status", ["result", "closed"])
+    .limit(300);
+
+  if (params.broadcastId) {
+    eventQuery = eventQuery.eq("broadcast_id", params.broadcastId);
+  } else if (params.sourceDate) {
+    eventQuery = eventQuery.eq("source_date", params.sourceDate).is("broadcast_id", null);
+  } else {
+    return result;
+  }
+
+  if (params.excludeEventId) {
+    eventQuery = eventQuery.neq("id", params.excludeEventId);
+  }
+
+  const { data: eventRows, error: eventError } = await eventQuery;
+
+  if (eventError) {
+    throw new Error(eventError.message || "같은 방송 기존 룰렛 이벤트 조회 실패");
+  }
+
+  const eventIds = (Array.isArray(eventRows) ? eventRows : [])
+    .map((row) => cleanText((row as { id?: unknown }).id))
+    .filter(Boolean);
+
+  if (eventIds.length <= 0) {
+    return result;
+  }
+
+  const { data: winnerRows, error: winnerError } = await supabase
+    .from("event_roulette_winners")
+    .select("nickname, event_id, is_test")
+    .in("event_id", eventIds)
+    .eq("is_test", params.isTest)
+    .limit(1000);
+
+  if (winnerError) {
+    throw new Error(winnerError.message || "같은 방송 기존 당첨자 조회 실패");
+  }
+
+  for (const row of Array.isArray(winnerRows) ? winnerRows : []) {
+    const nickname = normalizeWinnerNicknameForDedupe((row as { nickname?: unknown }).nickname);
+
+    if (nickname) {
+      result.add(nickname);
+    }
+  }
+
+  return result;
+}
+
+async function applyNoDuplicateWinnerRule(
+  supabase: SupabaseAdminClient,
+  participants: EventRouletteParticipant[],
+  params: {
+    mode: EventRouletteMode;
+    isTest: boolean;
+    sourceDate: string | null;
+    broadcastId: string;
+    excludeEventId?: string;
+  }
+) {
+  const priorWinnerNicknames = await fetchPriorWinnerNicknameSet(supabase, params);
+  const filteredParticipants = filterParticipantsExcludingWinnerNicknames(participants, priorWinnerNicknames);
+
+  return {
+    participants: filteredParticipants,
+    excludedWinnerCount: participants.length - filteredParticipants.length,
+  };
+}
+
+
 async function handleBroadcasts(request: NextRequest) {
   const authError = requireAdmin(request);
   if (authError) return authError;
@@ -397,7 +507,14 @@ async function handleParticipants(request: NextRequest) {
   const mode = normalizeEventRouletteMode(request.nextUrl.searchParams.get("mode"));
   const sourceDate = normalizeDateText(request.nextUrl.searchParams.get("sourceDate"));
   const broadcastId = cleanBroadcastId(request.nextUrl.searchParams.get("broadcastId"));
-  const participants = await buildParticipantsForRequest(supabase, mode, sourceDate, broadcastId);
+  const rawParticipants = await buildParticipantsForRequest(supabase, mode, sourceDate, broadcastId);
+  const deduped = await applyNoDuplicateWinnerRule(supabase, rawParticipants, {
+    mode,
+    isTest: mode === "test",
+    sourceDate,
+    broadcastId,
+  });
+  const participants = deduped.participants;
 
   return json({
     ok: true,
@@ -405,6 +522,7 @@ async function handleParticipants(request: NextRequest) {
     source_date: sourceDate,
     broadcast_id: broadcastId || null,
     participant_count: participants.length,
+    excluded_winner_count: deduped.excludedWinnerCount,
     participants: participants.map(sanitizeParticipantForAdmin),
   });
 }
@@ -419,7 +537,7 @@ async function handleEvents(request: NextRequest) {
   let query = supabase
     .from("event_roulette_events")
     .select(
-      "id, title, overlay_token, mode, is_test, status, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
+      "id, title, overlay_token, mode, is_test, status, broadcast_id, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
     )
     .order("created_at", { ascending: false })
     .limit(30);
@@ -472,7 +590,18 @@ async function createEvent(body: Record<string, unknown>) {
   const sourceDate = normalizeDateText(body.sourceDate);
   const broadcastId = cleanBroadcastId(body.broadcastId);
   const title = cleanText(body.title) || DEFAULT_TITLE;
-  const participants = await buildParticipantsForRequest(supabase, mode, sourceDate, broadcastId);
+  const rawParticipants = await buildParticipantsForRequest(supabase, mode, sourceDate, broadcastId);
+  const deduped = await applyNoDuplicateWinnerRule(supabase, rawParticipants, {
+    mode,
+    isTest: mode === "test",
+    sourceDate,
+    broadcastId,
+  });
+  const participants = deduped.participants;
+
+  if (rawParticipants.length > 0 && participants.length <= 0) {
+    return json({ ok: false, message: "같은 방송에서 이미 모든 참여자가 당첨되었습니다. 중복당첨 방지를 위해 룰렛을 만들 수 없습니다." }, 400);
+  }
 
   if (participants.length <= 0) {
     return json({ ok: false, message: "룰렛 참여자가 없습니다." }, 400);
@@ -489,6 +618,7 @@ async function createEvent(body: Record<string, unknown>) {
         mode,
         is_test: true,
         status: "idle",
+        broadcast_id: broadcastId || null,
         participants: participants.map(sanitizeParticipantForAdmin),
         participant_count: participants.length,
         spin_duration_ms: calculateRouletteSpinDurationMs(participants.length),
@@ -508,13 +638,14 @@ async function createEvent(body: Record<string, unknown>) {
       mode,
       is_test: mode === "test",
       status: "idle",
+      broadcast_id: broadcastId || null,
       event_date: sourceDate,
       source_date: sourceDate,
       participant_snapshot: participants,
       spin_duration_ms: spinDurationMs,
     })
     .select(
-      "id, title, overlay_token, mode, is_test, status, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
+      "id, title, overlay_token, mode, is_test, status, broadcast_id, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
     )
     .single();
 
@@ -537,7 +668,7 @@ async function spinEvent(body: Record<string, unknown>) {
   const { data: eventData, error: eventError } = await supabase
     .from("event_roulette_events")
     .select(
-      "id, title, overlay_token, mode, is_test, status, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
+      "id, title, overlay_token, mode, is_test, status, broadcast_id, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
     )
     .eq("id", eventId)
     .single();
@@ -557,7 +688,20 @@ async function spinEvent(body: Record<string, unknown>) {
     return json({ ok: true, event: sanitizeEventForAdmin(event), already_result: true });
   }
 
-  const picked = pickRouletteWinner(participants);
+  const deduped = await applyNoDuplicateWinnerRule(supabase, participants, {
+    mode: event.mode,
+    isTest: event.is_test,
+    sourceDate: event.source_date,
+    broadcastId: cleanText(event.broadcast_id),
+    excludeEventId: event.id,
+  });
+  const eligibleParticipants = deduped.participants;
+
+  if (participants.length > 0 && eligibleParticipants.length <= 0) {
+    return json({ ok: false, message: "같은 방송에서 이미 모든 참여자가 당첨되었습니다. 중복당첨 방지를 위해 룰렛을 시작할 수 없습니다." }, 400);
+  }
+
+  const picked = pickRouletteWinner(eligibleParticipants);
   const now = new Date().toISOString();
   const spinDurationMs = calculateRouletteSpinDurationMs(participants.length);
 
@@ -575,7 +719,7 @@ async function spinEvent(body: Record<string, unknown>) {
     })
     .eq("id", eventId)
     .select(
-      "id, title, overlay_token, mode, is_test, status, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
+      "id, title, overlay_token, mode, is_test, status, broadcast_id, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
     )
     .single();
 
