@@ -3,15 +3,14 @@ import LiveOpsStatusBox from "./LiveOpsStatusBox";
 import AdminLiveLogoutButton from "./AdminLiveLogoutButton";
 import AdminLiveCustomerIssueSummaryCard from "./AdminLiveCustomerIssueSummaryCard";
 
-
 type Props = {
   activeMenu: AdminLiveMenuKey;
   onMenuChange: (menuKey: AdminLiveMenuKey) => void;
 };
 
 export default function AdminLiveSidebar({ activeMenu, onMenuChange }: Props) {
-return (
-    <aside className="flex h-screen w-[220px] shrink-0 flex-col border-r border-slate-200 bg-white px-4 py-6">
+  return (
+    <aside className="flex min-h-screen w-[220px] shrink-0 flex-col border-r border-slate-200 bg-white px-4 py-6">
       <div className="mb-8 flex items-center gap-2">
         <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-white">▶</div>
         <div>
@@ -23,6 +22,7 @@ return (
       <nav className="space-y-1.5">
         {ADMIN_LIVE_MENUS.map((menu) => {
           const active = menu.key === activeMenu;
+
           return (
             <button
               key={menu.key}
@@ -48,8 +48,8 @@ return (
       </nav>
 
       {activeMenu === "broadcast" ? (
-        <div
-          className="mb-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm"
+        <section
+          className="mt-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm"
           data-ruru-quick-modal-dock="sidebar-inline"
         >
           <div className="mb-2 flex items-center justify-between">
@@ -94,16 +94,14 @@ return (
           <div className="mt-2 rounded-xl bg-slate-50 px-2 py-2 text-[10px] font-bold leading-4 text-slate-500">
             방송 중 필요한 내용만 빠르게 확인
           </div>
-        </div>
+        </section>
       ) : null}
 
       <div className="mt-4 space-y-3">
         <LiveOpsStatusBox />
-
         <AdminLiveCustomerIssueSummaryCard onOpenCustomers={() => onMenuChange("customers")} />
+        <AdminLiveLogoutButton />
       </div>
-          <AdminLiveLogoutButton />
-
     </aside>
   );
 }

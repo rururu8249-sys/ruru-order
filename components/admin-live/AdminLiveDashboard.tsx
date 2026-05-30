@@ -554,7 +554,7 @@ export default function AdminLiveDashboard() {
     const result = await response.json().catch(() => null);
 
     if (!response.ok || !result?.ok) {
-      throw new Error(result?.message || "뱅크다 입금내역 조회에 실패했습니다.");
+      throw new Error(result?.message || "입금내역 조회에 실패했습니다.");
     }
 
     await loadDepositsFromServer();
@@ -1001,12 +1001,12 @@ export default function AdminLiveDashboard() {
               <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
 
               <div className="mb-4 mt-4 grid w-full grid-cols-12 items-stretch gap-3">
-                <div className="col-span-12 min-h-[520px] min-w-0 xl:col-span-8">
+                <div className="col-span-12 h-[520px] min-h-0 min-w-0 xl:col-span-8 [&>*]:h-full">
                   <LiveBroadcastPanels videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} />
                 </div>
 
-                <div className="col-span-12 min-h-[520px] min-w-0 xl:col-span-4">
-                  <AdminLiveProductListPanel fillHeight className="h-full min-w-0 overflow-hidden" />
+                <div className="col-span-12 h-[520px] min-h-0 min-w-0 xl:col-span-4 [&>*]:h-full">
+                  <AdminLiveProductListPanel fillHeight className="h-full min-w-0" />
                 </div>
               </div>
 
