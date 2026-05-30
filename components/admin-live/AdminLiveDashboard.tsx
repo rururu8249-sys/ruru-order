@@ -864,7 +864,7 @@ export default function AdminLiveDashboard() {
   return (
     <div
       className="min-h-screen bg-slate-100 text-slate-950"
-      data-ruru-controltower-shell="slide-panel-v1-2-compact"
+      data-ruru-controltower-shell="slide-panel-v1-fix-props"
     >
       <div className="flex min-h-screen">
         <AdminLiveSidebar
@@ -875,77 +875,38 @@ export default function AdminLiveDashboard() {
           }}
         />
 
-        <main className="min-w-0 flex-1 overflow-x-hidden px-5 py-3">
-          <section className="rounded-[26px] border border-slate-200 bg-white px-4 py-3 shadow-sm">
-            <div className="grid grid-cols-12 items-end gap-3">
-              <div className="col-span-12 min-w-0 2xl:col-span-3">
-                <div className="mb-2 flex items-center gap-2">
-                  <h1 className="text-[24px] font-black tracking-tight text-slate-950">방송 컨트롤타워</h1>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600">
-                    {new Date().toLocaleDateString("ko-KR", {
-                      month: "2-digit",
-                      day: "2-digit",
-                      weekday: "short",
-                    })}
-                  </span>
-                  <span
-                    className={[
-                      "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-black",
-                      activeBroadcast ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700",
-                    ].join(" ")}
-                  >
-                    <span className={["h-2 w-2 rounded-full", activeBroadcast ? "bg-emerald-500" : "bg-amber-500"].join(" ")} />
-                    {activeBroadcast ? "방송중" : "대기중"}
-                  </span>
-                </div>
-
-                <label className="block">
-                  <span className="mb-1 block text-[11px] font-black text-slate-500">방송 제목</span>
-                  <input
-                    value={controlTitle}
-                    onChange={(event) => setControlTitle(event.target.value)}
-                    className="h-10 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-950 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                    placeholder="루루동이LIVE"
-                  />
-                </label>
-              </div>
-
-              <label className="col-span-12 min-w-0 2xl:col-span-4">
-                <span className="mb-1 block text-[11px] font-black text-slate-500">유튜브 라이브 URL</span>
-                <input
-                  value={controlYoutubeUrl}
-                  onChange={(event) => setControlYoutubeUrl(event.target.value)}
-                  className="h-10 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-950 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                  placeholder="https://www.youtube.com/watch?v=..."
-                />
-              </label>
-
-              <div className="col-span-6 min-w-0 lg:col-span-2 2xl:col-span-1">
-                <span className="mb-1 block text-[11px] font-black text-slate-500">시작시간</span>
-                <div className="flex h-10 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-3 text-xs font-black text-slate-800">
-                  {activeBroadcast?.started_at
-                    ? new Date(activeBroadcast.started_at).toLocaleTimeString("ko-KR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : "방송시작 전"}
+        <main className="min-w-0 flex-1 overflow-x-hidden px-5 py-4">
+          <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-[25px] font-black tracking-tight text-slate-950">방송 컨트롤타워</h1>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
+                      {new Date().toLocaleDateString("ko-KR", {
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        weekday: "long",
+                      })}
+                    </span>
+                    <span
+                      className={[
+                        "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black",
+                        activeBroadcast ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700",
+                      ].join(" ")}
+                    >
+                      <span className={["h-2 w-2 rounded-full", activeBroadcast ? "bg-emerald-500" : "bg-amber-500"].join(" ")} />
+                      {activeBroadcast ? "방송중" : "대기중"}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs font-bold text-slate-500">
+                    방송 중 주문·입금·상품·고객 이슈를 한 화면에서 처리하는 운영 메인 화면입니다.
+                  </p>
                 </div>
               </div>
 
-              <label className="col-span-6 min-w-0 lg:col-span-2 2xl:col-span-1">
-                <span className="mb-1 block text-[11px] font-black text-slate-500">화면비율</span>
-                <select
-                  value={videoRatio}
-                  onChange={(event) => setVideoRatio(event.target.value as VideoRatio)}
-                  className="h-10 w-full rounded-2xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                >
-                  <option value="vertical">세로 9:16</option>
-                  <option value="wide">가로 16:9</option>
-                  <option value="auto">자동</option>
-                </select>
-              </label>
-
-              <div className="col-span-12 flex flex-wrap items-end justify-end gap-2 2xl:col-span-3">
+              <div className="flex shrink-0 items-center gap-2">
                 <AdminLiveEventRoulettePanel
                   buttonLabel="🎁 이벤트 룰렛"
                   buttonClassName="h-10 rounded-2xl bg-violet-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98]"
@@ -966,11 +927,61 @@ export default function AdminLiveDashboard() {
                 >
                   ■ 방송종료
                 </button>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-12 gap-3">
+              <label className="col-span-12 min-w-0 lg:col-span-4">
+                <span className="mb-1 block text-[11px] font-black text-slate-500">방송 제목</span>
+                <input
+                  value={controlTitle}
+                  onChange={(event) => setControlTitle(event.target.value)}
+                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-950 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  placeholder="루루동이LIVE"
+                />
+              </label>
+
+              <label className="col-span-12 min-w-0 lg:col-span-4">
+                <span className="mb-1 block text-[11px] font-black text-slate-500">유튜브 라이브 URL</span>
+                <input
+                  value={controlYoutubeUrl}
+                  onChange={(event) => setControlYoutubeUrl(event.target.value)}
+                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-950 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  placeholder="https://www.youtube.com/watch?v=..."
+                />
+              </label>
+
+              <div className="col-span-6 min-w-0 lg:col-span-1">
+                <span className="mb-1 block text-[11px] font-black text-slate-500">시작시간</span>
+                <div className="flex h-11 items-center rounded-2xl border border-slate-200 bg-slate-50 px-3 text-xs font-black text-slate-800">
+                  {activeBroadcast?.started_at
+                    ? new Date(activeBroadcast.started_at).toLocaleTimeString("ko-KR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "방송시작 전"}
+                </div>
+              </div>
+
+              <label className="col-span-6 min-w-0 lg:col-span-1">
+                <span className="mb-1 block text-[11px] font-black text-slate-500">화면비율</span>
+                <select
+                  value={videoRatio}
+                  onChange={(event) => setVideoRatio(event.target.value as VideoRatio)}
+                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="vertical">세로 9:16</option>
+                  <option value="wide">가로 16:9</option>
+                  <option value="auto">자동</option>
+                </select>
+              </label>
+
+              <div className="col-span-12 flex items-end gap-2 lg:col-span-2">
                 <button
                   type="button"
                   disabled={savingBroadcast || !activeBroadcast}
                   onClick={() => saveBroadcast({ title: controlTitle, youtubeUrl: controlYoutubeUrl })}
-                  className="h-10 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] disabled:bg-slate-100 disabled:text-slate-400"
+                  className="h-11 flex-1 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] disabled:bg-slate-100 disabled:text-slate-400"
                 >
                   저장
                 </button>
@@ -980,7 +991,7 @@ export default function AdminLiveDashboard() {
                     setActiveMenu("settings");
                     replacePanelInUrl("settings");
                   }}
-                  className="h-10 rounded-2xl bg-slate-100 px-4 text-sm font-black text-slate-700 transition hover:bg-slate-200 active:scale-[0.98]"
+                  className="h-11 rounded-2xl bg-slate-100 px-4 text-sm font-black text-slate-700 transition hover:bg-slate-200 active:scale-[0.98]"
                 >
                   설정
                 </button>
@@ -988,27 +999,21 @@ export default function AdminLiveDashboard() {
             </div>
           </section>
 
-          <section className="mt-3">
+          <section className="mt-4">
             <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
           </section>
 
-          {loadError ? (
-            <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700">
-              주문 데이터 불러오기 실패: {loadError}
-            </div>
-          ) : null}
-
-          <section className="mt-3 grid grid-cols-12 gap-3">
-            <div className="col-span-12 min-h-[360px] min-w-0 overflow-hidden xl:col-span-8">
+          <section className="mt-4 grid min-h-[500px] grid-cols-12 gap-4">
+            <div className="col-span-12 min-h-[500px] min-w-0 overflow-hidden xl:col-span-8">
               <LiveBroadcastPanels videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || controlYoutubeUrl || ""} />
             </div>
 
-            <aside className="col-span-12 min-h-[360px] min-w-0 overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-sm xl:col-span-4">
+            <aside className="col-span-12 min-h-[500px] min-w-0 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm xl:col-span-4">
               <AdminLiveProductListPanel fillHeight className="h-full min-w-0 overflow-hidden" />
             </aside>
           </section>
 
-          <section className="mt-3 rounded-[26px] border border-slate-200 bg-white p-3 shadow-sm">
+          <section className="mt-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
             <LiveOrderTable
               orders={filteredOrders}
               allOrderCount={orders.length}
