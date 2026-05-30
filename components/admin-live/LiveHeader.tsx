@@ -169,12 +169,9 @@ export default function LiveHeader({
         </div>
       </div>
 
-      <div className="mt-2 grid grid-cols-1 gap-1.5 text-[11px] font-black text-slate-500 md:grid-cols-3">
+      <div className="mt-2 grid grid-cols-1 gap-1.5 text-[11px] font-black text-slate-500 md:grid-cols-2">
         <div className="rounded-lg bg-slate-50 px-3 py-1.5">
           시작시간 <span className="ml-1 text-slate-900">{activeBroadcast?.started_at ? formatBroadcastTime(activeBroadcast.started_at) : "방송시작 전"}</span>
-        </div>
-        <div className="rounded-lg bg-slate-50 px-3 py-1.5">
-          종료시간 <span className="ml-1 text-slate-900">{activeBroadcast?.ended_at ? formatBroadcastTime(activeBroadcast.ended_at) : activeBroadcast ? "방송중" : "-"}</span>
         </div>
         <div className="rounded-lg bg-slate-50 px-3 py-1.5">
           주문묶음 <span className="ml-1 text-blue-700">방송 시작~종료 시간 기준</span>

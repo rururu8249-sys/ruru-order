@@ -635,6 +635,23 @@ export default function AdminLiveDashboard() {
   }, [activeMenu]);
 
   useEffect(() => {
+    const openPanel = (event: Event) => {
+      const menuKey = String((event as CustomEvent).detail || "");
+
+      if (!isMenuKeyForUrl(menuKey)) return;
+
+      setActiveMenu(menuKey);
+      replacePanelInUrl(menuKey);
+    };
+
+    window.addEventListener("ruru-admin-live-open-panel", openPanel);
+
+    return () => {
+      window.removeEventListener("ruru-admin-live-open-panel", openPanel);
+    };
+  }, []);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
 
     const url = new URL(window.location.href);
@@ -853,7 +870,10 @@ export default function AdminLiveDashboard() {
   const criteriaLabel = buildCriteriaLabel(filters);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div
+      className="min-h-screen bg-slate-100 text-slate-950"
+      data-ruru-controltower-shell="true-drawer-shell-v1-3-propfix"
+    >
       <div className="flex min-h-screen">
         <AdminLiveSidebar
           activeMenu={activeMenu}
@@ -864,45 +884,35 @@ export default function AdminLiveDashboard() {
         />
 
         <main className="min-w-0 flex-1 overflow-x-hidden px-5 py-4">
-          {activeMenu === "broadcast" ? (
-            <>
           <LiveHeader
-            videoRatio={videoRatio}
-            onVideoRatioChange={setVideoRatio}
             activeBroadcast={activeBroadcast}
             savingBroadcast={savingBroadcast}
+            videoRatio={videoRatio}
+            onVideoRatioChange={setVideoRatio}
             onStartBroadcast={startBroadcast}
             onEndBroadcast={endBroadcast}
             onSaveBroadcast={saveBroadcast}
           />
-          <div className="mb-6 grid w-full grid-cols-12 grid-rows-[auto_480px] items-stretch gap-3">
 
+          <div className="mb-4 grid w-full grid-cols-12 grid-rows-[auto_360px] items-stretch gap-3">
             <div className="col-span-12 min-w-0 xl:col-span-8">
-
               <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
-
             </div>
-
 
             <div className="col-span-12 min-h-0 min-w-0 overflow-hidden xl:col-span-4 xl:row-span-2">
-
               <AdminLiveProductListPanel fillHeight className="h-full min-w-0 overflow-hidden" />
-
             </div>
 
-
-            <div className="col-span-12 min-w-0 xl:col-span-8">
-
+            <div className="col-span-12 min-h-0 min-w-0 overflow-hidden xl:col-span-8">
               <LiveBroadcastPanels videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} />
-
             </div>
-
           </div>
-{loadError && (
+
+          {loadError ? (
             <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700">
               주문 데이터 불러오기 실패: {loadError}
             </div>
-          )}
+          ) : null}
 
           <section className="grid grid-cols-12 gap-3">
             <div className="col-span-12 xl:col-span-12">
@@ -910,65 +920,28 @@ export default function AdminLiveDashboard() {
                 orders={filteredOrders}
                 allOrderCount={orders.length}
                 selectedOrderId={selectedOrder?.id || ""}
+                loading={loading}
+                filters={filters}
+                broadcastOptions={broadcastOptions}
                 onSelectOrder={(order) => {
                   setSelectedOrderId(order.id);
                   setOrderDetailOpen(true);
                 }}
-                onOpenManualMatch={openManualMatchForOrder}
-                onRefresh={loadOrders}
-                loading={loading}
-                filters={filters}
                 onFiltersChange={setFilters}
-                broadcastOptions={broadcastOptions}
+                onRefresh={loadOrders}
+                onOpenManualMatch={openManualMatchForOrder}
               />
             </div>
-
-
           </section>
 
-          {orderDetailOpen && selectedOrder ? (
+          {activeMenu === "broadcast" && selectedOrder && orderDetailOpen ? (
             <LiveOrderDetailDrawer
               order={selectedOrder}
               onOpenManualMatch={openManualMatchForOrder}
               onClose={closeOrderDetail}
+              onAfterStatusChange={loadOrders}
             />
           ) : null}
-
-            </>
-          ) : activeMenu === "orders" ? (
-            <AdminLiveOrdersPanel
-              orders={filteredOrders}
-              allOrderCount={orders.length}
-              selectedOrder={selectedOrder}
-              selectedOrderId={selectedOrder?.id || ""}
-              orderDetailOpen={orderDetailOpen}
-              filters={filters}
-              broadcastOptions={broadcastOptions}
-              onSelectOrder={(order) => {
-                setSelectedOrderId(order.id);
-                setOrderDetailOpen(true);
-              }}
-              onCloseOrderDetail={() => setOrderDetailOpen(false)}
-              onFiltersChange={setFilters}
-              onRefresh={loadOrders}
-            />
-          ) : activeMenu === "payments" ? (
-            <AdminLivePaymentPanel
-              deposits={deposits}
-              orderGroups={orderGroups}
-              onRefresh={loadDepositsFromServer}
-              onBankdaSync={syncBankdaDepositsOnly}
-              onOpenManualMatch={setManualMatchGroup}
-            />
-          ) : activeMenu === "customers" ? (
-            <AdminLiveCustomersPanel orders={orders} />
-          ) : activeMenu === "settlement" ? (
-            <AdminLiveSettlementPanel orders={orders} />
-          ) : activeMenu === "settings" ? (
-            <AdminLiveSettingsPanel />
-          ) : (
-            <AdminLiveMenuPlaceholder menuKey={activeMenu} />
-          )}
 
           <ManualPaymentMatchDrawer
             group={manualMatchGroup}
@@ -976,6 +949,7 @@ export default function AdminLiveDashboard() {
             onClose={() => setManualMatchGroup(null)}
             onMatched={refreshAfterManualMatch}
           />
+
           {broadcastEndSummary ? (
             <LiveBroadcastEndSummaryModal
               summary={broadcastEndSummary}
@@ -989,8 +963,83 @@ export default function AdminLiveDashboard() {
           ) : null}
 
           <AdminLiveQuickProductDrawer activeBroadcastId={activeBroadcast?.id || null} />
+        </main>
 
-      </main>
+        {activeMenu !== "broadcast" ? (
+          <aside
+            className="fixed inset-y-0 right-0 z-[80] flex w-[min(760px,calc(100vw-260px))] flex-col border-l border-slate-200 bg-white shadow-2xl"
+            data-ruru-controltower-slide-panel="right-drawer"
+          >
+            <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 px-5">
+              <div>
+                <div className="text-lg font-black text-slate-950">
+                  {activeMenu === "orders"
+                    ? "주문관리 빠른패널"
+                    : activeMenu === "payments"
+                    ? "입금확인 빠른패널"
+                    : activeMenu === "customers"
+                    ? "고객관리 빠른패널"
+                    : activeMenu === "settlement"
+                    ? "정산요약 빠른패널"
+                    : activeMenu === "settings"
+                    ? "방송 설정 빠른패널"
+                    : "빠른패널"}
+                </div>
+                <div className="mt-0.5 text-xs font-bold text-slate-400">
+                  방송 화면을 유지한 채 필요한 업무만 바로 확인합니다.
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveMenu("broadcast");
+                  replacePanelInUrl("broadcast");
+                }}
+                className="h-10 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:bg-slate-50 active:scale-[0.98]"
+              >
+                닫기
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 p-4">
+              {activeMenu === "orders" ? (
+                <AdminLiveOrdersPanel
+                  orders={filteredOrders}
+                  allOrderCount={orders.length}
+                  selectedOrder={selectedOrder}
+                  selectedOrderId={selectedOrder?.id || ""}
+                  orderDetailOpen={orderDetailOpen}
+                  filters={filters}
+                  broadcastOptions={broadcastOptions}
+                  onSelectOrder={(order) => {
+                    setSelectedOrderId(order.id);
+                    setOrderDetailOpen(true);
+                  }}
+                  onCloseOrderDetail={() => setOrderDetailOpen(false)}
+                  onFiltersChange={setFilters}
+                  onRefresh={loadOrders}
+                />
+              ) : activeMenu === "payments" ? (
+                <AdminLivePaymentPanel
+                  deposits={deposits}
+                  orderGroups={orderGroups}
+                  onRefresh={loadDepositsFromServer}
+                  onBankdaSync={syncBankdaDepositsOnly}
+                  onOpenManualMatch={setManualMatchGroup}
+                />
+              ) : activeMenu === "customers" ? (
+                <AdminLiveCustomersPanel orders={orders} />
+              ) : activeMenu === "settlement" ? (
+                <AdminLiveSettlementPanel orders={orders} />
+              ) : activeMenu === "settings" ? (
+                <AdminLiveSettingsPanel />
+              ) : (
+                <AdminLiveMenuPlaceholder menuKey={activeMenu} />
+              )}
+            </div>
+          </aside>
+        ) : null}
       </div>
     </div>
   );

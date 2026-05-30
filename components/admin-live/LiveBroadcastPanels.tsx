@@ -382,7 +382,11 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
   const pageNumbers = Array.from({ length: Math.min(totalPages, 4) }, (_, index) => index + 1);
 
   const goCustomerManagement = () => {
-    window.location.href = "/admin-live?panel=customers";
+    window.dispatchEvent(
+      new CustomEvent("ruru-admin-live-open-panel", {
+        detail: "customers",
+      })
+    );
   };
 
   const searchCustomers = async () => {
