@@ -370,12 +370,12 @@ export default function AdminLiveEventRoulettePanel({
       return;
     }
 
-    if (!winner.is_test) {
-      showAdminToast("운영 당첨 기록은 삭제할 수 없습니다. 테스트 기록만 삭제 가능합니다.", "warning");
-      return;
-    }
+    const recordLabel = winner.is_test ? "테스트 당첨 기록" : "운영 당첨 기록";
+    const confirmMessage = winner.is_test
+      ? `테스트 당첨 기록을 삭제할까요?\n\n${winner.nickname}`
+      : `운영 당첨 기록을 삭제합니다.\n\n닉네임: ${winner.nickname}\n\n이 기록은 실제 운영 당첨 기록이며, 삭제하면 당첨자 리스트와 같은 방송 중복당첨 기준에서 빠집니다.\n포인트 지급/고객 안내 여부는 별도로 확인해야 합니다.\n\n정말 삭제할까요?`;
 
-    if (!window.confirm(`테스트 당첨 기록을 삭제할까요?\n\n${winner.nickname}`)) return;
+    if (!window.confirm(confirmMessage)) return;
 
     try {
       const payload = await requestJson<{ ok: boolean; message?: string }>("/api/admin-live/event-roulette", {
@@ -383,17 +383,23 @@ export default function AdminLiveEventRoulettePanel({
         body: JSON.stringify({
           action: "delete_winner",
           winnerId: winner.id,
+          allowLiveDelete: !winner.is_test,
+          liveConfirmText: winner.is_test ? "" : "운영기록삭제",
         }),
       });
 
       if (!payload.ok) {
-        throw new Error(payload.message || "테스트 당첨 기록 삭제 실패");
+        throw new Error(payload.message || `${recordLabel} 삭제 실패`);
       }
 
-      showAdminToast("테스트 당첨 기록을 삭제했습니다.", "success");
+      if (currentEvent?.id && currentEvent.id === winner.event_id) {
+        setCurrentEvent(null);
+      }
+
+      showAdminToast(`${recordLabel}을 삭제했습니다.`, "success");
       await loadEventsAndWinners();
     } catch (error) {
-      showAdminToast("테스트 당첨 기록 삭제 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
+      showAdminToast(`${recordLabel} 삭제 실패\n\n` + (error instanceof Error ? error.message : String(error)), "error");
     }
   };
 
@@ -693,7 +699,7 @@ export default function AdminLiveEventRoulettePanel({
                     <div className="flex shrink-0 items-start justify-between gap-2">
                       <div>
                         <div className="text-lg font-black text-slate-950">당첨자 리스트</div>
-                        <div className="mt-1 text-xs font-bold text-slate-400">테스트 기록은 정리 가능, 운영 기록은 보존</div>
+                        <div className="mt-1 text-xs font-bold text-slate-400">잘못 만든 기록은 개별 삭제 가능, 운영 전체삭제는 없음</div>
                       </div>
                       <button
                         type="button"
@@ -735,15 +741,17 @@ export default function AdminLiveEventRoulettePanel({
                               >
                                 {winner.is_reward_done ? "지급완료됨" : "지급완료 체크"}
                               </button>
-                              {winner.is_test ? (
-                                <button
-                                  type="button"
-                                  onClick={() => void deleteWinnerRecord(winner)}
-                                  className="w-full rounded-xl border border-red-100 bg-white px-3 py-2 text-xs font-black text-red-600 hover:bg-red-50"
-                                >
-                                  테스트 기록 삭제
-                                </button>
-                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => void deleteWinnerRecord(winner)}
+                                className={`w-full rounded-xl border bg-white px-3 py-2 text-xs font-black transition active:scale-[0.98] ${
+                                  winner.is_test
+                                    ? "border-red-100 text-red-600 hover:bg-red-50 active:bg-red-100"
+                                    : "border-amber-200 text-amber-700 hover:bg-amber-50 active:bg-amber-100"
+                                }`}
+                              >
+                                {winner.is_test ? "테스트 기록 삭제" : "운영 기록 삭제"}
+                              </button>
                             </div>
                           </div>
                         ))

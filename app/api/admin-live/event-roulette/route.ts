@@ -789,43 +789,82 @@ async function markRewardDone(body: Record<string, unknown>) {
 }
 
 async function deleteWinnerRecord(body: Record<string, unknown>) {
-  const supabase = getSupabaseAdmin();
   const winnerId = cleanText(body.winnerId);
+  const allowLiveDelete = body.allowLiveDelete === true;
+  const liveConfirmText = cleanText(body.liveConfirmText);
 
   if (!winnerId) {
-    return json({ ok: false, message: "winnerId가 없습니다." }, 400);
+    return json({ ok: false, message: "당첨 기록 ID가 없습니다." }, 400);
   }
 
-  const { data: winner, error: loadError } = await supabase
+  const supabase = getSupabaseAdmin();
+
+  const { data: winnerRow, error: lookupError } = await supabase
     .from("event_roulette_winners")
     .select("id, event_id, nickname, is_test, is_reward_done")
     .eq("id", winnerId)
     .maybeSingle();
 
-  if (loadError) {
-    return json({ ok: false, message: loadError.message || "당첨 기록 조회 실패" }, 500);
+  if (lookupError) {
+    return json({ ok: false, message: lookupError.message || "당첨 기록 조회 실패" }, 500);
   }
 
-  if (!winner) {
+  if (!winnerRow) {
     return json({ ok: false, message: "삭제할 당첨 기록을 찾지 못했습니다." }, 404);
   }
 
-  if (!winner.is_test) {
-    return json({ ok: false, message: "운영 당첨 기록은 여기서 삭제할 수 없습니다. 테스트 당첨 기록만 삭제 가능합니다." }, 400);
+  const winner = winnerRow as {
+    id: string;
+    event_id: string | null;
+    nickname: string | null;
+    is_test: boolean;
+    is_reward_done: boolean | null;
+  };
+
+  if (!winner.is_test && (!allowLiveDelete || liveConfirmText !== "운영기록삭제")) {
+    return json({ ok: false, message: "운영 당첨 기록 삭제 확인값이 없습니다." }, 400);
   }
 
-  const { error } = await supabase
+  const { error: deleteError } = await supabase
     .from("event_roulette_winners")
     .delete()
     .eq("id", winnerId)
-    .eq("is_test", true);
+    .eq("is_test", winner.is_test);
 
-  if (error) {
-    return json({ ok: false, message: error.message || "테스트 당첨 기록 삭제 실패" }, 500);
+  if (deleteError) {
+    return json({ ok: false, message: deleteError.message || "당첨 기록 삭제 실패" }, 500);
   }
 
-  return json({ ok: true, deleted_winner_id: winnerId });
+  const eventId = cleanText(winner.event_id);
+
+  if (eventId) {
+    const { error: eventUpdateError } = await supabase
+      .from("event_roulette_events")
+      .update({
+        status: "idle",
+        winner_nickname: null,
+        winner_note: null,
+        winner_order_ids: null,
+        result_at: null,
+        spin_started_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", eventId)
+      .eq("is_test", winner.is_test);
+
+    if (eventUpdateError) {
+      return json({ ok: false, message: eventUpdateError.message || "당첨 이벤트 초기화 실패" }, 500);
+    }
+  }
+
+  return json({
+    ok: true,
+    deleted_winner_id: winnerId,
+    reset_event_id: eventId || null,
+    is_test: winner.is_test,
+  });
 }
+
 
 async function deleteTestRecords() {
   const supabase = getSupabaseAdmin();
