@@ -686,7 +686,7 @@ export default function AdminLiveEventRoulettePanel({
                   </section>
                 </div>
 
-                <aside className="grid min-h-0 grid-rows-[190px_1fr] gap-4">
+                <aside className="grid min-h-0 grid-rows-[176px_1fr] gap-4">
                   <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="flex items-center justify-between">
                       <div className="text-lg font-black text-slate-950">현재 룰렛</div>
@@ -720,11 +720,11 @@ export default function AdminLiveEventRoulettePanel({
                           onClick={() => void deleteRouletteEvent(currentEvent, "현재 룰렛")}
                           className="col-span-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98] active:bg-amber-200"
                         >
-                          현재 룰렛 삭제
+                          현재 룰렛 기록 삭제
                         </button>
                       </div>
                     ) : (
-                      <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-10 text-center text-sm font-bold text-slate-400">
+                      <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm font-bold text-slate-400">
                         아직 만든 룰렛이 없습니다.
                       </div>
                     )}
@@ -734,7 +734,7 @@ export default function AdminLiveEventRoulettePanel({
                     <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 px-5 py-4">
                       <div className="min-w-0">
                         <div className="text-lg font-black text-slate-950">당첨자 리스트</div>
-                        <div className="mt-1 truncate text-xs font-bold text-slate-400">잘못 만든 기록은 개별 삭제 가능, 운영 전체삭제는 없음</div>
+                        <div className="mt-1 truncate text-xs font-bold text-slate-400">잘못 만든 룰렛은 기록째 삭제됩니다. 운영 전체삭제는 없습니다.</div>
                       </div>
                       <button
                         type="button"
@@ -747,7 +747,7 @@ export default function AdminLiveEventRoulettePanel({
 
                     <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3">
                       {winners.length === 0 ? (
-                        <div className="rounded-2xl bg-slate-50 px-4 py-12 text-center text-sm font-bold text-slate-400">
+                        <div className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm font-bold text-slate-400">
                           당첨 기록이 없습니다.
                         </div>
                       ) : (
@@ -785,7 +785,7 @@ export default function AdminLiveEventRoulettePanel({
                                     : "border-amber-200 text-amber-700 hover:bg-amber-50 active:bg-amber-100"
                                 }`}
                               >
-                                "룰렛 삭제"
+                                기록 삭제
                               </button>
                             </div>
                           </div>
@@ -795,7 +795,7 @@ export default function AdminLiveEventRoulettePanel({
 
                     <details className="shrink-0 border-t border-slate-100 bg-slate-50 px-4 py-3">
                       <summary className="cursor-pointer select-none text-sm font-black text-slate-700 transition active:scale-[0.99]">
-                        최근 이벤트 보기 · 최근 {Math.min(events.length, 20)}개
+                        최근 이벤트 · 최근 {Math.min(events.length, 20)}개
                       </summary>
 
                       <div className="mt-3 max-h-[150px] space-y-2 overflow-y-auto pr-1">
@@ -828,7 +828,7 @@ export default function AdminLiveEventRoulettePanel({
                                 onClick={() => void deleteRouletteEvent(event, "최근 이벤트")}
                                 className="mt-2 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98] active:bg-amber-200"
                               >
-                                룰렛 기록 삭제
+                                이 룰렛 기록 삭제
                               </button>
                             </div>
                           ))
