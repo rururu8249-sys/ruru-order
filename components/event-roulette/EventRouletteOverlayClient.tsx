@@ -89,6 +89,8 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
   const [message, setMessage] = useState("룰렛 준비중");
   const [loadedAt, setLoadedAt] = useState(0);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [lastResultKey, setLastResultKey] = useState("");
+  const [resultFirstSeenAtMs, setResultFirstSeenAtMs] = useState(0);
 
   useEffect(() => {
     const html = document.documentElement;
@@ -159,14 +161,32 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
   const visibleParticipants = useMemo(() => participants.slice(0, 48), [participants]);
   const titleParts = useMemo(() => splitRouletteTitle(event?.title || "🎁 루루동이룰렛"), [event?.title]);
   const gradient = useMemo(() => segmentGradient(visibleParticipants), [visibleParticipants]);
-  const spinStartedAtMs = parseDateMs(event?.spin_started_at);
-  const spinDurationMs = safeSpinDurationMs(event?.spin_duration_ms);
-  const resultUnlockAtMs = spinStartedAtMs > 0 ? spinStartedAtMs + spinDurationMs + RESULT_REVEAL_GRACE_MS : loadedAt + MIN_SPIN_DISPLAY_MS;
-  const shouldHoldResult = event?.status === "result" && Boolean(event.winner_nickname) && nowMs < resultUnlockAtMs;
+  const resultKey =
+    event?.status === "result" && event.winner_nickname
+      ? `${event.result_at || ""}|${event.winner_nickname}|${event.winner_note || ""}`
+      : "";
+  const shouldHoldResult =
+    Boolean(resultKey) &&
+    (resultKey !== lastResultKey || resultFirstSeenAtMs <= 0 || nowMs < resultFirstSeenAtMs + MIN_SPIN_DISPLAY_MS);
   const isRouletteSpinning = event?.status === "spinning" || shouldHoldResult;
   const hasResult = event?.status === "result" && Boolean(event.winner_nickname) && !shouldHoldResult;
   const rotation = loadedAt % 360;
   const statusMessage = isRouletteSpinning ? "룰렛이 돌아가는 중..." : message;
+
+  useEffect(() => {
+    if (!resultKey) {
+      if (lastResultKey) {
+        setLastResultKey("");
+        setResultFirstSeenAtMs(0);
+      }
+      return;
+    }
+
+    if (resultKey !== lastResultKey) {
+      setLastResultKey(resultKey);
+      setResultFirstSeenAtMs(Date.now());
+    }
+  }, [resultKey, lastResultKey]);
 
   if (!token) {
     return (
