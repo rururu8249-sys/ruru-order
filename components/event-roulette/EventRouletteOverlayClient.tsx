@@ -30,7 +30,27 @@ function normalizeToken(value: string) {
   return String(value || "").trim();
 }
 
-const ROULETTE_COLORS = ["#dbeafe", "#ede9fe", "#f8fafc", "#e0f2fe", "#f3e8ff", "#f1f5f9"];
+const ROULETTE_COLORS = ["#fbcfe8", "#ddd6fe", "#bfdbfe", "#a7f3d0", "#fde68a", "#fed7aa", "#c7d2fe", "#bae6fd", "#bbf7d0", "#f5d0fe"];
+const MIN_SPIN_DISPLAY_MS = 6500;
+const RESULT_REVEAL_GRACE_MS = 500;
+
+function parseDateMs(value: string | null | undefined) {
+  if (!value) return 0;
+
+  const parsed = new Date(value).getTime();
+
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function safeSpinDurationMs(value: number | null | undefined) {
+  const numberValue = Number(value || 0);
+
+  if (!Number.isFinite(numberValue) || numberValue <= 0) {
+    return MIN_SPIN_DISPLAY_MS;
+  }
+
+  return Math.min(9000, Math.max(MIN_SPIN_DISPLAY_MS, numberValue));
+}
 
 function segmentGradient(participants: OverlayParticipant[]) {
   const list = participants.length > 0 ? participants.slice(0, 48) : [{ nickname: "READY" }];
@@ -68,6 +88,7 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
   const [event, setEvent] = useState<OverlayEvent | null>(null);
   const [message, setMessage] = useState("룰렛 준비중");
   const [loadedAt, setLoadedAt] = useState(0);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
     const html = document.documentElement;
@@ -84,6 +105,14 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
       body.style.margin = "";
       body.style.overflow = "";
     };
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 250);
+
+    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -129,9 +158,15 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
   const participants = event?.participants || [];
   const visibleParticipants = useMemo(() => participants.slice(0, 48), [participants]);
   const titleParts = useMemo(() => splitRouletteTitle(event?.title || "🎁 루루동이룰렛"), [event?.title]);
-  const hasResult = event?.status === "result" && Boolean(event.winner_nickname);
   const gradient = useMemo(() => segmentGradient(visibleParticipants), [visibleParticipants]);
+  const spinStartedAtMs = parseDateMs(event?.spin_started_at);
+  const spinDurationMs = safeSpinDurationMs(event?.spin_duration_ms);
+  const resultUnlockAtMs = spinStartedAtMs > 0 ? spinStartedAtMs + spinDurationMs + RESULT_REVEAL_GRACE_MS : loadedAt + MIN_SPIN_DISPLAY_MS;
+  const shouldHoldResult = event?.status === "result" && Boolean(event.winner_nickname) && nowMs < resultUnlockAtMs;
+  const isRouletteSpinning = event?.status === "spinning" || shouldHoldResult;
+  const hasResult = event?.status === "result" && Boolean(event.winner_nickname) && !shouldHoldResult;
   const rotation = loadedAt % 360;
+  const statusMessage = isRouletteSpinning ? "룰렛이 돌아가는 중..." : message;
 
   if (!token) {
     return (
@@ -166,8 +201,8 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
               className="absolute inset-[3%] rounded-full"
               style={{
                 background: gradient,
-                transform: event?.status === "spinning" ? undefined : `rotate(${rotation}deg)`,
-                animation: event?.status === "spinning" ? "ruruRouletteSpin 4.5s cubic-bezier(.18,.82,.25,1) infinite" : undefined,
+                transform: isRouletteSpinning ? undefined : `rotate(${rotation}deg)`,
+                animation: isRouletteSpinning ? "ruruRouletteSpin 4.8s cubic-bezier(.16,.9,.18,1) infinite" : undefined,
               }}
             >
               <div className="absolute inset-0 rounded-full ring-1 ring-slate-500/15" />
@@ -195,25 +230,25 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
             </div>
 
             <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-              <div className="flex h-[34%] w-[34%] flex-col items-center justify-center rounded-full bg-slate-950 text-center shadow-[0_12px_30px_rgba(0,0,0,0.30)] ring-[3px] ring-white/95">
+              <div className="flex h-[34%] w-[34%] flex-col items-center justify-center rounded-full bg-white/92 text-center shadow-[0_16px_36px_rgba(15,23,42,0.22)] ring-[4px] ring-white/95 backdrop-blur">
                 {titleParts.gift ? (
                   <div className="mb-1 text-[clamp(20px,3.3vw,38px)] leading-none">{titleParts.gift}</div>
                 ) : null}
-                <div className="flex flex-col items-center justify-center px-3 text-[clamp(18px,3.1vw,34px)] font-black leading-[1.14] text-white">
+                <div className="flex flex-col items-center justify-center px-3 text-[clamp(18px,3.1vw,34px)] font-black leading-[1.14] text-slate-950">
                   {titleParts.lines.map((line) => (
                     <span key={line}>{line}</span>
                   ))}
                 </div>
-                <div className="mt-2 text-[clamp(12px,1.9vw,20px)] font-black text-slate-300">
+                <div className="mt-2 text-[clamp(12px,1.9vw,20px)] font-black text-slate-500">
                   {participants.length.toLocaleString("ko-KR")}명 참여
                 </div>
               </div>
             </div>
           </div>
 
-          {message ? (
+          {statusMessage ? (
             <div className="absolute bottom-10 left-1/2 -translate-x-1/2 rounded-full bg-white/75 px-6 py-3 text-xl font-black text-slate-950 shadow-[0_8px_24px_rgba(15,23,42,0.16)] backdrop-blur">
-              {message}
+              {statusMessage}
             </div>
           ) : null}
 
@@ -226,11 +261,14 @@ export default function EventRouletteOverlayClient({ initialToken }: { initialTo
             }
 
             @keyframes ruruRouletteSpin {
-              from {
+              0% {
                 transform: rotate(0deg);
               }
-              to {
-                transform: rotate(1080deg);
+              72% {
+                transform: rotate(1240deg);
+              }
+              100% {
+                transform: rotate(1440deg);
               }
             }
           `}</style>
