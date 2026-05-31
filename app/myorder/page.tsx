@@ -270,7 +270,7 @@ export default function MyOrderPage() {
         />
 
       <section className="mx-auto w-full max-w-md">
-        <CustomerTopNav />
+        <CustomerTopNav activeTab="myorder" variant="compact" />
 
         <MyOrderPageHero isLoggedIn={isLoggedIn} customerName={customerName} />
 

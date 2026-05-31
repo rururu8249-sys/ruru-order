@@ -33,14 +33,24 @@ const initialInfo: SavedCustomerInfo = {
 type CustomerTopNavProps = {
   showGreeting?: boolean;
   className?: string;
+  activeTab?: "home" | "myorder" | "edit";
+  variant?: "card" | "compact";
 };
 
 const navButtonClass =
   "rounded-2xl bg-slate-50 px-4 py-3 text-center text-[13px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-100 transition active:scale-[0.98]";
 
+const compactNavButtonClass =
+  "rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-center text-[11px] font-black tracking-[-0.04em] text-slate-700 transition active:scale-[0.98]";
+
+const compactActiveNavButtonClass =
+  "rounded-full bg-blue-700 px-2.5 py-1.5 text-center text-[11px] font-black tracking-[-0.04em] text-white shadow-[0_8px_18px_rgba(37,99,235,0.20)] transition active:scale-[0.98]";
+
 export default function CustomerTopNav({
   showGreeting = true,
   className = "",
+  activeTab,
+  variant = "card",
 }: CustomerTopNavProps) {
   const [customerInfo, setCustomerInfo] = useState<SavedCustomerInfo>(initialInfo);
   const [isReady, setIsReady] = useState(false);
@@ -52,6 +62,12 @@ export default function CustomerTopNav({
 
   const isLoggedIn = isReady && hasSavedCustomerInfo(customerInfo);
   const greetingName = getCustomerGreetingName(customerInfo);
+  const isCompact = variant === "compact";
+  const headerClassName = isCompact
+    ? `mb-4 border-b border-slate-200 bg-[#f8fafc]/95 px-4 py-3 backdrop-blur ${className}`
+    : `mb-4 rounded-[24px] bg-white/95 px-4 py-4 shadow-[0_10px_24px_rgba(30,64,175,0.07)] ring-1 ring-blue-100/70 ${className}`;
+  const inactiveButtonClass = isCompact ? compactNavButtonClass : navButtonClass;
+  const activeButtonClass = isCompact ? compactActiveNavButtonClass : navButtonClass;
 
   const handleLogout = () => {
 
@@ -62,16 +78,17 @@ export default function CustomerTopNav({
 
   return (
     <header
-      className={`mb-4 rounded-[24px] bg-white/95 px-4 py-4 shadow-[0_10px_24px_rgba(30,64,175,0.07)] ring-1 ring-blue-100/70 ${className}`}
+      data-ruru-customer-top-nav={isCompact ? "compact" : "card"}
+      className={headerClassName}
     >
       <div className="flex items-start justify-between gap-3">
         <Link href="/" className="min-w-0 transition active:scale-[0.99]">
-          <p className="text-[15px] font-black tracking-[-0.04em] text-blue-700">
+          <p className={isCompact ? "text-[17px] font-black tracking-[-0.05em] text-slate-950" : "text-[15px] font-black tracking-[-0.04em] text-blue-700"}>
             루루동이 LIVE
           </p>
 
           {showGreeting && (
-            <p className="mt-1 truncate text-[17px] font-black tracking-[-0.06em] text-[#151923]">
+            <p className={isCompact ? "mt-1 truncate text-[13px] font-extrabold tracking-[-0.04em] text-slate-700" : "mt-1 truncate text-[17px] font-black tracking-[-0.06em] text-[#151923]"}>
               {isLoggedIn
                 ? `${greetingName || "고객"}님 안녕하세요`
                 : "주문 전 정보를 확인해주세요"}
@@ -88,22 +105,22 @@ export default function CustomerTopNav({
         )}
       </div>
 
-      <nav className={`mt-3 grid gap-2 ${isLoggedIn ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-1"}`}>
-        <Link href="/" className={navButtonClass}>
-          🏠 HOME
+      <nav className={isCompact ? `mt-3 grid gap-1 ${isLoggedIn ? "grid-cols-4" : "grid-cols-1"}` : `mt-3 grid gap-2 ${isLoggedIn ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-1"}`}>
+        <Link href="/" className={activeTab === "home" ? activeButtonClass : inactiveButtonClass}>
+          {isCompact ? "HOME" : "🏠 HOME"}
         </Link>
 
         {isLoggedIn && (
           <>
-            <Link href="/myorder" className={navButtonClass}>
+            <Link href="/myorder" className={activeTab === "myorder" ? activeButtonClass : inactiveButtonClass}>
               주문조회
             </Link>
 
-            <Link href="/order?mode=edit" className={navButtonClass}>
+            <Link href="/order?mode=edit" className={activeTab === "edit" ? activeButtonClass : inactiveButtonClass}>
               정보수정
             </Link>
 
-            <button type="button" onClick={handleLogout} className={navButtonClass}>
+            <button type="button" onClick={handleLogout} className={inactiveButtonClass}>
               로그아웃
             </button>
           </>
