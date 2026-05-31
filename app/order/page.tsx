@@ -64,6 +64,7 @@ import OrderDepositConfirmModal from "@/components/order/OrderDepositConfirmModa
 import OrderCustomerInfoIntro from "@/components/order/OrderCustomerInfoIntro";
 import OrderCustomerInfoFormCard from "@/components/order/OrderCustomerInfoFormCard";
 import OrderCompletePaymentNotice from "@/components/order/OrderCompletePaymentNotice";
+import CustomerPaymentGuideBottomSheet from "@/components/customer/CustomerPaymentGuideBottomSheet";
 import OrderKakaoNicknameNotice from "@/components/order/OrderKakaoNicknameNotice";
 import CustomerBlockedNotice from "@/components/customer/CustomerBlockedNotice";
 import CustomerToastNotice from "@/components/customer/CustomerToastNotice";
@@ -855,6 +856,8 @@ export default function OrderPage() {
   );
   const [done, setDone] = useState<DoneData | null>(null);
   const [copyDone, setCopyDone] = useState(false);
+  const [nicknameCopyDone, setNicknameCopyDone] = useState(false);
+  const [paymentGuideOpen, setPaymentGuideOpen] = useState(false);
   const [customerCardRate, setCustomerCardRate] = useState(10);
   const [actualCardFeeRate, setActualCardFeeRate] = useState(7);
   const [cardPaymentMinAmount, setCardPaymentMinAmount] = useState(100000);
@@ -2935,6 +2938,10 @@ export default function OrderPage() {
         finalAmount: savedFinalAmount,
       });
 
+      if (paymentMethod === "무통장입금" && savedFinalAmount > 0) {
+        setPaymentGuideOpen(true);
+      }
+
       clearOrderDraftData();
 
       setItems([{ ...emptyItem }]);
@@ -2978,6 +2985,23 @@ export default function OrderPage() {
       setTimeout(() => setCopyDone(false), 1800);
     } catch {
       showCustomerNotice(BANK_ACCOUNT);
+    }
+  };
+
+  const copyDepositNickname = async () => {
+    const nickname = String(done?.nickname || youtubeNickname || customerName || "").trim();
+
+    if (!nickname) {
+      showCustomerNotice("복사할 닉네임이 없습니다.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(nickname);
+      setNicknameCopyDone(true);
+      setTimeout(() => setNicknameCopyDone(false), 1800);
+    } catch {
+      showCustomerNotice(nickname);
     }
   };
 
@@ -3239,6 +3263,18 @@ export default function OrderPage() {
   if (done) {
     return (
       <main className="min-h-screen bg-[#f8fafc] px-4 py-4 text-slate-950">
+        <CustomerPaymentGuideBottomSheet
+          open={paymentGuideOpen}
+          depositNickname={done.nickname || youtubeNickname || customerName}
+          bankName={BANK_NAME}
+          bankAccount={BANK_ACCOUNT}
+          bankHolder={BANK_HOLDER}
+          nicknameCopyDone={nicknameCopyDone}
+          bankCopyDone={copyDone}
+          onCopyNickname={copyDepositNickname}
+          onCopyBankAccount={copyBankAccount}
+          onClose={() => setPaymentGuideOpen(false)}
+        />
         <section className="mx-auto w-full max-w-[430px]">
           <TopCustomerNav />
 
