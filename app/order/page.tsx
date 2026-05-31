@@ -3329,9 +3329,15 @@ export default function OrderPage() {
                             {item.product_name}
                           </h3>
 
-                          <p className="mt-1 break-keep text-[13px] font-bold tracking-[-0.04em] text-slate-500">
-                            {[hideNone(item.color), hideNone(item.size)].filter(Boolean).join(" / ") || "옵션 없음"}
-                          </p>
+                          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-bold tracking-[-0.04em] text-slate-500">
+                            <span className="min-w-0 break-keep">
+                              {[hideNone(item.color), hideNone(item.size)].filter(Boolean).join(" / ") || "옵션 없음"}
+                            </span>
+                            <span className="text-slate-300">·</span>
+                            <span className="shrink-0 font-black text-slate-700">
+                              상품금액 {won(toNumber(item.product_price))}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
