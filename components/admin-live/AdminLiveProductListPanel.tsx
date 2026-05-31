@@ -437,6 +437,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
   const [loadError, setLoadError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [listFilter, setListFilter] = useState<ProductListFilter>("visible");
+  const [listSearchText, setListSearchText] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<ProductRow | null>(null);
   const [previewImage, setPreviewImage] = useState("");
   const [showProductDetailList, setShowProductDetailList] = useState(false);
@@ -492,6 +493,10 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
   useEffect(() => {
     setDetailPage(1);
   }, [detailSearchText, detailStatusFilter, detailPageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [listFilter, listSearchText]);
 
   const resetSimpleFastRows = useCallback(() => {
     setSimpleFastRows([{ productName: "", priceText: "", isVisible: true }]);
@@ -700,16 +705,38 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
   }, [products]);
 
   const listFilteredProducts = useMemo(() => {
-    if (listFilter === "hidden") {
-      return products.filter((product) => statusInfo(product).label === "숨김");
-    }
+    const keyword = listSearchText.trim().toLowerCase();
 
-    if (listFilter === "all") {
-      return products;
-    }
+    const baseProducts = (() => {
+      if (listFilter === "hidden") {
+        return products.filter((product) => statusInfo(product).label === "숨김");
+      }
 
-    return products.filter((product) => statusInfo(product).label !== "숨김");
-  }, [listFilter, products]);
+      if (listFilter === "all") {
+        return products;
+      }
+
+      return products.filter((product) => statusInfo(product).label !== "숨김");
+    })();
+
+    if (!keyword) return baseProducts;
+
+    return baseProducts.filter((product) => {
+      const haystack = [
+        productName(product),
+        String(productPrice(product)),
+        colorSummary(product),
+        sizeSummary(product),
+        productTypeLabel(product),
+        shippingLabel(product),
+        statusInfo(product).label,
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(keyword);
+    });
+  }, [listFilter, listSearchText, products]);
 
   const totalPages = Math.max(1, Math.ceil(listFilteredProducts.length / DEFAULT_PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
@@ -884,6 +911,28 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
             ))}
           </div>
 
+          <div className="mt-2 flex items-center gap-2 rounded-2xl border border-blue-100 bg-white px-3 py-2 shadow-sm">
+            <input
+              value={listSearchText}
+              onChange={(event) => setListSearchText(event.target.value)}
+              placeholder="상품명 / 금액 / 배송유형 검색"
+              className="min-w-0 flex-1 bg-transparent text-[13px] font-bold text-slate-900 outline-none placeholder:text-slate-400"
+            />
+            {listSearchText.trim() ? (
+              <button
+                type="button"
+                onClick={() => setListSearchText("")}
+                className="rounded-xl bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-500 hover:bg-slate-200"
+              >
+                지우기
+              </button>
+            ) : null}
+          </div>
+
+          <div className="mt-1 text-[10px] font-bold leading-4 text-slate-400">
+            검색하면 전체 등록상품에서 바로 찾습니다.
+          </div>
+
             {listFilteredProducts.length === 0 ? "0개" : `${pageStart + 1}-${Math.min(pageStart + DEFAULT_PAGE_SIZE, listFilteredProducts.length)} / ${listFilteredProducts.length}개`}
           </div>
 
@@ -900,9 +949,9 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
               </div>
             ) : visibleProducts.length === 0 ? (
               <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 text-center text-xs font-bold leading-5 text-slate-400">
-                등록된 상품이 없습니다.
+                {listSearchText.trim() ? "검색 결과가 없습니다." : "등록된 상품이 없습니다."}
                 <br />
-                + 빠른등록으로 상품을 먼저 추가하세요.
+                {listSearchText.trim() ? "검색어를 지우거나 전체상품에서 다시 확인하세요." : "+ 빠른등록으로 상품을 먼저 추가하세요."}
               </div>
             ) : (
               <div className="divide-y divide-slate-100">
