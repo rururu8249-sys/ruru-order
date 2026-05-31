@@ -3678,7 +3678,7 @@ export default function OrderPage() {
                       </label>
                     </div>
 
-                    <div className="grid min-w-0 grid-cols-2 gap-3">
+                    <div data-ruru-direct-input-amount-full-width="enabled" className="grid min-w-0 grid-cols-1 gap-3">
                       <label className="min-w-0 grid gap-2">
                         <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">수량</span>
                         <div className="grid h-12 grid-cols-[48px_1fr_48px] overflow-hidden rounded-[17px] border border-slate-200 bg-white">
@@ -3707,7 +3707,7 @@ export default function OrderPage() {
 
                       <label className="min-w-0 grid gap-2">
                         <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">금액</span>
-                        <div className="flex h-12 items-center rounded-[17px] border border-slate-200 bg-white px-4">
+                        <div className="flex h-12 min-w-0 items-center rounded-[17px] border border-slate-200 bg-white px-4">
                           <input
                             value={directInputItem.product_price ? Number(directInputItem.product_price).toLocaleString("ko-KR") : ""}
                             onChange={(event) => updateItem(directInputTargetIndex, "product_price", onlyNumber(event.target.value))}
@@ -3715,7 +3715,7 @@ export default function OrderPage() {
                             placeholder="0"
                             className="min-w-0 flex-1 text-right text-[15px] font-black tracking-[-0.04em] outline-none"
                           />
-                          <span className="ml-2 text-[14px] font-black text-slate-400">원</span>
+                          <span className="ml-2 shrink-0 text-[14px] font-black text-slate-400">원</span>
                         </div>
                       </label>
                     </div>
