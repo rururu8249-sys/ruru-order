@@ -839,7 +839,38 @@ export default function OrderPage() {
   const [customerPointLoading, setCustomerPointLoading] = useState(false);
   const [pointUseInput, setPointUseInput] = useState("");
   const [directInputOpen, setDirectInputOpen] = useState(false);
+  const [directInputKeyboardInset, setDirectInputKeyboardInset] = useState(0);
   const [directInputTargetIndex, setDirectInputTargetIndex] = useState(0);
+
+  useEffect(() => {
+    if (!directInputOpen || typeof window === "undefined") {
+      setDirectInputKeyboardInset(0);
+      return;
+    }
+
+    const viewport = window.visualViewport;
+
+    const updateKeyboardInset = () => {
+      const viewportHeight = viewport?.height ?? window.innerHeight;
+      const viewportOffsetTop = viewport?.offsetTop ?? 0;
+      const nextInset = Math.max(0, window.innerHeight - viewportHeight - viewportOffsetTop);
+
+      setDirectInputKeyboardInset(nextInset > 80 ? Math.min(Math.round(nextInset), 360) : 0);
+    };
+
+    updateKeyboardInset();
+
+    viewport?.addEventListener("resize", updateKeyboardInset);
+    viewport?.addEventListener("scroll", updateKeyboardInset);
+    window.addEventListener("resize", updateKeyboardInset);
+
+    return () => {
+      viewport?.removeEventListener("resize", updateKeyboardInset);
+      viewport?.removeEventListener("scroll", updateKeyboardInset);
+      window.removeEventListener("resize", updateKeyboardInset);
+    };
+  }, [directInputOpen]);
+
   const [orderDraftRestored, setOrderDraftRestored] = useState(false);
 
   useEffect(() => {
@@ -3504,7 +3535,12 @@ export default function OrderPage() {
 
           {directInputOpen && directInputItem && (
             <div className="fixed inset-0 z-[130] bg-slate-950/55 backdrop-blur-[2px]">
-              <div className="absolute inset-x-0 bottom-0 mx-auto max-h-[88dvh] w-full max-w-[430px] overflow-hidden rounded-t-[30px] bg-white shadow-[0_-24px_80px_rgba(15,23,42,0.25)]">
+              <div
+                className="absolute inset-x-0 bottom-0 mx-auto max-h-[88dvh] w-full max-w-[430px] overflow-hidden rounded-t-[30px] bg-white shadow-[0_-24px_80px_rgba(15,23,42,0.25)]"
+                style={{
+                  bottom: directInputKeyboardInset > 0 ? `${directInputKeyboardInset}px` : "0px",
+                }}
+              >
                 <div className="mx-auto mt-3 h-1.5 w-16 rounded-full bg-slate-200" />
 
                 <div className="max-h-[calc(88dvh-92px)] overflow-y-auto px-4 pb-4 pt-5">
@@ -3518,7 +3554,7 @@ export default function OrderPage() {
                   </div>
 
                   <div className="grid gap-4">
-                    <div className="grid gap-2">
+                    <div data-ruru-product-search-area className="grid gap-2">
                       <label className="grid gap-2">
                         <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">상품명</span>
                         <input
@@ -3529,9 +3565,16 @@ export default function OrderPage() {
                             setProductSearchText(nextValue);
                             setProductSearchOpenIndex(directInputTargetIndex);
                           }}
-                          onFocus={() => {
+                          onFocus={(event) => {
+                            const target = event.currentTarget;
                             setProductSearchText(directInputItem.product_name);
                             setProductSearchOpenIndex(directInputTargetIndex);
+
+                            if (typeof window !== "undefined") {
+                              window.setTimeout(() => {
+                                target.scrollIntoView({ block: "center", behavior: "smooth" });
+                              }, 80);
+                            }
                           }}
                           placeholder="상품명을 입력해주세요"
                           className="h-13 w-full rounded-[18px] border border-slate-200 bg-white px-4 text-[16px] font-bold tracking-[-0.04em] outline-none focus:border-blue-600"
