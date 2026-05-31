@@ -3539,24 +3539,37 @@ export default function OrderPage() {
           {directInputOpen && directInputItem && (
             <div className="fixed inset-0 z-[130] bg-slate-950/55 backdrop-blur-[2px]">
               <div
-                className={directInputProductSearchMode ? "absolute inset-x-0 bottom-0 mx-auto max-h-[94dvh] w-full max-w-[430px] overflow-hidden rounded-t-[30px] bg-white shadow-[0_-24px_80px_rgba(15,23,42,0.25)]" : "absolute inset-x-0 bottom-0 mx-auto max-h-[88dvh] w-full max-w-[430px] overflow-hidden rounded-t-[30px] bg-white shadow-[0_-24px_80px_rgba(15,23,42,0.25)]"}
+                data-ruru-direct-input-shell="direct-input-shell-v2"
+                className={directInputProductSearchMode ? "absolute inset-x-0 bottom-0 mx-auto max-h-[95dvh] w-full max-w-[430px] overflow-hidden rounded-t-[30px] bg-white shadow-[0_-24px_80px_rgba(15,23,42,0.25)]" : "absolute inset-x-0 bottom-0 mx-auto max-h-[90dvh] w-full max-w-[430px] overflow-hidden rounded-t-[30px] bg-white shadow-[0_-24px_80px_rgba(15,23,42,0.25)]"}
                 style={{
                   bottom: directInputProductSearchMode ? "0px" : directInputKeyboardInset > 0 ? `${directInputKeyboardInset}px` : "0px",
                 }}
               >
-                <div className="mx-auto mt-3 h-1.5 w-16 rounded-full bg-slate-200" />
+                <div className="mx-auto mt-2.5 h-1.5 w-16 rounded-full bg-slate-200" />
 
-                <div className="max-h-[calc(88dvh-92px)] overflow-y-auto px-4 pb-4 pt-5">
-                  <div className="mb-5">
-                    <h2 className="text-[24px] font-black tracking-[-0.08em] text-slate-950">
-                      직접 입력 주문
-                    </h2>
-                    <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
-                      목록에 없는 상품만 입력해주세요.
-                    </p>
+                <div className="max-h-[calc(95dvh-18px)] overflow-y-auto px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-4">
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="text-[28px] font-black leading-none tracking-[-0.08em] text-slate-950">
+                          직접 입력 주문
+                        </h2>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black tracking-[-0.04em] text-slate-500">
+                          없는 상품만 직접 입력
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={closeDirectInputSheet}
+                      className="shrink-0 rounded-2xl bg-slate-100 px-4 py-3 text-[14px] font-black tracking-[-0.04em] text-slate-700"
+                    >
+                      닫기
+                    </button>
                   </div>
 
-                  <div className="grid gap-4">
+                  <div className="grid gap-3">
                     <div data-ruru-product-search-area className={directInputProductSearchMode ? "sticky top-0 z-20 grid gap-2 rounded-b-2xl bg-white pb-2" : "grid gap-2"}>
                       <label className="grid gap-2">
                         <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">상품명</span>
@@ -3597,13 +3610,12 @@ export default function OrderPage() {
                             }
                           }}
                           placeholder="상품명을 입력해주세요"
-                          className="h-13 w-full rounded-[18px] border border-slate-200 bg-white px-4 text-[16px] font-bold tracking-[-0.04em] outline-none focus:border-blue-600"
+                          className="h-13 w-full rounded-[18px] border border-blue-500 bg-white px-4 text-[17px] font-black tracking-[-0.05em] text-slate-950 outline-none focus:border-blue-700"
                         />
                       </label>
 
-
                       {productSearchOpenIndex === directInputTargetIndex && productSearchText.trim().length > 0 ? (
-                        <div className={directInputProductSearchMode ? "max-h-[42dvh] overscroll-contain overflow-y-auto rounded-2xl border border-blue-100 bg-white p-2 shadow-[0_14px_35px_rgba(15,23,42,0.12)]" : "max-h-52 overflow-y-auto rounded-2xl border border-blue-100 bg-white p-2 shadow-[0_14px_35px_rgba(15,23,42,0.12)]"}>
+                        <div className={directInputProductSearchMode ? "max-h-[44dvh] overscroll-contain overflow-y-auto rounded-2xl border border-blue-100 bg-white p-2 shadow-[0_14px_35px_rgba(15,23,42,0.12)]" : "max-h-52 overflow-y-auto rounded-2xl border border-blue-100 bg-white p-2 shadow-[0_14px_35px_rgba(15,23,42,0.12)]"}>
                           <div className="px-3 py-2 text-[12px] font-black tracking-[-0.03em] text-blue-600">
                             직접입력 추천 상품명
                           </div>
@@ -3650,14 +3662,14 @@ export default function OrderPage() {
                       ) : null}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-3">
                       <label className="grid gap-2">
                         <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">옵션 / 색상</span>
                         <input
                           value={directInputItem.color}
                           onChange={(event) => updateItem(directInputTargetIndex, "color", event.target.value)}
                           placeholder="색상을 입력해주세요"
-                          className="h-13 min-w-0 rounded-[18px] border border-slate-200 bg-white px-4 text-[16px] font-bold tracking-[-0.04em] outline-none focus:border-blue-600"
+                          className="h-12 w-full rounded-[17px] border border-slate-200 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none focus:border-blue-600"
                         />
                       </label>
 
@@ -3667,19 +3679,19 @@ export default function OrderPage() {
                           value={directInputItem.size}
                           onChange={(event) => updateItem(directInputTargetIndex, "size", event.target.value)}
                           placeholder="사이즈를 입력해주세요"
-                          className="h-13 min-w-0 rounded-[18px] border border-slate-200 bg-white px-4 text-[16px] font-bold tracking-[-0.04em] outline-none focus:border-blue-600"
+                          className="h-12 w-full rounded-[17px] border border-slate-200 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none focus:border-blue-600"
                         />
                       </label>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-3">
                       <label className="grid gap-2">
                         <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">수량</span>
-                        <div className="flex h-13 overflow-hidden rounded-[18px] border border-slate-200 bg-white">
+                        <div className="grid h-12 grid-cols-[48px_1fr_48px] overflow-hidden rounded-[17px] border border-slate-200 bg-white">
                           <button
                             type="button"
                             onClick={() => updateItem(directInputTargetIndex, "qty", String(Math.max(1, (toNumber(directInputItem.qty) || 1) - 1)))}
-                            className="w-12 text-[18px] font-black text-slate-700"
+                            className="border-r border-slate-100 text-[18px] font-black text-slate-700"
                           >
                             -
                           </button>
@@ -3687,12 +3699,12 @@ export default function OrderPage() {
                             value={directInputItem.qty}
                             onChange={(event) => updateItem(directInputTargetIndex, "qty", onlyNumber(event.target.value))}
                             inputMode="numeric"
-                            className="min-w-0 flex-1 border-x border-slate-100 text-center text-[16px] font-black outline-none"
+                            className="min-w-0 text-center text-[16px] font-black tracking-[-0.04em] outline-none"
                           />
                           <button
                             type="button"
                             onClick={() => updateItem(directInputTargetIndex, "qty", String((toNumber(directInputItem.qty) || 0) + 1))}
-                            className="w-12 text-[18px] font-black text-blue-700"
+                            className="border-l border-slate-100 text-[18px] font-black text-blue-700"
                           >
                             +
                           </button>
@@ -3701,42 +3713,40 @@ export default function OrderPage() {
 
                       <label className="grid gap-2">
                         <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">금액</span>
-                        <div className="relative">
+                        <div className="flex h-12 items-center rounded-[17px] border border-slate-200 bg-white px-4">
                           <input
-                            value={directInputItem.product_price ? moneyText(directInputItem.product_price) : ""}
+                            value={directInputItem.product_price ? Number(directInputItem.product_price).toLocaleString("ko-KR") : ""}
                             onChange={(event) => updateItem(directInputTargetIndex, "product_price", onlyNumber(event.target.value))}
-                            placeholder="0"
                             inputMode="numeric"
-                            className="h-13 w-full rounded-[18px] border border-slate-200 bg-white px-4 pr-10 text-right text-[16px] font-bold outline-none focus:border-blue-600"
+                            placeholder="0"
+                            className="min-w-0 flex-1 text-right text-[15px] font-black tracking-[-0.04em] outline-none"
                           />
-                          <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[13px] font-black text-slate-400">
-                            원
-                          </span>
+                          <span className="ml-2 text-[14px] font-black text-slate-400">원</span>
                         </div>
                       </label>
                     </div>
 
-                    <div className="rounded-[18px] bg-blue-50 p-3 text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-blue-800 ring-1 ring-blue-100">
+                    <div className="rounded-2xl bg-blue-50 px-4 py-3 text-[13px] font-black leading-5 tracking-[-0.04em] text-blue-800">
                       방송에서 안내한 상품명/옵션/금액을 그대로 입력해주세요. 옵션이 없는 상품은 “없음”이라고 입력해주세요.
                     </div>
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-[0.8fr_1.2fr] gap-2 border-t border-slate-100 bg-white px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-3">
-                  <button
-                    type="button"
-                    onClick={closeDirectInputSheet}
-                    className={`${buttonBase} h-14 rounded-[20px] bg-slate-100 text-[16px] font-black tracking-[-0.05em] text-slate-700`}
-                  >
-                    취소
-                  </button>
-                  <button
-                    type="button"
-                    onClick={confirmDirectInputSheet}
-                    className={`${buttonBase} h-14 rounded-[20px] bg-blue-700 text-[16px] font-black tracking-[-0.05em] text-white shadow-lg shadow-blue-700/20`}
-                  >
-                    주문서에 담기
-                  </button>
+                    <div className="grid grid-cols-[0.8fr_1.2fr] gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={closeDirectInputSheet}
+                        className="h-14 rounded-[22px] bg-slate-100 text-[17px] font-black tracking-[-0.05em] text-slate-700"
+                      >
+                        취소
+                      </button>
+                      <button
+                        type="button"
+                        onClick={confirmDirectInputSheet}
+                        className="h-14 rounded-[22px] bg-blue-700 text-[17px] font-black tracking-[-0.05em] text-white shadow-[0_12px_28px_rgba(37,99,235,0.28)]"
+                      >
+                        주문서에 담기
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
