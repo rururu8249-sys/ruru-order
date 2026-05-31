@@ -2769,22 +2769,87 @@ export default function OrderPage() {
     .map((item, index) => ({ item, index }))
     .filter(({ item }) => item.product_name.trim());
 
+  const getRecordText = (record: Record<string, unknown> | undefined, keys: string[]) => {
+    if (!record) return "";
+
+    for (const key of keys) {
+      const value = record[key];
+      if (typeof value === "string" && value.trim()) return value.trim();
+      if (typeof value === "number" && Number.isFinite(value)) return String(value);
+    }
+
+    return "";
+  };
+
+  const findSourceProductForItem = (item: OrderItem) => {
+    const itemRecord = item as unknown as Record<string, unknown>;
+    const itemProductId = getRecordText(itemRecord, ["product_id", "productId", "id"]);
+    const itemProductName = item.product_name.trim();
+
+    const sourceProducts = [
+      ...quickGroupBuyProducts,
+      ...broadcastProducts,
+      ...groupBuyQuickProductsFromCatalog,
+    ] as unknown[];
+
+    return sourceProducts.find((source) => {
+      if (!source || typeof source !== "object") return false;
+
+      const sourceRecord = source as Record<string, unknown>;
+      const sourceProductId = getRecordText(sourceRecord, ["id", "product_id", "productId"]);
+      const sourceProductName = getRecordText(sourceRecord, ["product_name", "name", "title"]);
+
+      if (itemProductId && sourceProductId && itemProductId === sourceProductId) return true;
+      if (itemProductName && sourceProductName && itemProductName === sourceProductName) return true;
+
+      return false;
+    }) as Record<string, unknown> | undefined;
+  };
+
+  const getImageUrlFromRecord = (record: Record<string, unknown> | undefined) => {
+    if (!record) return "";
+
+    const directImageUrl = getRecordText(record, [
+      "image_url",
+      "main_image_url",
+      "thumbnail_url",
+      "product_image_url",
+      "imageUrl",
+      "image",
+      "thumbnail",
+      "photo_url",
+      "photo",
+    ]);
+
+    if (directImageUrl) return directImageUrl;
+
+    const dynamicImageKey = Object.keys(record).find((key) => {
+      const lowerKey = key.toLowerCase();
+      const value = record[key];
+
+      return (
+        typeof value === "string" &&
+        value.trim().length > 0 &&
+        (lowerKey.includes("image") || lowerKey.includes("thumb") || lowerKey.includes("photo")) &&
+        (value.startsWith("http") || value.startsWith("/") || value.startsWith("data:image"))
+      );
+    });
+
+    if (!dynamicImageKey) return "";
+
+    const value = record[dynamicImageKey];
+    return typeof value === "string" ? value.trim() : "";
+  };
+
   const isDirectInputItem = (item: OrderItem) => {
-    return !String(item.product_id || "").trim();
+    return !findSourceProductForItem(item);
   };
 
   const getOrderItemImageUrl = (item: OrderItem) => {
-    const imageRecord = item as OrderItem &
-      Partial<Record<"image_url" | "product_image_url" | "thumbnail_url" | "imageUrl" | "image", string>>;
+    const itemRecord = item as unknown as Record<string, unknown>;
+    const sourceRecord = findSourceProductForItem(item);
 
-    return (
-      imageRecord.image_url ||
-      imageRecord.product_image_url ||
-      imageRecord.thumbnail_url ||
-      imageRecord.imageUrl ||
-      imageRecord.image ||
-      ""
-    );
+    return getImageUrlFromRecord(itemRecord) || getImageUrlFromRecord(sourceRecord);
   };
 
   const openDirectInputSheet = () => {
@@ -3009,7 +3074,7 @@ export default function OrderPage() {
             </button>
           </section>
 
-          <section className="mt-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
+          <section className="mt-4 w-full max-w-full overflow-hidden rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-4">
               <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
                 선택한 상품
@@ -3029,17 +3094,20 @@ export default function OrderPage() {
                 </p>
               </div>
             ) : (
-              <div className="grid gap-3">
+              <div className="grid w-full max-w-full gap-3 overflow-hidden">
                 {selectedItemEntries.map(({ item, index }) => {
                   const itemAmount = toNumber(item.product_price) * toNumber(item.qty);
                   const directItem = isDirectInputItem(item);
                   const imageUrl = getOrderItemImageUrl(item);
 
                   return (
-                    <article key={`${item.product_name}-${index}`} className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
-                      <div className="flex items-center gap-3">
+                    <article
+                      key={`${item.product_name}-${index}`}
+                      className="w-full max-w-full overflow-hidden rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm"
+                    >
+                      <div className="flex w-full max-w-full items-start gap-3 overflow-hidden">
                         {!directItem && (
-                          <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[18px] bg-slate-50 ring-1 ring-slate-100">
+                          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[18px] bg-slate-50 ring-1 ring-slate-100">
                             {imageUrl ? (
                               <img
                                 src={imageUrl}
@@ -3047,18 +3115,19 @@ export default function OrderPage() {
                                 className="h-full w-full object-cover"
                               />
                             ) : (
-                              <span className="px-2 text-center text-[11px] font-black leading-tight text-slate-400">
+                              <span className="px-2 text-center text-[10px] font-black leading-tight text-slate-400">
                                 등록상품
                               </span>
                             )}
                           </div>
                         )}
 
-                        <div className="min-w-0 flex-1">
-                          <div className="mb-1 flex items-center gap-2">
+                        <div className="min-w-0 flex-1 overflow-hidden">
+                          <div className="mb-1 flex min-w-0 flex-wrap items-center gap-2">
                             <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
                               상품 {index + 1}
                             </p>
+
                             {directItem && (
                               <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-black tracking-[-0.04em] text-amber-700 ring-1 ring-amber-100">
                                 직접입력
@@ -3066,7 +3135,7 @@ export default function OrderPage() {
                             )}
                           </div>
 
-                          <h3 className="break-keep text-[17px] font-black leading-relaxed tracking-[-0.06em] text-slate-950">
+                          <h3 className="break-keep text-[17px] font-black leading-snug tracking-[-0.06em] text-slate-950">
                             {item.product_name}
                           </h3>
 
@@ -3075,41 +3144,48 @@ export default function OrderPage() {
                           </p>
 
                           <p className="mt-1 text-[14px] font-black tracking-[-0.05em] text-slate-700">
-                            {won(toNumber(item.product_price))}
+                            단가 {won(toNumber(item.product_price))}
                           </p>
                         </div>
                       </div>
 
-                      <div className="mt-4 flex items-center justify-between gap-3">
-                        <div className="flex h-12 min-w-[150px] overflow-hidden rounded-[18px] border border-slate-200 bg-white">
+                      <div className="mt-4 grid w-full max-w-full grid-cols-1 gap-3 overflow-hidden">
+                        <div className="flex h-12 w-full overflow-hidden rounded-[18px] border border-slate-200 bg-white">
                           <button
                             type="button"
                             onClick={() => updateItem(index, "qty", String(Math.max(1, (toNumber(item.qty) || 1) - 1)))}
-                            className="w-12 text-[18px] font-black text-slate-700"
+                            className="w-12 shrink-0 text-[18px] font-black text-slate-700"
                           >
                             -
                           </button>
+
                           <input
                             value={item.qty}
                             onChange={(event) => updateItem(index, "qty", onlyNumber(event.target.value))}
                             inputMode="numeric"
                             className="min-w-0 flex-1 border-x border-slate-100 text-center text-[16px] font-black outline-none"
                           />
+
                           <button
                             type="button"
                             onClick={() => updateItem(index, "qty", String((toNumber(item.qty) || 0) + 1))}
-                            className="w-12 text-[18px] font-black text-blue-700"
+                            className="w-12 shrink-0 text-[18px] font-black text-blue-700"
                           >
                             +
                           </button>
                         </div>
 
-                        <div className="min-w-[116px] text-right text-[17px] font-black tracking-[-0.05em] text-blue-800">
-                          {won(itemAmount)}
+                        <div className="flex w-full items-center justify-between rounded-[18px] bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
+                          <span className="text-[12px] font-black tracking-[-0.04em] text-slate-500">
+                            합계금액
+                          </span>
+                          <span className="text-[18px] font-black tracking-[-0.05em] text-blue-800">
+                            {won(itemAmount)}
+                          </span>
                         </div>
                       </div>
 
-                      <div className="mt-3 flex items-center justify-end gap-2">
+                      <div className="mt-3 flex w-full max-w-full flex-wrap items-center justify-end gap-2 overflow-hidden">
                         {directItem && (
                           <button
                             type="button"
