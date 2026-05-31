@@ -180,6 +180,99 @@ const emptyItem: OrderItem = {
   combine_shipping: "Y",
 };
 
+const ORDER_DRAFT_STORAGE_KEY = "ruru_order_draft_v1";
+
+type OrderDraftData = {
+  items?: OrderItem[];
+  paymentMethod?: "무통장입금" | "카드결제";
+  requestMemo?: string;
+  pointUseInput?: string;
+  savedAt?: number;
+};
+
+const readOrderDraftText = (value: unknown) => {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return "";
+  return String(value);
+};
+
+const isMeaningfulOrderItem = (item: Partial<OrderItem> | undefined) => {
+  if (!item) return false;
+
+  return Boolean(
+    readOrderDraftText(item.product_name).trim() ||
+      readOrderDraftText(item.color).trim() ||
+      readOrderDraftText(item.size).trim() ||
+      readOrderDraftText(item.qty).trim() ||
+      readOrderDraftText(item.product_price).trim()
+  );
+};
+
+const normalizeOrderDraftItem = (value: unknown): OrderItem | null => {
+  const record = (value || {}) as Record<string, unknown>;
+  const productId = readOrderDraftText(record.product_id).trim();
+
+  const nextItem: OrderItem = {
+    ...(productId ? { product_id: productId } : {}),
+    product_name: readOrderDraftText(record.product_name),
+    color: readOrderDraftText(record.color),
+    size: readOrderDraftText(record.size),
+    qty: readOrderDraftText(record.qty),
+    product_price: readOrderDraftText(record.product_price),
+    shipping_type: readOrderDraftText(record.shipping_type),
+    combine_shipping: readOrderDraftText(record.combine_shipping),
+  };
+
+  return isMeaningfulOrderItem(nextItem) ? nextItem : null;
+};
+
+const normalizeOrderDraftItems = (value: unknown): OrderItem[] => {
+  if (!Array.isArray(value)) return [{ ...emptyItem }];
+
+  const nextItems = value
+    .map((item) => normalizeOrderDraftItem(item))
+    .filter((item): item is OrderItem => Boolean(item));
+
+  return nextItems.length > 0 ? nextItems : [{ ...emptyItem }];
+};
+
+const readOrderDraftData = (): OrderDraftData | null => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const rawValue = window.localStorage.getItem(ORDER_DRAFT_STORAGE_KEY);
+    if (!rawValue) return null;
+
+    const parsed = JSON.parse(rawValue) as OrderDraftData;
+    if (!parsed || typeof parsed !== "object") return null;
+
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const writeOrderDraftData = (draft: OrderDraftData) => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(ORDER_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+  } catch {
+    // 임시저장 실패는 주문서 작성 자체를 막지 않습니다.
+  }
+};
+
+const clearOrderDraftData = () => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.removeItem(ORDER_DRAFT_STORAGE_KEY);
+  } catch {
+    // 임시저장 삭제 실패는 주문 저장 로직에 영향을 주지 않습니다.
+  }
+};
+
+
 const onlyNumber = (value: string) => String(value || "").replace(/[^0-9]/g, "");
 const normalizePhone = (value: string) => normalizeOrderPhone(value);
 const formatPhone = (value: string) => formatOrderPhone(value);
@@ -747,6 +840,55 @@ export default function OrderPage() {
   const [pointUseInput, setPointUseInput] = useState("");
   const [directInputOpen, setDirectInputOpen] = useState(false);
   const [directInputTargetIndex, setDirectInputTargetIndex] = useState(0);
+  const [orderDraftRestored, setOrderDraftRestored] = useState(false);
+
+  useEffect(() => {
+    const draft = readOrderDraftData();
+
+    if (draft) {
+      const draftItems = normalizeOrderDraftItems(draft.items);
+
+      setItems(draftItems);
+
+      if (draft.paymentMethod === "무통장입금" || draft.paymentMethod === "카드결제") {
+        setPaymentMethod(draft.paymentMethod);
+      }
+
+      if (typeof draft.requestMemo === "string") {
+        setRequestMemo(draft.requestMemo);
+      }
+
+      if (typeof draft.pointUseInput === "string") {
+        setPointUseInput(onlyNumber(draft.pointUseInput));
+      }
+    }
+
+    setOrderDraftRestored(true);
+  }, []);
+
+  useEffect(() => {
+    if (!orderDraftRestored || done) return;
+
+    const draftItems = normalizeOrderDraftItems(items);
+    const hasMeaningfulDraft =
+      draftItems.some((item) => isMeaningfulOrderItem(item)) ||
+      requestMemo.trim() ||
+      pointUseInput.trim() ||
+      paymentMethod !== "무통장입금";
+
+    if (!hasMeaningfulDraft) {
+      clearOrderDraftData();
+      return;
+    }
+
+    writeOrderDraftData({
+      items: draftItems,
+      paymentMethod,
+      requestMemo,
+      pointUseInput,
+      savedAt: Date.now(),
+    });
+  }, [orderDraftRestored, items, paymentMethod, requestMemo, pointUseInput, done]);
 
   const isRemoteAreaShippingAddress = isRemoteAreaAddress(zipcode, address, detailAddress);
   // 배송비 기준은 관리자 설정값(settings.default_shipping_fee)을 우선 적용합니다.
@@ -2676,6 +2818,8 @@ export default function OrderPage() {
         finalAmount: savedFinalAmount,
       });
 
+      clearOrderDraftData();
+
       setItems([{ ...emptyItem }]);
       setRequestMemo("");
       setPaymentMethod("무통장입금");
@@ -3123,16 +3267,38 @@ export default function OrderPage() {
                         )}
 
                         <div className="min-w-0 flex-1 overflow-hidden">
-                          <div className="mb-1 flex min-w-0 flex-wrap items-center gap-2">
-                            <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
-                              상품 {index + 1}
-                            </p>
+                          <div className="mb-1 flex min-w-0 items-start justify-between gap-2">
+                            <div className="min-w-0 flex flex-wrap items-center gap-2">
+                              <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
+                                상품 {index + 1}
+                              </p>
 
-                            {directItem && (
-                              <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-black tracking-[-0.04em] text-amber-700 ring-1 ring-amber-100">
-                                직접입력
-                              </span>
-                            )}
+                              {directItem && (
+                                <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-black tracking-[-0.04em] text-amber-700 ring-1 ring-amber-100">
+                                  직접입력
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex shrink-0 items-center gap-1">
+                              {directItem && (
+                                <button
+                                  type="button"
+                                  onClick={() => openDirectInputEditSheet(index)}
+                                  className={`${buttonBase} rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-[11px] font-black text-blue-700`}
+                                >
+                                  수정
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => removeItem(index)}
+                                className={`${buttonBase} rounded-full border border-red-100 bg-white px-2.5 py-1.5 text-[11px] font-black text-red-500`}
+                              >
+                                삭제
+                              </button>
+                            </div>
                           </div>
 
                           <h3 className="break-keep text-[17px] font-black leading-snug tracking-[-0.06em] text-slate-950">
@@ -3183,26 +3349,6 @@ export default function OrderPage() {
                             {won(itemAmount)}
                           </span>
                         </div>
-                      </div>
-
-                      <div className="mt-3 flex w-full max-w-full flex-wrap items-center justify-end gap-2 overflow-hidden">
-                        {directItem && (
-                          <button
-                            type="button"
-                            onClick={() => openDirectInputEditSheet(index)}
-                            className={`${buttonBase} rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-[12px] font-black text-blue-700`}
-                          >
-                            수정
-                          </button>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => removeItem(index)}
-                          className={`${buttonBase} rounded-full border border-red-100 bg-white px-3 py-1.5 text-[12px] font-black text-red-500`}
-                        >
-                          삭제
-                        </button>
                       </div>
                     </article>
                   );
