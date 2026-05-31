@@ -3192,20 +3192,25 @@ export default function OrderPage() {
             )}
           </section>
 
-          <section id="orderProductInputSection" className="mt-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
+          <section
+            id="orderProductInputSection"
+            className="mt-4 w-full max-w-full overflow-hidden rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm"
+          >
             <div className="mb-4">
               <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
                 등록된 상품 선택
               </h2>
               <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
-                상품을 누르면 아래 선택한 상품에 담깁니다.
+                상품을 누르면 아래 주문서 담은 상품에 담깁니다.
               </p>
             </div>
 
-            <GroupBuyQuickSelect
-              products={quickGroupBuyProducts as GroupBuyQuickSelectProduct[]}
-              onSelect={(product) => selectQuickGroupBuyProduct(product as BroadcastProduct)}
-            />
+            <div className="w-full max-w-full overflow-hidden">
+              <GroupBuyQuickSelect
+                products={quickGroupBuyProducts as GroupBuyQuickSelectProduct[]}
+                onSelect={(product) => selectQuickGroupBuyProduct(product as BroadcastProduct)}
+              />
+            </div>
           </section>
 
           <section className="mt-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
@@ -3326,10 +3331,6 @@ export default function OrderPage() {
 
                           <p className="mt-1 break-keep text-[13px] font-bold tracking-[-0.04em] text-slate-500">
                             {[hideNone(item.color), hideNone(item.size)].filter(Boolean).join(" / ") || "옵션 없음"}
-                          </p>
-
-                          <p className="mt-1 text-[14px] font-black tracking-[-0.05em] text-slate-700">
-                            단가 {won(toNumber(item.product_price))}
                           </p>
                         </div>
                       </div>
