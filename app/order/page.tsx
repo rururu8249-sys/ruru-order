@@ -3013,6 +3013,8 @@ export default function OrderPage() {
   };
 
   const closeDirectInputSheet = () => {
+    setProductSearchText("");
+    setProductSearchOpenIndex(null);
     setDirectInputOpen(false);
   };
 
@@ -3043,6 +3045,8 @@ export default function OrderPage() {
       return;
     }
 
+    setProductSearchText("");
+    setProductSearchOpenIndex(null);
     setDirectInputOpen(false);
   };
 
@@ -3514,15 +3518,65 @@ export default function OrderPage() {
                   </div>
 
                   <div className="grid gap-4">
-                    <label className="grid gap-2">
-                      <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">상품명</span>
-                      <input
-                        value={directInputItem.product_name}
-                        onChange={(event) => updateItem(directInputTargetIndex, "product_name", event.target.value)}
-                        placeholder="상품명을 입력해주세요"
-                        className="h-13 w-full rounded-[18px] border border-slate-200 bg-white px-4 text-[16px] font-bold tracking-[-0.04em] outline-none focus:border-blue-600"
-                      />
-                    </label>
+                    <div className="grid gap-2">
+                      <label className="grid gap-2">
+                        <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">상품명</span>
+                        <input
+                          value={directInputItem.product_name}
+                          onChange={(event) => {
+                            const nextValue = event.target.value;
+                            updateItem(directInputTargetIndex, "product_name", nextValue);
+                            setProductSearchText(nextValue);
+                            setProductSearchOpenIndex(directInputTargetIndex);
+                          }}
+                          onFocus={() => {
+                            setProductSearchText(directInputItem.product_name);
+                            setProductSearchOpenIndex(directInputTargetIndex);
+                          }}
+                          placeholder="상품명을 입력해주세요"
+                          className="h-13 w-full rounded-[18px] border border-slate-200 bg-white px-4 text-[16px] font-bold tracking-[-0.04em] outline-none focus:border-blue-600"
+                        />
+                      </label>
+
+                      {productSearchOpenIndex === directInputTargetIndex && productSearchText.trim().length > 0 ? (
+                        <div className="max-h-52 overflow-y-auto rounded-2xl border border-blue-100 bg-white p-2 shadow-[0_14px_35px_rgba(15,23,42,0.12)]">
+                          <div className="px-3 py-2 text-[12px] font-black tracking-[-0.03em] text-blue-600">
+                            직접입력 추천 상품명
+                          </div>
+
+                          {filteredBroadcastProducts.length === 0 ? (
+                            <div className="px-3 py-4 text-[13px] font-bold leading-5 text-slate-500">
+                              추천 상품명이 없어요. 방송에서 안내한 상품명 그대로 입력해주세요.
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              {filteredBroadcastProducts.map((product) => (
+                                <button
+                                  key={String(product.id)}
+                                  type="button"
+                                  onClick={() => {
+                                    selectBroadcastProduct(directInputTargetIndex, product);
+                                    setProductSearchText("");
+                                    setProductSearchOpenIndex(null);
+                                  }}
+                                  className="w-full rounded-2xl px-3 py-3 text-left hover:bg-blue-50 active:scale-[0.99]"
+                                >
+                                  <div className="line-clamp-2 text-[14px] font-black leading-5 tracking-[-0.04em] text-slate-950">
+                                    {product.product_name}
+                                  </div>
+                                  <div className="mt-1 flex items-center justify-between gap-2 text-[12px] font-black text-slate-500">
+                                    <span className="min-w-0 truncate">
+                                      {productSuggestionKeywords(product).slice(0, 3).join(", ") || "등록상품"}
+                                    </span>
+                                    <span className="shrink-0 text-blue-600">{won(Number(product.price || 0))}</span>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
 
                     <div className="grid grid-cols-2 gap-2">
                       <label className="grid gap-2">
