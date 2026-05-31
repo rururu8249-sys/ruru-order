@@ -3641,13 +3641,13 @@ export default function OrderPage() {
                 <div className="shrink-0 border-b border-slate-100 p-4">
                   <div className="mx-auto mb-3 h-1.5 w-14 rounded-full bg-slate-200" />
                   <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
-                    등록상품 옵션선택
+                    옵션 선택 후 담기
                   </p>
                   <h2 className="mt-1 break-keep text-[24px] font-black leading-tight tracking-[-0.08em] text-slate-950">
-                    상품 옵션 선택
+                    색상 · 사이즈 선택
                   </h2>
                   <p className="mt-2 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
-                    색상/사이즈를 선택한 뒤 주문서에 담아주세요.
+                    선택한 옵션 그대로 주문서에 들어갑니다. 빠뜨리지 말고 확인해주세요.
                   </p>
                 </div>
 
@@ -3755,7 +3755,7 @@ export default function OrderPage() {
                     onClick={confirmRegisteredOptionSelectSheet}
                     className="h-14 rounded-[20px] bg-blue-600 text-[16px] font-black tracking-[-0.05em] text-white shadow-sm"
                   >
-                    선택완료
+                    주문서에 담기
                   </button>
                 </div>
               </div>
