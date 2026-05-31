@@ -2763,19 +2763,53 @@ export default function OrderPage() {
     submitOrder();
   };
 
-  const TopCustomerNav = () => (
-    <OrderCustomerTopNav
-      isLoggedIn={hasSavedInfo}
-      greetingName={youtubeNickname || customerName}
-      onEditInfo={startEditCustomerInfo}
-      onLogout={logoutCustomerInfo}
-    />
-  );
+  const TopCustomerNav = () => {
+    const safeGreetingName = youtubeNickname || customerName || "고객";
+    const safePointText = `${Math.max(0, Number(customerPointBalance || 0)).toLocaleString()}원`;
+
+    return (
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-[#f8fafc]/95 px-4 py-3 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-[430px] flex-col gap-2">
+          <div className="flex items-center justify-between gap-3">
+            <Link href="/order" className="text-[17px] font-black tracking-[-0.05em] text-slate-950">
+              루루동이 LIVE
+            </Link>
+
+            <div className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[12px] font-black tracking-[-0.04em] text-amber-800">
+              RD포인트 {safePointText}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-2">
+            <p className="min-w-0 flex-1 truncate text-[13px] font-extrabold tracking-[-0.04em] text-slate-700">
+              {safeGreetingName}님 안녕하세요
+            </p>
+
+            <nav className="flex shrink-0 items-center gap-1">
+              <Link href="/order" className="rounded-full bg-blue-700 px-3 py-1.5 text-[12px] font-black text-white">
+                주문서
+              </Link>
+              <Link href="/myorder" className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-black text-slate-700">
+                주문조회
+              </Link>
+              <button
+                type="button"
+                onClick={startEditCustomerInfo}
+                className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-black text-slate-700"
+              >
+                정보수정
+              </button>
+            </nav>
+          </div>
+        </div>
+      </header>
+    );
+  };
 
   if (done) {
     return (
-      <main className="min-h-screen bg-[#f5f8ff] px-3 py-4 text-[#151923] select-none sm:px-4 sm:py-6" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
-        <section className="mx-auto w-full max-w-md">
+      <main className="min-h-screen bg-[#f8fafc] px-4 py-4 text-slate-950">
+        <section className="mx-auto w-full max-w-[430px]">
           <TopCustomerNav />
 
           <OrderCompletePaymentNotice
@@ -2793,19 +2827,34 @@ export default function OrderPage() {
             items={done.items}
           />
 
-        <footer className="py-8 text-center text-[11px] font-bold text-[#9b8d82]">
-            {FOOTER_TEXT}
+          <footer className="py-8 text-center text-[11px] font-bold tracking-[-0.03em] text-slate-400">
+            © 2024 RURUDONGI. All rights reserved.
           </footer>
         </section>
       </main>
     );
   }
 
+  const hasCustomerSummary =
+    Boolean(youtubeNickname.trim()) ||
+    Boolean(customerName.trim()) ||
+    Boolean(customerPhone.trim()) ||
+    Boolean(address.trim()) ||
+    Boolean(detailAddress.trim());
+
+  const customerInfoMissing =
+    !youtubeNickname.trim() ||
+    !customerName.trim() ||
+    normalizePhone(customerPhone).length < 10 ||
+    !address.trim() ||
+    !detailAddress.trim();
+
   return (
     <OrderPageShell>
-        {hasSavedInfo && <TopCustomerNav />}
+      {hasSavedInfo && <TopCustomerNav />}
 
-        {isKakaoLoginReturn && !isAutoLoggedIn && (
+      {isKakaoLoginReturn && !isAutoLoggedIn && (
+        <section className="rounded-[28px] border border-yellow-200 bg-yellow-50 p-4 shadow-sm">
           <OrderKakaoNicknameNotice
             kakaoNickname={kakaoNickname}
             youtubeNickname={youtubeNickname}
@@ -2813,13 +2862,13 @@ export default function OrderPage() {
             onYoutubeNicknameChange={handleYoutubeNicknameChange}
             onConfirm={confirmKakaoYoutubeNickname}
           />
-        )}
+        </section>
+      )}
 
-        {!isAutoLoggedIn && (isEditingCustomerInfo || customerMode === "new") && (
+      {!isAutoLoggedIn && (isEditingCustomerInfo || customerMode === "new") && (
+        <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
           <OrderCustomerInfoIntro mode={isEditingCustomerInfo ? "edit" : "check"} />
-        )}
 
-        {!isAutoLoggedIn && (isEditingCustomerInfo || customerMode === "new") && (
           <OrderCustomerInfoFormCard
             isEdit={isEditingCustomerInfo}
             youtubeNickname={youtubeNickname}
@@ -2836,255 +2885,346 @@ export default function OrderPage() {
             onCancel={cancelEditCustomerInfo}
             onConfirm={completeEditCustomerInfo}
           />
-        )}
+        </section>
+      )}
 
-        {isAutoLoggedIn && (
-          <>
-<section id="orderProductInputSection" className="mt-4 rounded-[2rem] border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
-          <h2 className="text-xl font-black">함께 주문 가능 상품</h2>
-          <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">필요한 상품은 선택하고, 목록에 없으면 아래 상품명에 직접 적어주세요.</p>
+      {isAutoLoggedIn && (
+        <>
+          <section className="mt-4 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
+              모바일 간편주문
+            </p>
+            <h1 className="mt-1 text-[26px] font-black tracking-[-0.08em] text-slate-950">
+              주문서 작성
+            </h1>
+            <p className="mt-2 break-keep text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
+              상품을 선택하거나 목록에 없는 상품만 직접 입력해주세요.
+            </p>
+          </section>
 
+          <section className="mt-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setShowSavedCustomerDetail((current) => !current)}
+              className="flex w-full items-center justify-between gap-3 text-left"
+            >
+              <div>
+                <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
+                  저장된 주문자 정보
+                </h2>
+                <p className="mt-1 text-[12px] font-bold tracking-[-0.04em] text-slate-500">
+                  배송 사고 방지를 위해 주문 전 확인해주세요.
+                </p>
+              </div>
 
+              <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-[12px] font-black text-slate-600">
+                {showSavedCustomerDetail ? "접기" : "펼쳐보기"}
+              </span>
+            </button>
 
-          <div className="mt-4 grid gap-4">
+            <div className="mt-4 rounded-[22px] bg-slate-50 p-4">
+              <div className="space-y-1 text-[14px] font-extrabold tracking-[-0.04em] text-slate-800">
+                <p>유튜브 닉네임 {youtubeNickname.trim() || "-"}</p>
+                <p>{[customerName.trim() || "-", formatPhone(customerPhone) || "-"].join(" / ")}</p>
+                <p className="break-keep text-slate-600">
+                  {[address.trim(), detailAddress.trim()].filter(Boolean).join(" ") || "주소 정보 없음"}
+                </p>
+              </div>
+
+              {customerInfoMissing && (
+                <div className="mt-3 rounded-[18px] border border-orange-200 bg-orange-50 p-3 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-orange-800">
+                  배송정보 확인이 필요합니다. 주문서 제출 전 상단 [정보수정]에서 정보를 먼저 저장해주세요.
+                </div>
+              )}
+
+              {!showSavedCustomerDetail && !hasCustomerSummary && (
+                <div className="mt-3 rounded-[18px] border border-slate-200 bg-white p-3 text-[13px] font-bold tracking-[-0.04em] text-slate-500">
+                  저장된 주문자 정보가 없습니다.
+                </div>
+              )}
+            </div>
+
+            {showSavedCustomerDetail && (
+              <div className="mt-4 space-y-2 rounded-[22px] border border-slate-100 bg-white p-4 text-[14px] font-bold tracking-[-0.04em] text-slate-700">
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-400">유튜브 닉네임</span>
+                  <span className="text-right font-black text-slate-950">{youtubeNickname || "-"}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-400">이름</span>
+                  <span className="text-right font-black text-slate-950">{customerName || "-"}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-400">전화번호</span>
+                  <span className="text-right font-black text-slate-950">{formatPhone(customerPhone) || "-"}</span>
+                </div>
+                <div className="grid gap-1">
+                  <span className="text-slate-400">주소</span>
+                  <span className="break-keep font-black text-slate-950">
+                    {[address, detailAddress].filter(Boolean).join(" ") || "-"}
+                  </span>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section id="orderProductInputSection" className="mt-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-4">
+              <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
+                등록된 상품 선택
+              </h2>
+              <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
+                등록상품은 선택 후 아래 선택한 상품에서 옵션과 수량을 확인해주세요.
+              </p>
+            </div>
+
             <GroupBuyQuickSelect
               products={quickGroupBuyProducts as GroupBuyQuickSelectProduct[]}
               onSelect={(product) => selectQuickGroupBuyProduct(product as BroadcastProduct)}
             />
+          </section>
 
-            {items.map((item, index) => (
-              <div key={index} className="rounded-[26px] border border-blue-100 bg-white p-3.5 shadow-[0_10px_22px_rgba(30,64,175,0.06)] sm:p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <div className="font-black">상품 {index + 1}</div>
+          <section className="mt-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-4">
+              <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
+                선택한 상품
+              </h2>
+              <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
+                목록에 없는 상품은 상품명에 직접 적어주세요.
+              </p>
+            </div>
 
-                  {items.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeItem(index)}
-                      className={`${buttonBase} rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-600`}
-                    >
-                      삭제
-                    </button>
-                  )}
-                </div>
+            <div className="grid gap-4">
+              {items.map((item, index) => {
+                const colorSuggestions = getItemOptionSuggestions(item, "color");
+                const sizeSuggestions = getItemOptionSuggestions(item, "size");
+                const itemAmount = toNumber(item.product_price) * toNumber(item.qty);
 
-                <div className="grid gap-3">
-                  <div data-ruru-product-search-area className="relative">
-                    <div className="relative min-w-0 [&>input]:w-full [&>input]:min-w-0 [&>input]:pr-10">
-<input
-                      value={item.product_name}
-                      onFocus={() => {
-                        if (broadcastProducts.length + groupBuyQuickProductsFromCatalog.length > 0) {
-                          setProductSearchOpenIndex(index);
-                          setProductSearchText(item.product_name);
-                        }
-                      }}
-                      onChange={(event) => {
-                        updateItem(index, "product_name", event.target.value);
-                        setProductSearchOpenIndex(index);
-                        setProductSearchText(event.target.value);
-                      }}
-                      id={index === 0 ? "firstProductNameInput" : undefined}
-                      placeholder="상품명"
-                      className="w-full rounded-2xl border border-gray-200 bg-white p-4 font-bold"
-                    />
-  <OrderInputClearButton
-    show={String(item.product_name ?? "").length > 0}
-    label="상품명 지우기"
-    onClear={() => updateItem(index, "product_name", "")}
-  />
-</div>
+                return (
+                  <article key={index} className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
+                          상품 {index + 1}
+                        </p>
+                        <h3 className="mt-1 text-[16px] font-black tracking-[-0.06em] text-slate-950">
+                          {item.product_name.trim() || "직접입력 상품"}
+                        </h3>
+                      </div>
 
-                    {productSearchOpenIndex === index && productSearchText.trim().length > 0 && broadcastProducts.length + groupBuyQuickProductsFromCatalog.length > 0 && (
-                      <div className="absolute left-0 right-0 top-[58px] z-40 max-h-72 overflow-auto rounded-3xl border border-blue-100 bg-white p-2 shadow-[0_18px_45px_rgba(30,20,20,0.15)]">
-                        <div className="px-3 py-2 text-xs font-black text-blue-600">
-                          추천 상품명
-                        </div>
-
-                        {filteredBroadcastProducts.length === 0 ? (
-                          <div className="px-3 py-4 text-sm font-bold text-gray-500">
-                            추천 상품명이 없어요. 방송에서 안내된 상품명 그대로 입력해주세요.
-                          </div>
-                        ) : (
-                          filteredBroadcastProducts.map((product) => (
-                            <button
-                              key={String(product.id)}
-                              type="button"
-                              onClick={() => selectBroadcastProduct(index, product)}
-                              className={`${buttonBase} mb-1 w-full rounded-2xl px-3 py-3 text-left hover:bg-blue-50`}
-                            >
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="min-w-0">
-                                  <div className="truncate font-black text-gray-950">
-                                    {product.product_name}
-                                  </div>
-                                  {productSuggestionKeywords(product).length > 0 ? (
-                                    <div className="mt-1 truncate text-xs font-bold text-gray-500">
-                                      {productSuggestionKeywords(product).slice(0, 5).join(", ")}
-                                    </div>
-                                  ) : null}
-                                </div>
-
-
-                              </div>
-                            </button>
-                          ))
-                        )}
-
+                      {items.length > 1 && (
                         <button
                           type="button"
-                          onClick={() => {
-                            setProductSearchOpenIndex(null);
-                            setProductSearchText("");
-                          }}
-                          className={`${buttonBase} mt-1 w-full rounded-2xl bg-gray-100 p-3 text-sm font-black text-gray-600`}
+                          onClick={() => removeItem(index)}
+                          className={`${buttonBase} rounded-full border border-red-100 bg-white px-3 py-1.5 text-[12px] font-black text-red-500`}
                         >
-                          직접입력 계속하기
+                          삭제
                         </button>
+                      )}
+                    </div>
+
+                    <div className="grid gap-3">
+                      <div data-ruru-product-search-area className="relative">
+                        <input
+                          value={item.product_name}
+                          onFocus={() => {
+                            if (broadcastProducts.length + groupBuyQuickProductsFromCatalog.length > 0) {
+                              setProductSearchOpenIndex(index);
+                              setProductSearchText(item.product_name);
+                            }
+                          }}
+                          onChange={(event) => {
+                            updateItem(index, "product_name", event.target.value);
+                            setProductSearchOpenIndex(index);
+                            setProductSearchText(event.target.value);
+                          }}
+                          id={index === 0 ? "firstProductNameInput" : undefined}
+                          placeholder="상품명"
+                          className="h-12 w-full rounded-[18px] border border-slate-200 bg-white px-4 text-[16px] font-bold tracking-[-0.04em] outline-none focus:border-blue-600"
+                        />
+
+                        {productSearchOpenIndex === index &&
+                          productSearchText.trim().length > 0 &&
+                          broadcastProducts.length + groupBuyQuickProductsFromCatalog.length > 0 && (
+                            <div className="absolute left-0 right-0 top-[56px] z-40 max-h-72 overflow-auto rounded-[24px] border border-blue-100 bg-white p-2 shadow-[0_18px_45px_rgba(15,23,42,0.16)]">
+                              <div className="px-3 py-2 text-[12px] font-black text-blue-700">
+                                추천 상품명
+                              </div>
+
+                              {filteredBroadcastProducts.length === 0 ? (
+                                <div className="px-3 py-4 text-[13px] font-bold text-slate-500">
+                                  추천 상품명이 없어요. 방송에서 안내된 상품명 그대로 입력해주세요.
+                                </div>
+                              ) : (
+                                filteredBroadcastProducts.map((product) => (
+                                  <button
+                                    key={String(product.id)}
+                                    type="button"
+                                    onClick={() => selectBroadcastProduct(index, product)}
+                                    className={`${buttonBase} mb-1 w-full rounded-[18px] px-3 py-3 text-left hover:bg-blue-50`}
+                                  >
+                                    <div className="truncate text-[14px] font-black text-slate-950">
+                                      {product.product_name}
+                                    </div>
+                                  </button>
+                                ))
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setProductSearchOpenIndex(null);
+                                  setProductSearchText("");
+                                }}
+                                className={`${buttonBase} mt-1 w-full rounded-[18px] bg-slate-100 p-3 text-[13px] font-black text-slate-600`}
+                              >
+                                직접입력 계속하기
+                              </button>
+                            </div>
+                          )}
                       </div>
-                    )}
-                  </div>
 
-                  <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
-                    <div className="relative min-w-0 [&>input]:w-full [&>input]:min-w-0 [&>input]:pr-10">
-<input
-                      value={item.color}
-                      onChange={(event) => updateItem(index, "color", event.target.value)}
-                      placeholder="색상"
-                      className="rounded-2xl border border-gray-200 bg-white p-4 font-bold"
-                    />
-  <OrderInputClearButton
-    show={String(item.color ?? "").length > 0}
-    label="색상 지우기"
-    onClear={() => updateItem(index, "color", "")}
-  />
-</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          value={item.color}
+                          onChange={(event) => updateItem(index, "color", event.target.value)}
+                          placeholder="옵션 / 색상"
+                          className="h-12 min-w-0 rounded-[18px] border border-slate-200 bg-white px-4 text-[16px] font-bold tracking-[-0.04em] outline-none focus:border-blue-600"
+                        />
 
-                    <div className="relative min-w-0 [&>input]:w-full [&>input]:min-w-0 [&>input]:pr-10">
-<input
-                      value={item.size}
-                      onChange={(event) => updateItem(index, "size", event.target.value)}
-                      placeholder="사이즈"
-                      className="rounded-2xl border border-gray-200 bg-white p-4 font-bold"
-                    />
-  <OrderInputClearButton
-    show={String(item.size ?? "").length > 0}
-    label="사이즈 지우기"
-    onClear={() => updateItem(index, "size", "")}
-  />
-</div>
-                    {(() => {
-                      const colorSuggestions = getItemOptionSuggestions(item, "color");
-                      const sizeSuggestions = getItemOptionSuggestions(item, "size");
+                        <input
+                          value={item.size}
+                          onChange={(event) => updateItem(index, "size", event.target.value)}
+                          placeholder="사이즈"
+                          className="h-12 min-w-0 rounded-[18px] border border-slate-200 bg-white px-4 text-[16px] font-bold tracking-[-0.04em] outline-none focus:border-blue-600"
+                        />
+                      </div>
 
-                      if (colorSuggestions.length === 0 && sizeSuggestions.length === 0) {
-                        return null;
-                      }
-
-                      return (
-                        <div data-ruru-option-suggestions className="col-span-2 -mt-1 space-y-2 rounded-2xl bg-blue-50/60 p-3">
-                          {colorSuggestions.length > 0 ? (
-                            <div>
-                              <div className="mb-1 text-[11px] font-black text-blue-600">색상 추천</div>
-                              <div className="flex flex-wrap gap-1.5">
+                      {(colorSuggestions.length > 0 || sizeSuggestions.length > 0) && (
+                        <div data-ruru-option-suggestions className="rounded-[18px] bg-blue-50 p-3">
+                          {colorSuggestions.length > 0 && (
+                            <div className="mb-2">
+                              <p className="mb-2 text-[11px] font-black tracking-[-0.04em] text-blue-700">
+                                색상 빠른선택
+                              </p>
+                              <div className="flex flex-wrap gap-2">
                                 {colorSuggestions.map((option) => (
                                   <button
-                                    key={`color-${option}`}
+                                    key={`color-${index}-${option}`}
                                     type="button"
                                     onClick={() => updateItem(index, "color", option)}
-                                    className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-gray-700 shadow-sm ring-1 ring-blue-100"
+                                    className="rounded-full bg-white px-3 py-1.5 text-[12px] font-black text-blue-800 ring-1 ring-blue-100"
                                   >
                                     {option}
                                   </button>
                                 ))}
                               </div>
                             </div>
-                          ) : null}
+                          )}
 
-                          {sizeSuggestions.length > 0 ? (
+                          {sizeSuggestions.length > 0 && (
                             <div>
-                              <div className="mb-1 text-[11px] font-black text-blue-600">사이즈 추천</div>
-                              <div className="flex flex-wrap gap-1.5">
+                              <p className="mb-2 text-[11px] font-black tracking-[-0.04em] text-blue-700">
+                                사이즈 빠른선택
+                              </p>
+                              <div className="flex flex-wrap gap-2">
                                 {sizeSuggestions.map((option) => (
                                   <button
-                                    key={`size-${option}`}
+                                    key={`size-${index}-${option}`}
                                     type="button"
                                     onClick={() => updateItem(index, "size", option)}
-                                    className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-gray-700 shadow-sm ring-1 ring-blue-100"
+                                    className="rounded-full bg-white px-3 py-1.5 text-[12px] font-black text-blue-800 ring-1 ring-blue-100"
                                   >
                                     {option}
                                   </button>
                                 ))}
                               </div>
                             </div>
-                          ) : null}
+                          )}
                         </div>
-                      );
-                    })()}
+                      )}
 
-                  </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="flex h-12 overflow-hidden rounded-[18px] border border-slate-200 bg-white">
+                          <button
+                            type="button"
+                            onClick={() => updateItem(index, "qty", String(Math.max(1, (toNumber(item.qty) || 1) - 1)))}
+                            className="w-12 text-[18px] font-black text-slate-700"
+                          >
+                            -
+                          </button>
 
-                  <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
-                    <input
-                      value={item.qty}
-                      onChange={(event) => updateItem(index, "qty", onlyNumber(event.target.value))}
-                      placeholder="수량"
-                      inputMode="numeric"
-                      className="rounded-2xl border border-gray-200 bg-white p-4 font-bold"
-                    />
+                          <input
+                            value={item.qty}
+                            onChange={(event) => updateItem(index, "qty", onlyNumber(event.target.value))}
+                            placeholder="수량"
+                            inputMode="numeric"
+                            className="min-w-0 flex-1 border-x border-slate-100 text-center text-[16px] font-black outline-none"
+                          />
 
-                    <div className="relative">
-                      <input
-                        value={item.product_price ? moneyText(item.product_price) : ""}
-                        onChange={(event) =>
-                          updateItem(index, "product_price", onlyNumber(event.target.value))
-                        }
-                        placeholder="금액"
-                        inputMode="numeric"
-                        className="w-full rounded-2xl border border-gray-200 bg-white p-4 pr-10 font-bold"
-                      />
+                          <button
+                            type="button"
+                            onClick={() => updateItem(index, "qty", String((toNumber(item.qty) || 0) + 1))}
+                            className="w-12 text-[18px] font-black text-blue-700"
+                          >
+                            +
+                          </button>
+                        </div>
 
-                      <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-black text-gray-400">
-                        원
-                      </span>
+                        <div className="relative">
+                          <input
+                            value={item.product_price ? moneyText(item.product_price) : ""}
+                            onChange={(event) => updateItem(index, "product_price", onlyNumber(event.target.value))}
+                            placeholder="금액"
+                            inputMode="numeric"
+                            className="h-12 w-full rounded-[18px] border border-slate-200 bg-white px-4 pr-10 text-right text-[16px] font-bold outline-none focus:border-blue-600"
+                          />
+                          <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[13px] font-black text-slate-400">
+                            원
+                          </span>
+                        </div>
+                      </div>
+
+                      {item.product_name && (
+                        <div className="flex items-center justify-between rounded-[18px] bg-white px-4 py-3">
+                          <span className="text-[12px] font-black tracking-[-0.04em] text-slate-500">
+                            상품 소계
+                          </span>
+                          <span className="text-[16px] font-black tracking-[-0.05em] text-slate-950">
+                            {won(itemAmount)}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  </article>
+                );
+              })}
 
-                  {item.product_name && (
-                    <div className="rounded-2xl bg-white p-3 text-sm font-black text-gray-600">
-                      {itemLabel(item)} / {won(toNumber(item.product_price) * toNumber(item.qty))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
+              <button
+                type="button"
+                onClick={addItem}
+                className={`${buttonBase} rounded-[20px] border border-blue-200 bg-blue-50 px-4 py-4 text-[15px] font-black tracking-[-0.04em] text-blue-800`}
+              >
+                + 목록에 없는 상품 직접 입력
+              </button>
+            </div>
+          </section>
 
-            <button
-              type="button"
-              onClick={addItem}
-              className={`${buttonBase} rounded-2xl border border-dashed border-blue-300 bg-blue-50 p-4 font-black text-blue-700`}
-            >
-              + 상품 추가하기
-            </button>
-          </div>
-        </section>
+          <section className="mt-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
+              결제방식 / 요청사항
+            </h2>
 
-        <section className="mt-4 rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black">결제방식 / 요청사항</h2>
-
-          <div className="mt-4 grid gap-3">
-            <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
+            <div className="mt-4 grid grid-cols-2 gap-2">
               {(["무통장입금", "카드결제"] as const).map((method) => (
                 <button
                   key={method}
                   type="button"
                   onClick={() => setPaymentMethod(method)}
-                  className={`${buttonBase} rounded-2xl p-4 font-black ${
+                  className={`${buttonBase} h-12 rounded-[18px] text-[15px] font-black tracking-[-0.04em] ${
                     paymentMethod === method
-                      ? method === "카드결제"
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-950 text-white"
-                      : "bg-gray-50 text-gray-700"
+                      ? "bg-blue-700 text-white"
+                      : "border border-slate-200 bg-white text-slate-700"
                   }`}
                 >
                   {method}
@@ -3093,8 +3233,8 @@ export default function OrderPage() {
             </div>
 
             {paymentMethod === "카드결제" && (
-              <div className="rounded-2xl bg-blue-50 p-3 text-xs font-bold leading-relaxed text-blue-700">
-                {`💳 카드결제는 ${cardPaymentMinAmount.toLocaleString()}원 이상 구매 시 가능합니다.`}
+              <div className="mt-3 rounded-[18px] border border-blue-100 bg-blue-50 p-3 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-blue-800">
+                카드결제는 {cardPaymentMinAmount.toLocaleString()}원 이상 구매 시 가능합니다.
                 <br />
                 주문서 작성 후 카톡채널 문의 부탁드립니다.
               </div>
@@ -3104,12 +3244,12 @@ export default function OrderPage() {
               value={requestMemo}
               onChange={(event) => setRequestMemo(event.target.value)}
               placeholder="요청사항(선택) / 배송메모"
-              className="min-h-[100px] rounded-2xl border border-gray-200 bg-gray-50 p-4 font-bold outline-none focus:border-blue-400"
+              className="mt-4 min-h-[96px] w-full resize-none rounded-[20px] border border-slate-200 bg-slate-50 p-4 text-[16px] font-bold leading-relaxed tracking-[-0.04em] outline-none focus:border-blue-600"
             />
 
             {shippingNoticeText && (
               <div
-                className={`rounded-2xl p-3 text-xs font-black leading-relaxed ${
+                className={`mt-3 rounded-[18px] p-3 text-[13px] font-black leading-relaxed tracking-[-0.04em] ${
                   shippingFee > 0
                     ? "bg-amber-50 text-amber-800 ring-1 ring-amber-100"
                     : "bg-green-50 text-green-700"
@@ -3119,24 +3259,81 @@ export default function OrderPage() {
               </div>
             )}
 
-            <OrderPriceSummaryBox
-              productAmount={productAmount}
-              shippingFee={shippingFee}
-              cardExtra={cardExtra}
-              totalAmount={totalAmount}
-              paymentMethod={paymentMethod}
-              customerPointBalance={customerPointBalance}
-              customerPointLoading={customerPointLoading}
-              pointUseInput={commaNumberText(pointUseInput)}
-              pointUsedAmount={selectedPointUseAmount}
-              finalAmount={finalPaymentAmount}
-              showPointUse={customerPointBalance >= 1000 && totalAmount > 0}
-              onPointUseInputChange={(value) => setPointUseInput(onlyNumber(value))}
-              onUseAllPoints={() => setPointUseInput(String(Math.min(customerPointBalance, totalAmount)))}
-            />
+            <div className="mt-4">
+              <OrderPriceSummaryBox
+                productAmount={productAmount}
+                shippingFee={shippingFee}
+                cardExtra={cardExtra}
+                totalAmount={totalAmount}
+                paymentMethod={paymentMethod}
+                customerPointBalance={customerPointBalance}
+                customerPointLoading={customerPointLoading}
+                pointUseInput={commaNumberText(pointUseInput)}
+                pointUsedAmount={selectedPointUseAmount}
+                finalAmount={finalPaymentAmount}
+                showPointUse={customerPointBalance >= 1000 && totalAmount > 0}
+                onPointUseInputChange={(value) => setPointUseInput(onlyNumber(value))}
+                onUseAllPoints={() => setPointUseInput(String(Math.min(customerPointBalance, totalAmount)))}
+              />
+            </div>
+
+            {paymentMethod === "무통장입금" && (
+              <div className="mt-4 rounded-[22px] border border-blue-100 bg-blue-50 p-4">
+                <h3 className="text-[15px] font-black tracking-[-0.05em] text-slate-950">
+                  입금 안내
+                </h3>
+
+                <div className="mt-3 space-y-2 text-[14px] font-extrabold tracking-[-0.04em] text-slate-700">
+                  <div className="flex items-center justify-between gap-3">
+                    <span>은행명</span>
+                    <span className="text-right text-slate-950">{BANK_NAME}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span>계좌번호</span>
+                    <span className="text-right text-slate-950">{BANK_ACCOUNT}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span>예금주</span>
+                    <span className="text-right text-slate-950">{BANK_HOLDER}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span>입금자명</span>
+                    <span className="text-right text-blue-800">유튜브 닉네임 {youtubeNickname || "-"}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 border-t border-blue-100 pt-2">
+                    <span>입금금액</span>
+                    <span className="text-right text-[17px] font-black text-blue-800">{won(finalPaymentAmount)}</span>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(youtubeNickname || "");
+                      showCustomerNotice("유튜브 닉네임을 복사했습니다.", "success");
+                    }}
+                    className={`${buttonBase} h-12 rounded-[18px] bg-blue-700 px-3 text-[13px] font-black tracking-[-0.04em] text-white`}
+                  >
+                    유튜브 닉네임 복사
+                  </button>
+                  <button
+                    type="button"
+                    onClick={copyBankAccount}
+                    className={`${buttonBase} h-12 rounded-[18px] border border-blue-200 bg-white px-3 text-[13px] font-black tracking-[-0.04em] text-blue-800`}
+                  >
+                    계좌번호 복사
+                  </button>
+                </div>
+
+                <p className="mt-3 break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
+                  입금자명은 현재 유튜브 닉네임과 같아야 자동 확인됩니다. 입금금액은 총 결제금액과 같아야 자동 입금확인됩니다.
+                </p>
+              </div>
+            )}
 
             {!hasPrivacyConsent && !hasSavedOrderCustomerInfo && (
-              <label className="flex cursor-pointer items-start gap-3 rounded-[22px] bg-blue-50 p-4 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-blue-900 ring-1 ring-blue-100 active:scale-[0.99]">
+              <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-[22px] bg-blue-50 p-4 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-blue-900 ring-1 ring-blue-100 active:scale-[0.99]">
                 <input
                   type="checkbox"
                   checked={privacyConsentChecked}
@@ -3157,7 +3354,7 @@ export default function OrderPage() {
               </label>
             )}
 
-                        <CustomerToastNotice
+            <CustomerToastNotice
               open={Boolean(customerNotice.message)}
               type={customerNotice.type}
               message={customerNotice.message}
@@ -3177,37 +3374,47 @@ export default function OrderPage() {
               onConfirm={submitOrderWithoutDetailAddress}
             />
 
-            {customerBlockStatus.blocked ? (
-              <CustomerBlockedNotice />
-            ) : null}
+            {customerBlockStatus.blocked ? <CustomerBlockedNotice /> : null}
+          </section>
 
-            <button
-              type="button"
-              onClick={handleSubmitOrderClick}
-              disabled={submitting || customerBlockStatus.blocked}
-              className={`${buttonBase} rounded-2xl bg-blue-500 p-5 text-lg font-black text-white shadow-lg shadow-blue-200 disabled:opacity-50`}
-            >
-              {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : "주문서 제출하기"}
-            </button>
+          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
+            <div className="mx-auto flex max-w-[430px] items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-black tracking-[-0.04em] text-slate-400">
+                  총 결제금액
+                </p>
+                <p className="truncate text-[20px] font-black tracking-[-0.08em] text-slate-950">
+                  {won(finalPaymentAmount)}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSubmitOrderClick}
+                disabled={submitting || customerBlockStatus.blocked}
+                className={`${buttonBase} h-14 min-w-[154px] rounded-[22px] bg-blue-700 px-5 text-[16px] font-black tracking-[-0.05em] text-white shadow-lg shadow-blue-700/20 disabled:bg-slate-300 disabled:shadow-none`}
+              >
+                {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : "주문서 제출"}
+              </button>
+            </div>
           </div>
-        </section>
-          </>
-        )}
+        </>
+      )}
 
-        <OrderDepositConfirmModal
-          open={showDepositConfirmModal}
-          nickname={youtubeNickname || customerName}
-          totalAmount={finalPaymentAmount}
-          originalTotalAmount={totalAmount}
-          pointUsedAmount={selectedPointUseAmount}
-          finalAmount={finalPaymentAmount}
-          onClose={() => setShowDepositConfirmModal(false)}
-          onConfirm={handleDepositConfirmSubmit}
-        />
+      <OrderDepositConfirmModal
+        open={showDepositConfirmModal}
+        nickname={youtubeNickname || customerName}
+        totalAmount={finalPaymentAmount}
+        originalTotalAmount={totalAmount}
+        pointUsedAmount={selectedPointUseAmount}
+        finalAmount={finalPaymentAmount}
+        onClose={() => setShowDepositConfirmModal(false)}
+        onConfirm={handleDepositConfirmSubmit}
+      />
 
-        <footer className="py-8 text-center text-[11px] font-bold text-[#9b8d82]">
-          {FOOTER_TEXT}
-        </footer>
+      <footer className="py-8 text-center text-[11px] font-bold tracking-[-0.03em] text-slate-400">
+        © 2024 RURUDONGI. All rights reserved.
+      </footer>
     </OrderPageShell>
   );
 }
