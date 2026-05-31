@@ -18,7 +18,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import CustomerTopNav from "@/components/customer/CustomerTopNav";
 import MyOrderPageHero from "@/components/myorder/MyOrderPageHero";
-import MyOrderBankAccountCard from "@/components/myorder/MyOrderBankAccountCard";
+import CustomerPaymentGuideBottomSheet from "@/components/customer/CustomerPaymentGuideBottomSheet";
 import MyOrderLookupForm from "@/components/myorder/MyOrderLookupForm";
 import MyOrderResultCard from "@/components/myorder/MyOrderResultCard";
 import MyOrderEmptyState from "@/components/myorder/MyOrderEmptyState";
@@ -169,6 +169,8 @@ export default function MyOrderPage() {
   const [loading, setLoading] = useState(false);
   const [copyDone, setCopyDone] = useState(false);
   const [nicknameCopyDone, setNicknameCopyDone] = useState(false);
+  const [paymentGuideOpen, setPaymentGuideOpen] = useState(false);
+  const [customerNickname, setCustomerNickname] = useState("");
   const [hasCustomerInfo, setHasCustomerInfo] = useState(false);
 
   const [isLegacyMode, setIsLegacyMode] = useState(false);
@@ -184,9 +186,14 @@ export default function MyOrderPage() {
 
     const savedName = localStorage.getItem("ruru_customer_name") || "";
     const savedPhone = localStorage.getItem("ruru_customer_phone") || "";
+    const savedNickname =
+      localStorage.getItem("ruru_youtube_nickname") ||
+      localStorage.getItem("ruru_customer_nickname") ||
+      "";
 
     if (savedName) setCustomerName(savedName);
     if (savedPhone) setPhone(savedPhone);
+    if (savedNickname) setCustomerNickname(savedNickname);
 
     if (savedPhone) {
       setHasCustomerInfo(true);
@@ -303,6 +310,7 @@ export default function MyOrderPage() {
   const depositNickname =
     String(orders[0]?.youtube_nickname || "").trim() ||
     String(orders[0]?.nickname || "").trim() ||
+    String(customerNickname || "").trim() ||
     String(customerName || "").trim();
 
 
@@ -318,22 +326,48 @@ export default function MyOrderPage() {
           onClose={closeCustomerNotice}
         />
 
+        <CustomerPaymentGuideBottomSheet
+          open={paymentGuideOpen}
+          depositNickname={depositNickname}
+          bankName={BANK_NAME}
+          bankAccount={BANK_ACCOUNT}
+          bankHolder={BANK_HOLDER}
+          nicknameCopyDone={nicknameCopyDone}
+          bankCopyDone={copyDone}
+          onCopyNickname={copyDepositNickname}
+          onCopyBankAccount={copyBankAccount}
+          onClose={() => setPaymentGuideOpen(false)}
+        />
+
       <section className="mx-auto w-full max-w-md">
         <CustomerTopNav activeTab="myorder" variant="compact" />
 
         <MyOrderPageHero isLoggedIn={isLoggedIn} customerName={customerName} />
 
         {isLoggedIn && (
-          <MyOrderBankAccountCard
-            bankName={BANK_NAME}
-            bankAccount={BANK_ACCOUNT}
-            bankHolder={BANK_HOLDER}
-            copyDone={copyDone}
-            nicknameCopyDone={nicknameCopyDone}
-            depositNickname={depositNickname}
-            onCopy={copyBankAccount}
-            onCopyNickname={copyDepositNickname}
-          />
+          <section
+            data-ruru-myorder-payment-guide-button="shell-v1"
+            className="mt-3 rounded-[20px] bg-white p-3 ring-1 ring-slate-200"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
+                  입금계좌
+                </p>
+                <p className="mt-0.5 break-keep text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
+                  계좌정보는 필요할 때만 확인할 수 있어요.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setPaymentGuideOpen(true)}
+                className="shrink-0 rounded-[16px] bg-blue-600 px-4 py-3 text-[13px] font-black tracking-[-0.04em] text-white shadow-[0_10px_22px_rgba(37,99,235,0.20)] transition active:scale-[0.98]"
+              >
+                입금 계좌 보기
+              </button>
+            </div>
+          </section>
         )}
 
         {isLegacyMode && !isLoggedIn && (
