@@ -21,11 +21,15 @@
 
 "use client";
 const normalizeEmptyProductOptionValue = (value: unknown) => {
+  // data-ruru-no-auto-none-option="enabled"
+  // 등록상품 선택 시 색상/사이즈 옵션이 비어 있으면 고객 입력칸도 빈칸으로 유지합니다.
+  // 고객이 직접 "없음"을 입력하는 것은 직접입력 onChange에서 그대로 처리됩니다.
   const text = typeof value === "string" ? value.trim() : "";
 
   if (!text) return "";
+
   if (["없음", "없슴", "색상없음", "사이즈없음", "옵션없음", "x", "X", "-", "none", "None", "NONE"].includes(text)) {
-    return "없음";
+    return "";
   }
 
   return text;
