@@ -253,7 +253,6 @@ function QuickProductCard({
   onDetail: () => void;
   onSelect: () => void;
 }) {
-  void onSelect;
   if (variant === "mini") {
     return (
       <div data-ruru-quick-mini-card className="rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-blue-100">
@@ -300,13 +299,20 @@ function QuickProductCard({
             <PriceAndDelivery product={product} />
           </button>
 
-          <div className="mt-1 grid grid-cols-1 gap-1.5">
+          <div data-ruru-main-quick-card-actions="detail-add" className="mt-1 grid grid-cols-2 gap-1.5">
             <button
               type="button"
               onClick={onDetail}
               className="h-8 rounded-xl border border-slate-200 bg-white text-[12px] font-black text-slate-700"
             >
-              상세보기
+              상세
+            </button>
+            <button
+              type="button"
+              onClick={onSelect}
+              className="h-8 rounded-xl bg-blue-600 text-[12px] font-black text-white shadow-sm"
+            >
+              담기
             </button>
           </div>
         </div>
