@@ -8,14 +8,14 @@ type CompressConfig = {
 
 const CONFIG_BY_KIND: Record<ProductImageKind, CompressConfig> = {
   cover: {
-    maxEdge: 1200,
-    quality: 0.84,
-    softMaxBytes: 700 * 1024,
+    maxEdge: 900,
+    quality: 0.72,
+    softMaxBytes: 300 * 1024,
   },
   detail: {
-    maxEdge: 1400,
-    quality: 0.8,
-    softMaxBytes: 900 * 1024,
+    maxEdge: 1100,
+    quality: 0.7,
+    softMaxBytes: 500 * 1024,
   },
 };
 
