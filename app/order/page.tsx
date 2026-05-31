@@ -3022,13 +3022,28 @@ export default function OrderPage() {
   const confirmDirectInputSheet = () => {
     const targetItem = items[directInputTargetIndex];
 
-    if (!targetItem || !targetItem.product_name.trim()) {
-      showCustomerNotice("상품명을 입력해주세요.", "warning");
+    if (!targetItem) {
+      showCustomerNotice("직접입력 상품 정보를 다시 확인해주세요.", "warning");
       return;
     }
 
-    if (!toNumber(targetItem.qty)) {
-      updateItem(directInputTargetIndex, "qty", "1");
+    const missingFields: string[] = [];
+
+    if (!targetItem.product_name.trim()) missingFields.push("상품명");
+    if (!targetItem.color.trim()) missingFields.push("옵션 / 색상");
+    if (!targetItem.size.trim()) missingFields.push("옵션 / 사이즈");
+    if (!toNumber(targetItem.qty)) missingFields.push("수량");
+    if (!toNumber(targetItem.product_price)) missingFields.push("금액");
+
+    if (missingFields.length > 0) {
+      const optionMissing =
+        missingFields.includes("옵션 / 색상") || missingFields.includes("옵션 / 사이즈");
+
+      showCustomerNotice(
+        `아래 항목을 입력해주세요: ${missingFields.join(", ")}${optionMissing ? " / 옵션이 없는 상품은 “없음”이라고 입력해주세요." : ""}`,
+        "warning"
+      );
+      return;
     }
 
     setDirectInputOpen(false);
@@ -3221,7 +3236,7 @@ export default function OrderPage() {
           <section className="mt-4 w-full max-w-full overflow-hidden rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-4">
               <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
-                선택한 상품
+                주문서 담은 상품
               </h2>
               <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
                 담긴 상품의 수량과 금액을 확인해주세요.
@@ -3273,9 +3288,13 @@ export default function OrderPage() {
                                 상품 {index + 1}
                               </p>
 
-                              {directItem && (
+                              {directItem ? (
                                 <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-black tracking-[-0.04em] text-amber-700 ring-1 ring-amber-100">
                                   직접입력
+                                </span>
+                              ) : (
+                                <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-black tracking-[-0.04em] text-blue-700 ring-1 ring-blue-100">
+                                  선택상품
                                 </span>
                               )}
                             </div>
@@ -3481,23 +3500,13 @@ export default function OrderPage() {
                 <div className="mx-auto mt-3 h-1.5 w-16 rounded-full bg-slate-200" />
 
                 <div className="max-h-[calc(88dvh-92px)] overflow-y-auto px-4 pb-4 pt-5">
-                  <div className="mb-5 flex items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-[24px] font-black tracking-[-0.08em] text-slate-950">
-                        직접 입력 주문
-                      </h2>
-                      <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
-                        목록에 없는 상품만 입력해주세요.
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={closeDirectInputSheet}
-                      className={`${buttonBase} h-11 rounded-[16px] border border-slate-200 bg-white px-4 text-[13px] font-black text-slate-700`}
-                    >
-                      닫기
-                    </button>
+                  <div className="mb-5">
+                    <h2 className="text-[24px] font-black tracking-[-0.08em] text-slate-950">
+                      직접 입력 주문
+                    </h2>
+                    <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
+                      목록에 없는 상품만 입력해주세요.
+                    </p>
                   </div>
 
                   <div className="grid gap-4">
@@ -3513,21 +3522,21 @@ export default function OrderPage() {
 
                     <div className="grid grid-cols-2 gap-2">
                       <label className="grid gap-2">
-                        <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">색상 / 옵션</span>
+                        <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">옵션 / 색상</span>
                         <input
                           value={directInputItem.color}
                           onChange={(event) => updateItem(directInputTargetIndex, "color", event.target.value)}
-                          placeholder="없으면 비움"
+                          placeholder="색상을 입력해주세요"
                           className="h-13 min-w-0 rounded-[18px] border border-slate-200 bg-white px-4 text-[16px] font-bold tracking-[-0.04em] outline-none focus:border-blue-600"
                         />
                       </label>
 
                       <label className="grid gap-2">
-                        <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">사이즈</span>
+                        <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">옵션 / 사이즈</span>
                         <input
                           value={directInputItem.size}
                           onChange={(event) => updateItem(directInputTargetIndex, "size", event.target.value)}
-                          placeholder="없으면 비움"
+                          placeholder="사이즈를 입력해주세요"
                           className="h-13 min-w-0 rounded-[18px] border border-slate-200 bg-white px-4 text-[16px] font-bold tracking-[-0.04em] outline-none focus:border-blue-600"
                         />
                       </label>
@@ -3578,7 +3587,7 @@ export default function OrderPage() {
                     </div>
 
                     <div className="rounded-[18px] bg-blue-50 p-3 text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-blue-800 ring-1 ring-blue-100">
-                      방송에서 안내한 상품명/옵션/금액을 그대로 적어주세요.
+                      방송에서 안내한 상품명/옵션/금액을 그대로 입력해주세요. 옵션이 없는 상품은 “없음”이라고 입력해주세요.
                     </div>
                   </div>
                 </div>
