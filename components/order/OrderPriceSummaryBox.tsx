@@ -37,11 +37,13 @@ export default function OrderPriceSummaryBox({
 }: OrderPriceSummaryBoxProps) {
   const safePointBalance = Math.max(0, Number(customerPointBalance || 0));
   const safePointUsedAmount = Math.max(0, Number(pointUsedAmount || 0));
-  const finalPaymentAmount = Math.max(0, Number(finalAmount ?? totalAmount ?? 0));
   const hasSmallPoint = safePointBalance > 0 && safePointBalance < 1000;
 
   return (
-    <section className="rounded-[28px] bg-white p-5 shadow-[0_12px_26px_rgba(30,64,175,0.08)] ring-1 ring-blue-100">
+    <section
+      data-ruru-price-summary-box="no-duplicate-total"
+      className="rounded-[28px] bg-white p-5 shadow-[0_12px_26px_rgba(30,64,175,0.08)] ring-1 ring-blue-100"
+    >
       <h2 className="text-[20px] font-black tracking-[-0.06em] text-[#151923]">
         결제금액 확인
       </h2>
@@ -117,10 +119,7 @@ export default function OrderPriceSummaryBox({
           </div>
         )}
 
-        <div className="mt-4 flex justify-between border-t border-blue-100 pt-4 text-xl font-black tracking-[-0.05em] text-[#151923]">
-          <span>{safePointUsedAmount > 0 ? "최종 결제금액" : "총 결제금액"}</span>
-          <span>{won(finalPaymentAmount)}</span>
-        </div>
+
       </div>
     </section>
   );
