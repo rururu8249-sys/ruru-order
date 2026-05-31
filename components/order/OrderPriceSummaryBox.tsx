@@ -76,7 +76,7 @@ export default function OrderPriceSummaryBox({
             </div>
 
             <div className="mt-3 flex flex-col gap-3" data-ruru-point-input-stack>
-              <div className="w-full" data-ruru-point-input-layout>
+              <div className="relative w-full" data-ruru-point-input-layout>
                 <input
                   value={pointUseInput}
                   onChange={(event) => onPointUseInputChange?.(event.target.value)}
