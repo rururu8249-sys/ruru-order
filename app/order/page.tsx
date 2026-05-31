@@ -3332,7 +3332,7 @@ export default function OrderPage() {
                 등록된 상품 선택
               </h2>
               <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
-                상세를 확인한 뒤 [담기] 버튼을 눌러 주문서에 추가해주세요.
+                옵션 없는 상품은 [담기], 옵션 있는 상품은 [옵션선택] 후 주문서에 담아주세요.
               </p>
             </div>
 
