@@ -3020,22 +3020,10 @@ export default function OrderPage() {
   const handleSubmitOrderClick = () => {
     if (!validate()) return;
 
-    if (paymentMethod !== "무통장입금") {
-      submitOrder();
-      return;
-    }
-
-    if (productAmount <= 0 || totalAmount <= 0) {
-      submitOrder();
-      return;
-    }
-
-    if (shouldSkipDepositConfirm()) {
-      submitOrder();
-      return;
-    }
-
-    setShowDepositConfirmModal(true);
+    // data-ruru-order-submit-direct-with-payment-sheet="v1"
+    // 주문서 제출 전 기존 입금확인 모달은 띄우지 않습니다.
+    // 무통장입금 주문은 저장 성공 후 공통 입금안내 바텀시트로 안내합니다.
+    submitOrder();
   };
 
   const handleDepositConfirmSubmit = (hideFor24Hours: boolean) => {
