@@ -17,7 +17,7 @@ type StatusInfo = {
   className: string;
 };
 
-const DEFAULT_PAGE_SIZE = 5;
+const DEFAULT_PAGE_SIZE = 3;
 
 type ProductListFilter = "visible" | "hidden" | "all";
 
