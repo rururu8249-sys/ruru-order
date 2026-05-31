@@ -483,6 +483,7 @@ function uniqueOptionValues(values: string[]): string[] {
 
 function getProductOptionSuggestions(product: BroadcastProduct, field: "color" | "size"): string[] {
   const note = parseProductSuggestionNote(product.product_note);
+  const noteRecord = (note || {}) as Record<string, unknown>;
   const record = product as unknown as Record<string, unknown>;
   const values: string[] = [];
 
@@ -498,17 +499,41 @@ function getProductOptionSuggestions(product: BroadcastProduct, field: "color" |
 
   if (field === "color") {
     values.push(...splitProductOptionValue(note?.colors));
+    values.push(...splitProductOptionValue(noteRecord.color_options));
+    values.push(...splitProductOptionValue(noteRecord.product_colors));
+    values.push(...splitProductOptionValue(noteRecord.option_color));
     values.push(...splitProductOptionValue(record.colors));
     values.push(...splitProductOptionValue(record.color_options));
+    values.push(...splitProductOptionValue(record.product_colors));
+    values.push(...splitProductOptionValue(record.option_color));
     values.push(...splitProductOptionValue(record.color));
   } else {
     values.push(...splitProductOptionValue(note?.sizes));
+    values.push(...splitProductOptionValue(noteRecord.size_options));
+    values.push(...splitProductOptionValue(noteRecord.product_sizes));
+    values.push(...splitProductOptionValue(noteRecord.option_size));
     values.push(...splitProductOptionValue(record.sizes));
     values.push(...splitProductOptionValue(record.size_options));
+    values.push(...splitProductOptionValue(record.product_sizes));
+    values.push(...splitProductOptionValue(record.option_size));
     values.push(...splitProductOptionValue(record.size));
   }
 
   return uniqueOptionValues(values);
+}
+
+function getSelectableRegisteredOptions(product: BroadcastProduct, field: "color" | "size"): string[] {
+  return getProductOptionSuggestions(product, field)
+    .map((value) => normalizeEmptyProductOptionValue(value))
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function registeredProductNeedsOptionSelect(product: BroadcastProduct): boolean {
+  return (
+    getSelectableRegisteredOptions(product, "color").length > 0 ||
+    getSelectableRegisteredOptions(product, "size").length > 0
+  );
 }
 
 function findMatchedBroadcastProduct(item: OrderItem, products: BroadcastProduct[]): BroadcastProduct | null {
@@ -846,6 +871,10 @@ export default function OrderPage() {
   const [directInputKeyboardInset, setDirectInputKeyboardInset] = useState(0);
   const [directInputProductSearchMode, setDirectInputProductSearchMode] = useState(false);
   const [directInputTargetIndex, setDirectInputTargetIndex] = useState(0);
+  const [registeredOptionSelectProduct, setRegisteredOptionSelectProduct] = useState<BroadcastProduct | null>(null);
+  const [registeredOptionColor, setRegisteredOptionColor] = useState("");
+  const [registeredOptionSize, setRegisteredOptionSize] = useState("");
+  const [registeredOptionQty, setRegisteredOptionQty] = useState(1);
 
   useEffect(() => {
     if (!directInputOpen || typeof window === "undefined") {
@@ -2467,17 +2496,14 @@ export default function OrderPage() {
   };
 
 
-  const selectQuickGroupBuyProduct = (product: BroadcastProduct) => {
-    const emptyIndex = items.findIndex((item) => !item.product_name.trim());
-
-    if (emptyIndex >= 0) {
-      selectBroadcastProduct(emptyIndex, product);
-      return;
-    }
-
+  const addRegisteredProductToOrderItems = (
+    product: BroadcastProduct,
+    options?: { color?: string; size?: string; qty?: number }
+  ) => {
     const productPrice = Number(product.price || 0);
     const nextProductPrice = Number.isFinite(productPrice) && productPrice > 0 ? String(Math.round(productPrice)) : "";
-    const productColor = pickRegisteredProductOptionText(product, [
+
+    const fallbackColor = pickRegisteredProductOptionText(product, [
       "color",
       "colors",
       "product_color",
@@ -2486,7 +2512,7 @@ export default function OrderPage() {
       "color_options",
       "option_color",
     ]);
-    const productSize = pickRegisteredProductOptionText(product, [
+    const fallbackSize = pickRegisteredProductOptionText(product, [
       "size",
       "sizes",
       "product_size",
@@ -2498,18 +2524,76 @@ export default function OrderPage() {
 
     const nextItem: OrderItem = {
       product_id: String(product.id ?? ""),
-        product_name: product.product_name,
-      color: normalizeEmptyProductOptionValue(productColor),
-      size: normalizeEmptyProductOptionValue(productSize),
-      qty: "1",
+      product_name: product.product_name,
+      color: normalizeEmptyProductOptionValue(options?.color ?? fallbackColor),
+      size: normalizeEmptyProductOptionValue(options?.size ?? fallbackSize),
+      qty: String(Math.max(1, Number(options?.qty || 1))),
       product_price: nextProductPrice,
       shipping_type: product.shipping_type || "일반",
       combine_shipping: product.combine_shipping || "Y",
     };
 
-    setItems((prev) => [...prev, nextItem]);
+    setItems((prev) => {
+      const emptyIndex = prev.findIndex((item) => !item.product_name.trim());
+
+      if (emptyIndex >= 0) {
+        return prev.map((item, index) => (index === emptyIndex ? nextItem : item));
+      }
+
+      return [...prev, nextItem];
+    });
+
     setProductSearchOpenIndex(null);
     setProductSearchText("");
+  };
+
+  const openRegisteredOptionSelectSheet = (product: BroadcastProduct) => {
+    setRegisteredOptionSelectProduct(product);
+    setRegisteredOptionColor("");
+    setRegisteredOptionSize("");
+    setRegisteredOptionQty(1);
+  };
+
+  const closeRegisteredOptionSelectSheet = () => {
+    setRegisteredOptionSelectProduct(null);
+    setRegisteredOptionColor("");
+    setRegisteredOptionSize("");
+    setRegisteredOptionQty(1);
+  };
+
+  const confirmRegisteredOptionSelectSheet = () => {
+    const product = registeredOptionSelectProduct;
+    if (!product) return;
+
+    const colorOptions = getSelectableRegisteredOptions(product, "color");
+    const sizeOptions = getSelectableRegisteredOptions(product, "size");
+
+    if (colorOptions.length > 0 && !registeredOptionColor.trim()) {
+      showCustomerNotice("색상을 선택해주세요.");
+      return;
+    }
+
+    if (sizeOptions.length > 0 && !registeredOptionSize.trim()) {
+      showCustomerNotice("사이즈를 선택해주세요.");
+      return;
+    }
+
+    addRegisteredProductToOrderItems(product, {
+      color: registeredOptionColor,
+      size: registeredOptionSize,
+      qty: registeredOptionQty,
+    });
+
+    closeRegisteredOptionSelectSheet();
+  };
+
+  const selectQuickGroupBuyProduct = (product: BroadcastProduct) => {
+    if (registeredProductNeedsOptionSelect(product)) {
+      openRegisteredOptionSelectSheet(product);
+      return;
+    }
+
+    addRegisteredProductToOrderItems(product);
   };
 
   const getItemOptionSuggestions = (item: OrderItem, field: "color" | "size") => {
@@ -3168,6 +3252,14 @@ export default function OrderPage() {
     !detailAddress.trim();
 
   const directInputItem = items[directInputTargetIndex] || null;
+  const registeredOptionColorChoices = registeredOptionSelectProduct
+    ? getSelectableRegisteredOptions(registeredOptionSelectProduct, "color")
+    : [];
+  const registeredOptionSizeChoices = registeredOptionSelectProduct
+    ? getSelectableRegisteredOptions(registeredOptionSelectProduct, "size")
+    : [];
+  const registeredOptionPrice = registeredOptionSelectProduct ? Number(registeredOptionSelectProduct.price || 0) : 0;
+  const registeredOptionTotalPrice = Math.max(1, registeredOptionQty) * (Number.isFinite(registeredOptionPrice) ? registeredOptionPrice : 0);
 
   return (
     <OrderPageShell>
@@ -3247,6 +3339,9 @@ export default function OrderPage() {
             <div className="w-full max-w-full overflow-hidden">
               <GroupBuyQuickSelect
                 products={quickGroupBuyProducts as GroupBuyQuickSelectProduct[]}
+                getSelectLabel={(product) =>
+                  registeredProductNeedsOptionSelect(product as BroadcastProduct) ? "옵션선택" : "담기"
+                }
                 onSelect={(product) => selectQuickGroupBuyProduct(product as BroadcastProduct)}
               />
             </div>
@@ -3539,6 +3634,133 @@ export default function OrderPage() {
 
             {customerBlockStatus.blocked ? <CustomerBlockedNotice /> : null}
           </section>
+
+          {registeredOptionSelectProduct && (
+            <div className="fixed inset-0 z-[128] flex items-end bg-black/45 px-2 pb-0 sm:px-3">
+              <div className="mx-auto flex max-h-[92dvh] w-full max-w-[430px] flex-col overflow-hidden rounded-t-[30px] bg-white shadow-2xl">
+                <div className="shrink-0 border-b border-slate-100 p-4">
+                  <div className="mx-auto mb-3 h-1.5 w-14 rounded-full bg-slate-200" />
+                  <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
+                    등록상품 옵션선택
+                  </p>
+                  <h2 className="mt-1 break-keep text-[24px] font-black leading-tight tracking-[-0.08em] text-slate-950">
+                    상품 옵션 선택
+                  </h2>
+                  <p className="mt-2 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
+                    색상/사이즈를 선택한 뒤 주문서에 담아주세요.
+                  </p>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                  <div className="rounded-[24px] bg-slate-50 p-4 ring-1 ring-slate-100">
+                    <h3 className="break-keep text-[18px] font-black leading-snug tracking-[-0.06em] text-slate-950">
+                      {registeredOptionSelectProduct.product_name}
+                    </h3>
+                    <p className="mt-1 text-[15px] font-black text-blue-700">
+                      {registeredOptionPrice > 0 ? won(registeredOptionPrice) : "가격 직접입력"}
+                    </p>
+                  </div>
+
+                  {registeredOptionColorChoices.length > 0 && (
+                    <div className="mt-4">
+                      <p className="mb-2 text-[14px] font-black tracking-[-0.04em] text-slate-800">
+                        색상
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {registeredOptionColorChoices.map((option) => (
+                          <button
+                            key={`registered-color-${option}`}
+                            type="button"
+                            onClick={() => setRegisteredOptionColor(option)}
+                            className={`min-h-12 rounded-[16px] border px-3 text-[14px] font-black tracking-[-0.04em] ${
+                              registeredOptionColor === option
+                                ? "border-blue-600 bg-blue-600 text-white"
+                                : "border-slate-200 bg-white text-slate-700"
+                            }`}
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {registeredOptionSizeChoices.length > 0 && (
+                    <div className="mt-4">
+                      <p className="mb-2 text-[14px] font-black tracking-[-0.04em] text-slate-800">
+                        사이즈
+                      </p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {registeredOptionSizeChoices.map((option) => (
+                          <button
+                            key={`registered-size-${option}`}
+                            type="button"
+                            onClick={() => setRegisteredOptionSize(option)}
+                            className={`min-h-12 rounded-[16px] border px-2 text-[14px] font-black tracking-[-0.04em] ${
+                              registeredOptionSize === option
+                                ? "border-blue-600 bg-blue-600 text-white"
+                                : "border-slate-200 bg-white text-slate-700"
+                            }`}
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-4 grid grid-cols-[0.82fr_1.18fr] gap-3">
+                    <label className="grid gap-2">
+                      <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">수량</span>
+                      <div className="grid h-12 grid-cols-[42px_1fr_42px] overflow-hidden rounded-[17px] border border-slate-200 bg-white">
+                        <button
+                          type="button"
+                          onClick={() => setRegisteredOptionQty((current) => Math.max(1, current - 1))}
+                          className="border-r border-slate-100 text-[18px] font-black text-slate-700"
+                        >
+                          -
+                        </button>
+                        <div className="flex items-center justify-center text-[16px] font-black tracking-[-0.04em] text-slate-950">
+                          {registeredOptionQty}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setRegisteredOptionQty((current) => current + 1)}
+                          className="border-l border-slate-100 text-[18px] font-black text-blue-700"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </label>
+
+                    <div className="grid gap-2">
+                      <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">선택금액</span>
+                      <div className="flex h-12 items-center justify-end rounded-[17px] border border-slate-200 bg-white px-3 text-[14px] font-black tracking-[-0.04em] text-slate-950">
+                        {registeredOptionTotalPrice > 0 ? won(registeredOptionTotalPrice) : "가격 직접입력"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="shrink-0 grid grid-cols-[0.85fr_1.15fr] gap-3 border-t border-slate-100 bg-white p-3 pb-[calc(12px+env(safe-area-inset-bottom))]">
+                  <button
+                    type="button"
+                    onClick={closeRegisteredOptionSelectSheet}
+                    className="h-14 rounded-[20px] bg-slate-100 text-[16px] font-black tracking-[-0.05em] text-slate-700"
+                  >
+                    닫기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmRegisteredOptionSelectSheet}
+                    className="h-14 rounded-[20px] bg-blue-600 text-[16px] font-black tracking-[-0.05em] text-white shadow-sm"
+                  >
+                    선택완료
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {directInputOpen && directInputItem && (
             <div className="fixed inset-0 z-[130] bg-slate-950/55 backdrop-blur-[2px]">

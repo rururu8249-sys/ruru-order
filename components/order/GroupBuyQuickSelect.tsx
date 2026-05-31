@@ -29,6 +29,7 @@ export type GroupBuyQuickSelectProduct = {
 type Props = {
   products: GroupBuyQuickSelectProduct[];
   onSelect: (product: GroupBuyQuickSelectProduct) => void;
+  getSelectLabel?: (product: GroupBuyQuickSelectProduct) => string;
 };
 
 type FilterKey = "all" | "normal" | "vendor" | "needsPrice";
@@ -245,11 +246,13 @@ function PriceAndDelivery({ product }: { product: GroupBuyQuickSelectProduct }) 
 function QuickProductCard({
   product,
   variant = "feature",
+  selectLabel,
   onDetail,
   onSelect,
 }: {
   product: GroupBuyQuickSelectProduct;
   variant?: "feature" | "mini";
+  selectLabel: string;
   onDetail: () => void;
   onSelect: () => void;
 }) {
@@ -312,7 +315,7 @@ function QuickProductCard({
               onClick={onSelect}
               className="h-8 rounded-xl bg-blue-600 text-[12px] font-black text-white shadow-sm"
             >
-              담기
+              {selectLabel}
             </button>
           </div>
         </div>
@@ -323,10 +326,12 @@ function QuickProductCard({
 
 function SheetProductCard({
   product,
+  selectLabel,
   onDetail,
   onSelect,
 }: {
   product: GroupBuyQuickSelectProduct;
+  selectLabel: string;
   onDetail: () => void;
   onSelect: () => void;
 }) {
@@ -354,7 +359,7 @@ function SheetProductCard({
               onClick={onSelect}
               className="h-10 rounded-xl bg-blue-600 text-sm font-black text-white shadow-sm"
             >
-              담기
+              {selectLabel}
             </button>
           </div>
         </div>
@@ -365,10 +370,12 @@ function SheetProductCard({
 
 function ProductDetailSheet({
   product,
+  selectLabel,
   onClose,
   onSelect,
 }: {
   product: GroupBuyQuickSelectProduct;
+  selectLabel: string;
   onClose: () => void;
   onSelect: () => void;
 }) {
@@ -447,7 +454,7 @@ function ProductDetailSheet({
             onClick={onSelect}
             className="h-14 rounded-2xl bg-blue-600 text-base font-black text-white shadow-sm"
           >
-            이 상품 담기
+            {selectLabel === "옵션선택" ? "옵션 선택하기" : "이 상품 담기"}
           </button>
         </div>
       </div>
@@ -455,12 +462,17 @@ function ProductDetailSheet({
   );
 }
 
-export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
+export default function GroupBuyQuickSelect({ products, onSelect, getSelectLabel }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [detailProduct, setDetailProduct] = useState<GroupBuyQuickSelectProduct | null>(null);
   const [searchText, setSearchText] = useState("");
   const [filterKey, setFilterKey] = useState<FilterKey>("all");
   const [currentPage, setCurrentPage] = useState(1);
+
+  const getProductSelectLabel = (product: GroupBuyQuickSelectProduct) => {
+    const label = getSelectLabel?.(product);
+    return label && label.trim() ? label.trim() : "담기";
+  };
 
   const quickProducts = products.slice(0, 2);
 
@@ -524,6 +536,7 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
               key={`quick-group-buy-mobile-first-${String(quickProducts[0].id)}`}
               product={quickProducts[0]}
               variant="mini"
+              selectLabel={getProductSelectLabel(quickProducts[0])}
               onDetail={() => setDetailProduct(quickProducts[0])}
               onSelect={() => handleSelect(quickProducts[0])}
             />
@@ -534,6 +547,7 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
               key={`quick-group-buy-mobile-second-${String(quickProducts[1].id)}`}
               product={quickProducts[1]}
               variant="mini"
+              selectLabel={getProductSelectLabel(quickProducts[1])}
               onDetail={() => setDetailProduct(quickProducts[1])}
               onSelect={() => handleSelect(quickProducts[1])}
             />
@@ -566,6 +580,7 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
               key={`quick-group-buy-feature-${String(quickProducts[0].id)}`}
               product={quickProducts[0]}
               variant="feature"
+              selectLabel={getProductSelectLabel(quickProducts[0])}
               onDetail={() => setDetailProduct(quickProducts[0])}
               onSelect={() => handleSelect(quickProducts[0])}
             />
@@ -576,6 +591,7 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
               key={`quick-group-buy-mini-${String(quickProducts[1].id)}`}
               product={quickProducts[1]}
               variant="mini"
+              selectLabel={getProductSelectLabel(quickProducts[1])}
               onDetail={() => setDetailProduct(quickProducts[1])}
               onSelect={() => handleSelect(quickProducts[1])}
             />
@@ -644,6 +660,7 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
                       <SheetProductCard
                         key={`sheet-group-buy-${String(product.id)}`}
                         product={product}
+                        selectLabel={getProductSelectLabel(product)}
                         onDetail={() => setDetailProduct(product)}
                         onSelect={() => handleSelect(product)}
                       />
@@ -705,6 +722,7 @@ export default function GroupBuyQuickSelect({ products, onSelect }: Props) {
       {detailProduct ? (
         <ProductDetailSheet
           product={detailProduct}
+          selectLabel={getProductSelectLabel(detailProduct)}
           onClose={() => setDetailProduct(null)}
           onSelect={() => handleSelect(detailProduct)}
         />
