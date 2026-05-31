@@ -41,14 +41,10 @@ export default function OrderPriceSummaryBox({
 
   return (
     <section
-      data-ruru-price-summary-box="no-duplicate-total"
-      className="rounded-[28px] bg-white p-5 shadow-[0_12px_26px_rgba(30,64,175,0.08)] ring-1 ring-blue-100"
+      data-ruru-price-summary-box="clean-no-duplicate-title"
+      className="w-full"
     >
-      <h2 className="text-[20px] font-black tracking-[-0.06em] text-[#151923]">
-        결제금액 확인
-      </h2>
-
-      <div className="mt-4 rounded-[22px] bg-blue-50 p-4 ring-1 ring-blue-100">
+      <div className="rounded-[22px] bg-blue-50 p-4 ring-1 ring-blue-100">
         <div className="flex justify-between text-sm font-bold text-slate-600">
           <span>상품금액</span>
           <span>{won(productAmount)}</span>
