@@ -3611,7 +3611,7 @@ export default function OrderPage() {
               </div>
             )}
 
-            <div className="mt-4 overflow-hidden rounded-[24px] bg-slate-50 p-3 ring-1 ring-slate-100">
+            <div data-ruru-price-summary-wrapper="flat" className="mt-4">
               <OrderPriceSummaryBox
                 productAmount={productAmount}
                 shippingFee={shippingFee}
