@@ -557,7 +557,7 @@ export default function QuickProductFastForm({
 
   const orderExposureOptions = [
     { value: "card_and_search", label: "카드+검색", desc: "카드 표시 + 상품명 검색" },
-    { value: "search_only", label: "검색", desc: "카드 숨김 + 상품명 검색" },
+    { value: "search_only", label: "검색만", desc: "카드 숨김 + 상품명 검색" },
     { value: "hidden", label: "숨김", desc: "카드/검색 모두 제외" },
   ] as const;
 
@@ -611,15 +611,14 @@ export default function QuickProductFastForm({
 
   const toggleNoneOptionAutofill = () => {
     if (noneOptionAutofillEnabled) {
-      setColorText("");
-      setSizeText("");
+      setColorText((current) => current.trim() === "없음" ? "" : current);
+      setSizeText((current) => current.trim() === "없음" ? "" : current);
       return;
     }
 
     setColorText("없음");
     setSizeText("없음");
   };
-
 
   const resolvedVariantRows = useMemo(() => {
     if (stockMode !== "option") return [];
@@ -1224,7 +1223,7 @@ export default function QuickProductFastForm({
           <span className="mx-1 text-slate-300">·</span>
           <span>{shippingType === "vendor" ? "업체배송" : "일반배송"}</span>
           <span className="mx-1 text-slate-300">·</span>
-          <span>{orderExposureMode === "hidden" ? "숨김" : orderExposureMode === "card_and_search" ? "카드+검색" : "검색"}</span>
+          <span>{orderExposureMode === "hidden" ? "숨김" : orderExposureMode === "card_and_search" ? "카드+검색" : "검색만"}</span>
           <span className="mx-1 text-slate-300">·</span>
           <span>재고 {totalStock.toLocaleString("ko-KR")}개</span>
         </div>

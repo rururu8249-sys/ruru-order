@@ -386,6 +386,16 @@ function getProductNoteFlags(product: { product_note?: unknown; productNote?: un
   };
 }
 
+function productExposureMode(product: ProductRow): "card" | "search" | "hidden" {
+  const flags = getProductNoteFlags(product);
+  const info = statusInfo(product);
+
+  if (info.label === "숨김") return "hidden";
+  if (flags.registeredOrderEnabled) return "card";
+  if (flags.nameSuggestionEnabled) return "search";
+  return "hidden";
+}
+
 function ProductFeatureBadges({ product }: { product: ProductRow }) {
   const flags = getProductNoteFlags(product);
   const info = statusInfo(product);
@@ -403,7 +413,7 @@ function ProductFeatureBadges({ product }: { product: ProductRow }) {
           }
         : flags.nameSuggestionEnabled
           ? {
-              label: "검색",
+              label: "검색만",
               className: "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100",
             }
           : {
@@ -692,12 +702,14 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
   }, [products]);
 
   const productListSummary = useMemo(() => {
-    const hidden = products.filter((product) => statusInfo(product).label === "숨김").length;
+    const card = products.filter((product) => productExposureMode(product) === "card").length;
+    const searchOnly = products.filter((product) => productExposureMode(product) === "search").length;
+    const hidden = products.filter((product) => productExposureMode(product) === "hidden").length;
     const soldout = products.filter((product) => statusInfo(product).label === "품절").length;
-    const visible = products.filter((product) => statusInfo(product).label !== "숨김").length;
 
     return {
-      visible,
+      visible: card,
+      searchOnly,
       hidden,
       soldout,
       all: products.length,
@@ -709,19 +721,22 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
 
     const baseProducts = (() => {
       if (listFilter === "hidden") {
-        return products.filter((product) => statusInfo(product).label === "숨김");
+        return products.filter((product) => productExposureMode(product) === "hidden");
       }
 
       if (listFilter === "all") {
         return products;
       }
 
-      return products.filter((product) => statusInfo(product).label !== "숨김");
+      return products.filter((product) => productExposureMode(product) === "card");
     })();
 
     if (!keyword) return baseProducts;
 
     return baseProducts.filter((product) => {
+      const exposureMode = productExposureMode(product);
+      const exposureLabel = exposureMode === "card" ? "카드+검색" : exposureMode === "search" ? "검색만" : "숨김";
+
       const haystack = [
         productName(product),
         String(productPrice(product)),
@@ -730,6 +745,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
         productTypeLabel(product),
         shippingLabel(product),
         statusInfo(product).label,
+        exposureLabel,
       ]
         .join(" ")
         .toLowerCase();
@@ -836,7 +852,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
             <div className="min-w-0">
               <h2 className="text-sm font-black text-slate-950">등록상품 리스트</h2>
               <div className="mt-1 text-[11px] font-bold text-slate-400">
-                노출 {counts.visible} · 고정 {counts.pinned} · 숨김 {counts.hidden} · 품절 {counts.soldout}
+                카드 {counts.visible} · 고정 {counts.pinned} · 숨김 {counts.hidden} · 품절 {counts.soldout}
               </div>
             </div>
 
@@ -882,7 +898,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
 <div className="shrink-0 py-2 text-[11px] font-black text-slate-500">
           <div className="mt-2 flex flex-wrap items-center gap-1.5 rounded-2xl border border-slate-200 bg-slate-50 p-1.5">
             {([
-              { key: "visible", label: "노출상품", count: productListSummary.visible },
+              { key: "visible", label: "카드상품", count: productListSummary.visible },
               { key: "hidden", label: "숨김상품", count: productListSummary.hidden },
               { key: "all", label: "전체상품", count: productListSummary.all },
             ] as const).map((filter) => (
@@ -1175,7 +1191,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
 
 
               <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-bold leading-5 text-slate-500">
-                기본값: 방송상품 · 일반배송 · 검색 · 금액 미입력 시 고객 직접입력
+                기본값: 방송상품 · 일반배송 · 검색만 · 금액 미입력 시 고객 직접입력
               </div>
             </div>
 
