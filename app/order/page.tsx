@@ -2507,10 +2507,7 @@ export default function OrderPage() {
   };
 
   const removeItem = (index: number) => {
-    setItems((prev) => {
-      if (prev.length <= 1) return prev;
-      return prev.filter((_, itemIndex) => itemIndex !== index);
-    });
+    setItems((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
   };
 
   const saveCustomer = async () => {
