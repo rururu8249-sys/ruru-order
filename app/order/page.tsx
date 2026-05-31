@@ -3552,25 +3552,15 @@ export default function OrderPage() {
                 <div className="mx-auto mt-2.5 h-1.5 w-16 rounded-full bg-slate-200" />
 
                 <div className="max-h-[calc(95dvh-18px)] overflow-y-auto px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-4">
-                  <div className="mb-4 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="text-[28px] font-black leading-none tracking-[-0.08em] text-slate-950">
-                          직접 입력 주문
-                        </h2>
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black tracking-[-0.04em] text-slate-500">
-                          없는 상품만 직접 입력
-                        </span>
-                      </div>
+                  <div data-ruru-direct-input-no-top-close="enabled" className="mb-3">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <h2 className="text-[27px] font-black leading-none tracking-[-0.08em] text-slate-950">
+                        직접 입력 주문
+                      </h2>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black tracking-[-0.04em] text-slate-500">
+                        없는 상품만 직접 입력
+                      </span>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={closeDirectInputSheet}
-                      className="shrink-0 rounded-2xl bg-slate-100 px-4 py-3 text-[14px] font-black tracking-[-0.04em] text-slate-700"
-                    >
-                      닫기
-                    </button>
                   </div>
 
                   <div className="grid gap-3">
