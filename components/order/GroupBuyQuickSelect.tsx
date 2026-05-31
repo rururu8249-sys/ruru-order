@@ -348,7 +348,7 @@ function SheetProductCard({
               onClick={onSelect}
               className="h-10 rounded-xl bg-blue-600 text-sm font-black text-white shadow-sm"
             >
-              선택
+              담기
             </button>
           </div>
         </div>
@@ -441,7 +441,7 @@ function ProductDetailSheet({
             onClick={onSelect}
             className="h-14 rounded-2xl bg-blue-600 text-base font-black text-white shadow-sm"
           >
-            이 상품 선택하기
+            이 상품 담기
           </button>
         </div>
       </div>
