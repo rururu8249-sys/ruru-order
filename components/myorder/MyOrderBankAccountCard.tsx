@@ -72,7 +72,7 @@ export default function MyOrderBankAccountCard({
           onClick={onCopyNickname}
           className="min-h-[46px] rounded-[16px] bg-white px-3 py-2 text-[13px] font-black tracking-[-0.04em] text-blue-700 ring-1 ring-blue-100 transition active:scale-[0.98]"
         >
-          {nicknameCopyDone ? "닉네임 복사완료" : "닉네임 복사"}
+          {nicknameCopyDone ? "입금자명 복사완료" : "입금자명(닉네임) 복사"}
         </button>
 
         <button
