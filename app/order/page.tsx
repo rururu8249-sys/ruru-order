@@ -840,6 +840,7 @@ export default function OrderPage() {
   const [pointUseInput, setPointUseInput] = useState("");
   const [directInputOpen, setDirectInputOpen] = useState(false);
   const [directInputKeyboardInset, setDirectInputKeyboardInset] = useState(0);
+  const [directInputProductSearchMode, setDirectInputProductSearchMode] = useState(false);
   const [directInputTargetIndex, setDirectInputTargetIndex] = useState(0);
 
   useEffect(() => {
@@ -3046,6 +3047,7 @@ export default function OrderPage() {
   const closeDirectInputSheet = () => {
     setProductSearchText("");
     setProductSearchOpenIndex(null);
+    setDirectInputProductSearchMode(false);
     setDirectInputOpen(false);
   };
 
@@ -3078,6 +3080,7 @@ export default function OrderPage() {
 
     setProductSearchText("");
     setProductSearchOpenIndex(null);
+    setDirectInputProductSearchMode(false);
     setDirectInputOpen(false);
   };
 
@@ -3538,7 +3541,7 @@ export default function OrderPage() {
               <div
                 className="absolute inset-x-0 bottom-0 mx-auto max-h-[88dvh] w-full max-w-[430px] overflow-hidden rounded-t-[30px] bg-white shadow-[0_-24px_80px_rgba(15,23,42,0.25)]"
                 style={{
-                  bottom: directInputKeyboardInset > 0 ? `${directInputKeyboardInset}px` : "0px",
+                  bottom: directInputProductSearchMode ? "0px" : directInputKeyboardInset > 0 ? `${directInputKeyboardInset}px` : "0px",
                 }}
               >
                 <div className="mx-auto mt-3 h-1.5 w-16 rounded-full bg-slate-200" />
@@ -3554,7 +3557,7 @@ export default function OrderPage() {
                   </div>
 
                   <div className="grid gap-4">
-                    <div data-ruru-product-search-area className="grid gap-2">
+                    <div data-ruru-product-search-area className={directInputProductSearchMode ? "sticky top-0 z-20 grid gap-2 rounded-b-2xl bg-white pb-2" : "grid gap-2"}>
                       <label className="grid gap-2">
                         <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">상품명</span>
                         <input
@@ -3564,16 +3567,24 @@ export default function OrderPage() {
                             updateItem(directInputTargetIndex, "product_name", nextValue);
                             setProductSearchText(nextValue);
                             setProductSearchOpenIndex(directInputTargetIndex);
+                            setDirectInputProductSearchMode(true);
                           }}
                           onFocus={(event) => {
                             const target = event.currentTarget;
                             setProductSearchText(directInputItem.product_name);
                             setProductSearchOpenIndex(directInputTargetIndex);
+                            setDirectInputProductSearchMode(true);
 
                             if (typeof window !== "undefined") {
                               window.setTimeout(() => {
-                                target.scrollIntoView({ block: "center", behavior: "smooth" });
+                                target.scrollIntoView({ block: "start", behavior: "smooth" });
                               }, 80);
+                            }
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.currentTarget.blur();
+                              setDirectInputProductSearchMode(false);
                             }
                           }}
                           placeholder="상품명을 입력해주세요"
@@ -3581,8 +3592,29 @@ export default function OrderPage() {
                         />
                       </label>
 
+                      {directInputProductSearchMode ? (
+                        <div className="flex items-center justify-between gap-2 rounded-2xl bg-blue-50 px-3 py-2">
+                          <span className="min-w-0 break-keep text-[12px] font-bold leading-5 tracking-[-0.04em] text-blue-700">
+                            추천상품을 선택하거나 입력 완료를 눌러 옵션을 입력하세요.
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDirectInputProductSearchMode(false);
+                              setProductSearchOpenIndex(null);
+                              if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+                                document.activeElement.blur();
+                              }
+                            }}
+                            className="shrink-0 rounded-xl bg-white px-3 py-2 text-[12px] font-black text-blue-700 shadow-sm"
+                          >
+                            입력 완료
+                          </button>
+                        </div>
+                      ) : null}
+
                       {productSearchOpenIndex === directInputTargetIndex && productSearchText.trim().length > 0 ? (
-                        <div className="max-h-52 overflow-y-auto rounded-2xl border border-blue-100 bg-white p-2 shadow-[0_14px_35px_rgba(15,23,42,0.12)]">
+                        <div className={directInputProductSearchMode ? "max-h-[34dvh] overscroll-contain overflow-y-auto rounded-2xl border border-blue-100 bg-white p-2 shadow-[0_14px_35px_rgba(15,23,42,0.12)]" : "max-h-52 overflow-y-auto rounded-2xl border border-blue-100 bg-white p-2 shadow-[0_14px_35px_rgba(15,23,42,0.12)]"}>
                           <div className="px-3 py-2 text-[12px] font-black tracking-[-0.03em] text-blue-600">
                             직접입력 추천 상품명
                           </div>
@@ -3601,6 +3633,11 @@ export default function OrderPage() {
                                     selectBroadcastProduct(directInputTargetIndex, product);
                                     setProductSearchText("");
                                     setProductSearchOpenIndex(null);
+                                    setDirectInputProductSearchMode(false);
+
+                                    if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+                                      document.activeElement.blur();
+                                    }
                                   }}
                                   className="w-full rounded-2xl px-3 py-3 text-left hover:bg-blue-50 active:scale-[0.99]"
                                 >
