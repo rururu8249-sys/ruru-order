@@ -2769,6 +2769,24 @@ export default function OrderPage() {
     .map((item, index) => ({ item, index }))
     .filter(({ item }) => item.product_name.trim());
 
+  const isDirectInputItem = (item: OrderItem) => {
+    return !String(item.product_id || "").trim();
+  };
+
+  const getOrderItemImageUrl = (item: OrderItem) => {
+    const imageRecord = item as OrderItem &
+      Partial<Record<"image_url" | "product_image_url" | "thumbnail_url" | "imageUrl" | "image", string>>;
+
+    return (
+      imageRecord.image_url ||
+      imageRecord.product_image_url ||
+      imageRecord.thumbnail_url ||
+      imageRecord.imageUrl ||
+      imageRecord.image ||
+      ""
+    );
+  };
+
   const openDirectInputSheet = () => {
     const emptyIndex = items.findIndex((item) => !item.product_name.trim());
 
@@ -2780,6 +2798,11 @@ export default function OrderPage() {
 
     setDirectInputTargetIndex(items.length);
     addItem();
+    setDirectInputOpen(true);
+  };
+
+  const openDirectInputEditSheet = (index: number) => {
+    setDirectInputTargetIndex(index);
     setDirectInputOpen(true);
   };
 
@@ -2934,54 +2957,13 @@ export default function OrderPage() {
             <p className="mt-2 break-keep text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
               상품을 선택하고, 목록에 없는 상품만 직접 입력해주세요.
             </p>
-          </section>
-
-          <section className="mt-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
-            <button
-              type="button"
-              onClick={() => setShowSavedCustomerDetail((current) => !current)}
-              className="flex w-full items-center justify-between gap-3 text-left"
-            >
-              <div>
-                <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
-                  주문자 배송지 정보
-                </h2>
-                <p className="mt-1 text-[12px] font-bold tracking-[-0.04em] text-slate-500">
-                  필요할 때만 열어 확인해주세요.
-                </p>
-              </div>
-
-              <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-[12px] font-black text-slate-600">
-                {showSavedCustomerDetail ? "접기" : "펼쳐보기"}
-              </span>
-            </button>
+            <p className="mt-2 break-keep text-[13px] font-black leading-relaxed tracking-[-0.04em] text-blue-700">
+              주문 전 상단 [정보수정]에서 배송정보를 확인해주세요.
+            </p>
 
             {customerInfoMissing && (
               <div className="mt-3 rounded-[18px] border border-orange-200 bg-orange-50 p-3 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-orange-800">
-                배송정보 확인이 필요합니다. 상단 [정보수정]에서 정보를 먼저 저장해주세요.
-              </div>
-            )}
-
-            {showSavedCustomerDetail && (
-              <div className="mt-4 space-y-2 rounded-[22px] border border-slate-100 bg-slate-50 p-4 text-[14px] font-bold tracking-[-0.04em] text-slate-700">
-                <div className="flex justify-between gap-3">
-                  <span className="text-slate-400">유튜브 닉네임</span>
-                  <span className="text-right font-black text-slate-950">{youtubeNickname || "-"}</span>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <span className="text-slate-400">이름</span>
-                  <span className="text-right font-black text-slate-950">{customerName || "-"}</span>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <span className="text-slate-400">전화번호</span>
-                  <span className="text-right font-black text-slate-950">{formatPhone(customerPhone) || "-"}</span>
-                </div>
-                <div className="grid gap-1">
-                  <span className="text-slate-400">주소</span>
-                  <span className="break-keep font-black text-slate-950">
-                    {[address, detailAddress].filter(Boolean).join(" ") || "-"}
-                  </span>
-                </div>
+                배송정보 확인이 필요합니다. 상단 [정보수정]에서 이름, 전화번호, 주소를 먼저 저장해주세요.
               </div>
             )}
           </section>
@@ -3013,7 +2995,7 @@ export default function OrderPage() {
                   목록에 없는 상품만 직접 입력
                 </h2>
                 <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
-                  방송에서 안내한 상품명, 옵션, 금액을 그대로 적어주세요.
+                  등록상품 외 직접 상품명, 옵션, 금액 입력
                 </p>
               </div>
             </div>
@@ -3050,33 +3032,56 @@ export default function OrderPage() {
               <div className="grid gap-3">
                 {selectedItemEntries.map(({ item, index }) => {
                   const itemAmount = toNumber(item.product_price) * toNumber(item.qty);
+                  const directItem = isDirectInputItem(item);
+                  const imageUrl = getOrderItemImageUrl(item);
 
                   return (
-                    <article key={`${item.product_name}-${index}`} className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-                      <div className="flex items-start justify-between gap-3">
+                    <article key={`${item.product_name}-${index}`} className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
+                      <div className="flex items-center gap-3">
+                        {!directItem && (
+                          <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[18px] bg-slate-50 ring-1 ring-slate-100">
+                            {imageUrl ? (
+                              <img
+                                src={imageUrl}
+                                alt={item.product_name}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <span className="px-2 text-center text-[11px] font-black leading-tight text-slate-400">
+                                등록상품
+                              </span>
+                            )}
+                          </div>
+                        )}
+
                         <div className="min-w-0 flex-1">
-                          <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
-                            상품 {index + 1}
-                          </p>
-                          <h3 className="mt-1 break-keep text-[17px] font-black leading-relaxed tracking-[-0.06em] text-slate-950">
+                          <div className="mb-1 flex items-center gap-2">
+                            <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
+                              상품 {index + 1}
+                            </p>
+                            {directItem && (
+                              <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-black tracking-[-0.04em] text-amber-700 ring-1 ring-amber-100">
+                                직접입력
+                              </span>
+                            )}
+                          </div>
+
+                          <h3 className="break-keep text-[17px] font-black leading-relaxed tracking-[-0.06em] text-slate-950">
                             {item.product_name}
                           </h3>
+
                           <p className="mt-1 break-keep text-[13px] font-bold tracking-[-0.04em] text-slate-500">
                             {[hideNone(item.color), hideNone(item.size)].filter(Boolean).join(" / ") || "옵션 없음"}
                           </p>
-                        </div>
 
-                        <button
-                          type="button"
-                          onClick={() => removeItem(index)}
-                          className={`${buttonBase} shrink-0 rounded-full border border-red-100 bg-white px-3 py-1.5 text-[12px] font-black text-red-500`}
-                        >
-                          삭제
-                        </button>
+                          <p className="mt-1 text-[14px] font-black tracking-[-0.05em] text-slate-700">
+                            {won(toNumber(item.product_price))}
+                          </p>
+                        </div>
                       </div>
 
-                      <div className="mt-4 grid grid-cols-[minmax(0,1fr)_120px] gap-3">
-                        <div className="flex h-12 overflow-hidden rounded-[18px] border border-slate-200 bg-white">
+                      <div className="mt-4 flex items-center justify-between gap-3">
+                        <div className="flex h-12 min-w-[150px] overflow-hidden rounded-[18px] border border-slate-200 bg-white">
                           <button
                             type="button"
                             onClick={() => updateItem(index, "qty", String(Math.max(1, (toNumber(item.qty) || 1) - 1)))}
@@ -3099,21 +3104,33 @@ export default function OrderPage() {
                           </button>
                         </div>
 
-                        <div className="flex h-12 items-center justify-end rounded-[18px] bg-white px-3 text-[16px] font-black tracking-[-0.05em] text-blue-800 ring-1 ring-slate-200">
+                        <div className="min-w-[116px] text-right text-[17px] font-black tracking-[-0.05em] text-blue-800">
                           {won(itemAmount)}
                         </div>
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-end gap-2">
+                        {directItem && (
+                          <button
+                            type="button"
+                            onClick={() => openDirectInputEditSheet(index)}
+                            className={`${buttonBase} rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-[12px] font-black text-blue-700`}
+                          >
+                            수정
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => removeItem(index)}
+                          className={`${buttonBase} rounded-full border border-red-100 bg-white px-3 py-1.5 text-[12px] font-black text-red-500`}
+                        >
+                          삭제
+                        </button>
                       </div>
                     </article>
                   );
                 })}
-
-                <button
-                  type="button"
-                  onClick={openDirectInputSheet}
-                  className={`${buttonBase} rounded-[20px] border border-blue-200 bg-blue-50 px-4 py-4 text-[15px] font-black tracking-[-0.04em] text-blue-800`}
-                >
-                  + 목록에 없는 상품 추가 입력
-                </button>
               </div>
             )}
           </section>
