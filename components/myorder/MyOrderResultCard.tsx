@@ -1,6 +1,6 @@
 // components/myorder/MyOrderResultCard.tsx
 // 목적: 고객 주문조회 결과 카드 UI
-// 주의: UI 전용. 주문조회 Supabase 로직, 상태 계산 로직 없음.
+// 주의: UI 전용. 주문조회 Supabase 로직, 상태 저장 로직 없음.
 
 import { formatMyOrderDateTime } from "@/components/myorder/myOrderDateFormat";
 
@@ -49,6 +49,8 @@ export default function MyOrderResultCard({
   const paidLabels = [
     "입금확인완료",
     "입금확인",
+    "자동입금확인",
+    "수동입금확인",
     "확인완료",
     "배송출발",
     "출고준비중",
@@ -61,19 +63,19 @@ export default function MyOrderResultCard({
     label === "주문취소" || label === "주문서 취소" || label === "환불완료"
       ? label
       : paidLabels.includes(label)
-        ? "입금확인완료"
+        ? "입금확인"
         : "입금대기";
 
   const deliveryStatus =
     label === "배송출발" || label === "출고완료"
-      ? "택배출고"
+      ? "출고완료"
       : label === "출고준비중" || label === "확인완료"
         ? "출고준비"
         : label === "주문취소" || label === "주문서 취소" || label === "환불완료"
           ? label
           : "확인중";
 
-  const showBandTrackingNotice = deliveryStatus === "택배출고";
+  const showBandTrackingNotice = deliveryStatus === "출고완료";
 
   const pointUsedAmount = toMoneyNumber(order.point_used_amount ?? order.pointUsedAmount);
   const finalPaymentAmount = toMoneyNumber(
@@ -90,112 +92,110 @@ export default function MyOrderResultCard({
       (pointUsedAmount > 0 ? finalPaymentAmount + pointUsedAmount : finalPaymentAmount)
   );
 
+  const productName = String(order.product_name || "주문상품").trim();
+  const quantityText = `${order.qty || 1}개`;
+  const optionAndQuantity = optionText ? `${optionText} · ${quantityText}` : quantityText;
+
+  const statusChipClass =
+    deliveryStatus === "출고완료"
+      ? "bg-blue-600 text-white"
+      : paymentStatus === "입금확인"
+        ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
+        : paymentStatus === "입금대기"
+          ? "bg-orange-50 text-orange-700 ring-1 ring-orange-100"
+          : statusClassName;
+
+  void statusClassName;
+
   return (
-    <article className="rounded-[26px] bg-white p-4 shadow-[0_12px_28px_rgba(30,64,175,0.08)] ring-1 ring-blue-100 min-[390px]:rounded-[28px] min-[390px]:p-5">
-      <div className="flex items-start gap-3 min-[390px]:gap-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-blue-50 text-[24px] ring-1 ring-blue-100 min-[390px]:h-16 min-[390px]:w-16 min-[390px]:rounded-[22px] min-[390px]:text-[31px]">
-          🛍️
+    <article
+      data-ruru-myorder-result-card="shell-v2"
+      className="rounded-[20px] bg-white p-3 ring-1 ring-slate-200"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black tracking-[-0.04em] text-slate-600">
+              {paymentLabel}
+            </span>
+            <span className={`rounded-full px-2 py-1 text-[11px] font-black tracking-[-0.04em] ${statusChipClass}`}>
+              {deliveryStatus === "출고완료" ? "출고완료" : paymentStatus}
+            </span>
+          </div>
+
+          <h3 className="mt-2 break-keep text-[16px] font-black leading-snug tracking-[-0.06em] text-slate-950">
+            {productName}
+          </h3>
+
+          <p className="mt-1 truncate text-[12px] font-bold tracking-[-0.04em] text-slate-500" title={optionAndQuantity}>
+            {optionAndQuantity}
+          </p>
         </div>
 
-        <div className="min-w-0 flex-1">
-          <div className="grid gap-2 text-[13px] font-bold text-slate-600 min-[390px]:text-[14px]">
-            <div className="flex items-center justify-between gap-3">
-              <span className="shrink-0 font-black text-[#151923]">주문번호</span>
-              <span className="min-w-0 truncate text-right font-black text-[#151923]" title={orderCode}>
-                {orderCode}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between gap-3">
-              <span className="shrink-0 font-black text-[#151923]">주문일</span>
-              <span className="text-right">{displayDate}</span>
-            </div>
-
-            <div className="flex items-start justify-between gap-3">
-              <span className="shrink-0 font-black text-[#151923]">상품명</span>
-              <span className="break-keep text-right font-black text-[#151923]">
-                {order.product_name || "주문상품"}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between gap-3">
-              <span className="shrink-0 font-black text-[#151923]">수량/옵션</span>
-              <span className="text-right">
-                {optionText || "옵션 없음"} · {order.qty || 1}개
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between gap-3">
-              <span className="shrink-0 font-black text-[#151923]">결제방식</span>
-              <span className="text-right font-black text-blue-600">{paymentLabel}</span>
-            </div>
-          </div>
-
-          <div className="mt-4 grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
-            <div className="rounded-2xl bg-blue-50 px-3 py-2 text-center ring-1 ring-blue-100">
-              <div className="text-[11px] font-black text-slate-500">입금상태</div>
-              <div className="mt-1 text-[13px] font-black text-blue-700">{paymentStatus}</div>
-            </div>
-
-            <div className="rounded-2xl bg-slate-50 px-3 py-2 text-center ring-1 ring-slate-100">
-              <div className="text-[11px] font-black text-slate-500">배송상태</div>
-              <div className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[12px] font-black ${statusClassName}`}>
-                {deliveryStatus}
-              </div>
-            </div>
-          </div>
-
-          {showBandTrackingNotice ? (
-            <div className="mt-3 rounded-[18px] bg-slate-50 p-3 ring-1 ring-slate-100">
-              <p className="break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
-                택배출고 후 당일 늦은 오후~저녁 사이 밴드에서 송장조회가 가능합니다.
-              </p>
-              <a
-                href="https://band.us/@ruru8249"
-                target="_blank"
-                rel="noreferrer"
-                className="mt-2 flex min-h-[40px] items-center justify-center rounded-[16px] bg-slate-950 px-3 py-2 text-[13px] font-black tracking-[-0.04em] text-white transition active:scale-[0.98]"
-              >
-                밴드에서 송장조회
-              </a>
-            </div>
-          ) : null}
-
-          <div className="mt-4 border-t border-slate-100 pt-4">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[14px] font-bold text-slate-500">
-                {pointUsedAmount > 0 ? "최종 결제금액" : "주문금액"}
-              </span>
-              <span className="shrink-0 text-[20px] font-black tracking-[-0.045em] text-[#151923] min-[390px]:text-[22px]">
-                {amountText}
-              </span>
-            </div>
-
-            {pointUsedAmount > 0 ? (
-              <div className="mt-3 rounded-2xl bg-emerald-50 px-3 py-2 text-[12px] font-black leading-relaxed text-emerald-800 ring-1 ring-emerald-100">
-                <div className="flex items-center justify-between gap-3">
-                  <span>상품금액</span>
-                  <span>{pointWon(pointOriginalAmount)}</span>
-                </div>
-                <div className="mt-1 flex items-center justify-between gap-3 text-emerald-700">
-                  <span>포인트 사용</span>
-                  <span>-{pointWon(pointUsedAmount)}</span>
-                </div>
-                <div className="mt-1 flex items-center justify-between gap-3 border-t border-emerald-100 pt-1 text-orange-700">
-                  <span>최종 결제금액</span>
-                  <span>{pointWon(finalPaymentAmount)}</span>
-                </div>
-              </div>
-            ) : null}
-          </div>
-
-          {order.cancel_reason && (
-            <div className="mt-3 rounded-2xl bg-red-50 p-3 text-sm font-bold text-red-600 ring-1 ring-red-100">
-              취소 사유: {order.cancel_reason}
-            </div>
-          )}
+        <div className="shrink-0 text-right">
+          <p className="text-[11px] font-bold tracking-[-0.04em] text-slate-400">
+            결제금액
+          </p>
+          <p className="mt-1 text-[18px] font-black tracking-[-0.06em] text-slate-950">
+            {amountText}
+          </p>
         </div>
       </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 rounded-[16px] bg-slate-50 px-3 py-2 text-[12px] font-bold tracking-[-0.04em] text-slate-600 ring-1 ring-slate-100">
+        <div className="min-w-0">
+          <p className="text-slate-400">주문번호</p>
+          <p className="mt-0.5 truncate font-black text-slate-800" title={orderCode}>
+            {orderCode}
+          </p>
+        </div>
+
+        <div className="min-w-0 text-right">
+          <p className="text-slate-400">주문일</p>
+          <p className="mt-0.5 truncate font-black text-slate-800">
+            {displayDate}
+          </p>
+        </div>
+      </div>
+
+      {pointUsedAmount > 0 ? (
+        <div className="mt-2 rounded-[16px] bg-emerald-50 px-3 py-2 text-[12px] font-black leading-relaxed tracking-[-0.04em] text-emerald-800 ring-1 ring-emerald-100">
+          <div className="flex items-center justify-between gap-3">
+            <span>상품금액</span>
+            <span>{pointWon(pointOriginalAmount)}</span>
+          </div>
+          <div className="mt-0.5 flex items-center justify-between gap-3 text-emerald-700">
+            <span>포인트 사용</span>
+            <span>-{pointWon(pointUsedAmount)}</span>
+          </div>
+          <div className="mt-0.5 flex items-center justify-between gap-3 border-t border-emerald-100 pt-1 text-orange-700">
+            <span>최종 결제금액</span>
+            <span>{pointWon(finalPaymentAmount)}</span>
+          </div>
+        </div>
+      ) : null}
+
+      {showBandTrackingNotice ? (
+        <div className="mt-2 rounded-[16px] bg-blue-50 p-3 ring-1 ring-blue-100">
+          <p className="break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
+            출고완료 후 당일 늦은 오후~저녁 사이 밴드에서 송장조회가 가능합니다.
+          </p>
+          <a
+            href="https://band.us/@ruru8249"
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 flex min-h-[38px] items-center justify-center rounded-[14px] bg-white px-3 py-2 text-[12px] font-black tracking-[-0.04em] text-blue-700 ring-1 ring-blue-100 transition active:scale-[0.98]"
+          >
+            밴드에서 송장조회
+          </a>
+        </div>
+      ) : null}
+
+      {order.cancel_reason ? (
+        <div className="mt-2 rounded-[16px] bg-red-50 p-3 text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-red-600 ring-1 ring-red-100">
+          취소 사유: {order.cancel_reason}
+        </div>
+      ) : null}
     </article>
   );
 }
