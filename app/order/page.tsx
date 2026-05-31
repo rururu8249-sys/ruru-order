@@ -65,6 +65,10 @@ import OrderCustomerInfoIntro from "@/components/order/OrderCustomerInfoIntro";
 import OrderCustomerInfoFormCard from "@/components/order/OrderCustomerInfoFormCard";
 import OrderCompletePaymentNotice from "@/components/order/OrderCompletePaymentNotice";
 import CustomerPaymentGuideBottomSheet from "@/components/customer/CustomerPaymentGuideBottomSheet";
+import CustomerOrderLookupBottomSheet, {
+  type CustomerOrderLookupFilter,
+  type CustomerOrderLookupItem,
+} from "@/components/customer/CustomerOrderLookupBottomSheet";
 import OrderKakaoNicknameNotice from "@/components/order/OrderKakaoNicknameNotice";
 import CustomerBlockedNotice from "@/components/customer/CustomerBlockedNotice";
 import CustomerToastNotice from "@/components/customer/CustomerToastNotice";
@@ -172,6 +176,9 @@ const resolveShippingGroupFromValue = (value: unknown): "normal" | "vendor" => {
 const BANK_NAME = "새마을금고";
 const BANK_ACCOUNT = "9002186993725";
 const BANK_HOLDER = "유혜원";
+
+const ORDER_LOOKUP_FILTERS = ["전체", "입금대기", "입금확인", "출고완료"] as const;
+const ORDER_LOOKUP_PER_PAGE = 2;
 const FOOTER_TEXT = "© since 2024 루루동이 | All Rights Reserved.";
 
 const emptyItem: OrderItem = {
@@ -858,6 +865,11 @@ export default function OrderPage() {
   const [copyDone, setCopyDone] = useState(false);
   const [nicknameCopyDone, setNicknameCopyDone] = useState(false);
   const [paymentGuideOpen, setPaymentGuideOpen] = useState(false);
+  const [orderLookupOpen, setOrderLookupOpen] = useState(false);
+  const [orderLookupLoading, setOrderLookupLoading] = useState(false);
+  const [orderLookupOrders, setOrderLookupOrders] = useState<any[]>([]);
+  const [orderLookupFilter, setOrderLookupFilter] = useState<CustomerOrderLookupFilter>("전체");
+  const [orderLookupPage, setOrderLookupPage] = useState(1);
   const [customerCardRate, setCustomerCardRate] = useState(10);
   const [actualCardFeeRate, setActualCardFeeRate] = useState(7);
   const [cardPaymentMinAmount, setCardPaymentMinAmount] = useState(100000);
@@ -3005,6 +3017,170 @@ export default function OrderPage() {
     }
   };
 
+  const ruruOrderLookupWon = (value: unknown) => {
+    const amount = Number(value || 0);
+    if (!Number.isFinite(amount)) return "0원";
+    return `${amount.toLocaleString()}원`;
+  };
+
+  const ruruOrderLookupDateText = (value: unknown) => {
+    if (!value) return "-";
+
+    const date = new Date(String(value));
+    if (Number.isNaN(date.getTime())) return "-";
+
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const hour = String(date.getHours()).padStart(2, "0");
+    const minute = String(date.getMinutes()).padStart(2, "0");
+
+    return `${month}월 ${day}일 ${hour}:${minute}`;
+  };
+
+  const ruruOrderLookupText = (value: unknown) => String(value || "").trim();
+
+  const ruruOrderLookupStatusLabel = (order: any): CustomerOrderLookupFilter => {
+    const deliveryText = [
+      order?.delivery_status,
+      order?.shipping_status,
+      order?.tracking_number,
+      order?.invoice_number,
+      order?.waybill_number,
+      order?.order_manage_status,
+      order?.admin_status,
+    ]
+      .map(ruruOrderLookupText)
+      .join(" ");
+
+    if (/출고완료|택배출고|배송출발|배송완료|송장/.test(deliveryText)) {
+      return "출고완료";
+    }
+
+    const paymentText = [
+      order?.payment_status,
+      order?.deposit_status,
+      order?.admin_order_status_v2,
+      order?.order_manage_status,
+      order?.order_status,
+      order?.admin_status,
+      order?.status,
+      order?.payment_method,
+    ]
+      .map(ruruOrderLookupText)
+      .join(" ");
+
+    if (/입금확인|자동입금|수동입금|결제완료|카드결제완료|확인완료|출고준비/.test(paymentText)) {
+      return "입금확인";
+    }
+
+    return "입금대기";
+  };
+
+  const ruruOrderLookupProductName = (order: any) =>
+    ruruOrderLookupText(order?.product_name) ||
+    ruruOrderLookupText(order?.representative_product_name) ||
+    ruruOrderLookupText(order?.item_name) ||
+    ruruOrderLookupText(order?.title) ||
+    "주문상품";
+
+  const ruruOrderLookupOptionText = (order: any) =>
+    [order?.color, order?.size, order?.option, order?.product_option]
+      .map(ruruOrderLookupText)
+      .filter(Boolean)
+      .join(" / ");
+
+  const ruruOrderLookupQuantityText = (order: any) => {
+    const quantity = Number(order?.qty ?? order?.quantity ?? order?.count ?? 0);
+    return Number.isFinite(quantity) && quantity > 0 ? `${quantity}개` : "";
+  };
+
+  const ruruOrderLookupOrderCode = (order: any) =>
+    ruruOrderLookupText(order?.order_code) ||
+    ruruOrderLookupText(order?.order_number) ||
+    ruruOrderLookupText(order?.order_no) ||
+    ruruOrderLookupText(order?.id);
+
+  const loadOrderLookupOrders = async () => {
+    const savedPhone =
+      typeof window !== "undefined" ? localStorage.getItem("ruru_customer_phone") || "" : "";
+    const cleanPhone = normalizeOrderPhone(String(customerPhone || savedPhone || ""));
+
+    setOrderLookupOpen(true);
+    setOrderLookupLoading(true);
+    setOrderLookupPage(1);
+
+    if (!cleanPhone) {
+      setOrderLookupOrders([]);
+      setOrderLookupLoading(false);
+      showCustomerNotice("전화번호 저장 후 주문조회가 가능합니다.", "error");
+      return;
+    }
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("customer_phone", cleanPhone)
+      .gte("created_at", sevenDaysAgo.toISOString())
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      setOrderLookupOrders([]);
+      setOrderLookupLoading(false);
+      showCustomerNotice("주문조회 오류: " + error.message, "error");
+      return;
+    }
+
+    setOrderLookupOrders(data || []);
+    setOrderLookupLoading(false);
+  };
+
+  const openOrderLookupBottomSheet = () => {
+    setOrderLookupFilter("전체");
+    setOrderLookupPage(1);
+    loadOrderLookupOrders();
+  };
+
+  const orderLookupAllItems: CustomerOrderLookupItem[] = orderLookupOrders.map((order) => {
+    const statusLabel = ruruOrderLookupStatusLabel(order);
+    const finalAmount =
+      order?.final_amount ??
+      order?.adjusted_total_price ??
+      order?.total_price ??
+      order?.product_price ??
+      0;
+
+    return {
+      id: order?.id ?? `${order?.created_at || ""}-${ruruOrderLookupProductName(order)}`,
+      productName: ruruOrderLookupProductName(order),
+      optionText: ruruOrderLookupOptionText(order),
+      quantityText: ruruOrderLookupQuantityText(order),
+      amountText: ruruOrderLookupWon(finalAmount),
+      statusLabel,
+      deliveryLabel: statusLabel === "출고완료" ? "출고완료" : "확인중",
+      dateText: ruruOrderLookupDateText(order?.created_at),
+      orderCode: ruruOrderLookupOrderCode(order),
+    };
+  });
+
+  const orderLookupFilteredItems =
+    orderLookupFilter === "전체"
+      ? orderLookupAllItems
+      : orderLookupAllItems.filter((item) => item.statusLabel === orderLookupFilter);
+
+  const orderLookupTotalPages = Math.max(
+    1,
+    Math.ceil(orderLookupFilteredItems.length / ORDER_LOOKUP_PER_PAGE),
+  );
+  const orderLookupSafePage = Math.min(orderLookupPage, orderLookupTotalPages);
+  const orderLookupVisibleItems = orderLookupFilteredItems.slice(
+    (orderLookupSafePage - 1) * ORDER_LOOKUP_PER_PAGE,
+    orderLookupSafePage * ORDER_LOOKUP_PER_PAGE,
+  );
+
   const buttonBase = "transition-all duration-150 active:scale-[0.97]";
 
 
@@ -3231,9 +3407,13 @@ export default function OrderPage() {
               >
                 주문서
               </Link>
-              <Link href="/myorder" className={topNavInactiveButtonClass}>
+              <button
+                type="button"
+                onClick={openOrderLookupBottomSheet}
+                className={topNavInactiveButtonClass}
+              >
                 주문조회
-              </Link>
+              </button>
               <button
                 type="button"
                 onClick={startEditCustomerInfo}
@@ -3262,6 +3442,24 @@ export default function OrderPage() {
           onCopyNickname={copyDepositNickname}
           onCopyBankAccount={copyBankAccount}
           onClose={() => setPaymentGuideOpen(false)}
+        />
+        <CustomerOrderLookupBottomSheet
+          open={orderLookupOpen}
+          items={orderLookupVisibleItems}
+          activeFilter={orderLookupFilter}
+          page={orderLookupSafePage}
+          totalPages={orderLookupTotalPages}
+          filters={ORDER_LOOKUP_FILTERS}
+          onFilterChange={(filter) => {
+            setOrderLookupFilter(filter);
+            setOrderLookupPage(1);
+          }}
+          onPageChange={setOrderLookupPage}
+          onClose={() => setOrderLookupOpen(false)}
+          onOpenPaymentGuide={() => {
+            setOrderLookupOpen(false);
+            setPaymentGuideOpen(true);
+          }}
         />
         <section className="mx-auto w-full max-w-[430px]">
           <TopCustomerNav />
@@ -4075,6 +4273,25 @@ export default function OrderPage() {
           </div>
         </>
       )}
+
+        <CustomerOrderLookupBottomSheet
+          open={orderLookupOpen}
+          items={orderLookupVisibleItems}
+          activeFilter={orderLookupFilter}
+          page={orderLookupSafePage}
+          totalPages={orderLookupTotalPages}
+          filters={ORDER_LOOKUP_FILTERS}
+          onFilterChange={(filter) => {
+            setOrderLookupFilter(filter);
+            setOrderLookupPage(1);
+          }}
+          onPageChange={setOrderLookupPage}
+          onClose={() => setOrderLookupOpen(false)}
+          onOpenPaymentGuide={() => {
+            setOrderLookupOpen(false);
+            setPaymentGuideOpen(true);
+          }}
+        />
 
       <OrderDepositConfirmModal
         open={showDepositConfirmModal}
