@@ -1,22 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 
-const ADMIN_COOKIE_NAME = "ruru_admin_session";
 const BUCKET_NAME = "product-images";
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ ok: false, message }, { status });
-}
-
-function assertAdmin(request: NextRequest) {
-  const expectedToken = process.env.ADMIN_SESSION_TOKEN;
-  const sessionToken = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
-
-  return {
-    ok: Boolean(expectedToken && sessionToken === expectedToken),
-    hasExpectedToken: Boolean(expectedToken),
-    hasSessionCookie: Boolean(sessionToken),
-  };
 }
 
 function getSupabaseAdmin() {
@@ -62,17 +51,10 @@ async function ensureBucket(supabase: any) {
 }
 
 export async function POST(request: NextRequest) {
-  const adminAuth = assertAdmin(request);
+  const adminSession = await verifyAdminSessionFromRequest(request);
 
-  if (!adminAuth.ok) {
-    return jsonError(
-      adminAuth.hasExpectedToken
-        ? adminAuth.hasSessionCookie
-          ? "관리자 로그인 정보가 일치하지 않습니다. /admin-login에서 다시 로그인 후 새로고침해주세요."
-          : "관리자 로그인 쿠키가 없습니다. /admin-login에서 다시 로그인 후 새로고침해주세요."
-        : "관리자 인증 환경변수가 없습니다. Vercel ADMIN_SESSION_TOKEN을 확인해주세요.",
-      401,
-    );
+  if (!adminSession) {
+    return jsonError("관리자 로그인이 필요합니다. /admin-login에서 다시 로그인 후 새로고침해주세요.", 401);
   }
 
   try {

@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { createClient } from "@supabase/supabase-js";
 import {
   buildRouletteParticipants,
@@ -162,37 +163,12 @@ function getSupabaseAdmin() {
 
 type SupabaseAdminClient = ReturnType<typeof getSupabaseAdmin>;
 
-function hasAdminAccess(request: NextRequest) {
-  const expectedToken = process.env.ADMIN_SESSION_TOKEN || process.env.ADMIN_TOKEN || "";
+async function requireAdmin(request: NextRequest) {
+  const adminSession = await verifyAdminSessionFromRequest(request);
 
-  if (!expectedToken) {
-    return true;
-  }
+  if (adminSession) return null;
 
-  const headerToken = request.headers.get("x-ruru-admin-token") || request.headers.get("x-admin-token") || "";
-  if (headerToken && headerToken === expectedToken) {
-    return true;
-  }
-
-  const cookieNames = [
-    "ruru_admin_session",
-    "ruru_admin_token",
-    "ruru_admin_auth",
-    "admin_session",
-    "admin_token",
-    "admin_auth",
-    "ADMIN_SESSION_TOKEN",
-  ];
-
-  return cookieNames.some((name) => request.cookies.get(name)?.value === expectedToken);
-}
-
-function requireAdmin(request: NextRequest) {
-  if (hasAdminAccess(request)) {
-    return null;
-  }
-
-  return json({ ok: false, message: "관리자 인증이 필요합니다." }, 401);
+  return json({ ok: false, message: "관리자 로그인이 필요합니다. /admin-login에서 다시 로그인 후 새로고침해주세요." }, 401);
 }
 
 function sanitizeParticipantForAdmin(participant: EventRouletteParticipant) {
@@ -487,7 +463,7 @@ async function applyNoDuplicateWinnerRule(
 
 
 async function handleBroadcasts(request: NextRequest) {
-  const authError = requireAdmin(request);
+  const authError = await requireAdmin(request);
   if (authError) return authError;
 
   const supabase = getSupabaseAdmin();
@@ -500,7 +476,7 @@ async function handleBroadcasts(request: NextRequest) {
 }
 
 async function handleParticipants(request: NextRequest) {
-  const authError = requireAdmin(request);
+  const authError = await requireAdmin(request);
   if (authError) return authError;
 
   const supabase = getSupabaseAdmin();
@@ -528,7 +504,7 @@ async function handleParticipants(request: NextRequest) {
 }
 
 async function handleEvents(request: NextRequest) {
-  const authError = requireAdmin(request);
+  const authError = await requireAdmin(request);
   if (authError) return authError;
 
   const supabase = getSupabaseAdmin();
@@ -559,7 +535,7 @@ async function handleEvents(request: NextRequest) {
 }
 
 async function handleWinners(request: NextRequest) {
-  const authError = requireAdmin(request);
+  const authError = await requireAdmin(request);
   if (authError) return authError;
 
   const supabase = getSupabaseAdmin();
@@ -969,7 +945,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const authError = requireAdmin(request);
+  const authError = await requireAdmin(request);
   if (authError) return authError;
 
   try {
