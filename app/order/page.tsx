@@ -3401,11 +3401,12 @@ export default function OrderPage() {
                   return (
                     <article
                       key={`${item.product_name}-${index}`}
-                      className="w-full max-w-full overflow-hidden rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm"
+                      data-ruru-selected-item-card="redesigned"
+                      className="w-full max-w-full overflow-hidden rounded-[26px] border border-slate-200 bg-white p-4 shadow-sm"
                     >
                       <div className="flex w-full max-w-full items-start gap-3 overflow-hidden">
                         {!directItem && (
-                          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[18px] bg-slate-50 ring-1 ring-slate-100">
+                          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[20px] bg-slate-50 ring-1 ring-slate-100">
                             {imageUrl ? (
                               <img
                                 src={imageUrl}
@@ -3421,18 +3422,18 @@ export default function OrderPage() {
                         )}
 
                         <div className="min-w-0 flex-1 overflow-hidden">
-                          <div className="mb-1 flex min-w-0 items-start justify-between gap-2">
+                          <div className="mb-2 flex min-w-0 items-start justify-between gap-2">
                             <div className="min-w-0 flex flex-wrap items-center gap-2">
-                              <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
+                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black tracking-[-0.04em] text-slate-700">
                                 상품 {index + 1}
-                              </p>
+                              </span>
 
                               {directItem ? (
-                                <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-black tracking-[-0.04em] text-amber-700 ring-1 ring-amber-100">
+                                <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-black tracking-[-0.04em] text-amber-700 ring-1 ring-amber-100">
                                   직접입력
                                 </span>
                               ) : (
-                                <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-black tracking-[-0.04em] text-blue-700 ring-1 ring-blue-100">
+                                <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-black tracking-[-0.04em] text-blue-700 ring-1 ring-blue-100">
                                   선택상품
                                 </span>
                               )}
@@ -3459,53 +3460,74 @@ export default function OrderPage() {
                             </div>
                           </div>
 
-                          <h3 className="break-keep text-[17px] font-black leading-snug tracking-[-0.06em] text-slate-950">
+                          <h3 className="break-keep text-[18px] font-black leading-snug tracking-[-0.06em] text-slate-950">
                             {item.product_name}
                           </h3>
 
-                          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-bold tracking-[-0.04em] text-slate-500">
-                            <span className="min-w-0 break-keep">
-                              {[hideNone(item.color), hideNone(item.size)].filter(Boolean).join(" / ") || "옵션 없음"}
-                            </span>
-                            <span className="text-slate-300">·</span>
-                            <span className="shrink-0 font-black text-slate-700">
-                              상품금액 {won(toNumber(item.product_price))}
-                            </span>
+                          <div className="mt-2 grid gap-2">
+                            <div className="rounded-[16px] bg-slate-50 px-3 py-2 ring-1 ring-slate-100">
+                              <p className="text-[11px] font-black tracking-[-0.04em] text-slate-400">
+                                선택 옵션
+                              </p>
+                              <p className="mt-0.5 break-keep text-[13px] font-black tracking-[-0.04em] text-slate-700">
+                                {[hideNone(item.color), hideNone(item.size)].filter(Boolean).join(" / ") || "옵션 없음"}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center justify-between rounded-[16px] bg-white px-3 py-2 ring-1 ring-slate-100">
+                              <span className="text-[11px] font-black tracking-[-0.04em] text-slate-400">
+                                상품금액
+                              </span>
+                              <span className="text-[14px] font-black tracking-[-0.04em] text-slate-800">
+                                {won(toNumber(item.product_price))}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </div>
 
                       <div className="mt-4 grid w-full max-w-full grid-cols-1 gap-3 overflow-hidden">
-                        <div className="flex h-12 w-full overflow-hidden rounded-[18px] border border-slate-200 bg-white">
-                          <button
-                            type="button"
-                            onClick={() => updateItem(index, "qty", String(Math.max(1, (toNumber(item.qty) || 1) - 1)))}
-                            className="w-12 shrink-0 text-[18px] font-black text-slate-700"
-                          >
-                            -
-                          </button>
+                        <div className="grid gap-2">
+                          <div className="flex items-center justify-between px-1">
+                            <span className="text-[12px] font-black tracking-[-0.04em] text-slate-500">
+                              수량
+                            </span>
+                            <span className="text-[12px] font-black tracking-[-0.04em] text-slate-400">
+                              수량 변경 가능
+                            </span>
+                          </div>
 
-                          <input
-                            value={item.qty}
-                            onChange={(event) => updateItem(index, "qty", onlyNumber(event.target.value))}
-                            inputMode="numeric"
-                            className="min-w-0 flex-1 border-x border-slate-100 text-center text-[16px] font-black outline-none"
-                          />
+                          <div className="flex h-12 w-full overflow-hidden rounded-[18px] border border-slate-200 bg-white">
+                            <button
+                              type="button"
+                              onClick={() => updateItem(index, "qty", String(Math.max(1, (toNumber(item.qty) || 1) - 1)))}
+                              className="w-12 shrink-0 text-[18px] font-black text-slate-700"
+                            >
+                              -
+                            </button>
 
-                          <button
-                            type="button"
-                            onClick={() => updateItem(index, "qty", String((toNumber(item.qty) || 0) + 1))}
-                            className="w-12 shrink-0 text-[18px] font-black text-blue-700"
-                          >
-                            +
-                          </button>
+                            <input
+                              value={item.qty}
+                              onChange={(event) => updateItem(index, "qty", onlyNumber(event.target.value))}
+                              inputMode="numeric"
+                              className="min-w-0 flex-1 border-x border-slate-100 text-center text-[16px] font-black outline-none"
+                            />
+
+                            <button
+                              type="button"
+                              onClick={() => updateItem(index, "qty", String((toNumber(item.qty) || 0) + 1))}
+                              className="w-12 shrink-0 text-[18px] font-black text-blue-700"
+                            >
+                              +
+                            </button>
+                          </div>
                         </div>
 
-                        <div className="flex w-full items-center justify-between rounded-[18px] bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
-                          <span className="text-[12px] font-black tracking-[-0.04em] text-slate-500">
-                            합계금액
+                        <div className="flex w-full items-center justify-between rounded-[20px] bg-blue-50 px-4 py-3 ring-1 ring-blue-100">
+                          <span className="text-[13px] font-black tracking-[-0.04em] text-blue-700">
+                            이 상품 합계
                           </span>
-                          <span className="text-[18px] font-black tracking-[-0.05em] text-blue-800">
+                          <span className="text-[20px] font-black tracking-[-0.05em] text-blue-900">
                             {won(itemAmount)}
                           </span>
                         </div>
