@@ -3539,7 +3539,7 @@ export default function OrderPage() {
           {directInputOpen && directInputItem && (
             <div className="fixed inset-0 z-[130] bg-slate-950/55 backdrop-blur-[2px]">
               <div
-                className="absolute inset-x-0 bottom-0 mx-auto max-h-[88dvh] w-full max-w-[430px] overflow-hidden rounded-t-[30px] bg-white shadow-[0_-24px_80px_rgba(15,23,42,0.25)]"
+                className={directInputProductSearchMode ? "absolute inset-x-0 bottom-0 mx-auto max-h-[94dvh] w-full max-w-[430px] overflow-hidden rounded-t-[30px] bg-white shadow-[0_-24px_80px_rgba(15,23,42,0.25)]" : "absolute inset-x-0 bottom-0 mx-auto max-h-[88dvh] w-full max-w-[430px] overflow-hidden rounded-t-[30px] bg-white shadow-[0_-24px_80px_rgba(15,23,42,0.25)]"}
                 style={{
                   bottom: directInputProductSearchMode ? "0px" : directInputKeyboardInset > 0 ? `${directInputKeyboardInset}px` : "0px",
                 }}
@@ -3587,34 +3587,23 @@ export default function OrderPage() {
                               setDirectInputProductSearchMode(false);
                             }
                           }}
+                          onBlur={() => {
+                            if (typeof window !== "undefined") {
+                              window.setTimeout(() => {
+                                setDirectInputProductSearchMode(false);
+                              }, 160);
+                            } else {
+                              setDirectInputProductSearchMode(false);
+                            }
+                          }}
                           placeholder="상품명을 입력해주세요"
                           className="h-13 w-full rounded-[18px] border border-slate-200 bg-white px-4 text-[16px] font-bold tracking-[-0.04em] outline-none focus:border-blue-600"
                         />
                       </label>
 
-                      {directInputProductSearchMode ? (
-                        <div className="flex items-center justify-between gap-2 rounded-2xl bg-blue-50 px-3 py-2">
-                          <span className="min-w-0 break-keep text-[12px] font-bold leading-5 tracking-[-0.04em] text-blue-700">
-                            추천상품을 선택하거나 입력 완료를 눌러 옵션을 입력하세요.
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDirectInputProductSearchMode(false);
-                              setProductSearchOpenIndex(null);
-                              if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
-                                document.activeElement.blur();
-                              }
-                            }}
-                            className="shrink-0 rounded-xl bg-white px-3 py-2 text-[12px] font-black text-blue-700 shadow-sm"
-                          >
-                            입력 완료
-                          </button>
-                        </div>
-                      ) : null}
 
                       {productSearchOpenIndex === directInputTargetIndex && productSearchText.trim().length > 0 ? (
-                        <div className={directInputProductSearchMode ? "max-h-[34dvh] overscroll-contain overflow-y-auto rounded-2xl border border-blue-100 bg-white p-2 shadow-[0_14px_35px_rgba(15,23,42,0.12)]" : "max-h-52 overflow-y-auto rounded-2xl border border-blue-100 bg-white p-2 shadow-[0_14px_35px_rgba(15,23,42,0.12)]"}>
+                        <div className={directInputProductSearchMode ? "max-h-[42dvh] overscroll-contain overflow-y-auto rounded-2xl border border-blue-100 bg-white p-2 shadow-[0_14px_35px_rgba(15,23,42,0.12)]" : "max-h-52 overflow-y-auto rounded-2xl border border-blue-100 bg-white p-2 shadow-[0_14px_35px_rgba(15,23,42,0.12)]"}>
                           <div className="px-3 py-2 text-[12px] font-black tracking-[-0.03em] text-blue-600">
                             직접입력 추천 상품명
                           </div>
@@ -3629,6 +3618,9 @@ export default function OrderPage() {
                                 <button
                                   key={String(product.id)}
                                   type="button"
+                                  onPointerDown={(event) => {
+                                    event.preventDefault();
+                                  }}
                                   onClick={() => {
                                     selectBroadcastProduct(directInputTargetIndex, product);
                                     setProductSearchText("");
