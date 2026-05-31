@@ -3179,6 +3179,20 @@ export default function OrderPage() {
     const topNavActiveButtonClass = "rounded-full bg-blue-700 px-3 py-1.5 text-[12px] font-black text-white";
     const topNavInactiveButtonClass = "rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-black text-slate-700";
 
+    const handleTopNavOrderClick = (event: { preventDefault: () => void }) => {
+      if (!isTopNavEditActive) return;
+
+      event.preventDefault();
+      setIsEditingCustomerInfo(false);
+      setIsEditMode(false);
+      setCustomerMode("load");
+      setIsCustomerInfoOpen(false);
+
+      if (typeof window !== "undefined") {
+        window.history.replaceState(null, "", "/order");
+      }
+    };
+
     return (
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-[#f8fafc]/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex w-full max-w-[430px] flex-col gap-2">
@@ -3198,7 +3212,11 @@ export default function OrderPage() {
             </p>
 
             <nav className="flex shrink-0 items-center gap-1">
-              <Link href="/order" className={isTopNavEditActive ? topNavInactiveButtonClass : topNavActiveButtonClass}>
+              <Link
+                href="/order"
+                onClick={handleTopNavOrderClick}
+                className={isTopNavEditActive ? topNavInactiveButtonClass : topNavActiveButtonClass}
+              >
                 주문서
               </Link>
               <Link href="/myorder" className={topNavInactiveButtonClass}>
