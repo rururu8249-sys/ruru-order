@@ -3678,10 +3678,10 @@ export default function OrderPage() {
                       </label>
                     </div>
 
-                    <div data-ruru-direct-input-amount-full-width="enabled" className="grid min-w-0 grid-cols-1 gap-3">
+                    <div data-ruru-direct-input-amount-same-row="enabled" className="grid min-w-0 grid-cols-[0.82fr_1.18fr] gap-3">
                       <label className="min-w-0 grid gap-2">
                         <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">수량</span>
-                        <div className="grid h-12 grid-cols-[48px_1fr_48px] overflow-hidden rounded-[17px] border border-slate-200 bg-white">
+                        <div className="grid h-12 grid-cols-[42px_1fr_42px] overflow-hidden rounded-[17px] border border-slate-200 bg-white">
                           <button
                             type="button"
                             onClick={() => updateItem(directInputTargetIndex, "qty", String(Math.max(1, (toNumber(directInputItem.qty) || 1) - 1)))}
@@ -3707,15 +3707,15 @@ export default function OrderPage() {
 
                       <label className="min-w-0 grid gap-2">
                         <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">금액</span>
-                        <div className="flex h-12 min-w-0 items-center rounded-[17px] border border-slate-200 bg-white px-4">
+                        <div className="flex h-12 min-w-0 items-center rounded-[17px] border border-slate-200 bg-white px-3">
                           <input
                             value={directInputItem.product_price ? Number(directInputItem.product_price).toLocaleString("ko-KR") : ""}
                             onChange={(event) => updateItem(directInputTargetIndex, "product_price", onlyNumber(event.target.value))}
                             inputMode="numeric"
                             placeholder="0"
-                            className="min-w-0 flex-1 text-right text-[15px] font-black tracking-[-0.04em] outline-none"
+                            className="min-w-0 flex-1 text-right text-[14px] font-black tracking-[-0.04em] outline-none"
                           />
-                          <span className="ml-2 shrink-0 text-[14px] font-black text-slate-400">원</span>
+                          <span className="ml-1.5 shrink-0 text-[13px] font-black text-slate-400">원</span>
                         </div>
                       </label>
                     </div>
