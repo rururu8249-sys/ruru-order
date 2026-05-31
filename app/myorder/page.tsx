@@ -29,6 +29,9 @@ const BANK_NAME = "새마을금고";
 const BANK_ACCOUNT = "9002186993725";
 const BANK_HOLDER = "유혜원";
 
+const MY_ORDER_FILTERS = ["전체", "입금대기", "입금확인", "출고완료"] as const;
+type MyOrderFilter = (typeof MY_ORDER_FILTERS)[number];
+
 const normalizePhone = (value: string) =>
   String(value || "").replace(/[^0-9]/g, "");
 
@@ -82,6 +85,25 @@ function getStatusClassName(label: string) {
   if (label === "확인완료") return "bg-blue-100 text-blue-700";
 
   return "bg-gray-100 text-gray-700";
+}
+
+function getMyOrderFilterLabel(label: string): MyOrderFilter {
+  if (label === "배송출발" || label === "출고완료") return "출고완료";
+
+  const paidLabels = [
+    "입금확인완료",
+    "입금확인",
+    "자동입금확인",
+    "수동입금확인",
+    "확인완료",
+    "출고준비중",
+    "결제완료",
+    "카드결제완료",
+  ];
+
+  if (paidLabels.includes(label)) return "입금확인";
+
+  return "입금대기";
 }
 
 const blockCustomerCopyEvents = () => {
@@ -142,6 +164,7 @@ export default function MyOrderPage() {
   const [phone, setPhone] = useState("");
   const [orders, setOrders] = useState<any[]>([]);
   const [orderPage, setOrderPage] = useState(1);
+  const [orderFilter, setOrderFilter] = useState<MyOrderFilter>("전체");
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [copyDone, setCopyDone] = useState(false);
@@ -227,6 +250,7 @@ export default function MyOrderPage() {
 
     setOrders(data || []);
     setOrderPage(1);
+    setOrderFilter("전체");
     setLoading(false);
   };
 
@@ -262,9 +286,16 @@ export default function MyOrderPage() {
   };
 
   const ORDERS_PER_PAGE = 2;
-  const totalOrderPages = Math.max(1, Math.ceil(orders.length / ORDERS_PER_PAGE));
+  const filteredOrders =
+    orderFilter === "전체"
+      ? orders
+      : orders.filter((order) => {
+          const label = getCustomerStatusLabel(order);
+          return getMyOrderFilterLabel(label) === orderFilter;
+        });
+  const totalOrderPages = Math.max(1, Math.ceil(filteredOrders.length / ORDERS_PER_PAGE));
   const safeOrderPage = Math.min(orderPage, totalOrderPages);
-  const visibleOrders = orders.slice(
+  const visibleOrders = filteredOrders.slice(
     (safeOrderPage - 1) * ORDERS_PER_PAGE,
     safeOrderPage * ORDERS_PER_PAGE
   );
@@ -337,42 +368,81 @@ export default function MyOrderPage() {
         {searched && orders.length === 0 && <MyOrderEmptyState />}
 
         {orders.length > 0 && (
-          <section className="mt-6">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <h2 className="break-keep text-[22px] font-black leading-tight tracking-[-0.06em] text-[#151923] min-[390px]:text-[24px]">
-                최근 주문내역
-              </h2>
-              <span className="rounded-full bg-blue-50 px-3 py-1 text-[12px] font-black text-blue-700 ring-1 ring-blue-100">
-                최근 7일
-              </span>
+          <section
+            data-ruru-myorder-list="shell-v2"
+            className="mt-4"
+          >
+            <div className="mb-3 rounded-[20px] bg-white p-3 ring-1 ring-slate-200">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
+                    주문내역
+                  </p>
+                  <h2 className="mt-0.5 text-[20px] font-black leading-tight tracking-[-0.06em] text-slate-950">
+                    최근 주문내역
+                  </h2>
+                </div>
+
+                <span className="shrink-0 rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-black tracking-[-0.04em] text-slate-600 ring-1 ring-slate-100">
+                  {filteredOrders.length}/{orders.length}건
+                </span>
+              </div>
+
+              <div className="mt-3 grid grid-cols-4 gap-1.5">
+                {MY_ORDER_FILTERS.map((filter) => (
+                  <button
+                    key={filter}
+                    type="button"
+                    onClick={() => {
+                      setOrderFilter(filter);
+                      setOrderPage(1);
+                    }}
+                    className={
+                      orderFilter === filter
+                        ? "min-h-[34px] rounded-full bg-blue-700 px-2 text-[11px] font-black tracking-[-0.04em] text-white transition active:scale-[0.98]"
+                        : "min-h-[34px] rounded-full bg-slate-50 px-2 text-[11px] font-black tracking-[-0.04em] text-slate-600 ring-1 ring-slate-100 transition active:scale-[0.98]"
+                    }
+                  >
+                    {filter}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="grid gap-4">
-              {visibleOrders.map((order) => {
-                const label = getCustomerStatusLabel(order);
-                const optionText = [cleanOption(order.color), cleanOption(order.size)]
-                  .filter(Boolean)
-                  .join(" / ");
+            {filteredOrders.length > 0 ? (
+              <div className="grid gap-2.5">
+                {visibleOrders.map((order) => {
+                  const label = getCustomerStatusLabel(order);
+                  const optionText = [cleanOption(order.color), cleanOption(order.size)]
+                    .filter(Boolean)
+                    .join(" / ");
 
-                return (
-                  <MyOrderResultCard
-                    key={order.id}
-                    order={order}
-                    label={label}
-                    statusClassName={getStatusClassName(label)}
-                    optionText={optionText}
-                    formattedDate={formatDate(order.created_at)}
-                    amountText={won(order.final_amount ?? order.adjusted_total_price ?? order.total_price ?? 0)}
-                  />
-                );
-              })}
+                  return (
+                    <MyOrderResultCard
+                      key={order.id}
+                      order={order}
+                      label={label}
+                      statusClassName={getStatusClassName(label)}
+                      optionText={optionText}
+                      formattedDate={formatDate(order.created_at)}
+                      amountText={won(order.final_amount ?? order.adjusted_total_price ?? order.total_price ?? 0)}
+                    />
+                  );
+                })}
 
                 <MyOrderPagination
                   page={safeOrderPage}
                   totalPages={totalOrderPages}
                   onPageChange={setOrderPage}
                 />
-            </div>
+              </div>
+            ) : (
+              <div className="rounded-[20px] bg-white p-4 text-center ring-1 ring-slate-200">
+                <p className="text-[14px] font-black tracking-[-0.04em] text-slate-700">
+                  선택한 상태의 주문내역이 없습니다.
+                </p>
+              </div>
+            )}
           </section>
         )}
 
