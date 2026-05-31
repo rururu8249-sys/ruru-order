@@ -3518,10 +3518,23 @@ export default function OrderPage() {
             )}
           </section>
 
-          <section className="mt-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
-              결제방식 / 요청사항
-            </h2>
+          <section
+            data-ruru-payment-section="redesigned"
+            className="mt-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
+                  결제 정보
+                </p>
+                <h2 className="mt-1 text-[18px] font-black tracking-[-0.06em] text-slate-950">
+                  결제방식 / 요청사항
+                </h2>
+              </div>
+              <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-black tracking-[-0.04em] text-slate-500">
+                필수 확인
+              </span>
+            </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2">
               {(["무통장입금", "카드결제"] as const).map((method) => (
@@ -3529,51 +3542,76 @@ export default function OrderPage() {
                   key={method}
                   type="button"
                   onClick={() => setPaymentMethod(method)}
-                  className={`${buttonBase} h-12 rounded-[18px] text-[15px] font-black tracking-[-0.04em] ${
+                  className={`${buttonBase} min-h-[68px] rounded-[20px] px-3 py-3 text-left tracking-[-0.04em] ${
                     paymentMethod === method
-                      ? "bg-blue-700 text-white"
+                      ? "bg-blue-700 text-white shadow-lg shadow-blue-700/20"
                       : "border border-slate-200 bg-white text-slate-700"
                   }`}
                 >
-                  {method}
+                  <span className="block text-[15px] font-black">
+                    {method}
+                  </span>
+                  <span
+                    className={`mt-1 block text-[11px] font-black leading-snug ${
+                      paymentMethod === method ? "text-blue-100" : "text-slate-400"
+                    }`}
+                  >
+                    {method === "무통장입금" ? "입금자명·금액 확인" : "카톡채널 결제 문의"}
+                  </span>
                 </button>
               ))}
             </div>
 
             {paymentMethod === "카드결제" && (
-              <div className="mt-3 rounded-[18px] border border-blue-100 bg-blue-50 p-3 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-blue-800">
+              <div className="mt-3 rounded-[20px] border border-blue-100 bg-blue-50 p-3 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-blue-800">
                 카드결제는 {cardPaymentMinAmount.toLocaleString()}원 이상 구매 시 가능합니다.
                 <br />
                 주문서 작성 후 카톡채널 문의 부탁드립니다.
               </div>
             )}
 
-            <textarea
-              value={requestMemo}
-              onChange={(event) => setRequestMemo(event.target.value)}
-              placeholder="요청사항(선택) / 배송메모"
-              className="mt-4 min-h-[96px] w-full resize-none rounded-[20px] border border-slate-200 bg-slate-50 p-4 text-[16px] font-bold leading-relaxed tracking-[-0.04em] outline-none focus:border-blue-600"
-            />
+            <label className="mt-4 block">
+              <span className="mb-2 block text-[13px] font-black tracking-[-0.04em] text-slate-700">
+                요청사항 / 배송메모
+              </span>
+              <textarea
+                value={requestMemo}
+                onChange={(event) => setRequestMemo(event.target.value)}
+                placeholder="예) 문 앞에 놓아주세요 / 배송 전 연락주세요"
+                className="min-h-[88px] w-full resize-none rounded-[20px] border border-slate-200 bg-slate-50 p-4 text-[15px] font-bold leading-relaxed tracking-[-0.04em] outline-none focus:border-blue-600"
+              />
+            </label>
           </section>
 
-          <section className="mt-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
-              결제금액 확인
-            </h2>
+          <section
+            data-ruru-price-section="redesigned"
+            className="mt-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm"
+          >
+            <div className="min-w-0">
+              <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
+                최종 확인
+              </p>
+              <h2 className="mt-1 text-[18px] font-black tracking-[-0.06em] text-slate-950">
+                결제금액 확인
+              </h2>
+              <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
+                상품금액, 배송비, 포인트 사용 금액을 확인해주세요.
+              </p>
+            </div>
 
             {shippingNoticeText && (
               <div
-                className={`mt-3 rounded-[18px] p-3 text-[13px] font-black leading-relaxed tracking-[-0.04em] ${
+                className={`mt-3 rounded-[20px] p-3 text-[13px] font-black leading-relaxed tracking-[-0.04em] ${
                   shippingFee > 0
                     ? "bg-amber-50 text-amber-800 ring-1 ring-amber-100"
-                    : "bg-green-50 text-green-700"
+                    : "bg-green-50 text-green-700 ring-1 ring-green-100"
                 }`}
               >
                 {shippingFee > 0 ? "🚚" : "✅"} {shippingNoticeText}
               </div>
             )}
 
-            <div className="mt-4">
+            <div className="mt-4 overflow-hidden rounded-[24px] bg-slate-50 p-3 ring-1 ring-slate-100">
               <OrderPriceSummaryBox
                 productAmount={productAmount}
                 shippingFee={shippingFee}
