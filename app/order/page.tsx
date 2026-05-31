@@ -3551,7 +3551,7 @@ export default function OrderPage() {
               >
                 <div className="mx-auto mt-2.5 h-1.5 w-16 rounded-full bg-slate-200" />
 
-                <div className="max-h-[calc(95dvh-18px)] overflow-y-auto px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-4">
+                <div className="max-h-[calc(95dvh-18px)] overflow-x-hidden overflow-y-auto px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-4">
                   <div data-ruru-direct-input-no-top-close="enabled" className="mb-3">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <h2 className="text-[27px] font-black leading-none tracking-[-0.08em] text-slate-950">
@@ -3563,9 +3563,9 @@ export default function OrderPage() {
                     </div>
                   </div>
 
-                  <div className="grid gap-3">
+                  <div className="grid min-w-0 gap-3 overflow-x-hidden">
                     <div data-ruru-product-search-area className={directInputProductSearchMode ? "sticky top-0 z-20 grid gap-2 rounded-b-2xl bg-white pb-2" : "grid gap-2"}>
-                      <label className="grid gap-2">
+                      <label className="min-w-0 grid gap-2">
                         <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">상품명</span>
                         <input
                           value={directInputItem.product_name}
@@ -3604,7 +3604,7 @@ export default function OrderPage() {
                             }
                           }}
                           placeholder="상품명을 입력해주세요"
-                          className="h-13 w-full rounded-[18px] border border-blue-500 bg-white px-4 text-[17px] font-black tracking-[-0.05em] text-slate-950 outline-none focus:border-blue-700"
+                          className="h-13 min-w-0 w-full rounded-[18px] border border-blue-500 bg-white px-4 text-[17px] font-black tracking-[-0.05em] text-slate-950 outline-none focus:border-blue-700"
                         />
                       </label>
 
@@ -3656,30 +3656,30 @@ export default function OrderPage() {
                       ) : null}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <label className="grid gap-2">
+                    <div className="grid min-w-0 grid-cols-2 gap-3">
+                      <label className="min-w-0 grid gap-2">
                         <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">옵션 / 색상</span>
                         <input
                           value={directInputItem.color}
                           onChange={(event) => updateItem(directInputTargetIndex, "color", event.target.value)}
-                          placeholder="색상을 입력해주세요"
-                          className="h-12 w-full rounded-[17px] border border-slate-200 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none focus:border-blue-600"
+                          placeholder="색상입력"
+                          className="h-12 min-w-0 w-full rounded-[17px] border border-slate-200 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none focus:border-blue-600"
                         />
                       </label>
 
-                      <label className="grid gap-2">
+                      <label className="min-w-0 grid gap-2">
                         <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">옵션 / 사이즈</span>
                         <input
                           value={directInputItem.size}
                           onChange={(event) => updateItem(directInputTargetIndex, "size", event.target.value)}
-                          placeholder="사이즈를 입력해주세요"
-                          className="h-12 w-full rounded-[17px] border border-slate-200 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none focus:border-blue-600"
+                          placeholder="사이즈입력"
+                          className="h-12 min-w-0 w-full rounded-[17px] border border-slate-200 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none focus:border-blue-600"
                         />
                       </label>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <label className="grid gap-2">
+                    <div className="grid min-w-0 grid-cols-2 gap-3">
+                      <label className="min-w-0 grid gap-2">
                         <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">수량</span>
                         <div className="grid h-12 grid-cols-[48px_1fr_48px] overflow-hidden rounded-[17px] border border-slate-200 bg-white">
                           <button
@@ -3705,7 +3705,7 @@ export default function OrderPage() {
                         </div>
                       </label>
 
-                      <label className="grid gap-2">
+                      <label className="min-w-0 grid gap-2">
                         <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">금액</span>
                         <div className="flex h-12 items-center rounded-[17px] border border-slate-200 bg-white px-4">
                           <input
@@ -3724,7 +3724,7 @@ export default function OrderPage() {
                       방송에서 안내한 상품명/옵션/금액을 그대로 입력해주세요. 옵션이 없는 상품은 “없음”이라고 입력해주세요.
                     </div>
 
-                    <div className="grid grid-cols-[0.8fr_1.2fr] gap-3 pt-2">
+                    <div className="grid min-w-0 grid-cols-[0.8fr_1.2fr] gap-3 pt-2">
                       <button
                         type="button"
                         onClick={closeDirectInputSheet}
