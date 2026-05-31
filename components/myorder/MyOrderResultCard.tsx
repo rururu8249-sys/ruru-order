@@ -61,17 +61,19 @@ export default function MyOrderResultCard({
     label === "주문취소" || label === "주문서 취소" || label === "환불완료"
       ? label
       : paidLabels.includes(label)
-        ? "입금확인"
+        ? "입금확인완료"
         : "입금대기";
 
   const deliveryStatus =
-    label === "배송출발"
-      ? "출고완료"
+    label === "배송출발" || label === "출고완료"
+      ? "택배출고"
       : label === "출고준비중" || label === "확인완료"
         ? "출고준비"
-        : label === "주문취소" || label === "환불완료"
+        : label === "주문취소" || label === "주문서 취소" || label === "환불완료"
           ? label
           : "확인중";
+
+  const showBandTrackingNotice = deliveryStatus === "택배출고";
 
   const pointUsedAmount = toMoneyNumber(order.point_used_amount ?? order.pointUsedAmount);
   const finalPaymentAmount = toMoneyNumber(
@@ -142,6 +144,22 @@ export default function MyOrderResultCard({
               </div>
             </div>
           </div>
+
+          {showBandTrackingNotice ? (
+            <div className="mt-3 rounded-[18px] bg-slate-50 p-3 ring-1 ring-slate-100">
+              <p className="break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
+                택배출고 후 당일 늦은 오후~저녁 사이 밴드에서 송장조회가 가능합니다.
+              </p>
+              <a
+                href="https://band.us/@ruru8249"
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 flex min-h-[40px] items-center justify-center rounded-[16px] bg-slate-950 px-3 py-2 text-[13px] font-black tracking-[-0.04em] text-white transition active:scale-[0.98]"
+              >
+                밴드에서 송장조회
+              </a>
+            </div>
+          ) : null}
 
           <div className="mt-4 border-t border-slate-100 pt-4">
             <div className="flex items-center justify-between gap-3">

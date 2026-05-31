@@ -145,6 +145,7 @@ export default function MyOrderPage() {
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [copyDone, setCopyDone] = useState(false);
+  const [nicknameCopyDone, setNicknameCopyDone] = useState(false);
   const [hasCustomerInfo, setHasCustomerInfo] = useState(false);
 
   const [isLegacyMode, setIsLegacyMode] = useState(false);
@@ -243,6 +244,23 @@ export default function MyOrderPage() {
     }
   };
 
+  const copyDepositNickname = async () => {
+    const nickname = String(depositNickname || "").trim();
+
+    if (!nickname) {
+      showCustomerNotice("복사할 닉네임이 없습니다.", "warning");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(nickname);
+      setNicknameCopyDone(true);
+      setTimeout(() => setNicknameCopyDone(false), 1800);
+    } catch {
+      showCustomerNotice(nickname, "success");
+    }
+  };
+
   const ORDERS_PER_PAGE = 2;
   const totalOrderPages = Math.max(1, Math.ceil(orders.length / ORDERS_PER_PAGE));
   const safeOrderPage = Math.min(orderPage, totalOrderPages);
@@ -280,8 +298,10 @@ export default function MyOrderPage() {
             bankAccount={BANK_ACCOUNT}
             bankHolder={BANK_HOLDER}
             copyDone={copyDone}
+            nicknameCopyDone={nicknameCopyDone}
             depositNickname={depositNickname}
             onCopy={copyBankAccount}
+            onCopyNickname={copyDepositNickname}
           />
         )}
 
