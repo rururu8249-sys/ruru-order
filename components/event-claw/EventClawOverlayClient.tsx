@@ -78,9 +78,8 @@ function getElapsedPhase(elapsedMs: number, hasResult: boolean): AnimationPhase 
   return "result";
 }
 
-function prizeLabel(kind: PrizeKind) {
-  if (kind === "bear" || kind === "bunny") return "인형 당첨";
-  return "캡슐 당첨";
+function prizeLabel(_kind?: PrizeKind) {
+  return "당첨";
 }
 
 export default function EventClawOverlayClient({ initialToken }: EventClawOverlayClientProps) {
