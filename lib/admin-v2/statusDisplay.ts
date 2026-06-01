@@ -40,12 +40,12 @@ export function getAdminOrderStatusLabel(params: {
   const paymentMethod = String(params.paymentMethod || "무통장입금").trim();
 
   if (isCanceledStatus(status)) return "주문서취소";
-  if (paymentMethod === "카드결제" && !PAID_STATUS_VALUES.includes(status)) return "카드미결제";
+  if (paymentMethod === "카드결제" && !PAID_STATUS_VALUES.includes(status)) return "카드 미결제";
   if (paymentMethod === "카드결제") return "카드결제완료";
   if (status === "수동입금확인") return "결제완료(수동)";
   if (PAID_STATUS_VALUES.includes(status)) return "결제완료(무통장)";
 
-  return "미결제";
+  return "입금대기";
 }
 
 export function getAdminOrderStatusDesc(params: {

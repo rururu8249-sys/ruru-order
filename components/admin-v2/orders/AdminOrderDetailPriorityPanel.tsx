@@ -55,7 +55,7 @@ export default function AdminOrderDetailPriorityPanel({
   let tone: "danger" | "warn" | "good" | "blue" | "neutral" = "neutral";
 
   if (canceled) {
-    title = "주문서 취소 상태";
+    title = "주문서취소 상태";
     desc = "주문서가 폐기된 상태입니다. 다시 살릴 때만 주문서복구를 누르세요.";
     tone = "danger";
   } else if (bankUnpaid) {
@@ -64,7 +64,7 @@ export default function AdminOrderDetailPriorityPanel({
     tone = "warn";
   } else if (cardUnpaid) {
     title = "카드결제 확인 필요";
-    desc = "카드결제완료를 잘못 처리한 경우에는 카드미결제로 되돌리기를 사용하세요. 주문 자체를 없애야 할 때만 주문서 자체 취소를 사용하세요.";
+    desc = "카드결제완료를 잘못 처리한 경우에는 카드 미결제로 되돌리기를 사용하세요. 주문 자체를 없애야 할 때만 주문서 자체 취소를 사용하세요.";
     tone = "warn";
   } else if (!shipped) {
     title = hasTracking ? "출고완료 처리 필요" : "배송처리 필요";
