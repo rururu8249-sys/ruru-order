@@ -89,8 +89,8 @@ export default function CustomerOrderLookupBottomSheet({
       <section className="w-full max-w-[430px] overflow-hidden rounded-t-[30px] bg-white shadow-[0_-22px_70px_rgba(15,23,42,0.22)]">
         <div className="mx-auto mt-3 h-1.5 w-14 rounded-full bg-slate-200" />
 
-        <div className="flex h-[88dvh] max-h-[88dvh] flex-col">
-          <header className="shrink-0 px-4 pb-1.5 pt-4">
+        <div className="flex max-h-[88dvh] flex-col">
+          <header className="shrink-0 px-4 pb-2 pt-4">
             <div className="flex items-baseline gap-2 whitespace-nowrap">
               <h2 className="text-[26px] font-black leading-none tracking-[-0.08em] text-slate-950">
                 주문조회
@@ -100,7 +100,7 @@ export default function CustomerOrderLookupBottomSheet({
               </span>
             </div>
 
-            <div className="mt-3 grid grid-cols-4 rounded-[18px] bg-slate-50 p-1 ring-1 ring-slate-100">
+            <div className="mt-3.5 grid grid-cols-4 rounded-[18px] bg-slate-50 p-1 ring-1 ring-slate-100">
               {filters.map((filter) => {
                 const selected = activeFilter === filter;
 
@@ -122,9 +122,9 @@ export default function CustomerOrderLookupBottomSheet({
             </div>
           </header>
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-1 pt-1">
+          <div className="min-h-0 overflow-y-auto px-4 pb-2 pt-2">
             {items.length > 0 ? (
-              <div className="grid gap-2">
+              <div className="grid gap-2.5">
                 {items.map((item) => {
                   const optionLine = [item.optionText, item.quantityText].filter(Boolean).join(" · ");
                   const deliveryLabel =
@@ -134,7 +134,7 @@ export default function CustomerOrderLookupBottomSheet({
                   return (
                     <article
                       key={item.id}
-                      className="rounded-[20px] bg-white px-4 py-2.5 ring-1 ring-slate-200"
+                      className="rounded-[20px] bg-white px-4 py-2 ring-1 ring-slate-200"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex min-w-0 items-center gap-1.5">
@@ -155,7 +155,7 @@ export default function CustomerOrderLookupBottomSheet({
                         </p>
                       </div>
 
-                      <div className="mt-2 grid grid-cols-[1fr_auto] items-start gap-3">
+                      <div className="mt-1.5 grid grid-cols-[1fr_auto] items-start gap-3">
                         <div className="min-w-0">
                           <h3 className="truncate text-[17px] font-black leading-tight tracking-[-0.07em] text-slate-950">
                             {item.productName || "주문상품"}
@@ -171,7 +171,7 @@ export default function CustomerOrderLookupBottomSheet({
                         </p>
                       </div>
 
-                      <div className="mt-2 flex min-w-0 items-center rounded-[14px] bg-slate-50 px-3 py-1.5 ring-1 ring-slate-100">
+                      <div className="mt-1.5 flex min-w-0 items-center rounded-[14px] bg-slate-50 px-3 py-1.5 ring-1 ring-slate-100">
                         <p className="min-w-0 flex-1 truncate text-[11px] font-black tracking-[-0.04em] text-slate-500">
                           {orderMeta || "-"}
                         </p>
@@ -193,7 +193,7 @@ export default function CustomerOrderLookupBottomSheet({
 
             <nav
               data-ruru-order-lookup-pagination="compact-v3"
-              className="mt-auto flex items-center justify-center gap-2 pt-2"
+              className="mt-3 flex items-center justify-center gap-2"
               aria-label="주문조회 페이지 이동"
             >
               <button
