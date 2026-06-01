@@ -1123,8 +1123,8 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
                         <div className="flex flex-col items-end gap-1">
                           <span>{customer.orderCount.toLocaleString("ko-KR")}건</span>
                           {customer.orderCount === 0 ? (
-                            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-black tracking-[-0.04em] text-blue-700">
-                              주문전 회원
+                            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-black tracking-[-0.04em] text-blue-700 whitespace-nowrap">
+                              주문전회원
                             </span>
                           ) : null}
                         </div>
