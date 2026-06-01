@@ -77,7 +77,7 @@ export default function KakaoStartPage() {
       className="min-h-screen bg-[#f5f8ff] px-2 py-4 text-[#151923] select-none sm:px-4"
       style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
     >
-      <section className="mx-auto flex min-h-[calc(100vh-32px)] w-full max-w-[560px] items-center">
+      <section className="mx-auto flex min-h-[calc(100svh-32px)] w-full max-w-[560px] items-start pt-16 min-[390px]:pt-20">
         <section className="w-full overflow-hidden rounded-[34px] border border-slate-200 bg-white p-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
