@@ -649,6 +649,7 @@ async function createEvent(body: Record<string, unknown>) {
   const sourceDate = normalizeDateText(body.sourceDate);
   const broadcastId = cleanBroadcastId(body.broadcastId);
   const title = cleanText(body.title) || DEFAULT_TITLE;
+  const eventKind = cleanText(body.eventKind) === "claw" ? "claw" : "roulette";
   const participantSource = cleanText(body.participantSource);
   const manualParticipants = normalizeManualParticipantsForEvent(body.participants);
   const useManualParticipants = participantSource === "manual" && manualParticipants.length > 0;
@@ -691,7 +692,7 @@ async function createEvent(body: Record<string, unknown>) {
     });
   }
 
-  const overlayToken = `roulette_${randomUUID().replace(/-/g, "")}`;
+  const overlayToken = `${eventKind}_${randomUUID().replace(/-/g, "")}`;
   const spinDurationMs = calculateRouletteSpinDurationMs(participants.length);
 
   const { data, error } = await supabase

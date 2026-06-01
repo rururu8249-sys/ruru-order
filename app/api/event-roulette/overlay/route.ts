@@ -76,6 +76,7 @@ export async function GET(request: NextRequest) {
         .select(
           "title, mode, is_test, status, participant_snapshot, winner_nickname, winner_note, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
         )
+        .like("overlay_token", "roulette_%")
         .neq("status", "closed")
         .order("created_at", { ascending: false })
         .order("updated_at", { ascending: false })

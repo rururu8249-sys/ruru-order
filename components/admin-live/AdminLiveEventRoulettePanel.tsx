@@ -281,13 +281,65 @@ export default function AdminLiveEventRoulettePanel({
     showAdminToast("인형뽑기 연출 미리보기는 다음 단계에서 방송용 위젯에 연결합니다.", "info");
   };
 
-  const startClawEvent = () => {
+  const startClawEvent = async () => {
     if (finalParticipants.length === 0) {
       showAdminToast("참가자 명단이 없습니다. 자동 명단을 불러오거나 수동 참가자를 입력해주세요.", "warning");
       return;
     }
 
-    showAdminToast("인형뽑기 실제 시작은 다음 단계에서 별도 위젯/API와 연결합니다.", "info");
+    setSpinning(true);
+
+    try {
+      const createPayload = await requestJson<EventPayload>("/api/admin-live/event-roulette", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "create_event",
+          mode,
+          sourceDate,
+          broadcastId,
+          title,
+          participantSource,
+          participants: finalParticipants,
+          eventKind: "claw",
+        }),
+      });
+
+      if (!createPayload.ok || !createPayload.event) {
+        throw new Error(createPayload.message || "인형뽑기 이벤트 생성 실패");
+      }
+
+      const eventId = createPayload.event.id;
+
+      if (!eventId) {
+        setCurrentEvent(createPayload.event);
+        setParticipants(createPayload.event.participants || finalParticipants);
+        showAdminToast("인형뽑기 미리보기 이벤트를 불러왔습니다.", "success");
+        return;
+      }
+
+      const spinPayload = await requestJson<EventPayload>("/api/admin-live/event-roulette", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "spin_event",
+          eventId,
+          winnerNote,
+          fixedWinnerNickname: fixedWinnerNickname.trim(),
+        }),
+      });
+
+      if (!spinPayload.ok || !spinPayload.event) {
+        throw new Error(spinPayload.message || "인형뽑기 시작 실패");
+      }
+
+      setCurrentEvent(spinPayload.event);
+      setParticipants(spinPayload.event.participants || createPayload.event.participants || finalParticipants);
+      await loadEventsAndWinners();
+      showAdminToast(`인형뽑기 당첨자: ${spinPayload.event.winner_nickname || "-"}`, "success");
+    } catch (error) {
+      showAdminToast("인형뽑기 시작 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
+    } finally {
+      setSpinning(false);
+    }
   };
 
 
@@ -384,6 +436,7 @@ export default function AdminLiveEventRoulettePanel({
           title,
           participantSource,
           participants: finalParticipants,
+          eventKind: "roulette",
         }),
       });
 
