@@ -52,6 +52,31 @@ export default function KakaoCallbackPage() {
       setIfValue("ruru_customer_detail_address", data.customer_detail_address);
       localStorage.setItem(CUSTOMER_SESSION_VERSION_KEY, REQUIRED_CUSTOMER_SESSION_VERSION);
 
+      try {
+        const syncResponse = await fetch("/api/customer-login-sync", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            kakao_id: data.kakao_id,
+            kakao_nickname: data.kakao_nickname,
+            customer_name: data.customer_name,
+            customer_phone: data.customer_phone,
+            customer_zipcode: data.customer_zipcode,
+            customer_address: data.customer_address,
+            customer_detail_address: data.customer_detail_address,
+          }),
+        });
+
+        if (!syncResponse.ok) {
+          const syncDetail = await syncResponse.json().catch(() => null);
+          console.warn("카카오 고객 자동등록 실패:", syncDetail?.message || syncResponse.statusText);
+        }
+      } catch (syncError) {
+        console.warn("카카오 고객 자동등록 요청 실패:", syncError);
+      }
+
       setStatus("success");
       setMessage("확인 완료. 주문서로 이동합니다.");
 
