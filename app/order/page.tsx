@@ -3429,7 +3429,7 @@ export default function OrderPage() {
   const TopCustomerNav = () => {
     const safeGreetingName = youtubeNickname || customerName || "고객";
     const safePointText = `${Math.max(0, Number(customerPointBalance || 0)).toLocaleString()}원`;
-    const isTopNavEditActive = isEditingCustomerInfo || isEditMode;
+    const isTopNavEditActive = isEditingCustomerInfo || isEditMode || customerInfoEditSheetOpen;
     const topNavActiveButtonClass = "rounded-full bg-blue-700 px-3 py-1.5 text-[12px] font-black text-white";
     const topNavInactiveButtonClass = "rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-black text-slate-700";
 
