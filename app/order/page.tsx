@@ -3721,121 +3721,136 @@ export default function OrderPage() {
             ) : (
               <div className="grid w-full max-w-full gap-3 overflow-hidden">
                 {selectedItemEntries.map(({ item, index }) => {
-                  const itemAmount = toNumber(item.product_price) * toNumber(item.qty);
-                  const directItem = isDirectInputItem(item);
-                  const imageUrl = getOrderItemImageUrl(item);
+                  const matchedRegisteredProduct = findMatchedBroadcastProduct(item, broadcastProducts);
+                  const itemIsRegisteredProduct = Boolean(item.product_id || matchedRegisteredProduct);
+                  const imageUrl = matchedRegisteredProduct
+                    ? pickOrderProductImageUrl(matchedRegisteredProduct)
+                    : getOrderItemImageUrl(item);
+                  const optionColorText = normalizeEmptyProductOptionValue(item.color) || "없음";
+                  const optionSizeText = normalizeEmptyProductOptionValue(item.size) || "없음";
+                  const itemHasNoOptions = optionColorText === "없음" && optionSizeText === "없음";
+                  const canInlineChangeQty = itemIsRegisteredProduct && itemHasNoOptions;
+                  const itemSourceLabel = itemIsRegisteredProduct ? "등록상품" : "직접입력";
+                  const itemAmount = toNumber(item.product_price) * (toNumber(item.qty) || 1);
 
                   return (
                     <article
                       key={`${item.product_name}-${index}`}
-                      data-ruru-selected-item-card="hybrid-restored"
-                      className="w-full max-w-full overflow-hidden rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm"
+                      data-ruru-selected-item-card="hybrid-redesigned"
+                      className="w-full max-w-full overflow-hidden rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm"
                     >
-                      <div className="flex w-full max-w-full items-start gap-3 overflow-hidden">
-                        {!directItem && (
-                          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[18px] bg-slate-50 ring-1 ring-slate-100">
-                            {imageUrl ? (
-                              <img
-                                src={imageUrl}
-                                alt={item.product_name}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <span className="px-2 text-center text-[10px] font-black leading-tight text-slate-400">
-                                등록상품
-                              </span>
-                            )}
-                          </div>
-                        )}
+                      <div className="grid w-full grid-cols-[76px_1fr] gap-3">
+                        <div className="h-[76px] w-[76px] overflow-hidden rounded-[18px] bg-slate-50 ring-1 ring-slate-100">
+                          {imageUrl ? (
+                            <img
+                              src={imageUrl}
+                              alt={item.product_name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center px-2 text-center text-[11px] font-black leading-tight tracking-[-0.04em] text-slate-400">
+                              {itemSourceLabel}
+                            </div>
+                          )}
+                        </div>
 
-                        <div className="min-w-0 flex-1 overflow-hidden">
-                          <div className="mb-1 flex min-w-0 items-start justify-between gap-2">
-                            <div className="min-w-0 flex flex-wrap items-center gap-2">
-                              <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
-                                상품 {index + 1}
-                              </p>
-
-                              {directItem ? (
-                                <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-black tracking-[-0.04em] text-amber-700 ring-1 ring-amber-100">
-                                  직접입력
-                                </span>
-                              ) : (
+                        <div className="min-w-0">
+                          <div className="flex min-w-0 items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="mb-1 flex min-w-0 flex-wrap items-center gap-1.5">
                                 <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-black tracking-[-0.04em] text-blue-700 ring-1 ring-blue-100">
-                                  선택상품
+                                  상품 {index + 1}
                                 </span>
-                              )}
-                            </div>
-
-                            <div className="flex shrink-0 items-center gap-1">
-                              {directItem && (
-                                <button
-                                  type="button"
-                                  onClick={() => openDirectInputEditSheet(index)}
-                                  className={`${buttonBase} rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-[11px] font-black text-blue-700`}
+                                <span
+                                  className={`rounded-full px-2 py-1 text-[11px] font-black tracking-[-0.04em] ring-1 ${
+                                    itemIsRegisteredProduct
+                                      ? "bg-blue-50 text-blue-700 ring-blue-100"
+                                      : "bg-amber-50 text-amber-700 ring-amber-100"
+                                  }`}
                                 >
-                                  수정
-                                </button>
+                                  {itemSourceLabel}
+                                </span>
+                              </div>
+
+                              <h3 className="line-clamp-2 break-keep text-[17px] font-black leading-tight tracking-[-0.06em] text-slate-950">
+                                {item.product_name || "상품명 없음"}
+                              </h3>
+
+                              <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-bold tracking-[-0.04em] text-slate-500">
+                                <span className="min-w-0 break-keep">
+                                  {optionColorText} · {optionSizeText}
+                                </span>
+                                <span className="text-slate-300">·</span>
+                                <span className="shrink-0 font-black text-slate-700">
+                                  {won(toNumber(item.product_price))}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="shrink-0 text-right">
+                              {canInlineChangeQty ? (
+                                <div
+                                  data-ruru-selected-item-inline-qty="enabled"
+                                  className="grid h-10 w-[126px] grid-cols-3 overflow-hidden rounded-[14px] border border-slate-200 bg-white"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => updateItem(index, "qty", String(Math.max(1, (toNumber(item.qty) || 1) - 1)))}
+                                    className="flex items-center justify-center text-[18px] font-black text-slate-700 active:bg-slate-50"
+                                    aria-label="수량 줄이기"
+                                  >
+                                    -
+                                  </button>
+                                  <div className="flex items-center justify-center border-x border-slate-100 text-[15px] font-black tracking-[-0.04em] text-slate-950">
+                                    {toNumber(item.qty) || 1}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateItem(index, "qty", String((toNumber(item.qty) || 1) + 1))}
+                                    className="flex items-center justify-center text-[18px] font-black text-blue-700 active:bg-blue-50"
+                                    aria-label="수량 늘리기"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              ) : (
+                                <div
+                                  data-ruru-selected-item-qty-readonly="enabled"
+                                  className="rounded-[14px] bg-slate-50 px-3 py-2 text-[13px] font-black tracking-[-0.04em] text-slate-600 ring-1 ring-slate-100"
+                                >
+                                  수량 {toNumber(item.qty) || 1}개
+                                </div>
                               )}
 
-                              <button
-                                type="button"
-                                onClick={() => removeItem(index)}
-                                className={`${buttonBase} rounded-full border border-red-100 bg-white px-2.5 py-1.5 text-[11px] font-black text-red-500`}
-                              >
-                                삭제
-                              </button>
+                              <p className="mt-2 text-[20px] font-black tracking-[-0.06em] text-blue-700">
+                                {won(itemAmount)}
+                              </p>
                             </div>
                           </div>
 
-                          <h3 className="break-keep text-[17px] font-black leading-snug tracking-[-0.06em] text-slate-950">
-                            {item.product_name}
-                          </h3>
+                          <div className="mt-3 flex items-center justify-end gap-1.5">
+                            {!canInlineChangeQty && (
+                              <p className="mr-auto hidden text-[11px] font-bold tracking-[-0.04em] text-slate-400 min-[390px]:block">
+                                수정에서 수량·옵션 변경
+                              </p>
+                            )}
 
-                          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-bold tracking-[-0.04em] text-slate-500">
-                            <span className="min-w-0 break-keep">
-                              {[hideNone(item.color), hideNone(item.size)].filter(Boolean).join(" / ") || "옵션 없음"}
-                            </span>
-                            <span className="text-slate-300">·</span>
-                            <span className="shrink-0 font-black text-slate-700">
-                              상품금액 {won(toNumber(item.product_price))}
-                            </span>
+                            <button
+                              type="button"
+                              onClick={() => openDirectInputEditSheet(index)}
+                              className={`${buttonBase} rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-[12px] font-black tracking-[-0.04em] text-blue-700`}
+                            >
+                              수정
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => removeItem(index)}
+                              className={`${buttonBase} rounded-full border border-red-100 bg-white px-3 py-1.5 text-[12px] font-black tracking-[-0.04em] text-red-500`}
+                            >
+                              삭제
+                            </button>
                           </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid w-full max-w-full grid-cols-1 gap-3 overflow-hidden">
-                        <div className="flex h-12 w-full overflow-hidden rounded-[18px] border border-slate-200 bg-white">
-                          <button
-                            type="button"
-                            onClick={() => updateItem(index, "qty", String(Math.max(1, (toNumber(item.qty) || 1) - 1)))}
-                            className="w-12 shrink-0 text-[18px] font-black text-slate-700"
-                          >
-                            -
-                          </button>
-
-                          <input
-                            value={item.qty}
-                            onChange={(event) => updateItem(index, "qty", onlyNumber(event.target.value))}
-                            inputMode="numeric"
-                            className="min-w-0 flex-1 border-x border-slate-100 text-center text-[16px] font-black outline-none"
-                          />
-
-                          <button
-                            type="button"
-                            onClick={() => updateItem(index, "qty", String((toNumber(item.qty) || 0) + 1))}
-                            className="w-12 shrink-0 text-[18px] font-black text-blue-700"
-                          >
-                            +
-                          </button>
-                        </div>
-
-                        <div className="flex w-full items-center justify-between rounded-[20px] bg-blue-50 px-4 py-3 ring-1 ring-blue-100">
-                          <span className="text-[13px] font-black tracking-[-0.04em] text-blue-700">
-                            이 상품 합계
-                          </span>
-                          <span className="text-[20px] font-black tracking-[-0.05em] text-blue-900">
-                            {won(itemAmount)}
-                          </span>
                         </div>
                       </div>
                     </article>
