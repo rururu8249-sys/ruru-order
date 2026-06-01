@@ -10,7 +10,6 @@ type CustomerInfoEditBottomSheetProps = {
   customerPhone: string;
   address: string;
   detailAddress: string;
-  requestMemo: string;
 
   youtubeNicknameError?: string;
 
@@ -19,7 +18,6 @@ type CustomerInfoEditBottomSheetProps = {
   onCustomerPhoneChange: (value: string) => void;
   onAddressChange: (value: string) => void;
   onDetailAddressChange: (value: string) => void;
-  onRequestMemoChange: (value: string) => void;
 
   onOpenAddressSearch: () => void;
   onClose: () => void;
@@ -41,14 +39,12 @@ export default function CustomerInfoEditBottomSheet({
   customerPhone,
   address,
   detailAddress,
-  requestMemo,
   youtubeNicknameError,
   onYoutubeNicknameChange,
   onCustomerNameChange,
   onCustomerPhoneChange,
   onAddressChange,
   onDetailAddressChange,
-  onRequestMemoChange,
   onOpenAddressSearch,
   onClose,
   onSave,
@@ -172,18 +168,6 @@ export default function CustomerInfoEditBottomSheet({
                 />
               </div>
 
-              <div className="rounded-[22px] bg-white p-3 ring-1 ring-slate-200">
-                <label className={labelClassName} htmlFor="customerInfoEditMemo">
-                  배송메모
-                </label>
-                <textarea
-                  id="customerInfoEditMemo"
-                  value={requestMemo}
-                  onChange={(event) => onRequestMemoChange(event.target.value)}
-                  className="min-h-[76px] w-full resize-none rounded-[16px] bg-slate-50 px-4 py-3 text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-slate-950 outline-none ring-1 ring-slate-100 transition placeholder:text-slate-300 focus:bg-white focus:ring-2 focus:ring-blue-500/30"
-                  placeholder="배송 요청사항이 있으면 입력해주세요"
-                />
-              </div>
             </div>
           </div>
 

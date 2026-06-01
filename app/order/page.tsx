@@ -3487,14 +3487,12 @@ export default function OrderPage() {
           customerPhone={formatPhone(customerPhone)}
           address={address}
           detailAddress={detailAddress}
-          requestMemo={requestMemo}
           youtubeNicknameError={youtubeNicknameError}
           onYoutubeNicknameChange={setYoutubeNickname}
           onCustomerNameChange={setCustomerName}
           onCustomerPhoneChange={(value) => setCustomerPhone(normalizePhone(value))}
           onAddressChange={setAddress}
           onDetailAddressChange={setDetailAddress}
-          onRequestMemoChange={setRequestMemo}
           onOpenAddressSearch={openAddressSearch}
           onClose={() => setCustomerInfoEditSheetOpen(false)}
           onSave={completeEditCustomerInfo}
@@ -4351,14 +4349,12 @@ export default function OrderPage() {
           customerPhone={formatPhone(customerPhone)}
           address={address}
           detailAddress={detailAddress}
-          requestMemo={requestMemo}
           youtubeNicknameError={youtubeNicknameError}
           onYoutubeNicknameChange={setYoutubeNickname}
           onCustomerNameChange={setCustomerName}
           onCustomerPhoneChange={(value) => setCustomerPhone(normalizePhone(value))}
           onAddressChange={setAddress}
           onDetailAddressChange={setDetailAddress}
-          onRequestMemoChange={setRequestMemo}
           onOpenAddressSearch={openAddressSearch}
           onClose={() => setCustomerInfoEditSheetOpen(false)}
           onSave={completeEditCustomerInfo}
