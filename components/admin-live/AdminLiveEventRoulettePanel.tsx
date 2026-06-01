@@ -991,7 +991,7 @@ export default function AdminLiveEventRoulettePanel({
                               </div>
                               <div className="flex h-full items-center justify-center pt-6">
                                 <img
-                                  src="/event-claw/capsule-blue-closed.svg"
+                                  src="/event-claw/machine.svg"
                                   alt=""
                                   className="max-h-[270px] w-auto object-contain"
                                   draggable={false}
