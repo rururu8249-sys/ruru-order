@@ -1,6 +1,10 @@
+"use client";
+
 // components/customer/CustomerInfoEditBottomSheet.tsx
 // 목적: 주문서 화면 안에서 사용하는 고객 정보수정 바텀시트
 // 주의: UI 전용. DB, API, 주문저장, 입금매칭, 정산, 배송 로직 없음.
+
+import { useEffect, useRef } from "react";
 
 type CustomerInfoEditBottomSheetProps = {
   open: boolean;
@@ -29,8 +33,21 @@ type CustomerInfoEditBottomSheetProps = {
 const inputClassName =
   "h-12 w-full rounded-[16px] bg-slate-50 px-4 text-[15px] font-black tracking-[-0.05em] text-slate-950 outline-none ring-1 ring-slate-100 transition placeholder:text-slate-300 focus:bg-white focus:ring-2 focus:ring-blue-500/30";
 
+const phoneInputClassName =
+  "h-12 w-full rounded-[16px] bg-slate-50 px-3 text-[14px] font-black tracking-[-0.065em] text-slate-950 outline-none ring-1 ring-slate-100 transition placeholder:text-slate-300 focus:bg-white focus:ring-2 focus:ring-blue-500/30";
+
+const addressTextareaClassName =
+  "min-h-12 max-h-24 w-full resize-none overflow-hidden rounded-[16px] bg-slate-50 px-4 py-3 text-[15px] font-black leading-[1.45] tracking-[-0.055em] text-slate-950 outline-none ring-1 ring-slate-100 transition placeholder:text-slate-300 focus:bg-white focus:ring-2 focus:ring-blue-500/30";
+
 const labelClassName =
   "mb-1.5 block text-[12px] font-black tracking-[-0.04em] text-slate-500";
+
+const resizeTextareaHeight = (textarea: HTMLTextAreaElement | null) => {
+  if (!textarea) return;
+
+  textarea.style.height = "auto";
+  textarea.style.height = `${Math.min(textarea.scrollHeight, 96)}px`;
+};
 
 export default function CustomerInfoEditBottomSheet({
   open,
@@ -50,11 +67,18 @@ export default function CustomerInfoEditBottomSheet({
   onSave,
   saving = false,
 }: CustomerInfoEditBottomSheetProps) {
+  const addressTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    resizeTextareaHeight(addressTextareaRef.current);
+  }, [open, address]);
+
   if (!open) return null;
 
   return (
     <div
-      data-ruru-customer-info-edit-sheet="shell-v1"
+      data-ruru-customer-info-edit-sheet="shell-v2"
       className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/45 px-3"
       role="dialog"
       aria-modal="true"
@@ -104,7 +128,7 @@ export default function CustomerInfoEditBottomSheet({
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-[0.78fr_1.22fr] gap-2">
                 <div className="rounded-[22px] bg-white p-3 ring-1 ring-slate-200">
                   <label className={labelClassName} htmlFor="customerInfoEditName">
                     이름
@@ -127,7 +151,7 @@ export default function CustomerInfoEditBottomSheet({
                     id="customerInfoEditPhone"
                     value={customerPhone}
                     onChange={(event) => onCustomerPhoneChange(event.target.value)}
-                    className={inputClassName}
+                    className={phoneInputClassName}
                     placeholder="01012345678"
                     inputMode="numeric"
                     autoComplete="tel"
@@ -137,7 +161,10 @@ export default function CustomerInfoEditBottomSheet({
 
               <div className="rounded-[22px] bg-white p-3 ring-1 ring-slate-200">
                 <div className="mb-1.5 flex items-center justify-between gap-2">
-                  <label className="block text-[12px] font-black tracking-[-0.04em] text-slate-500" htmlFor="customerInfoEditAddress">
+                  <label
+                    className="block text-[12px] font-black tracking-[-0.04em] text-slate-500"
+                    htmlFor="customerInfoEditAddress"
+                  >
                     주소
                   </label>
 
@@ -150,11 +177,17 @@ export default function CustomerInfoEditBottomSheet({
                   </button>
                 </div>
 
-                <input
+                <textarea
                   id="customerInfoEditAddress"
+                  ref={addressTextareaRef}
+                  rows={1}
                   value={address}
-                  onChange={(event) => onAddressChange(event.target.value)}
-                  className={inputClassName}
+                  onChange={(event) => {
+                    onAddressChange(event.target.value);
+                    resizeTextareaHeight(event.currentTarget);
+                  }}
+                  onInput={(event) => resizeTextareaHeight(event.currentTarget)}
+                  className={addressTextareaClassName}
                   placeholder="주소검색을 눌러 주소를 입력해주세요"
                   autoComplete="street-address"
                 />
@@ -167,7 +200,6 @@ export default function CustomerInfoEditBottomSheet({
                   autoComplete="address-line2"
                 />
               </div>
-
             </div>
           </div>
 
