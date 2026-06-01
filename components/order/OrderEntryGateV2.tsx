@@ -35,12 +35,12 @@ export default function OrderEntryGateV2({ onKakaoLogin }: OrderEntryGateV2Props
 
         <div className="mt-7 text-center">
           <h1 className="break-keep text-[35px] font-black leading-[1.08] tracking-[-0.085em] text-[#151923]">
-            <span className="text-blue-600">루루동이</span>
-            <span className="text-slate-950"> X 카카오톡</span>
+            <span className="text-blue-600">주문은</span>
+            <span className="text-slate-950"> 카카오로 시작</span>
           </h1>
 
           <p className="mt-4 break-keep text-[20px] font-black leading-relaxed tracking-[-0.06em] text-slate-600">
-            복잡한 배송지 정보 입력 없이
+            카카오 로그인 후 주문서를 작성합니다.
           </p>
         </div>
 
@@ -59,7 +59,7 @@ export default function OrderEntryGateV2({ onKakaoLogin }: OrderEntryGateV2Props
             </span>
 
             <span className="min-w-0 flex-1 text-center text-[20px] font-black tracking-[-0.055em]">
-              카카오로 간편 주문 시작
+              카카오로 주문 시작하기
             </span>
 
             <span className="ml-3 text-[28px] font-black leading-none">›</span>
@@ -70,21 +70,21 @@ export default function OrderEntryGateV2({ onKakaoLogin }: OrderEntryGateV2Props
           <div className="border-r border-blue-100 px-2 py-4 text-center">
             <div className="text-[22px]">📍</div>
             <div className="mt-1 break-keep text-[12px] font-black tracking-[-0.04em] text-slate-700">
-              배송정보
+              정보확인
             </div>
           </div>
 
           <div className="border-r border-blue-100 px-2 py-4 text-center">
             <div className="text-[22px]">📝</div>
             <div className="mt-1 break-keep text-[12px] font-black tracking-[-0.04em] text-slate-700">
-              주문간편
+              주문작성
             </div>
           </div>
 
           <div className="px-2 py-4 text-center">
             <div className="text-[22px]">🔒</div>
             <div className="mt-1 break-keep text-[12px] font-black tracking-[-0.04em] text-slate-700">
-              정보보호
+              주문조회
             </div>
           </div>
         </div>
