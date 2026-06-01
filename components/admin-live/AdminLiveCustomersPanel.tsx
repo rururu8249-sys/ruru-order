@@ -386,20 +386,7 @@ function CustomerDetailDrawer({
             </p>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onBlockAction(customer)}
-              disabled={blockSaving}
-              className={`rounded-xl px-4 py-2 text-sm font-black disabled:opacity-50 ${
-                customer.blocked
-                  ? "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                  : "bg-red-600 text-white hover:bg-red-700"
-              }`}
-            >
-              {customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}
-            </button>
-
+          <div className="flex shrink-0 items-center justify-end">
             <button
               type="button"
               onClick={onClose}
