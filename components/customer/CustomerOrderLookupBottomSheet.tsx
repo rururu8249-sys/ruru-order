@@ -222,7 +222,7 @@ export default function CustomerOrderLookupBottomSheet({
             </nav>
           </div>
 
-          <footer className="grid shrink-0 grid-cols-[0.78fr_1.22fr] gap-2 border-t border-slate-100 bg-white px-4 pb-[calc(14px+env(safe-area-inset-bottom))] pt-3">
+          <footer className="grid shrink-0 grid-cols-[0.78fr_1.22fr] gap-x-2 gap-y-2 border-t border-slate-100 bg-white px-4 pb-[calc(14px+env(safe-area-inset-bottom))] pt-3">
             <button
               type="button"
               onClick={onClose}
@@ -243,9 +243,24 @@ export default function CustomerOrderLookupBottomSheet({
               href={BAND_TRACKING_URL}
               target="_blank"
               rel="noreferrer"
-              className="flex min-h-[56px] items-center justify-center rounded-[18px] border border-green-100 bg-green-50 px-3 py-3 text-[15px] font-black tracking-[-0.04em] text-green-700 shadow-sm active:scale-[0.98]"
+              className="col-span-2 flex items-center gap-3 rounded-[20px] border border-green-100 bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-3 shadow-sm transition active:scale-[0.98]"
             >
-              밴드 송장확인
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#21c531] text-[13px] font-black tracking-[-0.04em] text-white shadow-sm">
+                BAND
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p className="text-[15px] font-black leading-tight tracking-[-0.05em] text-green-800">
+                  밴드에서 송장 확인
+                </p>
+                <p className="mt-1 break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-green-700">
+                  택배출고 완료 후 당일 저녁 밴드에서 택배송장번호 확인 가능!
+                </p>
+              </div>
+
+              <div className="shrink-0 text-[20px] font-black text-green-700">
+                ›
+              </div>
             </a>
           </footer>
         </div>
