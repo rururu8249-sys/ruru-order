@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 
 import {
   assertValidCustomerPointPhone,
@@ -47,40 +48,11 @@ function getSupabaseAdminClient() {
 
 type SupabaseAdminClient = ReturnType<typeof getSupabaseAdminClient>;
 
-function readRequestToken(request: NextRequest): string {
-  const auth = request.headers.get("authorization") || "";
-  const bearer = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+async function assertAdminRequest(request: NextRequest) {
+  const adminSession = await verifyAdminSessionFromRequest(request);
 
-  const headerToken =
-    request.headers.get("x-admin-token") ||
-    request.headers.get("x-ruru-admin-token") ||
-    request.headers.get("x-admin-session-token") ||
-    "";
-
-  const cookieNames = [
-    "ruru_admin_session",
-    "ruru_admin_session_token",
-    "admin_session",
-    "admin_session_token",
-    "admin_token",
-  ];
-
-  const cookieToken = cookieNames.map((name) => request.cookies.get(name)?.value || "").find(Boolean) || "";
-
-  return bearer || headerToken || cookieToken;
-}
-
-function assertAdminRequest(request: NextRequest) {
-  const expectedToken = process.env.ADMIN_SESSION_TOKEN || process.env.ADMIN_TOKEN || "";
-
-  if (!expectedToken) {
-    throw new Error("관리자 인증 환경변수가 설정되지 않았습니다.");
-  }
-
-  const requestToken = readRequestToken(request);
-
-  if (!requestToken || requestToken !== expectedToken) {
-    throw new Error("관리자 인증이 필요합니다.");
+  if (!adminSession) {
+    throw new Error("관리자 로그인이 필요합니다. /admin-login에서 다시 로그인 후 새로고침해주세요.");
   }
 }
 
@@ -117,7 +89,7 @@ async function fetchPointLedger(supabase: SupabaseAdminClient, phone: string, li
 
 export async function GET(request: NextRequest) {
   try {
-    assertAdminRequest(request);
+    await assertAdminRequest(request);
 
     const supabase = getSupabaseAdminClient();
     const { searchParams } = new URL(request.url);
@@ -152,7 +124,7 @@ export async function POST(request: NextRequest) {
   let ledgerIdForRollback = "";
 
   try {
-    assertAdminRequest(request);
+    await assertAdminRequest(request);
 
     const body = await request.json().catch(() => null);
 
