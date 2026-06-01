@@ -232,9 +232,9 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
 
   const statusLabelMap: Record<LiveOrderFilters["status"], string> = {
     all: "상태 전체보기",
-    unpaid: "결제대기",
-    paid: "입금확인완료",
-    manual_match_needed: "입금확인 필요",
+    unpaid: "입금대기",
+    paid: "입금확인",
+    manual_match_needed: "입금매칭 필요",
     card_paid: "카드결제완료",
     card_unpaid: "카드 미결제",
   };
@@ -1499,7 +1499,7 @@ export default function AdminLiveDashboard() {
                     const canceled = isCanceledOrder(order);
                     const paid = isPaidOrder(order);
 
-                    const label = canceled ? "주문취소" : paid ? "입금확인" : "입금확인 필요";
+                    const label = canceled ? "주문서취소" : paid ? "입금확인" : "입금매칭 필요";
                     const klass = canceled
                       ? "bg-red-50 text-red-600"
                       : paid
@@ -1818,7 +1818,7 @@ export default function AdminLiveDashboard() {
                                       <div className="mt-2 text-3xl font-black text-red-600">{unpaidOrders.length}건</div>
                                     </div>
                                     <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">
-                                      <div className="text-xs font-black text-red-600">주문취소</div>
+                                      <div className="text-xs font-black text-red-600">주문서취소</div>
                                       <div className="mt-2 text-3xl font-black text-red-600">{canceledOrders.length}건</div>
                                     </div>
                                   </div>
