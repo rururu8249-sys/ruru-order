@@ -89,7 +89,7 @@ export default function CustomerOrderLookupBottomSheet({
       <section className="w-full max-w-[430px] overflow-hidden rounded-t-[30px] bg-white shadow-[0_-22px_70px_rgba(15,23,42,0.22)]">
         <div className="mx-auto mt-3 h-1.5 w-14 rounded-full bg-slate-200" />
 
-        <div className="flex max-h-[86dvh] flex-col">
+        <div className="flex h-[88dvh] max-h-[88dvh] flex-col">
           <header className="shrink-0 px-4 pb-2 pt-5">
             <div className="flex items-baseline gap-2 whitespace-nowrap">
               <h2 className="text-[26px] font-black leading-none tracking-[-0.08em] text-slate-950">
@@ -223,6 +223,30 @@ export default function CustomerOrderLookupBottomSheet({
           </div>
 
           <footer className="grid shrink-0 grid-cols-[0.78fr_1.22fr] gap-x-2 gap-y-2 border-t border-slate-100 bg-white px-4 pb-[calc(14px+env(safe-area-inset-bottom))] pt-3">
+            <a
+              href={BAND_TRACKING_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="col-span-2 flex items-center gap-3 rounded-[18px] border border-green-100 bg-gradient-to-r from-green-50 to-emerald-50 px-3.5 py-2.5 shadow-sm transition active:scale-[0.98]"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#21c531] text-[12px] font-black tracking-[-0.04em] text-white shadow-sm">
+                BAND
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p className="text-[14px] font-black leading-tight tracking-[-0.05em] text-green-800">
+                  밴드에서 송장 확인
+                </p>
+                <p className="mt-0.5 break-keep text-[11px] font-bold leading-relaxed tracking-[-0.04em] text-green-700">
+                  택배출고 완료 후 당일 저녁 밴드에서 택배송장번호 확인 가능!
+                </p>
+              </div>
+
+              <div className="shrink-0 text-[19px] font-black text-green-700">
+                ›
+              </div>
+            </a>
+
             <button
               type="button"
               onClick={onClose}
@@ -238,30 +262,6 @@ export default function CustomerOrderLookupBottomSheet({
             >
               입금 계좌 보기
             </button>
-
-            <a
-              href={BAND_TRACKING_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="col-span-2 flex items-center gap-3 rounded-[20px] border border-green-100 bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-3 shadow-sm transition active:scale-[0.98]"
-            >
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#21c531] text-[13px] font-black tracking-[-0.04em] text-white shadow-sm">
-                BAND
-              </div>
-
-              <div className="min-w-0 flex-1">
-                <p className="text-[15px] font-black leading-tight tracking-[-0.05em] text-green-800">
-                  밴드에서 송장 확인
-                </p>
-                <p className="mt-1 break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-green-700">
-                  택배출고 완료 후 당일 저녁 밴드에서 택배송장번호 확인 가능!
-                </p>
-              </div>
-
-              <div className="shrink-0 text-[20px] font-black text-green-700">
-                ›
-              </div>
-            </a>
           </footer>
         </div>
       </section>
