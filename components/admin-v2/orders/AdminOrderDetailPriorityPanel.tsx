@@ -92,7 +92,7 @@ export default function AdminOrderDetailPriorityPanel({
 
   const cancelOrder = () => {
     runStatusAction("cancel", "주문취소", [
-      "이 주문서를 주문서 취소 상태로 변경할까요?",
+      "이 주문서를 주문서취소 상태로 변경할까요?",
       "",
       "중요: 주문상태만 변경합니다.",
       "환불, 입금내역 연결 해제, 정산 차감은 자동 처리하지 않습니다.",
