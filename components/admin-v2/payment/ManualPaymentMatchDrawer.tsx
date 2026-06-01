@@ -338,9 +338,9 @@ export default function ManualPaymentMatchDrawer(props: Props) {
                 onClick={props.onClose}
                 disabled={saving}
                 aria-label="수동 입금매칭 닫기"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-xl font-black text-slate-400 shadow-sm active:scale-[0.97] disabled:opacity-50"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 hover:bg-slate-50 disabled:opacity-50"
               >
-                ×
+                닫기
               </button>
             </div>
           </div>

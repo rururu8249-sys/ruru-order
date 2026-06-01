@@ -365,10 +365,10 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               event.stopPropagation();
               onClose?.();
             }}
-            className="flex h-8 w-8 items-center justify-center rounded-xl text-xl font-black text-slate-400 hover:bg-slate-100 hover:text-slate-800"
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 hover:bg-slate-50"
             aria-label="주문상세 닫기"
           >
-            ×
+            닫기
           </button>
         </div>
       </header>

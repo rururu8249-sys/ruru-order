@@ -1231,14 +1231,6 @@ export default function QuickProductFastForm({
         <div className="flex shrink-0 items-center justify-end gap-2">
         <button
           type="button"
-          onClick={onClose}
-          className="h-11 w-[120px] rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-600 hover:bg-slate-50"
-        >
-          닫기
-        </button>
-
-        <button
-          type="button"
           disabled={saving}
           onClick={() => void saveProduct()}
           className="h-11 w-[180px] rounded-xl bg-blue-600 text-sm font-black text-white shadow-sm disabled:opacity-50"
