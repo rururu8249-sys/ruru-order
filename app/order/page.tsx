@@ -3639,8 +3639,8 @@ export default function OrderPage() {
             <p className="mt-2 break-keep text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
               상품을 선택하고, 목록에 없는 상품만 직접 입력해주세요.
             </p>
-            <p className="mt-2 break-keep text-[13px] font-black leading-relaxed tracking-[-0.04em] text-blue-700">
-              주문 전 상단 [정보수정]에서 배송정보를 확인해주세요.
+            <p className="mt-2 break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-slate-400">
+              배송정보 변경은 상단 [정보수정]에서 할 수 있어요.
             </p>
 
             {customerInfoMissing && (
