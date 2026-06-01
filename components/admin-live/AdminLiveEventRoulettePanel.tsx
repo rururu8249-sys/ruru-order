@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 type RouletteMode = "live" | "test" | "preview";
 
 const FIXED_OVERLAY_TOKEN = "roulette_luludongi_live";
+const FIXED_CLAW_OVERLAY_TOKEN = "claw_luludongi_live";
 
 type RouletteBroadcast = {
   id: string;
@@ -162,6 +163,12 @@ function buildOverlayUrl(_event: RouletteEvent | null) {
   return `${window.location.origin}/event-roulette/overlay?token=${encodeURIComponent(FIXED_OVERLAY_TOKEN)}`;
 }
 
+function buildClawOverlayUrl() {
+  if (typeof window === "undefined") return "";
+
+  return `${window.location.origin}/event-claw/overlay?token=${encodeURIComponent(FIXED_CLAW_OVERLAY_TOKEN)}`;
+}
+
 async function copyText(value: string) {
   if (!value) {
     showAdminToast("복사할 위젯주소가 없습니다.", "warning");
@@ -177,7 +184,7 @@ async function copyText(value: string) {
 }
 
 export default function AdminLiveEventRoulettePanel({
-  buttonLabel = "🎁 이벤트 룰렛",
+  buttonLabel = "🎁 이벤트",
   buttonClassName = "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-xl bg-violet-600 px-3 text-xs font-black text-white shadow-sm transition hover:bg-violet-700",
 }: AdminLiveEventRoulettePanelProps) {
   const [open, setOpen] = useState(false);
@@ -185,16 +192,104 @@ export default function AdminLiveEventRoulettePanel({
   const [sourceDate] = useState(todayText);
   const [broadcasts, setBroadcasts] = useState<RouletteBroadcast[]>([]);
   const [broadcastId, setBroadcastId] = useState("");
-  const [title, setTitle] = useState("🎁 루루동이룰렛");
-  const [winnerNote, setWinnerNote] = useState("룰렛 당첨");
+  const [title, setTitle] = useState("🎁 선물이모티콘이벤트");
+  const [winnerNote, setWinnerNote] = useState("이벤트 당첨");
   const [participants, setParticipants] = useState<RouletteParticipant[]>([]);
   const [currentEvent, setCurrentEvent] = useState<RouletteEvent | null>(null);
   const [events, setEvents] = useState<RouletteEvent[]>([]);
   const [winners, setWinners] = useState<RouletteWinner[]>([]);
   const [loading, setLoading] = useState(false);
   const [spinning, setSpinning] = useState(false);
+  const [eventTab, setEventTab] = useState<"roulette" | "claw">("claw");
+  const [participantSource, setParticipantSource] = useState<"auto" | "manual">("auto");
+  const [manualParticipantText, setManualParticipantText] = useState("");
+  const [fixedWinnerNickname, setFixedWinnerNickname] = useState("");
+  const [clawResultType, setClawResultType] = useState<"capsule" | "doll">("capsule");
+
 
   const overlayUrl = useMemo(() => buildOverlayUrl(currentEvent), [currentEvent]);
+  const clawOverlayUrl = useMemo(() => buildClawOverlayUrl(), []);
+
+  const manualParticipants = useMemo<RouletteParticipant[]>(() => {
+    const seen = new Set<string>();
+
+    return manualParticipantText
+      .split(/\r?\n|,/)
+      .map((name) => name.trim())
+      .filter(Boolean)
+      .filter((nickname) => {
+        if (seen.has(nickname)) return false;
+        seen.add(nickname);
+        return true;
+      })
+      .map((nickname) => ({
+        nickname,
+        order_count: 0,
+        qty_sum: 0,
+        amount_sum: 0,
+        order_ids: [],
+        weight: 1,
+      }));
+  }, [manualParticipantText]);
+
+  const finalParticipants = participantSource === "auto" ? participants : manualParticipants;
+  const selectedWinnerNickname =
+    fixedWinnerNickname.trim() ||
+    finalParticipants[0]?.nickname ||
+    currentEvent?.winner_nickname ||
+    "";
+
+  const recentEvents = events.slice(0, 3);
+  const recentWinners = winners.slice(0, 100);
+  const autoParticipantCount = participants.length;
+  const manualParticipantCount = manualParticipants.length;
+
+  const openEventPanel = () => {
+    setOpen(true);
+  };
+
+  const changeMode = (nextMode: RouletteMode) => {
+    setMode(nextMode);
+    void loadParticipants(nextMode, sourceDate, broadcastId);
+  };
+
+  const changeBroadcast = (nextBroadcastId: string) => {
+    setBroadcastId(nextBroadcastId);
+    void loadParticipants(mode, sourceDate, nextBroadcastId);
+  };
+
+  const changeParticipantSource = (source: "auto" | "manual") => {
+    setParticipantSource(source);
+
+    if (source === "auto" && participants.length === 0) {
+      void loadParticipants(mode, sourceDate, broadcastId);
+    }
+  };
+
+  const addManualSample = () => {
+    const current = manualParticipantText.trim();
+
+    if (!current) {
+      setManualParticipantText("눈누난나\n뽀글이\n오랑이");
+      return;
+    }
+
+    setManualParticipantText(`${current}\n새참가자`);
+  };
+
+  const previewClawAnimation = () => {
+    showAdminToast("인형뽑기 연출 미리보기는 다음 단계에서 방송용 위젯에 연결합니다.", "info");
+  };
+
+  const startClawEvent = () => {
+    if (finalParticipants.length === 0) {
+      showAdminToast("참가자 명단이 없습니다. 자동 명단을 불러오거나 수동 참가자를 입력해주세요.", "warning");
+      return;
+    }
+
+    showAdminToast("인형뽑기 실제 시작은 다음 단계에서 별도 위젯/API와 연결합니다.", "info");
+  };
+
 
   const loadBroadcasts = async () => {
     try {
@@ -460,33 +555,52 @@ export default function AdminLiveEventRoulettePanel({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={buttonClassName}>
+      <button type="button" onClick={openEventPanel} className={buttonClassName}>
         {buttonLabel}
       </button>
 
       {open ? (
         <div
           className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/55 px-4 py-4 backdrop-blur-sm"
-          data-ruru-roulette-ui-shell="pixel-match-target-v3-no-clip"
+          data-ruru-event-ui-shell="event-tabs-claw-v1"
         >
-          <div className="flex h-[calc(100vh-44px)] max-h-[1040px] min-h-[860px] w-[min(92vw,1320px)] min-w-[1180px] flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
-            <div className="shrink-0 border-b border-slate-200 bg-white px-6 py-3">
+          <div className="flex h-[calc(100vh-44px)] max-h-[1040px] min-h-[860px] w-[min(96vw,1540px)] min-w-[1180px] flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
+            <div className="shrink-0 border-b border-slate-200 bg-white px-6 py-4">
               <div className="flex items-start justify-between gap-5">
                 <div className="min-w-0">
-                  <div className="text-[28px] font-black leading-none tracking-tight text-slate-950">🎁 이벤트 룰렛</div>
+                  <div className="text-[30px] font-black leading-none tracking-tight text-slate-950">🎁 이벤트</div>
                   <div className="mt-2 text-sm font-bold text-slate-500">
-                    방송 중 실시간으로 참여자를 추첨하는 룰렛 이벤트를 관리하세요.
+                    룰렛과 인형뽑기 이벤트를 같은 패널에서 관리합니다.
+                  </div>
+
+                  <div className="mt-4 inline-flex rounded-2xl bg-slate-100 p-1">
+                    <button
+                      type="button"
+                      onClick={() => setEventTab("roulette")}
+                      className={[
+                        "h-10 rounded-xl px-8 text-sm font-black transition active:scale-[0.98]",
+                        eventTab === "roulette" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-800",
+                      ].join(" ")}
+                    >
+                      룰렛
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEventTab("claw")}
+                      className={[
+                        "h-10 rounded-xl px-8 text-sm font-black transition active:scale-[0.98]",
+                        eventTab === "claw" ? "bg-violet-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-800",
+                      ].join(" ")}
+                    >
+                      인형뽑기
+                    </button>
                   </div>
                 </div>
 
                 <div className="flex shrink-0 items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      const nextMode: RouletteMode = "test";
-                      setMode(nextMode);
-                      void loadParticipants(nextMode, sourceDate, broadcastId);
-                    }}
+                    onClick={() => changeMode("test")}
                     className={`h-10 rounded-xl px-5 text-sm font-black ring-1 transition active:scale-[0.98] ${
                       mode === "test"
                         ? "bg-amber-50 text-amber-700 ring-amber-200"
@@ -497,11 +611,7 @@ export default function AdminLiveEventRoulettePanel({
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      const nextMode: RouletteMode = "live";
-                      setMode(nextMode);
-                      void loadParticipants(nextMode, sourceDate, broadcastId);
-                    }}
+                    onClick={() => changeMode("live")}
                     className={`h-10 rounded-xl px-5 text-sm font-black ring-1 transition active:scale-[0.98] ${
                       mode === "live"
                         ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
@@ -521,7 +631,7 @@ export default function AdminLiveEventRoulettePanel({
                 </div>
               </div>
 
-              <div className="mt-3 grid gap-4 xl:grid-cols-[1fr_560px]">
+              <div className="mt-4 grid gap-3 xl:grid-cols-[1fr_1fr]">
                 <div
                   className={`flex min-h-[48px] items-center rounded-2xl border px-4 py-2.5 text-sm font-black ${
                     mode === "live"
@@ -534,67 +644,406 @@ export default function AdminLiveEventRoulettePanel({
                     : "⚠ 현재 테스트 모드입니다. 실제 운영 기록과 구분되며, 테스트 기록은 정리할 수 있습니다."}
                 </div>
 
-                <div className="flex min-h-[48px] items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3">
-                  <div className="shrink-0 text-sm font-black text-slate-950">방송용 위젯주소</div>
-                  <div className="min-w-0 flex-1 truncate rounded-xl bg-white px-3 py-2 text-sm font-bold text-slate-600 ring-1 ring-slate-100">
-                    {overlayUrl || "고정 방송용 위젯주소를 준비중입니다."}
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="flex min-h-[48px] items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3">
+                    <div className="shrink-0 text-xs font-black text-slate-950">룰렛 위젯</div>
+                    <div className="min-w-0 flex-1 truncate rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-600 ring-1 ring-slate-100">
+                      {overlayUrl || "룰렛 위젯주소 준비중"}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyText(overlayUrl)}
+                      disabled={!overlayUrl}
+                      className="h-9 shrink-0 rounded-xl bg-violet-600 px-3 text-xs font-black text-white disabled:opacity-50"
+                    >
+                      복사
+                    </button>
                   </div>
-                  <div className="shrink-0 text-base font-black text-slate-400" aria-hidden="true">🔗</div>
-                  <button
-                    type="button"
-                    onClick={() => copyText(overlayUrl)}
-                    disabled={!overlayUrl}
-                    className="h-10 shrink-0 rounded-xl bg-violet-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98] active:bg-violet-800 disabled:opacity-50"
-                  >
-                    고정주소 복사
-                  </button>
+
+                  <div className="flex min-h-[48px] items-center gap-2 rounded-2xl border border-pink-200 bg-pink-50 px-3">
+                    <div className="shrink-0 text-xs font-black text-pink-900">인형뽑기 위젯</div>
+                    <div className="min-w-0 flex-1 truncate rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-600 ring-1 ring-pink-100">
+                      {clawOverlayUrl || "인형뽑기 위젯주소 준비중"}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyText(clawOverlayUrl)}
+                      disabled={!clawOverlayUrl}
+                      className="h-9 shrink-0 rounded-xl bg-pink-600 px-3 text-xs font-black text-white disabled:opacity-50"
+                    >
+                      복사
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
 
             <div className="min-h-0 flex-1 overflow-hidden bg-slate-50 px-6 py-4">
-              <div className="grid h-full min-h-0 gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-                <div className="grid min-h-0 grid-rows-[360px_minmax(0,1fr)] gap-5">
-                  <section className="rounded-[26px] border border-slate-200 bg-white shadow-sm">
-                    <div className="grid h-full grid-cols-[minmax(0,1fr)_170px] overflow-hidden rounded-[26px]">
-                      <div className="min-w-0 p-4">
-                        <div className="grid grid-cols-[1fr_28px_1fr_28px_1fr] items-center gap-3 border-b border-slate-100 pb-3">
-                          <div className="flex min-w-0 items-center gap-3 rounded-2xl bg-violet-50 px-3 py-2.5 ring-1 ring-violet-100">
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-600 text-base font-black text-white shadow-sm">1</span>
-                            <div className="min-w-0">
-                              <div className="truncate text-sm font-black text-violet-700">참여자 불러오기</div>
-                              <div className="truncate text-[11px] font-bold text-violet-400">구매자 목록</div>
+              {eventTab === "roulette" ? (
+                <div className="grid h-full min-h-0 gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+                  <div className="grid min-h-0 grid-rows-[360px_minmax(0,1fr)] gap-5">
+                    <section className="rounded-[26px] border border-slate-200 bg-white shadow-sm">
+                      <div className="grid h-full grid-cols-[minmax(0,1fr)_170px] overflow-hidden rounded-[26px]">
+                        <div className="min-w-0 p-4">
+                          <div className="grid grid-cols-[1fr_28px_1fr_28px_1fr] items-center gap-3 border-b border-slate-100 pb-3">
+                            <div className="flex min-w-0 items-center gap-3 rounded-2xl bg-violet-50 px-3 py-2.5 ring-1 ring-violet-100">
+                              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-600 text-base font-black text-white shadow-sm">1</span>
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-black text-violet-700">참여자 불러오기</div>
+                                <div className="truncate text-[11px] font-bold text-violet-400">구매자 목록</div>
+                              </div>
+                            </div>
+                            <div className="text-center text-xl font-black text-slate-400">→</div>
+                            <div className="flex min-w-0 items-center gap-3 rounded-2xl bg-slate-50 px-3 py-2.5 ring-1 ring-slate-100">
+                              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-base font-black text-slate-600">2</span>
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-black text-slate-700">룰렛 만들기</div>
+                                <div className="truncate text-[11px] font-bold text-slate-400">룰렛 생성</div>
+                              </div>
+                            </div>
+                            <div className="text-center text-xl font-black text-slate-400">→</div>
+                            <div className="flex min-w-0 items-center gap-3 rounded-2xl bg-slate-50 px-3 py-2.5 ring-1 ring-slate-100">
+                              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-base font-black text-slate-600">3</span>
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-black text-slate-700">룰렛 시작</div>
+                                <div className="truncate text-[11px] font-bold text-slate-400">당첨 추첨</div>
+                              </div>
                             </div>
                           </div>
-                          <div className="text-center text-xl font-black text-slate-400">→</div>
-                          <div className="flex min-w-0 items-center gap-3 rounded-2xl bg-slate-50 px-3 py-2.5 ring-1 ring-slate-100">
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-base font-black text-slate-600">2</span>
-                            <div className="min-w-0">
-                              <div className="truncate text-sm font-black text-slate-700">룰렛 만들기</div>
-                              <div className="truncate text-[11px] font-bold text-slate-400">룰렛 생성</div>
-                            </div>
+
+                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+                            <label className="block">
+                              <span className="text-xs font-black text-slate-500">방송리스트</span>
+                              <select
+                                value={broadcastId}
+                                onChange={(event) => changeBroadcast(event.target.value)}
+                                className="mt-1 h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                              >
+                                <option value="">방송을 선택하세요</option>
+                                {broadcasts.map((broadcast) => (
+                                  <option key={broadcast.id} value={broadcast.id}>
+                                    {broadcast.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+
+                            <label className="block">
+                              <span className="text-xs font-black text-slate-500">룰렛 제목</span>
+                              <input
+                                value={title}
+                                onChange={(event) => setTitle(event.target.value)}
+                                maxLength={30}
+                                className="mt-1 h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                              />
+                            </label>
                           </div>
-                          <div className="text-center text-xl font-black text-slate-400">→</div>
-                          <div className="flex min-w-0 items-center gap-3 rounded-2xl bg-slate-50 px-3 py-2.5 ring-1 ring-slate-100">
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-base font-black text-slate-600">3</span>
-                            <div className="min-w-0">
-                              <div className="truncate text-sm font-black text-slate-700">룰렛 시작</div>
-                              <div className="truncate text-[11px] font-bold text-slate-400">당첨 추첨</div>
-                            </div>
+
+                          <div className="mt-3 grid items-end gap-3 md:grid-cols-[1fr_180px]">
+                            <label className="block">
+                              <span className="text-xs font-black text-slate-500">당첨내용 / 상품명</span>
+                              <input
+                                value={winnerNote}
+                                onChange={(event) => setWinnerNote(event.target.value)}
+                                maxLength={40}
+                                placeholder="예: 1,000포인트 / 향수 샘플 / 무료배송쿠폰"
+                                className="mt-1 h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                              />
+                            </label>
+
+                            <button
+                              type="button"
+                              onClick={() => loadParticipants(mode, sourceDate, broadcastId)}
+                              disabled={loading}
+                              className="h-[44px] rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-800 transition hover:bg-slate-50 active:scale-[0.98] active:bg-slate-100 disabled:opacity-50"
+                            >
+                              👥 참여자 불러오기
+                            </button>
+                          </div>
+
+                          <div className="mt-4 grid grid-cols-2 gap-3">
+                            <button
+                              type="button"
+                              onClick={createEvent}
+                              disabled={loading || participants.length === 0}
+                              className="h-[48px] rounded-2xl bg-violet-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98] active:bg-violet-800 disabled:bg-slate-300 disabled:text-white"
+                            >
+                              룰렛 만들기
+                            </button>
+                            <button
+                              type="button"
+                              onClick={spinEvent}
+                              disabled={spinning || !currentEvent?.id}
+                              className="h-[48px] rounded-2xl bg-slate-950 px-4 text-sm font-black text-white shadow-sm transition hover:bg-slate-800 active:scale-[0.98] active:bg-black disabled:bg-slate-300 disabled:text-white"
+                            >
+                              {spinning ? "룰렛 진행중..." : "룰렛 시작"}
+                            </button>
                           </div>
                         </div>
 
-                        <div className="mt-3 grid gap-3 md:grid-cols-2">
+                        <div className="flex min-h-full flex-col items-center justify-center bg-[radial-gradient(circle_at_50%_30%,#ffffff_0%,#f6f0ff_42%,#24184d_100%)] p-4 text-center">
+                          <div className="relative mb-4 flex h-[104px] w-[104px] items-center justify-center rounded-full bg-white/85 shadow-2xl ring-4 ring-violet-200">
+                            <div className="absolute h-full w-full rounded-full border-[15px] border-violet-200 border-r-rose-200 border-t-amber-300" />
+                            <div className="z-10 h-6 w-6 rounded-full bg-violet-600 shadow-sm" />
+                          </div>
+                          <div className="text-base font-black text-white drop-shadow">선물이모티콘이벤트</div>
+                          <div className="mt-1 text-[12px] font-black text-white/80 drop-shadow">룰렛 위젯 미리보기</div>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className="flex min-h-0 flex-col overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-sm">
+                      <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_120px_90px] items-end gap-4 border-b border-slate-100 px-5 py-4">
+                        <div className="min-w-0">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="text-xl font-black text-slate-950">참여자 목록</div>
+                            <div className="text-xs font-black text-slate-400">총 {participants.length.toLocaleString("ko-KR")}명</div>
+                          </div>
+                          <div className="mt-1 text-xs font-bold text-slate-400">
+                            최종 후보 {participants.length.toLocaleString("ko-KR")}명 · 닉네임 기준 그룹
+                          </div>
+                        </div>
+                        <div className="text-right text-xs font-black text-slate-400">구매금액</div>
+                        <div className="text-right text-xs font-black text-violet-500">가중치</div>
+                      </div>
+
+                      <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto">
+                        {participants.length === 0 ? (
+                          <div className="flex h-full min-h-[180px] items-center justify-center px-4 text-center text-sm font-bold text-slate-400">
+                            참여자가 없습니다. 방송리스트를 선택하고 참여자 불러오기를 눌러주세요.
+                          </div>
+                        ) : (
+                          participants.slice(0, 160).map((item) => (
+                            <div key={`${item.nickname}-${item.order_ids?.join("-")}`} className="grid grid-cols-[minmax(0,1fr)_120px_90px] items-center gap-4 px-5 py-3 text-sm">
+                              <div className="min-w-0">
+                                <div className="truncate text-base font-black text-slate-950">{item.nickname}</div>
+                                <div className="mt-1 text-xs font-bold text-slate-400">
+                                  주문 {Number(item.order_count || 0).toLocaleString("ko-KR")}건 · 수량 {Number(item.qty_sum || 0).toLocaleString("ko-KR")}개
+                                </div>
+                              </div>
+                              <div className="text-right font-black text-slate-800">{money(item.amount_sum)}</div>
+                              <div className="text-right text-sm font-black text-violet-600">
+                                {Number(item.weight || 1).toFixed(2)}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </section>
+                  </div>
+
+                  <aside className="grid min-h-0 grid-rows-[165px_minmax(0,1fr)_225px] gap-5">
+                    <section className="overflow-hidden rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-xl font-black text-slate-950">현재 룰렛</div>
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-2 w-2 rounded-full bg-emerald-500" />
+                          <span className={`rounded-full px-3 py-1 text-xs font-black ring-1 ${currentEvent ? modeBadgeClass(currentEvent.mode) : "bg-slate-100 text-slate-500 ring-slate-200"}`}>
+                            {currentEvent?.status || "idle"}
+                          </span>
+                          {currentEvent ? (
+                            <button
+                              type="button"
+                              onClick={() => void deleteRouletteEvent(currentEvent, "현재 룰렛")}
+                              className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98]"
+                            >
+                              기록 삭제
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-4 gap-3">
+                        <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                          <div className="text-xs font-black text-slate-400">상태</div>
+                          <div className="mt-2 truncate text-base font-black text-emerald-600">{currentEvent?.status || "idle"}</div>
+                        </div>
+                        <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                          <div className="text-xs font-black text-slate-400">참여자</div>
+                          <div className="mt-2 text-base font-black text-slate-950">
+                            {Number(currentEvent?.participant_count || currentEvent?.participants?.length || participants.length || 0).toLocaleString("ko-KR")}명
+                          </div>
+                        </div>
+                        <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                          <div className="text-xs font-black text-slate-400">현재 당첨자</div>
+                          <div className="mt-2 truncate text-base font-black text-slate-950">{currentEvent?.winner_nickname || "-"}</div>
+                        </div>
+                        <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                          <div className="text-xs font-black text-slate-400">당첨내용</div>
+                          <div className="mt-2 truncate text-sm font-black text-slate-800">{currentEvent?.winner_note || winnerNote || "🎁 이벤트 당첨"}</div>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className="flex min-h-0 flex-col overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-sm">
+                      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+                        <div className="min-w-0">
+                          <div className="text-xl font-black text-slate-950">당첨자 리스트</div>
+                          <div className="mt-1 truncate text-xs font-bold text-slate-400">잘못 만든 이벤트는 개별 삭제 가능, 운영 전체삭제 없음</div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={loadEventsAndWinners}
+                            className="h-9 rounded-2xl bg-slate-100 px-3 text-xs font-black text-slate-700 transition hover:bg-slate-200 active:scale-95"
+                          >
+                            새로고침
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void deleteAllTestRecords()}
+                            className="h-9 rounded-2xl border border-amber-200 bg-amber-50 px-3 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98]"
+                          >
+                            테스트기록 정리
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
+                        {recentWinners.length === 0 ? (
+                          <div className="flex h-full min-h-[160px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white px-4 text-center text-sm font-bold text-slate-400">
+                            아직 당첨 기록이 없습니다.
+                          </div>
+                        ) : (
+                          recentWinners.map((winner) => (
+                            <div key={winner.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
+                                <div className="min-w-0">
+                                  <div className="truncate text-base font-black text-slate-950">🏆 {winner.nickname}</div>
+                                  <div className="mt-1 truncate text-sm font-bold text-slate-600">{winner.winner_note || "이벤트 당첨"}</div>
+                                  <div className="mt-1 text-xs font-bold text-slate-400">{dateTime(winner.winner_at)}</div>
+                                </div>
+                                <span className={`h-fit shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black ring-1 ${winner.is_test ? "bg-amber-50 text-amber-700 ring-amber-100" : "bg-emerald-50 text-emerald-700 ring-emerald-100"}`}>
+                                  {winner.is_test ? "테스트" : "운영"}
+                                </span>
+                              </div>
+
+                              <div className="mt-3 grid grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => markRewardDone(winner, !winner.is_reward_done)}
+                                  className={`rounded-xl px-3 py-2 text-xs font-black transition active:scale-[0.98] ${
+                                    winner.is_reward_done
+                                      ? "bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800"
+                                      : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 active:bg-slate-100"
+                                  }`}
+                                >
+                                  {winner.is_reward_done ? "지급완료됨" : "지급완료 체크"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void deleteWinnerRecord(winner)}
+                                  className={`rounded-xl border bg-white px-3 py-2 text-xs font-black transition active:scale-[0.98] ${
+                                    winner.is_test
+                                      ? "border-red-100 text-red-600 hover:bg-red-50 active:bg-red-100"
+                                      : "border-amber-200 text-amber-700 hover:bg-amber-50 active:bg-amber-100"
+                                  }`}
+                                >
+                                  기록 삭제
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </section>
+
+                    <section className="flex min-h-0 flex-col overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-sm">
+                      <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-3">
+                        <div>
+                          <div className="text-lg font-black text-slate-950">최근 이벤트</div>
+                          <div className="mt-1 text-xs font-bold text-slate-400">최근 {Math.min(events.length, 3)}개</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={loadEventsAndWinners}
+                          className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-500 transition hover:bg-slate-50"
+                        >
+                          더보기 &gt;
+                        </button>
+                      </div>
+
+                      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3">
+                        {recentEvents.length === 0 ? (
+                          <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white px-4 text-center text-sm font-bold text-slate-400">
+                            최근 이벤트 없음
+                          </div>
+                        ) : (
+                          recentEvents.map((event, eventIndex) => (
+                            <div key={event.id || `${event.title}-${event.status}-${event.winner_nickname || "none"}-${eventIndex}`} className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                              <button
+                                type="button"
+                                onClick={() => setCurrentEvent(event)}
+                                className="w-full text-left transition active:scale-[0.99]"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="truncate text-sm font-black text-slate-900">🎁 {event.title}</div>
+                                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ring-1 ${modeBadgeClass(event.mode)}`}>
+                                    {modeLabel(event.mode)}
+                                  </span>
+                                </div>
+                                <div className="mt-1 truncate text-xs font-bold text-slate-500">
+                                  {event.status} · {event.winner_nickname || "당첨 전"}
+                                </div>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void deleteRouletteEvent(event, "최근 이벤트")}
+                                className="mt-2 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98]"
+                              >
+                                이 이벤트 기록 삭제
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </section>
+                  </aside>
+                </div>
+              ) : (
+                <div className="grid h-full min-h-0 gap-5 xl:grid-cols-[1.22fr_0.78fr]">
+                  <div className="grid min-h-0 grid-rows-[330px_minmax(0,1fr)] gap-5">
+                    <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
+                      <div className="mb-4 flex items-start justify-between gap-4">
+                        <div>
+                          <div className="text-xl font-black text-slate-950">1. 참가자 설정</div>
+                          <div className="mt-1 text-xs font-bold text-slate-500">
+                            기존 룰렛처럼 방송리스트 기준 자동 명단을 쓰거나, 수동 입력 명단으로 진행합니다.
+                          </div>
+                        </div>
+
+                        <div className="inline-flex shrink-0 rounded-2xl bg-slate-100 p-1">
+                          <button
+                            type="button"
+                            onClick={() => changeParticipantSource("auto")}
+                            className={[
+                              "h-10 rounded-xl px-4 text-xs font-black transition",
+                              participantSource === "auto" ? "bg-blue-600 text-white shadow-sm" : "text-slate-500",
+                            ].join(" ")}
+                          >
+                            자동 명단으로 시작
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => changeParticipantSource("manual")}
+                            className={[
+                              "h-10 rounded-xl px-4 text-xs font-black transition",
+                              participantSource === "manual" ? "bg-violet-600 text-white shadow-sm" : "text-slate-500",
+                            ].join(" ")}
+                          >
+                            수동 입력으로 시작
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid h-[250px] min-h-0 grid-cols-[260px_minmax(0,1fr)_320px] gap-4">
+                        <div className="space-y-3">
                           <label className="block">
                             <span className="text-xs font-black text-slate-500">방송리스트</span>
                             <select
                               value={broadcastId}
-                              onChange={(event) => {
-                                const nextBroadcastId = event.target.value;
-                                setBroadcastId(nextBroadcastId);
-                                void loadParticipants(mode, sourceDate, nextBroadcastId);
-                              }}
-                              className="mt-1 h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                              onChange={(event) => changeBroadcast(event.target.value)}
+                              className="mt-1 h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                             >
                               <option value="">방송을 선택하세요</option>
                               {broadcasts.map((broadcast) => (
@@ -605,309 +1054,351 @@ export default function AdminLiveEventRoulettePanel({
                             </select>
                           </label>
 
-                          <label className="block">
-                            <span className="text-xs font-black text-slate-500">룰렛 제목</span>
-                            <input
-                              value={title}
-                              onChange={(event) => setTitle(event.target.value)}
-                              maxLength={30}
-                              className="mt-1 h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-                            />
-                          </label>
-                        </div>
-
-                        <div className="mt-3 grid items-end gap-3 md:grid-cols-[1fr_180px]">
-                          <label className="block">
-                            <span className="text-xs font-black text-slate-500">당첨내용 / 상품명</span>
-                            <input
-                              value={winnerNote}
-                              onChange={(event) => setWinnerNote(event.target.value)}
-                              maxLength={40}
-                              placeholder="예: 1,000포인트 / 향수 샘플 / 무료배송쿠폰"
-                              className="mt-1 h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-                            />
-                          </label>
-
                           <button
                             type="button"
                             onClick={() => loadParticipants(mode, sourceDate, broadcastId)}
                             disabled={loading}
-                            className="h-[44px] rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-800 transition hover:bg-slate-50 active:scale-[0.98] active:bg-slate-100 disabled:opacity-50"
+                            className="h-[44px] w-full rounded-2xl bg-blue-600 px-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:bg-slate-300"
                           >
-                            👥 참여자 불러오기
+                            {loading ? "불러오는중..." : "주문서 명단 불러오기"}
                           </button>
+
+                          <div className="rounded-2xl bg-blue-50 px-3 py-3 text-xs font-black leading-5 text-blue-700">
+                            방송리스트 선택 후 가운데 영역에 주문서 작성자 명단이 표시됩니다.
+                          </div>
                         </div>
 
-                        <div className="mt-4 grid grid-cols-2 gap-3">
-                          <button
-                            type="button"
-                            onClick={createEvent}
-                            disabled={loading || participants.length === 0}
-                            className="h-[48px] rounded-2xl bg-violet-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98] active:bg-violet-800 disabled:bg-slate-300 disabled:text-white"
-                          >
-                            룰렛 만들기
-                          </button>
-                          <button
-                            type="button"
-                            onClick={spinEvent}
-                            disabled={spinning || !currentEvent?.id}
-                            className="h-[48px] rounded-2xl bg-slate-950 px-4 text-sm font-black text-white shadow-sm transition hover:bg-slate-800 active:scale-[0.98] active:bg-black disabled:bg-slate-300 disabled:text-white"
-                          >
-                            {spinning ? "룰렛 진행중..." : "룰렛 시작"}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="flex min-h-full flex-col items-center justify-center bg-[radial-gradient(circle_at_50%_30%,#ffffff_0%,#f6f0ff_42%,#24184d_100%)] p-4 text-center">
-                        <div className="relative mb-4 flex h-[104px] w-[104px] items-center justify-center rounded-full bg-white/85 shadow-2xl ring-4 ring-violet-200">
-                          <div className="absolute h-full w-full rounded-full border-[15px] border-violet-200 border-r-rose-200 border-t-amber-300" />
-                          <div className="z-10 h-6 w-6 rounded-full bg-violet-600 shadow-sm" />
-                        </div>
-                        <div className="text-base font-black text-white drop-shadow">루루동이룰렛</div>
-                        <div className="mt-1 text-[12px] font-black text-white/80 drop-shadow">방송 위젯 미리보기</div>
-                      </div>
-                    </div>
-                  </section>
-
-                  <section className="flex min-h-0 flex-col overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-sm">
-                    <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_120px_90px] items-end gap-4 border-b border-slate-100 px-5 py-4">
-                      <div className="min-w-0">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="text-xl font-black text-slate-950">참여자 목록</div>
-                          <div className="text-xs font-black text-slate-400">총 {participants.length.toLocaleString("ko-KR")}명</div>
-                        </div>
-                        <div className="mt-1 text-xs font-bold text-slate-400">
-                          최종 후보 {participants.length.toLocaleString("ko-KR")}명 · 닉네임 기준 그룹
-                        </div>
-                      </div>
-                      <div className="text-right text-xs font-black text-slate-400">구매금액</div>
-                      <div className="text-right text-xs font-black text-violet-500">가중치</div>
-                    </div>
-
-                    <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto">
-                      {participants.length === 0 ? (
-                        <div className="flex h-full min-h-[180px] items-center justify-center px-4 text-center text-sm font-bold text-slate-400">
-                          참여자가 없습니다. 방송리스트를 선택하고 참여자 불러오기를 눌러주세요.
-                        </div>
-                      ) : (
-                        participants.slice(0, 160).map((item) => (
-                          <div key={`${item.nickname}-${item.order_ids?.join("-")}`} className="grid grid-cols-[minmax(0,1fr)_120px_90px] items-center gap-4 px-5 py-3 text-sm">
+                        <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border-2 border-violet-100 bg-white">
+                          <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_110px_110px] items-end gap-3 border-b border-slate-100 px-4 py-3">
                             <div className="min-w-0">
-                              <div className="truncate text-base font-black text-slate-950">{item.nickname}</div>
+                              <div className="text-base font-black text-slate-950">주문서 작성자 명단 자동</div>
                               <div className="mt-1 text-xs font-bold text-slate-400">
-                                주문 {Number(item.order_count || 0).toLocaleString("ko-KR")}건 · 수량 {Number(item.qty_sum || 0).toLocaleString("ko-KR")}개
+                                총 {autoParticipantCount.toLocaleString("ko-KR")}명 · 닉네임 기준 중복 제거
                               </div>
                             </div>
-                            <div className="text-right font-black text-slate-800">{money(item.amount_sum)}</div>
-                            <div className="text-right text-sm font-black text-violet-600">
-                              {Number(item.weight || 1).toFixed(2)}
-                            </div>
+                            <div className="text-right text-xs font-black text-slate-400">주문</div>
+                            <div className="text-right text-xs font-black text-slate-400">구매금액</div>
                           </div>
-                        ))
-                      )}
-                    </div>
-                  </section>
-                </div>
 
-                <aside className="grid min-h-0 grid-rows-[165px_minmax(0,1fr)_225px] gap-5">
-                  <section className="overflow-hidden rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-xl font-black text-slate-950">현재 룰렛</div>
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-2 w-2 rounded-full bg-emerald-500" />
-                        <span className={`rounded-full px-3 py-1 text-xs font-black ring-1 ${currentEvent ? modeBadgeClass(currentEvent.mode) : "bg-slate-100 text-slate-500 ring-slate-200"}`}>
-                          {currentEvent?.status || "idle"}
-                        </span>
-                        {currentEvent ? (
-                          <button
-                            type="button"
-                            onClick={() => void deleteRouletteEvent(currentEvent, "현재 룰렛")}
-                            className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98]"
-                          >
-                            기록 삭제
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
+                          <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto">
+                            {participants.length === 0 ? (
+                              <div className="flex h-full min-h-[160px] items-center justify-center px-4 text-center text-sm font-bold leading-6 text-slate-400">
+                                자동 명단이 없습니다.<br />방송리스트 선택 후 명단을 불러오세요.
+                              </div>
+                            ) : (
+                              participants.slice(0, 180).map((item, index) => (
+                                <div key={`${item.nickname}-${item.order_ids?.join("-") || index}`} className="grid grid-cols-[34px_minmax(0,1fr)_110px_110px] items-center gap-3 px-4 py-2.5 text-sm">
+                                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-50 text-xs font-black text-violet-700">
+                                    {index + 1}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="truncate text-sm font-black text-slate-950">{item.nickname}</div>
+                                    <div className="mt-0.5 text-[11px] font-bold text-slate-400">
+                                      수량 {Number(item.qty_sum || 0).toLocaleString("ko-KR")}개 · 가중치 {Number(item.weight || 1).toLocaleString("ko-KR")}
+                                    </div>
+                                  </div>
+                                  <div className="text-right text-xs font-black text-slate-600">
+                                    {Number(item.order_count || 0).toLocaleString("ko-KR")}건
+                                  </div>
+                                  <div className="text-right text-xs font-black text-slate-900">
+                                    {money(item.amount_sum)}
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
 
-                    <div className="mt-4 grid grid-cols-4 gap-3">
-                      <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                        <div className="text-xs font-black text-slate-400">상태</div>
-                        <div className="mt-2 truncate text-base font-black text-emerald-600">{currentEvent?.status || "idle"}</div>
-                      </div>
-                      <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                        <div className="text-xs font-black text-slate-400">참여자</div>
-                        <div className="mt-2 text-base font-black text-slate-950">
-                          {Number(currentEvent?.participant_count || currentEvent?.participants?.length || participants.length || 0).toLocaleString("ko-KR")}명
+                        <div className="space-y-3">
+                          <div className="rounded-3xl border border-slate-200 bg-white p-4">
+                            <div className="mb-2 flex items-center justify-between">
+                              <div className="text-base font-black text-slate-950">수동 참가자 추가</div>
+                              <span className="rounded-full bg-violet-50 px-3 py-1 text-[11px] font-black text-violet-700">
+                                {manualParticipantCount.toLocaleString("ko-KR")}명
+                              </span>
+                            </div>
+                            <textarea
+                              value={manualParticipantText}
+                              onChange={(event) => setManualParticipantText(event.target.value)}
+                              placeholder={"닉네임을 한 줄에 한 명씩 입력하세요.\n예: 눈누난나\n뽀글이\n오랑이"}
+                              className="h-[105px] w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-800 outline-none focus:border-violet-400"
+                            />
+                            <button
+                              type="button"
+                              onClick={addManualSample}
+                              className="mt-2 h-9 w-full rounded-xl border border-slate-200 bg-white text-xs font-black text-slate-700"
+                            >
+                              + 샘플/참가자 추가
+                            </button>
+                          </div>
+
+                          <div className="rounded-3xl border border-slate-200 bg-white p-4">
+                            <div className="text-base font-black text-slate-950">당첨자 미리 지정</div>
+                            <select
+                              value={fixedWinnerNickname}
+                              onChange={(event) => setFixedWinnerNickname(event.target.value)}
+                              className="mt-2 h-10 w-full rounded-2xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-800 outline-none focus:border-violet-400"
+                            >
+                              <option value="">자동 선택</option>
+                              {finalParticipants.map((participant, index) => (
+                                <option key={`${participant.nickname}-${index}`} value={participant.nickname}>
+                                  {participant.nickname}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
                       </div>
-                      <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                        <div className="text-xs font-black text-slate-400">현재 당첨자</div>
-                        <div className="mt-2 truncate text-base font-black text-slate-950">{currentEvent?.winner_nickname || "-"}</div>
-                      </div>
-                      <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                        <div className="text-xs font-black text-slate-400">당첨내용</div>
-                        <div className="mt-2 truncate text-sm font-black text-slate-800">{currentEvent?.winner_note || winnerNote || "🎁 룰렛 당첨"}</div>
-                      </div>
-                    </div>
-                  </section>
+                    </section>
 
-                  <section className="flex min-h-0 flex-col overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-sm">
-                    <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
-                      <div className="min-w-0">
-                        <div className="text-xl font-black text-slate-950">당첨자 리스트</div>
-                        <div className="mt-1 truncate text-xs font-bold text-slate-400">잘못 만든 룰렛은 개별 삭제 가능, 운영 전체삭제 없음</div>
+                    <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
+                      <div className="mb-4 flex items-start justify-between gap-4">
+                        <div>
+                          <div className="text-xl font-black text-slate-950">2. 인형뽑기 연출</div>
+                          <div className="mt-1 text-xs font-bold text-slate-500">
+                            1~2회 랜덤 실패 후 정식 집기 성공, 마지막에 당첨자를 공개합니다.
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs font-black text-slate-500">
+                          <span className="rounded-full bg-violet-50 px-3 py-2 text-violet-700">1~2회 실패</span>
+                          <span>→</span>
+                          <span className="rounded-full bg-slate-100 px-3 py-2">정식 집기 성공</span>
+                          <span>→</span>
+                          <span className="rounded-full bg-pink-50 px-3 py-2 text-pink-700">당첨 공개</span>
+                        </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-2">
+
+                      <div className="grid h-[330px] min-h-0 grid-cols-[minmax(0,1fr)_230px] gap-4">
+                        <div className="grid grid-cols-3 gap-3">
+                          {[1, 2, 3].map((step) => (
+                            <div key={step} className="relative overflow-hidden rounded-3xl border border-pink-100 bg-gradient-to-b from-pink-50 to-white p-3">
+                              <div className="absolute left-3 top-3 z-10 rounded-full bg-violet-600 px-3 py-1 text-[11px] font-black text-white">
+                                {step < 3 ? `${step}회차 실패` : "정식 집기 성공"}
+                              </div>
+
+                              <div className="mx-auto mt-7 h-[250px] max-w-[230px] rounded-t-[34px] border-[7px] border-pink-400 bg-white/70 shadow-inner">
+                                <div className="h-8 rounded-t-[24px] bg-pink-500" />
+                                <div className="relative h-[166px] overflow-hidden bg-white/45 backdrop-blur-[1px]">
+                                  <div className="absolute inset-0 bg-sky-100/35" />
+                                  <div
+                                    className={[
+                                      "absolute left-1/2 h-16 w-1 -translate-x-1/2 bg-slate-400",
+                                      step === 1 ? "top-5" : step === 2 ? "top-10" : "top-12",
+                                    ].join(" ")}
+                                  />
+                                  <div
+                                    className={[
+                                      "absolute left-1/2 h-8 w-12 -translate-x-1/2 rounded-b-full border-4 border-slate-500 border-t-0",
+                                      step === 1 ? "top-16 rotate-12" : step === 2 ? "top-24 -rotate-6" : "top-28",
+                                    ].join(" ")}
+                                  />
+                                  <div className="absolute bottom-0 left-0 right-0 flex h-16 items-end justify-center gap-1 px-2">
+                                    {["bg-pink-400", "bg-emerald-400", "bg-blue-400", "bg-violet-400", "bg-amber-300", "bg-rose-400"].map((color, index) => (
+                                      <span key={index} className={["h-7 w-7 rounded-full shadow-sm", color].join(" ")} />
+                                    ))}
+                                  </div>
+                                  <div className="absolute bottom-9 left-1/2 flex -translate-x-1/2 items-end gap-1">
+                                    <span className="h-10 w-8 rounded-t-full bg-orange-300" />
+                                    <span className="h-11 w-9 rounded-t-full bg-red-400" />
+                                    <span className="h-10 w-8 rounded-t-full bg-green-300" />
+                                  </div>
+                                  {step === 3 ? (
+                                    <div className="absolute left-1/2 top-[118px] -translate-x-1/2 rounded-full bg-orange-300 px-3 py-2 text-xs font-black text-slate-900 shadow">
+                                      인형
+                                    </div>
+                                  ) : null}
+                                </div>
+                                <div className="flex h-12 items-center justify-center gap-5 bg-pink-500">
+                                  <span className="h-5 w-5 rounded-full bg-pink-200" />
+                                  <span className="h-5 w-5 rounded-full bg-yellow-300" />
+                                  <span className="h-5 w-5 rounded-full bg-rose-300" />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="rounded-3xl border border-pink-100 bg-white p-4 shadow-sm">
+                          <div className="rounded-2xl bg-pink-500 px-4 py-3 text-center text-sm font-black text-white">
+                            당첨 공개!
+                          </div>
+
+                          <div className="mt-4 rounded-3xl border border-dashed border-amber-200 bg-amber-50 p-4 text-center">
+                            {clawResultType === "capsule" ? (
+                              <>
+                                <div className="mx-auto mb-3 h-16 w-24 rounded-b-full rounded-t-[999px] bg-gradient-to-br from-pink-300 to-violet-300 shadow-inner" />
+                                <div className="rounded-2xl bg-white px-3 py-4 text-sm font-black text-slate-950 shadow-sm">
+                                  {selectedWinnerNickname || "당첨자"}
+                                </div>
+                                <p className="mt-3 text-xs font-bold text-slate-500">캡슐 속 종이로 닉네임 공개</p>
+                              </>
+                            ) : (
+                              <>
+                                <div className="mx-auto mb-3 flex h-24 w-20 items-center justify-center rounded-t-full bg-orange-300 text-xs font-black text-slate-900 shadow">
+                                  앞모습
+                                </div>
+                                <div className="mx-auto mb-3 flex h-24 w-20 items-center justify-center rounded-t-full bg-orange-400 text-xs font-black text-slate-900 shadow">
+                                  뒷모습<br />{selectedWinnerNickname || "당첨자"}
+                                </div>
+                                <p className="mt-3 text-xs font-bold text-slate-500">뽑힌 인형과 같은 인형의 등 뒤에 닉네임 공개</p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+                  </div>
+
+                  <aside className="grid min-h-0 grid-rows-[185px_255px_minmax(0,1fr)] gap-5">
+                    <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div className="text-xl font-black text-slate-950">현재 인형뽑기</div>
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500">
+                          {currentEvent?.status || "idle"}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="rounded-2xl bg-slate-50 p-3">
+                          <div className="text-xs font-black text-slate-400">참여자 수</div>
+                          <div className="mt-1 text-xl font-black text-slate-950">{finalParticipants.length.toLocaleString("ko-KR")}명</div>
+                        </div>
+                        <div className="rounded-2xl bg-slate-50 p-3">
+                          <div className="text-xs font-black text-slate-400">자동/수동</div>
+                          <div className="mt-1 text-xl font-black text-slate-950">
+                            {participantSource === "auto" ? `${autoParticipantCount.toLocaleString("ko-KR")}명` : `${manualParticipantCount.toLocaleString("ko-KR")}명`}
+                          </div>
+                        </div>
+                        <div className="col-span-2 rounded-2xl bg-violet-50 p-3">
+                          <div className="text-xs font-black text-violet-500">지정 당첨자</div>
+                          <div className="mt-1 truncate text-lg font-black text-violet-900">🏆 {selectedWinnerNickname || "자동 선택"}</div>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
+                      <div className="text-xl font-black text-slate-950">당첨 연출 방식</div>
+                      <div className="mt-1 text-xs font-bold text-slate-500">캡슐 또는 인형 방식으로 공개합니다.</div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setClawResultType("capsule")}
+                          className={[
+                            "rounded-3xl border p-4 text-center transition active:scale-[0.98]",
+                            clawResultType === "capsule" ? "border-violet-300 bg-violet-50" : "border-slate-200 bg-white",
+                          ].join(" ")}
+                        >
+                          <div className="text-sm font-black text-violet-700">캡슐 당첨</div>
+                          <div className="mx-auto mt-3 h-12 w-16 rounded-b-full rounded-t-[999px] bg-gradient-to-br from-pink-300 to-violet-300" />
+                          <div className="mt-3 rounded-xl bg-white px-2 py-2 text-xs font-black text-slate-700 shadow-sm">
+                            종이 닉네임
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setClawResultType("doll")}
+                          className={[
+                            "rounded-3xl border p-4 text-center transition active:scale-[0.98]",
+                            clawResultType === "doll" ? "border-violet-300 bg-violet-50" : "border-slate-200 bg-white",
+                          ].join(" ")}
+                        >
+                          <div className="text-sm font-black text-violet-700">인형 당첨</div>
+                          <div className="mx-auto mt-3 h-14 w-12 rounded-t-full bg-orange-300" />
+                          <div className="mt-3 rounded-xl bg-white px-2 py-2 text-xs font-black text-slate-700 shadow-sm">
+                            등 뒤 닉네임
+                          </div>
+                        </button>
+                      </div>
+                    </section>
+
+                    <section className="flex min-h-0 flex-col overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-sm">
+                      <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-3">
+                        <div>
+                          <div className="text-lg font-black text-slate-950">최근 이벤트 기록</div>
+                          <div className="mt-1 text-xs font-bold text-slate-400">룰렛 기록과 같은 방식으로 관리</div>
+                        </div>
                         <button
                           type="button"
                           onClick={loadEventsAndWinners}
-                          className="h-9 rounded-2xl bg-slate-100 px-3 text-xs font-black text-slate-700 transition hover:bg-slate-200 active:scale-95"
+                          className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-500 transition hover:bg-slate-50"
                         >
                           새로고침
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => void deleteAllTestRecords()}
-                          className="h-9 rounded-2xl border border-amber-200 bg-amber-50 px-3 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98]"
-                        >
-                          테스트기록 정리
-                        </button>
                       </div>
-                    </div>
 
-                    <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
-                      {winners.length === 0 ? (
-                        <div className="flex h-full min-h-[160px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white px-4 text-center text-sm font-bold text-slate-400">
-                          아직 당첨 기록이 없습니다.
-                        </div>
-                      ) : (
-                        winners.slice(0, 100).map((winner) => (
-                          <div key={winner.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
-                              <div className="min-w-0">
-                                <div className="truncate text-base font-black text-slate-950">🏆 {winner.nickname}</div>
-                                <div className="mt-1 truncate text-sm font-bold text-slate-600">{winner.winner_note || "룰렛 당첨"}</div>
-                                <div className="mt-1 text-xs font-bold text-slate-400">{dateTime(winner.winner_at)}</div>
-                              </div>
-                              <span className={`h-fit shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black ring-1 ${winner.is_test ? "bg-amber-50 text-amber-700 ring-amber-100" : "bg-emerald-50 text-emerald-700 ring-emerald-100"}`}>
-                                {winner.is_test ? "테스트" : "운영"}
-                              </span>
-                            </div>
-
-                            <div className="mt-3 grid grid-cols-2 gap-2">
-                              <button
-                                type="button"
-                                onClick={() => markRewardDone(winner, !winner.is_reward_done)}
-                                className={`rounded-xl px-3 py-2 text-xs font-black transition active:scale-[0.98] ${
-                                  winner.is_reward_done
-                                    ? "bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800"
-                                    : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 active:bg-slate-100"
-                                }`}
-                              >
-                                {winner.is_reward_done ? "지급완료됨" : "지급완료 체크"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void deleteWinnerRecord(winner)}
-                                className={`rounded-xl border bg-white px-3 py-2 text-xs font-black transition active:scale-[0.98] ${
-                                  winner.is_test
-                                    ? "border-red-100 text-red-600 hover:bg-red-50 active:bg-red-100"
-                                    : "border-amber-200 text-amber-700 hover:bg-amber-50 active:bg-amber-100"
-                                }`}
-                              >
-                                기록 삭제
-                              </button>
-                            </div>
+                      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3">
+                        {recentEvents.length === 0 ? (
+                          <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white px-4 text-center text-sm font-bold text-slate-400">
+                            최근 이벤트 없음
                           </div>
-                        ))
-                      )}
-                    </div>
-                  </section>
-
-                  <section className="flex min-h-0 flex-col overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-sm">
-                    <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-3">
-                      <div>
-                        <div className="text-lg font-black text-slate-950">최근 이벤트</div>
-                        <div className="mt-1 text-xs font-bold text-slate-400">최근 {Math.min(events.length, 3)}개</div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={loadEventsAndWinners}
-                        className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-500 transition hover:bg-slate-50"
-                      >
-                        더보기 &gt;
-                      </button>
-                    </div>
-
-                    <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3">
-                      {events.length === 0 ? (
-                        <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white px-4 text-center text-sm font-bold text-slate-400">
-                          최근 이벤트 없음
-                        </div>
-                      ) : (
-                        events.slice(0, 3).map((event, eventIndex) => (
-                          <div key={event.id || `${event.title}-${event.status}-${event.winner_nickname || "none"}-${eventIndex}`} className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                            <button
-                              type="button"
-                              onClick={() => setCurrentEvent(event)}
-                              className="w-full text-left transition active:scale-[0.99]"
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="truncate text-sm font-black text-slate-900">🎁 {event.title}</div>
-                                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ring-1 ${modeBadgeClass(event.mode)}`}>
-                                  {modeLabel(event.mode)}
-                                </span>
-                              </div>
+                        ) : (
+                          recentEvents.map((event, eventIndex) => (
+                            <div key={event.id || `${event.title}-${event.status}-${event.winner_nickname || "none"}-${eventIndex}`} className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                              <div className="truncate text-sm font-black text-slate-900">🎁 {event.title}</div>
                               <div className="mt-1 truncate text-xs font-bold text-slate-500">
                                 {event.status} · {event.winner_nickname || "당첨 전"}
                               </div>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void deleteRouletteEvent(event, "최근 이벤트")}
-                              className="mt-2 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98]"
-                            >
-                              이 룰렛 기록 삭제
-                            </button>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </section>
-                </aside>
-              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </section>
+                  </aside>
+                </div>
+              )}
             </div>
 
             <div className="shrink-0 border-t border-slate-200 bg-white px-6 py-3">
               <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setOpen(false)}
-                    className="h-12 rounded-2xl border border-slate-200 bg-white px-8 text-sm font-black text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] active:bg-slate-100"
-                  >
-                    닫기
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="h-12 rounded-2xl border border-slate-200 bg-white px-8 text-sm font-black text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] active:bg-slate-100"
+                >
+                  닫기
+                </button>
 
                 <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={createEvent}
-                    disabled={loading || participants.length === 0}
-                    className="h-12 rounded-2xl border border-slate-200 bg-white px-12 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50 active:scale-[0.98] active:bg-slate-100 disabled:bg-slate-100 disabled:text-slate-400"
-                  >
-                    저장
-                  </button>
-                  <button
-                    type="button"
-                    onClick={spinEvent}
-                    disabled={spinning || !currentEvent?.id}
-                    className="h-12 rounded-2xl bg-violet-600 px-12 text-sm font-black text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98] active:bg-violet-800 disabled:bg-slate-300 disabled:text-white"
-                  >
-                    {spinning ? "룰렛 진행중..." : "룰렛 시작"}
-                  </button>
+                  {eventTab === "claw" ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={previewClawAnimation}
+                        className="h-12 rounded-2xl border border-slate-200 bg-white px-8 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50 active:scale-[0.98]"
+                      >
+                        연출 미리보기
+                      </button>
+                      <button
+                        type="button"
+                        onClick={startClawEvent}
+                        disabled={spinning || finalParticipants.length === 0}
+                        className="h-12 rounded-2xl bg-violet-600 px-12 text-sm font-black text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98] disabled:bg-slate-300 disabled:text-white"
+                      >
+                        인형뽑기 시작
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={createEvent}
+                        disabled={loading || participants.length === 0}
+                        className="h-12 rounded-2xl border border-slate-200 bg-white px-12 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50 active:scale-[0.98] active:bg-slate-100 disabled:bg-slate-100 disabled:text-slate-400"
+                      >
+                        저장
+                      </button>
+                      <button
+                        type="button"
+                        onClick={spinEvent}
+                        disabled={spinning || !currentEvent?.id}
+                        className="h-12 rounded-2xl bg-violet-600 px-12 text-sm font-black text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98] active:bg-violet-800 disabled:bg-slate-300 disabled:text-white"
+                      >
+                        {spinning ? "룰렛 진행중..." : "룰렛 시작"}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
