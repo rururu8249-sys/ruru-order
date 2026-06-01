@@ -67,6 +67,14 @@ function money(value: unknown) {
   return `${amount.toLocaleString("ko-KR")}원`;
 }
 
+function commaNumberText(value: unknown) {
+  const digits = digitsOnly(value).replace(/^0+(?=\d)/, "");
+
+  if (!digits) return "";
+
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
 function signedMoney(value: unknown) {
   const amount = Math.floor(Number(value || 0));
 
@@ -159,8 +167,8 @@ function CustomerPointActionModal({
           <label className="block">
             <span className="mb-1 block text-xs font-black text-slate-500">{actionLabel} 포인트</span>
             <input
-              value={form.amount}
-              onChange={(event) => setForm((current) => ({ ...current, amount: event.target.value }))}
+              value={commaNumberText(form.amount)}
+              onChange={(event) => setForm((current) => ({ ...current, amount: commaNumberText(event.target.value) }))}
               inputMode="numeric"
               placeholder="예: 10,000"
               className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-lg font-black text-slate-950 outline-none focus:border-blue-400"
@@ -345,7 +353,7 @@ export default function AdminLiveCustomerPointPanel({ customer }: { customer: Po
         body: JSON.stringify({
           phone: phoneKey,
           action: form.mode,
-          amount: form.amount,
+          amount: digitsOnly(form.amount),
           reason: form.reason,
           admin_memo: form.adminMemo,
           youtube_nickname: customer.nickname,
