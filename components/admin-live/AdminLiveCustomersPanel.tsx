@@ -5,6 +5,7 @@
 // 주의: 1차는 조회/화면 구성 전용. 고객 차단 저장, 메모 저장, 주문/입금/배송/정산 로직 없음.
 
 import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
 import type { LiveOrder } from "./types";
 import AdminLiveCustomerIssueRail from "./AdminLiveCustomerIssueRail";
 import AdminLivePhoneBlockPanel from "./AdminLivePhoneBlockPanel";
@@ -33,6 +34,21 @@ type CustomerSummary = {
   blocked: boolean;
   blockReason: string;
   orders: LooseLiveOrder[];
+};
+
+type CustomerProfile = {
+  id?: string | number | null;
+  youtube_nickname?: string | null;
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  zipcode?: string | null;
+  address?: string | null;
+  detail_address?: string | null;
+  is_blocked?: boolean | null;
+  block_reason?: string | null;
+  customer_memo?: string | null;
+  last_order_at?: string | null;
+  created_at?: string | null;
 };
 
 type SortMode = "latest" | "amount" | "orders" | "nickname";
@@ -274,6 +290,17 @@ function buildCustomerKey(order: LooseLiveOrder) {
   return `name:${nickname}:${name}`;
 }
 
+function customerProfileFullAddress(profile: CustomerProfile) {
+  return [clean(profile.address), clean(profile.detail_address)].filter(Boolean).join(" ").trim();
+}
+
+function customerProfileKey(profile: CustomerProfile) {
+  const phone = digitsOnly(profile.customer_phone);
+  if (phone) return `phone:${phone}`;
+
+  return `profile:${clean(profile.id) || clean(profile.customer_name) || clean(profile.youtube_nickname) || "unknown"}`;
+}
+
 function statusBadge(customer: CustomerSummary) {
   if (customer.blocked) {
     return <span className="rounded-lg bg-red-100 px-2 py-1 text-xs font-black text-red-700">{CUSTOMER_TERMS.blocked}</span>;
@@ -395,7 +422,7 @@ function CustomerDetailDrawer({
             icon="🧾"
             label={CUSTOMER_TERMS.orderCount}
             value={`${customer.orderCount.toLocaleString("ko-KR")}건`}
-            sub="현재 주문 데이터 기준"
+            sub="주문+회원 기준"
             valueClassName="whitespace-nowrap text-[18px] leading-tight"
           />
           <SummaryCard
@@ -535,6 +562,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
   const [blockedCustomerPageSize, setBlockedCustomerPageSize] = useState(10);
   const [blockedCustomerPage, setBlockedCustomerPage] = useState(1);
   const [directPhoneBlocks, setDirectPhoneBlocks] = useState<DirectPhoneBlock[]>([]);
+  const [customerProfiles, setCustomerProfiles] = useState<CustomerProfile[]>([]);
 
   useEffect(() => {
     let alive = true;
@@ -566,6 +594,36 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
     };
 
     loadDirectPhoneBlocks();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+
+    const loadCustomerProfiles = async () => {
+      const { data, error } = await supabase
+        .from("customers")
+        .select(
+          "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, is_blocked, block_reason, customer_memo, last_order_at, created_at"
+        )
+        .order("created_at", { ascending: false })
+        .limit(1000);
+
+      if (!alive) return;
+
+      if (error) {
+        console.warn("[admin-live] customers 테이블 불러오기 실패", error.message);
+        setCustomerProfiles([]);
+        return;
+      }
+
+      setCustomerProfiles(((data || []) as CustomerProfile[]).filter((profile) => digitsOnly(profile.customer_phone) || clean(profile.customer_name) || clean(profile.youtube_nickname)));
+    };
+
+    void loadCustomerProfiles();
 
     return () => {
       alive = false;
@@ -628,8 +686,64 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
       }
     });
 
+    customerProfiles.forEach((profile) => {
+      const key = customerProfileKey(profile);
+      const phoneKey = digitsOnly(profile.customer_phone);
+      const current = map.get(key);
+      const override = phoneKey ? blockOverrides[phoneKey] : undefined;
+      const directBlockReason = phoneKey ? directPhoneBlockMap.get(phoneKey) : undefined;
+      const profileBlocked = override ? override.blocked : Boolean(profile.is_blocked) || Boolean(directBlockReason);
+      const profileBlockReason = override ? override.reason : directBlockReason || clean(profile.block_reason);
+      const profileAddress = customerProfileFullAddress(profile);
+      const profileLatestAt = clean(profile.last_order_at) || clean(profile.created_at);
+
+      if (current) {
+        if (!current.nickname || current.nickname === "-") {
+          current.nickname = clean(profile.youtube_nickname) || "닉네임 미입력";
+        }
+
+        if (!current.name || current.name === "-") {
+          current.name = clean(profile.customer_name) || "이름 없음";
+        }
+
+        if (!current.phone) {
+          current.phone = clean(profile.customer_phone);
+        }
+
+        if (!current.address) {
+          current.address = profileAddress;
+        }
+
+        current.blocked = current.blocked || profileBlocked;
+        current.blockReason = current.blockReason || profileBlockReason;
+
+        if (!current.latestOrderAt && profileLatestAt) {
+          current.latestOrderAt = profileLatestAt;
+        }
+
+        return;
+      }
+
+      map.set(key, {
+        key,
+        nickname: clean(profile.youtube_nickname) || "닉네임 미입력",
+        name: clean(profile.customer_name) || "이름 없음",
+        phone: clean(profile.customer_phone),
+        address: profileAddress,
+        orderCount: 0,
+        totalAmount: 0,
+        paidCount: 0,
+        unpaidCount: 0,
+        manualNeededCount: 0,
+        latestOrderAt: profileLatestAt,
+        blocked: profileBlocked,
+        blockReason: profileBlockReason,
+        orders: [],
+      });
+    });
+
     return Array.from(map.values());
-  }, [blockOverrides, directPhoneBlocks, orders]);
+  }, [blockOverrides, customerProfiles, directPhoneBlocks, orders]);
 
   const filteredCustomers = useMemo(() => {
     const searchText = keyword.replace(/\s+/g, "").toLowerCase();
