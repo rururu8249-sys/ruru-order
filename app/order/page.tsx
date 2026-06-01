@@ -3588,12 +3588,10 @@ export default function OrderPage() {
   const registeredOptionPrice = registeredOptionSelectProduct ? Number(registeredOptionSelectProduct.price || 0) : 0;
   const registeredOptionTotalPrice = Math.max(1, registeredOptionQty) * (Number.isFinite(registeredOptionPrice) ? registeredOptionPrice : 0);
 
-  return (
-    <OrderPageShell>
-      {hasSavedInfo && <TopCustomerNav />}
-
-      {isKakaoLoginReturn && !isAutoLoggedIn && (
-        <section className="rounded-[28px] border border-yellow-200 bg-yellow-50 p-4 shadow-sm">
+  if (isKakaoLoginReturn && !isAutoLoggedIn) {
+    return (
+      <OrderPageShell>
+        <section className="rounded-[32px] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
           <OrderKakaoNicknameNotice
             kakaoNickname={kakaoNickname}
             youtubeNickname={youtubeNickname}
@@ -3602,7 +3600,13 @@ export default function OrderPage() {
             onConfirm={confirmKakaoYoutubeNickname}
           />
         </section>
-      )}
+      </OrderPageShell>
+    );
+  }
+
+  return (
+    <OrderPageShell>
+      {hasSavedInfo && <TopCustomerNav />}
 
       {!isAutoLoggedIn && (isEditingCustomerInfo || customerMode === "new") && (
         <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
