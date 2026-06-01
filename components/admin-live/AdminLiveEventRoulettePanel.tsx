@@ -382,6 +382,8 @@ export default function AdminLiveEventRoulettePanel({
           sourceDate,
           broadcastId,
           title,
+          participantSource,
+          participants: finalParticipants,
         }),
       });
 
@@ -420,6 +422,7 @@ export default function AdminLiveEventRoulettePanel({
           action: "spin_event",
           eventId: currentEvent.id,
           winnerNote,
+          fixedWinnerNickname: fixedWinnerNickname.trim(),
         }),
       });
 
@@ -909,7 +912,7 @@ export default function AdminLiveEventRoulettePanel({
                             <button
                               type="button"
                               onClick={createEvent}
-                              disabled={loading || participants.length === 0}
+                              disabled={loading || finalParticipants.length === 0}
                               className="h-11 rounded-2xl border border-slate-200 bg-white text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50 active:scale-[0.98] disabled:bg-slate-100 disabled:text-slate-400"
                             >
                               룰렛 만들기
@@ -1472,7 +1475,7 @@ export default function AdminLiveEventRoulettePanel({
                       <button
                         type="button"
                         onClick={createEvent}
-                        disabled={loading || participants.length === 0}
+                        disabled={loading || finalParticipants.length === 0}
                         className="h-12 rounded-2xl border border-slate-200 bg-white px-12 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50 active:scale-[0.98] active:bg-slate-100 disabled:bg-slate-100 disabled:text-slate-400"
                       >
                         저장

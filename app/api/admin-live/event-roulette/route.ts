@@ -462,6 +462,89 @@ async function applyNoDuplicateWinnerRule(
 }
 
 
+function safeNumber(value: unknown, fallback = 0) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return fallback;
+  }
+
+  return Math.max(0, Math.floor(number));
+}
+
+function normalizeParticipantOrderIds(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.map((item) => cleanText(item)).filter(Boolean);
+}
+
+function normalizeManualParticipantsForEvent(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+  const result: EventRouletteParticipant[] = [];
+
+  for (const raw of value) {
+    const row = raw as Record<string, unknown>;
+    const nickname = cleanText(row.nickname);
+
+    if (!nickname) continue;
+
+    const dedupeKey = normalizeWinnerNicknameForDedupe(nickname);
+    if (!dedupeKey || seen.has(dedupeKey)) continue;
+
+    seen.add(dedupeKey);
+
+    const orderIds = normalizeParticipantOrderIds(row.orderIds || row.order_ids);
+    const orderCount = safeNumber(row.orderCount ?? row.order_count, orderIds.length);
+    const qtySum = safeNumber(row.qtySum ?? row.qty_sum, 0);
+    const amountSum = safeNumber(row.amountSum ?? row.amount_sum, 0);
+    const weightValue = Number(row.weight ?? 1);
+    const weight = Number.isFinite(weightValue) && weightValue > 0 ? weightValue : 1;
+
+    result.push({
+      nickname,
+      orderCount,
+      qtySum,
+      amountSum,
+      orderIds,
+      weight,
+    });
+  }
+
+  return result;
+}
+
+function findRequestedWinner(
+  participants: EventRouletteParticipant[],
+  requestedWinnerNickname: string
+) {
+  const target = normalizeWinnerNicknameForDedupe(requestedWinnerNickname);
+
+  if (!target) {
+    return null;
+  }
+
+  return participants.find((participant) => normalizeWinnerNicknameForDedupe(participant.nickname) === target) || null;
+}
+
+function calculateTotalParticipantWeight(participants: EventRouletteParticipant[]) {
+  return participants.reduce((sum, participant) => {
+    const weight = Number(participant.weight || 1);
+
+    if (!Number.isFinite(weight) || weight <= 0) {
+      return sum + 1;
+    }
+
+    return sum + weight;
+  }, 0);
+}
+
+
 async function handleBroadcasts(request: NextRequest) {
   const authError = await requireAdmin(request);
   if (authError) return authError;
@@ -566,7 +649,12 @@ async function createEvent(body: Record<string, unknown>) {
   const sourceDate = normalizeDateText(body.sourceDate);
   const broadcastId = cleanBroadcastId(body.broadcastId);
   const title = cleanText(body.title) || DEFAULT_TITLE;
-  const rawParticipants = await buildParticipantsForRequest(supabase, mode, sourceDate, broadcastId);
+  const participantSource = cleanText(body.participantSource);
+  const manualParticipants = normalizeManualParticipantsForEvent(body.participants);
+  const useManualParticipants = participantSource === "manual" && manualParticipants.length > 0;
+  const rawParticipants = useManualParticipants
+    ? manualParticipants
+    : await buildParticipantsForRequest(supabase, mode, sourceDate, broadcastId);
   const deduped = await applyNoDuplicateWinnerRule(supabase, rawParticipants, {
     mode,
     isTest: mode === "test",
@@ -677,7 +765,23 @@ async function spinEvent(body: Record<string, unknown>) {
     return json({ ok: false, message: "같은 방송에서 이미 모든 참여자가 당첨되었습니다. 중복당첨 방지를 위해 룰렛을 시작할 수 없습니다." }, 400);
   }
 
-  const picked = pickRouletteWinner(eligibleParticipants);
+  const fixedWinnerNickname = cleanText(body.fixedWinnerNickname);
+  const fixedWinner = fixedWinnerNickname ? findRequestedWinner(eligibleParticipants, fixedWinnerNickname) : null;
+
+  if (fixedWinnerNickname && !fixedWinner) {
+    return json({
+      ok: false,
+      message: "지정한 당첨자가 현재 룰렛 후보에 없습니다. 이미 당첨 제외됐거나 참가자 명단에 없습니다.",
+    }, 400);
+  }
+
+  const picked = fixedWinner
+    ? {
+        winner: fixedWinner,
+        totalWeight: calculateTotalParticipantWeight(eligibleParticipants),
+        randomValue: -1,
+      }
+    : pickRouletteWinner(eligibleParticipants);
   const now = new Date().toISOString();
   const spinDurationMs = calculateRouletteSpinDurationMs(participants.length);
 
