@@ -114,7 +114,7 @@ export default function CustomerPaymentGuideBottomSheet({
               </h2>
               <p className="mt-2 break-keep text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
                 {isOrderComplete
-                  ? "주문서가 접수됐습니다. 아래 내용을 확인해주세요."
+                  ? "입금자명과 계좌번호를 확인해주세요."
                   : "현재 보이는 닉네임으로 입금해주세요."}
               </p>
             </div>
@@ -123,17 +123,6 @@ export default function CustomerPaymentGuideBottomSheet({
               {isOrderComplete ? "✅" : "💙"}
             </div>
           </header>
-
-          {isOrderComplete && (
-            <section className="mt-4 rounded-[22px] bg-slate-950 p-4 text-white shadow-[0_14px_35px_rgba(15,23,42,0.18)]">
-              <p className="text-[13px] font-black tracking-[-0.04em] text-blue-100">
-                접수 완료
-              </p>
-              <p className="mt-1 break-keep text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-white/85">
-                닉네임과 결제금액이 정확히 맞아야 자동 입금확인이 됩니다.
-              </p>
-            </section>
-          )}
 
           {isFullyPaidByPoints && (
             <section className="mt-4 rounded-[22px] bg-emerald-50 p-4 ring-1 ring-emerald-100">
@@ -186,7 +175,7 @@ export default function CustomerPaymentGuideBottomSheet({
                       {safeNickname}
                     </p>
                     <p className="mt-2 break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
-                      현재 닉네임 그대로 입금해야 자동 확인됩니다.
+                      이 닉네임으로 입금해주세요.
                     </p>
                   </div>
 
@@ -237,11 +226,7 @@ export default function CustomerPaymentGuideBottomSheet({
                 </button>
               </div>
 
-              <div className="mt-3 rounded-[18px] bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
-                <p className="break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
-                  입금자명과 결제금액이 주문서와 정확히 같아야 자동 입금확인이 됩니다.
-                </p>
-              </div>
+
             </>
           )}
 
