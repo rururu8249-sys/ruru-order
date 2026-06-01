@@ -1,0 +1,29 @@
+{
+  "machine": "/event-claw/machine.svg",
+  "claw": "/event-claw/claw.svg",
+  "capsules": [
+    {
+      "id": "capsule-pink",
+      "closed": "/event-claw/capsule-pink-closed.svg",
+      "open": "/event-claw/capsule-pink-open.svg"
+    },
+    {
+      "id": "capsule-blue",
+      "closed": "/event-claw/capsule-blue-closed.svg",
+      "open": "/event-claw/capsule-blue-open.svg"
+    }
+  ],
+  "dolls": [
+    {
+      "id": "doll-bear",
+      "front": "/event-claw/doll-bear-front.svg",
+      "back": "/event-claw/doll-bear-back.svg"
+    },
+    {
+      "id": "doll-bunny",
+      "front": "/event-claw/doll-bunny-front.svg",
+      "back": "/event-claw/doll-bunny-back.svg"
+    }
+  ],
+  "paper": "/event-claw/paper-slip.svg"
+}
