@@ -69,8 +69,8 @@ export default function KakaoCallbackPage() {
 
   return (
     <main className="min-h-screen bg-[#f5f8ff] px-2 py-4 text-[#151923] sm:px-4">
-      <section className="mx-auto flex min-h-[calc(100svh-32px)] w-full max-w-[560px] items-start pt-16 min-[390px]:pt-20">
-        <section className="w-full overflow-hidden rounded-[34px] border border-slate-200 bg-white p-5 text-center shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
+      <section className="mx-auto flex min-h-[calc(100svh-32px)] w-full max-w-[560px] items-center">
+        <section className="w-full -translate-y-[4vh] overflow-hidden rounded-[34px] border border-slate-200 bg-white p-5 text-center shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] bg-blue-50 text-[32px] ring-1 ring-blue-100">
             {statusIcon}
           </div>
