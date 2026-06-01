@@ -4,6 +4,8 @@
 
 export type CustomerOrderLookupFilter = "전체" | "입금대기" | "입금확인" | "출고완료";
 
+const BAND_TRACKING_URL = "https://band.us/@ruru8249";
+
 export type CustomerOrderLookupItem = {
   id: string | number;
   productName: string;
@@ -236,6 +238,15 @@ export default function CustomerOrderLookupBottomSheet({
             >
               입금 계좌 보기
             </button>
+
+            <a
+              href={BAND_TRACKING_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="flex min-h-[56px] items-center justify-center rounded-[18px] border border-green-100 bg-green-50 px-3 py-3 text-[15px] font-black tracking-[-0.04em] text-green-700 shadow-sm active:scale-[0.98]"
+            >
+              밴드 송장확인
+            </a>
           </footer>
         </div>
       </section>
