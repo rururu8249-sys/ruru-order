@@ -3094,11 +3094,41 @@ export default function OrderPage() {
     return Number.isFinite(quantity) && quantity > 0 ? `${quantity}개` : "";
   };
 
-  const ruruOrderLookupOrderCode = (order: any) =>
-    ruruOrderLookupText(order?.order_code) ||
-    ruruOrderLookupText(order?.order_number) ||
-    ruruOrderLookupText(order?.order_no) ||
-    ruruOrderLookupText(order?.id);
+  const ruruOrderLookupOrderCode = (order: any) => {
+    const ruruCode =
+      ruruOrderLookupText(order?.order_lookup_code) ||
+      ruruOrderLookupText(order?.order_code) ||
+      ruruOrderLookupText(order?.customer_order_code) ||
+      ruruOrderLookupText(order?.customer_order_number) ||
+      ruruOrderLookupText(order?.public_order_code) ||
+      ruruOrderLookupText(order?.public_order_number) ||
+      ruruOrderLookupText(order?.order_number) ||
+      ruruOrderLookupText(order?.order_no) ||
+      ruruOrderLookupText(order?.code);
+
+    if (ruruCode) return ruruCode.startsWith("RURU-") ? ruruCode : `RURU-${ruruCode}`;
+
+    const shortCode = ruruOrderLookupText(order?.short_code);
+    if (shortCode) return shortCode.startsWith("RURU-") ? shortCode : `RURU-${shortCode}`;
+
+    const rawIdForRuruFallbackOnly = ruruOrderLookupText(order?.id);
+    const createdAt = ruruOrderLookupText(order?.created_at);
+
+    if (!rawIdForRuruFallbackOnly) return "-";
+
+    const cleanId = rawIdForRuruFallbackOnly.replace(/[^0-9A-Za-z]/g, "").toUpperCase();
+    const tail = cleanId.slice(-6).padStart(6, "0");
+
+    if (!createdAt) return `RURU-${tail}`;
+
+    const date = new Date(createdAt);
+    if (Number.isNaN(date.getTime())) return `RURU-${tail}`;
+
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `RURU-${month}${day}-${tail}`;
+  };
 
   const loadOrderLookupOrders = async () => {
     const savedPhone =
