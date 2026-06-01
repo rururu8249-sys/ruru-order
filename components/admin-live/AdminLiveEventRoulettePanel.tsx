@@ -618,7 +618,7 @@ export default function AdminLiveEventRoulettePanel({
       {open ? (
         <div
           className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm"
-          data-ruru-event-ui-shell="event-panel-no-stage-b15-retry"
+          data-ruru-event-ui-shell="event-panel-no-stage-b16-text-card"
         >
           <section className="flex h-[calc(100vh-24px)] w-[min(1580px,calc(100vw-24px))] flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-2xl">
             <header className="shrink-0 border-b border-slate-200 bg-white px-6 py-3">
@@ -734,7 +734,7 @@ export default function AdminLiveEventRoulettePanel({
                 <main className="min-h-0 overflow-hidden rounded-[26px] border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="mb-3 flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                      <div className="text-xl font-black text-slate-950">1. 참가자 설정</div>
+                      <div className="text-lg font-black text-slate-950">1. 참가자 설정</div>
                       <div className="mt-1 text-xs font-bold text-slate-500">자동 명단 또는 수동 입력 명단으로 진행합니다.</div>
                     </div>
 
@@ -763,7 +763,7 @@ export default function AdminLiveEventRoulettePanel({
                   </div>
 
                   <div className="grid h-[calc(100%-54px)] min-h-0 gap-4 xl:grid-cols-[300px_minmax(0,1fr)_300px]">
-                    <div className="flex min-h-0 flex-col gap-3">
+                    <div className="grid min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-3">
                       <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                         <div className="mb-2 text-xs font-black text-slate-500">방송리스트</div>
                         <select
@@ -807,12 +807,32 @@ export default function AdminLiveEventRoulettePanel({
                           className="h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                         />
                       </div>
+
+                      <div className="min-h-0 overflow-hidden rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-pink-50 p-4">
+                        <div className="flex h-full min-h-[120px] flex-col justify-between">
+                          <div>
+                            <div className="text-[11px] font-black text-violet-500">현재 선택된 이벤트</div>
+                            <div className="mt-1 text-lg font-black tracking-tight text-slate-950">
+                              {eventTab === "roulette" ? "🎡 룰렛 이벤트" : "🕹️ 인형뽑기 이벤트"}
+                            </div>
+                            <div className="mt-2 text-[11px] font-bold leading-5 text-slate-500">
+                              {eventTab === "roulette"
+                                ? "주문서 명단을 기준으로 룰렛 당첨자를 뽑습니다."
+                                : "주문서 명단 또는 수동 입력 명단으로 당첨자를 뽑습니다."}
+                            </div>
+                          </div>
+
+                          <div className="mt-3 rounded-2xl bg-white/80 px-3 py-2 text-[11px] font-black text-slate-600 ring-1 ring-violet-100">
+                            {participantSource === "auto" ? "자동 명단 기준" : "수동 입력 기준"} · {finalParticipants.length.toLocaleString("ko-KR")}명
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border-2 border-violet-100 bg-white">
                       <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_92px] items-end gap-3 border-b border-slate-100 px-4 py-3">
                         <div className="min-w-0">
-                          <div className="truncate text-base font-black text-slate-950">주문서 작성자 명단 자동</div>
+                          <div className="truncate text-sm font-black text-slate-950">주문서 작성자 명단 자동</div>
                           <div className="mt-1 text-xs font-bold text-slate-400">
                             총 {autoParticipantCount.toLocaleString("ko-KR")}명 · 닉네임 기준 중복 제거
                           </div>
@@ -857,7 +877,7 @@ export default function AdminLiveEventRoulettePanel({
                     <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_150px] gap-3">
                       <div className="flex min-h-0 flex-col rounded-3xl border border-slate-200 bg-white p-4">
                         <div className="mb-2 flex items-center justify-between">
-                          <div className="text-base font-black text-slate-950">수동 참가자 추가</div>
+                          <div className="text-sm font-black text-slate-950">수동 참가자 추가</div>
                           <span className="rounded-full bg-violet-50 px-3 py-1 text-[11px] font-black text-violet-700">
                             {manualParticipantCount.toLocaleString("ko-KR")}명
                           </span>
@@ -878,7 +898,7 @@ export default function AdminLiveEventRoulettePanel({
                       </div>
 
                       <div className="rounded-3xl border border-slate-200 bg-white p-4">
-                        <div className="text-base font-black text-slate-950">당첨자 미리 지정</div>
+                        <div className="text-sm font-black text-slate-950">당첨자 미리 지정</div>
                         <select
                           value={fixedWinnerNickname}
                           onChange={(event) => setFixedWinnerNickname(event.target.value)}
@@ -913,19 +933,19 @@ export default function AdminLiveEventRoulettePanel({
                     <div className="grid grid-cols-3 gap-3">
                       <div className="rounded-2xl bg-slate-50 p-3">
                         <div className="text-xs font-black text-slate-400">참여자</div>
-                        <div className="mt-1 text-xl font-black text-slate-950">{finalParticipants.length.toLocaleString("ko-KR")}명</div>
+                        <div className="mt-1 text-lg font-black text-slate-950">{finalParticipants.length.toLocaleString("ko-KR")}명</div>
                       </div>
                       <div className="rounded-2xl bg-slate-50 p-3">
                         <div className="text-xs font-black text-slate-400">자동</div>
-                        <div className="mt-1 text-xl font-black text-slate-950">{autoParticipantCount.toLocaleString("ko-KR")}명</div>
+                        <div className="mt-1 text-lg font-black text-slate-950">{autoParticipantCount.toLocaleString("ko-KR")}명</div>
                       </div>
                       <div className="rounded-2xl bg-slate-50 p-3">
                         <div className="text-xs font-black text-slate-400">수동</div>
-                        <div className="mt-1 text-xl font-black text-slate-950">{manualParticipantCount.toLocaleString("ko-KR")}명</div>
+                        <div className="mt-1 text-lg font-black text-slate-950">{manualParticipantCount.toLocaleString("ko-KR")}명</div>
                       </div>
                       <div className="col-span-3 rounded-2xl bg-violet-50 p-3">
                         <div className="text-xs font-black text-violet-500">현재 당첨자</div>
-                        <div className="mt-1 truncate text-lg font-black text-violet-900">🏆 {currentEvent?.winner_nickname || selectedWinnerNickname || "당첨 전"}</div>
+                        <div className="mt-1 truncate text-base font-black text-violet-900">🏆 {currentEvent?.winner_nickname || selectedWinnerNickname || "당첨 전"}</div>
                       </div>
                     </div>
                   </section>
@@ -934,7 +954,7 @@ export default function AdminLiveEventRoulettePanel({
                     <div className="shrink-0 border-b border-slate-100 px-5 py-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="text-xl font-black text-slate-950">당첨자 관리</div>
+                          <div className="text-lg font-black text-slate-950">당첨자 관리</div>
                           <div className="mt-1 truncate text-xs font-bold text-slate-400">
                             당첨자 지급완료, 삭제, 테스트기록 정리를 한 곳에서 관리합니다.
                           </div>
@@ -972,7 +992,7 @@ export default function AdminLiveEventRoulettePanel({
                                   {index + 1}
                                 </div>
                                 <div className="min-w-0">
-                                  <div className="truncate text-base font-black text-slate-950">🏆 {winner.nickname}</div>
+                                  <div className="truncate text-sm font-black text-slate-950">🏆 {winner.nickname}</div>
                                   <div className="mt-1 truncate text-xs font-bold text-slate-500">{dateTime(winner.winner_at)}</div>
                                 </div>
                                 <span className={`h-fit shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black ring-1 ${winner.is_test ? "bg-amber-50 text-amber-700 ring-amber-100" : "bg-emerald-50 text-emerald-700 ring-emerald-100"}`}>
