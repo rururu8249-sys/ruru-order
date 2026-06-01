@@ -124,6 +124,12 @@ export default function CustomerPaymentGuideBottomSheet({
             </div>
           </header>
 
+          {isOrderComplete && showBankGuide && (
+            <div className="mt-4 rounded-[18px] bg-slate-950 px-4 py-3 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-white">
+              닉네임과 결제금액이 정확히 맞아야 자동 입금확인이 됩니다.
+            </div>
+          )}
+
           {isFullyPaidByPoints && (
             <section className="mt-4 rounded-[22px] bg-emerald-50 p-4 ring-1 ring-emerald-100">
               <div className="flex items-start gap-3">
