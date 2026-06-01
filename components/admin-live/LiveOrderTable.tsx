@@ -160,7 +160,7 @@ function statusBadge(order: LiveOrder) {
   }
 
   if (order.paymentStatus === "manual_match_needed") {
-    return <span className="rounded-lg bg-orange-100 px-2 py-1 text-xs font-black text-orange-700">입금확인 필요</span>;
+    return <span className="rounded-lg bg-orange-100 px-2 py-1 text-xs font-black text-orange-700">입금매칭 필요</span>;
   }
   if (order.paymentStatus === "card_unpaid") {
     return <span className="rounded-lg bg-red-100 px-2 py-1 text-xs font-black text-red-700">카드 미결제</span>;
@@ -177,7 +177,7 @@ function statusBadge(order: LiveOrder) {
   if (order.paymentStatus === "manual_paid") {
     return <span className="rounded-lg bg-blue-100 px-2 py-1 text-xs font-black text-blue-700">수동입금확인</span>;
   }
-  return <span className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-700">입금확인완료</span>;
+  return <span className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-700">입금확인</span>;
 }
 
 function testOrderBadge(order: LiveOrder) {
@@ -437,9 +437,9 @@ export default function LiveOrderTable({
 
     const statusLabelMap: Record<LiveOrderStatusFilter, string> = {
       all: "상태: 전체보기",
-      unpaid: "결제대기",
-      paid: "입금확인완료",
-      manual_match_needed: "입금확인 필요",
+      unpaid: "입금대기",
+      paid: "입금확인",
+      manual_match_needed: "입금매칭 필요",
       card_paid: "카드결제완료",
       card_unpaid: "카드 미결제",
     };
@@ -481,8 +481,8 @@ export default function LiveOrderTable({
 
         {[
           ["전체", counts.total, "all"],
-          ["결제대기", counts.unpaid, "unpaid"],
-          ["입금확인완료", counts.paid, "paid"],
+          ["입금대기", counts.unpaid, "unpaid"],
+          ["입금확인", counts.paid, "paid"],
           ["주문서취소", counts.canceled, "canceled"],
         ].map(([label, count, status]) => {
           const active = filters.status === status;
@@ -617,9 +617,9 @@ export default function LiveOrderTable({
           onChange={(event) => updateFilter("status", event.target.value as LiveOrderStatusFilter)}
         >
           <option value="all">상태: 전체보기</option>
-          <option value="unpaid">결제대기</option>
-          <option value="paid">입금확인완료</option>
-          <option value="manual_match_needed">입금확인 필요</option>
+          <option value="unpaid">입금대기</option>
+          <option value="paid">입금확인</option>
+          <option value="manual_match_needed">입금매칭 필요</option>
           <option value="card_paid">카드결제완료</option>
           <option value="card_unpaid">카드 미결제</option>
         </select>
