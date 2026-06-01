@@ -867,6 +867,13 @@ export default function OrderPage() {
   const [nicknameCopyDone, setNicknameCopyDone] = useState(false);
   const [paymentGuideOpen, setPaymentGuideOpen] = useState(false);
   const [customerInfoEditSheetOpen, setCustomerInfoEditSheetOpen] = useState(false);
+  const [customerInfoEditSnapshot, setCustomerInfoEditSnapshot] = useState<{
+    youtubeNickname: string;
+    customerName: string;
+    customerPhone: string;
+    address: string;
+    detailAddress: string;
+  } | null>(null);
   const [orderLookupOpen, setOrderLookupOpen] = useState(false);
   const [orderLookupLoading, setOrderLookupLoading] = useState(false);
   const [orderLookupOrders, setOrderLookupOrders] = useState<any[]>([]);
@@ -2203,6 +2210,7 @@ export default function OrderPage() {
       setIsEditingCustomerInfo(false);
       setIsCustomerInfoOpen(false);
       setCustomerInfoEditSheetOpen(false);
+      setCustomerInfoEditSnapshot(null);
       setPin("");
 
       showCustomerNotice("고객정보수정이 완료되었습니다.");
@@ -3021,7 +3029,28 @@ export default function OrderPage() {
   };
 
   const openCustomerInfoEditBottomSheet = () => {
+    setCustomerInfoEditSnapshot({
+      youtubeNickname,
+      customerName,
+      customerPhone,
+      address,
+      detailAddress,
+    });
     setCustomerInfoEditSheetOpen(true);
+  };
+
+  const closeCustomerInfoEditBottomSheet = () => {
+    if (customerInfoEditSnapshot) {
+      setYoutubeNickname(customerInfoEditSnapshot.youtubeNickname);
+      setCustomerName(customerInfoEditSnapshot.customerName);
+      setCustomerPhone(customerInfoEditSnapshot.customerPhone);
+      setAddress(customerInfoEditSnapshot.address);
+      setDetailAddress(customerInfoEditSnapshot.detailAddress);
+    }
+
+    setYoutubeNicknameError("");
+    setCustomerInfoEditSheetOpen(false);
+    setCustomerInfoEditSnapshot(null);
   };
 
   const ruruOrderLookupWon = (value: unknown) => {
@@ -3494,7 +3523,7 @@ export default function OrderPage() {
           onAddressChange={setAddress}
           onDetailAddressChange={setDetailAddress}
           onOpenAddressSearch={openAddressSearch}
-          onClose={() => setCustomerInfoEditSheetOpen(false)}
+          onClose={closeCustomerInfoEditBottomSheet}
           onSave={completeEditCustomerInfo}
         />
 
@@ -4356,7 +4385,7 @@ export default function OrderPage() {
           onAddressChange={setAddress}
           onDetailAddressChange={setDetailAddress}
           onOpenAddressSearch={openAddressSearch}
-          onClose={() => setCustomerInfoEditSheetOpen(false)}
+          onClose={closeCustomerInfoEditBottomSheet}
           onSave={completeEditCustomerInfo}
         />
 
