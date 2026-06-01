@@ -532,7 +532,7 @@ export default function AdminLiveEventRoulettePanel({
 
     const isLive = event.mode === "live" || event.is_test === false;
     const confirmMessage = isLive
-      ? `운영 룰렛 이벤트를 삭제합니다.\n\n이벤트: ${event.title || sourceLabel}\n당첨자: ${event.winner_nickname || "-"}\n\n이 룰렛 이벤트와 연결 당첨자 기록이 이벤트 기록 / 당첨자 관리에서 모두 삭제됩니다.\n이미 지급/고객 안내한 내용은 별도로 확인해야 합니다.\n\n정말 삭제할까요?`
+      ? `운영 룰렛 이벤트를 삭제합니다.\n\n이벤트: ${event.title || sourceLabel}\n당첨자: ${event.winner_nickname || "-"}\n\n이 룰렛 이벤트와 연결 당첨자 기록이 당첨자 관리에서 모두 삭제됩니다.\n이미 지급/고객 안내한 내용은 별도로 확인해야 합니다.\n\n정말 삭제할까요?`
       : `테스트 룰렛 이벤트를 삭제할까요?\n\n${event.title || sourceLabel}`;
 
     if (!window.confirm(confirmMessage)) return;
@@ -618,7 +618,7 @@ export default function AdminLiveEventRoulettePanel({
       {open ? (
         <div
           className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm"
-          data-ruru-event-ui-shell="event-panel-no-top-close-unified-record-v2"
+          data-ruru-event-ui-shell="event-panel-winner-management-only-v1"
         >
           <section className="flex h-[min(940px,calc(100vh-24px))] w-[min(1580px,calc(100vw-24px))] flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
             <header className="shrink-0 border-b border-slate-200 bg-white px-6 py-4">
@@ -1101,7 +1101,7 @@ export default function AdminLiveEventRoulettePanel({
                         onClick={() => void deleteRouletteEvent(currentEvent, `현재 ${eventTab === "roulette" ? "룰렛" : "인형뽑기"}`)}
                         className="mt-3 h-10 w-full rounded-2xl border border-amber-200 bg-amber-50 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98]"
                       >
-                        현재 이벤트 기록 삭제
+                        현재 당첨 기록 삭제
                       </button>
                     ) : null}
                   </section>
@@ -1110,9 +1110,9 @@ export default function AdminLiveEventRoulettePanel({
                     <div className="shrink-0 border-b border-slate-100 px-5 py-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="text-xl font-black text-slate-950">이벤트 기록 / 당첨자 관리</div>
+                          <div className="text-xl font-black text-slate-950">당첨자 관리</div>
                           <div className="mt-1 truncate text-xs font-bold text-slate-400">
-                            지급완료, 삭제, 테스트기록 정리를 한 곳에서 관리합니다.
+                            당첨자 지급완료, 삭제, 테스트기록 정리를 한 곳에서 관리합니다.
                           </div>
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
@@ -1135,9 +1135,9 @@ export default function AdminLiveEventRoulettePanel({
                     </div>
 
                     <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-                      {recentWinners.length === 0 && recentEvents.length === 0 ? (
+                      {recentWinners.length === 0 ? (
                         <div className="flex h-full min-h-[320px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white px-4 text-center text-sm font-bold text-slate-400">
-                          아직 이벤트 기록이 없습니다.
+                          아직 당첨자 기록이 없습니다.
                         </div>
                       ) : (
                         <div className="space-y-3">
@@ -1186,40 +1186,6 @@ export default function AdminLiveEventRoulettePanel({
                               </div>
                             </div>
                           ))}
-
-                          {recentEvents.length > 0 ? (
-                            <div className="pt-2">
-                              <div className="mb-2 text-xs font-black text-slate-400">이벤트 내역</div>
-                              <div className="space-y-2">
-                                {recentEvents.map((event, eventIndex) => (
-                                  <div key={`event-${event.id || eventIndex}`} className="rounded-2xl border border-slate-100 bg-white p-3">
-                                    <button
-                                      type="button"
-                                      onClick={() => setCurrentEvent(event)}
-                                      className="w-full text-left transition active:scale-[0.99]"
-                                    >
-                                      <div className="flex items-center justify-between gap-2">
-                                        <div className="truncate text-sm font-black text-slate-900">🎁 {event.title}</div>
-                                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ring-1 ${modeBadgeClass(event.mode)}`}>
-                                          {modeLabel(event.mode)}
-                                        </span>
-                                      </div>
-                                      <div className="mt-1 truncate text-xs font-bold text-slate-500">
-                                        {event.status} · {event.winner_nickname || "당첨 전"}
-                                      </div>
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => void deleteRouletteEvent(event, "이벤트 내역")}
-                                      className="mt-2 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98]"
-                                    >
-                                      이 이벤트 기록 삭제
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ) : null}
                         </div>
                       )}
                     </div>
