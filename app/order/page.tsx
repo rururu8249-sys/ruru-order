@@ -4274,6 +4274,19 @@ export default function OrderPage() {
         </>
       )}
 
+        <CustomerPaymentGuideBottomSheet
+          open={paymentGuideOpen}
+          depositNickname={youtubeNickname || customerName}
+          bankName={BANK_NAME}
+          bankAccount={BANK_ACCOUNT}
+          bankHolder={BANK_HOLDER}
+          nicknameCopyDone={nicknameCopyDone}
+          bankCopyDone={copyDone}
+          onCopyNickname={copyDepositNickname}
+          onCopyBankAccount={copyBankAccount}
+          onClose={() => setPaymentGuideOpen(false)}
+        />
+
         <CustomerOrderLookupBottomSheet
           open={orderLookupOpen}
           items={orderLookupVisibleItems}

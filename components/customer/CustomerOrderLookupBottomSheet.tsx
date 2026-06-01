@@ -95,7 +95,6 @@ export default function CustomerOrderLookupBottomSheet({
 
   const safeTotalPages = Math.max(1, totalPages);
   const safePage = clampPage(page, safeTotalPages);
-  const paginationItems = buildPaginationItems(safePage, safeTotalPages);
 
   return (
     <div
@@ -209,48 +208,30 @@ export default function CustomerOrderLookupBottomSheet({
             )}
 
             <nav
-              data-ruru-order-lookup-pagination="shell-v1"
-              className="mt-3 flex items-center justify-center gap-1"
+              data-ruru-order-lookup-pagination="compact-v2"
+              className="mt-3 flex items-center justify-center gap-2"
               aria-label="주문조회 페이지 이동"
             >
               <button
                 type="button"
                 onClick={() => onPageChange(Math.max(1, safePage - 1))}
                 disabled={safePage <= 1}
-                className="flex h-8 min-w-8 items-center justify-center rounded-full bg-slate-50 px-2 text-[12px] font-black text-slate-500 ring-1 ring-slate-100 disabled:opacity-35"
+                className="flex h-10 min-w-10 items-center justify-center rounded-full bg-slate-50 px-3 text-[14px] font-black text-slate-500 ring-1 ring-slate-100 transition active:scale-[0.97] disabled:opacity-30"
               >
                 &lt;
               </button>
 
-              {paginationItems.map((paginationItem, index) =>
-                paginationItem === "..." ? (
-                  <span
-                    key={`ellipsis-${index}`}
-                    className="flex h-8 min-w-8 items-center justify-center text-[12px] font-black text-slate-400"
-                  >
-                    ..
-                  </span>
-                ) : (
-                  <button
-                    key={paginationItem}
-                    type="button"
-                    onClick={() => onPageChange(paginationItem)}
-                    className={
-                      safePage === paginationItem
-                        ? "flex h-8 min-w-8 items-center justify-center rounded-full bg-blue-700 px-2 text-[12px] font-black text-white"
-                        : "flex h-8 min-w-8 items-center justify-center rounded-full bg-slate-50 px-2 text-[12px] font-black text-slate-600 ring-1 ring-slate-100"
-                    }
-                  >
-                    {paginationItem}
-                  </button>
-                )
-              )}
+              <div className="flex h-10 min-w-[104px] items-center justify-center rounded-full bg-slate-50 px-4 text-[14px] font-black tracking-[-0.04em] text-slate-700 ring-1 ring-slate-100">
+                <span className="text-blue-700">{safePage}</span>
+                <span className="mx-1.5 text-slate-300">/</span>
+                <span>{safeTotalPages}</span>
+              </div>
 
               <button
                 type="button"
                 onClick={() => onPageChange(Math.min(safeTotalPages, safePage + 1))}
                 disabled={safePage >= safeTotalPages}
-                className="flex h-8 min-w-8 items-center justify-center rounded-full bg-slate-50 px-2 text-[12px] font-black text-slate-500 ring-1 ring-slate-100 disabled:opacity-35"
+                className="flex h-10 min-w-10 items-center justify-center rounded-full bg-slate-50 px-3 text-[14px] font-black text-slate-500 ring-1 ring-slate-100 transition active:scale-[0.97] disabled:opacity-30"
               >
                 &gt;
               </button>
