@@ -247,23 +247,50 @@ function orderSummary(order: LooseLiveOrder) {
   return clean(order.orderSummary) || clean(order.memo) || clean(order.product_name) || clean(order.productName) || "주문내역 없음";
 }
 
-function orderStatusText(order: LooseLiveOrder) {
+function orderRawStatusText(order: LooseLiveOrder) {
   return clean(order.paymentStatus || order.payment_status || order.order_manage_status || order.admin_order_status_v2);
 }
 
+function formatAdminPaymentStatus(value: unknown) {
+  const status = clean(value);
+  const lower = status.toLowerCase();
+
+  if (!status) return "";
+
+  if (/canceled|cancelled|주문서취소|주문취소|취소/.test(lower)) return "주문서취소";
+  if (/manual_match_needed|입금확인 필요|입금매칭 필요|수동확인/.test(lower)) return "입금매칭 필요";
+  if (/manual_paid|수동입금확인/.test(lower)) return "수동입금확인";
+  if (/auto_paid|자동입금확인/.test(lower)) return "자동입금확인";
+  if (/card_paid|카드결제완료|카드완료/.test(lower)) return "카드결제완료";
+  if (/card_unpaid|카드 미결제|카드미결제/.test(lower)) return "카드 미결제";
+  if (/unpaid|미입금|입금대기|결제대기/.test(lower)) return "입금대기";
+  if (/paid|입금확인|결제완료/.test(lower)) return "입금확인";
+
+  return status;
+}
+
+function orderStatusText(order: LooseLiveOrder) {
+  return formatAdminPaymentStatus(orderRawStatusText(order));
+}
+
 function isPaid(order: LooseLiveOrder) {
-  const status = orderStatusText(order);
+  const status = orderRawStatusText(order);
+
+  if (/manual_match_needed|입금확인 필요|입금매칭 필요|수동확인|unpaid|미입금|입금대기|결제대기|card_unpaid|카드 미결제/i.test(status)) {
+    return false;
+  }
+
   return /paid|입금확인|자동입금확인|수동입금확인|카드결제완료|결제완료/i.test(status);
 }
 
 function isManualNeeded(order: LooseLiveOrder) {
-  const status = orderStatusText(order);
-  return /manual_match_needed|입금확인 필요|수동확인/i.test(status);
+  const status = orderRawStatusText(order);
+  return /manual_match_needed|입금확인 필요|입금매칭 필요|수동확인/i.test(status);
 }
 
 function isUnpaid(order: LooseLiveOrder) {
-  const status = orderStatusText(order);
-  return /unpaid|미입금|카드 미결제|card_unpaid/i.test(status) || isManualNeeded(order);
+  const status = orderRawStatusText(order);
+  return /unpaid|미입금|입금대기|결제대기|카드 미결제|card_unpaid/i.test(status) || isManualNeeded(order);
 }
 
 function isBlockedOrder(order: LooseLiveOrder) {
