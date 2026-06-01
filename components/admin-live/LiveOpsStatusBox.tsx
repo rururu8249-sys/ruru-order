@@ -121,7 +121,7 @@ function buildAutoPaidCopyText(orders: RecentOrder[]) {
     .map((order) => `${maskNicknameForPayment(order.maskedNickname || order.nickname)}님 ${money(order.amount)}`)
     .join(" ｜ ");
 
-  return `💰 입금확인완료 ｜ ${body} ｜ 입금 감사합니다 :)`;
+  return `💰 입금확인 ｜ ${body} ｜ 입금 감사합니다 :)`;
 }
 
 async function copyToClipboard(text: string) {
@@ -244,7 +244,7 @@ export default function LiveOpsStatusBox() {
     const targets = autoPaidOrders.slice(0, 3);
 
     if (!targets.length) {
-      showAdminToast("복사할 입금확인완료 알림이 없습니다.");
+      showAdminToast("복사할 입금확인 알림이 없습니다.");
       return;
     }
 
@@ -270,9 +270,9 @@ export default function LiveOpsStatusBox() {
         })
       );
 
-      showAdminToast(`입금확인완료 ${targets.length}건 복사완료`, "success");
+      showAdminToast(`입금확인 ${targets.length}건 복사완료`, "success");
     } catch {
-      showAdminToast("입금확인완료 자동복사에 실패했습니다. 다시 시도해주세요.", "error");
+      showAdminToast("입금확인 자동복사에 실패했습니다. 다시 시도해주세요.", "error");
     }
   };
 
@@ -347,7 +347,7 @@ export default function LiveOpsStatusBox() {
           .map((order) => ({
             id: `auto-${order.id}`,
             type: "auto_paid" as const,
-            title: "입금확인완료",
+            title: "입금확인",
             body: `${maskNicknameForPayment(order.maskedNickname || order.nickname)}님 · ${money(order.amount)}`,
             createdAt: order.paidAt || order.createdAt,
           }));
@@ -412,7 +412,7 @@ export default function LiveOpsStatusBox() {
 
       <div className="grid grid-cols-2 gap-1.5">
         <MiniStat label="새 주문서" value={recentOrders.length} />
-        <MiniStat label="입금확인완료" value={autoPaidOrders.length} />
+        <MiniStat label="입금확인" value={autoPaidOrders.length} />
       </div>
 
       <div className="mt-2 grid grid-cols-1 gap-1.5">
@@ -432,7 +432,7 @@ export default function LiveOpsStatusBox() {
           disabled={!autoPaidOrders.length}
           className="flex w-full items-center justify-between rounded-xl border border-emerald-100 bg-white px-3 py-2 text-left hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-45"
         >
-          <span className="text-[11px] font-black text-emerald-800">💰 입금확인완료 복사</span>
+          <span className="text-[11px] font-black text-emerald-800">💰 입금확인 복사</span>
           <span className="text-[11px] font-black text-emerald-600">{Math.min(3, autoPaidOrders.length)}건</span>
         </button>
       </div>

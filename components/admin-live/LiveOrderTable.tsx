@@ -166,7 +166,7 @@ function statusBadge(order: LiveOrder) {
     return <span className="rounded-lg bg-red-100 px-2 py-1 text-xs font-black text-red-700">카드 미결제</span>;
   }
   if (order.paymentStatus === "unpaid") {
-    return <span className="rounded-lg bg-red-100 px-2 py-1 text-xs font-black text-red-700">무통장 미입금</span>;
+    return <span className="rounded-lg bg-red-100 px-2 py-1 text-xs font-black text-red-700">입금대기</span>;
   }
   if (order.paymentStatus === "card_paid") {
     return <span className="rounded-lg bg-violet-100 px-2 py-1 text-xs font-black text-violet-700">카드결제완료</span>;
