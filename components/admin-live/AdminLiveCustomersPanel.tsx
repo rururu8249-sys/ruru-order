@@ -1005,8 +1005,12 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
             <SummaryCard
               icon="⛔"
               label="차단 고객"
-              value={`${blockedTotalCount.toLocaleString("ko-KR")}명`}
-              sub="클릭하면 차단목록 확인"
+              value={`${customers.filter((customer) => customer.blocked).length.toLocaleString("ko-KR")}명`}
+              sub={
+                directPhoneBlocks.length > 0
+                  ? `전화번호 전용 차단 ${directPhoneBlocks.length.toLocaleString("ko-KR")}건 별도`
+                  : "클릭하면 차단목록 확인"
+              }
             />
           </button>
           <SummaryCard icon="⚠️" label="관리필요 고객" value={`${attentionCustomers.length.toLocaleString("ko-KR")}명`} sub="미입금 / 입금확인 필요" />
