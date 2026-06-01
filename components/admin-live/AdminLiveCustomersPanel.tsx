@@ -692,8 +692,8 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
       const current = map.get(key);
       const override = phoneKey ? blockOverrides[phoneKey] : undefined;
       const directBlockReason = phoneKey ? directPhoneBlockMap.get(phoneKey) : undefined;
-      const profileBlocked = override ? override.blocked : Boolean(profile.is_blocked) || Boolean(directBlockReason);
-      const profileBlockReason = override ? override.reason : directBlockReason || clean(profile.block_reason);
+      const profileBlocked = override ? override.blocked : Boolean(directBlockReason);
+      const profileBlockReason = profileBlocked ? override?.reason || directBlockReason || clean(profile.block_reason) : "";
       const profileAddress = customerProfileFullAddress(profile);
       const profileLatestAt = clean(profile.last_order_at) || clean(profile.created_at);
 
