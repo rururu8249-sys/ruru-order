@@ -435,8 +435,8 @@ function CustomerDetailDrawer({
           <SummaryCard
             icon="🕒"
             label={CUSTOMER_TERMS.latestOrder}
-            value={formatOrderDateTime(customer.latestOrderAt)}
-            sub="가장 최근 주문"
+            value={customer.orderCount > 0 ? formatOrderDateTime(customer.latestOrderAt) : "주문 전 회원"}
+            sub={customer.orderCount > 0 ? "가장 최근 주문" : "카톡 로그인/회원등록 고객"}
             valueClassName="text-[13px] leading-[1.25] tracking-[-0.02em]"
             subClassName="text-[12px]"
           />
@@ -1115,9 +1115,20 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
                       </td>
                       <td className="truncate px-3 py-3 font-bold text-slate-700">{customer.name}</td>
                       <td className="px-3 py-3 font-bold text-slate-600">{formatPhone(customer.phone)}</td>
-                      <td className="px-3 py-3 text-right font-black text-slate-800">{customer.orderCount.toLocaleString("ko-KR")}건</td>
+                      <td className="px-3 py-3 text-right font-black text-slate-800">
+                        <div className="flex flex-col items-end gap-1">
+                          <span>{customer.orderCount.toLocaleString("ko-KR")}건</span>
+                          {customer.orderCount === 0 ? (
+                            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-black tracking-[-0.04em] text-blue-700">
+                              주문전 회원
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
                       <td className="px-3 py-3 text-right font-black text-slate-950">{money(customer.totalAmount)}</td>
-                      <td className="px-3 py-3 font-bold text-slate-600">{formatOrderDateTime(customer.latestOrderAt)}</td>
+                      <td className="px-3 py-3 font-bold text-slate-600">
+                        {customer.orderCount > 0 ? formatOrderDateTime(customer.latestOrderAt) : "주문 전 회원"}
+                      </td>
                       <td className="px-3 py-3 text-center">
                         <button
                           type="button"
