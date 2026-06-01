@@ -989,7 +989,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
         </div>
 
         <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <SummaryCard icon="👥" label="전체 고객" value={`${customers.length.toLocaleString("ko-KR")}명`} sub="현재 주문 데이터 기준" />
+          <SummaryCard icon="👥" label="전체 고객" value={`${customers.length.toLocaleString("ko-KR")}명`} sub="주문+회원 기준" />
           <SummaryCard icon="✅" label="정상 고객" value={`${normalCustomers.length.toLocaleString("ko-KR")}명`} sub="차단 제외" />
           <button
             type="button"
