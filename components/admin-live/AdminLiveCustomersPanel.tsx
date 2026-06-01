@@ -1027,7 +1027,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
               }
             />
           </button>
-          <SummaryCard icon="⚠️" label="관리필요 고객" value={`${attentionCustomers.length.toLocaleString("ko-KR")}명`} sub="미입금 / 입금확인 필요" />
+          <SummaryCard icon="⚠️" label="관리필요 고객" value={`${attentionCustomers.length.toLocaleString("ko-KR")}명`} sub="입금대기 / 입금매칭 필요" />
         </div>
       </div>
 

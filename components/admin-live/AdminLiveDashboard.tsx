@@ -1814,7 +1814,7 @@ export default function AdminLiveDashboard() {
                                       <div className="mt-2 text-3xl font-black text-blue-600">{money(activePeriodOrderAmount)}</div>
                                     </div>
                                     <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">
-                                      <div className="text-xs font-black text-red-500">미입금/대기</div>
+                                      <div className="text-xs font-black text-red-500">입금대기</div>
                                       <div className="mt-2 text-3xl font-black text-red-600">{unpaidOrders.length}건</div>
                                     </div>
                                     <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">

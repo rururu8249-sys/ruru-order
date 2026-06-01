@@ -88,13 +88,13 @@ function formatFullDateTime(value: string | null | undefined, fallback?: string 
 
 function getPaymentStatusLabel(order: LiveOrder) {
   if (order.paymentStatus === "canceled") return "주문서취소";
-  if (order.paymentStatus === "manual_match_needed") return "입금확인 필요";
+  if (order.paymentStatus === "manual_match_needed") return "입금매칭 필요";
   if (order.paymentStatus === "manual_paid") return "수동입금확인";
   if (order.paymentStatus === "auto_paid") return "자동입금확인";
   if (order.paymentStatus === "card_paid") return "카드결제완료";
   if (order.paymentStatus === "card_unpaid") return "카드 미결제";
-  if (order.paymentStatus === "unpaid") return "무통장 미입금";
-  return "입금확인완료";
+  if (order.paymentStatus === "unpaid") return "입금대기";
+  return "입금확인";
 }
 
 function getPaymentStatusClass(order: LiveOrder) {
@@ -397,7 +397,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 
           {["manual_paid", "auto_paid", "paid"].includes(orderForView.paymentStatus) ? (
             <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-bold leading-4 text-slate-500">
-              입금확인완료 주문입니다. 입금확인을 잘못 처리한 경우에는 [입금확인 취소]를 사용하세요. 주문 자체를 없애야 하는 경우에만 [주문서 자체 취소]를 사용하세요.
+              입금확인 주문입니다. 입금확인을 잘못 처리한 경우에는 [입금확인 취소]를 사용하세요. 주문 자체를 없애야 하는 경우에만 [주문서 자체 취소]를 사용하세요.
             </div>
           ) : null}
 

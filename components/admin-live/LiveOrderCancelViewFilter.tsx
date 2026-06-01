@@ -54,7 +54,7 @@ export default function LiveOrderCancelViewFilter({
         onClick={() => onChange("canceled")}
         className={["rounded-xl px-3 py-1.5 text-xs font-black", buttonClass(value === "canceled", "red")].join(" ")}
       >
-        취소만 보기 {canceledCount.toLocaleString("ko-KR")}
+        주문서취소만 보기 {canceledCount.toLocaleString("ko-KR")}
       </button>
     </div>
   );

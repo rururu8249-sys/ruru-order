@@ -71,8 +71,8 @@ function mapPaymentStatus(order: LooseRow) {
   if (/auto_paid|자동입금확인/i.test(raw)) return "자동입금확인";
   if (/card_paid|card_done|카드결제완료|카드완료/i.test(raw)) return "카드결제완료";
   if (/paid|confirmed|complete|입금확인|결제완료/i.test(raw)) return "입금확인";
-  if (/manual_match_needed|입금확인 필요|수동확인/i.test(raw)) return "입금확인 필요";
-  if (/unpaid|미입금|card_unpaid|카드 미결제/i.test(raw)) return "미입금";
+  if (/manual_match_needed|입금확인 필요|수동확인/i.test(raw)) return "입금매칭 필요";
+  if (/unpaid|미입금|card_unpaid|카드 미결제/i.test(raw)) return "입금대기";
 
   return raw || "주문확인전";
 }

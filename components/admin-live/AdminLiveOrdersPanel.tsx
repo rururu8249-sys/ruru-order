@@ -105,7 +105,7 @@ export default function AdminLiveOrdersPanel({
       />
 
       <div className="rounded-2xl bg-amber-50 px-4 py-3 text-xs font-black leading-5 text-amber-700">
-        현재 주문관리 메뉴는 조회/검색/필터/상세보기 전용입니다. 입금확인 필요 주문의 수동매칭은 아직 방송 화면에서만 처리합니다.
+        현재 주문관리 메뉴는 조회/검색/필터/상세보기 전용입니다. 입금매칭 필요 주문의 수동매칭은 아직 방송 화면에서만 처리합니다.
       </div>
 
       {orderDetailOpen && selectedOrder ? (
