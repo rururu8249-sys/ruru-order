@@ -3445,8 +3445,8 @@ export default function OrderPage() {
     };
 
     return (
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-[#f8fafc]/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-[430px] flex-col gap-2">
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-[#f8fafc]/95 px-2 py-3 backdrop-blur sm:px-4">
+        <div className="mx-auto flex w-full max-w-[560px] flex-col gap-2">
           <div className="flex items-center justify-between gap-3">
             <Link href="/order" className="text-[17px] font-black tracking-[-0.05em] text-slate-950">
               루루동이 LIVE
@@ -3554,7 +3554,7 @@ export default function OrderPage() {
 
       {isAutoLoggedIn && (
         <>
-          <section className="mt-4 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+          <section className="mt-3 rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm">
             <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
               모바일 간편주문
             </p>
@@ -3577,7 +3577,7 @@ export default function OrderPage() {
 
           <section
             id="orderProductInputSection"
-            className="mt-4 w-full max-w-full overflow-hidden rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm"
+            className="mt-3 w-full max-w-full overflow-hidden rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm"
           >
             <div className="mb-4">
               <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
@@ -3599,7 +3599,7 @@ export default function OrderPage() {
             </div>
           </section>
 
-          <section className="mt-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
+          <section className="mt-3 rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-50 text-[22px] font-black text-blue-700 ring-1 ring-blue-100">
                 +
@@ -3618,13 +3618,13 @@ export default function OrderPage() {
             <button
               type="button"
               onClick={openDirectInputSheet}
-              className={`${buttonBase} mt-4 w-full rounded-[20px] border border-blue-200 bg-blue-50 px-4 py-4 text-[15px] font-black tracking-[-0.04em] text-blue-800`}
+              className={`${buttonBase} mt-3 w-full rounded-[18px] border border-blue-200 bg-blue-50 px-3 py-3 text-[15px] font-black tracking-[-0.04em] text-blue-800`}
             >
               직접 입력하기
             </button>
           </section>
 
-          <section className="mt-4 w-full max-w-full overflow-hidden rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
+          <section className="mt-3 w-full max-w-full overflow-hidden rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm">
             <div className="mb-4">
               <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
                 주문서 담은 상품
@@ -3644,7 +3644,7 @@ export default function OrderPage() {
                 </p>
               </div>
             ) : (
-              <div className="grid w-full max-w-full gap-3 overflow-hidden">
+              <div className="grid w-full max-w-full gap-2 overflow-hidden">
                 {selectedItemEntries.map(({ item, index }) => {
                   const matchedRegisteredProduct = findMatchedBroadcastProduct(item, broadcastProducts);
                   const itemIsRegisteredProduct = Boolean(item.product_id || matchedRegisteredProduct);
@@ -3661,11 +3661,11 @@ export default function OrderPage() {
                   return (
                     <article
                       key={`selected-item-${index}`}
-                      data-ruru-selected-item-card="mobile-rescue-v1"
-                      className="rounded-[26px] border border-slate-200 bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.06)]"
+                      data-ruru-selected-item-card="wide-compact-v1"
+                      className="rounded-[22px] border border-slate-200 bg-white p-2.5 shadow-[0_8px_20px_rgba(15,23,42,0.05)]"
                     >
-                      <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-3">
-                        <div className="h-[88px] w-[88px] overflow-hidden rounded-[18px] bg-slate-100 ring-1 ring-slate-200">
+                      <div className="grid grid-cols-[78px_minmax(0,1fr)] gap-2.5">
+                        <div className="h-[78px] w-[78px] overflow-hidden rounded-[16px] bg-slate-100 ring-1 ring-slate-200">
                           {imageUrl ? (
                             <img
                               src={imageUrl}
@@ -3673,48 +3673,67 @@ export default function OrderPage() {
                               className="h-full w-full object-cover"
                             />
                           ) : (
-                            <div className="flex h-full w-full items-center justify-center px-2 text-center text-[11px] font-black leading-tight tracking-[-0.04em] text-slate-400">
+                            <div className="flex h-full w-full items-center justify-center px-2 text-center text-[10px] font-black leading-tight tracking-[-0.04em] text-slate-400">
                               {itemSourceLabel}
                             </div>
                           )}
                         </div>
 
                         <div className="min-w-0">
-                          <div className="mb-1 flex min-w-0 flex-wrap items-center gap-1.5">
-                            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-black tracking-[-0.04em] text-blue-700 ring-1 ring-blue-100">
-                              상품 {index + 1}
-                            </span>
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-black tracking-[-0.04em] ring-1 ${
-                                itemIsRegisteredProduct
-                                  ? "bg-blue-50 text-blue-700 ring-blue-100"
-                                  : "bg-amber-50 text-amber-700 ring-amber-100"
-                              }`}
-                            >
-                              {itemSourceLabel}
-                            </span>
+                          <div className="flex min-w-0 items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="mb-1 flex min-w-0 flex-wrap items-center gap-1">
+                                <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-black tracking-[-0.04em] text-blue-700 ring-1 ring-blue-100">
+                                  상품 {index + 1}
+                                </span>
+                                <span
+                                  className={`rounded-full px-1.5 py-0.5 text-[10px] font-black tracking-[-0.04em] ring-1 ${
+                                    itemIsRegisteredProduct
+                                      ? "bg-blue-50 text-blue-700 ring-blue-100"
+                                      : "bg-amber-50 text-amber-700 ring-amber-100"
+                                  }`}
+                                >
+                                  {itemSourceLabel}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex shrink-0 items-center gap-1">
+                              {!canInlineChangeQty && (
+                                <button
+                                  type="button"
+                                  onClick={() => openDirectInputEditSheet(index)}
+                                  className={`${buttonBase} rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-[11px] font-black tracking-[-0.04em] text-blue-700`}
+                                >
+                                  수정
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => removeItem(index)}
+                                className={`${buttonBase} rounded-full border border-red-100 bg-white px-2 py-1 text-[11px] font-black tracking-[-0.04em] text-red-500`}
+                              >
+                                삭제
+                              </button>
+                            </div>
                           </div>
 
-                          <h3 className="line-clamp-2 break-keep text-[16px] font-black leading-snug tracking-[-0.06em] text-slate-950">
+                          <h3 className="mt-0.5 line-clamp-2 break-keep pr-1 text-[16px] font-black leading-snug tracking-[-0.06em] text-slate-950">
                             {item.product_name || "상품명 없음"}
                           </h3>
 
-                          <div className="mt-1 grid gap-0.5 text-[12px] font-bold tracking-[-0.04em] text-slate-500">
-                            <p className="min-w-0 truncate">
-                              {itemHasNoOptions ? "옵션 없음" : `${optionColorText} / ${optionSizeText}`}
-                            </p>
-                            <p className="font-black text-slate-700">
-                              단가 {won(toNumber(item.product_price))}
-                            </p>
-                          </div>
+                          <p className="mt-1 min-w-0 truncate text-[12px] font-bold tracking-[-0.04em] text-slate-500">
+                            {itemHasNoOptions ? "옵션 없음" : `${optionColorText} / ${optionSizeText}`} · 단가 {won(toNumber(item.product_price))}
+                          </p>
                         </div>
                       </div>
 
-                      <div className="mt-3 flex items-center justify-between gap-2 rounded-[18px] bg-slate-50 px-3 py-2 ring-1 ring-slate-100">
+                      <div className="mt-2 flex items-center justify-between gap-2 rounded-[16px] bg-slate-50 px-2.5 py-2 ring-1 ring-slate-100">
                         {canInlineChangeQty ? (
                           <div
                             data-ruru-selected-item-inline-qty="enabled"
-                            className="grid h-10 w-[118px] grid-cols-3 overflow-hidden rounded-[14px] border border-slate-200 bg-white"
+                            className="grid h-10 w-[116px] grid-cols-3 overflow-hidden rounded-[14px] border border-slate-200 bg-white"
                           >
                             <button
                               type="button"
@@ -3746,33 +3765,13 @@ export default function OrderPage() {
                         )}
 
                         <div className="min-w-0 text-right">
-                          <p className="text-[11px] font-black tracking-[-0.04em] text-slate-400">
+                          <p className="text-[10px] font-black tracking-[-0.04em] text-slate-400">
                             상품금액
                           </p>
                           <p className="text-[21px] font-black leading-tight tracking-[-0.07em] text-blue-700">
                             {won(itemAmount)}
                           </p>
                         </div>
-                      </div>
-
-                      <div className="mt-3 flex items-center justify-end gap-1.5">
-                        {!canInlineChangeQty && (
-                          <button
-                            type="button"
-                            onClick={() => openDirectInputEditSheet(index)}
-                            className={`${buttonBase} rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-[12px] font-black tracking-[-0.04em] text-blue-700`}
-                          >
-                            수정
-                          </button>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => removeItem(index)}
-                          className={`${buttonBase} rounded-full border border-red-100 bg-white px-3 py-1.5 text-[12px] font-black tracking-[-0.04em] text-red-500`}
-                        >
-                          삭제
-                        </button>
                       </div>
                     </article>
                   );
@@ -3783,7 +3782,7 @@ export default function OrderPage() {
 
           <section
             data-ruru-payment-section="redesigned"
-            className="mt-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm"
+            className="mt-3 rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -3848,7 +3847,7 @@ export default function OrderPage() {
 
           <section
             data-ruru-price-section="redesigned"
-            className="mt-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm"
+            className="mt-3 rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm"
           >
             <div className="min-w-0">
               <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
@@ -4270,8 +4269,8 @@ export default function OrderPage() {
             </div>
           )}
 
-          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
-            <div className="mx-auto flex max-w-[430px] items-center gap-3">
+          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 pb-[max(16px,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:px-4">
+            <div className="mx-auto flex max-w-[560px] items-center gap-3">
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-black tracking-[-0.04em] text-slate-400">
                   총 결제금액
