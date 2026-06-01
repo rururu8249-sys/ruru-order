@@ -63,7 +63,6 @@ import OrderPriceSummaryBox from "@/components/order/OrderPriceSummaryBox";
 import OrderDepositConfirmModal from "@/components/order/OrderDepositConfirmModal";
 import OrderCustomerInfoIntro from "@/components/order/OrderCustomerInfoIntro";
 import OrderCustomerInfoFormCard from "@/components/order/OrderCustomerInfoFormCard";
-import OrderCompletePaymentNotice from "@/components/order/OrderCompletePaymentNotice";
 import CustomerPaymentGuideBottomSheet from "@/components/customer/CustomerPaymentGuideBottomSheet";
 import CustomerInfoEditBottomSheet from "@/components/customer/CustomerInfoEditBottomSheet";
 import CustomerOrderLookupBottomSheet, {
@@ -2961,9 +2960,7 @@ export default function OrderPage() {
         finalAmount: savedFinalAmount,
       });
 
-      if (paymentMethod === "무통장입금" && savedFinalAmount > 0) {
-        setPaymentGuideOpen(true);
-      }
+      setPaymentGuideOpen(true);
 
       clearOrderDraftData();
 
@@ -3494,82 +3491,6 @@ export default function OrderPage() {
     );
   };
 
-  if (done) {
-    return (
-      <main className="min-h-screen bg-[#f8fafc] px-4 py-4 text-slate-950">
-        <CustomerPaymentGuideBottomSheet
-          open={paymentGuideOpen}
-          depositNickname={done.nickname || youtubeNickname || customerName}
-          bankName={BANK_NAME}
-          bankAccount={BANK_ACCOUNT}
-          bankHolder={BANK_HOLDER}
-          nicknameCopyDone={nicknameCopyDone}
-          bankCopyDone={copyDone}
-          onCopyNickname={copyDepositNickname}
-          onCopyBankAccount={copyBankAccount}
-          onClose={() => setPaymentGuideOpen(false)}
-        />
-        <CustomerInfoEditBottomSheet
-          open={customerInfoEditSheetOpen}
-          youtubeNickname={youtubeNickname}
-          customerName={customerName}
-          customerPhone={formatPhone(customerPhone)}
-          address={address}
-          detailAddress={detailAddress}
-          youtubeNicknameError={youtubeNicknameError}
-          onYoutubeNicknameChange={setYoutubeNickname}
-          onCustomerNameChange={setCustomerName}
-          onCustomerPhoneChange={(value) => setCustomerPhone(normalizePhone(value))}
-          onAddressChange={setAddress}
-          onDetailAddressChange={setDetailAddress}
-          onOpenAddressSearch={openAddressSearch}
-          onClose={closeCustomerInfoEditBottomSheet}
-          onSave={completeEditCustomerInfo}
-        />
-
-        <CustomerOrderLookupBottomSheet
-          open={orderLookupOpen}
-          items={orderLookupVisibleItems}
-          activeFilter={orderLookupFilter}
-          page={orderLookupSafePage}
-          totalPages={orderLookupTotalPages}
-          filters={ORDER_LOOKUP_FILTERS}
-          onFilterChange={(filter) => {
-            setOrderLookupFilter(filter);
-            setOrderLookupPage(1);
-          }}
-          onPageChange={setOrderLookupPage}
-          onClose={() => setOrderLookupOpen(false)}
-          onOpenPaymentGuide={() => {
-            setOrderLookupOpen(false);
-            setPaymentGuideOpen(true);
-          }}
-        />
-        <section className="mx-auto w-full max-w-[430px]">
-          <TopCustomerNav />
-
-          <OrderCompletePaymentNotice
-            nickname={done.nickname}
-            name={done.name}
-            paymentMethod={done.paymentMethod}
-            productAmount={done.productAmount}
-            shippingFee={done.shippingFee}
-            totalAmount={done.totalAmount}
-            pointUsedAmount={done.pointUsedAmount}
-            finalAmount={done.finalAmount}
-            bankName={BANK_NAME}
-            bankAccount={BANK_ACCOUNT}
-            bankHolder={BANK_HOLDER}
-            items={done.items}
-          />
-
-          <footer className="py-8 text-center text-[11px] font-bold tracking-[-0.03em] text-slate-400">
-            © 2024 RURUDONGI. All rights reserved.
-          </footer>
-        </section>
-      </main>
-    );
-  }
 
   const customerInfoMissing =
     !youtubeNickname.trim() ||
@@ -4379,7 +4300,7 @@ export default function OrderPage() {
 
         <CustomerPaymentGuideBottomSheet
           open={paymentGuideOpen}
-          depositNickname={youtubeNickname || customerName}
+          depositNickname={done?.nickname || youtubeNickname || customerName}
           bankName={BANK_NAME}
           bankAccount={BANK_ACCOUNT}
           bankHolder={BANK_HOLDER}
@@ -4388,6 +4309,14 @@ export default function OrderPage() {
           onCopyNickname={copyDepositNickname}
           onCopyBankAccount={copyBankAccount}
           onClose={() => setPaymentGuideOpen(false)}
+          isOrderComplete={Boolean(done)}
+          paymentMethod={done?.paymentMethod || paymentMethod}
+          items={done?.items || []}
+          productAmount={done?.productAmount || 0}
+          shippingFee={done?.shippingFee || 0}
+          totalAmount={done?.totalAmount || 0}
+          pointUsedAmount={done?.pointUsedAmount || 0}
+          finalAmount={done?.finalAmount}
         />
 
         <CustomerInfoEditBottomSheet
