@@ -89,7 +89,7 @@ export default function CustomerOrderLookupBottomSheet({
       <section className="w-full max-w-[430px] overflow-hidden rounded-t-[30px] bg-white shadow-[0_-22px_70px_rgba(15,23,42,0.22)]">
         <div className="mx-auto mt-3 h-1.5 w-14 rounded-full bg-slate-200" />
 
-        <div className="flex h-[89dvh] max-h-[89dvh] flex-col">
+        <div className="flex h-[88dvh] max-h-[88dvh] flex-col">
           <header className="shrink-0 px-4 pb-1.5 pt-4">
             <div className="flex items-baseline gap-2 whitespace-nowrap">
               <h2 className="text-[26px] font-black leading-none tracking-[-0.08em] text-slate-950">
