@@ -618,7 +618,7 @@ export default function AdminLiveEventRoulettePanel({
       {open ? (
         <div
           className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm"
-          data-ruru-event-ui-shell="event-panel-b17-compact-current-card"
+          data-ruru-event-ui-shell="event-panel-b18-more-compact-current-card"
         >
           <section className="flex h-[calc(100vh-24px)] w-[min(1580px,calc(100vw-24px))] flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-2xl">
             <header className="shrink-0 border-b border-slate-200 bg-white px-6 py-3">
@@ -811,7 +811,7 @@ export default function AdminLiveEventRoulettePanel({
                       <div className="min-h-0 overflow-hidden rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-pink-50 p-4">
                         <div className="flex h-full min-h-[120px] flex-col justify-between">
                           <div>
-                            <div className="text-[11px] font-black text-violet-500">현재 선택된 이벤트</div>
+                            <div className="text-[10px] font-black text-violet-500">현재 선택된 이벤트</div>
                             <div className="mt-1 text-lg font-black tracking-tight text-slate-950">
                               {eventTab === "roulette" ? "🎡 룰렛 이벤트" : "🕹️ 인형뽑기 이벤트"}
                             </div>
@@ -919,33 +919,33 @@ export default function AdminLiveEventRoulettePanel({
                   </div>
                 </main>
 
-                <aside className="grid h-full min-h-0 grid-rows-[156px_minmax(0,1fr)] gap-3">
-                  <section className="overflow-hidden rounded-[22px] border border-slate-200 bg-white p-3 shadow-sm">
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <div className="text-base font-black text-slate-950">
+                <aside className="grid h-full min-h-0 grid-rows-[138px_minmax(0,1fr)] gap-3">
+                  <section className="overflow-hidden rounded-[22px] border border-slate-200 bg-white p-2.5 shadow-sm">
+                    <div className="mb-1.5 flex items-center justify-between gap-2">
+                      <div className="text-sm font-black text-slate-950">
                         현재 {eventTab === "roulette" ? "룰렛" : "인형뽑기"}
                       </div>
-                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ring-1 ${currentEvent ? modeBadgeClass(currentEvent.mode) : "bg-slate-100 text-slate-500 ring-slate-200"}`}>
+                      <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-black ring-1 ${currentEvent ? modeBadgeClass(currentEvent.mode) : "bg-slate-100 text-slate-500 ring-slate-200"}`}>
                         {currentEvent?.status || "idle"}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="rounded-xl bg-slate-50 px-3 py-2">
-                        <div className="text-[11px] font-black text-slate-400">참여자</div>
-                        <div className="mt-0.5 text-base font-black text-slate-950">{finalParticipants.length.toLocaleString("ko-KR")}명</div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <div className="rounded-xl bg-slate-50 px-2.5 py-1.5">
+                        <div className="text-[10px] font-black text-slate-400">참여자</div>
+                        <div className="mt-0.5 text-sm font-black text-slate-950">{finalParticipants.length.toLocaleString("ko-KR")}명</div>
                       </div>
-                      <div className="rounded-xl bg-slate-50 px-3 py-2">
-                        <div className="text-[11px] font-black text-slate-400">자동</div>
-                        <div className="mt-0.5 text-base font-black text-slate-950">{autoParticipantCount.toLocaleString("ko-KR")}명</div>
+                      <div className="rounded-xl bg-slate-50 px-2.5 py-1.5">
+                        <div className="text-[10px] font-black text-slate-400">자동</div>
+                        <div className="mt-0.5 text-sm font-black text-slate-950">{autoParticipantCount.toLocaleString("ko-KR")}명</div>
                       </div>
-                      <div className="rounded-xl bg-slate-50 px-3 py-2">
-                        <div className="text-[11px] font-black text-slate-400">수동</div>
-                        <div className="mt-0.5 text-base font-black text-slate-950">{manualParticipantCount.toLocaleString("ko-KR")}명</div>
+                      <div className="rounded-xl bg-slate-50 px-2.5 py-1.5">
+                        <div className="text-[10px] font-black text-slate-400">수동</div>
+                        <div className="mt-0.5 text-sm font-black text-slate-950">{manualParticipantCount.toLocaleString("ko-KR")}명</div>
                       </div>
-                      <div className="col-span-3 rounded-xl bg-violet-50 px-3 py-1.5">
-                        <div className="text-[11px] font-black text-violet-500">현재 당첨자</div>
-                        <div className="mt-0.5 truncate text-sm font-black text-violet-900">🏆 {currentEvent?.winner_nickname || selectedWinnerNickname || "당첨 전"}</div>
+                      <div className="col-span-3 rounded-xl bg-violet-50 px-2.5 py-1">
+                        <div className="text-[10px] font-black text-violet-500">현재 당첨자</div>
+                        <div className="mt-0.5 truncate text-[13px] font-black text-violet-900">🏆 {currentEvent?.winner_nickname || selectedWinnerNickname || "당첨 전"}</div>
                       </div>
                     </div>
                   </section>
