@@ -3755,18 +3755,20 @@ export default function OrderPage() {
 
                           <div className="mt-3 flex items-center justify-end gap-1.5">
                             {!canInlineChangeQty && (
-                              <p className="mr-auto hidden text-[11px] font-bold tracking-[-0.04em] text-slate-400 min-[390px]:block">
-                                수정에서 수량·옵션 변경
-                              </p>
-                            )}
+                              <>
+                                <p className="mr-auto hidden text-[11px] font-bold tracking-[-0.04em] text-slate-400 min-[390px]:block">
+                                  수정에서 수량·옵션 변경
+                                </p>
 
-                            <button
-                              type="button"
-                              onClick={() => openDirectInputEditSheet(index)}
-                              className={`${buttonBase} rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-[12px] font-black tracking-[-0.04em] text-blue-700`}
-                            >
-                              수정
-                            </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openDirectInputEditSheet(index)}
+                                  className={`${buttonBase} rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-[12px] font-black tracking-[-0.04em] text-blue-700`}
+                                >
+                                  수정
+                                </button>
+                              </>
+                            )}
 
                             <button
                               type="button"
