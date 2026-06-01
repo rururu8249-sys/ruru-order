@@ -122,7 +122,7 @@ export default function CustomerOrderLookupBottomSheet({
             </div>
           </header>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-1 pt-1">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-1 pt-1">
             {items.length > 0 ? (
               <div className="grid gap-2">
                 {items.map((item) => {
@@ -193,7 +193,7 @@ export default function CustomerOrderLookupBottomSheet({
 
             <nav
               data-ruru-order-lookup-pagination="compact-v3"
-              className="mt-2 flex items-center justify-center gap-2"
+              className="mt-auto flex items-center justify-center gap-2 pt-2"
               aria-label="주문조회 페이지 이동"
             >
               <button
