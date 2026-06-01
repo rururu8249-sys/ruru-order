@@ -65,6 +65,7 @@ import OrderCustomerInfoIntro from "@/components/order/OrderCustomerInfoIntro";
 import OrderCustomerInfoFormCard from "@/components/order/OrderCustomerInfoFormCard";
 import OrderCompletePaymentNotice from "@/components/order/OrderCompletePaymentNotice";
 import CustomerPaymentGuideBottomSheet from "@/components/customer/CustomerPaymentGuideBottomSheet";
+import CustomerInfoEditBottomSheet from "@/components/customer/CustomerInfoEditBottomSheet";
 import CustomerOrderLookupBottomSheet, {
   type CustomerOrderLookupFilter,
   type CustomerOrderLookupItem,
@@ -865,6 +866,7 @@ export default function OrderPage() {
   const [copyDone, setCopyDone] = useState(false);
   const [nicknameCopyDone, setNicknameCopyDone] = useState(false);
   const [paymentGuideOpen, setPaymentGuideOpen] = useState(false);
+  const [customerInfoEditSheetOpen, setCustomerInfoEditSheetOpen] = useState(false);
   const [orderLookupOpen, setOrderLookupOpen] = useState(false);
   const [orderLookupLoading, setOrderLookupLoading] = useState(false);
   const [orderLookupOrders, setOrderLookupOrders] = useState<any[]>([]);
@@ -2200,8 +2202,9 @@ export default function OrderPage() {
       await saveCustomer();
       setIsEditingCustomerInfo(false);
       setIsCustomerInfoOpen(false);
+      setCustomerInfoEditSheetOpen(false);
       setPin("");
-      
+
       showCustomerNotice("고객정보수정이 완료되었습니다.");
     } catch (error: any) {
       showCustomerNotice("고객정보 저장 오류: " + error.message);
@@ -3017,6 +3020,10 @@ export default function OrderPage() {
     }
   };
 
+  const openCustomerInfoEditBottomSheet = () => {
+    setCustomerInfoEditSheetOpen(true);
+  };
+
   const ruruOrderLookupWon = (value: unknown) => {
     const amount = Number(value || 0);
     if (!Number.isFinite(amount)) return "0원";
@@ -3446,7 +3453,7 @@ export default function OrderPage() {
               </button>
               <button
                 type="button"
-                onClick={startEditCustomerInfo}
+                onClick={openCustomerInfoEditBottomSheet}
                 className={isTopNavEditActive ? topNavActiveButtonClass : topNavInactiveButtonClass}
               >
                 정보수정
@@ -3473,6 +3480,26 @@ export default function OrderPage() {
           onCopyBankAccount={copyBankAccount}
           onClose={() => setPaymentGuideOpen(false)}
         />
+        <CustomerInfoEditBottomSheet
+          open={customerInfoEditSheetOpen}
+          youtubeNickname={youtubeNickname}
+          customerName={customerName}
+          customerPhone={formatPhone(customerPhone)}
+          address={address}
+          detailAddress={detailAddress}
+          requestMemo={requestMemo}
+          youtubeNicknameError={youtubeNicknameError}
+          onYoutubeNicknameChange={setYoutubeNickname}
+          onCustomerNameChange={setCustomerName}
+          onCustomerPhoneChange={(value) => setCustomerPhone(normalizePhone(value))}
+          onAddressChange={setAddress}
+          onDetailAddressChange={setDetailAddress}
+          onRequestMemoChange={setRequestMemo}
+          onOpenAddressSearch={openAddressSearch}
+          onClose={() => setCustomerInfoEditSheetOpen(false)}
+          onSave={completeEditCustomerInfo}
+        />
+
         <CustomerOrderLookupBottomSheet
           open={orderLookupOpen}
           items={orderLookupVisibleItems}
@@ -4315,6 +4342,26 @@ export default function OrderPage() {
           onCopyNickname={copyDepositNickname}
           onCopyBankAccount={copyBankAccount}
           onClose={() => setPaymentGuideOpen(false)}
+        />
+
+        <CustomerInfoEditBottomSheet
+          open={customerInfoEditSheetOpen}
+          youtubeNickname={youtubeNickname}
+          customerName={customerName}
+          customerPhone={formatPhone(customerPhone)}
+          address={address}
+          detailAddress={detailAddress}
+          requestMemo={requestMemo}
+          youtubeNicknameError={youtubeNicknameError}
+          onYoutubeNicknameChange={setYoutubeNickname}
+          onCustomerNameChange={setCustomerName}
+          onCustomerPhoneChange={(value) => setCustomerPhone(normalizePhone(value))}
+          onAddressChange={setAddress}
+          onDetailAddressChange={setDetailAddress}
+          onRequestMemoChange={setRequestMemo}
+          onOpenAddressSearch={openAddressSearch}
+          onClose={() => setCustomerInfoEditSheetOpen(false)}
+          onSave={completeEditCustomerInfo}
         />
 
         <CustomerOrderLookupBottomSheet
