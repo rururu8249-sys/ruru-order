@@ -227,22 +227,17 @@ export default function CustomerOrderLookupBottomSheet({
               href={BAND_TRACKING_URL}
               target="_blank"
               rel="noreferrer"
-              className="col-span-2 flex items-center gap-3 rounded-[18px] border border-green-100 bg-gradient-to-r from-green-50 to-emerald-50 px-3.5 py-2.5 shadow-sm transition active:scale-[0.98]"
+              className="col-span-2 flex min-h-[50px] items-center gap-2.5 rounded-[18px] border border-green-100 bg-gradient-to-r from-green-50 to-emerald-50 px-3 py-2 shadow-sm transition active:scale-[0.98]"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#21c531] text-[12px] font-black tracking-[-0.04em] text-white shadow-sm">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#21c531] text-[11px] font-black tracking-[-0.04em] text-white shadow-sm">
                 BAND
               </div>
 
-              <div className="min-w-0 flex-1">
-                <p className="text-[14px] font-black leading-tight tracking-[-0.05em] text-green-800">
-                  밴드에서 송장 확인
-                </p>
-                <p className="mt-0.5 break-keep text-[11px] font-bold leading-relaxed tracking-[-0.04em] text-green-700">
-                  택배출고 완료 후 당일 저녁 밴드에서 택배송장번호 확인 가능!
-                </p>
-              </div>
+              <p className="min-w-0 flex-1 break-keep text-[14px] font-black leading-snug tracking-[-0.05em] text-green-800">
+                밴드에서 택배송장번호 확인 가능
+              </p>
 
-              <div className="shrink-0 text-[19px] font-black text-green-700">
+              <div className="shrink-0 text-[18px] font-black text-green-700">
                 ›
               </div>
             </a>
