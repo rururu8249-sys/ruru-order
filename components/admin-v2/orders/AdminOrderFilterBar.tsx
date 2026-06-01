@@ -41,13 +41,13 @@ const STATUS_OPTIONS: ChipOption[] = [
   { value: "all", label: "전체" },
   { value: "ready", label: "출고준비" },
   { value: "shipped", label: "발송완료" },
-  { value: "canceled", label: "취소·환불" },
+  { value: "canceled", label: "주문서취소" },
 ];
 
 const PAYMENT_OPTIONS: ChipOption[] = [
   { value: "all", label: "전체" },
   { value: "paid", label: "결제완료" },
-  { value: "unpaid", label: "미결제" },
+  { value: "unpaid", label: "입금대기" },
 ];
 
 

@@ -48,8 +48,8 @@ export const ADMIN_PAGE_HEADERS = {
 } as const;
 
 export const ADMIN_STATUS_LABELS = {
-  unpaid: "미입금",
-  paymentNeeded: "입금확인 필요",
+  unpaid: "입금대기",
+  paymentNeeded: "입금매칭 필요",
   autoPaid: "자동입금확인",
   manualPaid: "수동입금확인",
   amountMismatch: "금액불일치",
@@ -57,7 +57,7 @@ export const ADMIN_STATUS_LABELS = {
   cardPaid: "카드결제완료",
   readyToShip: "출고대기",
   shipped: "출고완료",
-  canceled: "취소",
+  canceled: "주문서취소",
   refunded: "환불",
   hidden: "숨김",
   normal: "정상",
@@ -127,9 +127,9 @@ export const ADMIN_LEGACY_TERMS_TO_REVIEW = [
   "매칭완료",
   "처리완료",
   "결제완료",
-  "입금확인/카드완료만",
+  "입금확인/카드결제완료만",
   "무통장 입금확인만",
-  "미입금/확인전만",
+  "입금대기/확인전만",
   "주문없음",
   "초과입금",
   "부분입금",

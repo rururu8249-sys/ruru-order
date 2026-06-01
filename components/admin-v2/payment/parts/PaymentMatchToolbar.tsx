@@ -42,7 +42,7 @@ export default function PaymentMatchToolbar({
       <div className="grid gap-2 lg:grid-cols-[460px_1fr] lg:items-center">
         <div className="flex flex-wrap gap-1.5">
           <TabButton active={view === "unmatched"} onClick={() => onChangeView("unmatched")}>
-            미결제 주문
+            입금대기 주문
           </TabButton>
 
           <TabButton active={view === "paid"} onClick={() => onChangeView("paid")}>

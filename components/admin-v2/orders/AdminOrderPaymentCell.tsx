@@ -1,7 +1,7 @@
 "use client";
 
 // components/admin-v2/orders/AdminOrderPaymentCell.tsx
-// 목적: 주문관리 주문상태 + 미결제 주문 입금매칭 버튼 표시
+// 목적: 주문관리 주문상태 + 입금대기 주문 입금매칭 버튼 표시
 // 주의: UI 전용. 입금확인 처리, 입금매칭 API, 금액 계산, Supabase 저장 로직 없음.
 
 import AdminOrderPaymentBadge from "@/components/admin-v2/orders/AdminOrderPaymentBadge";
@@ -24,9 +24,16 @@ export default function AdminOrderPaymentCell({
   onOpenManualMatch,
 }: AdminOrderPaymentCellProps) {
   const safePaymentMethod = paymentMethod || "";
-  const safePaymentLabel = paymentLabel || "결제대기";
+  const safePaymentLabel = paymentLabel || "입금대기";
 
-  const displayLabel = isBankUnpaid ? "무통장 미입금" : safePaymentLabel;
+  const displayLabel = isBankUnpaid
+    ? "입금대기"
+    : safePaymentLabel
+        .replace("입금확인완료", "입금확인")
+        .replace("결제대기", "입금대기")
+        .replace("카드미결제", "카드 미결제")
+        .replace("미결제", "입금대기")
+        .replace("무통장 미입금", "입금대기");
 
   const displayDesc = isBankUnpaid
     ? "입금 매칭 필요"

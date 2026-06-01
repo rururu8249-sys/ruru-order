@@ -86,7 +86,7 @@ export default function AutoMatchPreviewBox({
       <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-6">
         <CountCard label="검사 주문" value={`${Number(summary.checked_orders || 0).toLocaleString()}건`} />
         <CountCard label="검사 입금" value={`${Number(summary.checked_deposits || 0).toLocaleString()}건`} />
-        <CountCard label="미결제 주문" value={`${Number(summary.eligible_unpaid_orders || 0).toLocaleString()}건`} />
+        <CountCard label="입금대기 주문" value={`${Number(summary.eligible_unpaid_orders || 0).toLocaleString()}건`} />
         <CountCard label="미확인 입금" value={`${Number(summary.eligible_unmatched_deposits || 0).toLocaleString()}건`} />
         <CountCard label="자동후보" value={`${candidateCount.toLocaleString()}건`} strong />
         <CountCard

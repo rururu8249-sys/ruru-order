@@ -2210,14 +2210,14 @@ function SettlementPanel({
         <SummaryCard label="환불전 정산금액" value={money(grossBaseSales)} />
         <SummaryCard label="무통장 확인" value={money(bankConfirmedOrderSales)} />
         <SummaryCard label="카드 확인" value={money(cardConfirmedOrderSales)} />
-        <SummaryCard label="미결제 합계" value={money(unpaidOrderSales)} strong />
+        <SummaryCard label="아직 못 받은 금액" value={money(unpaidOrderSales)} strong />
         <SummaryCard label="확인입금자료" value={money(confirmedBankDeposits)} />
         <SummaryCard label="무통장 차액" value={money(bankDepositDiff)} strong={bankDepositDiff !== 0} />
         <SummaryCard label="카드 실수수료" value={money(actualCardFee)} />
         <SummaryCard label="카드 추가금" value={money(customerCardExtra)} />
         <SummaryCard label="카드 수수료차익" value={money(cardFeeMargin)} strong={cardFeeMargin < 0} />
         <SummaryCard label="환불금액" value={money(refundAmount)} />
-        <SummaryCard label="취소금액" value={money(canceledAmount)} />
+        <SummaryCard label="주문서취소 금액" value={money(canceledAmount)} />
         <SummaryCard label="확정매출" value={money(expectedConfirmedSales)} />
       </div>
 

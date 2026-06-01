@@ -86,11 +86,11 @@ export default function AdminTodayControlSummaryBar({
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
-        <SummaryCard title="총매출" value={money(totalOrderAmount)} desc="미입금 포함" tone="blue" />
-        <SummaryCard title="무통장완료" value={money(bankPaidAmount)} desc="입금확인" tone="emerald" />
-        <SummaryCard title="무통장미입금" value={money(bankUnpaidAmount)} desc="입금매칭 필요" tone="amber" />
-        <SummaryCard title="카드완료" value={money(cardPaidAmount)} desc="카드결제완료" tone="emerald" />
-        <SummaryCard title="카드미결제" value={money(cardUnpaidAmount)} desc="확인 필요" tone="rose" />
+        <SummaryCard title="주문서 총금액" value={money(totalOrderAmount)} desc="입금대기 포함" tone="blue" />
+        <SummaryCard title="무통장 입금확인" value={money(bankPaidAmount)} desc="입금확인" tone="emerald" />
+        <SummaryCard title="무통장 입금대기" value={money(bankUnpaidAmount)} desc="입금매칭 필요" tone="amber" />
+        <SummaryCard title="카드결제완료" value={money(cardPaidAmount)} desc="카드결제완료" tone="emerald" />
+        <SummaryCard title="카드 미결제" value={money(cardUnpaidAmount)} desc="확인 필요" tone="rose" />
         <SummaryCard title="주문건수" value={`${orderCount.toLocaleString()}건`} desc="선택 기간" />
         <SummaryCard title="상품수량" value={`${itemQuantity.toLocaleString()}개`} desc="주문수량 합계" />
         <SummaryCard title="이슈큐" value={`${issueCount.toLocaleString()}건`} desc="미해결 고객이슈" tone="rose" />

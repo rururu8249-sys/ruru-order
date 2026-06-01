@@ -277,7 +277,7 @@ export const buildWorkItems = (groups: OrderGroup[]) => {
         ...baseItem,
         tab: "payment",
         tone: "amber",
-        label: isCardUnpaid(first) ? "카드미결제" : "미결제",
+        label: isCardUnpaid(first) ? "카드 미결제" : "입금대기",
       };
     }
 
