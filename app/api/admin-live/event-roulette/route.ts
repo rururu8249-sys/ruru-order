@@ -783,10 +783,9 @@ async function spinEvent(body: Record<string, unknown>) {
   }
 
   const event = eventData as RouletteEventRow;
-  const manualSpinParticipants = normalizeManualParticipantsForEvent(body.participants);
-  const useManualSpinParticipants = cleanText(body.participantSource) === "manual" && manualSpinParticipants.length > 0;
-  const participants = useManualSpinParticipants
-    ? manualSpinParticipants
+  const requestedSpinParticipants = normalizeManualParticipantsForEvent(body.participants);
+  const participants = requestedSpinParticipants.length > 0
+    ? requestedSpinParticipants
     : Array.isArray(event.participant_snapshot)
       ? event.participant_snapshot
       : [];
