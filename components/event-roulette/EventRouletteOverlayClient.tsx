@@ -117,27 +117,23 @@ function makeWheelGradient(count: number) {
 
 function getLabelPoint(index: number, total: number) {
   const safeTotal = Math.max(total, 1);
-  const segmentAngle = 360 / safeTotal;
+  const sliceAngle = 360 / safeTotal;
+  const angle = -90 + sliceAngle * index + sliceAngle / 2;
+  const rad = (angle * Math.PI) / 180;
 
-  // conic-gradient(from -90deg) 기준: 첫 칸은 위쪽에서 시작
-  const degree = -90 + index * segmentAngle + segmentAngle / 2;
-  const rad = (degree * Math.PI) / 180;
-
-  // 50% 중심 기준, 칸의 안쪽 중앙 영역으로 배치
-  const radius =
-    safeTotal >= 70 ? 25 :
-    safeTotal >= 55 ? 26 :
-    safeTotal >= 40 ? 27 :
-    safeTotal >= 24 ? 29 :
-    31;
-
-  const x = 50 + Math.cos(rad) * radius;
-  const y = 50 + Math.sin(rad) * radius;
+  // 칸 경계선이 아니라 칸 안쪽 중심선에 닉네임을 놓는다.
+  // 참여자가 많을수록 안쪽으로 조금 당긴다.
+  const labelRadius =
+    safeTotal >= 70 ? 22 :
+    safeTotal >= 55 ? 23 :
+    safeTotal >= 40 ? 24 :
+    safeTotal >= 24 ? 26 :
+    29;
 
   return {
-    left: `${x}%`,
-    top: `${y}%`,
-    rotate: `${degree + 90}deg`,
+    x: 50 + Math.cos(rad) * labelRadius,
+    y: 50 + Math.sin(rad) * labelRadius,
+    rotation: angle,
   };
 }
 
@@ -326,7 +322,6 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           <div className="pointer-outline" />
           <div className="pointer-main" />
           <div className="pointer-dot" />
-          <div className="pointer-line" />
         </div>
 
         <div className="wheel-wrap">
@@ -347,9 +342,9 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
                   key={`${name}-${index}`}
                   className="name-label"
                   style={{
-                    left: point.left,
-                    top: point.top,
-                    transform: `translate(-50%, -50%) rotate(${point.rotate})`,
+                    left: `${point.x}%`,
+                    top: `${point.y}%`,
+                    transform: `translate(-50%, -50%) rotate(${point.rotation}deg)`,
                     fontSize: labelFontSize,
                   }}
                 >
@@ -362,6 +357,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           <div className="fixed-center-cap" aria-hidden="true">
             <div>루루동이</div>
             <div>이벤트</div>
+            <div className="participant-count">현재 {participants.length}명 참여중</div>
           </div>
         </div>
 
@@ -413,10 +409,10 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
         .pointer-wrap {
           position: absolute;
           left: 50%;
-          top: 4.2%;
+          top: 3.4%;
           z-index: 90;
-          width: clamp(82px, 14vw, 140px);
-          height: clamp(92px, 15vw, 158px);
+          width: clamp(86px, 15vw, 150px);
+          height: clamp(90px, 15vw, 150px);
           transform: translateX(-50%);
           display: flex;
           align-items: flex-start;
@@ -427,73 +423,60 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
         .pointer-shadow {
           position: absolute;
           left: 50%;
-          top: 12%;
-          width: 70%;
-          height: 70%;
+          top: 14%;
+          width: 82%;
+          height: 76%;
           transform: translateX(-50%);
           border-radius: 999px;
-          background: rgba(244, 63, 94, 0.44);
-          filter: blur(14px);
+          background: rgba(239, 68, 68, 0.42);
+          filter: blur(16px);
         }
 
         .pointer-outline {
           position: absolute;
-          top: 12%;
+          top: 10%;
           left: 50%;
           transform: translateX(-50%);
           width: 0;
           height: 0;
-          border-left: clamp(34px, 5.8vw, 58px) solid transparent;
-          border-right: clamp(34px, 5.8vw, 58px) solid transparent;
-          border-top: clamp(60px, 10vw, 102px) solid #fde047;
+          border-left: clamp(36px, 6vw, 62px) solid transparent;
+          border-right: clamp(36px, 6vw, 62px) solid transparent;
+          border-top: clamp(64px, 10.5vw, 108px) solid #ffffff;
           filter:
-            drop-shadow(0 10px 12px rgba(127, 29, 29, 0.34))
-            drop-shadow(0 0 18px rgba(253, 224, 71, 0.7));
+            drop-shadow(0 8px 10px rgba(15, 23, 42, 0.25))
+            drop-shadow(0 0 16px rgba(253, 224, 71, 0.75));
         }
 
         .pointer-main {
           position: absolute;
-          top: 19%;
+          top: 17%;
           left: 50%;
           transform: translateX(-50%);
           width: 0;
           height: 0;
-          border-left: clamp(26px, 4.5vw, 45px) solid transparent;
-          border-right: clamp(26px, 4.5vw, 45px) solid transparent;
-          border-top: clamp(48px, 8vw, 82px) solid #ef4444;
+          border-left: clamp(27px, 4.7vw, 47px) solid transparent;
+          border-right: clamp(27px, 4.7vw, 47px) solid transparent;
+          border-top: clamp(50px, 8.2vw, 86px) solid #ef4444;
           filter:
-            drop-shadow(0 6px 8px rgba(127, 29, 29, 0.45))
-            drop-shadow(0 0 16px rgba(239, 68, 68, 0.68));
+            drop-shadow(0 7px 10px rgba(127, 29, 29, 0.48))
+            drop-shadow(0 0 18px rgba(239, 68, 68, 0.72));
         }
 
         .pointer-dot {
           position: absolute;
-          top: 1%;
+          top: 0;
           left: 50%;
-          width: clamp(26px, 4.2vw, 42px);
-          height: clamp(26px, 4.2vw, 42px);
+          width: clamp(28px, 4.4vw, 44px);
+          height: clamp(28px, 4.4vw, 44px);
           transform: translateX(-50%);
           border-radius: 999px;
           background: #ffffff;
           border: clamp(5px, 0.9vw, 8px) solid #ef4444;
           box-shadow:
-            0 8px 20px rgba(127, 29, 29, 0.28),
-            0 0 0 5px rgba(253, 224, 71, 0.8);
+            0 0 0 4px #facc15,
+            0 8px 20px rgba(127, 29, 29, 0.32);
         }
 
-        .pointer-line {
-          position: absolute;
-          left: 50%;
-          top: 65%;
-          width: clamp(5px, 0.8vw, 8px);
-          height: clamp(26px, 4vw, 44px);
-          transform: translateX(-50%);
-          border-radius: 999px;
-          background: #111827;
-          box-shadow:
-            0 0 0 3px #ffffff,
-            0 0 0 6px rgba(239, 68, 68, 0.9);
-        }
 
         .wheel-wrap {
           position: relative;
@@ -536,7 +519,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           left: 50%;
           top: 50%;
           z-index: 45;
-          width: 22%;
+          width: 24%;
           aspect-ratio: 1 / 1;
           transform: translate(-50%, -50%);
           border-radius: 999px;
@@ -550,11 +533,12 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           justify-content: center;
           color: #111827;
           font-weight: 950;
-          line-height: 1.05;
+          line-height: 1.04;
           letter-spacing: -0.08em;
-          font-size: clamp(12px, 2.5vw, 22px);
+          font-size: clamp(11px, 2.25vw, 20px);
           text-align: center;
           pointer-events: none;
+          gap: 2px;
         }
 
         .fixed-center-cap div + div {
@@ -562,23 +546,32 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           color: #7c3aed;
         }
 
+        .participant-count {
+          margin-top: 4px;
+          color: #475569;
+          font-size: clamp(6px, 1.2vw, 10px);
+          font-weight: 900;
+          letter-spacing: -0.06em;
+          white-space: nowrap;
+        }
+
         .name-label {
           position: absolute;
           z-index: 12;
-          width: 20%;
-          height: 14px;
+          width: clamp(74px, 14vw, 138px);
+          height: 18px;
           transform-origin: center center;
           display: flex;
           align-items: center;
           justify-content: center;
-          color: rgba(17, 24, 39, 0.96);
+          color: rgba(17, 24, 39, 0.98);
           font-weight: 1000;
           line-height: 1;
-          letter-spacing: -0.08em;
+          letter-spacing: -0.07em;
           text-align: center;
           text-shadow:
-            0 1px 0 rgba(255, 255, 255, 0.92),
-            0 0 4px rgba(255, 255, 255, 0.72);
+            0 1px 0 rgba(255, 255, 255, 0.9),
+            0 0 5px rgba(255, 255, 255, 0.7);
           white-space: nowrap;
           pointer-events: none;
         }
@@ -588,6 +581,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           max-width: 100%;
           overflow: hidden;
           text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         .spin-status {
@@ -667,7 +661,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           }
 
           .name-label {
-            width: 18%;
+            width: clamp(62px, 15vw, 118px);
           }
 
           .fixed-center-cap {
