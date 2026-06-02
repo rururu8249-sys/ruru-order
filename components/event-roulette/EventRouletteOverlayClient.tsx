@@ -117,18 +117,28 @@ function makeWheelGradient(count: number) {
 
 function getLabelPoint(index: number, total: number) {
   const safeTotal = Math.max(total || 1, 1);
-  const sliceAngle = (Math.PI * 2) / safeTotal;
-  const middleAngle = -Math.PI / 2 + sliceAngle * (index + 0.5);
+  const sliceAngle = 360 / safeTotal;
+  const angle = -90 + sliceAngle * index + sliceAngle / 2;
+  const rad = (angle * Math.PI) / 180;
 
-  const radius =
-    safeTotal >= 60 ? 31 :
-    safeTotal >= 40 ? 33 :
-    safeTotal >= 24 ? 35 :
-    safeTotal >= 16 ? 37 : 39;
+  // 칸의 가운데 선을 따라 닉네임을 길게 배치한다.
+  // 참여자가 많아도 경계선보다 칸 안쪽 중심축에 붙도록 반지름을 조정한다.
+  const labelRadius =
+    safeTotal >= 70 ? 34 :
+    safeTotal >= 55 ? 35 :
+    safeTotal >= 40 ? 36 :
+    safeTotal >= 24 ? 37 :
+    39;
 
-  const x = 50 + Math.cos(middleAngle) * radius;
-  const y = 50 + Math.sin(middleAngle) * radius;
-  const rotation = (middleAngle * 180) / Math.PI + 90;
+  const x = 50 + Math.cos(rad) * labelRadius;
+  const y = 50 + Math.sin(rad) * labelRadius;
+
+  let rotation = angle;
+
+  // 왼쪽 반원 글씨가 뒤집히지 않도록 보정
+  if (rotation > 90 || rotation < -90) {
+    rotation += 180;
+  }
 
   return { x, y, rotation };
 }
@@ -301,14 +311,14 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
 
   const labelFontSize =
     participants.length >= 70
-      ? "clamp(5px, 1.04vw, 7.5px)"
+      ? "clamp(7px, 1.22vw, 10px)"
       : participants.length >= 55
-        ? "clamp(5.5px, 1.18vw, 8px)"
+        ? "clamp(7.5px, 1.34vw, 11px)"
         : participants.length >= 40
-          ? "clamp(6.5px, 1.38vw, 9.5px)"
+          ? "clamp(8.5px, 1.55vw, 12.5px)"
           : participants.length >= 24
-            ? "clamp(8px, 1.72vw, 11.5px)"
-            : "clamp(10px, 2.1vw, 15px)";
+            ? "clamp(10px, 1.9vw, 15px)"
+            : "clamp(12px, 2.35vw, 18px)";
 
   return (
     <main className="roulette-overlay-root">
@@ -353,7 +363,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           <div className="fixed-center-cap" aria-hidden="true">
             <div>루루동이</div>
             <div>이벤트</div>
-            <div className="participant-count">현재 {participants.length}명 참여중</div>
+            <div className="participant-count">{participants.length}명 참여중</div>
           </div>
         </div>
 
@@ -515,7 +525,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           left: 50%;
           top: 50%;
           z-index: 45;
-          width: 28%;
+          width: 34%;
           aspect-ratio: 1 / 1;
           transform: translate(-50%, -50%);
           border-radius: 999px;
@@ -531,7 +541,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           font-weight: 1000;
           line-height: 1.02;
           letter-spacing: -0.08em;
-          font-size: clamp(16px, 3.2vw, 30px);
+          font-size: clamp(20px, 4.3vw, 40px);
           text-align: center;
           pointer-events: none;
           gap: 2px;
@@ -540,12 +550,14 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
         .fixed-center-cap div + div {
           margin-top: 3px;
           color: #7c3aed;
+          font-size: 0.92em;
+          font-weight: 1000;
         }
 
         .participant-count {
-          margin-top: 4px;
+          margin-top: 7px;
           color: #6d28d9;
-          font-size: clamp(8px, 1.8vw, 15px);
+          font-size: clamp(12px, 2.5vw, 22px);
           font-weight: 1000;
           letter-spacing: -0.07em;
           white-space: nowrap;
@@ -554,7 +566,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
         .name-label {
           position: absolute;
           z-index: 12;
-          width: clamp(82px, 13vw, 150px);
+          width: clamp(108px, 19vw, 190px);
           height: 18px;
           transform-origin: center center;
           display: flex;
@@ -566,8 +578,8 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           letter-spacing: -0.06em;
           text-align: center;
           text-shadow:
-            0 1px 0 rgba(255, 255, 255, 0.88),
-            0 0 5px rgba(255, 255, 255, 0.68);
+            0 1px 0 rgba(255, 255, 255, 0.92),
+            0 0 5px rgba(255, 255, 255, 0.72);
           white-space: nowrap;
           pointer-events: none;
         }
@@ -657,11 +669,11 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           }
 
           .name-label {
-            width: clamp(70px, 16vw, 130px);
+            width: clamp(96px, 23vw, 170px);
           }
 
           .fixed-center-cap {
-            width: 30%;
+            width: 36%;
           }
         }
       `}</style>
