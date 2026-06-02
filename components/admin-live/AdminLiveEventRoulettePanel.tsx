@@ -564,7 +564,9 @@ export default function AdminLiveEventRoulettePanel({
           mode,
           sourceDate,
           broadcastId,
+          participantSource,
           participants: finalParticipants,
+          manualParticipantText,
           eventKind: "roulette",
         }),
       });

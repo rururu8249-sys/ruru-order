@@ -650,11 +650,9 @@ async function createEvent(body: Record<string, unknown>) {
   const broadcastId = cleanBroadcastId(body.broadcastId);
   const title = cleanText(body.title) || DEFAULT_TITLE;
   const eventKind = cleanText(body.eventKind) === "claw" ? "claw" : "roulette";
-  const participantSource = cleanText(body.participantSource);
-  const manualParticipants = normalizeManualParticipantsForEvent(body.participants);
-  const useManualParticipants = participantSource === "manual" && manualParticipants.length > 0;
-  const rawParticipants = useManualParticipants
-    ? manualParticipants
+  const requestedCreateParticipants = normalizeManualParticipantsForEvent(body.participants);
+  const rawParticipants = requestedCreateParticipants.length > 0
+    ? requestedCreateParticipants
     : await buildParticipantsForRequest(supabase, mode, sourceDate, broadcastId);
   const deduped = await applyNoDuplicateWinnerRule(supabase, rawParticipants, {
     mode,
