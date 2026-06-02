@@ -793,7 +793,7 @@ async function spinEvent(body: Record<string, unknown>) {
   if (fixedWinnerNickname && !fixedWinner) {
     return json({
       ok: false,
-      message: "지정한 당첨자가 참가자 명단에 없습니다. 닉네임을 확인해주세요.",
+      message: "[디버그] 받은지정값=[" + fixedWinnerNickname + "] / 명단=[" + participants.map((p:any)=>p.nickname).join(", ") + "]",
     }, 400);
   }
 
