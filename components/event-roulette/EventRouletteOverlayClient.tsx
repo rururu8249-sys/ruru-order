@@ -1,52 +1,58 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type RouletteEvent = {
+  id?: string;
   title?: string | null;
+  overlay_token?: string | null;
   status?: string | null;
-  is_test?: boolean | null;
+  participants?: unknown;
+  participant_snapshot?: unknown;
   winner_nickname?: string | null;
   winner_note?: string | null;
-  updated_at?: string | null;
   result_at?: string | null;
-  spin_started_at?: string | null;
+  updated_at?: string | null;
   spin_duration_ms?: number | null;
-  participant_snapshot?: unknown;
-  participants?: unknown;
 };
 
 type OverlayPayload = {
-  ok: boolean;
+  ok?: boolean;
   message?: string;
-  event?: RouletteEvent;
+  event?: RouletteEvent | null;
 };
 
 type EventRouletteOverlayClientProps = {
-  initialToken: string;
+  initialToken?: string;
 };
 
 const FALLBACK_TOKEN = "roulette_luludongi_live";
+const SPIN_TURNS = 30;
+const SPIN_MS = 9200;
+
+const COLORS = [
+  "#ec4899",
+  "#fb7185",
+  "#f59e0b",
+  "#22c55e",
+  "#06b6d4",
+  "#3b82f6",
+  "#8b5cf6",
+  "#7c3aed",
+];
 
 function cleanText(value: unknown) {
   return String(value ?? "").trim();
 }
 
-function hashText(value: string) {
-  return Array.from(value).reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-}
+function getTokenFromLocation(initialToken?: string) {
+  const fromProp = cleanText(initialToken);
+  if (fromProp) return fromProp;
 
-function makeResultKey(event: RouletteEvent | null) {
-  if (!event || cleanText(event.status) !== "result" || !cleanText(event.winner_nickname)) {
-    return "";
-  }
+  if (typeof window === "undefined") return FALLBACK_TOKEN;
 
-  return [
-    cleanText(event.updated_at),
-    cleanText(event.result_at),
-    cleanText(event.winner_nickname),
-    cleanText(event.winner_note),
-  ].join("|");
+  const token = new URLSearchParams(window.location.search).get("token");
+  return cleanText(token) || FALLBACK_TOKEN;
 }
 
 function normalizeParticipants(event: RouletteEvent | null) {
@@ -56,7 +62,7 @@ function normalizeParticipants(event: RouletteEvent | null) {
       ? event?.participant_snapshot
       : [];
 
-  const names = source
+  return source
     .map((item) => {
       if (typeof item === "string") return cleanText(item);
 
@@ -67,35 +73,64 @@ function normalizeParticipants(event: RouletteEvent | null) {
 
       return "";
     })
-    .filter(Boolean);
-
-  return names.length > 0
-    ? names.slice(0, 12)
-    : ["행운", "당첨", "이벤트", "루루동이", "럭키", "기프트", "LIVE", "WIN"];
+    .filter(Boolean)
+    .slice(0, 80);
 }
 
-function easeOutCubic(x: number) {
-  const t = Math.max(0, Math.min(1, x));
-  return 1 - Math.pow(1 - t, 3);
+function winnerIndexOf(names: string[], winner: string) {
+  const target = cleanText(winner).toLowerCase();
+  if (!target) return -1;
+
+  return names.findIndex((name) => cleanText(name).toLowerCase() === target);
 }
 
-export default function EventRouletteOverlayClient({ initialToken }: EventRouletteOverlayClientProps) {
-  const token = cleanText(initialToken) || FALLBACK_TOKEN;
+function makeWheelGradient(count: number) {
+  const safeCount = Math.max(count, 1);
+  const step = 100 / safeCount;
+
+  return `conic-gradient(from -90deg, ${Array.from({ length: safeCount })
+    .map((_, index) => {
+      const start = index * step;
+      const end = (index + 1) * step;
+      const color = COLORS[index % COLORS.length];
+      return `${color} ${start}% ${end}%`;
+    })
+    .join(", ")})`;
+}
+
+export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverlayClientProps) {
   const [event, setEvent] = useState<RouletteEvent | null>(null);
   const [message, setMessage] = useState("");
-  const [now, setNow] = useState(() => Date.now());
-  const [resultKey, setResultKey] = useState("");
-  const [animationStartedAt, setAnimationStartedAt] = useState(0);
+  const [wheelAngle, setWheelAngle] = useState(0);
+  const [phase, setPhase] = useState<"idle" | "spinning" | "result">("idle");
+  const [showResult, setShowResult] = useState(false);
+
+  const lastAnimatedKeyRef = useRef("");
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const participants = useMemo(() => normalizeParticipants(event), [event]);
+  const winnerNickname = cleanText(event?.winner_nickname);
+  const participantCount = Math.max(participants.length, 1);
+  const segmentAngle = 360 / participantCount;
+
+  const wheelGradient = useMemo(() => makeWheelGradient(participantCount), [participantCount]);
+
+  useEffect(() => {
+    document.documentElement.style.background = "transparent";
+    document.body.style.background = "transparent";
+    document.body.style.margin = "0";
+    document.body.style.overflow = "hidden";
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadOverlay() {
+    const load = async () => {
       try {
-        const response = await fetch(`/api/event-roulette/overlay?token=${encodeURIComponent(token)}`, {
+        const token = getTokenFromLocation(initialToken);
+        const response = await fetch(`/api/event-roulette/overlay?token=${encodeURIComponent(token)}&_=${Date.now()}`, {
           cache: "no-store",
         });
-
         const payload = (await response.json()) as OverlayPayload;
 
         if (cancelled) return;
@@ -103,6 +138,8 @@ export default function EventRouletteOverlayClient({ initialToken }: EventRoulet
         if (!payload.ok || !payload.event) {
           setEvent(null);
           setMessage(payload.message || "표시할 룰렛 이벤트가 없습니다.");
+          setPhase("idle");
+          setShowResult(false);
           return;
         }
 
@@ -111,264 +148,409 @@ export default function EventRouletteOverlayClient({ initialToken }: EventRoulet
       } catch (error) {
         if (cancelled) return;
         setEvent(null);
-        setMessage(error instanceof Error ? error.message : String(error));
+        setMessage(error instanceof Error ? error.message : "룰렛 정보를 불러오지 못했습니다.");
       }
-    }
+    };
 
-    void loadOverlay();
-    const timer = window.setInterval(loadOverlay, 900);
+    load();
+    const interval = window.setInterval(load, 1200);
 
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      window.clearInterval(interval);
     };
-  }, [token]);
+  }, [initialToken]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 60);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const nextKey = makeResultKey(event);
-    if (nextKey && nextKey !== resultKey) {
-      setResultKey(nextKey);
-      setAnimationStartedAt(Date.now());
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
-  }, [event, resultKey]);
 
-  const participants = useMemo(() => normalizeParticipants(event), [event]);
-  const winnerNickname = cleanText(event?.winner_nickname);
-  const winnerNote = cleanText(event?.winner_note) || "이벤트 당첨";
-  const hasResult = cleanText(event?.status) === "result" && Boolean(winnerNickname);
-  const seed = hashText(`${winnerNickname}|${resultKey}`);
-  const segmentCount = Math.max(8, Math.min(10, participants.length));
-  const visibleSegments = participants.slice(0, segmentCount);
-  const idleRotation = (now / 45) % 360;
+    if (!event?.id) {
+      setPhase("idle");
+      setShowResult(false);
+      return;
+    }
 
-  let wheelRotation = idleRotation;
-  if (hasResult && animationStartedAt) {
-    const elapsed = now - animationStartedAt;
-    const total = 4200;
-    const targetIndex = seed % segmentCount;
-    const segmentAngle = 360 / segmentCount;
-    const finalAngle = 360 * 6 + (360 - targetIndex * segmentAngle - segmentAngle / 2);
-    const progress = Math.min(1, elapsed / total);
-    wheelRotation = finalAngle * easeOutCubic(progress);
-  }
+    const key = `${event.id}-${event.result_at || ""}-${event.winner_nickname || ""}-${event.updated_at || ""}`;
+
+    if (event.status === "result" && winnerNickname) {
+      if (lastAnimatedKeyRef.current === key) return;
+
+      lastAnimatedKeyRef.current = key;
+
+      const winnerIndex = winnerIndexOf(participants, winnerNickname);
+      const safeWinnerIndex = winnerIndex >= 0 ? winnerIndex : 0;
+      const winnerCenterAngle = safeWinnerIndex * segmentAngle + segmentAngle / 2;
+      const finalAngle = SPIN_TURNS * 360 + (360 - winnerCenterAngle);
+
+      setPhase("spinning");
+      setShowResult(false);
+      setWheelAngle(0);
+
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          setWheelAngle(finalAngle);
+        });
+      });
+
+      timerRef.current = setTimeout(() => {
+        setPhase("result");
+        setShowResult(true);
+      }, SPIN_MS + 300);
+
+      return;
+    }
+
+    setPhase("idle");
+    setShowResult(false);
+  }, [event, participants, segmentAngle, winnerNickname]);
+
+  const labelFontSize =
+    participants.length >= 60
+      ? "clamp(6px, 1.35vw, 9px)"
+      : participants.length >= 40
+        ? "clamp(7px, 1.55vw, 10px)"
+        : participants.length >= 24
+          ? "clamp(8px, 1.8vw, 12px)"
+          : "clamp(10px, 2.2vw, 15px)";
 
   return (
-    <main className="roulette-root">
-      <style>{`
-        html, body {
-          margin: 0;
-          width: 100%;
-          height: 100%;
-          overflow: hidden;
-          background: transparent !important;
-        }
-        .roulette-root {
+    <main className="roulette-overlay-root">
+      <section className="roulette-stage" aria-label="루루동이 룰렛">
+        <div className="pointer-wrap" aria-hidden="true">
+          <div className="pointer-glow" />
+          <div className="pointer-main" />
+          <div className="pointer-dot" />
+        </div>
+
+        <div className="wheel-wrap">
+          <div
+            className="wheel"
+            style={{
+              background: wheelGradient,
+              transform: `rotate(${wheelAngle}deg)`,
+              transition: phase === "spinning" ? `transform ${SPIN_MS}ms cubic-bezier(0.07, 0.78, 0.08, 1)` : "none",
+            }}
+          >
+            <div className="inner-soft-ring" />
+
+            {participants.map((name, index) => {
+              const degree = index * segmentAngle + segmentAngle / 2;
+
+              return (
+                <div
+                  key={`${name}-${index}`}
+                  className="name-label"
+                  style={{
+                    transform: `rotate(${degree}deg) translateY(calc(-1 * var(--label-radius))) rotate(90deg)`,
+                    fontSize: labelFontSize,
+                  }}
+                >
+                  <span>{name}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="fixed-center-cap" aria-hidden="true">
+            <div>루루동이</div>
+            <div>이벤트</div>
+          </div>
+        </div>
+
+        {phase === "spinning" ? <div className="spin-status">룰렛 돌아가는 중...</div> : null}
+
+        {showResult && winnerNickname ? (
+          <div className="result-card">
+            <div className="result-eyebrow">당첨</div>
+            <div className="result-name">{winnerNickname}</div>
+            <div className="result-note">{cleanText(event?.winner_note) || "이벤트 당첨"}</div>
+          </div>
+        ) : null}
+
+        {!event && message ? <div className="empty-message">{message}</div> : null}
+      </section>
+
+      <style jsx>{`
+        .roulette-overlay-root {
           position: fixed;
           inset: 0;
           width: 100vw;
           height: 100vh;
           overflow: hidden;
           background: transparent;
-          pointer-events: none;
-          font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-family:
+            ui-sans-serif,
+            system-ui,
+            -apple-system,
+            BlinkMacSystemFont,
+            "Segoe UI",
+            sans-serif;
         }
+
         .roulette-stage {
-          position: absolute;
-          left: 50%;
-          top: 50%;
-          transform: translate(-50%, -50%);
-          width: min(92vw, 760px);
-          aspect-ratio: 1 / 1.12;
+          position: relative;
+          width: min(98vw, 850px);
+          aspect-ratio: 1 / 1.02;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: transparent;
+          overflow: visible;
         }
-        .title-pill {
+
+        .pointer-wrap {
           position: absolute;
           left: 50%;
-          top: 2%;
+          top: 6.8%;
+          z-index: 60;
+          width: clamp(62px, 11vw, 108px);
+          height: clamp(66px, 12vw, 118px);
+          transform: translateX(-50%);
+          display: flex;
+          align-items: flex-start;
+          justify-content: center;
+          pointer-events: none;
+        }
+
+        .pointer-glow {
+          position: absolute;
+          top: 4%;
+          left: 50%;
+          width: 78%;
+          height: 78%;
           transform: translateX(-50%);
           border-radius: 999px;
-          background: rgba(255,255,255,0.94);
-          box-shadow: 0 10px 24px rgba(15,23,42,0.12);
-          padding: 10px 18px;
-          font-size: clamp(16px, 1.8vw, 22px);
-          font-weight: 900;
-          color: #0f172a;
-          letter-spacing: -0.03em;
-          z-index: 20;
+          background: radial-gradient(circle, rgba(255, 255, 255, 0.9) 0%, rgba(244, 63, 94, 0.38) 45%, rgba(244, 63, 94, 0) 72%);
+          filter: blur(1px);
         }
-        .pointer {
+
+        .pointer-main {
           position: absolute;
+          top: 8%;
           left: 50%;
-          top: 18.8%;
           transform: translateX(-50%);
           width: 0;
           height: 0;
-          border-left: 20px solid transparent;
-          border-right: 20px solid transparent;
-          border-top: 34px solid #f43f5e;
-          filter: drop-shadow(0 6px 12px rgba(15,23,42,0.18));
-          z-index: 25;
+          border-left: clamp(24px, 4.4vw, 42px) solid transparent;
+          border-right: clamp(24px, 4.4vw, 42px) solid transparent;
+          border-top: clamp(42px, 7.2vw, 70px) solid #f43f5e;
+          filter:
+            drop-shadow(0 8px 10px rgba(127, 29, 29, 0.35))
+            drop-shadow(0 0 14px rgba(244, 63, 94, 0.38));
         }
-        .wheel-shell {
+
+        .pointer-dot {
           position: absolute;
+          top: 0;
           left: 50%;
-          top: 54%;
-          width: 82%;
-          aspect-ratio: 1 / 1;
-          transform: translate(-50%, -50%);
-          border-radius: 999px;
-          background: linear-gradient(145deg, #ffffff, #f8fafc);
-          box-shadow:
-            0 22px 50px rgba(15,23,42,0.18),
-            inset 0 8px 18px rgba(255,255,255,0.92),
-            inset 0 -10px 16px rgba(148,163,184,0.22);
-          z-index: 10;
-        }
-        .wheel-face {
-          position: absolute;
-          inset: 4.5%;
-          border-radius: 999px;
-          overflow: hidden;
-          background:
-            conic-gradient(
-              from -90deg,
-              #7c3aed 0deg 45deg,
-              #ec4899 45deg 90deg,
-              #fb7185 90deg 135deg,
-              #f59e0b 135deg 180deg,
-              #22c55e 180deg 225deg,
-              #06b6d4 225deg 270deg,
-              #3b82f6 270deg 315deg,
-              #8b5cf6 315deg 360deg
-            );
-        }
-        .wheel-gloss {
-          position: absolute;
-          inset: 8%;
-          border-radius: 999px;
-          background: linear-gradient(180deg, rgba(255,255,255,0.28), rgba(255,255,255,0));
-          z-index: 2;
-        }
-        .center-cap {
-          position: absolute;
-          left: 50%;
-          top: 50%;
-          width: 18%;
-          aspect-ratio: 1 / 1;
-          transform: translate(-50%, -50%);
-          border-radius: 999px;
-          background: radial-gradient(circle at 30% 30%, #ffffff, #f8fafc 55%, #cbd5e1 100%);
-          box-shadow: 0 6px 14px rgba(15,23,42,0.15);
-          z-index: 4;
-        }
-        .label {
-          position: absolute;
-          left: 50%;
-          top: 50%;
-          transform-origin: center center;
-          width: 42%;
-          text-align: center;
-          font-size: clamp(11px, 1.2vw, 15px);
-          font-weight: 900;
-          color: rgba(255,255,255,0.96);
-          letter-spacing: -0.03em;
-          text-shadow: 0 1px 3px rgba(15,23,42,0.20);
-          z-index: 3;
-        }
-        .message-pill {
-          position: absolute;
-          left: 50%;
-          bottom: 8%;
+          width: clamp(20px, 3.5vw, 34px);
+          height: clamp(20px, 3.5vw, 34px);
           transform: translateX(-50%);
           border-radius: 999px;
-          background: rgba(15, 23, 42, 0.72);
-          color: #ffffff;
-          padding: 10px 16px;
-          font-size: 13px;
-          font-weight: 800;
-          max-width: min(80vw, 420px);
-          text-align: center;
+          background: #ffffff;
+          border: 5px solid #f43f5e;
+          box-shadow: 0 8px 18px rgba(127, 29, 29, 0.24);
         }
+
+        .wheel-wrap {
+          position: relative;
+          width: 90%;
+          aspect-ratio: 1 / 1;
+          border-radius: 999px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(255, 255, 255, 0.98);
+          box-shadow:
+            0 30px 80px rgba(15, 23, 42, 0.2),
+            inset 0 0 0 clamp(14px, 2vw, 24px) rgba(255, 255, 255, 0.96);
+          overflow: visible;
+        }
+
+        .wheel {
+          --label-radius: min(31vw, 278px);
+          position: relative;
+          width: 92%;
+          aspect-ratio: 1 / 1;
+          border-radius: 999px;
+          overflow: hidden;
+          box-shadow:
+            inset 0 0 0 1px rgba(255, 255, 255, 0.28),
+            inset 0 0 42px rgba(255, 255, 255, 0.16);
+          will-change: transform;
+          transform-origin: center center;
+        }
+
+        .inner-soft-ring {
+          position: absolute;
+          inset: 16%;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.16);
+          pointer-events: none;
+        }
+
+        .fixed-center-cap {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          z-index: 45;
+          width: 22%;
+          aspect-ratio: 1 / 1;
+          transform: translate(-50%, -50%);
+          border-radius: 999px;
+          background: radial-gradient(circle at 36% 30%, #ffffff 0%, #f8fafc 52%, #e5e7eb 100%);
+          box-shadow:
+            0 12px 28px rgba(15, 23, 42, 0.18),
+            inset 0 0 0 1px rgba(255, 255, 255, 0.9);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          color: #111827;
+          font-weight: 950;
+          line-height: 1.05;
+          letter-spacing: -0.08em;
+          font-size: clamp(12px, 2.5vw, 22px);
+          text-align: center;
+          pointer-events: none;
+        }
+
+        .fixed-center-cap div + div {
+          margin-top: 3px;
+          color: #7c3aed;
+        }
+
+        .name-label {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          z-index: 12;
+          width: 22%;
+          height: 14px;
+          margin-left: -11%;
+          margin-top: -7px;
+          transform-origin: center center;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: rgba(255, 255, 255, 0.96);
+          font-weight: 950;
+          line-height: 1;
+          letter-spacing: -0.08em;
+          text-align: center;
+          text-shadow:
+            0 1px 2px rgba(15, 23, 42, 0.36),
+            0 0 8px rgba(15, 23, 42, 0.2);
+          white-space: nowrap;
+          pointer-events: none;
+        }
+
+        .name-label span {
+          display: block;
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .spin-status {
+          position: absolute;
+          left: 50%;
+          bottom: 4.8%;
+          z-index: 55;
+          transform: translateX(-50%);
+          border-radius: 999px;
+          background: rgba(15, 23, 42, 0.76);
+          color: #ffffff;
+          padding: 8px 16px;
+          font-size: clamp(13px, 2.4vw, 18px);
+          font-weight: 900;
+          letter-spacing: -0.04em;
+        }
+
         .result-card {
           position: absolute;
           left: 50%;
-          bottom: 0;
-          transform: translateX(-50%);
-          width: min(84%, 360px);
+          top: 55%;
+          z-index: 80;
+          width: min(76%, 430px);
+          transform: translate(-50%, -50%);
           border-radius: 28px;
-          background: rgba(255,255,255,0.96);
-          box-shadow: 0 18px 44px rgba(15,23,42,0.18);
-          padding: 18px 18px 20px;
+          background: rgba(255, 255, 255, 0.96);
+          box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24);
+          padding: clamp(18px, 3vw, 28px);
           text-align: center;
-          z-index: 30;
+          backdrop-filter: blur(6px);
         }
-        .result-kicker {
-          font-size: 17px;
-          font-weight: 900;
+
+        .result-eyebrow {
           color: #7c3aed;
-          letter-spacing: -0.03em;
-        }
-        .result-name {
-          margin-top: 4px;
-          font-size: clamp(28px, 3.2vw, 40px);
-          font-weight: 900;
-          color: #020617;
-          line-height: 1.08;
+          font-size: clamp(15px, 3vw, 24px);
+          font-weight: 950;
           letter-spacing: -0.05em;
         }
-        .result-note {
+
+        .result-name {
           margin-top: 6px;
-          font-size: clamp(15px, 1.8vw, 22px);
-          font-weight: 800;
+          color: #111827;
+          font-size: clamp(34px, 8vw, 72px);
+          font-weight: 950;
+          line-height: 1.05;
+          letter-spacing: -0.08em;
+          word-break: keep-all;
+          overflow-wrap: anywhere;
+        }
+
+        .result-note {
+          margin-top: 10px;
           color: #475569;
-          letter-spacing: -0.03em;
+          font-size: clamp(15px, 3.2vw, 25px);
+          font-weight: 900;
+          letter-spacing: -0.05em;
+        }
+
+        .empty-message {
+          position: absolute;
+          left: 50%;
+          bottom: 8%;
+          z-index: 40;
+          transform: translateX(-50%);
+          border-radius: 999px;
+          background: rgba(15, 23, 42, 0.76);
+          color: #ffffff;
+          padding: 8px 14px;
+          font-size: clamp(12px, 2.4vw, 16px);
+          font-weight: 850;
+          white-space: nowrap;
+        }
+
+        @media (max-width: 520px) {
+          .roulette-stage {
+            width: 110vw;
+            transform: scale(0.95);
+          }
+
+          .wheel {
+            --label-radius: 34vw;
+          }
+
+          .name-label {
+            width: 18%;
+            margin-left: -9%;
+          }
+
+          .fixed-center-cap {
+            width: 24%;
+          }
         }
       `}</style>
-
-      <div className="roulette-stage">
-        <div className="title-pill">🎯 루루동이 룰렛</div>
-        <div className="pointer" />
-
-        <div className="wheel-shell">
-          <div
-            className="wheel-face"
-            style={{
-              transform: `rotate(${wheelRotation}deg)`,
-            }}
-          >
-            <div className="wheel-gloss" />
-            {visibleSegments.map((label, index) => {
-              const angle = (360 / segmentCount) * index;
-              return (
-                <div
-                  key={`${label}-${index}`}
-                  className="label"
-                  style={{
-                    transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-118px) rotate(${-angle}deg)`,
-                  }}
-                >
-                  {label}
-                </div>
-              );
-            })}
-          </div>
-          <div className="center-cap" />
-        </div>
-
-        {winnerNickname ? (
-          <div className="result-card">
-            <div className="result-kicker">당첨</div>
-            <div className="result-name">{winnerNickname}</div>
-            <div className="result-note">{winnerNote}</div>
-          </div>
-        ) : message ? (
-          <div className="message-pill">{message}</div>
-        ) : null}
-      </div>
     </main>
   );
 }
+
+export default EventRouletteOverlayClient;
