@@ -160,7 +160,7 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
 function buildOverlayUrl(_event: RouletteEvent | null) {
   if (typeof window === "undefined") return "";
 
-  return "https://ruru-order.vercel.app/event-roulette/overlay?token=roulette_luludongi_live&scale=0.72&v=69cfb1d";
+  return "https://ruru-order.vercel.app/event-roulette/live?token=roulette_luludongi_live&scale=0.72&v=b50";
 }
 
 function buildClawOverlayUrl() {
@@ -324,6 +324,8 @@ export default function AdminLiveEventRoulettePanel({
           eventId,
           winnerNote,
           fixedWinnerNickname: fixedWinnerNickname.trim(),
+          participantSource,
+          participants: finalParticipants,
         }),
       });
 
@@ -484,6 +486,8 @@ export default function AdminLiveEventRoulettePanel({
           eventId: currentEvent.id,
           winnerNote,
           fixedWinnerNickname: fixedWinnerNickname.trim(),
+          participantSource,
+          participants: finalParticipants,
         }),
       });
 
