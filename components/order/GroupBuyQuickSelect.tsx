@@ -226,7 +226,7 @@ function PriceAndDelivery({ product }: { product: GroupBuyQuickSelectProduct }) 
   const deliveryLabel = getDeliveryLabel(product);
 
   return (
-    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[13px] font-black">
+    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[15px] font-black">
       <span className={priceExists ? "text-coral-600" : "text-coral-600"}>
         {priceExists ? formatWon(product.price) : "가격 직접입력"}
       </span>
@@ -266,11 +266,11 @@ function QuickProductCard({
         >
           <ProductThumbnail product={product} className="mx-auto mb-1.5 h-12 w-12" />
 
-          <div className="line-clamp-1 text-[12px] font-black leading-4 tracking-[-0.04em] text-gray-950">
+          <div className="line-clamp-1 text-[14px] font-black leading-5 tracking-[-0.04em] text-gray-950">
             {product.product_name}
           </div>
 
-          <div className="mt-0.5 truncate text-[12px] font-black text-coral-600">
+          <div className="mt-0.5 truncate text-[14px] font-black text-coral-600">
             {hasPrice(product) ? formatWon(product.price) : "직접입력"}
           </div>
         </button>
@@ -295,7 +295,7 @@ function QuickProductCard({
             onClick={onDetail}
             className="block w-full text-left"
           >
-            <div className="line-clamp-2 min-h-[34px] text-[12px] font-black leading-[17px] tracking-[-0.04em] text-gray-950">
+            <div className="line-clamp-2 min-h-[38px] text-[14px] font-black leading-[19px] tracking-[-0.04em] text-gray-950">
               {product.product_name}
             </div>
 
@@ -313,7 +313,7 @@ function QuickProductCard({
             <button
               type="button"
               onClick={onSelect}
-              className="h-8 rounded-xl bg-coral-600 text-[12px] font-black text-white shadow-sm"
+              className="h-8 rounded-xl bg-coral-600 text-[14px] font-black text-white shadow-sm"
             >
               {selectLabel}
             </button>
@@ -341,7 +341,7 @@ function SheetProductCard({
         <ProductThumbnail product={product} className="h-20 w-20" />
 
         <div className="min-w-0 flex-1">
-          <div className="line-clamp-2 text-[15px] font-black leading-5 tracking-[-0.04em] text-gray-950">
+          <div className="line-clamp-2 text-[16px] font-black leading-6 tracking-[-0.04em] text-gray-950">
             {product.product_name}
           </div>
           <PriceAndDelivery product={product} />
@@ -357,7 +357,7 @@ function SheetProductCard({
             <button
               type="button"
               onClick={onSelect}
-              className="h-10 rounded-xl bg-coral-600 text-sm font-black text-white shadow-sm"
+              className="h-10 rounded-xl bg-coral-600 text-[15px] font-black text-white shadow-sm"
             >
               {selectLabel}
             </button>

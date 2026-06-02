@@ -3463,8 +3463,8 @@ export default function OrderPage() {
     const safeGreetingName = youtubeNickname || customerName || "고객";
     const safePointText = `${Math.max(0, Number(customerPointBalance || 0)).toLocaleString()}원`;
     const isTopNavEditActive = isEditingCustomerInfo || isEditMode || customerInfoEditSheetOpen;
-    const topNavActiveButtonClass = "rounded-full bg-coral-700 px-3 py-1.5 text-[12px] font-black text-white";
-    const topNavInactiveButtonClass = "rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-black text-slate-700";
+    const topNavActiveButtonClass = "shrink-0 whitespace-nowrap rounded-full bg-coral-700 px-2.5 py-1.5 text-[12px] font-black text-white";
+    const topNavInactiveButtonClass = "shrink-0 whitespace-nowrap rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] font-black text-slate-700";
 
     const handleTopNavOrderClick = (event: { preventDefault: () => void }) => {
       if (!isTopNavEditActive) return;
@@ -4347,7 +4347,7 @@ export default function OrderPage() {
                 <p className="text-[11px] font-black tracking-[-0.04em] text-slate-400">
                   총 결제금액
                 </p>
-                <p className="truncate text-[20px] font-black tracking-[-0.08em] text-slate-950">
+                <p className="truncate text-[24px] font-black tracking-[-0.08em] text-slate-950">
                   {won(finalPaymentAmount)}
                 </p>
               </div>
