@@ -530,7 +530,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
 
         {phase === "spinning" ? <div className="spin-status">룰렛 돌아가는 중...</div> : null}
 
-        {showResult && winnerNickname ? (
+        {false && showResult && winnerNickname ? (
           <div className="result-card">
             <div className="result-eyebrow">당첨</div>
             <div className="result-name">{winnerNickname}</div>

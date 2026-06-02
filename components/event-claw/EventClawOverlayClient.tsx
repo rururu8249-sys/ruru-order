@@ -650,7 +650,7 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
 
         {message && !winnerNickname ? <div className="message-pill">{message}</div> : null}
 
-        <div className={`result-card ${motion.showResult && winnerNickname ? "show" : ""}`}>
+        <div className={`result-card ${false && motion.showResult && winnerNickname ? "show" : ""}`}>
           <div className="result-label">당첨</div>
           <div className="result-name">{winnerNickname || "대기중"}</div>
           <div className="result-note">{winnerNote}</div>
