@@ -500,6 +500,75 @@ export default function AdminLiveEventRoulettePanel({
     }
   };
 
+  const startRouletteOneClick = async () => {
+    if (finalParticipants.length === 0) {
+      showAdminToast("먼저 주문서 명단을 불러오거나 수동 참가자를 입력해주세요.", "warning");
+      return;
+    }
+
+    setSpinning(true);
+
+    try {
+      const mustCreateNewEvent =
+        !currentEvent?.id ||
+        !String(currentEvent.overlay_token || "").startsWith("roulette_") ||
+        currentEvent.status === "result" ||
+        currentEvent.status === "closed";
+
+      let eventToSpin = currentEvent;
+
+      if (mustCreateNewEvent) {
+        const createPayload = await requestJson<EventPayload>("/api/admin-live/event-roulette", {
+          method: "POST",
+          body: JSON.stringify({
+            action: "create",
+            title,
+            mode,
+            sourceDate,
+            broadcastId,
+            participants: finalParticipants,
+            eventKind: "roulette",
+          }),
+        });
+
+        if (!createPayload.ok || !createPayload.event) {
+          throw new Error(createPayload.message || "룰렛 이벤트 생성 실패");
+        }
+
+        eventToSpin = createPayload.event;
+        setCurrentEvent(createPayload.event);
+        setParticipants(createPayload.event.participants || finalParticipants);
+      }
+
+      if (!eventToSpin?.id) {
+        throw new Error("룰렛 이벤트 ID가 없습니다.");
+      }
+
+      const spinPayload = await requestJson<EventPayload>("/api/admin-live/event-roulette", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "spin",
+          eventId: eventToSpin.id,
+          winnerNote,
+        }),
+      });
+
+      if (!spinPayload.ok || !spinPayload.event) {
+        throw new Error(spinPayload.message || "룰렛 시작 실패");
+      }
+
+      setCurrentEvent(spinPayload.event);
+      setParticipants(spinPayload.event.participants || finalParticipants);
+      await loadEventsAndWinners();
+      showAdminToast(`당첨자: ${spinPayload.event.winner_nickname || "-"}`, "success");
+    } catch (error) {
+      showAdminToast("룰렛 시작 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
+    } finally {
+      setSpinning(false);
+    }
+  };
+
+
   const markRewardDone = async (winner: RouletteWinner, isRewardDone: boolean) => {
     try {
       const payload = await requestJson<{ ok: boolean; message?: string }>("/api/admin-live/event-roulette", {
@@ -1066,11 +1135,11 @@ export default function AdminLiveEventRoulettePanel({
                 {eventTab === "roulette" ? (
                   <button
                     type="button"
-                    onClick={currentEvent?.id ? spinEvent : createEvent}
+                    onClick={startRouletteOneClick}
                     disabled={spinning || loading || finalParticipants.length === 0}
                     className="h-11 rounded-2xl bg-violet-600 px-12 text-sm font-black text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98] disabled:bg-slate-300"
                   >
-                    {currentEvent?.id ? (spinning ? "룰렛 진행중..." : "룰렛 시작") : "룰렛 만들기"}
+                    {spinning ? "룰렛 진행중..." : "룰렛 시작"}
                   </button>
                 ) : (
                   <button
