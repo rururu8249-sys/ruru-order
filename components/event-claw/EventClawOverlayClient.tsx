@@ -51,6 +51,7 @@ type MotionState = {
   prizeX: number;
   prizeY: number;
   showResult: boolean;
+  isMiss: boolean;
 };
 
 const FALLBACK_TOKEN = "claw_luludongi_live";
@@ -138,6 +139,7 @@ function getMotionState(elapsedMs: number, seed: number, hasResult: boolean, now
       prizeX: idleX,
       prizeY: 0,
       showResult: false,
+      isMiss: false,
     };
   }
 
@@ -164,27 +166,31 @@ function getMotionState(elapsedMs: number, seed: number, hasResult: boolean, now
     const missX = missXOptions[(seed + i * 7) % missXOptions.length];
 
     if (t <= moveMissMs) {
-      return { phase: "move-miss", x: lerp(prevX, missX, t / moveMissMs), cable: topCable, clawClosed: false, showPrize: false, prizeX: missX, prizeY: deepCable, showResult: false };
+      return { phase: "move-miss", x: lerp(prevX, missX, t / moveMissMs), cable: topCable, clawClosed: false, showPrize: false, prizeX: missX, prizeY: deepCable, showResult: false , isMiss: true};
     }
     t -= moveMissMs;
 
     if (t <= dropMissMs) {
-      return { phase: "drop-miss", x: missX, cable: lerp(topCable, deepCable, t / dropMissMs), clawClosed: false, showPrize: false, prizeX: missX, prizeY: deepCable, showResult: false };
+      return { phase: "drop-miss", x: missX, cable: lerp(topCable, deepCable, t / dropMissMs), clawClosed: false, showPrize: false, prizeX: missX, prizeY: deepCable, showResult: false , isMiss: true};
     }
     t -= dropMissMs;
 
     if (t <= grabMissMs) {
-      return { phase: "grab-miss", x: missX, cable: deepCable, clawClosed: t > grabMissMs * 0.65, showPrize: true, prizeX: missX, prizeY: deepCable + 6, showResult: false };
+      return { phase: "grab-miss", x: missX, cable: deepCable, clawClosed: t > grabMissMs * 0.65, showPrize: true, prizeX: missX, prizeY: deepCable + 6, showResult: false , isMiss: true};
     }
     t -= grabMissMs;
 
     if (t <= liftMissMs) {
-      return { phase: "lift-miss", x: missX, cable: lerp(deepCable, midCable, t / liftMissMs), clawClosed: true, showPrize: true, prizeX: missX, prizeY: lerp(deepCable + 6, midCable + 26, t / liftMissMs), showResult: false };
+      // 인형을 집게로 잡고 위로 끌어올리는 중 (집게 닫힘, 인형 같이 상승)
+      return { phase: "lift-miss", x: missX, cable: lerp(deepCable, midCable, t / liftMissMs), clawClosed: true, showPrize: true, prizeX: missX, prizeY: lerp(deepCable + 6, midCable + 4, t / liftMissMs), showResult: false , isMiss: true};
     }
     t -= liftMissMs;
 
     if (t <= fallMissMs) {
-      return { phase: "fall-miss", x: missX + 10, cable: lerp(midCable, deepCable, t / fallMissMs), clawClosed: false, showPrize: t < fallMissMs * 0.6, prizeX: missX + 10, prizeY: lerp(midCable + 26, deepCable + 14, t / fallMissMs), showResult: false };
+      // 올라오던 도중 아슬아슬하게 놓침: 집게는 그 높이에 머물고(살짝 흔들), 인형만 아래로 떨어진다
+      const fp = t / fallMissMs;
+      const clawShake = Math.sin(fp * Math.PI * 3) * 4;
+      return { phase: "fall-miss", x: missX + clawShake, cable: midCable, clawClosed: fp < 0.18, showPrize: true, prizeX: missX, prizeY: lerp(midCable + 4, deepCable + 16, fp), showResult: false , isMiss: true};
     }
     t -= fallMissMs;
 
@@ -192,25 +198,25 @@ function getMotionState(elapsedMs: number, seed: number, hasResult: boolean, now
   }
 
   if (t <= moveCatchMs) {
-    return { phase: "move-catch", x: lerp(prevX, catchX, t / moveCatchMs), cable: topCable, clawClosed: false, showPrize: false, prizeX: catchX, prizeY: deepCable, showResult: false };
+    return { phase: "move-catch", x: lerp(prevX, catchX, t / moveCatchMs), cable: topCable, clawClosed: false, showPrize: false, prizeX: catchX, prizeY: deepCable, showResult: false , isMiss: false};
   }
   t -= moveCatchMs;
 
   if (t <= dropCatchMs) {
-    return { phase: "drop-catch", x: catchX, cable: lerp(topCable, deepCable + 8, t / dropCatchMs), clawClosed: false, showPrize: false, prizeX: catchX, prizeY: deepCable + 8, showResult: false };
+    return { phase: "drop-catch", x: catchX, cable: lerp(topCable, deepCable + 8, t / dropCatchMs), clawClosed: false, showPrize: false, prizeX: catchX, prizeY: deepCable + 8, showResult: false , isMiss: false};
   }
   t -= dropCatchMs;
 
   if (t <= grabCatchMs) {
-    return { phase: "grab-catch", x: catchX, cable: deepCable + 8, clawClosed: t > grabCatchMs * 0.65, showPrize: true, prizeX: catchX, prizeY: deepCable + 12, showResult: false };
+    return { phase: "grab-catch", x: catchX, cable: deepCable + 8, clawClosed: t > grabCatchMs * 0.65, showPrize: true, prizeX: catchX, prizeY: deepCable + 12, showResult: false , isMiss: false};
   }
   t -= grabCatchMs;
 
   if (t <= liftCatchMs) {
-    return { phase: "lift-catch", x: catchX, cable: lerp(deepCable + 8, 126, t / liftCatchMs), clawClosed: true, showPrize: true, prizeX: catchX, prizeY: lerp(deepCable + 12, 160, t / liftCatchMs), showResult: false };
+    return { phase: "lift-catch", x: catchX, cable: lerp(deepCable + 8, 126, t / liftCatchMs), clawClosed: true, showPrize: true, prizeX: catchX, prizeY: lerp(deepCable + 12, 160, t / liftCatchMs), showResult: false , isMiss: false};
   }
 
-  return { phase: "result", x: catchX, cable: 108, clawClosed: true, showPrize: true, prizeX: catchX, prizeY: 142, showResult: true };
+  return { phase: "result", x: catchX, cable: 108, clawClosed: true, showPrize: true, prizeX: catchX, prizeY: 142, showResult: true , isMiss: false};
 }
 
 export default function EventClawOverlayClient({ initialToken }: EventClawOverlayClientProps) {
@@ -285,6 +291,8 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
   const seed = hashText(`${winnerNickname}|${resultKey}`);
   const prizeKey = useMemo(() => pickPrizeKey(winnerNickname || "default", resultKey || "idle"), [winnerNickname, resultKey]);
   const prizeSrc = PRIZE_ASSETS[prizeKey];
+  const missPrizeKey = pickPrizeKey((winnerNickname || "default") + "-miss", (resultKey || "idle") + "-miss");
+  const missPrizeSrc = PRIZE_ASSETS[missPrizeKey === prizeKey ? (Object.keys(PRIZE_ASSETS) as PrizeKey[]).filter((k) => k !== prizeKey)[0] : missPrizeKey];
   const elapsedMs = hasResult && animationStartedAt ? now - animationStartedAt : 0;
   const motion = getMotionState(elapsedMs, seed, hasResult, now);
   const clawResultCardVisibleMs = 5000;
@@ -444,20 +452,42 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
           border-radius: 999px;
           transform-origin: top center;
         }
+        .claw-arm {
+          height: 30px;
+          background: linear-gradient(180deg, #94a3b8, #475569);
+          border-radius: 999px 999px 4px 4px;
+          box-shadow: inset -1px 0 1px rgba(255,255,255,0.4);
+        }
+        .claw-arm::after {
+          content: "";
+          position: absolute;
+          bottom: -5px;
+          left: 50%;
+          width: 9px;
+          height: 9px;
+          background: #334155;
+          border-radius: 2px 2px 6px 6px;
+        }
         .claw-arm.center {
           left: 50%;
           transform: translateX(-50%) rotate(0deg);
         }
+        .claw-arm.center::after { transform: translateX(-50%); }
         .claw-arm.left {
-          left: 12px;
-          transform: rotate(-70deg);
+          left: 9px;
+          transform: rotate(-46deg);
+          transform-origin: top center;
         }
+        .claw-arm.left::after { transform: translateX(-50%) rotate(46deg); }
         .claw-arm.right {
-          right: 12px;
-          transform: rotate(70deg);
+          right: 9px;
+          transform: rotate(46deg);
+          transform-origin: top center;
         }
-        .claw.closed .claw-arm.left { transform: rotate(-6deg); }
-        .claw.closed .claw-arm.right { transform: rotate(6deg); }
+        .claw-arm.right::after { transform: translateX(-50%) rotate(-46deg); }
+        .claw.closed .claw-arm.left { transform: rotate(-12deg); }
+        .claw.closed .claw-arm.right { transform: rotate(12deg); }
+        .claw .claw-arm { transition: transform 0.18s ease; }
 
         .grabbed-prize {
           position: absolute;
@@ -569,8 +599,8 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
 
           {motion.showPrize ? (
             <img
-              src={prizeSrc}
-              alt="당첨 인형"
+              src={motion.isMiss ? missPrizeSrc : prizeSrc}
+              alt={motion.isMiss ? "놓친 인형" : "당첨 인형"}
               className="grabbed-prize"
               style={{
                 left: `calc(50% + ${motion.prizeX}px)`,
