@@ -326,6 +326,8 @@ export default function AdminLiveEventRoulettePanel({
           fixedWinnerNickname: fixedWinnerNickname.trim(),
           participantSource,
           participants: finalParticipants,
+        
+          manualParticipantText,
         }),
       });
 
@@ -488,6 +490,8 @@ export default function AdminLiveEventRoulettePanel({
           fixedWinnerNickname: fixedWinnerNickname.trim(),
           participantSource,
           participants: finalParticipants,
+        
+          manualParticipantText,
         }),
       });
 
@@ -578,6 +582,10 @@ export default function AdminLiveEventRoulettePanel({
           action: "spin_event",
           eventId: createPayload.event.id,
           winnerNote,
+        
+          participantSource,
+          participants: finalParticipants,
+          manualParticipantText,
         }),
       });
 
