@@ -712,8 +712,10 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
       const profileLatestAt = clean(profile.last_order_at) || clean(profile.created_at);
 
       if (current) {
-        if (!current.nickname || current.nickname === "-") {
-          current.nickname = clean(profile.youtube_nickname) || "닉네임 미입력";
+        if (clean(profile.youtube_nickname)) {
+          current.nickname = clean(profile.youtube_nickname);
+        } else if (!current.nickname || current.nickname === "-") {
+          current.nickname = "닉네임 미입력";
         }
 
         if (!current.name || current.name === "-") {
