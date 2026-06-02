@@ -1430,6 +1430,30 @@ export default function AdminPage() {
       });
   }, [orders, customerKeyword, blockedPhones]);
 
+
+  const customerCurrentAddressByPhone = useMemo(() => {
+    const map = new Map<string, string>();
+
+    customers.forEach((customer) => {
+      const phone = normalizePhoneKey(customer.customer_phone || "");
+      const address = [customer.zipcode, customer.address, customer.detail_address]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+
+      if (phone && address) {
+        map.set(phone, address);
+      }
+    });
+
+    return map;
+  }, [customers]);
+
+  const currentCustomerAddressFor = (customer: any) => {
+    const phone = normalizePhoneKey(customer?.first?.customer_phone || customer?.customer_phone || "");
+    return phone ? customerCurrentAddressByPhone.get(phone) || "" : "";
+  };
+
 const selectedCustomerDetail = useMemo(() => {
     if (!selectedCustomerDetailKey) return null;
     return customerRows.find((customer) => customer.key === selectedCustomerDetailKey) || null;
@@ -3796,7 +3820,7 @@ const selectedCustomerDetail = useMemo(() => {
                               {customer.first.customer_name || "이름없음"}
                             </div>
                             <div className="mt-1 truncate text-sm font-bold text-gray-500">
-                              {customer.first.customer_phone || "-"} · {fullAddress(customer.first) || "주소 없음"}
+                              {customer.first.customer_phone || "-"} · {currentCustomerAddressFor(customer) || fullAddress(customer.first) || "주소 없음"}
                             </div>
                           </button>
 
@@ -3852,7 +3876,7 @@ const selectedCustomerDetail = useMemo(() => {
 
                     <div className="grid md:grid-cols-2 gap-3">
                       <InfoBox label="전화번호" value={selectedCustomerDetail.first.customer_phone || "-"} />
-                      <InfoBox label="주소" value={fullAddress(selectedCustomerDetail.first) || "-"} />
+                      <InfoBox label="주소" value={currentCustomerAddressFor(selectedCustomerDetail) || fullAddress(selectedCustomerDetail.first) || "-"} />
                       <InfoBox label="총 주문건수" value={`${selectedCustomerDetail.orderCount}건`} />
                       <InfoBox label="총 구매수량" value={`${selectedCustomerDetail.totalQty}개`} />
                       <InfoBox label="총 구매금액" value={money(selectedCustomerDetail.totalAmount)} />

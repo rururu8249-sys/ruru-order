@@ -527,6 +527,34 @@ export default function AdminLiveDashboard() {
   const [quickModalSearch, setQuickModalSearch] = useState("");
   const [quickModalPage, setQuickModalPage] = useState(1);
   const [quickModalCustomerDetail, setQuickModalCustomerDetail] = useState<any | null>(null);
+
+  const [quickCustomerProfiles, setQuickCustomerProfiles] = useState<any[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+
+    const loadQuickCustomerProfiles = async () => {
+      const { data, error } = await supabase
+        .from("customers")
+        .select("id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address")
+        .limit(1000);
+
+      if (!alive) return;
+
+      if (error) {
+        console.warn("[admin-live] quick customer profiles load failed", error.message);
+        return;
+      }
+
+      setQuickCustomerProfiles(data || []);
+    };
+
+    void loadQuickCustomerProfiles();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
   const [quickPointAmount, setQuickPointAmount] = useState("");
   const [quickPointMemo, setQuickPointMemo] = useState("");
   const [quickPointSaving, setQuickPointSaving] = useState<"add" | "subtract" | null>(null);
@@ -923,6 +951,40 @@ export default function AdminLiveDashboard() {
     }
 
     return 0;
+  };
+
+
+  const quickCustomerProfileAddressByPhone = useMemo(() => {
+    const normalizePhone = (value: unknown) => {
+      const digits = String(value || "").replace(/\D/g, "");
+      if (digits.length === 10 && digits.startsWith("10")) return `0${digits}`;
+      return digits;
+    };
+
+    const map = new Map<string, string>();
+
+    quickCustomerProfiles.forEach((profile) => {
+      const phone = normalizePhone(profile?.customer_phone);
+      const address = [profile?.zipcode, profile?.address, profile?.detail_address]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      if (phone && address) {
+        map.set(phone, address);
+      }
+    });
+
+    return map;
+  }, [quickCustomerProfiles]);
+
+  const getQuickCustomerProfileAddress = (phoneValue: unknown) => {
+    const digits = String(phoneValue || "").replace(/\D/g, "");
+    const phone = digits.length === 10 && digits.startsWith("10") ? `0${digits}` : digits;
+
+    return phone ? quickCustomerProfileAddressByPhone.get(phone) || "" : "";
   };
 
   const quickOrderRows = filteredOrders.slice(0, 8);
@@ -1330,12 +1392,13 @@ export default function AdminLiveDashboard() {
                     const phone = orderPhone(order);
                     const key = `${nickname}-${phone || orderName(order)}`;
                     const canceled = isCanceledOrder(order);
+                    const profileAddress = getQuickCustomerProfileAddress(phone);
                     const current = customerMap.get(key) || {
                       key,
                       nickname,
                       name: orderName(order),
                       phone,
-                      address: orderAddress(order),
+                      address: profileAddress || orderAddress(order),
                       count: 0,
                       activeCount: 0,
                       cancelCount: 0,
@@ -1349,7 +1412,7 @@ export default function AdminLiveDashboard() {
                     current.amount += canceled ? 0 : orderAmount(order);
                     current.latestOrder = order;
                     current.latestAt = orderCreatedAt(order) || current.latestAt;
-                    current.address = current.address || orderAddress(order);
+                    current.address = profileAddress || current.address || orderAddress(order);
                     customerMap.set(key, current);
                   });
 

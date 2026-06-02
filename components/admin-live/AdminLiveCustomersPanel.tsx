@@ -318,7 +318,7 @@ function buildCustomerKey(order: LooseLiveOrder) {
 }
 
 function customerProfileFullAddress(profile: CustomerProfile) {
-  return [clean(profile.address), clean(profile.detail_address)].filter(Boolean).join(" ").trim();
+  return [clean(profile.zipcode), clean(profile.address), clean(profile.detail_address)].filter(Boolean).join(" ").trim();
 }
 
 function customerProfileKey(profile: CustomerProfile) {

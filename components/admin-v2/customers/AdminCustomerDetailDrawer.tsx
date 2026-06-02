@@ -73,7 +73,7 @@ export default function AdminCustomerDetailDrawer({
 
   const blocked = isBlockedCustomer(customer);
   const tags = Array.isArray(customer.customer_tags) ? customer.customer_tags : [];
-  const address = [customer.address, customer.detail_address].filter(Boolean).join(" ");
+  const address = [(customer as any).zipcode, customer.address, customer.detail_address].filter(Boolean).join(" ");
 
   return (
     <div
