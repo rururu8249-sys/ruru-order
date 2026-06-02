@@ -712,45 +712,13 @@ async function createEvent(body: Record<string, unknown>) {
     spin_duration_ms: spinDurationMs,
   };
 
-  const { data: existingEvent, error: existingError } = await supabase
+  const { data, error } = await supabase
     .from("event_roulette_events")
-    .select("id")
-    .eq("overlay_token", overlayToken)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (existingError) {
-    return json({ ok: false, message: existingError.message || "룰렛 이벤트 조회 실패" }, 500);
-  }
-
-  let data: RouletteEventRow | null = null;
-  let error: { message?: string } | null = null;
-
-  if (existingEvent?.id) {
-    const updateResult = await supabase
-      .from("event_roulette_events")
-      .update(eventPayload)
-      .eq("id", existingEvent.id)
-      .select(
-        "id, title, overlay_token, mode, is_test, status, broadcast_id, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
-      )
-      .single();
-
-    data = updateResult.data as RouletteEventRow | null;
-    error = updateResult.error;
-  } else {
-    const insertResult = await supabase
-      .from("event_roulette_events")
-      .insert(eventPayload)
-      .select(
-        "id, title, overlay_token, mode, is_test, status, broadcast_id, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
-      )
-      .single();
-
-    data = insertResult.data as RouletteEventRow | null;
-    error = insertResult.error;
-  }
+    .insert(eventPayload)
+    .select(
+      "id, title, overlay_token, mode, is_test, status, broadcast_id, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
+    )
+    .single();
 
   if (error) {
     return json({ ok: false, message: error.message || "룰렛 이벤트 생성 실패" }, 500);
