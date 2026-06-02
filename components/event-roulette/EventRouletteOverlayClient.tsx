@@ -105,7 +105,7 @@ function makeWheelGradient(count: number) {
   const safeCount = Math.max(count, 1);
   const step = 100 / safeCount;
 
-  return `conic-gradient(from -90deg, ${Array.from({ length: safeCount })
+  return `conic-gradient(from ${-90 - 180 / safeCount}deg, ${Array.from({ length: safeCount })
     .map((_, index) => {
       const start = index * step;
       const end = (index + 1) * step;
@@ -274,7 +274,7 @@ function getLabelPoint(index: number, total: number) {
   const layout = getRouletteLabelLayout(safeTotal);
   const sliceAngle = 360 / safeTotal;
 
-  const degree = -90 + sliceAngle * (index + 0.5);
+  const degree = -90 + sliceAngle * index;
   const rad = (degree * Math.PI) / 180;
 
   const x = 50 + Math.cos(rad) * layout.radius;
@@ -399,7 +399,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
 
       const winnerIndex = winnerIndexOf(participants, winnerNickname);
       const safeWinnerIndex = winnerIndex >= 0 ? winnerIndex : 0;
-      const winnerCenterAngle = safeWinnerIndex * segmentAngle + segmentAngle / 2;
+      const winnerCenterAngle = safeWinnerIndex * segmentAngle;
       const finalAngle = SPIN_TURNS * 360 + (360 - winnerCenterAngle);
 
       animationRef.current?.cancel();
