@@ -355,37 +355,14 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
   const resultEventTime = Date.parse(cleanText(event?.result_at) || cleanText(event?.updated_at) || "");
   const isFreshResultForThisWidget =
     Number.isFinite(resultEventTime) && resultEventTime >= mountedAtRef.current - 1000;
-  const [resultCardVisible, setResultCardVisible] = useState(false);
-  const lastScheduledResultCardKeyRef = useRef("");
-
-  useEffect(() => {
-    if (!winnerNickname || !resultDisplayKey || !isFreshResultForThisWidget) {
-      setResultCardVisible(false);
-      return;
-    }
-
-    if (lastScheduledResultCardKeyRef.current === resultDisplayKey) {
-      return;
-    }
-
-    lastScheduledResultCardKeyRef.current = resultDisplayKey;
-    setResultCardVisible(false);
-
-    const showTimeoutId = window.setTimeout(() => {
-      setResultCardVisible(true);
-    }, 7000);
-
-    const hideTimeoutId = window.setTimeout(() => {
-      setResultCardVisible(false);
-    }, 12000);
-
-    return () => {
-      window.clearTimeout(showTimeoutId);
-      window.clearTimeout(hideTimeoutId);
-    };
-  }, [winnerNickname, resultDisplayKey, isFreshResultForThisWidget]);
-
   const elapsedMs = hasResult && animationStartedAt ? now - animationStartedAt : 0;
+  const clawResultCardDelayMs = 13500;
+  const clawResultCardVisibleMs = 5000;
+  const resultCardVisible =
+    isFreshResultForThisWidget &&
+    Boolean(winnerNickname) &&
+    elapsedMs >= clawResultCardDelayMs &&
+    elapsedMs < clawResultCardDelayMs + clawResultCardVisibleMs;
   const seed = hashText(`${winnerNickname}|${resultKey}`);
   const prizeKey = useMemo(() => pickPrizeKey(winnerNickname || "default", resultKey || "idle"), [winnerNickname, resultKey]);
   const prizeSrc = PRIZE_ASSETS[prizeKey];
