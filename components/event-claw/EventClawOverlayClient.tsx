@@ -356,33 +356,40 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
   const isFreshResultForThisWidget =
     Number.isFinite(resultEventTime) && resultEventTime >= mountedAtRef.current - 1000;
   const [resultCardVisible, setResultCardVisible] = useState(false);
-  const lastShownResultCardKeyRef = useRef("");
+  const lastScheduledResultCardKeyRef = useRef("");
+
+  useEffect(() => {
+    if (!winnerNickname || !resultDisplayKey || !isFreshResultForThisWidget) {
+      setResultCardVisible(false);
+      return;
+    }
+
+    if (lastScheduledResultCardKeyRef.current === resultDisplayKey) {
+      return;
+    }
+
+    lastScheduledResultCardKeyRef.current = resultDisplayKey;
+    setResultCardVisible(false);
+
+    const showTimeoutId = window.setTimeout(() => {
+      setResultCardVisible(true);
+    }, 7000);
+
+    const hideTimeoutId = window.setTimeout(() => {
+      setResultCardVisible(false);
+    }, 12000);
+
+    return () => {
+      window.clearTimeout(showTimeoutId);
+      window.clearTimeout(hideTimeoutId);
+    };
+  }, [winnerNickname, resultDisplayKey, isFreshResultForThisWidget]);
 
   const elapsedMs = hasResult && animationStartedAt ? now - animationStartedAt : 0;
   const seed = hashText(`${winnerNickname}|${resultKey}`);
   const prizeKey = useMemo(() => pickPrizeKey(winnerNickname || "default", resultKey || "idle"), [winnerNickname, resultKey]);
   const prizeSrc = PRIZE_ASSETS[prizeKey];
   const motion = getMotionState(elapsedMs, seed, hasResult, now);
-  useEffect(() => {
-    if (!motion.showResult || !winnerNickname || !resultDisplayKey || !isFreshResultForThisWidget) {
-      setResultCardVisible(false);
-      return;
-    }
-
-    if (lastShownResultCardKeyRef.current === resultDisplayKey) {
-      return;
-    }
-
-    lastShownResultCardKeyRef.current = resultDisplayKey;
-    setResultCardVisible(true);
-
-    const timeoutId = window.setTimeout(() => {
-      setResultCardVisible(false);
-    }, 5000);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [motion.showResult, winnerNickname, resultDisplayKey, isFreshResultForThisWidget]);
-
 
   return (
     <main className="claw-root">
@@ -680,7 +687,7 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
 
         {message && !winnerNickname ? <div className="message-pill">{message}</div> : null}
 
-        <div className={`result-card ${resultCardVisible && motion.showResult && winnerNickname ? "show" : ""}`}>
+        <div className={`result-card ${resultCardVisible && winnerNickname ? "show" : ""}`}>
           <div className="result-label">당첨</div>
           <div className="result-name">{winnerNickname || "대기중"}</div>
           <div className="result-note">{winnerNote}</div>
