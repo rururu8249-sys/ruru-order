@@ -180,6 +180,7 @@ const BANK_HOLDER = "유혜원";
 const ORDER_LOOKUP_FILTERS = ["전체", "입금대기", "입금확인", "출고완료"] as const;
 const ORDER_LOOKUP_PER_PAGE = 2;
 const FOOTER_TEXT = "© since 2024 루루동이 | All Rights Reserved.";
+const ORDER_FIRST_GUIDE_HIDE_UNTIL_KEY = "ruru_order_first_guide_hide_until";
 
 const emptyItem: OrderItem = {
   product_id: "",
@@ -865,6 +866,26 @@ export default function OrderPage() {
   const [copyDone, setCopyDone] = useState(false);
   const [nicknameCopyDone, setNicknameCopyDone] = useState(false);
   const [paymentGuideOpen, setPaymentGuideOpen] = useState(false);
+  const [firstOrderGuideOpen, setFirstOrderGuideOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const hideUntil = Number(window.localStorage.getItem(ORDER_FIRST_GUIDE_HIDE_UNTIL_KEY) || 0);
+    if (!hideUntil || Date.now() > hideUntil) {
+      setFirstOrderGuideOpen(true);
+    }
+  }, []);
+
+  const closeFirstOrderGuide = (hideToday: boolean) => {
+    if (hideToday && typeof window !== "undefined") {
+      const endOfToday = new Date();
+      endOfToday.setHours(23, 59, 59, 999);
+      window.localStorage.setItem(ORDER_FIRST_GUIDE_HIDE_UNTIL_KEY, String(endOfToday.getTime()));
+    }
+
+    setFirstOrderGuideOpen(false);
+  };
   const [customerInfoEditSheetOpen, setCustomerInfoEditSheetOpen] = useState(false);
   const [customerInfoEditSnapshot, setCustomerInfoEditSnapshot] = useState<{
     youtubeNickname: string;
@@ -3562,10 +3583,10 @@ export default function OrderPage() {
               주문서 작성
             </h1>
             <p className="mt-2 break-keep text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
-              상품을 선택하고, 목록에 없는 상품만 직접 입력해주세요.
+              상품목록에서 [담기]를 누르고, 없으면 [직접 입력]을 사용해 주세요.
             </p>
             <p className="mt-2 break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-slate-400">
-              배송정보 변경은 상단 [정보수정]에서 할 수 있어요.
+              금액 확인 후 [주문서 제출]을 눌러주세요.
             </p>
 
             {customerInfoMissing && (
@@ -3580,11 +3601,12 @@ export default function OrderPage() {
             className="mt-3 w-full max-w-full overflow-hidden rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm"
           >
             <div className="mb-4">
-              <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
-                등록된 상품 선택
+              <h2 className="flex items-center gap-2 text-[17px] font-black tracking-[-0.06em] text-slate-950">
+                <span className="text-[12px] font-black tracking-[-0.03em] text-slate-400">01</span>
+                상품목록
               </h2>
               <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
-                옵션 없는 상품은 [담기], 옵션 있는 상품은 [옵션선택] 후 주문서에 담아주세요.
+                주문할 상품의 [담기]를 눌러주세요.
               </p>
             </div>
 
@@ -3592,25 +3614,26 @@ export default function OrderPage() {
               <GroupBuyQuickSelect
                 products={quickGroupBuyProducts as GroupBuyQuickSelectProduct[]}
                 getSelectLabel={(product) =>
-                  registeredProductNeedsOptionSelect(product as BroadcastProduct) ? "옵션선택" : "담기"
+                  "담기"
                 }
                 onSelect={(product) => selectQuickGroupBuyProduct(product as BroadcastProduct)}
               />
             </div>
           </section>
 
-          <section className="mt-3 rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm">
+          <section className="mt-3 rounded-[24px] border border-slate-200 bg-slate-50 p-3 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-50 text-[22px] font-black text-blue-700 ring-1 ring-blue-100">
                 +
               </div>
 
               <div className="min-w-0 flex-1">
-                <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
-                  목록에 없는 상품만 직접 입력
+                <h2 className="flex items-center gap-2 text-[17px] font-black tracking-[-0.06em] text-slate-950">
+                  <span className="text-[12px] font-black tracking-[-0.03em] text-slate-400">02</span>
+                  직접 입력
                 </h2>
                 <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
-                  등록상품 외 직접 상품명, 옵션, 금액 입력
+                  상품목록에 없을 때만 사용해 주세요.
                 </p>
               </div>
             </div>
@@ -3620,17 +3643,18 @@ export default function OrderPage() {
               onClick={openDirectInputSheet}
               className={`${buttonBase} mt-3 w-full rounded-[18px] border border-blue-200 bg-blue-50 px-3 py-3 text-[15px] font-black tracking-[-0.04em] text-blue-800`}
             >
-              직접 입력하기
+              직접 입력
             </button>
           </section>
 
-          <section className="mt-3 w-full max-w-full overflow-hidden rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm">
+          <section className="mt-3 w-full max-w-full overflow-hidden rounded-[24px] border border-blue-100 bg-blue-50/40 p-3 shadow-sm">
             <div className="mb-4">
-              <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
-                주문서 담은 상품
+              <h2 className="flex items-center gap-2 text-[17px] font-black tracking-[-0.06em] text-slate-950">
+                <span className="text-[12px] font-black tracking-[-0.03em] text-slate-400">03</span>
+                주문서 확인
               </h2>
               <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
-                담긴 상품의 수량과 금액을 확인해주세요.
+                담은 상품과 금액을 확인해 주세요.
               </p>
             </div>
 
@@ -3640,7 +3664,7 @@ export default function OrderPage() {
                   아직 담긴 상품이 없습니다.
                 </p>
                 <p className="mt-1 break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
-                  위 등록상품을 선택하거나, 목록에 없는 상품은 직접 입력해주세요.
+                  상품목록에서 [담기]를 눌러주세요.
                 </p>
               </div>
             ) : (
@@ -3655,7 +3679,7 @@ export default function OrderPage() {
                   const optionSizeText = normalizeEmptyProductOptionValue(item.size) || "없음";
                   const itemHasNoOptions = optionColorText === "없음" && optionSizeText === "없음";
                   const canInlineChangeQty = itemIsRegisteredProduct && itemHasNoOptions;
-                  const itemSourceLabel = itemIsRegisteredProduct ? "등록상품" : "직접입력";
+                  const itemSourceLabel = itemIsRegisteredProduct ? "선택상품" : "직접입력";
                   const itemAmount = toNumber(item.product_price) * (toNumber(item.qty) || 1);
 
                   return (
@@ -3780,17 +3804,14 @@ export default function OrderPage() {
             )}
           </section>
 
-          <section
-            data-ruru-payment-section="redesigned"
-            className="mt-3 rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm"
-          >
+          <section className="mt-3 rounded-[24px] border border-blue-100 bg-white p-3 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
-                  결제 정보
+                  04 결제방식
                 </p>
                 <h2 className="mt-1 text-[18px] font-black tracking-[-0.06em] text-slate-950">
-                  결제방식 / 요청사항
+                  결제 방법을 선택해 주세요.
                 </h2>
               </div>
               <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-black tracking-[-0.04em] text-slate-500">
@@ -3834,7 +3855,7 @@ export default function OrderPage() {
 
             <label className="mt-4 block">
               <span className="mb-2 block text-[13px] font-black tracking-[-0.04em] text-slate-700">
-                요청사항 / 배송메모
+                요청사항
               </span>
               <textarea
                 value={requestMemo}
@@ -3851,7 +3872,7 @@ export default function OrderPage() {
           >
             <div className="min-w-0">
               <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
-                최종 확인
+                05 최종 확인
               </p>
               <h2 className="mt-1 text-[18px] font-black tracking-[-0.06em] text-slate-950">
                 결제금액 확인
@@ -3942,7 +3963,7 @@ export default function OrderPage() {
                 <div className="shrink-0 border-b border-slate-100 p-4">
                   <div className="mx-auto mb-3 h-1.5 w-14 rounded-full bg-slate-200" />
                   <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
-                    옵션 선택 후 담기
+                    옵션을 선택해 주세요
                   </p>
                   <h2 className="mt-1 break-keep text-[24px] font-black leading-tight tracking-[-0.08em] text-slate-950">
                     색상 · 사이즈 선택
@@ -4078,10 +4099,10 @@ export default function OrderPage() {
                   <div data-ruru-direct-input-no-top-close="enabled" className="mb-3">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <h2 className="text-[27px] font-black leading-none tracking-[-0.08em] text-slate-950">
-                        직접 입력 주문
+                        상품 직접 입력
                       </h2>
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black tracking-[-0.04em] text-slate-500">
-                        없는 상품만 직접 입력
+                        상품목록에 없을 때만 사용
                       </span>
                     </div>
                   </div>
@@ -4292,6 +4313,49 @@ export default function OrderPage() {
           </div>
         </>
       )}
+
+        {firstOrderGuideOpen ? (
+          <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/35 px-3 pb-3">
+            <section
+              role="dialog"
+              aria-modal="true"
+              className="w-full max-w-[430px] overflow-hidden rounded-t-[30px] bg-white shadow-[0_-24px_80px_rgba(15,23,42,0.25)] ring-1 ring-white/70"
+            >
+              <div className="grid gap-4 p-5">
+                <div className="text-center">
+                  <div className="text-[24px] font-black tracking-[-0.07em] text-slate-950">
+                    처음이신가요?
+                  </div>
+                </div>
+
+                <div className="grid gap-3 rounded-[24px] bg-slate-50 p-4 text-[15px] font-bold leading-relaxed tracking-[-0.04em] text-slate-700 ring-1 ring-slate-100">
+                  <p>이 안내를 닫으면 상품목록이 보입니다.</p>
+                  <p>상품목록에서 주문할 상품의 <span className="font-black text-blue-700">[담기]</span>를 눌러주세요.</p>
+                  <p>상품목록에 없을 때만 <span className="font-black text-slate-950">[직접 입력]</span>을 사용해 주세요.</p>
+                  <p>담은 상품과 금액을 확인한 뒤 <span className="font-black text-blue-700">[주문서 제출]</span>을 눌러주세요.</p>
+                  <p className="text-[14px] text-amber-700">입금자명과 금액이 다르면 입금확인이 늦어질 수 있어요.</p>
+                </div>
+
+                <div className="grid grid-cols-[1fr_1fr] gap-2">
+                  <button
+                    type="button"
+                    onClick={() => closeFirstOrderGuide(true)}
+                    className="min-h-[54px] rounded-[18px] border border-slate-200 bg-white px-3 py-3 text-[15px] font-black tracking-[-0.05em] text-slate-700 transition active:scale-[0.98]"
+                  >
+                    오늘 하루 보지 않기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => closeFirstOrderGuide(false)}
+                    className="min-h-[54px] rounded-[18px] bg-blue-600 px-3 py-3 text-[17px] font-black tracking-[-0.05em] text-white shadow-[0_12px_24px_rgba(37,99,235,0.25)] transition active:scale-[0.98]"
+                  >
+                    확인
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+        ) : null}
 
         <CustomerPaymentGuideBottomSheet
           open={paymentGuideOpen}
