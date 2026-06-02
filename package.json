@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "guard:bankda": "node scripts/guard-bankda-admin-live.js",
-    "prebuild": "npm run guard:bankda"
+    "prebuild": "npm run guard:bankda && npm run guard:bankda-cron",
+    "guard:bankda-cron": "node scripts/guard-bankda-cron.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",
