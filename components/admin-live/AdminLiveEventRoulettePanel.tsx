@@ -160,7 +160,7 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
 function buildOverlayUrl(_event: RouletteEvent | null) {
   if (typeof window === "undefined") return "";
 
-  return `${window.location.origin}/event-roulette/overlay?token=${encodeURIComponent(FIXED_OVERLAY_TOKEN)}`;
+  return "https://ruru-order.vercel.app/event-roulette/overlay?token=roulette_luludongi_live&scale=0.72&v=69cfb1d";
 }
 
 function buildClawOverlayUrl() {
