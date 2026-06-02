@@ -430,30 +430,20 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
         .claw {
           position: absolute;
           left: 50%;
-          bottom: -34px;
-          width: 56px;
-          height: 50px;
+          bottom: -42px;
+          width: 64px;
+          height: 64px;
           transform: translateX(-50%);
           z-index: 13;
         }
-        .claw-svg {
+        .claw-img {
           width: 100%;
           height: 100%;
-          overflow: visible;
-          filter: drop-shadow(0 4px 5px rgba(15,23,42,0.28));
+          object-fit: contain;
+          object-position: top center;
+          filter: drop-shadow(0 4px 6px rgba(15,23,42,0.3));
+          transition: opacity 0.12s ease;
         }
-        /* 발톱: 대기 상태는 살짝 벌어짐 */
-        .claw-finger {
-          transform-origin: 50px 24px;
-          transition: transform 0.28s ease;
-        }
-        /* 평소(대기/하강): 활짝 벌어진 상태 */
-        .claw-finger.left { transform: rotate(-22deg); }
-        .claw-finger.right { transform: rotate(22deg); }
-        .claw-finger.center { transform: rotate(0deg); }
-        /* 잡을 때(closed): 발톱 확 오므라듦 */
-        .claw.closed .claw-finger.left { transform: rotate(6deg); }
-        .claw.closed .claw-finger.right { transform: rotate(-6deg); }
 
         .grabbed-prize {
           position: absolute;
@@ -555,18 +545,11 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
 
             <div className="cable" style={{ height: `${motion.cable}px` }}>
               <div className={`claw ${motion.clawClosed ? "closed" : ""}`}>
-                <svg className="claw-svg" viewBox="0 0 100 90" xmlns="http://www.w3.org/2000/svg">
-                  {/* 집게 몸통 */}
-                  <rect x="44" y="0" width="12" height="16" rx="3" fill="#64748b" />
-                  <ellipse cx="50" cy="18" rx="16" ry="9" fill="#94a3b8" stroke="#475569" strokeWidth="1.5" />
-                  <ellipse cx="50" cy="15" rx="9" ry="3.5" fill="#cbd5e1" opacity="0.7" />
-                  {/* 왼쪽 갈고리: 바깥으로 휘었다가 끝이 안으로 (낫 모양) */}
-                  <path className="claw-finger left" d="M44 24 C 30 34, 18 50, 22 74 C 23 80, 30 80, 31 74 C 28 56, 36 40, 47 30 C 49 27, 46 22, 44 24 Z" fill="#7c8694" stroke="#334155" strokeWidth="1.4" />
-                  {/* 오른쪽 갈고리 */}
-                  <path className="claw-finger right" d="M56 24 C 70 34, 82 50, 78 74 C 77 80, 70 80, 69 74 C 72 56, 64 40, 53 30 C 51 27, 54 22, 56 24 Z" fill="#7c8694" stroke="#334155" strokeWidth="1.4" />
-                  {/* 가운데 갈고리 */}
-                  <path className="claw-finger center" d="M50 26 C 47 42, 47 60, 50 80 C 50 83, 50 83, 50 80 C 53 60, 53 42, 50 26 Z" fill="#5b6675" stroke="#334155" strokeWidth="1.4" />
-                </svg>
+                <img
+                  className="claw-img"
+                  src={`${ASSET_BASE}/${motion.clawClosed ? "claw-closed" : "claw-open"}.png`}
+                  alt="집게"
+                />
               </div>
             </div>
           </div>
