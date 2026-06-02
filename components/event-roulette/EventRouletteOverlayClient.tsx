@@ -119,24 +119,25 @@ function getLabelPoint(index: number, total: number) {
   const safeTotal = Math.max(total || 1, 1);
   const sliceAngle = 360 / safeTotal;
 
-  // conic-gradient(from -90deg) 기준: 각 칸의 정중앙 각도
-  const degree = -90 + index * sliceAngle + sliceAngle / 2;
+  // 기존 세로 방향 유지.
+  // 경계선에 붙어 보이는 문제를 줄이기 위해 라벨 기준각을 반 칸 더 이동한다.
+  const degree = -90 + sliceAngle * index + sliceAngle;
   const rad = (degree * Math.PI) / 180;
 
-  // 칸 안쪽에 들어오게 반지름을 고정한다.
-  // 너무 중앙이면 결과카드에 숨고, 너무 바깥이면 경계선/테두리에 걸친다.
+  // 색상 칸 안쪽에 들어오도록 반지름은 너무 바깥으로 보내지 않는다.
   const radius =
-    safeTotal >= 70 ? 38 :
-    safeTotal >= 55 ? 39 :
-    safeTotal >= 40 ? 40 :
-    safeTotal >= 24 ? 41 :
-    42;
+    safeTotal >= 70 ? 33 :
+    safeTotal >= 55 ? 34 :
+    safeTotal >= 40 ? 35 :
+    safeTotal >= 24 ? 36 :
+    38;
 
   const x = 50 + Math.cos(rad) * radius;
   const y = 50 + Math.sin(rad) * radius;
 
-  // 글씨는 칸 안에서 길게 보이도록 중심축 방향으로 둔다.
   let rotation = degree;
+
+  // 왼쪽 반원은 글씨가 뒤집히지 않게 유지
   if (rotation > 90 || rotation < -90) {
     rotation += 180;
   }
@@ -567,7 +568,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
         .name-label {
           position: absolute;
           z-index: 12;
-          width: clamp(74px, 14vw, 138px);
+          width: clamp(92px, 16vw, 168px);
           height: 18px;
           transform-origin: center center;
           display: flex;
@@ -670,8 +671,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           }
 
           .name-label {
-            width: 18%;
-            margin-left: -9%;
+            width: clamp(82px, 19vw, 150px);
           }
 
           .fixed-center-cap {
