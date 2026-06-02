@@ -20,9 +20,9 @@ type OrderEntryGateV2Props = {
 export default function OrderEntryGateV2({ onKakaoLogin }: OrderEntryGateV2Props) {
   return (
     <section className="grid gap-4">
-      <section className="overflow-hidden rounded-[34px] bg-gradient-to-b from-white via-[#f7fbff] to-[#e7f1ff] px-5 pb-7 pt-7 shadow-[0_22px_55px_rgba(37,99,235,0.13)] ring-1 ring-blue-100">
-        <div className="mx-auto flex w-fit items-center justify-center gap-3 rounded-full bg-white/90 px-4 py-2 shadow-[0_10px_24px_rgba(37,99,235,0.10)] ring-1 ring-blue-100">
-          <div className="flex h-9 w-9 items-center justify-center rounded-[13px] bg-blue-600 text-[17px] font-black text-white shadow-[0_10px_20px_rgba(37,99,235,0.20)]">
+      <section className="overflow-hidden rounded-[34px] bg-gradient-to-b from-white via-[#fdf5f1] to-[#faece7] px-5 pb-7 pt-7 shadow-[0_22px_55px_rgba(216,90,48,0.13)] ring-1 ring-coral-100">
+        <div className="mx-auto flex w-fit items-center justify-center gap-3 rounded-full bg-white/90 px-4 py-2 shadow-[0_10px_24px_rgba(216,90,48,0.10)] ring-1 ring-coral-100">
+          <div className="flex h-9 w-9 items-center justify-center rounded-[13px] bg-coral-600 text-[17px] font-black text-white shadow-[0_10px_20px_rgba(216,90,48,0.20)]">
             R
           </div>
 
@@ -35,7 +35,7 @@ export default function OrderEntryGateV2({ onKakaoLogin }: OrderEntryGateV2Props
 
         <div className="mt-7 text-center">
           <h1 className="break-keep text-[35px] font-black leading-[1.08] tracking-[-0.085em] text-[#151923]">
-            <span className="text-blue-600">주문은</span>
+            <span className="text-coral-600">주문은</span>
             <span className="text-slate-950"> 카카오로 시작</span>
           </h1>
 
@@ -44,9 +44,9 @@ export default function OrderEntryGateV2({ onKakaoLogin }: OrderEntryGateV2Props
           </p>
         </div>
 
-        <div className="relative mt-7 overflow-hidden rounded-[32px] bg-gradient-to-br from-blue-50 via-white to-blue-100 px-4 pb-7 pt-7 shadow-inner ring-1 ring-blue-100">
+        <div className="relative mt-7 overflow-hidden rounded-[32px] bg-gradient-to-br from-coral-50 via-white to-coral-100 px-4 pb-7 pt-7 shadow-inner ring-1 ring-coral-100">
           <div className="pointer-events-none absolute -left-10 top-8 h-36 w-36 rounded-full bg-white/70 blur-2xl" />
-          <div className="pointer-events-none absolute -right-10 bottom-5 h-40 w-40 rounded-full bg-blue-300/35 blur-2xl" />
+          <div className="pointer-events-none absolute -right-10 bottom-5 h-40 w-40 rounded-full bg-coral-300/35 blur-2xl" />
           <div className="pointer-events-none absolute left-1/2 top-1/2 h-36 w-36 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#fee500]/18 blur-3xl" />
 
           <button
@@ -66,15 +66,15 @@ export default function OrderEntryGateV2({ onKakaoLogin }: OrderEntryGateV2Props
           </button>
         </div>
 
-        <div className="mt-5 grid grid-cols-3 overflow-hidden rounded-[26px] bg-white/82 shadow-[0_12px_26px_rgba(37,99,235,0.08)] ring-1 ring-blue-100">
-          <div className="border-r border-blue-100 px-2 py-4 text-center">
+        <div className="mt-5 grid grid-cols-3 overflow-hidden rounded-[26px] bg-white/82 shadow-[0_12px_26px_rgba(216,90,48,0.08)] ring-1 ring-coral-100">
+          <div className="border-r border-coral-100 px-2 py-4 text-center">
             <div className="text-[22px]">📍</div>
             <div className="mt-1 break-keep text-[12px] font-black tracking-[-0.04em] text-slate-700">
               정보확인
             </div>
           </div>
 
-          <div className="border-r border-blue-100 px-2 py-4 text-center">
+          <div className="border-r border-coral-100 px-2 py-4 text-center">
             <div className="text-[22px]">📝</div>
             <div className="mt-1 break-keep text-[12px] font-black tracking-[-0.04em] text-slate-700">
               주문작성

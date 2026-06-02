@@ -139,10 +139,10 @@ export default function CustomerPointGiftPopup() {
         role="dialog"
         aria-modal="true"
         aria-label="포인트 선물 알림"
-        className="w-full max-w-[360px] overflow-hidden rounded-[30px] border border-blue-100 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.28)]"
+        className="w-full max-w-[360px] overflow-hidden rounded-[30px] border border-coral-100 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.28)]"
       >
-        <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-5 pb-5 pt-6 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-600 text-[32px] shadow-[0_14px_30px_rgba(37,99,235,0.28)]">
+        <div className="bg-gradient-to-br from-coral-50 via-white to-indigo-50 px-5 pb-5 pt-6 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-coral-600 text-[32px] shadow-[0_14px_30px_rgba(216,90,48,0.28)]">
             🎁
           </div>
 
@@ -156,9 +156,9 @@ export default function CustomerPointGiftPopup() {
         </div>
 
         <div className="px-5 pb-5">
-          <div className="rounded-[24px] border border-blue-100 bg-blue-50 px-4 py-4 text-center">
-            <div className="text-[13px] font-black tracking-[-0.04em] text-blue-700">지급 포인트</div>
-            <div className="mt-1 text-[28px] font-black leading-tight tracking-[-0.07em] text-blue-700">
+          <div className="rounded-[24px] border border-coral-100 bg-coral-50 px-4 py-4 text-center">
+            <div className="text-[13px] font-black tracking-[-0.04em] text-coral-700">지급 포인트</div>
+            <div className="mt-1 text-[28px] font-black leading-tight tracking-[-0.07em] text-coral-700">
               {amountText}
             </div>
           </div>
@@ -182,7 +182,7 @@ export default function CustomerPointGiftPopup() {
             type="button"
             onClick={closeGift}
             disabled={giftState.closing}
-            className="mt-4 flex min-h-[54px] w-full items-center justify-center rounded-[20px] bg-blue-600 px-4 py-3 text-[16px] font-black tracking-[-0.04em] text-white shadow-[0_14px_30px_rgba(37,99,235,0.25)] transition active:scale-[0.98] disabled:cursor-wait disabled:opacity-70"
+            className="mt-4 flex min-h-[54px] w-full items-center justify-center rounded-[20px] bg-coral-600 px-4 py-3 text-[16px] font-black tracking-[-0.04em] text-white shadow-[0_14px_30px_rgba(216,90,48,0.25)] transition active:scale-[0.98] disabled:cursor-wait disabled:opacity-70"
           >
             {giftState.closing ? "확인 저장중" : "확인했어요"}
           </button>

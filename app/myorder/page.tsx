@@ -82,7 +82,7 @@ function getStatusClassName(label: string) {
   if (label === "부분환불") return "bg-orange-100 text-orange-700";
   if (label === "배송출발") return "bg-green-100 text-green-700";
   if (label === "출고준비중") return "bg-yellow-100 text-yellow-700";
-  if (label === "확인완료") return "bg-blue-100 text-blue-700";
+  if (label === "확인완료") return "bg-coral-100 text-coral-700";
 
   return "bg-gray-100 text-gray-700";
 }
@@ -316,7 +316,7 @@ export default function MyOrderPage() {
 
   return (
     <main
-      className="min-h-screen select-none bg-[#f5f8ff] px-3 py-4 text-[#151923] sm:px-4 sm:py-6"
+      className="min-h-screen select-none bg-[#fdf5f1] px-3 py-4 text-[#151923] sm:px-4 sm:py-6"
       style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
     >
         <CustomerToastNotice
@@ -351,7 +351,7 @@ export default function MyOrderPage() {
           >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
+                <p className="text-[12px] font-black tracking-[-0.04em] text-coral-700">
                   입금계좌
                 </p>
                 <p className="mt-0.5 break-keep text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
@@ -362,7 +362,7 @@ export default function MyOrderPage() {
               <button
                 type="button"
                 onClick={() => setPaymentGuideOpen(true)}
-                className="shrink-0 rounded-[16px] bg-blue-600 px-4 py-3 text-[13px] font-black tracking-[-0.04em] text-white shadow-[0_10px_22px_rgba(37,99,235,0.20)] transition active:scale-[0.98]"
+                className="shrink-0 rounded-[16px] bg-coral-600 px-4 py-3 text-[13px] font-black tracking-[-0.04em] text-white shadow-[0_10px_22px_rgba(216,90,48,0.20)] transition active:scale-[0.98]"
               >
                 입금 계좌 보기
               </button>
@@ -382,7 +382,7 @@ export default function MyOrderPage() {
         )}
 
         {!isLegacyMode && !isLoggedIn && (
-          <section className="mt-4 rounded-[26px] bg-white p-4 text-center shadow-[0_10px_24px_rgba(30,64,175,0.08)] ring-1 ring-blue-100 min-[390px]:rounded-[28px] min-[390px]:p-5">
+          <section className="mt-4 rounded-[26px] bg-white p-4 text-center shadow-[0_10px_24px_rgba(30,64,175,0.08)] ring-1 ring-coral-100 min-[390px]:rounded-[28px] min-[390px]:p-5">
             <h2 className="text-[22px] font-black tracking-[-0.06em] text-[#151923]">
               카카오 간편주문 후 조회 가능
             </h2>
@@ -391,7 +391,7 @@ export default function MyOrderPage() {
             </p>
             <Link
               href="/"
-              className="mt-4 flex min-h-[54px] w-full items-center justify-center rounded-[20px] bg-blue-600 px-4 py-3 text-[16px] font-black text-white shadow-[0_12px_26px_rgba(37,99,235,0.22)] transition active:scale-[0.98]"
+              className="mt-4 flex min-h-[54px] w-full items-center justify-center rounded-[20px] bg-coral-600 px-4 py-3 text-[16px] font-black text-white shadow-[0_12px_26px_rgba(216,90,48,0.22)] transition active:scale-[0.98]"
             >
               카카오로 간편 주문 시작
             </Link>
@@ -409,7 +409,7 @@ export default function MyOrderPage() {
             <div className="mb-3 rounded-[20px] bg-white p-3 ring-1 ring-slate-200">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
+                  <p className="text-[12px] font-black tracking-[-0.04em] text-coral-700">
                     주문내역
                   </p>
                   <h2 className="mt-0.5 text-[20px] font-black leading-tight tracking-[-0.06em] text-slate-950">
@@ -433,7 +433,7 @@ export default function MyOrderPage() {
                     }}
                     className={
                       orderFilter === filter
-                        ? "min-h-[34px] rounded-full bg-blue-700 px-2 text-[11px] font-black tracking-[-0.04em] text-white transition active:scale-[0.98]"
+                        ? "min-h-[34px] rounded-full bg-coral-700 px-2 text-[11px] font-black tracking-[-0.04em] text-white transition active:scale-[0.98]"
                         : "min-h-[34px] rounded-full bg-slate-50 px-2 text-[11px] font-black tracking-[-0.04em] text-slate-600 ring-1 ring-slate-100 transition active:scale-[0.98]"
                     }
                   >

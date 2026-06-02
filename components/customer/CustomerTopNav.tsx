@@ -44,7 +44,7 @@ const compactNavButtonClass =
   "rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-center text-[11px] font-black tracking-[-0.04em] text-slate-700 transition active:scale-[0.98]";
 
 const compactActiveNavButtonClass =
-  "rounded-full bg-blue-700 px-2.5 py-1.5 text-center text-[11px] font-black tracking-[-0.04em] text-white shadow-[0_8px_18px_rgba(37,99,235,0.20)] transition active:scale-[0.98]";
+  "rounded-full bg-coral-700 px-2.5 py-1.5 text-center text-[11px] font-black tracking-[-0.04em] text-white shadow-[0_8px_18px_rgba(216,90,48,0.20)] transition active:scale-[0.98]";
 
 export default function CustomerTopNav({
   showGreeting = true,
@@ -65,7 +65,7 @@ export default function CustomerTopNav({
   const isCompact = variant === "compact";
   const headerClassName = isCompact
     ? `mb-4 border-b border-slate-200 bg-[#f8fafc]/95 px-4 py-3 backdrop-blur ${className}`
-    : `mb-4 rounded-[24px] bg-white/95 px-4 py-4 shadow-[0_10px_24px_rgba(30,64,175,0.07)] ring-1 ring-blue-100/70 ${className}`;
+    : `mb-4 rounded-[24px] bg-white/95 px-4 py-4 shadow-[0_10px_24px_rgba(30,64,175,0.07)] ring-1 ring-coral-100/70 ${className}`;
   const inactiveButtonClass = isCompact ? compactNavButtonClass : navButtonClass;
   const activeButtonClass = isCompact ? compactActiveNavButtonClass : navButtonClass;
 
@@ -83,7 +83,7 @@ export default function CustomerTopNav({
     >
       <div className="flex items-start justify-between gap-3">
         <Link href="/" className="min-w-0 transition active:scale-[0.99]">
-          <p className={isCompact ? "text-[17px] font-black tracking-[-0.05em] text-slate-950" : "text-[15px] font-black tracking-[-0.04em] text-blue-700"}>
+          <p className={isCompact ? "text-[17px] font-black tracking-[-0.05em] text-slate-950" : "text-[15px] font-black tracking-[-0.04em] text-coral-700"}>
             루루동이 LIVE
           </p>
 

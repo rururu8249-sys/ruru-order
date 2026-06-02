@@ -12,6 +12,22 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Customer-screen coral palette (admin screens keep Tailwind blue).
+   Anchored on: main #D85A30, light bg #FAECE7, accent text #993C1D, dark text #4A1B0C. */
+@theme {
+  --color-coral-50: #fdf5f1;
+  --color-coral-100: #faece7;
+  --color-coral-200: #f4d7ca;
+  --color-coral-300: #ecbba7;
+  --color-coral-400: #e2906c;
+  --color-coral-500: #dc6b41;
+  --color-coral-600: #d85a30;
+  --color-coral-700: #b5481f;
+  --color-coral-800: #993c1d;
+  --color-coral-900: #4a1b0c;
+  --color-coral-950: #2e1006;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;

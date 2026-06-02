@@ -18,7 +18,7 @@ export default function OrderCustomerModeSwitch({
   if (isEditing) {
     return (
       <div className="rounded-[20px] bg-white p-2">
-        <div className="rounded-2xl bg-blue-600 px-3 py-3 text-center text-sm font-black text-white">
+        <div className="rounded-2xl bg-coral-600 px-3 py-3 text-center text-sm font-black text-white">
           저장된 정보를 수정합니다
         </div>
       </div>
@@ -44,7 +44,7 @@ export default function OrderCustomerModeSwitch({
         onClick={() => onModeChange("new")}
         className={`rounded-2xl px-3 py-3 text-sm font-black active:scale-[0.98] ${
           customerMode === "new"
-            ? "bg-blue-600 text-white"
+            ? "bg-coral-600 text-white"
             : "bg-slate-100 text-slate-600"
         }`}
       >

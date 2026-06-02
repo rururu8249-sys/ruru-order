@@ -17,12 +17,12 @@ export default function OrderCustomerInfoIntro({
       className="mb-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm"
     >
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] bg-blue-50 text-[22px] ring-1 ring-blue-100">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] bg-coral-50 text-[22px] ring-1 ring-coral-100">
           {isEdit ? "✏️" : "🛡️"}
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
+          <p className="text-[12px] font-black tracking-[-0.04em] text-coral-700">
             {isEdit ? "배송정보 수정" : "주문 전 필수 확인"}
           </p>
 

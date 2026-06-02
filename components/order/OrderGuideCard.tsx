@@ -4,9 +4,9 @@
 
 export default function OrderGuideCard() {
   return (
-    <section className="mb-5 rounded-[28px] bg-white p-5 shadow-[0_12px_26px_rgba(30,64,175,0.08)] ring-1 ring-blue-100">
+    <section className="mb-5 rounded-[28px] bg-white p-5 shadow-[0_12px_26px_rgba(30,64,175,0.08)] ring-1 ring-coral-100">
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-50 text-[24px] text-blue-600 ring-1 ring-blue-100">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-coral-50 text-[24px] text-coral-600 ring-1 ring-coral-100">
           🛡️
         </div>
 

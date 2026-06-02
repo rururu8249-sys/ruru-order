@@ -28,7 +28,7 @@ function FieldLabel({ children }: { children: ReactNode }) {
       <span className="text-[13px] font-black tracking-[-0.04em] text-slate-700">
         {children}
       </span>
-      <span className="text-[11px] font-black tracking-[-0.04em] text-blue-600">
+      <span className="text-[11px] font-black tracking-[-0.04em] text-coral-600">
         필수
       </span>
     </div>
@@ -63,7 +63,7 @@ export default function OrderCustomerInfoFormCard({
             value={youtubeNickname}
             onChange={(event) => onYoutubeNicknameChange(event.target.value)}
             placeholder="유튜브 닉네임"
-            className="h-12 w-full rounded-[18px] border border-blue-100 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none transition placeholder:text-slate-400 focus:border-blue-500"
+            className="h-12 w-full rounded-[18px] border border-coral-100 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none transition placeholder:text-slate-400 focus:border-coral-500"
           />
         </div>
 
@@ -74,7 +74,7 @@ export default function OrderCustomerInfoFormCard({
               value={customerName}
               onChange={(event) => onCustomerNameChange(event.target.value)}
               placeholder="이름"
-              className="h-12 w-full rounded-[18px] border border-blue-100 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none transition placeholder:text-slate-400 focus:border-blue-500"
+              className="h-12 w-full rounded-[18px] border border-coral-100 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none transition placeholder:text-slate-400 focus:border-coral-500"
             />
           </div>
 
@@ -86,7 +86,7 @@ export default function OrderCustomerInfoFormCard({
               placeholder="010-0000-0000"
               inputMode="numeric"
               maxLength={ORDER_PHONE_FORMAT_MAX_LENGTH}
-              className="h-12 w-full rounded-[18px] border border-blue-100 bg-white px-4 text-[15px] font-bold tabular-nums tracking-[-0.04em] outline-none transition placeholder:text-slate-400 focus:border-blue-500"
+              className="h-12 w-full rounded-[18px] border border-coral-100 bg-white px-4 text-[15px] font-bold tabular-nums tracking-[-0.04em] outline-none transition placeholder:text-slate-400 focus:border-coral-500"
             />
           </div>
         </div>
@@ -98,13 +98,13 @@ export default function OrderCustomerInfoFormCard({
               value={address}
               onChange={(event) => onAddressChange(event.target.value)}
               placeholder="주소를 검색해주세요"
-              className="h-12 min-w-0 rounded-[18px] border border-blue-100 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none transition placeholder:text-slate-400 focus:border-blue-500"
+              className="h-12 min-w-0 rounded-[18px] border border-coral-100 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none transition placeholder:text-slate-400 focus:border-coral-500"
             />
 
             <button
               type="button"
               onClick={onOpenAddressSearch}
-              className="h-12 rounded-[18px] border border-blue-600 bg-white text-[14px] font-black tracking-[-0.04em] text-blue-600 transition active:scale-[0.98]"
+              className="h-12 rounded-[18px] border border-coral-600 bg-white text-[14px] font-black tracking-[-0.04em] text-coral-600 transition active:scale-[0.98]"
             >
               주소검색
             </button>
@@ -117,7 +117,7 @@ export default function OrderCustomerInfoFormCard({
             value={detailAddress}
             onChange={(event) => onDetailAddressChange(event.target.value)}
             placeholder="동/호수, 건물명 등 상세주소"
-            className="h-12 w-full rounded-[18px] border border-blue-100 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none transition placeholder:text-slate-400 focus:border-blue-500"
+            className="h-12 w-full rounded-[18px] border border-coral-100 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none transition placeholder:text-slate-400 focus:border-coral-500"
           />
         </div>
 
@@ -135,7 +135,7 @@ export default function OrderCustomerInfoFormCard({
           <button
             type="button"
             onClick={onConfirm}
-            className="h-13 min-h-[52px] rounded-[18px] bg-blue-600 text-[16px] font-black tracking-[-0.04em] text-white shadow-[0_12px_24px_rgba(37,99,235,0.22)] transition active:scale-[0.98]"
+            className="h-13 min-h-[52px] rounded-[18px] bg-coral-600 text-[16px] font-black tracking-[-0.04em] text-white shadow-[0_12px_24px_rgba(216,90,48,0.22)] transition active:scale-[0.98]"
           >
             {isEdit ? "수정완료" : "확인"}
           </button>

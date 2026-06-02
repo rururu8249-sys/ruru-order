@@ -11,7 +11,7 @@ type OrderPageShellProps = {
 export default function OrderPageShell({ children }: OrderPageShellProps) {
   return (
     <main
-      className="min-h-screen bg-[#f5f8ff] px-2 py-4 text-[#151923] select-none sm:px-4"
+      className="min-h-screen bg-[#fdf5f1] px-2 py-4 text-[#151923] select-none sm:px-4"
       style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
     >
       <section className="mx-auto w-full max-w-[560px]">{children}</section>

@@ -43,7 +43,7 @@ const paymentChipClassName = (statusLabel: CustomerOrderLookupFilter) => {
   }
 
   if (statusLabel === "출고완료") {
-    return "bg-blue-50 text-blue-700 ring-1 ring-blue-100";
+    return "bg-coral-50 text-coral-700 ring-1 ring-coral-100";
   }
 
   if (statusLabel === "입금대기") {
@@ -55,7 +55,7 @@ const paymentChipClassName = (statusLabel: CustomerOrderLookupFilter) => {
 
 const deliveryChipClassName = (deliveryLabel: string) => {
   if (/출고완료|택배출고|배송완료/.test(deliveryLabel)) {
-    return "bg-blue-600 text-white";
+    return "bg-coral-600 text-white";
   }
 
   return "bg-slate-100 text-slate-500 ring-1 ring-slate-100";
@@ -111,7 +111,7 @@ export default function CustomerOrderLookupBottomSheet({
                     onClick={() => onFilterChange(filter)}
                     className={
                       selected
-                        ? "min-h-[38px] rounded-[15px] bg-blue-700 px-1.5 text-[12px] font-black tracking-[-0.05em] text-white shadow-[0_8px_18px_rgba(29,78,216,0.22)] transition active:scale-[0.98]"
+                        ? "min-h-[38px] rounded-[15px] bg-coral-700 px-1.5 text-[12px] font-black tracking-[-0.05em] text-white shadow-[0_8px_18px_rgba(181,72,31,0.22)] transition active:scale-[0.98]"
                         : "min-h-[38px] rounded-[15px] px-1.5 text-[12px] font-black tracking-[-0.05em] text-slate-500 transition active:scale-[0.98]"
                     }
                   >
@@ -206,7 +206,7 @@ export default function CustomerOrderLookupBottomSheet({
               </button>
 
               <div className="flex h-10 min-w-[112px] items-center justify-center rounded-full bg-slate-50 px-4 text-[15px] font-black tracking-[-0.05em] text-slate-700 ring-1 ring-slate-100">
-                <span className="text-blue-700">{safePage}</span>
+                <span className="text-coral-700">{safePage}</span>
                 <span className="mx-2 text-slate-300">/</span>
                 <span>{safeTotalPages}</span>
               </div>
@@ -253,7 +253,7 @@ export default function CustomerOrderLookupBottomSheet({
             <button
               type="button"
               onClick={onOpenPaymentGuide}
-              className="flex min-h-[48px] items-center justify-center rounded-[18px] bg-blue-600 px-3 text-[15px] font-black tracking-[-0.05em] text-white shadow-[0_12px_28px_rgba(37,99,235,0.22)] transition active:scale-[0.98]"
+              className="flex min-h-[48px] items-center justify-center rounded-[18px] bg-coral-600 px-3 text-[15px] font-black tracking-[-0.05em] text-white shadow-[0_12px_28px_rgba(216,90,48,0.22)] transition active:scale-[0.98]"
             >
               입금 계좌 보기
             </button>

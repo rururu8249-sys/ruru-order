@@ -8,12 +8,12 @@ type OrderHeroProps = {
 
 export default function OrderHero({ broadcastTitle }: OrderHeroProps) {
   return (
-    <section className="mb-5 rounded-[34px] bg-white p-6 text-center shadow-[0_18px_40px_rgba(30,64,175,0.08)] ring-1 ring-blue-100">
-      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-600 text-[32px] text-white shadow-[0_12px_26px_rgba(37,99,235,0.24)]">
+    <section className="mb-5 rounded-[34px] bg-white p-6 text-center shadow-[0_18px_40px_rgba(30,64,175,0.08)] ring-1 ring-coral-100">
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-coral-600 text-[32px] text-white shadow-[0_12px_26px_rgba(216,90,48,0.24)]">
         📝
       </div>
 
-      <div className="mt-4 text-sm font-black tracking-[-0.03em] text-blue-600">
+      <div className="mt-4 text-sm font-black tracking-[-0.03em] text-coral-600">
         RURU ORDER
       </div>
 
@@ -28,7 +28,7 @@ export default function OrderHero({ broadcastTitle }: OrderHeroProps) {
       </p>
 
       {broadcastTitle && (
-        <div className="mt-4 rounded-2xl bg-blue-50 px-4 py-3 text-sm font-black tracking-[-0.04em] text-blue-700 ring-1 ring-blue-100">
+        <div className="mt-4 rounded-2xl bg-coral-50 px-4 py-3 text-sm font-black tracking-[-0.04em] text-coral-700 ring-1 ring-coral-100">
           현재 방송: {broadcastTitle}
         </div>
       )}

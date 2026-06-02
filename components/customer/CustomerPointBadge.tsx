@@ -92,7 +92,7 @@ export default function CustomerPointBadge({ className = "" }: CustomerPointBadg
 
   return (
     <div
-      className={`inline-flex shrink-0 items-center justify-end gap-1 text-right text-[15px] font-black leading-tight tracking-[-0.04em] text-blue-700 whitespace-nowrap ${className}`}
+      className={`inline-flex shrink-0 items-center justify-end gap-1 text-right text-[15px] font-black leading-tight tracking-[-0.04em] text-coral-700 whitespace-nowrap ${className}`}
       title="보유 포인트"
     >
       <span>💰</span>

@@ -20,8 +20,8 @@ export default function OrderCustomerEntryPanel({
   onStartNew,
 }: OrderCustomerEntryPanelProps) {
   return (
-    <section className="mt-5 rounded-[34px] bg-white p-5 shadow-[0_18px_40px_rgba(30,64,175,0.10)] ring-1 ring-blue-100">
-      <div className="rounded-[28px] bg-[#f8fbff] p-4 ring-1 ring-blue-100">
+    <section className="mt-5 rounded-[34px] bg-white p-5 shadow-[0_18px_40px_rgba(30,64,175,0.10)] ring-1 ring-coral-100">
+      <div className="rounded-[28px] bg-[#fdf5f1] p-4 ring-1 ring-coral-100">
         <h2 className="text-[22px] font-black tracking-[-0.05em] text-[#151923]">
           기존 고객이신가요?
         </h2>
@@ -33,7 +33,7 @@ export default function OrderCustomerEntryPanel({
               value={loginName}
               onChange={(event) => onLoginNameChange(event.target.value)}
               placeholder="이름을 입력해주세요"
-              className="h-14 w-full rounded-2xl border border-blue-100 bg-white px-4 text-[16px] font-bold outline-none transition placeholder:text-slate-400 focus:border-blue-500"
+              className="h-14 w-full rounded-2xl border border-coral-100 bg-white px-4 text-[16px] font-bold outline-none transition placeholder:text-slate-400 focus:border-coral-500"
             />
           </label>
 
@@ -44,21 +44,21 @@ export default function OrderCustomerEntryPanel({
               onChange={(event) => onLoginPhoneChange(event.target.value)}
               placeholder="- 없이 숫자만 입력해주세요"
               inputMode="numeric"
-              className="h-14 w-full rounded-2xl border border-blue-100 bg-white px-4 text-[16px] font-bold outline-none transition placeholder:text-slate-400 focus:border-blue-500"
+              className="h-14 w-full rounded-2xl border border-coral-100 bg-white px-4 text-[16px] font-bold outline-none transition placeholder:text-slate-400 focus:border-coral-500"
             />
           </label>
 
           <button
             type="button"
             onClick={onLoadCustomer}
-            className="mt-1 h-14 rounded-2xl bg-blue-600 text-[18px] font-black text-white shadow-[0_12px_24px_rgba(37,99,235,0.22)] transition active:scale-[0.98]"
+            className="mt-1 h-14 rounded-2xl bg-coral-600 text-[18px] font-black text-white shadow-[0_12px_24px_rgba(216,90,48,0.22)] transition active:scale-[0.98]"
           >
             정보 불러오기
           </button>
         </div>
       </div>
 
-      <div className="mt-4 rounded-[28px] bg-white p-4 ring-1 ring-blue-100">
+      <div className="mt-4 rounded-[28px] bg-white p-4 ring-1 ring-coral-100">
         <h2 className="text-[22px] font-black tracking-[-0.05em] text-[#151923]">
           처음 주문이신가요?
         </h2>

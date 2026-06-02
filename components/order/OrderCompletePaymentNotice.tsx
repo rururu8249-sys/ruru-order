@@ -106,10 +106,10 @@ export default function OrderCompletePaymentNotice({
           </div>
         </section>
       ) : paymentMethod === "무통장입금" ? (
-        <section className="rounded-[30px] bg-blue-50 p-5 shadow-[0_14px_35px_rgba(30,64,175,0.08)] ring-1 ring-blue-200">
+        <section className="rounded-[30px] bg-coral-50 p-5 shadow-[0_14px_35px_rgba(30,64,175,0.08)] ring-1 ring-coral-200">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-[27px] text-blue-600 shadow-sm ring-1 ring-blue-100">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-[27px] text-coral-600 shadow-sm ring-1 ring-coral-100">
                 🏦
               </div>
 
@@ -120,12 +120,12 @@ export default function OrderCompletePaymentNotice({
               </div>
             </div>
 
-            <span className="shrink-0 rounded-full bg-blue-100 px-3 py-1.5 text-[12px] font-black text-blue-700">
+            <span className="shrink-0 rounded-full bg-coral-100 px-3 py-1.5 text-[12px] font-black text-coral-700">
               입금 후 준비
             </span>
           </div>
 
-          <div className="rounded-[24px] bg-white p-5 shadow-sm ring-1 ring-blue-100">
+          <div className="rounded-[24px] bg-white p-5 shadow-sm ring-1 ring-coral-100">
             <div className="grid gap-3 text-[15px] font-bold text-slate-700">
               <div className="flex items-center justify-between gap-4">
                 <span>은행명</span>
@@ -161,9 +161,9 @@ export default function OrderCompletePaymentNotice({
           </button>
         </section>
       ) : (
-        <section className="rounded-[30px] bg-blue-50 p-5 shadow-[0_14px_35px_rgba(30,64,175,0.08)] ring-1 ring-blue-200">
+        <section className="rounded-[30px] bg-coral-50 p-5 shadow-[0_14px_35px_rgba(30,64,175,0.08)] ring-1 ring-coral-200">
           <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-[26px] text-blue-600 ring-1 ring-blue-100">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-[26px] text-coral-600 ring-1 ring-coral-100">
               💳
             </div>
 
@@ -172,7 +172,7 @@ export default function OrderCompletePaymentNotice({
             </h2>
           </div>
 
-          <div className="rounded-[24px] bg-white p-5 text-[14px] font-black leading-relaxed tracking-[-0.04em] text-blue-800 ring-1 ring-blue-100">
+          <div className="rounded-[24px] bg-white p-5 text-[14px] font-black leading-relaxed tracking-[-0.04em] text-coral-800 ring-1 ring-coral-100">
             카드결제는 카톡채널로 문의해주세요.
             <br />
             관리자 확인 후 결제 링크를 보내드립니다.
@@ -180,10 +180,10 @@ export default function OrderCompletePaymentNotice({
         </section>
       )}
 
-      <section className="rounded-[30px] bg-white p-5 shadow-[0_14px_35px_rgba(30,64,175,0.08)] ring-1 ring-blue-100">
+      <section className="rounded-[30px] bg-white p-5 shadow-[0_14px_35px_rgba(30,64,175,0.08)] ring-1 ring-coral-100">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-[22px] text-blue-600 ring-1 ring-blue-100">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-coral-50 text-[22px] text-coral-600 ring-1 ring-coral-100">
               🛍️
             </div>
 
@@ -192,7 +192,7 @@ export default function OrderCompletePaymentNotice({
             </h2>
           </div>
 
-          <span className="rounded-full bg-blue-50 px-3 py-1.5 text-[12px] font-black text-blue-700 ring-1 ring-blue-100">
+          <span className="rounded-full bg-coral-50 px-3 py-1.5 text-[12px] font-black text-coral-700 ring-1 ring-coral-100">
             총 {totalQty || items.length}개
           </span>
         </div>
@@ -218,7 +218,7 @@ export default function OrderCompletePaymentNotice({
                       </div>
                     </div>
 
-                    <div className="shrink-0 text-right text-[15px] font-black text-blue-600">
+                    <div className="shrink-0 text-right text-[15px] font-black text-coral-600">
                       {won(amount)}
                     </div>
                   </div>
@@ -232,7 +232,7 @@ export default function OrderCompletePaymentNotice({
           )}
         </div>
 
-        <div className="mt-4 rounded-[24px] bg-blue-50 p-4 ring-1 ring-blue-100">
+        <div className="mt-4 rounded-[24px] bg-coral-50 p-4 ring-1 ring-coral-100">
           <div className="flex items-center justify-between py-1 text-[14px] font-bold text-slate-600">
             <span>상품금액</span>
             <span>{won(productAmount)}</span>
@@ -250,16 +250,16 @@ export default function OrderCompletePaymentNotice({
             </div>
           )}
 
-          <div className="mt-3 flex items-center justify-between border-t border-blue-100 pt-3 text-[18px] font-black text-[#151923]">
+          <div className="mt-3 flex items-center justify-between border-t border-coral-100 pt-3 text-[18px] font-black text-[#151923]">
             <span>{safePointUsedAmount > 0 ? "최종 결제금액" : "결제금액"}</span>
-            <span className="text-blue-600">{won(finalPaymentAmount)}</span>
+            <span className="text-coral-600">{won(finalPaymentAmount)}</span>
           </div>
         </div>
       </section>
 
       <Link
         href="/myorder"
-        className="mt-3 flex w-full items-center justify-center rounded-[24px] bg-blue-600 px-5 py-5 text-[18px] font-black text-white shadow-[0_16px_34px_rgba(37,99,235,0.30)] transition-all duration-150 active:scale-[0.98]"
+        className="mt-3 flex w-full items-center justify-center rounded-[24px] bg-coral-600 px-5 py-5 text-[18px] font-black text-white shadow-[0_16px_34px_rgba(216,90,48,0.30)] transition-all duration-150 active:scale-[0.98]"
       >
         확인하고 주문조회로 이동
       </Link>

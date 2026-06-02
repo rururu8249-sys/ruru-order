@@ -227,13 +227,13 @@ function PriceAndDelivery({ product }: { product: GroupBuyQuickSelectProduct }) 
 
   return (
     <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[13px] font-black">
-      <span className={priceExists ? "text-blue-600" : "text-blue-600"}>
+      <span className={priceExists ? "text-coral-600" : "text-coral-600"}>
         {priceExists ? formatWon(product.price) : "가격 직접입력"}
       </span>
       <span className="text-gray-300">·</span>
       <span className={`rounded-full px-2 py-0.5 text-[11px] font-black ${
         deliveryLabel === "업체배송"
-          ? "bg-blue-50 text-blue-600"
+          ? "bg-coral-50 text-coral-600"
           : "bg-slate-100 text-slate-600"
       }`}
       >
@@ -258,7 +258,7 @@ function QuickProductCard({
 }) {
   if (variant === "mini") {
     return (
-      <div data-ruru-quick-mini-card className="rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-blue-100">
+      <div data-ruru-quick-mini-card className="rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-coral-100">
         <button
           type="button"
           onClick={onDetail}
@@ -270,7 +270,7 @@ function QuickProductCard({
             {product.product_name}
           </div>
 
-          <div className="mt-0.5 truncate text-[12px] font-black text-blue-600">
+          <div className="mt-0.5 truncate text-[12px] font-black text-coral-600">
             {hasPrice(product) ? formatWon(product.price) : "직접입력"}
           </div>
         </button>
@@ -279,7 +279,7 @@ function QuickProductCard({
   }
 
   return (
-    <div data-ruru-quick-feature-card className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-blue-100">
+    <div data-ruru-quick-feature-card className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-coral-100">
       <div className="flex gap-2">
         <button
           type="button"
@@ -313,7 +313,7 @@ function QuickProductCard({
             <button
               type="button"
               onClick={onSelect}
-              className="h-8 rounded-xl bg-blue-600 text-[12px] font-black text-white shadow-sm"
+              className="h-8 rounded-xl bg-coral-600 text-[12px] font-black text-white shadow-sm"
             >
               {selectLabel}
             </button>
@@ -336,7 +336,7 @@ function SheetProductCard({
   onSelect: () => void;
 }) {
   return (
-    <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-blue-100">
+    <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-coral-100">
       <div className="flex gap-3">
         <ProductThumbnail product={product} className="h-20 w-20" />
 
@@ -357,7 +357,7 @@ function SheetProductCard({
             <button
               type="button"
               onClick={onSelect}
-              className="h-10 rounded-xl bg-blue-600 text-sm font-black text-white shadow-sm"
+              className="h-10 rounded-xl bg-coral-600 text-sm font-black text-white shadow-sm"
             >
               {selectLabel}
             </button>
@@ -452,7 +452,7 @@ function ProductDetailSheet({
           <button
             type="button"
             onClick={onSelect}
-            className="h-14 rounded-2xl bg-blue-600 text-base font-black text-white shadow-sm"
+            className="h-14 rounded-2xl bg-coral-600 text-base font-black text-white shadow-sm"
           >
             {selectLabel === "옵션선택" ? "옵션 선택하기" : "이 상품 담기"}
           </button>
@@ -526,7 +526,7 @@ export default function GroupBuyQuickSelect({ products, onSelect, getSelectLabel
 
   return (
     <>
-      <section data-ruru-group-buy-quick-select className="mb-4 rounded-3xl border border-blue-100 bg-blue-50/70 p-1.5">
+      <section data-ruru-group-buy-quick-select className="mb-4 rounded-3xl border border-coral-100 bg-coral-50/70 p-1.5">
         <div
           data-ruru-mobile-quick-row
           className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_58px] gap-1.5 sm:hidden"
@@ -561,12 +561,12 @@ export default function GroupBuyQuickSelect({ products, onSelect, getSelectLabel
                 setCurrentPage(1);
                 setSheetOpen(true);
               }}
-              className="col-start-3 flex min-h-[104px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-200 bg-white/70 px-1 text-center text-[10px] font-black tracking-[-0.04em] text-blue-600"
+              className="col-start-3 flex min-h-[104px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-coral-200 bg-white/70 px-1 text-center text-[10px] font-black tracking-[-0.04em] text-coral-600"
             >
               <span className="text-xl leading-none">+</span>
               <span className="mt-1">상품</span>
               <span>더보기</span>
-              <span className="mt-1 text-[10px] font-black text-blue-500">총 {products.length.toLocaleString("ko-KR")}개</span>
+              <span className="mt-1 text-[10px] font-black text-coral-500">총 {products.length.toLocaleString("ko-KR")}개</span>
             </button>
           ) : null}
         </div>
@@ -605,12 +605,12 @@ export default function GroupBuyQuickSelect({ products, onSelect, getSelectLabel
                 setCurrentPage(1);
                 setSheetOpen(true);
               }}
-              className="col-start-3 flex min-h-[96px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-200 bg-white/70 px-1 text-center text-[10px] font-black tracking-[-0.04em] text-blue-600"
+              className="col-start-3 flex min-h-[96px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-coral-200 bg-white/70 px-1 text-center text-[10px] font-black tracking-[-0.04em] text-coral-600"
             >
               <span className="text-xl leading-none">+</span>
               <span className="mt-1">상품</span>
               <span>더보기</span>
-              <span className="mt-1 text-[10px] font-black text-blue-500">총 {products.length.toLocaleString("ko-KR")}개</span>
+              <span className="mt-1 text-[10px] font-black text-coral-500">총 {products.length.toLocaleString("ko-KR")}개</span>
             </button>
           ) : null}
         </div>
@@ -643,7 +643,7 @@ export default function GroupBuyQuickSelect({ products, onSelect, getSelectLabel
                 value={searchText}
                 onChange={(event) => setSearchText(event.target.value)}
                 placeholder="상품명 검색"
-                className="mt-4 h-[52px] w-full rounded-2xl border border-slate-200 px-4 text-base font-black outline-none focus:border-blue-500"
+                className="mt-4 h-[52px] w-full rounded-2xl border border-slate-200 px-4 text-base font-black outline-none focus:border-coral-500"
               />
 
             </div>
@@ -693,7 +693,7 @@ export default function GroupBuyQuickSelect({ products, onSelect, getSelectLabel
                             onClick={() => setCurrentPage(item)}
                             className={`h-10 min-w-10 rounded-xl px-3 text-sm font-black ${
                               item === safeCurrentPage
-                                ? "bg-blue-600 text-white"
+                                ? "bg-coral-600 text-white"
                                 : "bg-slate-100 text-slate-700"
                             }`}
                           >

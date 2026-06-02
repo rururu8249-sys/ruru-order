@@ -56,12 +56,12 @@ export default function OrderDepositConfirmModal({
           ×
         </button>
 
-          <div className="mx-auto mb-3 flex w-fit items-center rounded-full bg-blue-50 px-4 py-2 text-[14px] font-black tracking-[-0.04em] text-blue-700 ring-1 ring-blue-100">
+          <div className="mx-auto mb-3 flex w-fit items-center rounded-full bg-coral-50 px-4 py-2 text-[14px] font-black tracking-[-0.04em] text-coral-700 ring-1 ring-coral-100">
             주문서 제출 전 확인
           </div>
 
           <div className="text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] bg-blue-600 text-[32px] text-white shadow-[0_14px_28px_rgba(37,99,235,0.26)]">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] bg-coral-600 text-[32px] text-white shadow-[0_14px_28px_rgba(216,90,48,0.26)]">
               원
             </div>
 
@@ -79,15 +79,15 @@ export default function OrderDepositConfirmModal({
           </div>
 
           <div className="mt-5 grid gap-3">
-            <div className="rounded-[24px] bg-blue-50 p-3 ring-1 ring-blue-100">
-              <div className="mb-1 flex items-center gap-2 text-[13px] font-black tracking-[-0.04em] text-blue-700">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-[17px] text-white">
+            <div className="rounded-[24px] bg-coral-50 p-3 ring-1 ring-coral-100">
+              <div className="mb-1 flex items-center gap-2 text-[13px] font-black tracking-[-0.04em] text-coral-700">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-coral-600 text-[17px] text-white">
                   원
                 </span>
                 최종 입금금액
               </div>
 
-              <div className="break-all pl-10 text-[28px] font-black leading-tight tracking-[-0.05em] text-blue-700">
+              <div className="break-all pl-10 text-[28px] font-black leading-tight tracking-[-0.05em] text-coral-700">
                 {safeAmount}
               </div>
             </div>
@@ -109,7 +109,7 @@ export default function OrderDepositConfirmModal({
           <div className="mt-4 rounded-[24px] bg-yellow-50 p-4 text-center ring-1 ring-yellow-100">
             <p className="break-keep text-[19px] font-black leading-relaxed tracking-[-0.06em] text-[#151923]">
               {safePointUsedAmount > 0 ? (
-                <div className="mb-4 rounded-2xl border border-blue-100 bg-white/85 p-3 text-sm font-black text-slate-700">
+                <div className="mb-4 rounded-2xl border border-coral-100 bg-white/85 p-3 text-sm font-black text-slate-700">
                   <div className="flex items-center justify-between gap-3">
                     <span>주문서 총금액</span>
                     <span className="text-slate-950">{formatWon(safeOriginalTotalAmount)}</span>
@@ -118,24 +118,24 @@ export default function OrderDepositConfirmModal({
                     <span>포인트 차감</span>
                     <span>-{formatWon(safePointUsedAmount)}</span>
                   </div>
-                  <div className="mt-2 flex items-center justify-between gap-3 border-t border-slate-100 pt-2 text-blue-700">
+                  <div className="mt-2 flex items-center justify-between gap-3 border-t border-slate-100 pt-2 text-coral-700">
                     <span>최종 입금금액</span>
                     <span>{formatWon(safeFinalAmount)}</span>
                   </div>
                 </div>
               ) : null}
               입금자명은{" "}
-              <span className="text-blue-700">{safeNickname}</span>
+              <span className="text-coral-700">{safeNickname}</span>
               <br />
               입금금액은{" "}
-              <span className="text-blue-700">{safeAmount}</span>
+              <span className="text-coral-700">{safeAmount}</span>
             </p>
 
             <p className="mt-3 break-keep text-[15px] font-black leading-relaxed tracking-[-0.04em] text-slate-700">
               다르게 입금하면 자동확인이 안 될 수 있어요.
               <br />
               {safeFinalAmount === 0 ? (
-                <span className="mt-2 block text-blue-700">
+                <span className="mt-2 block text-coral-700">
                   포인트로 전액 결제되어 추가 입금금액은 0원입니다.
                 </span>
               ) : null}
@@ -161,7 +161,7 @@ export default function OrderDepositConfirmModal({
             <button
               type="button"
               onClick={() => onConfirm(false)}
-              className="min-h-[54px] rounded-[18px] bg-blue-600 px-3 py-3 text-[17px] font-black tracking-[-0.05em] text-white shadow-[0_12px_24px_rgba(37,99,235,0.25)] transition active:scale-[0.98]"
+              className="min-h-[54px] rounded-[18px] bg-coral-600 px-3 py-3 text-[17px] font-black tracking-[-0.05em] text-white shadow-[0_12px_24px_rgba(216,90,48,0.25)] transition active:scale-[0.98]"
             >
               확인
             </button>
