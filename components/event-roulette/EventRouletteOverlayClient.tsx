@@ -130,7 +130,7 @@ function getRouletteLabelLayout(total: number): RouletteLabelLayout {
   if (count <= 8) {
     return {
       radius: 32,
-      width: "clamp(140px, 25vw, 230px)",
+      width: "clamp(130px, 23vw, 220px)",
       height: "24px",
       fontSize: "clamp(16px, 3vw, 28px)",
       letterSpacing: "-0.07em",
@@ -140,23 +140,23 @@ function getRouletteLabelLayout(total: number): RouletteLabelLayout {
 
   if (count <= 16) {
     return {
-      radius: 35,
-      width: "clamp(124px, 22vw, 210px)",
-      height: "22px",
-      fontSize: "clamp(13px, 2.5vw, 22px)",
-      letterSpacing: "-0.07em",
-      maxChars: 12,
+      radius: 39,
+      width: "clamp(82px, 13vw, 124px)",
+      height: "15px",
+      fontSize: "clamp(9.5px, 1.62vw, 13.5px)",
+      letterSpacing: "-0.055em",
+      maxChars: 8,
     };
   }
 
   if (count <= 30) {
     return {
-      radius: 38,
-      width: "clamp(108px, 19vw, 185px)",
-      height: "20px",
-      fontSize: "clamp(10.5px, 2vw, 17px)",
-      letterSpacing: "-0.065em",
-      maxChars: 10,
+      radius: 41,
+      width: "clamp(72px, 11.5vw, 110px)",
+      height: "12px",
+      fontSize: "clamp(8px, 1.28vw, 10.5px)",
+      letterSpacing: "-0.045em",
+      maxChars: 7,
     };
   }
 
