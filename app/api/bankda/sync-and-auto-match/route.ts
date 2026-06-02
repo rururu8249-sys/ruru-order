@@ -25,12 +25,23 @@ function pickAutoSummary(autoResult: any) {
   };
 }
 
+function getInternalCronSecret() {
+  return (
+    String(process.env.CRON_SECRET || "").trim() ||
+    String(process.env.BANKDA_CRON_SECRET || "").trim()
+  );
+}
+
 async function handleSyncAndAutoMatch(request: NextRequest) {
   const origin = new URL(request.url).origin;
+  const internalCronSecret = getInternalCronSecret();
 
   const syncResponse = await fetch(`${origin}/api/bankda/sync-deposits`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-ruru-internal-cron": internalCronSecret,
+    },
     cache: "no-store",
   });
 
@@ -51,7 +62,10 @@ async function handleSyncAndAutoMatch(request: NextRequest) {
 
   const autoResponse = await fetch(`${origin}/api/admin-v2/auto-payment-match/run`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-ruru-internal-cron": internalCronSecret,
+    },
     body: JSON.stringify({ confirm: "RUN_AUTO_MATCH" }),
     cache: "no-store",
   });

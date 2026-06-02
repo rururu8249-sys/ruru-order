@@ -39,4 +39,31 @@ if (!route.includes("export async function GET") || !route.includes("export asyn
   fail("크론 API에 GET/POST 핸들러가 모두 없습니다.");
 }
 
+
+const middlewarePath = path.join(root, "middleware.ts");
+const middleware = fs.existsSync(middlewarePath) ? fs.readFileSync(middlewarePath, "utf8") : "";
+
+if (!middleware.includes("INTERNAL_CRON_API_PATHS")) {
+  fail("middleware.ts에 내부 Cron API 제한 통과 목록이 없습니다.");
+}
+
+if (!middleware.includes("/api/bankda/sync-and-auto-match") || !middleware.includes("/api/bankda/sync-deposits") || !middleware.includes("/api/admin-v2/auto-payment-match/run")) {
+  fail("middleware.ts 내부 Cron API 통과 목록에 필요한 Bankda/자동입금확인 API가 없습니다.");
+}
+
+if (!middleware.includes("x-ruru-internal-cron")) {
+  fail("middleware.ts에 x-ruru-internal-cron 내부 인증 헤더 검사가 없습니다.");
+}
+
+if (!route.includes("x-ruru-internal-cron")) {
+  fail("cron route가 내부 API 호출 시 x-ruru-internal-cron 헤더를 보내지 않습니다.");
+}
+
+const syncAndAutoPath = path.join(root, "app/api/bankda/sync-and-auto-match/route.ts");
+const syncAndAuto = fs.existsSync(syncAndAutoPath) ? fs.readFileSync(syncAndAutoPath, "utf8") : "";
+
+if (!syncAndAuto.includes("x-ruru-internal-cron")) {
+  fail("sync-and-auto-match가 하위 API 호출 시 x-ruru-internal-cron 헤더를 보내지 않습니다.");
+}
+
 console.log("✅ BANKDA CRON 안전가드 통과: 서버형 자동동기화 API 정상");

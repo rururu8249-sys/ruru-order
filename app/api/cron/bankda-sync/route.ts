@@ -34,6 +34,13 @@ function isVercelCronRequest(request: NextRequest) {
   return userAgent.includes("vercel-cron/1.0") && Boolean(cronSchedule.trim());
 }
 
+function getInternalCronSecret() {
+  return (
+    String(process.env.CRON_SECRET || "").trim() ||
+    String(process.env.BANKDA_CRON_SECRET || "").trim()
+  );
+}
+
 function assertAuthorized(request: NextRequest) {
   const cronSecret = String(process.env.CRON_SECRET || "").trim();
   const bankdaCronSecret = String(process.env.BANKDA_CRON_SECRET || "").trim();
@@ -82,10 +89,13 @@ async function handleBankdaCron(request: NextRequest) {
 
   const origin = new URL(request.url).origin;
 
+  const internalCronSecret = getInternalCronSecret();
+
   const syncResponse = await fetch(`${origin}/api/bankda/sync-and-auto-match`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "x-ruru-internal-cron": internalCronSecret,
     },
     body: JSON.stringify({
       source: "bankda_server_cron",
