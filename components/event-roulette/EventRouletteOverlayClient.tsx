@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 
 type RouletteEvent = {
   id?: string;
@@ -60,15 +60,15 @@ function getTokenFromLocation(initialToken?: string) {
 }
 
 function getScaleFromLocation() {
-  if (typeof window === "undefined") return 0.82;
+  if (typeof window === "undefined") return 0.72;
 
   const params = new URLSearchParams(window.location.search);
   const raw = params.get("scale") || params.get("size") || "";
   const parsed = Number(raw);
 
-  if (!raw) return 0.82;
+  if (!raw) return 0.72;
 
-  return clampNumber(parsed, 0.55, 1.15);
+  return clampNumber(parsed, 0.5, 1.15);
 }
 
 function normalizeParticipants(event: RouletteEvent | null) {
@@ -117,10 +117,11 @@ function makeWheelGradient(count: number) {
 export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverlayClientProps) {
   const [event, setEvent] = useState<RouletteEvent | null>(null);
   const [message, setMessage] = useState("");
-  const [wheelAngle, setWheelAngle] = useState(0);
   const [phase, setPhase] = useState<"idle" | "spinning" | "result">("idle");
   const [showResult, setShowResult] = useState(false);
-  const [scale, setScale] = useState(0.82);
+  const [scale, setScale] = useState(0.72);
+  const [spinRunId, setSpinRunId] = useState(0);
+  const [finalAngle, setFinalAngle] = useState(0);
 
   const lastAnimatedKeyRef = useRef("");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -129,7 +130,6 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
   const winnerNickname = cleanText(event?.winner_nickname);
   const participantCount = Math.max(participants.length, 1);
   const segmentAngle = 360 / participantCount;
-
   const wheelGradient = useMemo(() => makeWheelGradient(participantCount), [participantCount]);
 
   useEffect(() => {
@@ -171,7 +171,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
     };
 
     load();
-    const interval = window.setInterval(load, 1200);
+    const interval = window.setInterval(load, 1000);
 
     return () => {
       cancelled = true;
@@ -191,12 +191,10 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
       return;
     }
 
-    const key = `${event.id}-${event.result_at || ""}-${event.winner_nickname || ""}-${event.updated_at || ""}`;
+    const key = `${event.id}-${event.status || ""}-${event.result_at || ""}-${event.winner_nickname || ""}-${event.updated_at || ""}`;
 
     if (event.status === "result" && winnerNickname) {
-      if (lastAnimatedKeyRef.current === key) {
-        return;
-      }
+      if (lastAnimatedKeyRef.current === key) return;
 
       lastAnimatedKeyRef.current = key;
 
@@ -208,39 +206,37 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
       const winnerIndex = winnerIndexOf(participants, winnerNickname);
       const safeWinnerIndex = winnerIndex >= 0 ? winnerIndex : 0;
       const winnerCenterAngle = safeWinnerIndex * segmentAngle + segmentAngle / 2;
-      const finalAngle = SPIN_TURNS * 360 + (360 - winnerCenterAngle);
+      const nextFinalAngle = SPIN_TURNS * 360 + (360 - winnerCenterAngle);
 
-      setPhase("spinning");
+      setFinalAngle(nextFinalAngle);
       setShowResult(false);
-      setWheelAngle(0);
-
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => {
-          setWheelAngle(finalAngle);
-        });
-      });
+      setPhase("spinning");
+      setSpinRunId((value) => value + 1);
 
       timerRef.current = setTimeout(() => {
         setPhase("result");
         setShowResult(true);
         timerRef.current = null;
-      }, SPIN_MS + 300);
+      }, SPIN_MS + 350);
 
       return;
     }
 
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
+    if (event.status !== "result") {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
 
-    setPhase("idle");
-    setShowResult(false);
-  }, [event?.id, event?.result_at, event?.winner_nickname, event?.updated_at, event?.status, participants, segmentAngle, winnerNickname]);
+      setPhase("idle");
+      setShowResult(false);
+      lastAnimatedKeyRef.current = "";
+    }
+  }, [event?.id, event?.status, event?.result_at, event?.winner_nickname, event?.updated_at, participants, segmentAngle, winnerNickname]);
 
   const labelFontSize =
     participants.length >= 70
-      ? "clamp(5px, 1.15vw, 8px)"
+      ? "clamp(5px, 1.12vw, 8px)"
       : participants.length >= 55
         ? "clamp(5.5px, 1.25vw, 8.5px)"
         : participants.length >= 40
@@ -262,12 +258,13 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
 
         <div className="wheel-wrap">
           <div
-            className="wheel"
+            key={phase === "spinning" ? `spin-${spinRunId}` : "idle-wheel"}
+            className={phase === "spinning" ? "wheel wheel-spinning" : "wheel"}
             style={{
               background: wheelGradient,
-              transform: `rotate(${wheelAngle}deg)`,
-              transition: phase === "spinning" ? `transform ${SPIN_MS}ms cubic-bezier(0.06, 0.8, 0.08, 1)` : "none",
-            }}
+              "--final-angle": `${finalAngle}deg`,
+              "--spin-ms": `${SPIN_MS}ms`,
+            } as CSSProperties}
           >
             <div className="inner-soft-ring" />
 
@@ -362,7 +359,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           height: 70%;
           transform: translateX(-50%);
           border-radius: 999px;
-          background: rgba(244, 63, 94, 0.4);
+          background: rgba(244, 63, 94, 0.44);
           filter: blur(14px);
         }
 
@@ -442,6 +439,8 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
 
         .wheel {
           --label-radius: min(31vw, 286px);
+          --final-angle: 0deg;
+          --spin-ms: 9200ms;
           position: relative;
           width: 92%;
           aspect-ratio: 1 / 1;
@@ -452,6 +451,19 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
             inset 0 0 42px rgba(255, 255, 255, 0.16);
           will-change: transform;
           transform-origin: center center;
+        }
+
+        .wheel-spinning {
+          animation: rouletteSpin var(--spin-ms) cubic-bezier(0.06, 0.8, 0.08, 1) forwards;
+        }
+
+        @keyframes rouletteSpin {
+          0% {
+            transform: rotate(0deg);
+          }
+          100% {
+            transform: rotate(var(--final-angle));
+          }
         }
 
         .inner-soft-ring {

@@ -550,11 +550,6 @@ export default function AdminLiveEventRoulettePanel({
         currentEvent.status === "result" ||
         currentEvent.status === "closed";
 
-      showAdminToast(
-        `룰렛 시작 진단: 참가자 ${finalParticipants.length}명 / 현재토큰 ${String(currentEvent?.overlay_token || "없음")} / 새로생성 ${mustCreateNewEvent ? "예" : "아니오"}`,
-        "info"
-      );
-
       let eventToSpin = currentEvent;
 
       if (mustCreateNewEvent) {
