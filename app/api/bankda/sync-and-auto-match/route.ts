@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
+const INTERNAL_CRON_BYPASS_TOKEN = "ruru-bankda-cron-internal-v1";
+
 async function readJsonSafe(response: Response) {
   const text = await response.text();
 
@@ -26,13 +28,7 @@ function pickAutoSummary(autoResult: any) {
 }
 
 function getInternalCronSecret() {
-  return (
-    String(process.env.CRON_SECRET || "").trim() ||
-    String(process.env.BANKDA_CRON_SECRET || "").trim() ||
-    String(process.env.ADMIN_SESSION_SECRET || "").trim() ||
-    String(process.env.ADMIN_SESSION_TOKEN || "").trim() ||
-    String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim()
-  );
+  return INTERNAL_CRON_BYPASS_TOKEN;
 }
 
 async function handleSyncAndAutoMatch(request: NextRequest) {

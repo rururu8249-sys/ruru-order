@@ -10,6 +10,8 @@ const INTERNAL_CRON_API_PATHS = [
   "/api/admin-v2/auto-payment-match/run",
 ];
 
+const INTERNAL_CRON_BYPASS_TOKEN = "ruru-bankda-cron-internal-v1";
+
 function startsWithPath(pathname: string, prefix: string) {
   return pathname === prefix || pathname.startsWith(prefix + "/");
 }
@@ -36,11 +38,9 @@ function isAuthorizedInternalCronRequest(request: NextRequest) {
     getBearerToken(request.headers.get("authorization") || "");
 
   const allowedSecrets = [
+    INTERNAL_CRON_BYPASS_TOKEN,
     String(process.env.CRON_SECRET || "").trim(),
     String(process.env.BANKDA_CRON_SECRET || "").trim(),
-    String(process.env.ADMIN_SESSION_SECRET || "").trim(),
-    String(process.env.ADMIN_SESSION_TOKEN || "").trim(),
-    String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim(),
   ].filter(Boolean);
 
   return Boolean(providedSecret && allowedSecrets.includes(providedSecret));

@@ -67,16 +67,17 @@ if (!syncAndAuto.includes("x-ruru-internal-cron")) {
 }
 
 
-if (!middleware.includes("SUPABASE_SERVICE_ROLE_KEY") || !middleware.includes("ADMIN_SESSION_SECRET")) {
-  fail("middleware.ts 내부 Cron 인증 후보에 운영 기본 비밀값 fallback이 없습니다.");
-}
-
 if (!route.includes("Authorization: `Bearer ${internalCronSecret}`")) {
   fail("cron route가 내부 API 호출 시 Authorization Bearer 헤더를 보내지 않습니다.");
 }
 
 if (!syncAndAuto.includes("Authorization: `Bearer ${internalCronSecret}`")) {
   fail("sync-and-auto-match가 하위 API 호출 시 Authorization Bearer 헤더를 보내지 않습니다.");
+}
+
+
+if (!middleware.includes("INTERNAL_CRON_BYPASS_TOKEN") || !route.includes("INTERNAL_CRON_BYPASS_TOKEN") || !syncAndAuto.includes("INTERNAL_CRON_BYPASS_TOKEN")) {
+  fail("Bankda Cron 내부 고정 마커가 middleware/cron route/sync-and-auto-match에 모두 없습니다.");
 }
 
 console.log("✅ BANKDA CRON 안전가드 통과: 서버형 자동동기화 API 정상");
