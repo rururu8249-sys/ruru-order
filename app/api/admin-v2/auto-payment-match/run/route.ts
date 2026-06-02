@@ -11,6 +11,7 @@ type OrderGroupCandidate = {
   orderIds: number[];
   firstOrder: AnyRow;
   nickname: string;
+  customerName: string;
   amount: number;
 };
 
@@ -18,10 +19,13 @@ type MatchCandidate = {
   order_group_id: string;
   order_ids: number[];
   order_nickname: string;
+  order_customer_name: string;
   order_amount: number;
   deposit_id: number;
   deposit_depositor: string;
   deposit_amount: number;
+  match_name: string;
+  match_basis: "닉네임" | "고객명";
   reason: string;
 };
 
@@ -47,6 +51,12 @@ function getSupabaseAdmin() {
 
 function text(value: unknown) {
   return String(value ?? "").trim();
+}
+
+function autoMatchName(value: unknown) {
+  // 안전 확장: 앞뒤 공백 제거 + 맨 앞 @ 접두어만 제거합니다.
+  // 중간 문자, 한글, 숫자, 대소문자는 임의로 바꾸지 않습니다.
+  return text(value).replace(/^@+/, "");
 }
 
 function num(value: unknown) {
@@ -82,9 +92,12 @@ function orderGroupId(order: AnyRow) {
 }
 
 function orderNickname(order: AnyRow) {
-  // 자동매칭은 유튜브 닉네임 완전일치만 허용합니다.
-  // 고객명 유사매칭은 자동처리 금지.
   return text(order.youtube_nickname || order.nickname || order.customer_nickname);
+}
+
+function orderCustomerName(order: AnyRow) {
+  // 유사매칭 금지. 고객명도 실제 입금자명과 완전일치할 때만 후보로 사용합니다.
+  return text(order.customer_name || order.name || order.buyer_name);
 }
 
 function orderStatusText(order: AnyRow) {
@@ -201,8 +214,7 @@ function isEligibleDeposit(deposit: AnyRow) {
 }
 
 function makeKey(name: string, amount: number) {
-  // 완전일치 기준: 앞뒤 공백만 제거한 값 그대로 사용
-  return `${name}__${amount}`;
+  return `${autoMatchName(name)}__${amount}`;
 }
 
 function buildOrderGroups(orders: AnyRow[]) {
@@ -221,6 +233,7 @@ function buildOrderGroups(orders: AnyRow[]) {
   for (const [groupId, groupOrders] of map.entries()) {
     const firstOrder = groupOrders[0];
     const nickname = orderNickname(firstOrder);
+    const customerName = orderCustomerName(firstOrder);
     const amount = groupOrders.reduce((sum, order) => sum + orderAmount(order), 0);
     const orderIds = groupOrders.map((item) => Number(item.id)).filter((id) => Number.isFinite(id) && id > 0);
 
@@ -231,6 +244,7 @@ function buildOrderGroups(orders: AnyRow[]) {
       orderIds,
       firstOrder,
       nickname,
+      customerName,
       amount,
     });
   }
@@ -242,12 +256,41 @@ function buildCandidates(orders: AnyRow[], deposits: AnyRow[]) {
   const eligibleOrderGroups = buildOrderGroups(orders);
   const eligibleDeposits = deposits.filter((deposit) => isEligibleDeposit(deposit).ok);
 
-  const ordersByKey = new Map<string, OrderGroupCandidate[]>();
+  const ordersByKey = new Map<
+    string,
+    Array<{
+      group: OrderGroupCandidate;
+      matchName: string;
+      matchBasis: "닉네임" | "고객명";
+    }>
+  >();
   const depositsByKey = new Map<string, AnyRow[]>();
 
   for (const group of eligibleOrderGroups) {
-    const key = makeKey(group.nickname, group.amount);
-    ordersByKey.set(key, [...(ordersByKey.get(key) || []), group]);
+    const matchNames: Array<{ name: string; basis: "닉네임" | "고객명" }> = [];
+
+    const nickname = autoMatchName(group.nickname);
+    const customerName = autoMatchName(group.customerName);
+
+    if (nickname) {
+      matchNames.push({ name: nickname, basis: "닉네임" });
+    }
+
+    if (customerName && customerName !== nickname) {
+      matchNames.push({ name: customerName, basis: "고객명" });
+    }
+
+    for (const match of matchNames) {
+      const key = makeKey(match.name, group.amount);
+      ordersByKey.set(key, [
+        ...(ordersByKey.get(key) || []),
+        {
+          group,
+          matchName: match.name,
+          matchBasis: match.basis,
+        },
+      ]);
+    }
   }
 
   for (const deposit of eligibleDeposits) {
@@ -255,35 +298,69 @@ function buildCandidates(orders: AnyRow[], deposits: AnyRow[]) {
     depositsByKey.set(key, [...(depositsByKey.get(key) || []), deposit]);
   }
 
-  const candidates: MatchCandidate[] = [];
+  const rawCandidates: MatchCandidate[] = [];
   const blocked: Array<{ key: string; reason: string; orderCount: number; depositCount: number }> = [];
 
   for (const [key, keyOrders] of ordersByKey.entries()) {
     const keyDeposits = depositsByKey.get(key) || [];
 
     if (keyOrders.length === 1 && keyDeposits.length === 1) {
-      const group = keyOrders[0];
+      const orderCandidate = keyOrders[0];
+      const group = orderCandidate.group;
       const deposit = keyDeposits[0];
 
-      candidates.push({
+      rawCandidates.push({
         order_group_id: group.orderGroupId,
         order_ids: group.orderIds,
         order_nickname: group.nickname,
+        order_customer_name: group.customerName,
         order_amount: group.amount,
         deposit_id: depositId(deposit),
         deposit_depositor: depositName(deposit),
         deposit_amount: depositAmount(deposit),
-        reason: "닉네임 완전일치 + 주문그룹 합계금액 완전일치 + 주문그룹 1건/입금 1건",
+        match_name: orderCandidate.matchName,
+        match_basis: orderCandidate.matchBasis,
+        reason: `${orderCandidate.matchBasis} 완전일치 + 주문그룹 합계금액 완전일치 + 주문그룹 1건/입금 1건`,
       });
-    } else if (keyDeposits.length > 0) {
+    } else {
       blocked.push({
         key,
-        reason: "1:1 단일 후보가 아니라 자동처리 제외",
         orderCount: keyOrders.length,
         depositCount: keyDeposits.length,
+        reason: "1:1 단일 후보가 아니라 자동처리 제외",
       });
     }
   }
+
+  const orderCandidateCount = new Map<string, number>();
+  const depositCandidateCount = new Map<number, number>();
+
+  for (const candidate of rawCandidates) {
+    orderCandidateCount.set(
+      candidate.order_group_id,
+      (orderCandidateCount.get(candidate.order_group_id) || 0) + 1
+    );
+    depositCandidateCount.set(
+      candidate.deposit_id,
+      (depositCandidateCount.get(candidate.deposit_id) || 0) + 1
+    );
+  }
+
+  const candidates = rawCandidates.filter((candidate) => {
+    const orderCount = orderCandidateCount.get(candidate.order_group_id) || 0;
+    const depositCount = depositCandidateCount.get(candidate.deposit_id) || 0;
+
+    if (orderCount === 1 && depositCount === 1) return true;
+
+    blocked.push({
+      key: `${candidate.match_name}__${candidate.order_amount}`,
+      orderCount,
+      depositCount,
+      reason: "한 주문 또는 한 입금내역에 자동매칭 후보가 2개 이상이라 자동처리 제외",
+    });
+
+    return false;
+  });
 
   return {
     candidates,
