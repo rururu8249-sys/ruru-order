@@ -315,31 +315,24 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
     !isLocalDebugMode && cleanText(event?.status) === "result" && winnerNickname
       ? [cleanText(event?.result_at), cleanText(event?.updated_at), winnerNickname].join("|")
       : "";
+  const mountedAtRef = useRef(Date.now());
+  const resultEventTime = Date.parse(cleanText(event?.result_at) || cleanText(event?.updated_at) || "");
+  const isFreshResultForThisWidget =
+    Number.isFinite(resultEventTime) && resultEventTime >= mountedAtRef.current - 1000;
   const [resultCardVisible, setResultCardVisible] = useState(false);
-  const resultCardInitializedRef = useRef(false);
-  const lastResultCardKeyRef = useRef("");
+  const lastShownResultCardKeyRef = useRef("");
 
   useEffect(() => {
-    if (!event) return;
-
-    if (!resultDisplayKey) {
-      resultCardInitializedRef.current = true;
+    if (!showResult || !winnerNickname || !resultDisplayKey || !isFreshResultForThisWidget) {
       setResultCardVisible(false);
       return;
     }
 
-    if (!resultCardInitializedRef.current) {
-      resultCardInitializedRef.current = true;
-      lastResultCardKeyRef.current = resultDisplayKey;
-      setResultCardVisible(false);
+    if (lastShownResultCardKeyRef.current === resultDisplayKey) {
       return;
     }
 
-    if (lastResultCardKeyRef.current === resultDisplayKey) {
-      return;
-    }
-
-    lastResultCardKeyRef.current = resultDisplayKey;
+    lastShownResultCardKeyRef.current = resultDisplayKey;
     setResultCardVisible(true);
 
     const timeoutId = window.setTimeout(() => {
@@ -347,7 +340,8 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
     }, 5000);
 
     return () => window.clearTimeout(timeoutId);
-  }, [event, resultDisplayKey]);
+  }, [showResult, winnerNickname, resultDisplayKey, isFreshResultForThisWidget]);
+
   const eventIdentity = cleanText(event?.id) || cleanText(event?.overlay_token) || (event ? FALLBACK_TOKEN : "");
   const participantCount = Math.max(participants.length, 1);
   const labelLayout = useMemo(() => getRouletteLabelLayout(participantCount), [participantCount]);
@@ -567,7 +561,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
 
         {phase === "spinning" ? <div className="spin-status">룰렛 돌아가는 중...</div> : null}
 
-        {resultCardVisible && winnerNickname ? (
+        {resultCardVisible && showResult && winnerNickname ? (
           <div className="result-card">
             <div className="result-eyebrow">당첨</div>
             <div className="result-name">{winnerNickname}</div>

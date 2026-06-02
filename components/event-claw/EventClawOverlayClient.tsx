@@ -351,31 +351,29 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
   const resultDisplayKey = hasResult
     ? [cleanText(event?.result_at), cleanText(event?.updated_at), winnerNickname].join("|")
     : "";
+  const mountedAtRef = useRef(Date.now());
+  const resultEventTime = Date.parse(cleanText(event?.result_at) || cleanText(event?.updated_at) || "");
+  const isFreshResultForThisWidget =
+    Number.isFinite(resultEventTime) && resultEventTime >= mountedAtRef.current - 1000;
   const [resultCardVisible, setResultCardVisible] = useState(false);
-  const resultCardInitializedRef = useRef(false);
-  const lastResultCardKeyRef = useRef("");
+  const lastShownResultCardKeyRef = useRef("");
 
+  const elapsedMs = hasResult && animationStartedAt ? now - animationStartedAt : 0;
+  const seed = hashText(`${winnerNickname}|${resultKey}`);
+  const prizeKey = useMemo(() => pickPrizeKey(winnerNickname || "default", resultKey || "idle"), [winnerNickname, resultKey]);
+  const prizeSrc = PRIZE_ASSETS[prizeKey];
+  const motion = getMotionState(elapsedMs, seed, hasResult, now);
   useEffect(() => {
-    if (!event) return;
-
-    if (!resultDisplayKey) {
-      resultCardInitializedRef.current = true;
+    if (!motion.showResult || !winnerNickname || !resultDisplayKey || !isFreshResultForThisWidget) {
       setResultCardVisible(false);
       return;
     }
 
-    if (!resultCardInitializedRef.current) {
-      resultCardInitializedRef.current = true;
-      lastResultCardKeyRef.current = resultDisplayKey;
-      setResultCardVisible(false);
+    if (lastShownResultCardKeyRef.current === resultDisplayKey) {
       return;
     }
 
-    if (lastResultCardKeyRef.current === resultDisplayKey) {
-      return;
-    }
-
-    lastResultCardKeyRef.current = resultDisplayKey;
+    lastShownResultCardKeyRef.current = resultDisplayKey;
     setResultCardVisible(true);
 
     const timeoutId = window.setTimeout(() => {
@@ -383,12 +381,8 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
     }, 5000);
 
     return () => window.clearTimeout(timeoutId);
-  }, [event, resultDisplayKey]);
-  const elapsedMs = hasResult && animationStartedAt ? now - animationStartedAt : 0;
-  const seed = hashText(`${winnerNickname}|${resultKey}`);
-  const prizeKey = useMemo(() => pickPrizeKey(winnerNickname || "default", resultKey || "idle"), [winnerNickname, resultKey]);
-  const prizeSrc = PRIZE_ASSETS[prizeKey];
-  const motion = getMotionState(elapsedMs, seed, hasResult, now);
+  }, [motion.showResult, winnerNickname, resultDisplayKey, isFreshResultForThisWidget]);
+
 
   return (
     <main className="claw-root">
@@ -686,7 +680,7 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
 
         {message && !winnerNickname ? <div className="message-pill">{message}</div> : null}
 
-        <div className={`result-card ${resultCardVisible && winnerNickname ? "show" : ""}`}>
+        <div className={`result-card ${resultCardVisible && motion.showResult && winnerNickname ? "show" : ""}`}>
           <div className="result-label">당첨</div>
           <div className="result-name">{winnerNickname || "대기중"}</div>
           <div className="result-note">{winnerNote}</div>
