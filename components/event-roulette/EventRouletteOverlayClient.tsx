@@ -105,7 +105,7 @@ function makeWheelGradient(count: number) {
   const safeCount = Math.max(count, 1);
   const step = 100 / safeCount;
 
-  return `conic-gradient(from ${-90 - 180 / safeCount}deg, ${Array.from({ length: safeCount })
+  return `conic-gradient(from ${-180 / safeCount}deg, ${Array.from({ length: safeCount })
     .map((_, index) => {
       const start = index * step;
       const end = (index + 1) * step;
