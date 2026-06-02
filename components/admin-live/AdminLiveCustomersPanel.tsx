@@ -718,11 +718,13 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
           current.nickname = "닉네임 미입력";
         }
 
-        if (!current.name || current.name === "-") {
-          current.name = clean(profile.customer_name) || "이름 없음";
+        if (clean(profile.customer_name)) {
+          current.name = clean(profile.customer_name);
+        } else if (!current.name || current.name === "-") {
+          current.name = "이름 없음";
         }
 
-        if (!current.phone) {
+        if (clean(profile.customer_phone)) {
           current.phone = clean(profile.customer_phone);
         }
 
