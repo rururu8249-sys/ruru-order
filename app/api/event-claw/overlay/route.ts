@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
       .select(
         "title, mode, is_test, status, participant_snapshot, winner_nickname, winner_note, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
       )
-      .eq("overlay_token", token)
+      .like("overlay_token", `${token}%`)
       .neq("status", "closed")
       .order("updated_at", { ascending: false })
       .order("created_at", { ascending: false })

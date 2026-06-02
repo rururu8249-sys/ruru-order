@@ -690,8 +690,9 @@ async function createEvent(body: Record<string, unknown>) {
     });
   }
 
-  const overlayToken =
+  const overlayBaseToken =
     eventKind === "roulette" ? "roulette_luludongi_live" : "claw_luludongi_live";
+  const overlayToken = `${overlayBaseToken}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const spinDurationMs = calculateRouletteSpinDurationMs(participants.length);
 
   const eventPayload = {
