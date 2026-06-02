@@ -265,11 +265,9 @@ function styleRosenSheet(sheet: ExcelJS.Worksheet, rowCount: number, columnCount
         };
       }
 
-      if (splitAddress) {
-        if ([5, 6, 9].includes(colNumber)) cell.numFmt = "@";
-      } else if ([4, 5, 8].includes(colNumber)) {
-        cell.numFmt = "@";
-      }
+      // 전화·핸드폰·운임구분 칸을 @(텍스트강제) 대신 General로 둠.
+      // 값이 이미 문자열이라 앞자리 0은 유지되고, 택배 합배송(이름+연락처+주소) 인식이 정상화됨.
+      // (원래 @ 형식이라 로젠 프로그램이 차수를 갈라 합포장이 안 묶이던 문제 해결)
     });
   });
 }
