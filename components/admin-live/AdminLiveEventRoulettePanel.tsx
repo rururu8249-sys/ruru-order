@@ -541,49 +541,38 @@ export default function AdminLiveEventRoulettePanel({
       return;
     }
 
+    if (spinning) {
+      return;
+    }
+
     setSpinning(true);
 
     try {
-      const mustCreateNewEvent =
-        !currentEvent?.id ||
-        !String(currentEvent.overlay_token || "").startsWith("roulette_") ||
-        currentEvent.status === "result" ||
-        currentEvent.status === "closed";
+      const createPayload = await requestJson<EventPayload>("/api/admin-live/event-roulette", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "create_event",
+          title,
+          mode,
+          sourceDate,
+          broadcastId,
+          participants: finalParticipants,
+          eventKind: "roulette",
+        }),
+      });
 
-      let eventToSpin = currentEvent;
-
-      if (mustCreateNewEvent) {
-        const createPayload = await requestJson<EventPayload>("/api/admin-live/event-roulette", {
-          method: "POST",
-          body: JSON.stringify({
-            action: "create_event",
-            title,
-            mode,
-            sourceDate,
-            broadcastId,
-            participants: finalParticipants,
-            eventKind: "roulette",
-          }),
-        });
-
-        if (!createPayload.ok || !createPayload.event) {
-          throw new Error(createPayload.message || "룰렛 이벤트 생성 실패");
-        }
-
-        eventToSpin = createPayload.event;
-        setCurrentEvent(createPayload.event);
-        setParticipants(createPayload.event.participants || finalParticipants);
+      if (!createPayload.ok || !createPayload.event) {
+        throw new Error(createPayload.message || "룰렛 이벤트 생성 실패");
       }
 
-      if (!eventToSpin?.id) {
-        throw new Error("룰렛 이벤트 ID가 없습니다.");
-      }
+      setCurrentEvent(createPayload.event);
+      setParticipants(createPayload.event.participants || finalParticipants);
 
       const spinPayload = await requestJson<EventPayload>("/api/admin-live/event-roulette", {
         method: "POST",
         body: JSON.stringify({
           action: "spin_event",
-          eventId: eventToSpin.id,
+          eventId: createPayload.event.id,
           winnerNote,
         }),
       });
@@ -593,7 +582,7 @@ export default function AdminLiveEventRoulettePanel({
       }
 
       setCurrentEvent(spinPayload.event);
-      setParticipants(spinPayload.event.participants || finalParticipants);
+      setParticipants(spinPayload.event.participants || createPayload.event.participants || finalParticipants);
       await loadEventsAndWinners();
       showAdminToast(`당첨자: ${spinPayload.event.winner_nickname || "-"}`, "success");
     } catch (error) {
@@ -1171,7 +1160,7 @@ export default function AdminLiveEventRoulettePanel({
                   <button
                     type="button"
                     onClick={startRouletteOneClick}
-                    disabled={spinning || loading || finalParticipants.length === 0}
+                    disabled={spinning || finalParticipants.length === 0}
                     className="h-11 rounded-2xl bg-violet-600 px-12 text-sm font-black text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98] disabled:bg-slate-300"
                   >
                     {spinning ? "룰렛 진행중..." : "룰렛 시작"}
