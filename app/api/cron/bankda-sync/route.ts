@@ -28,18 +28,21 @@ function getProvidedSecret(request: NextRequest) {
 }
 
 function assertAuthorized(request: NextRequest) {
-  const expectedSecret = String(process.env.BANKDA_CRON_SECRET || "").trim();
+  const cronSecret = String(process.env.CRON_SECRET || "").trim();
+  const bankdaCronSecret = String(process.env.BANKDA_CRON_SECRET || "").trim();
   const providedSecret = getProvidedSecret(request);
 
-  if (!expectedSecret) {
+  const allowedSecrets = [cronSecret, bankdaCronSecret].filter(Boolean);
+
+  if (allowedSecrets.length === 0) {
     return {
       ok: false,
       status: 500,
-      message: "BANKDA_CRON_SECRET 환경변수가 설정되지 않았습니다.",
+      message: "CRON_SECRET 또는 BANKDA_CRON_SECRET 환경변수가 설정되지 않았습니다.",
     };
   }
 
-  if (!providedSecret || providedSecret !== expectedSecret) {
+  if (!providedSecret || !allowedSecrets.includes(providedSecret)) {
     return {
       ok: false,
       status: 401,

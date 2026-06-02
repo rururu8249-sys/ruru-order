@@ -19,8 +19,8 @@ if (!fs.existsSync(cronRoutePath)) {
 
 const route = fs.readFileSync(cronRoutePath, "utf8");
 
-if (!route.includes("BANKDA_CRON_SECRET")) {
-  fail("크론 API에 BANKDA_CRON_SECRET 인증 검사가 없습니다.");
+if (!route.includes("CRON_SECRET") || !route.includes("BANKDA_CRON_SECRET")) {
+  fail("크론 API에 CRON_SECRET / BANKDA_CRON_SECRET 인증 검사가 없습니다.");
 }
 
 if (!route.includes("/api/bankda/sync-and-auto-match")) {
