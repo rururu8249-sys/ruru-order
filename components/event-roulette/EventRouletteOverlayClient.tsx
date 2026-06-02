@@ -127,67 +127,94 @@ type RouletteLabelLayout = {
 function getRouletteLabelLayout(total: number): RouletteLabelLayout {
   const count = Math.max(total || 1, 1);
 
-  if (count <= 8) {
+  // 1~2명: 좌우 큰 반원. 테두리로 밀리지 않게 안쪽에 둔다.
+  if (count <= 2) {
     return {
       radius: 32,
-      width: "clamp(130px, 23vw, 220px)",
-      height: "24px",
-      fontSize: "clamp(16px, 3vw, 28px)",
-      letterSpacing: "-0.07em",
-      maxChars: 14,
+      width: "16%",
+      height: "20px",
+      fontSize: "clamp(13px, 2.2vw, 20px)",
+      letterSpacing: "-0.06em",
+      maxChars: 9,
     };
   }
 
-  if (count <= 16) {
+  // 3~4명: 칸은 넓지만 중앙 카드와 겹치지 않게 중간 링에 둔다.
+  if (count <= 4) {
     return {
-      radius: 39,
-      width: "clamp(82px, 13vw, 124px)",
-      height: "15px",
-      fontSize: "clamp(9.5px, 1.62vw, 13.5px)",
+      radius: 35,
+      width: "14%",
+      height: "18px",
+      fontSize: "clamp(11px, 1.9vw, 17px)",
       letterSpacing: "-0.055em",
       maxChars: 8,
     };
   }
 
-  if (count <= 30) {
+  if (count <= 8) {
     return {
-      radius: 41,
-      width: "clamp(72px, 11.5vw, 110px)",
-      height: "12px",
-      fontSize: "clamp(8px, 1.28vw, 10.5px)",
+      radius: 37,
+      width: "12%",
+      height: "16px",
+      fontSize: "clamp(9.5px, 1.65vw, 14px)",
+      letterSpacing: "-0.052em",
+      maxChars: 8,
+    };
+  }
+
+  // 9~16명: 10몇 명 흔들림 방지
+  if (count <= 16) {
+    return {
+      radius: 39,
+      width: "9.6%",
+      height: "13px",
+      fontSize: "clamp(8px, 1.28vw, 11px)",
       letterSpacing: "-0.045em",
       maxChars: 7,
     };
   }
 
+  // 17~30명: 18명 경계선 침범 방지
+  if (count <= 30) {
+    return {
+      radius: 40,
+      width: "8.2%",
+      height: "11px",
+      fontSize: "clamp(7px, 1.06vw, 9.2px)",
+      letterSpacing: "-0.038em",
+      maxChars: 6,
+    };
+  }
+
+  // 31~60명: 52명에서 정상에 가까웠던 구간
   if (count <= 60) {
     return {
       radius: 40,
-      width: "clamp(92px, 15.5vw, 155px)",
-      height: "16px",
-      fontSize: "clamp(8px, 1.45vw, 12px)",
-      letterSpacing: "-0.055em",
-      maxChars: 8,
+      width: "8.8%",
+      height: "13px",
+      fontSize: "clamp(7px, 1.2vw, 9.8px)",
+      letterSpacing: "-0.04em",
+      maxChars: 6,
     };
   }
 
   if (count <= 100) {
     return {
       radius: 41,
-      width: "clamp(76px, 12.5vw, 128px)",
-      height: "12px",
-      fontSize: "clamp(6.2px, 1.05vw, 8.5px)",
-      letterSpacing: "-0.04em",
-      maxChars: 6,
+      width: "6.8%",
+      height: "10px",
+      fontSize: "clamp(5.6px, 0.9vw, 7.6px)",
+      letterSpacing: "-0.032em",
+      maxChars: 5,
     };
   }
 
   return {
     radius: 42,
-    width: "clamp(58px, 9.5vw, 94px)",
-    height: "10px",
-    fontSize: "clamp(5px, 0.86vw, 7px)",
-    letterSpacing: "-0.035em",
+    width: "5.2%",
+    height: "9px",
+    fontSize: "clamp(4.8px, 0.72vw, 6.5px)",
+    letterSpacing: "-0.025em",
     maxChars: 4,
   };
 }
@@ -199,22 +226,62 @@ function compactRouletteName(name: string, maxChars: number) {
   return chars.slice(0, maxChars - 1).join("") + "…";
 }
 
+function makeLocalDebugParticipants() {
+  if (typeof window === "undefined") return null;
+
+  const host = window.location.hostname;
+  const isLocal = host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0";
+  if (!isLocal) return null;
+
+  const params = new URLSearchParams(window.location.search);
+  const rawCount = params.get("debugCount");
+  const count = Number(rawCount);
+
+  if (!Number.isFinite(count) || count < 1) return null;
+
+  const safeCount = Math.max(1, Math.min(160, Math.floor(count)));
+  const sampleNames = [
+    "동실장",
+    "우유자매맘",
+    "오랑이",
+    "키티로라",
+    "동글-m5g",
+    "에이치더블",
+    "블랙선영",
+    "뿌니757",
+    "연유라떼",
+    "민min",
+    "stella1337",
+    "오레오",
+    "무지개마나",
+    "하이슈슈",
+    "ORORA",
+    "알더블케이",
+    "이은지",
+    "눈누난나",
+    "뽀글이",
+    "쪼꼬",
+  ];
+
+  return Array.from({ length: safeCount }, (_, index) => {
+    const base = sampleNames[index % sampleNames.length];
+    return index >= sampleNames.length ? `${base}${index + 1}` : base;
+  });
+}
+
 function getLabelPoint(index: number, total: number) {
   const safeTotal = Math.max(total || 1, 1);
   const layout = getRouletteLabelLayout(safeTotal);
   const sliceAngle = 360 / safeTotal;
 
-  // conic-gradient(from -90deg) 기준 각 칸의 정확한 중앙각
   const degree = -90 + sliceAngle * (index + 0.5);
   const rad = (degree * Math.PI) / 180;
 
   const x = 50 + Math.cos(rad) * layout.radius;
   const y = 50 + Math.sin(rad) * layout.radius;
 
-  // 닉네임은 지금처럼 세로로 길게 보이는 방향 유지
   let rotation = degree;
 
-  // 왼쪽 반원에서 글씨가 뒤집히지 않게만 보정
   if (rotation > 90 || rotation < -90) {
     rotation += 180;
   }
@@ -234,8 +301,16 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const animationRef = useRef<Animation | null>(null);
 
-  const participants = useMemo(() => normalizeParticipants(event), [event]);
-  const winnerNickname = cleanText(event?.winner_nickname);
+  const realParticipants = useMemo(() => normalizeParticipants(event), [event]);
+  const [localDebugParticipants, setLocalDebugParticipants] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    setLocalDebugParticipants(makeLocalDebugParticipants());
+  }, []);
+
+  const isLocalDebugMode = Boolean(localDebugParticipants);
+  const participants = localDebugParticipants || realParticipants;
+  const winnerNickname = isLocalDebugMode ? "" : cleanText(event?.winner_nickname);
   const eventIdentity = cleanText(event?.id) || cleanText(event?.overlay_token) || (event ? FALLBACK_TOKEN : "");
   const participantCount = Math.max(participants.length, 1);
   const labelLayout = useMemo(() => getRouletteLabelLayout(participantCount), [participantCount]);
@@ -390,6 +465,18 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
   ]);
 
   const labelFontSize = labelLayout.fontSize;
+
+  useEffect(() => {
+    if (!isLocalDebugMode) return;
+
+    setShowResult(false);
+    lastAnimatedKeyRef.current = "local-debug";
+
+    if (wheelRef.current) {
+      wheelRef.current.getAnimations().forEach((animation) => animation.cancel());
+      wheelRef.current.style.transform = "rotate(0deg)";
+    }
+  }, [isLocalDebugMode]);
 
   return (
     <main className="roulette-overlay-root">
