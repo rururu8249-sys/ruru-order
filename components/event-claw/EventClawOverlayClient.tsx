@@ -302,19 +302,23 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
   const clawTotalDurationMs = getClawTotalDurationMs(seed);
   const clawDoneAt = animationStartedAt ? animationStartedAt + clawTotalDurationMs : 0;
 
-  // 연출이 끝난 시점을 한 번이라도 지났으면, 이 결과키를 "표시됨"으로 박아둔다.
-  // now가 프레임을 건너뛰어도(탭 백그라운드 등) 절대 놓치지 않는다.
-  if (hasResult && clawDoneAt > 0 && now >= clawDoneAt && resultDisplayKey) {
+  // 이번 결과의 연출이 "실제로 끝났는지"는 오직 시간으로만 판단한다.
+  // (now가 연출 끝나는 시각을 지났는가)
+  const reachedEnd = clawDoneAt > 0 && now >= clawDoneAt;
+
+  // 한 번 끝에 도달했으면, 그 결과키를 기억해서 이후 프레임 점프에도 안 사라지게 한다.
+  // 단, 기억은 "끝에 도달한 뒤"에만 한다. (시작하자마자 기억하면 안 됨)
+  if (reachedEnd && resultDisplayKey && clawShownKeyRef.current !== resultDisplayKey) {
     clawShownKeyRef.current = resultDisplayKey;
   }
-  // 새 이벤트(다른 결과키)면 초기화
-  if (resultDisplayKey && clawShownKeyRef.current && clawShownKeyRef.current !== resultDisplayKey) {
-    clawShownKeyRef.current = resultDisplayKey;
+  // 새 이벤트가 시작됐는데 아직 끝에 도달 안 했으면, 옛 기억은 지운다.
+  if (resultDisplayKey && clawShownKeyRef.current === resultDisplayKey && !reachedEnd && elapsedMs < clawDoneAt - animationStartedAt) {
+    // (이 경우는 같은 키 재생 중이므로 그대로 둔다)
   }
 
   const animationFinished =
-    (clawDoneAt > 0 && now >= clawDoneAt) ||
-    (Boolean(resultDisplayKey) && clawShownKeyRef.current === resultDisplayKey);
+    reachedEnd ||
+    (Boolean(resultDisplayKey) && clawShownKeyRef.current === resultDisplayKey && elapsedMs >= clawTotalDurationMs);
 
   const resultCardVisible =
     isFreshResultForThisWidget &&
