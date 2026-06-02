@@ -779,12 +779,17 @@ async function spinEvent(body: Record<string, unknown>) {
   }
 
   const fixedWinnerNickname = cleanText(body.fixedWinnerNickname);
-  const fixedWinner = fixedWinnerNickname ? findRequestedWinner(eligibleParticipants, fixedWinnerNickname) : null;
+  // 지정 당첨자는 관리자가 명시적으로 고른 것이므로, 중복제외(eligible) 필터에 휘둘리지 않고
+  // 원본 참가자 명단(participants)에서 직접 찾아 무조건 당첨시킨다.
+  const fixedWinner = fixedWinnerNickname
+    ? (findRequestedWinner(eligibleParticipants, fixedWinnerNickname)
+        || findRequestedWinner(participants, fixedWinnerNickname))
+    : null;
 
   if (fixedWinnerNickname && !fixedWinner) {
     return json({
       ok: false,
-      message: "지정한 당첨자가 현재 룰렛 후보에 없습니다. 이미 당첨 제외됐거나 참가자 명단에 없습니다.",
+      message: "지정한 당첨자가 참가자 명단에 없습니다. 닉네임을 확인해주세요.",
     }, 400);
   }
 
