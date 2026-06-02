@@ -311,6 +311,43 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
   const isLocalDebugMode = Boolean(localDebugParticipants);
   const participants = localDebugParticipants || realParticipants;
   const winnerNickname = isLocalDebugMode ? "" : cleanText(event?.winner_nickname);
+  const resultDisplayKey =
+    !isLocalDebugMode && cleanText(event?.status) === "result" && winnerNickname
+      ? [cleanText(event?.result_at), cleanText(event?.updated_at), winnerNickname].join("|")
+      : "";
+  const [resultCardVisible, setResultCardVisible] = useState(false);
+  const resultCardInitializedRef = useRef(false);
+  const lastResultCardKeyRef = useRef("");
+
+  useEffect(() => {
+    if (!event) return;
+
+    if (!resultDisplayKey) {
+      resultCardInitializedRef.current = true;
+      setResultCardVisible(false);
+      return;
+    }
+
+    if (!resultCardInitializedRef.current) {
+      resultCardInitializedRef.current = true;
+      lastResultCardKeyRef.current = resultDisplayKey;
+      setResultCardVisible(false);
+      return;
+    }
+
+    if (lastResultCardKeyRef.current === resultDisplayKey) {
+      return;
+    }
+
+    lastResultCardKeyRef.current = resultDisplayKey;
+    setResultCardVisible(true);
+
+    const timeoutId = window.setTimeout(() => {
+      setResultCardVisible(false);
+    }, 5000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [event, resultDisplayKey]);
   const eventIdentity = cleanText(event?.id) || cleanText(event?.overlay_token) || (event ? FALLBACK_TOKEN : "");
   const participantCount = Math.max(participants.length, 1);
   const labelLayout = useMemo(() => getRouletteLabelLayout(participantCount), [participantCount]);
@@ -530,7 +567,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
 
         {phase === "spinning" ? <div className="spin-status">룰렛 돌아가는 중...</div> : null}
 
-        {false && showResult && winnerNickname ? (
+        {resultCardVisible && winnerNickname ? (
           <div className="result-card">
             <div className="result-eyebrow">당첨</div>
             <div className="result-name">{winnerNickname}</div>

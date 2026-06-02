@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 
 type ClawEvent = {
   title?: string | null;
@@ -348,6 +348,42 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
   const winnerNickname = cleanText(event?.winner_nickname);
   const winnerNote = cleanText(event?.winner_note) || "이벤트 당첨";
   const hasResult = cleanText(event?.status) === "result" && Boolean(winnerNickname);
+  const resultDisplayKey = hasResult
+    ? [cleanText(event?.result_at), cleanText(event?.updated_at), winnerNickname].join("|")
+    : "";
+  const [resultCardVisible, setResultCardVisible] = useState(false);
+  const resultCardInitializedRef = useRef(false);
+  const lastResultCardKeyRef = useRef("");
+
+  useEffect(() => {
+    if (!event) return;
+
+    if (!resultDisplayKey) {
+      resultCardInitializedRef.current = true;
+      setResultCardVisible(false);
+      return;
+    }
+
+    if (!resultCardInitializedRef.current) {
+      resultCardInitializedRef.current = true;
+      lastResultCardKeyRef.current = resultDisplayKey;
+      setResultCardVisible(false);
+      return;
+    }
+
+    if (lastResultCardKeyRef.current === resultDisplayKey) {
+      return;
+    }
+
+    lastResultCardKeyRef.current = resultDisplayKey;
+    setResultCardVisible(true);
+
+    const timeoutId = window.setTimeout(() => {
+      setResultCardVisible(false);
+    }, 5000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [event, resultDisplayKey]);
   const elapsedMs = hasResult && animationStartedAt ? now - animationStartedAt : 0;
   const seed = hashText(`${winnerNickname}|${resultKey}`);
   const prizeKey = useMemo(() => pickPrizeKey(winnerNickname || "default", resultKey || "idle"), [winnerNickname, resultKey]);
@@ -650,7 +686,7 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
 
         {message && !winnerNickname ? <div className="message-pill">{message}</div> : null}
 
-        <div className={`result-card ${false && motion.showResult && winnerNickname ? "show" : ""}`}>
+        <div className={`result-card ${resultCardVisible && winnerNickname ? "show" : ""}`}>
           <div className="result-label">당첨</div>
           <div className="result-name">{winnerNickname || "대기중"}</div>
           <div className="result-note">{winnerNote}</div>
