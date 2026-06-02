@@ -444,15 +444,16 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
         }
         /* 발톱: 대기 상태는 살짝 벌어짐 */
         .claw-finger {
-          transform-origin: 40px 22px;
-          transition: transform 0.22s ease;
+          transform-origin: 50px 24px;
+          transition: transform 0.28s ease;
         }
-        .claw-finger.left { transform: rotate(-16deg); }
-        .claw-finger.right { transform: rotate(16deg); }
+        /* 평소(대기/하강): 활짝 벌어진 상태 */
+        .claw-finger.left { transform: rotate(-22deg); }
+        .claw-finger.right { transform: rotate(22deg); }
         .claw-finger.center { transform: rotate(0deg); }
-        /* 잡을 때(closed): 발톱 오므라듦 */
-        .claw.closed .claw-finger.left { transform: rotate(2deg); }
-        .claw.closed .claw-finger.right { transform: rotate(-2deg); }
+        /* 잡을 때(closed): 발톱 확 오므라듦 */
+        .claw.closed .claw-finger.left { transform: rotate(6deg); }
+        .claw.closed .claw-finger.right { transform: rotate(-6deg); }
 
         .grabbed-prize {
           position: absolute;
@@ -554,17 +555,17 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
 
             <div className="cable" style={{ height: `${motion.cable}px` }}>
               <div className={`claw ${motion.clawClosed ? "closed" : ""}`}>
-                <svg className="claw-svg" viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg">
-                  {/* 집게 몸통 (위쪽 둥근 헤드) */}
-                  <rect x="34" y="0" width="12" height="14" rx="3" fill="#64748b" />
-                  <ellipse cx="40" cy="16" rx="15" ry="9" fill="#94a3b8" stroke="#475569" strokeWidth="1.5" />
-                  <ellipse cx="40" cy="14" rx="9" ry="4" fill="#cbd5e1" opacity="0.7" />
-                  {/* 왼쪽 갈고리 발톱 */}
-                  <path className="claw-finger left" d="M33 22 C 24 30, 20 44, 26 60 C 27 62, 31 62, 31 59 C 28 46, 31 34, 38 27 C 39 24, 35 21, 33 22 Z" fill="#64748b" stroke="#334155" strokeWidth="1.2" />
-                  {/* 오른쪽 갈고리 발톱 */}
-                  <path className="claw-finger right" d="M47 22 C 56 30, 60 44, 54 60 C 53 62, 49 62, 49 59 C 52 46, 49 34, 42 27 C 41 24, 45 21, 47 22 Z" fill="#64748b" stroke="#334155" strokeWidth="1.2" />
-                  {/* 가운데 발톱 */}
-                  <path className="claw-finger center" d="M40 24 C 38 36, 38 50, 40 64 C 40 66, 42 66, 42 64 C 44 50, 44 36, 42 24 Z" fill="#475569" stroke="#334155" strokeWidth="1.2" />
+                <svg className="claw-svg" viewBox="0 0 100 90" xmlns="http://www.w3.org/2000/svg">
+                  {/* 집게 몸통 */}
+                  <rect x="44" y="0" width="12" height="16" rx="3" fill="#64748b" />
+                  <ellipse cx="50" cy="18" rx="16" ry="9" fill="#94a3b8" stroke="#475569" strokeWidth="1.5" />
+                  <ellipse cx="50" cy="15" rx="9" ry="3.5" fill="#cbd5e1" opacity="0.7" />
+                  {/* 왼쪽 갈고리: 바깥으로 휘었다가 끝이 안으로 (낫 모양) */}
+                  <path className="claw-finger left" d="M44 24 C 30 34, 18 50, 22 74 C 23 80, 30 80, 31 74 C 28 56, 36 40, 47 30 C 49 27, 46 22, 44 24 Z" fill="#7c8694" stroke="#334155" strokeWidth="1.4" />
+                  {/* 오른쪽 갈고리 */}
+                  <path className="claw-finger right" d="M56 24 C 70 34, 82 50, 78 74 C 77 80, 70 80, 69 74 C 72 56, 64 40, 53 30 C 51 27, 54 22, 56 24 Z" fill="#7c8694" stroke="#334155" strokeWidth="1.4" />
+                  {/* 가운데 갈고리 */}
+                  <path className="claw-finger center" d="M50 26 C 47 42, 47 60, 50 80 C 50 83, 50 83, 50 80 C 53 60, 53 42, 50 26 Z" fill="#5b6675" stroke="#334155" strokeWidth="1.4" />
                 </svg>
               </div>
             </div>
