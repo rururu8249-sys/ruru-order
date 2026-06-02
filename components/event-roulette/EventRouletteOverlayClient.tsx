@@ -118,24 +118,25 @@ function makeWheelGradient(count: number) {
 function getLabelPoint(index: number, total: number) {
   const safeTotal = Math.max(total || 1, 1);
   const sliceAngle = 360 / safeTotal;
-  const angle = -90 + sliceAngle * index + sliceAngle / 2;
-  const rad = (angle * Math.PI) / 180;
 
-  // 칸의 가운데 선을 따라 닉네임을 길게 배치한다.
-  // 참여자가 많아도 경계선보다 칸 안쪽 중심축에 붙도록 반지름을 조정한다.
-  const labelRadius =
-    safeTotal >= 70 ? 34 :
-    safeTotal >= 55 ? 35 :
-    safeTotal >= 40 ? 36 :
-    safeTotal >= 24 ? 37 :
-    39;
+  // conic-gradient(from -90deg) 기준: 각 칸의 정중앙 각도
+  const degree = -90 + index * sliceAngle + sliceAngle / 2;
+  const rad = (degree * Math.PI) / 180;
 
-  const x = 50 + Math.cos(rad) * labelRadius;
-  const y = 50 + Math.sin(rad) * labelRadius;
+  // 칸 안쪽에 들어오게 반지름을 고정한다.
+  // 너무 중앙이면 결과카드에 숨고, 너무 바깥이면 경계선/테두리에 걸친다.
+  const radius =
+    safeTotal >= 70 ? 38 :
+    safeTotal >= 55 ? 39 :
+    safeTotal >= 40 ? 40 :
+    safeTotal >= 24 ? 41 :
+    42;
 
-  let rotation = angle;
+  const x = 50 + Math.cos(rad) * radius;
+  const y = 50 + Math.sin(rad) * radius;
 
-  // 왼쪽 반원 글씨가 뒤집히지 않도록 보정
+  // 글씨는 칸 안에서 길게 보이도록 중심축 방향으로 둔다.
+  let rotation = degree;
   if (rotation > 90 || rotation < -90) {
     rotation += 180;
   }
@@ -311,14 +312,14 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
 
   const labelFontSize =
     participants.length >= 70
-      ? "clamp(5.5px, 1.22vw, 8px)"
+      ? "clamp(7px, 1.22vw, 10px)"
       : participants.length >= 55
-        ? "clamp(6px, 1.32vw, 9px)"
+        ? "clamp(7.5px, 1.34vw, 11px)"
         : participants.length >= 40
-          ? "clamp(7px, 1.5vw, 10.5px)"
+          ? "clamp(8.5px, 1.55vw, 12.5px)"
           : participants.length >= 24
-            ? "clamp(8.5px, 1.85vw, 13px)"
-            : "clamp(11px, 2.35vw, 17px)";
+            ? "clamp(10px, 1.9vw, 15px)"
+            : "clamp(12px, 2.35vw, 18px)";
 
   return (
     <main className="roulette-overlay-root">
@@ -341,20 +342,16 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
             <div className="inner-soft-ring" />
 
             {participants.map((name, index) => {
-              const labelRotate = index * segmentAngle + segmentAngle / 2;
-              const labelDistance =
-                participantCount >= 70 ? "35%" :
-                participantCount >= 55 ? "36%" :
-                participantCount >= 40 ? "37%" :
-                participantCount >= 24 ? "38%" :
-                "39%";
+              const point = getLabelPoint(index, participantCount);
 
               return (
                 <div
                   key={`${name}-${index}`}
                   className="name-label"
                   style={{
-                    transform: `rotate(${labelRotate}deg) translateY(-${labelDistance})`,
+                    left: `${point.x}%`,
+                    top: `${point.y}%`,
+                    transform: `translate(-50%, -50%) rotate(${point.rotation}deg)`,
                     fontSize: labelFontSize,
                   } as CSSProperties}
                 >
@@ -569,13 +566,9 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
 
         .name-label {
           position: absolute;
-          left: 50%;
-          top: 50%;
           z-index: 12;
-          width: 22%;
-          height: 14px;
-          margin-left: -11%;
-          margin-top: -7px;
+          width: clamp(74px, 14vw, 138px);
+          height: 18px;
           transform-origin: center center;
           display: flex;
           align-items: center;
@@ -583,7 +576,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           color: rgba(17, 24, 39, 0.98);
           font-weight: 1000;
           line-height: 1;
-          letter-spacing: -0.08em;
+          letter-spacing: -0.07em;
           text-align: center;
           text-shadow:
             0 1px 0 rgba(255, 255, 255, 0.92),
