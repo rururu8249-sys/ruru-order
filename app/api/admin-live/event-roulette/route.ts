@@ -842,7 +842,6 @@ async function spinEvent(body: Record<string, unknown>) {
       updated_at: now,
     
       participant_snapshot: participants,
-      participant_count: participants.length,
     })
     .eq("id", eventId)
     .select(
