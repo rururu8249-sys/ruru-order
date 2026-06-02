@@ -382,6 +382,7 @@ export default function AdminLiveEventRoulettePanel({
       }
 
       setParticipants(payload.participants || []);
+      await ensureRoulettePreviewEvent(payload.participants || []);
     } catch (error) {
       showAdminToast("룰렛 참여자 조회 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
     } finally {
@@ -497,6 +498,40 @@ export default function AdminLiveEventRoulettePanel({
       showAdminToast("룰렛 시작 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
     } finally {
       setSpinning(false);
+    }
+  };
+
+
+  const ensureRoulettePreviewEvent = async (nextParticipants: RouletteParticipant[]) => {
+    if (eventTab !== "roulette") return;
+    if (nextParticipants.length === 0) return;
+
+    try {
+      const createPayload = await requestJson<EventPayload>("/api/admin-live/event-roulette", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "create_event",
+          title,
+          mode,
+          sourceDate,
+          broadcastId,
+          participants: nextParticipants,
+          eventKind: "roulette",
+        }),
+      });
+
+      if (!createPayload.ok || !createPayload.event) {
+        throw new Error(createPayload.message || "룰렛 미리보기 이벤트 생성 실패");
+      }
+
+      setCurrentEvent(createPayload.event);
+      setParticipants(createPayload.event.participants || nextParticipants);
+      await loadEventsAndWinners();
+    } catch (error) {
+      showAdminToast(
+        "룰렛 미리보기 생성 실패\\n\\n" + (error instanceof Error ? error.message : String(error)),
+        "error"
+      );
     }
   };
 

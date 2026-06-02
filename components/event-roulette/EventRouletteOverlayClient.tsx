@@ -13,7 +13,6 @@ type RouletteEvent = {
   winner_note?: string | null;
   result_at?: string | null;
   updated_at?: string | null;
-  spin_duration_ms?: number | null;
 };
 
 type OverlayPayload = {
@@ -45,6 +44,11 @@ function cleanText(value: unknown) {
   return String(value ?? "").trim();
 }
 
+function clampNumber(value: number, min: number, max: number) {
+  if (Number.isNaN(value)) return min;
+  return Math.min(max, Math.max(min, value));
+}
+
 function getTokenFromLocation(initialToken?: string) {
   const fromProp = cleanText(initialToken);
   if (fromProp) return fromProp;
@@ -53,6 +57,18 @@ function getTokenFromLocation(initialToken?: string) {
 
   const token = new URLSearchParams(window.location.search).get("token");
   return cleanText(token) || FALLBACK_TOKEN;
+}
+
+function getScaleFromLocation() {
+  if (typeof window === "undefined") return 0.82;
+
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get("scale") || params.get("size") || "";
+  const parsed = Number(raw);
+
+  if (!raw) return 0.82;
+
+  return clampNumber(parsed, 0.55, 1.15);
 }
 
 function normalizeParticipants(event: RouletteEvent | null) {
@@ -74,7 +90,7 @@ function normalizeParticipants(event: RouletteEvent | null) {
       return "";
     })
     .filter(Boolean)
-    .slice(0, 80);
+    .slice(0, 90);
 }
 
 function winnerIndexOf(names: string[], winner: string) {
@@ -104,6 +120,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
   const [wheelAngle, setWheelAngle] = useState(0);
   const [phase, setPhase] = useState<"idle" | "spinning" | "result">("idle");
   const [showResult, setShowResult] = useState(false);
+  const [scale, setScale] = useState(0.82);
 
   const lastAnimatedKeyRef = useRef("");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -120,6 +137,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
     document.body.style.background = "transparent";
     document.body.style.margin = "0";
     document.body.style.overflow = "hidden";
+    setScale(getScaleFromLocation());
   }, []);
 
   useEffect(() => {
@@ -162,12 +180,12 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
   }, [initialToken]);
 
   useEffect(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-
     if (!event?.id) {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+
       setPhase("idle");
       setShowResult(false);
       return;
@@ -176,9 +194,16 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
     const key = `${event.id}-${event.result_at || ""}-${event.winner_nickname || ""}-${event.updated_at || ""}`;
 
     if (event.status === "result" && winnerNickname) {
-      if (lastAnimatedKeyRef.current === key) return;
+      if (lastAnimatedKeyRef.current === key) {
+        return;
+      }
 
       lastAnimatedKeyRef.current = key;
+
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
 
       const winnerIndex = winnerIndexOf(participants, winnerNickname);
       const safeWinnerIndex = winnerIndex >= 0 ? winnerIndex : 0;
@@ -198,31 +223,41 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
       timerRef.current = setTimeout(() => {
         setPhase("result");
         setShowResult(true);
+        timerRef.current = null;
       }, SPIN_MS + 300);
 
       return;
     }
 
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+
     setPhase("idle");
     setShowResult(false);
-  }, [event, participants, segmentAngle, winnerNickname]);
+  }, [event?.id, event?.result_at, event?.winner_nickname, event?.updated_at, event?.status, participants, segmentAngle, winnerNickname]);
 
   const labelFontSize =
-    participants.length >= 60
-      ? "clamp(6px, 1.35vw, 9px)"
-      : participants.length >= 40
-        ? "clamp(7px, 1.55vw, 10px)"
-        : participants.length >= 24
-          ? "clamp(8px, 1.8vw, 12px)"
-          : "clamp(10px, 2.2vw, 15px)";
+    participants.length >= 70
+      ? "clamp(5px, 1.15vw, 8px)"
+      : participants.length >= 55
+        ? "clamp(5.5px, 1.25vw, 8.5px)"
+        : participants.length >= 40
+          ? "clamp(6.5px, 1.45vw, 10px)"
+          : participants.length >= 24
+            ? "clamp(8px, 1.8vw, 12px)"
+            : "clamp(10px, 2.2vw, 15px)";
 
   return (
     <main className="roulette-overlay-root">
-      <section className="roulette-stage" aria-label="루루동이 룰렛">
+      <section className="roulette-stage" style={{ transform: `scale(${scale})` }} aria-label="루루동이 룰렛">
         <div className="pointer-wrap" aria-hidden="true">
-          <div className="pointer-glow" />
+          <div className="pointer-shadow" />
+          <div className="pointer-outline" />
           <div className="pointer-main" />
           <div className="pointer-dot" />
+          <div className="pointer-line" />
         </div>
 
         <div className="wheel-wrap">
@@ -231,7 +266,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
             style={{
               background: wheelGradient,
               transform: `rotate(${wheelAngle}deg)`,
-              transition: phase === "spinning" ? `transform ${SPIN_MS}ms cubic-bezier(0.07, 0.78, 0.08, 1)` : "none",
+              transition: phase === "spinning" ? `transform ${SPIN_MS}ms cubic-bezier(0.06, 0.8, 0.08, 1)` : "none",
             }}
           >
             <div className="inner-soft-ring" />
@@ -295,22 +330,23 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
 
         .roulette-stage {
           position: relative;
-          width: min(98vw, 850px);
+          width: min(104vw, 900px);
           aspect-ratio: 1 / 1.02;
           display: flex;
           align-items: center;
           justify-content: center;
           background: transparent;
           overflow: visible;
+          transform-origin: center center;
         }
 
         .pointer-wrap {
           position: absolute;
           left: 50%;
-          top: 6.8%;
-          z-index: 60;
-          width: clamp(62px, 11vw, 108px);
-          height: clamp(66px, 12vw, 118px);
+          top: 4.2%;
+          z-index: 90;
+          width: clamp(82px, 14vw, 140px);
+          height: clamp(92px, 15vw, 158px);
           transform: translateX(-50%);
           display: flex;
           align-items: flex-start;
@@ -318,49 +354,80 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           pointer-events: none;
         }
 
-        .pointer-glow {
+        .pointer-shadow {
           position: absolute;
-          top: 4%;
           left: 50%;
-          width: 78%;
-          height: 78%;
+          top: 12%;
+          width: 70%;
+          height: 70%;
           transform: translateX(-50%);
           border-radius: 999px;
-          background: radial-gradient(circle, rgba(255, 255, 255, 0.9) 0%, rgba(244, 63, 94, 0.38) 45%, rgba(244, 63, 94, 0) 72%);
-          filter: blur(1px);
+          background: rgba(244, 63, 94, 0.4);
+          filter: blur(14px);
         }
 
-        .pointer-main {
+        .pointer-outline {
           position: absolute;
-          top: 8%;
+          top: 12%;
           left: 50%;
           transform: translateX(-50%);
           width: 0;
           height: 0;
-          border-left: clamp(24px, 4.4vw, 42px) solid transparent;
-          border-right: clamp(24px, 4.4vw, 42px) solid transparent;
-          border-top: clamp(42px, 7.2vw, 70px) solid #f43f5e;
+          border-left: clamp(34px, 5.8vw, 58px) solid transparent;
+          border-right: clamp(34px, 5.8vw, 58px) solid transparent;
+          border-top: clamp(60px, 10vw, 102px) solid #fde047;
           filter:
-            drop-shadow(0 8px 10px rgba(127, 29, 29, 0.35))
-            drop-shadow(0 0 14px rgba(244, 63, 94, 0.38));
+            drop-shadow(0 10px 12px rgba(127, 29, 29, 0.34))
+            drop-shadow(0 0 18px rgba(253, 224, 71, 0.7));
+        }
+
+        .pointer-main {
+          position: absolute;
+          top: 19%;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 0;
+          height: 0;
+          border-left: clamp(26px, 4.5vw, 45px) solid transparent;
+          border-right: clamp(26px, 4.5vw, 45px) solid transparent;
+          border-top: clamp(48px, 8vw, 82px) solid #ef4444;
+          filter:
+            drop-shadow(0 6px 8px rgba(127, 29, 29, 0.45))
+            drop-shadow(0 0 16px rgba(239, 68, 68, 0.68));
         }
 
         .pointer-dot {
           position: absolute;
-          top: 0;
+          top: 1%;
           left: 50%;
-          width: clamp(20px, 3.5vw, 34px);
-          height: clamp(20px, 3.5vw, 34px);
+          width: clamp(26px, 4.2vw, 42px);
+          height: clamp(26px, 4.2vw, 42px);
           transform: translateX(-50%);
           border-radius: 999px;
           background: #ffffff;
-          border: 5px solid #f43f5e;
-          box-shadow: 0 8px 18px rgba(127, 29, 29, 0.24);
+          border: clamp(5px, 0.9vw, 8px) solid #ef4444;
+          box-shadow:
+            0 8px 20px rgba(127, 29, 29, 0.28),
+            0 0 0 5px rgba(253, 224, 71, 0.8);
+        }
+
+        .pointer-line {
+          position: absolute;
+          left: 50%;
+          top: 65%;
+          width: clamp(5px, 0.8vw, 8px);
+          height: clamp(26px, 4vw, 44px);
+          transform: translateX(-50%);
+          border-radius: 999px;
+          background: #111827;
+          box-shadow:
+            0 0 0 3px #ffffff,
+            0 0 0 6px rgba(239, 68, 68, 0.9);
         }
 
         .wheel-wrap {
           position: relative;
-          width: 90%;
+          width: 91%;
           aspect-ratio: 1 / 1;
           border-radius: 999px;
           display: flex;
@@ -374,7 +441,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
         }
 
         .wheel {
-          --label-radius: min(31vw, 278px);
+          --label-radius: min(31vw, 286px);
           position: relative;
           width: 92%;
           aspect-ratio: 1 / 1;
@@ -531,8 +598,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
 
         @media (max-width: 520px) {
           .roulette-stage {
-            width: 110vw;
-            transform: scale(0.95);
+            width: 112vw;
           }
 
           .wheel {
