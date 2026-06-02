@@ -3583,10 +3583,10 @@ export default function OrderPage() {
               주문서 작성
             </h1>
             <p className="mt-2 break-keep text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
-              상품목록에서 [담기]를 누르고, 없으면 [직접 입력]을 사용해 주세요.
+              상품목록에서 [담기]를 누르거나, 직접 입력으로 상품을 담아주세요.
             </p>
             <p className="mt-2 break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-slate-400">
-              금액 확인 후 [주문서 제출]을 눌러주세요.
+              담은 상품과 금액 확인 후 [주문서 제출]을 눌러주세요.
             </p>
 
             {customerInfoMissing && (
@@ -3633,7 +3633,7 @@ export default function OrderPage() {
                   직접 입력
                 </h2>
                 <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
-                  상품목록에 없을 때만 사용해 주세요.
+                  상품명, 옵션, 금액을 직접 입력해 주세요.
                 </p>
               </div>
             </div>
@@ -3664,7 +3664,7 @@ export default function OrderPage() {
                   아직 담긴 상품이 없습니다.
                 </p>
                 <p className="mt-1 break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
-                  상품목록에서 [담기]를 눌러주세요.
+                  상품목록에서 [담기]를 누르거나 [직접 입력]으로 담아주세요.
                 </p>
               </div>
             ) : (
@@ -4102,7 +4102,7 @@ export default function OrderPage() {
                         상품 직접 입력
                       </h2>
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black tracking-[-0.04em] text-slate-500">
-                        상품목록에 없을 때만 사용
+                        직접 적어야 할 때 사용
                       </span>
                     </div>
                   </div>
@@ -4265,7 +4265,7 @@ export default function OrderPage() {
                     </div>
 
                     <div className="rounded-2xl bg-blue-50 px-4 py-3 text-[13px] font-black leading-5 tracking-[-0.04em] text-blue-800">
-                      방송에서 안내한 상품명/옵션/금액을 그대로 입력해주세요. 옵션이 없는 상품은 “없음”이라고 입력해주세요.
+                      방송에서 안내받은 상품명, 옵션, 금액을 입력해 주세요. 옵션이 없으면 “없음”이라고 적어주세요.
                     </div>
 
                     <div className="grid min-w-0 grid-cols-[0.8fr_1.2fr] gap-3 pt-2">
@@ -4331,7 +4331,7 @@ export default function OrderPage() {
                 <div className="grid gap-3 rounded-[24px] bg-slate-50 p-4 text-[15px] font-bold leading-relaxed tracking-[-0.04em] text-slate-700 ring-1 ring-slate-100">
                   <p>이 안내를 닫으면 상품목록이 보입니다.</p>
                   <p>상품목록에서 주문할 상품의 <span className="font-black text-blue-700">[담기]</span>를 눌러주세요.</p>
-                  <p>상품목록에 없을 때만 <span className="font-black text-slate-950">[직접 입력]</span>을 사용해 주세요.</p>
+                  <p>직접 적어야 할 상품은 <span className="font-black text-slate-950">[직접 입력]</span>을 사용해 주세요.</p>
                   <p>담은 상품과 금액을 확인한 뒤 <span className="font-black text-blue-700">[주문서 제출]</span>을 눌러주세요.</p>
                   <p className="text-[14px] text-amber-700">입금자명과 금액이 다르면 입금확인이 늦어질 수 있어요.</p>
                 </div>
