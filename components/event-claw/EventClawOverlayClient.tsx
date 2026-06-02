@@ -293,8 +293,9 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
   const prizeSrc = PRIZE_ASSETS[prizeKey];
   const missPrizeKey = pickPrizeKey((winnerNickname || "default") + "-miss", (resultKey || "idle") + "-miss");
   const missPrizeSrc = PRIZE_ASSETS[missPrizeKey === prizeKey ? (Object.keys(PRIZE_ASSETS) as PrizeKey[]).filter((k) => k !== prizeKey)[0] : missPrizeKey];
-  const elapsedMs = hasResult && animationStartedAt ? now - animationStartedAt : 0;
-  const motion = getMotionState(elapsedMs, seed, hasResult, now);
+  const playAnimation = hasResult && isFreshResultForThisWidget;
+  const elapsedMs = playAnimation && animationStartedAt ? now - animationStartedAt : 0;
+  const motion = getMotionState(elapsedMs, seed, playAnimation, now);
   const clawResultCardVisibleMs = 5000;
 
   // 가장 단순하고 확실한 방식: 이번 판 경과시간이 연출 총길이를 넘으면 표시.
