@@ -783,7 +783,13 @@ async function spinEvent(body: Record<string, unknown>) {
   }
 
   const event = eventData as RouletteEventRow;
-  const participants = Array.isArray(event.participant_snapshot) ? event.participant_snapshot : [];
+  const manualSpinParticipants = normalizeManualParticipantsForEvent(body.participants);
+  const useManualSpinParticipants = cleanText(body.participantSource) === "manual" && manualSpinParticipants.length > 0;
+  const participants = useManualSpinParticipants
+    ? manualSpinParticipants
+    : Array.isArray(event.participant_snapshot)
+      ? event.participant_snapshot
+      : [];
 
   if (participants.length <= 0) {
     return json({ ok: false, message: "룰렛 참여자가 없습니다." }, 400);
@@ -837,6 +843,9 @@ async function spinEvent(body: Record<string, unknown>) {
       spin_duration_ms: spinDurationMs,
       result_at: now,
       updated_at: now,
+    
+      participant_snapshot: participants,
+      participant_count: participants.length,
     })
     .eq("id", eventId)
     .select(
