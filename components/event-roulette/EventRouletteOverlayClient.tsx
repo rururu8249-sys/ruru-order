@@ -246,7 +246,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
       const winnerIndex = winnerIndexOf(participants, winnerNickname);
       const safeWinnerIndex = winnerIndex >= 0 ? winnerIndex : 0;
       const winnerCenterAngle = safeWinnerIndex * segmentAngle + segmentAngle / 2;
-      const finalAngle = SPIN_TURNS * 360 + (360 - winnerCenterAngle);
+      const finalAngle = SPIN_TURNS * 360 + (360 - winnerCenterAngle) + segmentAngle / 2;
 
       animationRef.current?.cancel();
       animationRef.current = null;
