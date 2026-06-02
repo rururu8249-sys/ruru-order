@@ -466,6 +466,13 @@ export default function AdminLiveEventRoulettePanel({
       return;
     }
 
+    if (!String(currentEvent.overlay_token || "").startsWith("roulette_")) {
+      setCurrentEvent(null);
+      setSpinning(false);
+      showAdminToast("현재 선택된 이벤트가 룰렛이 아닙니다. 룰렛 만들기를 먼저 눌러주세요.", "warning");
+      return;
+    }
+
     setSpinning(true);
 
     try {
@@ -635,7 +642,11 @@ export default function AdminLiveEventRoulettePanel({
                   <div className="mt-3 inline-flex rounded-2xl bg-slate-100 p-1">
                     <button
                       type="button"
-                      onClick={() => setEventTab("roulette")}
+                      onClick={() => {
+                        setEventTab("roulette");
+                        setCurrentEvent(null);
+                        setSpinning(false);
+                      }}
                       className={[
                         "h-10 rounded-xl px-10 text-sm font-black transition active:scale-[0.98]",
                         eventTab === "roulette" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-800",
@@ -645,7 +656,11 @@ export default function AdminLiveEventRoulettePanel({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setEventTab("claw")}
+                      onClick={() => {
+                        setEventTab("claw");
+                        setCurrentEvent(null);
+                        setSpinning(false);
+                      }}
                       className={[
                         "h-10 rounded-xl px-10 text-sm font-black transition active:scale-[0.98]",
                         eventTab === "claw" ? "bg-violet-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-800",
