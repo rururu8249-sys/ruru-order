@@ -1,346 +1,367 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-type OverlayParticipant = {
-  nickname: string;
-};
-
-type OverlayEvent = {
-  title: string;
-  mode: "live" | "test" | "preview";
-  is_test: boolean;
-  status: "idle" | "spinning" | "result" | "closed";
-  participants: OverlayParticipant[];
-  winner_nickname: string;
-  winner_note: string;
-  spin_started_at: string | null;
-  spin_duration_ms: number;
-  result_at: string | null;
-  updated_at: string | null;
+type RouletteEvent = {
+  title?: string | null;
+  status?: string | null;
+  is_test?: boolean | null;
+  winner_nickname?: string | null;
+  winner_note?: string | null;
+  updated_at?: string | null;
+  result_at?: string | null;
+  spin_started_at?: string | null;
+  spin_duration_ms?: number | null;
+  participant_snapshot?: unknown;
 };
 
 type OverlayPayload = {
   ok: boolean;
   message?: string;
-  event?: OverlayEvent;
+  event?: RouletteEvent;
 };
 
-function normalizeToken(value: string) {
-  return String(value || "").trim();
+type EventRouletteOverlayClientProps = {
+  initialToken: string;
+};
+
+const FALLBACK_TOKEN = "roulette_luludongi_live";
+
+function cleanText(value: unknown) {
+  return String(value ?? "").trim();
 }
 
-const ROULETTE_COLORS = ["#fbcfe8", "#ddd6fe", "#bfdbfe", "#a7f3d0", "#fde68a", "#fed7aa", "#c7d2fe", "#bae6fd", "#bbf7d0", "#f5d0fe"];
-const MIN_SPIN_DISPLAY_MS = 10000;
-const RESULT_REVEAL_PAUSE_MS = 1200;
-const WINNER_STOP_SPINS = 14;
-
-function normalizeRouletteName(value: string | null | undefined) {
-  return String(value || "").replace(/\s+/g, "").trim();
+function hashText(value: string) {
+  return Array.from(value).reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
 }
 
-function normalizeRotation(value: number) {
-  const result = value % 360;
-
-  return result < 0 ? result + 360 : result;
-}
-
-function getWinnerStopRotation(params: {
-  currentRotation: number;
-  participants: OverlayParticipant[];
-  winnerNickname: string;
-}) {
-  const list = params.participants.length > 0 ? params.participants.slice(0, 48) : [{ nickname: "READY" }];
-  const total = Math.max(list.length, 1);
-  const step = 360 / total;
-  const winnerName = normalizeRouletteName(params.winnerNickname);
-  const winnerIndex = list.findIndex((participant) => normalizeRouletteName(participant.nickname) === winnerName);
-  const safeIndex = winnerIndex >= 0 ? winnerIndex : 0;
-  const winnerCenterAngle = safeIndex * step + step / 2;
-  const targetModulo = normalizeRotation(360 - winnerCenterAngle);
-  const currentModulo = normalizeRotation(params.currentRotation);
-  const forwardDelta = normalizeRotation(targetModulo - currentModulo);
-
-  return params.currentRotation + WINNER_STOP_SPINS * 360 + forwardDelta;
-}
-
-function segmentGradient(participants: OverlayParticipant[]) {
-  const list = participants.length > 0 ? participants.slice(0, 48) : [{ nickname: "READY" }];
-  const step = 360 / list.length;
-
-  return `conic-gradient(${list
-    .map((_, index) => {
-      const from = Math.round(index * step);
-      const to = Math.round((index + 1) * step);
-      return `${ROULETTE_COLORS[index % ROULETTE_COLORS.length]} ${from}deg ${to}deg`;
-    })
-    .join(", ")})`;
-}
-
-function splitRouletteTitle(value: string) {
-  const raw = String(value || "🎁 루루동이룰렛").trim();
-  const hasGift = raw.includes("🎁");
-  const clean = raw.replace(/🎁/g, "").trim();
-
-  if (clean === "루루동이룰렛") {
-    return {
-      gift: hasGift ? "🎁" : "",
-      lines: ["루루동이", "룰렛 이벤트"],
-    };
+function makeResultKey(event: RouletteEvent | null) {
+  if (!event || cleanText(event.status) !== "result" || !cleanText(event.winner_nickname)) {
+    return "";
   }
 
-  return {
-    gift: hasGift ? "🎁" : "",
-    lines: [clean || "루루동이룰렛"],
-  };
+  return [
+    cleanText(event.updated_at),
+    cleanText(event.result_at),
+    cleanText(event.winner_nickname),
+    cleanText(event.winner_note),
+  ].join("|");
 }
 
-export default function EventRouletteOverlayClient({ initialToken }: { initialToken: string }) {
-  const [token] = useState(() => normalizeToken(initialToken));
-  const [event, setEvent] = useState<OverlayEvent | null>(null);
-  const [message, setMessage] = useState("룰렛 준비중");
-  const [loadedAt, setLoadedAt] = useState(0);
-  const [revealedResultKey, setRevealedResultKey] = useState("");
-  const [wheelRotation, setWheelRotation] = useState(0);
-  const [isWheelDecelerating, setIsWheelDecelerating] = useState(false);
-  const activeSpinResultKeyRef = useRef("");
-  const visibleParticipantsRef = useRef<OverlayParticipant[]>([]);
-  const winnerNicknameRef = useRef("");
-  const spinTimersRef = useRef<number[]>([]);
+function normalizeParticipants(snapshot: unknown) {
+  if (!Array.isArray(snapshot)) {
+    return ["행운", "당첨", "이벤트", "루루동이", "럭키", "기프트", "LIVE", "WIN"];
+  }
+
+  const names = snapshot
+    .map((item) => {
+      if (typeof item === "string") return cleanText(item);
+      if (item && typeof item === "object") {
+        const nickname = cleanText((item as { nickname?: unknown }).nickname);
+        if (nickname) return nickname;
+      }
+      return "";
+    })
+    .filter(Boolean);
+
+  return names.length >= 6 ? names.slice(0, 10) : ["행운", "당첨", "이벤트", "루루동이", "럭키", "기프트", "LIVE", "WIN"];
+}
+
+function easeOutCubic(x: number) {
+  const t = Math.max(0, Math.min(1, x));
+  return 1 - Math.pow(1 - t, 3);
+}
+
+export default function EventRouletteOverlayClient({ initialToken }: EventRouletteOverlayClientProps) {
+  const token = cleanText(initialToken) || FALLBACK_TOKEN;
+  const [event, setEvent] = useState<RouletteEvent | null>(null);
+  const [message, setMessage] = useState("");
+  const [now, setNow] = useState(() => Date.now());
+  const [resultKey, setResultKey] = useState("");
+  const [animationStartedAt, setAnimationStartedAt] = useState(0);
 
   useEffect(() => {
-    const html = document.documentElement;
-    const body = document.body;
+    let cancelled = false;
 
-    html.style.background = "transparent";
-    body.style.background = "transparent";
-    body.style.margin = "0";
-    body.style.overflow = "hidden";
-
-    return () => {
-      html.style.background = "";
-      body.style.background = "";
-      body.style.margin = "";
-      body.style.overflow = "";
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!token) {
-      setMessage("위젯주소 token이 없습니다.");
-      return;
-    }
-
-    let alive = true;
-
-    const load = async () => {
+    async function loadOverlay() {
       try {
         const response = await fetch(`/api/event-roulette/overlay?token=${encodeURIComponent(token)}`, {
           cache: "no-store",
         });
-        const payload = (await response.json().catch(() => null)) as OverlayPayload | null;
 
-        if (!alive) return;
+        const payload = (await response.json()) as OverlayPayload;
 
-        if (!response.ok || !payload?.ok || !payload.event) {
-          setMessage(payload?.message || "룰렛 이벤트를 찾지 못했습니다.");
+        if (cancelled) return;
+
+        if (!payload.ok || !payload.event) {
+          setEvent(null);
+          setMessage(payload.message || "표시할 룰렛 이벤트가 없습니다.");
           return;
         }
 
         setEvent(payload.event);
         setMessage("");
-        setLoadedAt(Date.now());
       } catch (error) {
-        if (!alive) return;
-        setMessage(error instanceof Error ? error.message : "룰렛 정보를 불러오지 못했습니다.");
+        if (cancelled) return;
+        setEvent(null);
+        setMessage(error instanceof Error ? error.message : String(error));
       }
-    };
+    }
 
-    void load();
-    const timer = window.setInterval(load, 1200);
+    void loadOverlay();
+    const timer = window.setInterval(loadOverlay, 900);
 
     return () => {
-      alive = false;
+      cancelled = true;
       window.clearInterval(timer);
     };
   }, [token]);
 
-  const participants = event?.participants || [];
-  const visibleParticipants = useMemo(() => participants.slice(0, 48), [participants]);
-  const titleParts = useMemo(() => splitRouletteTitle(event?.title || "🎁 루루동이룰렛"), [event?.title]);
-  const gradient = useMemo(() => segmentGradient(visibleParticipants), [visibleParticipants]);
-  const resultKey =
-    event?.status === "result" && event.winner_nickname
-      ? `${event.updated_at || ""}|${event.result_at || ""}|${event.winner_nickname}|${event.winner_note || ""}`
-      : "";
-  const isPendingResult = Boolean(resultKey) && revealedResultKey !== resultKey;
-  const isWaitingForResult = event?.status === "spinning" && !resultKey;
-  const isRouletteSpinning = isWaitingForResult || isPendingResult;
-  const hasResult = event?.status === "result" && Boolean(event.winner_nickname) && revealedResultKey === resultKey;
-  const idleRotation = loadedAt % 360;
-  const displayRotation = isWaitingForResult || isPendingResult || hasResult ? wheelRotation : idleRotation;
-  const statusMessage = isRouletteSpinning ? "🔥 룰렛 추첨 중..." : message;
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
-    visibleParticipantsRef.current = visibleParticipants;
-    winnerNicknameRef.current = event?.winner_nickname || "";
-  }, [visibleParticipants, event?.winner_nickname]);
-
-  useEffect(() => {
-    spinTimersRef.current.forEach((timer) => window.clearTimeout(timer));
-    spinTimersRef.current = [];
-
-    if (!resultKey) {
-      activeSpinResultKeyRef.current = "";
-
-      if (revealedResultKey) {
-        setRevealedResultKey("");
-      }
-
-      setIsWheelDecelerating(false);
-      return;
+    const nextKey = makeResultKey(event);
+    if (nextKey && nextKey !== resultKey) {
+      setResultKey(nextKey);
+      setAnimationStartedAt(Date.now());
     }
+  }, [event, resultKey]);
 
-    if (revealedResultKey === resultKey || activeSpinResultKeyRef.current === resultKey) {
-      return;
-    }
+  const participants = useMemo(() => normalizeParticipants(event?.participant_snapshot), [event?.participant_snapshot]);
+  const winnerNickname = cleanText(event?.winner_nickname);
+  const winnerNote = cleanText(event?.winner_note) || "이벤트 당첨";
+  const hasResult = cleanText(event?.status) === "result" && Boolean(winnerNickname);
+  const seed = hashText(`${winnerNickname}|${resultKey}`);
+  const segmentCount = Math.max(8, Math.min(10, participants.length));
+  const visibleSegments = participants.slice(0, segmentCount);
+  const idleRotation = (now / 45) % 360;
 
-    activeSpinResultKeyRef.current = resultKey;
-    setIsWheelDecelerating(false);
-
-    const startTimer = window.setTimeout(() => {
-      setIsWheelDecelerating(true);
-      setWheelRotation((currentRotation) =>
-        getWinnerStopRotation({
-          currentRotation,
-          participants: visibleParticipantsRef.current,
-          winnerNickname: winnerNicknameRef.current,
-        }),
-      );
-    }, 50);
-
-    const revealTimer = window.setTimeout(() => {
-      setRevealedResultKey(resultKey);
-      setIsWheelDecelerating(false);
-      activeSpinResultKeyRef.current = "";
-      spinTimersRef.current = [];
-    }, MIN_SPIN_DISPLAY_MS + RESULT_REVEAL_PAUSE_MS);
-
-    spinTimersRef.current = [startTimer, revealTimer];
-
-    return () => {
-      spinTimersRef.current.forEach((timer) => window.clearTimeout(timer));
-      spinTimersRef.current = [];
-    };
-  }, [resultKey]);
-
-  if (!token) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-transparent p-6 text-center text-4xl font-black text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.85)]">
-        위젯주소를 다시 확인해주세요.
-      </main>
-    );
+  let wheelRotation = idleRotation;
+  if (hasResult && animationStartedAt) {
+    const elapsed = now - animationStartedAt;
+    const total = 4200;
+    const targetIndex = seed % segmentCount;
+    const segmentAngle = 360 / segmentCount;
+    const finalAngle = 360 * 6 + (360 - targetIndex * segmentAngle - segmentAngle / 2);
+    const progress = Math.min(1, elapsed / total);
+    wheelRotation = finalAngle * easeOutCubic(progress);
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-transparent">
-      {hasResult ? (
-        <section className="flex min-h-screen w-full items-center justify-center bg-transparent px-8 text-center">
-          <div className="rounded-[42px] bg-white/92 px-10 py-9 shadow-[0_24px_80px_rgba(0,0,0,0.32)] ring-1 ring-white/70 backdrop-blur-md">
-            <div className="text-3xl font-black text-violet-700">🎉 당첨자</div>
-            <div className="mt-5 max-w-[860px] break-keep text-7xl font-black leading-tight text-slate-950">
-              {event?.winner_nickname || ""}
-            </div>
-            <div className="mt-5 max-w-[860px] break-keep text-4xl font-black text-slate-700">
-              {event?.winner_note || "룰렛 당첨"}
-            </div>
-          </div>
-        </section>
-      ) : (
-        <section className="relative flex h-screen w-screen items-center justify-center bg-transparent">
-          <div className="absolute left-1/2 top-[9%] z-20 h-0 w-0 -translate-x-1/2 border-x-[22px] border-t-[42px] border-x-transparent border-t-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]" />
+    <main className="roulette-root">
+      <style>{`
+        html, body {
+          margin: 0;
+          width: 100%;
+          height: 100%;
+          overflow: hidden;
+          background: transparent !important;
+        }
+        .roulette-root {
+          position: fixed;
+          inset: 0;
+          width: 100vw;
+          height: 100vh;
+          overflow: hidden;
+          background: transparent;
+          pointer-events: none;
+          font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        .roulette-stage {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          width: min(60vw, 560px);
+          aspect-ratio: 1 / 1.12;
+        }
+        .title-pill {
+          position: absolute;
+          left: 50%;
+          top: 2%;
+          transform: translateX(-50%);
+          border-radius: 999px;
+          background: rgba(255,255,255,0.94);
+          box-shadow: 0 10px 24px rgba(15,23,42,0.12);
+          padding: 10px 18px;
+          font-size: clamp(16px, 1.8vw, 22px);
+          font-weight: 900;
+          color: #0f172a;
+          letter-spacing: -0.03em;
+          z-index: 20;
+        }
+        .pointer {
+          position: absolute;
+          left: 50%;
+          top: 12%;
+          transform: translateX(-50%);
+          width: 0;
+          height: 0;
+          border-left: 18px solid transparent;
+          border-right: 18px solid transparent;
+          border-top: 30px solid #f43f5e;
+          filter: drop-shadow(0 6px 12px rgba(15,23,42,0.18));
+          z-index: 25;
+        }
+        .wheel-shell {
+          position: absolute;
+          left: 50%;
+          top: 54%;
+          width: 74%;
+          aspect-ratio: 1 / 1;
+          transform: translate(-50%, -50%);
+          border-radius: 999px;
+          background: linear-gradient(145deg, #ffffff, #f8fafc);
+          box-shadow:
+            0 22px 50px rgba(15,23,42,0.18),
+            inset 0 8px 18px rgba(255,255,255,0.92),
+            inset 0 -10px 16px rgba(148,163,184,0.22);
+          z-index: 10;
+        }
+        .wheel-face {
+          position: absolute;
+          inset: 4.5%;
+          border-radius: 999px;
+          overflow: hidden;
+          background:
+            conic-gradient(
+              from -90deg,
+              #7c3aed 0deg 45deg,
+              #ec4899 45deg 90deg,
+              #fb7185 90deg 135deg,
+              #f59e0b 135deg 180deg,
+              #22c55e 180deg 225deg,
+              #06b6d4 225deg 270deg,
+              #3b82f6 270deg 315deg,
+              #8b5cf6 315deg 360deg
+            );
+        }
+        .wheel-gloss {
+          position: absolute;
+          inset: 8%;
+          border-radius: 999px;
+          background: linear-gradient(180deg, rgba(255,255,255,0.28), rgba(255,255,255,0));
+          z-index: 2;
+        }
+        .center-cap {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          width: 18%;
+          aspect-ratio: 1 / 1;
+          transform: translate(-50%, -50%);
+          border-radius: 999px;
+          background: radial-gradient(circle at 30% 30%, #ffffff, #f8fafc 55%, #cbd5e1 100%);
+          box-shadow: 0 6px 14px rgba(15,23,42,0.15);
+          z-index: 4;
+        }
+        .label {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          transform-origin: center center;
+          width: 42%;
+          text-align: center;
+          font-size: clamp(11px, 1.2vw, 15px);
+          font-weight: 900;
+          color: rgba(255,255,255,0.96);
+          letter-spacing: -0.03em;
+          text-shadow: 0 1px 3px rgba(15,23,42,0.20);
+          z-index: 3;
+        }
+        .message-pill {
+          position: absolute;
+          left: 50%;
+          bottom: 8%;
+          transform: translateX(-50%);
+          border-radius: 999px;
+          background: rgba(15, 23, 42, 0.72);
+          color: #ffffff;
+          padding: 10px 16px;
+          font-size: 13px;
+          font-weight: 800;
+          max-width: min(80vw, 420px);
+          text-align: center;
+        }
+        .result-card {
+          position: absolute;
+          left: 50%;
+          bottom: 0;
+          transform: translateX(-50%);
+          width: min(84%, 360px);
+          border-radius: 28px;
+          background: rgba(255,255,255,0.96);
+          box-shadow: 0 18px 44px rgba(15,23,42,0.18);
+          padding: 18px 18px 20px;
+          text-align: center;
+          z-index: 30;
+        }
+        .result-kicker {
+          font-size: 17px;
+          font-weight: 900;
+          color: #7c3aed;
+          letter-spacing: -0.03em;
+        }
+        .result-name {
+          margin-top: 4px;
+          font-size: clamp(28px, 3.2vw, 40px);
+          font-weight: 900;
+          color: #020617;
+          line-height: 1.08;
+          letter-spacing: -0.05em;
+        }
+        .result-note {
+          margin-top: 6px;
+          font-size: clamp(15px, 1.8vw, 22px);
+          font-weight: 800;
+          color: #475569;
+          letter-spacing: -0.03em;
+        }
+      `}</style>
 
-          <div className="relative flex aspect-square w-[min(74vw,74vh)] max-w-[720px] items-center justify-center overflow-hidden rounded-full bg-slate-900/10 shadow-[0_22px_80px_rgba(0,0,0,0.28)] ring-[9px] ring-slate-500/70">
-            <div className="absolute left-1/2 top-0 z-30 h-0 w-0 -translate-x-1/2 -translate-y-[2px] border-x-[20px] border-t-[38px] border-x-transparent border-t-rose-500 drop-shadow-[0_4px_10px_rgba(0,0,0,0.35)]" />
+      <div className="roulette-stage">
+        <div className="title-pill">🎯 루루동이 룰렛</div>
+        <div className="pointer" />
 
-            <div
-              className="absolute inset-[3%] rounded-full"
-              style={{
-                background: gradient,
-                transform: `rotate(${displayRotation}deg)`,
-                transition: isWheelDecelerating
-                  ? `transform ${MIN_SPIN_DISPLAY_MS}ms cubic-bezier(.06,.82,.12,1)`
-                  : undefined,
-                willChange: isRouletteSpinning ? "transform" : undefined,
-                animation: isWaitingForResult ? "ruruRouletteFastSpin 0.42s linear infinite" : undefined,
-              }}
-            >
-              <div className="absolute inset-0 rounded-full ring-1 ring-slate-500/15" />
-              <div className="absolute inset-[16%] rounded-full border-[2px] border-slate-500/25" />
-
-              {visibleParticipants.map((participant, index) => {
-                const total = Math.max(visibleParticipants.length, 1);
-                const angle = (360 / total) * index + 360 / total / 2;
-
-                return (
-                  <div
-                    key={`${participant.nickname}-${index}`}
-                    className="absolute inset-0 flex items-start justify-center"
-                    style={{ transform: `rotate(${angle}deg)` }}
-                  >
-                    <div
-                      className="mt-[9%] flex h-[34%] min-w-[22px] max-w-[30px] items-center justify-start overflow-hidden rounded-full bg-white/35 px-1 py-2 text-center text-[clamp(9px,1.5vw,15px)] font-black leading-none text-slate-800 drop-shadow-[0_2px_5px_rgba(255,255,255,0.45)]"
-                      style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
-                    >
-                      {participant.nickname || "참여자"}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-              <div className="flex h-[34%] w-[34%] flex-col items-center justify-center rounded-full bg-white/92 text-center shadow-[0_16px_36px_rgba(15,23,42,0.22)] ring-[4px] ring-white/95 backdrop-blur">
-                {titleParts.gift ? (
-                  <div className="mb-1 text-[clamp(20px,3.3vw,38px)] leading-none">{titleParts.gift}</div>
-                ) : null}
-                <div className="flex flex-col items-center justify-center px-3 text-[clamp(18px,3.1vw,34px)] font-black leading-[1.14] text-slate-950">
-                  {titleParts.lines.map((line) => (
-                    <span key={line}>{line}</span>
-                  ))}
+        <div className="wheel-shell">
+          <div
+            className="wheel-face"
+            style={{
+              transform: `rotate(${wheelRotation}deg)`,
+            }}
+          >
+            <div className="wheel-gloss" />
+            {visibleSegments.map((label, index) => {
+              const angle = (360 / segmentCount) * index;
+              return (
+                <div
+                  key={`${label}-${index}`}
+                  className="label"
+                  style={{
+                    transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-118px) rotate(${-angle}deg)`,
+                  }}
+                >
+                  {label}
                 </div>
-                <div className="mt-2 text-[clamp(12px,1.9vw,20px)] font-black text-slate-500">
-                  {participants.length.toLocaleString("ko-KR")}명 참여
-                </div>
-              </div>
-            </div>
+              );
+            })}
           </div>
+          <div className="center-cap" />
+        </div>
 
-          {statusMessage ? (
-            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 rounded-full bg-white/75 px-6 py-3 text-xl font-black text-slate-950 shadow-[0_8px_24px_rgba(15,23,42,0.16)] backdrop-blur">
-              {statusMessage}
-            </div>
-          ) : null}
-
-          <style jsx global>{`
-            html,
-            body {
-              margin: 0 !important;
-              background: transparent !important;
-              overflow: hidden !important;
-            }
-
-            @keyframes ruruRouletteFastSpin {
-              from {
-                transform: rotate(0deg) translateZ(0);
-              }
-              to {
-                transform: rotate(360deg) translateZ(0);
-              }
-            }
-          `}</style>
-        </section>
-      )}
+        {winnerNickname ? (
+          <div className="result-card">
+            <div className="result-kicker">당첨</div>
+            <div className="result-name">{winnerNickname}</div>
+            <div className="result-note">{winnerNote}</div>
+          </div>
+        ) : message ? (
+          <div className="message-pill">{message}</div>
+        ) : null}
+      </div>
     </main>
   );
 }

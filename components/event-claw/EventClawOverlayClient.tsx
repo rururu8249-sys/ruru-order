@@ -3,14 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 
 type ClawEvent = {
-  id: number | string;
-  title: string | null;
-  winner_nickname: string | null;
-  winner_note: string | null;
-  status: string | null;
-  spin_duration_ms: number | null;
-  result_at: string | null;
-  updated_at: string | null;
+  title?: string | null;
+  status?: string | null;
+  is_test?: boolean | null;
+  winner_nickname?: string | null;
+  winner_note?: string | null;
+  updated_at?: string | null;
+  result_at?: string | null;
 };
 
 type OverlayPayload = {
@@ -23,291 +22,268 @@ type EventClawOverlayClientProps = {
   initialToken: string;
 };
 
-type PrizeKind =
+type PrizeKey =
   | "shinchan"
   | "bo"
   | "himawari"
-  | "nene"
-  | "masao"
+  | "shiro"
   | "kazama"
-  | "shiro";
+  | "nene"
+  | "masao";
 
-type MotionPhase = "idle" | "move" | "drop" | "grab" | "lift" | "release" | "result";
-
-type ClawMotion = {
+type MotionState = {
+  phase:
+    | "idle"
+    | "move-miss"
+    | "drop-miss"
+    | "grab-miss"
+    | "lift-miss"
+    | "fall-miss"
+    | "move-catch"
+    | "drop-catch"
+    | "grab-catch"
+    | "lift-catch"
+    | "result";
   x: number;
   cable: number;
-  closed: boolean;
-  phase: MotionPhase;
+  clawClosed: boolean;
   showPrize: boolean;
   prizeX: number;
   prizeY: number;
-  prizeIsWinner: boolean;
   showResult: boolean;
 };
 
 const FALLBACK_TOKEN = "claw_luludongi_live";
 const ASSET_BASE = "/event-claw";
 
-const PRIZE_ASSETS: Record<PrizeKind, { src: string; alt: string }> = {
-  shinchan: { src: `${ASSET_BASE}/prize-shinchan-front.png`, alt: "짱구 인형" },
-  bo: { src: `${ASSET_BASE}/prize-bo-front.png`, alt: "맹구 인형" },
-  himawari: { src: `${ASSET_BASE}/prize-himawari-front.png`, alt: "짱아 인형" },
-  nene: { src: `${ASSET_BASE}/prize-nene-front.png`, alt: "네네 인형" },
-  masao: { src: `${ASSET_BASE}/prize-masao-front.png`, alt: "훈이 인형" },
-  kazama: { src: `${ASSET_BASE}/prize-kazama-front.png`, alt: "철수 인형" },
-  shiro: { src: `${ASSET_BASE}/prize-shiro-front.png`, alt: "흰둥이 인형" },
+const PRIZE_ASSETS: Record<PrizeKey, string> = {
+  shinchan: `${ASSET_BASE}/prize-shinchan-front.png`,
+  bo: `${ASSET_BASE}/prize-bo-front.png`,
+  himawari: `${ASSET_BASE}/prize-himawari-front.png`,
+  shiro: `${ASSET_BASE}/prize-shiro-front.png`,
+  kazama: `${ASSET_BASE}/prize-kazama-front.png`,
+  nene: `${ASSET_BASE}/prize-nene-front.png`,
+  masao: `${ASSET_BASE}/prize-masao-front.png`,
 };
+
+const PILE_LAYOUT: Array<{ key: PrizeKey; left: number; bottom: number; size: number; z: number }> = [
+  { key: "nene", left: 18, bottom: 14, size: 19, z: 2 },
+  { key: "bo", left: 29, bottom: 7, size: 19, z: 3 },
+  { key: "shiro", left: 43, bottom: 18, size: 15, z: 2 },
+  { key: "shinchan", left: 50, bottom: 8, size: 22, z: 4 },
+  { key: "masao", left: 61, bottom: 17, size: 18, z: 2 },
+  { key: "himawari", left: 74, bottom: 8, size: 18, z: 3 },
+  { key: "kazama", left: 82, bottom: 17, size: 19, z: 2 },
+];
 
 function cleanText(value: unknown) {
   return String(value ?? "").trim();
 }
 
 function hashText(value: string) {
-  return Array.from(value).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return Array.from(value).reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
 }
 
-function easeInOut(value: number) {
-  const t = Math.max(0, Math.min(1, value));
-  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+function easeInOut(t: number) {
+  const x = Math.max(0, Math.min(1, t));
+  return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
 }
 
-function lerp(start: number, end: number, ratio: number) {
-  return start + (end - start) * easeInOut(ratio);
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * easeInOut(t);
 }
 
 function makeResultKey(event: ClawEvent | null) {
-  if (!event || event.status !== "result" || !event.winner_nickname) {
+  if (!event || cleanText(event.status) !== "result" || !cleanText(event.winner_nickname)) {
     return "";
   }
 
   return [
-    event.updated_at || "",
-    event.result_at || "",
-    event.winner_nickname,
-    event.winner_note || "",
+    cleanText(event.updated_at),
+    cleanText(event.result_at),
+    cleanText(event.winner_nickname),
+    cleanText(event.winner_note),
   ].join("|");
 }
 
-function pickPrizeKind(nickname: string, resultKey: string, winnerNote: string): PrizeKind {
-  const note = `${winnerNote || ""}`.toLowerCase();
-  const seed = hashText(`${nickname}|${resultKey}|${winnerNote}`);
-
-  if (note.includes("흰둥") || note.includes("시로")) return "shiro";
-  if (note.includes("맹구")) return "bo";
-  if (note.includes("짱아")) return "himawari";
-  if (note.includes("철수")) return "kazama";
-  if (note.includes("훈이")) return "masao";
-  if (note.includes("유리") || note.includes("네네")) return "nene";
-  if (note.includes("짱구")) return "shinchan";
-
-  const pool: PrizeKind[] = ["shinchan", "bo", "himawari", "nene", "masao", "kazama", "shiro"];
-  return pool[seed % pool.length];
+function pickPrizeKey(nickname: string, resultKey: string): PrizeKey {
+  const seed = hashText(`${nickname}|${resultKey}`);
+  const list: PrizeKey[] = ["shinchan", "bo", "himawari", "shiro", "kazama", "nene", "masao"];
+  return list[seed % list.length];
 }
 
-function getMotion(elapsedMs: number, seed: number, hasResult: boolean, now: number): ClawMotion {
-  const idleCable = 72;
-  const bottomCable = 300;
-  const liftedCable = 126;
+function getMotionState(elapsedMs: number, seed: number, hasResult: boolean, now: number): MotionState {
+  const topCable = 52;
+  const deepCable = 258;
+  const midCable = 168;
+
+  const idleX = Math.sin(now / 1500) * 86;
 
   if (!hasResult) {
     return {
-      x: Math.sin(now / 900) * 108,
-      cable: idleCable,
-      closed: false,
       phase: "idle",
+      x: idleX,
+      cable: topCable,
+      clawClosed: false,
       showPrize: false,
-      prizeX: 0,
+      prizeX: idleX,
       prizeY: 0,
-      prizeIsWinner: false,
       showResult: false,
     };
   }
 
-  const missCount = seed % 2 === 0 ? 1 : 2;
-  const missTargets = seed % 3 === 0 ? [-118, 88] : seed % 3 === 1 ? [112, -82] : [-52, 126];
-  const successTargets = [-104, -34, 34, 104];
-  const finalX = successTargets[seed % successTargets.length];
-  const targets = [...missTargets.slice(0, missCount), finalX];
+  const missXOptions = [-92, -42, 56];
+  const catchXOptions = [-28, 8, 34];
+  const missX = missXOptions[seed % missXOptions.length];
+  const catchX = catchXOptions[seed % catchXOptions.length];
 
-  const moveMs = 860;
-  const dropMs = 980;
-  const grabMs = 360;
-  const liftMs = 1040;
-  const releaseMs = 760;
-  const settleMs = 280;
-  const resultMs = 1700;
+  const moveMissMs = 1600;
+  const dropMissMs = 1700;
+  const grabMissMs = 520;
+  const liftMissMs = 1150;
+  const fallMissMs = 900;
+  const moveCatchMs = 1400;
+  const dropCatchMs = 1650;
+  const grabCatchMs = 520;
+  const liftCatchMs = 1700;
 
-  let cursor = 0;
-  let previousX = 0;
+  let t = elapsedMs;
 
-  for (let index = 0; index < targets.length; index += 1) {
-    const targetX = targets[index] ?? finalX;
-    const isFinal = index === targets.length - 1;
-
-    if (elapsedMs < cursor + moveMs) {
-      const local = (elapsedMs - cursor) / moveMs;
-      return {
-        x: lerp(previousX, targetX, local),
-        cable: idleCable,
-        closed: false,
-        phase: "move",
-        showPrize: false,
-        prizeX: targetX,
-        prizeY: bottomCable + 26,
-        prizeIsWinner: false,
-        showResult: false,
-      };
-    }
-    cursor += moveMs;
-
-    if (elapsedMs < cursor + dropMs) {
-      const local = (elapsedMs - cursor) / dropMs;
-      return {
-        x: targetX,
-        cable: lerp(idleCable, bottomCable, local),
-        closed: false,
-        phase: "drop",
-        showPrize: false,
-        prizeX: targetX,
-        prizeY: bottomCable + 26,
-        prizeIsWinner: false,
-        showResult: false,
-      };
-    }
-    cursor += dropMs;
-
-    if (elapsedMs < cursor + grabMs) {
-      return {
-        x: targetX,
-        cable: bottomCable,
-        closed: true,
-        phase: "grab",
-        showPrize: false,
-        prizeX: targetX,
-        prizeY: bottomCable + 26,
-        prizeIsWinner: false,
-        showResult: false,
-      };
-    }
-    cursor += grabMs;
-
-    if (elapsedMs < cursor + liftMs) {
-      const local = (elapsedMs - cursor) / liftMs;
-      const cable = lerp(bottomCable, liftedCable, local);
-      return {
-        x: targetX,
-        cable,
-        closed: true,
-        phase: "lift",
-        showPrize: true,
-        prizeX: targetX,
-        prizeY: cable + 58,
-        prizeIsWinner: isFinal,
-        showResult: false,
-      };
-    }
-    cursor += liftMs;
-
-    if (!isFinal) {
-      if (elapsedMs < cursor + releaseMs) {
-        const local = (elapsedMs - cursor) / releaseMs;
-        return {
-          x: targetX,
-          cable: liftedCable,
-          closed: false,
-          phase: "release",
-          showPrize: true,
-          prizeX: targetX,
-          prizeY: lerp(liftedCable + 58, bottomCable + 26, local),
-          prizeIsWinner: false,
-          showResult: false,
-        };
-      }
-      cursor += releaseMs;
-
-      if (elapsedMs < cursor + settleMs) {
-        return {
-          x: targetX,
-          cable: idleCable,
-          closed: false,
-          phase: "move",
-          showPrize: false,
-          prizeX: targetX,
-          prizeY: bottomCable + 26,
-          prizeIsWinner: false,
-          showResult: false,
-        };
-      }
-      cursor += settleMs;
-      previousX = targetX;
-      continue;
-    }
-
-    if (elapsedMs < cursor + resultMs) {
-      const local = (elapsedMs - cursor) / resultMs;
-      return {
-        x: targetX,
-        cable: liftedCable,
-        closed: true,
-        phase: "result",
-        showPrize: true,
-        prizeX: targetX,
-        prizeY: liftedCable + 42,
-        prizeIsWinner: true,
-        showResult: local > 0.32,
-      };
-    }
-
+  if (t <= moveMissMs) {
     return {
-      x: targetX,
-      cable: liftedCable,
-      closed: true,
-      phase: "result",
+      phase: "move-miss",
+      x: lerp(idleX, missX, t / moveMissMs),
+      cable: topCable,
+      clawClosed: false,
+      showPrize: false,
+      prizeX: missX,
+      prizeY: deepCable,
+      showResult: false,
+    };
+  }
+  t -= moveMissMs;
+
+  if (t <= dropMissMs) {
+    return {
+      phase: "drop-miss",
+      x: missX,
+      cable: lerp(topCable, deepCable, t / dropMissMs),
+      clawClosed: false,
+      showPrize: false,
+      prizeX: missX,
+      prizeY: deepCable,
+      showResult: false,
+    };
+  }
+  t -= dropMissMs;
+
+  if (t <= grabMissMs) {
+    return {
+      phase: "grab-miss",
+      x: missX,
+      cable: deepCable,
+      clawClosed: true,
       showPrize: true,
-      prizeX: targetX,
-      prizeY: liftedCable + 42,
-      prizeIsWinner: true,
-      showResult: true,
+      prizeX: missX,
+      prizeY: deepCable + 6,
+      showResult: false,
+    };
+  }
+  t -= grabMissMs;
+
+  if (t <= liftMissMs) {
+    return {
+      phase: "lift-miss",
+      x: missX,
+      cable: lerp(deepCable, midCable, t / liftMissMs),
+      clawClosed: true,
+      showPrize: true,
+      prizeX: missX,
+      prizeY: lerp(deepCable + 6, midCable + 26, t / liftMissMs),
+      showResult: false,
+    };
+  }
+  t -= liftMissMs;
+
+  if (t <= fallMissMs) {
+    return {
+      phase: "fall-miss",
+      x: missX + 10,
+      cable: lerp(midCable, deepCable, t / fallMissMs),
+      clawClosed: false,
+      showPrize: t < fallMissMs * 0.6,
+      prizeX: missX + 10,
+      prizeY: lerp(midCable + 26, deepCable + 14, t / fallMissMs),
+      showResult: false,
+    };
+  }
+  t -= fallMissMs;
+
+  if (t <= moveCatchMs) {
+    return {
+      phase: "move-catch",
+      x: lerp(missX + 10, catchX, t / moveCatchMs),
+      cable: topCable,
+      clawClosed: false,
+      showPrize: false,
+      prizeX: catchX,
+      prizeY: deepCable,
+      showResult: false,
+    };
+  }
+  t -= moveCatchMs;
+
+  if (t <= dropCatchMs) {
+    return {
+      phase: "drop-catch",
+      x: catchX,
+      cable: lerp(topCable, deepCable + 8, t / dropCatchMs),
+      clawClosed: false,
+      showPrize: false,
+      prizeX: catchX,
+      prizeY: deepCable + 8,
+      showResult: false,
+    };
+  }
+  t -= dropCatchMs;
+
+  if (t <= grabCatchMs) {
+    return {
+      phase: "grab-catch",
+      x: catchX,
+      cable: deepCable + 8,
+      clawClosed: true,
+      showPrize: true,
+      prizeX: catchX,
+      prizeY: deepCable + 12,
+      showResult: false,
+    };
+  }
+  t -= grabCatchMs;
+
+  if (t <= liftCatchMs) {
+    return {
+      phase: "lift-catch",
+      x: catchX,
+      cable: lerp(deepCable + 8, 126, t / liftCatchMs),
+      clawClosed: true,
+      showPrize: true,
+      prizeX: catchX,
+      prizeY: lerp(deepCable + 12, 160, t / liftCatchMs),
+      showResult: false,
     };
   }
 
   return {
-    x: 0,
-    cable: idleCable,
-    closed: false,
-    phase: "idle",
-    showPrize: false,
-    prizeX: 0,
-    prizeY: 0,
-    prizeIsWinner: false,
-    showResult: false,
+    phase: "result",
+    x: catchX,
+    cable: 108,
+    clawClosed: true,
+    showPrize: true,
+    prizeX: catchX,
+    prizeY: 142,
+    showResult: true,
   };
-}
-
-function PrizeImage({
-  kind,
-  nickname,
-  subtleTag = false,
-  className = "",
-}: {
-  kind: PrizeKind;
-  nickname?: string;
-  subtleTag?: boolean;
-  className?: string;
-}) {
-  const asset = PRIZE_ASSETS[kind];
-
-  return (
-    <div className={`prize-image ${className}`}>
-      <img src={asset.src} alt={asset.alt} />
-      {nickname ? (
-        <div className={`prize-front-tag ${subtleTag ? "is-subtle" : ""}`}>
-          {nickname}
-        </div>
-      ) : null}
-    </div>
-  );
 }
 
 export default function EventClawOverlayClient({ initialToken }: EventClawOverlayClientProps) {
@@ -334,7 +310,7 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
 
         if (!payload.ok || !payload.event) {
           setEvent(null);
-          setMessage(payload.message || "표시할 이벤트가 없습니다.");
+          setMessage(payload.message || "표시할 인형뽑기 이벤트가 없습니다.");
           return;
         }
 
@@ -342,6 +318,7 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
         setMessage("");
       } catch (error) {
         if (cancelled) return;
+        setEvent(null);
         setMessage(error instanceof Error ? error.message : String(error));
       }
     }
@@ -356,408 +333,327 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
   }, [token]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 50);
+    const timer = window.setInterval(() => setNow(Date.now()), 60);
     return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
-    const nextResultKey = makeResultKey(event);
-
-    if (nextResultKey && nextResultKey !== resultKey) {
-      setResultKey(nextResultKey);
+    const nextKey = makeResultKey(event);
+    if (nextKey && nextKey !== resultKey) {
+      setResultKey(nextKey);
       setAnimationStartedAt(Date.now());
     }
   }, [event, resultKey]);
 
-  const hasResult = Boolean(event?.status === "result" && event?.winner_nickname);
-  const winnerNickname = cleanText(event?.winner_nickname) || "";
+  const winnerNickname = cleanText(event?.winner_nickname);
   const winnerNote = cleanText(event?.winner_note) || "이벤트 당첨";
+  const hasResult = cleanText(event?.status) === "result" && Boolean(winnerNickname);
   const elapsedMs = hasResult && animationStartedAt ? now - animationStartedAt : 0;
-  const seed = hashText(`${winnerNickname}|${resultKey}|${winnerNote}`);
-  const motion = getMotion(elapsedMs, seed, hasResult, now);
-
-  const prizeKind = useMemo(
-    () => pickPrizeKind(winnerNickname, resultKey, winnerNote),
-    [winnerNickname, resultKey, winnerNote]
-  );
-
-  const floatingLeft = `calc(50% + ${motion.prizeX}px)`;
-  const floatingTop = `calc(30.4% + ${motion.prizeY}px)`;
+  const seed = hashText(`${winnerNickname}|${resultKey}`);
+  const prizeKey = useMemo(() => pickPrizeKey(winnerNickname || "default", resultKey || "idle"), [winnerNickname, resultKey]);
+  const prizeSrc = PRIZE_ASSETS[prizeKey];
+  const motion = getMotionState(elapsedMs, seed, hasResult, now);
 
   return (
-    <main className={`claw-overlay-root phase-${motion.phase}`}>
-      <style jsx global>{`
-        html,
-        body {
+    <main className="claw-root">
+      <style>{`
+        html, body {
           margin: 0;
-          padding: 0;
           width: 100%;
           height: 100%;
           overflow: hidden;
-          background: transparent;
+          background: transparent !important;
         }
-
-        * {
-          box-sizing: border-box;
-        }
-      `}</style>
-
-      <style jsx>{`
-        .claw-overlay-root {
-          position: relative;
+        .claw-root {
+          position: fixed;
+          inset: 0;
           width: 100vw;
           height: 100vh;
           overflow: hidden;
           background: transparent;
-          font-family:
-            "Pretendard",
-            "Apple SD Gothic Neo",
-            "Malgun Gothic",
-            sans-serif;
-        }
-
-        .overlay-stage {
-          position: absolute;
-          inset: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
           pointer-events: none;
+          font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
-
-        .overlay-message {
+        .claw-stage {
           position: absolute;
           left: 50%;
-          top: 7%;
-          transform: translateX(-50%);
-          z-index: 30;
-          max-width: min(92vw, 720px);
-          border-radius: 18px;
-          background: rgba(15, 23, 42, 0.82);
-          color: #ffffff;
-          padding: 12px 18px;
-          font-size: clamp(14px, 1.6vw, 24px);
-          font-weight: 800;
-          text-align: center;
-          backdrop-filter: blur(10px);
+          top: 50%;
+          width: min(54vw, 470px);
+          aspect-ratio: 0.74;
+          transform: translate(-50%, -50%);
         }
-
-        .machine-shell {
-          position: relative;
-          width: min(74vw, 520px);
-          aspect-ratio: 9 / 14;
-        }
-
-        .machine-base {
+        .machine {
           position: absolute;
           inset: 0;
           width: 100%;
           height: 100%;
           object-fit: contain;
-          z-index: 1;
           user-select: none;
-          -webkit-user-drag: none;
+          filter: drop-shadow(0 18px 30px rgba(15, 23, 42, 0.20));
         }
-
-        .machine-sign {
+        .machine-title {
           position: absolute;
           left: 50%;
-          top: 22.7%;
+          top: 11%;
+          transform: translateX(-50%);
+          min-width: 46%;
+          max-width: 62%;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          text-align: center;
+          border-radius: 999px;
+          background: rgba(255,255,255,0.92);
+          box-shadow: 0 8px 16px rgba(15,23,42,0.12);
+          padding: 8px 18px;
+          font-size: clamp(13px, 1.4vw, 18px);
+          font-weight: 900;
+          color: #0f172a;
+          z-index: 20;
+          letter-spacing: -0.03em;
+        }
+        .glass-clip {
+          position: absolute;
+          left: 18%;
+          top: 22%;
+          width: 64%;
+          height: 51%;
+          overflow: hidden;
+          z-index: 5;
+        }
+        .rail {
+          position: absolute;
+          left: 4%;
+          right: 4%;
+          top: 6%;
+          height: 10px;
+          border-radius: 999px;
+          background: linear-gradient(180deg, #cbd5e1, #94a3b8);
+          box-shadow: inset 0 1px 2px rgba(255,255,255,0.8), inset 0 -1px 2px rgba(51,65,85,0.35);
+          z-index: 10;
+        }
+        .rail-car {
+          position: absolute;
+          left: 50%;
+          top: 1.7%;
+          width: 38px;
+          height: 24px;
           transform: translateX(-50%);
           z-index: 12;
-          min-width: 250px;
-          max-width: 76%;
-          border-radius: 999px;
-          background: rgba(255, 255, 255, 0.88);
-          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.14);
-          padding: 7px 16px;
-          color: #0f172a;
-          font-size: clamp(16px, 1.9vw, 24px);
-          font-weight: 1000;
-          line-height: 1;
-          text-align: center;
-          white-space: nowrap;
         }
-
-        .machine-rail {
+        .rail-car-body {
           position: absolute;
-          left: 24.2%;
-          right: 24.2%;
-          top: 33.2%;
-          height: 12px;
-          z-index: 10;
+          inset: 0;
           border-radius: 999px;
-          background: linear-gradient(180deg, rgba(232, 240, 248, 0.98), rgba(104, 122, 142, 0.98));
-          box-shadow:
-            inset 0 2px 0 rgba(255, 255, 255, 0.72),
-            inset 0 -3px 0 rgba(15, 23, 42, 0.22),
-            0 5px 10px rgba(15, 23, 42, 0.17);
+          background: linear-gradient(180deg, #f8fafc, #cbd5e1);
+          box-shadow: 0 2px 4px rgba(15,23,42,0.18);
         }
-
-        .machine-rail-car {
-          position: absolute;
-          top: 31.6%;
-          width: 58px;
-          height: 28px;
-          z-index: 13;
-          transform: translateX(-50%);
-          border-radius: 14px;
-          background: linear-gradient(180deg, #f8fafc, #94a3b8);
-          box-shadow: 0 7px 12px rgba(15, 23, 42, 0.2);
-        }
-
-        .machine-rail-car::before,
-        .machine-rail-car::after {
-          content: "";
+        .rail-wheel {
           position: absolute;
           top: 8px;
-          width: 9px;
-          height: 9px;
+          width: 7px;
+          height: 7px;
           border-radius: 999px;
-          background: #334155;
+          background: #475569;
         }
+        .rail-wheel.left { left: 10px; }
+        .rail-wheel.right { right: 10px; }
 
-        .machine-rail-car::before {
-          left: 13px;
-        }
-
-        .machine-rail-car::after {
-          right: 13px;
-        }
-
-        .machine-claw {
+        .cable {
           position: absolute;
-          top: 33.0%;
-          width: 74px;
-          height: 380px;
-          z-index: 14;
+          left: 50%;
+          top: 18px;
+          width: 3px;
           transform: translateX(-50%);
-          filter: drop-shadow(0 7px 8px rgba(15, 23, 42, 0.22));
+          background: linear-gradient(180deg, #475569, #1e293b);
+          border-radius: 999px;
+          z-index: 11;
         }
-
-        .machine-claw-cable {
+        .claw {
+          position: absolute;
+          left: 50%;
+          bottom: -28px;
+          width: 44px;
+          height: 38px;
+          transform: translateX(-50%);
+          z-index: 13;
+        }
+        .claw-core {
           position: absolute;
           left: 50%;
           top: 0;
-          width: 5px;
-          transform: translateX(-50%);
-          border-radius: 999px;
-          background: linear-gradient(180deg, #64748b 0%, #334155 100%);
-        }
-
-        .machine-claw-head {
-          position: absolute;
-          left: 50%;
-          width: 58px;
-          height: 52px;
-          transform: translateX(-50%);
-        }
-
-        .machine-claw-head::before {
-          content: "";
-          position: absolute;
-          left: 50%;
-          top: 0;
-          width: 25px;
-          height: 19px;
+          width: 18px;
+          height: 18px;
           transform: translateX(-50%);
           border-radius: 999px;
           background: #475569;
         }
-
         .claw-arm {
           position: absolute;
-          top: 14px;
-          width: 25px;
-          height: 35px;
-          border-bottom: 6px solid #334155;
-          border-radius: 0 0 999px 999px;
-          transition: transform 0.18s ease;
-        }
-
-        .claw-arm-left {
-          left: 4px;
-          border-left: 6px solid #334155;
-          transform: rotate(25deg);
-        }
-
-        .claw-arm-right {
-          right: 4px;
-          border-right: 6px solid #334155;
-          transform: rotate(-25deg);
-        }
-
-        .machine-claw.is-closed .claw-arm-left {
-          transform: rotate(3deg);
-        }
-
-        .machine-claw.is-closed .claw-arm-right {
-          transform: rotate(-3deg);
-        }
-
-        .floating-prize {
-          position: absolute;
-          z-index: 11;
-          transform: translate(-50%, -50%);
-          width: 100px;
-          min-height: 100px;
-          pointer-events: none;
-          filter: drop-shadow(0 12px 12px rgba(15, 23, 42, 0.24));
-        }
-
-        .floating-prize.is-miss {
-          opacity: 0.98;
-        }
-
-        .floating-prize.is-winner {
-          opacity: 1;
-        }
-
-        .prize-image {
-          position: relative;
-          width: 100%;
-        }
-
-        .prize-image img {
-          display: block;
-          width: 100%;
-          height: auto;
-          user-select: none;
-          -webkit-user-drag: none;
-        }
-
-        .prize-front-tag {
-          position: absolute;
-          left: 50%;
-          bottom: 20%;
-          transform: translateX(-50%);
-          max-width: 72%;
+          top: 12px;
+          width: 4px;
+          height: 19px;
+          background: #334155;
           border-radius: 999px;
-          background: rgba(255, 255, 255, 0.78);
-          color: rgba(15, 23, 42, 0.9);
-          padding: 5px 9px;
-          font-size: 12px;
-          font-weight: 900;
-          line-height: 1;
-          text-align: center;
-          white-space: nowrap;
-          backdrop-filter: blur(4px);
-          box-shadow: 0 6px 12px rgba(15, 23, 42, 0.14);
+          transform-origin: top center;
         }
-
-        .prize-front-tag.is-subtle {
-          opacity: 0.72;
-          filter: blur(0.15px);
+        .claw-arm.center {
+          left: 50%;
+          transform: translateX(-50%) rotate(0deg);
         }
+        .claw-arm.left {
+          left: 12px;
+          transform: rotate(-32deg);
+        }
+        .claw-arm.right {
+          right: 12px;
+          transform: rotate(32deg);
+        }
+        .claw.closed .claw-arm.left { transform: rotate(-12deg); }
+        .claw.closed .claw-arm.right { transform: rotate(12deg); }
 
-        .result-panel {
+        .grabbed-prize {
           position: absolute;
           left: 50%;
-          bottom: 22.5%;
-          z-index: 20;
+          width: 24%;
+          transform: translate(-50%, -50%);
+          z-index: 9;
+          filter: drop-shadow(0 10px 14px rgba(15, 23, 42, 0.18));
+        }
+
+        .pile-item {
+          position: absolute;
+          transform: translate(-50%, 0);
+          user-select: none;
+          z-index: 3;
+          filter: drop-shadow(0 8px 10px rgba(15,23,42,0.12));
+        }
+
+        .message-pill {
+          position: absolute;
+          left: 50%;
+          top: 6%;
           transform: translateX(-50%);
-          width: min(76%, 360px);
-          border-radius: 22px;
-          background: rgba(255, 255, 255, 0.94);
-          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.24);
+          border-radius: 999px;
+          background: rgba(15, 23, 42, 0.72);
+          color: #ffffff;
+          padding: 10px 16px;
+          font-size: 13px;
+          font-weight: 800;
+          max-width: min(80vw, 420px);
+          text-align: center;
+          letter-spacing: -0.02em;
+        }
+
+        .result-card {
+          position: absolute;
+          left: 50%;
+          bottom: 11%;
+          transform: translateX(-50%);
+          width: min(78%, 320px);
+          border-radius: 26px;
+          background: rgba(255,255,255,0.96);
+          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
           padding: 16px 18px 18px;
           text-align: center;
-          backdrop-filter: blur(10px);
+          z-index: 30;
+          opacity: 0;
+          transition: opacity 0.35s ease;
         }
-
-        .result-kicker {
-          color: #8b5cf6;
-          font-size: clamp(15px, 1.7vw, 22px);
-          font-weight: 1000;
-          line-height: 1.1;
+        .result-card.show {
+          opacity: 1;
         }
-
-        .result-winner-name {
-          margin-top: 8px;
-          color: #0f172a;
-          font-size: clamp(28px, 3.4vw, 48px);
-          font-weight: 1000;
-          line-height: 1.05;
+        .result-label {
+          font-size: 18px;
+          font-weight: 900;
+          color: #7c3aed;
+          letter-spacing: -0.03em;
+        }
+        .result-name {
+          margin-top: 2px;
+          font-size: clamp(26px, 3.1vw, 38px);
+          font-weight: 900;
+          line-height: 1.08;
+          letter-spacing: -0.05em;
+          color: #020617;
           word-break: keep-all;
         }
-
         .result-note {
-          margin-top: 9px;
-          color: #475569;
-          font-size: clamp(14px, 1.55vw, 21px);
+          margin-top: 6px;
+          font-size: clamp(16px, 1.8vw, 22px);
           font-weight: 800;
-          line-height: 1.2;
-        }
-
-        @media (max-width: 768px) {
-          .machine-shell {
-            width: min(88vw, 480px);
-          }
-
-          .machine-sign {
-            min-width: 220px;
-            padding: 6px 14px;
-          }
-
-          .result-panel {
-            width: 74%;
-            bottom: 22%;
-          }
+          color: #475569;
+          letter-spacing: -0.03em;
         }
       `}</style>
 
-      <div className="overlay-stage">
-        {message ? <div className="overlay-message">{message}</div> : null}
+      <div className="claw-stage">
+        <img
+          src={machineSrc}
+          alt="루루동이 인형뽑기"
+          className="machine"
+          onError={() => setMachineSrc(`${ASSET_BASE}/machine.svg`)}
+        />
 
-        <div className="machine-shell">
-          <img
-            src={machineSrc}
-            alt="루루동이 인형뽑기 기계"
-            className="machine-base"
-            onError={() => setMachineSrc(`${ASSET_BASE}/machine.svg`)}
-          />
+        <div className="machine-title">🎁 루루동이 인형뽑기</div>
 
-          <div className="machine-sign">🎁 루루동이 인형뽑기</div>
-
-          <div className="machine-rail" aria-hidden="true" />
+        <div className="glass-clip">
+          <div className="rail" />
 
           <div
-            className="machine-rail-car"
-            aria-hidden="true"
-            style={{ left: `calc(50% + ${motion.x}px)` }}
-          />
-
-          <div
-            className={`machine-claw ${motion.closed ? "is-closed" : ""}`}
-            aria-hidden="true"
-            style={{ left: `calc(50% + ${motion.x}px)` }}
+            className="rail-car"
+            style={{
+              transform: `translateX(calc(-50% + ${motion.x}px))`,
+            }}
           >
-            <div className="machine-claw-cable" style={{ height: `${motion.cable}px` }} />
-            <div className="machine-claw-head" style={{ top: `${motion.cable - 2}px` }}>
-              <span className="claw-arm claw-arm-left" />
-              <span className="claw-arm claw-arm-right" />
+            <div className="rail-car-body" />
+            <div className="rail-wheel left" />
+            <div className="rail-wheel right" />
+
+            <div className="cable" style={{ height: `${motion.cable}px` }}>
+              <div className={`claw ${motion.clawClosed ? "closed" : ""}`}>
+                <div className="claw-core" />
+                <div className="claw-arm center" />
+                <div className="claw-arm left" />
+                <div className="claw-arm right" />
+              </div>
             </div>
           </div>
 
           {motion.showPrize ? (
-            <div
-              className={`floating-prize ${motion.prizeIsWinner ? "is-winner" : "is-miss"}`}
+            <img
+              src={prizeSrc}
+              alt="당첨 인형"
+              className="grabbed-prize"
               style={{
-                left: floatingLeft,
-                top: floatingTop,
+                left: `calc(50% + ${motion.prizeX}px)`,
+                top: `${motion.prizeY}px`,
               }}
-            >
-              <PrizeImage kind={prizeKind} nickname={winnerNickname} subtleTag />
-            </div>
+            />
           ) : null}
 
-          {motion.showResult ? (
-            <div className="result-panel">
-              <div className="result-kicker">당첨</div>
-              <div className="result-winner-name">{winnerNickname || "-"}</div>
-              <div className="result-note">{winnerNote}</div>
-            </div>
-          ) : null}
+          {PILE_LAYOUT.map((item, index) => (
+            <img
+              key={`${item.key}-${index}`}
+              src={PRIZE_ASSETS[item.key]}
+              alt={item.key}
+              className="pile-item"
+              style={{
+                left: `${item.left}%`,
+                bottom: `${item.bottom}%`,
+                width: `${item.size}%`,
+                zIndex: item.z,
+              }}
+            />
+          ))}
+        </div>
+
+        {message && !winnerNickname ? <div className="message-pill">{message}</div> : null}
+
+        <div className={`result-card ${motion.showResult && winnerNickname ? "show" : ""}`}>
+          <div className="result-label">당첨</div>
+          <div className="result-name">{winnerNickname || "대기중"}</div>
+          <div className="result-note">{winnerNote}</div>
         </div>
       </div>
     </main>
