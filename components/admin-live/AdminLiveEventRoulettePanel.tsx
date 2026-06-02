@@ -521,7 +521,7 @@ export default function AdminLiveEventRoulettePanel({
         const createPayload = await requestJson<EventPayload>("/api/admin-live/event-roulette", {
           method: "POST",
           body: JSON.stringify({
-            action: "create",
+            action: "create_event",
             title,
             mode,
             sourceDate,
@@ -547,7 +547,7 @@ export default function AdminLiveEventRoulettePanel({
       const spinPayload = await requestJson<EventPayload>("/api/admin-live/event-roulette", {
         method: "POST",
         body: JSON.stringify({
-          action: "spin",
+          action: "spin_event",
           eventId: eventToSpin.id,
           winnerNote,
         }),
