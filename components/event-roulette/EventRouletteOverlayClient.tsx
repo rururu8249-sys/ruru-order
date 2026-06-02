@@ -13,6 +13,7 @@ type RouletteEvent = {
   spin_started_at?: string | null;
   spin_duration_ms?: number | null;
   participant_snapshot?: unknown;
+  participants?: unknown;
 };
 
 type OverlayPayload = {
@@ -48,23 +49,29 @@ function makeResultKey(event: RouletteEvent | null) {
   ].join("|");
 }
 
-function normalizeParticipants(snapshot: unknown) {
-  if (!Array.isArray(snapshot)) {
-    return ["행운", "당첨", "이벤트", "루루동이", "럭키", "기프트", "LIVE", "WIN"];
-  }
+function normalizeParticipants(event: RouletteEvent | null) {
+  const source = Array.isArray(event?.participants)
+    ? event?.participants
+    : Array.isArray(event?.participant_snapshot)
+      ? event?.participant_snapshot
+      : [];
 
-  const names = snapshot
+  const names = source
     .map((item) => {
       if (typeof item === "string") return cleanText(item);
+
       if (item && typeof item === "object") {
-        const nickname = cleanText((item as { nickname?: unknown }).nickname);
-        if (nickname) return nickname;
+        const record = item as Record<string, unknown>;
+        return cleanText(record.nickname || record.name || record.youtube_nickname);
       }
+
       return "";
     })
     .filter(Boolean);
 
-  return names.length >= 6 ? names.slice(0, 10) : ["행운", "당첨", "이벤트", "루루동이", "럭키", "기프트", "LIVE", "WIN"];
+  return names.length > 0
+    ? names.slice(0, 12)
+    : ["행운", "당첨", "이벤트", "루루동이", "럭키", "기프트", "LIVE", "WIN"];
 }
 
 function easeOutCubic(x: number) {
@@ -130,7 +137,7 @@ export default function EventRouletteOverlayClient({ initialToken }: EventRoulet
     }
   }, [event, resultKey]);
 
-  const participants = useMemo(() => normalizeParticipants(event?.participant_snapshot), [event?.participant_snapshot]);
+  const participants = useMemo(() => normalizeParticipants(event), [event]);
   const winnerNickname = cleanText(event?.winner_nickname);
   const winnerNote = cleanText(event?.winner_note) || "이벤트 당첨";
   const hasResult = cleanText(event?.status) === "result" && Boolean(winnerNickname);
