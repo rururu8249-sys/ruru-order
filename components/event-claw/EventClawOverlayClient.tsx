@@ -182,7 +182,7 @@ function getMotionState(elapsedMs: number, seed: number, hasResult: boolean, now
       phase: "grab-miss",
       x: missX,
       cable: deepCable,
-      clawClosed: t > grabMissMs * 0.42,
+      clawClosed: t > grabMissMs * 0.65,
       showPrize: true,
       prizeX: missX,
       prizeY: deepCable + 6,
@@ -252,7 +252,7 @@ function getMotionState(elapsedMs: number, seed: number, hasResult: boolean, now
       phase: "grab-catch",
       x: catchX,
       cable: deepCable + 8,
-      clawClosed: t > grabCatchMs * 0.42,
+      clawClosed: t > grabCatchMs * 0.65,
       showPrize: true,
       prizeX: catchX,
       prizeY: deepCable + 12,
@@ -437,7 +437,7 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
           left: 50%;
           top: 0.9%;
           width: 40px;
-          height: 25px;
+          height: 34px;
           transform: translateX(-50%);
           z-index: 12;
         }
@@ -492,7 +492,7 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
           position: absolute;
           top: 12px;
           width: 4px;
-          height: 19px;
+          height: 32px;
           background: #334155;
           border-radius: 999px;
           transform-origin: top center;
@@ -503,14 +503,14 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
         }
         .claw-arm.left {
           left: 12px;
-          transform: rotate(-46deg);
+          transform: rotate(-70deg);
         }
         .claw-arm.right {
           right: 12px;
-          transform: rotate(46deg);
+          transform: rotate(70deg);
         }
-        .claw.closed .claw-arm.left { transform: rotate(-12deg); }
-        .claw.closed .claw-arm.right { transform: rotate(12deg); }
+        .claw.closed .claw-arm.left { transform: rotate(-6deg); }
+        .claw.closed .claw-arm.right { transform: rotate(6deg); }
 
         .grabbed-prize {
           position: absolute;
@@ -548,15 +548,15 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
         .result-card {
           position: absolute;
           left: 50%;
-          bottom: 11%;
-          transform: translateX(-50%);
-          width: min(78%, 320px);
-          border-radius: 26px;
+          top: 53%;
+          transform: translate(-50%, -50%);
+          width: min(76%, 360px);
+          border-radius: 24px;
           background: rgba(255,255,255,0.96);
           box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
-          padding: 16px 18px 18px;
+          padding: 14px 18px 16px;
           text-align: center;
-          z-index: 30;
+          z-index: 60;
           opacity: 0;
           transition: opacity 0.35s ease;
         }
@@ -571,7 +571,7 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
         }
         .result-name {
           margin-top: 2px;
-          font-size: clamp(26px, 3.1vw, 38px);
+          font-size: clamp(30px, 5.5vw, 52px);
           font-weight: 900;
           line-height: 1.08;
           letter-spacing: -0.05em;
