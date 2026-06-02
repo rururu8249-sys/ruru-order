@@ -1,5 +1,5 @@
 "use client";
-const LIVE_ORDER_AUTO_REFRESH_ENABLED = false;
+const LIVE_ORDER_AUTO_REFRESH_ENABLED = true;
 const LIVE_ORDER_BANKDA_EVENT_REFRESH_ENABLED = true;
 
 const maybeSetLiveOrderAutoRefreshInterval = (
@@ -508,7 +508,6 @@ async function saveLiveBroadcastEndReport({
 }
 
 export default function AdminLiveDashboard() {
-  useAutoBankdaPaymentSync();
   const [activeMenu, setActiveMenu] = useState<AdminLiveMenuKey>(() => readMenuFromUrl());
   const [orders, setOrders] = useState<LiveOrder[]>([]);
   const [broadcasts, setBroadcasts] = useState<AdminLiveBroadcast[]>([]);
@@ -640,6 +639,14 @@ export default function AdminLiveDashboard() {
     });
     setLoading(false);
   };
+
+  useAutoBankdaPaymentSync({
+    enabled: true,
+    onSynced: async () => {
+      await loadDepositsFromServer();
+      await loadOrders();
+    },
+  });
 
   useEffect(() => {
     void loadOrders();

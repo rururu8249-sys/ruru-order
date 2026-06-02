@@ -11,6 +11,19 @@ type LockPayload = {
   expiresAt: number;
 };
 
+type AutoBankdaSyncReason = "mount" | "interval";
+
+type AutoBankdaSyncDetail = {
+  reason: AutoBankdaSyncReason;
+  successCount: number;
+  result: any;
+};
+
+type UseAutoBankdaPaymentSyncOptions = {
+  enabled?: boolean;
+  onSynced?: (detail: AutoBankdaSyncDetail) => void | Promise<void>;
+};
+
 function createLockToken() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
@@ -48,67 +61,95 @@ function getAutoMatchSuccessCount(result: any) {
   return Number(result?.autoMatchSummary?.success_count || result?.autoMatch?.summary?.success_count || 0);
 }
 
-export function useAutoBankdaPaymentSync() {
+export function useAutoBankdaPaymentSync(options: UseAutoBankdaPaymentSyncOptions = {}) {
+  const enabled = options.enabled ?? true;
+  const onSyncedRef = useRef(options.onSynced);
   const inFlightRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const runAutoBankdaSync = useCallback(async (reason: "mount" | "interval" = "interval") => {
-    if (inFlightRef.current) return;
+  useEffect(() => {
+    onSyncedRef.current = options.onSynced;
+  }, [options.onSynced]);
 
-    const lockToken = claimBrowserLock();
+  const runAutoBankdaSync = useCallback(
+    async (reason: AutoBankdaSyncReason = "interval") => {
+      if (!enabled) return;
+      if (inFlightRef.current) return;
 
-    if (!lockToken) return;
+      const lockToken = claimBrowserLock();
 
-    inFlightRef.current = true;
+      if (!lockToken) return;
 
-    try {
-      const response = await fetch("/api/bankda/sync-and-auto-match", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        cache: "no-store",
-      });
+      inFlightRef.current = true;
 
-      const result = await response.json().catch(() => null);
-
-      if (!response.ok || result?.ok === false) {
-        console.warn("[admin-live] 자동입금 자동조회 실패", {
-          reason,
-          result,
+      try {
+        const response = await fetch("/api/bankda/sync-and-auto-match", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          cache: "no-store",
         });
-        return;
-      }
 
-      const successCount = getAutoMatchSuccessCount(result);
+        const result = await response.json().catch(() => null);
 
-      if (successCount > 0) {
-        console.info("[admin-live] 자동입금 자동처리 완료", {
+        if (!response.ok || result?.ok === false) {
+          console.warn("[admin-live] 자동입금 자동조회 실패", {
+            reason,
+            result,
+          });
+          return;
+        }
+
+        const successCount = getAutoMatchSuccessCount(result);
+        const detail: AutoBankdaSyncDetail = {
           reason,
           successCount,
           result,
-        });
-      }
+        };
 
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(
-          new CustomEvent("ruru-admin-live-auto-bankda-synced", {
-            detail: {
-              reason,
-              successCount,
-              result,
-            },
-          })
-        );
+        if (successCount > 0) {
+          console.info("[admin-live] 자동입금 자동처리 완료", {
+            reason,
+            successCount,
+            result,
+          });
+        }
+
+        await onSyncedRef.current?.(detail);
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("ruru-admin-live-auto-bankda-synced", {
+              detail,
+            })
+          );
+
+          try {
+            window.localStorage.setItem(
+              "ruru-admin-live-auto-bankda-synced-at",
+              JSON.stringify({
+                at: Date.now(),
+                reason,
+                successCount,
+              })
+            );
+          } catch {
+            // 다른 탭 알림 실패는 자동동기화 자체를 막지 않습니다.
+          }
+        }
+      } catch (error) {
+        console.warn("[admin-live] 자동입금 자동조회 오류", error);
+      } finally {
+        inFlightRef.current = false;
       }
-    } catch (error) {
-      console.warn("[admin-live] 자동입금 자동조회 오류", error);
-    } finally {
-      inFlightRef.current = false;
-    }
-  }, []);
+    },
+    [enabled]
+  );
 
   useEffect(() => {
+    if (!enabled) return undefined;
+
     void runAutoBankdaSync("mount");
 
     timerRef.current = setInterval(() => {
@@ -121,5 +162,5 @@ export function useAutoBankdaPaymentSync() {
         timerRef.current = null;
       }
     };
-  }, [runAutoBankdaSync]);
+  }, [enabled, runAutoBankdaSync]);
 }
