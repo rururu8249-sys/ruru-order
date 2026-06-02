@@ -210,6 +210,7 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
   const [message, setMessage] = useState("");
   const [resultKey, setResultKey] = useState("");
   const [animationStartedAt, setAnimationStartedAt] = useState(0);
+  const clawDoneAtRef = useRef(0);
   const [now, setNow] = useState(() => Date.now());
   const [machineSrc, setMachineSrc] = useState(`${ASSET_BASE}/claw-machine-main.png`);
 
@@ -279,12 +280,21 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
   const elapsedMs = hasResult && animationStartedAt ? now - animationStartedAt : 0;
   const motion = getMotionState(elapsedMs, seed, hasResult, now);
   const clawResultCardVisibleMs = 5000;
-  const clawAnimationDoneAt = motion.showResult ? (animationStartedAt + elapsedMs) : 0;
+
+  // 연출이 완전히 끝난(result 단계 도달) 시각을 딱 한 번만 기억해 고정한다.
+  if (motion.phase === "result" && clawDoneAtRef.current === 0) {
+    clawDoneAtRef.current = now;
+  }
+  if (!hasResult || !animationStartedAt) {
+    clawDoneAtRef.current = 0;
+  }
+
   const resultCardVisible =
     isFreshResultForThisWidget &&
     Boolean(winnerNickname) &&
-    motion.showResult &&
-    (now - clawAnimationDoneAt) < clawResultCardVisibleMs;
+    motion.phase === "result" &&
+    clawDoneAtRef.current > 0 &&
+    (now - clawDoneAtRef.current) < clawResultCardVisibleMs;
 
   return (
     <main className="claw-root">
