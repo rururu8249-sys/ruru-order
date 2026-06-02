@@ -724,7 +724,7 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
           current.phone = clean(profile.customer_phone);
         }
 
-        if (!current.address) {
+        if (profileAddress) {
           current.address = profileAddress;
         }
 
