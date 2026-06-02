@@ -3586,7 +3586,7 @@ export default function OrderPage() {
               상품목록에서 [담기]를 누르거나, 직접 입력으로 상품을 담아주세요.
             </p>
             <p className="mt-2 break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-slate-400">
-              담은 상품과 담은 상품과 금액 확인 후 [주문서 제출]을 눌러주세요.
+              담은 상품과 담은 상품과 담은 상품과 금액 확인 후 [주문서 제출]을 눌러주세요.
             </p>
 
             {customerInfoMissing && (
