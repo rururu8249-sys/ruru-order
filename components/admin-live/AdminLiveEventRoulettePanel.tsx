@@ -578,6 +578,7 @@ export default function AdminLiveEventRoulettePanel({
       setCurrentEvent(createPayload.event);
       setParticipants(createPayload.event.participants || finalParticipants);
 
+      window.alert("[디버그] 룰렛시작이 보내는 지정값=[" + fixedWinnerNickname.trim() + "]");
       const spinPayload = await requestJson<EventPayload>("/api/admin-live/event-roulette", {
         method: "POST",
         body: JSON.stringify({
