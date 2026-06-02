@@ -2,21 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-type ClawStatus = "idle" | "spinning" | "result" | "closed";
-
-type ClawParticipant = {
-  nickname: string;
-};
-
 type ClawEvent = {
-  title: string;
-  mode: "live" | "test" | "preview";
-  is_test: boolean;
-  status: ClawStatus;
-  participants: ClawParticipant[];
-  winner_nickname: string;
-  winner_note: string;
-  spin_started_at: string | null;
+  id: number | string;
+  title: string | null;
+  winner_nickname: string | null;
+  winner_note: string | null;
+  status: string | null;
   spin_duration_ms: number | null;
   result_at: string | null;
   updated_at: string | null;
@@ -33,53 +24,43 @@ type EventClawOverlayClientProps = {
 };
 
 type PrizeKind =
-  | "characterRed"
-  | "characterYellow"
-  | "characterOrange"
-  | "characterGreen"
-  | "capsulePink"
-  | "capsuleBlue";
+  | "shinchan"
+  | "bo"
+  | "himawari"
+  | "nene"
+  | "masao"
+  | "kazama"
+  | "shiro";
 
-type CharacterKind = Exclude<PrizeKind, "capsulePink" | "capsuleBlue">;
-
-type MotionPhase = "idle" | "move" | "drop" | "grip" | "lift" | "showFront" | "showBack";
+type MotionPhase = "idle" | "move" | "drop" | "grab" | "lift" | "release" | "result";
 
 type ClawMotion = {
   x: number;
   cable: number;
   closed: boolean;
   phase: MotionPhase;
-  showGrabbed: boolean;
-  showFront: boolean;
-  showBack: boolean;
-  showCapsuleOpen: boolean;
+  showPrize: boolean;
+  prizeX: number;
+  prizeY: number;
+  prizeIsWinner: boolean;
+  showResult: boolean;
 };
 
 const FALLBACK_TOKEN = "claw_luludongi_live";
 const ASSET_BASE = "/event-claw";
 
-const CHARACTER_CLASS: Record<CharacterKind, string> = {
-  characterRed: "character-red",
-  characterYellow: "character-yellow",
-  characterOrange: "character-orange",
-  characterGreen: "character-green",
+const PRIZE_ASSETS: Record<PrizeKind, { src: string; alt: string }> = {
+  shinchan: { src: `${ASSET_BASE}/prize-shinchan-front.png`, alt: "짱구 인형" },
+  bo: { src: `${ASSET_BASE}/prize-bo-front.png`, alt: "맹구 인형" },
+  himawari: { src: `${ASSET_BASE}/prize-himawari-front.png`, alt: "짱아 인형" },
+  nene: { src: `${ASSET_BASE}/prize-nene-front.png`, alt: "네네 인형" },
+  masao: { src: `${ASSET_BASE}/prize-masao-front.png`, alt: "훈이 인형" },
+  kazama: { src: `${ASSET_BASE}/prize-kazama-front.png`, alt: "철수 인형" },
+  shiro: { src: `${ASSET_BASE}/prize-shiro-front.png`, alt: "흰둥이 인형" },
 };
 
 function cleanText(value: unknown) {
   return String(value ?? "").trim();
-}
-
-function makeResultKey(event: ClawEvent | null) {
-  if (!event || event.status !== "result" || !event.winner_nickname) {
-    return "";
-  }
-
-  return [
-    event.updated_at || "",
-    event.result_at || "",
-    event.winner_nickname,
-    event.winner_note || "",
-  ].join("|");
 }
 
 function hashText(value: string) {
@@ -95,200 +76,236 @@ function lerp(start: number, end: number, ratio: number) {
   return start + (end - start) * easeInOut(ratio);
 }
 
+function makeResultKey(event: ClawEvent | null) {
+  if (!event || event.status !== "result" || !event.winner_nickname) {
+    return "";
+  }
+
+  return [
+    event.updated_at || "",
+    event.result_at || "",
+    event.winner_nickname,
+    event.winner_note || "",
+  ].join("|");
+}
+
 function pickPrizeKind(nickname: string, resultKey: string, winnerNote: string): PrizeKind {
   const note = `${winnerNote || ""}`.toLowerCase();
   const seed = hashText(`${nickname}|${resultKey}|${winnerNote}`);
 
-  if (note.includes("캡슐")) {
-    return seed % 2 === 0 ? "capsulePink" : "capsuleBlue";
-  }
+  if (note.includes("흰둥") || note.includes("시로")) return "shiro";
+  if (note.includes("맹구")) return "bo";
+  if (note.includes("짱아")) return "himawari";
+  if (note.includes("철수")) return "kazama";
+  if (note.includes("훈이")) return "masao";
+  if (note.includes("유리") || note.includes("네네")) return "nene";
+  if (note.includes("짱구")) return "shinchan";
 
-  const characters: CharacterKind[] = ["characterRed", "characterYellow", "characterOrange", "characterGreen"];
-  return characters[seed % characters.length];
-}
-
-function prizeLabel(_kind?: PrizeKind) {
-  return "당첨";
+  const pool: PrizeKind[] = ["shinchan", "bo", "himawari", "nene", "masao", "kazama", "shiro"];
+  return pool[seed % pool.length];
 }
 
 function getMotion(elapsedMs: number, seed: number, hasResult: boolean, now: number): ClawMotion {
-  const baseCable = 70;
+  const idleCable = 72;
   const bottomCable = 300;
+  const liftedCable = 126;
 
   if (!hasResult) {
     return {
-      x: Math.sin(now / 900) * 132,
-      cable: baseCable,
+      x: Math.sin(now / 900) * 108,
+      cable: idleCable,
       closed: false,
       phase: "idle",
-      showGrabbed: false,
-      showFront: false,
-      showBack: false,
-      showCapsuleOpen: false,
+      showPrize: false,
+      prizeX: 0,
+      prizeY: 0,
+      prizeIsWinner: false,
+      showResult: false,
     };
   }
 
   const missCount = seed % 2 === 0 ? 1 : 2;
-  const missTargets = seed % 3 === 0 ? [-130, 96] : seed % 3 === 1 ? [126, -84] : [-62, 138];
-  const catchTargets = [-118, -38, 42, 118];
-  const catchX = catchTargets[seed % catchTargets.length];
+  const missTargets = seed % 3 === 0 ? [-118, 88] : seed % 3 === 1 ? [112, -82] : [-52, 126];
+  const successTargets = [-104, -34, 34, 104];
+  const finalX = successTargets[seed % successTargets.length];
+  const targets = [...missTargets.slice(0, missCount), finalX];
 
-  const targets = [...missTargets.slice(0, missCount), catchX];
-  const moveMs = 950;
-  const dropMs = 1450;
-  const gripMs = 520;
-  const liftMs = 1450;
-  const pauseMs = 350;
-  const showFrontMs = 1350;
-  const singleAttemptMs = moveMs + dropMs + gripMs + liftMs + pauseMs;
+  const moveMs = 860;
+  const dropMs = 980;
+  const grabMs = 360;
+  const liftMs = 1040;
+  const releaseMs = 760;
+  const settleMs = 280;
+  const resultMs = 1700;
 
   let cursor = 0;
   let previousX = 0;
 
   for (let index = 0; index < targets.length; index += 1) {
-    const targetX = targets[index] ?? catchX;
-    const isFinalAttempt = index === targets.length - 1;
+    const targetX = targets[index] ?? finalX;
+    const isFinal = index === targets.length - 1;
 
     if (elapsedMs < cursor + moveMs) {
       const local = (elapsedMs - cursor) / moveMs;
-
       return {
         x: lerp(previousX, targetX, local),
-        cable: baseCable,
+        cable: idleCable,
         closed: false,
         phase: "move",
-        showGrabbed: false,
-        showFront: false,
-        showBack: false,
-        showCapsuleOpen: false,
+        showPrize: false,
+        prizeX: targetX,
+        prizeY: bottomCable + 26,
+        prizeIsWinner: false,
+        showResult: false,
       };
     }
-
     cursor += moveMs;
 
     if (elapsedMs < cursor + dropMs) {
       const local = (elapsedMs - cursor) / dropMs;
-
       return {
         x: targetX,
-        cable: lerp(baseCable, bottomCable, local),
+        cable: lerp(idleCable, bottomCable, local),
         closed: false,
         phase: "drop",
-        showGrabbed: false,
-        showFront: false,
-        showBack: false,
-        showCapsuleOpen: false,
+        showPrize: false,
+        prizeX: targetX,
+        prizeY: bottomCable + 26,
+        prizeIsWinner: false,
+        showResult: false,
       };
     }
-
     cursor += dropMs;
 
-    if (elapsedMs < cursor + gripMs) {
+    if (elapsedMs < cursor + grabMs) {
       return {
         x: targetX,
         cable: bottomCable,
         closed: true,
-        phase: "grip",
-        showGrabbed: false,
-        showFront: false,
-        showBack: false,
-        showCapsuleOpen: false,
+        phase: "grab",
+        showPrize: false,
+        prizeX: targetX,
+        prizeY: bottomCable + 26,
+        prizeIsWinner: false,
+        showResult: false,
       };
     }
-
-    cursor += gripMs;
+    cursor += grabMs;
 
     if (elapsedMs < cursor + liftMs) {
       const local = (elapsedMs - cursor) / liftMs;
-
+      const cable = lerp(bottomCable, liftedCable, local);
       return {
         x: targetX,
-        cable: lerp(bottomCable, baseCable, local),
-        closed: isFinalAttempt,
+        cable,
+        closed: true,
         phase: "lift",
-        showGrabbed: isFinalAttempt,
-        showFront: false,
-        showBack: false,
-        showCapsuleOpen: false,
+        showPrize: true,
+        prizeX: targetX,
+        prizeY: cable + 58,
+        prizeIsWinner: isFinal,
+        showResult: false,
       };
     }
-
     cursor += liftMs;
 
-    if (elapsedMs < cursor + pauseMs) {
+    if (!isFinal) {
+      if (elapsedMs < cursor + releaseMs) {
+        const local = (elapsedMs - cursor) / releaseMs;
+        return {
+          x: targetX,
+          cable: liftedCable,
+          closed: false,
+          phase: "release",
+          showPrize: true,
+          prizeX: targetX,
+          prizeY: lerp(liftedCable + 58, bottomCable + 26, local),
+          prizeIsWinner: false,
+          showResult: false,
+        };
+      }
+      cursor += releaseMs;
+
+      if (elapsedMs < cursor + settleMs) {
+        return {
+          x: targetX,
+          cable: idleCable,
+          closed: false,
+          phase: "move",
+          showPrize: false,
+          prizeX: targetX,
+          prizeY: bottomCable + 26,
+          prizeIsWinner: false,
+          showResult: false,
+        };
+      }
+      cursor += settleMs;
+      previousX = targetX;
+      continue;
+    }
+
+    if (elapsedMs < cursor + resultMs) {
+      const local = (elapsedMs - cursor) / resultMs;
       return {
         x: targetX,
-        cable: baseCable,
-        closed: false,
-        phase: isFinalAttempt ? "lift" : "move",
-        showGrabbed: isFinalAttempt,
-        showFront: false,
-        showBack: false,
-        showCapsuleOpen: false,
+        cable: liftedCable,
+        closed: true,
+        phase: "result",
+        showPrize: true,
+        prizeX: targetX,
+        prizeY: liftedCable + 42,
+        prizeIsWinner: true,
+        showResult: local > 0.32,
       };
     }
 
-    cursor += pauseMs;
-    previousX = targetX;
-  }
-
-  const afterCatch = elapsedMs - cursor;
-
-  if (afterCatch < showFrontMs) {
     return {
-      x: catchX,
-      cable: baseCable,
+      x: targetX,
+      cable: liftedCable,
       closed: true,
-      phase: "showFront",
-      showGrabbed: false,
-      showFront: true,
-      showBack: false,
-      showCapsuleOpen: true,
+      phase: "result",
+      showPrize: true,
+      prizeX: targetX,
+      prizeY: liftedCable + 42,
+      prizeIsWinner: true,
+      showResult: true,
     };
   }
 
   return {
-    x: catchX,
-    cable: baseCable,
-    closed: true,
-    phase: "showBack",
-    showGrabbed: false,
-    showFront: false,
-    showBack: true,
-    showCapsuleOpen: false,
+    x: 0,
+    cable: idleCable,
+    closed: false,
+    phase: "idle",
+    showPrize: false,
+    prizeX: 0,
+    prizeY: 0,
+    prizeIsWinner: false,
+    showResult: false,
   };
 }
 
-function CharacterPrize({
+function PrizeImage({
   kind,
-  side,
-  name,
+  nickname,
+  subtleTag = false,
   className = "",
 }: {
-  kind: CharacterKind;
-  side: "front" | "back";
-  name?: string;
+  kind: PrizeKind;
+  nickname?: string;
+  subtleTag?: boolean;
   className?: string;
 }) {
+  const asset = PRIZE_ASSETS[kind];
+
   return (
-    <div className={`character-prize ${CHARACTER_CLASS[kind]} ${side === "back" ? "is-back" : "is-front"} ${className}`}>
-      <div className="character-head">
-        <span className="character-hair" />
-        {side === "front" ? (
-          <>
-            <span className="character-eye character-eye-left" />
-            <span className="character-eye character-eye-right" />
-            <span className="character-mouth" />
-          </>
-        ) : null}
-      </div>
-      <div className="character-body">
-        {side === "back" ? <div className="character-name-patch">{name || "-"}</div> : null}
-      </div>
-      <span className="character-arm character-arm-left" />
-      <span className="character-arm character-arm-right" />
-      <span className="character-leg character-leg-left" />
-      <span className="character-leg character-leg-right" />
+    <div className={`prize-image ${className}`}>
+      <img src={asset.src} alt={asset.alt} />
+      {nickname ? (
+        <div className={`prize-front-tag ${subtleTag ? "is-subtle" : ""}`}>
+          {nickname}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -339,7 +356,7 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
   }, [token]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 60);
+    const timer = window.setInterval(() => setNow(Date.now()), 50);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -352,7 +369,7 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
     }
   }, [event, resultKey]);
 
-  const hasResult = Boolean(event?.status === "result" && event.winner_nickname);
+  const hasResult = Boolean(event?.status === "result" && event?.winner_nickname);
   const winnerNickname = cleanText(event?.winner_nickname) || "";
   const winnerNote = cleanText(event?.winner_note) || "이벤트 당첨";
   const elapsedMs = hasResult && animationStartedAt ? now - animationStartedAt : 0;
@@ -361,159 +378,164 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
 
   const prizeKind = useMemo(
     () => pickPrizeKind(winnerNickname, resultKey, winnerNote),
-    [winnerNickname, resultKey, winnerNote],
+    [winnerNickname, resultKey, winnerNote]
   );
 
-  const isCapsule = prizeKind === "capsulePink" || prizeKind === "capsuleBlue";
-  const isCharacter = !isCapsule;
-  const characterKind: CharacterKind = isCharacter ? (prizeKind as CharacterKind) : "characterRed";
-
-  const closedCapsuleAsset =
-    prizeKind === "capsuleBlue" ? `${ASSET_BASE}/capsule-blue-closed.svg` : `${ASSET_BASE}/capsule-pink-closed.svg`;
-  const openCapsuleAsset =
-    prizeKind === "capsuleBlue" ? `${ASSET_BASE}/capsule-blue-open.svg` : `${ASSET_BASE}/capsule-pink-open.svg`;
-
-  const grabbedLeft = `calc(50% + ${motion.x}px)`;
-  const grabbedTop = `calc(33.2% + ${motion.cable + 50}px)`;
+  const floatingLeft = `calc(50% + ${motion.prizeX}px)`;
+  const floatingTop = `calc(30.4% + ${motion.prizeY}px)`;
 
   return (
     <main className={`claw-overlay-root phase-${motion.phase}`}>
-      <style>{`
+      <style jsx global>{`
         html,
         body {
           margin: 0;
+          padding: 0;
           width: 100%;
           height: 100%;
           overflow: hidden;
-          background: transparent !important;
+          background: transparent;
         }
 
+        * {
+          box-sizing: border-box;
+        }
+      `}</style>
+
+      <style jsx>{`
         .claw-overlay-root {
-          position: fixed;
-          inset: 0;
+          position: relative;
           width: 100vw;
           height: 100vh;
           overflow: hidden;
           background: transparent;
-          font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          font-family:
+            "Pretendard",
+            "Apple SD Gothic Neo",
+            "Malgun Gothic",
+            sans-serif;
+        }
+
+        .overlay-stage {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           pointer-events: none;
         }
 
-        .claw-stage {
+        .overlay-message {
           position: absolute;
           left: 50%;
-          top: 50%;
-          width: min(76vw, 860px);
-          aspect-ratio: 0.72;
-          transform: translate(-50%, -50%);
+          top: 7%;
+          transform: translateX(-50%);
+          z-index: 30;
+          max-width: min(92vw, 720px);
+          border-radius: 18px;
+          background: rgba(15, 23, 42, 0.82);
+          color: #ffffff;
+          padding: 12px 18px;
+          font-size: clamp(14px, 1.6vw, 24px);
+          font-weight: 800;
+          text-align: center;
+          backdrop-filter: blur(10px);
         }
 
-        .machine {
+        .machine-shell {
+          position: relative;
+          width: min(74vw, 520px);
+          aspect-ratio: 9 / 14;
+        }
+
+        .machine-base {
           position: absolute;
           inset: 0;
           width: 100%;
           height: 100%;
           object-fit: contain;
-          filter: drop-shadow(0 22px 35px rgba(15, 23, 42, 0.18));
-          user-select: none;
           z-index: 1;
-        }
-
-        .glass-brightener {
-          position: absolute;
-          left: 17.6%;
-          top: 29.5%;
-          width: 64.8%;
-          height: 39.5%;
-          z-index: 2;
-          border-radius: 10px 10px 18px 18px;
-          background:
-            linear-gradient(
-              180deg,
-              rgba(255, 255, 255, 0.58) 0%,
-              rgba(255, 255, 255, 0.42) 34%,
-              rgba(255, 255, 255, 0.26) 67%,
-              rgba(255, 255, 255, 0.14) 100%
-            );
-          mix-blend-mode: screen;
+          user-select: none;
+          -webkit-user-drag: none;
         }
 
         .machine-sign {
           position: absolute;
           left: 50%;
-          top: 24.7%;
+          top: 22.7%;
           transform: translateX(-50%);
-          z-index: 8;
+          z-index: 12;
           min-width: 250px;
+          max-width: 76%;
           border-radius: 999px;
-          background: rgba(255, 255, 255, 0.86);
+          background: rgba(255, 255, 255, 0.88);
           box-shadow: 0 8px 18px rgba(15, 23, 42, 0.14);
-          padding: 6px 15px;
+          padding: 7px 16px;
           color: #0f172a;
-          font-size: clamp(16px, 1.9vw, 25px);
+          font-size: clamp(16px, 1.9vw, 24px);
           font-weight: 1000;
           line-height: 1;
           text-align: center;
-          letter-spacing: -0.07em;
+          white-space: nowrap;
         }
 
-        .rail {
+        .machine-rail {
           position: absolute;
-          left: 24%;
-          right: 24%;
-          top: 33.5%;
-          z-index: 5;
-          height: 13px;
+          left: 24.2%;
+          right: 24.2%;
+          top: 33.2%;
+          height: 12px;
+          z-index: 10;
           border-radius: 999px;
-          background: linear-gradient(180deg, rgba(226, 232, 240, 0.98), rgba(100, 116, 139, 0.98));
+          background: linear-gradient(180deg, rgba(232, 240, 248, 0.98), rgba(104, 122, 142, 0.98));
           box-shadow:
             inset 0 2px 0 rgba(255, 255, 255, 0.72),
-            inset 0 -3px 0 rgba(15, 23, 42, 0.2),
+            inset 0 -3px 0 rgba(15, 23, 42, 0.22),
             0 5px 10px rgba(15, 23, 42, 0.17);
         }
 
-        .rail-car {
+        .machine-rail-car {
           position: absolute;
-          left: 50%;
-          top: 31.9%;
+          top: 31.6%;
           width: 58px;
-          height: 27px;
-          z-index: 7;
-          border-radius: 13px;
+          height: 28px;
+          z-index: 13;
+          transform: translateX(-50%);
+          border-radius: 14px;
           background: linear-gradient(180deg, #f8fafc, #94a3b8);
           box-shadow: 0 7px 12px rgba(15, 23, 42, 0.2);
         }
 
-        .rail-car::before,
-        .rail-car::after {
+        .machine-rail-car::before,
+        .machine-rail-car::after {
           content: "";
           position: absolute;
-          top: 7px;
+          top: 8px;
           width: 9px;
           height: 9px;
           border-radius: 999px;
           background: #334155;
         }
 
-        .rail-car::before {
+        .machine-rail-car::before {
           left: 13px;
         }
 
-        .rail-car::after {
+        .machine-rail-car::after {
           right: 13px;
         }
 
-        .claw-rig {
+        .machine-claw {
           position: absolute;
-          left: 50%;
-          top: 33.2%;
-          width: 72px;
-          height: 410px;
-          z-index: 7;
-          filter: drop-shadow(0 7px 8px rgba(15, 23, 42, 0.24));
+          top: 33.0%;
+          width: 74px;
+          height: 380px;
+          z-index: 14;
+          transform: translateX(-50%);
+          filter: drop-shadow(0 7px 8px rgba(15, 23, 42, 0.22));
         }
 
-        .claw-cable {
+        .machine-claw-cable {
           position: absolute;
           left: 50%;
           top: 0;
@@ -523,7 +545,7 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
           background: linear-gradient(180deg, #64748b 0%, #334155 100%);
         }
 
-        .claw-head {
+        .machine-claw-head {
           position: absolute;
           left: 50%;
           width: 58px;
@@ -531,7 +553,7 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
           transform: translateX(-50%);
         }
 
-        .claw-head::before {
+        .machine-claw-head::before {
           content: "";
           position: absolute;
           left: 50%;
@@ -543,8 +565,7 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
           background: #475569;
         }
 
-        .claw-left,
-        .claw-right {
+        .claw-arm {
           position: absolute;
           top: 14px;
           width: 25px;
@@ -554,417 +575,191 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
           transition: transform 0.18s ease;
         }
 
-        .claw-left {
+        .claw-arm-left {
           left: 4px;
           border-left: 6px solid #334155;
           transform: rotate(25deg);
         }
 
-        .claw-right {
+        .claw-arm-right {
           right: 4px;
           border-right: 6px solid #334155;
           transform: rotate(-25deg);
         }
 
-        .claw-rig.is-closed .claw-left {
+        .machine-claw.is-closed .claw-arm-left {
           transform: rotate(3deg);
         }
 
-        .claw-rig.is-closed .claw-right {
+        .machine-claw.is-closed .claw-arm-right {
           transform: rotate(-3deg);
         }
 
-        .grabbed-prize {
+        .floating-prize {
           position: absolute;
-          width: 92px;
-          min-height: 92px;
-          transform: translate(-50%, -50%) scale(0.86);
-          opacity: 0;
-          z-index: 6;
+          z-index: 11;
+          transform: translate(-50%, -50%);
+          width: 100px;
+          min-height: 100px;
+          pointer-events: none;
           filter: drop-shadow(0 12px 12px rgba(15, 23, 42, 0.24));
         }
 
-        .grabbed-prize.is-visible {
+        .floating-prize.is-miss {
+          opacity: 0.98;
+        }
+
+        .floating-prize.is-winner {
           opacity: 1;
         }
 
-        .grabbed-prize img {
+        .prize-image {
+          position: relative;
+          width: 100%;
+        }
+
+        .prize-image img {
+          display: block;
           width: 100%;
           height: auto;
-          display: block;
+          user-select: none;
+          -webkit-user-drag: none;
         }
 
-        .character-prize {
-          position: relative;
-          width: 138px;
-          height: 178px;
-          transform-origin: center;
-        }
-
-        .grabbed-prize .character-prize {
-          width: 92px;
-          height: 120px;
-        }
-
-        .character-head {
+        .prize-front-tag {
           position: absolute;
           left: 50%;
-          top: 0;
-          width: 86px;
-          height: 76px;
+          bottom: 20%;
           transform: translateX(-50%);
-          border-radius: 48% 48% 44% 44%;
-          background: #ffd6a5;
-          box-shadow: inset 0 -8px 0 rgba(15, 23, 42, 0.07);
-        }
-
-        .grabbed-prize .character-head {
-          width: 58px;
-          height: 52px;
-        }
-
-        .character-hair {
-          position: absolute;
-          left: 7px;
-          top: -4px;
-          width: 72px;
-          height: 24px;
-          border-radius: 999px 999px 30px 30px;
-          background: var(--hair);
-        }
-
-        .grabbed-prize .character-hair {
-          left: 5px;
-          width: 48px;
-          height: 17px;
-        }
-
-        .character-eye {
-          position: absolute;
-          top: 31px;
-          width: 10px;
-          height: 10px;
+          max-width: 72%;
           border-radius: 999px;
-          background: #111827;
-        }
-
-        .character-eye-left {
-          left: 25px;
-        }
-
-        .character-eye-right {
-          right: 25px;
-        }
-
-        .character-mouth {
-          position: absolute;
-          left: 50%;
-          bottom: 15px;
-          width: 22px;
-          height: 12px;
-          transform: translateX(-50%);
-          border-radius: 0 0 999px 999px;
-          background: #7f1d1d;
-        }
-
-        .character-body {
-          position: absolute;
-          left: 50%;
-          top: 68px;
-          width: 98px;
-          height: 78px;
-          transform: translateX(-50%);
-          border-radius: 42px 42px 28px 28px;
-          background: var(--body);
-          box-shadow: inset 0 -10px 0 rgba(15, 23, 42, 0.08);
-        }
-
-        .grabbed-prize .character-body {
-          top: 46px;
-          width: 66px;
-          height: 52px;
-        }
-
-        .character-arm {
-          position: absolute;
-          top: 80px;
-          width: 24px;
-          height: 42px;
-          border-radius: 999px;
-          background: var(--body);
-        }
-
-        .character-arm-left {
-          left: 11px;
-          transform: rotate(18deg);
-        }
-
-        .character-arm-right {
-          right: 11px;
-          transform: rotate(-18deg);
-        }
-
-        .character-leg {
-          position: absolute;
-          bottom: 0;
-          width: 25px;
-          height: 42px;
-          border-radius: 999px;
-          background: #fde68a;
-        }
-
-        .character-leg-left {
-          left: 43px;
-        }
-
-        .character-leg-right {
-          right: 43px;
-        }
-
-        .character-red {
-          --body: #ef4444;
-          --hair: #111827;
-        }
-
-        .character-yellow {
-          --body: #facc15;
-          --hair: #111827;
-        }
-
-        .character-orange {
-          --body: #fb923c;
-          --hair: #b45309;
-        }
-
-        .character-green {
-          --body: #22c55e;
-          --hair: #334155;
-        }
-
-        .character-prize.is-back .character-head {
-          background: var(--hair);
-        }
-
-        .character-prize.is-back .character-hair,
-        .character-prize.is-back .character-eye,
-        .character-prize.is-back .character-mouth {
-          display: none;
-        }
-
-        .character-name-patch {
-          position: absolute;
-          left: 50%;
-          top: 23px;
-          max-width: 112px;
-          transform: translateX(-50%);
-          border-radius: 999px;
-          background: rgba(255, 255, 255, 0.96);
-          box-shadow: 0 8px 16px rgba(15, 23, 42, 0.18);
-          padding: 8px 13px;
-          color: #0f172a;
-          font-size: 20px;
-          font-weight: 1000;
+          background: rgba(255, 255, 255, 0.78);
+          color: rgba(15, 23, 42, 0.9);
+          padding: 5px 9px;
+          font-size: 12px;
+          font-weight: 900;
           line-height: 1;
           text-align: center;
-          letter-spacing: -0.07em;
-          word-break: keep-all;
+          white-space: nowrap;
+          backdrop-filter: blur(4px);
+          box-shadow: 0 6px 12px rgba(15, 23, 42, 0.14);
         }
 
-        .result-character {
+        .prize-front-tag.is-subtle {
+          opacity: 0.72;
+          filter: blur(0.15px);
+        }
+
+        .result-panel {
           position: absolute;
           left: 50%;
-          top: 48%;
-          transform: translate(-50%, -50%) scale(0.84);
-          opacity: 0;
-          z-index: 12;
-          filter: drop-shadow(0 18px 18px rgba(15, 23, 42, 0.2));
-        }
-
-        .result-character.is-visible {
-          opacity: 1;
-          transform: translate(-50%, -50%) scale(1);
-          transition: opacity 0.42s ease, transform 0.42s ease;
-        }
-
-        .capsule-open {
-          position: absolute;
-          left: 50%;
-          top: 43%;
-          width: 17%;
-          transform: translate(-50%, -50%);
-          opacity: 0;
-          z-index: 9;
-          filter: drop-shadow(0 15px 16px rgba(15, 23, 42, 0.2));
-        }
-
-        .capsule-open.is-visible {
-          opacity: 1;
-          animation: popOpen 0.55s ease-out both;
-        }
-
-        .paper-result {
-          position: absolute;
-          left: 50%;
-          top: 49%;
-          min-width: 250px;
-          max-width: 400px;
-          transform: translate(-50%, -50%) scale(0.9);
-          opacity: 0;
-          z-index: 12;
+          bottom: 22.5%;
+          z-index: 20;
+          transform: translateX(-50%);
+          width: min(76%, 360px);
           border-radius: 22px;
           background: rgba(255, 255, 255, 0.94);
-          box-shadow: 0 22px 55px rgba(15, 23, 42, 0.22);
-          padding: 16px 20px;
+          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.24);
+          padding: 16px 18px 18px;
           text-align: center;
+          backdrop-filter: blur(10px);
         }
 
-        .paper-result.is-visible {
-          opacity: 1;
-          transform: translate(-50%, -50%) scale(1);
-          transition: opacity 0.35s ease, transform 0.35s ease;
-        }
-
-        .result-label {
+        .result-kicker {
           color: #8b5cf6;
-          font-size: 16px;
+          font-size: clamp(15px, 1.7vw, 22px);
           font-weight: 1000;
-          letter-spacing: -0.06em;
+          line-height: 1.1;
         }
 
-        .result-name {
+        .result-winner-name {
           margin-top: 8px;
           color: #0f172a;
-          font-size: clamp(28px, 4.3vw, 52px);
+          font-size: clamp(28px, 3.4vw, 48px);
           font-weight: 1000;
-          line-height: 0.98;
-          letter-spacing: -0.08em;
+          line-height: 1.05;
           word-break: keep-all;
         }
 
         .result-note {
-          margin-top: 8px;
+          margin-top: 9px;
           color: #475569;
-          font-size: clamp(15px, 1.7vw, 24px);
-          font-weight: 950;
-          letter-spacing: -0.05em;
+          font-size: clamp(14px, 1.55vw, 21px);
+          font-weight: 800;
+          line-height: 1.2;
         }
 
-        .debug-message {
-          position: absolute;
-          left: 50%;
-          bottom: 7%;
-          transform: translateX(-50%);
-          z-index: 30;
-          max-width: 680px;
-          border-radius: 999px;
-          background: rgba(255, 255, 255, 0.78);
-          padding: 8px 16px;
-          color: rgba(100, 116, 139, 0.82);
-          font-size: 14px;
-          font-weight: 900;
-          text-align: center;
-        }
-
-        @keyframes popOpen {
-          0% {
-            opacity: 0;
-            transform: translate(-50%, -50%) scale(0.55) rotate(-8deg);
+        @media (max-width: 768px) {
+          .machine-shell {
+            width: min(88vw, 480px);
           }
-          100% {
-            opacity: 1;
-            transform: translate(-50%, -50%) scale(1) rotate(0deg);
+
+          .machine-sign {
+            min-width: 220px;
+            padding: 6px 14px;
+          }
+
+          .result-panel {
+            width: 74%;
+            bottom: 22%;
           }
         }
       `}</style>
 
-      <section className="claw-stage">
-        <img
-          src={machineSrc}
-          onError={() => setMachineSrc(`${ASSET_BASE}/machine.svg`)}
-          className="machine"
-          alt=""
-          draggable={false}
-        />
+      <div className="overlay-stage">
+        {message ? <div className="overlay-message">{message}</div> : null}
 
-        <div className="glass-brightener" aria-hidden="true" />
-        <div className="machine-sign">🎁 루루동이 인형뽑기</div>
-        <div className="rail" aria-hidden="true" />
-
-        <div
-          className="rail-car"
-          aria-hidden="true"
-          style={{
-            transform: `translate(calc(-50% + ${motion.x}px), 0)`,
-          }}
-        />
-
-        <div
-          className={`claw-rig ${motion.closed ? "is-closed" : ""}`}
-          aria-hidden="true"
-          style={{
-            transform: `translate(calc(-50% + ${motion.x}px), 0)`,
-          }}
-        >
-          <div
-            className="claw-cable"
-            style={{
-              height: `${motion.cable}px`,
-            }}
+        <div className="machine-shell">
+          <img
+            src={machineSrc}
+            alt="루루동이 인형뽑기 기계"
+            className="machine-base"
+            onError={() => setMachineSrc(`${ASSET_BASE}/machine.svg`)}
           />
+
+          <div className="machine-sign">🎁 루루동이 인형뽑기</div>
+
+          <div className="machine-rail" aria-hidden="true" />
+
           <div
-            className="claw-head"
-            style={{
-              top: `${motion.cable - 2}px`,
-            }}
+            className="machine-rail-car"
+            aria-hidden="true"
+            style={{ left: `calc(50% + ${motion.x}px)` }}
+          />
+
+          <div
+            className={`machine-claw ${motion.closed ? "is-closed" : ""}`}
+            aria-hidden="true"
+            style={{ left: `calc(50% + ${motion.x}px)` }}
           >
-            <span className="claw-left" />
-            <span className="claw-right" />
+            <div className="machine-claw-cable" style={{ height: `${motion.cable}px` }} />
+            <div className="machine-claw-head" style={{ top: `${motion.cable - 2}px` }}>
+              <span className="claw-arm claw-arm-left" />
+              <span className="claw-arm claw-arm-right" />
+            </div>
           </div>
-        </div>
 
-        <div
-          className={`grabbed-prize ${motion.showGrabbed ? "is-visible" : ""}`}
-          style={{
-            left: grabbedLeft,
-            top: grabbedTop,
-          }}
-        >
-          {isCharacter ? (
-            <CharacterPrize kind={characterKind} side="front" />
-          ) : (
-            <img src={closedCapsuleAsset} alt="" draggable={false} />
-          )}
-        </div>
-
-        {isCharacter ? (
-          <>
-            <div className={`result-character ${motion.showFront ? "is-visible" : ""}`}>
-              <CharacterPrize kind={characterKind} side="front" />
+          {motion.showPrize ? (
+            <div
+              className={`floating-prize ${motion.prizeIsWinner ? "is-winner" : "is-miss"}`}
+              style={{
+                left: floatingLeft,
+                top: floatingTop,
+              }}
+            >
+              <PrizeImage kind={prizeKind} nickname={winnerNickname} subtleTag />
             </div>
-            <div className={`result-character ${motion.showBack ? "is-visible" : ""}`}>
-              <CharacterPrize kind={characterKind} side="back" name={winnerNickname} />
-            </div>
-          </>
-        ) : null}
+          ) : null}
 
-        {isCapsule ? (
-          <>
-            <img
-              src={openCapsuleAsset}
-              className={`capsule-open ${motion.showCapsuleOpen ? "is-visible" : ""}`}
-              alt=""
-              draggable={false}
-            />
-            <div className={`paper-result ${motion.showBack ? "is-visible" : ""}`}>
-              <div className="result-label">{prizeLabel(prizeKind)}</div>
-              <div className="result-name">{winnerNickname}</div>
+          {motion.showResult ? (
+            <div className="result-panel">
+              <div className="result-kicker">당첨</div>
+              <div className="result-winner-name">{winnerNickname || "-"}</div>
               <div className="result-note">{winnerNote}</div>
             </div>
-          </>
-        ) : null}
-
-        {message && !event ? <div className="debug-message">{message}</div> : null}
-      </section>
+          ) : null}
+        </div>
+      </div>
     </main>
   );
 }
