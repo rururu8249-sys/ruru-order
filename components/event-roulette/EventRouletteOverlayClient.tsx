@@ -119,25 +119,24 @@ function getLabelPoint(index: number, total: number) {
   const safeTotal = Math.max(total || 1, 1);
   const sliceAngle = 360 / safeTotal;
 
-  // 기존 세로 방향 유지.
-  // 경계선에 붙어 보이는 문제를 줄이기 위해 라벨 기준각을 반 칸 더 이동한다.
-  const degree = -90 + sliceAngle * index + sliceAngle;
+  // 칸 중앙각: index + 0.5
+  // +1은 다음 칸 경계선이라 틀림.
+  const degree = -90 + sliceAngle * (index + 0.5);
   const rad = (degree * Math.PI) / 180;
 
-  // 색상 칸 안쪽에 들어오도록 반지름은 너무 바깥으로 보내지 않는다.
+  // 세로 글씨 방향 유지, 칸 안쪽에 보이게 배치
   const radius =
-    safeTotal >= 70 ? 33 :
-    safeTotal >= 55 ? 34 :
-    safeTotal >= 40 ? 35 :
-    safeTotal >= 24 ? 36 :
-    38;
+    safeTotal >= 70 ? 34 :
+    safeTotal >= 55 ? 35 :
+    safeTotal >= 40 ? 36 :
+    safeTotal >= 24 ? 37 :
+    39;
 
   const x = 50 + Math.cos(rad) * radius;
   const y = 50 + Math.sin(rad) * radius;
 
   let rotation = degree;
 
-  // 왼쪽 반원은 글씨가 뒤집히지 않게 유지
   if (rotation > 90 || rotation < -90) {
     rotation += 180;
   }
