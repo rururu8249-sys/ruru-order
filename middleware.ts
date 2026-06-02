@@ -38,6 +38,9 @@ function isAuthorizedInternalCronRequest(request: NextRequest) {
   const allowedSecrets = [
     String(process.env.CRON_SECRET || "").trim(),
     String(process.env.BANKDA_CRON_SECRET || "").trim(),
+    String(process.env.ADMIN_SESSION_SECRET || "").trim(),
+    String(process.env.ADMIN_SESSION_TOKEN || "").trim(),
+    String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim(),
   ].filter(Boolean);
 
   return Boolean(providedSecret && allowedSecrets.includes(providedSecret));
