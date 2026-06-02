@@ -23,6 +23,10 @@ if (!route.includes("CRON_SECRET") || !route.includes("BANKDA_CRON_SECRET")) {
   fail("크론 API에 CRON_SECRET / BANKDA_CRON_SECRET 인증 검사가 없습니다.");
 }
 
+if (!route.includes("vercel-cron/1.0") || !route.includes("x-vercel-cron-schedule")) {
+  fail("크론 API에 Vercel Cron 공식 헤더 보조 인증 검사가 없습니다.");
+}
+
 if (!route.includes("/api/bankda/sync-and-auto-match")) {
   fail("크론 API가 /api/bankda/sync-and-auto-match를 호출하지 않습니다.");
 }

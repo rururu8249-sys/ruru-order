@@ -27,12 +27,29 @@ function getProvidedSecret(request: NextRequest) {
   ).trim();
 }
 
+function isVercelCronRequest(request: NextRequest) {
+  const userAgent = request.headers.get("user-agent") || "";
+  const cronSchedule = request.headers.get("x-vercel-cron-schedule") || "";
+
+  return userAgent.includes("vercel-cron/1.0") && Boolean(cronSchedule.trim());
+}
+
 function assertAuthorized(request: NextRequest) {
   const cronSecret = String(process.env.CRON_SECRET || "").trim();
   const bankdaCronSecret = String(process.env.BANKDA_CRON_SECRET || "").trim();
   const providedSecret = getProvidedSecret(request);
 
   const allowedSecrets = [cronSecret, bankdaCronSecret].filter(Boolean);
+
+  if (providedSecret && allowedSecrets.includes(providedSecret)) {
+    return { ok: true, status: 200, message: "" };
+  }
+
+  // Vercel Cron 공식 호출은 user-agent: vercel-cron/1.0 과 x-vercel-cron-schedule 헤더를 포함합니다.
+  // CRON_SECRET 헤더 반영이 꼬여도 Vercel Cron 자체는 통과시켜 Bankda 서버 자동동기화를 살립니다.
+  if (isVercelCronRequest(request)) {
+    return { ok: true, status: 200, message: "" };
+  }
 
   if (allowedSecrets.length === 0) {
     return {
@@ -42,15 +59,11 @@ function assertAuthorized(request: NextRequest) {
     };
   }
 
-  if (!providedSecret || !allowedSecrets.includes(providedSecret)) {
-    return {
-      ok: false,
-      status: 401,
-      message: "Bankda cron 인증 실패",
-    };
-  }
-
-  return { ok: true, status: 200, message: "" };
+  return {
+    ok: false,
+    status: 401,
+    message: "Bankda cron 인증 실패",
+  };
 }
 
 async function handleBankdaCron(request: NextRequest) {
