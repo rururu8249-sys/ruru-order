@@ -132,9 +132,10 @@ function getMotionState(elapsedMs: number, seed: number, hasResult: boolean, now
     };
   }
 
+  const missCount = seed % 3;
+
   const missXOptions = [-58, -22, 42];
   const catchXOptions = [-26, 6, 30];
-  const missX = missXOptions[seed % missXOptions.length];
   const catchX = catchXOptions[seed % catchXOptions.length];
 
   const moveMissMs = 2300;
@@ -148,142 +149,59 @@ function getMotionState(elapsedMs: number, seed: number, hasResult: boolean, now
   const liftCatchMs = 2200;
 
   let t = elapsedMs;
+  let prevX = idleX;
 
-  if (t <= moveMissMs) {
-    return {
-      phase: "move-miss",
-      x: lerp(idleX, missX, t / moveMissMs),
-      cable: topCable,
-      clawClosed: false,
-      showPrize: false,
-      prizeX: missX,
-      prizeY: deepCable,
-      showResult: false,
-    };
-  }
-  t -= moveMissMs;
+  for (let i = 0; i < missCount; i++) {
+    const missX = missXOptions[(seed + i * 7) % missXOptions.length];
 
-  if (t <= dropMissMs) {
-    return {
-      phase: "drop-miss",
-      x: missX,
-      cable: lerp(topCable, deepCable, t / dropMissMs),
-      clawClosed: false,
-      showPrize: false,
-      prizeX: missX,
-      prizeY: deepCable,
-      showResult: false,
-    };
-  }
-  t -= dropMissMs;
+    if (t <= moveMissMs) {
+      return { phase: "move-miss", x: lerp(prevX, missX, t / moveMissMs), cable: topCable, clawClosed: false, showPrize: false, prizeX: missX, prizeY: deepCable, showResult: false };
+    }
+    t -= moveMissMs;
 
-  if (t <= grabMissMs) {
-    return {
-      phase: "grab-miss",
-      x: missX,
-      cable: deepCable,
-      clawClosed: t > grabMissMs * 0.65,
-      showPrize: true,
-      prizeX: missX,
-      prizeY: deepCable + 6,
-      showResult: false,
-    };
-  }
-  t -= grabMissMs;
+    if (t <= dropMissMs) {
+      return { phase: "drop-miss", x: missX, cable: lerp(topCable, deepCable, t / dropMissMs), clawClosed: false, showPrize: false, prizeX: missX, prizeY: deepCable, showResult: false };
+    }
+    t -= dropMissMs;
 
-  if (t <= liftMissMs) {
-    return {
-      phase: "lift-miss",
-      x: missX,
-      cable: lerp(deepCable, midCable, t / liftMissMs),
-      clawClosed: true,
-      showPrize: true,
-      prizeX: missX,
-      prizeY: lerp(deepCable + 6, midCable + 26, t / liftMissMs),
-      showResult: false,
-    };
-  }
-  t -= liftMissMs;
+    if (t <= grabMissMs) {
+      return { phase: "grab-miss", x: missX, cable: deepCable, clawClosed: t > grabMissMs * 0.65, showPrize: true, prizeX: missX, prizeY: deepCable + 6, showResult: false };
+    }
+    t -= grabMissMs;
 
-  if (t <= fallMissMs) {
-    return {
-      phase: "fall-miss",
-      x: missX + 10,
-      cable: lerp(midCable, deepCable, t / fallMissMs),
-      clawClosed: false,
-      showPrize: t < fallMissMs * 0.6,
-      prizeX: missX + 10,
-      prizeY: lerp(midCable + 26, deepCable + 14, t / fallMissMs),
-      showResult: false,
-    };
+    if (t <= liftMissMs) {
+      return { phase: "lift-miss", x: missX, cable: lerp(deepCable, midCable, t / liftMissMs), clawClosed: true, showPrize: true, prizeX: missX, prizeY: lerp(deepCable + 6, midCable + 26, t / liftMissMs), showResult: false };
+    }
+    t -= liftMissMs;
+
+    if (t <= fallMissMs) {
+      return { phase: "fall-miss", x: missX + 10, cable: lerp(midCable, deepCable, t / fallMissMs), clawClosed: false, showPrize: t < fallMissMs * 0.6, prizeX: missX + 10, prizeY: lerp(midCable + 26, deepCable + 14, t / fallMissMs), showResult: false };
+    }
+    t -= fallMissMs;
+
+    prevX = missX + 10;
   }
-  t -= fallMissMs;
 
   if (t <= moveCatchMs) {
-    return {
-      phase: "move-catch",
-      x: lerp(missX + 10, catchX, t / moveCatchMs),
-      cable: topCable,
-      clawClosed: false,
-      showPrize: false,
-      prizeX: catchX,
-      prizeY: deepCable,
-      showResult: false,
-    };
+    return { phase: "move-catch", x: lerp(prevX, catchX, t / moveCatchMs), cable: topCable, clawClosed: false, showPrize: false, prizeX: catchX, prizeY: deepCable, showResult: false };
   }
   t -= moveCatchMs;
 
   if (t <= dropCatchMs) {
-    return {
-      phase: "drop-catch",
-      x: catchX,
-      cable: lerp(topCable, deepCable + 8, t / dropCatchMs),
-      clawClosed: false,
-      showPrize: false,
-      prizeX: catchX,
-      prizeY: deepCable + 8,
-      showResult: false,
-    };
+    return { phase: "drop-catch", x: catchX, cable: lerp(topCable, deepCable + 8, t / dropCatchMs), clawClosed: false, showPrize: false, prizeX: catchX, prizeY: deepCable + 8, showResult: false };
   }
   t -= dropCatchMs;
 
   if (t <= grabCatchMs) {
-    return {
-      phase: "grab-catch",
-      x: catchX,
-      cable: deepCable + 8,
-      clawClosed: t > grabCatchMs * 0.65,
-      showPrize: true,
-      prizeX: catchX,
-      prizeY: deepCable + 12,
-      showResult: false,
-    };
+    return { phase: "grab-catch", x: catchX, cable: deepCable + 8, clawClosed: t > grabCatchMs * 0.65, showPrize: true, prizeX: catchX, prizeY: deepCable + 12, showResult: false };
   }
   t -= grabCatchMs;
 
   if (t <= liftCatchMs) {
-    return {
-      phase: "lift-catch",
-      x: catchX,
-      cable: lerp(deepCable + 8, 126, t / liftCatchMs),
-      clawClosed: true,
-      showPrize: true,
-      prizeX: catchX,
-      prizeY: lerp(deepCable + 12, 160, t / liftCatchMs),
-      showResult: false,
-    };
+    return { phase: "lift-catch", x: catchX, cable: lerp(deepCable + 8, 126, t / liftCatchMs), clawClosed: true, showPrize: true, prizeX: catchX, prizeY: lerp(deepCable + 12, 160, t / liftCatchMs), showResult: false };
   }
 
-  return {
-    phase: "result",
-    x: catchX,
-    cable: 108,
-    clawClosed: true,
-    showPrize: true,
-    prizeX: catchX,
-    prizeY: 142,
-    showResult: true,
-  };
+  return { phase: "result", x: catchX, cable: 108, clawClosed: true, showPrize: true, prizeX: catchX, prizeY: 142, showResult: true };
 }
 
 export default function EventClawOverlayClient({ initialToken }: EventClawOverlayClientProps) {
@@ -355,18 +273,18 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
   const resultEventTime = Date.parse(cleanText(event?.result_at) || cleanText(event?.updated_at) || "");
   const isFreshResultForThisWidget =
     Number.isFinite(resultEventTime) && resultEventTime >= mountedAtRef.current - 1000;
-  const elapsedMs = hasResult && animationStartedAt ? now - animationStartedAt : 0;
-  const clawResultCardDelayMs = 13500;
-  const clawResultCardVisibleMs = 5000;
-  const resultCardVisible =
-    isFreshResultForThisWidget &&
-    Boolean(winnerNickname) &&
-    elapsedMs >= clawResultCardDelayMs &&
-    elapsedMs < clawResultCardDelayMs + clawResultCardVisibleMs;
   const seed = hashText(`${winnerNickname}|${resultKey}`);
   const prizeKey = useMemo(() => pickPrizeKey(winnerNickname || "default", resultKey || "idle"), [winnerNickname, resultKey]);
   const prizeSrc = PRIZE_ASSETS[prizeKey];
+  const elapsedMs = hasResult && animationStartedAt ? now - animationStartedAt : 0;
   const motion = getMotionState(elapsedMs, seed, hasResult, now);
+  const clawResultCardVisibleMs = 5000;
+  const clawAnimationDoneAt = motion.showResult ? (animationStartedAt + elapsedMs) : 0;
+  const resultCardVisible =
+    isFreshResultForThisWidget &&
+    Boolean(winnerNickname) &&
+    motion.showResult &&
+    (now - clawAnimationDoneAt) < clawResultCardVisibleMs;
 
   return (
     <main className="claw-root">
