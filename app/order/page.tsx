@@ -3598,11 +3598,27 @@ export default function OrderPage() {
 
           <section
             id="orderProductInputSection"
-            className="mt-3 w-full max-w-full overflow-hidden rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm"
+            className="mt-3 w-full max-w-full overflow-hidden rounded-[24px] border border-blue-200 bg-blue-50 p-4 shadow-sm"
           >
+            <h2 className="text-[22px] font-black leading-tight tracking-[-0.07em] text-slate-950">
+              방송에서 주문한 상품 찾기
+            </h2>
+            <p className="mt-2 break-keep text-[15px] font-bold leading-relaxed tracking-[-0.04em] text-blue-700">
+              이름만 쳐도 가격까지 떠요. 못 찾으면 직접 입력도 돼요.
+            </p>
+
+            <button
+              type="button"
+              onClick={openDirectInputSheet}
+              className={`${buttonBase} mt-4 w-full rounded-[18px] bg-blue-600 px-3 py-4 text-[17px] font-black tracking-[-0.04em] text-white`}
+            >
+              상품 찾기 / 직접 입력
+            </button>
+          </section>
+
+          <section className="mt-3 w-full max-w-full overflow-hidden rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm">
             <div className="mb-4">
-              <h2 className="flex items-center gap-2 text-[17px] font-black tracking-[-0.06em] text-slate-950">
-                <span className="text-[12px] font-black tracking-[-0.03em] text-slate-400">01</span>
+              <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
                 상품목록
               </h2>
               <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
@@ -3621,36 +3637,9 @@ export default function OrderPage() {
             </div>
           </section>
 
-          <section className="mt-3 rounded-[24px] border border-slate-200 bg-slate-50 p-3 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-50 text-[22px] font-black text-blue-700 ring-1 ring-blue-100">
-                +
-              </div>
-
-              <div className="min-w-0 flex-1">
-                <h2 className="flex items-center gap-2 text-[17px] font-black tracking-[-0.06em] text-slate-950">
-                  <span className="text-[12px] font-black tracking-[-0.03em] text-slate-400">02</span>
-                  직접 입력
-                </h2>
-                <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
-                  상품명, 옵션, 금액을 직접 입력해 주세요.
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={openDirectInputSheet}
-              className={`${buttonBase} mt-3 w-full rounded-[18px] border border-blue-200 bg-blue-50 px-3 py-3 text-[15px] font-black tracking-[-0.04em] text-blue-800`}
-            >
-              직접 입력
-            </button>
-          </section>
-
           <section className="mt-3 w-full max-w-full overflow-hidden rounded-[24px] border border-blue-100 bg-blue-50/40 p-3 shadow-sm">
             <div className="mb-4">
-              <h2 className="flex items-center gap-2 text-[17px] font-black tracking-[-0.06em] text-slate-950">
-                <span className="text-[12px] font-black tracking-[-0.03em] text-slate-400">03</span>
+              <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
                 주문서 확인
               </h2>
               <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
