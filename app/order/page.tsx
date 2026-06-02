@@ -3661,7 +3661,7 @@ export default function OrderPage() {
             {selectedItemEntries.length === 0 ? (
               <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50 p-5 text-center">
                 <p className="text-[14px] font-black tracking-[-0.04em] text-slate-700">
-                  아직 담긴 상품이 없습니다.
+                  아직 담은 상품이 없습니다.
                 </p>
                 <p className="mt-1 break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
                   상품목록에서 [담기]를 누르거나 [직접 입력]으로 담아주세요.
@@ -3827,7 +3827,7 @@ export default function OrderPage() {
                   onClick={() => setPaymentMethod(method)}
                   className={`${buttonBase} min-h-[68px] rounded-[20px] px-3 py-3 text-left tracking-[-0.04em] ${
                     paymentMethod === method
-                      ? "bg-blue-700 text-white shadow-lg shadow-blue-700/20"
+                      ? "border-2 border-blue-600 bg-blue-50 text-blue-800 shadow-[0_10px_22px_rgba(37,99,235,0.10)]"
                       : "border border-slate-200 bg-white text-slate-700"
                   }`}
                 >
@@ -3836,7 +3836,7 @@ export default function OrderPage() {
                   </span>
                   <span
                     className={`mt-1 block text-[11px] font-black leading-snug ${
-                      paymentMethod === method ? "text-blue-100" : "text-slate-400"
+                      paymentMethod === method ? "text-blue-700" : "text-slate-400"
                     }`}
                   >
                     {method === "무통장입금" ? "입금자명·금액 확인" : "카톡채널 결제 문의"}
