@@ -113,9 +113,9 @@ function pickPrizeKey(nickname: string, resultKey: string): PrizeKey {
 }
 
 function getMotionState(elapsedMs: number, seed: number, hasResult: boolean, now: number): MotionState {
-  const topCable = 52;
-  const deepCable = 258;
-  const midCable = 168;
+  const topCable = 54;
+  const deepCable = 292;
+  const midCable = 178;
 
   const idleX = Math.sin(now / 1500) * 86;
 
@@ -132,20 +132,20 @@ function getMotionState(elapsedMs: number, seed: number, hasResult: boolean, now
     };
   }
 
-  const missXOptions = [-92, -42, 56];
-  const catchXOptions = [-28, 8, 34];
+  const missXOptions = [-58, -22, 42];
+  const catchXOptions = [-26, 6, 30];
   const missX = missXOptions[seed % missXOptions.length];
   const catchX = catchXOptions[seed % catchXOptions.length];
 
-  const moveMissMs = 1600;
-  const dropMissMs = 1700;
-  const grabMissMs = 520;
-  const liftMissMs = 1150;
-  const fallMissMs = 900;
-  const moveCatchMs = 1400;
-  const dropCatchMs = 1650;
-  const grabCatchMs = 520;
-  const liftCatchMs = 1700;
+  const moveMissMs = 2300;
+  const dropMissMs = 2200;
+  const grabMissMs = 700;
+  const liftMissMs = 1500;
+  const fallMissMs = 1100;
+  const moveCatchMs = 2100;
+  const dropCatchMs = 2200;
+  const grabCatchMs = 700;
+  const liftCatchMs = 2200;
 
   let t = elapsedMs;
 
@@ -182,7 +182,7 @@ function getMotionState(elapsedMs: number, seed: number, hasResult: boolean, now
       phase: "grab-miss",
       x: missX,
       cable: deepCable,
-      clawClosed: true,
+      clawClosed: t > grabMissMs * 0.42,
       showPrize: true,
       prizeX: missX,
       prizeY: deepCable + 6,
@@ -252,7 +252,7 @@ function getMotionState(elapsedMs: number, seed: number, hasResult: boolean, now
       phase: "grab-catch",
       x: catchX,
       cable: deepCable + 8,
-      clawClosed: true,
+      clawClosed: t > grabCatchMs * 0.42,
       showPrize: true,
       prizeX: catchX,
       prizeY: deepCable + 12,
@@ -378,7 +378,7 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
           position: absolute;
           left: 50%;
           top: 50%;
-          width: min(54vw, 470px);
+          width: min(92vw, 720px);
           aspect-ratio: 0.74;
           transform: translate(-50%, -50%);
         }
@@ -414,10 +414,10 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
         }
         .glass-clip {
           position: absolute;
-          left: 18%;
-          top: 22%;
-          width: 64%;
-          height: 51%;
+          left: 18.5%;
+          top: 26.2%;
+          width: 63%;
+          height: 45.8%;
           overflow: hidden;
           z-index: 5;
         }
@@ -425,8 +425,8 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
           position: absolute;
           left: 4%;
           right: 4%;
-          top: 6%;
-          height: 10px;
+          top: 4.5%;
+          height: 11px;
           border-radius: 999px;
           background: linear-gradient(180deg, #cbd5e1, #94a3b8);
           box-shadow: inset 0 1px 2px rgba(255,255,255,0.8), inset 0 -1px 2px rgba(51,65,85,0.35);
@@ -435,9 +435,9 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
         .rail-car {
           position: absolute;
           left: 50%;
-          top: 1.7%;
-          width: 38px;
-          height: 24px;
+          top: 0.9%;
+          width: 40px;
+          height: 25px;
           transform: translateX(-50%);
           z-index: 12;
         }
@@ -503,11 +503,11 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
         }
         .claw-arm.left {
           left: 12px;
-          transform: rotate(-32deg);
+          transform: rotate(-46deg);
         }
         .claw-arm.right {
           right: 12px;
-          transform: rotate(32deg);
+          transform: rotate(46deg);
         }
         .claw.closed .claw-arm.left { transform: rotate(-12deg); }
         .claw.closed .claw-arm.right { transform: rotate(12deg); }

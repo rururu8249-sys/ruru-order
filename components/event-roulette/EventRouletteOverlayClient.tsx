@@ -175,7 +175,7 @@ export default function EventRouletteOverlayClient({ initialToken }: EventRoulet
           left: 50%;
           top: 50%;
           transform: translate(-50%, -50%);
-          width: min(60vw, 560px);
+          width: min(92vw, 760px);
           aspect-ratio: 1 / 1.12;
         }
         .title-pill {
@@ -196,13 +196,13 @@ export default function EventRouletteOverlayClient({ initialToken }: EventRoulet
         .pointer {
           position: absolute;
           left: 50%;
-          top: 12%;
+          top: 18.8%;
           transform: translateX(-50%);
           width: 0;
           height: 0;
-          border-left: 18px solid transparent;
-          border-right: 18px solid transparent;
-          border-top: 30px solid #f43f5e;
+          border-left: 20px solid transparent;
+          border-right: 20px solid transparent;
+          border-top: 34px solid #f43f5e;
           filter: drop-shadow(0 6px 12px rgba(15,23,42,0.18));
           z-index: 25;
         }
@@ -210,7 +210,7 @@ export default function EventRouletteOverlayClient({ initialToken }: EventRoulet
           position: absolute;
           left: 50%;
           top: 54%;
-          width: 74%;
+          width: 82%;
           aspect-ratio: 1 / 1;
           transform: translate(-50%, -50%);
           border-radius: 999px;
