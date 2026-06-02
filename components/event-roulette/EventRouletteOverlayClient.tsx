@@ -324,7 +324,13 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
   return (
     <main className="roulette-overlay-root">
       <section className="roulette-stage" style={{ transform: `scale(${scale})` }} aria-label="루루동이 룰렛">
-        <div className="pointer-wrap" aria-hidden="true">
+        <div
+          className="pointer-wrap"
+          aria-hidden="true"
+          style={{
+            "--pointer-shift": `${Math.max(10, Math.min(42, 900 / participantCount))}px`,
+          } as CSSProperties}
+        >
           <div className="pointer-shadow" />
           <div className="pointer-outline" />
           <div className="pointer-main" />
@@ -415,7 +421,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
 
         .pointer-wrap {
           position: absolute;
-          left: 50%;
+          left: calc(50% + var(--pointer-shift, 0px));
           top: 3.4%;
           z-index: 90;
           width: clamp(86px, 15vw, 150px);
