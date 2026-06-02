@@ -430,67 +430,29 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
         .claw {
           position: absolute;
           left: 50%;
-          bottom: -28px;
-          width: 44px;
-          height: 38px;
+          bottom: -34px;
+          width: 56px;
+          height: 50px;
           transform: translateX(-50%);
           z-index: 13;
         }
-        .claw-core {
-          position: absolute;
-          left: 50%;
-          top: 0;
-          width: 18px;
-          height: 18px;
-          transform: translateX(-50%);
-          border-radius: 999px;
-          background: #475569;
+        .claw-svg {
+          width: 100%;
+          height: 100%;
+          overflow: visible;
+          filter: drop-shadow(0 4px 5px rgba(15,23,42,0.28));
         }
-        .claw-arm {
-          position: absolute;
-          top: 12px;
-          width: 4px;
-          height: 32px;
-          background: #334155;
-          border-radius: 999px;
-          transform-origin: top center;
+        /* 발톱: 대기 상태는 살짝 벌어짐 */
+        .claw-finger {
+          transform-origin: 40px 22px;
+          transition: transform 0.22s ease;
         }
-        .claw-arm {
-          height: 30px;
-          background: linear-gradient(180deg, #94a3b8, #475569);
-          border-radius: 999px 999px 4px 4px;
-          box-shadow: inset -1px 0 1px rgba(255,255,255,0.4);
-        }
-        .claw-arm::after {
-          content: "";
-          position: absolute;
-          bottom: -5px;
-          left: 50%;
-          width: 9px;
-          height: 9px;
-          background: #334155;
-          border-radius: 2px 2px 6px 6px;
-        }
-        .claw-arm.center {
-          left: 50%;
-          transform: translateX(-50%) rotate(0deg);
-        }
-        .claw-arm.center::after { transform: translateX(-50%); }
-        .claw-arm.left {
-          left: 9px;
-          transform: rotate(-46deg);
-          transform-origin: top center;
-        }
-        .claw-arm.left::after { transform: translateX(-50%) rotate(46deg); }
-        .claw-arm.right {
-          right: 9px;
-          transform: rotate(46deg);
-          transform-origin: top center;
-        }
-        .claw-arm.right::after { transform: translateX(-50%) rotate(-46deg); }
-        .claw.closed .claw-arm.left { transform: rotate(-12deg); }
-        .claw.closed .claw-arm.right { transform: rotate(12deg); }
-        .claw .claw-arm { transition: transform 0.18s ease; }
+        .claw-finger.left { transform: rotate(-16deg); }
+        .claw-finger.right { transform: rotate(16deg); }
+        .claw-finger.center { transform: rotate(0deg); }
+        /* 잡을 때(closed): 발톱 오므라듦 */
+        .claw.closed .claw-finger.left { transform: rotate(2deg); }
+        .claw.closed .claw-finger.right { transform: rotate(-2deg); }
 
         .grabbed-prize {
           position: absolute;
@@ -592,10 +554,18 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
 
             <div className="cable" style={{ height: `${motion.cable}px` }}>
               <div className={`claw ${motion.clawClosed ? "closed" : ""}`}>
-                <div className="claw-core" />
-                <div className="claw-arm center" />
-                <div className="claw-arm left" />
-                <div className="claw-arm right" />
+                <svg className="claw-svg" viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg">
+                  {/* 집게 몸통 (위쪽 둥근 헤드) */}
+                  <rect x="34" y="0" width="12" height="14" rx="3" fill="#64748b" />
+                  <ellipse cx="40" cy="16" rx="15" ry="9" fill="#94a3b8" stroke="#475569" strokeWidth="1.5" />
+                  <ellipse cx="40" cy="14" rx="9" ry="4" fill="#cbd5e1" opacity="0.7" />
+                  {/* 왼쪽 갈고리 발톱 */}
+                  <path className="claw-finger left" d="M33 22 C 24 30, 20 44, 26 60 C 27 62, 31 62, 31 59 C 28 46, 31 34, 38 27 C 39 24, 35 21, 33 22 Z" fill="#64748b" stroke="#334155" strokeWidth="1.2" />
+                  {/* 오른쪽 갈고리 발톱 */}
+                  <path className="claw-finger right" d="M47 22 C 56 30, 60 44, 54 60 C 53 62, 49 62, 49 59 C 52 46, 49 34, 42 27 C 41 24, 45 21, 47 22 Z" fill="#64748b" stroke="#334155" strokeWidth="1.2" />
+                  {/* 가운데 발톱 */}
+                  <path className="claw-finger center" d="M40 24 C 38 36, 38 50, 40 64 C 40 66, 42 66, 42 64 C 44 50, 44 36, 42 24 Z" fill="#475569" stroke="#334155" strokeWidth="1.2" />
+                </svg>
               </div>
             </div>
           </div>
