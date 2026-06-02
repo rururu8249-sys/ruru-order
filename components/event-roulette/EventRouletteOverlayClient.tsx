@@ -116,25 +116,21 @@ function makeWheelGradient(count: number) {
 }
 
 function getLabelPoint(index: number, total: number) {
-  const safeTotal = Math.max(total, 1);
-  const sliceAngle = 360 / safeTotal;
-  const angle = -90 + sliceAngle * index + sliceAngle / 2;
-  const rad = (angle * Math.PI) / 180;
+  const safeTotal = Math.max(total || 1, 1);
+  const sliceAngle = (Math.PI * 2) / safeTotal;
+  const middleAngle = -Math.PI / 2 + sliceAngle * (index + 0.5);
 
-  // 칸 경계선이 아니라 칸 안쪽 중심선에 닉네임을 놓는다.
-  // 참여자가 많을수록 안쪽으로 조금 당긴다.
-  const labelRadius =
-    safeTotal >= 70 ? 22 :
-    safeTotal >= 55 ? 23 :
-    safeTotal >= 40 ? 24 :
-    safeTotal >= 24 ? 26 :
-    29;
+  const radius =
+    safeTotal >= 60 ? 31 :
+    safeTotal >= 40 ? 33 :
+    safeTotal >= 24 ? 35 :
+    safeTotal >= 16 ? 37 : 39;
 
-  return {
-    x: 50 + Math.cos(rad) * labelRadius,
-    y: 50 + Math.sin(rad) * labelRadius,
-    rotation: angle,
-  };
+  const x = 50 + Math.cos(middleAngle) * radius;
+  const y = 50 + Math.sin(middleAngle) * radius;
+  const rotation = (middleAngle * 180) / Math.PI + 90;
+
+  return { x, y, rotation };
 }
 
 export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverlayClientProps) {
@@ -434,40 +430,40 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
 
         .pointer-outline {
           position: absolute;
-          top: 10%;
+          top: 8%;
           left: 50%;
           transform: translateX(-50%);
           width: 0;
           height: 0;
-          border-left: clamp(36px, 6vw, 62px) solid transparent;
-          border-right: clamp(36px, 6vw, 62px) solid transparent;
-          border-top: clamp(64px, 10.5vw, 108px) solid #ffffff;
+          border-left: clamp(38px, 6.2vw, 66px) solid transparent;
+          border-right: clamp(38px, 6.2vw, 66px) solid transparent;
+          border-top: clamp(66px, 10.8vw, 112px) solid #ffffff;
           filter:
-            drop-shadow(0 8px 10px rgba(15, 23, 42, 0.25))
-            drop-shadow(0 0 16px rgba(253, 224, 71, 0.75));
+            drop-shadow(0 8px 12px rgba(15, 23, 42, 0.28))
+            drop-shadow(0 0 18px rgba(250, 204, 21, 0.9));
         }
 
         .pointer-main {
           position: absolute;
-          top: 17%;
+          top: 16%;
           left: 50%;
           transform: translateX(-50%);
           width: 0;
           height: 0;
-          border-left: clamp(27px, 4.7vw, 47px) solid transparent;
-          border-right: clamp(27px, 4.7vw, 47px) solid transparent;
-          border-top: clamp(50px, 8.2vw, 86px) solid #ef4444;
+          border-left: clamp(28px, 4.8vw, 48px) solid transparent;
+          border-right: clamp(28px, 4.8vw, 48px) solid transparent;
+          border-top: clamp(52px, 8.4vw, 88px) solid #ef4444;
           filter:
-            drop-shadow(0 7px 10px rgba(127, 29, 29, 0.48))
-            drop-shadow(0 0 18px rgba(239, 68, 68, 0.72));
+            drop-shadow(0 7px 12px rgba(127, 29, 29, 0.48))
+            drop-shadow(0 0 18px rgba(239, 68, 68, 0.78));
         }
 
         .pointer-dot {
           position: absolute;
           top: 0;
           left: 50%;
-          width: clamp(28px, 4.4vw, 44px);
-          height: clamp(28px, 4.4vw, 44px);
+          width: clamp(30px, 4.8vw, 46px);
+          height: clamp(30px, 4.8vw, 46px);
           transform: translateX(-50%);
           border-radius: 999px;
           background: #ffffff;
@@ -519,7 +515,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           left: 50%;
           top: 50%;
           z-index: 45;
-          width: 24%;
+          width: 28%;
           aspect-ratio: 1 / 1;
           transform: translate(-50%, -50%);
           border-radius: 999px;
@@ -532,10 +528,10 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           align-items: center;
           justify-content: center;
           color: #111827;
-          font-weight: 950;
-          line-height: 1.04;
+          font-weight: 1000;
+          line-height: 1.02;
           letter-spacing: -0.08em;
-          font-size: clamp(11px, 2.25vw, 20px);
+          font-size: clamp(16px, 3.2vw, 30px);
           text-align: center;
           pointer-events: none;
           gap: 2px;
@@ -548,17 +544,17 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
 
         .participant-count {
           margin-top: 4px;
-          color: #475569;
-          font-size: clamp(6px, 1.2vw, 10px);
-          font-weight: 900;
-          letter-spacing: -0.06em;
+          color: #6d28d9;
+          font-size: clamp(8px, 1.8vw, 15px);
+          font-weight: 1000;
+          letter-spacing: -0.07em;
           white-space: nowrap;
         }
 
         .name-label {
           position: absolute;
           z-index: 12;
-          width: clamp(74px, 14vw, 138px);
+          width: clamp(82px, 13vw, 150px);
           height: 18px;
           transform-origin: center center;
           display: flex;
@@ -567,11 +563,11 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           color: rgba(17, 24, 39, 0.98);
           font-weight: 1000;
           line-height: 1;
-          letter-spacing: -0.07em;
+          letter-spacing: -0.06em;
           text-align: center;
           text-shadow:
-            0 1px 0 rgba(255, 255, 255, 0.9),
-            0 0 5px rgba(255, 255, 255, 0.7);
+            0 1px 0 rgba(255, 255, 255, 0.88),
+            0 0 5px rgba(255, 255, 255, 0.68);
           white-space: nowrap;
           pointer-events: none;
         }
@@ -661,11 +657,11 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           }
 
           .name-label {
-            width: clamp(62px, 15vw, 118px);
+            width: clamp(70px, 16vw, 130px);
           }
 
           .fixed-center-cap {
-            width: 24%;
+            width: 30%;
           }
         }
       `}</style>
