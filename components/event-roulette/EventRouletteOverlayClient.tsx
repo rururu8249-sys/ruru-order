@@ -125,11 +125,11 @@ function getLabelPoint(index: number, total: number) {
 
   // 50% 중심 기준, 칸의 안쪽 중앙 영역으로 배치
   const radius =
-    safeTotal >= 70 ? 30 :
-    safeTotal >= 55 ? 31 :
-    safeTotal >= 40 ? 32 :
-    safeTotal >= 24 ? 33 :
-    34;
+    safeTotal >= 70 ? 25 :
+    safeTotal >= 55 ? 26 :
+    safeTotal >= 40 ? 27 :
+    safeTotal >= 24 ? 29 :
+    31;
 
   const x = 50 + Math.cos(rad) * radius;
   const y = 50 + Math.sin(rad) * radius;
@@ -155,6 +155,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
 
   const participants = useMemo(() => normalizeParticipants(event), [event]);
   const winnerNickname = cleanText(event?.winner_nickname);
+  const eventIdentity = cleanText(event?.id) || cleanText(event?.overlay_token) || (event ? FALLBACK_TOKEN : "");
   const participantCount = Math.max(participants.length, 1);
   const segmentAngle = 360 / participantCount;
   const wheelGradient = useMemo(() => makeWheelGradient(participantCount), [participantCount]);
@@ -207,7 +208,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
   }, [initialToken]);
 
   useEffect(() => {
-    if (!event?.id) {
+    if (!eventIdentity || !event) {
       animationRef.current?.cancel();
       animationRef.current = null;
 
@@ -221,10 +222,12 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
       return;
     }
 
-    const spinSignal = cleanText(event.spin_started_at) || cleanText(event.result_at) || cleanText(event.updated_at);
-    const key = `${event.id}-${event.status || ""}-${spinSignal}-${event.winner_nickname || ""}`;
+    const currentEvent = event;
 
-    if (event.status === "result" && winnerNickname) {
+    const spinSignal = cleanText(currentEvent.spin_started_at) || cleanText(currentEvent.result_at) || cleanText(currentEvent.updated_at);
+    const key = `${eventIdentity}-${currentEvent.status || ""}-${spinSignal}-${currentEvent.winner_nickname || ""}`;
+
+    if (currentEvent.status === "result" && winnerNickname) {
       if (lastAnimatedKeyRef.current === key) return;
 
       lastAnimatedKeyRef.current = key;
@@ -274,7 +277,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
       return;
     }
 
-    if (event.status !== "result") {
+    if (currentEvent.status !== "result") {
       animationRef.current?.cancel();
       animationRef.current = null;
 
@@ -292,6 +295,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
       lastAnimatedKeyRef.current = "";
     }
   }, [
+    eventIdentity,
     event?.id,
     event?.status,
     event?.spin_started_at,
@@ -561,20 +565,20 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
         .name-label {
           position: absolute;
           z-index: 12;
-          width: 15%;
+          width: 20%;
           height: 14px;
           transform-origin: center center;
           display: flex;
           align-items: center;
           justify-content: center;
-          color: rgba(255, 255, 255, 0.96);
-          font-weight: 950;
+          color: rgba(17, 24, 39, 0.96);
+          font-weight: 1000;
           line-height: 1;
           letter-spacing: -0.08em;
           text-align: center;
           text-shadow:
-            0 1px 2px rgba(15, 23, 42, 0.36),
-            0 0 8px rgba(15, 23, 42, 0.2);
+            0 1px 0 rgba(255, 255, 255, 0.92),
+            0 0 4px rgba(255, 255, 255, 0.72);
           white-space: nowrap;
           pointer-events: none;
         }
@@ -663,7 +667,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           }
 
           .name-label {
-            width: 13%;
+            width: 18%;
           }
 
           .fixed-center-cap {
