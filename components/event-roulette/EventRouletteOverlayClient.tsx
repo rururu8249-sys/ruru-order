@@ -311,14 +311,14 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
 
   const labelFontSize =
     participants.length >= 70
-      ? "clamp(7px, 1.22vw, 10px)"
+      ? "clamp(5.5px, 1.22vw, 8px)"
       : participants.length >= 55
-        ? "clamp(7.5px, 1.34vw, 11px)"
+        ? "clamp(6px, 1.32vw, 9px)"
         : participants.length >= 40
-          ? "clamp(8.5px, 1.55vw, 12.5px)"
+          ? "clamp(7px, 1.5vw, 10.5px)"
           : participants.length >= 24
-            ? "clamp(10px, 1.9vw, 15px)"
-            : "clamp(12px, 2.35vw, 18px)";
+            ? "clamp(8.5px, 1.85vw, 13px)"
+            : "clamp(11px, 2.35vw, 17px)";
 
   return (
     <main className="roulette-overlay-root">
@@ -341,18 +341,22 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
             <div className="inner-soft-ring" />
 
             {participants.map((name, index) => {
-              const point = getLabelPoint(index, participantCount);
+              const labelRotate = index * segmentAngle + segmentAngle / 2;
+              const labelDistance =
+                participantCount >= 70 ? "35%" :
+                participantCount >= 55 ? "36%" :
+                participantCount >= 40 ? "37%" :
+                participantCount >= 24 ? "38%" :
+                "39%";
 
               return (
                 <div
                   key={`${name}-${index}`}
                   className="name-label"
                   style={{
-                    left: `${point.x}%`,
-                    top: `${point.y}%`,
-                    transform: `translate(-50%, -50%) rotate(${point.rotation}deg)`,
+                    transform: `rotate(${labelRotate}deg) translateY(-${labelDistance})`,
                     fontSize: labelFontSize,
-                  }}
+                  } as CSSProperties}
                 >
                   <span>{name}</span>
                 </div>
@@ -541,23 +545,23 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           font-weight: 1000;
           line-height: 1.02;
           letter-spacing: -0.08em;
-          font-size: clamp(20px, 4.3vw, 40px);
+          font-size: clamp(20px, 4.2vw, 38px);
           text-align: center;
           pointer-events: none;
           gap: 2px;
         }
 
         .fixed-center-cap div + div {
-          margin-top: 3px;
+          margin-top: 2px;
           color: #7c3aed;
-          font-size: 0.92em;
+          font-size: 0.96em;
           font-weight: 1000;
         }
 
         .participant-count {
           margin-top: 7px;
           color: #6d28d9;
-          font-size: clamp(12px, 2.5vw, 22px);
+          font-size: clamp(12px, 2.55vw, 22px);
           font-weight: 1000;
           letter-spacing: -0.07em;
           white-space: nowrap;
@@ -565,9 +569,13 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
 
         .name-label {
           position: absolute;
+          left: 50%;
+          top: 50%;
           z-index: 12;
-          width: clamp(108px, 19vw, 190px);
-          height: 18px;
+          width: 22%;
+          height: 14px;
+          margin-left: -11%;
+          margin-top: -7px;
           transform-origin: center center;
           display: flex;
           align-items: center;
@@ -575,7 +583,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           color: rgba(17, 24, 39, 0.98);
           font-weight: 1000;
           line-height: 1;
-          letter-spacing: -0.06em;
+          letter-spacing: -0.08em;
           text-align: center;
           text-shadow:
             0 1px 0 rgba(255, 255, 255, 0.92),
@@ -669,7 +677,8 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           }
 
           .name-label {
-            width: clamp(96px, 23vw, 170px);
+            width: 18%;
+            margin-left: -9%;
           }
 
           .fixed-center-cap {
