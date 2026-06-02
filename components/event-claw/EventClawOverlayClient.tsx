@@ -225,6 +225,7 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
   const [message, setMessage] = useState("");
   const [resultKey, setResultKey] = useState("");
   const [animationStartedAt, setAnimationStartedAt] = useState(0);
+  const clawShownKeyRef = useRef("");
   const [now, setNow] = useState(() => Date.now());
   const [machineSrc, setMachineSrc] = useState(`${ASSET_BASE}/claw-machine-main.png`);
 
@@ -301,13 +302,25 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
   const clawTotalDurationMs = getClawTotalDurationMs(seed);
   const clawDoneAt = animationStartedAt ? animationStartedAt + clawTotalDurationMs : 0;
 
+  // 연출이 끝난 시점을 한 번이라도 지났으면, 이 결과키를 "표시됨"으로 박아둔다.
+  // now가 프레임을 건너뛰어도(탭 백그라운드 등) 절대 놓치지 않는다.
+  if (hasResult && clawDoneAt > 0 && now >= clawDoneAt && resultDisplayKey) {
+    clawShownKeyRef.current = resultDisplayKey;
+  }
+  // 새 이벤트(다른 결과키)면 초기화
+  if (resultDisplayKey && clawShownKeyRef.current && clawShownKeyRef.current !== resultDisplayKey) {
+    clawShownKeyRef.current = resultDisplayKey;
+  }
+
+  const animationFinished =
+    (clawDoneAt > 0 && now >= clawDoneAt) ||
+    (Boolean(resultDisplayKey) && clawShownKeyRef.current === resultDisplayKey);
+
   const resultCardVisible =
     isFreshResultForThisWidget &&
     Boolean(winnerNickname) &&
     hasResult &&
-    clawDoneAt > 0 &&
-    now >= clawDoneAt &&
-    (now - clawDoneAt) < clawResultCardVisibleMs;
+    animationFinished;
 
   return (
     <main className="claw-root">
