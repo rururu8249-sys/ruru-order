@@ -1,6 +1,6 @@
 "use client";
 const LIVE_ORDER_AUTO_REFRESH_ENABLED = false;
-const LIVE_ORDER_BANKDA_EVENT_REFRESH_ENABLED = false;
+const LIVE_ORDER_BANKDA_EVENT_REFRESH_ENABLED = true;
 
 const maybeSetLiveOrderAutoRefreshInterval = (
   handler: Parameters<typeof window.setInterval>[0],
