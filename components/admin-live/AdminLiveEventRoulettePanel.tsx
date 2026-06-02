@@ -929,7 +929,7 @@ export default function AdminLiveEventRoulettePanel({
                             </div>
                             <div className="mt-2 text-[11px] font-bold leading-5 text-slate-500">
                               {eventTab === "roulette"
-                                ? "주문서 명단을 기준으로 룰렛 당첨자를 뽑습니다."
+                                ? "자동 명단 또는 수동 입력 명단으로 룰렛 당첨자를 뽑습니다."
                                 : "주문서 명단 또는 수동 입력 명단으로 당첨자를 뽑습니다."}
                             </div>
                           </div>
