@@ -250,13 +250,43 @@ function ProductBadges({ product }: { product: GroupBuyQuickSelectProduct }) {
   );
 }
 
-function ProductThumbnail({ product, className = "h-14 w-14" }: { product: GroupBuyQuickSelectProduct; className?: string }) {
+function ProductInlineBadges({ product, className = "" }: { product: GroupBuyQuickSelectProduct; className?: string }) {
+  const hot = isHotProduct(product);
+  const isNew = isNewProduct(product);
+
+  if (!hot && !isNew) return null;
+
+  return (
+    <div className={`flex flex-wrap items-center gap-1 ${className}`}>
+      {hot ? (
+        <span className="rounded bg-red-500 px-1.5 py-0.5 text-[10px] font-black leading-none text-white">
+          HOT
+        </span>
+      ) : null}
+      {isNew ? (
+        <span className="rounded bg-coral-600 px-1.5 py-0.5 text-[10px] font-black leading-none text-white">
+          NEW
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function ProductThumbnail({
+  product,
+  className = "h-14 w-14",
+  showBadges = true,
+}: {
+  product: GroupBuyQuickSelectProduct;
+  className?: string;
+  showBadges?: boolean;
+}) {
   const imageUrl = getImageUrl(product);
 
   if (!imageUrl) {
     return (
       <div className={`relative flex shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-xs font-black text-slate-400 ring-1 ring-slate-200 ${className}`}>
-        <ProductBadges product={product} />
+        {showBadges ? <ProductBadges product={product} /> : null}
         NO
       </div>
     );
@@ -264,7 +294,7 @@ function ProductThumbnail({ product, className = "h-14 w-14" }: { product: Group
 
   return (
     <div className={`relative shrink-0 ${className}`}>
-      <ProductBadges product={product} />
+      {showBadges ? <ProductBadges product={product} /> : null}
       <img
         src={imageUrl}
         alt={product.product_name}
@@ -317,13 +347,15 @@ function QuickProductCard({
           onClick={onDetail}
           className="block w-full text-left"
         >
-          <ProductThumbnail product={product} className="mx-auto mb-1.5 h-12 w-12" />
+          <ProductThumbnail product={product} className="mx-auto mb-1.5 h-12 w-12" showBadges={false} />
 
-          <div className="line-clamp-1 text-[14px] font-black leading-5 tracking-[-0.04em] text-gray-950">
+          <ProductInlineBadges product={product} className="mb-0.5 justify-center" />
+
+          <div className="line-clamp-1 text-center text-[14px] font-black leading-5 tracking-[-0.04em] text-gray-950">
             {product.product_name}
           </div>
 
-          <div className="mt-0.5 truncate text-[14px] font-black text-coral-600">
+          <div className="mt-0.5 truncate text-center text-[14px] font-black text-coral-600">
             {hasPrice(product) ? formatWon(product.price) : "직접입력"}
           </div>
         </button>
@@ -339,7 +371,7 @@ function QuickProductCard({
           onClick={onDetail}
           className="shrink-0 text-left"
         >
-          <ProductThumbnail product={product} className="h-[54px] w-[72px]" />
+          <ProductThumbnail product={product} className="h-[54px] w-[72px]" showBadges={false} />
         </button>
 
         <div className="min-w-0 flex-1">
@@ -348,6 +380,8 @@ function QuickProductCard({
             onClick={onDetail}
             className="block w-full text-left"
           >
+            <ProductInlineBadges product={product} className="mb-1" />
+
             <div className="line-clamp-2 min-h-[38px] text-[14px] font-black leading-[19px] tracking-[-0.04em] text-gray-950">
               {product.product_name}
             </div>
