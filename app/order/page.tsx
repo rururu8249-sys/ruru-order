@@ -538,10 +538,22 @@ function getSelectableRegisteredOptions(product: BroadcastProduct, field: "color
     .filter(Boolean);
 }
 
+// 등록상품의 색상/사이즈 필드가 어떤 모드인지 판별한다.
+// - "select": 실제 옵션값(블랙/화이트, 230~290 등)이 있어 고객이 골라야 함.
+// - "none":   원본 옵션값이 "없음"으로 명시됨(없음입력 토글 ON) → 자동 "없음", 입력 불필요.
+// - "input":  옵션값이 완전히 비어 있음(없음입력 토글 OFF) → 고객이 직접 입력해야 함.
+function getRegisteredOptionMode(product: BroadcastProduct, field: "color" | "size"): "select" | "none" | "input" {
+  if (getSelectableRegisteredOptions(product, field).length > 0) return "select";
+  if (getProductOptionSuggestions(product, field).length > 0) return "none";
+  return "input";
+}
+
 function registeredProductNeedsOptionSelect(product: BroadcastProduct): boolean {
+  // 옵션을 골라야 하거나(select) 직접 입력해야 하는(input) 필드가 하나라도 있으면 시트를 거친다.
+  // 둘 다 "none"(없음입력 토글 ON)인 상품만 시트 없이 바로 담긴다.
   return (
-    getSelectableRegisteredOptions(product, "color").length > 0 ||
-    getSelectableRegisteredOptions(product, "size").length > 0
+    getRegisteredOptionMode(product, "color") !== "none" ||
+    getRegisteredOptionMode(product, "size") !== "none"
   );
 }
 
@@ -2630,16 +2642,25 @@ export default function OrderPage() {
     const product = registeredOptionSelectProduct;
     if (!product) return;
 
-    const colorOptions = getSelectableRegisteredOptions(product, "color");
-    const sizeOptions = getSelectableRegisteredOptions(product, "size");
+    const colorMode = getRegisteredOptionMode(product, "color");
+    const sizeMode = getRegisteredOptionMode(product, "size");
 
-    if (colorOptions.length > 0 && !registeredOptionColor.trim()) {
-      showCustomerNotice("색상을 선택해주세요.");
+    // none(없음입력 토글 ON)은 입력/선택 불필요. select는 선택 강제, input은 직접입력 강제.
+    if (colorMode !== "none" && !registeredOptionColor.trim()) {
+      showCustomerNotice(
+        colorMode === "input"
+          ? "색상을 입력해주세요. 색상이 없으면 “없음”이라고 적어주세요."
+          : "색상을 선택해주세요."
+      );
       return;
     }
 
-    if (sizeOptions.length > 0 && !registeredOptionSize.trim()) {
-      showCustomerNotice("사이즈를 선택해주세요.");
+    if (sizeMode !== "none" && !registeredOptionSize.trim()) {
+      showCustomerNotice(
+        sizeMode === "input"
+          ? "사이즈를 입력해주세요. 사이즈가 없으면 “없음”이라고 적어주세요."
+          : "사이즈를 선택해주세요."
+      );
       return;
     }
 
@@ -2804,6 +2825,23 @@ export default function OrderPage() {
 
       if (toNumber(item.product_price) < 1) {
         showCustomerNotice("상품금액은 1원 이상으로 입력해주세요.");
+        return false;
+      }
+    }
+
+    // 안전망: 시트를 거치지 않은 경로로 담겼더라도, 등록상품이 "직접입력 필요"(없음입력 토글 OFF)인데
+    // 색상/사이즈가 비어 있으면 제출을 막는다. (토글 ON=none / 옵션 있는 상품=select 은 막지 않음)
+    for (const item of validItems) {
+      const matchedProduct = findMatchedBroadcastProduct(item, broadcastProducts);
+      if (!matchedProduct) continue;
+
+      if (getRegisteredOptionMode(matchedProduct, "color") === "input" && !item.color.trim()) {
+        showCustomerNotice("색상을 입력해주세요. 색상이 없으면 “없음”이라고 적어주세요.");
+        return false;
+      }
+
+      if (getRegisteredOptionMode(matchedProduct, "size") === "input" && !item.size.trim()) {
+        showCustomerNotice("사이즈를 입력해주세요. 사이즈가 없으면 “없음”이라고 적어주세요.");
         return false;
       }
     }
@@ -3568,6 +3606,12 @@ export default function OrderPage() {
   const registeredOptionSizeChoices = registeredOptionSelectProduct
     ? getSelectableRegisteredOptions(registeredOptionSelectProduct, "size")
     : [];
+  const registeredOptionColorMode = registeredOptionSelectProduct
+    ? getRegisteredOptionMode(registeredOptionSelectProduct, "color")
+    : "none";
+  const registeredOptionSizeMode = registeredOptionSelectProduct
+    ? getRegisteredOptionMode(registeredOptionSelectProduct, "size")
+    : "none";
   const registeredOptionPrice = registeredOptionSelectProduct ? Number(registeredOptionSelectProduct.price || 0) : 0;
   const registeredOptionTotalPrice = Math.max(1, registeredOptionQty) * (Number.isFinite(registeredOptionPrice) ? registeredOptionPrice : 0);
 
@@ -4088,6 +4132,34 @@ export default function OrderPage() {
                           </button>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {registeredOptionColorMode === "input" && (
+                    <div className="mt-4">
+                      <p className="mb-2 text-[14px] font-black tracking-[-0.04em] text-slate-800">
+                        색상
+                      </p>
+                      <input
+                        value={registeredOptionColor}
+                        onChange={(event) => setRegisteredOptionColor(event.target.value)}
+                        placeholder="색상을 입력해주세요. 없으면 “없음”"
+                        className="h-12 w-full rounded-[16px] border border-slate-200 bg-white px-4 text-[15px] font-black tracking-[-0.04em] text-slate-950 outline-none focus:border-coral-500"
+                      />
+                    </div>
+                  )}
+
+                  {registeredOptionSizeMode === "input" && (
+                    <div className="mt-4">
+                      <p className="mb-2 text-[14px] font-black tracking-[-0.04em] text-slate-800">
+                        사이즈
+                      </p>
+                      <input
+                        value={registeredOptionSize}
+                        onChange={(event) => setRegisteredOptionSize(event.target.value)}
+                        placeholder="사이즈를 입력해주세요. 없으면 “없음”"
+                        className="h-12 w-full rounded-[16px] border border-slate-200 bg-white px-4 text-[15px] font-black tracking-[-0.04em] text-slate-950 outline-none focus:border-coral-500"
+                      />
                     </div>
                   )}
 
