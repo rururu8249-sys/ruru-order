@@ -94,7 +94,7 @@ export default function AdminLiveSidebar({ activeMenu, onMenuChange }: Props) {
           <div className="mt-1.5 grid grid-cols-2 gap-1.5">
             <button
               type="button"
-              onClick={() => window.open("http://pf.kakao.com/_RMxaqX", "_blank", "noopener")}
+              onClick={() => window.open("https://business.kakao.com/_RMxaqX/chats?t_src=business_partnercenter&t_ch=lnb&t_obj=%EB%82%B4%EC%B1%84%ED%8C%85_%ED%81%B4%EB%A6%AD", "ruruKakaoConsult", "popup=yes,width=480,height=720")}
               className="flex h-10 items-center justify-center gap-1 rounded-xl border border-blue-100 bg-blue-50 text-xs font-black text-blue-700 transition hover:bg-blue-100 active:scale-[0.98]"
             >
               <span>💬</span>
@@ -102,7 +102,7 @@ export default function AdminLiveSidebar({ activeMenu, onMenuChange }: Props) {
             </button>
             <button
               type="button"
-              onClick={() => window.open("https://user.service.payster.co.kr/#/payment/smspayment", "_blank", "noopener")}
+              onClick={() => window.open("https://user.service.payster.co.kr/#/payment/smspayment", "ruruPayster", "popup=yes,width=480,height=720")}
               className="flex h-10 items-center justify-center gap-1 rounded-xl border border-slate-200 bg-slate-50 text-xs font-black text-slate-700 transition hover:bg-slate-100 active:scale-[0.98]"
             >
               <span>💳</span>
