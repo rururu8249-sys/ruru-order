@@ -864,9 +864,11 @@ export default function OrderPage() {
     setCustomerNotice({ type: autoType, message: text });
 
     if (typeof window !== "undefined") {
+      // 경고/오류(입력 누락 안내 등)는 고객이 충분히 읽도록 더 오래 띄운다.
+      const autoHideMs = autoType === "warning" || autoType === "error" ? 6000 : 3200;
       window.setTimeout(() => {
         setCustomerNotice((current) => (current.message === text ? { type: "info", message: "" } : current));
-      }, 3200);
+      }, autoHideMs);
     }
   };
   const [manualAddressOpen, setManualAddressOpen] = useState(false);
@@ -2819,12 +2821,12 @@ export default function OrderPage() {
       }
 
       if (!toNumber(item.product_price)) {
-        showCustomerNotice("상품금액을 입력해주세요.");
+        showCustomerNotice("금액을 입력해주세요.");
         return false;
       }
 
       if (toNumber(item.product_price) < 1) {
-        showCustomerNotice("상품금액은 1원 이상으로 입력해주세요.");
+        showCustomerNotice("금액을 1원 이상으로 입력해주세요.");
         return false;
       }
     }

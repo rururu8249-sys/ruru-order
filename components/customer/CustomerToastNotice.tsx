@@ -31,19 +31,19 @@ export default function CustomerToastNotice({ open, type = "info", message, onCl
   if (!open || !message) return null;
 
   return (
-    <div className="fixed bottom-5 left-1/2 z-[90] w-[calc(100%-32px)] max-w-[520px] -translate-x-1/2">
-      <section className={`rounded-[22px] border p-4 shadow-2xl backdrop-blur ${NOTICE_STYLE[type]}`}>
+    <div className="fixed bottom-5 left-1/2 z-[200] w-[calc(100%-32px)] max-w-[520px] -translate-x-1/2">
+      <section className={`rounded-[22px] border-2 p-4 shadow-2xl ring-4 ring-black/5 backdrop-blur ${NOTICE_STYLE[type]}`}>
         <div className="flex items-start gap-3">
-          <div className="shrink-0 text-xl">{NOTICE_ICON[type]}</div>
+          <div className="shrink-0 text-2xl">{NOTICE_ICON[type]}</div>
 
-          <div className="min-w-0 flex-1 whitespace-pre-line break-keep text-[14px] font-black leading-relaxed">
+          <div className="min-w-0 flex-1 whitespace-pre-line break-keep text-[16px] font-black leading-relaxed">
             {message}
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-xl bg-white/70 px-3 py-1.5 text-[12px] font-black text-slate-600 active:scale-[0.98]"
+            className="shrink-0 rounded-xl bg-white/70 px-3 py-2 text-[13px] font-black text-slate-600 active:scale-[0.98]"
           >
             닫기
           </button>
