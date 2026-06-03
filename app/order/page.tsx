@@ -102,6 +102,16 @@ type BroadcastProduct = {
   product_type: string;
   shipping_type: string;
   combine_shipping: string;
+  color_options?: unknown;
+  size_options?: unknown;
+  size_option_enabled?: unknown;
+  color_option_enabled?: unknown;
+  color?: unknown;
+  size?: unknown;
+  colors?: unknown;
+  sizes?: unknown;
+  product_colors?: unknown;
+  product_sizes?: unknown;
   product_note?: unknown;
   description?: string;
   detail_description?: string;
@@ -798,6 +808,17 @@ function normalizeOrderProductRow(product: any): BroadcastProduct {
     status: String(product?.status ?? "판매중"),
     product_type: String(product?.product_type ?? ""),
     shipping_type: String(product?.shipping_type ?? product?.delivery_type ?? ""),
+    // 옵션/없음입력 토글 신호: 고객 옵션 판단(getRegisteredOptionMode)이 읽을 수 있게 그대로 통과시킨다.
+    color_options: product?.color_options ?? null,
+    size_options: product?.size_options ?? null,
+    size_option_enabled: product?.size_option_enabled ?? null,
+    color_option_enabled: product?.color_option_enabled ?? null,
+    color: product?.color ?? null,
+    size: product?.size ?? null,
+    colors: product?.colors ?? null,
+    sizes: product?.sizes ?? null,
+    product_colors: product?.product_colors ?? null,
+    product_sizes: product?.product_sizes ?? null,
     image_url: pickOrderProductImageUrl(product),
   } as BroadcastProduct;
 }
@@ -1752,6 +1773,17 @@ export default function OrderPage() {
         product_type: product.product_type || "방송상품",
         shipping_type: product.shipping_type || "일반",
         combine_shipping: product.combine_shipping || "Y",
+        // 옵션/없음입력 토글 신호: 고객 옵션 판단(getRegisteredOptionMode)이 읽을 수 있게 그대로 통과시킨다.
+        color_options: product.color_options ?? null,
+        size_options: product.size_options ?? null,
+        size_option_enabled: product.size_option_enabled ?? null,
+        color_option_enabled: product.color_option_enabled ?? null,
+        color: product.color ?? null,
+        size: product.size ?? null,
+        colors: product.colors ?? null,
+        sizes: product.sizes ?? null,
+        product_colors: product.product_colors ?? null,
+        product_sizes: product.product_sizes ?? null,
       }));
 
     setBroadcastProducts(nextProducts);
