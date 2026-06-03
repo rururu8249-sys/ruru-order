@@ -3463,8 +3463,8 @@ export default function OrderPage() {
     const safeGreetingName = youtubeNickname || customerName || "고객";
     const safePointText = `${Math.max(0, Number(customerPointBalance || 0)).toLocaleString()}원`;
     const isTopNavEditActive = isEditingCustomerInfo || isEditMode || customerInfoEditSheetOpen;
-    const topNavActiveButtonClass = "shrink-0 whitespace-nowrap rounded-full bg-coral-700 px-2.5 py-1.5 text-[12px] font-black text-white";
-    const topNavInactiveButtonClass = "shrink-0 whitespace-nowrap rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] font-black text-slate-700";
+    const topNavActiveButtonClass = "shrink-0 whitespace-nowrap rounded-full bg-coral-700 px-2.5 py-1.5 text-[12px] font-black text-white transition active:scale-[0.97]";
+    const topNavInactiveButtonClass = "shrink-0 whitespace-nowrap rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] font-black text-slate-700 transition active:scale-[0.97] active:border-coral-700 active:bg-coral-700 active:text-white";
 
     const handleTopNavOrderClick = (event: { preventDefault: () => void }) => {
       if (!isTopNavEditActive) return;
@@ -3852,7 +3852,7 @@ export default function OrderPage() {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[12px] font-black tracking-[-0.04em] text-coral-700">
-                  04 결제방식
+                  결제방식
                 </p>
                 <h2 className="mt-1 text-[18px] font-black tracking-[-0.06em] text-slate-950">
                   결제 방법을 선택해 주세요.
@@ -3916,7 +3916,7 @@ export default function OrderPage() {
           >
             <div className="min-w-0">
               <p className="text-[12px] font-black tracking-[-0.04em] text-coral-700">
-                05 최종 확인
+                최종 확인
               </p>
               <h2 className="mt-1 text-[18px] font-black tracking-[-0.06em] text-slate-950">
                 결제금액 확인
@@ -4373,11 +4373,10 @@ export default function OrderPage() {
                 </div>
 
                 <div className="grid gap-3 rounded-[24px] bg-slate-50 p-4 text-[15px] font-bold leading-relaxed tracking-[-0.04em] text-slate-700 ring-1 ring-slate-100">
-                  <p>이 안내를 닫으면 상품목록이 보입니다.</p>
-                  <p>상품목록에서 주문할 상품의 <span className="font-black text-coral-700">[담기]</span>를 눌러주세요.</p>
-                  <p>직접 적어야 할 상품은 <span className="font-black text-slate-950">[직접 입력]</span>을 사용해 주세요.</p>
-                  <p>담은 상품과 금액을 확인한 뒤 <span className="font-black text-coral-700">[주문서 제출]</span>을 눌러주세요.</p>
-                  <p className="text-[14px] text-amber-700">입금자명과 금액이 다르면 입금확인이 늦어질 수 있어요.</p>
+                  <p className="font-black text-slate-950">주문하는 법이에요.</p>
+                  <p>① 상품은 <span className="font-black text-coral-700">[담기]</span>로, 없으면 <span className="font-black text-slate-950">[직접 입력]</span>으로 담아요.</p>
+                  <p>② 다 담으면 <span className="font-black text-coral-700">[주문서 제출]</span>을 눌러요.</p>
+                  <p className="text-[14px] text-amber-700">③ 입금자명·금액이 다르면 입금확인이 늦어져요.</p>
                 </div>
 
                 <div className="grid grid-cols-[1fr_1fr] gap-2">

@@ -561,12 +561,11 @@ export default function GroupBuyQuickSelect({ products, onSelect, getSelectLabel
                 setCurrentPage(1);
                 setSheetOpen(true);
               }}
-              className="col-start-3 flex min-h-[104px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-coral-200 bg-white/70 px-1 text-center text-[10px] font-black tracking-[-0.04em] text-coral-600"
+              className="col-start-3 flex min-h-[104px] flex-col items-center justify-center gap-0.5 rounded-2xl bg-coral-600 px-1 text-center font-black tracking-[-0.04em] text-white shadow-[0_8px_18px_rgba(216,90,48,0.30)] transition active:scale-[0.97]"
             >
-              <span className="text-xl leading-none">+</span>
-              <span className="mt-1">상품</span>
-              <span>더보기</span>
-              <span className="mt-1 text-[10px] font-black text-coral-500">총 {products.length.toLocaleString("ko-KR")}개</span>
+              <span className="text-[16px] leading-none">{products.length.toLocaleString("ko-KR")}개</span>
+              <span className="text-[11px] leading-tight">더 보기</span>
+              <span className="text-[17px] leading-none">→</span>
             </button>
           ) : null}
         </div>
@@ -605,12 +604,11 @@ export default function GroupBuyQuickSelect({ products, onSelect, getSelectLabel
                 setCurrentPage(1);
                 setSheetOpen(true);
               }}
-              className="col-start-3 flex min-h-[96px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-coral-200 bg-white/70 px-1 text-center text-[10px] font-black tracking-[-0.04em] text-coral-600"
+              className="col-start-3 flex min-h-[96px] flex-col items-center justify-center gap-0.5 rounded-2xl bg-coral-600 px-1 text-center font-black tracking-[-0.04em] text-white shadow-[0_8px_18px_rgba(216,90,48,0.30)] transition active:scale-[0.97]"
             >
-              <span className="text-xl leading-none">+</span>
-              <span className="mt-1">상품</span>
-              <span>더보기</span>
-              <span className="mt-1 text-[10px] font-black text-coral-500">총 {products.length.toLocaleString("ko-KR")}개</span>
+              <span className="text-[16px] leading-none">{products.length.toLocaleString("ko-KR")}개</span>
+              <span className="text-[11px] leading-tight">더 보기</span>
+              <span className="text-[17px] leading-none">→</span>
             </button>
           ) : null}
         </div>
