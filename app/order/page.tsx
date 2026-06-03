@@ -3642,6 +3642,17 @@ export default function OrderPage() {
                           onClick={() => {
                             selectQuickGroupBuyProduct(product);
                             setTopProductSearchText("");
+
+                            if (typeof window !== "undefined") {
+                              if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+                                document.activeElement.blur();
+                              }
+                              window.setTimeout(() => {
+                                document
+                                  .getElementById("orderProductListSection")
+                                  ?.scrollIntoView({ block: "start", behavior: "smooth" });
+                              }, 120);
+                            }
                           }}
                           className="w-full rounded-2xl px-3 py-3 text-left hover:bg-coral-50 active:scale-[0.99]"
                         >
@@ -3671,7 +3682,10 @@ export default function OrderPage() {
             </button>
           </section>
 
-          <section className="mt-3 w-full max-w-full overflow-hidden rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm">
+          <section
+            id="orderProductListSection"
+            className="mt-3 w-full max-w-full overflow-hidden rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm"
+          >
             <div className="mb-4">
               <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
                 상품목록
