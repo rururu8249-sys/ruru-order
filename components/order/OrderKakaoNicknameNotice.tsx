@@ -21,7 +21,6 @@ export default function OrderKakaoNicknameNotice({
   onYoutubeNicknameChange,
   onConfirm,
 }: OrderKakaoNicknameNoticeProps) {
-  const displayKakaoNickname = kakaoNickname.trim() || "확인되지 않음";
   const isEmpty = youtubeNickname.trim().length === 0;
 
   return (
@@ -36,32 +35,16 @@ export default function OrderKakaoNicknameNotice({
           </div>
 
           <div className="text-center">
-            <p className="break-keep text-[14px] font-black leading-relaxed tracking-[-0.04em] text-slate-500">
-              카카오 이름: <span className="text-slate-800">“{displayKakaoNickname}”</span>
-            </p>
+            <h2 className="break-keep text-[24px] font-black leading-[1.15] tracking-[-0.07em] text-[#151923] sm:text-[28px]">
+              유튜브 닉네임을 입력해 주세요
+            </h2>
 
-            <div className="mt-4 rounded-[26px] bg-white px-4 py-5 shadow-[0_14px_34px_rgba(216,90,48,0.10)] ring-1 ring-coral-100">
-              <h2 className="break-keep text-[26px] font-black leading-[1.12] tracking-[-0.07em] text-[#151923] sm:text-[30px]">
-                유튜브 닉네임을
-                <br />
-                딱 1번만 입력해 주세요
-              </h2>
-
-              <p className="mt-3 break-keep text-[14px] font-black leading-relaxed tracking-[-0.04em] text-coral-700">
-                방송 채팅에서 쓰는 이름으로
-                <br />
-                주문 확인과 입금 확인을 진행합니다.
-              </p>
-            </div>
-
-            <p className="mt-4 break-keep rounded-[20px] bg-slate-50 px-4 py-3 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-slate-600">
-              카카오 이름이 아니라
-              <br />
-              <span className="text-slate-950">유튜브 라이브 채팅에 보이는 닉네임</span>을 입력해 주세요.
+            <p className="mt-2 break-keep text-[15px] font-black leading-relaxed tracking-[-0.04em] text-coral-700">
+              방송 채팅에서 쓰는 이름으로 주문·입금을 확인해요.
             </p>
           </div>
 
-          <div className="mt-5">
+          <div className="mt-4">
             <label className="mb-2 block text-[15px] font-black tracking-[-0.04em] text-slate-800">
               유튜브 닉네임 입력
             </label>
@@ -110,10 +93,6 @@ export default function OrderKakaoNicknameNotice({
             >
               {isEmpty ? "유튜브 닉네임을 입력해 주세요" : "유튜브 닉네임 저장하고 주문서 작성하기"}
             </button>
-
-            <p className="mt-3 break-keep text-center text-[12px] font-black leading-relaxed tracking-[-0.04em] text-slate-400">
-              한 번 저장하면 다음 카카오 로그인부터 자동으로 불러옵니다.
-            </p>
           </div>
         </div>
       </section>
