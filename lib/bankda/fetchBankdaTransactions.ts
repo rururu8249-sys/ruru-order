@@ -22,6 +22,10 @@ function ymdKst(date: Date) {
 
 export function getDefaultDateRange() {
   const to = new Date();
+  // 뱅크다가 상한일(오늘)을 미포함으로 해석하거나 당일 거래 반영이 늦는 경우를 대비해
+  // 조회 상한만 "오늘+1일(KST)"로 잡아 오늘 입금이 항상 창 안에 들어오게 한다.
+  // (datefrom·금액·중복판정·저장 로직은 그대로)
+  to.setDate(to.getDate() + 1);
   const from = new Date();
   from.setDate(from.getDate() - 30);
 
