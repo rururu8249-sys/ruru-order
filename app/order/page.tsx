@@ -538,13 +538,44 @@ function getSelectableRegisteredOptions(product: BroadcastProduct, field: "color
     .filter(Boolean);
 }
 
+// "없음입력 토글 ON" 신호 판별.
+// 등록 화면(빠른등록/상품목록/상품등록 모두)이 토글 ON일 때 products.size_option_enabled 컬럼을 true로 저장하고,
+// 고객 페이지는 select("*")로 그 컬럼을 그대로 받는다. 이 플래그가 진짜 토글 신호다.
+// (일부 경로는 옵션값에 "없음" 글자를 같이 저장하므로, 그 경우도 보조 신호로 인정한다.)
+function registeredProductNoneOptionEnabled(product: BroadcastProduct): boolean {
+  const record = product as unknown as Record<string, unknown>;
+  const note = (parseProductSuggestionNote(product.product_note) || {}) as Record<string, unknown>;
+
+  const readFlag = (value: unknown) => {
+    if (value === true) return true;
+    if (typeof value === "number") return value === 1;
+    return ["true", "1", "y", "yes"].includes(String(value ?? "").trim().toLowerCase());
+  };
+
+  if (
+    readFlag(record.size_option_enabled) ||
+    readFlag(record.sizeOptionEnabled) ||
+    readFlag(note.size_option_enabled)
+  ) {
+    return true;
+  }
+
+  // 옵션값에 "없음"이 명시된 경우(예: color_options:["없음"])도 토글 ON으로 본다.
+  const rawHasExplicitNone = (field: "color" | "size") =>
+    getProductOptionSuggestions(product, field).some(
+      (value) => String(value).trim() !== "" && normalizeEmptyProductOptionValue(value) === ""
+    );
+
+  return rawHasExplicitNone("color") || rawHasExplicitNone("size");
+}
+
 // 등록상품의 색상/사이즈 필드가 어떤 모드인지 판별한다.
 // - "select": 실제 옵션값(블랙/화이트, 230~290 등)이 있어 고객이 골라야 함.
-// - "none":   원본 옵션값이 "없음"으로 명시됨(없음입력 토글 ON) → 자동 "없음", 입력 불필요.
-// - "input":  옵션값이 완전히 비어 있음(없음입력 토글 OFF) → 고객이 직접 입력해야 함.
+// - "none":   없음입력 토글 ON(size_option_enabled=true 또는 "없음" 명시) → 자동 "없음", 입력 불필요.
+// - "input":  실옵션도 없고 토글도 OFF → 고객이 직접 입력해야 함.
 function getRegisteredOptionMode(product: BroadcastProduct, field: "color" | "size"): "select" | "none" | "input" {
   if (getSelectableRegisteredOptions(product, field).length > 0) return "select";
-  if (getProductOptionSuggestions(product, field).length > 0) return "none";
+  if (registeredProductNoneOptionEnabled(product)) return "none";
   return "input";
 }
 
