@@ -56,6 +56,19 @@ function firstNumber(...values: unknown[]) {
   return 0;
 }
 
+// 금액 선택용: 0을 정상값으로 인정하고, 진짜 빈칸(null/undefined/빈문자)만 건너뛴다.
+// (firstNumber는 0을 "값 없음"으로 보고 버려서, 전액 포인트 결제(final_amount=0) 주문이
+//  원금으로 둔갑하던 문제가 있어 별도 헬퍼로 분리. 값이 하나도 없으면 null 반환 → 호출부에서 ?? 로 폴백)
+function firstPresentNumber(...values: unknown[]): number | null {
+  for (const value of values) {
+    if (value === null || value === undefined) continue;
+    if (String(value).trim() === "") continue;
+    return toNumber(value);
+  }
+
+  return null;
+}
+
 function mapPaymentStatus(order: LooseRow) {
   const raw = firstText(
     order.order_manage_status,
@@ -87,7 +100,7 @@ function mapPaymentMethod(order: LooseRow) {
 }
 
 function normalizeLiveOrder(order: LooseRow, index: number) {
-  const amount = firstNumber(
+  const amount = firstPresentNumber(
     order.final_amount,
     order.finalAmount,
     order.adjusted_total_price,
@@ -101,7 +114,7 @@ function normalizeLiveOrder(order: LooseRow, index: number) {
     order.payment_amount,
     order.paymentAmount,
     order.amount,
-  );
+  ) ?? 0;
 
   const createdAt = firstText(
     order.created_at,
@@ -129,9 +142,9 @@ function normalizeLiveOrder(order: LooseRow, index: number) {
     payment_status: mapPaymentStatus(order),
     deposit_status: mapPaymentStatus(order),
     status: mapPaymentStatus(order),
-    final_amount: firstNumber(order.final_amount, order.finalAmount) || amount,
-    adjusted_total_price: firstNumber(order.adjusted_total_price, order.adjustedTotalPrice) || amount,
-    total_price: firstNumber(order.total_price, order.totalPrice) || amount,
+    final_amount: firstPresentNumber(order.final_amount, order.finalAmount) ?? amount,
+    adjusted_total_price: firstPresentNumber(order.adjusted_total_price, order.adjustedTotalPrice) ?? amount,
+    total_price: firstPresentNumber(order.total_price, order.totalPrice) ?? amount,
     shipping_fee: shippingFee,
     adjusted_shipping_fee: shippingFee,
     refund_amount: firstNumber(order.refund_amount, order.refundAmount),
