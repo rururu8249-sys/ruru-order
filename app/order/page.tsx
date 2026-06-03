@@ -37,7 +37,7 @@ const normalizeEmptyProductOptionValue = (value: unknown) => {
 
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { isRemoteAreaAddress } from "@/lib/order/shippingAddress";
 import { formatOrderPhone, normalizeOrderPhone } from "@/lib/order/phone";
@@ -815,6 +815,10 @@ export default function OrderPage() {
   const [paymentMethod, setPaymentMethod] = useState<"무통장입금" | "카드결제">("무통장입금");
   const [items, setItems] = useState<OrderItem[]>([{ ...emptyItem }]);
   const [submitting, setSubmitting] = useState(false);
+  // 중복 제출 방지: state는 반영이 느려 연타를 못 막으므로 ref로 즉시 빗장을 건다.
+  const submitInFlightRef = useRef(false);
+  // 멱등성: 같은 주문의 재시도는 같은 키를 재사용하고, 성공 후에만 다음 주문용으로 비운다.
+  const pendingOrderKeyRef = useRef<{ groupId: string; lookupCode: string } | null>(null);
   const [customerBlockStatus, setCustomerBlockStatus] = useState<CustomerBlockStatus>({
     blocked: false,
     checking: false,
@@ -2818,23 +2822,26 @@ export default function OrderPage() {
   };
 
   const submitOrder = async (options?: { allowMissingDetailAddress?: boolean }) => {
-    const blockCheck = await refreshCustomerBlockStatus(customerPhone);
-
-    if (blockCheck.blocked) {
-      setShowDepositConfirmModal(false);
-      return;
-    }
-
-    if (!validate(options)) return;
-
-    if (!hasPrivacyConsent && privacyConsentChecked && typeof window !== "undefined") {
-      window.localStorage.setItem(PRIVACY_CONSENT_STORAGE_KEY, PRIVACY_CONSENT_VERSION);
-      setHasPrivacyConsent(true);
-    }
-
+    // 연타/중복 제출 차단: 이미 처리 중이면 즉시 무시 (ref는 즉시 반영되어 state보다 안전)
+    if (submitInFlightRef.current) return;
+    submitInFlightRef.current = true;
     setSubmitting(true);
 
     try {
+      const blockCheck = await refreshCustomerBlockStatus(customerPhone);
+
+      if (blockCheck.blocked) {
+        setShowDepositConfirmModal(false);
+        return;
+      }
+
+      if (!validate(options)) return;
+
+      if (!hasPrivacyConsent && privacyConsentChecked && typeof window !== "undefined") {
+        window.localStorage.setItem(PRIVACY_CONSENT_STORAGE_KEY, PRIVACY_CONSENT_VERSION);
+        setHasPrivacyConsent(true);
+      }
+
       const cleanPhone = normalizePhone(customerPhone);
       const operatorTestOrderFlags = await getOperatorTestOrderFlags(cleanPhone);
       const paidShippingGroupsBeforeSubmit = await checkAlreadyPaidShippingGroups(cleanPhone);
@@ -2858,8 +2865,15 @@ export default function OrderPage() {
 
       await saveCustomer();
 
-      const groupId = crypto.randomUUID();
-      const lookupCode = `RURU-${Date.now().toString(36).toUpperCase()}`;
+      // 멱등성: 재시도 시 같은 키를 재사용한다. 성공한 뒤에만(아래 성공 분기) 새 키로 비운다.
+      if (!pendingOrderKeyRef.current) {
+        pendingOrderKeyRef.current = {
+          groupId: crypto.randomUUID(),
+          lookupCode: `RURU-${Date.now().toString(36).toUpperCase()}`,
+        };
+      }
+      const groupId = pendingOrderKeyRef.current.groupId;
+      const lookupCode = pendingOrderKeyRef.current.lookupCode;
       const broadcastName =
         broadcast?.broadcast_public_title ||
         broadcast?.public_title ||
@@ -2973,6 +2987,9 @@ export default function OrderPage() {
         throw new Error(orderSubmitPayload?.message || "주문 저장 실패");
       }
 
+      // 제출 성공(서버가 신규 저장 또는 멱등 중복감지로 기존 주문을 반환) → 다음 주문은 새 키 사용
+      pendingOrderKeyRef.current = null;
+
       const savedPointUsedAmount = toNumber(orderSubmitPayload?.point_used_amount);
       const savedPointOriginalAmount = toNumber(orderSubmitPayload?.point_original_amount) || appliedTotalAmount;
       const savedFinalAmount = Math.max(0, savedPointOriginalAmount - savedPointUsedAmount);
@@ -3024,9 +3041,11 @@ export default function OrderPage() {
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error: any) {
       showCustomerNotice("주문서 제출 오류: " + error.message);
+      // 재시도를 위해 pendingOrderKeyRef는 비우지 않는다(같은 키 재사용 → 서버가 멱등 처리).
+    } finally {
+      submitInFlightRef.current = false;
+      setSubmitting(false);
     }
-
-    setSubmitting(false);
   };
 
   const submitOrderWithoutDetailAddress = async () => {

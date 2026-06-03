@@ -40,6 +40,13 @@ declare
   v_ledger_id uuid := gen_random_uuid();
   v_order_ids bigint[] := array[]::bigint[];
   v_inserted_count integer := 0;
+
+  -- 멱등성(중복 제출 방지)용
+  v_order_group_id text;
+  v_dup_order_ids bigint[];
+  v_dup_count integer := 0;
+  v_dup_point_original integer := 0;
+  v_dup_point_used integer := 0;
 begin
   if p_order_rows is null or jsonb_typeof(p_order_rows) <> 'array' then
     raise exception '주문 상품이 없습니다.';
@@ -49,6 +56,40 @@ begin
 
   if v_order_count <= 0 then
     raise exception '주문 상품이 없습니다.';
+  end if;
+
+  -- 멱등성 가드: 같은 주문그룹(order_group_id)이 이미 저장돼 있으면
+  -- 새로 INSERT하지 않고 기존 주문 요약을 "성공"으로 반환한다.
+  -- (네트워크 끊김 후 재시도/중복요청 시 주문이 두 번 저장되는 것을 막음.
+  --  금액·포인트 계산식은 그대로이며, 여기서는 이미 저장된 값을 합산해 echo만 한다.)
+  v_order_group_id := nullif(p_order_rows->0->>'order_group_id', '');
+
+  if v_order_group_id is not null then
+    -- 동시 요청을 직렬화: 같은 키끼리만 잠그므로 정상 주문 성능 영향 없음
+    perform pg_advisory_xact_lock(hashtextextended(v_order_group_id, 0));
+
+    select
+      array_agg(id order by id),
+      count(*),
+      coalesce(sum(coalesce(point_original_amount, 0)), 0)::integer,
+      coalesce(sum(coalesce(point_used_amount, 0)), 0)::integer
+      into v_dup_order_ids, v_dup_count, v_dup_point_original, v_dup_point_used
+    from public.orders
+    where order_group_id = v_order_group_id;
+
+    if coalesce(v_dup_count, 0) > 0 then
+      return jsonb_build_object(
+        'ok', true,
+        'duplicate', true,
+        'inserted_count', v_dup_count,
+        'order_ids', to_jsonb(v_dup_order_ids),
+        'point_original_amount', v_dup_point_original,
+        'point_used_amount', v_dup_point_used,
+        'point_balance_before', null,
+        'point_balance_after', null,
+        'point_ledger_id', null
+      );
+    end if;
   end if;
 
   v_phone := regexp_replace(
