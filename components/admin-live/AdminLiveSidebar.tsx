@@ -94,7 +94,7 @@ export default function AdminLiveSidebar({ activeMenu, onMenuChange }: Props) {
           <div className="mt-1.5 grid grid-cols-2 gap-1.5">
             <button
               type="button"
-              onClick={() => window.open("https://business.kakao.com/_RMxaqX/chats?t_src=business_partnercenter&t_ch=lnb&t_obj=%EB%82%B4%EC%B1%84%ED%8C%85_%ED%81%B4%EB%A6%AD", "ruruKakaoConsult", "popup=yes,width=480,height=720")}
+              onClick={() => window.open("https://business.kakao.com/_RMxaqX/chats?t_src=business_partnercenter&t_ch=lnb&t_obj=%EB%82%B4%EC%B1%84%ED%8C%85_%ED%81%B4%EB%A6%AD", "ruruKakaoConsult", "popup=yes,width=1200,height=860")}
               className="flex h-10 items-center justify-center gap-1 rounded-xl border border-blue-100 bg-blue-50 text-xs font-black text-blue-700 transition hover:bg-blue-100 active:scale-[0.98]"
             >
               <span>💬</span>
