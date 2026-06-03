@@ -2116,6 +2116,22 @@ export default function OrderPage() {
     window.location.href = `https://kauth.kakao.com/oauth/authorize?${params.toString()}`;
   };
 
+  // 담기 완료 직후 주문서(오늘의 상품/담긴 상품) 영역으로 부드럽게 스크롤.
+  // 모든 담기 경로에서 일관되게 쓰도록 공용 헬퍼로 분리.
+  const scrollToOrderProductList = () => {
+    if (typeof window === "undefined") return;
+
+    if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+
+    window.setTimeout(() => {
+      document
+        .getElementById("orderProductListSection")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+  };
+
   const scrollToProductInput = () => {
     window.setTimeout(() => {
       const target =
@@ -2687,6 +2703,7 @@ export default function OrderPage() {
 
     setProductSearchOpenIndex(null);
     setProductSearchText("");
+    scrollToOrderProductList();
   };
 
   const openRegisteredOptionSelectSheet = (product: BroadcastProduct) => {
@@ -3586,6 +3603,7 @@ export default function OrderPage() {
     setProductSearchOpenIndex(null);
     setDirectInputProductSearchMode(false);
     setDirectInputOpen(false);
+    scrollToOrderProductList();
   };
 
   const TopCustomerNav = () => {
@@ -3775,19 +3793,10 @@ export default function OrderPage() {
                           key={String(product.id)}
                           type="button"
                           onClick={() => {
+                            // 담기/시트오픈은 selectQuickGroupBuyProduct가 처리하고,
+                            // 스크롤은 실제 담기 완료 지점(addRegisteredProductToOrderItems / 옵션시트 확정)에서 일괄 처리된다.
                             selectQuickGroupBuyProduct(product);
                             setTopProductSearchText("");
-
-                            if (typeof window !== "undefined") {
-                              if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
-                                document.activeElement.blur();
-                              }
-                              window.setTimeout(() => {
-                                document
-                                  .getElementById("orderProductListSection")
-                                  ?.scrollIntoView({ block: "start", behavior: "smooth" });
-                              }, 120);
-                            }
                           }}
                           className="w-full rounded-2xl px-3 py-3 text-left hover:bg-coral-50 active:scale-[0.99]"
                         >
