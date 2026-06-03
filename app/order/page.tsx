@@ -3453,22 +3453,29 @@ export default function OrderPage() {
       return;
     }
 
-    const missingFields: string[] = [];
+    // 빈 칸이 어디인지 바로 알 수 있게 한 칸씩 안내하고, 비어 있으면 담기를 막는다.
+    if (!targetItem.product_name.trim()) {
+      showCustomerNotice("상품명을 입력해주세요.", "warning");
+      return;
+    }
 
-    if (!targetItem.product_name.trim()) missingFields.push("상품명");
-    if (!targetItem.color.trim()) missingFields.push("옵션 / 색상");
-    if (!targetItem.size.trim()) missingFields.push("옵션 / 사이즈");
-    if (!toNumber(targetItem.qty)) missingFields.push("수량");
-    if (!toNumber(targetItem.product_price)) missingFields.push("금액");
+    if (!targetItem.color.trim()) {
+      showCustomerNotice("색상을 입력해주세요. 색상이 없으면 “없음”이라고 적어주세요.", "warning");
+      return;
+    }
 
-    if (missingFields.length > 0) {
-      const optionMissing =
-        missingFields.includes("옵션 / 색상") || missingFields.includes("옵션 / 사이즈");
+    if (!targetItem.size.trim()) {
+      showCustomerNotice("사이즈를 입력해주세요. 사이즈가 없으면 “없음”이라고 적어주세요.", "warning");
+      return;
+    }
 
-      showCustomerNotice(
-        `아래 항목을 입력해주세요: ${missingFields.join(", ")}${optionMissing ? " / 옵션이 없는 상품은 “없음”이라고 입력해주세요." : ""}`,
-        "warning"
-      );
+    if (!toNumber(targetItem.qty)) {
+      showCustomerNotice("수량을 입력해주세요.", "warning");
+      return;
+    }
+
+    if (!toNumber(targetItem.product_price)) {
+      showCustomerNotice("금액을 입력해주세요.", "warning");
       return;
     }
 
