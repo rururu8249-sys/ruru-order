@@ -3502,14 +3502,14 @@ export default function OrderPage() {
               <Link
                 href="/order"
                 onClick={handleTopNavOrderClick}
-                className={isTopNavEditActive ? topNavInactiveButtonClass : topNavActiveButtonClass}
+                className={!isTopNavEditActive && !orderLookupOpen ? topNavActiveButtonClass : topNavInactiveButtonClass}
               >
                 주문서
               </Link>
               <button
                 type="button"
                 onClick={openOrderLookupBottomSheet}
-                className={topNavInactiveButtonClass}
+                className={orderLookupOpen ? topNavActiveButtonClass : topNavInactiveButtonClass}
               >
                 주문조회
               </button>
@@ -3684,11 +3684,11 @@ export default function OrderPage() {
 
           <section
             id="orderProductListSection"
-            className="mt-3 w-full max-w-full overflow-hidden rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm"
+            className="mt-3 w-full max-w-full scroll-mt-28 overflow-hidden rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm"
           >
             <div className="mb-4">
               <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
-                상품목록
+                오늘의 상품
               </h2>
               <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
                 주문할 상품의 [담기]를 눌러주세요.
@@ -4388,9 +4388,10 @@ export default function OrderPage() {
 
                 <div className="grid gap-3 rounded-[24px] bg-slate-50 p-4 text-[15px] font-bold leading-relaxed tracking-[-0.04em] text-slate-700 ring-1 ring-slate-100">
                   <p className="font-black text-slate-950">주문하는 법이에요.</p>
-                  <p>① 상품은 <span className="font-black text-coral-700">[담기]</span>로, 없으면 <span className="font-black text-slate-950">[직접 입력]</span>으로 담아요.</p>
-                  <p>② 다 담으면 <span className="font-black text-coral-700">[주문서 제출]</span>을 눌러요.</p>
-                  <p className="text-[14px] text-amber-700">③ 입금자명·금액이 다르면 입금확인이 늦어져요.</p>
+                  <p>① 상품 이름을 <span className="font-black text-coral-700">검색</span>하거나, 목록에서 <span className="font-black text-coral-700">[담기]</span>를 눌러요.</p>
+                  <p>② 없는 상품은 <span className="font-black text-slate-950">[직접 입력]</span>으로 담아요.</p>
+                  <p>③ 다 담으면 <span className="font-black text-coral-700">[주문서 제출]</span>을 눌러요.</p>
+                  <p className="text-[14px] text-amber-700">④ 입금자명·금액이 다르면 입금확인이 늦어져요.</p>
                 </div>
 
                 <div className="grid grid-cols-[1fr_1fr] gap-2">

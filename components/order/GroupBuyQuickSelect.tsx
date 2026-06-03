@@ -7,6 +7,7 @@ export type GroupBuyQuickSelectProduct = {
   product_name: string;
   price?: number | string;
   shipping_type?: string;
+  product_type?: string | null;
   image_url?: string;
   thumbnail_url?: string;
   main_image_url?: string;
@@ -81,6 +82,32 @@ function readBooleanFlag(value: unknown) {
 
 function isPinnedProduct(product: GroupBuyQuickSelectProduct) {
   return readBooleanFlag(product.is_pinned) || readBooleanFlag(product.pinned);
+}
+
+const NEW_PRODUCT_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
+
+function isHotProduct(product: GroupBuyQuickSelectProduct) {
+  const typeValue = String(product.product_type ?? "").trim().toLowerCase();
+
+  return (
+    typeValue.includes("group") ||
+    typeValue.includes("공구") ||
+    typeValue === "gonggu"
+  );
+}
+
+function isNewProduct(product: GroupBuyQuickSelectProduct) {
+  const raw = String(product.created_at ?? "").trim();
+
+  if (!raw) return false;
+
+  const timestamp = new Date(raw).getTime();
+
+  if (!Number.isFinite(timestamp)) return false;
+
+  const diff = Date.now() - timestamp;
+
+  return diff >= 0 && diff < NEW_PRODUCT_WINDOW_MS;
 }
 
 function normalizeText(value: unknown) {
@@ -201,23 +228,49 @@ function getPaginationItems(currentPage: number, totalPages: number): Array<numb
   return [1, "ellipsis", currentPage - 1, currentPage, currentPage + 1, "ellipsis", totalPages];
 }
 
+function ProductBadges({ product }: { product: GroupBuyQuickSelectProduct }) {
+  const hot = isHotProduct(product);
+  const isNew = isNewProduct(product);
+
+  if (!hot && !isNew) return null;
+
+  return (
+    <div className="pointer-events-none absolute left-1 top-1 z-10 flex flex-col gap-0.5">
+      {hot ? (
+        <span className="rounded-md bg-red-500 px-1.5 py-0.5 text-[9px] font-black leading-none text-white shadow-sm ring-1 ring-white/40">
+          HOT
+        </span>
+      ) : null}
+      {isNew ? (
+        <span className="rounded-md bg-coral-600 px-1.5 py-0.5 text-[9px] font-black leading-none text-white shadow-sm ring-1 ring-white/40">
+          NEW
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function ProductThumbnail({ product, className = "h-14 w-14" }: { product: GroupBuyQuickSelectProduct; className?: string }) {
   const imageUrl = getImageUrl(product);
 
   if (!imageUrl) {
     return (
-      <div className={`flex shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-xs font-black text-slate-400 ring-1 ring-slate-200 ${className}`}>
+      <div className={`relative flex shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-xs font-black text-slate-400 ring-1 ring-slate-200 ${className}`}>
+        <ProductBadges product={product} />
         NO
       </div>
     );
   }
 
   return (
-    <img
-      src={imageUrl}
-      alt={product.product_name}
-      className={`shrink-0 rounded-2xl object-cover ring-1 ring-slate-200 ${className}`}
-    />
+    <div className={`relative shrink-0 ${className}`}>
+      <ProductBadges product={product} />
+      <img
+        src={imageUrl}
+        alt={product.product_name}
+        className="h-full w-full rounded-2xl object-cover ring-1 ring-slate-200"
+      />
+    </div>
   );
 }
 
