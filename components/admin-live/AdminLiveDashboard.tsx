@@ -1599,8 +1599,8 @@ export default function AdminLiveDashboard() {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
-                          action: mode === "add" ? "grant" : "revoke",
-                          type: mode === "add" ? "grant" : "revoke",
+                          action: mode === "add" ? "grant" : "deduct",
+                          type: mode === "add" ? "grant" : "deduct",
                           mode,
                           kind: mode,
                           direction: mode,
