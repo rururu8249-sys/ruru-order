@@ -12,7 +12,7 @@ export default function AdminLiveSidebar({ activeMenu, onMenuChange }: Props) {
   return (
     <aside className="flex min-h-screen w-[220px] shrink-0 flex-col border-r border-slate-200 bg-white px-4 py-6">
       <div className="mb-8 flex items-center gap-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-white">▶</div>
+        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-deep text-white">▶</div>
         <div>
           <div className="text-lg font-black tracking-tight text-slate-950">루루동이LIVE</div>
           <div className="text-[11px] font-bold text-slate-400">운영 컨트롤타워</div>
@@ -31,7 +31,7 @@ export default function AdminLiveSidebar({ activeMenu, onMenuChange }: Props) {
               className={[
                 "flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition",
                 active
-                  ? "bg-blue-50 text-blue-700 shadow-sm ring-1 ring-blue-100"
+                  ? "bg-rose-soft text-rose-deep shadow-sm ring-1 ring-rose-line"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-950",
               ].join(" ")}
             >
@@ -57,14 +57,14 @@ export default function AdminLiveSidebar({ activeMenu, onMenuChange }: Props) {
               <div className="text-[10px] font-black tracking-[0.18em] text-slate-400">QUICK</div>
               <div className="text-sm font-black text-slate-950">빠른보기</div>
             </div>
-            <div className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-600">방송중</div>
+            <div className="rounded-full bg-rose-soft px-2 py-1 text-[10px] font-black text-rose-deep">방송중</div>
           </div>
 
           <div className="grid grid-cols-2 gap-1.5">
             <button
               type="button"
               onClick={() => window.dispatchEvent(new CustomEvent("ruru-admin-live-open-panel", { detail: "orders" }))}
-              className="h-10 rounded-xl border border-blue-100 bg-blue-50 text-xs font-black text-blue-700 transition hover:bg-blue-100 active:scale-[0.98]"
+              className="h-10 rounded-xl border border-rose-line bg-rose-soft text-xs font-black text-rose-deep transition hover:bg-rose-soft active:scale-[0.98]"
             >
               주문
             </button>
@@ -95,7 +95,7 @@ export default function AdminLiveSidebar({ activeMenu, onMenuChange }: Props) {
             <button
               type="button"
               onClick={() => window.open("https://business.kakao.com/_RMxaqX/chats?t_src=business_partnercenter&t_ch=lnb&t_obj=%EB%82%B4%EC%B1%84%ED%8C%85_%ED%81%B4%EB%A6%AD", "ruruKakaoConsult", "popup=yes,width=1200,height=860")}
-              className="flex h-10 items-center justify-center gap-1 rounded-xl border border-blue-100 bg-blue-50 text-xs font-black text-blue-700 transition hover:bg-blue-100 active:scale-[0.98]"
+              className="flex h-10 items-center justify-center gap-1 rounded-xl border border-rose-line bg-rose-soft text-xs font-black text-rose-deep transition hover:bg-rose-soft active:scale-[0.98]"
             >
               <span>💬</span>
               카톡 상담
