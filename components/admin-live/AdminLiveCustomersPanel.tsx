@@ -1112,77 +1112,50 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
             </div>
           </div>
 
-          <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200">
-            <table className="w-full table-fixed border-collapse text-sm">
-              <thead className="bg-slate-50 text-xs font-black text-slate-500">
-                <tr>
-                  <th className="w-[94px] px-3 py-3 text-left">{CUSTOMER_TERMS.customerStatus}</th>
-                  <th className="w-[150px] px-3 py-3 text-left">닉네임</th>
-                  <th className="w-[112px] px-3 py-3 text-left">이름</th>
-                  <th className="w-[150px] px-3 py-3 text-left">전화번호</th>
-                  <th className="w-[82px] px-3 py-3 text-right">주문수</th>
-                  <th className="w-[132px] px-3 py-3 text-right">{CUSTOMER_TERMS.totalOrderAmount}</th>
-                  <th className="w-[178px] px-3 py-3 text-left">{CUSTOMER_TERMS.latestOrder}</th>
-                  <th className="w-[112px] px-3 py-3 text-center">{CUSTOMER_TERMS.work}</th>
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-slate-100">
-                {visibleCustomers.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="px-3 py-10 text-center text-sm font-black text-slate-400">
-                      표시할 고객이 없습니다.
-                    </td>
-                  </tr>
-                ) : (
-                  visibleCustomers.map((customer) => (
-                    <tr key={customer.key} className="hover:bg-slate-50">
-                      <td className="px-3 py-3">{statusBadge(customer)}</td>
-                      <td className="px-3 py-3">
-                        <button
-                          type="button"
-                          onClick={() => openDetail(customer)}
-                          className="truncate font-black text-rose-deep underline-offset-2 hover:underline"
-                          title="고객 상세 보기"
-                        >
-                          {customer.nickname}
-                        </button>
-                      </td>
-                      <td className="truncate px-3 py-3 font-bold text-slate-700">{customer.name}</td>
-                      <td className="px-3 py-3 font-bold text-slate-600">{formatPhone(customer.phone)}</td>
-                      <td className="px-3 py-3 text-right font-black text-slate-800">
-                        <div className="flex flex-col items-end gap-1">
-                          <span>{customer.orderCount.toLocaleString("ko-KR")}건</span>
-                          {customer.orderCount === 0 ? (
-                            <span className="rounded-full bg-rose-soft px-2 py-0.5 text-[11px] font-black tracking-[-0.04em] text-rose-deep whitespace-nowrap">
-                              주문전회원
-                            </span>
-                          ) : null}
+            <div className="mt-3 flex flex-col gap-1.5">
+              {visibleCustomers.length === 0 ? (
+                <div className="py-10 text-center text-sm text-slate-400">표시할 고객이 없습니다.</div>
+              ) : (
+                visibleCustomers.map((customer) => {
+                  const initial = (customer.nickname || customer.name || "?").trim().charAt(0);
+                  return (
+                    <div
+                      key={customer.key}
+                      className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors ${customer.blocked ? "border-slate-200 bg-slate-50 opacity-60" : "border-slate-200 bg-white hover:border-rose-line hover:bg-rose-soft/30"}`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => openDetail(customer)}
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-black ${customer.blocked ? "bg-slate-200 text-slate-400" : "bg-rose-soft text-rose-deep"}`}
+                      >
+                        {initial}
+                      </button>
+                      <button type="button" onClick={() => openDetail(customer)} className="min-w-0 flex-1 text-left">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate text-[13px] font-black text-slate-900">{customer.nickname || "—"}</span>
+                          {customer.name ? <span className="shrink-0 text-xs text-slate-400">· {customer.name}</span> : null}
                         </div>
-                      </td>
-                      <td className="px-3 py-3 text-right font-black text-slate-950">{money(customer.totalAmount)}</td>
-                      <td className="px-3 py-3 font-bold text-slate-600">
-                        {customer.orderCount > 0 ? formatOrderDateTime(customer.latestOrderAt) : "주문 전 회원"}
-                      </td>
-                      <td className="px-3 py-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleCustomerBlockButton(customer)}
-                          className={`rounded-xl px-3 py-1.5 text-xs font-black ${
-                            customer.blocked
-                              ? "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                              : "bg-red-50 text-red-700 hover:bg-red-100"
-                          }`}
-                        >
-                          {customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                        <div className="mt-0.5 truncate text-[11px] text-slate-400">
+                          누적 {customer.orderCount}건 · {money(customer.totalAmount)}원
+                          {customer.phone ? ` · ${formatPhone(customer.phone)}` : ""}
+                        </div>
+                      </button>
+                      {customer.blocked ? (
+                        <span className="shrink-0 rounded-md bg-red-50 px-2 py-0.5 text-[11px] font-black text-red-500">차단</span>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => handleCustomerBlockButton(customer)}
+                        className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-black transition-colors ${customer.blocked ? "border border-slate-200 text-slate-500 hover:bg-slate-100" : "text-red-500 hover:bg-red-50"}`}
+                      >
+                        {customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}
+                      </button>
+                      <button type="button" onClick={() => openDetail(customer)} className="shrink-0 text-[11px] font-black text-rose-deep">상세 ›</button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
 
           <div className="mt-4 flex items-center justify-between">
             <div className="text-xs font-black text-slate-500">
