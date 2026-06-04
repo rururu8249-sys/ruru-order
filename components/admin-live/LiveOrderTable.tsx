@@ -650,7 +650,7 @@ export default function LiveOrderTable({
 
       <div className="overflow-hidden rounded-xl border border-slate-200">
             {/* 헤더 행 */}
-            <div className="grid grid-cols-[1fr_52px_80px_90px_80px] gap-2 border-b border-rose-line bg-rose-soft/40 px-3 py-2 text-[11px] font-black text-slate-500">
+            <div className="grid grid-cols-[2fr_48px_96px_80px_72px] gap-2 border-b border-rose-line bg-rose-soft/40 px-3 py-2 text-[11px] font-black text-slate-500">
               <span>닉네임 · 주문내역</span>
               <span className="text-center">수량</span>
               <span className="text-right">금액</span>
@@ -668,7 +668,7 @@ export default function LiveOrderTable({
                 visibleOrders.map((order) => {
                   const selected = order.id === selectedOrderId;
                   return (
-                    <div key={order.id} className={`grid grid-cols-[1fr_52px_80px_90px_80px] gap-2 items-start px-3 py-2.5 text-[12px] transition ${selected ? "bg-rose-soft/70" : "hover:bg-slate-50"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}>
+                    <div key={order.id} className={`grid grid-cols-[2fr_48px_96px_80px_72px] gap-2 items-start px-3 py-2.5 text-[13px] transition ${selected ? "bg-rose-soft/70" : "hover:bg-slate-50"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}>
                       {/* 닉네임 + 주문내역 */}
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-1 mb-0.5">
@@ -685,7 +685,7 @@ export default function LiveOrderTable({
                           </div>
                         )}
                         <div className="text-[10px] text-slate-400 mt-0.5">
-                          {order.submittedAt && <span>제출 {order.submittedAt}</span>}
+                          {order.submittedAt && <span>제출 {(() => { try { const d = new Date(order.submittedAt); if (isNaN(d.getTime())) return order.submittedAt; return d.toLocaleString("ko-KR", { month: "numeric", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" }); } catch { return order.submittedAt; } })()}</span>}
                         </div>
                       </div>
                       {/* 수량 */}
@@ -706,6 +706,7 @@ export default function LiveOrderTable({
                         {String((order as any).paymentMethod || "").includes("카드") && Number((order as any).cardPaymentTotalAmount || 0) > 0 ? (
                           <div className="text-purple-700">카드 {money(Number((order as any).cardPaymentTotalAmount || 0))}</div>
                         ) : null}
+                        {Number(order.shippingFee || 0) > 0 && <div className="text-slate-400">배송 {money(order.shippingFee)}</div>}
                       </div>
                       {/* 입금상태 */}
                       <div className="text-center pt-0.5">
@@ -718,8 +719,6 @@ export default function LiveOrderTable({
                           <button type="button" onClick={() => onOpenManualMatch(order)} className="rounded-lg border border-orange-300 bg-orange-50 px-2 py-1 text-[10px] font-black text-orange-700 hover:bg-orange-100">
                             매칭
                           </button>
-                        ) : order.shippingFee ? (
-                          <span className="text-[10px] text-slate-500">{money(order.shippingFee)}원</span>
                         ) : (
                           <span className="text-slate-300">-</span>
                         )}
