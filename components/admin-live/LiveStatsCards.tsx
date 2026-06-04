@@ -39,7 +39,7 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
       amount: money(paidAmount),
       sub: `결제완료 ${paidOrders.length}건 · 전체 ${settlementOrders.length}건`,
       icon: "📈",
-      color: "bg-slate-50 text-slate-700",
+      color: "bg-rose-soft text-rose-deep",
     },
     {
       label: "무통장 결제완료",
@@ -75,7 +75,7 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
     <section className="mb-3">
 <div className="grid w-full grid-cols-5 gap-2">
         {stats.map((stat) => (
-          <div key={stat.label} className="min-w-0 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+          <div key={stat.label} className="min-w-0 rounded-2xl border border-rose-line bg-white px-3 py-2.5 shadow-sm">
             <div className="flex items-center gap-3">
               <div className={`flex h-9 w-9 items-center justify-center rounded-xl text-base ${stat.color}`}>
                 {stat.icon}
