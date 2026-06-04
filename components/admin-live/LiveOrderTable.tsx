@@ -495,8 +495,8 @@ export default function LiveOrderTable({
               className={[
                 "rounded-full px-3 py-1.5 text-xs font-black transition",
                 active
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-700",
+                  ? "bg-rose-deep text-white shadow-sm"
+                  : "bg-slate-100 text-slate-600 hover:bg-rose-soft hover:text-rose-deep",
               ].join(" ")}
             >
               {label} <span className="ml-1 opacity-80">{count}</span>
@@ -509,7 +509,7 @@ export default function LiveOrderTable({
             type="button"
             onClick={exportRosen}
             disabled={exporting !== "" || exportableOrders.length === 0}
-            className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="rounded-xl bg-rose-deep px-3 py-2 text-xs font-black text-white shadow-sm hover:bg-rose-deep disabled:cursor-not-allowed disabled:bg-slate-300"
             title="현재 필터 조건 그대로 로젠 송장 엑셀을 내보냅니다"
           >
             {exporting === "rozen" ? "내보내는중..." : "택배송장 내보내기"}
@@ -565,7 +565,7 @@ export default function LiveOrderTable({
         </div>
       </div>
 
-      <div className="mb-2 rounded-xl bg-blue-50 px-3 py-2 text-[11px] font-black text-blue-700">
+      <div className="mb-2 rounded-xl bg-rose-soft px-3 py-2 text-[11px] font-black text-rose-deep">
         상단 카운트 버튼과 필터가 실제 주문서와 매출요약에 함께 적용됩니다. 검색은 Enter 또는 검색 버튼을 눌렀을 때만 적용됩니다.
       </div>
 
@@ -633,7 +633,7 @@ export default function LiveOrderTable({
           placeholder="닉네임 / 이름 / 주문내역 검색"
         />
 
-        <button className="h-11 w-full flex-none rounded-xl bg-blue-600 px-3 text-[12px] font-black text-white shadow-sm hover:bg-blue-700 active:scale-[0.99] sm:w-[84px]"
+        <button className="h-11 w-full flex-none rounded-xl bg-rose-deep px-3 text-[12px] font-black text-white shadow-sm hover:bg-rose-deep active:scale-[0.99] sm:w-[84px]"
           type="button"
           onClick={applyKeyword}
         >
@@ -681,7 +681,7 @@ export default function LiveOrderTable({
               visibleOrders.map((order) => {
                 const selected = order.id === selectedOrderId;
                 return (
-                  <tr key={order.id} className={selected ? "bg-blue-50/70" : "hover:bg-slate-50"}>
+                  <tr key={order.id} className={selected ? "bg-rose-soft/70" : "hover:bg-slate-50"}>
                     <td className="px-4 py-3">
                     <div className="flex flex-wrap items-center gap-2">
                       {statusBadge(order)}
@@ -695,7 +695,7 @@ export default function LiveOrderTable({
                       <button
                         type="button"
                         onClick={() => onSelectOrder(order)}
-                        className="font-black text-blue-700 underline-offset-2 hover:underline"
+                        className="font-black text-rose-deep underline-offset-2 hover:underline"
                       >
                         {order.nickname}
                       </button>
@@ -772,7 +772,7 @@ export default function LiveOrderTable({
                 onClick={() => setPage(pageNumber)}
                 className={
                   safePage === pageNumber
-                    ? "flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white"
+                    ? "flex h-8 w-8 items-center justify-center rounded-full bg-rose-deep text-white"
                     : "text-slate-500"
                 }
               >
