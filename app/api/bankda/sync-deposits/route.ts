@@ -133,17 +133,22 @@ export async function POST(request: NextRequest) {
         confirmed_note: item.confirmed_note,
       }));
 
-    if (insertRows.length > 0) {
-      const { error: insertError } = await supabase
-        .from("deposits")
-        .insert(insertRows);
+    // 건별 INSERT: 한 건이 실패해도 나머지는 저장(부분성공).
+    // 비정상 1건이 그날 입금 전체를 막던 문제 해결. 삽입 방식만 배열 1회→건별 루프로 바꾸며,
+    // 중복판정(sameDepositKey)·금액·저장시각(toDepositDbTime)·뱅크다 호출은 그대로.
+    let insertedCount = 0;
+    const insertFailures: Array<{ message: string }> = [];
+
+    for (const row of insertRows) {
+      const { error: insertError } = await supabase.from("deposits").insert(row);
 
       if (insertError) {
-        return NextResponse.json(
-          { ok: false, message: insertError.message },
-          { status: 500 }
-        );
+        insertFailures.push({ message: insertError.message });
+        console.warn("[sync-deposits] 입금 1건 저장 실패(건너뜀):", insertError.message);
+        continue;
       }
+
+      insertedCount += 1;
     }
 
     return NextResponse.json({
@@ -151,8 +156,9 @@ export async function POST(request: NextRequest) {
       rawCount,
       bankdaDescription,
       fetchedCount: deposits.length,
-      insertedCount: insertRows.length,
+      insertedCount,
       skippedCount: deposits.length - insertRows.length,
+      failedCount: insertFailures.length,
       autoMatchedCount: 0,
       autoMatchScannedOrders: 0,
       autoMatchScannedDeposits: 0,
