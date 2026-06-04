@@ -370,6 +370,90 @@ function buildCandidates(orders: AnyRow[], deposits: AnyRow[]) {
   };
 }
 
+// [읽기 전용] "금액 단독" 추천 계산. DB를 절대 쓰지 않으며 자동확정도 하지 않는다.
+// 기존 buildCandidates(이름+금액 1:1 자동확정)는 건드리지 않고, 별도 추천 목록만 만든다.
+// 규칙(돈 사고 방지):
+// - 자격(미결제·무통장·테스트/정산제외 아님)은 buildOrderGroups/isEligibleDeposit 재사용으로 동일 적용.
+// - 정확금액 일치만. 그 금액의 미결제 주문이 정확히 1건일 때만 추천(2건↑이면 추천 안 함).
+//   · 동일금액 미확인 입금 1건  → green(강력추천, 1클릭 후보)
+//   · 동일금액 미확인 입금 2건↑ → yellow(입금자명 확인 필요, 입금 후보 목록 제공)
+//   · 동일금액 입금 0건         → 추천 없음
+function buildAmountOnlySuggestions(orders: AnyRow[], deposits: AnyRow[]) {
+  const eligibleGroups = buildOrderGroups(orders);
+  const eligibleDeposits = deposits.filter((deposit) => isEligibleDeposit(deposit).ok);
+
+  const groupsByAmount = new Map<number, OrderGroupCandidate[]>();
+  for (const group of eligibleGroups) {
+    if (!group.amount || group.amount <= 0) continue;
+    groupsByAmount.set(group.amount, [...(groupsByAmount.get(group.amount) || []), group]);
+  }
+
+  const depositsByAmount = new Map<number, AnyRow[]>();
+  for (const deposit of eligibleDeposits) {
+    const amount = depositAmount(deposit);
+    if (!amount || amount <= 0) continue;
+    depositsByAmount.set(amount, [...(depositsByAmount.get(amount) || []), deposit]);
+  }
+
+  const suggestions: any[] = [];
+
+  for (const [amount, groupsAtAmount] of groupsByAmount.entries()) {
+    // 같은 금액의 미결제 주문이 2건 이상이면 어느 주문인지 불명 → 추천하지 않음
+    if (groupsAtAmount.length !== 1) continue;
+
+    const depositsAtAmount = depositsByAmount.get(amount) || [];
+    if (depositsAtAmount.length === 0) continue; // 일치하는 미확인 입금 없음
+
+    const group = groupsAtAmount[0];
+    const nicknameNorm = autoMatchName(group.nickname);
+    const customerNorm = autoMatchName(group.customerName);
+
+    if (depositsAtAmount.length === 1) {
+      const deposit = depositsAtAmount[0];
+      const depName = depositName(deposit);
+      const depNameNorm = autoMatchName(depName);
+      const nameMatched = Boolean(
+        depNameNorm && (depNameNorm === nicknameNorm || (customerNorm && depNameNorm === customerNorm))
+      );
+
+      suggestions.push({
+        confidence: "green",
+        order_group_id: group.orderGroupId,
+        order_ids: group.orderIds,
+        order_nickname: group.nickname,
+        order_customer_name: group.customerName,
+        order_amount: group.amount,
+        deposit_id: depositId(deposit),
+        depositor_name: depName,
+        deposit_amount: depositAmount(deposit),
+        name_matched: nameMatched,
+        reason: "그 금액의 미결제 주문 1건 + 미확인 입금 1건 (금액 단독 1:1)",
+      });
+    } else {
+      suggestions.push({
+        confidence: "yellow",
+        order_group_id: group.orderGroupId,
+        order_ids: group.orderIds,
+        order_nickname: group.nickname,
+        order_customer_name: group.customerName,
+        order_amount: group.amount,
+        deposit_candidates: depositsAtAmount.map((deposit) => ({
+          deposit_id: depositId(deposit),
+          depositor_name: depositName(deposit),
+          deposit_amount: depositAmount(deposit),
+        })),
+        reason: "그 금액의 미결제 주문은 1건이나 동일금액 미확인 입금이 여러 건 — 입금자명 확인 필요",
+      });
+    }
+  }
+
+  return {
+    suggestions,
+    greenCount: suggestions.filter((item) => item.confidence === "green").length,
+    yellowCount: suggestions.filter((item) => item.confidence === "yellow").length,
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = getSupabaseAdmin();
@@ -404,6 +488,9 @@ export async function POST(request: NextRequest) {
     const preview = buildCandidates(orders, deposits);
 
     if (!confirm) {
+      // [읽기 전용] 금액 단독 추천. DB 쓰기/자동확정 없음. 미리보기 응답에만 포함.
+      const amountOnly = buildAmountOnlySuggestions(orders, deposits);
+
       return NextResponse.json({
         ok: true,
         mode: "dry_run_no_db_write",
@@ -417,9 +504,12 @@ export async function POST(request: NextRequest) {
           eligible_deposits: preview.eligibleDepositCount,
           auto_match_candidates: preview.candidates.length,
           blocked_count: preview.blocked.length,
+          amount_only_green: amountOnly.greenCount,
+          amount_only_yellow: amountOnly.yellowCount,
         },
         candidates: preview.candidates,
         blocked: preview.blocked,
+        amount_only_suggestions: amountOnly.suggestions,
       });
     }
 
