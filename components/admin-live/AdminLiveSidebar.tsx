@@ -60,37 +60,6 @@ export default function AdminLiveSidebar({ activeMenu, onMenuChange }: Props) {
             <div className="rounded-full bg-rose-soft px-2 py-1 text-[10px] font-black text-rose-deep">방송중</div>
           </div>
 
-          <div className="grid grid-cols-2 gap-1.5">
-            <button
-              type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent("ruru-admin-live-open-panel", { detail: "orders" }))}
-              className="h-10 rounded-xl border border-rose-line bg-rose-soft text-xs font-black text-rose-deep transition hover:bg-rose-soft active:scale-[0.98]"
-            >
-              주문
-            </button>
-            <button
-              type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent("ruru-admin-live-open-panel", { detail: "payments" }))}
-              className="h-10 rounded-xl border border-emerald-100 bg-emerald-50 text-xs font-black text-emerald-700 transition hover:bg-emerald-100 active:scale-[0.98]"
-            >
-              입금
-            </button>
-            <button
-              type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent("ruru-admin-live-open-panel", { detail: "customers" }))}
-              className="h-10 rounded-xl border border-amber-100 bg-amber-50 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98]"
-            >
-              고객
-            </button>
-            <button
-              type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent("ruru-admin-live-open-panel", { detail: "settlement" }))}
-              className="h-10 rounded-xl border border-violet-100 bg-violet-50 text-xs font-black text-violet-700 transition hover:bg-violet-100 active:scale-[0.98]"
-            >
-              정산
-            </button>
-          </div>
-
           <div className="mt-1.5 grid grid-cols-2 gap-1.5">
             <button
               type="button"
