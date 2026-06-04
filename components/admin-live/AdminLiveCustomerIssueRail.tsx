@@ -314,7 +314,7 @@ function IssueTypeChips({
               onChange(next.length > 0 ? next : ["general"]);
             }}
             className={`h-9 rounded-xl px-3 text-sm font-black ${
-              active ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              active ? "bg-rose-deep text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
             {active ? "✓ " : ""}
@@ -752,7 +752,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     <aside className="flex h-full flex-col rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-[11px] font-black tracking-[0.18em] text-blue-500">CUSTOMER ISSUE</div>
+          <div className="text-[11px] font-black tracking-[0.18em] text-rose-deep">CUSTOMER ISSUE</div>
           <h2 className="mt-1 text-[22px] font-black tracking-[-0.04em] text-slate-950">{CUSTOMER_TERMS.customerIssue}</h2>
           <p className="mt-1 text-[12px] font-bold text-slate-500">고객관리 화면에서 이슈를 같이 확인합니다.</p>
         </div>
@@ -761,7 +761,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           <button
             type="button"
             onClick={() => setShowMemoAdd(true)}
-            className="h-9 rounded-xl bg-blue-600 px-3 text-[12px] font-black text-white hover:bg-blue-700"
+            className="h-9 rounded-xl bg-rose-deep px-3 text-[12px] font-black text-white hover:bg-rose-deep"
           >
             + 메모
           </button>
@@ -790,7 +790,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               setIssuePage(1);
             }}
             className={`h-9 rounded-xl text-[12px] font-black ${
-              activeTab === key ? "bg-white text-blue-700 shadow-sm" : "text-slate-500"
+              activeTab === key ? "bg-white text-rose-deep shadow-sm" : "text-slate-500"
             }`}
           >
             {label}
@@ -855,7 +855,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
         </div>
       </div>
 
-      <div className="mt-4 rounded-2xl bg-blue-50 p-3 text-[12px] font-bold leading-relaxed text-blue-700">
+      <div className="mt-4 rounded-2xl bg-rose-soft p-3 text-[12px] font-bold leading-relaxed text-rose-deep">
         고객이슈는 이 화면에서 메모 추가/수정/해결완료 처리가 가능합니다. 해결된 목록삭제는 DB 완전삭제가 아니라 숨김 처리입니다.
       </div>
 
@@ -864,7 +864,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           <div className="max-h-[92vh] w-full max-w-[620px] overflow-y-auto rounded-[28px] border border-slate-200 bg-white p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[11px] font-black tracking-[0.18em] text-blue-500">ADD CUSTOMER ISSUE</div>
+                <div className="text-[11px] font-black tracking-[0.18em] text-rose-deep">ADD CUSTOMER ISSUE</div>
                 <h3 className="mt-1 text-lg font-black text-slate-950">고객이슈 메모 추가</h3>
               </div>
 
@@ -920,12 +920,12 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
                         key={customer.key}
                         type="button"
                         onClick={() => selectCustomer(customer)}
-                        className="grid w-full grid-cols-[1fr_auto] gap-2 rounded-xl bg-white px-3 py-2 text-left text-xs font-bold text-slate-600 hover:bg-blue-50"
+                        className="grid w-full grid-cols-[1fr_auto] gap-2 rounded-xl bg-white px-3 py-2 text-left text-xs font-bold text-slate-600 hover:bg-rose-soft"
                       >
                         <span className="min-w-0 truncate">
                           <b className="text-slate-950">{customer.nickname || "-"}</b> · {customer.name || "-"}
                         </span>
-                        <span className="font-black text-blue-700">{formatPhone(customer.phone)}</span>
+                        <span className="font-black text-rose-deep">{formatPhone(customer.phone)}</span>
                       </button>
                     ))}
                   </div>
@@ -995,7 +995,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
                 type="button"
                 onClick={saveIssueMemo}
                 disabled={saving}
-                className="h-11 rounded-xl bg-blue-600 text-sm font-black text-white hover:bg-blue-700 disabled:opacity-50"
+                className="h-11 rounded-xl bg-rose-deep text-sm font-black text-white hover:bg-rose-deep disabled:opacity-50"
               >
                 저장
               </button>
@@ -1009,12 +1009,12 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           <div className="w-full max-w-[560px] rounded-[28px] border border-slate-200 bg-white p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[11px] font-black tracking-[0.18em] text-blue-500">EDIT CUSTOMER ISSUE</div>
+                <div className="text-[11px] font-black tracking-[0.18em] text-rose-deep">EDIT CUSTOMER ISSUE</div>
                 <h3 className="mt-1 text-lg font-black text-slate-950">고객이슈 메모 수정</h3>
                 <p className="mt-1 text-xs font-bold text-slate-500">
                   {getNickname(editingIssueTask)} / {getName(editingIssueTask)}
                 </p>
-                <p className="mt-1 text-[11px] font-bold text-blue-600">
+                <p className="mt-1 text-[11px] font-bold text-rose-deep">
                   고객정보는 수정하지 않고 이슈유형·우선순위·메모만 수정합니다.
                 </p>
               </div>
@@ -1065,7 +1065,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
                 type="button"
                 onClick={saveEditedIssueMemo}
                 disabled={saving}
-                className="h-11 rounded-xl bg-blue-600 text-sm font-black text-white hover:bg-blue-700 disabled:opacity-50"
+                className="h-11 rounded-xl bg-rose-deep text-sm font-black text-white hover:bg-rose-deep disabled:opacity-50"
               >
                 수정 저장
               </button>

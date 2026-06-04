@@ -196,7 +196,7 @@ function CustomerPointActionModal({
             />
           </label>
 
-          <label className="flex items-center gap-3 rounded-2xl bg-blue-50 px-4 py-3 text-sm font-black text-blue-800 ring-1 ring-blue-100">
+          <label className="flex items-center gap-3 rounded-2xl bg-rose-soft px-4 py-3 text-sm font-black text-blue-800 ring-1 ring-rose-line">
             <input
               type="checkbox"
               checked={form.customerVisible}
@@ -232,7 +232,7 @@ function CustomerPointActionModal({
             disabled={saving}
             className={[
               "rounded-2xl px-5 py-2 text-sm font-black text-white shadow-sm disabled:opacity-50",
-              isGrant ? "bg-blue-600 hover:bg-blue-700" : "bg-slate-900 hover:bg-slate-700",
+              isGrant ? "bg-rose-deep hover:bg-rose-deep" : "bg-slate-900 hover:bg-slate-700",
             ].join(" ")}
           >
             {saving ? "처리중..." : title}
@@ -387,7 +387,7 @@ export default function AdminLiveCustomerPointPanel({ customer }: { customer: Po
   };
 
   return (
-    <section className="mt-5 rounded-[24px] border border-blue-100 bg-blue-50/60 p-4">
+    <section className="mt-5 rounded-[24px] border border-rose-line bg-rose-soft/60 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-black text-slate-950">🎁 포인트 관리</h3>
@@ -400,16 +400,16 @@ export default function AdminLiveCustomerPointPanel({ customer }: { customer: Po
           type="button"
           onClick={() => void loadPoints()}
           disabled={pointState.loading || pointState.saving}
-          className="rounded-xl border border-blue-200 bg-white px-3 py-2 text-xs font-black text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+          className="rounded-xl border border-rose-line bg-white px-3 py-2 text-xs font-black text-rose-deep hover:bg-rose-soft disabled:opacity-50"
         >
           새로고침
         </button>
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr]">
-        <div className="rounded-[22px] bg-white p-4 ring-1 ring-blue-100">
+        <div className="rounded-[22px] bg-white p-4 ring-1 ring-rose-line">
           <div className="text-xs font-black text-slate-500">현재 포인트</div>
-          <div className="mt-2 text-[30px] font-black tracking-[-0.06em] text-blue-700">
+          <div className="mt-2 text-[30px] font-black tracking-[-0.06em] text-rose-deep">
             {pointState.loading ? "불러오는중..." : pointState.currentPointsText}
           </div>
           <div className="mt-2 text-xs font-bold leading-relaxed text-slate-500">
@@ -417,12 +417,12 @@ export default function AdminLiveCustomerPointPanel({ customer }: { customer: Po
           </div>
         </div>
 
-        <div className="grid content-start gap-2 rounded-[22px] bg-white p-4 ring-1 ring-blue-100">
+        <div className="grid content-start gap-2 rounded-[22px] bg-white p-4 ring-1 ring-rose-line">
           <button
             type="button"
             onClick={() => openModal("grant")}
             disabled={pointState.loading || pointState.saving || !phoneKey}
-            className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-700 disabled:opacity-50"
+            className="rounded-2xl bg-rose-deep px-4 py-3 text-sm font-black text-white hover:bg-rose-deep disabled:opacity-50"
           >
             포인트 지급
           </button>
@@ -449,7 +449,7 @@ export default function AdminLiveCustomerPointPanel({ customer }: { customer: Po
         </div>
       ) : null}
 
-      <div className="mt-4 overflow-hidden rounded-2xl border border-blue-100 bg-white">
+      <div className="mt-4 overflow-hidden rounded-2xl border border-rose-line bg-white">
         <div className="flex items-center justify-between border-b border-blue-50 px-4 py-3">
           <div className="text-sm font-black text-slate-900">최근 포인트 이력</div>
           <div className="text-xs font-bold text-slate-400">{recentLedger.length.toLocaleString("ko-KR")}건 표시</div>
@@ -465,7 +465,7 @@ export default function AdminLiveCustomerPointPanel({ customer }: { customer: Po
               <div key={ledgerKey(item, index)} className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[96px_72px_150px_minmax(0,1fr)]">
                 <div className="font-bold text-slate-500">{dateLabel(item.created_at)}</div>
                 <div className="font-black text-slate-900">{ledgerLabel(item)}</div>
-                <div className={Number(item.amount || 0) >= 0 ? "whitespace-nowrap text-right font-black tabular-nums text-blue-700" : "whitespace-nowrap text-right font-black tabular-nums text-red-600"}>
+                <div className={Number(item.amount || 0) >= 0 ? "whitespace-nowrap text-right font-black tabular-nums text-rose-deep" : "whitespace-nowrap text-right font-black tabular-nums text-red-600"}>
                   {signedMoney(item.amount)}
                 </div>
                 <div className="min-w-0">

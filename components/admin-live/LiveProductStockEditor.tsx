@@ -98,7 +98,7 @@ export default function LiveProductStockEditor({
               </span>
             ))}
             {hiddenCount ? (
-              <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-700">
+              <span className="rounded-full bg-rose-soft px-2 py-1 text-[10px] font-black text-rose-deep">
                 +{hiddenCount}개
               </span>
             ) : null}

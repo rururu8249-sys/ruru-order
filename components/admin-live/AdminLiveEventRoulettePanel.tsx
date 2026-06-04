@@ -866,7 +866,7 @@ export default function AdminLiveEventRoulettePanel({
                         onClick={() => changeParticipantSource("auto")}
                         className={[
                           "h-10 rounded-xl px-5 text-xs font-black transition",
-                          participantSource === "auto" ? "bg-blue-600 text-white shadow-sm" : "text-slate-500",
+                          participantSource === "auto" ? "bg-rose-deep text-white shadow-sm" : "text-slate-500",
                         ].join(" ")}
                       >
                         자동 명단
@@ -891,7 +891,7 @@ export default function AdminLiveEventRoulettePanel({
                         <select
                           value={broadcastId}
                           onChange={(event) => changeBroadcast(event.target.value)}
-                          className="h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                          className="h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-rose-line"
                         >
                           <option value="">방송을 선택하세요</option>
                           {broadcasts.map((broadcast) => (
@@ -905,7 +905,7 @@ export default function AdminLiveEventRoulettePanel({
                           type="button"
                           onClick={() => void loadParticipants(mode, sourceDate, broadcastId)}
                           disabled={loading}
-                          className="mt-3 h-[44px] w-full rounded-2xl bg-blue-600 px-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:bg-slate-300"
+                          className="mt-3 h-[44px] w-full rounded-2xl bg-rose-deep px-3 text-sm font-black text-white shadow-sm transition hover:bg-rose-deep disabled:bg-slate-300"
                         >
                           {loading ? "불러오는중..." : "주문서 명단 불러오기"}
                         </button>
@@ -917,7 +917,7 @@ export default function AdminLiveEventRoulettePanel({
                           value={title}
                           onChange={(event) => setTitle(event.target.value)}
                           maxLength={30}
-                          className="h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                          className="h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-rose-line"
                         />
 
                         <div className="mb-2 mt-4 text-xs font-black text-slate-500">당첨내용 / 상품명</div>
@@ -926,7 +926,7 @@ export default function AdminLiveEventRoulettePanel({
                           onChange={(event) => setWinnerNote(event.target.value)}
                           maxLength={40}
                           placeholder="예: 이벤트 당첨"
-                          className="h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                          className="h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-rose-line"
                         />
                       </div>
 

@@ -12,7 +12,7 @@ export default function AdminLiveMenuPlaceholder({ menuKey }: Props) {
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <div className="mb-2 flex items-center gap-2">
-            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-xl">
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-soft text-xl">
               {menu.icon}
             </span>
             <div>
@@ -47,7 +47,7 @@ export default function AdminLiveMenuPlaceholder({ menuKey }: Props) {
         </div>
       </div>
 
-      <div className="mt-4 rounded-2xl bg-blue-50 px-4 py-3 text-xs font-black leading-5 text-blue-700">
+      <div className="mt-4 rounded-2xl bg-rose-soft px-4 py-3 text-xs font-black leading-5 text-rose-deep">
         지금 단계는 메뉴 클릭 구조만 안전하게 연결한 상태입니다. 실제 주문·입금·정산 데이터 처리 화면은
         기존 로직을 확인한 뒤 메뉴별로 1개씩 분리 연결합니다.
       </div>

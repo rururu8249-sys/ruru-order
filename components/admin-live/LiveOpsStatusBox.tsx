@@ -403,7 +403,7 @@ export default function LiveOpsStatusBox() {
           onClick={() => setSoundOn((value) => !value)}
           className={[
             "rounded-full px-2 py-1 text-[10px] font-black",
-            soundOn ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-500",
+            soundOn ? "bg-rose-deep text-white" : "bg-slate-200 text-slate-500",
           ].join(" ")}
         >
           {soundOn ? "🔔 ON" : "🔕 OFF"}
@@ -420,10 +420,10 @@ export default function LiveOpsStatusBox() {
           type="button"
           onClick={handleCopyRecentOrderNotices}
           disabled={!recentOrders.length}
-          className="flex w-full items-center justify-between rounded-xl border border-blue-100 bg-white px-3 py-2 text-left hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-45"
+          className="flex w-full items-center justify-between rounded-xl border border-rose-line bg-white px-3 py-2 text-left hover:bg-rose-soft disabled:cursor-not-allowed disabled:opacity-45"
         >
           <span className="text-[11px] font-black text-blue-800">📦 새 주문서 복사</span>
-          <span className="text-[11px] font-black text-blue-600">{Math.min(2, recentOrders.length)}건</span>
+          <span className="text-[11px] font-black text-rose-deep">{Math.min(2, recentOrders.length)}건</span>
         </button>
 
         <button
@@ -440,10 +440,10 @@ export default function LiveOpsStatusBox() {
       <button
         type="button"
         onClick={() => setOpenVisitors((value) => !value)}
-        className="mt-2 flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-left hover:bg-blue-50"
+        className="mt-2 flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-left hover:bg-rose-soft"
       >
         <span className="text-xs font-black text-slate-700">👀 접속중</span>
-        <span className="text-sm font-black text-blue-700">{activeVisitors.length}명</span>
+        <span className="text-sm font-black text-rose-deep">{activeVisitors.length}명</span>
       </button>
 
       <div className="mt-2 space-y-1.5">
@@ -459,7 +459,7 @@ export default function LiveOpsStatusBox() {
               onClick={notice.title === "새 주문서 제출" ? () => setOrderCopyModalOpen(true) : undefined}
               className={[
                 "w-full rounded-xl bg-white px-3 py-2 text-left",
-                notice.title === "새 주문서 제출" ? "cursor-pointer hover:bg-blue-50 active:scale-[0.99]" : "cursor-default",
+                notice.title === "새 주문서 제출" ? "cursor-pointer hover:bg-rose-soft active:scale-[0.99]" : "cursor-default",
               ].join(" ")}
             >
               <div className="text-[11px] font-black text-slate-800">

@@ -183,9 +183,9 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
 
   if (editing) {
     return (
-      <div className="overflow-hidden rounded-2xl border border-blue-200 bg-blue-50/40 p-3">
+      <div className="overflow-hidden rounded-2xl border border-rose-line bg-rose-soft/40 p-3">
         <div className="mb-2 flex items-center justify-between">
-          <div className="text-xs font-black text-blue-700">#{index + 1} 상품 수정</div>
+          <div className="text-xs font-black text-rose-deep">#{index + 1} 상품 수정</div>
           {countText ? (
             <div className="flex flex-wrap items-center justify-end gap-1.5">
               <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-black text-amber-700">
@@ -263,7 +263,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
         </div>
 
         <div className="mt-2 overflow-hidden rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-600">
-          수정 후 상품금액: <span className="text-blue-700">{money(previewProductTotal)}</span>
+          수정 후 상품금액: <span className="text-rose-deep">{money(previewProductTotal)}</span>
         </div>
 
 
@@ -285,7 +285,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
                       <span className="font-black text-slate-400">전</span> {line.beforeText}
                     </div>
                     <div>
-                      <span className="font-black text-blue-600">후</span> {line.afterText}
+                      <span className="font-black text-rose-deep">후</span> {line.afterText}
                     </div>
                   </div>
                 );
@@ -307,7 +307,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
             type="button"
             onClick={submit}
             disabled={saving || inventoryLocked}
-            className="h-10 rounded-xl bg-blue-600 text-xs font-black text-white hover:bg-blue-700 disabled:bg-slate-300"
+            className="h-10 rounded-xl bg-rose-deep text-xs font-black text-white hover:bg-rose-deep disabled:bg-slate-300"
           >
             {inventoryLocked ? "수정잠금" : saving ? "저장중..." : "저장"}
           </button>
@@ -359,7 +359,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
             onClick={() => setEditing(true)}
             disabled={disabled || inventoryLocked}
             title={inventoryLocked ? "재고복구완료 주문은 상품수정할 수 없습니다." : undefined}
-            className="mt-2 rounded-xl bg-slate-950 px-2.5 py-1.5 text-[11px] font-black text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
+            className="mt-2 rounded-xl bg-slate-950 px-2.5 py-1.5 text-[11px] font-black text-white hover:bg-rose-deep disabled:bg-slate-200 disabled:text-slate-400"
           >
             {inventoryLocked ? "수정잠금" : "수정"}
           </button>
@@ -383,7 +383,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
                     <span className="font-black text-slate-400">전</span> {line.beforeText}
                   </div>
                   <div>
-                    <span className="font-black text-blue-600">후</span> {line.afterText}
+                    <span className="font-black text-rose-deep">후</span> {line.afterText}
                   </div>
                 </div>
               );

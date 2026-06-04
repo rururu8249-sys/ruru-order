@@ -238,7 +238,7 @@ export default function LiveOpsOrderCopyModal({ open, orders, onClose, onCopied 
             </button>
           </div>
 
-          <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-[13px] font-black leading-5 text-blue-800">
+          <div className="mt-3 rounded-2xl border border-rose-line bg-rose-soft px-4 py-3 text-[13px] font-black leading-5 text-blue-800">
             복사 형식: 📦 새 주문서 접수완료 ｜ 닉네임님 / 상품명 옵션 x1개 / 19,000원 ｜ 주문내역과 금액 확인 후 결제 부탁드립니다 :)
           </div>
         </div>
@@ -285,12 +285,12 @@ export default function LiveOpsOrderCopyModal({ open, orders, onClose, onCopied 
                     type="button"
                     onClick={() => toggleOrder(key)}
                     className={`grid w-full grid-cols-[34px_1fr] gap-3 px-4 py-3 text-left active:scale-[0.995] ${
-                      selected ? "bg-blue-50" : "bg-white hover:bg-slate-50"
+                      selected ? "bg-rose-soft" : "bg-white hover:bg-slate-50"
                     }`}
                   >
                     <span
                       className={`mt-1 flex h-6 w-6 items-center justify-center rounded-lg border text-xs font-black ${
-                        selected ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 text-transparent"
+                        selected ? "border-blue-600 bg-rose-deep text-white" : "border-slate-300 text-transparent"
                       }`}
                     >
                       ✓
@@ -326,7 +326,7 @@ export default function LiveOpsOrderCopyModal({ open, orders, onClose, onCopied 
             type="button"
             onClick={copySelected}
             disabled={copying || !selectedOrders.length}
-            className="h-12 w-full rounded-2xl bg-blue-600 text-sm font-black text-white shadow-sm active:scale-[0.99] disabled:bg-slate-300"
+            className="h-12 w-full rounded-2xl bg-rose-deep text-sm font-black text-white shadow-sm active:scale-[0.99] disabled:bg-slate-300"
           >
             {copying ? "복사중..." : `복사 확인 · 선택 ${selectedOrders.length.toLocaleString("ko-KR")}건`}
           </button>

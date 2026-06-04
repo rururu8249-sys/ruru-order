@@ -72,14 +72,14 @@ export default function AdminLiveOrdersPanel({
       <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="text-[11px] font-black tracking-[0.18em] text-blue-500">ORDER MANAGEMENT</div>
+            <div className="text-[11px] font-black tracking-[0.18em] text-rose-deep">ORDER MANAGEMENT</div>
             <h1 className="mt-1 text-3xl font-black tracking-[-0.05em] text-slate-950">주문관리</h1>
             <p className="mt-2 text-sm font-bold text-slate-500">
               주문표·검색·필터·정렬·상세보기까지 연결했습니다. 주문 수정·상태 변경·입금확인 처리는 아직 실행하지 않습니다.
             </p>
           </div>
 
-          <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
+          <span className="rounded-full bg-rose-soft px-3 py-1 text-xs font-black text-rose-deep">
             조회/상세 연결
           </span>
         </div>

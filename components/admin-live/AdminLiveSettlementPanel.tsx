@@ -231,9 +231,9 @@ export default function AdminLiveSettlementPanel({ orders }: Props) {
 
   return (
     <section className="grid gap-4">
-      <div className="rounded-[28px] border border-blue-100 bg-blue-50 px-5 py-4 text-sm font-bold leading-6 text-blue-800">
+      <div className="rounded-[28px] border border-rose-line bg-rose-soft px-5 py-4 text-sm font-bold leading-6 text-blue-800">
         /admin-live 정산통계는 전체 주문을 불러온 뒤, 이 화면의 기간/방송리스트/결제수단 필터 기준으로 계산합니다. 방송메뉴와 같은 금액을 보려면 같은 방송·날짜 기준으로 맞춰 확인해주세요. 주문 상태, 입금 상태, 배송비, 환불 로직은 변경하지 않고 조회·계산·표시만 합니다.
-        {loadingMeta ? <span className="ml-2 text-blue-500">정산 기준값 불러오는 중...</span> : null}
+        {loadingMeta ? <span className="ml-2 text-rose-deep">정산 기준값 불러오는 중...</span> : null}
       </div>
 
       <AdminSettlementPanel

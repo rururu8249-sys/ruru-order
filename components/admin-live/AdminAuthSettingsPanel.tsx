@@ -59,7 +59,7 @@ export default function AdminAuthSettingsPanel() {
         </div>
       </div>
 
-      <div className="mt-4 rounded-3xl border border-blue-100 bg-blue-50 p-4 text-sm font-bold leading-7 text-blue-900">
+      <div className="mt-4 rounded-3xl border border-rose-line bg-rose-soft p-4 text-sm font-bold leading-7 text-blue-900">
         변경이 필요하면 Vercel Environment Variables에서 위 3개 값을 수정한 뒤
         Production 재배포를 진행하세요. 재배포 후에는 새 아이디/비밀번호로
         다시 로그인하면 됩니다.

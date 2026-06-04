@@ -51,7 +51,7 @@ function StatCard({
 }) {
   const toneClass =
     tone === "blue"
-      ? "border-blue-100 bg-blue-50 text-blue-900"
+      ? "border-rose-line bg-rose-soft text-blue-900"
       : tone === "green"
         ? "border-emerald-100 bg-emerald-50 text-emerald-900"
         : tone === "orange"
@@ -77,7 +77,7 @@ export default function LiveBroadcastEndSummaryModal({ summary, onClose, onOpenS
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-3 py-5">
       <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[32px] border border-white/80 bg-white p-5 shadow-[0_28px_90px_rgba(15,23,42,0.35)]">
         <div className="border-b border-slate-100 pb-4">
-          <div className="text-xs font-black tracking-[0.2em] text-blue-600">BROADCAST SUMMARY</div>
+          <div className="text-xs font-black tracking-[0.2em] text-rose-deep">BROADCAST SUMMARY</div>
           <h2 className="mt-2 text-3xl font-black tracking-[-0.05em] text-slate-950">방송 종료 요약</h2>
           <p className="mt-2 text-sm font-bold text-slate-500">
             방송 종료 시점 기준으로 오늘 먼저 확인할 주문·결제 현황만 크게 정리했습니다.
@@ -102,7 +102,7 @@ export default function LiveBroadcastEndSummaryModal({ summary, onClose, onOpenS
             </div>
             <div>
               <div className="text-[11px] font-black text-slate-400">총 방송시간</div>
-              <div className="mt-1 font-black text-blue-700">{summary.durationText}</div>
+              <div className="mt-1 font-black text-rose-deep">{summary.durationText}</div>
             </div>
           </div>
         </div>
@@ -161,7 +161,7 @@ export default function LiveBroadcastEndSummaryModal({ summary, onClose, onOpenS
           <button
             type="button"
             onClick={onOpenSettlement}
-            className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
+            className="rounded-2xl bg-rose-deep px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-rose-deep"
           >
             정산통계에서 보기
           </button>

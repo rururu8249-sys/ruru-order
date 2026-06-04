@@ -191,7 +191,7 @@ export default function AdminLiveSettingsPanel() {
       <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.06)]">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="text-xs font-black tracking-[0.22em] text-blue-600">ADMIN LIVE SETTINGS</div>
+            <div className="text-xs font-black tracking-[0.22em] text-rose-deep">ADMIN LIVE SETTINGS</div>
             <h1 className="mt-1 text-3xl font-black tracking-[-0.05em] text-slate-950">설정</h1>
             <p className="mt-2 text-sm font-bold leading-6 text-slate-500">
               주문서·카드결제·배송비에 실제 적용되는 운영 설정입니다. 저장 후 새 주문부터 반영됩니다.
@@ -202,7 +202,7 @@ export default function AdminLiveSettingsPanel() {
             type="button"
             onClick={saveSettings}
             disabled={saving || loading}
-            className="rounded-2xl bg-blue-600 px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-50"
+            className="rounded-2xl bg-rose-deep px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-rose-deep disabled:cursor-wait disabled:opacity-50"
           >
             {saving ? "저장중" : "설정 저장"}
           </button>
@@ -270,7 +270,7 @@ export default function AdminLiveSettingsPanel() {
         </div>
       </div>
 
-      <div className="rounded-[30px] border border-blue-100 bg-blue-50 p-5">
+      <div className="rounded-[30px] border border-rose-line bg-rose-soft p-5">
         <h2 className="text-lg font-black text-slate-950">현재 설정 미리보기</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-5">
           <div className="rounded-2xl bg-white p-4">
