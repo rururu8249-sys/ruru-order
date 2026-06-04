@@ -65,7 +65,7 @@ export default function LiveHeader({
   return (
     <header className="mb-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <h1 className="mr-2 text-[25px] font-black tracking-tight text-slate-950">방송 컨트롤타워</h1>
+        <h1 className="mr-2 text-[25px] font-black tracking-tight text-rose-deep">방송 컨트롤타워</h1>
 
         <div className="hidden h-7 w-px bg-slate-200 md:block" />
 
@@ -123,7 +123,7 @@ export default function LiveHeader({
               type="button"
               disabled={savingBroadcast || !activeBroadcast}
               onClick={saveCurrentBroadcast}
-              className="h-9 shrink-0 rounded-xl bg-slate-900 px-3 text-xs font-black text-white hover:bg-slate-700 disabled:bg-slate-300"
+              className="h-9 shrink-0 rounded-xl bg-rose-deep px-3 text-xs font-black text-white hover:bg-rose-deep/90 disabled:bg-slate-300"
             >
               저장
             </button>
@@ -148,7 +148,7 @@ export default function LiveHeader({
               type="button"
               disabled={savingBroadcast || !activeBroadcast}
               onClick={applyYoutubeUrl}
-              className="h-9 shrink-0 rounded-xl bg-blue-600 px-3 text-xs font-black text-white hover:bg-blue-700 disabled:bg-slate-300"
+              className="h-9 shrink-0 rounded-xl bg-rose-deep px-3 text-xs font-black text-white hover:bg-rose-deep/90 disabled:bg-slate-300"
             >
               적용
             </button>

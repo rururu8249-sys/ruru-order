@@ -28,6 +28,13 @@
   --color-coral-950: #2e1006;
 }
 
+/* Admin(admin-live) 재설계용 딥로즈 톤. (메인 #7B2D43, 연한배경 #F5E6EB, 라인 #D9C5CC) */
+@theme {
+  --color-rose-deep: #7b2d43;
+  --color-rose-soft: #f5e6eb;
+  --color-rose-line: #d9c5cc;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
