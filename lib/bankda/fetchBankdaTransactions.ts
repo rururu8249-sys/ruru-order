@@ -211,40 +211,6 @@ export async function fetchBankdaTransactions(options?: {
 
   const rows = flattenRows(json);
 
-  // [임시 디버그] 뱅크다 응답 "구조/필드명"만 확인용. 값(계좌·이름·금액)은 절대 안 찍음. 확인 후 즉시 제거 예정.
-  try {
-    const topObj =
-      json && typeof json === "object" && !Array.isArray(json)
-        ? (json as Record<string, unknown>)
-        : {};
-    const topKeys = Object.keys(topObj);
-    const responseObj =
-      topObj.response && typeof topObj.response === "object"
-        ? (topObj.response as Record<string, unknown>)
-        : null;
-    const pageNumbers: Record<string, unknown> = {};
-    const PAGE_KEYS = [
-      "total", "totalcount", "totalCount", "total_count", "totcnt", "totalcnt",
-      "count", "cnt", "page", "pagecnt", "pageCount", "pages", "totalpage",
-      "next", "hasnext", "hasNext", "more",
-    ];
-    for (const obj of [topObj, responseObj || {}]) {
-      for (const key of PAGE_KEYS) {
-        const value = (obj as Record<string, unknown>)[key];
-        if (typeof value === "number" || typeof value === "string" || typeof value === "boolean") {
-          pageNumbers[key] = value;
-        }
-      }
-    }
-    console.log("[debug-bankda] topKeys=", topKeys);
-    console.log("[debug-bankda] responseKeys=", responseObj ? Object.keys(responseObj) : null);
-    console.log("[debug-bankda] pageNumberFields=", pageNumbers);
-    console.log("[debug-bankda] rowsLength=", rows.length);
-    console.log("[debug-bankda] row0Keys=", rows[0] ? Object.keys(rows[0]) : null);
-  } catch (debugError) {
-    console.warn("[debug-bankda] 구조 로그 실패(무시):", debugError instanceof Error ? debugError.message : String(debugError));
-  }
-
   const deposits: NormalizedBankdaDeposit[] = rows
     .map((row) => {
       const depositor_name =
