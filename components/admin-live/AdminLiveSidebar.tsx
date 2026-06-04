@@ -85,11 +85,6 @@ export default function AdminLiveSidebar({ activeMenu, onMenuChange }: Props) {
         </section>
       ) : null}
 
-      <div className="mt-4 space-y-3">
-        <LiveOpsStatusBox />
-        <AdminLiveCustomerIssueSummaryCard onOpenCustomers={() => onMenuChange("customers")} />
-        <AdminLiveLogoutButton />
-      </div>
     </aside>
   );
 }
