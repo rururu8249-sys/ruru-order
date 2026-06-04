@@ -1572,7 +1572,7 @@ export default function AdminLiveDashboard() {
                             onClick={() => setQuickModalPage(page)}
                             className={[
                               "h-9 min-w-9 rounded-xl px-3 text-xs font-black",
-                              page === activePage ? "bg-blue-600 text-white" : "border border-slate-200 bg-white text-slate-600",
+                              page === activePage ? "bg-rose-deep text-white" : "border border-slate-200 bg-white text-slate-600",
                             ].join(" ")}
                           >
                             {page}
@@ -1679,7 +1679,7 @@ export default function AdminLiveDashboard() {
                         <div className="shrink-0 border-b border-slate-100 px-6 py-4">
                           <div className="flex items-start justify-between gap-4">
                             <div>
-                              <div className="text-[10px] font-black tracking-[0.34em] text-blue-600">
+                              <div className="text-[10px] font-black tracking-[0.34em] text-rose-deep">
                                 {quickModalCustomerDetail ? "CUSTOMER DETAIL" : "QUICK MODAL"}
                               </div>
                               <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">{modalTitle}</h2>
@@ -1696,7 +1696,7 @@ export default function AdminLiveDashboard() {
                               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="min-w-0">
-                                    <div className="text-[10px] font-black tracking-[0.3em] text-blue-600">CUSTOMER DETAIL</div>
+                                    <div className="text-[10px] font-black tracking-[0.3em] text-rose-deep">CUSTOMER DETAIL</div>
                                     <h3 className="mt-2 text-3xl font-black text-slate-950">{quickModalCustomerDetail.nickname}</h3>
                                     <p className="mt-2 text-sm font-black text-slate-500">
                                       {quickModalCustomerDetail.name || "이름 확인 필요"} · {quickModalCustomerDetail.phone || "전화번호 확인 필요"}
@@ -1716,7 +1716,7 @@ export default function AdminLiveDashboard() {
                                     <button
                                       type="button"
                                       onClick={() => goPanel("customers")}
-                                      className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white"
+                                      className="rounded-xl bg-rose-deep px-4 py-2 text-xs font-black text-white"
                                     >
                                       고객관리
                                     </button>
@@ -1737,7 +1737,7 @@ export default function AdminLiveDashboard() {
                                 </div>
                                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                                   <div className="text-xs font-black text-slate-500">누적구매금액</div>
-                                  <div className="mt-2 text-3xl font-black text-blue-600">{money(customerDetailAmount)}</div>
+                                  <div className="mt-2 text-3xl font-black text-rose-deep">{money(customerDetailAmount)}</div>
                                   <div className="mt-2 text-xs font-bold text-slate-400">취소 주문 제외 표시</div>
                                 </div>
                                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -1746,13 +1746,13 @@ export default function AdminLiveDashboard() {
                                 </div>
                               </div>
 
-                              <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+                              <div className="rounded-2xl border border-rose-line bg-white p-5 shadow-sm">
                                 <div className="mb-4 flex items-center justify-between gap-3">
                                   <div>
                                     <h3 className="text-lg font-black text-slate-950">🎁 포인트 관리</h3>
                                     <p className="mt-1 text-xs font-bold text-slate-500">고객관리로 이동하지 않고 이 창에서 바로 지급/회수합니다.</p>
                                   </div>
-                                  <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-600">모달 안 처리</span>
+                                  <span className="rounded-full bg-rose-soft px-3 py-1 text-xs font-black text-rose-deep">모달 안 처리</span>
                                 </div>
 
                                 <div className="grid gap-3">
@@ -1789,7 +1789,7 @@ export default function AdminLiveDashboard() {
                                       type="button"
                                       disabled={quickPointSaving !== null}
                                       onClick={() => submitQuickPoint("add")}
-                                      className="rounded-2xl bg-blue-600 px-4 py-4 text-sm font-black text-white shadow-sm disabled:opacity-50"
+                                      className="rounded-2xl bg-rose-deep px-4 py-4 text-sm font-black text-white shadow-sm disabled:opacity-50"
                                     >
                                       {quickPointSaving === "add" ? "지급 중..." : "포인트 지급"}
                                     </button>
@@ -1855,13 +1855,13 @@ export default function AdminLiveDashboard() {
                                 <div className="flex flex-wrap items-center gap-2">
                                   {quickModal === "orders" ? (
                                     <>
-                                      <button type="button" onClick={() => goPanel("orders")} className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white">주문관리</button>
+                                      <button type="button" onClick={() => goPanel("orders")} className="rounded-xl bg-rose-deep px-4 py-2 text-xs font-black text-white">주문관리</button>
                                       <button type="button" onClick={() => goPanel("payments")} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700">입금확인</button>
                                     </>
                                   ) : null}
 
                                   {quickModal === "payments" ? (
-                                    <button type="button" onClick={loadDepositsFromServer} className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white">입금내역 조회</button>
+                                    <button type="button" onClick={loadDepositsFromServer} className="rounded-xl bg-rose-deep px-4 py-2 text-xs font-black text-white">입금내역 조회</button>
                                   ) : null}
 
                                   {quickModal === "customers" ? (
@@ -1909,9 +1909,9 @@ export default function AdminLiveDashboard() {
                                       <div className="text-xs font-black text-slate-500">현재 표시 주문</div>
                                       <div className="mt-2 text-3xl font-black text-slate-950">{orderRows.length}건</div>
                                     </div>
-                                    <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
-                                      <div className="text-xs font-black text-blue-600">해당기간 주문금액</div>
-                                      <div className="mt-2 text-3xl font-black text-blue-600">{money(activePeriodOrderAmount)}</div>
+                                    <div className="rounded-2xl border border-rose-line bg-white p-4 shadow-sm">
+                                      <div className="text-xs font-black text-rose-deep">해당기간 주문금액</div>
+                                      <div className="mt-2 text-3xl font-black text-rose-deep">{money(activePeriodOrderAmount)}</div>
                                     </div>
                                     <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">
                                       <div className="text-xs font-black text-red-500">입금대기</div>
@@ -1968,7 +1968,7 @@ export default function AdminLiveDashboard() {
                                                 {!paid && !canceled ? (
                                                   <button type="button" onClick={() => openManualMatchAndClose(order)} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700">입금매칭</button>
                                                 ) : null}
-                                                <button type="button" onClick={() => openOrderDetail(order)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-blue-600">상세열기</button>
+                                                <button type="button" onClick={() => openOrderDetail(order)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-rose-deep">상세열기</button>
                                               </div>
                                             </div>
                                           );
@@ -1989,9 +1989,9 @@ export default function AdminLiveDashboard() {
                                       <div className="text-xs font-black text-slate-500">입금내역</div>
                                       <div className="mt-2 text-3xl font-black text-slate-950">{depositRows.length}건</div>
                                     </div>
-                                    <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
-                                      <div className="text-xs font-black text-blue-500">매칭 대상 주문</div>
-                                      <div className="mt-2 text-3xl font-black text-blue-600">{unpaidOrders.length}건</div>
+                                    <div className="rounded-2xl border border-rose-line bg-white p-4 shadow-sm">
+                                      <div className="text-xs font-black text-rose-deep">매칭 대상 주문</div>
+                                      <div className="mt-2 text-3xl font-black text-rose-deep">{unpaidOrders.length}건</div>
                                     </div>
                                     <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
                                       <div className="text-xs font-black text-emerald-500">최근 입금 합계</div>
@@ -2032,9 +2032,9 @@ export default function AdminLiveDashboard() {
                                       <div className="text-xs font-black text-slate-500">고객 후보</div>
                                       <div className="mt-2 text-3xl font-black text-slate-950">{customerRows.length}명</div>
                                     </div>
-                                    <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
-                                      <div className="text-xs font-black text-blue-500">현재 주문 기준</div>
-                                      <div className="mt-2 text-3xl font-black text-blue-600">{modalAllOrders.length}건</div>
+                                    <div className="rounded-2xl border border-rose-line bg-white p-4 shadow-sm">
+                                      <div className="text-xs font-black text-rose-deep">현재 주문 기준</div>
+                                      <div className="mt-2 text-3xl font-black text-rose-deep">{modalAllOrders.length}건</div>
                                     </div>
                                     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                                       <div className="text-xs font-black text-slate-500">고객상세</div>
@@ -2062,7 +2062,7 @@ export default function AdminLiveDashboard() {
                                               </div>
                                             </div>
                                             <div className="text-right text-sm font-black text-slate-950">{money(customer.amount)}</div>
-                                            <button type="button" onClick={() => openCustomerDetail(customer)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-blue-600">고객상세</button>
+                                            <button type="button" onClick={() => openCustomerDetail(customer)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-rose-deep">고객상세</button>
                                           </div>
                                         ))
                                       ) : (
@@ -2081,9 +2081,9 @@ export default function AdminLiveDashboard() {
                                       <div className="text-xs font-black text-slate-500">현재 주문</div>
                                       <div className="mt-2 text-3xl font-black text-slate-950">{modalAllOrders.length}건</div>
                                     </div>
-                                    <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
-                                      <div className="text-xs font-black text-blue-500">주문 총액</div>
-                                      <div className="mt-2 text-2xl font-black text-blue-600">{money(totalOrderAmount)}</div>
+                                    <div className="rounded-2xl border border-rose-line bg-white p-4 shadow-sm">
+                                      <div className="text-xs font-black text-rose-deep">주문 총액</div>
+                                      <div className="mt-2 text-2xl font-black text-rose-deep">{money(totalOrderAmount)}</div>
                                     </div>
                                     <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
                                       <div className="text-xs font-black text-emerald-500">결제완료 매출</div>
