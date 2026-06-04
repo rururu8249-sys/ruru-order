@@ -15,6 +15,7 @@ import { CUSTOMER_TERMS } from "./adminLiveCustomerTerms";
 
 type Props = {
   orders: LiveOrder[];
+  onClose?: () => void;
 };
 
 type LooseLiveOrder = LiveOrder & Record<string, any>;
@@ -558,7 +559,7 @@ function CustomerDetailDrawer({
   );
 }
 
-export default function AdminLiveCustomersPanel({ orders }: Props) {
+export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("latest");
@@ -990,7 +991,13 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
   };
 
   return (
-    <section className="space-y-5">
+    <div className="fixed inset-0 z-40 flex items-start justify-center bg-slate-950/40 overflow-y-auto py-8 px-4" onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}>
+      <div className="w-full max-w-[780px] rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-rose-line px-5 py-3">
+          <span className="text-[15px] font-black text-slate-950">👥 고객·이슈</span>
+          <button type="button" onClick={() => onClose?.()} className="text-slate-400 hover:text-slate-700 text-lg leading-none">✕</button>
+        </div>
+        <div className="p-5 space-y-5">
       <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -1451,6 +1458,8 @@ export default function AdminLiveCustomersPanel({ orders }: Props) {
         }}
         onSubmit={submitCustomerBlockReason}
       />
-    </section>
+        </div>
+      </div>
+    </div>
   );
 }

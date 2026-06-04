@@ -1168,7 +1168,7 @@ export default function AdminLiveDashboard() {
               onOpenManualMatch={setManualMatchGroup}
             />
           ) : activeMenu === "customers" ? (
-            <AdminLiveCustomersPanel orders={orders} />
+            <AdminLiveCustomersPanel orders={orders} onClose={() => setActiveMenu("broadcast")} />
           ) : activeMenu === "settlement" ? (
             <AdminLiveSettlementPanel orders={orders} />
           ) : activeMenu === "settings" ? (
