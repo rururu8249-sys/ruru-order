@@ -408,7 +408,7 @@ function ImagePicker({
             onClick={() => inputRef.current?.click()}
             onDragOver={(event) => event.preventDefault()}
             onDrop={handleDrop}
-            className="flex h-[150px] w-full items-center justify-center overflow-hidden rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-xs font-black text-slate-400 hover:border-blue-300"
+            className="flex h-[150px] w-full items-center justify-center overflow-hidden rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-xs font-black text-slate-400 hover:border-rose-line"
           >
             {coverImage ? (
               <img
@@ -459,7 +459,7 @@ function ImagePicker({
               onClick={() => inputRef.current?.click()}
               onDragOver={(event) => event.preventDefault()}
               onDrop={handleDrop}
-              className="flex h-[64px] w-full items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-200 bg-slate-50 text-[10px] font-black text-slate-400 hover:border-blue-300"
+              className="flex h-[64px] w-full items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-200 bg-slate-50 text-[10px] font-black text-slate-400 hover:border-rose-line"
             >
               {image ? (
                 <img
@@ -490,7 +490,7 @@ function ImagePicker({
           <button
             type="button"
             onClick={() => setShowAllDetailImages(true)}
-            className="flex h-[64px] items-center justify-center rounded-xl border border-dashed border-blue-200 bg-blue-50 text-[11px] font-black text-blue-600"
+            className="flex h-[64px] items-center justify-center rounded-xl border border-dashed border-rose-line bg-rose-soft text-[11px] font-black text-rose-deep"
           >
             +{maxFiles - 2}장 더
           </button>
@@ -879,7 +879,7 @@ export default function QuickProductFastForm({
                   onClick={() => setProductType("broadcast")}
                   className={[
                     choiceButton,
-                    productType === "broadcast" ? "bg-blue-600 text-white" : inactiveChoice,
+                    productType === "broadcast" ? "bg-rose-deep text-white" : inactiveChoice,
                   ].join(" ")}
                 >
                   방송
@@ -889,7 +889,7 @@ export default function QuickProductFastForm({
                   onClick={() => setProductType("group_buy")}
                   className={[
                     choiceButton,
-                    productType === "group_buy" ? "bg-blue-600 text-white" : inactiveChoice,
+                    productType === "group_buy" ? "bg-rose-deep text-white" : inactiveChoice,
                   ].join(" ")}
                 >
                   공구
@@ -910,7 +910,7 @@ export default function QuickProductFastForm({
                     onClick={() => setShippingType(value)}
                     className={[
                       choiceButton,
-                      shippingType === value ? "bg-blue-600 text-white" : inactiveChoice,
+                      shippingType === value ? "bg-rose-deep text-white" : inactiveChoice,
                     ].join(" ")}
                   >
                     {label}
@@ -929,7 +929,7 @@ export default function QuickProductFastForm({
                     onClick={() => applyOrderExposureMode(option.value)}
                     className={[
                       "h-8 rounded-lg px-1 text-[10px] font-black leading-none",
-                      orderExposureMode === option.value ? "bg-blue-600 text-white" : inactiveChoice,
+                      orderExposureMode === option.value ? "bg-rose-deep text-white" : inactiveChoice,
                     ].join(" ")}
                     title={option.desc}
                   >
@@ -957,7 +957,7 @@ export default function QuickProductFastForm({
                   onClick={() => setIsPinned(true)}
                   className={[
                     choiceButton,
-                    isPinned ? "bg-blue-600 text-white" : inactiveChoice,
+                    isPinned ? "bg-rose-deep text-white" : inactiveChoice,
                   ].join(" ")}
                 >
                   상단
@@ -967,13 +967,13 @@ export default function QuickProductFastForm({
           </section>
 
           <div data-ruru-section-title="option-stock" className="flex items-center gap-2 px-1 py-0.5">
-            <span className="rounded-full bg-blue-600 px-2.5 py-1 text-[10px] font-black text-white">03</span>
+            <span className="rounded-full bg-rose-deep px-2.5 py-1 text-[10px] font-black text-white">03</span>
             <div>
               <div className="text-sm font-black text-slate-900">옵션 · 재고</div>
             </div>
           </div>
 
-          <div data-ruru-quick-none-toggle className="flex items-center justify-between gap-3 rounded-2xl border border-blue-100 bg-blue-50/50 px-4 py-3">
+          <div data-ruru-quick-none-toggle className="flex items-center justify-between gap-3 rounded-2xl border border-rose-line bg-rose-soft/50 px-4 py-3">
                 <div className="min-w-0">
                   <div className="text-xs font-black text-slate-700">색상/사이즈 없음입력</div>
                   <div className="mt-0.5 text-[11px] font-bold text-slate-400">ON이면 고객 주문서에 없음으로 자동입력</div>
@@ -985,7 +985,7 @@ export default function QuickProductFastForm({
                   className={[
                     "shrink-0 rounded-full px-3.5 py-1.5 text-xs font-black transition active:scale-[0.98]",
                     noneOptionAutofillEnabled
-                      ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-100"
+                      ? "bg-rose-deep text-white shadow-sm ring-2 ring-rose-line"
                       : "bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-100",
                   ].join(" ")}
                 >
@@ -1015,7 +1015,7 @@ export default function QuickProductFastForm({
                     className={[
                       "rounded-full px-2.5 py-1 text-[11px] font-black transition active:scale-[0.96]",
                       splitOptions(colorText).includes(preset)
-                        ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-100"
+                        ? "bg-rose-deep text-white shadow-sm ring-2 ring-rose-line"
                         : "bg-slate-100 text-slate-500 hover:bg-slate-200",
                     ].join(" ")}
                   >
@@ -1045,7 +1045,7 @@ export default function QuickProductFastForm({
                     className={[
                       "rounded-full px-2.5 py-1 text-[11px] font-black transition active:scale-[0.96]",
                       normalizePresetOptions(preset).some((option) => splitOptions(sizeText).includes(option))
-                        ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-100"
+                        ? "bg-rose-deep text-white shadow-sm ring-2 ring-rose-line"
                         : "bg-slate-100 text-slate-500 hover:bg-slate-200",
                     ].join(" ")}
                   >
@@ -1056,7 +1056,7 @@ export default function QuickProductFastForm({
             </div>
           </section>
 
-<section data-ruru-option-stock-card className="flex min-h-[168px] max-h-[360px] flex-col overflow-hidden rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm shadow-slate-100">
+<section data-ruru-option-stock-card className="flex min-h-[168px] max-h-[360px] flex-col overflow-hidden rounded-2xl border border-rose-line bg-white p-3.5 shadow-sm shadow-slate-100">
             <div className="mb-2.5 flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
@@ -1065,7 +1065,7 @@ export default function QuickProductFastForm({
                     <button
                       type="button"
                       onClick={() => setStockManagementEnabled(true)}
-                      className={`rounded-lg px-3 py-1.5 ${stockManagementEnabled ? "bg-blue-600 text-white shadow-sm" : "text-slate-500"}`}
+                      className={`rounded-lg px-3 py-1.5 ${stockManagementEnabled ? "bg-rose-deep text-white shadow-sm" : "text-slate-500"}`}
                     >
                       사용
                     </button>
@@ -1089,7 +1089,7 @@ export default function QuickProductFastForm({
                   onClick={() => setStockMode("total")}
                   className={[
                     "rounded-lg px-3 py-1.5 text-[11px] font-black",
-                    stockMode === "total" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500",
+                    stockMode === "total" ? "bg-white text-rose-deep shadow-sm" : "text-slate-500",
                   ].join(" ")}
                 >
                   총재고
@@ -1099,7 +1099,7 @@ export default function QuickProductFastForm({
                   onClick={() => setStockMode("option")}
                   className={[
                     "rounded-lg px-3 py-1.5 text-[11px] font-black",
-                    stockMode === "option" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500",
+                    stockMode === "option" ? "bg-white text-rose-deep shadow-sm" : "text-slate-500",
                   ].join(" ")}
                 >
                   옵션별
@@ -1233,7 +1233,7 @@ export default function QuickProductFastForm({
           type="button"
           disabled={saving}
           onClick={() => void saveProduct()}
-          className="h-11 w-[180px] rounded-xl bg-blue-600 text-sm font-black text-white shadow-sm disabled:opacity-50"
+          className="h-11 w-[180px] rounded-xl bg-rose-deep text-sm font-black text-white shadow-sm disabled:opacity-50"
         >
           {saving ? "저장중..." : "저장"}
         </button>
