@@ -560,6 +560,7 @@ function CustomerDetailDrawer({
 }
 
 export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
+  const [custTab, setCustTab] = useState<"members" | "issues">("members");
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("latest");
@@ -1044,7 +1045,12 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
 
       <AdminLivePhoneBlockPanel onSaved={applyBlockResult} />
 
-      <div className="grid items-stretch gap-5 xl:grid-cols-[minmax(760px,1fr)_390px]">
+      <div className="flex gap-2 border-b border-rose-line">
+        <button type="button" onClick={() => setCustTab("members")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "members" ? "bg-rose-deep text-white" : "text-slate-500 hover:text-rose-deep"}`}>회원 목록</button>
+        <button type="button" onClick={() => setCustTab("issues")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "issues" ? "bg-rose-deep text-white" : "text-slate-500 hover:text-rose-deep"}`}>고객 이슈</button>
+      </div>
+
+      <div className={custTab === "members" ? "" : "hidden"}>
         <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
           <div className="grid gap-2 lg:grid-cols-[180px_180px_180px_1fr]">
             <select
@@ -1204,7 +1210,9 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
             </div>
           </div>
         </div>
+        </div>
 
+        <div className={custTab === "issues" ? "" : "hidden"}>
         <AdminLiveCustomerIssueRail
           customerOptions={customers.map((customer) => ({
             key: customer.key,
