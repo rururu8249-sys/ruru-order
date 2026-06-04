@@ -1092,88 +1092,145 @@ export default function AdminLiveDashboard() {
         />
 
         <main className="min-w-0 flex-1 overflow-x-hidden px-5 py-4">
-          {activeMenu === "broadcast" ? (
-            <>
-              <LiveHeader
-                activeBroadcast={activeBroadcast}
-                savingBroadcast={savingBroadcast}
-                videoRatio={videoRatio}
-                onVideoRatioChange={setVideoRatio}
-                onStartBroadcast={startBroadcast}
-                onEndBroadcast={endBroadcast}
-                onSaveBroadcast={saveBroadcast}
-              />
+          {/* 방송화면 항상 렌더 (배경) */}
+          <div className={activeMenu !== "broadcast" ? "pointer-events-none" : ""}>
+            <LiveHeader
+              activeBroadcast={activeBroadcast}
+              savingBroadcast={savingBroadcast}
+              videoRatio={videoRatio}
+              onVideoRatioChange={setVideoRatio}
+              onStartBroadcast={startBroadcast}
+              onEndBroadcast={endBroadcast}
+              onSaveBroadcast={saveBroadcast}
+            />
 
-              <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
+            <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
 
-              <div className="mb-4 mt-4 grid w-full grid-cols-3 items-stretch gap-3">
-                <div className="col-span-2 h-[520px] min-h-0 min-w-0 [&>*]:h-full [&>*]:min-h-0 [&>*>*]:h-full [&>*>*]:min-h-0">
-                  <LiveBroadcastPanels videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} />
-                </div>
-
-                <div className="col-span-1 h-[520px] min-h-0 min-w-0 [&>*]:h-full [&>*]:min-h-0">
-                  <AdminLiveProductListPanel fillHeight className="h-full min-w-0" />
-                </div>
+            <div className="mb-4 mt-4 grid w-full grid-cols-3 items-stretch gap-3">
+              <div className="col-span-2 h-[520px] min-h-0 min-w-0 [&>*]:h-full [&>*]:min-h-0 [&>*>*]:h-full [&>*>*]:min-h-0">
+                <LiveBroadcastPanels videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} />
               </div>
 
-              {loadError ? (
-                <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700">
-                  주문 데이터 불러오기 실패: {loadError}
-                </div>
-              ) : null}
+              <div className="col-span-1 h-[520px] min-h-0 min-w-0 [&>*]:h-full [&>*]:min-h-0">
+                <AdminLiveProductListPanel fillHeight className="h-full min-w-0" />
+              </div>
+            </div>
 
-              <section className="grid grid-cols-12 gap-3">
-                <div className="col-span-12">
-                  <LiveOrderTable
+            {loadError ? (
+              <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700">
+                주문 데이터 불러오기 실패: {loadError}
+              </div>
+            ) : null}
+
+            <section className="grid grid-cols-12 gap-3">
+              <div className="col-span-12">
+                <LiveOrderTable
+                  orders={filteredOrders}
+                  allOrderCount={orders.length}
+                  selectedOrderId={selectedOrder?.id || ""}
+                  loading={loading}
+                  filters={filters}
+                  broadcastOptions={broadcastOptions}
+                  onSelectOrder={(order) => {
+                    setSelectedOrderId(order.id);
+                    setOrderDetailOpen(true);
+                  }}
+                  onFiltersChange={setFilters}
+                  onRefresh={loadOrders}
+                  onOpenManualMatch={openManualMatchForOrder}
+                />
+              </div>
+            </section>
+          </div>
+
+          {/* 주문관리 팝업 */}
+          {activeMenu === "orders" && (
+            <div className="fixed inset-0 z-40 overflow-y-auto bg-slate-950/40 px-4 py-8" onClick={(e) => { if (e.target === e.currentTarget) setActiveMenu("broadcast"); }}>
+              <div className="mx-auto w-full max-w-[1100px] rounded-2xl bg-white shadow-2xl">
+                <div className="flex items-center justify-between border-b border-rose-line px-5 py-3">
+                  <span className="text-[15px] font-black text-slate-950">📋 주문관리</span>
+                  <button type="button" onClick={() => setActiveMenu("broadcast")} className="text-lg leading-none text-slate-400 hover:text-slate-700">✕</button>
+                </div>
+                <div className="p-5">
+                  <AdminLiveOrdersPanel
                     orders={filteredOrders}
                     allOrderCount={orders.length}
+                    selectedOrder={selectedOrder}
                     selectedOrderId={selectedOrder?.id || ""}
-                    loading={loading}
+                    orderDetailOpen={orderDetailOpen}
                     filters={filters}
                     broadcastOptions={broadcastOptions}
                     onSelectOrder={(order) => {
                       setSelectedOrderId(order.id);
                       setOrderDetailOpen(true);
                     }}
+                    onCloseOrderDetail={() => setOrderDetailOpen(false)}
                     onFiltersChange={setFilters}
                     onRefresh={loadOrders}
-                    onOpenManualMatch={openManualMatchForOrder}
                   />
                 </div>
-              </section>
-            </>
-          ) : activeMenu === "orders" ? (
-            <AdminLiveOrdersPanel
-              orders={filteredOrders}
-              allOrderCount={orders.length}
-              selectedOrder={selectedOrder}
-              selectedOrderId={selectedOrder?.id || ""}
-              orderDetailOpen={orderDetailOpen}
-              filters={filters}
-              broadcastOptions={broadcastOptions}
-              onSelectOrder={(order) => {
-                setSelectedOrderId(order.id);
-                setOrderDetailOpen(true);
-              }}
-              onCloseOrderDetail={() => setOrderDetailOpen(false)}
-              onFiltersChange={setFilters}
-              onRefresh={loadOrders}
-            />
-          ) : activeMenu === "payments" ? (
-            <AdminLivePaymentPanel
-              deposits={deposits}
-              orderGroups={orderGroups}
-              onRefresh={loadDepositsFromServer}
-              onBankdaSync={syncBankdaDepositsOnly}
-              onOpenManualMatch={setManualMatchGroup}
-            />
-          ) : activeMenu === "customers" ? (
+              </div>
+            </div>
+          )}
+
+          {/* 입금확인 팝업 */}
+          {activeMenu === "payments" && (
+            <div className="fixed inset-0 z-40 overflow-y-auto bg-slate-950/40 px-4 py-8" onClick={(e) => { if (e.target === e.currentTarget) setActiveMenu("broadcast"); }}>
+              <div className="mx-auto w-full max-w-[1100px] rounded-2xl bg-white shadow-2xl">
+                <div className="flex items-center justify-between border-b border-rose-line px-5 py-3">
+                  <span className="text-[15px] font-black text-slate-950">💳 입금확인</span>
+                  <button type="button" onClick={() => setActiveMenu("broadcast")} className="text-lg leading-none text-slate-400 hover:text-slate-700">✕</button>
+                </div>
+                <div className="p-5">
+                  <AdminLivePaymentPanel
+                    deposits={deposits}
+                    orderGroups={orderGroups}
+                    onRefresh={loadDepositsFromServer}
+                    onBankdaSync={syncBankdaDepositsOnly}
+                    onOpenManualMatch={setManualMatchGroup}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 고객관리 (자체 모달) */}
+          {activeMenu === "customers" && (
             <AdminLiveCustomersPanel orders={orders} onClose={() => setActiveMenu("broadcast")} />
-          ) : activeMenu === "settlement" ? (
-            <AdminLiveSettlementPanel orders={orders} />
-          ) : activeMenu === "settings" ? (
-            <AdminLiveSettingsPanel />
-          ) : (
+          )}
+
+          {/* 정산통계 팝업 */}
+          {activeMenu === "settlement" && (
+            <div className="fixed inset-0 z-40 overflow-y-auto bg-slate-950/40 px-4 py-8" onClick={(e) => { if (e.target === e.currentTarget) setActiveMenu("broadcast"); }}>
+              <div className="mx-auto w-full max-w-[1100px] rounded-2xl bg-white shadow-2xl">
+                <div className="flex items-center justify-between border-b border-rose-line px-5 py-3">
+                  <span className="text-[15px] font-black text-slate-950">🧮 정산통계</span>
+                  <button type="button" onClick={() => setActiveMenu("broadcast")} className="text-lg leading-none text-slate-400 hover:text-slate-700">✕</button>
+                </div>
+                <div className="p-5">
+                  <AdminLiveSettlementPanel orders={orders} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 설정 팝업 */}
+          {activeMenu === "settings" && (
+            <div className="fixed inset-0 z-40 overflow-y-auto bg-slate-950/40 px-4 py-8" onClick={(e) => { if (e.target === e.currentTarget) setActiveMenu("broadcast"); }}>
+              <div className="mx-auto w-full max-w-[700px] rounded-2xl bg-white shadow-2xl">
+                <div className="flex items-center justify-between border-b border-rose-line px-5 py-3">
+                  <span className="text-[15px] font-black text-slate-950">⚙ 설정</span>
+                  <button type="button" onClick={() => setActiveMenu("broadcast")} className="text-lg leading-none text-slate-400 hover:text-slate-700">✕</button>
+                </div>
+                <div className="p-5">
+                  <AdminLiveSettingsPanel />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 알 수 없는 메뉴 */}
+          {activeMenu !== "broadcast" && activeMenu !== "orders" && activeMenu !== "payments" && activeMenu !== "customers" && activeMenu !== "settlement" && activeMenu !== "settings" && (
             <AdminLiveMenuPlaceholder menuKey={activeMenu} />
           )}
 
