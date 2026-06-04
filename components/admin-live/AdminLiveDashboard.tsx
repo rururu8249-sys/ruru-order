@@ -510,6 +510,8 @@ async function saveLiveBroadcastEndReport({
 export default function AdminLiveDashboard() {
   const [activeMenu, setActiveMenu] = useState<AdminLiveMenuKey>(() => readMenuFromUrl());
   const [orders, setOrders] = useState<LiveOrder[]>([]);
+  // [표시 전용] 금액 단독 추천(amount_only_suggestions). 읽기 전용 dry_run으로만 채우며 확정/쓰기 없음.
+  const [paymentSuggestions, setPaymentSuggestions] = useState<any[]>([]);
   const [broadcasts, setBroadcasts] = useState<AdminLiveBroadcast[]>([]);
   const [savingBroadcast, setSavingBroadcast] = useState(false);
   const [orderGroups, setOrderGroups] = useState<OrderGroup[]>([]);
@@ -640,6 +642,27 @@ export default function AdminLiveDashboard() {
     setLoading(false);
   };
 
+  // [읽기 전용] 금액 단독 추천을 dry_run(confirm 없음)으로 가져온다. DB 쓰기·자동확정 없음.
+  // 실패(세션만료 등)하면 추천을 비워 칩이 그냥 안 보이게만 한다(안전 degrade).
+  const loadPaymentSuggestions = async () => {
+    try {
+      const response = await fetch("/api/admin-v2/auto-payment-match/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ source: "live_dashboard_suggest_display" }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.ok || !Array.isArray(result.amount_only_suggestions)) {
+        setPaymentSuggestions([]);
+        return;
+      }
+      setPaymentSuggestions(result.amount_only_suggestions);
+    } catch {
+      setPaymentSuggestions([]);
+    }
+  };
+
   useAutoBankdaPaymentSync({
     enabled: true,
     onSynced: async () => {
@@ -647,6 +670,13 @@ export default function AdminLiveDashboard() {
       await loadOrders();
     },
   });
+
+  useEffect(() => {
+    // 입금/주문 빠른보기를 열 때만 추천을 새로 불러와 표시용으로 쓴다(읽기 전용).
+    if (quickModal === "payments" || quickModal === "orders") {
+      void loadPaymentSuggestions();
+    }
+  }, [quickModal]);
 
   useEffect(() => {
     void loadOrders();
@@ -1904,6 +1934,14 @@ export default function AdminLiveDashboard() {
                                           const paid = isPaidOrder(order);
                                           const canceled = isCanceledOrder(order);
 
+                                          // [표시 전용] 이 주문그룹에 해당하는 금액 단독 추천(있으면). 클릭/확정 없음.
+                                          const suggestion =
+                                            !paid && !canceled
+                                              ? paymentSuggestions.find(
+                                                  (item) => String(item?.order_group_id || "") === String(order?.groupId || "")
+                                                )
+                                              : null;
+
                                           return (
                                             <div key={String(order?.id || `${activePage}-${index}`)} className={["grid grid-cols-[32px_1fr_130px_160px] items-center gap-3 py-3", canceled ? "bg-red-50/40" : ""].join(" ")}>
                                               <div className="text-sm font-black text-slate-400">{pageStart + index + 1}</div>
@@ -1913,6 +1951,17 @@ export default function AdminLiveDashboard() {
                                                   {renderStatusBadge(order)}
                                                 </div>
                                                 <div className="mt-1 line-clamp-2 text-xs font-bold leading-5 text-slate-500">{orderMemo(order)}</div>
+                                                {suggestion ? (
+                                                  suggestion.confidence === "green" ? (
+                                                    <span className="mt-1 inline-flex items-center rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-black text-emerald-700 ring-1 ring-emerald-200">
+                                                      추천: {String(suggestion.depositor_name || "")} {money(Number(suggestion.deposit_amount || 0))}
+                                                    </span>
+                                                  ) : (
+                                                    <span className="mt-1 inline-flex items-center rounded-full bg-amber-50 px-2 py-1 text-[11px] font-black text-amber-700 ring-1 ring-amber-200">
+                                                      동일금액 입금 {Array.isArray(suggestion.deposit_candidates) ? suggestion.deposit_candidates.length : 0}건 · 확인 필요
+                                                    </span>
+                                                  )
+                                                ) : null}
                                               </div>
                                               <div className={["text-right text-sm font-black", canceled ? "text-red-500 line-through" : "text-slate-950"].join(" ")}>{money(orderAmount(order))}</div>
                                               <div className="flex justify-end gap-2">
