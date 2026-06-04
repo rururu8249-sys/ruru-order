@@ -72,23 +72,14 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
   ];
 
   return (
-    <section className="mb-3">
-<div className="grid w-full grid-cols-5 gap-2">
-        {stats.map((stat) => (
-          <div key={stat.label} className="min-w-0 rounded-2xl border border-rose-line bg-white px-3 py-2.5 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className={`flex h-9 w-9 items-center justify-center rounded-xl text-base ${stat.color}`}>
-                {stat.icon}
-              </div>
-              <div className="min-w-0">
-                <div className="truncate text-xs font-black text-slate-500">{stat.label}</div>
-                <div className="text-[17px] font-black tracking-tight text-slate-950">{stat.amount}</div>
-                <div className="mt-0.5 text-[11px] font-bold text-slate-400">{stat.sub}</div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
+    <div className="mb-3 flex items-center gap-3 rounded-2xl border border-rose-line bg-white px-4 py-2.5 text-sm shadow-sm">
+      <span className="font-black text-slate-950">매출 <b className="text-rose-deep">{money(paidAmount)}</b></span>
+      <span className="text-slate-300">|</span>
+      <span className="text-slate-600">무통장 미입금 <b className="text-amber-500">{money(bankUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</b></span>
+      <span className="text-slate-300">|</span>
+      <span className="text-slate-600">카드 미결제 <b className="text-amber-500">{money(cardUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</b></span>
+      <span className="text-slate-300">|</span>
+      <span className="text-slate-600">전체 미입금 <b className="text-red-600">{money((bankUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))+(cardUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0)))}</b></span>
+    </div>
   );
 }
