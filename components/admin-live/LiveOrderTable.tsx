@@ -175,7 +175,7 @@ function statusBadge(order: LiveOrder) {
     return <span className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-700">자동입금확인</span>;
   }
   if (order.paymentStatus === "manual_paid") {
-    return <span className="rounded-lg bg-blue-100 px-2 py-1 text-xs font-black text-blue-700">수동입금확인</span>;
+    return <span className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-700">수동입금확인</span>;
   }
   return <span className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-700">입금확인</span>;
 }
