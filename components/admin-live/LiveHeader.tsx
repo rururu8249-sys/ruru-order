@@ -117,7 +117,7 @@ export default function LiveHeader({
             <input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              className="h-9 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+              className="h-9 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none focus:border-rose-line focus:ring-4 focus:ring-blue-50"
             />
             <button
               type="button"
@@ -142,7 +142,7 @@ export default function LiveHeader({
               value={youtubeUrl}
               onChange={(event) => setYoutubeUrl(event.target.value)}
               placeholder="https://www.youtube.com/watch?v=..."
-              className="h-9 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+              className="h-9 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none focus:border-rose-line focus:ring-4 focus:ring-blue-50"
             />
             <button
               type="button"
@@ -160,7 +160,7 @@ export default function LiveHeader({
           <select
             value={videoRatio}
             onChange={(event) => onVideoRatioChange(event.target.value as VideoRatio)}
-            className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+            className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 outline-none focus:border-rose-line focus:ring-4 focus:ring-blue-50"
           >
             <option value="vertical">세로 9:16</option>
             <option value="wide">가로 16:9</option>
@@ -174,7 +174,7 @@ export default function LiveHeader({
           시작시간 <span className="ml-1 text-slate-900">{activeBroadcast?.started_at ? formatBroadcastTime(activeBroadcast.started_at) : "방송시작 전"}</span>
         </div>
         <div className="rounded-lg bg-slate-50 px-3 py-1.5">
-          주문묶음 <span className="ml-1 text-blue-700">방송 시작~종료 시간 기준</span>
+          주문묶음 <span className="ml-1 text-rose-deep">방송 시작~종료 시간 기준</span>
         </div>
       </div>
     </header>

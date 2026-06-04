@@ -171,7 +171,7 @@ function CustomerPointActionModal({
               onChange={(event) => setForm((current) => ({ ...current, amount: commaNumberText(event.target.value) }))}
               inputMode="numeric"
               placeholder="예: 10,000"
-              className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-lg font-black text-slate-950 outline-none focus:border-blue-400"
+              className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-lg font-black text-slate-950 outline-none focus:border-rose-line"
             />
           </label>
 
@@ -181,7 +181,7 @@ function CustomerPointActionModal({
               value={form.reason}
               onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))}
               placeholder={isGrant ? "예: 방송 이벤트 당첨" : "예: 오지급 정정"}
-              className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-900 outline-none focus:border-blue-400"
+              className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-900 outline-none focus:border-rose-line"
             />
           </label>
 
@@ -192,11 +192,11 @@ function CustomerPointActionModal({
               onChange={(event) => setForm((current) => ({ ...current, adminMemo: event.target.value }))}
               placeholder="관리자만 참고할 내용을 적어주세요."
               rows={3}
-              className="w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-blue-400"
+              className="w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-rose-line"
             />
           </label>
 
-          <label className="flex items-center gap-3 rounded-2xl bg-rose-soft px-4 py-3 text-sm font-black text-blue-800 ring-1 ring-rose-line">
+          <label className="flex items-center gap-3 rounded-2xl bg-rose-soft px-4 py-3 text-sm font-black text-rose-deep ring-1 ring-rose-line">
             <input
               type="checkbox"
               checked={form.customerVisible}
@@ -450,7 +450,7 @@ export default function AdminLiveCustomerPointPanel({ customer }: { customer: Po
       ) : null}
 
       <div className="mt-4 overflow-hidden rounded-2xl border border-rose-line bg-white">
-        <div className="flex items-center justify-between border-b border-blue-50 px-4 py-3">
+        <div className="flex items-center justify-between border-b border-rose-line px-4 py-3">
           <div className="text-sm font-black text-slate-900">최근 포인트 이력</div>
           <div className="text-xs font-bold text-slate-400">{recentLedger.length.toLocaleString("ko-KR")}건 표시</div>
         </div>

@@ -12,13 +12,13 @@ type Props = {
 
 function buttonClass(active: boolean, tone: "dark" | "blue" | "red") {
   if (active) {
-    if (tone === "blue") return "bg-blue-600 text-white";
+    if (tone === "blue") return "bg-rose-deep text-white";
     if (tone === "red") return "bg-red-600 text-white";
     return "bg-slate-950 text-white";
   }
 
   if (tone === "red") return "bg-white text-red-600 hover:bg-red-50";
-  if (tone === "blue") return "bg-white text-slate-600 hover:bg-blue-50";
+  if (tone === "blue") return "bg-white text-slate-600 hover:bg-rose-soft";
   return "bg-white text-slate-600 hover:bg-slate-100";
 }
 

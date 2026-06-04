@@ -254,8 +254,8 @@ export default function QuickProductImageDropzone({
         className={[
           "rounded-2xl border border-dashed p-2 transition",
           isDragging
-            ? "border-blue-400 bg-blue-50"
-            : "border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50/40",
+            ? "border-rose-line bg-rose-soft"
+            : "border-slate-200 bg-slate-50 hover:border-rose-line hover:bg-rose-soft/40",
         ].join(" ")}
       >
         {isMultiple ? (

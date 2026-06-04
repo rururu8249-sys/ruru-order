@@ -100,7 +100,7 @@ function getPaymentStatusLabel(order: LiveOrder) {
 function getPaymentStatusClass(order: LiveOrder) {
   if (order.paymentStatus === "canceled") return "border-red-200 bg-red-50 text-red-700";
   if (order.paymentStatus === "manual_match_needed") return "border-orange-200 bg-orange-50 text-orange-700";
-  if (order.paymentStatus === "manual_paid") return "border-blue-200 bg-blue-50 text-blue-700";
+  if (order.paymentStatus === "manual_paid") return "border-emerald-200 bg-emerald-50 text-emerald-700";
   if (["auto_paid", "paid"].includes(order.paymentStatus)) {
     return "border-emerald-200 bg-emerald-50 text-emerald-700";
   }
@@ -354,7 +354,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       <header className="shrink-0 border-b border-slate-100 px-4 py-3">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] font-black tracking-[0.18em] text-blue-500">ORDER DETAIL</div>
+            <div className="text-[10px] font-black tracking-[0.18em] text-rose-deep">ORDER DETAIL</div>
             <h2 className="mt-0.5 text-lg font-black tracking-[-0.04em] text-slate-950">주문 상세</h2>
           </div>
 
@@ -467,7 +467,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 type="button"
                 onClick={restoreOrder}
                 disabled={Boolean(savingAction)}
-                className="h-10 w-full rounded-xl bg-blue-600 text-[13px] font-black text-white shadow-sm hover:bg-blue-700 active:scale-[0.99] disabled:bg-slate-300"
+                className="h-10 w-full rounded-xl bg-rose-deep text-[13px] font-black text-white shadow-sm hover:bg-rose-deep active:scale-[0.99] disabled:bg-slate-300"
               >
                 {savingAction === "restore" ? "처리중..." : "주문서복구"}
               </button>
@@ -507,7 +507,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-sm font-black text-slate-950">주문내역 ({items.length}건)</h3>
             {refreshingDetail ? (
-              <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-700">
+              <span className="rounded-full bg-rose-soft px-2 py-1 text-[11px] font-black text-rose-deep">
                 상세정보 갱신중...
               </span>
             ) : null}
@@ -568,7 +568,7 @@ function Info({ label, value, strong = false }: { label: string; value: string; 
   return (
     <div className="min-w-0">
       <div className="text-[11px] font-black text-slate-400">{label}</div>
-      <div className={["mt-0.5 truncate text-sm font-black", strong ? "text-blue-700" : "text-slate-900"].join(" ")}>
+      <div className={["mt-0.5 truncate text-sm font-black", strong ? "text-rose-deep" : "text-slate-900"].join(" ")}>
         {value}
       </div>
     </div>

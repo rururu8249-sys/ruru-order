@@ -44,7 +44,7 @@ type AdminIssueTask = {
 };
 
 const ISSUE_TYPES = [
-  { label: "교환", taskType: "exchange", className: "bg-blue-100 text-blue-700 border-blue-200" },
+  { label: "교환", taskType: "exchange", className: "bg-rose-soft text-rose-deep border-rose-line" },
   { label: "반품", taskType: "return", className: "bg-violet-100 text-violet-700 border-violet-200" },
   { label: "환불", taskType: "refund", className: "bg-red-100 text-red-700 border-red-200" },
   { label: "구매", taskType: "product", className: "bg-green-100 text-green-700 border-green-200" },
@@ -272,7 +272,7 @@ function CustomerIssueSummaryRow({
     <button
       type="button"
       onClick={onDetail}
-      className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2 text-left hover:bg-blue-50"
+      className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2 text-left hover:bg-rose-soft"
       title="고객관리에서 자세히 보기"
     >
       <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-black text-orange-700">

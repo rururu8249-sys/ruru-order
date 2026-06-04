@@ -238,7 +238,7 @@ export default function LiveOpsOrderCopyModal({ open, orders, onClose, onCopied 
             </button>
           </div>
 
-          <div className="mt-3 rounded-2xl border border-rose-line bg-rose-soft px-4 py-3 text-[13px] font-black leading-5 text-blue-800">
+          <div className="mt-3 rounded-2xl border border-rose-line bg-rose-soft px-4 py-3 text-[13px] font-black leading-5 text-rose-deep">
             복사 형식: 📦 새 주문서 접수완료 ｜ 닉네임님 / 상품명 옵션 x1개 / 19,000원 ｜ 주문내역과 금액 확인 후 결제 부탁드립니다 :)
           </div>
         </div>
@@ -290,7 +290,7 @@ export default function LiveOpsOrderCopyModal({ open, orders, onClose, onCopied 
                   >
                     <span
                       className={`mt-1 flex h-6 w-6 items-center justify-center rounded-lg border text-xs font-black ${
-                        selected ? "border-blue-600 bg-rose-deep text-white" : "border-slate-300 text-transparent"
+                        selected ? "border-rose-line bg-rose-deep text-white" : "border-slate-300 text-transparent"
                       }`}
                     >
                       ✓

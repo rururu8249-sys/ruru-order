@@ -422,7 +422,7 @@ export default function LiveOpsStatusBox() {
           disabled={!recentOrders.length}
           className="flex w-full items-center justify-between rounded-xl border border-rose-line bg-white px-3 py-2 text-left hover:bg-rose-soft disabled:cursor-not-allowed disabled:opacity-45"
         >
-          <span className="text-[11px] font-black text-blue-800">📦 새 주문서 복사</span>
+          <span className="text-[11px] font-black text-rose-deep">📦 새 주문서 복사</span>
           <span className="text-[11px] font-black text-rose-deep">{Math.min(2, recentOrders.length)}건</span>
         </button>
 
