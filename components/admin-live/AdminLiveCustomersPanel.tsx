@@ -561,6 +561,7 @@ function CustomerDetailDrawer({
 
 export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
   const [custTab, setCustTab] = useState<"members" | "issues">("members");
+  const [phoneBlockOpen, setPhoneBlockOpen] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("latest");
@@ -992,58 +993,49 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-start justify-center bg-slate-950/40 overflow-y-auto py-8 px-4" onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}>
-      <div className="w-full max-w-[780px] rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-rose-line px-5 py-3">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}>
+      <div className="flex w-full max-w-[640px] max-h-[88vh] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-rose-line px-5 py-3 shrink-0">
           <span className="text-[15px] font-black text-slate-950">👥 고객·이슈</span>
           <button type="button" onClick={() => onClose?.()} className="text-slate-400 hover:text-slate-700 text-lg leading-none">✕</button>
         </div>
-        <div className="p-5 space-y-5">
-      <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="text-[11px] font-black tracking-[0.18em] text-rose-deep">CUSTOMER MANAGEMENT</div>
-            <h1 className="mt-1 text-3xl font-black tracking-[-0.05em] text-slate-950">{CUSTOMER_TERMS.pageTitle}</h1>
-            <p className="mt-2 text-sm font-bold text-slate-500">
-              {CUSTOMER_TERMS.pageSubTitle} · 1차는 조회/상세 확인 전용입니다.
-            </p>
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-rose-soft/40 px-4 py-2.5 text-[12px] font-black text-slate-600">
+            <span>전체 <span className="text-rose-deep">{customers.length.toLocaleString("ko-KR")}</span></span>
+            <span className="text-slate-300">·</span>
+            <span>정상 <span className="text-emerald-600">{normalCustomers.length.toLocaleString("ko-KR")}</span></span>
+            <span className="text-slate-300">·</span>
+            <button
+              type="button"
+              onClick={() => {
+                setBlockedCustomerKeywordDraft("");
+                setBlockedCustomerKeyword("");
+                setBlockedCustomerPage(1);
+                setShowBlockedCustomers(true);
+              }}
+              className="hover:underline"
+            >
+              차단 <span className="text-red-500">{blockedTotalCount.toLocaleString("ko-KR")}</span>
+            </button>
+            <span className="text-slate-300">·</span>
+            <span>관리필요 <span className="text-amber-600">{attentionCustomers.length.toLocaleString("ko-KR")}</span></span>
           </div>
 
-          <div className="rounded-full bg-rose-soft px-4 py-2 text-xs font-black text-rose-deep">
-            차단 저장 연결
+      <div className="rounded-xl border border-red-100 bg-red-50/50">
+        <button
+          type="button"
+          onClick={() => setPhoneBlockOpen((v) => !v)}
+          className="flex w-full items-center justify-between px-4 py-2.5 text-[12px] font-black text-red-500"
+        >
+          <span>⛔ 전화번호 직접 차단</span>
+          <span className="text-base leading-none">{phoneBlockOpen ? "−" : "+"}</span>
+        </button>
+        {phoneBlockOpen ? (
+          <div className="px-2 pb-2">
+            <AdminLivePhoneBlockPanel onSaved={applyBlockResult} />
           </div>
-        </div>
-
-        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <SummaryCard icon="👥" label="전체 고객" value={`${customers.length.toLocaleString("ko-KR")}명`} sub="주문+회원 기준" />
-          <SummaryCard icon="✅" label="정상 고객" value={`${normalCustomers.length.toLocaleString("ko-KR")}명`} sub="차단 제외" />
-          <button
-            type="button"
-            onClick={() => {
-              setBlockedCustomerKeywordDraft("");
-              setBlockedCustomerKeyword("");
-              setBlockedCustomerPage(1);
-              setShowBlockedCustomers(true);
-            }}
-            className="text-left"
-            title="차단 고객 목록 보기"
-          >
-            <SummaryCard
-              icon="⛔"
-              label="차단 관리"
-              value={`${blockedTotalCount.toLocaleString("ko-KR")}건`}
-              sub={
-                standalonePhoneBlocks.length > 0
-                  ? `고객차단 ${blockedCustomers.length.toLocaleString("ko-KR")}명 · 전화번호차단 ${standalonePhoneBlocks.length.toLocaleString("ko-KR")}건`
-                  : `고객차단 ${blockedCustomers.length.toLocaleString("ko-KR")}명`
-              }
-            />
-          </button>
-          <SummaryCard icon="⚠️" label="관리필요 고객" value={`${attentionCustomers.length.toLocaleString("ko-KR")}명`} sub="입금대기 / 입금매칭 필요" />
-        </div>
+        ) : null}
       </div>
-
-      <AdminLivePhoneBlockPanel onSaved={applyBlockResult} />
 
       <div className="flex gap-2 border-b border-rose-line">
         <button type="button" onClick={() => setCustTab("members")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "members" ? "bg-rose-deep text-white" : "text-slate-500 hover:text-rose-deep"}`}>회원 목록</button>
