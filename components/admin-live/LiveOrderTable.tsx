@@ -6,6 +6,7 @@ import { exportLiveOrdersForPicking, exportLiveOrdersForRosen } from "./adminLiv
 import { supabase } from "@/lib/supabase";
 import LiveOrderCancelViewFilter, { type LiveOrderCancelViewFilterValue } from "./LiveOrderCancelViewFilter";
 import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
+import { openPaysterRightHalf } from "./AdminLiveCardPayPopup";
 
 export type LiveOrderDateFilter = "all" | "today" | "yesterday" | "7days" | "month" | "custom";
 export type LiveOrderStatusFilter =
@@ -758,7 +759,7 @@ export default function LiveOrderTable({
                           </button>
                         ) : null}
                         {order.paymentStatus === "card_unpaid" && onOpenCardPay ? (
-                          <button type="button" onClick={() => onOpenCardPay(order)} className="mt-1 rounded-lg border border-blue-300 bg-blue-50 px-2 py-0.5 text-[10px] font-black text-blue-700 hover:bg-blue-100">
+                          <button type="button" onClick={() => { openPaysterRightHalf(); onOpenCardPay(order); }} className="mt-1 rounded-lg border border-blue-300 bg-blue-50 px-2 py-0.5 text-[10px] font-black text-blue-700 hover:bg-blue-100">
                             💳 카드결제
                           </button>
                         ) : null}

@@ -8,6 +8,16 @@ import type { LiveOrder } from "./types";
 
 const PAYSTER_URL = "https://user.service.payster.co.kr/#/payment/smspayment";
 
+// 페이스터를 화면 오른쪽 절반에 띄움 (왼쪽 절반 = 복사창). 사용자 클릭 제스처 안에서 호출해야 팝업차단 안 됨.
+export function openPaysterRightHalf() {
+  if (typeof window === "undefined") return;
+  const sw = window.screen?.availWidth || window.innerWidth;
+  const sh = window.screen?.availHeight || window.innerHeight;
+  const left = Math.floor(sw / 2);
+  const width = sw - left;
+  window.open(PAYSTER_URL, "ruruPayster", `popup=yes,left=${left},top=0,width=${width},height=${sh}`);
+}
+
 type Props = {
   order: LiveOrder;
   onClose: () => void;
@@ -50,19 +60,6 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
       window.setTimeout(() => setCopiedKey((k) => (k === key ? "" : k)), 1500);
     } catch {
       showAdminToast("복사 실패 — 길게 눌러 직접 복사해주세요.", "warning");
-    }
-  };
-
-  const openPayster = () => {
-    if (typeof window === "undefined") return;
-    const isPC = window.innerWidth >= 1024;
-    if (isPC && window.screen?.availWidth) {
-      const w = Math.floor(window.screen.availWidth / 2);
-      const h = window.screen.availHeight;
-      const left = window.screen.availWidth - w;
-      window.open(PAYSTER_URL, "ruruPayster", `popup=yes,left=${left},top=0,width=${w},height=${h}`);
-    } else {
-      window.open(PAYSTER_URL, "ruruPayster", "popup=yes,width=480,height=720");
     }
   };
 
@@ -112,7 +109,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-8"
+      className="fixed inset-y-0 left-0 z-50 flex w-full items-center justify-center bg-slate-950/30 p-4 md:w-1/2"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -161,10 +158,10 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
 
           <button
             type="button"
-            onClick={openPayster}
+            onClick={openPaysterRightHalf}
             className="mt-3 w-full rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
           >
-            ↗ 페이스터 결제창 열기
+            ↗ 페이스터 결제창 다시 열기
           </button>
 
           <button
