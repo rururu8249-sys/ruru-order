@@ -234,9 +234,9 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
     all: "상태 전체보기",
     unpaid: "입금대기",
     paid: "입금확인",
-    manual_match_needed: "입금매칭 필요",
+    manual_match_needed: "매칭필요",
     card_paid: "카드결제완료",
-    card_unpaid: "카드 미결제",
+    card_unpaid: "카드미결제",
   };
   parts.push(statusLabelMap[filters.status]);
 
@@ -1651,7 +1651,7 @@ export default function AdminLiveDashboard() {
                     const canceled = isCanceledOrder(order);
                     const paid = isPaidOrder(order);
 
-                    const label = canceled ? "주문서취소" : paid ? "입금확인" : "입금매칭 필요";
+                    const label = canceled ? "주문서취소" : paid ? "입금확인" : "매칭필요";
                     const klass = canceled
                       ? "bg-red-50 text-red-600"
                       : paid
