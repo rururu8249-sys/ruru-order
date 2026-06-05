@@ -663,14 +663,14 @@ export default function LiveOrderTable({
       <div className="overflow-hidden rounded-xl border border-slate-200">
             {/* 헤더 행 */}
             <div className="grid grid-cols-[108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 border-b border-rose-line bg-rose-soft/40 text-[12px] font-black text-slate-500">
-              <span className="whitespace-nowrap px-3 py-2.5 text-left">주문일</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-left">닉네임</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-left">이름</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-left">주문내용</span>
+              <span className="whitespace-nowrap px-3 py-2.5 text-center">주문일</span>
+              <span className="whitespace-nowrap px-3 py-2.5 text-center">닉네임</span>
+              <span className="whitespace-nowrap px-3 py-2.5 text-center">이름</span>
+              <span className="whitespace-nowrap px-3 py-2.5 text-center">주문내용</span>
               <span className="whitespace-nowrap px-3 py-2.5 text-center">수량</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-right">상품금액</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-right">택배비</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-right">총금액</span>
+              <span className="whitespace-nowrap px-3 py-2.5 text-center">상품금액</span>
+              <span className="whitespace-nowrap px-3 py-2.5 text-center">택배비</span>
+              <span className="whitespace-nowrap px-3 py-2.5 text-center">총금액</span>
               <span className="whitespace-nowrap px-3 py-2.5 text-center">입금</span>
               <span className="whitespace-nowrap px-3 py-2.5 text-center">출고</span>
             </div>
