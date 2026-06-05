@@ -143,7 +143,7 @@ function renderOrderSummary(order: LiveOrder) {
     <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
       {parts.map((part, index) => (
         <span key={`${part}-${index}`} className="inline-flex min-w-0 items-center gap-2">
-          {index > 0 && <span className="shrink-0 font-black text-red-500">|</span>}
+          {index > 0 && <span className="text-rose-deep mx-0.5 shrink-0">,</span>}
           <span className="truncate">{part}</span>
         </span>
       ))}
@@ -650,7 +650,7 @@ export default function LiveOrderTable({
 
       <div className="overflow-hidden rounded-xl border border-slate-200">
             {/* 헤더 행 */}
-            <div className="grid grid-cols-[92px_130px_minmax(0,1fr)_40px_84px_60px_88px_104px_58px] gap-2 border-b border-rose-line bg-rose-soft/40 px-3 py-2 text-[11px] font-black text-slate-500">
+            <div className="grid grid-cols-[120px_130px_minmax(0,1fr)_40px_84px_60px_88px_104px_58px] gap-2 border-b border-rose-line bg-rose-soft/40 px-3 py-2 text-[12px] font-black text-slate-500">
               <span className="whitespace-nowrap">주문일</span>
               <span className="whitespace-nowrap">닉네임</span>
               <span className="whitespace-nowrap">주문내용</span>
@@ -672,9 +672,9 @@ export default function LiveOrderTable({
                 visibleOrders.map((order) => {
                   const selected = order.id === selectedOrderId;
                   return (
-                    <div key={order.id} className={`grid grid-cols-[92px_130px_minmax(0,1fr)_40px_84px_60px_88px_104px_58px] gap-2 items-start px-3 py-2.5 text-[13px] transition ${selected ? "bg-rose-soft/70" : "hover:bg-slate-50"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}>
+                    <div key={order.id} className={`grid grid-cols-[120px_130px_minmax(0,1fr)_40px_84px_60px_88px_104px_58px] gap-2 items-start px-3 py-3 text-[14px] transition ${selected ? "bg-rose-soft/70" : "hover:bg-slate-50"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}>
                       {/* 1. 주문일 */}
-                      <div className="pt-0.5 text-[10px] leading-tight text-slate-500">
+                      <div className="pt-0.5 text-[12px] leading-tight text-slate-500">
                         {order.submittedAt ? (() => {
                           try {
                             const d = new Date(order.submittedAt);
@@ -699,10 +699,10 @@ export default function LiveOrderTable({
                       {/* 2. 닉네임 */}
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-1 mb-0.5">
-                          <button type="button" onClick={() => onSelectOrder(order)} className="font-black text-rose-deep underline-offset-2 hover:underline text-[12px]">
+                          <button type="button" onClick={() => onSelectOrder(order)} className="font-black text-rose-deep underline-offset-2 hover:underline text-[13px]">
                             {order.nickname}
                           </button>
-                          {order.name && order.name !== order.nickname && <span className="text-slate-400 text-[10px]">{order.name}</span>}
+                          {order.name && order.name !== order.nickname && <span className="text-slate-400 text-[11px]">{order.name}</span>}
                         </div>
                         {(inventoryStatusBadge(order) || testOrderBadge(order)) && (
                           <div className="flex flex-wrap gap-1 mt-0.5">
@@ -712,26 +712,26 @@ export default function LiveOrderTable({
                         )}
                       </div>
                       {/* 3. 주문내용 */}
-                      <div className="min-w-0 truncate pt-0.5 text-[11px] text-slate-600">{renderOrderSummary(order)}</div>
+                      <div className="min-w-0 truncate pt-0.5 text-[13px] text-slate-600">{renderOrderSummary(order)}</div>
                       {/* 3. 수량 */}
                       <div className="pt-0.5 text-center">
-                        <span className="inline-flex min-w-[34px] items-center justify-center rounded-lg bg-slate-100 px-1 py-0.5 text-[11px] font-black text-slate-700">
+                        <span className="inline-flex min-w-[34px] items-center justify-center rounded-lg bg-slate-100 px-1 py-0.5 text-[13px] font-black text-slate-700">
                           {getTotalQty(order)}
                         </span>
                       </div>
                       {/* 4. 상품금액 */}
-                      <div className="pt-0.5 text-right text-[11px] font-black text-slate-700">
+                      <div className="pt-0.5 text-right text-[13px] font-black text-slate-700">
                         <div>{money(order.productAmount)}</div>
                         {Number(order.pointUsedAmount || 0) > 0 ? (
                           <div className="text-[10px] text-emerald-700">-{money(Number(order.pointUsedAmount || 0))}</div>
                         ) : null}
                       </div>
                       {/* 5. 택배비 */}
-                      <div className="pt-0.5 text-right text-[11px] text-slate-400">
+                      <div className="pt-0.5 text-right text-[13px] text-slate-400">
                         {Number(order.shippingFee || 0) > 0 ? money(order.shippingFee) : "0"}
                       </div>
                       {/* 6. 총금액 */}
-                      <div className="pt-0.5 text-right text-[12px] font-black text-slate-950">
+                      <div className="pt-0.5 text-right text-[14px] font-black text-slate-950">
                         {money(Number(order.totalAmount || 0) || Number(order.finalAmount || 0))}
                         {String((order as any).paymentMethod || "").includes("카드") && Number((order as any).cardPaymentTotalAmount || 0) > 0 ? (
                           <div className="text-[10px] font-black text-purple-700">카드 {money(Number((order as any).cardPaymentTotalAmount || 0))}</div>
@@ -740,7 +740,7 @@ export default function LiveOrderTable({
                       {/* 7. 입금 */}
                       <div className="pt-0.5 text-center">
                         <div>{statusBadge(order)}</div>
-                        {order.paidAt && <div className="mt-0.5 text-[9px] text-slate-400">{order.paidAt}</div>}
+                        {order.paidAt && <div className="mt-0.5 text-[10px] text-slate-400">{order.paidAt}</div>}
                         {order.paymentStatus === "manual_match_needed" && onOpenManualMatch ? (
                           <button type="button" onClick={() => onOpenManualMatch(order)} className="mt-1 rounded-lg border border-orange-300 bg-orange-50 px-2 py-0.5 text-[10px] font-black text-orange-700 hover:bg-orange-100">
                             매칭
