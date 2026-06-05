@@ -267,6 +267,7 @@ type Props = {
   filters: LiveOrderFilters;
   onFiltersChange: (filters: LiveOrderFilters) => void;
   broadcastOptions: BroadcastOption[];
+  broadcastStartedAt?: string | null;
 };
 
 
@@ -283,6 +284,7 @@ export default function LiveOrderTable({
   filters,
   onFiltersChange,
   broadcastOptions,
+  broadcastStartedAt,
 }: Props) {
   const [page, setPage] = useState(1);
   const [pendingKeyword, setPendingKeyword] = useState(filters.keyword);
@@ -304,27 +306,37 @@ export default function LiveOrderTable({
     setPendingKeyword(filters.keyword);
   }, [filters.keyword]);
 
+  const baseOrders = useMemo(() => {
+    if (!broadcastStartedAt) return orders;
+    const startMs = new Date(broadcastStartedAt).getTime();
+    if (Number.isNaN(startMs)) return orders;
+    return orders.filter((order) => {
+      const created = order.createdAt ? new Date(order.createdAt).getTime() : NaN;
+      return !Number.isNaN(created) && created >= startMs;
+    });
+  }, [orders, broadcastStartedAt]);
+
   const counts = useMemo(() => {
-    const paid = orders.filter((order) =>
+    const paid = baseOrders.filter((order) =>
       ["paid", "auto_paid", "manual_paid", "card_paid"].includes(order.paymentStatus)
     ).length;
-    const manual = orders.filter((order) => order.paymentStatus === "manual_match_needed").length;
-    const canceled = orders.filter((order) => order.paymentStatus === "canceled").length;
-    const unpaid = orders.filter((order) =>
+    const manual = baseOrders.filter((order) => order.paymentStatus === "manual_match_needed").length;
+    const canceled = baseOrders.filter((order) => order.paymentStatus === "canceled").length;
+    const unpaid = baseOrders.filter((order) =>
       ["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus)
     ).length;
 
     return {
-      total: orders.length,
+      total: baseOrders.length,
       unpaid,
       paid,
       manual,
       canceled,
     };
-  }, [orders]);
+  }, [baseOrders]);
 
   const sortedOrders = useMemo(() => {
-    const list = [...orders];
+    const list = [...baseOrders];
 
     if (sortMode === "nickname_asc") {
       return list.sort((a, b) => a.nickname.localeCompare(b.nickname, "ko-KR"));
@@ -339,7 +351,7 @@ export default function LiveOrderTable({
       const bTime = new Date(b.createdAt || 0).getTime() || 0;
       return bTime - aTime;
     });
-  }, [orders, sortMode]);
+  }, [baseOrders, sortMode]);
 
   const cancelViewFilteredOrders = useMemo(() => {
     if (cancelViewFilter === "active") {

@@ -1131,6 +1131,7 @@ export default function AdminLiveDashboard() {
                   loading={loading}
                   filters={filters}
                   broadcastOptions={broadcastOptions}
+                  broadcastStartedAt={activeBroadcast?.started_at || activeBroadcast?.created_at || null}
                   onSelectOrder={(order) => {
                     setSelectedOrderId(order.id);
                     setOrderDetailOpen(true);
