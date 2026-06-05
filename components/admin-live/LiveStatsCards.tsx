@@ -72,14 +72,15 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
   ];
 
   return (
-    <div className="mb-3 flex items-center gap-3 rounded-2xl border border-rose-line bg-white px-4 py-2.5 text-sm shadow-sm">
-      <span className="font-black text-slate-950">매출 <b className="text-rose-deep">{money(paidAmount)}</b></span>
-      <span className="text-slate-300">|</span>
-      <span className="text-slate-600">무통장 미입금 <b className="text-amber-500">{money(bankUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</b></span>
-      <span className="text-slate-300">|</span>
-      <span className="text-slate-600">카드 미결제 <b className="text-amber-500">{money(cardUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</b></span>
-      <span className="text-slate-300">|</span>
-      <span className="text-slate-600">전체 미입금 <b className="text-red-600">{money((bankUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))+(cardUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0)))}</b></span>
+    <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl border border-rose-line bg-white px-4 py-2.5 text-[12px] font-black">
+      <span className="text-slate-500">매출 <span className="text-slate-950 text-[13px]">{money(paidAmount)}</span></span>
+      <span className="text-rose-line">|</span>
+      <span className="text-slate-500">무통장입금 <span className="text-emerald-600">{money(bankPaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
+      <span className="text-slate-500">카드결제 <span className="text-emerald-600">{money(cardPaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
+      <span className="text-rose-line">|</span>
+      <span className="text-slate-500">무통장미입금 <span className="text-amber-600">{money(bankUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
+      <span className="text-slate-500">카드미결제 <span className="text-amber-600">{money(cardUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
+      <span className="text-slate-500">전체미입금 <span className="text-red-600">{money(bankUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0)+cardUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
     </div>
   );
 }
