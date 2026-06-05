@@ -1,5 +1,6 @@
 export type AdminLiveMenuKey =
   | "broadcast"
+  | "products"
   | "orders"
   | "payments"
   | "customers"
@@ -27,6 +28,16 @@ export const ADMIN_LIVE_MENUS: AdminLiveMenuItem[] = [
     readyTitle: "방송 컨트롤타워",
     readyDescription: "라이브 방송, 주문, 결제상태, 고객이슈를 한 화면에서 관리합니다.",
     checkpoints: ["방송 시작/종료", "유튜브 영상·채팅", "실시간 주문", "입금대기 주문"],
+  },
+  {
+    key: "products",
+    label: "상품",
+    icon: "📦",
+    desc: "상품 관리·순환",
+    sidebarNotice: "상품 관리 화면에서 방송상품·공구·전체 창고를 보고 순환 담기/새 상품 등록을 합니다.",
+    readyTitle: "상품 관리",
+    readyDescription: "방송상품, 공구·상시판매, 전체 창고를 보고 선택해 방송 순환에 담거나 새 상품을 등록합니다.",
+    checkpoints: ["방송상품", "공구·상시판매", "전체 창고", "새 상품 등록", "순환 담기"],
   },
   {
     key: "orders",

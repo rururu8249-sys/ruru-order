@@ -53,6 +53,7 @@ import {
 import { useAutoBankdaPaymentSync } from "./useAutoBankdaPaymentSync";
 import AdminLiveQuickProductDrawer from "./AdminLiveQuickProductDrawer";
 import AdminLiveProductListPanel from "./AdminLiveProductListPanel";
+import AdminLiveProductManagePopup from "./AdminLiveProductManagePopup";
 import {
   buildAlwaysOrderOptions,
   getAlwaysOrderDateFromFilter,
@@ -247,6 +248,7 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
 
 const MENU_KEYS_FOR_URL: AdminLiveMenuKey[] = [
   "broadcast",
+  "products",
   "orders",
   "payments",
   "customers",
@@ -1206,6 +1208,14 @@ export default function AdminLiveDashboard() {
             </div>
           )}
 
+          {/* 상품 관리 (자체 모달) */}
+          {activeMenu === "products" && (
+            <AdminLiveProductManagePopup
+              activeBroadcastId={activeBroadcast?.id || null}
+              onClose={() => setActiveMenu("broadcast")}
+            />
+          )}
+
           {/* 고객관리 (자체 모달) */}
           {activeMenu === "customers" && (
             <AdminLiveCustomersPanel orders={orders} onClose={() => setActiveMenu("broadcast")} />
@@ -1242,7 +1252,7 @@ export default function AdminLiveDashboard() {
           )}
 
           {/* 알 수 없는 메뉴 */}
-          {activeMenu !== "broadcast" && activeMenu !== "orders" && activeMenu !== "payments" && activeMenu !== "customers" && activeMenu !== "settlement" && activeMenu !== "settings" && (
+          {activeMenu !== "broadcast" && activeMenu !== "products" && activeMenu !== "orders" && activeMenu !== "payments" && activeMenu !== "customers" && activeMenu !== "settlement" && activeMenu !== "settings" && (
             <AdminLiveMenuPlaceholder menuKey={activeMenu} />
           )}
 
