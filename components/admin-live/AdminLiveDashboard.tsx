@@ -1192,7 +1192,7 @@ export default function AdminLiveDashboard() {
             <div className="fixed inset-0 z-40 overflow-y-auto bg-slate-950/40 px-4 py-8" onClick={(e) => { if (e.target === e.currentTarget) setActiveMenu("broadcast"); }}>
               <div className="mx-auto w-full max-w-[1100px] rounded-2xl bg-white shadow-2xl">
                 <div className="flex items-center justify-between border-b border-rose-line px-5 py-3">
-                  <span className="text-[15px] font-black text-slate-950">💳 입금확인</span>
+                  <span className="text-[15px] font-black text-slate-950">💳 입금내역</span>
                   <button type="button" onClick={() => setActiveMenu("broadcast")} className="text-lg leading-none text-slate-400 hover:text-slate-700">✕</button>
                 </div>
                 <div className="p-5">
@@ -1226,7 +1226,7 @@ export default function AdminLiveDashboard() {
             <div className="fixed inset-0 z-40 overflow-y-auto bg-slate-950/40 px-4 py-8" onClick={(e) => { if (e.target === e.currentTarget) setActiveMenu("broadcast"); }}>
               <div className="mx-auto w-full max-w-[1100px] rounded-2xl bg-white shadow-2xl">
                 <div className="flex items-center justify-between border-b border-rose-line px-5 py-3">
-                  <span className="text-[15px] font-black text-slate-950">🧮 정산통계</span>
+                  <span className="text-[15px] font-black text-slate-950">🧮 정산</span>
                   <button type="button" onClick={() => setActiveMenu("broadcast")} className="text-lg leading-none text-slate-400 hover:text-slate-700">✕</button>
                 </div>
                 <div className="p-5">

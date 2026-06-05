@@ -326,7 +326,7 @@ export default function ManualPaymentMatchDrawer(props: Props) {
           <div className="mb-3 flex items-start justify-between gap-4">
             <div>
               <div className="text-[10px] font-black tracking-[0.18em] text-slate-400">MANUAL PAYMENT MATCH</div>
-              <h2 className="mt-0.5 text-lg font-black tracking-[-0.04em] text-slate-950">수동 입금매칭</h2>
+              <h2 className="mt-0.5 text-lg font-black tracking-[-0.04em] text-slate-950">입금매칭</h2>
             </div>
 
             <div className="flex items-start gap-2">
