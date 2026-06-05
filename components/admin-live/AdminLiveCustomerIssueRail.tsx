@@ -346,10 +346,9 @@ function IssueCard({
   return (
     <article
       key={taskKey(task, index)}
-      className={`rounded-2xl border p-3 shadow-sm ${
-        done ? "border-slate-100 bg-slate-50" : "border-amber-200 bg-amber-50"
-      }`}
+      className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-3 pl-4 shadow-sm"
     >
+      <span className={`absolute left-0 top-0 h-full w-1 ${done ? "bg-emerald-400" : "bg-red-400"}`} />
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -845,10 +844,6 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
             다음
           </button>
         </div>
-      </div>
-
-      <div className="mt-4 rounded-2xl bg-rose-soft p-3 text-[12px] font-bold leading-relaxed text-rose-deep">
-        고객이슈는 이 화면에서 메모 추가/수정/해결완료 처리가 가능합니다. 해결된 목록삭제는 DB 완전삭제가 아니라 숨김 처리입니다.
       </div>
 
       {showMemoAdd && (
