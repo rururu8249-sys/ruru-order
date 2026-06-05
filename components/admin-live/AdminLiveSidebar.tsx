@@ -85,6 +85,9 @@ export default function AdminLiveSidebar({ activeMenu, onMenuChange }: Props) {
         </section>
       ) : null}
 
+      <div className="mt-auto pt-4">
+        <AdminLiveLogoutButton />
+      </div>
     </aside>
   );
 }
