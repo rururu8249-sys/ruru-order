@@ -650,9 +650,10 @@ export default function LiveOrderTable({
 
       <div className="overflow-hidden rounded-xl border border-slate-200">
             {/* 헤더 행 */}
-            <div className="grid grid-cols-[108px_148px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 border-b border-rose-line bg-rose-soft/40 text-[12px] font-black text-slate-500">
+            <div className="grid grid-cols-[108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 border-b border-rose-line bg-rose-soft/40 text-[12px] font-black text-slate-500">
               <span className="whitespace-nowrap px-3 py-2.5">주문일</span>
               <span className="whitespace-nowrap px-3 py-2.5">닉네임</span>
+              <span className="whitespace-nowrap px-3 py-2.5">이름</span>
               <span className="whitespace-nowrap px-3 py-2.5">주문내용</span>
               <span className="whitespace-nowrap px-3 py-2.5 text-center">수량</span>
               <span className="whitespace-nowrap px-3 py-2.5 text-right">상품금액</span>
@@ -672,7 +673,7 @@ export default function LiveOrderTable({
                 visibleOrders.map((order) => {
                   const selected = order.id === selectedOrderId;
                   return (
-                    <div key={order.id} className={`grid grid-cols-[108px_148px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 items-start text-[14px] transition ${selected ? "bg-rose-soft/70" : "hover:bg-slate-50"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}>
+                    <div key={order.id} className={`grid grid-cols-[108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 items-start text-[14px] transition ${selected ? "bg-rose-soft/70" : "hover:bg-slate-50"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}>
                       {/* 1. 주문일 */}
                       <div className="px-3 py-3 text-[12px] leading-tight text-slate-500">
                         {(() => {
@@ -700,11 +701,10 @@ export default function LiveOrderTable({
                       </div>
                       {/* 2. 닉네임 */}
                       <div className="min-w-0 px-3 py-3">
-                        <div className="flex flex-wrap items-center gap-1 mb-0.5">
+                        <div className="mb-0.5">
                           <button type="button" onClick={() => onSelectOrder(order)} className="font-black text-rose-deep underline-offset-2 hover:underline text-[13px]">
                             {order.nickname}
                           </button>
-                          {order.name && order.name !== order.nickname && <span className="text-slate-400 text-[11px]">{order.name}</span>}
                         </div>
                         {(inventoryStatusBadge(order) || testOrderBadge(order)) && (
                           <div className="flex flex-wrap gap-1 mt-0.5">
@@ -713,7 +713,9 @@ export default function LiveOrderTable({
                           </div>
                         )}
                       </div>
-                      {/* 3. 주문내용 */}
+                      {/* 3. 이름 */}
+                      <div className="min-w-0 truncate px-3 py-3 text-[13px] text-slate-600">{order.name || "-"}</div>
+                      {/* 4. 주문내용 */}
                       <div className="min-w-0 truncate px-3 py-3 text-[13px] text-slate-600">{renderOrderSummary(order)}</div>
                       {/* 4. 수량 */}
                       <div className="px-3 py-3 text-center">
