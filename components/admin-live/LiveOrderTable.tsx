@@ -262,6 +262,7 @@ type Props = {
   selectedOrderId: string;
   onSelectOrder: (order: LiveOrder) => void;
   onOpenManualMatch?: (order: LiveOrder) => void;
+  onOpenCardPay?: (order: LiveOrder) => void;
   onRefresh?: () => void | Promise<void>;
   loading?: boolean;
   filters: LiveOrderFilters;
@@ -279,6 +280,7 @@ export default function LiveOrderTable({
   selectedOrderId,
   onSelectOrder,
   onOpenManualMatch,
+  onOpenCardPay,
   onRefresh,
   loading = false,
   filters,
@@ -753,6 +755,11 @@ export default function LiveOrderTable({
                         {order.paymentStatus === "manual_match_needed" && onOpenManualMatch ? (
                           <button type="button" onClick={() => onOpenManualMatch(order)} className="mt-1 rounded-lg border border-orange-300 bg-orange-50 px-2 py-0.5 text-[10px] font-black text-orange-700 hover:bg-orange-100">
                             매칭
+                          </button>
+                        ) : null}
+                        {order.paymentStatus === "card_unpaid" && onOpenCardPay ? (
+                          <button type="button" onClick={() => onOpenCardPay(order)} className="mt-1 rounded-lg border border-blue-300 bg-blue-50 px-2 py-0.5 text-[10px] font-black text-blue-700 hover:bg-blue-100">
+                            💳 카드결제
                           </button>
                         ) : null}
                       </div>

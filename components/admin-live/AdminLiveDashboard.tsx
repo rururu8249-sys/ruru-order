@@ -54,6 +54,7 @@ import { useAutoBankdaPaymentSync } from "./useAutoBankdaPaymentSync";
 import AdminLiveQuickProductDrawer from "./AdminLiveQuickProductDrawer";
 import AdminLiveProductListPanel from "./AdminLiveProductListPanel";
 import AdminLiveProductManagePopup from "./AdminLiveProductManagePopup";
+import AdminLiveCardPayPopup from "./AdminLiveCardPayPopup";
 import {
   buildAlwaysOrderOptions,
   getAlwaysOrderDateFromFilter,
@@ -521,6 +522,7 @@ export default function AdminLiveDashboard() {
   const [orderGroups, setOrderGroups] = useState<OrderGroup[]>([]);
   const [deposits, setDeposits] = useState<DepositRow[]>([]);
   const [manualMatchGroup, setManualMatchGroup] = useState<OrderGroup | null>(null);
+  const [cardPayOrder, setCardPayOrder] = useState<LiveOrder | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string>("");
   const [orderDetailOpen, setOrderDetailOpen] = useState(false);
   const [videoRatio, setVideoRatio] = useState<VideoRatio>("vertical");
@@ -1152,6 +1154,7 @@ export default function AdminLiveDashboard() {
                   onFiltersChange={setFilters}
                   onRefresh={loadOrders}
                   onOpenManualMatch={openManualMatchForOrder}
+                  onOpenCardPay={setCardPayOrder}
                 />
               </div>
             </section>
@@ -1213,6 +1216,15 @@ export default function AdminLiveDashboard() {
             <AdminLiveProductManagePopup
               activeBroadcastId={activeBroadcast?.id || null}
               onClose={() => setActiveMenu("broadcast")}
+            />
+          )}
+
+          {/* 카드결제 복사창 (카드미결제 배지 → 페이스터) */}
+          {cardPayOrder && (
+            <AdminLiveCardPayPopup
+              order={cardPayOrder}
+              onClose={() => setCardPayOrder(null)}
+              onAfterStatusChange={loadOrders}
             />
           )}
 
