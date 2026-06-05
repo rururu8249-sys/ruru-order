@@ -6,6 +6,30 @@ import { showAdminToast } from "@/lib/adminToast";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { CustomerRow } from "@/lib/admin-v2/types";
+import { resolveProductImageUrl } from "./quick-product/productImageUrl";
+
+function nowProdListSummary(raw: unknown): string {
+  if (Array.isArray(raw)) return raw.filter(Boolean).join(", ");
+  if (typeof raw === "string" && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.filter(Boolean).join(", ");
+    } catch {
+      // 쉼표 구분 문자열일 수 있음
+    }
+    return raw.trim();
+  }
+  return "";
+}
+
+function nowProdImageOf(p: any): string {
+  if (!p) return "";
+  const direct = p.image_url || p.cover_image_url || p.main_image_url || p.thumbnail_url || "";
+  if (direct) return resolveProductImageUrl(String(direct).trim());
+  const arr = p.images || p.image_urls || p.detail_image_urls;
+  if (Array.isArray(arr) && arr[0]) return resolveProductImageUrl(String(arr[0]).trim());
+  return "";
+}
 
 type IssueStatusFilter = "open" | "all" | "resolved";
 type VideoRatio = "vertical" | "wide" | "auto";
@@ -298,6 +322,25 @@ function CustomerIssueSummaryRow({
 }
 
 export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
+  const [pinnedProduct, setPinnedProduct] = useState<any | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase.from("products").select("*");
+        if (error || !alive) return;
+        const pinned = (data || []).find((p: any) => p?.is_pinned === true || p?.pinned === true) || null;
+        if (alive) setPinnedProduct(pinned);
+      } catch {
+        // 무시 (상품 로드 실패해도 방송화면엔 영향 없음)
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const [showMemoAdd, setShowMemoAdd] = useState(false);
   const [statusFilter, setStatusFilter] = useState<IssueStatusFilter>("open");
   const [tasks, setTasks] = useState<AdminIssueTask[]>([]);
@@ -666,8 +709,8 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
   };
 
   return (
-    <section className="mb-4 grid w-full grid-cols-12 items-stretch gap-3">
-      <div className="col-span-12 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-4 h-[480px] flex flex-col">
+    <section className="mb-4 flex w-full items-stretch gap-3">
+      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm h-[480px] flex flex-col" style={{ flex: "2 1 0%" }}>
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-black text-slate-950">
             방송화면
@@ -708,7 +751,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
         </div>
       </div>
 
-      <div className="col-span-12 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm lg:col-span-8 h-[480px] flex flex-col">
+      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm h-[480px] flex flex-col" style={{ flex: "2 1 0%" }}>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-black text-slate-950">라이브 채팅</h2>
           <span className="text-xs font-bold text-slate-500">{chatEmbedUrl ? "채팅 연결" : "URL 대기"}</span>
@@ -734,6 +777,45 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm h-[480px] flex flex-col" style={{ flex: "1.2 1 0%" }}>
+        <div className="mb-2 flex items-center gap-2 text-sm font-black text-slate-950">
+          지금 띄운 상품
+          <span className="rounded-md bg-rose-soft px-2 py-0.5 text-[11px] font-black text-rose-deep">📌</span>
+        </div>
+        {pinnedProduct ? (
+          <div className="flex flex-1 min-h-0 flex-col">
+            <div className="flex-1 min-h-0 overflow-hidden rounded-2xl bg-slate-100">
+              {nowProdImageOf(pinnedProduct) ? (
+                <img src={nowProdImageOf(pinnedProduct)} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full items-center justify-center text-4xl">👟</div>
+              )}
+            </div>
+            <div className="mt-2 truncate text-[14px] font-black text-slate-900">
+              {pinnedProduct.product_name || pinnedProduct.name || pinnedProduct.title || "상품명 없음"}
+            </div>
+            <div className="text-[15px] font-black text-rose-deep">
+              {Number(pinnedProduct.price ?? pinnedProduct.sale_price ?? pinnedProduct.selling_price ?? 0).toLocaleString("ko-KR")}원
+            </div>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {nowProdListSummary(pinnedProduct.color_options ?? pinnedProduct.colors) ? (
+                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">{nowProdListSummary(pinnedProduct.color_options ?? pinnedProduct.colors)}</span>
+              ) : null}
+              {nowProdListSummary(pinnedProduct.size_options ?? pinnedProduct.sizes) ? (
+                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">{nowProdListSummary(pinnedProduct.size_options ?? pinnedProduct.sizes)}</span>
+              ) : null}
+            </div>
+            <button type="button" className="mt-2 w-full rounded-xl border border-slate-200 py-2 text-[12px] font-black text-slate-500 hover:border-rose-line hover:text-rose-deep">
+              다른 상품 띄우기
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-1 min-h-0 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 text-center text-xs font-bold leading-5 text-slate-400">
+            상품을 📌 고정하면<br />여기에 표시됩니다.
+          </div>
+        )}
       </div>
 </section>
   );

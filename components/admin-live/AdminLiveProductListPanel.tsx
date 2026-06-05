@@ -759,11 +759,6 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
   const pageStart = (safePage - 1) * DEFAULT_PAGE_SIZE;
   const visibleProducts = listFilteredProducts.slice(pageStart, pageStart + DEFAULT_PAGE_SIZE);
 
-  const pinnedProduct = useMemo(
-    () => products.find((p) => pickBoolean(p, ["is_pinned", "pinned"], false)) || null,
-    [products],
-  );
-
   const paginationPages = useMemo(() => {
     const pages: Array<number | "ellipsis"> = [];
 
@@ -901,37 +896,6 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
           </div>
 
 <div className="shrink-0 py-2 text-[11px] font-black text-slate-500">
-          {pinnedProduct ? (
-            <div className="mb-3 rounded-xl border border-rose-line bg-rose-soft/40 p-3">
-              <div className="mb-2 flex items-center gap-1.5">
-                <span className="text-[11px] font-bold text-slate-500">지금 띄운 상품</span>
-                <span className="rounded-full bg-rose-soft px-1.5 py-0.5 text-[10px] font-black text-rose-deep">📌</span>
-              </div>
-              <div className="flex items-center gap-3">
-                {mainImage(pinnedProduct) ? (
-                  <img src={mainImage(pinnedProduct)} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
-                ) : (
-                  <div className="h-12 w-12 shrink-0 rounded-lg bg-slate-200" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px] font-medium text-slate-900">{productName(pinnedProduct)}</div>
-                  <div className="text-[13px] font-black text-rose-deep">{money(productPrice(pinnedProduct))}원</div>
-                  <div className="mt-0.5 flex flex-wrap gap-1">
-                    {colorSummary(pinnedProduct) ? (
-                      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">{colorSummary(pinnedProduct)}</span>
-                    ) : null}
-                    {sizeSummary(pinnedProduct) ? (
-                      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">{sizeSummary(pinnedProduct)}</span>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-              <button type="button" className="mt-2 w-full text-[11px] font-bold text-slate-500 hover:text-rose-deep">
-                다른 상품 띄우기
-              </button>
-            </div>
-          ) : null}
-
           <div className="mt-2 flex flex-wrap items-center gap-1.5 rounded-2xl border border-slate-200 bg-slate-50 p-1.5">
             {([
               { key: "visible", label: "카드상품", count: productListSummary.visible },

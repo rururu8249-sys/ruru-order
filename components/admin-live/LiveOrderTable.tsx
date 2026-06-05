@@ -662,8 +662,7 @@ export default function LiveOrderTable({
 
       <div className="overflow-hidden rounded-xl border border-slate-200">
             {/* 헤더 행 */}
-            <div className="grid grid-cols-[108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 border-b border-rose-line bg-rose-soft/40 text-[12px] font-black text-slate-500">
-              <span className="whitespace-nowrap px-3 py-2.5">주문일</span>
+            <div className="grid grid-cols-[130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 border-b border-rose-line bg-rose-soft/40 text-[12px] font-black text-slate-500">
               <span className="whitespace-nowrap px-3 py-2.5">닉네임</span>
               <span className="whitespace-nowrap px-3 py-2.5">이름</span>
               <span className="whitespace-nowrap px-3 py-2.5">주문내용</span>
@@ -685,33 +684,8 @@ export default function LiveOrderTable({
                 visibleOrders.map((order) => {
                   const selected = order.id === selectedOrderId;
                   return (
-                    <div key={order.id} className={`grid grid-cols-[108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 items-start text-[14px] transition ${selected ? "bg-rose-soft/70" : "hover:bg-slate-50"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}>
-                      {/* 1. 주문일 */}
-                      <div className="px-3 py-3 text-[12px] leading-tight text-slate-500">
-                        {(() => {
-                          const src = order.createdAt || order.submittedAt;
-                          if (!src) return "-";
-                          try {
-                            const d = new Date(src);
-                            if (isNaN(d.getTime())) return <span>{order.submittedAt || src}</span>;
-                            const yy = d.getFullYear();
-                            const mm = String(d.getMonth() + 1).padStart(2, "0");
-                            const dd = String(d.getDate()).padStart(2, "0");
-                            const wd = ["일", "월", "화", "수", "목", "금", "토"][d.getDay()];
-                            const hh = String(d.getHours()).padStart(2, "0");
-                            const mi = String(d.getMinutes()).padStart(2, "0");
-                            return (
-                              <>
-                                <div>{`${yy}.${mm}.${dd}`}</div>
-                                <div className="text-slate-400">{`(${wd}) ${hh}:${mi}`}</div>
-                              </>
-                            );
-                          } catch {
-                            return <span>{order.submittedAt || src}</span>;
-                          }
-                        })()}
-                      </div>
-                      {/* 2. 닉네임 */}
+                    <div key={order.id} className={`grid grid-cols-[130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 items-start text-[14px] transition ${selected ? "bg-rose-soft/70" : "hover:bg-slate-50"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}>
+                      {/* 1. 닉네임 */}
                       <div className="min-w-0 px-3 py-3">
                         <div className="mb-0.5">
                           <button type="button" onClick={() => onSelectOrder(order)} className="font-black text-rose-deep underline-offset-2 hover:underline text-[13px]">
