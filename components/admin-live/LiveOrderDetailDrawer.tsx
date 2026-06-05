@@ -88,11 +88,11 @@ function formatFullDateTime(value: string | null | undefined, fallback?: string 
 
 function getPaymentStatusLabel(order: LiveOrder) {
   if (order.paymentStatus === "canceled") return "주문서취소";
-  if (order.paymentStatus === "manual_match_needed") return "입금매칭 필요";
+  if (order.paymentStatus === "manual_match_needed") return "매칭필요";
   if (order.paymentStatus === "manual_paid") return "수동입금확인";
   if (order.paymentStatus === "auto_paid") return "자동입금확인";
   if (order.paymentStatus === "card_paid") return "카드결제완료";
-  if (order.paymentStatus === "card_unpaid") return "카드 미결제";
+  if (order.paymentStatus === "card_unpaid") return "카드미결제";
   if (order.paymentStatus === "unpaid") return "입금대기";
   return "입금확인";
 }
@@ -314,7 +314,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             "주문상태만 카드결제완료로 변경합니다.",
           ].join("\n")
         : [
-            "카드결제완료 상태를 카드 미결제로 되돌릴까요?",
+            "카드결제완료 상태를 카드미결제로 되돌릴까요?",
             "",
             "주문상태는 주문확인전으로 돌아갑니다.",
             "결제방식은 카드결제로 유지됩니다.",
@@ -339,7 +339,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         return;
       }
 
-      showAdminToast(nextStatus === "카드결제완료" ? "카드결제완료 처리됐습니다." : "카드 미결제로 되돌렸습니다.", "success");
+      showAdminToast(nextStatus === "카드결제완료" ? "카드결제완료 처리됐습니다." : "카드미결제로 되돌렸습니다.", "success");
 
       await onAfterStatusChange?.();
       onClose?.();
@@ -436,7 +436,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               {isCardPaid ? (
                 <>
                   <div className="rounded-xl border border-purple-100 bg-purple-50 px-3 py-2 text-[11px] font-bold leading-4 text-purple-700">
-                    카드결제완료 주문입니다. 결제완료 처리를 잘못한 경우에는 [카드 미결제로 되돌리기]를 사용하세요. 주문 자체를 없애야 하는 경우에만 [주문서 자체 취소]를 사용하세요.
+                    카드결제완료 주문입니다. 결제완료 처리를 잘못한 경우에는 [카드미결제로 되돌리기]를 사용하세요. 주문 자체를 없애야 하는 경우에만 [주문서 자체 취소]를 사용하세요.
                   </div>
                   <button
                     type="button"
@@ -444,7 +444,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                     disabled={Boolean(cardStatusAction)}
                     className="h-10 w-full rounded-xl border border-rose-200 bg-rose-50 text-[13px] font-black text-rose-700 shadow-sm hover:bg-rose-100 active:scale-[0.99] disabled:bg-slate-100 disabled:text-slate-400"
                   >
-                    {cardStatusAction === "card-unpaid" ? "처리중..." : "카드 미결제로 되돌리기"}
+                    {cardStatusAction === "card-unpaid" ? "처리중..." : "카드미결제로 되돌리기"}
                   </button>
                 </>
               ) : null}

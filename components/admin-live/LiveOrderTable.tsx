@@ -160,10 +160,10 @@ function statusBadge(order: LiveOrder) {
   }
 
   if (order.paymentStatus === "manual_match_needed") {
-    return <span className="rounded-lg bg-orange-100 px-2 py-1 text-xs font-black text-orange-700">입금매칭 필요</span>;
+    return <span className="rounded-lg bg-orange-100 px-2 py-1 text-xs font-black text-orange-700">매칭필요</span>;
   }
   if (order.paymentStatus === "card_unpaid") {
-    return <span className="rounded-lg bg-red-100 px-2 py-1 text-xs font-black text-red-700">카드 미결제</span>;
+    return <span className="rounded-lg bg-red-100 px-2 py-1 text-xs font-black text-red-700">카드미결제</span>;
   }
   if (order.paymentStatus === "unpaid") {
     return <span className="rounded-lg bg-red-100 px-2 py-1 text-xs font-black text-red-700">입금대기</span>;
@@ -451,9 +451,9 @@ export default function LiveOrderTable({
       all: "상태: 전체보기",
       unpaid: "입금대기",
       paid: "입금확인",
-      manual_match_needed: "입금매칭 필요",
+      manual_match_needed: "매칭필요",
       card_paid: "카드결제완료",
-      card_unpaid: "카드 미결제",
+      card_unpaid: "카드미결제",
     };
 
     return [
@@ -631,9 +631,9 @@ export default function LiveOrderTable({
           <option value="all">상태: 전체보기</option>
           <option value="unpaid">입금대기</option>
           <option value="paid">입금확인</option>
-          <option value="manual_match_needed">입금매칭 필요</option>
+          <option value="manual_match_needed">매칭필요</option>
           <option value="card_paid">카드결제완료</option>
-          <option value="card_unpaid">카드 미결제</option>
+          <option value="card_unpaid">카드미결제</option>
         </select>
 
         <input className="h-11 min-w-[160px] flex-1 rounded-xl border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50"

@@ -63,9 +63,9 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
       color: "bg-violet-50 text-violet-700",
     },
     {
-      label: "카드 미결제",
+      label: "카드미결제",
       amount: money(cardUnpaid.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)),
-      sub: `카드 미결제 ${cardUnpaid.length}건`,
+      sub: `카드미결제 ${cardUnpaid.length}건`,
       icon: "💳",
       color: "bg-red-50 text-red-700",
     },
