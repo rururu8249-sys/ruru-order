@@ -23,6 +23,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 (없음)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-06-06 세션7-3: 시안 라벨 통일(사이드바 메뉴명 방송→주문·입금/정산통계→정산/고객관리→고객·이슈/카톡상담→카톡채널, 메인 송장출력·물건챙기기·검색placeholder 시안문구, 팝업제목 주문상세→✎주문서수정/포인트관리→🪙포인트/CUSTOMER DETAIL→👤회원상세) + 방송모드 토글 추가(AdminLiveSidebar, LiveHeader title/url을 Dashboard로 끌어올려 공유, URL있을때만 ON가능, ON→startBroadcast OFF→endBroadcast, start/end 로직 무변경)
 - 2026-06-06 세션7-2: 용어 표시라벨 2차 통일(AdminLiveDashboard/AdminLiveOrdersPanel/adminLiveOrderExcelExport에서 "입금매칭 필요"→"매칭필요", "카드 미결제"→"카드미결제", 표시만·영어 status코드 무변경, 엑셀 상태칸 텍스트도 반영). CustomersPanel/SettlementPanel은 정규식(분류 로직)이라 표시통일 대상 아님
 - 2026-06-06 세션7: 용어 표준 확정(입금대기/입금확인/매칭필요/카드미결제/카드결제완료, 입금내역/입금매칭) · 표시 라벨 통일 1차(LiveOrderTable/LiveOrderDetailDrawer/LiveStatsCards에서 "입금매칭 필요"→"매칭필요", "카드 미결제"→"카드미결제", 영어 status 코드·분류 정규식은 무변경)
 - 2026-06-06 세션6: 방송패널 3분할(영상+채팅+지금띄운상품 flex 1:3:1.2, 높이360, 영상9:16) / 지금띄운상품=고정1개(사진+상품명+금액+옵션+다른상품띄우기) / 등록상품리스트패널 제거 / 주문서 10칸(주문일·닉네임·이름·주문내용·수량·상품금액·택배비·총금액·입금·출고, 주문일=createdAt YYYY.MM.DD/(요일)HH:mm 두줄, 입금=배지+paidAt, 주문내용 font-black) / 헤더+셀 전부 가운데정렬(text-center) 통일
