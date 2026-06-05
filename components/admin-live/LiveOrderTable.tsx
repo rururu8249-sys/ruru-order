@@ -650,15 +650,16 @@ export default function LiveOrderTable({
 
       <div className="overflow-hidden rounded-xl border border-slate-200">
             {/* 헤더 행 */}
-            <div className="grid grid-cols-[1.6fr_2fr_40px_84px_64px_84px_92px_72px] gap-2 border-b border-rose-line bg-rose-soft/40 px-3 py-2 text-[11px] font-black text-slate-500">
-              <span>닉네임</span>
-              <span>주문내용</span>
-              <span className="text-center">수량</span>
-              <span className="text-right">상품금액</span>
-              <span className="text-right">택배비</span>
-              <span className="text-right">총금액</span>
-              <span className="text-center">입금</span>
-              <span className="text-center">출고</span>
+            <div className="grid grid-cols-[92px_130px_minmax(0,1fr)_40px_84px_60px_88px_104px_58px] gap-2 border-b border-rose-line bg-rose-soft/40 px-3 py-2 text-[11px] font-black text-slate-500">
+              <span className="whitespace-nowrap">주문일</span>
+              <span className="whitespace-nowrap">닉네임</span>
+              <span className="whitespace-nowrap">주문내용</span>
+              <span className="whitespace-nowrap text-center">수량</span>
+              <span className="whitespace-nowrap text-right">상품금액</span>
+              <span className="whitespace-nowrap text-right">택배비</span>
+              <span className="whitespace-nowrap text-right">총금액</span>
+              <span className="whitespace-nowrap text-center">입금</span>
+              <span className="whitespace-nowrap text-center">출고</span>
             </div>
 
             {/* 주문 행 목록 */}
@@ -671,8 +672,31 @@ export default function LiveOrderTable({
                 visibleOrders.map((order) => {
                   const selected = order.id === selectedOrderId;
                   return (
-                    <div key={order.id} className={`grid grid-cols-[1.6fr_2fr_40px_84px_64px_84px_92px_72px] gap-2 items-start px-3 py-2.5 text-[13px] transition ${selected ? "bg-rose-soft/70" : "hover:bg-slate-50"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}>
-                      {/* 1. 닉네임 */}
+                    <div key={order.id} className={`grid grid-cols-[92px_130px_minmax(0,1fr)_40px_84px_60px_88px_104px_58px] gap-2 items-start px-3 py-2.5 text-[13px] transition ${selected ? "bg-rose-soft/70" : "hover:bg-slate-50"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}>
+                      {/* 1. 주문일 */}
+                      <div className="pt-0.5 text-[10px] leading-tight text-slate-500">
+                        {order.submittedAt ? (() => {
+                          try {
+                            const d = new Date(order.submittedAt);
+                            if (isNaN(d.getTime())) return <span>{order.submittedAt}</span>;
+                            const yy = d.getFullYear();
+                            const mm = String(d.getMonth() + 1).padStart(2, "0");
+                            const dd = String(d.getDate()).padStart(2, "0");
+                            const wd = ["일", "월", "화", "수", "목", "금", "토"][d.getDay()];
+                            const hh = String(d.getHours()).padStart(2, "0");
+                            const mi = String(d.getMinutes()).padStart(2, "0");
+                            return (
+                              <>
+                                <div>{`${yy}.${mm}.${dd}`}</div>
+                                <div className="text-slate-400">{`(${wd}) ${hh}:${mi}`}</div>
+                              </>
+                            );
+                          } catch {
+                            return <span>{order.submittedAt}</span>;
+                          }
+                        })() : "-"}
+                      </div>
+                      {/* 2. 닉네임 */}
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-1 mb-0.5">
                           <button type="button" onClick={() => onSelectOrder(order)} className="font-black text-rose-deep underline-offset-2 hover:underline text-[12px]">
@@ -686,11 +710,8 @@ export default function LiveOrderTable({
                             {testOrderBadge(order)}
                           </div>
                         )}
-                        <div className="text-[10px] text-slate-400 mt-0.5">
-                          {order.submittedAt && <span>제출 {(() => { try { const d = new Date(order.submittedAt); if (isNaN(d.getTime())) return order.submittedAt; return d.toLocaleString("ko-KR", { month: "numeric", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" }); } catch { return order.submittedAt; } })()}</span>}
-                        </div>
                       </div>
-                      {/* 2. 주문내용 */}
+                      {/* 3. 주문내용 */}
                       <div className="min-w-0 truncate pt-0.5 text-[11px] text-slate-600">{renderOrderSummary(order)}</div>
                       {/* 3. 수량 */}
                       <div className="pt-0.5 text-center">
