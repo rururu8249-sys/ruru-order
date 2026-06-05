@@ -55,6 +55,7 @@ import AdminLiveQuickProductDrawer from "./AdminLiveQuickProductDrawer";
 import AdminLiveProductListPanel from "./AdminLiveProductListPanel";
 import AdminLiveProductManagePopup from "./AdminLiveProductManagePopup";
 import AdminLiveCardPayPopup from "./AdminLiveCardPayPopup";
+import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
 import {
   buildAlwaysOrderOptions,
   getAlwaysOrderDateFromFilter,
@@ -250,6 +251,7 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
 const MENU_KEYS_FOR_URL: AdminLiveMenuKey[] = [
   "broadcast",
   "products",
+  "event",
   "orders",
   "payments",
   "customers",
@@ -1228,6 +1230,13 @@ export default function AdminLiveDashboard() {
             />
           )}
 
+          {/* 이벤트 (항상 마운트 → 상태유지, 사이드바 이벤트 메뉴로 열고닫음) */}
+          <AdminLiveEventRoulettePanel
+            renderTrigger={false}
+            controlledOpen={activeMenu === "event"}
+            onRequestClose={() => setActiveMenu("broadcast")}
+          />
+
           {/* 고객관리 (자체 모달) */}
           {activeMenu === "customers" && (
             <AdminLiveCustomersPanel orders={orders} onClose={() => setActiveMenu("broadcast")} />
@@ -1264,7 +1273,7 @@ export default function AdminLiveDashboard() {
           )}
 
           {/* 알 수 없는 메뉴 */}
-          {activeMenu !== "broadcast" && activeMenu !== "products" && activeMenu !== "orders" && activeMenu !== "payments" && activeMenu !== "customers" && activeMenu !== "settlement" && activeMenu !== "settings" && (
+          {activeMenu !== "broadcast" && activeMenu !== "products" && activeMenu !== "event" && activeMenu !== "orders" && activeMenu !== "payments" && activeMenu !== "customers" && activeMenu !== "settlement" && activeMenu !== "settings" && (
             <AdminLiveMenuPlaceholder menuKey={activeMenu} />
           )}
 

@@ -90,6 +90,9 @@ type EventsPayload = {
 type AdminLiveEventRoulettePanelProps = {
   buttonLabel?: string;
   buttonClassName?: string;
+  renderTrigger?: boolean;
+  controlledOpen?: boolean;
+  onRequestClose?: () => void;
 };
 
 type WinnersPayload = {
@@ -186,8 +189,16 @@ async function copyText(value: string) {
 export default function AdminLiveEventRoulettePanel({
   buttonLabel = "🎁 이벤트",
   buttonClassName = "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-xl bg-violet-600 px-3 text-xs font-black text-white shadow-sm transition hover:bg-violet-700",
+  renderTrigger = true,
+  controlledOpen,
+  onRequestClose,
 }: AdminLiveEventRoulettePanelProps) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const closePanel = () => {
+    if (controlledOpen !== undefined) onRequestClose?.();
+    else setInternalOpen(false);
+  };
   const [mode, setMode] = useState<RouletteMode>("test");
   const [sourceDate] = useState(todayText);
   const [broadcasts, setBroadcasts] = useState<RouletteBroadcast[]>([]);
@@ -245,7 +256,15 @@ export default function AdminLiveEventRoulettePanel({
   const manualParticipantCount = manualParticipants.length;
 
   const openEventPanel = () => {
-    setOpen(true);
+    setInternalOpen(true);
+  };
+
+  // 초기화: 참가자 + 당첨고정 + 당첨자발표(현재 이벤트) 동시 리셋. 기록/목록은 건드리지 않음.
+  const resetEvent = () => {
+    setParticipants([]);
+    setManualParticipantText("");
+    setFixedWinnerNickname("");
+    setCurrentEvent(null);
   };
 
   const changeMode = (nextMode: RouletteMode) => {
@@ -725,9 +744,11 @@ export default function AdminLiveEventRoulettePanel({
 
   return (
     <>
-      <button type="button" onClick={openEventPanel} className={buttonClassName}>
-        {buttonLabel}
-      </button>
+      {renderTrigger ? (
+        <button type="button" onClick={openEventPanel} className={buttonClassName}>
+          {buttonLabel}
+        </button>
+      ) : null}
 
       {open ? (
         <div
@@ -1161,10 +1182,19 @@ export default function AdminLiveEventRoulettePanel({
             </div>
 
             <footer className="shrink-0 border-t border-slate-200 bg-white px-6 py-3">
-              <div className="flex items-center justify-end gap-3">
+              <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setOpen(false)}
+                  onClick={resetEvent}
+                  className="h-11 rounded-2xl border border-rose-line bg-rose-soft px-6 text-sm font-black text-rose-deep transition hover:bg-rose-soft/80 active:scale-[0.98]"
+                >
+                  ↺ 초기화
+                </button>
+
+                <div className="ml-auto flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={closePanel}
                   className="h-11 rounded-2xl border border-slate-200 bg-white px-9 text-sm font-black text-slate-700 transition hover:bg-slate-50 active:scale-[0.98]"
                 >
                   닫기
@@ -1189,6 +1219,7 @@ export default function AdminLiveEventRoulettePanel({
                     {spinning ? "인형뽑기 진행중..." : "인형뽑기 시작"}
                   </button>
                 )}
+                </div>
               </div>
             </footer>
           </section>

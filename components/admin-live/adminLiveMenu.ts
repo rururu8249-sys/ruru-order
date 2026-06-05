@@ -4,6 +4,7 @@ export type AdminLiveMenuKey =
   | "orders"
   | "payments"
   | "customers"
+  | "event"
   | "settlement"
   | "settings";
 
@@ -68,6 +69,16 @@ export const ADMIN_LIVE_MENUS: AdminLiveMenuItem[] = [
     readyTitle: "고객관리 화면 연결 준비중",
     readyDescription: "고객정보, 차단회원, 특이사항, 고객이슈를 한 화면에서 확인하도록 설계합니다.",
     checkpoints: ["고객 검색", "차단회원", "고객 특이사항", "고객이슈", "최근 주문"],
+  },
+  {
+    key: "event",
+    label: "이벤트",
+    icon: "◆",
+    desc: "룰렛·인형뽑기",
+    sidebarNotice: "이벤트 화면에서 룰렛·인형뽑기 참가자 불러오기, 당첨고정, 당첨선물, 기록을 관리합니다.",
+    readyTitle: "이벤트",
+    readyDescription: "룰렛·인형뽑기 추첨과 당첨선물 지급을 한 화면에서 진행합니다.",
+    checkpoints: ["룰렛/인형뽑기", "참가자 불러오기", "당첨고정", "당첨선물", "이벤트 기록"],
   },
   {
     key: "settlement",
