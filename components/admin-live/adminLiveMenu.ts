@@ -20,7 +20,7 @@ export type AdminLiveMenuItem = {
 export const ADMIN_LIVE_MENUS: AdminLiveMenuItem[] = [
   {
     key: "broadcast",
-    label: "방송",
+    label: "주문·입금",
     icon: "📡",
     desc: "라이브 컨트롤타워",
     sidebarNotice: "방송 메뉴는 실시간 주문·결제상태 중심입니다. 주문관리/고객관리/정산통계는 별도 화면으로 확장합니다.",
@@ -50,7 +50,7 @@ export const ADMIN_LIVE_MENUS: AdminLiveMenuItem[] = [
   },
   {
     key: "customers",
-    label: "고객관리",
+    label: "고객·이슈",
     icon: "👤",
     desc: "고객·특이사항",
     sidebarNotice: "고객관리 화면은 고객 검색·차단·특이사항·이슈 관리를 분리해서 연결할 예정입니다.",
@@ -60,7 +60,7 @@ export const ADMIN_LIVE_MENUS: AdminLiveMenuItem[] = [
   },
   {
     key: "settlement",
-    label: "정산통계",
+    label: "정산",
     icon: "◔",
     desc: "방송·날짜별 통계",
     sidebarNotice: "정산통계 화면은 돈 로직을 건드리지 않고 조회·통계 중심으로 설계합니다.",

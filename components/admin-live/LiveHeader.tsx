@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { AdminLiveBroadcast } from "./liveBroadcastController";
 import { formatBroadcastTime } from "./liveBroadcastController";
 import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
@@ -15,6 +15,10 @@ type Props = {
   onStartBroadcast: (input: { title: string; youtubeUrl?: string }) => Promise<void> | void;
   onEndBroadcast: () => Promise<void> | void;
   onSaveBroadcast: (input: { title: string; youtubeUrl?: string }) => Promise<void> | void;
+  title: string;
+  onTitleChange: (value: string) => void;
+  youtubeUrl: string;
+  onYoutubeUrlChange: (value: string) => void;
 };
 
 function todayLabel() {
@@ -34,18 +38,13 @@ export default function LiveHeader({
   onStartBroadcast,
   onEndBroadcast,
   onSaveBroadcast,
+  title,
+  onTitleChange,
+  youtubeUrl,
+  onYoutubeUrlChange,
 }: Props) {
-  const [title, setTitle] = useState("루루동이LIVE");
-  const [youtubeUrl, setYoutubeUrl] = useState("");
   const [titleSavedAt, setTitleSavedAt] = useState("");
   const [urlAppliedAt, setUrlAppliedAt] = useState("");
-
-  useEffect(() => {
-    if (!activeBroadcast) return;
-
-    setTitle(activeBroadcast.public_title || "루루동이LIVE");
-    setYoutubeUrl(activeBroadcast.youtube_live_url || "");
-  }, [activeBroadcast?.id]);
 
   const statusLabel = useMemo(() => {
     if (activeBroadcast) return "방송중";
@@ -116,7 +115,7 @@ export default function LiveHeader({
           <div className="flex gap-2">
             <input
               value={title}
-              onChange={(event) => setTitle(event.target.value)}
+              onChange={(event) => onTitleChange(event.target.value)}
               className="h-9 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none focus:border-rose-line focus:ring-4 focus:ring-blue-50"
             />
             <button
@@ -140,7 +139,7 @@ export default function LiveHeader({
           <div className="flex gap-2">
             <input
               value={youtubeUrl}
-              onChange={(event) => setYoutubeUrl(event.target.value)}
+              onChange={(event) => onYoutubeUrlChange(event.target.value)}
               placeholder="https://www.youtube.com/watch?v=..."
               className="h-9 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none focus:border-rose-line focus:ring-4 focus:ring-blue-50"
             />

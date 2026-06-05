@@ -514,6 +514,8 @@ export default function AdminLiveDashboard() {
   const [paymentSuggestions, setPaymentSuggestions] = useState<any[]>([]);
   const [broadcasts, setBroadcasts] = useState<AdminLiveBroadcast[]>([]);
   const [savingBroadcast, setSavingBroadcast] = useState(false);
+  const [broadcastTitle, setBroadcastTitle] = useState("루루동이LIVE");
+  const [broadcastYoutubeUrl, setBroadcastYoutubeUrl] = useState("");
   const [orderGroups, setOrderGroups] = useState<OrderGroup[]>([]);
   const [deposits, setDeposits] = useState<DepositRow[]>([]);
   const [manualMatchGroup, setManualMatchGroup] = useState<OrderGroup | null>(null);
@@ -742,6 +744,12 @@ export default function AdminLiveDashboard() {
   }, []);
 
   const activeBroadcast = useMemo(() => getActiveBroadcast(broadcasts), [broadcasts]);
+
+  useEffect(() => {
+    if (!activeBroadcast) return;
+    setBroadcastTitle(activeBroadcast.public_title || "루루동이LIVE");
+    setBroadcastYoutubeUrl(activeBroadcast.youtube_live_url || "");
+  }, [activeBroadcast?.id]);
 
   const broadcastOptions = useMemo(() => {
     const todayDateKey = getAlwaysOrderDateKey(new Date().toISOString());
@@ -1089,6 +1097,11 @@ export default function AdminLiveDashboard() {
             setActiveMenu(nextMenu);
             replacePanelInUrl(nextMenu);
           }}
+          broadcastLive={Boolean(activeBroadcast)}
+          canStartBroadcast={broadcastYoutubeUrl.trim().length > 0}
+          savingBroadcast={savingBroadcast}
+          onStartBroadcast={() => startBroadcast({ title: broadcastTitle, youtubeUrl: broadcastYoutubeUrl })}
+          onEndBroadcast={endBroadcast}
         />
 
         <main className="min-w-0 flex-1 overflow-x-hidden px-5 py-4">
@@ -1102,6 +1115,10 @@ export default function AdminLiveDashboard() {
               onStartBroadcast={startBroadcast}
               onEndBroadcast={endBroadcast}
               onSaveBroadcast={saveBroadcast}
+              title={broadcastTitle}
+              onTitleChange={setBroadcastTitle}
+              youtubeUrl={broadcastYoutubeUrl}
+              onYoutubeUrlChange={setBroadcastYoutubeUrl}
             />
 
             <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />

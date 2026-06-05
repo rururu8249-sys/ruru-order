@@ -404,7 +404,7 @@ function CustomerDetailDrawer({
       <aside className="h-full w-full max-w-[680px] overflow-y-auto bg-white p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
           <div>
-            <div className="text-[11px] font-black tracking-[0.18em] text-rose-deep">CUSTOMER DETAIL</div>
+            <div className="text-[11px] font-black tracking-[0.18em] text-rose-deep">👤 회원 상세</div>
             <h2 className="mt-1 text-2xl font-black tracking-[-0.04em] text-slate-950">{customer.nickname}</h2>
             <p className="mt-1 text-sm font-bold text-slate-500">
               {customer.name} · {formatPhone(customer.phone)}

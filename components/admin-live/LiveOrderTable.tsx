@@ -524,7 +524,7 @@ export default function LiveOrderTable({
             className="rounded-xl bg-rose-deep px-3 py-2 text-xs font-black text-white shadow-sm hover:bg-rose-deep disabled:cursor-not-allowed disabled:bg-slate-300"
             title="현재 필터 조건 그대로 로젠 송장 엑셀을 내보냅니다"
           >
-            {exporting === "rozen" ? "내보내는중..." : "택배송장 내보내기"}
+            {exporting === "rozen" ? "내보내는중..." : "🚚 송장 출력"}
           </button>
 
           <button
@@ -534,7 +534,7 @@ export default function LiveOrderTable({
             className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             title="현재 필터 조건 그대로 물건챙기기 엑셀을 내보냅니다"
           >
-            {exporting === "picking" ? "내보내는중..." : "물건챙기기 엑셀"}
+            {exporting === "picking" ? "내보내는중..." : "🛍 물건챙기기"}
           </button>
           <AdminLiveEventRoulettePanel
             buttonLabel="🎁 이벤트당첨자"
@@ -642,7 +642,7 @@ export default function LiveOrderTable({
           onKeyDown={(event) => {
             if (event.key === "Enter") applyKeyword();
           }}
-          placeholder="닉네임 / 이름 / 주문내역 검색"
+          placeholder="🔍 닉네임·상품·금액 검색"
         />
 
         <button className="h-11 w-full flex-none rounded-xl bg-rose-deep px-3 text-[12px] font-black text-white shadow-sm hover:bg-rose-deep active:scale-[0.99] sm:w-[84px]"

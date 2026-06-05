@@ -355,7 +355,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <div className="text-[10px] font-black tracking-[0.18em] text-rose-deep">ORDER DETAIL</div>
-            <h2 className="mt-0.5 text-lg font-black tracking-[-0.04em] text-slate-950">주문 상세</h2>
+            <h2 className="mt-0.5 text-lg font-black tracking-[-0.04em] text-slate-950">✎ 주문서 수정</h2>
           </div>
 
           <button

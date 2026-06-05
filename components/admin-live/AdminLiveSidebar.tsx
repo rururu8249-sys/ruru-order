@@ -6,9 +6,22 @@ import AdminLiveCustomerIssueSummaryCard from "./AdminLiveCustomerIssueSummaryCa
 type Props = {
   activeMenu: AdminLiveMenuKey;
   onMenuChange: (menuKey: AdminLiveMenuKey) => void;
+  broadcastLive: boolean;
+  canStartBroadcast: boolean;
+  savingBroadcast?: boolean;
+  onStartBroadcast: () => void;
+  onEndBroadcast: () => void;
 };
 
-export default function AdminLiveSidebar({ activeMenu, onMenuChange }: Props) {
+export default function AdminLiveSidebar({
+  activeMenu,
+  onMenuChange,
+  broadcastLive,
+  canStartBroadcast,
+  savingBroadcast = false,
+  onStartBroadcast,
+  onEndBroadcast,
+}: Props) {
   return (
     <aside className="flex min-h-screen w-[220px] shrink-0 flex-col border-r border-slate-200 bg-white px-4 py-6">
       <div className="mb-8 flex items-center gap-2">
@@ -17,6 +30,28 @@ export default function AdminLiveSidebar({ activeMenu, onMenuChange }: Props) {
           <div className="text-lg font-black tracking-tight text-slate-950">루루동이LIVE</div>
           <div className="text-[11px] font-bold text-slate-400">운영 컨트롤타워</div>
         </div>
+      </div>
+
+      <div className="mb-4 flex items-center justify-between rounded-2xl border border-rose-line bg-rose-soft px-3 py-2.5">
+        <span className="text-[13px] font-black text-rose-deep">방송모드</span>
+        <button
+          type="button"
+          disabled={savingBroadcast || (!broadcastLive && !canStartBroadcast)}
+          onClick={() => (broadcastLive ? onEndBroadcast() : onStartBroadcast())}
+          title={!broadcastLive && !canStartBroadcast ? "유튜브 라이브 URL을 먼저 입력하세요" : broadcastLive ? "방송 종료" : "방송 시작"}
+          aria-pressed={broadcastLive}
+          className={[
+            "relative h-5 w-9 shrink-0 rounded-full transition disabled:cursor-not-allowed disabled:opacity-40",
+            broadcastLive ? "bg-red-600" : "bg-slate-300",
+          ].join(" ")}
+        >
+          <span
+            className={[
+              "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all",
+              broadcastLive ? "right-0.5" : "left-0.5",
+            ].join(" ")}
+          />
+        </button>
       </div>
 
       <nav className="space-y-1.5">
@@ -67,7 +102,7 @@ export default function AdminLiveSidebar({ activeMenu, onMenuChange }: Props) {
               className="flex h-10 items-center justify-center gap-1 rounded-xl border border-rose-line bg-rose-soft text-xs font-black text-rose-deep transition hover:bg-rose-soft active:scale-[0.98]"
             >
               <span>💬</span>
-              카톡 상담
+              카톡채널
             </button>
             <button
               type="button"
