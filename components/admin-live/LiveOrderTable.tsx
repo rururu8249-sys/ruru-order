@@ -687,7 +687,7 @@ export default function LiveOrderTable({
                   return (
                     <div key={order.id} className={`grid grid-cols-[108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 items-start text-[14px] transition ${selected ? "bg-rose-soft/70" : "hover:bg-slate-50"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}>
                       {/* 1. 주문일 */}
-                      <div className="px-3 py-3 text-[11px] leading-tight text-slate-500">
+                      <div className="px-3 py-3 text-center text-[11px] leading-tight text-slate-500">
                         {(() => {
                           const src = order.createdAt || order.submittedAt;
                           if (!src) return <span>-</span>;
@@ -705,7 +705,7 @@ export default function LiveOrderTable({
                         })()}
                       </div>
                       {/* 2. 닉네임 */}
-                      <div className="min-w-0 px-3 py-3">
+                      <div className="min-w-0 px-3 py-3 text-center">
                         <div className="mb-0.5">
                           <button type="button" onClick={() => onSelectOrder(order)} className="font-black text-rose-deep underline-offset-2 hover:underline text-[13px]">
                             {order.nickname}
@@ -719,9 +719,9 @@ export default function LiveOrderTable({
                         )}
                       </div>
                       {/* 3. 이름 */}
-                      <div className="min-w-0 truncate px-3 py-3 text-[13px] text-slate-600">{order.name || "-"}</div>
+                      <div className="min-w-0 truncate px-3 py-3 text-center text-[13px] text-slate-600">{order.name || "-"}</div>
                       {/* 4. 주문내용 */}
-                      <div className="min-w-0 truncate px-3 py-3 text-[13px] font-black text-slate-600">{renderOrderSummary(order)}</div>
+                      <div className="min-w-0 truncate px-3 py-3 text-center text-[13px] font-black text-slate-600">{renderOrderSummary(order)}</div>
                       {/* 4. 수량 */}
                       <div className="px-3 py-3 text-center">
                         <span className="inline-flex min-w-[34px] items-center justify-center rounded-lg bg-slate-100 px-1 py-0.5 text-[13px] font-black text-slate-700">
@@ -729,18 +729,18 @@ export default function LiveOrderTable({
                         </span>
                       </div>
                       {/* 5. 상품금액 */}
-                      <div className="px-3 py-3 text-right text-[13px] font-black text-slate-700">
+                      <div className="px-3 py-3 text-center text-[13px] font-black text-slate-700">
                         <div>{money(order.productAmount)}</div>
                         {Number(order.pointUsedAmount || 0) > 0 ? (
                           <div className="text-[10px] text-emerald-700">-{money(Number(order.pointUsedAmount || 0))}</div>
                         ) : null}
                       </div>
                       {/* 6. 택배비 */}
-                      <div className="px-3 py-3 text-right text-[13px] text-slate-400">
+                      <div className="px-3 py-3 text-center text-[13px] text-slate-400">
                         {Number(order.shippingFee || 0) > 0 ? money(order.shippingFee) : "0"}
                       </div>
                       {/* 7. 총금액 */}
-                      <div className="px-3 py-3 text-right text-[14px] font-black text-slate-950">
+                      <div className="px-3 py-3 text-center text-[14px] font-black text-slate-950">
                         {money(Number(order.totalAmount || 0) || Number(order.finalAmount || 0))}
                         {String((order as any).paymentMethod || "").includes("카드") && Number((order as any).cardPaymentTotalAmount || 0) > 0 ? (
                           <div className="text-[10px] font-black text-purple-700">카드 {money(Number((order as any).cardPaymentTotalAmount || 0))}</div>
