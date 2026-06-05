@@ -23,6 +23,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 (없음)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-06-06 세션9-2: 카드결제 복사창 좌우분할 개선 — 💳카드결제 버튼 클릭 시 복사창+페이스터 동시열림(openPaysterRightHalf를 LiveOrderTable 클릭 제스처에서 호출→팝업차단 회피), 페이스터=화면 오른쪽절반(left=½/width=½/height=전체), 복사창 모달=화면 왼쪽절반 고정(fixed inset-y-0 left-0 md:w-1/2)
 - 2026-06-06 세션9: 카드결제 복사창 신규(AdminLiveCardPayPopup, 시안⑫). LiveOrderTable card_unpaid 입금셀에 "💳 카드결제" 버튼→팝업. 복사4칸(상품명 외N건요약/결제금액 cardPaymentTotalAmount우선 없으면 totalAmount 숫자만/닉네임 매칭기준/전화 하이픈제거) 각 클립보드복사. 페이스터 window.open(PC≥1024 우측반분할, 복사창 유지). "카드결제완료 처리"=DetailDrawer handleCardPaymentStatusChange와 동일 update(orders admin_order_status_v2/order_manage_status="카드결제완료", order.items id 기준)→loadOrders, 신규 결제write 없음
 - 2026-06-06 세션8-2: 팝업 제목 시안 통일(Dashboard 정산통계→정산·입금확인→입금내역, admin-v2 ManualPaymentMatchDrawer 수동입금매칭→입금매칭). 제목 텍스트만, 돈/입금/정산 로직 무변경. ※admin-v2는 사장님 명시 허용으로 제목만 변경(구버전 AdminV2Client도 같이 바뀜, 미사용)
 - 2026-06-06 세션8: 상품관리 팝업 신규(AdminLiveProductManagePopup, 사이드바 "상품" 메뉴→fixed모달, 시안②기준 탭[방송상품/공구·상시판매/전체창고]+상품명검색+올림날짜(created_at)+2열카드 다중선택+페이지네이션, "+새상품등록"→기존 ruru-open-quick-product-panel 이벤트로 ③폼, "순환담기"→broadcast_products insert(중복제외, 활성방송필요)). 방송/돈 로직 무변경. 가정: 공구·상시탭=product_type group_buy(상시판매 별도타입 없음), 올림날짜=created_at. 기존 AdminLiveProductListPanel은 미사용으로 잔존
