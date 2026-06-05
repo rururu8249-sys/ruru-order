@@ -999,7 +999,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
           <span className="text-[15px] font-black text-slate-950">👥 고객·이슈</span>
           <button type="button" onClick={() => onClose?.()} className="text-slate-400 hover:text-slate-700 text-lg leading-none">✕</button>
         </div>
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-5 space-y-4">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-rose-soft/40 px-4 py-2.5 text-[12px] font-black text-slate-600">
             <span>전체 <span className="text-rose-deep">{customers.length.toLocaleString("ko-KR")}</span></span>
             <span className="text-slate-300">·</span>
@@ -1044,7 +1044,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
 
       <div className={custTab === "members" ? "" : "hidden"}>
         <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="grid gap-2 lg:grid-cols-[180px_180px_180px_1fr]">
+          <div className="grid grid-cols-2 gap-2">
             <select
               value={statusFilter}
               onChange={(event) => {
