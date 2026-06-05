@@ -1106,12 +1106,12 @@ export default function AdminLiveDashboard() {
 
             <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
 
-            <div className="mb-4 mt-4 grid w-full grid-cols-3 items-stretch gap-3">
-              <div className="col-span-2 h-[520px] min-h-0 min-w-0 [&>*]:h-full [&>*]:min-h-0 [&>*>*]:h-full [&>*>*]:min-h-0">
+            <div className="mb-4 mt-4 grid w-full grid-cols-4 items-stretch gap-3">
+              <div className="col-span-3 h-[360px] min-h-0 min-w-0 [&>*]:h-full [&>*]:min-h-0 [&>*>*]:h-full [&>*>*]:min-h-0">
                 <LiveBroadcastPanels videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} />
               </div>
 
-              <div className="col-span-1 h-[520px] min-h-0 min-w-0 [&>*]:h-full [&>*]:min-h-0">
+              <div className="col-span-1 h-[360px] min-h-0 min-w-0 [&>*]:h-full [&>*]:min-h-0">
                 <AdminLiveProductListPanel fillHeight className="h-full min-w-0" />
               </div>
             </div>

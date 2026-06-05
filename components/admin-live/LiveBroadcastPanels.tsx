@@ -710,7 +710,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
 
   return (
     <section className="mb-4 flex w-full items-stretch gap-3">
-      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm h-[480px] flex flex-col" style={{ flex: "2 1 0%" }}>
+      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm h-[360px] flex flex-col" style={{ flex: "2 1 0%" }}>
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-black text-slate-950">
             방송화면
@@ -751,7 +751,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
         </div>
       </div>
 
-      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm h-[480px] flex flex-col" style={{ flex: "2 1 0%" }}>
+      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm h-[360px] flex flex-col" style={{ flex: "2 1 0%" }}>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-black text-slate-950">라이브 채팅</h2>
           <span className="text-xs font-bold text-slate-500">{chatEmbedUrl ? "채팅 연결" : "URL 대기"}</span>
@@ -779,7 +779,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
         </div>
       </div>
 
-      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm h-[480px] flex flex-col" style={{ flex: "1.2 1 0%" }}>
+      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm h-[360px] flex flex-col" style={{ flex: "1.2 1 0%" }}>
         <div className="mb-2 flex items-center gap-2 text-sm font-black text-slate-950">
           지금 띄운 상품
           <span className="rounded-md bg-rose-soft px-2 py-0.5 text-[11px] font-black text-rose-deep">📌</span>
