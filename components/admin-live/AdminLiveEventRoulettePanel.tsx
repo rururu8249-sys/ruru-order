@@ -1,6 +1,7 @@
 "use client";
 
 import { showAdminToast } from "@/lib/adminToast";
+import { supabase } from "@/lib/supabase";
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
 
 type RouletteMode = "live" | "test" | "preview";
@@ -389,9 +390,15 @@ export default function AdminLiveEventRoulettePanel({
     const n = Math.max(names.length, 1);
     const idx = Math.max(0, names.indexOf(winner));
     const seg = (Math.PI * 2) / n;
-    const turns = 8 + Math.floor(Math.random() * 7); // 8~14바퀴
+    const turns = 30; // 30바퀴
     const duration = 4000 + Math.random() * 2000; // 4~6초
     const target = turns * Math.PI * 2 - (idx * seg + seg / 2);
+
+    // 당첨 확정 시점의 선물 설정 캡처 (포인트 자동지급용)
+    const gType = giftType;
+    const gAmount = Number(giftPointAmount || 0);
+    const gReason = (winnerNote || title || "이벤트 당첨").trim();
+    const isLive = mode === "live";
 
     setCenterWinner("");
     angleRef.current = 0;
@@ -406,6 +413,14 @@ export default function AdminLiveEventRoulettePanel({
         rafRef.current = requestAnimationFrame(tick);
       } else {
         setCenterWinner(winner);
+        // 포인트 선물 + 금액 있으면 자동지급 (운영 모드만)
+        if (gType === "point" && gAmount > 0) {
+          if (isLive) {
+            void grantPointToWinner(winner, gAmount, gReason);
+          } else {
+            showAdminToast("테스트 모드라 포인트 자동지급은 건너뜁니다.", "info");
+          }
+        }
       }
     };
     rafRef.current = requestAnimationFrame(tick);
@@ -414,6 +429,40 @@ export default function AdminLiveEventRoulettePanel({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentEvent?.winner_nickname, currentEvent?.status, currentEvent?.result_at, currentEvent?.id]);
+
+  // 당첨자 닉네임 → orders 최신 주문 전화번호 매핑 → 기존 포인트 API로 자동지급
+  const grantPointToWinner = async (nickname: string, amount: number, reason: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("customer_phone")
+        .eq("youtube_nickname", nickname)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      const phone = String((data as { customer_phone?: unknown } | null)?.customer_phone || "").replace(/[^0-9]/g, "");
+      if (!phone) {
+        showAdminToast(`${nickname}의 전화번호를 찾지 못해 포인트 자동지급을 건너뜁니다.`, "warning");
+        return;
+      }
+      const payload = await requestJson<{ ok: boolean; message?: string }>("/api/admin-live/customer-points", {
+        method: "POST",
+        body: JSON.stringify({
+          phone,
+          action: "grant",
+          amount,
+          reason: reason || "이벤트 당첨",
+          youtube_nickname: nickname,
+          customer_visible: true,
+        }),
+      });
+      if (!payload.ok) throw new Error(payload.message || "포인트 지급 실패");
+      showAdminToast(`${nickname}님에게 ${amount.toLocaleString("ko-KR")}P 자동지급 완료.`, "success");
+    } catch (e) {
+      showAdminToast("포인트 자동지급 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    }
+  };
 
   const openEventPanel = () => {
     setInternalOpen(true);
@@ -981,21 +1030,28 @@ export default function AdminLiveEventRoulettePanel({
               {/* 룰렛 + 참가자 */}
               <div style={{ display: "flex", gap: "14px", alignItems: "stretch", marginBottom: "13px" }}>
                 <div style={{ flex: 1, background: "#f7f5f1", borderRadius: "10px", minHeight: "190px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", position: "relative" }}>
-                  <div className="wheel">
-                    <span className="pt" style={{ top: "6px", fontSize: "24px" }}>▼</span>
-                    <canvas ref={canvasRef} width={300} height={300} style={{ width: "100%", height: "100%", borderRadius: "50%", display: "block" }} />
-                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-                      <span style={{ fontSize: "12px", color: "var(--rose)", fontWeight: 600 }}>{finalParticipants.length}명</span>
+                  {eventTab === "roulette" ? (
+                    <div className="wheel">
+                      <span className="pt" style={{ top: "6px", fontSize: "24px" }}>▼</span>
+                      <canvas ref={canvasRef} width={300} height={300} style={{ width: "100%", height: "100%", borderRadius: "50%", display: "block" }} />
+                      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+                        <span style={{ fontSize: "12px", color: "var(--rose)", fontWeight: 600 }}>{finalParticipants.length}명</span>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div style={{ width: "150px", height: "150px", borderRadius: "16px", background: "#fff", border: "1px solid var(--bd)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                      <span style={{ fontSize: "46px", lineHeight: 1 }}>🕹️</span>
+                      <span style={{ fontSize: "12px", color: "var(--rose)", fontWeight: 600 }}>인형뽑기 · {finalParticipants.length}명</span>
+                    </div>
+                  )}
                   <button className="btn rose" style={{ height: "auto", padding: "9px 30px" }} onClick={startSpin} disabled={spinning || finalParticipants.length === 0}>{spinning ? "진행중..." : "▶ 돌리기"}</button>
 
                   {/* 당첨자 발표 카드 — EventRouletteOverlayClient result-card 디자인 */}
                   {centerWinner && currentEvent?.winner_nickname === centerWinner ? (
-                    <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: "min(88%,300px)", borderRadius: "20px", background: "rgba(255,255,255,0.96)", boxShadow: "0 18px 50px rgba(15,23,42,0.24)", padding: "18px 20px", textAlign: "center", backdropFilter: "blur(6px)" }}>
-                      <div style={{ color: "#7c3aed", fontSize: "16px", fontWeight: 950, letterSpacing: "-0.05em" }}>당첨</div>
-                      <div style={{ marginTop: "6px", color: "#111827", fontSize: "34px", fontWeight: 950, lineHeight: 1.05, letterSpacing: "-0.08em", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{centerWinner}</div>
-                      <div style={{ marginTop: "10px", color: "#475569", fontSize: "15px", fontWeight: 900, letterSpacing: "-0.05em" }}>{currentEvent?.winner_note || "이벤트 당첨"}</div>
+                    <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: "min(90%,320px)", borderRadius: "28px", background: "rgba(255,255,255,0.96)", boxShadow: "0 24px 70px rgba(15,23,42,0.24)", padding: "24px", textAlign: "center", backdropFilter: "blur(6px)" }}>
+                      <div style={{ color: "#7c3aed", fontSize: "18px", fontWeight: 950, letterSpacing: "-0.05em" }}>당첨</div>
+                      <div style={{ marginTop: "6px", color: "#111827", fontSize: "40px", fontWeight: 950, lineHeight: 1.05, letterSpacing: "-0.08em", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{centerWinner}</div>
+                      <div style={{ marginTop: "10px", color: "#475569", fontSize: "16px", fontWeight: 900, letterSpacing: "-0.05em" }}>{currentEvent?.winner_note || "이벤트 당첨"}</div>
                     </div>
                   ) : null}
                 </div>
