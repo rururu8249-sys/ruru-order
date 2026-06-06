@@ -23,6 +23,8 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 (없음)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-06-06 세션15(이벤트 입금완료 필터 서버연동·P2): app/api/admin-live/event-roulette/route.ts handleParticipants가 paidOnly 파라미터 읽어 buildParticipantsForRequest(…,paidOnly) 전달 → paidOnly면 주문 rows를 admin_order_status_v2/order_manage_status가 자동입금확인·수동입금확인·카드결제완료인 것만 필터 후 참가자 구성(isPaidOrderRowForRoulette). 기존엔 서버가 paidOnly 무시해 전체와 동일했음. buildRouletteparticipants(import)·추첨/포인트 로직 무변경. PUSH 0b30e29
+- 2026-06-06 세션15(당첨자 목록 종류뱃지): AdminLiveEventRoulettePanel 당첨자행에 🎡룰렛/🪆인형뽑기 표시 — winners엔 종류정보 없어 w.event_id로 events 매칭→overlay_token 접두사(roulette/claw) 판별, 매칭실패 시 "이벤트". 프론트 표시만. PUSH 7d1731a ※events 응답이 과거 당첨자 이벤트 다 포함 안하면 "이벤트"로만 뜸 → 그땐 winners API에 종류 내려주기 보강 필요
 - 2026-06-06 세션15(고객정보 중복row 재발방지): app/order/page.tsx saveCustomer가 customer_phone으로만 조회/갱신해 번호변경 시 새 row INSERT(중복 원인 — 471/475 같은). saveCustomer(previousPhone?) 추가 → lookupPhone=옛번호≠새번호면 옛번호로 조회/update(customer_phone을 새번호로 갱신). 정보수정 호출(2374)만 customerInfoEditSnapshot?.customerPhone 전달, 주문제출(3037)·돈로직 무변경. sed 다중매칭(cleanPhone 7곳) 위험 회피 위해 Edit으로 saveCustomer에만 적용
 - 2026-06-06 세션15(적립률 소수점·소급 1.5%): 설정 적립률칸 소수점 허용(공유 SettingInput에 선택 props type=number step0.1 min0 max100 inputMode=decimal만 추가, 기존 칸 무변경 / decimalInput 핸들러로 onlyDigits 대체 → 1.5 입력가능). 소급적립 SQL(order_point_backfill_today.sql) 적립률 고정 1.5%(=15/1000 bigint 정수연산, 설정값 의존·v_rate 제거). PUSH d5e2ceb
 - 2026-06-06 세션15(포인트 자동적립): 설정에 "포인트 적립 규칙" 카드(자동적립 ON/OFF 토글 + 적립률 입력, settings.point_auto_earn_enabled/point_earn_rate, 적립률 소수점 허용 type=number step0.1). 결제완료(자동·수동 입금확인/카드결제완료) 시 자동적립 = DB 트리거 SQL(supabase/sql/order_point_auto_earn_rpc.sql, 별도 적용 — 입금 JS 무수정, 상품금액(택배비제외)×률, 1주문1회 point_earned_at, 포인트사용/테스트/정산제외 주문 제외, 선물팝업 미표시 customer_seen_at=now). 주문서 멘트 "구매금액 N% 적립"/OFF숨김(OrderPriceSummaryBox pointEarnRate prop). 오늘건 소급적립 SQL(order_point_backfill_today.sql, 1.5% 고정=15/1000, 1단계 미리보기+2단계 DO). orders ADD COLUMN point_earned_at/point_earned_amount. 돈/입금/매칭 로직 무변경. ※SQL 2개는 Supabase SQL Editor 직접 실행 필요
@@ -54,7 +56,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 ## 남은 작업 (우선순위 순 · 끝나면 지우고 진행상황에 기록)
 [admin-live 관리자]
 1. 화면 전체 용어·버튼·라벨·문구 시안 기준 전수 통일 (입금상태뿐 아니라 전 화면 일괄, 일부만 고치지 말 것) — 입금상태·메뉴·주요 팝업제목(정산·입금내역·입금매칭 포함) 통일 완료. 잔여 세부 라벨은 화면별 점검 시 추가
-2. 이벤트 — P1(메뉴/모달/상태유지/초기화/참가자3버튼/활성방송기준/당첨고정칩/당첨선물/돌리기) 완료. ✅완료: 시안⑨ 인라인 1:1 이식, canvas 실제스핀(30바퀴/4~6초/당첨칸정지/가운데 당첨오버레이/화살표), 인형뽑기 탭 전환, 당첨 포인트 자동지급(P5, 운영모드만), 중복당첨 토글 연동(excludeDailyDup). 잔여: P2(입금완료 서버필터·winners 기간필터 서버연동), P3(가중치 추첨공식 서버 — 토글UI만 있음) — 각 페이즈 ⚠️정의 받고 진행
+2. 이벤트 — P1 완료. ✅완료: 시안⑨ 인라인, canvas 실제스핀, 인형뽑기 탭, 당첨 포인트 자동지급(운영모드만), 중복당첨 토글(excludeDailyDup), **입금완료 서버필터(paidOnly)**, 당첨자목록 종류뱃지. 잔여: P2-나머지(winners 기간필터 서버연동), P3(가중치 추첨공식 서버 — 토글UI만), ⚠️**당첨 자동지급 중복 가드 없음**(effect 재실행 시 재지급 가능 — 돈 위험, 가드 추가 권장), 자동지급↔지급완료(is_reward_done) 배지 미연동
 3. 수동매칭 설정 팝업 메뉴
 4. (사장님 추가 예정 — 그 외 작업 생각나는 대로 여기 누적)
    ※ 후속: 상품관리 팝업 — 상시판매 별도 type 도입 / 올림날짜 전용 필드 / 기존 AdminLiveProductListPanel 정리 여부
