@@ -3995,7 +3995,7 @@ export default function OrderPage() {
                           <div className="flex min-w-0 items-start justify-between gap-2">
                             <div className="min-w-0 flex-1">
                               <div className="mb-1 flex min-w-0 flex-wrap items-center gap-1">
-                                <span className="rounded-full bg-coral-50 px-1.5 py-0.5 text-[10px] font-black tracking-[-0.04em] text-coral-700 ring-1 ring-coral-100">
+                                <span className="rounded-full px-1.5 py-0.5 text-[10px] font-black tracking-[-0.04em]" style={{ background: "#F5E6EB", color: "#7B2D43" }}>
                                   상품 {index + 1}
                                 </span>
                                 <span
@@ -4015,7 +4015,8 @@ export default function OrderPage() {
                                 <button
                                   type="button"
                                   onClick={() => openDirectInputEditSheet(index)}
-                                  className={`${buttonBase} rounded-full border border-coral-100 bg-coral-50 px-2 py-1 text-[11px] font-black tracking-[-0.04em] text-coral-700`}
+                                  className={`${buttonBase} rounded-full px-2 py-1 text-[11px] font-black tracking-[-0.04em]`}
+                                  style={{ border: "1px solid #D9C5CC", background: "#F5E6EB", color: "#7B2D43" }}
                                 >
                                   수정
                                 </button>
@@ -4080,7 +4081,7 @@ export default function OrderPage() {
                           <p className="text-[10px] font-black tracking-[-0.04em] text-slate-400">
                             상품금액
                           </p>
-                          <p className="text-[21px] font-black leading-tight tracking-[-0.07em] text-coral-700">
+                          <p className="text-[21px] font-black leading-tight tracking-[-0.07em]" style={{ color: "#7B2D43" }}>
                             {won(itemAmount)}
                           </p>
                         </div>
@@ -4107,26 +4108,18 @@ export default function OrderPage() {
               </span>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            <div style={{ marginTop: "16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
               {(["무통장입금", "카드결제"] as const).map((method) => (
                 <button
                   key={method}
                   type="button"
                   onClick={() => setPaymentMethod(method)}
-                  className={`${buttonBase} min-h-[68px] rounded-[20px] px-3 py-3 text-left tracking-[-0.04em] ${
-                    paymentMethod === method
-                      ? "border-2 border-coral-600 bg-coral-50 text-coral-800 shadow-[0_10px_22px_rgba(216,90,48,0.10)]"
-                      : "border border-slate-200 bg-white text-slate-700"
-                  }`}
+                  style={{ minHeight: "68px", borderRadius: "16px", padding: "12px", textAlign: "left", border: paymentMethod === method ? "2px solid #7B2D43" : "1px solid #E8E2DD", background: paymentMethod === method ? "#F5E6EB" : "#fff", cursor: "pointer" }}
                 >
-                  <span className="block text-[15px] font-black">
-                    {method}
+                  <span style={{ display: "block", fontSize: "15px", fontWeight: 800, color: paymentMethod === method ? "#7B2D43" : "#444" }}>
+                    {method === "카드결제" ? `카드결제 (+${cardRateForCustomer}%)` : method}
                   </span>
-                  <span
-                    className={`mt-1 block text-[11px] font-black leading-snug ${
-                      paymentMethod === method ? "text-coral-700" : "text-slate-400"
-                    }`}
-                  >
+                  <span style={{ marginTop: "4px", display: "block", fontSize: "11px", fontWeight: 800, lineHeight: 1.3, color: paymentMethod === method ? "#7B2D43" : "#999" }}>
                     {method === "무통장입금" ? "입금자명·금액 확인" : "카톡채널 결제 문의"}
                   </span>
                 </button>
@@ -4134,10 +4127,10 @@ export default function OrderPage() {
             </div>
 
             {paymentMethod === "카드결제" && (
-              <div className="mt-3 rounded-[20px] border border-coral-100 bg-coral-50 p-3 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-coral-800">
-                카드결제는 {cardPaymentMinAmount.toLocaleString()}원 이상 구매 시 가능합니다.
+              <div style={{ marginTop: "12px", borderRadius: "16px", border: "1px solid #D9C5CC", background: "#F5E6EB", padding: "12px", fontSize: "13px", fontWeight: 800, lineHeight: 1.6, color: "#7B2D43" }}>
+                ⓘ 카드결제는 {cardPaymentMinAmount.toLocaleString()}원 이상 구매 시 가능합니다.
                 <br />
-                주문서 작성 후 카톡채널 문의 부탁드립니다.
+                주문서 제출 후 카톡채널로 문의 남겨주세요.
               </div>
             )}
 
@@ -4565,7 +4558,7 @@ export default function OrderPage() {
                 type="button"
                 onClick={handleSubmitOrderClick}
                 disabled={submitting || customerBlockStatus.blocked}
-                className={`${buttonBase} h-14 min-w-[154px] rounded-[22px] bg-coral-700 px-5 text-[16px] font-black tracking-[-0.05em] text-white shadow-lg shadow-coral-700/20 disabled:bg-slate-300 disabled:shadow-none`}
+                style={{ height: "56px", minWidth: "154px", borderRadius: "18px", border: "none", padding: "0 20px", fontSize: "16px", fontWeight: 800, color: "#fff", background: submitting || customerBlockStatus.blocked ? "#cbd5e1" : "#7B2D43", cursor: submitting || customerBlockStatus.blocked ? "default" : "pointer" }}
               >
                 {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : "주문서 제출"}
               </button>
