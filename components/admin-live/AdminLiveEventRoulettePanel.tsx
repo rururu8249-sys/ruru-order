@@ -980,19 +980,24 @@ export default function AdminLiveEventRoulettePanel({
 
               {/* 룰렛 + 참가자 */}
               <div style={{ display: "flex", gap: "14px", alignItems: "stretch", marginBottom: "13px" }}>
-                <div style={{ flex: 1, background: "#f7f5f1", borderRadius: "10px", minHeight: "190px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px" }}>
+                <div style={{ flex: 1, background: "#f7f5f1", borderRadius: "10px", minHeight: "190px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", position: "relative" }}>
                   <div className="wheel">
                     <span className="pt" style={{ top: "6px", fontSize: "24px" }}>▼</span>
                     <canvas ref={canvasRef} width={300} height={300} style={{ width: "100%", height: "100%", borderRadius: "50%", display: "block" }} />
                     <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-                      {centerWinner && currentEvent?.winner_nickname === centerWinner ? (
-                        <span style={{ fontSize: "11px", color: "var(--rose)", fontWeight: 600, textAlign: "center", maxWidth: "88px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>🏆 {centerWinner}</span>
-                      ) : (
-                        <span style={{ fontSize: "12px", color: "var(--rose)", fontWeight: 600 }}>{finalParticipants.length}명</span>
-                      )}
+                      <span style={{ fontSize: "12px", color: "var(--rose)", fontWeight: 600 }}>{finalParticipants.length}명</span>
                     </div>
                   </div>
                   <button className="btn rose" style={{ height: "auto", padding: "9px 30px" }} onClick={startSpin} disabled={spinning || finalParticipants.length === 0}>{spinning ? "진행중..." : "▶ 돌리기"}</button>
+
+                  {/* 당첨자 발표 카드 — EventRouletteOverlayClient result-card 디자인 */}
+                  {centerWinner && currentEvent?.winner_nickname === centerWinner ? (
+                    <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: "min(88%,300px)", borderRadius: "20px", background: "rgba(255,255,255,0.96)", boxShadow: "0 18px 50px rgba(15,23,42,0.24)", padding: "18px 20px", textAlign: "center", backdropFilter: "blur(6px)" }}>
+                      <div style={{ color: "#7c3aed", fontSize: "16px", fontWeight: 950, letterSpacing: "-0.05em" }}>당첨</div>
+                      <div style={{ marginTop: "6px", color: "#111827", fontSize: "34px", fontWeight: 950, lineHeight: 1.05, letterSpacing: "-0.08em", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{centerWinner}</div>
+                      <div style={{ marginTop: "10px", color: "#475569", fontSize: "15px", fontWeight: 900, letterSpacing: "-0.05em" }}>{currentEvent?.winner_note || "이벤트 당첨"}</div>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div style={{ flex: 0.95, display: "flex", flexDirection: "column", gap: "9px" }}>
