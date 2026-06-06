@@ -23,6 +23,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 (없음)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-06-06 세션14(고객 order page P1): app/order/page.tsx(4664줄) 상단바를 손님페이지 시안(/Users/ruru/Downloads/files/루루동이_손님페이지_위젯_통합본.txt)대로 딥로즈 1:1 인라인 교체 — 루루동이+LIVE배지(방송ON시)+주문서아이콘(담은개수 cartCount 배지)+☰. ☰→메뉴 바텀시트(주문조회/정보수정/내포인트/유튜브·카톡·밴드·인스타 링크 placeholder, 기존 openOrderLookup/openCustomerInfoEdit 핸들러 재사용). MENU_ITEM_STYLE 모듈상수. 주문제출/돈/포인트 로직 무변경. ※order page는 섹션별 증분(P2 주문방법~P10 위젯)
 - 2026-06-06 세션13-2(상품 시안 P2): 새 상품 등록 폼(QuickProductFastForm) 시안③ 인라인 1:1 교체(560px 중앙모달, .ruru-product-sian). 드로어(AdminLiveQuickProductDrawer)는 우측 aside/헤더 제거→폼만 렌더(모달 본체=폼). 배송구분 select normal/vendor/vendor2(=업체배송1/2), 상품종류 broadcast/group_buy(방송상품/상시판매), 방송화면 캡처=UI버튼+토스트(기능없음), 옵션4줄(색상/사이즈+프리셋/수량/금액)+재고관리·고객노출 토글. 저장로직(saveProduct/insertProductSchemaSafe/broadcast_products/combine_shipping 등) 100% 보존, 렌더만 교체. ※combine_shipping은 vendor만 N(미변경) — vendor2 합배송 처리 필요시 별도
 - 2026-06-06 세션13(상품 시안 P1·P3): 상품관리 팝업(AdminLiveProductManagePopup) 시안② 인라인 1:1 교체(.ruru-product-sian 스코프 globals.css, 560px 고정) + 순환/고정 모드 토글(순환=broadcast_products insert 기존, 고정=products.is_pinned update 기존고정해제후 선택고정). 지금띄운상품 패널(LiveBroadcastPanels): 고정상품 있으면 1개, 없고 순환 있으면 broadcast_products 목록 나열, 둘다없으면 안내(activeBroadcastId prop 추가, 상품변경 이벤트 갱신). 돈/배송 로직 무변경. ※P2 잔여=QuickProductFastForm(③ 새상품등록, 1244줄) 시안 인라인 이식 — 저장로직 보존 위해 별도 정밀 패스 필요
 - 2026-06-06 세션12-2(중복당첨 토글 연동): event-roulette API의 중복당첨 방지(applyNoDuplicateWinnerRule, 666 "이미 모든 참여자 당첨" 에러)를 excludeDailyDup으로 게이트 — false면 중복체크 건너뜀(handleParticipants searchParams + createEvent body 둘 다, 기본 true). 패널이 "당일 중복당첨 금지" 토글값을 create_event 3곳 + 참가자GET에 전송. 돈/포인트/추첨 로직 무변경
@@ -52,8 +53,10 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 4. (사장님 추가 예정 — 그 외 작업 생각나는 대로 여기 누적)
    ※ 후속: 상품관리 팝업 — 상시판매 별도 type 도입 / 올림날짜 전용 필드 / 기존 AdminLiveProductListPanel 정리 여부
 
-[고객 주문 페이지]
-- 고객 페이지 (별도 작업 영역 — 세부항목 추후 정리)
+[고객 주문 페이지] — 시안: /Users/ruru/Downloads/files/루루동이_손님페이지_위젯_통합본.txt (텍스트 사양, 딥로즈 #7B2D43 인라인). app/order/page.tsx 섹션별 증분:
+- ✅ P1 상단바+☰메뉴 (세션14)
+- P2 주문방법 접기/펼치기 / P3 영상(방송ON/OFF) / P4 상품목록(검색+2열격자+페이지네이션) / P5 상품옵션(펼침/방송중배지/품절SOLD OUT) / P6 담기 confetti / P7 주문서(결제방법 무통장·카드+7%/금액내역/적립예정/제출) / P8 메뉴 세부(이미 시트 골격 있음) / P9 정보수정·주문조회 배지·포인트선물 / P10 상품 방송위젯(신규)
+- 진입(카톡로그인/유튜브닉네임 유니크) 화면도 시안 반영 대상
 
 ※ 위 목록은 완전하지 않을 수 있음. 사장님이 새 작업 말하면 즉시 여기 추가할 것.
 
