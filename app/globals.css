@@ -47,3 +47,48 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* === 시안(루루동이 관리자 시안모음) CSS 변수 — 이벤트 등 시안 1:1 이식용 === */
+:root {
+  --rose: #7B2D43;
+  --rose-bg: #F5E6EB;
+  --rose-bg2: #FAF6F2;
+  --rose-bd: #D9C5CC;
+  --red: #C0392B;
+  --green: #0F6E56;
+  --green-bg: #E1F5EE;
+  --blue: #185FA5;
+  --blue-bg: #E6F1FB;
+  --amber: #854F0B;
+  --amber-bg: #FAEEDA;
+  --ink: #222;
+  --mut: #666;
+  --mut2: #999;
+  --bd: #E8E2DD;
+}
+
+/* 시안 클래스 — .ruru-event-sian 하위로 스코프(전역 .btn/.row/.note 충돌 방지) */
+.ruru-event-sian .body { background: #fff; border: 1px solid var(--bd); border-radius: 10px; padding: 13px; }
+.ruru-event-sian .btn { font-size: 11px; height: 32px; padding: 0 11px; border: 1px solid var(--bd); background: #fff; border-radius: 7px; cursor: pointer; color: var(--ink); }
+.ruru-event-sian .btn.rose { background: var(--rose); color: #fff; border-color: var(--rose); }
+.ruru-event-sian .btn.green { background: var(--green); color: #fff; border-color: var(--green); }
+.ruru-event-sian .btn:disabled { opacity: .45; cursor: not-allowed; }
+.ruru-event-sian .ipt { font-size: 11px; height: 32px; border: 1px solid var(--bd); border-radius: 7px; padding: 0 9px; background: #fff; }
+.ruru-event-sian .row { display: flex; gap: 9px; align-items: center; border: 1px solid var(--bd); border-radius: 7px; padding: 8px 11px; margin-bottom: 5px; font-size: 11px; }
+.ruru-event-sian .row b { font-size: 12px; }
+.ruru-event-sian .badge { font-size: 9px; padding: 2px 7px; border-radius: 4px; }
+.ruru-event-sian .b-ok { background: var(--green-bg); color: var(--green); }
+.ruru-event-sian .b-card { background: var(--amber-bg); color: var(--amber); }
+.ruru-event-sian .seclabel { font-size: 12px; font-weight: 600; margin: 0 0 7px; }
+.ruru-event-sian .note { font-size: 10px; color: var(--mut2); }
+.ruru-event-sian .nick { font-size: 10px; background: var(--rose-bg); color: var(--rose); padding: 3px 10px; border-radius: 11px; cursor: pointer; }
+.ruru-event-sian .nick.win { background: var(--rose); color: #fff; }
+.ruru-event-sian .nick.out { background: #eee; color: #999; text-decoration: line-through; }
+.ruru-event-sian .tog { width: 28px; height: 16px; border-radius: 8px; position: relative; display: inline-block; }
+.ruru-event-sian .tog.on { background: var(--red); }
+.ruru-event-sian .tog.on i { right: 2px; }
+.ruru-event-sian .tog.off { background: #ccc; }
+.ruru-event-sian .tog.off i { left: 2px; }
+.ruru-event-sian .tog i { position: absolute; top: 2px; width: 12px; height: 12px; background: #fff; border-radius: 50%; }
+.ruru-event-sian .wheel { width: 130px; height: 130px; border-radius: 50%; border: 7px solid var(--rose); position: relative; }
+.ruru-event-sian .wheel .pt { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); color: var(--red); font-size: 18px; z-index: 10; pointer-events: none; }
