@@ -917,7 +917,7 @@ export default function QuickProductFastForm({
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "9px" }}>
             <span style={{ fontSize: "11px", width: "36px" }}>금액</span>
-            <span className="badge" style={{ background: "#eee", color: "#888" }}>{priceText.trim() ? "위 가격" : "OFF"}</span>
+            <span className={`badge ${priceText.trim() ? "b-ok" : ""}`} style={priceText.trim() ? {} : { background: "#eee", color: "#888" }}>{priceText.trim() ? "위 가격" : "OFF"}</span>
             <span className="note">{priceText.trim() ? "위 가격 사용" : "비우면 손님 직접입력"}</span>
           </div>
         </div>

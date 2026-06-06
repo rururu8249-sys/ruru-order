@@ -259,9 +259,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
   const confirmAction = () => (mode === "pin" ? pinSelected() : addToRotation());
 
-  // 수정: 새 상품 등록 폼을 edit 모드로 (상품 detail 전달)
+  // 수정: 관리 팝업은 유지한 채 새 상품 등록 폼을 edit 모드로 (상품 detail 전달).
+  // edit 드로어(z-90)가 관리 팝업(z-40) 위에 뜨고, 저장 후 ruru-live-product-updated로 목록 갱신됨.
   const editProduct = (p: ProductRow) => {
-    onClose();
     window.dispatchEvent(new CustomEvent("ruru-edit-quick-product", { detail: p }));
   };
 
