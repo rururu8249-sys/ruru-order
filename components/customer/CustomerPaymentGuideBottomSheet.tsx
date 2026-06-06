@@ -1,6 +1,8 @@
 // components/customer/CustomerPaymentGuideBottomSheet.tsx
 // 목적: 공통으로 사용하는 입금안내 바텀시트
-// 주의: UI 전용. DB, API, 주문저장, 입금매칭, 정산, 배송 로직 없음.
+// 주의: UI 전용. DB, API, 주문저장, 입금매칭, 정산, 배송 로직 없음. (시안 딥로즈 #7B2D43 인라인)
+
+import type { CSSProperties } from "react";
 
 type CustomerPaymentGuideOrderItem = {
   product_name?: string;
@@ -87,80 +89,62 @@ export default function CustomerPaymentGuideBottomSheet({
     !isOrderComplete || (safePaymentMethod === "무통장입금" && !isFullyPaidByPoints);
   const showCardGuide = isOrderComplete && safePaymentMethod === "카드결제" && !isFullyPaidByPoints;
 
-  const normalButtonClass =
-    "flex min-h-[46px] items-center justify-center rounded-[16px] bg-white px-3 py-2 text-[13px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-200 transition active:scale-[0.98]";
-  const doneButtonClass =
-    "flex min-h-[46px] items-center justify-center rounded-[16px] bg-rose-deep px-3 py-2 text-[13px] font-black tracking-[-0.04em] text-white ring-1 ring-rose-deep transition active:scale-[0.98]";
+  const normalButtonStyle: CSSProperties = { display: "flex", minHeight: "46px", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", padding: "8px 12px", fontSize: "13px", fontWeight: 800, letterSpacing: "-0.04em", color: "#444", cursor: "pointer" };
+  const doneButtonStyle: CSSProperties = { ...normalButtonStyle, border: "1px solid #7B2D43", background: "#7B2D43", color: "#fff" };
+  const sumRow: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0", fontSize: "13px", fontWeight: 700, color: "#666" };
 
   return (
     <div
       data-ruru-payment-guide-bottom-sheet="shell-v2"
-      className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/45 px-3"
+      style={{ position: "fixed", inset: 0, zIndex: 90, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(15,23,42,0.45)", padding: "0 12px" }}
       role="dialog"
       aria-modal="true"
       aria-label={isOrderComplete ? "주문 접수 완료 및 입금 안내" : "입금 안내"}
     >
-      <div className="w-full max-w-[430px] overflow-hidden rounded-t-[30px] bg-white shadow-[0_-22px_70px_rgba(15,23,42,0.22)]">
-        <div className="mx-auto mt-3 h-1.5 w-14 rounded-full bg-slate-200" />
+      <div style={{ width: "100%", maxWidth: "430px", overflow: "hidden", borderTopLeftRadius: "28px", borderTopRightRadius: "28px", background: "#fff", boxShadow: "0 -22px 70px rgba(15,23,42,0.22)" }}>
+        <div style={{ margin: "12px auto 0", height: "5px", width: "52px", borderRadius: "3px", background: "#E8E2DD" }} />
 
-        <div className="max-h-[86dvh] overflow-y-auto px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-5">
-          <header className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[12px] font-black tracking-[-0.04em] text-rose-deep">
-                루루동이 LIVE
-              </p>
-              <h2 className="mt-1 text-[26px] font-black leading-tight tracking-[-0.07em] text-slate-950">
+        <div style={{ maxHeight: "86dvh", overflowY: "auto", padding: "20px 16px calc(16px + env(safe-area-inset-bottom))" }}>
+          <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
+            <div style={{ minWidth: 0 }}>
+              <p style={{ fontSize: "12px", fontWeight: 800, letterSpacing: "-0.04em", color: "#7B2D43" }}>루루동이 LIVE</p>
+              <h2 style={{ marginTop: "4px", fontSize: "26px", fontWeight: 800, lineHeight: 1.2, letterSpacing: "-0.07em", color: "#222" }}>
                 {isOrderComplete ? "주문 접수 완료" : "입금 안내"}
               </h2>
-              <p className="mt-2 break-keep text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
-                {isOrderComplete
-                  ? "입금자명과 계좌번호를 확인해주세요."
-                  : "현재 보이는 닉네임으로 입금해주세요."}
+              <p style={{ marginTop: "8px", wordBreak: "keep-all", fontSize: "14px", fontWeight: 700, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#666" }}>
+                {isOrderComplete ? "입금자명과 계좌번호를 확인해주세요." : "현재 보이는 닉네임으로 입금해주세요."}
               </p>
             </div>
-
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-rose-soft text-[25px] ring-1 ring-rose-line">
+            <div style={{ display: "flex", height: "48px", width: "48px", flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: "16px", background: "#F5E6EB", border: "1px solid #D9C5CC", fontSize: "25px" }}>
               {isOrderComplete ? "✅" : "💙"}
             </div>
           </header>
 
           {isOrderComplete && showBankGuide && (
-            <div className="mt-4 rounded-[18px] bg-slate-950 px-4 py-3 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-white">
+            <div style={{ marginTop: "16px", borderRadius: "14px", background: "#7B2D43", padding: "12px 16px", fontSize: "13px", fontWeight: 800, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#fff" }}>
               닉네임과 결제금액이 정확히 맞아야 자동 입금확인이 됩니다.
             </div>
           )}
 
           {isFullyPaidByPoints && (
-            <section className="mt-4 rounded-[22px] bg-emerald-50 p-4 ring-1 ring-emerald-100">
-              <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-white text-[23px] ring-1 ring-emerald-100">
-                  ✅
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-[18px] font-black tracking-[-0.06em] text-emerald-900">
-                    포인트로 결제완료
-                  </h3>
-                  <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-emerald-800">
-                    추가 입금 없이 주문이 접수됐습니다.
-                  </p>
+            <section style={{ marginTop: "16px", borderRadius: "18px", background: "#E1F5EE", border: "1px solid #C7EBDD", padding: "16px" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+                <div style={{ display: "flex", height: "44px", width: "44px", flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: "14px", background: "#fff", fontSize: "23px" }}>✅</div>
+                <div style={{ minWidth: 0 }}>
+                  <h3 style={{ fontSize: "18px", fontWeight: 800, letterSpacing: "-0.06em", color: "#0F6E56" }}>포인트로 결제완료</h3>
+                  <p style={{ marginTop: "4px", wordBreak: "keep-all", fontSize: "13px", fontWeight: 700, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#0F6E56" }}>추가 입금 없이 주문이 접수됐습니다.</p>
                 </div>
               </div>
             </section>
           )}
 
           {showCardGuide && (
-            <section className="mt-4 rounded-[22px] bg-rose-soft p-4 ring-1 ring-rose-line">
-              <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-white text-[23px] ring-1 ring-rose-line">
-                  💳
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-[18px] font-black tracking-[-0.06em] text-rose-deep">
-                    카드결제 안내
-                  </h3>
-                  <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-rose-deep">
-                    카드결제는 카톡채널 안내에 따라 진행해주세요.
-                  </p>
+            <section style={{ marginTop: "16px", borderRadius: "18px", background: "#F5E6EB", border: "1px solid #D9C5CC", padding: "16px" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+                <div style={{ display: "flex", height: "44px", width: "44px", flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: "14px", background: "#fff", fontSize: "23px" }}>💳</div>
+                <div style={{ minWidth: 0 }}>
+                  <h3 style={{ fontSize: "18px", fontWeight: 800, letterSpacing: "-0.06em", color: "#7B2D43" }}>카드결제 안내</h3>
+                  <p style={{ marginTop: "4px", wordBreak: "keep-all", fontSize: "13px", fontWeight: 700, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#7B2D43" }}>카드결제는 카톡채널 안내에 따라 진행해주세요.</p>
                 </div>
               </div>
             </section>
@@ -168,140 +152,81 @@ export default function CustomerPaymentGuideBottomSheet({
 
           {showBankGuide && (
             <>
-              <section className="mt-4 rounded-[22px] bg-rose-soft p-4 ring-1 ring-rose-line">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[12px] font-black tracking-[-0.04em] text-slate-500">
-                      입금자명
-                    </p>
-                    <p
-                      className="mt-1 truncate text-[30px] font-black leading-tight tracking-[-0.08em] text-rose-deep"
-                      title={safeNickname}
-                    >
+              <section style={{ marginTop: "16px", borderRadius: "18px", background: "#F5E6EB", border: "1px solid #D9C5CC", padding: "16px" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ fontSize: "12px", fontWeight: 800, letterSpacing: "-0.04em", color: "#888" }}>입금자명</p>
+                    <p style={{ marginTop: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "30px", fontWeight: 800, lineHeight: 1.2, letterSpacing: "-0.08em", color: "#7B2D43" }} title={safeNickname}>
                       {safeNickname}
                     </p>
-                    <p className="mt-2 break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
-                      이 닉네임으로 입금해주세요.
-                    </p>
+                    <p style={{ marginTop: "8px", wordBreak: "keep-all", fontSize: "12px", fontWeight: 700, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#666" }}>이 닉네임으로 입금해주세요.</p>
                   </div>
-
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-white/80 text-[24px] ring-1 ring-rose-line">
-                    👤
-                  </div>
+                  <div style={{ display: "flex", height: "48px", width: "48px", flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: "16px", background: "rgba(255,255,255,0.8)", border: "1px solid #D9C5CC", fontSize: "24px" }}>👤</div>
                 </div>
               </section>
 
-              <section className="mt-3 rounded-[22px] bg-amber-50 p-4 ring-1 ring-amber-100">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[12px] font-black tracking-[-0.04em] text-slate-500">
-                      계좌번호
-                    </p>
-                    <p
-                      className="mt-1 break-all text-[19px] font-black leading-snug tracking-[-0.06em] text-slate-950"
-                      title={`${safeBankName} ${safeBankAccount}`}
-                    >
+              <section style={{ marginTop: "12px", borderRadius: "18px", background: "#FAF6F2", border: "1px solid #E8E2DD", padding: "16px" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <p style={{ fontSize: "12px", fontWeight: 800, letterSpacing: "-0.04em", color: "#888" }}>계좌번호</p>
+                    <p style={{ marginTop: "4px", wordBreak: "break-all", fontSize: "19px", fontWeight: 800, lineHeight: 1.35, letterSpacing: "-0.06em", color: "#222" }} title={`${safeBankName} ${safeBankAccount}`}>
                       {safeBankName} {safeBankAccount}
                     </p>
-                    <p className="mt-2 text-[13px] font-black tracking-[-0.04em] text-slate-700">
-                      예금주 {safeBankHolder}
-                    </p>
+                    <p style={{ marginTop: "8px", fontSize: "13px", fontWeight: 800, letterSpacing: "-0.04em", color: "#555" }}>예금주 {safeBankHolder}</p>
                   </div>
-
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-white/80 text-[24px] ring-1 ring-amber-100">
-                    🏦
-                  </div>
+                  <div style={{ display: "flex", height: "48px", width: "48px", flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: "16px", background: "rgba(255,255,255,0.8)", border: "1px solid #E8E2DD", fontSize: "24px" }}>🏦</div>
                 </div>
               </section>
 
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={onCopyNickname}
-                  className={nicknameCopyDone ? doneButtonClass : normalButtonClass}
-                >
+              <div style={{ marginTop: "12px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                <button type="button" onClick={onCopyNickname} style={nicknameCopyDone ? doneButtonStyle : normalButtonStyle}>
                   {nicknameCopyDone ? "고객 닉네임 복사완료" : "입금자명(닉네임) 복사"}
                 </button>
-
-                <button
-                  type="button"
-                  onClick={onCopyBankAccount}
-                  className={bankCopyDone ? doneButtonClass : normalButtonClass}
-                >
+                <button type="button" onClick={onCopyBankAccount} style={bankCopyDone ? doneButtonStyle : normalButtonStyle}>
                   {bankCopyDone ? "계좌번호 복사완료" : "계좌번호 복사"}
                 </button>
               </div>
-
-
             </>
           )}
 
           {isOrderComplete && (
-            <section className="mt-4 rounded-[22px] bg-white p-4 ring-1 ring-slate-200">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h3 className="text-[18px] font-black tracking-[-0.06em] text-slate-950">
-                  주문 상품
-                </h3>
-                <span className="rounded-full bg-rose-soft px-3 py-1 text-[12px] font-black text-rose-deep ring-1 ring-rose-line">
-                  총 {totalQty || orderItems.length}개
-                </span>
+            <section style={{ marginTop: "16px", borderRadius: "18px", background: "#fff", border: "1px solid #E8E2DD", padding: "16px" }}>
+              <div style={{ marginBottom: "12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+                <h3 style={{ fontSize: "18px", fontWeight: 800, letterSpacing: "-0.06em", color: "#222" }}>주문 상품</h3>
+                <span style={{ borderRadius: "999px", background: "#F5E6EB", border: "1px solid #D9C5CC", padding: "4px 12px", fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>총 {totalQty || orderItems.length}개</span>
               </div>
 
-              <div className="grid gap-2">
+              <div style={{ display: "grid", gap: "8px" }}>
                 {orderItems.length > 0 ? (
                   orderItems.map((item, index) => {
                     const qty = toNumber(item.qty);
                     const amount = toNumber(item.product_price) * qty;
-
                     return (
-                      <div
-                        key={`${itemTitle(item)}-${index}`}
-                        className="rounded-[18px] bg-slate-50 px-3 py-3 ring-1 ring-slate-100"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="break-keep text-[14px] font-black leading-relaxed tracking-[-0.04em] text-slate-950">
-                              {itemTitle(item)}
-                            </p>
-                            <p className="mt-1 text-[12px] font-bold text-slate-500">
-                              수량 {qty || 0}개
-                            </p>
+                      <div key={`${itemTitle(item)}-${index}`} style={{ borderRadius: "14px", background: "#FAF6F2", padding: "12px", border: "1px solid #E8E2DD" }}>
+                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
+                          <div style={{ minWidth: 0 }}>
+                            <p style={{ wordBreak: "keep-all", fontSize: "14px", fontWeight: 800, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#222" }}>{itemTitle(item)}</p>
+                            <p style={{ marginTop: "4px", fontSize: "12px", fontWeight: 700, color: "#888" }}>수량 {qty || 0}개</p>
                           </div>
-                          <p className="shrink-0 text-right text-[14px] font-black text-rose-deep">
-                            {won(amount)}
-                          </p>
+                          <p style={{ flexShrink: 0, textAlign: "right", fontSize: "14px", fontWeight: 800, color: "#7B2D43" }}>{won(amount)}</p>
                         </div>
                       </div>
                     );
                   })
                 ) : (
-                  <div className="rounded-[18px] bg-slate-50 px-3 py-4 text-center text-[13px] font-bold text-slate-500 ring-1 ring-slate-100">
-                    주문 상품 정보가 비어 있습니다.
-                  </div>
+                  <div style={{ borderRadius: "14px", background: "#FAF6F2", padding: "16px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "#888", border: "1px solid #E8E2DD" }}>주문 상품 정보가 비어 있습니다.</div>
                 )}
               </div>
 
-              <div className="mt-3 rounded-[18px] bg-rose-soft p-3 ring-1 ring-rose-line">
-                <div className="flex items-center justify-between py-1 text-[13px] font-bold text-slate-600">
-                  <span>상품금액</span>
-                  <span>{won(safeProductAmount)}</span>
-                </div>
-
-                <div className="flex items-center justify-between py-1 text-[13px] font-bold text-slate-600">
-                  <span>배송비</span>
-                  <span>{won(safeShippingFee)}</span>
-                </div>
-
+              <div style={{ marginTop: "12px", borderRadius: "14px", background: "#F5E6EB", border: "1px solid #D9C5CC", padding: "12px" }}>
+                <div style={sumRow}><span>상품금액</span><span>{won(safeProductAmount)}</span></div>
+                <div style={sumRow}><span>배송비</span><span>{won(safeShippingFee)}</span></div>
                 {safePointUsedAmount > 0 && (
-                  <div className="flex items-center justify-between py-1 text-[13px] font-black text-emerald-700">
-                    <span>포인트 사용</span>
-                    <span>-{won(safePointUsedAmount)}</span>
-                  </div>
+                  <div style={{ ...sumRow, fontWeight: 800, color: "#0F6E56" }}><span>포인트 사용</span><span>-{won(safePointUsedAmount)}</span></div>
                 )}
-
-                <div className="mt-2 flex items-center justify-between border-t border-rose-line pt-3 text-[17px] font-black text-slate-950">
+                <div style={{ marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid #D9C5CC", paddingTop: "12px", fontSize: "17px", fontWeight: 800, color: "#222" }}>
                   <span>{safePointUsedAmount > 0 ? "최종 결제금액" : "결제금액"}</span>
-                  <span className="text-rose-deep">{won(safeFinalAmount)}</span>
+                  <span style={{ color: "#7B2D43" }}>{won(safeFinalAmount)}</span>
                 </div>
               </div>
             </section>
@@ -310,7 +235,7 @@ export default function CustomerPaymentGuideBottomSheet({
           <button
             type="button"
             onClick={onClose}
-            className="mt-4 flex min-h-[52px] w-full items-center justify-center rounded-[18px] bg-rose-deep px-4 py-3 text-[16px] font-black tracking-[-0.05em] text-white shadow-[0_12px_28px_rgba(216,90,48,0.24)] transition active:scale-[0.98]"
+            style={{ marginTop: "16px", display: "flex", minHeight: "52px", width: "100%", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "none", background: "#7B2D43", padding: "0 16px", fontSize: "16px", fontWeight: 800, letterSpacing: "-0.05em", color: "#fff", cursor: "pointer" }}
           >
             확인
           </button>

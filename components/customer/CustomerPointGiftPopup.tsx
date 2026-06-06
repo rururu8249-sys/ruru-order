@@ -134,47 +134,43 @@ export default function CustomerPointGiftPopup() {
   const reasonText = String(giftState.gift.reason || "").trim();
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-[2px]">
+    <div style={{ position: "fixed", inset: 0, zIndex: 80, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.45)", padding: "24px 16px" }}>
       <section
         role="dialog"
         aria-modal="true"
         aria-label="포인트 선물 알림"
-        className="w-full max-w-[360px] overflow-hidden rounded-[30px] border border-coral-100 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.28)]"
+        style={{ width: "100%", maxWidth: "360px", overflow: "hidden", borderRadius: "26px", border: "1px solid #D9C5CC", background: "#fff", boxShadow: "0 24px 70px rgba(15,23,42,0.28)" }}
       >
-        <div className="bg-gradient-to-br from-coral-50 via-white to-indigo-50 px-5 pb-5 pt-6 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-coral-600 text-[32px] shadow-[0_14px_30px_rgba(216,90,48,0.28)]">
+        <div style={{ background: "#F5E6EB", padding: "24px 20px 20px", textAlign: "center" }}>
+          <div style={{ margin: "0 auto", display: "flex", height: "64px", width: "64px", alignItems: "center", justifyContent: "center", borderRadius: "50%", background: "#7B2D43", fontSize: "32px" }}>
             🎁
           </div>
-
-          <h2 className="mt-4 text-[24px] font-black leading-tight tracking-[-0.06em] text-slate-950">
-            포인트가 도착했어요
+          <h2 style={{ marginTop: "16px", fontSize: "23px", fontWeight: 800, lineHeight: 1.2, letterSpacing: "-0.06em", color: "#7B2D43" }}>
+            포인트 선물이 도착했어요!
           </h2>
-
-          <p className="mt-2 text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
-            루루동이에서 고객님께 포인트를 선물했어요.
+          <p style={{ marginTop: "8px", fontSize: "14px", fontWeight: 700, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#666" }}>
+            루루동이님이 보낸 선물 · 감사합니다 💝
           </p>
         </div>
 
-        <div className="px-5 pb-5">
-          <div className="rounded-[24px] border border-coral-100 bg-coral-50 px-4 py-4 text-center">
-            <div className="text-[13px] font-black tracking-[-0.04em] text-coral-700">지급 포인트</div>
-            <div className="mt-1 text-[28px] font-black leading-tight tracking-[-0.07em] text-coral-700">
-              {amountText}
-            </div>
+        <div style={{ padding: "0 20px 20px" }}>
+          <div style={{ borderRadius: "18px", border: "1px solid #D9C5CC", background: "#F5E6EB", padding: "16px", textAlign: "center" }}>
+            <div style={{ fontSize: "13px", fontWeight: 800, letterSpacing: "-0.04em", color: "#7B2D43" }}>지급 포인트</div>
+            <div style={{ marginTop: "4px", fontSize: "28px", fontWeight: 800, lineHeight: 1.2, letterSpacing: "-0.07em", color: "#7B2D43" }}>{amountText}</div>
           </div>
 
-          <div className="mt-3 rounded-[20px] bg-slate-50 px-4 py-3 text-center">
-            <div className="text-[12px] font-black tracking-[-0.04em] text-slate-500">현재 보유 포인트</div>
-            <div className="mt-1 text-[18px] font-black tracking-[-0.05em] text-slate-900">{balanceText}</div>
+          <div style={{ marginTop: "12px", borderRadius: "16px", background: "#FAF6F2", padding: "12px 16px", textAlign: "center" }}>
+            <div style={{ fontSize: "12px", fontWeight: 800, letterSpacing: "-0.04em", color: "#888" }}>현재 보유 포인트</div>
+            <div style={{ marginTop: "4px", fontSize: "18px", fontWeight: 800, letterSpacing: "-0.05em", color: "#222" }}>{balanceText}</div>
           </div>
 
           {reasonText ? (
-            <div className="mt-3 rounded-[18px] border border-slate-100 bg-white px-4 py-3 text-center text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
+            <div style={{ marginTop: "12px", borderRadius: "14px", border: "1px solid #E8E2DD", background: "#fff", padding: "12px 16px", textAlign: "center", fontSize: "13px", fontWeight: 700, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#666" }}>
               {reasonText}
             </div>
           ) : null}
 
-          <p className="mt-3 break-keep text-center text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
+          <p style={{ marginTop: "12px", wordBreak: "keep-all", textAlign: "center", fontSize: "12px", fontWeight: 700, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#999" }}>
             아직 주문 결제에 자동 차감되지는 않아요. 포인트 사용 기능은 별도 안내 후 적용됩니다.
           </p>
 
@@ -182,7 +178,7 @@ export default function CustomerPointGiftPopup() {
             type="button"
             onClick={closeGift}
             disabled={giftState.closing}
-            className="mt-4 flex min-h-[54px] w-full items-center justify-center rounded-[20px] bg-coral-600 px-4 py-3 text-[16px] font-black tracking-[-0.04em] text-white shadow-[0_14px_30px_rgba(216,90,48,0.25)] transition active:scale-[0.98] disabled:cursor-wait disabled:opacity-70"
+            style={{ marginTop: "16px", display: "flex", minHeight: "54px", width: "100%", alignItems: "center", justifyContent: "center", borderRadius: "16px", border: "none", background: "#7B2D43", padding: "0 16px", fontSize: "16px", fontWeight: 800, letterSpacing: "-0.04em", color: "#fff", cursor: giftState.closing ? "wait" : "pointer", opacity: giftState.closing ? 0.7 : 1 }}
           >
             {giftState.closing ? "확인 저장중" : "확인했어요"}
           </button>
