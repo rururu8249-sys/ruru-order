@@ -984,6 +984,7 @@ export default function OrderPage() {
   const [orderLookupOpen, setOrderLookupOpen] = useState(false);
   const [orderLookupLoading, setOrderLookupLoading] = useState(false);
   const [menuSheetOpen, setMenuSheetOpen] = useState(false);
+  const [howToOpen, setHowToOpen] = useState(false);
   const [orderLookupOrders, setOrderLookupOrders] = useState<any[]>([]);
   const [orderLookupFilter, setOrderLookupFilter] = useState<CustomerOrderLookupFilter>("전체");
   const [orderLookupPage, setOrderLookupPage] = useState(1);
@@ -3727,6 +3728,36 @@ export default function OrderPage() {
   return (
     <OrderPageShell>
       {hasSavedInfo && <TopCustomerNav />}
+
+      {/* P2. 주문방법 접기/펼치기 (시안) */}
+      {hasSavedInfo ? (
+        <section style={{ margin: "10px auto 0", width: "100%", maxWidth: "560px" }}>
+          <button
+            type="button"
+            onClick={() => setHowToOpen((v) => !v)}
+            style={{ width: "100%", display: "flex", alignItems: "center", gap: "8px", border: "1px solid #D9C5CC", background: "#F5E6EB", borderRadius: "12px", padding: "12px 14px", fontSize: "14px", fontWeight: 800, color: "#7B2D43", cursor: "pointer" }}
+          >
+            📌 주문방법 보기
+            <span style={{ marginLeft: "auto", fontSize: "12px", color: "#7B2D43" }}>{howToOpen ? "▲" : "▼"}</span>
+          </button>
+          {howToOpen ? (
+            <div style={{ marginTop: "6px", border: "1px solid #D9C5CC", borderRadius: "12px", background: "#fff", padding: "14px 16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+              <div style={{ display: "flex", gap: "9px", alignItems: "flex-start" }}>
+                <span style={{ flexShrink: 0, width: "22px", height: "22px", borderRadius: "50%", background: "#7B2D43", color: "#fff", fontSize: "12px", fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>1</span>
+                <span style={{ fontSize: "14px", fontWeight: 700, color: "#333", lineHeight: 1.5 }}>방송 채팅에 상품 + <b style={{ color: "#7B2D43" }}>"저요!"</b> 접수 후</span>
+              </div>
+              <div style={{ display: "flex", gap: "9px", alignItems: "flex-start" }}>
+                <span style={{ flexShrink: 0, width: "22px", height: "22px", borderRadius: "50%", background: "#7B2D43", color: "#fff", fontSize: "12px", fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>2</span>
+                <span style={{ fontSize: "14px", fontWeight: 700, color: "#333", lineHeight: 1.5 }}>여기서 그 상품 담기</span>
+              </div>
+              <div style={{ display: "flex", gap: "9px", alignItems: "flex-start" }}>
+                <span style={{ flexShrink: 0, width: "22px", height: "22px", borderRadius: "50%", background: "#7B2D43", color: "#fff", fontSize: "12px", fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>3</span>
+                <span style={{ fontSize: "14px", fontWeight: 700, color: "#333", lineHeight: 1.5 }}>안내된 계좌로 입금</span>
+              </div>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       {!isAutoLoggedIn && (isEditingCustomerInfo || customerMode === "new") && (
         <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
