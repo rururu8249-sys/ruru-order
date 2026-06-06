@@ -566,13 +566,16 @@ async function handleParticipants(request: NextRequest) {
   const mode = normalizeEventRouletteMode(request.nextUrl.searchParams.get("mode"));
   const sourceDate = normalizeDateText(request.nextUrl.searchParams.get("sourceDate"));
   const broadcastId = cleanBroadcastId(request.nextUrl.searchParams.get("broadcastId"));
+  const excludeDailyDup = request.nextUrl.searchParams.get("excludeDailyDup") !== "false"; // 기본 true. false면 중복체크 건너뜀
   const rawParticipants = await buildParticipantsForRequest(supabase, mode, sourceDate, broadcastId);
-  const deduped = await applyNoDuplicateWinnerRule(supabase, rawParticipants, {
-    mode,
-    isTest: mode === "test",
-    sourceDate,
-    broadcastId,
-  });
+  const deduped = excludeDailyDup
+    ? await applyNoDuplicateWinnerRule(supabase, rawParticipants, {
+        mode,
+        isTest: mode === "test",
+        sourceDate,
+        broadcastId,
+      })
+    : { participants: rawParticipants, excludedWinnerCount: 0 };
   const participants = deduped.participants;
 
   return json({
@@ -654,12 +657,15 @@ async function createEvent(body: Record<string, unknown>) {
   const rawParticipants = requestedCreateParticipants.length > 0
     ? requestedCreateParticipants
     : await buildParticipantsForRequest(supabase, mode, sourceDate, broadcastId);
-  const deduped = await applyNoDuplicateWinnerRule(supabase, rawParticipants, {
-    mode,
-    isTest: mode === "test",
-    sourceDate,
-    broadcastId,
-  });
+  const excludeDailyDup = body.excludeDailyDup !== false; // 기본 true(중복당첨 금지). false면 중복체크 건너뜀
+  const deduped = excludeDailyDup
+    ? await applyNoDuplicateWinnerRule(supabase, rawParticipants, {
+        mode,
+        isTest: mode === "test",
+        sourceDate,
+        broadcastId,
+      })
+    : { participants: rawParticipants, excludedWinnerCount: 0 };
   const participants = deduped.participants;
 
   if (rawParticipants.length > 0 && participants.length <= 0) {

@@ -561,6 +561,7 @@ export default function AdminLiveEventRoulettePanel({
           participantSource,
           participants: finalParticipants,
           eventKind: "claw",
+          excludeDailyDup,
         }),
       });
 
@@ -644,6 +645,11 @@ export default function AdminLiveEventRoulettePanel({
         params.set("paidOnly", "true");
       }
 
+      // 당일 중복당첨 금지 OFF면 중복체크 건너뛰기
+      if (!excludeDailyDup) {
+        params.set("excludeDailyDup", "false");
+      }
+
       const payload = await requestJson<ParticipantsPayload>(`/api/admin-live/event-roulette?${params.toString()}`);
 
       if (!payload.ok) {
@@ -707,6 +713,7 @@ export default function AdminLiveEventRoulettePanel({
           participantSource,
           participants: finalParticipants,
           eventKind: "roulette",
+          excludeDailyDup,
         }),
       });
 
@@ -790,6 +797,7 @@ export default function AdminLiveEventRoulettePanel({
           broadcastId,
           participants: nextParticipants,
           eventKind: "roulette",
+          excludeDailyDup,
         }),
       });
 
