@@ -728,6 +728,32 @@ function pickOrderProductImageUrl(product: any): string {
   );
 }
 
+// P4 상품카드용 — 방송중 배지(고정상품) / 품절(재고관리 ON + 재고 0) 판정 (읽기 전용)
+function readOrderNoteObject(product: any): any {
+  let note = product?.product_note;
+  if (typeof note === "string") {
+    try {
+      note = JSON.parse(note);
+    } catch {
+      note = null;
+    }
+  }
+  return note && typeof note === "object" ? note : null;
+}
+
+function isPinnedOrderProduct(product: any): boolean {
+  const value = product?.is_pinned ?? product?.pinned;
+  if (typeof value === "boolean") return value;
+  return ["true", "1", "y", "yes", "상단", "고정"].includes(String(value ?? "").trim().toLowerCase());
+}
+
+function isSoldOutOrderProduct(product: any): boolean {
+  const note = readOrderNoteObject(product);
+  if (note?.stock_management_enabled !== true) return false; // 재고관리 OFF면 품절 처리 안 함(주문 막지 않음)
+  const stock = Number(product?.stock ?? product?.total_stock);
+  return Number.isFinite(stock) && stock <= 0;
+}
+
 
 
 function OrderInputClearButton({
@@ -986,6 +1012,7 @@ export default function OrderPage() {
   const [menuSheetOpen, setMenuSheetOpen] = useState(false);
   const [howToOpen, setHowToOpen] = useState(false);
   const [videoOpen, setVideoOpen] = useState(true);
+  const [productPage, setProductPage] = useState(1);
   const [orderLookupOrders, setOrderLookupOrders] = useState<any[]>([]);
   const [orderLookupFilter, setOrderLookupFilter] = useState<CustomerOrderLookupFilter>("전체");
   const [orderLookupPage, setOrderLookupPage] = useState(1);
@@ -3837,106 +3864,75 @@ export default function OrderPage() {
             </section>
           )}
 
-          <section
-            id="orderProductInputSection"
-            className="mt-3 w-full max-w-full overflow-hidden rounded-[24px] border border-coral-200 bg-coral-50 p-4 shadow-sm"
-          >
-            <h2 className="text-[22px] font-black leading-tight tracking-[-0.07em] text-slate-950">
-              방송에서 주문한 상품 찾기
-            </h2>
-            <p className="mt-2 break-keep text-[15px] font-bold leading-relaxed tracking-[-0.04em] text-coral-700">
-              이름만 쳐도 가격까지 떠요. 못 찾으면 직접 입력도 돼요.
-            </p>
-
-            <div className="mt-4">
-              <input
-                value={topProductSearchText}
-                onChange={(event) => setTopProductSearchText(event.target.value)}
-                onFocus={() => {
-                  if (typeof window === "undefined") return;
-                  window.setTimeout(() => {
-                    document
-                      .getElementById("orderProductInputSection")
-                      ?.scrollIntoView({ block: "start", behavior: "smooth" });
-                  }, 250);
-                }}
-                placeholder="상품 이름을 입력하세요"
-                className="h-14 w-full max-w-full rounded-[18px] border border-coral-500 bg-white px-4 text-[16px] font-black tracking-[-0.04em] text-slate-950 outline-none focus:border-coral-700"
-              />
-
-              {topProductSearchText.trim().length > 0 ? (
-                <div className="mt-2 max-h-80 overflow-y-auto rounded-2xl border border-coral-100 bg-white p-2 shadow-[0_14px_35px_rgba(15,23,42,0.12)]">
-                  <div className="px-3 py-2 text-[13px] font-black tracking-[-0.03em] text-coral-600">
-                    추천 상품
-                  </div>
-
-                  {topSearchMatches.length === 0 ? (
-                    <div className="px-3 py-4 text-[15px] font-bold leading-6 text-slate-500">
-                      찾는 상품이 없어요. 아래 [직접 입력]으로 담아주세요.
-                    </div>
-                  ) : (
-                    <div className="space-y-1">
-                      {topSearchMatches.map((product) => (
+          {/* P4. 상품 목록 — 검색 + 2열 격자 + 페이지네이션 (시안). quickGroupBuyProducts / selectQuickGroupBuyProduct 재사용 */}
+          {(() => {
+            const q = productSearchText.trim();
+            const filtered = quickGroupBuyProducts.filter((p) => !q || productMatchesSuggestion(p as BroadcastProduct, q));
+            const PAGE = 8;
+            const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE));
+            const safePage = Math.min(productPage, totalPages);
+            const pageItems = filtered.slice((safePage - 1) * PAGE, safePage * PAGE);
+            return (
+              <section style={{ margin: "12px auto 0", width: "100%", maxWidth: "560px" }}>
+                <input
+                  value={productSearchText}
+                  onChange={(e) => { setProductSearchText(e.target.value); setProductPage(1); }}
+                  placeholder="🔍 상품 이름 검색"
+                  style={{ width: "100%", height: "48px", boxSizing: "border-box", border: "1px solid #D9C5CC", borderRadius: "14px", padding: "0 16px", fontSize: "15px", fontWeight: 700, color: "#333", outline: "none" }}
+                />
+                {pageItems.length === 0 ? (
+                  <div style={{ marginTop: "14px", padding: "26px", textAlign: "center", color: "#999", fontSize: "14px", fontWeight: 700 }}>찾는 상품이 없어요. 아래 직접 입력으로 담아주세요.</div>
+                ) : (
+                  <div style={{ marginTop: "12px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                    {pageItems.map((product) => {
+                      const img = pickOrderProductImageUrl(product);
+                      const pinned = isPinnedOrderProduct(product);
+                      const sold = isSoldOutOrderProduct(product);
+                      return (
                         <button
                           key={String(product.id)}
                           type="button"
-                          onClick={() => {
-                            // 담기/시트오픈은 selectQuickGroupBuyProduct가 처리하고,
-                            // 스크롤은 실제 담기 완료 지점(addRegisteredProductToOrderItems / 옵션시트 확정)에서 일괄 처리된다.
-                            selectQuickGroupBuyProduct(product);
-                            setTopProductSearchText("");
-                          }}
-                          className="w-full rounded-2xl px-3 py-3 text-left hover:bg-coral-50 active:scale-[0.99]"
+                          disabled={sold}
+                          onClick={() => selectQuickGroupBuyProduct(product as BroadcastProduct)}
+                          style={{ position: "relative", textAlign: "left", border: `1.5px solid ${pinned ? "#7B2D43" : "#E8E2DD"}`, borderRadius: "14px", background: "#fff", padding: 0, overflow: "hidden", cursor: sold ? "default" : "pointer", opacity: sold ? 0.6 : 1 }}
                         >
-                          <div className="line-clamp-2 text-[16px] font-black leading-6 tracking-[-0.04em] text-slate-950">
-                            {product.product_name}
+                          <div style={{ position: "relative", width: "100%", aspectRatio: "1 / 1", background: "#f3f0ee" }}>
+                            {img ? (
+                              <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            ) : (
+                              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "32px" }}>👟</div>
+                            )}
+                            {pinned ? (
+                              <span style={{ position: "absolute", top: "6px", left: "6px", fontSize: "10px", fontWeight: 800, color: "#fff", background: "#7B2D43", borderRadius: "5px", padding: "3px 7px" }}>방송중</span>
+                            ) : null}
+                            {sold ? (
+                              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.22)" }}>
+                                <span style={{ transform: "rotate(-12deg)", color: "#C0392B", fontSize: "20px", fontWeight: 800, letterSpacing: "1px", textShadow: "0 1px 3px #fff" }}>SOLD OUT</span>
+                              </div>
+                            ) : null}
                           </div>
-                          <div className="mt-1 flex items-center justify-between gap-2 text-[14px] font-black text-slate-500">
-                            <span className="min-w-0 truncate">
-                              {productSuggestionKeywords(product).slice(0, 3).join(", ") || "등록상품"}
-                            </span>
-                            <span className="shrink-0 text-coral-600">{won(Number(product.price || 0))}</span>
+                          <div style={{ padding: "8px 10px 10px" }}>
+                            <div style={{ fontSize: "13px", fontWeight: 700, color: "#222", lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", minHeight: "34px" }}>{product.product_name}</div>
+                            <div style={{ marginTop: "3px", fontSize: "15px", fontWeight: 800, color: "#7B2D43" }}>{won(Number(product.price || 0))}</div>
                           </div>
                         </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : null}
-            </div>
-
-            <button
-              type="button"
-              onClick={openDirectInputSheet}
-              className={`${buttonBase} mt-3 w-full rounded-[18px] border border-coral-200 bg-white px-3 py-4 text-[16px] font-black tracking-[-0.04em] text-coral-800`}
-            >
-              직접 입력
-            </button>
-          </section>
-
-          <section
-            id="orderProductListSection"
-            className="mt-3 w-full max-w-full scroll-mt-28 overflow-hidden rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm"
-          >
-            <div className="mb-4">
-              <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
-                오늘의 상품
-              </h2>
-              <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
-                주문할 상품의 [담기]를 눌러주세요.
-              </p>
-            </div>
-
-            <div className="w-full max-w-full overflow-hidden">
-              <GroupBuyQuickSelect
-                products={quickGroupBuyProducts as GroupBuyQuickSelectProduct[]}
-                getSelectLabel={(product) =>
-                  "담기"
-                }
-                onSelect={(product) => selectQuickGroupBuyProduct(product as BroadcastProduct)}
-              />
-            </div>
-          </section>
+                      );
+                    })}
+                  </div>
+                )}
+                {totalPages > 1 ? (
+                  <div style={{ marginTop: "14px", display: "flex", justifyContent: "center", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                    <button type="button" onClick={() => setProductPage((p) => Math.max(1, p - 1))} disabled={safePage <= 1} style={{ width: "32px", height: "32px", borderRadius: "8px", border: "1px solid #D9C5CC", background: "#fff", color: "#7B2D43", fontWeight: 800, cursor: safePage <= 1 ? "default" : "pointer", opacity: safePage <= 1 ? 0.4 : 1 }}>‹</button>
+                    {Array.from({ length: totalPages }).map((_, i) => (
+                      <button key={i} type="button" onClick={() => setProductPage(i + 1)} style={{ minWidth: "32px", height: "32px", borderRadius: "8px", border: "1px solid #D9C5CC", background: safePage === i + 1 ? "#7B2D43" : "#fff", color: safePage === i + 1 ? "#fff" : "#7B2D43", fontWeight: 800, fontSize: "13px", cursor: "pointer", padding: "0 6px" }}>{i + 1}</button>
+                    ))}
+                    <button type="button" onClick={() => setProductPage((p) => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages} style={{ width: "32px", height: "32px", borderRadius: "8px", border: "1px solid #D9C5CC", background: "#fff", color: "#7B2D43", fontWeight: 800, cursor: safePage >= totalPages ? "default" : "pointer", opacity: safePage >= totalPages ? 0.4 : 1 }}>›</button>
+                  </div>
+                ) : null}
+                <button type="button" onClick={openDirectInputSheet} style={{ marginTop: "12px", width: "100%", border: "1px solid #D9C5CC", background: "#fff", borderRadius: "14px", padding: "13px", fontSize: "14px", fontWeight: 800, color: "#7B2D43", cursor: "pointer" }}>+ 못 찾으면 직접 입력</button>
+              </section>
+            );
+          })()}
 
           <section className="mt-3 w-full max-w-full overflow-hidden rounded-[24px] border border-coral-100 bg-coral-50/40 p-3 shadow-sm">
             <div className="mb-4">
