@@ -99,6 +99,7 @@ type BroadcastProduct = {
   price: number;
   stock: number;
   status: string;
+  is_visible?: boolean | null;
   product_type: string;
   shipping_type: string;
   combine_shipping: string;
@@ -848,6 +849,7 @@ function normalizeOrderProductRow(product: any): BroadcastProduct {
     created_at: String(product?.created_at ?? ""),
     updated_at: String(product?.updated_at ?? ""),
     status: String(product?.status ?? "판매중"),
+    is_visible: product?.is_visible ?? null,
     product_type: String(product?.product_type ?? ""),
     shipping_type: String(product?.shipping_type ?? product?.delivery_type ?? ""),
     // 옵션/없음입력 토글 신호: 고객 옵션 판단(getRegisteredOptionMode)이 읽을 수 있게 그대로 통과시킨다.
@@ -1817,6 +1819,7 @@ export default function OrderPage() {
         updated_at: String(product.updated_at ?? ""),
         stock: Number(product.stock || 0),
         status: product.status || "판매중",
+        is_visible: product.is_visible ?? null,
         product_type: product.product_type || "방송상품",
         shipping_type: product.shipping_type || "일반",
         combine_shipping: product.combine_shipping || "Y",
@@ -2623,7 +2626,8 @@ export default function OrderPage() {
       new Map(
         mergedProducts
           .filter((product) => product && product.status !== "숨김")
-          .filter((product) => productRegisteredOrderEnabled(product))
+          // 고객 노출(is_visible)이 명시적으로 false인 상품만 그리드에서 제외. (기존 registered_order_enabled 필터는 검색만(search_only) 상품을 빠뜨려서 교체)
+          .filter((product) => (product as any).is_visible !== false)
           .map((product) => [String(product.id), product]),
       ).values(),
     );
@@ -3658,8 +3662,8 @@ export default function OrderPage() {
     const safeGreetingName = youtubeNickname || customerName || "고객";
     const safePointText = `${Math.max(0, Number(customerPointBalance || 0)).toLocaleString()}원`;
     const isTopNavEditActive = isEditingCustomerInfo || isEditMode || customerInfoEditSheetOpen;
-    const topNavActiveButtonClass = "shrink-0 whitespace-nowrap rounded-full bg-coral-700 px-2.5 py-1.5 text-[12px] font-black text-white transition active:scale-[0.97]";
-    const topNavInactiveButtonClass = "shrink-0 whitespace-nowrap rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] font-black text-slate-700 transition active:scale-[0.97] active:border-coral-700 active:bg-coral-700 active:text-white";
+    const topNavActiveButtonClass = "shrink-0 whitespace-nowrap rounded-full bg-rose-deep px-2.5 py-1.5 text-[12px] font-black text-white transition active:scale-[0.97]";
+    const topNavInactiveButtonClass = "shrink-0 whitespace-nowrap rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] font-black text-slate-700 transition active:scale-[0.97] active:border-rose-deep active:bg-rose-deep active:text-white";
 
     const handleTopNavOrderClick = (event: { preventDefault: () => void }) => {
       if (!isTopNavEditActive) return;
@@ -3936,7 +3940,7 @@ export default function OrderPage() {
             );
           })()}
 
-          <section className="mt-3 w-full max-w-full overflow-hidden rounded-[24px] border border-coral-100 bg-coral-50/40 p-3 shadow-sm">
+          <section className="mt-3 w-full max-w-full overflow-hidden rounded-[24px] border border-rose-line bg-rose-soft/40 p-3 shadow-sm">
             <div className="mb-4">
               <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
                 주문서 확인
@@ -4001,7 +4005,7 @@ export default function OrderPage() {
                                 <span
                                   className={`rounded-full px-1.5 py-0.5 text-[10px] font-black tracking-[-0.04em] ring-1 ${
                                     itemIsRegisteredProduct
-                                      ? "bg-coral-50 text-coral-700 ring-coral-100"
+                                      ? "bg-rose-soft text-rose-deep ring-rose-line"
                                       : "bg-amber-50 text-amber-700 ring-amber-100"
                                   }`}
                                 >
@@ -4062,7 +4066,7 @@ export default function OrderPage() {
                             <button
                               type="button"
                               onClick={() => updateItem(index, "qty", String((toNumber(item.qty) || 1) + 1))}
-                              className="flex items-center justify-center text-[18px] font-black text-coral-700 active:bg-coral-50"
+                              className="flex items-center justify-center text-[18px] font-black text-rose-deep active:bg-rose-soft"
                               aria-label="수량 늘리기"
                             >
                               +
@@ -4093,10 +4097,10 @@ export default function OrderPage() {
             )}
           </section>
 
-          <section className="mt-3 rounded-[24px] border border-coral-100 bg-white p-3 shadow-sm">
+          <section className="mt-3 rounded-[24px] border border-rose-line bg-white p-3 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[12px] font-black tracking-[-0.04em] text-coral-700">
+                <p className="text-[12px] font-black tracking-[-0.04em] text-rose-deep">
                   결제방식
                 </p>
                 <h2 className="mt-1 text-[18px] font-black tracking-[-0.06em] text-slate-950">
@@ -4142,7 +4146,7 @@ export default function OrderPage() {
                 value={requestMemo}
                 onChange={(event) => setRequestMemo(event.target.value)}
                 placeholder="예) 문 앞에 놓아주세요 / 배송 전 연락주세요"
-                className="min-h-[88px] w-full resize-none rounded-[20px] border border-slate-200 bg-slate-50 p-4 text-[15px] font-bold leading-relaxed tracking-[-0.04em] outline-none focus:border-coral-600"
+                className="min-h-[88px] w-full resize-none rounded-[20px] border border-slate-200 bg-slate-50 p-4 text-[15px] font-bold leading-relaxed tracking-[-0.04em] outline-none focus:border-rose-deep"
               />
             </label>
           </section>
@@ -4152,7 +4156,7 @@ export default function OrderPage() {
             className="mt-3 rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm"
           >
             <div className="min-w-0">
-              <p className="text-[12px] font-black tracking-[-0.04em] text-coral-700">
+              <p className="text-[12px] font-black tracking-[-0.04em] text-rose-deep">
                 최종 확인
               </p>
               <h2 className="mt-1 text-[18px] font-black tracking-[-0.06em] text-slate-950">
@@ -4194,7 +4198,7 @@ export default function OrderPage() {
             </div>
 
             {!hasPrivacyConsent && !hasSavedOrderCustomerInfo && (
-              <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-[22px] bg-coral-50 p-4 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-coral-900 ring-1 ring-coral-100 active:scale-[0.99]">
+              <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-[22px] bg-rose-soft p-4 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-rose-deep ring-1 ring-rose-line active:scale-[0.99]">
                 <input
                   type="checkbox"
                   checked={privacyConsentChecked}
@@ -4205,7 +4209,7 @@ export default function OrderPage() {
                       window.localStorage.setItem(PRIVACY_CONSENT_STORAGE_KEY, PRIVACY_CONSENT_VERSION);
                     }
                   }}
-                  className="mt-1 h-5 w-5 shrink-0 accent-coral-600"
+                  className="mt-1 h-5 w-5 shrink-0 accent-rose-deep"
                 />
                 <span>
                   [필수] 개인정보 수집·이용 및 배송정보 제공 안내를 확인했습니다.
@@ -4401,7 +4405,7 @@ export default function OrderPage() {
                             }
                           }}
                           placeholder="상품명을 입력해주세요"
-                          className="h-13 min-w-0 w-full rounded-[18px] border border-coral-500 bg-white px-4 text-[17px] font-black tracking-[-0.05em] text-slate-950 outline-none focus:border-coral-700"
+                          className="h-13 min-w-0 w-full rounded-[18px] border border-rose-deep bg-white px-4 text-[17px] font-black tracking-[-0.05em] text-slate-950 outline-none focus:border-rose-deep"
                         />
                       </label>
 
@@ -4460,7 +4464,7 @@ export default function OrderPage() {
                           value={directInputItem.color}
                           onChange={(event) => updateItem(directInputTargetIndex, "color", event.target.value)}
                           placeholder="색상입력"
-                          className="h-12 min-w-0 w-full rounded-[17px] border border-slate-200 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none focus:border-coral-600"
+                          className="h-12 min-w-0 w-full rounded-[17px] border border-slate-200 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none focus:border-rose-deep"
                         />
                       </label>
 
@@ -4470,7 +4474,7 @@ export default function OrderPage() {
                           value={directInputItem.size}
                           onChange={(event) => updateItem(directInputTargetIndex, "size", event.target.value)}
                           placeholder="사이즈입력"
-                          className="h-12 min-w-0 w-full rounded-[17px] border border-slate-200 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none focus:border-coral-600"
+                          className="h-12 min-w-0 w-full rounded-[17px] border border-slate-200 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none focus:border-rose-deep"
                         />
                       </label>
                     </div>
@@ -4495,7 +4499,7 @@ export default function OrderPage() {
                           <button
                             type="button"
                             onClick={() => updateItem(directInputTargetIndex, "qty", String((toNumber(directInputItem.qty) || 0) + 1))}
-                            className="border-l border-slate-100 text-[18px] font-black text-coral-700"
+                            className="border-l border-slate-100 text-[18px] font-black text-rose-deep"
                           >
                             +
                           </button>
@@ -4517,7 +4521,7 @@ export default function OrderPage() {
                       </label>
                     </div>
 
-                    <div className="rounded-2xl bg-coral-50 px-4 py-3 text-[13px] font-black leading-5 tracking-[-0.04em] text-coral-800">
+                    <div className="rounded-2xl bg-rose-soft px-4 py-3 text-[13px] font-black leading-5 tracking-[-0.04em] text-rose-deep">
                       방송에서 안내받은 상품명, 옵션, 금액을 입력해 주세요. 옵션이 없으면 “없음”이라고 적어주세요.
                     </div>
 
@@ -4532,7 +4536,7 @@ export default function OrderPage() {
                       <button
                         type="button"
                         onClick={confirmDirectInputSheet}
-                        className="h-14 rounded-[22px] bg-coral-700 text-[17px] font-black tracking-[-0.05em] text-white shadow-[0_12px_28px_rgba(216,90,48,0.28)]"
+                        className="h-14 rounded-[22px] bg-rose-deep text-[17px] font-black tracking-[-0.05em] text-white shadow-[0_12px_28px_rgba(216,90,48,0.28)]"
                       >
                         주문서에 담기
                       </button>
@@ -4583,9 +4587,9 @@ export default function OrderPage() {
 
                 <div className="grid gap-3 rounded-[24px] bg-slate-50 p-4 text-[15px] font-bold leading-relaxed tracking-[-0.04em] text-slate-700 ring-1 ring-slate-100">
                   <p className="font-black text-slate-950">주문하는 법이에요.</p>
-                  <p>① 상품 이름을 <span className="font-black text-coral-700">검색</span>하거나, 목록에서 <span className="font-black text-coral-700">[담기]</span>를 눌러요.</p>
+                  <p>① 상품 이름을 <span className="font-black text-rose-deep">검색</span>하거나, 목록에서 <span className="font-black text-rose-deep">[담기]</span>를 눌러요.</p>
                   <p>② 없는 상품은 <span className="font-black text-slate-950">[직접 입력]</span>으로 담아요.</p>
-                  <p>③ 다 담으면 <span className="font-black text-coral-700">[주문서 제출]</span>을 눌러요.</p>
+                  <p>③ 다 담으면 <span className="font-black text-rose-deep">[주문서 제출]</span>을 눌러요.</p>
                   <p className="text-[14px] text-amber-700">④ 입금자명·금액이 다르면 입금확인이 늦어져요.</p>
                 </div>
 
@@ -4600,7 +4604,7 @@ export default function OrderPage() {
                   <button
                     type="button"
                     onClick={() => closeFirstOrderGuide(false)}
-                    className="min-h-[54px] rounded-[18px] bg-coral-600 px-3 py-3 text-[17px] font-black tracking-[-0.05em] text-white shadow-[0_12px_24px_rgba(216,90,48,0.25)] transition active:scale-[0.98]"
+                    className="min-h-[54px] rounded-[18px] bg-rose-deep px-3 py-3 text-[17px] font-black tracking-[-0.05em] text-white shadow-[0_12px_24px_rgba(216,90,48,0.25)] transition active:scale-[0.98]"
                   >
                     확인
                   </button>
