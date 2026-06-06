@@ -76,12 +76,22 @@ function SettingInput({
   value,
   suffix,
   onChange,
+  type,
+  step,
+  min,
+  max,
+  inputMode,
 }: {
   label: string;
   desc: string;
   value: string;
   suffix: string;
   onChange: (value: string) => void;
+  type?: string;
+  step?: string;
+  min?: string;
+  max?: string;
+  inputMode?: "numeric" | "decimal" | "text";
 }) {
   return (
     <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
@@ -91,12 +101,25 @@ function SettingInput({
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          type={type}
+          step={step}
+          min={min}
+          max={max}
+          inputMode={inputMode}
           className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-lg font-black outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
         />
         <span className="text-sm font-black text-slate-500">{suffix}</span>
       </div>
     </div>
   );
+}
+
+// 적립률 등 소수점 허용 입력: 숫자 + 소수점 1개만 통과
+function decimalInput(value: string) {
+  let v = String(value || "").replace(/[^0-9.]/g, "");
+  const parts = v.split(".");
+  if (parts.length > 2) v = parts[0] + "." + parts.slice(1).join("");
+  return v;
 }
 
 export default function AdminLiveSettingsPanel() {
@@ -301,10 +324,15 @@ export default function AdminLiveSettingsPanel() {
         <div className={pointAutoEarn ? "" : "pointer-events-none opacity-50"}>
           <SettingInput
             label="적립률"
-            desc="상품금액(택배비 제외) 대비 적립 비율입니다. 예: 3% → 1만원 구매 시 300P 적립."
+            desc="상품금액(택배비 제외) 대비 적립 비율입니다. 소수점 가능. 예: 1.5% → 1만원 구매 시 150P 적립."
             value={pointEarnRate}
             suffix="%"
-            onChange={(value) => setPointEarnRate(onlyDigits(value))}
+            type="number"
+            step="0.1"
+            min="0"
+            max="100"
+            inputMode="decimal"
+            onChange={(value) => setPointEarnRate(decimalInput(value))}
           />
         </div>
 
