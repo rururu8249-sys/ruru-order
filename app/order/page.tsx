@@ -1016,6 +1016,7 @@ export default function OrderPage() {
   const [videoOpen, setVideoOpen] = useState(true);
   const [productPage, setProductPage] = useState(1);
   const [cartAddedOpen, setCartAddedOpen] = useState(false);
+  const [pendingAddProduct, setPendingAddProduct] = useState<BroadcastProduct | null>(null);
   const [orderLookupOrders, setOrderLookupOrders] = useState<any[]>([]);
   const [orderLookupFilter, setOrderLookupFilter] = useState<CustomerOrderLookupFilter>("전체");
   const [orderLookupPage, setOrderLookupPage] = useState(1);
@@ -2813,7 +2814,8 @@ export default function OrderPage() {
       return;
     }
 
-    addRegisteredProductToOrderItems(product);
+    // 옵션 없는 상품: 바로 담지 않고 확인 팝업 먼저
+    setPendingAddProduct(product);
   };
 
   const getItemOptionSuggestions = (item: OrderItem, field: "color" | "size") => {
@@ -3698,9 +3700,10 @@ export default function OrderPage() {
               href="/order"
               onClick={handleTopNavOrderClick}
               aria-label="주문서"
-              style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", width: "40px", height: "38px", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#FAF6F2", textDecoration: "none", fontSize: "18px" }}
+              style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: "5px", justifyContent: "center", height: "38px", padding: "0 11px", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#FAF6F2", textDecoration: "none" }}
             >
-              🧾
+              <span style={{ fontSize: "18px" }}>🧾</span>
+              <span style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>주문서</span>
               {cartCount > 0 ? (
                 <span style={{ position: "absolute", top: "-6px", right: "-6px", minWidth: "18px", height: "18px", borderRadius: "9px", background: "#7B2D43", color: "#fff", fontSize: "10px", fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{cartCount}</span>
               ) : null}
@@ -4242,27 +4245,32 @@ export default function OrderPage() {
             {customerBlockStatus.blocked ? <CustomerBlockedNotice /> : null}
           </section>
 
-          {/* P6. 담기 완료 — confetti + 토스트 (주문서 보기 / 계속 담기) */}
+          {/* 옵션 없는 상품 담기 확인 팝업 */}
+          {pendingAddProduct && (
+            <div style={{ position: "fixed", inset: 0, zIndex: 141, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.35)" }} onClick={(e) => { if (e.target === e.currentTarget) setPendingAddProduct(null); }}>
+              <div style={{ width: "300px", maxWidth: "86%", background: "#fff", borderRadius: "20px", padding: "24px 22px", textAlign: "center", boxShadow: "0 18px 50px rgba(0,0,0,0.25)" }}>
+                <div style={{ fontSize: "16px", fontWeight: 800, color: "#222", lineHeight: 1.5 }}>
+                  <span style={{ color: "#7B2D43" }}>{pendingAddProduct.product_name || "이 상품"}</span>
+                  <br />담으시겠습니까?
+                </div>
+                <div style={{ marginTop: "20px", display: "flex", gap: "8px" }}>
+                  <button type="button" onClick={() => setPendingAddProduct(null)} style={{ flex: 1, height: "48px", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", color: "#666", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}>취소</button>
+                  <button type="button" onClick={() => { const p = pendingAddProduct; setPendingAddProduct(null); addRegisteredProductToOrderItems(p); }} style={{ flex: 1, height: "48px", borderRadius: "14px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}>확인</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 담기 완료 — 심플 (확인 ✓ + 주문서 보기 / 계속 담기) */}
           {cartAddedOpen && (
             <div style={{ position: "fixed", inset: 0, zIndex: 140, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.35)" }} onClick={(e) => { if (e.target === e.currentTarget) setCartAddedOpen(false); }}>
-              <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
-                {Array.from({ length: 18 }).map((_, i) => {
-                  const colors = ["#7B2D43", "#C0392B", "#0F6E56", "#185FA5", "#E2906C", "#FFD9E0"];
-                  const left = (i * 53) % 100;
-                  const delay = (i % 6) * 0.08;
-                  const dur = 1.1 + (i % 4) * 0.25;
-                  return <span key={i} style={{ position: "absolute", top: "-14px", left: `${left}%`, width: "9px", height: "14px", background: colors[i % colors.length], borderRadius: "2px", animation: `ruruConfetti ${dur}s ${delay}s ease-in forwards` }} />;
-                })}
-              </div>
-              <div style={{ position: "relative", width: "300px", maxWidth: "86%", background: "#fff", borderRadius: "22px", padding: "26px 22px", textAlign: "center", boxShadow: "0 18px 50px rgba(0,0,0,0.25)" }}>
-                <div style={{ fontSize: "38px" }}>🎉</div>
-                <div style={{ marginTop: "8px", fontSize: "18px", fontWeight: 800, color: "#7B2D43" }}>주문서에 담았어요!</div>
+              <div style={{ width: "300px", maxWidth: "86%", background: "#fff", borderRadius: "20px", padding: "24px 22px", textAlign: "center", boxShadow: "0 18px 50px rgba(0,0,0,0.25)" }}>
+                <div style={{ fontSize: "18px", fontWeight: 800, color: "#7B2D43" }}>담았어요 ✓</div>
                 <div style={{ marginTop: "18px", display: "flex", gap: "8px" }}>
-                  <button type="button" onClick={() => { setCartAddedOpen(false); scrollToOrderProductList(); }} style={{ flex: 1, height: "48px", borderRadius: "14px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}>주문서 보기 ({items.filter((it) => it.product_name.trim()).length})</button>
+                  <button type="button" onClick={() => { setCartAddedOpen(false); scrollToOrderProductList(); }} style={{ flex: 1, height: "48px", borderRadius: "14px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}>주문서 보기 ({items.filter((it) => it.product_name.trim()).length}개)</button>
                   <button type="button" onClick={() => setCartAddedOpen(false)} style={{ flex: 1, height: "48px", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", color: "#7B2D43", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}>계속 담기</button>
                 </div>
               </div>
-              <style>{`@keyframes ruruConfetti { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(105vh) rotate(540deg); opacity: 0.55; } }`}</style>
             </div>
           )}
 
@@ -4549,22 +4557,19 @@ export default function OrderPage() {
 
           <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 pb-[max(16px,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:px-4">
             <div className="mx-auto flex max-w-[560px] items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-black tracking-[-0.04em] text-slate-400">
-                  총 결제금액
-                </p>
-                <p className="truncate text-[24px] font-black tracking-[-0.08em] text-slate-950">
-                  {won(finalPaymentAmount)}
-                </p>
+              <div style={{ minWidth: 0, flex: 1, display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", fontSize: "14px", fontWeight: 800 }}>
+                <span style={{ color: "#7B2D43" }}>🧾 {items.filter((it) => it.product_name.trim()).length}개 담음</span>
+                <span style={{ color: "#bbb", fontWeight: 700 }}>·</span>
+                <span style={{ color: "#222", fontSize: "17px" }}>{won(finalPaymentAmount)}</span>
               </div>
 
               <button
                 type="button"
                 onClick={handleSubmitOrderClick}
                 disabled={submitting || customerBlockStatus.blocked}
-                style={{ height: "56px", minWidth: "154px", borderRadius: "18px", border: "none", padding: "0 20px", fontSize: "16px", fontWeight: 800, color: "#fff", background: submitting || customerBlockStatus.blocked ? "#cbd5e1" : "#7B2D43", cursor: submitting || customerBlockStatus.blocked ? "default" : "pointer" }}
+                style={{ height: "56px", minWidth: "150px", flexShrink: 0, borderRadius: "18px", border: "none", padding: "0 20px", fontSize: "16px", fontWeight: 800, color: "#fff", background: submitting || customerBlockStatus.blocked ? "#cbd5e1" : "#7B2D43", cursor: submitting || customerBlockStatus.blocked ? "default" : "pointer" }}
               >
-                {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : "주문서 제출"}
+                {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : "주문서 제출 →"}
               </button>
             </div>
           </div>

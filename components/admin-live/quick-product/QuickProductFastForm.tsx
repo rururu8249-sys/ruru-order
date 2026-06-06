@@ -512,7 +512,7 @@ export default function QuickProductFastForm({
   const [shippingType, setShippingType] = useState("normal");
   const [isVisible, setIsVisible] = useState(true);
   const [isPinned, setIsPinned] = useState(false);
-  const [registeredOrderEnabled, setRegisteredOrderEnabled] = useState(false);
+  const [registeredOrderEnabled, setRegisteredOrderEnabled] = useState(true);
   const [nameSuggestionEnabled, setNameSuggestionEnabled] = useState(true);
   const [suggestionKeywordsText, setSuggestionKeywordsText] = useState("");
 
