@@ -126,6 +126,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [mode, setMode] = useState<"rotate" | "pin">("rotate"); // 순환 / 고정
 
   const loadProducts = async () => {
     setLoading(true);
@@ -227,6 +228,27 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     }
   };
 
+  // 고정모드: 선택 상품을 is_pinned로 고정(지금 띄운 상품). 기존 고정은 해제하고 선택만 고정.
+  const pinSelected = async () => {
+    const ids = [...selected].filter(Boolean);
+    if (ids.length === 0) return;
+    setSaving(true);
+    try {
+      await supabase.from("products").update({ is_pinned: false }).eq("is_pinned", true);
+      const { error } = await supabase.from("products").update({ is_pinned: true }).in("id", ids);
+      if (error) throw error;
+      window.dispatchEvent(new Event("ruru-live-product-updated"));
+      showAdminToast(`${ids.length}개 상품을 고정(지금 띄움)했어요.`, "success");
+      setSelected(new Set());
+    } catch (e) {
+      showAdminToast("상품 고정 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confirmAction = () => (mode === "pin" ? pinSelected() : addToRotation());
+
   const tabs: [ProductTab, string][] = [
     ["broadcast", "방송상품"],
     ["group_buy", "공구·상시판매"],
@@ -235,134 +257,93 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 px-4 py-8"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      className="ruru-product-sian"
+      style={{ position: "fixed", inset: 0, zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(2,6,23,0.45)", padding: "16px" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="flex max-h-[88vh] w-full max-w-[680px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-rose-line px-5 py-3">
-          <span className="text-[15px] font-black text-slate-950">📦 상품 관리</span>
-          <button type="button" onClick={onClose} className="text-lg leading-none text-slate-400 hover:text-slate-700">
-            ✕
-          </button>
+      <div style={{ width: "560px", flexShrink: 0, maxHeight: "calc(100vh-32px)", overflowY: "auto", background: "#fff", borderRadius: "12px", padding: "17px" }}>
+
+        {/* 헤더 */}
+        <div className="mh">
+          <span className="mt">📦 상품 관리</span>
+          <button type="button" className="x" onClick={onClose}>✕</button>
         </div>
 
-        <div className="flex items-center gap-1 border-b border-slate-100 px-5 pt-3 pb-2">
+        {/* 순환 / 고정 모드 토글 */}
+        <div style={{ display: "flex", gap: "5px", marginBottom: "11px" }}>
+          <button type="button" onClick={() => setMode("rotate")}
+            className="btn" style={mode === "rotate" ? { background: "var(--rose)", color: "#fff", borderColor: "var(--rose)" } : {}}>🔁 순환모드</button>
+          <button type="button" onClick={() => setMode("pin")}
+            className="btn" style={mode === "pin" ? { background: "var(--rose)", color: "#fff", borderColor: "var(--rose)" } : {}}>📌 고정모드</button>
+          <span className="note" style={{ marginLeft: "auto", alignSelf: "center" }}>{mode === "rotate" ? "선택 상품을 방송 순환목록에 담습니다" : "선택 상품을 지금 띄운 상품으로 고정합니다"}</span>
+        </div>
+
+        {/* 서브탭 */}
+        <div className="subtabs">
           {tabs.map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setTab(key)}
-              className={[
-                "rounded-lg px-3 py-1.5 text-[12px] font-black transition",
-                tab === key ? "bg-rose-deep text-white" : "text-slate-500 hover:bg-slate-100",
-              ].join(" ")}
-            >
-              {label}
-            </button>
+            <span key={key} className={`st ${tab === key ? "on" : ""}`} onClick={() => setTab(key)}>{label}</span>
           ))}
-          <button
-            type="button"
-            onClick={openCreate}
-            className="ml-auto rounded-lg bg-rose-deep px-3 py-1.5 text-[12px] font-black text-white hover:bg-rose-deep/90"
-          >
-            + 새 상품 등록
-          </button>
+          <button type="button" className="btn rose" style={{ marginLeft: "auto" }} onClick={openCreate}>+ 새 상품 등록</button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 px-5 py-3">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="🔍 상품명 검색"
-            className="h-9 min-w-0 flex-1 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-rose-line"
-          />
-          <select
-            value={dateKey}
-            onChange={(e) => setDateKey(e.target.value)}
-            className="h-9 rounded-xl border border-slate-200 px-2 text-xs font-bold text-slate-600 outline-none"
-          >
+        {/* 필터 */}
+        <div className="filters">
+          <input className="ipt" style={{ flex: 1 }} placeholder="🔍 상품명 검색" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <select className="ipt" value={dateKey} onChange={(e) => setDateKey(e.target.value)}>
             <option value="">전체 기간</option>
-            {dateOptions.map((d) => (
-              <option key={d} value={d}>
-                {d} 올림
-              </option>
-            ))}
+            {dateOptions.map((d) => (<option key={d} value={d}>{d} 올림</option>))}
           </select>
           {selected.size > 0 ? (
-            <span className="text-[11px] font-black text-rose-deep">✓ {selected.size}개 선택 → 순환</span>
+            <span style={{ fontSize: "11px", color: "var(--rose)" }}>✓ {selected.size}개 선택 → {mode === "rotate" ? "순환" : "고정"}</span>
           ) : null}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-2">
-          {loading ? (
-            <div className="py-12 text-center text-sm text-slate-400">불러오는 중…</div>
-          ) : pageItems.length === 0 ? (
-            <div className="py-12 text-center text-sm text-slate-400">상품이 없습니다.</div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              {pageItems.map((p) => {
-                const id = productId(p);
-                const isSel = selected.has(id);
-                const img = mainImage(p);
-                const st = statusLabel(p);
-                return (
-                  <button
-                    key={id || productName(p)}
-                    type="button"
-                    onClick={() => toggleSelect(id)}
-                    className={[
-                      "flex items-center gap-2 rounded-xl border p-2 text-left transition",
-                      isSel ? "border-rose-deep bg-rose-soft/40 ring-1 ring-rose-line" : "border-slate-200 hover:bg-slate-50",
-                    ].join(" ")}
-                  >
-                    <input type="checkbox" readOnly checked={isSel} className="accent-rose-deep" />
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100 text-slate-300">
-                      {img ? <img src={img} alt="" className="h-full w-full object-cover" /> : "🖼"}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-black text-slate-900">{productName(p)}</span>
-                      <span className="block text-[12px] font-black text-rose-deep">{money(productPrice(p))}</span>
-                      <span className="mt-0.5 flex flex-wrap gap-1">
-                        <span className="rounded bg-rose-soft px-1.5 py-0.5 text-[9px] font-black text-rose-deep">{productTypeLabel(p)}</span>
-                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-black text-slate-500">{shippingLabel(p)}</span>
-                        <span className={["rounded px-1.5 py-0.5 text-[9px] font-black", st.cls].join(" ")}>{st.label}</span>
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+        {/* 상품 그리드 */}
+        {loading ? (
+          <div className="note" style={{ textAlign: "center", padding: "30px 0" }}>불러오는 중…</div>
+        ) : pageItems.length === 0 ? (
+          <div className="note" style={{ textAlign: "center", padding: "30px 0" }}>상품이 없습니다.</div>
+        ) : (
+          <div className="grid2">
+            {pageItems.map((p) => {
+              const id = productId(p);
+              const isSel = selected.has(id);
+              const img = mainImage(p);
+              return (
+                <div key={id || productName(p)} className={`pgrid ${isSel ? "sel" : ""}`} onClick={() => toggleSelect(id)}>
+                  <input type="checkbox" readOnly checked={isSel} />
+                  <span className="ph2" style={{ width: "42px", height: "42px" }}>
+                    {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🖼"}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "12px", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
+                    <div style={{ fontSize: "11px", color: "var(--mut)" }}>{money(productPrice(p))}</div>
+                    <div style={{ marginTop: "3px", display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                      <span className="badge" style={{ background: "var(--rose-bg)", color: "var(--rose)" }}>{productTypeLabel(p)}</span>
+                      <span className="badge" style={{ background: "var(--blue-bg)", color: "var(--blue)" }}>{shippingLabel(p)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* 푸터 */}
+        <div className="mfoot">
+          <span className="note">
+            <span style={{ cursor: page > 1 ? "pointer" : "default", opacity: page > 1 ? 1 : 0.3 }} onClick={() => page > 1 && setPage((v) => v - 1)}>‹ </span>
+            {page} / {totalPages}
+            <span style={{ cursor: page < totalPages ? "pointer" : "default", opacity: page < totalPages ? 1 : 0.3 }} onClick={() => page < totalPages && setPage((v) => v + 1)}> ›</span>
+          </span>
+          <span className="r">
+            <button type="button" className="btn" onClick={onClose}>취소</button>
+            <button type="button" className="btn rose" disabled={saving || selected.size === 0} onClick={confirmAction}>
+              {saving ? "처리중…" : mode === "rotate" ? `선택 상품 순환 담기${selected.size > 0 ? ` (${selected.size})` : ""}` : `선택 상품 고정${selected.size > 0 ? ` (${selected.size})` : ""}`}
+            </button>
+          </span>
         </div>
 
-        <div className="flex items-center gap-2 border-t border-rose-line px-5 py-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
-            <button type="button" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="px-1 disabled:opacity-30">
-              ‹
-            </button>
-            <span>
-              {page} / {totalPages}
-            </span>
-            <button type="button" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="px-1 disabled:opacity-30">
-              ›
-            </button>
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            <button type="button" onClick={onClose} className="h-9 rounded-xl border border-slate-200 px-4 text-xs font-black text-slate-600 hover:bg-slate-50">
-              취소
-            </button>
-            <button
-              type="button"
-              disabled={saving || selected.size === 0}
-              onClick={addToRotation}
-              className="h-9 rounded-xl bg-rose-deep px-4 text-xs font-black text-white hover:bg-rose-deep/90 disabled:bg-slate-300"
-            >
-              {saving ? "담는 중…" : `선택 상품 순환 담기${selected.size > 0 ? ` (${selected.size})` : ""}`}
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );
