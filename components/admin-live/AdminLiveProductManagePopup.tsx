@@ -13,7 +13,7 @@ type Props = {
   onClose: () => void;
 };
 
-type ProductTab = "broadcast" | "group_buy" | "all";
+type ProductTab = "broadcast" | "group_buy" | "all" | "manage";
 
 const PAGE_SIZE = 8;
 
@@ -285,6 +285,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     ["broadcast", "방송상품"],
     ["group_buy", "공구·상시판매"],
     ["all", "전체 창고"],
+    ["manage", "관리"],
   ];
 
   if (typeof document === "undefined") return null;
@@ -337,6 +338,30 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
           <div className="note" style={{ textAlign: "center", padding: "30px 0" }}>불러오는 중…</div>
         ) : pageItems.length === 0 ? (
           <div className="note" style={{ textAlign: "center", padding: "30px 0" }}>상품이 없습니다.</div>
+        ) : tab === "manage" ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            {pageItems.map((p) => {
+              const id = productId(p);
+              const img = mainImage(p);
+              return (
+                <div key={id || productName(p)} style={{ display: "flex", gap: "10px", alignItems: "center", border: "1px solid var(--bd)", borderRadius: "8px", padding: "9px 11px" }}>
+                  <span className="ph2" style={{ width: "40px", height: "40px" }}>
+                    {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🖼"}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
+                    <div style={{ marginTop: "2px", display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+                      <span style={{ fontSize: "11px", color: "var(--mut)" }}>{money(productPrice(p))}</span>
+                      <span className="badge" style={{ background: "var(--rose-bg)", color: "var(--rose)" }}>{productTypeLabel(p)}</span>
+                      <span className="badge" style={{ background: "var(--blue-bg)", color: "var(--blue)" }}>{shippingLabel(p)}</span>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => editProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "var(--blue)", background: "var(--blue-bg)", border: "none", borderRadius: "6px", padding: "6px 12px", cursor: "pointer", flexShrink: 0 }}>수정</button>
+                  <button type="button" onClick={() => void deleteProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "var(--red)", background: "#fdecec", border: "none", borderRadius: "6px", padding: "6px 12px", cursor: "pointer", flexShrink: 0 }}>삭제</button>
+                </div>
+              );
+            })}
+          </div>
         ) : (
           <div className="grid2">
             {pageItems.map((p) => {

@@ -692,11 +692,9 @@ export default function AdminLiveDashboard() {
     void loadDepositsFromServer();
     void loadBroadcasts();
 
-    const refreshTimer = maybeSetLiveOrderAutoRefreshInterval(() => {
-      void loadOrders();
-      void loadDepositsFromServer();
-    }, 15000);
-
+    // 화면 15초 자동 폴링 제거 — 화면 갱신은 BANKDA 입금확인(useAutoBankdaPaymentSync 훅의 onSynced)
+    // + 동기화 이벤트(ruru-admin-live-auto-bankda-synced) + 수동 새로고침 버튼으로만 수행.
+    // ※ BANKDA 입금확인 setInterval(useAutoBankdaPaymentSync.ts)은 그대로 유지 — 건드리지 않음.
     const handleAutoBankdaSynced = () => {
       if (!LIVE_ORDER_BANKDA_EVENT_REFRESH_ENABLED) return;
 
@@ -707,7 +705,6 @@ export default function AdminLiveDashboard() {
     window.addEventListener("ruru-admin-live-auto-bankda-synced", handleAutoBankdaSynced);
 
     return () => {
-      clearLiveOrderAutoRefreshInterval(refreshTimer);
       window.removeEventListener("ruru-admin-live-auto-bankda-synced", handleAutoBankdaSynced);
     };
   }, []);
