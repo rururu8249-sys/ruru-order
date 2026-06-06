@@ -23,6 +23,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 (없음)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-06-06 세션10(이벤트 P1-B): 참가자 3버튼(주문서전체/입금완료/수동) · 불러오기 기준=현재 활성방송(activeBroadcastId prop, Dashboard 전달) · 방송OFF시 전체/입금완료 버튼 비활성+안내 · 목록 토글(기본숨김) · 채팅붙여넣기 @파싱(중복제거) · 당첨고정 칩클릭(select 이중목록 제거)+"👑 당첨고정:닉" 한줄 · 당첨선물 드롭다운(포인트/직접)50:50+포인트 쉼표포맷 · 돌리기 시 currentEvent=null로 이전당첨자 제거. 추첨/포인트/돈 로직 무변경. ※입금완료 서버필터(paidOnly)는 P2 연동 대기
 - 2026-06-06 세션10(이벤트 P1-A): 사이드바 "◆ 이벤트" 메뉴 추가(adminLiveMenu event 키) + AdminLiveEventRoulettePanel을 Dashboard에 항상마운트(controlled props renderTrigger/controlledOpen/onRequestClose, activeMenu=event일때 표시, 닫아도 상태유지) + 초기화 버튼(참가자+당첨고정+currentEvent 리셋). 추첨/포인트/주문 로직 무변경. ※기존 LiveHeader/LiveOrderTable의 "🎁 이벤트" 버튼 인스턴스는 잔존(별도 state) — 후속 정리 검토. ※P1 잔여=참가자3버튼/채팅@파싱/당첨고정칩/당첨선물 드롭다운(P1-B)
 - 2026-06-06 세션9-2: 카드결제 복사창 좌우분할 개선 — 💳카드결제 버튼 클릭 시 복사창+페이스터 동시열림(openPaysterRightHalf를 LiveOrderTable 클릭 제스처에서 호출→팝업차단 회피), 페이스터=화면 오른쪽절반(left=½/width=½/height=전체), 복사창 모달=화면 왼쪽절반 고정(fixed inset-y-0 left-0 md:w-1/2)
 - 2026-06-06 세션9: 카드결제 복사창 신규(AdminLiveCardPayPopup, 시안⑫). LiveOrderTable card_unpaid 입금셀에 "💳 카드결제" 버튼→팝업. 복사4칸(상품명 외N건요약/결제금액 cardPaymentTotalAmount우선 없으면 totalAmount 숫자만/닉네임 매칭기준/전화 하이픈제거) 각 클립보드복사. 페이스터 window.open(PC≥1024 우측반분할, 복사창 유지). "카드결제완료 처리"=DetailDrawer handleCardPaymentStatusChange와 동일 update(orders admin_order_status_v2/order_manage_status="카드결제완료", order.items id 기준)→loadOrders, 신규 결제write 없음
@@ -39,7 +40,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 ## 남은 작업 (우선순위 순 · 끝나면 지우고 진행상황에 기록)
 [admin-live 관리자]
 1. 화면 전체 용어·버튼·라벨·문구 시안 기준 전수 통일 (입금상태뿐 아니라 전 화면 일괄, 일부만 고치지 말 것) — 입금상태·메뉴·주요 팝업제목(정산·입금내역·입금매칭 포함) 통일 완료. 잔여 세부 라벨은 화면별 점검 시 추가
-2. 이벤트 상세페이지
+2. 이벤트 — P1(메뉴/모달/상태유지/초기화/참가자3버튼/활성방송기준/당첨고정칩/당첨선물/돌리기) 완료. 잔여: P2(입금완료 서버필터·winners 기간필터·달력), P3(가중치 30/30/40 추첨공식 — 서버), P4(새 룰렛 위젯 8~14바퀴/가운데 당첨오버레이/화살표), P5(당첨 포인트 자동 일괄지급) — 각 페이즈 ⚠️정의 받고 진행
 3. 수동매칭 설정 팝업 메뉴
 4. (사장님 추가 예정 — 그 외 작업 생각나는 대로 여기 누적)
    ※ 후속: 상품관리 팝업 — 상시판매 별도 type 도입 / 올림날짜 전용 필드 / 기존 AdminLiveProductListPanel 정리 여부
