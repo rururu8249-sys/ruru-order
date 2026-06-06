@@ -674,9 +674,14 @@ export default function AdminLiveDashboard() {
 
   useAutoBankdaPaymentSync({
     enabled: true,
-    onSynced: async () => {
+    onSynced: async (detail) => {
       await loadDepositsFromServer();
-      await loadOrders();
+      // 주문목록은 실제로 입금매칭이 생겼을 때(successCount>0)만 갱신한다.
+      // 매 폴링마다 무조건 loadOrders 하던 것이 "원치 않는 자동 새로고침"의 원인이었음.
+      // 새 고객 주문은 아래 supabase realtime 구독이 즉시 반영한다.
+      if (detail && detail.successCount > 0) {
+        await loadOrders();
+      }
     },
   });
 
@@ -698,7 +703,7 @@ export default function AdminLiveDashboard() {
     const handleAutoBankdaSynced = () => {
       if (!LIVE_ORDER_BANKDA_EVENT_REFRESH_ENABLED) return;
 
-      void loadOrders();
+      // 입금내역만 갱신. 주문목록은 onSynced(매칭 성공 시)+realtime 구독이 담당 → 매 폴링 새로고침 방지.
       void loadDepositsFromServer();
     };
 
@@ -707,6 +712,28 @@ export default function AdminLiveDashboard() {
     return () => {
       window.removeEventListener("ruru-admin-live-auto-bankda-synced", handleAutoBankdaSynced);
     };
+  }, []);
+
+  // 실시간 주문 반영: orders INSERT/UPDATE 발생 시 주문목록을 재조회(디바운스 600ms로 연속 변경 묶음).
+  // 새 고객 주문/상태변경이 수동 새로고침 없이 즉시 화면에 뜨도록 한다. (BANKDA setInterval과 무관)
+  useEffect(() => {
+    let debounce: ReturnType<typeof setTimeout> | null = null;
+    const scheduleReload = () => {
+      if (debounce) clearTimeout(debounce);
+      debounce = setTimeout(() => {
+        void loadOrders();
+      }, 600);
+    };
+    const channel = supabase
+      .channel("ruru-admin-live-orders-realtime")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, scheduleReload)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, scheduleReload)
+      .subscribe();
+    return () => {
+      if (debounce) clearTimeout(debounce);
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
