@@ -6,7 +6,7 @@
 // - 주문 들어오면 "🛒 ○○님 주문!" 2~3초 표시 후 사라짐 (orders INSERT 실시간)
 // - 배경 투명(크로마키). 읽기 전용 — 돈/주문 로직 건드리지 않음.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { resolveProductImageUrl } from "@/components/admin-live/quick-product/productImageUrl";
 import { getActiveBroadcast, loadAdminLiveBroadcasts } from "@/components/admin-live/liveBroadcastController";
@@ -75,7 +75,10 @@ export default function ProductWidgetClient() {
   const [pinned, setPinned] = useState<AnyProduct | null>(null);
   const [rotation, setRotation] = useState<AnyProduct[]>([]);
   const [rotIndex, setRotIndex] = useState(0);
-  const [orderToast, setOrderToast] = useState("");
+  // 이벤트 토스트 — 여러 개 동시 도착 가능 → 큐로 순서대로 3초씩 표시
+  const [toastQueue, setToastQueue] = useState<string[]>([]);
+  const [currentToast, setCurrentToast] = useState("");
+  const seenRef = useRef<Set<string>>(new Set());
 
   // 배경 투명 (OBS 크로마키)
   useEffect(() => {
@@ -135,24 +138,65 @@ export default function ProductWidgetClient() {
     return () => window.clearInterval(timer);
   }, [pinned, rotation.length]);
 
-  // 주문 들어오면 토스트 (orders INSERT 실시간)
+  // 실시간 이벤트 토스트: 주문(INSERT) / 입금확인·카드결제완료(UPDATE). 실제 컬럼명 기준.
   useEffect(() => {
-    let hideTimer = 0;
+    const nick = (row: AnyProduct) => String(row?.youtube_nickname || row?.nickname || row?.customer_name || "손님").trim();
+    const amount = (row: AnyProduct) => Number(row?.total_amount ?? row?.totalAmount ?? 0).toLocaleString("ko-KR");
+    const pname = (row: AnyProduct) => String(row?.product_name || row?.name || "상품").trim();
+    // 입금/카드 상태가 기록되는 실제 컬럼들
+    const statusOf = (row: AnyProduct) => String(row?.admin_order_status_v2 || row?.order_manage_status || row?.deposit_status || "").trim();
+    const groupKey = (row: AnyProduct) => String(row?.order_group_id || row?.id || "");
+    const push = (msg: string) => setToastQueue((q) => [...q, msg]);
+
     const channel = supabase
-      .channel("ruru-product-widget-orders")
+      .channel("ruru-product-widget-events")
+      // A. 주문서 작성 완료
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, (payload) => {
         const row = (payload.new || {}) as AnyProduct;
-        const name = String(row.youtube_nickname || row.customer_name || row.nickname || "손님").trim();
-        setOrderToast(`🛒 ${name}님 주문!`);
-        window.clearTimeout(hideTimer);
-        hideTimer = window.setTimeout(() => setOrderToast(""), 2800);
+        const key = `ins:${groupKey(row)}`;
+        if (seenRef.current.has(key)) return; // 한 주문(여러 상품행) 중복 방지
+        seenRef.current.add(key);
+        push(`🛒 ${nick(row)}님 주문! ${pname(row)} ${amount(row)}원`);
+      })
+      // B·C. 입금 확인(자동/수동) / D. 카드 결제 완료
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, (payload) => {
+        const row = (payload.new || {}) as AnyProduct;
+        const oldRow = (payload.old || {}) as AnyProduct;
+        const status = statusOf(row);
+        const oldStatus = statusOf(oldRow);
+
+        // B·C. 입금확인 (자동입금확인/수동입금확인/입금확인)
+        if (/입금확인/.test(status) && !/입금확인/.test(oldStatus)) {
+          const key = `dep:${groupKey(row)}`;
+          if (!seenRef.current.has(key)) {
+            seenRef.current.add(key);
+            push(`✅ ${nick(row)}님 입금 확인! ${amount(row)}원`);
+          }
+        }
+
+        // D. 카드 결제 완료
+        if (status === "카드결제완료" && oldStatus !== "카드결제완료") {
+          const key = `card:${groupKey(row)}`;
+          if (!seenRef.current.has(key)) {
+            seenRef.current.add(key);
+            push(`💳 ${nick(row)}님 카드 결제 완료! ${amount(row)}원`);
+          }
+        }
       })
       .subscribe();
     return () => {
-      window.clearTimeout(hideTimer);
       supabase.removeChannel(channel);
     };
   }, []);
+
+  // 큐 처리: 표시 중이 아니면 다음 토스트를 3초간 표시
+  useEffect(() => {
+    if (currentToast || toastQueue.length === 0) return;
+    setCurrentToast(toastQueue[0]);
+    setToastQueue((q) => q.slice(1));
+    const t = window.setTimeout(() => setCurrentToast(""), 3000);
+    return () => window.clearTimeout(t);
+  }, [currentToast, toastQueue]);
 
   const current = pinned || rotation[rotIndex] || null;
   const img = imageOf(current);
@@ -163,22 +207,25 @@ export default function ProductWidgetClient() {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "transparent", pointerEvents: "none", fontFamily: "Pretendard, Arial, sans-serif" }}>
-      {orderToast ? (
+      {currentToast ? (
         <div
           style={{
             position: "absolute",
-            left: "24px",
-            bottom: "210px",
-            background: "rgba(15,110,86,0.92)",
+            top: "24px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "rgba(123,45,67,0.92)",
             color: "#fff",
-            padding: "10px 18px",
-            borderRadius: "12px",
-            fontSize: "19px",
+            padding: "16px 32px",
+            borderRadius: "16px",
+            fontSize: "26px",
             fontWeight: 800,
-            boxShadow: "0 6px 20px rgba(0,0,0,0.3)",
+            whiteSpace: "nowrap",
+            boxShadow: "0 6px 24px rgba(0,0,0,0.35)",
+            animation: "ruruWidgetIn 0.4s ease",
           }}
         >
-          {orderToast}
+          {currentToast}
         </div>
       ) : null}
 
@@ -189,41 +236,41 @@ export default function ProductWidgetClient() {
             position: "absolute",
             left: "24px",
             bottom: "24px",
-            width: "480px",
+            width: "720px",
             display: "flex",
-            gap: "20px",
+            gap: "30px",
             alignItems: "center",
             background: "rgba(38,38,44,0.60)",
             backdropFilter: "blur(9px)",
             WebkitBackdropFilter: "blur(9px)",
             border: "1px solid rgba(255,255,255,0.14)",
-            borderRadius: "24px",
-            padding: "20px",
+            borderRadius: "36px",
+            padding: "30px",
             color: "#fff",
             animation: "ruruWidgetIn 0.5s ease",
           }}
         >
-          <div style={{ position: "relative", width: "124px", height: "124px", flexShrink: 0, borderRadius: "18px", overflow: "hidden", background: "rgba(255,255,255,0.1)" }}>
+          <div style={{ position: "relative", width: "186px", height: "186px", flexShrink: 0, borderRadius: "27px", overflow: "hidden", background: "rgba(255,255,255,0.1)" }}>
             {img ? (
               <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
-              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "46px" }}>👟</div>
+              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "70px" }}>👟</div>
             )}
             {pinned ? (
-              <span style={{ position: "absolute", top: "6px", left: "6px", fontSize: "22px" }}>📌</span>
+              <span style={{ position: "absolute", top: "9px", left: "9px", fontSize: "33px" }}>📌</span>
             ) : null}
           </div>
 
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: "24px", fontWeight: 800, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", wordBreak: "break-all" }}>
+            <div style={{ fontSize: "36px", fontWeight: 800, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", wordBreak: "break-all" }}>
               {nameOf(current)}
             </div>
             {optionText ? (
-              <div style={{ marginTop: "5px", fontSize: "17px", color: "rgba(255,255,255,0.78)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{optionText}</div>
+              <div style={{ marginTop: "8px", fontSize: "26px", color: "rgba(255,255,255,0.78)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{optionText}</div>
             ) : null}
-            <div style={{ marginTop: "7px", display: "flex", alignItems: "baseline", gap: "10px" }}>
-              <span style={{ fontSize: "28px", fontWeight: 800, color: "#FFD9E0" }}>{priceOf(current).toLocaleString("ko-KR")}원</span>
-              {stock ? <span style={{ fontSize: "17px", fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>{stock}</span> : null}
+            <div style={{ marginTop: "11px", display: "flex", alignItems: "baseline", gap: "14px" }}>
+              <span style={{ fontSize: "42px", fontWeight: 800, color: "#FFD9E0" }}>{priceOf(current).toLocaleString("ko-KR")}원</span>
+              {stock ? <span style={{ fontSize: "26px", fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>{stock}</span> : null}
             </div>
           </div>
         </div>
