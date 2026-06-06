@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, DragEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, DragEvent, type MouseEvent as ReactMouseEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import { resolveProductImageUrl } from "./productImageUrl";
@@ -531,6 +531,29 @@ export default function QuickProductFastForm({
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // 팝업 드래그(헤더 잡고 이동)
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const dragRef = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(null);
+  const onHeaderMouseDown = (e: ReactMouseEvent) => {
+    if ((e.target as HTMLElement)?.closest("button")) return; // ✕ 버튼 등은 드래그 제외
+    e.preventDefault();
+    dragRef.current = { startX: e.clientX, startY: e.clientY, baseX: dragOffset.x, baseY: dragOffset.y };
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current) return;
+      setDragOffset({
+        x: dragRef.current.baseX + (ev.clientX - dragRef.current.startX),
+        y: dragRef.current.baseY + (ev.clientY - dragRef.current.startY),
+      });
+    };
+    const onUp = () => {
+      dragRef.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
   const editingProductId = pickString(initialProduct, ["id", "product_id", "uuid"], "");
   const isEditMode = Boolean(editingProductId);
 
@@ -842,12 +865,12 @@ export default function QuickProductFastForm({
   return (
     <div
       className="ruru-product-sian"
-      style={{ position: "fixed", inset: 0, zIndex: 90, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(2,6,23,0.45)", padding: "16px" }}
+      style={{ position: "fixed", inset: 0, zIndex: 90, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0)", padding: "16px" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
     >
-      <div style={{ width: "560px", flexShrink: 0, maxHeight: "calc(100vh-32px)", overflowY: "auto", background: "#fff", borderRadius: "12px", padding: "17px" }}>
+      <div style={{ width: "560px", flexShrink: 0, maxHeight: "calc(100vh - 32px)", overflowY: "auto", background: "#fff", borderRadius: "12px", padding: "17px", boxShadow: "0 18px 60px rgba(0,0,0,0.35)", transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}>
 
-        <div className="mh">
+        <div className="mh" onMouseDown={onHeaderMouseDown} style={{ cursor: "move", userSelect: "none" }}>
           <span className="mt">＋ {isEditMode ? "상품 수정" : "새 상품 등록"}</span>
           <button type="button" className="x" onClick={() => onClose?.()}>✕</button>
         </div>

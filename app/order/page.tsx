@@ -998,7 +998,6 @@ export default function OrderPage() {
   const [videoOpen, setVideoOpen] = useState(true);
   const [productPage, setProductPage] = useState(1);
   const [cartAddedOpen, setCartAddedOpen] = useState(false);
-  const [pendingAddProduct, setPendingAddProduct] = useState<BroadcastProduct | null>(null);
   const [lightboxImage, setLightboxImage] = useState<string>("");
   const [orderLookupOrders, setOrderLookupOrders] = useState<any[]>([]);
   const [orderLookupFilter, setOrderLookupFilter] = useState<CustomerOrderLookupFilter>("전체");
@@ -2797,8 +2796,8 @@ export default function OrderPage() {
       return;
     }
 
-    // 옵션 없는 상품: 바로 담지 않고 확인 팝업 먼저
-    setPendingAddProduct(product);
+    // 옵션 없는 상품: 바로 담기
+    addRegisteredProductToOrderItems(product);
   };
 
   const getItemOptionSuggestions = (item: OrderItem, field: "color" | "size") => {
@@ -3879,14 +3878,11 @@ export default function OrderPage() {
                       const pinned = isPinnedOrderProduct(product);
                       const sold = isSoldOutOrderProduct(product);
                       return (
-                        <button
+                        <div
                           key={String(product.id)}
-                          type="button"
-                          disabled={sold}
-                          onClick={() => selectQuickGroupBuyProduct(product as BroadcastProduct)}
-                          style={{ position: "relative", textAlign: "left", border: `1.5px solid ${pinned ? "#7B2D43" : "#E8E2DD"}`, borderRadius: "14px", background: "#fff", padding: 0, overflow: "hidden", cursor: sold ? "default" : "pointer", opacity: sold ? 0.6 : 1 }}
+                          style={{ position: "relative", textAlign: "left", border: `1.5px solid ${pinned ? "#7B2D43" : "#E8E2DD"}`, borderRadius: "14px", background: "#fff", overflow: "hidden", opacity: sold ? 0.6 : 1, display: "flex", flexDirection: "column" }}
                         >
-                          <div onClick={(e) => { if (img) { e.preventDefault(); e.stopPropagation(); setLightboxImage(img); } }} style={{ position: "relative", width: "100%", height: "120px", background: "#f3f0ee", cursor: img ? "zoom-in" : "default" }}>
+                          <div onClick={() => { if (img) setLightboxImage(img); }} style={{ position: "relative", width: "100%", height: "120px", background: "#f3f0ee", cursor: img ? "zoom-in" : "default" }}>
                             {img ? (
                               <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                             ) : (
@@ -3901,11 +3897,19 @@ export default function OrderPage() {
                               </div>
                             ) : null}
                           </div>
-                          <div style={{ padding: "8px 10px 10px" }}>
+                          <div style={{ padding: "8px 10px 6px" }}>
                             <div style={{ fontSize: "13px", fontWeight: 700, color: "#222", lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", minHeight: "34px" }}>{product.product_name}</div>
                             <div style={{ marginTop: "3px", fontSize: "15px", fontWeight: 800, color: "#7B2D43" }}>{won(Number(product.price || 0))}</div>
                           </div>
-                        </button>
+                          <button
+                            type="button"
+                            disabled={sold}
+                            onClick={() => selectQuickGroupBuyProduct(product as BroadcastProduct)}
+                            style={{ margin: "0 10px 10px", height: "34px", borderRadius: "9px", border: "none", background: sold ? "#ccc" : "#7B2D43", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: sold ? "default" : "pointer" }}
+                          >
+                            {sold ? "품절" : "담기"}
+                          </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -4237,22 +4241,6 @@ export default function OrderPage() {
               <img src={lightboxImage} alt="" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: "12px" }} />
             </div>
           ) : null}
-
-          {/* 옵션 없는 상품 담기 확인 팝업 */}
-          {pendingAddProduct && (
-            <div style={{ position: "fixed", inset: 0, zIndex: 141, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.35)" }} onClick={(e) => { if (e.target === e.currentTarget) setPendingAddProduct(null); }}>
-              <div style={{ width: "300px", maxWidth: "86%", background: "#fff", borderRadius: "20px", padding: "24px 22px", textAlign: "center", boxShadow: "0 18px 50px rgba(0,0,0,0.25)" }}>
-                <div style={{ fontSize: "16px", fontWeight: 800, color: "#222", lineHeight: 1.5 }}>
-                  <span style={{ color: "#7B2D43" }}>{pendingAddProduct.product_name || "이 상품"}</span>
-                  <br />담으시겠습니까?
-                </div>
-                <div style={{ marginTop: "20px", display: "flex", gap: "8px" }}>
-                  <button type="button" onClick={() => setPendingAddProduct(null)} style={{ flex: 1, height: "48px", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", color: "#666", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}>취소</button>
-                  <button type="button" onClick={() => { const p = pendingAddProduct; setPendingAddProduct(null); addRegisteredProductToOrderItems(p); }} style={{ flex: 1, height: "48px", borderRadius: "14px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}>확인</button>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* 담기 완료 — 심플 (확인 ✓ + 주문서 보기 / 계속 담기) */}
           {cartAddedOpen && (

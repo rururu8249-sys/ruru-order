@@ -805,6 +805,14 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
         <div className="mb-2 flex items-center gap-2 text-sm font-black text-slate-950">
           지금 띄운 상품
           <span className="rounded-md bg-rose-soft px-2 py-0.5 text-[11px] font-black text-rose-deep">📌</span>
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event("ruru-open-quick-product-panel"))}
+            className="ml-auto rounded-lg px-2.5 py-1 text-[11px] font-black text-white"
+            style={{ background: "#7B2D43" }}
+          >
+            + 새 상품 등록
+          </button>
         </div>
         {pinnedProduct ? (
           <div className="flex flex-1 min-h-0 flex-col">
