@@ -337,11 +337,21 @@ async function fetchOrderRowsForDate(supabase: SupabaseAdminClient, sourceDate: 
   return (Array.isArray(data) ? data : []) as EventRouletteOrderLike[];
 }
 
+// "입금완료한 사람만" 필터용 결제완료 상태값 (admin_order_status_v2 / order_manage_status 기준)
+const ROULETTE_PAID_STATUSES = new Set(["자동입금확인", "수동입금확인", "카드결제완료"]);
+
+function isPaidOrderRowForRoulette(row: EventRouletteOrderLike): boolean {
+  const a = String((row as { admin_order_status_v2?: unknown }).admin_order_status_v2 || "").trim();
+  const b = String((row as { order_manage_status?: unknown }).order_manage_status || "").trim();
+  return ROULETTE_PAID_STATUSES.has(a) || ROULETTE_PAID_STATUSES.has(b);
+}
+
 async function buildParticipantsForRequest(
   supabase: SupabaseAdminClient,
   mode: EventRouletteMode,
   sourceDate: string,
-  broadcastId = ""
+  broadcastId = "",
+  paidOnly = false
 ) {
   if (mode === "preview") {
     return buildRoulettePreviewParticipants();
@@ -351,7 +361,10 @@ async function buildParticipantsForRequest(
     ? await fetchOrderRowsForBroadcast(supabase, broadcastId)
     : await fetchOrderRowsForDate(supabase, sourceDate);
 
-  return buildRouletteParticipants(rows, mode);
+  // 입금완료한 사람만: admin_order_status_v2/order_manage_status가 결제완료 상태인 주문만 남긴다.
+  const targetRows = paidOnly ? rows.filter(isPaidOrderRowForRoulette) : rows;
+
+  return buildRouletteParticipants(targetRows, mode);
 }
 
 function normalizeWinnerNicknameForDedupe(value: unknown) {
@@ -566,8 +579,9 @@ async function handleParticipants(request: NextRequest) {
   const mode = normalizeEventRouletteMode(request.nextUrl.searchParams.get("mode"));
   const sourceDate = normalizeDateText(request.nextUrl.searchParams.get("sourceDate"));
   const broadcastId = cleanBroadcastId(request.nextUrl.searchParams.get("broadcastId"));
+  const paidOnly = request.nextUrl.searchParams.get("paidOnly") === "true"; // 입금완료한 사람만
   const excludeDailyDup = request.nextUrl.searchParams.get("excludeDailyDup") !== "false"; // 기본 true. false면 중복체크 건너뜀
-  const rawParticipants = await buildParticipantsForRequest(supabase, mode, sourceDate, broadcastId);
+  const rawParticipants = await buildParticipantsForRequest(supabase, mode, sourceDate, broadcastId, paidOnly);
   const deduped = excludeDailyDup
     ? await applyNoDuplicateWinnerRule(supabase, rawParticipants, {
         mode,
