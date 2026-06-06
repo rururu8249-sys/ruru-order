@@ -37,6 +37,7 @@ type VideoRatio = "vertical" | "wide" | "auto";
 type Props = {
   videoRatio: VideoRatio;
   youtubeUrl?: string | null;
+  activeBroadcastId?: string | number | null;
 };
 
 type AdminIssueTask = {
@@ -321,25 +322,46 @@ function CustomerIssueSummaryRow({
   );
 }
 
-export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
+export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroadcastId }: Props) {
   const [pinnedProduct, setPinnedProduct] = useState<any | null>(null);
+  const [rotationProducts, setRotationProducts] = useState<any[]>([]);
 
   useEffect(() => {
     let alive = true;
-    (async () => {
+    const loadNow = async () => {
       try {
-        const { data, error } = await supabase.from("products").select("*");
+        const { data: products, error } = await supabase.from("products").select("*");
         if (error || !alive) return;
-        const pinned = (data || []).find((p: any) => p?.is_pinned === true || p?.pinned === true) || null;
+        const list = (products || []) as any[];
+        // 고정모드: is_pinned 상품 1개
+        const pinned = list.find((p: any) => p?.is_pinned === true || p?.pinned === true) || null;
         if (alive) setPinnedProduct(pinned);
+        // 순환모드: 활성 방송의 broadcast_products 연결 상품들
+        if (activeBroadcastId) {
+          const { data: links } = await supabase
+            .from("broadcast_products")
+            .select("product_id, sort_order")
+            .eq("broadcast_id", activeBroadcastId)
+            .order("sort_order", { ascending: true });
+          const linkIds = ((links as { product_id: unknown }[]) || []).map((r) => String(r.product_id));
+          const byId = new Map(list.map((p: any) => [String(p?.id ?? p?.product_id), p]));
+          const rotation = linkIds.map((pid) => byId.get(pid)).filter(Boolean);
+          if (alive) setRotationProducts(rotation);
+        } else if (alive) {
+          setRotationProducts([]);
+        }
       } catch {
         // 무시 (상품 로드 실패해도 방송화면엔 영향 없음)
       }
-    })();
+    };
+    loadNow();
+    const onUpdated = () => loadNow();
+    window.addEventListener("ruru-live-product-updated", onUpdated);
     return () => {
       alive = false;
+      window.removeEventListener("ruru-live-product-updated", onUpdated);
     };
-  }, []);
+  }, [activeBroadcastId]);
 
   const [showMemoAdd, setShowMemoAdd] = useState(false);
   const [statusFilter, setStatusFilter] = useState<IssueStatusFilter>("open");
@@ -811,9 +833,26 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl }: Props) {
               다른 상품 띄우기
             </button>
           </div>
+        ) : rotationProducts.length > 0 ? (
+          <div className="flex flex-1 min-h-0 flex-col">
+            <div className="mb-1 text-[11px] font-black text-slate-400">🔁 순환 {rotationProducts.length}개</div>
+            <div className="flex-1 min-h-0 space-y-1.5 overflow-y-auto">
+              {rotationProducts.map((p: any, i: number) => (
+                <div key={String(p?.id ?? i)} className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white p-1.5">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100 text-slate-300">
+                    {nowProdImageOf(p) ? <img src={nowProdImageOf(p)} alt="" className="h-full w-full object-cover" /> : "👟"}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[12px] font-black text-slate-900">{p?.product_name || p?.name || p?.title || "상품명 없음"}</span>
+                    <span className="block text-[12px] font-black text-rose-deep">{Number(p?.price ?? p?.sale_price ?? p?.selling_price ?? 0).toLocaleString("ko-KR")}원</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         ) : (
           <div className="flex flex-1 min-h-0 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 text-center text-xs font-bold leading-5 text-slate-400">
-            상품을 📌 고정하면<br />여기에 표시됩니다.
+            상품관리에서 순환 담기 또는<br />📌 고정하면 여기에 표시됩니다.
           </div>
         )}
       </div>

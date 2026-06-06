@@ -1130,7 +1130,7 @@ export default function AdminLiveDashboard() {
             <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
 
             <div className="mb-4 mt-4 h-[360px] w-full min-h-0 [&>*]:h-full [&>*]:min-h-0 [&>*>*]:h-full [&>*>*]:min-h-0">
-              <LiveBroadcastPanels videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} />
+              <LiveBroadcastPanels videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} activeBroadcastId={activeBroadcast?.id || null} />
             </div>
 
             {loadError ? (
