@@ -399,162 +399,119 @@ function CustomerDetailDrawer({
   const safePage = Math.min(Math.max(1, page), totalPages);
   const visibleOrders = customer.orders.slice((safePage - 1) * DETAIL_ORDER_PAGE_SIZE, safePage * DETAIL_ORDER_PAGE_SIZE);
 
+  const statusBadge = (text: string) => {
+    const t = String(text || "");
+    if (/입금확인|결제완료/.test(t)) return { background: "#E7F3EE", color: "#0F6E56" };
+    if (/배송|출고/.test(t)) return { background: "#E8F0FA", color: "#185FA5" };
+    if (/대기|미입금|필요/.test(t)) return { background: "#FBF1E0", color: "#854F0B" };
+    return { background: "#F1EFEC", color: "#777" };
+  };
+  const avatarChar = (customer.nickname || customer.name || "?").trim().charAt(0) || "?";
+
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/30">
-      <aside className="h-full w-full max-w-[680px] overflow-y-auto bg-white p-5 shadow-2xl">
-        <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
-          <div>
-            <div className="text-[11px] font-black tracking-[0.18em] text-rose-deep">👤 회원 상세</div>
-            <h2 className="mt-1 text-2xl font-black tracking-[-0.04em] text-slate-950">{customer.nickname}</h2>
-            <p className="mt-1 text-sm font-bold text-slate-500">
-              {customer.name} · {formatPhone(customer.phone)}
-            </p>
-            <p className="mt-2 max-w-[520px] break-keep text-[13px] font-bold leading-5 text-slate-500">
-              📍 {customer.address || "주소 정보 없음"}
-            </p>
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.45)", padding: "24px 16px" }}
+    >
+      <section
+        role="dialog"
+        aria-modal="true"
+        style={{ width: "100%", maxWidth: "540px", maxHeight: "90vh", overflowY: "auto", borderRadius: "20px", border: "1px solid #D9C5CC", background: "#fff", boxShadow: "0 24px 70px rgba(15,23,42,0.28)" }}
+      >
+        {/* 헤더 */}
+        <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid #E8E2DD", padding: "14px 18px" }}>
+          <span style={{ fontSize: "15px", fontWeight: 800, color: "#7B2D43" }}>👤 회원 상세</span>
+          <button type="button" onClick={onClose} style={{ marginLeft: "auto", width: "27px", height: "27px", border: "none", background: "none", color: "#999", fontSize: "18px", cursor: "pointer" }}>✕</button>
+        </div>
+
+        <div style={{ padding: "16px 18px 18px" }}>
+          {/* 프로필 */}
+          <div style={{ display: "flex", gap: "13px", marginBottom: "14px" }}>
+            <span style={{ width: "54px", height: "54px", flexShrink: 0, borderRadius: "50%", background: "#F5E6EB", color: "#7B2D43", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", fontWeight: 800 }}>{avatarChar}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: "15px", fontWeight: 800, color: "#222", marginBottom: "3px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                {customer.nickname}
+                <span style={{ fontSize: "12px", fontWeight: 700, color: "#999" }}>· {customer.name || "-"}</span>
+                {customer.blocked ? (
+                  <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "6px", padding: "2px 7px" }}>차단</span>
+                ) : null}
+              </div>
+              <div style={{ fontSize: "11px", color: "#888", lineHeight: 1.8 }}>
+                📞 {formatPhone(customer.phone) || "-"}<br />
+                📍 {customer.address || "주소 정보 없음"}<br />
+                🕒 {customer.orderCount > 0 ? formatOrderDateTime(customer.latestOrderAt) : "주문 전 회원"}
+              </div>
+            </div>
           </div>
 
-          <div className="flex shrink-0 items-center justify-end">
+          {/* 3 스탯 */}
+          <div style={{ display: "flex", gap: "7px", marginBottom: "14px" }}>
+            <div style={{ flex: 1, background: "#FAF6F2", borderRadius: "10px", padding: "10px", textAlign: "center" }}>
+              <div style={{ fontSize: "11px", fontWeight: 800, color: "#999" }}>누적 주문</div>
+              <div style={{ marginTop: "3px", fontSize: "16px", fontWeight: 800, color: "#222" }}>{customer.orderCount.toLocaleString("ko-KR")}건</div>
+            </div>
+            <div style={{ flex: 1, background: "#FAF6F2", borderRadius: "10px", padding: "10px", textAlign: "center" }}>
+              <div style={{ fontSize: "11px", fontWeight: 800, color: "#999" }}>누적 결제</div>
+              <div style={{ marginTop: "3px", fontSize: "16px", fontWeight: 800, color: "#222" }}>{money(customer.totalAmount)}</div>
+            </div>
+            <div style={{ flex: 1, background: "#FAF6F2", borderRadius: "10px", padding: "10px", textAlign: "center" }}>
+              <div style={{ fontSize: "11px", fontWeight: 800, color: "#999" }}>미입금</div>
+              <div style={{ marginTop: "3px", fontSize: "16px", fontWeight: 800, color: customer.unpaidCount > 0 ? "#854F0B" : "#222" }}>{customer.unpaidCount.toLocaleString("ko-KR")}건</div>
+            </div>
+          </div>
+
+          {/* 주문 이력 */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+            <span style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>주문 이력</span>
+            <span style={{ fontSize: "11px", fontWeight: 700, color: "#999" }}>{safePage} / {totalPages}</span>
+          </div>
+          {visibleOrders.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "18px 0", fontSize: "12px", color: "#999" }}>주문 내역이 없습니다.</div>
+          ) : (
+            visibleOrders.map((order, index) => {
+              const badge = statusBadge(orderStatusText(order));
+              return (
+                <div key={`${order.id || index}-${orderCreatedLabel(order)}`} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 0", borderBottom: "1px solid #F0EDEA" }}>
+                  <span style={{ width: "92px", flexShrink: 0, fontSize: "11px", color: "#999" }}>{orderCreatedLabel(order)}</span>
+                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "12px", color: "#666" }} title={orderSummary(order)}>{orderSummary(order)}</span>
+                  <b style={{ fontSize: "12px", color: "#222" }}>{money(orderAmount(order))}</b>
+                  <span style={{ flexShrink: 0, fontSize: "10px", fontWeight: 800, borderRadius: "6px", padding: "3px 7px", ...badge }}>{orderStatusText(order) || "-"}</span>
+                </div>
+              );
+            })
+          )}
+          {totalPages > 1 ? (
+            <div style={{ display: "flex", justifyContent: "center", gap: "8px", marginTop: "12px" }}>
+              <button type="button" onClick={() => setPage(Math.max(1, safePage - 1))} style={{ border: "1px solid #E8E2DD", borderRadius: "8px", background: "#fff", padding: "5px 12px", fontSize: "11px", fontWeight: 800, color: "#777", cursor: "pointer" }}>이전</button>
+              <button type="button" onClick={() => setPage(Math.min(totalPages, safePage + 1))} style={{ border: "1px solid #E8E2DD", borderRadius: "8px", background: "#fff", padding: "5px 12px", fontSize: "11px", fontWeight: 800, color: "#777", cursor: "pointer" }}>다음</button>
+            </div>
+          ) : null}
+
+          {/* 포인트 (기존 패널 유지 — 보유포인트 표시 + 🪙 지급) */}
+          <div style={{ marginTop: "14px" }}>
+            <AdminLiveCustomerPointPanel customer={customer} />
+          </div>
+
+          {/* 푸터: 차단 / 닫기 */}
+          <div style={{ display: "flex", alignItems: "center", marginTop: "16px", paddingTop: "12px", borderTop: "1px solid #E8E2DD" }}>
+            <button
+              type="button"
+              onClick={() => onBlockAction(customer)}
+              disabled={blockSaving}
+              style={{ border: "1px solid", borderColor: customer.blocked ? "#D9C5CC" : "#E5B4AE", borderRadius: "8px", background: customer.blocked ? "#fff" : "#FBEAE7", padding: "8px 12px", fontSize: "11px", fontWeight: 800, color: customer.blocked ? "#555" : "#C0392B", cursor: blockSaving ? "wait" : "pointer", opacity: blockSaving ? 0.5 : 1 }}
+            >
+              {customer.blocked ? `✅ ${CUSTOMER_TERMS.unblock}` : `🚫 ${CUSTOMER_TERMS.block}`}
+            </button>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 hover:bg-slate-50"
+              style={{ marginLeft: "auto", borderRadius: "8px", border: "none", background: "#7B2D43", padding: "8px 18px", fontSize: "12px", fontWeight: 800, color: "#fff", cursor: "pointer" }}
             >
               닫기
             </button>
           </div>
         </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-4">
-          <SummaryCard
-            icon="👤"
-            label={CUSTOMER_TERMS.customerStatus}
-            value={customer.blocked ? CUSTOMER_TERMS.blocked : CUSTOMER_TERMS.normal}
-            sub={customer.blockReason || "차단 정보 없음"}
-            valueClassName="whitespace-nowrap text-[17px] leading-tight"
-          />
-          <SummaryCard
-            icon="🧾"
-            label={CUSTOMER_TERMS.orderCount}
-            value={`${customer.orderCount.toLocaleString("ko-KR")}건`}
-            sub="주문+회원 기준"
-            valueClassName="whitespace-nowrap text-[18px] leading-tight"
-          />
-          <SummaryCard
-            icon="💳"
-            label={CUSTOMER_TERMS.totalOrderAmount}
-            value={money(customer.totalAmount)}
-            sub="취소/정산 제외 전 표시합"
-            valueClassName="whitespace-nowrap text-[22px]"
-          />
-          <SummaryCard
-            icon="🕒"
-            label={CUSTOMER_TERMS.latestOrder}
-            value={customer.orderCount > 0 ? formatOrderDateTime(customer.latestOrderAt) : "주문 전 회원"}
-            sub={customer.orderCount > 0 ? "가장 최근 주문" : "카톡 로그인/회원등록 고객"}
-            valueClassName="text-[13px] leading-[1.25] tracking-[-0.02em]"
-            subClassName="text-[12px]"
-          />
-        </div>
-
-        <section className="mt-5 rounded-[24px] border border-slate-200 bg-white p-4">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <h3 className="text-[17px] font-black text-slate-950">📦 {CUSTOMER_TERMS.orderHistory}</h3>
-              <p className="mt-1 text-[12px] font-bold text-slate-400">닉네임 클릭 상세에서 고객의 전체 주문을 페이지별로 확인합니다.</p>
-            </div>
-
-            <div className="text-xs font-black text-slate-500">
-              {safePage} / {totalPages}
-            </div>
-          </div>
-
-          <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100">
-            <table className="w-full table-fixed border-collapse text-sm">
-              <thead className="bg-slate-50 text-xs font-black text-slate-500">
-                <tr>
-                  <th className="w-[178px] px-3 py-3 text-left">주문일시</th>
-                  <th className="px-3 py-3 text-left">주문내역</th>
-                  <th className="w-[112px] px-3 py-3 text-right">금액</th>
-                  <th className="w-[108px] px-3 py-3 text-center">상태</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {visibleOrders.map((order, index) => (
-                  <tr key={`${order.id || index}-${orderCreatedLabel(order)}`} className="hover:bg-slate-50">
-                    <td className="px-3 py-3 font-bold text-slate-600">{orderCreatedLabel(order)}</td>
-                    <td className="truncate px-3 py-3 font-bold text-slate-800" title={orderSummary(order)}>
-                      {orderSummary(order)}
-                    </td>
-                    <td className="px-3 py-3 text-right font-black text-slate-950">{money(orderAmount(order))}</td>
-                    <td className="px-3 py-3 text-center">
-                      <span className="rounded-lg bg-slate-100 px-2 py-1 text-xs font-black text-slate-600">
-                        {orderStatusText(order) || "-"}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="mt-4 flex items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={() => setPage(Math.max(1, safePage - 1))}
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500"
-            >
-              이전
-            </button>
-            <button
-              type="button"
-              onClick={() => setPage(Math.min(totalPages, safePage + 1))}
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500"
-            >
-              다음
-            </button>
-          </div>
-        </section>
-
-        <AdminLiveCustomerPointPanel customer={customer} />
-
-        <section className="mt-5 grid gap-3 md:grid-cols-2">
-          <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-            <h3 className="text-base font-black text-slate-950">📝 {CUSTOMER_TERMS.customerIssue}</h3>
-            <p className="mt-2 text-sm font-bold leading-relaxed text-slate-500">
-              미해결 이슈 연결은 오른쪽 고객이슈 패널에서 먼저 확인합니다. 고객별 자동 연결은 2차에서 customer_id/전화번호 기준으로 붙입니다.
-            </p>
-          </div>
-
-          <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-base font-black text-slate-950">🚫 차단 관리</h3>
-                <p className="mt-2 text-sm font-bold leading-relaxed text-slate-500">
-                  현재 고객의 차단 상태와 사유를 확인하고, 필요 시 바로 차단/차단해제합니다.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => onBlockAction(customer)}
-                disabled={blockSaving}
-                className={`shrink-0 rounded-xl px-4 py-2 text-xs font-black disabled:opacity-50 ${
-                  customer.blocked
-                    ? "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                    : "bg-red-600 text-white hover:bg-red-700"
-                }`}
-              >
-                {customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}
-              </button>
-            </div>
-
-            <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold leading-5 text-slate-500">
-              {customer.blocked ? customer.blockReason || "차단사유 없음" : "현재 차단되지 않은 고객입니다."}
-            </div>
-          </div>
-        </section>
-      </aside>
+      </section>
     </div>
   );
 }
