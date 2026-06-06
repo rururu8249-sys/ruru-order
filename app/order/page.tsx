@@ -985,6 +985,7 @@ export default function OrderPage() {
   const [orderLookupLoading, setOrderLookupLoading] = useState(false);
   const [menuSheetOpen, setMenuSheetOpen] = useState(false);
   const [howToOpen, setHowToOpen] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(true);
   const [orderLookupOrders, setOrderLookupOrders] = useState<any[]>([]);
   const [orderLookupFilter, setOrderLookupFilter] = useState<CustomerOrderLookupFilter>("전체");
   const [orderLookupPage, setOrderLookupPage] = useState(1);
@@ -3693,6 +3694,26 @@ export default function OrderPage() {
     !address.trim() ||
     !detailAddress.trim();
 
+  // P3. 방송 영상 — 방송 ON + 유튜브 URL 있을 때만
+  const isBroadcastOn = String(broadcast?.status || "").toUpperCase() === "ON";
+  const broadcastYoutubeUrl = String(broadcast?.youtube_live_url || broadcast?.youtube_url || "").trim();
+  const videoEmbedSrc = useMemo(() => {
+    if (!broadcastYoutubeUrl) return "";
+    try {
+      const u = new URL(broadcastYoutubeUrl);
+      let id = "";
+      if (u.hostname.includes("youtu.be")) id = u.pathname.replace("/", "").trim();
+      else if (u.searchParams.get("v")) id = u.searchParams.get("v") || "";
+      else {
+        const m = u.pathname.match(/\/(?:live|embed)\/([^/?]+)/);
+        if (m?.[1]) id = m[1];
+      }
+      return id ? `https://www.youtube.com/embed/${id}?playsinline=1&rel=0` : "";
+    } catch {
+      return "";
+    }
+  }, [broadcastYoutubeUrl]);
+
   const directInputItem = items[directInputTargetIndex] || null;
   const registeredOptionColorChoices = registeredOptionSelectProduct
     ? getSelectableRegisteredOptions(registeredOptionSelectProduct, "color")
@@ -3754,6 +3775,32 @@ export default function OrderPage() {
                 <span style={{ flexShrink: 0, width: "22px", height: "22px", borderRadius: "50%", background: "#7B2D43", color: "#fff", fontSize: "12px", fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>3</span>
                 <span style={{ fontSize: "14px", fontWeight: 700, color: "#333", lineHeight: 1.5 }}>안내된 계좌로 입금</span>
               </div>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {/* P3. 방송 영상 (방송 ON + URL 있을 때만) */}
+      {hasSavedInfo && isBroadcastOn && videoEmbedSrc ? (
+        <section style={{ margin: "8px auto 0", width: "100%", maxWidth: "560px" }}>
+          <button
+            type="button"
+            onClick={() => setVideoOpen((v) => !v)}
+            style={{ width: "100%", display: "flex", alignItems: "center", gap: "8px", border: "1px solid #D9C5CC", background: "#fff", borderRadius: "12px", padding: "12px 14px", fontSize: "14px", fontWeight: 800, color: "#7B2D43", cursor: "pointer" }}
+          >
+            📺 라이브 방송
+            <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#C0392B", borderRadius: "4px", padding: "2px 6px" }}>LIVE</span>
+            <span style={{ marginLeft: "auto", fontSize: "12px", color: "#7B2D43" }}>{videoOpen ? "접기 ▲" : "보기 ▼"}</span>
+          </button>
+          {videoOpen ? (
+            <div style={{ marginTop: "6px", borderRadius: "12px", overflow: "hidden", background: "#000", aspectRatio: "16 / 9" }}>
+              <iframe
+                src={videoEmbedSrc}
+                title="루루동이 라이브"
+                style={{ width: "100%", height: "100%", border: 0 }}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
             </div>
           ) : null}
         </section>
