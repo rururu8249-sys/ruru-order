@@ -23,6 +23,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 (없음)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-06-06 세션11(이벤트 패널 UI 시안 완전교체): AdminLiveEventRoulettePanel 렌더 JSX 전체를 시안 2단 레이아웃으로 교체(헤더 ◆이벤트+룰렛/인형뽑기탭+모드+초기화+✕ / 좌: conic-gradient 룰렛휠+화살표+가운데 당첨자오버레이+돌리기+위젯주소복사+이벤트목록[기간필터 오늘·주·월·날짜+달력, dateTimeFull 년월일(요일)시간] / 우: 참가자3버튼[활성방송기준·OFF비활성]+목록토글+채팅@파싱 / 당첨고정칩 / 당일중복금지·가중치(누적금액40%+당일60%) 토글 / 당첨선물 50:50). 룰렛=conic-gradient div(canvas 대신, 동일 모양·안정적). 기존 추첨/포인트/API/상태 로직 100% 보존, 렌더만 교체. 미사용 함수 일부 잔존(로직 보존 원칙). ※가중치·당일중복 토글은 UI 상태만(서버 추첨공식 연동은 P3), 입금완료 서버필터는 P2
 - 2026-06-06 세션10(이벤트 P1-B): 참가자 3버튼(주문서전체/입금완료/수동) · 불러오기 기준=현재 활성방송(activeBroadcastId prop, Dashboard 전달) · 방송OFF시 전체/입금완료 버튼 비활성+안내 · 목록 토글(기본숨김) · 채팅붙여넣기 @파싱(중복제거) · 당첨고정 칩클릭(select 이중목록 제거)+"👑 당첨고정:닉" 한줄 · 당첨선물 드롭다운(포인트/직접)50:50+포인트 쉼표포맷 · 돌리기 시 currentEvent=null로 이전당첨자 제거. 추첨/포인트/돈 로직 무변경. ※입금완료 서버필터(paidOnly)는 P2 연동 대기
 - 2026-06-06 세션10(이벤트 P1-A): 사이드바 "◆ 이벤트" 메뉴 추가(adminLiveMenu event 키) + AdminLiveEventRoulettePanel을 Dashboard에 항상마운트(controlled props renderTrigger/controlledOpen/onRequestClose, activeMenu=event일때 표시, 닫아도 상태유지) + 초기화 버튼(참가자+당첨고정+currentEvent 리셋). 추첨/포인트/주문 로직 무변경. ※기존 LiveHeader/LiveOrderTable의 "🎁 이벤트" 버튼 인스턴스는 잔존(별도 state) — 후속 정리 검토. ※P1 잔여=참가자3버튼/채팅@파싱/당첨고정칩/당첨선물 드롭다운(P1-B)
 - 2026-06-06 세션9-2: 카드결제 복사창 좌우분할 개선 — 💳카드결제 버튼 클릭 시 복사창+페이스터 동시열림(openPaysterRightHalf를 LiveOrderTable 클릭 제스처에서 호출→팝업차단 회피), 페이스터=화면 오른쪽절반(left=½/width=½/height=전체), 복사창 모달=화면 왼쪽절반 고정(fixed inset-y-0 left-0 md:w-1/2)
