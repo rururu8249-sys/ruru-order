@@ -19,73 +19,56 @@ type OrderEntryGateV2Props = {
 
 export default function OrderEntryGateV2({ onKakaoLogin }: OrderEntryGateV2Props) {
   return (
-    <section className="grid gap-4">
-      <section className="overflow-hidden rounded-[34px] bg-gradient-to-b from-white via-[#fdf5f1] to-[#faece7] px-5 pb-7 pt-7 shadow-[0_22px_55px_rgba(216,90,48,0.13)] ring-1 ring-coral-100">
-        <div className="mx-auto flex w-fit items-center justify-center gap-3 rounded-full bg-white/90 px-4 py-2 shadow-[0_10px_24px_rgba(216,90,48,0.10)] ring-1 ring-coral-100">
-          <div className="flex h-9 w-9 items-center justify-center rounded-[13px] bg-coral-600 text-[17px] font-black text-white shadow-[0_10px_20px_rgba(216,90,48,0.20)]">
+    <section style={{ display: "grid", gap: "16px" }}>
+      <section style={{ overflow: "hidden", borderRadius: "28px", background: "linear-gradient(to bottom, #ffffff, #F5E6EB)", padding: "28px 20px", border: "1px solid #D9C5CC", boxShadow: "0 22px 55px rgba(123,45,67,0.13)" }}>
+        <div style={{ margin: "0 auto", display: "flex", width: "fit-content", alignItems: "center", justifyContent: "center", gap: "12px", borderRadius: "999px", background: "rgba(255,255,255,0.9)", padding: "8px 16px", border: "1px solid #D9C5CC" }}>
+          <div style={{ display: "flex", height: "36px", width: "36px", alignItems: "center", justifyContent: "center", borderRadius: "13px", background: "#7B2D43", fontSize: "17px", fontWeight: 800, color: "#fff" }}>
             R
           </div>
-
-          <div className="text-[20px] font-black text-slate-400">×</div>
-
-          <div className="flex h-9 w-9 items-center justify-center rounded-[13px] bg-[#fee500] text-[13px] font-black text-[#241b17] shadow-[0_10px_20px_rgba(234,179,8,0.22)]">
+          <div style={{ fontSize: "20px", fontWeight: 800, color: "#bbb" }}>×</div>
+          <div style={{ display: "flex", height: "36px", width: "36px", alignItems: "center", justifyContent: "center", borderRadius: "13px", background: "#fee500", fontSize: "13px", fontWeight: 800, color: "#241b17" }}>
             TALK
           </div>
         </div>
 
-        <div className="mt-7 text-center">
-          <h1 className="break-keep text-[35px] font-black leading-[1.08] tracking-[-0.085em] text-[#151923]">
-            <span className="text-coral-600">주문은</span>
-            <span className="text-slate-950"> 카카오로 시작</span>
+        <div style={{ marginTop: "28px", textAlign: "center" }}>
+          <h1 style={{ wordBreak: "keep-all", fontSize: "35px", fontWeight: 800, lineHeight: 1.08, letterSpacing: "-0.085em", color: "#151923" }}>
+            <span style={{ color: "#7B2D43" }}>주문은</span>
+            <span style={{ color: "#151923" }}> 카카오로 시작</span>
           </h1>
-
-          <p className="mt-4 break-keep text-[20px] font-black leading-relaxed tracking-[-0.06em] text-slate-600">
+          <p style={{ marginTop: "16px", wordBreak: "keep-all", fontSize: "20px", fontWeight: 800, lineHeight: 1.6, letterSpacing: "-0.06em", color: "#666" }}>
             카카오 로그인 후 주문서를 작성합니다.
           </p>
         </div>
 
-        <div className="relative mt-7 overflow-hidden rounded-[32px] bg-gradient-to-br from-coral-50 via-white to-coral-100 px-4 pb-7 pt-7 shadow-inner ring-1 ring-coral-100">
-          <div className="pointer-events-none absolute -left-10 top-8 h-36 w-36 rounded-full bg-white/70 blur-2xl" />
-          <div className="pointer-events-none absolute -right-10 bottom-5 h-40 w-40 rounded-full bg-coral-300/35 blur-2xl" />
-          <div className="pointer-events-none absolute left-1/2 top-1/2 h-36 w-36 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#fee500]/18 blur-3xl" />
-
+        <div style={{ position: "relative", marginTop: "28px", overflow: "hidden", borderRadius: "28px", background: "#FAF6F2", border: "1px solid #D9C5CC", padding: "28px 16px" }}>
           <button
             type="button"
             onClick={onKakaoLogin}
-            className="relative z-10 mx-auto flex w-full max-w-[360px] items-center justify-center rounded-[26px] bg-[#fee500] px-5 py-5 text-[#241b17] shadow-[0_18px_36px_rgba(234,179,8,0.28)] ring-1 ring-yellow-200 transition active:scale-[0.98]"
+            style={{ position: "relative", zIndex: 10, margin: "0 auto", display: "flex", width: "100%", maxWidth: "360px", alignItems: "center", justifyContent: "center", borderRadius: "22px", border: "none", background: "#fee500", padding: "20px", color: "#241b17", boxShadow: "0 18px 36px rgba(234,179,8,0.28)", cursor: "pointer" }}
           >
-            <span className="mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#241b17] text-[12px] font-black text-[#fee500]">
+            <span style={{ marginRight: "12px", display: "flex", height: "40px", width: "40px", flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: "50%", background: "#241b17", fontSize: "12px", fontWeight: 800, color: "#fee500" }}>
               TALK
             </span>
-
-            <span className="min-w-0 flex-1 text-center text-[20px] font-black tracking-[-0.055em]">
+            <span style={{ minWidth: 0, flex: 1, textAlign: "center", fontSize: "20px", fontWeight: 800, letterSpacing: "-0.055em" }}>
               카카오로 주문 시작하기
             </span>
-
-            <span className="ml-3 text-[28px] font-black leading-none">›</span>
+            <span style={{ marginLeft: "12px", fontSize: "28px", fontWeight: 800, lineHeight: 1 }}>›</span>
           </button>
         </div>
 
-        <div className="mt-5 grid grid-cols-3 overflow-hidden rounded-[26px] bg-white/82 shadow-[0_12px_26px_rgba(216,90,48,0.08)] ring-1 ring-coral-100">
-          <div className="border-r border-coral-100 px-2 py-4 text-center">
-            <div className="text-[22px]">📍</div>
-            <div className="mt-1 break-keep text-[12px] font-black tracking-[-0.04em] text-slate-700">
-              정보확인
-            </div>
+        <div style={{ marginTop: "20px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", overflow: "hidden", borderRadius: "22px", background: "rgba(255,255,255,0.85)", border: "1px solid #D9C5CC" }}>
+          <div style={{ borderRight: "1px solid #D9C5CC", padding: "16px 8px", textAlign: "center" }}>
+            <div style={{ fontSize: "22px" }}>📍</div>
+            <div style={{ marginTop: "4px", wordBreak: "keep-all", fontSize: "12px", fontWeight: 800, color: "#555" }}>정보확인</div>
           </div>
-
-          <div className="border-r border-coral-100 px-2 py-4 text-center">
-            <div className="text-[22px]">📝</div>
-            <div className="mt-1 break-keep text-[12px] font-black tracking-[-0.04em] text-slate-700">
-              주문작성
-            </div>
+          <div style={{ borderRight: "1px solid #D9C5CC", padding: "16px 8px", textAlign: "center" }}>
+            <div style={{ fontSize: "22px" }}>📝</div>
+            <div style={{ marginTop: "4px", wordBreak: "keep-all", fontSize: "12px", fontWeight: 800, color: "#555" }}>주문작성</div>
           </div>
-
-          <div className="px-2 py-4 text-center">
-            <div className="text-[22px]">🔒</div>
-            <div className="mt-1 break-keep text-[12px] font-black tracking-[-0.04em] text-slate-700">
-              주문조회
-            </div>
+          <div style={{ padding: "16px 8px", textAlign: "center" }}>
+            <div style={{ fontSize: "22px" }}>🔒</div>
+            <div style={{ marginTop: "4px", wordBreak: "keep-all", fontSize: "12px", fontWeight: 800, color: "#555" }}>주문조회</div>
           </div>
         </div>
       </section>

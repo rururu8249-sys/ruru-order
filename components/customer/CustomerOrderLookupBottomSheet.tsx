@@ -37,30 +37,17 @@ const clampPage = (page: number, totalPages: number) => {
   return Math.min(Math.max(1, safePage), safeTotalPages);
 };
 
-const paymentChipClassName = (statusLabel: CustomerOrderLookupFilter) => {
-  // 시안 P9 배지색: 입금확인 초록 / 택배출고(출고완료) 파랑 / 입금대기 노랑 / 그 외(출고대기) 회색
-  if (statusLabel === "입금확인") {
-    return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100";
-  }
-
-  if (statusLabel === "출고완료") {
-    return "bg-blue-50 text-blue-700 ring-1 ring-blue-100";
-  }
-
-  if (statusLabel === "입금대기") {
-    return "bg-yellow-50 text-yellow-700 ring-1 ring-yellow-100";
-  }
-
-  return "bg-slate-100 text-slate-600 ring-1 ring-slate-100";
+// 시안 배지색(정확 hex): 입금확인 초록#0F6E56 / 택배출고(출고완료) 파랑#185FA5 / 입금대기 노랑#854F0B / 그 외(출고대기) 회색
+const paymentChipStyle = (statusLabel: CustomerOrderLookupFilter) => {
+  if (statusLabel === "입금확인") return { background: "#E1F5EE", color: "#0F6E56" };
+  if (statusLabel === "출고완료") return { background: "#E6F1FB", color: "#185FA5" };
+  if (statusLabel === "입금대기") return { background: "#FAEEDA", color: "#854F0B" };
+  return { background: "#EEEEEE", color: "#888888" };
 };
 
-const deliveryChipClassName = (deliveryLabel: string) => {
-  // 택배출고 = 파랑
-  if (/출고완료|택배출고|배송완료/.test(deliveryLabel)) {
-    return "bg-blue-600 text-white";
-  }
-
-  return "bg-slate-100 text-slate-500 ring-1 ring-slate-100";
+const deliveryChipStyle = (deliveryLabel: string) => {
+  if (/출고완료|택배출고|배송완료/.test(deliveryLabel)) return { background: "#185FA5", color: "#ffffff" };
+  return { background: "#EEEEEE", color: "#888888" };
 };
 
 export default function CustomerOrderLookupBottomSheet({
@@ -141,12 +128,14 @@ export default function CustomerOrderLookupBottomSheet({
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex min-w-0 items-center gap-1.5">
                           <span
-                            className={`rounded-full px-2.5 py-1 text-[11px] font-black tracking-[-0.04em] ${paymentChipClassName(item.statusLabel)}`}
+                            className="rounded-full px-2.5 py-1 text-[11px] font-black tracking-[-0.04em]"
+                            style={paymentChipStyle(item.statusLabel)}
                           >
                             {item.statusLabel}
                           </span>
                           <span
-                            className={`rounded-full px-2.5 py-1 text-[11px] font-black tracking-[-0.04em] ${deliveryChipClassName(deliveryLabel)}`}
+                            className="rounded-full px-2.5 py-1 text-[11px] font-black tracking-[-0.04em]"
+                            style={deliveryChipStyle(deliveryLabel)}
                           >
                             {deliveryLabel}
                           </span>

@@ -64,6 +64,7 @@ import OrderDepositConfirmModal from "@/components/order/OrderDepositConfirmModa
 import OrderCustomerInfoIntro from "@/components/order/OrderCustomerInfoIntro";
 import OrderCustomerInfoFormCard from "@/components/order/OrderCustomerInfoFormCard";
 import CustomerPaymentGuideBottomSheet from "@/components/customer/CustomerPaymentGuideBottomSheet";
+import CustomerPointGiftPopup from "@/components/customer/CustomerPointGiftPopup";
 import CustomerInfoEditBottomSheet from "@/components/customer/CustomerInfoEditBottomSheet";
 import CustomerOrderLookupBottomSheet, {
   type CustomerOrderLookupFilter,
@@ -981,26 +982,7 @@ export default function OrderPage() {
   const [copyDone, setCopyDone] = useState(false);
   const [nicknameCopyDone, setNicknameCopyDone] = useState(false);
   const [paymentGuideOpen, setPaymentGuideOpen] = useState(false);
-  const [firstOrderGuideOpen, setFirstOrderGuideOpen] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const hideUntil = Number(window.localStorage.getItem(ORDER_FIRST_GUIDE_HIDE_UNTIL_KEY) || 0);
-    if (!hideUntil || Date.now() > hideUntil) {
-      setFirstOrderGuideOpen(true);
-    }
-  }, []);
-
-  const closeFirstOrderGuide = (hideToday: boolean) => {
-    if (hideToday && typeof window !== "undefined") {
-      const endOfToday = new Date();
-      endOfToday.setHours(23, 59, 59, 999);
-      window.localStorage.setItem(ORDER_FIRST_GUIDE_HIDE_UNTIL_KEY, String(endOfToday.getTime()));
-    }
-
-    setFirstOrderGuideOpen(false);
-  };
+  const [orderSheetOpen, setOrderSheetOpen] = useState(false);
   const [customerInfoEditSheetOpen, setCustomerInfoEditSheetOpen] = useState(false);
   const [customerInfoEditSnapshot, setCustomerInfoEditSnapshot] = useState<{
     youtubeNickname: string;
@@ -3698,7 +3680,7 @@ export default function OrderPage() {
           <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
             <Link
               href="/order"
-              onClick={handleTopNavOrderClick}
+              onClick={(e) => { handleTopNavOrderClick(e); e.preventDefault(); setOrderSheetOpen(true); }}
               aria-label="주문서"
               style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: "5px", justifyContent: "center", height: "38px", padding: "0 11px", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#FAF6F2", textDecoration: "none" }}
             >
@@ -3785,6 +3767,8 @@ export default function OrderPage() {
   return (
     <OrderPageShell>
       {hasSavedInfo && <TopCustomerNav />}
+
+      <CustomerPointGiftPopup />
 
       {/* P2. 주문방법 접기/펼치기 (시안) */}
       {hasSavedInfo ? (
@@ -3905,7 +3889,7 @@ export default function OrderPage() {
                           onClick={() => selectQuickGroupBuyProduct(product as BroadcastProduct)}
                           style={{ position: "relative", textAlign: "left", border: `1.5px solid ${pinned ? "#7B2D43" : "#E8E2DD"}`, borderRadius: "14px", background: "#fff", padding: 0, overflow: "hidden", cursor: sold ? "default" : "pointer", opacity: sold ? 0.6 : 1 }}
                         >
-                          <div style={{ position: "relative", width: "100%", aspectRatio: "1 / 1", background: "#f3f0ee" }}>
+                          <div style={{ position: "relative", width: "100%", height: "160px", background: "#f3f0ee" }}>
                             {img ? (
                               <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                             ) : (
@@ -3943,6 +3927,8 @@ export default function OrderPage() {
             );
           })()}
 
+          {orderSheetOpen && (
+          <>
           <section className="mt-3 w-full max-w-full overflow-hidden rounded-[24px] border border-rose-line bg-rose-soft/40 p-3 shadow-sm">
             <div className="mb-4">
               <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
@@ -4221,6 +4207,9 @@ export default function OrderPage() {
                 </span>
               </label>
             )}
+          </section>
+          </>
+          )}
 
             <CustomerToastNotice
               open={Boolean(customerNotice.message)}
@@ -4243,7 +4232,6 @@ export default function OrderPage() {
             />
 
             {customerBlockStatus.blocked ? <CustomerBlockedNotice /> : null}
-          </section>
 
           {/* 옵션 없는 상품 담기 확인 팝업 */}
           {pendingAddProduct && (
@@ -4267,7 +4255,7 @@ export default function OrderPage() {
               <div style={{ width: "300px", maxWidth: "86%", background: "#fff", borderRadius: "20px", padding: "24px 22px", textAlign: "center", boxShadow: "0 18px 50px rgba(0,0,0,0.25)" }}>
                 <div style={{ fontSize: "18px", fontWeight: 800, color: "#7B2D43" }}>담았어요 ✓</div>
                 <div style={{ marginTop: "18px", display: "flex", gap: "8px" }}>
-                  <button type="button" onClick={() => { setCartAddedOpen(false); scrollToOrderProductList(); }} style={{ flex: 1, height: "48px", borderRadius: "14px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}>주문서 보기 ({items.filter((it) => it.product_name.trim()).length}개)</button>
+                  <button type="button" onClick={() => { setCartAddedOpen(false); setOrderSheetOpen(true); scrollToOrderProductList(); }} style={{ flex: 1, height: "48px", borderRadius: "14px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}>주문서 보기 ({items.filter((it) => it.product_name.trim()).length}개)</button>
                   <button type="button" onClick={() => setCartAddedOpen(false)} style={{ flex: 1, height: "48px", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", color: "#7B2D43", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}>계속 담기</button>
                 </div>
               </div>
@@ -4288,11 +4276,18 @@ export default function OrderPage() {
                   {registeredOptionColorChoices.length > 0 ? (
                     <div style={{ marginBottom: "16px" }}>
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>색상</div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                        {registeredOptionColorChoices.map((option) => (
-                          <button key={`c-${option}`} type="button" onClick={() => setRegisteredOptionColor(option)} style={{ minHeight: "46px", borderRadius: "14px", border: `1.5px solid ${registeredOptionColor === option ? "#7B2D43" : "#E8E2DD"}`, background: registeredOptionColor === option ? "#7B2D43" : "#fff", color: registeredOptionColor === option ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}>{option}</button>
-                        ))}
-                      </div>
+                      {registeredOptionColorChoices.length >= 3 ? (
+                        <select value={registeredOptionColor} onChange={(e) => setRegisteredOptionColor(e.target.value)} style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: `1.5px solid ${!registeredOptionColor.trim() ? "#E8B5B0" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: registeredOptionColor ? "#222" : "#999", outline: "none" }}>
+                          <option value="">색상 선택</option>
+                          {registeredOptionColorChoices.map((option) => <option key={`c-${option}`} value={option}>{option}</option>)}
+                        </select>
+                      ) : (
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                          {registeredOptionColorChoices.map((option) => (
+                            <button key={`c-${option}`} type="button" onClick={() => setRegisteredOptionColor(option)} style={{ minHeight: "46px", borderRadius: "14px", border: `1.5px solid ${registeredOptionColor === option ? "#7B2D43" : "#E8E2DD"}`, background: registeredOptionColor === option ? "#7B2D43" : "#fff", color: registeredOptionColor === option ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}>{option}</button>
+                          ))}
+                        </div>
+                      )}
                       {!registeredOptionColor.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>색상을 선택해주세요</div> : null}
                     </div>
                   ) : null}
@@ -4308,11 +4303,18 @@ export default function OrderPage() {
                   {registeredOptionSizeChoices.length > 0 ? (
                     <div style={{ marginBottom: "16px" }}>
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>사이즈</div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
-                        {registeredOptionSizeChoices.map((option) => (
-                          <button key={`s-${option}`} type="button" onClick={() => setRegisteredOptionSize(option)} style={{ minHeight: "46px", borderRadius: "14px", border: `1.5px solid ${registeredOptionSize === option ? "#7B2D43" : "#E8E2DD"}`, background: registeredOptionSize === option ? "#7B2D43" : "#fff", color: registeredOptionSize === option ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}>{option}</button>
-                        ))}
-                      </div>
+                      {registeredOptionSizeChoices.length >= 3 ? (
+                        <select value={registeredOptionSize} onChange={(e) => setRegisteredOptionSize(e.target.value)} style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: `1.5px solid ${!registeredOptionSize.trim() ? "#E8B5B0" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: registeredOptionSize ? "#222" : "#999", outline: "none" }}>
+                          <option value="">사이즈 선택</option>
+                          {registeredOptionSizeChoices.map((option) => <option key={`s-${option}`} value={option}>{option}</option>)}
+                        </select>
+                      ) : (
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+                          {registeredOptionSizeChoices.map((option) => (
+                            <button key={`s-${option}`} type="button" onClick={() => setRegisteredOptionSize(option)} style={{ minHeight: "46px", borderRadius: "14px", border: `1.5px solid ${registeredOptionSize === option ? "#7B2D43" : "#E8E2DD"}`, background: registeredOptionSize === option ? "#7B2D43" : "#fff", color: registeredOptionSize === option ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}>{option}</button>
+                          ))}
+                        </div>
+                      )}
                       {!registeredOptionSize.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>사이즈를 선택해주세요</div> : null}
                     </div>
                   ) : null}
@@ -4576,48 +4578,6 @@ export default function OrderPage() {
         </>
       )}
 
-        {firstOrderGuideOpen ? (
-          <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/35 px-3 pb-3">
-            <section
-              role="dialog"
-              aria-modal="true"
-              className="w-full max-w-[430px] overflow-hidden rounded-t-[30px] bg-white shadow-[0_-24px_80px_rgba(15,23,42,0.25)] ring-1 ring-white/70"
-            >
-              <div className="grid gap-4 p-5">
-                <div className="text-center">
-                  <div className="text-[24px] font-black tracking-[-0.07em] text-slate-950">
-                    처음이신가요?
-                  </div>
-                </div>
-
-                <div className="grid gap-3 rounded-[24px] bg-slate-50 p-4 text-[15px] font-bold leading-relaxed tracking-[-0.04em] text-slate-700 ring-1 ring-slate-100">
-                  <p className="font-black text-slate-950">주문하는 법이에요.</p>
-                  <p>① 상품 이름을 <span className="font-black text-rose-deep">검색</span>하거나, 목록에서 <span className="font-black text-rose-deep">[담기]</span>를 눌러요.</p>
-                  <p>② 없는 상품은 <span className="font-black text-slate-950">[직접 입력]</span>으로 담아요.</p>
-                  <p>③ 다 담으면 <span className="font-black text-rose-deep">[주문서 제출]</span>을 눌러요.</p>
-                  <p className="text-[14px] text-amber-700">④ 입금자명·금액이 다르면 입금확인이 늦어져요.</p>
-                </div>
-
-                <div className="grid grid-cols-[1fr_1fr] gap-2">
-                  <button
-                    type="button"
-                    onClick={() => closeFirstOrderGuide(true)}
-                    className="min-h-[54px] rounded-[18px] border border-slate-200 bg-white px-3 py-3 text-[15px] font-black tracking-[-0.05em] text-slate-700 transition active:scale-[0.98]"
-                  >
-                    오늘 하루 보지 않기
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => closeFirstOrderGuide(false)}
-                    className="min-h-[54px] rounded-[18px] bg-rose-deep px-3 py-3 text-[17px] font-black tracking-[-0.05em] text-white shadow-[0_12px_24px_rgba(216,90,48,0.25)] transition active:scale-[0.98]"
-                  >
-                    확인
-                  </button>
-                </div>
-              </div>
-            </section>
-          </div>
-        ) : null}
 
         {menuSheetOpen ? (
           <div

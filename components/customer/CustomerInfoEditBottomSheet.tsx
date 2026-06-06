@@ -31,13 +31,13 @@ type CustomerInfoEditBottomSheetProps = {
 };
 
 const inputClassName =
-  "h-12 w-full rounded-[16px] bg-slate-50 px-4 text-[15px] font-black tracking-[-0.05em] text-slate-950 outline-none ring-1 ring-slate-100 transition placeholder:text-slate-300 focus:bg-white focus:ring-2 focus:ring-coral-500/30";
+  "h-12 w-full rounded-[16px] bg-slate-50 px-4 text-[15px] font-black tracking-[-0.05em] text-slate-950 outline-none ring-1 ring-slate-100 transition placeholder:text-slate-300 focus:bg-white focus:ring-2 focus:ring-rose-deep/30";
 
 const phoneInputClassName =
-  "h-12 w-full rounded-[16px] bg-slate-50 px-3 text-[14px] font-black tracking-[-0.065em] text-slate-950 outline-none ring-1 ring-slate-100 transition placeholder:text-slate-300 focus:bg-white focus:ring-2 focus:ring-coral-500/30";
+  "h-12 w-full rounded-[16px] bg-slate-50 px-3 text-[14px] font-black tracking-[-0.065em] text-slate-950 outline-none ring-1 ring-slate-100 transition placeholder:text-slate-300 focus:bg-white focus:ring-2 focus:ring-rose-deep/30";
 
 const addressTextareaClassName =
-  "min-h-12 max-h-24 w-full resize-none overflow-hidden rounded-[16px] bg-slate-50 px-4 py-3 text-[15px] font-black leading-[1.45] tracking-[-0.055em] text-slate-950 outline-none ring-1 ring-slate-100 transition placeholder:text-slate-300 focus:bg-white focus:ring-2 focus:ring-coral-500/30";
+  "min-h-12 max-h-24 w-full resize-none overflow-hidden rounded-[16px] bg-slate-50 px-4 py-3 text-[15px] font-black leading-[1.45] tracking-[-0.055em] text-slate-950 outline-none ring-1 ring-slate-100 transition placeholder:text-slate-300 focus:bg-white focus:ring-2 focus:ring-rose-deep/30";
 
 const labelClassName =
   "mb-1.5 block text-[12px] font-black tracking-[-0.04em] text-slate-500";
@@ -217,7 +217,7 @@ export default function CustomerInfoEditBottomSheet({
               type="button"
               onClick={onSave}
               disabled={saving}
-              className="flex min-h-[50px] items-center justify-center rounded-[18px] bg-coral-600 px-3 text-[15px] font-black tracking-[-0.05em] text-white shadow-[0_12px_28px_rgba(216,90,48,0.22)] transition active:scale-[0.98] disabled:bg-slate-300 disabled:shadow-none"
+              className="flex min-h-[50px] items-center justify-center rounded-[18px] bg-rose-deep px-3 text-[15px] font-black tracking-[-0.05em] text-white shadow-[0_12px_28px_rgba(216,90,48,0.22)] transition active:scale-[0.98] disabled:bg-slate-300 disabled:shadow-none"
             >
               {saving ? "저장 중..." : "저장"}
             </button>

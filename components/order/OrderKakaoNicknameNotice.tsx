@@ -24,28 +24,25 @@ export default function OrderKakaoNicknameNotice({
   const isEmpty = youtubeNickname.trim().length === 0;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/68 px-3 py-4 backdrop-blur-[3px]">
-      <section className="max-h-[92svh] w-full max-w-[430px] overflow-y-auto rounded-[30px] bg-white shadow-[0_30px_90px_rgba(15,23,42,0.42)] ring-1 ring-white/70">
-        <div className="bg-gradient-to-b from-white via-white to-coral-50 px-4 pb-5 pt-5 sm:px-6 sm:pb-7 sm:pt-6">
-          <div className="mx-auto mb-4 flex w-fit items-center gap-2 rounded-full bg-[#fee500] px-4 py-2 text-[13px] font-black tracking-[-0.04em] text-[#241b17] shadow-sm">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#241b17] text-[14px] text-[#fee500]">
-              TALK
-            </span>
+    <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.68)", padding: "16px 12px" }}>
+      <section style={{ maxHeight: "92svh", width: "100%", maxWidth: "430px", overflowY: "auto", borderRadius: "28px", background: "#fff", boxShadow: "0 30px 90px rgba(15,23,42,0.42)" }}>
+        <div style={{ background: "linear-gradient(to bottom, #ffffff, #F5E6EB)", padding: "22px 18px" }}>
+          <div style={{ margin: "0 auto 16px", display: "flex", width: "fit-content", alignItems: "center", gap: "8px", borderRadius: "999px", background: "#fee500", padding: "8px 16px", fontSize: "13px", fontWeight: 800, color: "#241b17" }}>
+            <span style={{ display: "flex", height: "28px", width: "28px", alignItems: "center", justifyContent: "center", borderRadius: "50%", background: "#241b17", fontSize: "12px", color: "#fee500" }}>TALK</span>
             카카오 로그인 완료
           </div>
 
-          <div className="text-center">
-            <h2 className="break-keep text-[24px] font-black leading-[1.15] tracking-[-0.07em] text-[#151923] sm:text-[28px]">
+          <div style={{ textAlign: "center" }}>
+            <h2 style={{ wordBreak: "keep-all", fontSize: "25px", fontWeight: 800, lineHeight: 1.15, letterSpacing: "-0.07em", color: "#151923" }}>
               유튜브 닉네임을 입력해 주세요
             </h2>
-
-            <p className="mt-2 break-keep text-[15px] font-black leading-relaxed tracking-[-0.04em] text-coral-700">
+            <p style={{ marginTop: "8px", wordBreak: "keep-all", fontSize: "15px", fontWeight: 800, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#7B2D43" }}>
               방송 채팅에서 쓰는 이름으로 주문·입금을 확인해요.
             </p>
           </div>
 
-          <div className="mt-4">
-            <label className="mb-2 block text-[15px] font-black tracking-[-0.04em] text-slate-800">
+          <div style={{ marginTop: "16px" }}>
+            <label htmlFor="youtubeNicknameInput" style={{ marginBottom: "8px", display: "block", fontSize: "15px", fontWeight: 800, letterSpacing: "-0.04em", color: "#333" }}>
               유튜브 닉네임 입력
             </label>
 
@@ -60,20 +57,16 @@ export default function OrderKakaoNicknameNotice({
               }}
               placeholder="예) BTS, 블랙핑크, 홍길동"
               autoFocus
-              className={`w-full rounded-[22px] border bg-white px-4 py-4 text-[17px] font-black tracking-[-0.04em] text-[#151923] outline-none shadow-inner placeholder:text-slate-400 focus:ring-4 ${
-                errorMessage
-                  ? "border-red-300 focus:border-red-400 focus:ring-red-100"
-                  : "border-coral-100 focus:border-coral-500 focus:ring-coral-100"
-              }`}
+              style={{ width: "100%", boxSizing: "border-box", borderRadius: "18px", border: `1.5px solid ${errorMessage ? "#FCA5A5" : "#D9C5CC"}`, background: "#fff", padding: "16px", fontSize: "17px", fontWeight: 800, letterSpacing: "-0.04em", color: "#151923", outline: "none" }}
             />
 
             {errorMessage && (
-              <div className="mt-3 whitespace-pre-line break-keep rounded-[20px] border border-red-200 bg-red-50 px-4 py-3 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-red-700">
+              <div style={{ marginTop: "12px", whiteSpace: "pre-line", wordBreak: "keep-all", borderRadius: "16px", border: "1px solid #FECACA", background: "#FEF2F2", padding: "12px 16px", fontSize: "13px", fontWeight: 800, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#B91C1C" }}>
                 {errorMessage}
               </div>
             )}
 
-            <div className="mt-3 break-keep rounded-[20px] bg-coral-50 px-4 py-3 text-center text-[12px] font-black leading-relaxed tracking-[-0.04em] text-coral-700">
+            <div style={{ marginTop: "12px", wordBreak: "keep-all", borderRadius: "16px", background: "#F5E6EB", padding: "12px 16px", textAlign: "center", fontSize: "12px", fontWeight: 800, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#7B2D43" }}>
               닉네임이 중복되면
               <br />
               닉네임 뒤에 전화번호 끝 4자리를 붙여 입력해 주세요.
@@ -85,11 +78,7 @@ export default function OrderKakaoNicknameNotice({
               type="button"
               disabled={isEmpty}
               onClick={() => void onConfirm()}
-              className={`mt-4 flex w-full items-center justify-center rounded-[22px] px-4 py-4 text-[16px] font-black tracking-[-0.05em] transition active:scale-[0.98] ${
-                isEmpty
-                  ? "bg-slate-200 text-slate-400 shadow-none"
-                  : "bg-coral-600 text-white shadow-[0_16px_32px_rgba(216,90,48,0.28)]"
-              }`}
+              style={{ marginTop: "16px", display: "flex", width: "100%", alignItems: "center", justifyContent: "center", borderRadius: "18px", border: "none", padding: "16px", fontSize: "16px", fontWeight: 800, letterSpacing: "-0.05em", cursor: isEmpty ? "default" : "pointer", background: isEmpty ? "#E5E5E5" : "#7B2D43", color: isEmpty ? "#999" : "#fff" }}
             >
               {isEmpty ? "유튜브 닉네임을 입력해 주세요" : "유튜브 닉네임 저장하고 주문서 작성하기"}
             </button>
