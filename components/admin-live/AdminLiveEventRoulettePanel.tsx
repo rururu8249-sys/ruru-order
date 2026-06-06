@@ -131,6 +131,21 @@ function dateTime(value: unknown) {
   });
 }
 
+// 년월일(요일) 시간 — 예: 2026.06.06(금) 21:40
+function dateTimeFull(value: unknown) {
+  const raw = String(value || "");
+  if (!raw) return "-";
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return raw;
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const wd = ["일", "월", "화", "수", "목", "금", "토"][d.getDay()];
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `${yy}.${mm}.${dd}(${wd}) ${hh}:${mi}`;
+}
+
 function modeLabel(mode: RouletteMode) {
   if (mode === "live") return "실제 운영";
   if (mode === "test") return "테스트";
@@ -221,6 +236,11 @@ export default function AdminLiveEventRoulettePanel({
   const [showParticipantList, setShowParticipantList] = useState(false);
   const [giftType, setGiftType] = useState<"point" | "custom">("point");
   const [giftPointAmount, setGiftPointAmount] = useState("");
+  // 시안 신규 UI 상태 (추첨 로직 무변경 — 표시/선택용)
+  const [excludeDailyDup, setExcludeDailyDup] = useState(true);
+  const [useWeight, setUseWeight] = useState(false);
+  const [listPeriod, setListPeriod] = useState<"today" | "week" | "month" | "date">("today");
+  const [listDate, setListDate] = useState("");
 
 
   const overlayUrl = useMemo(() => buildOverlayUrl(currentEvent), [currentEvent]);
@@ -259,6 +279,43 @@ export default function AdminLiveEventRoulettePanel({
   const recentWinners = winners.slice(0, 100);
   const autoParticipantCount = participants.length;
   const manualParticipantCount = manualParticipants.length;
+
+  // 룰렛 휠 색상(시안 팔레트) + conic-gradient (참가자 N등분)
+  const WHEEL_COLORS = ["#ec4899", "#fb7185", "#f59e0b", "#22c55e", "#06b6d4", "#3b82f6", "#8b5cf6", "#7c3aed"];
+  const wheelCount = Math.max(finalParticipants.length, 1);
+  const wheelGradient = `conic-gradient(${Array.from({ length: wheelCount })
+    .map((_, i) => {
+      const start = (i / wheelCount) * 100;
+      const end = ((i + 1) / wheelCount) * 100;
+      return `${WHEEL_COLORS[i % WHEEL_COLORS.length]} ${start}% ${end}%`;
+    })
+    .join(", ")})`;
+
+  // 이벤트목록 기간필터 (오늘/이번주/이번달/날짜선택) — winner_at 기준 클라이언트 필터
+  const filteredWinners = useMemo(() => {
+    const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const now = new Date();
+    let from = 0;
+    let to = Number.MAX_SAFE_INTEGER;
+    if (listPeriod === "today") {
+      from = startOf(now);
+    } else if (listPeriod === "week") {
+      const day = (now.getDay() + 6) % 7; // 월요일 시작
+      from = startOf(now) - day * 86400000;
+    } else if (listPeriod === "month") {
+      from = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    } else if (listPeriod === "date" && listDate) {
+      const picked = new Date(listDate);
+      from = startOf(picked);
+      to = from + 86400000;
+    }
+    return recentWinners.filter((w) => {
+      const raw = String(w.winner_at || "");
+      const t = raw ? new Date(raw).getTime() : 0;
+      if (!Number.isFinite(t) || t === 0) return listPeriod === "today" ? false : true;
+      return t >= from && t < to;
+    });
+  }, [recentWinners, listPeriod, listDate]);
 
   const openEventPanel = () => {
     setInternalOpen(true);
@@ -785,6 +842,15 @@ export default function AdminLiveEventRoulettePanel({
   };
 
 
+  const startSpin = eventTab === "roulette" ? startRouletteOneClick : startClawEvent;
+  const widgetUrl = eventTab === "roulette" ? overlayUrl : clawOverlayUrl;
+  const periodChips: { key: "today" | "week" | "month" | "date"; label: string }[] = [
+    { key: "today", label: "오늘" },
+    { key: "week", label: "이번주" },
+    { key: "month", label: "이번달" },
+    { key: "date", label: "날짜선택" },
+  ];
+
   return (
     <>
       {renderTrigger ? (
@@ -794,554 +860,244 @@ export default function AdminLiveEventRoulettePanel({
       ) : null}
 
       {open ? (
-        <div
-          className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm"
-          data-ruru-event-ui-shell="event-panel-b19-ultra-compact-current-card"
-        >
-          <section className="flex h-[calc(100vh-24px)] w-[min(1580px,calc(100vw-24px))] flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-2xl">
-            <header className="shrink-0 border-b border-slate-200 bg-white px-6 py-3">
-              <div className="flex items-start justify-between gap-5">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-50 text-2xl">🎁</div>
-                    <div className="min-w-0">
-                      <div className="text-[30px] font-black leading-none tracking-tight text-slate-950">이벤트</div>
-                      <div className="mt-2 text-sm font-bold text-slate-500">룰렛과 인형뽑기를 같은 방식으로 관리합니다.</div>
-                    </div>
-                  </div>
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm">
+          <section className="flex h-[calc(100vh-24px)] w-[min(1400px,calc(100vw-24px))] flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
 
-                  <div className="mt-3 inline-flex rounded-2xl bg-slate-100 p-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEventTab("roulette");
-                        setCurrentEvent(null);
-                        setSpinning(false);
-                      }}
-                      className={[
-                        "h-10 rounded-xl px-10 text-sm font-black transition active:scale-[0.98]",
-                        eventTab === "roulette" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-800",
-                      ].join(" ")}
-                    >
-                      룰렛
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEventTab("claw");
-                        setCurrentEvent(null);
-                        setSpinning(false);
-                      }}
-                      className={[
-                        "h-10 rounded-xl px-10 text-sm font-black transition active:scale-[0.98]",
-                        eventTab === "claw" ? "bg-violet-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-800",
-                      ].join(" ")}
-                    >
-                      인형뽑기
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex shrink-0 items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => changeMode("test")}
-                    className={`h-10 rounded-xl px-5 text-sm font-black ring-1 transition active:scale-[0.98] ${
-                      mode === "test"
-                        ? "bg-amber-50 text-amber-700 ring-amber-200"
-                        : "bg-white text-slate-500 ring-slate-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    🧪 테스트 모드
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => changeMode("live")}
-                    className={`h-10 rounded-xl px-5 text-sm font-black ring-1 transition active:scale-[0.98] ${
-                      mode === "live"
-                        ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                        : "bg-white text-slate-500 ring-slate-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    • 운영 모드
-                  </button>
-                </div>
+            {/* 헤더: ◆ 이벤트 + 룰렛/인형뽑기 탭 + 모드 + 초기화 + ✕ */}
+            <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 px-5 py-3">
+              <div className="mr-1 text-[20px] font-black text-slate-950">◆ 이벤트</div>
+              <div className="inline-flex rounded-2xl bg-slate-100 p-1">
+                <button type="button" onClick={() => { setEventTab("roulette"); setCurrentEvent(null); setSpinning(false); }}
+                  className={["h-9 rounded-xl px-6 text-sm font-black transition", eventTab === "roulette" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"].join(" ")}>룰렛</button>
+                <button type="button" onClick={() => { setEventTab("claw"); setCurrentEvent(null); setSpinning(false); }}
+                  className={["h-9 rounded-xl px-6 text-sm font-black transition", eventTab === "claw" ? "bg-violet-600 text-white shadow-sm" : "text-slate-500"].join(" ")}>인형뽑기</button>
               </div>
-
-              <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <div
-                  className={`flex min-h-[46px] items-center rounded-2xl border px-4 py-2 text-sm font-black ${
-                    mode === "live"
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                      : "border-amber-200 bg-amber-50 text-amber-800"
-                  }`}
-                >
-                  {mode === "live"
-                    ? "현재 운영 모드입니다. 실제 운영 기록으로 저장됩니다."
-                    : "⚠ 현재 테스트 모드입니다. 실제 운영 기록과 구분됩니다."}
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="flex min-h-[46px] items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3">
-                    <div className="shrink-0 text-xs font-black text-slate-950">룰렛 위젯</div>
-                    <div className="min-w-0 flex-1 truncate rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-600 ring-1 ring-slate-100">
-                      {overlayUrl || "룰렛 위젯주소 준비중"}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => void copyText(overlayUrl)}
-                      disabled={!overlayUrl}
-                      className="h-9 shrink-0 rounded-xl bg-violet-600 px-3 text-xs font-black text-white disabled:opacity-50"
-                    >
-                      복사
-                    </button>
-                  </div>
-
-                  <div className="flex min-h-[46px] items-center gap-2 rounded-2xl border border-pink-200 bg-pink-50 px-3">
-                    <div className="shrink-0 text-xs font-black text-pink-900">인형뽑기 위젯</div>
-                    <div className="min-w-0 flex-1 truncate rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-600 ring-1 ring-pink-100">
-                      {clawOverlayUrl || "인형뽑기 위젯주소 준비중"}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => void copyText(clawOverlayUrl)}
-                      disabled={!clawOverlayUrl}
-                      className="h-9 shrink-0 rounded-xl bg-pink-600 px-3 text-xs font-black text-white disabled:opacity-50"
-                    >
-                      복사
-                    </button>
-                  </div>
-                </div>
+              <div className="inline-flex rounded-2xl bg-slate-100 p-1">
+                <button type="button" onClick={() => changeMode("test")}
+                  className={["h-9 rounded-xl px-3 text-xs font-black transition", mode === "test" ? "bg-amber-100 text-amber-700" : "text-slate-500"].join(" ")}>🧪 테스트</button>
+                <button type="button" onClick={() => changeMode("live")}
+                  className={["h-9 rounded-xl px-3 text-xs font-black transition", mode === "live" ? "bg-emerald-100 text-emerald-700" : "text-slate-500"].join(" ")}>운영</button>
+              </div>
+              <div className="ml-auto flex items-center gap-2">
+                <button type="button" onClick={resetEvent}
+                  className="h-9 rounded-2xl border border-rose-line bg-rose-soft px-4 text-xs font-black text-rose-deep transition hover:bg-rose-soft/80">↺ 초기화</button>
+                <button type="button" onClick={closePanel}
+                  className="flex h-9 w-9 items-center justify-center rounded-2xl text-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">✕</button>
               </div>
             </header>
 
-            <div className="min-h-0 flex-1 overflow-hidden bg-slate-50 px-4 py-3">
-              <div className="grid h-full min-h-0 gap-4 xl:grid-cols-[minmax(0,1.35fr)_420px]">
-                <main className="min-h-0 overflow-hidden rounded-[26px] border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="mb-3 flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="text-lg font-black text-slate-950">1. 참가자 설정</div>
-                      <div className={["mt-1 text-xs font-bold", liveBroadcastId ? "text-slate-500" : "text-amber-600"].join(" ")}>
-                        {liveBroadcastId
-                          ? "현재 방송 기준으로 주문서 전체 / 입금완료 명단을 불러옵니다."
-                          : "⚠ 방송 OFF — 방송 시작 후 주문서 전체 / 입금완료를 불러올 수 있어요. (수동 입력은 가능)"}
-                      </div>
-                    </div>
+            {/* 본문 2단 */}
+            <div className="grid min-h-0 flex-1 gap-4 overflow-hidden bg-slate-50 p-4 xl:grid-cols-[minmax(0,1fr)_440px]">
 
-                    <div className="inline-flex shrink-0 rounded-2xl bg-slate-100 p-1">
-                      <button
-                        type="button"
-                        onClick={() => changeParticipantSource("auto")}
-                        disabled={!liveBroadcastId}
-                        title={!liveBroadcastId ? "방송 시작 후 사용할 수 있어요" : undefined}
-                        className={[
-                          "h-10 rounded-xl px-4 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-40",
-                          participantSource === "auto" ? "bg-rose-deep text-white shadow-sm" : "text-slate-500",
-                        ].join(" ")}
-                      >
-                        주문서 전체
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => changeParticipantSource("paid")}
-                        disabled={!liveBroadcastId}
-                        title={!liveBroadcastId ? "방송 시작 후 사용할 수 있어요" : undefined}
-                        className={[
-                          "h-10 rounded-xl px-4 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-40",
-                          participantSource === "paid" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-500",
-                        ].join(" ")}
-                      >
-                        입금완료
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => changeParticipantSource("manual")}
-                        className={[
-                          "h-10 rounded-xl px-4 text-xs font-black transition",
-                          participantSource === "manual" ? "bg-violet-600 text-white shadow-sm" : "text-slate-500",
-                        ].join(" ")}
-                      >
-                        수동 입력
-                      </button>
-                    </div>
-                  </div>
+              {/* 좌측: 당첨고정 + 룰렛 + 돌리기 + 위젯주소 + 이벤트목록 */}
+              <div className="flex min-h-0 flex-col gap-3 overflow-y-auto pr-1">
+                {fixedWinnerNickname ? (
+                  <div className="rounded-2xl bg-rose-deep px-4 py-2 text-center text-sm font-black text-white">👑 당첨고정: {fixedWinnerNickname}</div>
+                ) : null}
 
-                  <div className="grid h-[calc(100%-54px)] min-h-0 gap-4 xl:grid-cols-[300px_minmax(0,1fr)_300px]">
-                    <div className="grid min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-3">
-                      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                        <div className="mb-2 text-xs font-black text-slate-500">방송리스트</div>
-                        <select
-                          value={broadcastId}
-                          onChange={(event) => changeBroadcast(event.target.value)}
-                          className="h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-rose-line"
-                        >
-                          <option value="">방송을 선택하세요</option>
-                          {broadcasts.map((broadcast) => (
-                            <option key={broadcast.id} value={broadcast.id}>
-                              {broadcast.label}
-                            </option>
-                          ))}
-                        </select>
-
-                        <button
-                          type="button"
-                          onClick={() => void loadParticipants(mode, sourceDate, broadcastId)}
-                          disabled={loading}
-                          className="mt-3 h-[44px] w-full rounded-2xl bg-rose-deep px-3 text-sm font-black text-white shadow-sm transition hover:bg-rose-deep disabled:bg-slate-300"
-                        >
-                          {loading ? "불러오는중..." : "주문서 명단 불러오기"}
-                        </button>
-                      </div>
-
-                      <div className="rounded-3xl border border-slate-200 bg-white p-4">
-                        <div className="mb-2 text-xs font-black text-slate-500">이벤트 제목</div>
-                        <input
-                          value={title}
-                          onChange={(event) => setTitle(event.target.value)}
-                          maxLength={30}
-                          className="h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-rose-line"
-                        />
-
-                        <div className="mb-2 mt-4 text-xs font-black text-slate-500">당첨 선물</div>
-                        <div className="flex gap-2">
-                          <select
-                            value={giftType}
-                            onChange={(event) => {
-                              const next = event.target.value as "point" | "custom";
-                              setGiftType(next);
-                              if (next === "point") {
-                                setWinnerNote(`포인트 ${Number(giftPointAmount || 0).toLocaleString("ko-KR")}P`);
-                              }
-                            }}
-                            className="h-[44px] w-1/2 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-blue-400"
-                          >
-                            <option value="point">포인트</option>
-                            <option value="custom">직접입력</option>
-                          </select>
-                          {giftType === "point" ? (
-                            <input
-                              value={giftPointAmount ? Number(giftPointAmount).toLocaleString("ko-KR") : ""}
-                              onChange={(event) => {
-                                const digits = event.target.value.replace(/[^0-9]/g, "");
-                                setGiftPointAmount(digits);
-                                setWinnerNote(`포인트 ${Number(digits || 0).toLocaleString("ko-KR")}P`);
-                              }}
-                              inputMode="numeric"
-                              placeholder="포인트 금액"
-                              className="h-[44px] w-1/2 rounded-2xl border border-slate-200 bg-white px-3 text-right text-sm font-black text-slate-900 outline-none transition focus:border-blue-400"
-                            />
-                          ) : (
-                            <input
-                              value={winnerNote}
-                              onChange={(event) => setWinnerNote(event.target.value)}
-                              maxLength={40}
-                              placeholder="예: 선물이모티콘"
-                              className="h-[44px] w-1/2 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-blue-400"
-                            />
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="min-h-0 overflow-hidden rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-pink-50 p-4">
-                        <div className="flex h-full min-h-[120px] flex-col justify-between">
-                          <div>
-                            <div className="text-[10px] font-black text-violet-500">현재 선택된 이벤트</div>
-                            <div className="mt-1 text-lg font-black tracking-tight text-slate-950">
-                              {eventTab === "roulette" ? "🎡 룰렛 이벤트" : "🕹️ 인형뽑기 이벤트"}
-                            </div>
-                            <div className="mt-2 text-[11px] font-bold leading-5 text-slate-500">
-                              {eventTab === "roulette"
-                                ? "자동 명단 또는 수동 입력 명단으로 룰렛 당첨자를 뽑습니다."
-                                : "주문서 명단 또는 수동 입력 명단으로 당첨자를 뽑습니다."}
-                            </div>
-                          </div>
-
-                          <div className="mt-3 rounded-2xl bg-white/80 px-3 py-2 text-[11px] font-black text-slate-600 ring-1 ring-violet-100">
-                            {participantSource === "manual" ? "수동 입력 기준" : participantSource === "paid" ? "입금완료 기준" : "주문서 전체 기준"} · {finalParticipants.length.toLocaleString("ko-KR")}명
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border-2 border-violet-100 bg-white">
-                      <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_92px] items-end gap-3 border-b border-slate-100 px-4 py-3">
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-black text-slate-950">주문서 작성자 명단 자동</div>
-                          <div className="mt-1 text-xs font-bold text-slate-400">
-                            총 {autoParticipantCount.toLocaleString("ko-KR")}명 · 닉네임 기준 중복 제거
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setShowParticipantList((v) => !v)}
-                          className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-1.5 text-[11px] font-black text-violet-700 transition hover:bg-violet-100"
-                        >
-                          {showParticipantList ? "목록 숨김" : "목록 보기"}
-                        </button>
-                      </div>
-
-                      <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto">
-                        {!showParticipantList ? (
-                          <div className="flex h-full min-h-[260px] items-center justify-center px-4 text-center text-sm font-bold leading-6 text-slate-400">
-                            참가자 {autoParticipantCount.toLocaleString("ko-KR")}명<br />“목록 보기”로 펼쳐서 확인하세요.
-                          </div>
-                        ) : participants.length === 0 ? (
-                          <div className="flex h-full min-h-[260px] items-center justify-center px-4 text-center text-sm font-bold leading-6 text-slate-400">
-                            자동 명단이 없습니다.<br />방송리스트 선택 후 명단을 불러오세요.
-                          </div>
-                        ) : (
-                          participants.slice(0, 260).map((item, index) => (
-                            <div
-                              key={`${item.nickname}-${item.order_ids?.join("-") || index}`}
-                              className="grid grid-cols-[34px_minmax(0,1fr)_110px] items-center gap-3 px-4 py-2.5 text-sm"
-                            >
-                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-50 text-xs font-black text-violet-700">
-                                {index + 1}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="truncate text-sm font-black text-slate-950">{item.nickname}</div>
-                                <div className="mt-0.5 text-[11px] font-bold text-slate-400">
-                                  수량 {Number(item.qty_sum || 0).toLocaleString("ko-KR")}개 · 가중치 {Number(item.weight || 1).toLocaleString("ko-KR")}
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <div className="text-xs font-black text-slate-600">
-                                  {Number(item.order_count || 0).toLocaleString("ko-KR")}건
-                                </div>
-                                <div className="mt-0.5 text-xs font-black text-slate-950">
-                                  {money(item.amount_sum)}
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_150px] gap-3">
-                      <div className="flex min-h-0 flex-col rounded-3xl border border-slate-200 bg-white p-4">
-                        <div className="mb-2 flex items-center justify-between">
-                          <div className="text-sm font-black text-slate-950">수동 참가자 추가</div>
-                          <span className="rounded-full bg-violet-50 px-3 py-1 text-[11px] font-black text-violet-700">
-                            {manualParticipantCount.toLocaleString("ko-KR")}명
-                          </span>
-                        </div>
-                        <textarea
-                          value={manualParticipantText}
-                          onChange={(event) => setManualParticipantText(event.target.value)}
-                          onPaste={handleManualPaste}
-                          placeholder={"닉네임을 한 줄에 한 명씩.\n채팅을 붙여넣으면 @닉네임만 자동 추출(중복 제거)됩니다."}
-                          className="min-h-0 flex-1 resize-none rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-800 outline-none focus:border-violet-400"
-                        />
-                        <button
-                          type="button"
-                          onClick={addManualSample}
-                          className="mt-2 h-9 w-full rounded-xl border border-slate-200 bg-white text-xs font-black text-slate-700"
-                        >
-                          + 샘플/참가자 추가
-                        </button>
-                      </div>
-
-                      <div className="rounded-3xl border border-slate-200 bg-white p-4">
-                        <div className="mb-2 flex items-center justify-between">
-                          <div className="text-sm font-black text-slate-950">당첨 고정</div>
-                          {fixedWinnerNickname ? (
-                            <button type="button" onClick={() => setFixedWinnerNickname("")} className="text-[11px] font-black text-slate-400 hover:text-slate-600">
-                              해제
-                            </button>
-                          ) : null}
-                        </div>
-                        <div className="mb-2 rounded-2xl bg-rose-soft px-3 py-2 text-[12px] font-black text-rose-deep">
-                          {fixedWinnerNickname ? `👑 당첨고정: ${fixedWinnerNickname}` : "자동 선택 (참가자 클릭 시 고정)"}
-                        </div>
-                        <div className="flex max-h-[76px] flex-wrap gap-1.5 overflow-y-auto">
-                          {finalParticipants.length === 0 ? (
-                            <span className="text-[11px] font-bold text-slate-400">참가자를 먼저 불러오세요.</span>
-                          ) : (
-                            finalParticipants.map((participant, index) => {
-                              const on = fixedWinnerNickname === participant.nickname;
-                              return (
-                                <button
-                                  key={`${participant.nickname}-${index}`}
-                                  type="button"
-                                  onClick={() => setFixedWinnerNickname(on ? "" : participant.nickname)}
-                                  className={[
-                                    "rounded-full px-2.5 py-1 text-[11px] font-black transition",
-                                    on ? "bg-rose-deep text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200",
-                                  ].join(" ")}
-                                >
-                                  {on ? "👑 " : ""}
-                                  {participant.nickname}
-                                </button>
-                              );
-                            })
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </main>
-
-                <aside className="grid h-full min-h-0 grid-rows-[120px_minmax(0,1fr)] gap-3">
-                  <section className="overflow-hidden rounded-[20px] border border-slate-200 bg-white p-2 shadow-sm">
-                    <div className="mb-1 flex items-center justify-between gap-2">
-                      <div className="text-[13px] font-black text-slate-950">
-                        현재 {eventTab === "roulette" ? "룰렛" : "인형뽑기"}
-                      </div>
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ring-1 ${currentEvent ? modeBadgeClass(currentEvent.mode) : "bg-slate-100 text-slate-500 ring-slate-200"}`}>
-                        {currentEvent?.status || "idle"}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-1.5">
-                      <div className="rounded-xl bg-slate-50 px-2 py-1">
-                        <div className="text-[10px] font-black text-slate-400">참여자</div>
-                        <div className="mt-0.5 text-[13px] font-black leading-none text-slate-950">{finalParticipants.length.toLocaleString("ko-KR")}명</div>
-                      </div>
-                      <div className="rounded-xl bg-slate-50 px-2 py-1">
-                        <div className="text-[10px] font-black text-slate-400">자동</div>
-                        <div className="mt-0.5 text-[13px] font-black leading-none text-slate-950">{autoParticipantCount.toLocaleString("ko-KR")}명</div>
-                      </div>
-                      <div className="rounded-xl bg-slate-50 px-2 py-1">
-                        <div className="text-[10px] font-black text-slate-400">수동</div>
-                        <div className="mt-0.5 text-[13px] font-black leading-none text-slate-950">{manualParticipantCount.toLocaleString("ko-KR")}명</div>
-                      </div>
-                      <div className="col-span-3 rounded-xl bg-violet-50 px-2 py-1">
-                        <div className="text-[10px] font-black text-violet-500">현재 당첨자</div>
-                        <div className="mt-0.5 truncate text-[12px] font-black leading-none text-violet-900">🏆 {currentEvent?.winner_nickname || selectedWinnerNickname || "당첨 전"}</div>
-                      </div>
-                    </div>
-                  </section>
-
-                  <section className="flex min-h-0 flex-col overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-sm">
-                    <div className="shrink-0 border-b border-slate-100 px-5 py-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="text-lg font-black text-slate-950">당첨자 관리</div>
-                          <div className="mt-1 truncate text-xs font-bold text-slate-400">
-                            당첨자 지급완료, 삭제, 테스트기록 정리를 한 곳에서 관리합니다.
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => void loadEventsAndWinners()}
-                            className="h-9 rounded-2xl bg-slate-100 px-3 text-xs font-black text-slate-700 transition hover:bg-slate-200 active:scale-95"
-                          >
-                            새로고침
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void deleteAllTestRecords()}
-                            className="h-9 rounded-2xl border border-amber-200 bg-amber-50 px-3 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98]"
-                          >
-                            테스트기록 정리
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-                      {recentWinners.length === 0 ? (
-                        <div className="flex h-full min-h-[260px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white px-4 text-center text-sm font-bold text-slate-400">
-                          아직 당첨자 기록이 없습니다.
-                        </div>
+                {/* 룰렛 휠 (conic-gradient) + 화살표 + 가운데 당첨자 오버레이 */}
+                <div className="relative mx-auto aspect-square w-full max-w-[340px]">
+                  <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1 text-3xl leading-none text-red-500 drop-shadow">▼</div>
+                  <div className="absolute inset-0 rounded-full shadow-xl ring-8 ring-white" style={{ background: wheelGradient }} />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="flex h-[44%] w-[44%] flex-col items-center justify-center rounded-full bg-white/95 px-2 text-center shadow-inner">
+                      {currentEvent?.winner_nickname ? (
+                        <>
+                          <div className="text-[11px] font-black text-violet-500">🏆 당첨</div>
+                          <div className="truncate text-[17px] font-black leading-tight text-slate-950">{currentEvent.winner_nickname}</div>
+                        </>
                       ) : (
-                        <div className="space-y-3">
-                          {recentWinners.map((winner, index) => (
-                            <div key={`winner-${winner.id}`} className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                              <div className="grid grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-xs font-black text-violet-700">
-                                  {index + 1}
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="truncate text-sm font-black text-slate-950">🏆 {winner.nickname}</div>
-                                  <div className="mt-1 truncate text-xs font-bold text-slate-500">{dateTime(winner.winner_at)}</div>
-                                </div>
-                                <span className={`h-fit shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black ring-1 ${winner.is_test ? "bg-amber-50 text-amber-700 ring-amber-100" : "bg-emerald-50 text-emerald-700 ring-emerald-100"}`}>
-                                  {winner.is_test ? "테스트" : "운영"}
-                                </span>
-                              </div>
-
-                              <div className="mt-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-600 shadow-sm">
-                                {winner.winner_note || "이벤트 당첨"}
-                              </div>
-
-                              <div className="mt-3 grid grid-cols-[minmax(0,1fr)_84px] gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => markRewardDone(winner, !winner.is_reward_done)}
-                                  className={`rounded-xl px-3 py-2 text-xs font-black transition active:scale-[0.98] ${
-                                    winner.is_reward_done
-                                      ? "bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800"
-                                      : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 active:bg-slate-100"
-                                  }`}
-                                >
-                                  {winner.is_reward_done ? "지급완료됨" : "지급완료 체크"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => void deleteWinnerRecord(winner)}
-                                  className={`rounded-xl border bg-white px-3 py-2 text-xs font-black transition active:scale-[0.98] ${
-                                    winner.is_test
-                                      ? "border-red-100 text-red-600 hover:bg-red-50 active:bg-red-100"
-                                      : "border-amber-200 text-amber-700 hover:bg-amber-50 active:bg-amber-100"
-                                  }`}
-                                >
-                                  삭제
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                        <div className="text-[12px] font-black leading-tight text-slate-500">{finalParticipants.length.toLocaleString("ko-KR")}명<br />{eventTab === "roulette" ? "룰렛" : "인형뽑기"}</div>
                       )}
                     </div>
-                  </section>
-                </aside>
-              </div>
-            </div>
+                  </div>
+                </div>
 
-            <footer className="shrink-0 border-t border-slate-200 bg-white px-6 py-3">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={resetEvent}
-                  className="h-11 rounded-2xl border border-rose-line bg-rose-soft px-6 text-sm font-black text-rose-deep transition hover:bg-rose-soft/80 active:scale-[0.98]"
-                >
-                  ↺ 초기화
+                <button type="button" onClick={startSpin} disabled={spinning || finalParticipants.length === 0}
+                  className="h-12 rounded-2xl bg-violet-600 text-base font-black text-white shadow-sm transition hover:bg-violet-700 disabled:bg-slate-300">
+                  {spinning ? "진행중..." : eventTab === "roulette" ? "▶ 룰렛 돌리기" : "▶ 인형뽑기 시작"}
                 </button>
 
-                <div className="ml-auto flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={closePanel}
-                  className="h-11 rounded-2xl border border-slate-200 bg-white px-9 text-sm font-black text-slate-700 transition hover:bg-slate-50 active:scale-[0.98]"
-                >
-                  닫기
-                </button>
+                {/* 위젯주소 복사 */}
+                <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                  <span className="shrink-0 text-xs font-black text-slate-500">방송 위젯주소</span>
+                  <span className="min-w-0 flex-1 truncate text-xs font-bold text-slate-500">{widgetUrl || "준비중"}</span>
+                  <button type="button" onClick={() => void copyText(widgetUrl)} disabled={!widgetUrl}
+                    className="h-8 shrink-0 rounded-xl bg-violet-600 px-3 text-xs font-black text-white disabled:opacity-50">복사</button>
+                </div>
 
-                {eventTab === "roulette" ? (
-                  <button
-                    type="button"
-                    onClick={startRouletteOneClick}
-                    disabled={spinning || finalParticipants.length === 0}
-                    className="h-11 rounded-2xl bg-violet-600 px-12 text-sm font-black text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98] disabled:bg-slate-300"
-                  >
-                    {spinning ? "룰렛 진행중..." : "룰렛 시작"}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={startClawEvent}
-                    disabled={spinning || finalParticipants.length === 0}
-                    className="h-11 rounded-2xl bg-violet-600 px-12 text-sm font-black text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98] disabled:bg-slate-300"
-                  >
-                    {spinning ? "인형뽑기 진행중..." : "인형뽑기 시작"}
-                  </button>
-                )}
+                {/* 이벤트 목록 (기간필터 + 달력) */}
+                <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-slate-200 bg-white">
+                  <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-2.5">
+                    <span className="text-sm font-black text-slate-950">이벤트 목록</span>
+                    <div className="flex flex-wrap gap-1">
+                      {periodChips.map((chip) => (
+                        <button key={chip.key} type="button" onClick={() => setListPeriod(chip.key)}
+                          className={["rounded-full px-2.5 py-1 text-[11px] font-black transition", listPeriod === chip.key ? "bg-rose-deep text-white" : "bg-slate-100 text-slate-500"].join(" ")}>{chip.label}</button>
+                      ))}
+                    </div>
+                    {listPeriod === "date" ? (
+                      <input type="date" value={listDate} onChange={(e) => setListDate(e.target.value)}
+                        className="h-8 rounded-xl border border-slate-200 px-2 text-xs font-bold text-slate-600" />
+                    ) : null}
+                    <div className="ml-auto flex gap-1.5">
+                      <button type="button" onClick={() => void loadEventsAndWinners()}
+                        className="h-8 rounded-xl bg-slate-100 px-2.5 text-[11px] font-black text-slate-600 hover:bg-slate-200">새로고침</button>
+                      <button type="button" onClick={() => void deleteAllTestRecords()}
+                        className="h-8 rounded-xl border border-amber-200 bg-amber-50 px-2.5 text-[11px] font-black text-amber-700 hover:bg-amber-100">테스트정리</button>
+                    </div>
+                  </div>
+                  <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+                    {filteredWinners.length === 0 ? (
+                      <div className="flex h-full min-h-[120px] items-center justify-center text-center text-sm font-bold text-slate-400">해당 기간 당첨 기록이 없습니다.</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {filteredWinners.map((winner) => (
+                          <div key={`winner-${winner.id}`} className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
+                            <div className="flex items-center gap-2">
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate text-sm font-black text-slate-950">🏆 {winner.nickname}</div>
+                                <div className="mt-0.5 truncate text-[11px] font-bold text-slate-400">{dateTimeFull(winner.winner_at)}</div>
+                              </div>
+                              <span className={["shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ring-1", winner.is_test ? "bg-amber-50 text-amber-700 ring-amber-100" : "bg-emerald-50 text-emerald-700 ring-emerald-100"].join(" ")}>{winner.is_test ? "테스트" : "운영"}</span>
+                            </div>
+                            <div className="mt-1.5 truncate rounded-lg bg-white px-2.5 py-1.5 text-[11px] font-black text-slate-600 shadow-sm">{winner.winner_note || "이벤트 당첨"}</div>
+                            <div className="mt-2 grid grid-cols-[minmax(0,1fr)_70px] gap-2">
+                              <button type="button" onClick={() => markRewardDone(winner, !winner.is_reward_done)}
+                                className={["rounded-lg px-2 py-1.5 text-[11px] font-black transition", winner.is_reward_done ? "bg-emerald-600 text-white" : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"].join(" ")}>{winner.is_reward_done ? "지급완료됨" : "지급완료"}</button>
+                              <button type="button" onClick={() => void deleteWinnerRecord(winner)}
+                                className="rounded-lg border border-amber-200 bg-white px-2 py-1.5 text-[11px] font-black text-amber-700 hover:bg-amber-50">삭제</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </footer>
+
+              {/* 우측: 참가자 + 당첨고정 + 토글 + 당첨선물 */}
+              <div className="flex min-h-0 flex-col gap-3 overflow-y-auto pr-1">
+                {/* 참가자 */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-sm font-black text-slate-950">참가자 <span className="text-violet-600">{finalParticipants.length.toLocaleString("ko-KR")}명</span></span>
+                    {participantSource !== "manual" ? (
+                      <button type="button" onClick={() => setShowParticipantList((v) => !v)}
+                        className="rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-black text-violet-700 hover:bg-violet-100">{showParticipantList ? "목록 숨김" : "목록 보기"}</button>
+                    ) : null}
+                  </div>
+                  <div className="inline-flex w-full rounded-xl bg-slate-100 p-1">
+                    <button type="button" onClick={() => changeParticipantSource("auto")} disabled={!liveBroadcastId}
+                      title={!liveBroadcastId ? "방송 시작 후 사용" : undefined}
+                      className={["h-9 flex-1 rounded-lg text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-40", participantSource === "auto" ? "bg-rose-deep text-white shadow-sm" : "text-slate-500"].join(" ")}>주문서 전체</button>
+                    <button type="button" onClick={() => changeParticipantSource("paid")} disabled={!liveBroadcastId}
+                      title={!liveBroadcastId ? "방송 시작 후 사용" : undefined}
+                      className={["h-9 flex-1 rounded-lg text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-40", participantSource === "paid" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-500"].join(" ")}>입금완료</button>
+                    <button type="button" onClick={() => changeParticipantSource("manual")}
+                      className={["h-9 flex-1 rounded-lg text-xs font-black transition", participantSource === "manual" ? "bg-violet-600 text-white shadow-sm" : "text-slate-500"].join(" ")}>수동 입력</button>
+                  </div>
+                  {!liveBroadcastId && participantSource !== "manual" ? (
+                    <div className="mt-2 text-[11px] font-black text-amber-600">⚠ 방송 OFF — 방송 시작 후 명단을 불러올 수 있어요.</div>
+                  ) : null}
+
+                  {participantSource === "manual" ? (
+                    <textarea value={manualParticipantText} onChange={(e) => setManualParticipantText(e.target.value)} onPaste={handleManualPaste}
+                      placeholder={"닉네임 한 줄에 한 명.\n채팅 붙여넣으면 @닉네임만 자동 추출(중복 제거)."}
+                      className="mt-3 h-32 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-800 outline-none focus:border-violet-400" />
+                  ) : showParticipantList ? (
+                    <div className="mt-3 max-h-40 overflow-y-auto rounded-xl border border-slate-100">
+                      {participants.length === 0 ? (
+                        <div className="px-3 py-6 text-center text-xs font-bold text-slate-400">명단 없음 — 위 버튼으로 불러오세요.</div>
+                      ) : (
+                        participants.slice(0, 300).map((p, i) => (
+                          <div key={`${p.nickname}-${i}`} className="flex items-center gap-2 border-b border-slate-50 px-3 py-1.5 text-xs">
+                            <span className="w-5 shrink-0 text-slate-400">{i + 1}</span>
+                            <span className="min-w-0 flex-1 truncate font-black text-slate-800">{p.nickname}</span>
+                            <span className="shrink-0 font-bold text-slate-400">{money(p.amount_sum)}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-3 rounded-xl bg-slate-50 px-3 py-4 text-center text-xs font-bold text-slate-400">참가자 {autoParticipantCount.toLocaleString("ko-KR")}명 · “목록 보기”로 펼치기</div>
+                  )}
+                </div>
+
+                {/* 당첨고정 */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-sm font-black text-slate-950">당첨 고정</span>
+                    {fixedWinnerNickname ? (
+                      <button type="button" onClick={() => setFixedWinnerNickname("")} className="text-[11px] font-black text-slate-400 hover:text-slate-600">해제</button>
+                    ) : null}
+                  </div>
+                  <div className="flex max-h-[88px] flex-wrap gap-1.5 overflow-y-auto">
+                    {finalParticipants.length === 0 ? (
+                      <span className="text-[11px] font-bold text-slate-400">참가자를 먼저 불러오세요.</span>
+                    ) : (
+                      finalParticipants.map((p, i) => {
+                        const on = fixedWinnerNickname === p.nickname;
+                        return (
+                          <button key={`fix-${p.nickname}-${i}`} type="button" onClick={() => setFixedWinnerNickname(on ? "" : p.nickname)}
+                            className={["rounded-full px-2.5 py-1 text-[11px] font-black transition", on ? "bg-rose-deep text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"].join(" ")}>{on ? "👑 " : ""}{p.nickname}</button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* 추첨 옵션 토글 */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="mb-2 text-sm font-black text-slate-950">추첨 옵션</div>
+                  <button type="button" onClick={() => setExcludeDailyDup((v) => !v)}
+                    className="flex w-full items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5">
+                    <span className="text-xs font-black text-slate-700">당일 중복당첨 금지</span>
+                    <span className={["relative h-5 w-9 rounded-full transition", excludeDailyDup ? "bg-rose-deep" : "bg-slate-300"].join(" ")}>
+                      <span className={["absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all", excludeDailyDup ? "right-0.5" : "left-0.5"].join(" ")} />
+                    </span>
+                  </button>
+                  <button type="button" onClick={() => setUseWeight((v) => !v)}
+                    className="mt-2 flex w-full items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5">
+                    <span className="text-left text-xs font-black text-slate-700">가중치 적용<br /><span className="text-[10px] font-bold text-slate-400">고정: 누적금액 40% + 당일 60%</span></span>
+                    <span className={["relative h-5 w-9 shrink-0 rounded-full transition", useWeight ? "bg-rose-deep" : "bg-slate-300"].join(" ")}>
+                      <span className={["absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all", useWeight ? "right-0.5" : "left-0.5"].join(" ")} />
+                    </span>
+                  </button>
+                </div>
+
+                {/* 당첨선물 + 제목 */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="mb-2 text-xs font-black text-slate-500">이벤트 제목</div>
+                  <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={30}
+                    className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm font-black text-slate-900 outline-none focus:border-violet-400" />
+                  <div className="mb-2 mt-3 text-xs font-black text-slate-500">당첨 선물</div>
+                  <div className="flex gap-2">
+                    <select value={giftType} onChange={(e) => {
+                        const next = e.target.value as "point" | "custom";
+                        setGiftType(next);
+                        if (next === "point") setWinnerNote(`포인트 ${Number(giftPointAmount || 0).toLocaleString("ko-KR")}P`);
+                      }}
+                      className="h-10 w-1/2 rounded-xl border border-slate-200 px-3 text-sm font-black text-slate-900 outline-none focus:border-violet-400">
+                      <option value="point">포인트</option>
+                      <option value="custom">직접입력</option>
+                    </select>
+                    {giftType === "point" ? (
+                      <input value={giftPointAmount ? Number(giftPointAmount).toLocaleString("ko-KR") : ""} inputMode="numeric" placeholder="포인트 금액"
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/[^0-9]/g, "");
+                          setGiftPointAmount(digits);
+                          setWinnerNote(`포인트 ${Number(digits || 0).toLocaleString("ko-KR")}P`);
+                        }}
+                        className="h-10 w-1/2 rounded-xl border border-slate-200 px-3 text-right text-sm font-black text-slate-900 outline-none focus:border-violet-400" />
+                    ) : (
+                      <input value={winnerNote} onChange={(e) => setWinnerNote(e.target.value)} maxLength={40} placeholder="예: 선물이모티콘"
+                        className="h-10 w-1/2 rounded-xl border border-slate-200 px-3 text-sm font-black text-slate-900 outline-none focus:border-violet-400" />
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           </section>
         </div>
       ) : null}
