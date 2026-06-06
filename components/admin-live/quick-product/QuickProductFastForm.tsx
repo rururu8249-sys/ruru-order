@@ -946,12 +946,12 @@ export default function QuickProductFastForm({
           colors.length > 0 || sizes.length > 0 ? (
             <div style={{ border: "1px solid var(--bd)", borderRadius: "8px", padding: "10px", marginTop: "8px", marginBottom: "11px" }}>
               <div style={{ fontSize: "11px", color: "var(--mut)", marginBottom: "7px" }}>옵션별 재고 (색상 × 사이즈)</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "5px", maxHeight: "180px", overflowY: "auto" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "5px", maxHeight: "180px", overflowY: "auto", paddingRight: "6px" }}>
                 {resolvedVariantRows.map((row) => (
-                  <div key={row.key} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span style={{ flex: 1, fontSize: "11px", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[row.color, row.size].filter(Boolean).join(" / ") || "기본"}</span>
-                    <input className="ipt" style={{ width: "90px" }} type="number" min={0} value={row.stock} onChange={(e) => updateVariantStock(row.key, Math.max(0, Number(e.target.value) || 0))} />
-                    <span className="note">개</span>
+                  <div key={row.key} style={{ display: "flex", alignItems: "flex-end", gap: "8px" }}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: "11px", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", borderBottom: "1px dotted var(--bd)", paddingBottom: "3px" }}>{[row.color, row.size].filter(Boolean).join(" / ") || "기본"}</span>
+                    <input className="ipt" style={{ width: "70px", flexShrink: 0, textAlign: "right" }} type="number" min={0} value={row.stock} onChange={(e) => updateVariantStock(row.key, Math.max(0, Number(e.target.value) || 0))} />
+                    <span className="note" style={{ flexShrink: 0, minWidth: "12px" }}>개</span>
                   </div>
                 ))}
               </div>
