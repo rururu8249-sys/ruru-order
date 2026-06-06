@@ -61,8 +61,10 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 - ✅ P4 상품목록 — 딥로즈 검색+2열격자+페이지네이션, 카드(방송중배지=is_pinned/품절 SOLD OUT), 직접입력 fallback (quickGroupBuyProducts/selectQuickGroupBuyProduct 재사용)
 - ✅ P5 옵션 선택 시트 — 딥로즈, 색상/사이즈(선택·입력형)+수량+선택금액+필수 빨강경고 (registeredOption* 재사용)
 - ✅ P6 담기 confetti 토스트 — addRegisteredProductToOrderItems 후 '🎉 주문서에 담았어요!'+주문서보기/계속담기
-- ⏳ P7 주문서(결제-핵심 ~630줄: 장바구니+결제방법+배송메모+금액내역+포인트사용+제출, OrderPriceSummaryBox 포함). ※금액/포인트 로직 이미 존재(finalPaymentAmount/selectedPointUseAmount/pointUseInput/submitOrder) — 렌더만 딥로즈 교체. 결제흐름이라 별도 집중 패스 필요(돈 로직 절대 무변경)
-- ⏳ P8 제출 후 계좌안내(입금자명 닉네임+계좌복사+닉네임복사+금액) / P9 주문조회 배지(입금확인초록/택배출고파랑/입금대기노랑/출고대기)
+- ✅ P7 주문서 결제부 딥로즈 — OrderPriceSummaryBox 인라인 재작성(금액내역+보유포인트/사용입력/전액사용/사용차감/🪙적립예정), 결제방법(무통장·카드+率)+카드안내+제출바+장바구니 코랄→딥로즈. 금액/포인트/제출 로직 100% 무변경(렌더만). ※적립률 코드에 없어 '적립 예정' 숫자 미표기(일반안내) — 률 정하면 숫자 반영
+- ✅ P8 제출 후 계좌안내 — CustomerPaymentGuideBottomSheet coral→rose-deep/soft/line 딥로즈(입금자명·계좌복사·닉네임복사·금액 무변경)
+- ✅ P9 주문조회 배지 — 입금확인 초록/택배출고 파랑/입금대기 노랑/그외 회색, 활성탭 등 딥로즈 통일
+- ★ 고객 order page P1~P10 전체 시안 1:1 완료(딥로즈 #7B2D43). 돈/입금/주문제출/포인트 로직 전부 무변경
 - 진입(카톡로그인/유튜브닉네임 유니크) 화면도 시안 반영 대상
 
 ※ 위 목록은 완전하지 않을 수 있음. 사장님이 새 작업 말하면 즉시 여기 추가할 것.
