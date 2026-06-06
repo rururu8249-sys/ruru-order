@@ -1013,6 +1013,7 @@ export default function OrderPage() {
   const [howToOpen, setHowToOpen] = useState(false);
   const [videoOpen, setVideoOpen] = useState(true);
   const [productPage, setProductPage] = useState(1);
+  const [cartAddedOpen, setCartAddedOpen] = useState(false);
   const [orderLookupOrders, setOrderLookupOrders] = useState<any[]>([]);
   const [orderLookupFilter, setOrderLookupFilter] = useState<CustomerOrderLookupFilter>("전체");
   const [orderLookupPage, setOrderLookupPage] = useState(1);
@@ -2749,7 +2750,8 @@ export default function OrderPage() {
 
     setProductSearchOpenIndex(null);
     setProductSearchText("");
-    scrollToOrderProductList();
+    // P6. 담기 완료 — confetti + "주문서에 담았어요!" 토스트(주문서 보기 / 계속 담기)
+    setCartAddedOpen(true);
   };
 
   const openRegisteredOptionSelectSheet = (product: BroadcastProduct) => {
@@ -4242,6 +4244,30 @@ export default function OrderPage() {
 
             {customerBlockStatus.blocked ? <CustomerBlockedNotice /> : null}
           </section>
+
+          {/* P6. 담기 완료 — confetti + 토스트 (주문서 보기 / 계속 담기) */}
+          {cartAddedOpen && (
+            <div style={{ position: "fixed", inset: 0, zIndex: 140, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.35)" }} onClick={(e) => { if (e.target === e.currentTarget) setCartAddedOpen(false); }}>
+              <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
+                {Array.from({ length: 18 }).map((_, i) => {
+                  const colors = ["#7B2D43", "#C0392B", "#0F6E56", "#185FA5", "#E2906C", "#FFD9E0"];
+                  const left = (i * 53) % 100;
+                  const delay = (i % 6) * 0.08;
+                  const dur = 1.1 + (i % 4) * 0.25;
+                  return <span key={i} style={{ position: "absolute", top: "-14px", left: `${left}%`, width: "9px", height: "14px", background: colors[i % colors.length], borderRadius: "2px", animation: `ruruConfetti ${dur}s ${delay}s ease-in forwards` }} />;
+                })}
+              </div>
+              <div style={{ position: "relative", width: "300px", maxWidth: "86%", background: "#fff", borderRadius: "22px", padding: "26px 22px", textAlign: "center", boxShadow: "0 18px 50px rgba(0,0,0,0.25)" }}>
+                <div style={{ fontSize: "38px" }}>🎉</div>
+                <div style={{ marginTop: "8px", fontSize: "18px", fontWeight: 800, color: "#7B2D43" }}>주문서에 담았어요!</div>
+                <div style={{ marginTop: "18px", display: "flex", gap: "8px" }}>
+                  <button type="button" onClick={() => { setCartAddedOpen(false); scrollToOrderProductList(); }} style={{ flex: 1, height: "48px", borderRadius: "14px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}>주문서 보기 ({items.filter((it) => it.product_name.trim()).length})</button>
+                  <button type="button" onClick={() => setCartAddedOpen(false)} style={{ flex: 1, height: "48px", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", color: "#7B2D43", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}>계속 담기</button>
+                </div>
+              </div>
+              <style>{`@keyframes ruruConfetti { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(105vh) rotate(540deg); opacity: 0.55; } }`}</style>
+            </div>
+          )}
 
           {registeredOptionSelectProduct && (
             <div style={{ position: "fixed", inset: 0, zIndex: 128, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(0,0,0,0.45)" }} onClick={(e) => { if (e.target === e.currentTarget) closeRegisteredOptionSelectSheet(); }}>
