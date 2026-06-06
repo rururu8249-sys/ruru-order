@@ -2,9 +2,9 @@
 
 // components/customer/CustomerInfoEditBottomSheet.tsx
 // 목적: 주문서 화면 안에서 사용하는 고객 정보수정 바텀시트
-// 주의: UI 전용. DB, API, 주문저장, 입금매칭, 정산, 배송 로직 없음.
+// 주의: UI 전용. DB, API, 주문저장, 입금매칭, 정산, 배송 로직 없음. (시안 딥로즈 #7B2D43 인라인)
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 
 type CustomerInfoEditBottomSheetProps = {
   open: boolean;
@@ -30,17 +30,40 @@ type CustomerInfoEditBottomSheetProps = {
   saving?: boolean;
 };
 
-const inputClassName =
-  "h-12 w-full rounded-[16px] bg-slate-50 px-4 text-[15px] font-black tracking-[-0.05em] text-slate-950 outline-none ring-1 ring-slate-100 transition placeholder:text-slate-300 focus:bg-white focus:ring-2 focus:ring-rose-deep/30";
+const inputStyle: CSSProperties = {
+  height: "48px",
+  width: "100%",
+  boxSizing: "border-box",
+  borderRadius: "12px",
+  border: "1px solid #D9C5CC",
+  background: "#fff",
+  padding: "0 14px",
+  fontSize: "15px",
+  fontWeight: 800,
+  color: "#222",
+  outline: "none",
+};
 
-const phoneInputClassName =
-  "h-12 w-full rounded-[16px] bg-slate-50 px-3 text-[14px] font-black tracking-[-0.065em] text-slate-950 outline-none ring-1 ring-slate-100 transition placeholder:text-slate-300 focus:bg-white focus:ring-2 focus:ring-rose-deep/30";
+const textareaStyle: CSSProperties = {
+  minHeight: "48px",
+  maxHeight: "96px",
+  width: "100%",
+  boxSizing: "border-box",
+  resize: "none",
+  overflow: "hidden",
+  borderRadius: "12px",
+  border: "1px solid #D9C5CC",
+  background: "#fff",
+  padding: "12px 14px",
+  fontSize: "15px",
+  fontWeight: 800,
+  lineHeight: 1.45,
+  color: "#222",
+  outline: "none",
+};
 
-const addressTextareaClassName =
-  "min-h-12 max-h-24 w-full resize-none overflow-hidden rounded-[16px] bg-slate-50 px-4 py-3 text-[15px] font-black leading-[1.45] tracking-[-0.055em] text-slate-950 outline-none ring-1 ring-slate-100 transition placeholder:text-slate-300 focus:bg-white focus:ring-2 focus:ring-rose-deep/30";
-
-const labelClassName =
-  "mb-1.5 block text-[12px] font-black tracking-[-0.04em] text-slate-500";
+const labelStyle: CSSProperties = { marginBottom: "6px", display: "block", fontSize: "12px", fontWeight: 800, color: "#888" };
+const fieldBoxStyle: CSSProperties = { borderRadius: "16px", background: "#fff", padding: "12px", border: "1px solid #E8E2DD" };
 
 const resizeTextareaHeight = (textarea: HTMLTextAreaElement | null) => {
   if (!textarea) return;
@@ -79,79 +102,64 @@ export default function CustomerInfoEditBottomSheet({
   return (
     <div
       data-ruru-customer-info-edit-sheet="shell-v2"
-      className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/45 px-3"
+      style={{ position: "fixed", inset: 0, zIndex: 90, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(15,23,42,0.45)", padding: "0 12px" }}
       role="dialog"
       aria-modal="true"
       aria-label="정보수정"
     >
-      <section className="w-full max-w-[430px] overflow-hidden rounded-t-[30px] bg-white shadow-[0_-22px_70px_rgba(15,23,42,0.22)]">
-        <div className="mx-auto mt-3 h-1.5 w-14 rounded-full bg-slate-200" />
+      <section style={{ width: "100%", maxWidth: "430px", overflow: "hidden", borderTopLeftRadius: "28px", borderTopRightRadius: "28px", background: "#fff", boxShadow: "0 -22px 70px rgba(15,23,42,0.22)" }}>
+        <div style={{ margin: "12px auto 0", height: "5px", width: "52px", borderRadius: "3px", background: "#E8E2DD" }} />
 
-        <div className="flex max-h-[88dvh] flex-col">
-          <header className="shrink-0 px-4 pb-3 pt-5">
-            <div className="flex items-baseline gap-2 whitespace-nowrap">
-              <h2 className="text-[26px] font-black leading-none tracking-[-0.08em] text-slate-950">
-                정보수정
-              </h2>
-              <span className="text-[12px] font-black tracking-[-0.05em] text-slate-400">
-                배송정보 확인
-              </span>
+        <div style={{ display: "flex", maxHeight: "88dvh", flexDirection: "column" }}>
+          <header style={{ flexShrink: 0, padding: "20px 16px 12px" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: "8px", whiteSpace: "nowrap" }}>
+              <h2 style={{ fontSize: "26px", fontWeight: 800, lineHeight: 1, letterSpacing: "-0.08em", color: "#7B2D43" }}>정보수정</h2>
+              <span style={{ fontSize: "12px", fontWeight: 800, color: "#999" }}>배송정보 확인</span>
             </div>
-
-            <p className="mt-2 text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-slate-400">
+            <p style={{ marginTop: "8px", fontSize: "12px", fontWeight: 700, lineHeight: 1.6, color: "#999" }}>
               주문 전 닉네임, 연락처, 주소가 맞는지 확인해주세요.
             </p>
           </header>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-3">
-            <div className="grid gap-3">
-              <div className="rounded-[22px] bg-white p-3 ring-1 ring-slate-200">
-                <label className={labelClassName} htmlFor="customerInfoEditNickname">
-                  유튜브 닉네임
-                </label>
+          <div style={{ minHeight: 0, flex: 1, overflowY: "auto", padding: "0 16px 12px" }}>
+            <div style={{ display: "grid", gap: "12px" }}>
+              <div style={fieldBoxStyle}>
+                <label style={labelStyle} htmlFor="customerInfoEditNickname">유튜브 닉네임</label>
                 <input
                   id="customerInfoEditNickname"
                   value={youtubeNickname}
                   onChange={(event) => onYoutubeNicknameChange(event.target.value)}
-                  className={inputClassName}
+                  style={inputStyle}
                   placeholder="채팅창에 보이는 닉네임"
                   autoComplete="nickname"
                 />
                 {youtubeNicknameError ? (
-                  <p className="mt-1.5 text-[11px] font-bold tracking-[-0.04em] text-red-500">
-                    {youtubeNicknameError}
-                  </p>
+                  <p style={{ marginTop: "6px", fontSize: "11px", fontWeight: 700, color: "#C0392B" }}>{youtubeNicknameError}</p>
                 ) : (
-                  <p className="mt-1.5 text-[11px] font-bold tracking-[-0.04em] text-slate-400">
-                    현재 보이는 닉네임과 다르면 주문 누락이 생길 수 있습니다.
-                  </p>
+                  <p style={{ marginTop: "6px", fontSize: "11px", fontWeight: 700, color: "#999" }}>현재 보이는 닉네임과 다르면 주문 누락이 생길 수 있습니다.</p>
                 )}
               </div>
 
-              <div className="grid grid-cols-[0.78fr_1.22fr] gap-2">
-                <div className="rounded-[22px] bg-white p-3 ring-1 ring-slate-200">
-                  <label className={labelClassName} htmlFor="customerInfoEditName">
-                    이름
-                  </label>
+              <div style={{ display: "grid", gridTemplateColumns: "0.78fr 1.22fr", gap: "8px" }}>
+                <div style={fieldBoxStyle}>
+                  <label style={labelStyle} htmlFor="customerInfoEditName">이름</label>
                   <input
                     id="customerInfoEditName"
                     value={customerName}
                     onChange={(event) => onCustomerNameChange(event.target.value)}
-                    className={inputClassName}
+                    style={inputStyle}
                     placeholder="이름"
                     autoComplete="name"
                   />
                 </div>
 
-                <div className="rounded-[22px] bg-white p-3 ring-1 ring-slate-200">
-                  <label className={labelClassName} htmlFor="customerInfoEditPhone">
-                    전화번호
-                  </label>
+                <div style={fieldBoxStyle}>
+                  <label style={labelStyle} htmlFor="customerInfoEditPhone">전화번호</label>
                   <input
                     id="customerInfoEditPhone"
                     value={customerPhone}
                     onChange={(event) => onCustomerPhoneChange(event.target.value)}
-                    className={phoneInputClassName}
+                    style={{ ...inputStyle, padding: "0 12px", fontSize: "14px" }}
                     placeholder="01012345678"
                     inputMode="numeric"
                     autoComplete="tel"
@@ -159,19 +167,13 @@ export default function CustomerInfoEditBottomSheet({
                 </div>
               </div>
 
-              <div className="rounded-[22px] bg-white p-3 ring-1 ring-slate-200">
-                <div className="mb-1.5 flex items-center justify-between gap-2">
-                  <label
-                    className="block text-[12px] font-black tracking-[-0.04em] text-slate-500"
-                    htmlFor="customerInfoEditAddress"
-                  >
-                    주소
-                  </label>
-
+              <div style={fieldBoxStyle}>
+                <div style={{ marginBottom: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: 800, color: "#888" }} htmlFor="customerInfoEditAddress">주소</label>
                   <button
                     type="button"
                     onClick={onOpenAddressSearch}
-                    className="rounded-full bg-slate-950 px-3 py-1.5 text-[11px] font-black tracking-[-0.04em] text-white transition active:scale-[0.97]"
+                    style={{ borderRadius: "999px", border: "none", background: "#7B2D43", padding: "6px 14px", fontSize: "11px", fontWeight: 800, color: "#fff", cursor: "pointer" }}
                   >
                     주소검색
                   </button>
@@ -187,7 +189,7 @@ export default function CustomerInfoEditBottomSheet({
                     resizeTextareaHeight(event.currentTarget);
                   }}
                   onInput={(event) => resizeTextareaHeight(event.currentTarget)}
-                  className={addressTextareaClassName}
+                  style={textareaStyle}
                   placeholder="주소검색을 눌러 주소를 입력해주세요"
                   autoComplete="street-address"
                 />
@@ -195,7 +197,7 @@ export default function CustomerInfoEditBottomSheet({
                 <input
                   value={detailAddress}
                   onChange={(event) => onDetailAddressChange(event.target.value)}
-                  className={`${inputClassName} mt-2`}
+                  style={{ ...inputStyle, marginTop: "8px" }}
                   placeholder="상세주소를 입력해주세요"
                   autoComplete="address-line2"
                 />
@@ -203,12 +205,12 @@ export default function CustomerInfoEditBottomSheet({
             </div>
           </div>
 
-          <footer className="grid shrink-0 grid-cols-[0.78fr_1.22fr] gap-2 border-t border-slate-100 bg-white px-4 pb-[calc(14px+env(safe-area-inset-bottom))] pt-3">
+          <footer style={{ display: "grid", flexShrink: 0, gridTemplateColumns: "0.78fr 1.22fr", gap: "8px", borderTop: "1px solid #E8E2DD", background: "#fff", padding: "12px 16px calc(14px + env(safe-area-inset-bottom))" }}>
             <button
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="flex min-h-[50px] items-center justify-center rounded-[18px] bg-slate-100 px-3 text-[15px] font-black tracking-[-0.05em] text-slate-700 transition active:scale-[0.98] disabled:opacity-45"
+              style={{ display: "flex", minHeight: "50px", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", padding: "0 12px", fontSize: "15px", fontWeight: 800, color: "#666", cursor: saving ? "default" : "pointer", opacity: saving ? 0.45 : 1 }}
             >
               취소
             </button>
@@ -217,7 +219,7 @@ export default function CustomerInfoEditBottomSheet({
               type="button"
               onClick={onSave}
               disabled={saving}
-              className="flex min-h-[50px] items-center justify-center rounded-[18px] bg-rose-deep px-3 text-[15px] font-black tracking-[-0.05em] text-white shadow-[0_12px_28px_rgba(216,90,48,0.22)] transition active:scale-[0.98] disabled:bg-slate-300 disabled:shadow-none"
+              style={{ display: "flex", minHeight: "50px", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "none", background: saving ? "#cbd5e1" : "#7B2D43", padding: "0 12px", fontSize: "15px", fontWeight: 800, color: "#fff", cursor: saving ? "default" : "pointer" }}
             >
               {saving ? "저장 중..." : "저장"}
             </button>

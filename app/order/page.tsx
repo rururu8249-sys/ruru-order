@@ -999,6 +999,7 @@ export default function OrderPage() {
   const [productPage, setProductPage] = useState(1);
   const [cartAddedOpen, setCartAddedOpen] = useState(false);
   const [pendingAddProduct, setPendingAddProduct] = useState<BroadcastProduct | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<string>("");
   const [orderLookupOrders, setOrderLookupOrders] = useState<any[]>([]);
   const [orderLookupFilter, setOrderLookupFilter] = useState<CustomerOrderLookupFilter>("전체");
   const [orderLookupPage, setOrderLookupPage] = useState(1);
@@ -3678,18 +3679,14 @@ export default function OrderPage() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-            <Link
-              href="/order"
-              onClick={(e) => { handleTopNavOrderClick(e); e.preventDefault(); setOrderSheetOpen(true); }}
-              aria-label="주문서"
-              style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: "5px", justifyContent: "center", height: "38px", padding: "0 11px", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#FAF6F2", textDecoration: "none" }}
+            <button
+              type="button"
+              onClick={(e) => { handleTopNavOrderClick(e); setOrderSheetOpen(true); window.setTimeout(() => document.getElementById("orderSheetSection")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}
+              aria-label="담은 상품 보기"
+              style={{ display: "inline-flex", alignItems: "center", gap: "5px", justifyContent: "center", height: "38px", padding: "0 12px", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#FAF6F2", cursor: "pointer" }}
             >
-              <span style={{ fontSize: "18px" }}>🧾</span>
-              <span style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>주문서</span>
-              {cartCount > 0 ? (
-                <span style={{ position: "absolute", top: "-6px", right: "-6px", minWidth: "18px", height: "18px", borderRadius: "9px", background: "#7B2D43", color: "#fff", fontSize: "10px", fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{cartCount}</span>
-              ) : null}
-            </Link>
+              <span style={{ fontSize: "13px", fontWeight: 800, color: "#7B2D43" }}>🧾 담은 상품 {cartCount}개 보기</span>
+            </button>
             <button
               type="button"
               onClick={() => setMenuSheetOpen(true)}
@@ -3861,7 +3858,7 @@ export default function OrderPage() {
           {(() => {
             const q = productSearchText.trim();
             const filtered = quickGroupBuyProducts.filter((p) => !q || productMatchesSuggestion(p as BroadcastProduct, q));
-            const PAGE = 8;
+            const PAGE = 6;
             const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE));
             const safePage = Math.min(productPage, totalPages);
             const pageItems = filtered.slice((safePage - 1) * PAGE, safePage * PAGE);
@@ -3889,7 +3886,7 @@ export default function OrderPage() {
                           onClick={() => selectQuickGroupBuyProduct(product as BroadcastProduct)}
                           style={{ position: "relative", textAlign: "left", border: `1.5px solid ${pinned ? "#7B2D43" : "#E8E2DD"}`, borderRadius: "14px", background: "#fff", padding: 0, overflow: "hidden", cursor: sold ? "default" : "pointer", opacity: sold ? 0.6 : 1 }}
                         >
-                          <div style={{ position: "relative", width: "100%", height: "160px", background: "#f3f0ee" }}>
+                          <div onClick={(e) => { if (img) { e.preventDefault(); e.stopPropagation(); setLightboxImage(img); } }} style={{ position: "relative", width: "100%", height: "120px", background: "#f3f0ee", cursor: img ? "zoom-in" : "default" }}>
                             {img ? (
                               <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                             ) : (
@@ -3929,7 +3926,7 @@ export default function OrderPage() {
 
           {orderSheetOpen && (
           <>
-          <section className="mt-3 w-full max-w-full overflow-hidden rounded-[24px] border border-rose-line bg-rose-soft/40 p-3 shadow-sm">
+          <section id="orderSheetSection" className="mt-3 w-full max-w-full overflow-hidden rounded-[24px] border border-rose-line bg-rose-soft/40 p-3 shadow-sm">
             <div className="mb-4">
               <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
                 주문서 확인
@@ -4232,6 +4229,14 @@ export default function OrderPage() {
             />
 
             {customerBlockStatus.blocked ? <CustomerBlockedNotice /> : null}
+
+          {/* 상품 이미지 크게 보기 (lightbox) */}
+          {lightboxImage ? (
+            <div style={{ position: "fixed", inset: 0, zIndex: 150, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.85)", padding: "20px" }} onClick={() => setLightboxImage("")}>
+              <button type="button" onClick={() => setLightboxImage("")} aria-label="닫기" style={{ position: "absolute", top: "16px", right: "16px", width: "44px", height: "44px", borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.2)", color: "#fff", fontSize: "22px", cursor: "pointer" }}>✕</button>
+              <img src={lightboxImage} alt="" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: "12px" }} />
+            </div>
+          ) : null}
 
           {/* 옵션 없는 상품 담기 확인 팝업 */}
           {pendingAddProduct && (

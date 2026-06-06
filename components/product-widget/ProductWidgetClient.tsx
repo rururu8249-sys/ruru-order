@@ -30,8 +30,7 @@ function priceOf(p: AnyProduct | null): number {
   return Number(p?.price ?? p?.sale_price ?? p?.selling_price ?? 0) || 0;
 }
 
-function sizesOf(p: AnyProduct | null): string {
-  const raw = p?.size_options ?? p?.sizes;
+function joinOptionValues(raw: unknown): string {
   if (Array.isArray(raw)) return raw.map((s) => String(s).trim()).filter(Boolean).join(" · ");
   if (typeof raw === "string") {
     try {
@@ -43,6 +42,15 @@ function sizesOf(p: AnyProduct | null): string {
     return raw.split(/[,/|]+/g).map((s) => s.trim()).filter(Boolean).join(" · ");
   }
   return "";
+}
+
+function sizesOf(p: AnyProduct | null): string {
+  return p ? joinOptionValues(p.size_options ?? p.sizes ?? p.size ?? p.product_sizes) : "";
+}
+
+// 색상 옵션 — 기존엔 이 함수/렌더가 없어서 색상이 표시되지 않았음
+function colorsOf(p: AnyProduct | null): string {
+  return p ? joinOptionValues(p.color_options ?? p.colors ?? p.color ?? p.product_colors) : "";
 }
 
 // 재고 "표시" 의도가 있을 때만 노출 — stock_management_enabled 이고 숫자일 때 "남은 N"
@@ -148,7 +156,9 @@ export default function ProductWidgetClient() {
 
   const current = pinned || rotation[rotIndex] || null;
   const img = imageOf(current);
+  const colors = colorsOf(current);
   const sizes = sizesOf(current);
+  const optionText = [colors, sizes].filter(Boolean).join("  /  ");
   const stock = stockLabel(current);
 
   return (
@@ -205,11 +215,11 @@ export default function ProductWidgetClient() {
           </div>
 
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: "16px", fontWeight: 800, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+            <div style={{ fontSize: "16px", fontWeight: 800, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", wordBreak: "break-all" }}>
               {nameOf(current)}
             </div>
-            {sizes ? (
-              <div style={{ marginTop: "3px", fontSize: "12px", color: "rgba(255,255,255,0.78)" }}>{sizes}</div>
+            {optionText ? (
+              <div style={{ marginTop: "3px", fontSize: "12px", color: "rgba(255,255,255,0.78)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{optionText}</div>
             ) : null}
             <div style={{ marginTop: "4px", display: "flex", alignItems: "baseline", gap: "8px" }}>
               <span style={{ fontSize: "19px", fontWeight: 800, color: "#FFD9E0" }}>{priceOf(current).toLocaleString("ko-KR")}원</span>

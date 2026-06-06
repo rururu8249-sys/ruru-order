@@ -1,6 +1,8 @@
 // components/customer/CustomerOrderLookupBottomSheet.tsx
 // 목적: 주문서 화면 안에서 사용하는 고객 주문조회 바텀시트
-// 주의: UI 전용. DB, API, 주문저장, 입금매칭, 정산, 배송 로직 없음.
+// 주의: UI 전용. DB, API, 주문저장, 입금매칭, 정산, 배송 로직 없음. (시안 딥로즈 #7B2D43 인라인)
+
+import type { CSSProperties } from "react";
 
 export type CustomerOrderLookupFilter = "전체" | "입금대기" | "입금확인" | "출고완료";
 
@@ -38,17 +40,20 @@ const clampPage = (page: number, totalPages: number) => {
 };
 
 // 시안 배지색(정확 hex): 입금확인 초록#0F6E56 / 택배출고(출고완료) 파랑#185FA5 / 입금대기 노랑#854F0B / 그 외(출고대기) 회색
-const paymentChipStyle = (statusLabel: CustomerOrderLookupFilter) => {
+const paymentChipStyle = (statusLabel: CustomerOrderLookupFilter): CSSProperties => {
   if (statusLabel === "입금확인") return { background: "#E1F5EE", color: "#0F6E56" };
   if (statusLabel === "출고완료") return { background: "#E6F1FB", color: "#185FA5" };
   if (statusLabel === "입금대기") return { background: "#FAEEDA", color: "#854F0B" };
   return { background: "#EEEEEE", color: "#888888" };
 };
 
-const deliveryChipStyle = (deliveryLabel: string) => {
+const deliveryChipStyle = (deliveryLabel: string): CSSProperties => {
   if (/출고완료|택배출고|배송완료/.test(deliveryLabel)) return { background: "#185FA5", color: "#ffffff" };
   return { background: "#EEEEEE", color: "#888888" };
 };
+
+const chipBaseStyle: CSSProperties = { borderRadius: "999px", padding: "4px 10px", fontSize: "11px", fontWeight: 800 };
+const pageArrowStyle: CSSProperties = { display: "flex", height: "40px", minWidth: "40px", alignItems: "center", justifyContent: "center", borderRadius: "999px", border: "1px solid #D9C5CC", background: "#fff", fontSize: "14px", fontWeight: 800, color: "#7B2D43", cursor: "pointer" };
 
 export default function CustomerOrderLookupBottomSheet({
   open,
@@ -70,39 +75,30 @@ export default function CustomerOrderLookupBottomSheet({
   return (
     <div
       data-ruru-order-lookup-bottom-sheet="shell-v2"
-      className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/45 px-3"
+      style={{ position: "fixed", inset: 0, zIndex: 90, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(15,23,42,0.45)", padding: "0 12px" }}
       role="dialog"
       aria-modal="true"
       aria-label="주문조회"
     >
-      <section className="w-full max-w-[430px] overflow-hidden rounded-t-[30px] bg-white shadow-[0_-22px_70px_rgba(15,23,42,0.22)]">
-        <div className="mx-auto mt-3 h-1.5 w-14 rounded-full bg-slate-200" />
+      <section style={{ width: "100%", maxWidth: "430px", overflow: "hidden", borderTopLeftRadius: "28px", borderTopRightRadius: "28px", background: "#fff", boxShadow: "0 -22px 70px rgba(15,23,42,0.22)" }}>
+        <div style={{ margin: "12px auto 0", height: "5px", width: "52px", borderRadius: "3px", background: "#E8E2DD" }} />
 
-        <div className="flex max-h-[88dvh] flex-col">
-          <header className="shrink-0 px-4 pb-2 pt-4">
-            <div className="flex items-baseline gap-2 whitespace-nowrap">
-              <h2 className="text-[26px] font-black leading-none tracking-[-0.08em] text-slate-950">
-                주문조회
-              </h2>
-              <span className="text-[12px] font-black tracking-[-0.05em] text-slate-400">
-                최근 7일 주문내역
-              </span>
+        <div style={{ display: "flex", maxHeight: "88dvh", flexDirection: "column" }}>
+          <header style={{ flexShrink: 0, padding: "16px 16px 8px" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: "8px", whiteSpace: "nowrap" }}>
+              <h2 style={{ fontSize: "26px", fontWeight: 800, lineHeight: 1, letterSpacing: "-0.08em", color: "#7B2D43" }}>주문조회</h2>
+              <span style={{ fontSize: "12px", fontWeight: 800, color: "#999" }}>최근 7일 주문내역</span>
             </div>
 
-            <div className="mt-3.5 grid grid-cols-4 rounded-[18px] bg-slate-50 p-1 ring-1 ring-slate-100">
+            <div style={{ marginTop: "14px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", borderRadius: "14px", background: "#F5F1F2", padding: "4px", gap: "2px" }}>
               {filters.map((filter) => {
                 const selected = activeFilter === filter;
-
                 return (
                   <button
                     key={filter}
                     type="button"
                     onClick={() => onFilterChange(filter)}
-                    className={
-                      selected
-                        ? "min-h-[38px] rounded-[15px] bg-rose-deep px-1.5 text-[12px] font-black tracking-[-0.05em] text-white shadow-[0_8px_18px_rgba(181,72,31,0.22)] transition active:scale-[0.98]"
-                        : "min-h-[38px] rounded-[15px] px-1.5 text-[12px] font-black tracking-[-0.05em] text-slate-500 transition active:scale-[0.98]"
-                    }
+                    style={{ minHeight: "38px", borderRadius: "11px", border: "none", padding: "0 6px", fontSize: "12px", fontWeight: 800, cursor: "pointer", background: selected ? "#7B2D43" : "transparent", color: selected ? "#fff" : "#888" }}
                   >
                     {filter}
                   </button>
@@ -111,59 +107,40 @@ export default function CustomerOrderLookupBottomSheet({
             </div>
           </header>
 
-          <div className="min-h-0 overflow-y-auto px-4 pb-2 pt-2">
+          <div style={{ minHeight: 0, overflowY: "auto", padding: "8px 16px" }}>
             {items.length > 0 ? (
-              <div className="grid gap-2.5">
+              <div style={{ display: "grid", gap: "10px" }}>
                 {items.map((item) => {
                   const optionLine = [item.optionText, item.quantityText].filter(Boolean).join(" · ");
-                  const deliveryLabel =
-                    item.deliveryLabel || (item.statusLabel === "출고완료" ? "출고완료" : "확인중");
+                  const deliveryLabel = item.deliveryLabel || (item.statusLabel === "출고완료" ? "출고완료" : "확인중");
                   const orderMeta = [item.orderCode, item.dateText].filter(Boolean).join(" · ");
 
                   return (
-                    <article
-                      key={item.id}
-                      className="rounded-[20px] bg-white px-4 py-2 ring-1 ring-slate-200"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex min-w-0 items-center gap-1.5">
-                          <span
-                            className="rounded-full px-2.5 py-1 text-[11px] font-black tracking-[-0.04em]"
-                            style={paymentChipStyle(item.statusLabel)}
-                          >
-                            {item.statusLabel}
-                          </span>
-                          <span
-                            className="rounded-full px-2.5 py-1 text-[11px] font-black tracking-[-0.04em]"
-                            style={deliveryChipStyle(deliveryLabel)}
-                          >
-                            {deliveryLabel}
-                          </span>
+                    <article key={item.id} style={{ borderRadius: "16px", background: "#fff", border: "1px solid #E8E2DD", padding: "8px 16px" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                        <div style={{ display: "flex", minWidth: 0, alignItems: "center", gap: "6px" }}>
+                          <span style={{ ...chipBaseStyle, ...paymentChipStyle(item.statusLabel) }}>{item.statusLabel}</span>
+                          <span style={{ ...chipBaseStyle, ...deliveryChipStyle(deliveryLabel) }}>{deliveryLabel}</span>
                         </div>
-
-                        <p className="shrink-0 text-[10px] font-black tracking-[-0.04em] text-slate-400">
-                          결제금액
-                        </p>
+                        <p style={{ flexShrink: 0, fontSize: "10px", fontWeight: 800, color: "#999" }}>결제금액</p>
                       </div>
 
-                      <div className="mt-1.5 grid grid-cols-[1fr_auto] items-start gap-3">
-                        <div className="min-w-0">
-                          <h3 className="truncate text-[17px] font-black leading-tight tracking-[-0.07em] text-slate-950">
+                      <div style={{ marginTop: "6px", display: "grid", gridTemplateColumns: "1fr auto", alignItems: "start", gap: "12px" }}>
+                        <div style={{ minWidth: 0 }}>
+                          <h3 style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "17px", fontWeight: 800, lineHeight: 1.2, letterSpacing: "-0.07em", color: "#222" }}>
                             {item.productName || "주문상품"}
                           </h3>
-
-                          <p className="mt-0.5 truncate text-[13px] font-black tracking-[-0.05em] text-slate-500">
+                          <p style={{ marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "13px", fontWeight: 800, letterSpacing: "-0.05em", color: "#888" }}>
                             {optionLine || "옵션 없음"}
                           </p>
                         </div>
-
-                        <p className="max-w-[112px] truncate pt-0.5 text-right text-[19px] font-black leading-tight tracking-[-0.08em] text-slate-950">
+                        <p style={{ maxWidth: "112px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingTop: "2px", textAlign: "right", fontSize: "19px", fontWeight: 800, lineHeight: 1.2, letterSpacing: "-0.08em", color: "#222" }}>
                           {item.amountText}
                         </p>
                       </div>
 
-                      <div className="mt-1.5 flex min-w-0 items-center rounded-[14px] bg-slate-50 px-3 py-1.5 ring-1 ring-slate-100">
-                        <p className="min-w-0 flex-1 truncate text-[11px] font-black tracking-[-0.04em] text-slate-500">
+                      <div style={{ marginTop: "6px", display: "flex", minWidth: 0, alignItems: "center", borderRadius: "12px", background: "#FAF6F2", padding: "6px 12px" }}>
+                        <p style={{ minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 800, color: "#888" }}>
                           {orderMeta || "-"}
                         </p>
                       </div>
@@ -172,71 +149,45 @@ export default function CustomerOrderLookupBottomSheet({
                 })}
               </div>
             ) : (
-              <div className="rounded-[22px] bg-slate-50 p-5 text-center ring-1 ring-slate-100">
-                <p className="text-[15px] font-black tracking-[-0.05em] text-slate-700">
-                  선택한 상태의 주문내역이 없습니다.
-                </p>
-                <p className="mt-1 text-[12px] font-bold tracking-[-0.04em] text-slate-400">
-                  다른 상태를 눌러 확인해주세요.
-                </p>
+              <div style={{ borderRadius: "16px", background: "#FAF6F2", padding: "20px", textAlign: "center", border: "1px solid #E8E2DD" }}>
+                <p style={{ fontSize: "15px", fontWeight: 800, letterSpacing: "-0.05em", color: "#555" }}>선택한 상태의 주문내역이 없습니다.</p>
+                <p style={{ marginTop: "4px", fontSize: "12px", fontWeight: 700, color: "#999" }}>다른 상태를 눌러 확인해주세요.</p>
               </div>
             )}
 
             <nav
               data-ruru-order-lookup-pagination="compact-v3"
-              className="mt-3 flex items-center justify-center gap-2"
+              style={{ marginTop: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
               aria-label="주문조회 페이지 이동"
             >
-              <button
-                type="button"
-                onClick={() => onPageChange(Math.max(1, safePage - 1))}
-                disabled={safePage <= 1}
-                className="flex h-10 min-w-10 items-center justify-center rounded-full bg-white px-3 text-[14px] font-black text-slate-500 ring-1 ring-slate-200 transition active:scale-[0.97] disabled:opacity-25"
-              >
-                &lt;
-              </button>
+              <button type="button" onClick={() => onPageChange(Math.max(1, safePage - 1))} disabled={safePage <= 1} style={{ ...pageArrowStyle, opacity: safePage <= 1 ? 0.25 : 1, cursor: safePage <= 1 ? "default" : "pointer" }}>&lt;</button>
 
-              <div className="flex h-10 min-w-[112px] items-center justify-center rounded-full bg-slate-50 px-4 text-[15px] font-black tracking-[-0.05em] text-slate-700 ring-1 ring-slate-100">
-                <span className="text-rose-deep">{safePage}</span>
-                <span className="mx-2 text-slate-300">/</span>
+              <div style={{ display: "flex", height: "40px", minWidth: "112px", alignItems: "center", justifyContent: "center", borderRadius: "999px", background: "#FAF6F2", padding: "0 16px", fontSize: "15px", fontWeight: 800, letterSpacing: "-0.05em", color: "#555" }}>
+                <span style={{ color: "#7B2D43" }}>{safePage}</span>
+                <span style={{ margin: "0 8px", color: "#ccc" }}>/</span>
                 <span>{safeTotalPages}</span>
               </div>
 
-              <button
-                type="button"
-                onClick={() => onPageChange(Math.min(safeTotalPages, safePage + 1))}
-                disabled={safePage >= safeTotalPages}
-                className="flex h-10 min-w-10 items-center justify-center rounded-full bg-white px-3 text-[14px] font-black text-slate-500 ring-1 ring-slate-200 transition active:scale-[0.97] disabled:opacity-25"
-              >
-                &gt;
-              </button>
+              <button type="button" onClick={() => onPageChange(Math.min(safeTotalPages, safePage + 1))} disabled={safePage >= safeTotalPages} style={{ ...pageArrowStyle, opacity: safePage >= safeTotalPages ? 0.25 : 1, cursor: safePage >= safeTotalPages ? "default" : "pointer" }}>&gt;</button>
             </nav>
           </div>
 
-          <footer className="grid shrink-0 grid-cols-[0.78fr_1.22fr] gap-x-2 gap-y-1.5 border-t border-slate-100 bg-white px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-2.5">
+          <footer style={{ display: "grid", flexShrink: 0, gridTemplateColumns: "0.78fr 1.22fr", columnGap: "8px", rowGap: "6px", borderTop: "1px solid #E8E2DD", background: "#fff", padding: "10px 16px calc(12px + env(safe-area-inset-bottom))" }}>
             <a
               href={BAND_TRACKING_URL}
               target="_blank"
               rel="noreferrer"
-              className="col-span-2 flex min-h-[46px] items-center gap-2.5 rounded-[17px] border border-green-100 bg-gradient-to-r from-green-50 to-emerald-50 px-3 py-1.5 shadow-sm transition active:scale-[0.98]"
+              style={{ gridColumn: "span 2", display: "flex", minHeight: "46px", alignItems: "center", gap: "10px", borderRadius: "14px", border: "1px solid #C8E6C9", background: "#EAF6EA", padding: "6px 12px", textDecoration: "none" }}
             >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#21c531] text-[11px] font-black tracking-[-0.04em] text-white shadow-sm">
-                BAND
-              </div>
-
-              <p className="min-w-0 flex-1 break-keep text-[14px] font-black leading-snug tracking-[-0.05em] text-green-800">
-                밴드에서 택배송장번호 확인 가능
-              </p>
-
-              <div className="shrink-0 text-[18px] font-black text-green-700">
-                ›
-              </div>
+              <div style={{ display: "flex", height: "36px", width: "36px", flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: "50%", background: "#21c531", fontSize: "11px", fontWeight: 800, color: "#fff" }}>BAND</div>
+              <p style={{ minWidth: 0, flex: 1, wordBreak: "keep-all", fontSize: "14px", fontWeight: 800, lineHeight: 1.3, letterSpacing: "-0.05em", color: "#1B5E20" }}>밴드에서 택배송장번호 확인 가능</p>
+              <div style={{ flexShrink: 0, fontSize: "18px", fontWeight: 800, color: "#2E7D32" }}>›</div>
             </a>
 
             <button
               type="button"
               onClick={onClose}
-              className="flex min-h-[48px] items-center justify-center rounded-[18px] bg-slate-100 px-3 text-[15px] font-black tracking-[-0.05em] text-slate-700 transition active:scale-[0.98]"
+              style={{ display: "flex", minHeight: "48px", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", padding: "0 12px", fontSize: "15px", fontWeight: 800, letterSpacing: "-0.05em", color: "#666", cursor: "pointer" }}
             >
               닫기
             </button>
@@ -244,7 +195,7 @@ export default function CustomerOrderLookupBottomSheet({
             <button
               type="button"
               onClick={onOpenPaymentGuide}
-              className="flex min-h-[48px] items-center justify-center rounded-[18px] bg-rose-deep px-3 text-[15px] font-black tracking-[-0.05em] text-white shadow-[0_12px_28px_rgba(216,90,48,0.22)] transition active:scale-[0.98]"
+              style={{ display: "flex", minHeight: "48px", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "none", background: "#7B2D43", padding: "0 12px", fontSize: "15px", fontWeight: 800, letterSpacing: "-0.05em", color: "#fff", cursor: "pointer" }}
             >
               입금 계좌 보기
             </button>
