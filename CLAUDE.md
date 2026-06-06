@@ -23,6 +23,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 (없음)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-06-06 세션12-2(중복당첨 토글 연동): event-roulette API의 중복당첨 방지(applyNoDuplicateWinnerRule, 666 "이미 모든 참여자 당첨" 에러)를 excludeDailyDup으로 게이트 — false면 중복체크 건너뜀(handleParticipants searchParams + createEvent body 둘 다, 기본 true). 패널이 "당일 중복당첨 금지" 토글값을 create_event 3곳 + 참가자GET에 전송. 돈/포인트/추첨 로직 무변경
 - 2026-06-06 세션12(이벤트 4건): 당첨자 카드=overlay result-card 디자인 정밀화 / 룰렛 회전 30바퀴 / 인형뽑기 탭=canvas 숨기고 🕹️인형UI 표시(버그수정) / 당첨 확정 시 giftType=point+금액 있으면 **포인트 자동지급**(운영모드만, orders 최신주문 customer_phone로 닉네임→전화 매핑, 기존 /api/admin-live/customer-points API 재사용, 테스트모드는 미지급). 모달 680px 고정 유지. 추첨 로직 보존
 - 2026-06-06 세션11-3(이벤트 시안 인라인 그대로 이식): screens.event의 HTML/CSS를 Tailwind 변환 없이 인라인 style + 시안 클래스(.btn/.note/.nick/.tog/.row/.badge/.wheel 등)로 이식. globals.css에 시안 :root 변수(--rose/--rose-bg/--rose-bd/--green/--blue 등) + 클래스를 `.ruru-event-sian` 스코프로 추가(전역충돌 방지). 룰렛은 canvas 실제스핀 유지(화살표 휠 안으로 삽입). 추첨/포인트/API/상태 로직 보존, 핸들러만 연결. + UI작업 필수원칙/룰렛기준 섹션 CLAUDE.md 추가
 - 2026-06-06 세션11-2(이벤트 시안⑨ 1:1 + 실제 canvas 룰렛): 패널 본문을 시안⑨ 단일컬럼으로 재구성(상단 룰렛+돌리기 | 참가자3버튼[👥주문서전체/💵입금완료/✎수동]+당일중복금지·가중치 토글 / 당첨고정 rose박스 칩 / 제목+당첨선물50:50 / 위젯주소 / 이벤트목록 기간필터+달력). 시안색상(rose-deep/rose-soft/rose-line/#f7f5f1). conic div → **실제 canvas 룰렛**(requestAnimationFrame, 당첨확정 시 8~14바퀴·4~6초·easeOutCubic로 당첨칸 정지, 화살표 상단삽입, 가운데 당첨자 오버레이). 추첨/포인트/API/상태 로직 100% 보존. ※가중치·당일중복 토글·입금완료필터는 여전히 서버연동 P2/P3
