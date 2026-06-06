@@ -1008,6 +1008,7 @@ export default function OrderPage() {
   const [cardPaymentMinAmount, setCardPaymentMinAmount] = useState(100000);
   const [defaultShippingFee, setDefaultShippingFee] = useState(4000);
   const [remoteAreaShippingFee, setRemoteAreaShippingFee] = useState(6000);
+  const [pointEarnRateForDisplay, setPointEarnRateForDisplay] = useState(0);
   const [combineShippingSettings, setCombineShippingSettings] =
     useState<CombineShippingSettings>(DEFAULT_COMBINE_SHIPPING_SETTINGS);
   const [alreadyPaidShipping, setAlreadyPaidShipping] = useState(false);
@@ -1571,6 +1572,8 @@ export default function OrderPage() {
         "card_payment_min_amount",
         "default_shipping_fee",
         "remote_area_shipping_fee",
+        "point_auto_earn_enabled",
+        "point_earn_rate",
         ...COMBINE_SHIPPING_SETTING_KEYS,
       ]);
 
@@ -1597,6 +1600,12 @@ export default function OrderPage() {
     setDefaultShippingFee(nextDefaultShippingFee);
     setRemoteAreaShippingFee(nextRemoteAreaShippingFee);
     setCombineShippingSettings(parseCombineShippingSettings(data));
+
+    // 포인트 자동적립 안내 문구용 (자동적립 ON + 적립률>0 일 때만 N% 표시, OFF면 0=숨김)
+    const pointAutoEarnEnabled =
+      String((data || []).find((item: any) => item.key === "point_auto_earn_enabled")?.value || "").trim() === "true";
+    const pointEarnRate = Math.min(100, Math.max(0, readNumber("point_earn_rate", 0)));
+    setPointEarnRateForDisplay(pointAutoEarnEnabled ? pointEarnRate : 0);
   };
 
   const loadSavedCustomerInfo = () => {
@@ -4193,6 +4202,7 @@ export default function OrderPage() {
                 pointUseInput={commaNumberText(pointUseInput)}
                 pointUsedAmount={selectedPointUseAmount}
                 finalAmount={finalPaymentAmount}
+                pointEarnRate={pointEarnRateForDisplay}
                 showPointUse={customerPointBalance >= 1000 && totalAmount > 0}
                 onPointUseInputChange={(value) => setPointUseInput(onlyNumber(value))}
                 onUseAllPoints={() => setPointUseInput(String(Math.min(customerPointBalance, totalAmount)))}

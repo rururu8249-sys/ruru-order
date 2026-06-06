@@ -10,7 +10,9 @@ type SettingKey =
   | "actual_card_fee_rate"
   | "card_payment_min_amount"
   | "default_shipping_fee"
-  | "remote_area_shipping_fee";
+  | "remote_area_shipping_fee"
+  | "point_auto_earn_enabled"
+  | "point_earn_rate";
 
 type SettingRow = {
   key: string;
@@ -23,6 +25,8 @@ const SETTING_KEYS: SettingKey[] = [
   "card_payment_min_amount",
   "default_shipping_fee",
   "remote_area_shipping_fee",
+  "point_auto_earn_enabled",
+  "point_earn_rate",
 ];
 
 const DEFAULTS: Record<SettingKey, number> = {
@@ -31,6 +35,8 @@ const DEFAULTS: Record<SettingKey, number> = {
   card_payment_min_amount: 100000,
   default_shipping_fee: 4000,
   remote_area_shipping_fee: 6000,
+  point_auto_earn_enabled: 0,
+  point_earn_rate: 0,
 };
 
 function clean(value: unknown) {
@@ -102,6 +108,8 @@ export default function AdminLiveSettingsPanel() {
   const [cardMinAmount, setCardMinAmount] = useState(formatMoneyInput(DEFAULTS.card_payment_min_amount));
   const [defaultShippingFee, setDefaultShippingFee] = useState(formatMoneyInput(DEFAULTS.default_shipping_fee));
   const [remoteShippingFee, setRemoteShippingFee] = useState(formatMoneyInput(DEFAULTS.remote_area_shipping_fee));
+  const [pointAutoEarn, setPointAutoEarn] = useState(false);
+  const [pointEarnRate, setPointEarnRate] = useState(String(DEFAULTS.point_earn_rate));
 
   useEffect(() => {
     let alive = true;
@@ -126,6 +134,8 @@ export default function AdminLiveSettingsPanel() {
         setCardMinAmount(formatMoneyInput(readNumber(rows, "card_payment_min_amount")));
         setDefaultShippingFee(formatMoneyInput(readNumber(rows, "default_shipping_fee")));
         setRemoteShippingFee(formatMoneyInput(readNumber(rows, "remote_area_shipping_fee")));
+        setPointAutoEarn(clean(rows.find((r) => r.key === "point_auto_earn_enabled")?.value) === "true");
+        setPointEarnRate(String(readNumber(rows, "point_earn_rate")));
       } finally {
         if (alive) setLoading(false);
       }
@@ -154,6 +164,7 @@ export default function AdminLiveSettingsPanel() {
     const nextCardMinAmount = Math.max(0, Math.round(toNumber(cardMinAmount)));
     const nextDefaultShippingFee = Math.max(0, Math.round(toNumber(defaultShippingFee)));
     const nextRemoteShippingFee = Math.max(nextDefaultShippingFee, Math.round(toNumber(remoteShippingFee)));
+    const nextPointEarnRate = Math.min(100, Math.max(0, toNumber(pointEarnRate)));
 
     setSaving(true);
 
@@ -165,6 +176,8 @@ export default function AdminLiveSettingsPanel() {
           { key: "card_payment_min_amount", value: String(nextCardMinAmount) },
           { key: "default_shipping_fee", value: String(nextDefaultShippingFee) },
           { key: "remote_area_shipping_fee", value: String(nextRemoteShippingFee) },
+          { key: "point_auto_earn_enabled", value: pointAutoEarn ? "true" : "false" },
+          { key: "point_earn_rate", value: String(nextPointEarnRate) },
         ],
         { onConflict: "key" },
       );
@@ -267,6 +280,36 @@ export default function AdminLiveSettingsPanel() {
               onChange={(value) => setRemoteShippingFee(formatMoneyInput(value))}
             />
           </div>
+        </div>
+      </div>
+
+      <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-black text-slate-950">포인트 적립 규칙</h2>
+            <p className="mt-1 text-xs font-bold text-slate-400">결제완료(자동·수동 입금확인, 카드결제완료) 시 구매금액(택배비 제외)의 일정 비율을 자동 적립합니다.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPointAutoEarn((v) => !v)}
+            className={`shrink-0 rounded-full px-4 py-2 text-xs font-black transition ${pointAutoEarn ? "bg-rose-deep text-white" : "border border-slate-200 bg-white text-slate-500"}`}
+          >
+            {pointAutoEarn ? "자동적립 ON" : "자동적립 OFF"}
+          </button>
+        </div>
+
+        <div className={pointAutoEarn ? "" : "pointer-events-none opacity-50"}>
+          <SettingInput
+            label="적립률"
+            desc="상품금액(택배비 제외) 대비 적립 비율입니다. 예: 3% → 1만원 구매 시 300P 적립."
+            value={pointEarnRate}
+            suffix="%"
+            onChange={(value) => setPointEarnRate(onlyDigits(value))}
+          />
+        </div>
+
+        <div className="mt-3 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3 text-[11px] font-bold leading-5 text-orange-800">
+          결제완료 시 자동 지급되며, 자동적립은 알림 팝업이 뜨지 않습니다(주문서 안내 문구로만 표시). 실제 지급/차감 관리는 포인트 메뉴에서.
         </div>
       </div>
 

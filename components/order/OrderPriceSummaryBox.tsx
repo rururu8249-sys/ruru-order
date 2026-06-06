@@ -15,6 +15,7 @@ type OrderPriceSummaryBoxProps = {
   pointUseInput?: string;
   pointUsedAmount?: number;
   finalAmount?: number;
+  pointEarnRate?: number; // 0 = 자동적립 OFF(문구 숨김) / >0 = 구매금액의 N% 적립 안내
   showPointUse?: boolean;
   onPointUseInputChange?: (value: string) => void;
   onUseAllPoints?: () => void;
@@ -33,6 +34,7 @@ export default function OrderPriceSummaryBox({
   pointUseInput = "",
   pointUsedAmount = 0,
   finalAmount,
+  pointEarnRate = 0,
   showPointUse = false,
   onPointUseInputChange,
   onUseAllPoints,
@@ -114,9 +116,11 @@ export default function OrderPriceSummaryBox({
           </div>
         ) : null}
 
-        <div style={{ marginTop: "12px", borderTop: "1px dashed #D9C5CC", paddingTop: "12px", display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", fontWeight: 700, color: "#7B2D43" }}>
-          🪙 결제 완료 시 포인트가 적립돼요
-        </div>
+        {pointEarnRate > 0 ? (
+          <div style={{ marginTop: "12px", borderTop: "1px dashed #D9C5CC", paddingTop: "12px", display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", fontWeight: 700, color: "#7B2D43" }}>
+            🪙 결제 완료 시 구매금액의 {pointEarnRate}% 포인트 적립
+          </div>
+        ) : null}
       </div>
     </section>
   );
