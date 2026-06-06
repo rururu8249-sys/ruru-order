@@ -1794,6 +1794,11 @@ export default function OrderPage() {
         detail_image_urls: product.detail_image_urls ?? product.detailImageUrls ?? product.detail_images ?? null,
         images: product.images ?? null,
         product_images: product.product_images ?? null,
+        // 카드 이미지: 기존엔 image_url/main_image_url/thumbnail_url을 빠뜨려 broadcast 상품 이미지가 안 떴음.
+        // 카탈로그(normalizeOrderProductRow)와 동일하게 메인 이미지를 사전 해석해 보존한다.
+        image_url: pickOrderProductImageUrl(product),
+        main_image_url: product.main_image_url ?? null,
+        thumbnail_url: product.thumbnail_url ?? null,
         is_pinned: Boolean(product.is_pinned) || Boolean(product.pinned),
         pinned: Boolean(product.pinned) || Boolean(product.is_pinned),
         pinned_at: String(product.pinned_at ?? ""),
