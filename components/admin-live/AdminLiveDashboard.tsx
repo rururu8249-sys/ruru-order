@@ -1235,6 +1235,7 @@ export default function AdminLiveDashboard() {
             renderTrigger={false}
             controlledOpen={activeMenu === "event"}
             onRequestClose={() => setActiveMenu("broadcast")}
+            activeBroadcastId={activeBroadcast?.id || null}
           />
 
           {/* 고객관리 (자체 모달) */}

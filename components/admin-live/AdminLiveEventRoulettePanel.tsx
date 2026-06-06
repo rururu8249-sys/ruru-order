@@ -1,7 +1,7 @@
 "use client";
 
 import { showAdminToast } from "@/lib/adminToast";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ClipboardEvent } from "react";
 
 type RouletteMode = "live" | "test" | "preview";
 
@@ -93,6 +93,7 @@ type AdminLiveEventRoulettePanelProps = {
   renderTrigger?: boolean;
   controlledOpen?: boolean;
   onRequestClose?: () => void;
+  activeBroadcastId?: string | number | null;
 };
 
 type WinnersPayload = {
@@ -192,6 +193,7 @@ export default function AdminLiveEventRoulettePanel({
   renderTrigger = true,
   controlledOpen,
   onRequestClose,
+  activeBroadcastId,
 }: AdminLiveEventRoulettePanelProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
@@ -212,10 +214,13 @@ export default function AdminLiveEventRoulettePanel({
   const [loading, setLoading] = useState(false);
   const [spinning, setSpinning] = useState(false);
   const [eventTab, setEventTab] = useState<"roulette" | "claw">("claw");
-  const [participantSource, setParticipantSource] = useState<"auto" | "manual">("auto");
+  const [participantSource, setParticipantSource] = useState<"auto" | "paid" | "manual">("auto");
   const [manualParticipantText, setManualParticipantText] = useState("");
   const [fixedWinnerNickname, setFixedWinnerNickname] = useState("");
   const [clawResultType, setClawResultType] = useState<"capsule" | "doll">("capsule");
+  const [showParticipantList, setShowParticipantList] = useState(false);
+  const [giftType, setGiftType] = useState<"point" | "custom">("point");
+  const [giftPointAmount, setGiftPointAmount] = useState("");
 
 
   const overlayUrl = useMemo(() => buildOverlayUrl(currentEvent), [currentEvent]);
@@ -243,7 +248,7 @@ export default function AdminLiveEventRoulettePanel({
       }));
   }, [manualParticipantText]);
 
-  const finalParticipants = participantSource === "auto" ? participants : manualParticipants;
+  const finalParticipants = participantSource === "manual" ? manualParticipants : participants;
   const selectedWinnerNickname =
     fixedWinnerNickname.trim() ||
     finalParticipants[0]?.nickname ||
@@ -277,12 +282,43 @@ export default function AdminLiveEventRoulettePanel({
     void loadParticipants(mode, sourceDate, nextBroadcastId);
   };
 
-  const changeParticipantSource = (source: "auto" | "manual") => {
+  // 참가자 불러오기 기준 = 현재 활성 방송(activeBroadcast) 기간. 방송 OFF면 안내.
+  const liveBroadcastId = activeBroadcastId != null ? String(activeBroadcastId) : "";
+
+  const changeParticipantSource = (source: "auto" | "paid" | "manual") => {
     setParticipantSource(source);
 
-    if (source === "auto" && participants.length === 0) {
-      void loadParticipants(mode, sourceDate, broadcastId);
+    if (source === "auto" || source === "paid") {
+      if (!liveBroadcastId) {
+        showAdminToast("진행 중인 방송이 없습니다.\n\n방송을 시작한 뒤 참가자를 불러올 수 있어요.", "warning");
+        return;
+      }
+      void loadParticipants(mode, sourceDate, liveBroadcastId, source === "paid");
     }
+  };
+
+  // 채팅 붙여넣기 → @닉네임만 추출(중복 제거). @가 없으면 줄/쉼표 단위로 처리.
+  const parseChatNicknames = (raw: string) => {
+    const atTokens = raw.match(/@[^\s,@]+/g);
+    const source = atTokens && atTokens.length > 0 ? atTokens.map((t) => t.slice(1)) : raw.split(/\r?\n|,/);
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const token of source) {
+      const name = token.trim();
+      if (!name || seen.has(name)) continue;
+      seen.add(name);
+      result.push(name);
+    }
+    return result;
+  };
+
+  const handleManualPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+    const pasted = event.clipboardData.getData("text");
+    if (!pasted.includes("@")) return; // 일반 붙여넣기는 그대로
+    event.preventDefault();
+    const existing = manualParticipantText.split(/\r?\n|,/).map((s) => s.trim()).filter(Boolean);
+    const merged = parseChatNicknames([...existing, ...parseChatNicknames(pasted)].join("\n"));
+    setManualParticipantText(merged.join("\n"));
   };
 
   const addManualSample = () => {
@@ -306,6 +342,7 @@ export default function AdminLiveEventRoulettePanel({
       return;
     }
 
+    setCurrentEvent(null); // 이전 당첨자 표시 제거 후 새 게임
     setSpinning(true);
 
     try {
@@ -384,7 +421,7 @@ export default function AdminLiveEventRoulettePanel({
     }
   };
 
-  const loadParticipants = async (nextMode = mode, nextSourceDate = sourceDate, nextBroadcastId = broadcastId) => {
+  const loadParticipants = async (nextMode = mode, nextSourceDate = sourceDate, nextBroadcastId = broadcastId, paidOnly = false) => {
     setLoading(true);
 
     try {
@@ -396,6 +433,11 @@ export default function AdminLiveEventRoulettePanel({
 
       if (nextBroadcastId) {
         params.set("broadcastId", nextBroadcastId);
+      }
+
+      // 입금완료만 필터 (서버 지원 시 적용 · P2에서 서버 연동)
+      if (paidOnly) {
+        params.set("paidOnly", "true");
       }
 
       const payload = await requestJson<ParticipantsPayload>(`/api/admin-live/event-roulette?${params.toString()}`);
@@ -572,6 +614,7 @@ export default function AdminLiveEventRoulettePanel({
       return;
     }
 
+    setCurrentEvent(null); // 이전 당첨자 표시 제거 후 새 게임
     setSpinning(true);
 
     try {
@@ -878,25 +921,43 @@ export default function AdminLiveEventRoulettePanel({
                   <div className="mb-3 flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <div className="text-lg font-black text-slate-950">1. 참가자 설정</div>
-                      <div className="mt-1 text-xs font-bold text-slate-500">자동 명단 또는 수동 입력 명단으로 진행합니다.</div>
+                      <div className={["mt-1 text-xs font-bold", liveBroadcastId ? "text-slate-500" : "text-amber-600"].join(" ")}>
+                        {liveBroadcastId
+                          ? "현재 방송 기준으로 주문서 전체 / 입금완료 명단을 불러옵니다."
+                          : "⚠ 방송 OFF — 방송 시작 후 주문서 전체 / 입금완료를 불러올 수 있어요. (수동 입력은 가능)"}
+                      </div>
                     </div>
 
                     <div className="inline-flex shrink-0 rounded-2xl bg-slate-100 p-1">
                       <button
                         type="button"
                         onClick={() => changeParticipantSource("auto")}
+                        disabled={!liveBroadcastId}
+                        title={!liveBroadcastId ? "방송 시작 후 사용할 수 있어요" : undefined}
                         className={[
-                          "h-10 rounded-xl px-5 text-xs font-black transition",
+                          "h-10 rounded-xl px-4 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-40",
                           participantSource === "auto" ? "bg-rose-deep text-white shadow-sm" : "text-slate-500",
                         ].join(" ")}
                       >
-                        자동 명단
+                        주문서 전체
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => changeParticipantSource("paid")}
+                        disabled={!liveBroadcastId}
+                        title={!liveBroadcastId ? "방송 시작 후 사용할 수 있어요" : undefined}
+                        className={[
+                          "h-10 rounded-xl px-4 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-40",
+                          participantSource === "paid" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-500",
+                        ].join(" ")}
+                      >
+                        입금완료
                       </button>
                       <button
                         type="button"
                         onClick={() => changeParticipantSource("manual")}
                         className={[
-                          "h-10 rounded-xl px-5 text-xs font-black transition",
+                          "h-10 rounded-xl px-4 text-xs font-black transition",
                           participantSource === "manual" ? "bg-violet-600 text-white shadow-sm" : "text-slate-500",
                         ].join(" ")}
                       >
@@ -941,14 +1002,44 @@ export default function AdminLiveEventRoulettePanel({
                           className="h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-rose-line"
                         />
 
-                        <div className="mb-2 mt-4 text-xs font-black text-slate-500">당첨내용 / 상품명</div>
-                        <input
-                          value={winnerNote}
-                          onChange={(event) => setWinnerNote(event.target.value)}
-                          maxLength={40}
-                          placeholder="예: 이벤트 당첨"
-                          className="h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-rose-line"
-                        />
+                        <div className="mb-2 mt-4 text-xs font-black text-slate-500">당첨 선물</div>
+                        <div className="flex gap-2">
+                          <select
+                            value={giftType}
+                            onChange={(event) => {
+                              const next = event.target.value as "point" | "custom";
+                              setGiftType(next);
+                              if (next === "point") {
+                                setWinnerNote(`포인트 ${Number(giftPointAmount || 0).toLocaleString("ko-KR")}P`);
+                              }
+                            }}
+                            className="h-[44px] w-1/2 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-blue-400"
+                          >
+                            <option value="point">포인트</option>
+                            <option value="custom">직접입력</option>
+                          </select>
+                          {giftType === "point" ? (
+                            <input
+                              value={giftPointAmount ? Number(giftPointAmount).toLocaleString("ko-KR") : ""}
+                              onChange={(event) => {
+                                const digits = event.target.value.replace(/[^0-9]/g, "");
+                                setGiftPointAmount(digits);
+                                setWinnerNote(`포인트 ${Number(digits || 0).toLocaleString("ko-KR")}P`);
+                              }}
+                              inputMode="numeric"
+                              placeholder="포인트 금액"
+                              className="h-[44px] w-1/2 rounded-2xl border border-slate-200 bg-white px-3 text-right text-sm font-black text-slate-900 outline-none transition focus:border-blue-400"
+                            />
+                          ) : (
+                            <input
+                              value={winnerNote}
+                              onChange={(event) => setWinnerNote(event.target.value)}
+                              maxLength={40}
+                              placeholder="예: 선물이모티콘"
+                              className="h-[44px] w-1/2 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-blue-400"
+                            />
+                          )}
+                        </div>
                       </div>
 
                       <div className="min-h-0 overflow-hidden rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-pink-50 p-4">
@@ -966,7 +1057,7 @@ export default function AdminLiveEventRoulettePanel({
                           </div>
 
                           <div className="mt-3 rounded-2xl bg-white/80 px-3 py-2 text-[11px] font-black text-slate-600 ring-1 ring-violet-100">
-                            {participantSource === "auto" ? "자동 명단 기준" : "수동 입력 기준"} · {finalParticipants.length.toLocaleString("ko-KR")}명
+                            {participantSource === "manual" ? "수동 입력 기준" : participantSource === "paid" ? "입금완료 기준" : "주문서 전체 기준"} · {finalParticipants.length.toLocaleString("ko-KR")}명
                           </div>
                         </div>
                       </div>
@@ -980,11 +1071,21 @@ export default function AdminLiveEventRoulettePanel({
                             총 {autoParticipantCount.toLocaleString("ko-KR")}명 · 닉네임 기준 중복 제거
                           </div>
                         </div>
-                        <div className="text-right text-xs font-black text-violet-600">주문 / 금액</div>
+                        <button
+                          type="button"
+                          onClick={() => setShowParticipantList((v) => !v)}
+                          className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-1.5 text-[11px] font-black text-violet-700 transition hover:bg-violet-100"
+                        >
+                          {showParticipantList ? "목록 숨김" : "목록 보기"}
+                        </button>
                       </div>
 
                       <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto">
-                        {participants.length === 0 ? (
+                        {!showParticipantList ? (
+                          <div className="flex h-full min-h-[260px] items-center justify-center px-4 text-center text-sm font-bold leading-6 text-slate-400">
+                            참가자 {autoParticipantCount.toLocaleString("ko-KR")}명<br />“목록 보기”로 펼쳐서 확인하세요.
+                          </div>
+                        ) : participants.length === 0 ? (
                           <div className="flex h-full min-h-[260px] items-center justify-center px-4 text-center text-sm font-bold leading-6 text-slate-400">
                             자동 명단이 없습니다.<br />방송리스트 선택 후 명단을 불러오세요.
                           </div>
@@ -1028,7 +1129,8 @@ export default function AdminLiveEventRoulettePanel({
                         <textarea
                           value={manualParticipantText}
                           onChange={(event) => setManualParticipantText(event.target.value)}
-                          placeholder={"닉네임을 한 줄에 한 명씩 입력하세요.\n예: 눈누난나\n뽀글이\n오랑이"}
+                          onPaste={handleManualPaste}
+                          placeholder={"닉네임을 한 줄에 한 명씩.\n채팅을 붙여넣으면 @닉네임만 자동 추출(중복 제거)됩니다."}
                           className="min-h-0 flex-1 resize-none rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-800 outline-none focus:border-violet-400"
                         />
                         <button
@@ -1041,21 +1143,39 @@ export default function AdminLiveEventRoulettePanel({
                       </div>
 
                       <div className="rounded-3xl border border-slate-200 bg-white p-4">
-                        <div className="text-sm font-black text-slate-950">당첨자 미리 지정</div>
-                        <select
-                          value={fixedWinnerNickname}
-                          onChange={(event) => setFixedWinnerNickname(event.target.value)}
-                          className="mt-2 h-10 w-full rounded-2xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-800 outline-none focus:border-violet-400"
-                        >
-                          <option value="">자동 선택</option>
-                          {finalParticipants.map((participant, index) => (
-                            <option key={`${participant.nickname}-${index}`} value={participant.nickname}>
-                              {participant.nickname}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="mt-3 rounded-2xl bg-amber-50 px-3 py-2 text-[11px] font-black leading-5 text-amber-700">
-                          지정 닉네임이 있으면 우선 당첨자로 사용합니다.
+                        <div className="mb-2 flex items-center justify-between">
+                          <div className="text-sm font-black text-slate-950">당첨 고정</div>
+                          {fixedWinnerNickname ? (
+                            <button type="button" onClick={() => setFixedWinnerNickname("")} className="text-[11px] font-black text-slate-400 hover:text-slate-600">
+                              해제
+                            </button>
+                          ) : null}
+                        </div>
+                        <div className="mb-2 rounded-2xl bg-rose-soft px-3 py-2 text-[12px] font-black text-rose-deep">
+                          {fixedWinnerNickname ? `👑 당첨고정: ${fixedWinnerNickname}` : "자동 선택 (참가자 클릭 시 고정)"}
+                        </div>
+                        <div className="flex max-h-[76px] flex-wrap gap-1.5 overflow-y-auto">
+                          {finalParticipants.length === 0 ? (
+                            <span className="text-[11px] font-bold text-slate-400">참가자를 먼저 불러오세요.</span>
+                          ) : (
+                            finalParticipants.map((participant, index) => {
+                              const on = fixedWinnerNickname === participant.nickname;
+                              return (
+                                <button
+                                  key={`${participant.nickname}-${index}`}
+                                  type="button"
+                                  onClick={() => setFixedWinnerNickname(on ? "" : participant.nickname)}
+                                  className={[
+                                    "rounded-full px-2.5 py-1 text-[11px] font-black transition",
+                                    on ? "bg-rose-deep text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200",
+                                  ].join(" ")}
+                                >
+                                  {on ? "👑 " : ""}
+                                  {participant.nickname}
+                                </button>
+                              );
+                            })
+                          )}
                         </div>
                       </div>
                     </div>
