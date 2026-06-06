@@ -37,7 +37,7 @@ const normalizeEmptyProductOptionValue = (value: unknown) => {
 
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { supabase } from "@/lib/supabase";
 import { isRemoteAreaAddress } from "@/lib/order/shippingAddress";
 import { formatOrderPhone, normalizeOrderPhone } from "@/lib/order/phone";
@@ -190,6 +190,22 @@ const BANK_HOLDER = "유혜원";
 const ORDER_LOOKUP_FILTERS = ["전체", "입금대기", "입금확인", "출고완료"] as const;
 const ORDER_LOOKUP_PER_PAGE = 2;
 const FOOTER_TEXT = "© since 2024 루루동이 | All Rights Reserved.";
+const MENU_ITEM_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  width: "100%",
+  textAlign: "left",
+  textDecoration: "none",
+  padding: "13px 14px",
+  borderRadius: "12px",
+  border: "1px solid #E8E2DD",
+  background: "#fff",
+  fontSize: "14px",
+  fontWeight: 700,
+  color: "#222",
+  cursor: "pointer",
+};
 const ORDER_FIRST_GUIDE_HIDE_UNTIL_KEY = "ruru_order_first_guide_hide_until";
 
 const emptyItem: OrderItem = {
@@ -967,6 +983,7 @@ export default function OrderPage() {
   } | null>(null);
   const [orderLookupOpen, setOrderLookupOpen] = useState(false);
   const [orderLookupLoading, setOrderLookupLoading] = useState(false);
+  const [menuSheetOpen, setMenuSheetOpen] = useState(false);
   const [orderLookupOrders, setOrderLookupOrders] = useState<any[]>([]);
   const [orderLookupFilter, setOrderLookupFilter] = useState<CustomerOrderLookupFilter>("전체");
   const [orderLookupPage, setOrderLookupPage] = useState(1);
@@ -3627,47 +3644,40 @@ export default function OrderPage() {
       }
     };
 
-    return (
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-[#f8fafc]/95 px-2 py-3 backdrop-blur sm:px-4">
-        <div className="mx-auto flex w-full max-w-[560px] flex-col gap-2">
-          <div className="flex items-center justify-between gap-3">
-            <Link href="/order" className="text-[17px] font-black tracking-[-0.05em] text-slate-950">
-              루루동이 LIVE
-            </Link>
+    const cartCount = items.filter(
+      (it) => it.product_name.trim() || it.color.trim() || it.size.trim() || it.product_price.trim(),
+    ).length;
 
-            <div className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[12px] font-black tracking-[-0.04em] text-amber-800">
-              RD포인트 {safePointText}
-            </div>
+    return (
+      <header style={{ position: "sticky", top: 0, zIndex: 30, background: "#fff", borderBottom: "1px solid #E8E2DD", padding: "10px 12px" }}>
+        <div style={{ margin: "0 auto", width: "100%", maxWidth: "560px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "7px", minWidth: 0 }}>
+            <Link href="/order" style={{ fontSize: "19px", fontWeight: 800, letterSpacing: "-0.04em", color: "#7B2D43", textDecoration: "none" }}>루루동이</Link>
+            {broadcast ? (
+              <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#C0392B", borderRadius: "4px", padding: "2px 6px", letterSpacing: "0.02em" }}>LIVE</span>
+            ) : null}
           </div>
 
-          <div className="flex items-center justify-between gap-2">
-            <p className="min-w-0 flex-1 truncate text-[13px] font-extrabold tracking-[-0.04em] text-slate-700">
-              {safeGreetingName}님 안녕하세요
-            </p>
-
-            <nav className="flex shrink-0 items-center gap-1">
-              <Link
-                href="/order"
-                onClick={handleTopNavOrderClick}
-                className={!isTopNavEditActive && !orderLookupOpen ? topNavActiveButtonClass : topNavInactiveButtonClass}
-              >
-                주문서
-              </Link>
-              <button
-                type="button"
-                onClick={openOrderLookupBottomSheet}
-                className={orderLookupOpen ? topNavActiveButtonClass : topNavInactiveButtonClass}
-              >
-                주문조회
-              </button>
-              <button
-                type="button"
-                onClick={openCustomerInfoEditBottomSheet}
-                className={isTopNavEditActive ? topNavActiveButtonClass : topNavInactiveButtonClass}
-              >
-                정보수정
-              </button>
-            </nav>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+            <Link
+              href="/order"
+              onClick={handleTopNavOrderClick}
+              aria-label="주문서"
+              style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", width: "40px", height: "38px", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#FAF6F2", textDecoration: "none", fontSize: "18px" }}
+            >
+              🧾
+              {cartCount > 0 ? (
+                <span style={{ position: "absolute", top: "-6px", right: "-6px", minWidth: "18px", height: "18px", borderRadius: "9px", background: "#7B2D43", color: "#fff", fontSize: "10px", fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{cartCount}</span>
+              ) : null}
+            </Link>
+            <button
+              type="button"
+              onClick={() => setMenuSheetOpen(true)}
+              aria-label="메뉴"
+              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "40px", height: "38px", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", fontSize: "18px", color: "#7B2D43", cursor: "pointer" }}
+            >
+              ☰
+            </button>
           </div>
         </div>
       </header>
@@ -4584,6 +4594,33 @@ export default function OrderPage() {
                 </div>
               </div>
             </section>
+          </div>
+        ) : null}
+
+        {menuSheetOpen ? (
+          <div
+            style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(0,0,0,0.4)" }}
+            onClick={(e) => { if (e.target === e.currentTarget) setMenuSheetOpen(false); }}
+          >
+            <div style={{ width: "100%", maxWidth: "560px", background: "#fff", borderTopLeftRadius: "20px", borderTopRightRadius: "20px", padding: "18px", maxHeight: "82vh", overflowY: "auto" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+                <span style={{ fontSize: "16px", fontWeight: 800, color: "#7B2D43" }}>메뉴</span>
+                <button type="button" onClick={() => setMenuSheetOpen(false)} aria-label="닫기" style={{ border: "none", background: "none", fontSize: "20px", color: "#999", cursor: "pointer" }}>✕</button>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <button type="button" onClick={() => { setMenuSheetOpen(false); openOrderLookupBottomSheet(); }} style={MENU_ITEM_STYLE}>📦 주문조회</button>
+                <button type="button" onClick={() => { setMenuSheetOpen(false); openCustomerInfoEditBottomSheet(); }} style={MENU_ITEM_STYLE}>✎ 정보수정</button>
+                <div style={{ ...MENU_ITEM_STYLE, cursor: "default", justifyContent: "space-between" }}>
+                  <span>🪙 내 포인트</span>
+                  <span style={{ color: "#7B2D43", fontWeight: 800 }}>{`${Math.max(0, Number(customerPointBalance || 0)).toLocaleString()}P`}</span>
+                </div>
+                <a href="https://www.youtube.com" target="_blank" rel="noreferrer" style={MENU_ITEM_STYLE}>▶ 유튜브 방송</a>
+                <a href="https://pf.kakao.com" target="_blank" rel="noreferrer" style={MENU_ITEM_STYLE}>💬 카카오톡 채널</a>
+                <a href="https://band.us" target="_blank" rel="noreferrer" style={MENU_ITEM_STYLE}>🎵 밴드</a>
+                <a href="https://www.instagram.com" target="_blank" rel="noreferrer" style={MENU_ITEM_STYLE}>📷 인스타그램</a>
+              </div>
+              <div style={{ marginTop: "12px", fontSize: "11px", color: "#999", textAlign: "center" }}>링크는 설정에서 입력됩니다</div>
+            </div>
           </div>
         ) : null}
 
