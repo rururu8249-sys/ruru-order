@@ -200,9 +200,6 @@ export default function ProductWidgetClient() {
 
   const current = pinned || rotation[rotIndex] || null;
   const img = imageOf(current);
-  const colors = colorsOf(current);
-  const sizes = sizesOf(current);
-  const optionText = [colors, sizes].filter(Boolean).join("  /  ");
   const stock = stockLabel(current);
 
   return (
@@ -211,17 +208,16 @@ export default function ProductWidgetClient() {
         <div
           style={{
             position: "absolute",
-            top: "24px",
-            left: "50%",
-            transform: "translateX(-50%)",
+            left: "24px",
+            bottom: "124px",
             background: "rgba(123,45,67,0.92)",
             color: "#fff",
-            padding: "16px 32px",
-            borderRadius: "16px",
-            fontSize: "26px",
+            padding: "8px 12px",
+            borderRadius: "10px",
+            fontSize: "13px",
             fontWeight: 800,
             whiteSpace: "nowrap",
-            boxShadow: "0 6px 24px rgba(0,0,0,0.35)",
+            boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
             animation: "ruruWidgetIn 0.4s ease",
           }}
         >
@@ -236,41 +232,38 @@ export default function ProductWidgetClient() {
             position: "absolute",
             left: "24px",
             bottom: "24px",
-            width: "720px",
+            width: "280px",
             display: "flex",
-            gap: "30px",
+            gap: "10px",
             alignItems: "center",
             background: "rgba(38,38,44,0.60)",
             backdropFilter: "blur(9px)",
             WebkitBackdropFilter: "blur(9px)",
             border: "1px solid rgba(255,255,255,0.14)",
-            borderRadius: "36px",
-            padding: "30px",
+            borderRadius: "12px",
+            padding: "10px",
             color: "#fff",
             animation: "ruruWidgetIn 0.5s ease",
           }}
         >
-          <div style={{ position: "relative", width: "186px", height: "186px", flexShrink: 0, borderRadius: "27px", overflow: "hidden", background: "rgba(255,255,255,0.1)" }}>
+          <div style={{ position: "relative", width: "72px", height: "72px", flexShrink: 0, borderRadius: "9px", overflow: "hidden", background: "rgba(255,255,255,0.1)" }}>
             {img ? (
               <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
-              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "70px" }}>👟</div>
+              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px" }}>👟</div>
             )}
             {pinned ? (
-              <span style={{ position: "absolute", top: "9px", left: "9px", fontSize: "33px" }}>📌</span>
+              <span style={{ position: "absolute", top: "4px", left: "4px", fontSize: "15px" }}>📌</span>
             ) : null}
           </div>
 
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: "36px", fontWeight: 800, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", wordBreak: "break-all" }}>
+            <div style={{ fontSize: "14px", fontWeight: 800, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", wordBreak: "break-all" }}>
               {nameOf(current)}
             </div>
-            {optionText ? (
-              <div style={{ marginTop: "8px", fontSize: "26px", color: "rgba(255,255,255,0.78)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{optionText}</div>
-            ) : null}
-            <div style={{ marginTop: "11px", display: "flex", alignItems: "baseline", gap: "14px" }}>
-              <span style={{ fontSize: "42px", fontWeight: 800, color: "#FFD9E0" }}>{priceOf(current).toLocaleString("ko-KR")}원</span>
-              {stock ? <span style={{ fontSize: "26px", fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>{stock}</span> : null}
+            <div style={{ marginTop: "5px", display: "flex", alignItems: "baseline", gap: "8px" }}>
+              <span style={{ fontSize: "16px", fontWeight: 800, color: "#FFD9E0" }}>{priceOf(current).toLocaleString("ko-KR")}원</span>
+              {stock ? <span style={{ fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>{stock}</span> : null}
             </div>
           </div>
         </div>
