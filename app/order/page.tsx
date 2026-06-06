@@ -515,7 +515,8 @@ function splitProductOptionValue(value: unknown): string[] {
 }
 
 function uniqueOptionValues(values: string[]): string[] {
-  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).slice(0, 8);
+  // 사이즈가 8개에서 잘리던 문제 → 신발/의류 사이즈 전부(예: 220~290) 노출되게 상향
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).slice(0, 40);
 }
 
 function getProductOptionSuggestions(product: BroadcastProduct, field: "color" | "size"): string[] {
@@ -3929,7 +3930,13 @@ export default function OrderPage() {
           })()}
 
           {orderSheetOpen && (
-          <>
+          <div style={{ position: "fixed", inset: 0, zIndex: 35, background: "rgba(0,0,0,0.45)" }} onClick={(e) => { if (e.target === e.currentTarget) setOrderSheetOpen(false); }}>
+            <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: "430px", maxHeight: "90vh", overflowY: "auto", borderTopLeftRadius: "24px", borderTopRightRadius: "24px", background: "#fff", boxShadow: "0 -20px 60px rgba(0,0,0,0.25)" }}>
+              <div style={{ position: "sticky", top: 0, zIndex: 1, background: "#fff", padding: "10px 0 6px" }}>
+                <div style={{ margin: "0 auto", height: "5px", width: "44px", borderRadius: "3px", background: "#D9C5CC" }} />
+                <button type="button" onClick={() => setOrderSheetOpen(false)} aria-label="닫기" style={{ position: "absolute", top: "8px", right: "12px", width: "32px", height: "32px", borderRadius: "50%", border: "1px solid #D9C5CC", background: "#fff", color: "#7B2D43", fontSize: "16px", fontWeight: 800, cursor: "pointer" }}>✕</button>
+              </div>
+              <div style={{ padding: "0 12px 96px" }}>
           <section id="orderSheetSection" className="mt-3 w-full max-w-full overflow-hidden rounded-[24px] border border-rose-line bg-rose-soft/40 p-3 shadow-sm">
             <div className="mb-4">
               <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
@@ -4209,7 +4216,9 @@ export default function OrderPage() {
               </label>
             )}
           </section>
-          </>
+              </div>
+            </div>
+          </div>
           )}
 
             <CustomerToastNotice
