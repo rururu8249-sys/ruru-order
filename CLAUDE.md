@@ -23,7 +23,11 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 (없음)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-06-06 세션15(적립률 소수점·소급 1.5%): 설정 적립률칸 소수점 허용(공유 SettingInput에 선택 props type=number step0.1 min0 max100 inputMode=decimal만 추가, 기존 칸 무변경 / decimalInput 핸들러로 onlyDigits 대체 → 1.5 입력가능). 소급적립 SQL(order_point_backfill_today.sql) 적립률 고정 1.5%(=15/1000 bigint 정수연산, 설정값 의존·v_rate 제거). PUSH d5e2ceb
 - 2026-06-06 세션15(포인트 자동적립): 설정에 "포인트 적립 규칙" 카드(자동적립 ON/OFF 토글 + 적립률 입력, settings.point_auto_earn_enabled/point_earn_rate, 적립률 소수점 허용 type=number step0.1). 결제완료(자동·수동 입금확인/카드결제완료) 시 자동적립 = DB 트리거 SQL(supabase/sql/order_point_auto_earn_rpc.sql, 별도 적용 — 입금 JS 무수정, 상품금액(택배비제외)×률, 1주문1회 point_earned_at, 포인트사용/테스트/정산제외 주문 제외, 선물팝업 미표시 customer_seen_at=now). 주문서 멘트 "구매금액 N% 적립"/OFF숨김(OrderPriceSummaryBox pointEarnRate prop). 오늘건 소급적립 SQL(order_point_backfill_today.sql, 1.5% 고정=15/1000, 1단계 미리보기+2단계 DO). orders ADD COLUMN point_earned_at/point_earned_amount. 돈/입금/매칭 로직 무변경. ※SQL 2개는 Supabase SQL Editor 직접 실행 필요
+- 2026-06-06 세션15(위젯 실시간 토스트·버그2건): components/product-widget/ProductWidgetClient.tsx — 주문(orders INSERT)/입금확인(자동·수동, admin_order_status_v2·order_manage_status가 ~'입금확인')/카드결제완료 UPDATE 4종 실시간 토스트, **큐 방식**(order_group_id 중복방지, 상단 딥로즈 반투명 3초 순차). 버그수정2: ①금액 0원 → amount()가 total_amount만 읽던 것을 **final_amount(=total_price/adjusted_total_price) 우선**으로(submit route 실제 컬럼) ②토스트 안사라짐 → 큐 useEffect가 [currentToast,toastQueue] 의존이라 표시직후 재실행으로 setTimeout 즉시clear됨 → **표시 effect와 자동숨김 effect([currentToast]만) 분리**. 옵션 색상만 표시(colorsOf, 사이즈 제거). 카드 크기 280px로 적당히 축소(이미지72/상품명14/가격16). 투명배경 유지
+- 2026-06-06 세션15(상품카드 이미지 버그): app/order/page.tsx loadBroadcastProducts 매핑이 image_url/main_image_url/thumbnail_url을 누락 → quickGroupBuyProducts dedup([...catalog,...broadcast]→Map)에서 broadcast가 catalog를 덮어써 이미지 빈칸. **broadcast 매핑에 image_url=pickOrderProductImageUrl(product) 추가**로 수정(이미지 표시만, 주문/돈 로직 무변경). ※여전히 안뜨면 image_url이 전체URL 아닌 스토리지 경로인 경우 — 경로→URL 변환 추가 필요
+- 2026-06-06 세션15(카드결제 팝업 최종): components/admin-live/AdminLiveCardPayPopup.tsx — 최종형 = 좌(복사4칸 패널)+우(페이스터 iframe) 좌우 960px. **window.open 별도창 완전 제거**(openPaysterRightHalf no-op로, LiveOrderTable import 호환 유지). handleComplete(카드결제완료 상태변경) 로직 무변경. ⚠️페이스터(user.service.payster.co.kr)가 iframe 임베드 차단(X-Frame-Options/CSP)하면 우측 빈화면 → 그 경우 window.open 방식 복귀 필요(검증 대기)
 - 2026-06-06 세션14(고객 order page P1): app/order/page.tsx(4664줄) 상단바를 손님페이지 시안(/Users/ruru/Downloads/files/루루동이_손님페이지_위젯_통합본.txt)대로 딥로즈 1:1 인라인 교체 — 루루동이+LIVE배지(방송ON시)+주문서아이콘(담은개수 cartCount 배지)+☰. ☰→메뉴 바텀시트(주문조회/정보수정/내포인트/유튜브·카톡·밴드·인스타 링크 placeholder, 기존 openOrderLookup/openCustomerInfoEdit 핸들러 재사용). MENU_ITEM_STYLE 모듈상수. 주문제출/돈/포인트 로직 무변경. ※order page는 섹션별 증분(P2 주문방법~P10 위젯)
 - 2026-06-06 세션13-2(상품 시안 P2): 새 상품 등록 폼(QuickProductFastForm) 시안③ 인라인 1:1 교체(560px 중앙모달, .ruru-product-sian). 드로어(AdminLiveQuickProductDrawer)는 우측 aside/헤더 제거→폼만 렌더(모달 본체=폼). 배송구분 select normal/vendor/vendor2(=업체배송1/2), 상품종류 broadcast/group_buy(방송상품/상시판매), 방송화면 캡처=UI버튼+토스트(기능없음), 옵션4줄(색상/사이즈+프리셋/수량/금액)+재고관리·고객노출 토글. 저장로직(saveProduct/insertProductSchemaSafe/broadcast_products/combine_shipping 등) 100% 보존, 렌더만 교체. ※combine_shipping은 vendor만 N(미변경) — vendor2 합배송 처리 필요시 별도
 - 2026-06-06 세션13(상품 시안 P1·P3): 상품관리 팝업(AdminLiveProductManagePopup) 시안② 인라인 1:1 교체(.ruru-product-sian 스코프 globals.css, 560px 고정) + 순환/고정 모드 토글(순환=broadcast_products insert 기존, 고정=products.is_pinned update 기존고정해제후 선택고정). 지금띄운상품 패널(LiveBroadcastPanels): 고정상품 있으면 1개, 없고 순환 있으면 broadcast_products 목록 나열, 둘다없으면 안내(activeBroadcastId prop 추가, 상품변경 이벤트 갱신). 돈/배송 로직 무변경. ※P2 잔여=QuickProductFastForm(③ 새상품등록, 1244줄) 시안 인라인 이식 — 저장로직 보존 위해 별도 정밀 패스 필요
@@ -53,6 +57,14 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 3. 수동매칭 설정 팝업 메뉴
 4. (사장님 추가 예정 — 그 외 작업 생각나는 대로 여기 누적)
    ※ 후속: 상품관리 팝업 — 상시판매 별도 type 도입 / 올림날짜 전용 필드 / 기존 AdminLiveProductListPanel 정리 여부
+
+[포인트 자동적립] — 코드(설정 UI·주문서 멘트·트리거 SQL·소급 SQL)는 완료. 운영 적용/검증 남음:
+- ⚠️ Supabase에서 order_point_auto_earn_rpc.sql 실행(미적용이면 자동적립 안 됨) + 설정에서 자동적립 ON + 적립률 저장
+- 소급적립(order_point_backfill_today.sql) 오늘건 1.5% 실행 여부는 사장님 판단(1단계 미리보기 후)
+- 시안 ⑪ 적립규칙 잔여: "90일 미사용 소멸" / "환불·취소 시 자동 회수" 토글 — 이번엔 ON/OFF+적립률만 구현. 필요 시 추가 설계
+- 포인트 사용 주문은 현재 적립 제외(정책). 포함 원하면 트리거/소급 SQL의 point_used_amount 조건 제거
+
+[카드결제 팝업] — ⚠️ 페이스터 iframe 임베드 차단(X-Frame-Options) 시 우측 빈화면 → window.open 방식 복귀 필요(실기기 검증 후 결정)
 
 [고객 주문 페이지] — 시안: /Users/ruru/Downloads/files/루루동이_손님페이지_위젯_통합본.txt (텍스트 사양, 딥로즈 #7B2D43 인라인). app/order/page.tsx 섹션별 증분:
 - ✅ P1 상단바+☰메뉴 (세션14)
@@ -96,6 +108,14 @@ git status
 - 스키마 변경: ADD COLUMN only
 - canonical 테이블: orders (flat)
 - 입금 추적: deposits 테이블
+
+## DB 변경사항 — Supabase SQL Editor에서 직접 실행해야 적용됨 (커밋만으로는 미적용)
+포인트 관련 테이블: customer_point_balances(잔액), customer_point_ledger(이력, change_type grant/use/cancel/adjust/expire), customer_point_gifts는 ledger의 customer_visible+seen으로 표시.
+적립 금액 컬럼은 orders.final_amount(=total_price=adjusted_total_price, 택배비 제외 상품금액은 adjusted_product_price?? product_price × qty).
+- **supabase/sql/order_point_auto_earn_rpc.sql** — 자동적립 트리거. orders ADD COLUMN point_earned_at/point_earned_amount + 트리거 trg_accrue_order_points(입금확인·카드결제완료 전환 시 settings.point_earn_rate%로 적립, 1주문1회, 포인트사용/테스트/정산제외 제외, customer_seen_at=now라 선물팝업 미표시). **아직 미적용이면 자동적립 안 됨.**
+- **supabase/sql/order_point_backfill_today.sql** — 오늘(KST) 이미 결제완료된 건 소급적립(고정 1.5%=15/1000). 1단계 미리보기 SELECT → 확인 → 2단계 DO 실행. point_earned_at 가드로 트리거와 중복 안 됨.
+- 기존: customer_order_submit_with_points_rpc.sql(주문저장+포인트차감 RPC, 적립 없음), customer_points.sql, order_point_usage_columns.sql 등
+- ⚠️ 자동적립을 쓰려면: ① 위 트리거 SQL 적용 + ② 관리자 설정에서 "자동적립 ON" + 적립률(예 1.5) 저장 (둘 다 필요)
 
 
 ## UI 작업 필수 원칙 (완전 리뉴얼 프로젝트)
