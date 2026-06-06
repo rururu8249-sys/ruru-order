@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabase";
 import { resolveProductImageUrl } from "./quick-product/productImageUrl";
 import { showAdminToast } from "@/lib/adminToast";
@@ -152,6 +153,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     setPage(1);
   }, [tab, search, dateKey]);
 
+  // 고정모드로 바꾸면 선택은 1개만 유지
+  useEffect(() => {
+    setSelected((prev) => (mode === "pin" && prev.size > 1 ? new Set([...prev].slice(0, 1)) : prev));
+  }, [mode]);
+
   const productId = (p: ProductRow) => pickString(p, ["id", "product_id"], "");
 
   const dateOptions = useMemo(() => {
@@ -181,6 +187,10 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const toggleSelect = (id: string) => {
     if (!id) return;
     setSelected((prev) => {
+      // 고정모드: 1개만 선택(다른 선택 자동 해제). 순환모드: 다중선택.
+      if (mode === "pin") {
+        return prev.has(id) ? new Set<string>() : new Set<string>([id]);
+      }
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -255,13 +265,15 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     ["all", "전체 창고"],
   ];
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div
       className="ruru-product-sian"
       style={{ position: "fixed", inset: 0, zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(2,6,23,0.45)", padding: "16px" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{ width: "560px", flexShrink: 0, maxHeight: "calc(100vh-32px)", overflowY: "auto", background: "#fff", borderRadius: "12px", padding: "17px" }}>
+      <div style={{ width: "560px", flexShrink: 0, maxHeight: "calc(100vh - 32px)", overflowY: "auto", background: "#fff", borderRadius: "12px", padding: "17px" }}>
 
         {/* 헤더 */}
         <div className="mh">
@@ -345,6 +357,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
