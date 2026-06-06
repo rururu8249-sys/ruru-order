@@ -44,37 +44,13 @@ export default function AdminLiveQuickProductDrawer({
 
   if (!isOpen) return null;
 
+  // 모달 본체(헤더·✕·560px)는 QuickProductFastForm이 시안③로 직접 렌더
   return (
-    <div className="fixed inset-0 z-[90] overflow-hidden">
-      <div className="absolute inset-0 bg-slate-950/35" />
-
-      <aside className="absolute right-0 top-0 flex h-full min-h-0 w-full max-w-[960px] flex-col overflow-hidden bg-slate-50 shadow-2xl">
-        <div className="flex h-[64px] shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-6">
-          <div className="min-w-0">
-            <h2 className="text-lg font-black text-slate-950">
-              {editingProduct ? "상품수정" : "빠른상품등록"}
-            </h2>
-            <p className="mt-1 text-xs font-bold text-slate-500">
-              방송 중 상품 등록·수정을 한 화면에서 빠르게 처리합니다.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setIsOpen(false)}
-            className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 hover:bg-slate-50"
-          >
-            닫기
-          </button>
-        </div>
-
-        <QuickProductFastForm
-          key={editingProduct ? String(editingProduct.id || "edit") : "new"}
-          activeBroadcastId={activeBroadcastId}
-          initialProduct={editingProduct}
-          onClose={() => setIsOpen(false)}
-        />
-      </aside>
-    </div>
+    <QuickProductFastForm
+      key={editingProduct ? String(editingProduct.id || "edit") : "new"}
+      activeBroadcastId={activeBroadcastId}
+      initialProduct={editingProduct}
+      onClose={() => setIsOpen(false)}
+    />
   );
 }

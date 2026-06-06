@@ -804,440 +804,101 @@ export default function QuickProductFastForm({
   const inactiveChoice = "bg-slate-100 text-slate-600 hover:bg-slate-200";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
-        <div className="grid min-h-0 content-start gap-3 pb-4">
-          <div data-ruru-section-title="basic" className="flex items-center gap-2 px-1 py-0.5">
-            <span className="rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-black text-white">01</span>
-            <div>
-              <div className="text-sm font-black text-slate-900">필수정보</div>
-            </div>
-          </div>
+    <div
+      className="ruru-product-sian"
+      style={{ position: "fixed", inset: 0, zIndex: 90, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(2,6,23,0.45)", padding: "16px" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
+    >
+      <div style={{ width: "560px", flexShrink: 0, maxHeight: "calc(100vh-32px)", overflowY: "auto", background: "#fff", borderRadius: "12px", padding: "17px" }}>
 
-          <section className="grid min-h-0 items-center grid-cols-[180px_minmax(0,1fr)] gap-4 rounded-2xl border border-slate-200 bg-white p-3 overflow-hidden">
-            <ImagePicker
-              label="대표사진"
-              value={coverImages}
-              maxFiles={1}
-              uploadKind="cover"
-              mode="cover"
-              onChange={setCoverImages}
-            />
-
-            <div className="grid min-h-0 grid-rows-[42px_minmax(0,1fr)] gap-3">
-              <div className="grid grid-cols-[minmax(0,1fr)_168px] gap-2">
-                <label className="min-w-0">
-                  <span className="mb-1 block text-[10px] font-black text-slate-500">상품명</span>
-                  <input
-                    value={productName}
-                    onChange={(event) => setProductName(event.target.value)}
-                    placeholder="상품명"
-                    className="h-9 w-full rounded-xl border border-slate-200 px-3 text-sm font-black outline-none focus:border-blue-400"
-                  />
-                </label>
-
-                <label>
-                  <span className="mb-1 block text-[10px] font-black text-slate-500">판매가</span>
-                  <div className="flex h-9 items-center rounded-xl border border-slate-200 px-3 focus-within:border-blue-400">
-                    <input
-                      value={formatNumberWithComma(priceText || "0")}
-                      onChange={(event) => setPriceText(onlyNumber(event.target.value))}
-                      placeholder="55,000"
-                      className="min-w-0 flex-1 text-right text-sm font-black outline-none"
-                    />
-                    <span className="ml-1 text-xs font-black text-slate-400">원</span>
-                  </div>
-                </label>
-              </div>
-
-              <label className="min-h-0">
-                <span className="mb-1 block text-[10px] font-black text-slate-500">상세설명</span>
-                <textarea
-                  value={description}
-                  onChange={(event) => setDescription(normalizeTextareaText(event.target.value))}
-                  placeholder="소재, 핏, 주의사항, 교환/환불 안내"
-                  className="h-[96px] max-h-[96px] w-full resize-none overflow-y-auto rounded-xl border border-slate-200 p-2.5 text-xs font-bold leading-5 outline-none focus:border-blue-400"
-                />
-              </label>
-
-            </div>
-          </section>
-
-          <div data-ruru-section-title="sale" className="flex items-center gap-2 px-1 py-0.5">
-            <span className="rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-black text-white">02</span>
-            <div>
-              <div className="text-sm font-black text-slate-900">판매설정</div>
-            </div>
-          </div>
-
-          <section className="grid min-h-0 items-center grid-cols-[1fr_1.2fr_1fr_1fr] gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
-            <div className="flex h-full min-h-0 flex-col items-center justify-center">
-              <div className="mb-1 text-[10px] font-black text-slate-500">상품구분</div>
-              <div className="flex justify-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setProductType("broadcast")}
-                  className={[
-                    choiceButton,
-                    productType === "broadcast" ? "bg-rose-deep text-white" : inactiveChoice,
-                  ].join(" ")}
-                >
-                  방송
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setProductType("group_buy")}
-                  className={[
-                    choiceButton,
-                    productType === "group_buy" ? "bg-rose-deep text-white" : inactiveChoice,
-                  ].join(" ")}
-                >
-                  공구
-                </button>
-              </div>
-            </div>
-
-            <div className="flex h-full min-h-0 flex-col items-center justify-center">
-              <div className="mb-1 text-[10px] font-black text-slate-500">배송유형</div>
-              <div className="flex justify-center gap-1">
-                {[
-                  ["normal", "일반"],
-                  ["vendor", "업체"],
-                ].map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setShippingType(value)}
-                    className={[
-                      choiceButton,
-                      shippingType === value ? "bg-rose-deep text-white" : inactiveChoice,
-                    ].join(" ")}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex h-full min-h-0 flex-col justify-center">
-              <div className="mb-1 text-center text-[10px] font-black text-slate-500">주문서 노출</div>
-              <div className="grid w-full grid-cols-3 gap-1">
-                {orderExposureOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => applyOrderExposureMode(option.value)}
-                    className={[
-                      "h-8 rounded-lg px-1 text-[10px] font-black leading-none",
-                      orderExposureMode === option.value ? "bg-rose-deep text-white" : inactiveChoice,
-                    ].join(" ")}
-                    title={option.desc}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex h-full min-h-0 flex-col items-center justify-center">
-              <div className="mb-1 text-[10px] font-black text-slate-500">리스트</div>
-              <div className="flex justify-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setIsPinned(false)}
-                  className={[
-                    choiceButton,
-                    !isPinned ? "bg-slate-800 text-white" : inactiveChoice,
-                  ].join(" ")}
-                >
-                  일반
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsPinned(true)}
-                  className={[
-                    choiceButton,
-                    isPinned ? "bg-rose-deep text-white" : inactiveChoice,
-                  ].join(" ")}
-                >
-                  상단
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <div data-ruru-section-title="option-stock" className="flex items-center gap-2 px-1 py-0.5">
-            <span className="rounded-full bg-rose-deep px-2.5 py-1 text-[10px] font-black text-white">03</span>
-            <div>
-              <div className="text-sm font-black text-slate-900">옵션 · 재고</div>
-            </div>
-          </div>
-
-          <div data-ruru-quick-none-toggle className="flex items-center justify-between gap-3 rounded-2xl border border-rose-line bg-rose-soft/50 px-4 py-3">
-                <div className="min-w-0">
-                  <div className="text-xs font-black text-slate-700">색상/사이즈 없음입력</div>
-                  <div className="mt-0.5 text-[11px] font-bold text-slate-400">ON이면 고객 주문서에 없음으로 자동입력</div>
-                </div>
-                <button
-                  type="button"
-                  aria-pressed={noneOptionAutofillEnabled}
-                  onClick={toggleNoneOptionAutofill}
-                  className={[
-                    "shrink-0 rounded-full px-3.5 py-1.5 text-xs font-black transition active:scale-[0.98]",
-                    noneOptionAutofillEnabled
-                      ? "bg-rose-deep text-white shadow-sm ring-2 ring-rose-line"
-                      : "bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-100",
-                  ].join(" ")}
-                >
-                  {noneOptionAutofillEnabled ? "ON" : "OFF"}
-                </button>
-              </div>
-
-          <section className="grid min-h-0 grid-cols-2 gap-3 rounded-2xl border border-slate-200 bg-white p-3">
-            <div className="min-w-0 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100">
-              <div className="mb-1 flex items-center justify-between">
-                <span className="text-[11px] font-black text-slate-700">색상</span>
-                <span className="text-[10px] font-bold text-slate-400">여러 개 가능</span>
-              </div>
-
-              <input
-                value={colorText}
-                onChange={(event) => setColorText(event.target.value)}
-                placeholder="예: 블랙, 화이트"
-                className="h-9 w-full rounded-xl border border-slate-200 px-3 text-xs font-bold outline-none focus:border-blue-400"
-              />
-              <div className="mt-2 flex flex-wrap gap-1">
-                {COLOR_PRESETS.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => applyColorPreset(preset)}
-                    className={[
-                      "rounded-full px-2.5 py-1 text-[11px] font-black transition active:scale-[0.96]",
-                      splitOptions(colorText).includes(preset)
-                        ? "bg-rose-deep text-white shadow-sm ring-2 ring-rose-line"
-                        : "bg-slate-100 text-slate-500 hover:bg-slate-200",
-                    ].join(" ")}
-                  >
-                    {preset}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="min-w-0 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100">
-              <div className="mb-1 flex items-center justify-between">
-                <span className="text-[11px] font-black text-slate-700">사이즈</span>
-                <span className="text-[10px] font-bold text-slate-400">빠른 선택</span>
-              </div>
-              <input
-                value={sizeText}
-                onChange={(event) => setSizeText(event.target.value)}
-                placeholder="예: FREE 또는 S, M, L"
-                className="h-9 w-full rounded-xl border border-slate-200 px-3 text-xs font-bold outline-none focus:border-blue-400"
-              />
-              <div className="mt-2 flex flex-wrap gap-1">
-                {SIZE_PRESETS.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => applySizePreset(preset)}
-                    className={[
-                      "rounded-full px-2.5 py-1 text-[11px] font-black transition active:scale-[0.96]",
-                      normalizePresetOptions(preset).some((option) => splitOptions(sizeText).includes(option))
-                        ? "bg-rose-deep text-white shadow-sm ring-2 ring-rose-line"
-                        : "bg-slate-100 text-slate-500 hover:bg-slate-200",
-                    ].join(" ")}
-                  >
-                    {preset}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </section>
-
-<section data-ruru-option-stock-card className="flex min-h-[168px] max-h-[360px] flex-col overflow-hidden rounded-2xl border border-rose-line bg-white p-3.5 shadow-sm shadow-slate-100">
-            <div className="mb-2.5 flex items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <div className="text-xs font-black text-slate-800">재고관리</div>
-                  <div data-ruru-stock-management-toggle className="flex rounded-xl bg-slate-100 p-1 text-[11px] font-black">
-                    <button
-                      type="button"
-                      onClick={() => setStockManagementEnabled(true)}
-                      className={`rounded-lg px-3 py-1.5 ${stockManagementEnabled ? "bg-rose-deep text-white shadow-sm" : "text-slate-500"}`}
-                    >
-                      사용
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setStockManagementEnabled(false)}
-                      className={`rounded-lg px-3 py-1.5 ${!stockManagementEnabled ? "bg-slate-900 text-white shadow-sm" : "text-slate-500"}`}
-                    >
-                      미사용
-                    </button>
-                  </div>
-                </div>
-                <div className="mt-0.5 text-[10px] font-bold text-slate-400">
-                  기본 총재고 · 필요 시 옵션별
-                </div>
-              </div>
-
-              <div className="flex rounded-xl bg-slate-100 p-1">
-                <button
-                  type="button"
-                  onClick={() => setStockMode("total")}
-                  className={[
-                    "rounded-lg px-3 py-1.5 text-[11px] font-black",
-                    stockMode === "total" ? "bg-white text-rose-deep shadow-sm" : "text-slate-500",
-                  ].join(" ")}
-                >
-                  총재고
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStockMode("option")}
-                  className={[
-                    "rounded-lg px-3 py-1.5 text-[11px] font-black",
-                    stockMode === "option" ? "bg-white text-rose-deep shadow-sm" : "text-slate-500",
-                  ].join(" ")}
-                >
-                  옵션별
-                </button>
-              </div>
-            </div>
-
-            {stockMode === "total" ? (
-              <div data-ruru-total-stock-mode className="flex min-h-[88px] items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3">
-                <div className="min-w-0">
-                  <div className="text-xs font-black text-slate-800">전체 재고</div>
-                  <div className="mt-0.5 text-[10px] font-bold text-slate-400">옵션별은 필요할 때만 사용</div>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <input
-                    value={formatNumberWithComma(totalStockText)}
-                    onChange={(event) => setTotalStockText(onlyNumber(event.target.value))}
-                    className="h-10 w-24 rounded-xl border border-slate-200 bg-white px-3 text-right text-base font-black outline-none focus:border-blue-400"
-                  />
-                  <span className="text-xs font-black text-slate-400">개</span>
-                </div>
-              </div>
-            ) : (
-              <div data-ruru-option-stock-mode className="grid h-[246px] min-h-0 grid-cols-[176px_minmax(0,1fr)] gap-3 overflow-hidden">
-              <div className="flex h-[54px] items-center gap-2 rounded-xl bg-slate-50 px-3">
-                <span className="text-xs font-bold text-slate-500">전체 재고</span>
-                <input
-                  value={formatNumberWithComma(stockMode === "option" ? String(totalStock) : totalStockText)}
-                  onChange={(event) => setTotalStockText(onlyNumber(event.target.value))}
-                  disabled={stockMode === "option"}
-                  className="h-9 w-20 rounded-xl border border-slate-200 px-3 text-right text-sm font-black outline-none focus:border-blue-400 disabled:bg-white disabled:text-slate-400"
-                />
-                <span className="text-xs font-black text-slate-400">개</span>
-              </div>
-
-              <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-slate-100 bg-white">
-                <div className="shrink-0 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_104px] bg-slate-50 px-3 py-1.5 text-[10px] font-black text-slate-400">
-                  <div>색상</div>
-                  <div>사이즈</div>
-                  <div className="text-right">재고</div>
-                </div>
-
-                <div data-ruru-variant-stock-scroll className="min-h-0 flex-1 overflow-y-auto pr-1">
-                  {stockMode === "option" && resolvedVariantRows.length > 0 ? (
-                    resolvedVariantRows.map((row) => (
-                      <div
-                        key={row.key}
-                        className="grid min-h-[34px] grid-cols-[minmax(0,1fr)_minmax(0,1fr)_104px] items-center border-t border-slate-100 px-3 py-1"
-                      >
-                        <div className="truncate text-[11px] font-bold text-slate-700">{row.color}</div>
-                        <div className="truncate text-[11px] font-bold text-slate-700">{row.size}</div>
-                        <input
-                          value={String(row.stock || "")}
-                          onChange={(event) => updateVariantStock(row.key, moneyNumber(event.target.value))}
-                          placeholder="0"
-                          className="h-7 rounded-lg border border-slate-200 px-2 text-right text-xs font-black outline-none focus:border-blue-400"
-                        />
-                      </div>
-                    ))
-                  ) : (
-                    <div className="flex h-[72px] items-center justify-center text-[11px] font-bold text-slate-400">
-                      옵션별 탭을 선택하면 색상/사이즈별 재고 입력
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            )}
-            {stockMode === "option" ? (
-              <div className="mt-1 shrink-0 text-right text-xs font-black text-slate-600">
-                총재고 {totalStock.toLocaleString("ko-KR")}개 · 옵션 {resolvedVariantRows.length.toLocaleString("ko-KR")}개
-              </div>
-            ) : null}
-          </section>
-
-          <div data-ruru-section-title="images" className="flex items-center gap-2 px-1 py-0.5">
-            <span className="rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-black text-white">04</span>
-            <div>
-              <div className="text-sm font-black text-slate-900">이미지</div>
-            </div>
-          </div>
-
-<section data-ruru-detail-images-section className="rounded-2xl border border-slate-200 bg-white p-3">
-<ImagePicker
-                label="상세사진 최대 5장"
-                value={detailImages}
-                maxFiles={5}
-                uploadKind="detail"
-                mode="detail"
-                onChange={setDetailImages}
-              />
-          </section>
-
-          <div data-ruru-section-title="search" className="flex items-center gap-2 px-1 py-0.5">
-            <span className="rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-black text-white">05</span>
-            <div>
-              <div className="text-sm font-black text-slate-900">검색 노출</div>
-            </div>
-          </div>
-
-<section data-ruru-search-exposure-section className="grid min-h-0 grid-cols-[120px_minmax(0,1fr)] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3">
-            <div className="min-w-0">
-              <div className="text-[11px] font-black text-slate-700">추천 키워드</div>
-              <div className="mt-0.5 text-[10px] font-bold text-slate-400">검색 보조</div>
-            </div>
-
-            <input
-              value={suggestionKeywordsText}
-              onChange={(event) => setSuggestionKeywordsText(event.target.value)}
-              placeholder="예: 알로, 바지, 밴딩, 알로바지"
-              className="h-9 w-full rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-800 outline-none focus:border-blue-400"
-            />
-          </section>
-
-        </div>
-      </div>
-
-      <div className="flex h-[70px] shrink-0 items-center justify-between gap-3 border-t border-slate-200 bg-white px-5">
-        <div data-ruru-save-summary className="min-w-0 truncate text-xs font-black text-slate-500">
-          <span className="text-slate-900">{productType === "broadcast" ? "방송상품" : "공구상품"}</span>
-          <span className="mx-1 text-slate-300">·</span>
-          <span>{shippingType === "vendor" ? "업체배송" : "일반배송"}</span>
-          <span className="mx-1 text-slate-300">·</span>
-          <span>{orderExposureMode === "hidden" ? "숨김" : orderExposureMode === "card_and_search" ? "카드+검색" : "검색만"}</span>
-          <span className="mx-1 text-slate-300">·</span>
-          <span>재고 {totalStock.toLocaleString("ko-KR")}개</span>
+        <div className="mh">
+          <span className="mt">＋ {isEditMode ? "상품 수정" : "새 상품 등록"}</span>
+          <button type="button" className="x" onClick={() => onClose?.()}>✕</button>
         </div>
 
-        <div className="flex shrink-0 items-center justify-end gap-2">
-        <button
-          type="button"
-          disabled={saving}
-          onClick={() => void saveProduct()}
-          className="h-11 w-[180px] rounded-xl bg-rose-deep text-sm font-black text-white shadow-sm disabled:opacity-50"
-        >
-          {saving ? "저장중..." : "저장"}
-        </button>
+        {/* 사진 + 우측 필드 */}
+        <div style={{ display: "flex", gap: "12px", marginBottom: "13px" }}>
+          <div style={{ width: "120px", flexShrink: 0 }}>
+            <ImagePicker label="사진" value={coverImages} maxFiles={1} uploadKind="cover" mode="cover" onChange={setCoverImages} />
+            <button type="button" className="btn" style={{ width: "100%", marginTop: "6px", fontSize: "10px" }}
+              onClick={() => showAdminToast("방송화면 캡처는 준비 중입니다. '사진 직접 올림'을 사용해주세요.", "info")}>📷 방송화면 캡처</button>
+          </div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px", minWidth: 0 }}>
+            <div>
+              <label className="fl">상품 이름</label>
+              <input className="ipt" style={{ width: "100%" }} placeholder="예: 스웨이드 로퍼" value={productName} onChange={(e) => setProductName(e.target.value)} />
+            </div>
+            <div>
+              <label className="fl">가격 (비우면 손님 직접입력)</label>
+              <input className="ipt" style={{ width: "100%" }} placeholder="59000" value={priceText} onChange={(e) => setPriceText(e.target.value)} />
+            </div>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ flex: 1 }}>
+                <label className="fl">배송 구분</label>
+                <select className="ipt" style={{ width: "100%" }} value={shippingType} onChange={(e) => setShippingType(e.target.value)}>
+                  <option value="normal">일반배송</option>
+                  <option value="vendor">업체배송1</option>
+                  <option value="vendor2">업체배송2</option>
+                </select>
+              </div>
+              <div style={{ width: "108px" }}>
+                <label className="fl">상품 종류</label>
+                <select className="ipt" style={{ width: "100%" }} value={productType} onChange={(e) => setProductType(e.target.value as "broadcast" | "group_buy")}>
+                  <option value="broadcast">방송상품</option>
+                  <option value="group_buy">상시판매</option>
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
+
+        {/* 옵션 박스 */}
+        <div style={{ border: "1px solid var(--bd)", borderRadius: "8px", padding: "11px", marginBottom: "11px" }}>
+          <div style={{ fontSize: "11px", color: "var(--mut)", marginBottom: "9px" }}>옵션 (각각 켜고 / 직접입력·선택)</div>
+          <div style={{ display: "flex", alignItems: "center", gap: "9px", marginBottom: "7px" }}>
+            <span style={{ fontSize: "11px", width: "36px" }}>색상</span>
+            <span className="badge b-ok">ON·선택</span>
+            <input className="ipt" style={{ flex: 1 }} placeholder="화이트, 블랙, 베이지" value={colorText} onChange={(e) => setColorText(e.target.value)} />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", marginBottom: "7px" }}>
+            <span style={{ fontSize: "11px", width: "36px" }}>사이즈</span>
+            <span className="badge b-ok">ON·선택</span>
+            <input className="ipt" style={{ flex: 1, minWidth: "110px" }} placeholder="220, 230, 240" value={sizeText} onChange={(e) => setSizeText(e.target.value)} />
+            {SIZE_PRESETS.map((preset) => (
+              <span key={preset} className="tag" style={{ cursor: "pointer", color: normalizePresetOptions(preset).some((o) => splitOptions(sizeText).includes(o)) ? "var(--rose)" : "var(--mut)" }} onClick={() => applySizePreset(preset)}>{preset}</span>
+            ))}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "9px", marginBottom: "7px" }}>
+            <span style={{ fontSize: "11px", width: "36px" }}>수량</span>
+            <span className="badge" style={{ background: "var(--blue-bg)", color: "var(--blue)" }}>ON·직접입력</span>
+            <span className="note">손님이 숫자 입력</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "9px" }}>
+            <span style={{ fontSize: "11px", width: "36px" }}>금액</span>
+            <span className="badge" style={{ background: "#eee", color: "#888" }}>{priceText.trim() ? "위 가격" : "OFF"}</span>
+            <span className="note">{priceText.trim() ? "위 가격 사용" : "비우면 손님 직접입력"}</span>
+          </div>
+        </div>
+
+        {/* 재고관리 / 고객 노출 */}
+        <div style={{ display: "flex", gap: "18px", fontSize: "11px", marginBottom: "4px", alignItems: "center" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }} onClick={() => setStockManagementEnabled((v) => !v)}>
+            재고관리 <span className="note">(끄면 무제한)</span> <span className={`tog ${stockManagementEnabled ? "on" : "off"}`}><i /></span>
+          </span>
+          <span style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }} onClick={() => setIsVisible((v) => !v)}>
+            고객 노출 <span className={`tog ${isVisible ? "on" : "off"}`}><i /></span>
+          </span>
+        </div>
+
+        {/* 푸터 */}
+        <div className="mfoot">
+          <span className="note">⚡ 빠른등록: 사진·이름만 넣고 바로</span>
+          <span className="r">
+            <button type="button" className="btn" onClick={() => onClose?.()}>취소</button>
+            <button type="button" className="btn rose" disabled={saving} onClick={() => void saveProduct()}>{saving ? "저장중..." : "등록"}</button>
+          </span>
+        </div>
+
       </div>
     </div>
   );
