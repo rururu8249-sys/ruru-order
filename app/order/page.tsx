@@ -4244,155 +4244,75 @@ export default function OrderPage() {
           </section>
 
           {registeredOptionSelectProduct && (
-            <div className="fixed inset-0 z-[128] flex items-end bg-black/45 px-2 pb-0 sm:px-3">
-              <div className="mx-auto flex max-h-[92dvh] w-full max-w-[430px] flex-col overflow-hidden rounded-t-[30px] bg-white shadow-2xl">
-                <div className="shrink-0 border-b border-slate-100 p-4">
-                  <div className="mx-auto mb-3 h-1.5 w-14 rounded-full bg-slate-200" />
-                  <p className="text-[12px] font-black tracking-[-0.04em] text-coral-700">
-                    옵션을 선택해 주세요
-                  </p>
-                  <h2 className="mt-1 break-keep text-[24px] font-black leading-tight tracking-[-0.08em] text-slate-950">
-                    색상 · 사이즈 선택
-                  </h2>
-                  <p className="mt-2 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
-                    선택한 옵션 그대로 주문서에 들어갑니다. 빠뜨리지 말고 확인해주세요.
-                  </p>
+            <div style={{ position: "fixed", inset: 0, zIndex: 128, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(0,0,0,0.45)" }} onClick={(e) => { if (e.target === e.currentTarget) closeRegisteredOptionSelectSheet(); }}>
+              <div style={{ width: "100%", maxWidth: "430px", maxHeight: "92dvh", display: "flex", flexDirection: "column", background: "#fff", borderTopLeftRadius: "26px", borderTopRightRadius: "26px", overflow: "hidden" }}>
+                <div style={{ flexShrink: 0, borderBottom: "1px solid #F0EAE0", padding: "16px" }}>
+                  <div style={{ margin: "0 auto 12px", width: "52px", height: "5px", borderRadius: "3px", background: "#E8E2DD" }} />
+                  <div style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>옵션을 선택해 주세요</div>
+                  <div style={{ marginTop: "4px", fontSize: "17px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{registeredOptionSelectProduct.product_name}</div>
+                  <div style={{ marginTop: "2px", fontSize: "15px", fontWeight: 800, color: "#7B2D43" }}>{registeredOptionPrice > 0 ? won(registeredOptionPrice) : "가격 직접입력"}</div>
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto p-4">
-                  <div className="rounded-[24px] bg-slate-50 p-4 ring-1 ring-slate-100">
-                    <h3 className="break-keep text-[18px] font-black leading-snug tracking-[-0.06em] text-slate-950">
-                      {registeredOptionSelectProduct.product_name}
-                    </h3>
-                    <p className="mt-1 text-[15px] font-black text-coral-700">
-                      {registeredOptionPrice > 0 ? won(registeredOptionPrice) : "가격 직접입력"}
-                    </p>
-                  </div>
-
-                  {registeredOptionColorChoices.length > 0 && (
-                    <div className="mt-4">
-                      <p className="mb-2 text-[14px] font-black tracking-[-0.04em] text-slate-800">
-                        색상
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
+                <div style={{ minHeight: 0, flex: 1, overflowY: "auto", padding: "16px" }}>
+                  {registeredOptionColorChoices.length > 0 ? (
+                    <div style={{ marginBottom: "16px" }}>
+                      <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>색상</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                         {registeredOptionColorChoices.map((option) => (
-                          <button
-                            key={`registered-color-${option}`}
-                            type="button"
-                            onClick={() => setRegisteredOptionColor(option)}
-                            className={`min-h-12 rounded-[16px] border px-3 text-[14px] font-black tracking-[-0.04em] ${
-                              registeredOptionColor === option
-                                ? "border-coral-600 bg-coral-600 text-white"
-                                : "border-slate-200 bg-white text-slate-700"
-                            }`}
-                          >
-                            {option}
-                          </button>
+                          <button key={`c-${option}`} type="button" onClick={() => setRegisteredOptionColor(option)} style={{ minHeight: "46px", borderRadius: "14px", border: `1.5px solid ${registeredOptionColor === option ? "#7B2D43" : "#E8E2DD"}`, background: registeredOptionColor === option ? "#7B2D43" : "#fff", color: registeredOptionColor === option ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}>{option}</button>
                         ))}
                       </div>
+                      {!registeredOptionColor.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>색상을 선택해주세요</div> : null}
                     </div>
-                  )}
+                  ) : null}
 
-                  {registeredOptionColorMode === "input" && (
-                    <div className="mt-4">
-                      <p className="mb-2 text-[14px] font-black tracking-[-0.04em] text-slate-800">
-                        색상
-                      </p>
-                      <input
-                        value={registeredOptionColor}
-                        onChange={(event) => setRegisteredOptionColor(event.target.value)}
-                        placeholder="색상을 입력해주세요. 없으면 “없음”"
-                        className="h-12 w-full rounded-[16px] border border-slate-200 bg-white px-4 text-[15px] font-black tracking-[-0.04em] text-slate-950 outline-none focus:border-coral-500"
-                      />
+                  {registeredOptionColorMode === "input" ? (
+                    <div style={{ marginBottom: "16px" }}>
+                      <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>색상</div>
+                      <input value={registeredOptionColor} onChange={(e) => setRegisteredOptionColor(e.target.value)} placeholder="색상을 입력해주세요. 없으면 “없음”" style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: `1.5px solid ${!registeredOptionColor.trim() ? "#E8B5B0" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
+                      {!registeredOptionColor.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>색상을 입력해주세요</div> : null}
                     </div>
-                  )}
+                  ) : null}
 
-                  {registeredOptionSizeMode === "input" && (
-                    <div className="mt-4">
-                      <p className="mb-2 text-[14px] font-black tracking-[-0.04em] text-slate-800">
-                        사이즈
-                      </p>
-                      <input
-                        value={registeredOptionSize}
-                        onChange={(event) => setRegisteredOptionSize(event.target.value)}
-                        placeholder="사이즈를 입력해주세요. 없으면 “없음”"
-                        className="h-12 w-full rounded-[16px] border border-slate-200 bg-white px-4 text-[15px] font-black tracking-[-0.04em] text-slate-950 outline-none focus:border-coral-500"
-                      />
-                    </div>
-                  )}
-
-                  {registeredOptionSizeChoices.length > 0 && (
-                    <div className="mt-4">
-                      <p className="mb-2 text-[14px] font-black tracking-[-0.04em] text-slate-800">
-                        사이즈
-                      </p>
-                      <div className="grid grid-cols-3 gap-2">
+                  {registeredOptionSizeChoices.length > 0 ? (
+                    <div style={{ marginBottom: "16px" }}>
+                      <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>사이즈</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
                         {registeredOptionSizeChoices.map((option) => (
-                          <button
-                            key={`registered-size-${option}`}
-                            type="button"
-                            onClick={() => setRegisteredOptionSize(option)}
-                            className={`min-h-12 rounded-[16px] border px-2 text-[14px] font-black tracking-[-0.04em] ${
-                              registeredOptionSize === option
-                                ? "border-coral-600 bg-coral-600 text-white"
-                                : "border-slate-200 bg-white text-slate-700"
-                            }`}
-                          >
-                            {option}
-                          </button>
+                          <button key={`s-${option}`} type="button" onClick={() => setRegisteredOptionSize(option)} style={{ minHeight: "46px", borderRadius: "14px", border: `1.5px solid ${registeredOptionSize === option ? "#7B2D43" : "#E8E2DD"}`, background: registeredOptionSize === option ? "#7B2D43" : "#fff", color: registeredOptionSize === option ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}>{option}</button>
                         ))}
                       </div>
+                      {!registeredOptionSize.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>사이즈를 선택해주세요</div> : null}
                     </div>
-                  )}
+                  ) : null}
 
-                  <div className="mt-4 grid grid-cols-[0.82fr_1.18fr] gap-3">
-                    <label className="grid gap-2">
-                      <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">수량</span>
-                      <div className="grid h-12 grid-cols-[42px_1fr_42px] overflow-hidden rounded-[17px] border border-slate-200 bg-white">
-                        <button
-                          type="button"
-                          onClick={() => setRegisteredOptionQty((current) => Math.max(1, current - 1))}
-                          className="border-r border-slate-100 text-[18px] font-black text-slate-700"
-                        >
-                          -
-                        </button>
-                        <div className="flex items-center justify-center text-[16px] font-black tracking-[-0.04em] text-slate-950">
-                          {registeredOptionQty}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setRegisteredOptionQty((current) => current + 1)}
-                          className="border-l border-slate-100 text-[18px] font-black text-coral-700"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </label>
+                  {registeredOptionSizeMode === "input" ? (
+                    <div style={{ marginBottom: "16px" }}>
+                      <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>사이즈</div>
+                      <input value={registeredOptionSize} onChange={(e) => setRegisteredOptionSize(e.target.value)} placeholder="사이즈를 입력해주세요. 없으면 “없음”" style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: `1.5px solid ${!registeredOptionSize.trim() ? "#E8B5B0" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
+                      {!registeredOptionSize.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>사이즈를 입력해주세요</div> : null}
+                    </div>
+                  ) : null}
 
-                    <div className="grid gap-2">
-                      <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">선택금액</span>
-                      <div className="flex h-12 items-center justify-end rounded-[17px] border border-slate-200 bg-white px-3 text-[14px] font-black tracking-[-0.04em] text-slate-950">
-                        {registeredOptionTotalPrice > 0 ? won(registeredOptionTotalPrice) : "가격 직접입력"}
+                  <div style={{ display: "grid", gridTemplateColumns: "0.82fr 1.18fr", gap: "12px" }}>
+                    <div>
+                      <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>수량</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "42px 1fr 42px", height: "46px", borderRadius: "14px", border: "1px solid #E8E2DD", overflow: "hidden" }}>
+                        <button type="button" onClick={() => setRegisteredOptionQty((c) => Math.max(1, c - 1))} style={{ borderRight: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#555", cursor: "pointer" }}>−</button>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionQty}</div>
+                        <button type="button" onClick={() => setRegisteredOptionQty((c) => c + 1)} style={{ borderLeft: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#7B2D43", cursor: "pointer" }}>+</button>
                       </div>
+                    </div>
+                    <div>
+                      <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>선택금액</div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", height: "46px", borderRadius: "14px", border: "1px solid #E8E2DD", background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 800, color: "#222" }}>{registeredOptionTotalPrice > 0 ? won(registeredOptionTotalPrice) : "가격 직접입력"}</div>
                     </div>
                   </div>
                 </div>
 
-                <div className="shrink-0 grid grid-cols-[0.85fr_1.15fr] gap-3 border-t border-slate-100 bg-white p-3 pb-[calc(12px+env(safe-area-inset-bottom))]">
-                  <button
-                    type="button"
-                    onClick={closeRegisteredOptionSelectSheet}
-                    className="h-14 rounded-[20px] bg-slate-100 text-[16px] font-black tracking-[-0.05em] text-slate-700"
-                  >
-                    닫기
-                  </button>
-                  <button
-                    type="button"
-                    onClick={confirmRegisteredOptionSelectSheet}
-                    className="h-14 rounded-[20px] bg-coral-600 text-[16px] font-black tracking-[-0.05em] text-white shadow-sm"
-                  >
-                    주문서에 담기
-                  </button>
+                <div style={{ flexShrink: 0, display: "grid", gridTemplateColumns: "0.85fr 1.15fr", gap: "10px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "12px 12px calc(12px + env(safe-area-inset-bottom))" }}>
+                  <button type="button" onClick={closeRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#F1ECEE", fontSize: "16px", fontWeight: 800, color: "#666", cursor: "pointer" }}>닫기</button>
+                  <button type="button" onClick={confirmRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#7B2D43", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>주문서에 담기</button>
                 </div>
               </div>
             </div>
