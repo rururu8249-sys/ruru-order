@@ -90,7 +90,7 @@ export default function CustomerPaymentGuideBottomSheet({
   const normalButtonClass =
     "flex min-h-[46px] items-center justify-center rounded-[16px] bg-white px-3 py-2 text-[13px] font-black tracking-[-0.04em] text-slate-800 ring-1 ring-slate-200 transition active:scale-[0.98]";
   const doneButtonClass =
-    "flex min-h-[46px] items-center justify-center rounded-[16px] bg-coral-600 px-3 py-2 text-[13px] font-black tracking-[-0.04em] text-white ring-1 ring-coral-600 transition active:scale-[0.98]";
+    "flex min-h-[46px] items-center justify-center rounded-[16px] bg-rose-deep px-3 py-2 text-[13px] font-black tracking-[-0.04em] text-white ring-1 ring-rose-deep transition active:scale-[0.98]";
 
   return (
     <div
@@ -106,7 +106,7 @@ export default function CustomerPaymentGuideBottomSheet({
         <div className="max-h-[86dvh] overflow-y-auto px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-5">
           <header className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[12px] font-black tracking-[-0.04em] text-coral-700">
+              <p className="text-[12px] font-black tracking-[-0.04em] text-rose-deep">
                 루루동이 LIVE
               </p>
               <h2 className="mt-1 text-[26px] font-black leading-tight tracking-[-0.07em] text-slate-950">
@@ -119,7 +119,7 @@ export default function CustomerPaymentGuideBottomSheet({
               </p>
             </div>
 
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-coral-50 text-[25px] ring-1 ring-coral-100">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-rose-soft text-[25px] ring-1 ring-rose-line">
               {isOrderComplete ? "✅" : "💙"}
             </div>
           </header>
@@ -149,16 +149,16 @@ export default function CustomerPaymentGuideBottomSheet({
           )}
 
           {showCardGuide && (
-            <section className="mt-4 rounded-[22px] bg-coral-50 p-4 ring-1 ring-coral-100">
+            <section className="mt-4 rounded-[22px] bg-rose-soft p-4 ring-1 ring-rose-line">
               <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-white text-[23px] ring-1 ring-coral-100">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-white text-[23px] ring-1 ring-rose-line">
                   💳
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-[18px] font-black tracking-[-0.06em] text-coral-950">
+                  <h3 className="text-[18px] font-black tracking-[-0.06em] text-rose-deep">
                     카드결제 안내
                   </h3>
-                  <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-coral-800">
+                  <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-rose-deep">
                     카드결제는 카톡채널 안내에 따라 진행해주세요.
                   </p>
                 </div>
@@ -168,14 +168,14 @@ export default function CustomerPaymentGuideBottomSheet({
 
           {showBankGuide && (
             <>
-              <section className="mt-4 rounded-[22px] bg-coral-50 p-4 ring-1 ring-coral-100">
+              <section className="mt-4 rounded-[22px] bg-rose-soft p-4 ring-1 ring-rose-line">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[12px] font-black tracking-[-0.04em] text-slate-500">
                       입금자명
                     </p>
                     <p
-                      className="mt-1 truncate text-[30px] font-black leading-tight tracking-[-0.08em] text-coral-700"
+                      className="mt-1 truncate text-[30px] font-black leading-tight tracking-[-0.08em] text-rose-deep"
                       title={safeNickname}
                     >
                       {safeNickname}
@@ -185,7 +185,7 @@ export default function CustomerPaymentGuideBottomSheet({
                     </p>
                   </div>
 
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-white/80 text-[24px] ring-1 ring-coral-100">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-white/80 text-[24px] ring-1 ring-rose-line">
                     👤
                   </div>
                 </div>
@@ -242,7 +242,7 @@ export default function CustomerPaymentGuideBottomSheet({
                 <h3 className="text-[18px] font-black tracking-[-0.06em] text-slate-950">
                   주문 상품
                 </h3>
-                <span className="rounded-full bg-coral-50 px-3 py-1 text-[12px] font-black text-coral-700 ring-1 ring-coral-100">
+                <span className="rounded-full bg-rose-soft px-3 py-1 text-[12px] font-black text-rose-deep ring-1 ring-rose-line">
                   총 {totalQty || orderItems.length}개
                 </span>
               </div>
@@ -267,7 +267,7 @@ export default function CustomerPaymentGuideBottomSheet({
                               수량 {qty || 0}개
                             </p>
                           </div>
-                          <p className="shrink-0 text-right text-[14px] font-black text-coral-700">
+                          <p className="shrink-0 text-right text-[14px] font-black text-rose-deep">
                             {won(amount)}
                           </p>
                         </div>
@@ -281,7 +281,7 @@ export default function CustomerPaymentGuideBottomSheet({
                 )}
               </div>
 
-              <div className="mt-3 rounded-[18px] bg-coral-50 p-3 ring-1 ring-coral-100">
+              <div className="mt-3 rounded-[18px] bg-rose-soft p-3 ring-1 ring-rose-line">
                 <div className="flex items-center justify-between py-1 text-[13px] font-bold text-slate-600">
                   <span>상품금액</span>
                   <span>{won(safeProductAmount)}</span>
@@ -299,9 +299,9 @@ export default function CustomerPaymentGuideBottomSheet({
                   </div>
                 )}
 
-                <div className="mt-2 flex items-center justify-between border-t border-coral-100 pt-3 text-[17px] font-black text-slate-950">
+                <div className="mt-2 flex items-center justify-between border-t border-rose-line pt-3 text-[17px] font-black text-slate-950">
                   <span>{safePointUsedAmount > 0 ? "최종 결제금액" : "결제금액"}</span>
-                  <span className="text-coral-700">{won(safeFinalAmount)}</span>
+                  <span className="text-rose-deep">{won(safeFinalAmount)}</span>
                 </div>
               </div>
             </section>
@@ -310,7 +310,7 @@ export default function CustomerPaymentGuideBottomSheet({
           <button
             type="button"
             onClick={onClose}
-            className="mt-4 flex min-h-[52px] w-full items-center justify-center rounded-[18px] bg-coral-600 px-4 py-3 text-[16px] font-black tracking-[-0.05em] text-white shadow-[0_12px_28px_rgba(216,90,48,0.24)] transition active:scale-[0.98]"
+            className="mt-4 flex min-h-[52px] w-full items-center justify-center rounded-[18px] bg-rose-deep px-4 py-3 text-[16px] font-black tracking-[-0.05em] text-white shadow-[0_12px_28px_rgba(216,90,48,0.24)] transition active:scale-[0.98]"
           >
             확인
           </button>
