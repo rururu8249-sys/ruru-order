@@ -5,6 +5,7 @@ export type AdminLiveMenuKey =
   | "payments"
   | "customers"
   | "event"
+  | "point"
   | "settlement"
   | "settings";
 
@@ -25,7 +26,7 @@ export const ADMIN_LIVE_MENUS: AdminLiveMenuItem[] = [
     label: "주문·입금",
     icon: "📡",
     desc: "라이브 컨트롤타워",
-    sidebarNotice: "방송 메뉴는 실시간 주문·결제상태 중심입니다. 주문관리/고객관리/정산통계는 별도 화면으로 확장합니다.",
+    sidebarNotice: "방송 메뉴는 실시간 주문·결제상태 중심입니다.",
     readyTitle: "방송 컨트롤타워",
     readyDescription: "라이브 방송, 주문, 결제상태, 고객이슈를 한 화면에서 관리합니다.",
     checkpoints: ["방송 시작/종료", "유튜브 영상·채팅", "실시간 주문", "입금대기 주문"],
@@ -41,24 +42,14 @@ export const ADMIN_LIVE_MENUS: AdminLiveMenuItem[] = [
     checkpoints: ["방송상품", "공구·상시판매", "전체 창고", "새 상품 등록", "순환 담기"],
   },
   {
-    key: "orders",
-    label: "주문관리",
-    icon: "📋",
-    desc: "주문 상세 관리",
-    sidebarNotice: "주문관리 화면은 주문 목록·상세·필터·상태 변경을 분리해서 연결할 예정입니다.",
-    readyTitle: "주문관리 화면 연결 준비중",
-    readyDescription: "방송 메뉴의 실시간 주문표와 기존 admin-v2 주문 컴포넌트를 비교한 뒤 안전하게 연결합니다.",
-    checkpoints: ["주문 목록", "주문 상세", "입금상태 필터", "배송상태 필터", "일괄 처리"],
-  },
-  {
-    key: "payments",
-    label: "입금확인",
-    icon: "원",
-    desc: "입금 확인 처리",
-    sidebarNotice: "입금확인 화면은 자동입금확인 조건을 유지한 상태로 별도 화면 연결 예정입니다.",
-    readyTitle: "입금확인 화면 연결 준비중",
-    readyDescription: "자동입금확인 조건은 그대로 유지하고, 수동입금확인과 입금내역 조회 화면을 분리 연결합니다.",
-    checkpoints: ["입금내역 조회", "자동입금확인", "수동입금확인", "미매칭 입금", "입금 새로고침"],
+    key: "settlement",
+    label: "정산",
+    icon: "◔",
+    desc: "방송·날짜별 통계",
+    sidebarNotice: "정산통계 화면은 돈 로직을 건드리지 않고 조회·통계 중심으로 설계합니다.",
+    readyTitle: "정산통계 화면 연결 준비중",
+    readyDescription: "방송별·날짜별 결제완료 매출, 입금대기, 카드결제 통계를 조회 전용으로 구성합니다.",
+    checkpoints: ["방송별 매출", "날짜별 통계", "결제상태", "카드결제", "상품 랭킹"],
   },
   {
     key: "customers",
@@ -81,14 +72,14 @@ export const ADMIN_LIVE_MENUS: AdminLiveMenuItem[] = [
     checkpoints: ["룰렛/인형뽑기", "참가자 불러오기", "당첨고정", "당첨선물", "이벤트 기록"],
   },
   {
-    key: "settlement",
-    label: "정산",
-    icon: "◔",
-    desc: "방송·날짜별 통계",
-    sidebarNotice: "정산통계 화면은 돈 로직을 건드리지 않고 조회·통계 중심으로 설계합니다.",
-    readyTitle: "정산통계 화면 연결 준비중",
-    readyDescription: "방송별·날짜별 결제완료 매출, 입금대기, 카드결제 통계를 조회 전용으로 구성합니다.",
-    checkpoints: ["방송별 매출", "날짜별 통계", "결제상태", "카드결제", "상품 랭킹"],
+    key: "point",
+    label: "포인트",
+    icon: "●",
+    desc: "포인트 일괄지급·기록",
+    sidebarNotice: "포인트 일괄지급·기록 화면(시안 ⑩)은 별도 화면으로 연결 예정입니다.",
+    readyTitle: "포인트",
+    readyDescription: "받을 사람 추가 → 한번에 지급, 기간별 지급/차감 기록을 관리합니다.",
+    checkpoints: ["받을 사람 추가", "일괄 지급", "당첨자 불러오기", "지급/차감 기록"],
   },
   {
     key: "settings",

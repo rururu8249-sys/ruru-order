@@ -508,7 +508,7 @@ export default function QuickProductFastForm({
   const [productType, setProductType] = useState<"broadcast" | "group_buy">("broadcast");
   const [productName, setProductName] = useState("");
   const [priceText, setPriceText] = useState("");
-  const [stockManagementEnabled, setStockManagementEnabled] = useState(true);
+  const [stockManagementEnabled, setStockManagementEnabled] = useState(false);
   const [shippingType, setShippingType] = useState("normal");
   const [isVisible, setIsVisible] = useState(true);
   const [isPinned, setIsPinned] = useState(false);
@@ -521,6 +521,8 @@ export default function QuickProductFastForm({
 
   const [colorText, setColorText] = useState("");
   const [sizeText, setSizeText] = useState("");
+  const [colorEnabled, setColorEnabled] = useState(true);
+  const [sizeEnabled, setSizeEnabled] = useState(true);
 
   const [stockMode, setStockMode] = useState<"total" | "option">("total");
   const [totalStockText, setTotalStockText] = useState("0");
@@ -656,6 +658,35 @@ export default function QuickProductFastForm({
 
       return nextOptions.join(", ");
     });
+  };
+
+  // 방송화면 캡처: getDisplayMedia 화면공유 → canvas 캡처 → coverImages 세팅
+  const captureBroadcastScreen = async () => {
+    try {
+      const md = navigator.mediaDevices as MediaDevices & {
+        getDisplayMedia?: (c?: MediaStreamConstraints) => Promise<MediaStream>;
+      };
+      if (!md?.getDisplayMedia) {
+        showAdminToast("이 브라우저는 화면 캡처를 지원하지 않습니다.", "warning");
+        return;
+      }
+      const stream = await md.getDisplayMedia({ video: true });
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      video.muted = true;
+      await video.play();
+      await new Promise((r) => setTimeout(r, 350));
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth || 1280;
+      canvas.height = video.videoHeight || 720;
+      canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
+      stream.getTracks().forEach((t) => t.stop());
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      setCoverImages([dataUrl]);
+      showAdminToast("방송화면을 캡처했어요. (사진에 자동 설정)", "success");
+    } catch {
+      showAdminToast("화면 캡처를 취소했어요.", "info");
+    }
   };
 
   const updateVariantStock = (targetKey: string, stock: number) => {
@@ -821,7 +852,7 @@ export default function QuickProductFastForm({
           <div style={{ width: "120px", flexShrink: 0 }}>
             <ImagePicker label="사진" value={coverImages} maxFiles={1} uploadKind="cover" mode="cover" onChange={setCoverImages} />
             <button type="button" className="btn" style={{ width: "100%", marginTop: "6px", fontSize: "10px" }}
-              onClick={() => showAdminToast("방송화면 캡처는 준비 중입니다. '사진 직접 올림'을 사용해주세요.", "info")}>📷 방송화면 캡처</button>
+              onClick={() => void captureBroadcastScreen()}>📷 방송화면 캡처</button>
           </div>
           <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px", minWidth: 0 }}>
             <div>
@@ -855,18 +886,29 @@ export default function QuickProductFastForm({
         {/* 옵션 박스 */}
         <div style={{ border: "1px solid var(--bd)", borderRadius: "8px", padding: "11px", marginBottom: "11px" }}>
           <div style={{ fontSize: "11px", color: "var(--mut)", marginBottom: "9px" }}>옵션 (각각 켜고 / 직접입력·선택)</div>
-          <div style={{ display: "flex", alignItems: "center", gap: "9px", marginBottom: "7px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", marginBottom: "7px" }}>
             <span style={{ fontSize: "11px", width: "36px" }}>색상</span>
-            <span className="badge b-ok">ON·선택</span>
-            <input className="ipt" style={{ flex: 1 }} placeholder="화이트, 블랙, 베이지" value={colorText} onChange={(e) => setColorText(e.target.value)} />
+            <span className={`badge ${colorEnabled ? "b-ok" : ""}`} onClick={() => setColorEnabled((v) => { const next = !v; if (!next) setColorText(""); return next; })} style={{ cursor: "pointer", ...(colorEnabled ? {} : { background: "#eee", color: "#888" }) }}>{colorEnabled ? "ON·선택" : "OFF"}</span>
+            {colorEnabled ? (
+              <>
+                <input className="ipt" style={{ flex: 1, minWidth: "110px" }} placeholder="화이트, 블랙, 베이지" value={colorText} onChange={(e) => setColorText(e.target.value)} />
+                {COLOR_PRESETS.map((preset) => (
+                  <span key={preset} className="tag" style={{ cursor: "pointer", color: splitOptions(colorText).includes(preset) ? "var(--rose)" : "var(--mut)" }} onClick={() => applyColorPreset(preset)}>{preset}</span>
+                ))}
+              </>
+            ) : null}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", marginBottom: "7px" }}>
             <span style={{ fontSize: "11px", width: "36px" }}>사이즈</span>
-            <span className="badge b-ok">ON·선택</span>
-            <input className="ipt" style={{ flex: 1, minWidth: "110px" }} placeholder="220, 230, 240" value={sizeText} onChange={(e) => setSizeText(e.target.value)} />
-            {SIZE_PRESETS.map((preset) => (
-              <span key={preset} className="tag" style={{ cursor: "pointer", color: normalizePresetOptions(preset).some((o) => splitOptions(sizeText).includes(o)) ? "var(--rose)" : "var(--mut)" }} onClick={() => applySizePreset(preset)}>{preset}</span>
-            ))}
+            <span className={`badge ${sizeEnabled ? "b-ok" : ""}`} onClick={() => setSizeEnabled((v) => { const next = !v; if (!next) setSizeText(""); return next; })} style={{ cursor: "pointer", ...(sizeEnabled ? {} : { background: "#eee", color: "#888" }) }}>{sizeEnabled ? "ON·선택" : "OFF"}</span>
+            {sizeEnabled ? (
+              <>
+                <input className="ipt" style={{ flex: 1, minWidth: "110px" }} placeholder="220, 230, 240" value={sizeText} onChange={(e) => setSizeText(e.target.value)} />
+                {SIZE_PRESETS.map((preset) => (
+                  <span key={preset} className="tag" style={{ cursor: "pointer", color: normalizePresetOptions(preset).some((o) => splitOptions(sizeText).includes(o)) ? "var(--rose)" : "var(--mut)" }} onClick={() => applySizePreset(preset)}>{preset}</span>
+                ))}
+              </>
+            ) : null}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "9px", marginBottom: "7px" }}>
             <span style={{ fontSize: "11px", width: "36px" }}>수량</span>

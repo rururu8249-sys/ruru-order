@@ -539,10 +539,6 @@ export default function LiveOrderTable({
           >
             {exporting === "picking" ? "내보내는중..." : "🛍 물건챙기기"}
           </button>
-          <AdminLiveEventRoulettePanel
-            buttonLabel="🎁 이벤트당첨자"
-            buttonClassName="inline-flex rounded-xl font-black disabled:bg-slate-300 items-center justify-center whitespace-nowrap h-8 px-3 text-xs transition bg-violet-600 text-white hover:bg-violet-700"
-          />
 
             {canceledExportExcludedCount > 0 ? (
               <span className="rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-600">

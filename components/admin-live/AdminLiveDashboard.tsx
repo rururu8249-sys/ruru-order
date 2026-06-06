@@ -252,6 +252,7 @@ const MENU_KEYS_FOR_URL: AdminLiveMenuKey[] = [
   "broadcast",
   "products",
   "event",
+  "point",
   "orders",
   "payments",
   "customers",
@@ -1127,9 +1128,7 @@ export default function AdminLiveDashboard() {
               onYoutubeUrlChange={setBroadcastYoutubeUrl}
             />
 
-            <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
-
-            <div className="mb-4 mt-4 h-[360px] w-full min-h-0 [&>*]:h-full [&>*]:min-h-0 [&>*>*]:h-full [&>*>*]:min-h-0">
+            <div className="mb-4 mt-4 h-[420px] w-full min-h-0 [&>*]:h-full [&>*]:min-h-0 [&>*>*]:h-full [&>*>*]:min-h-0">
               <LiveBroadcastPanels videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} activeBroadcastId={activeBroadcast?.id || null} />
             </div>
 
@@ -1138,6 +1137,8 @@ export default function AdminLiveDashboard() {
                 주문 데이터 불러오기 실패: {loadError}
               </div>
             ) : null}
+
+            <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
 
             <section className="grid grid-cols-12 gap-3">
               <div className="col-span-12">

@@ -121,7 +121,7 @@ function createdDateKey(p: ProductRow) {
 export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose }: Props) {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState<ProductTab>("broadcast");
+  const [tab, setTab] = useState<ProductTab>("all");
   const [search, setSearch] = useState("");
   const [dateKey, setDateKey] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -259,6 +259,28 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
   const confirmAction = () => (mode === "pin" ? pinSelected() : addToRotation());
 
+  // 수정: 새 상품 등록 폼을 edit 모드로 (상품 detail 전달)
+  const editProduct = (p: ProductRow) => {
+    onClose();
+    window.dispatchEvent(new CustomEvent("ruru-edit-quick-product", { detail: p }));
+  };
+
+  // 삭제: confirm 후 products delete + 재로드
+  const deleteProduct = async (p: ProductRow) => {
+    const id = productId(p);
+    if (!id) return;
+    if (!window.confirm(`"${productName(p)}" 상품을 삭제할까요?\n\n삭제 후 복구할 수 없습니다.`)) return;
+    try {
+      const { error } = await supabase.from("products").delete().eq("id", id);
+      if (error) throw error;
+      showAdminToast("상품을 삭제했어요.", "success");
+      window.dispatchEvent(new Event("ruru-live-product-updated"));
+      await loadProducts();
+    } catch (e) {
+      showAdminToast("상품 삭제 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    }
+  };
+
   const tabs: [ProductTab, string][] = [
     ["broadcast", "방송상품"],
     ["group_buy", "공구·상시판매"],
@@ -277,7 +299,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
         {/* 헤더 */}
         <div className="mh">
-          <span className="mt">📦 상품 관리</span>
+          <span className="mt" style={{ color: "#222" }}>📦 관리</span>
           <button type="button" className="x" onClick={onClose}>✕</button>
         </div>
 
@@ -334,6 +356,10 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       <span className="badge" style={{ background: "var(--rose-bg)", color: "var(--rose)" }}>{productTypeLabel(p)}</span>
                       <span className="badge" style={{ background: "var(--blue-bg)", color: "var(--blue)" }}>{shippingLabel(p)}</span>
                     </div>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", flexShrink: 0 }}>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); editProduct(p); }} style={{ fontSize: "10px", fontWeight: 700, color: "var(--blue)", background: "var(--blue-bg)", border: "none", borderRadius: "5px", padding: "4px 8px", cursor: "pointer" }}>수정</button>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); void deleteProduct(p); }} style={{ fontSize: "10px", fontWeight: 700, color: "var(--red)", background: "#fdecec", border: "none", borderRadius: "5px", padding: "4px 8px", cursor: "pointer" }}>삭제</button>
                   </div>
                 </div>
               );

@@ -732,7 +732,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
 
   return (
     <section className="mb-4 flex w-full items-stretch gap-3">
-      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm h-[360px] flex flex-col" style={{ flex: "1 1 0%" }}>
+      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm h-[420px] flex flex-col" style={{ flex: "1 1 0%" }}>
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-black text-slate-950">
             방송화면
@@ -773,7 +773,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
         </div>
       </div>
 
-      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm h-[360px] flex flex-col" style={{ flex: "3 1 0%" }}>
+      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm h-[420px] flex flex-col" style={{ flex: "3 1 0%" }}>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-black text-slate-950">라이브 채팅</h2>
           <span className="text-xs font-bold text-slate-500">{chatEmbedUrl ? "채팅 연결" : "URL 대기"}</span>
@@ -801,7 +801,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
         </div>
       </div>
 
-      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm h-[360px] flex flex-col" style={{ flex: "1.2 1 0%" }}>
+      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm h-[420px] flex flex-col" style={{ flex: "1.2 1 0%" }}>
         <div className="mb-2 flex items-center gap-2 text-sm font-black text-slate-950">
           지금 띄운 상품
           <span className="rounded-md bg-rose-soft px-2 py-0.5 text-[11px] font-black text-rose-deep">📌</span>
@@ -829,9 +829,6 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
                 <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">{nowProdListSummary(pinnedProduct.size_options ?? pinnedProduct.sizes)}</span>
               ) : null}
             </div>
-            <button type="button" className="mt-2 w-full rounded-xl border border-slate-200 py-2 text-[12px] font-black text-slate-500 hover:border-rose-line hover:text-rose-deep">
-              다른 상품 띄우기
-            </button>
           </div>
         ) : rotationProducts.length > 0 ? (
           <div className="flex flex-1 min-h-0 flex-col">
