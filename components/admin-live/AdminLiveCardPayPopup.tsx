@@ -114,8 +114,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
       }}
       style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}
     >
-      <div style={{ display: "flex", flexDirection: "row", width: "960px", maxWidth: "95vw", height: "600px", borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
-        <div style={{ width: "50%", height: "100%", background: "#fff", padding: "24px", overflowY: "auto" }}>
+      <div style={{ width: "440px", maxWidth: "95vw", maxHeight: "90vh", background: "#fff", borderRadius: "16px", overflow: "hidden", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
         <div className="flex items-center justify-between border-b border-rose-line px-5 py-3">
           <span className="text-[15px] font-black text-slate-950">💳 카드결제 — {order.nickname}</span>
           <button type="button" onClick={onClose} className="text-lg leading-none text-slate-400 hover:text-slate-700">
@@ -177,10 +176,6 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
           <div className="mt-3 rounded-xl bg-blue-50 px-3 py-2 text-[10px] font-bold leading-4 text-blue-700">
             닉네임으로 넣어야 나중에 어느 주문인지 매칭됩니다(이름 X). 페이스터는 남의 서버라 자동 채우기가 안 돼요 — 칸별로 복사해 붙여넣어 주세요.
           </div>
-        </div>
-        </div>
-        <div style={{ width: "50%", height: "100%", background: "#fff", borderLeft: "1px solid #E8E2DD" }}>
-          <iframe src={PAYSTER_URL} title="페이스터 결제" style={{ width: "100%", height: "100%", border: 0 }} />
         </div>
       </div>
     </div>
