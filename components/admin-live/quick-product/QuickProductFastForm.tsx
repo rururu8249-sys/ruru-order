@@ -635,6 +635,11 @@ export default function QuickProductFastForm({
     return moneyNumber(totalStockText);
   }, [resolvedVariantRows, stockMode, totalStockText]);
 
+  // 색상/사이즈 옵션이 있으면 옵션별(option) 재고, 없으면 단순 총(total) 재고로 자동 전환.
+  useEffect(() => {
+    setStockMode(colors.length > 0 || sizes.length > 0 ? "option" : "total");
+  }, [colors.length, sizes.length]);
+
   const applyColorPreset = (preset: string) => {
     setColorText((current) => {
       const currentOptions = splitOptions(current);
@@ -896,7 +901,9 @@ export default function QuickProductFastForm({
                   <span key={preset} className="tag" style={{ cursor: "pointer", color: splitOptions(colorText).includes(preset) ? "var(--rose)" : "var(--mut)" }} onClick={() => applyColorPreset(preset)}>{preset}</span>
                 ))}
               </>
-            ) : null}
+            ) : (
+              <span className="note" style={{ color: "#999" }}>고객 직접입력</span>
+            )}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", marginBottom: "7px" }}>
             <span style={{ fontSize: "11px", width: "36px" }}>사이즈</span>
@@ -908,7 +915,9 @@ export default function QuickProductFastForm({
                   <span key={preset} className="tag" style={{ cursor: "pointer", color: normalizePresetOptions(preset).some((o) => splitOptions(sizeText).includes(o)) ? "var(--rose)" : "var(--mut)" }} onClick={() => applySizePreset(preset)}>{preset}</span>
                 ))}
               </>
-            ) : null}
+            ) : (
+              <span className="note" style={{ color: "#999" }}>고객 직접입력</span>
+            )}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "9px", marginBottom: "7px" }}>
             <span style={{ fontSize: "11px", width: "36px" }}>수량</span>
@@ -931,6 +940,31 @@ export default function QuickProductFastForm({
             고객 노출 <span className={`tog ${isVisible ? "on" : "off"}`}><i /></span>
           </span>
         </div>
+
+        {/* 재고관리 ON: 옵션 있으면 조합별 재고 / 없으면 총 재고 1칸 */}
+        {stockManagementEnabled ? (
+          colors.length > 0 || sizes.length > 0 ? (
+            <div style={{ border: "1px solid var(--bd)", borderRadius: "8px", padding: "10px", marginTop: "8px", marginBottom: "11px" }}>
+              <div style={{ fontSize: "11px", color: "var(--mut)", marginBottom: "7px" }}>옵션별 재고 (색상 × 사이즈)</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "5px", maxHeight: "180px", overflowY: "auto" }}>
+                {resolvedVariantRows.map((row) => (
+                  <div key={row.key} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ flex: 1, fontSize: "11px", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[row.color, row.size].filter(Boolean).join(" / ") || "기본"}</span>
+                    <input className="ipt" style={{ width: "90px" }} type="number" min={0} value={row.stock} onChange={(e) => updateVariantStock(row.key, Math.max(0, Number(e.target.value) || 0))} />
+                    <span className="note">개</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: "7px", fontSize: "11px", color: "var(--mut)", textAlign: "right" }}>총 재고 {totalStock.toLocaleString("ko-KR")}개</div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px", marginBottom: "11px" }}>
+              <span style={{ fontSize: "11px", color: "var(--mut)" }}>총 재고 수량</span>
+              <input className="ipt" style={{ width: "120px" }} type="number" min={0} value={totalStockText} onChange={(e) => setTotalStockText(e.target.value)} />
+              <span className="note">개</span>
+            </div>
+          )
+        ) : null}
 
         {/* 푸터 */}
         <div className="mfoot">
