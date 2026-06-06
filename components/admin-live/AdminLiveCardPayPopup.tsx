@@ -8,14 +8,10 @@ import type { LiveOrder } from "./types";
 
 const PAYSTER_URL = "https://user.service.payster.co.kr/#/payment/smspayment";
 
-// 페이스터를 화면 오른쪽 절반에 띄움 (왼쪽 절반 = 복사창). 사용자 클릭 제스처 안에서 호출해야 팝업차단 안 됨.
+// 페이스터는 카드결제 팝업 내부 iframe으로 표시합니다. 별도 창(window.open)은 더 이상 사용하지 않습니다.
+// LiveOrderTable 등 기존 호출부 호환을 위해 함수 시그니처만 유지(no-op).
 export function openPaysterRightHalf() {
-  if (typeof window === "undefined") return;
-  const sw = window.screen?.availWidth || window.innerWidth;
-  const sh = window.screen?.availHeight || window.innerHeight;
-  const left = Math.floor(sw / 2);
-  const width = sw - left;
-  window.open(PAYSTER_URL, "ruruPayster", `popup=yes,left=${left},top=0,width=${width},height=${sh}`);
+  /* no-op */
 }
 
 type Props = {
@@ -114,7 +110,8 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
       }}
       style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}
     >
-      <div style={{ width: "440px", maxWidth: "95vw", maxHeight: "90vh", background: "#fff", borderRadius: "16px", overflow: "hidden", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+      <div style={{ display: "flex", flexDirection: "row", width: "960px", maxWidth: "95vw", height: "600px", borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+        <div style={{ width: "50%", height: "100%", background: "#fff", overflowY: "auto" }}>
         <div className="flex items-center justify-between border-b border-rose-line px-5 py-3">
           <span className="text-[15px] font-black text-slate-950">💳 카드결제 — {order.nickname}</span>
           <button type="button" onClick={onClose} className="text-lg leading-none text-slate-400 hover:text-slate-700">
@@ -158,14 +155,6 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
 
           <button
             type="button"
-            onClick={openPaysterRightHalf}
-            className="mt-3 w-full rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
-          >
-            ↗ 페이스터 결제창 다시 열기
-          </button>
-
-          <button
-            type="button"
             disabled={saving}
             onClick={handleComplete}
             className="mt-2 w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:bg-slate-300"
@@ -176,6 +165,10 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
           <div className="mt-3 rounded-xl bg-blue-50 px-3 py-2 text-[10px] font-bold leading-4 text-blue-700">
             닉네임으로 넣어야 나중에 어느 주문인지 매칭됩니다(이름 X). 페이스터는 남의 서버라 자동 채우기가 안 돼요 — 칸별로 복사해 붙여넣어 주세요.
           </div>
+        </div>
+        </div>
+        <div style={{ width: "50%", height: "100%", background: "#fff", borderLeft: "1px solid #E8E2DD" }}>
+          <iframe src={PAYSTER_URL} title="페이스터 결제" style={{ width: "100%", height: "100%", border: 0 }} />
         </div>
       </div>
     </div>
