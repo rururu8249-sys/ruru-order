@@ -109,8 +109,8 @@ body {
 .ruru-product-sian .subtabs .st { font-size: 11px; padding: 5px 11px; color: var(--mut); border-radius: 6px; cursor: pointer; }
 .ruru-product-sian .subtabs .st.on { background: var(--rose); color: #fff; }
 .ruru-product-sian .filters { display: flex; gap: 7px; margin-bottom: 10px; align-items: center; flex-wrap: wrap; }
-.ruru-product-sian .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.ruru-product-sian .pgrid { border: 1px solid var(--bd); border-radius: 8px; padding: 9px; display: flex; gap: 9px; align-items: center; cursor: pointer; }
+.ruru-product-sian .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; overflow-x: hidden; }
+.ruru-product-sian .pgrid { border: 1px solid var(--bd); border-radius: 8px; padding: 9px; display: flex; gap: 9px; align-items: center; cursor: pointer; min-width: 0; }
 .ruru-product-sian .pgrid.sel { border: 1.5px solid var(--rose); background: var(--rose-bg2); }
 .ruru-product-sian .ph2 { width: 18px; height: 18px; background: #eee; border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; color: #aaa; flex-shrink: 0; overflow: hidden; }
 .ruru-product-sian .mfoot { display: flex; align-items: center; margin-top: 15px; padding-top: 12px; border-top: 1px solid var(--bd); }
