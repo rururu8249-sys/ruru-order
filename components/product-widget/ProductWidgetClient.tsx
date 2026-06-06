@@ -141,7 +141,9 @@ export default function ProductWidgetClient() {
   // 실시간 이벤트 토스트: 주문(INSERT) / 입금확인·카드결제완료(UPDATE). 실제 컬럼명 기준.
   useEffect(() => {
     const nick = (row: AnyProduct) => String(row?.youtube_nickname || row?.nickname || row?.customer_name || "손님").trim();
-    const amount = (row: AnyProduct) => Number(row?.total_amount ?? row?.totalAmount ?? 0).toLocaleString("ko-KR");
+    // 주문 row의 실제 금액 컬럼: submit route가 final_amount(=total_price=adjusted_total_price)에 합계를 저장. total_amount는 인서트에 없어 0원이 떴음.
+    const amount = (row: AnyProduct) =>
+      (Number(row?.final_amount ?? row?.total_amount ?? row?.totalAmount ?? row?.total_price ?? row?.adjusted_total_price ?? 0) || 0).toLocaleString("ko-KR");
     const pname = (row: AnyProduct) => String(row?.product_name || row?.name || "상품").trim();
     // 입금/카드 상태가 기록되는 실제 컬럼들
     const statusOf = (row: AnyProduct) => String(row?.admin_order_status_v2 || row?.order_manage_status || row?.deposit_status || "").trim();
@@ -189,17 +191,24 @@ export default function ProductWidgetClient() {
     };
   }, []);
 
-  // 큐 처리: 표시 중이 아니면 다음 토스트를 3초간 표시
+  // 큐에서 다음 토스트 꺼내기: 표시 중이 아니고 대기열이 있으면 하나 꺼낸다.
   useEffect(() => {
     if (currentToast || toastQueue.length === 0) return;
     setCurrentToast(toastQueue[0]);
     setToastQueue((q) => q.slice(1));
+  }, [currentToast, toastQueue]);
+
+  // 자동 숨김: currentToast가 생기면 3초 뒤 비운다. (이 effect는 currentToast에만 의존 →
+  // 큐 변경으로 재실행되며 타이머가 즉시 clear되던 버그 수정. 3초 후 사라지고 다음 큐로 넘어감)
+  useEffect(() => {
+    if (!currentToast) return;
     const t = window.setTimeout(() => setCurrentToast(""), 3000);
     return () => window.clearTimeout(t);
-  }, [currentToast, toastQueue]);
+  }, [currentToast]);
 
   const current = pinned || rotation[rotIndex] || null;
   const img = imageOf(current);
+  const colors = colorsOf(current); // 색상만 표시(사이즈는 제외)
   const stock = stockLabel(current);
 
   return (
@@ -261,6 +270,9 @@ export default function ProductWidgetClient() {
             <div style={{ fontSize: "14px", fontWeight: 800, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", wordBreak: "break-all" }}>
               {nameOf(current)}
             </div>
+            {colors ? (
+              <div style={{ marginTop: "4px", fontSize: "12px", color: "rgba(255,255,255,0.78)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{colors}</div>
+            ) : null}
             <div style={{ marginTop: "5px", display: "flex", alignItems: "baseline", gap: "8px" }}>
               <span style={{ fontSize: "16px", fontWeight: 800, color: "#FFD9E0" }}>{priceOf(current).toLocaleString("ko-KR")}원</span>
               {stock ? <span style={{ fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>{stock}</span> : null}
