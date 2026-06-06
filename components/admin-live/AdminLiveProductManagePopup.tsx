@@ -211,6 +211,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     }
     setSaving(true);
     try {
+      // 순환모드 전환: 기존 고정(is_pinned) 해제 → '지금 띄운 상품' 패널이 고정 1개가 아닌 순환목록을 표시하도록.
+      await supabase.from("products").update({ is_pinned: false }).eq("is_pinned", true);
+
       const { data: existing } = await supabase
         .from("broadcast_products")
         .select("product_id")
