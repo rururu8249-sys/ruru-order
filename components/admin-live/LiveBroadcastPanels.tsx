@@ -83,8 +83,8 @@ function clean(value: unknown) {
 
 function videoSizeClass(videoRatio: VideoRatio) {
   if (videoRatio === "wide") return "aspect-video h-[430px] w-full max-w-[760px]";
-  if (videoRatio === "auto") return "aspect-[4/5] h-[500px] w-auto";
-  return "aspect-[9/16] h-[500px] w-auto";
+  if (videoRatio === "auto") return "aspect-[4/5] h-full max-w-full";
+  return "aspect-[9/16] h-full max-w-full";
 }
 
 function extractYoutubeVideoId(rawUrl?: string | null) {

@@ -328,7 +328,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🖼"}
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "12px", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
+                    <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
                     <div style={{ fontSize: "11px", color: "var(--mut)" }}>{money(productPrice(p))}</div>
                     <div style={{ marginTop: "3px", display: "flex", gap: "4px", flexWrap: "wrap" }}>
                       <span className="badge" style={{ background: "var(--rose-bg)", color: "var(--rose)" }}>{productTypeLabel(p)}</span>
