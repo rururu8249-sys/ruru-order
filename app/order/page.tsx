@@ -2372,7 +2372,7 @@ export default function OrderPage() {
     }
 
     try {
-      await saveCustomer();
+      await saveCustomer(customerInfoEditSnapshot?.customerPhone);
       setIsEditingCustomerInfo(false);
       setIsCustomerInfoOpen(false);
       setCustomerInfoEditSheetOpen(false);
@@ -2849,8 +2849,11 @@ export default function OrderPage() {
     setItems((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
   };
 
-  const saveCustomer = async () => {
+  const saveCustomer = async (previousPhone?: string) => {
     const cleanPhone = normalizePhone(customerPhone);
+    // 번호 변경 시 옛 번호 row를 찾아 갱신해 중복 row 생성을 막는다(옛 번호 없으면 현재 번호로 조회).
+    const prevClean = normalizePhone(previousPhone || "");
+    const lookupPhone = prevClean && prevClean !== cleanPhone ? prevClean : cleanPhone;
 
     const customerData: any = {
       youtube_nickname: youtubeNickname.trim(),
@@ -2867,7 +2870,7 @@ export default function OrderPage() {
     const { data: rows, error: findError } = await supabase
       .from("customers")
       .select("id")
-      .eq("customer_phone", cleanPhone)
+      .eq("customer_phone", lookupPhone)
       .limit(1);
 
     if (findError) throw findError;
@@ -2876,7 +2879,7 @@ export default function OrderPage() {
       const { error } = await supabase
         .from("customers")
         .update(customerData)
-        .eq("customer_phone", cleanPhone);
+        .eq("customer_phone", lookupPhone);
 
       if (error) throw error;
     } else {
