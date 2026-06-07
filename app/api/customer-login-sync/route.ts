@@ -34,6 +34,9 @@ type CustomerRow = {
   is_blocked?: boolean | null;
   last_order_at?: string | null;
   created_at?: string | null;
+  kakao_id?: string | null;
+  kakao_nickname?: string | null;
+  customer_history?: unknown;
 };
 
 const cleanText = (value: unknown) => String(value ?? "").trim();
@@ -126,6 +129,9 @@ export async function POST(request: NextRequest) {
   const zipcode = cleanText(body.customer_zipcode);
   const address = cleanText(body.customer_address);
   const detailAddress = cleanText(body.customer_detail_address);
+  const kakaoId = cleanText(body.kakao_id);
+  const kakaoNickname = cleanText(body.kakao_nickname);
+  const nowIso = new Date().toISOString();
 
   if (customerPhoneDigits.length < 10) {
     return NextResponse.json(
@@ -144,7 +150,7 @@ export async function POST(request: NextRequest) {
     const { data: existingRows, error: selectError } = await supabase
       .from("customers")
       .select(
-        "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, customer_memo, is_blocked, last_order_at, created_at"
+        "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, customer_memo, is_blocked, last_order_at, created_at, kakao_id, kakao_nickname, customer_history"
       )
       .in("customer_phone", phoneVariants)
       .order("created_at", { ascending: false })
@@ -163,10 +169,18 @@ export async function POST(request: NextRequest) {
     const existing = Array.isArray(existingRows) ? (existingRows[0] as CustomerRow | undefined) : undefined;
 
     if (existing?.id) {
-      const updateData: Record<string, string> = {};
+      const updateData: Record<string, unknown> = {};
+
+      // customer_history: 실제 변경되는 값만 기록 (기존 배열에 append)
+      const history = Array.isArray(existing.customer_history) ? [...(existing.customer_history as unknown[])] : [];
+      const historyBefore = history.length;
+      const recordChange = (field: string, oldValue: unknown, newValue: string) => {
+        history.push({ field, old_value: cleanText(oldValue), new_value: newValue, changed_at: nowIso });
+      };
 
       if (shouldFill(existing.customer_name, customerName)) {
         updateData.customer_name = customerName;
+        recordChange("customer_name", existing.customer_name, customerName);
       }
 
       if (shouldFill(existing.zipcode, zipcode)) {
@@ -175,20 +189,29 @@ export async function POST(request: NextRequest) {
 
       if (shouldFill(existing.address, address)) {
         updateData.address = address;
+        recordChange("address", existing.address, address);
       }
 
       if (shouldFill(existing.detail_address, detailAddress)) {
         updateData.detail_address = detailAddress;
+        recordChange("detail_address", existing.detail_address, detailAddress);
       }
 
-      if (Object.keys(updateData).length === 0) {
-        return NextResponse.json({
-          ok: true,
-          mode: "exists",
-          customer_id: existing.id,
-          message: "기존 고객정보 유지",
-        });
+      // 카카오 식별자: kakao_id는 비어있을 때만 보완, nickname은 있으면 갱신
+      if (shouldFill(existing.kakao_id, kakaoId)) {
+        updateData.kakao_id = kakaoId;
       }
+      if (kakaoNickname) {
+        updateData.kakao_nickname = kakaoNickname;
+      }
+
+      // 변경 이력이 생겼으면 저장
+      if (history.length > historyBefore) {
+        updateData.customer_history = history;
+      }
+
+      // last_login_at은 항상 갱신 (→ updateData가 비는 일이 없으므로 스킵 분기 미발생)
+      updateData.last_login_at = nowIso;
 
       const { error: updateError } = await supabase
         .from("customers")
@@ -213,13 +236,17 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const insertData = {
+    const insertData: Record<string, unknown> = {
       youtube_nickname: "",
       customer_name: customerName,
       customer_phone: customerPhone,
       zipcode,
       address,
       detail_address: detailAddress,
+      kakao_id: kakaoId || null,
+      kakao_nickname: kakaoNickname || null,
+      first_login_at: nowIso,
+      last_login_at: nowIso,
     };
 
     const { data: insertedRows, error: insertError } = await supabase
