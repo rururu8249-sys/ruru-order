@@ -15,6 +15,8 @@ type Props = {
 
 const PAGE_STEP = 10;
 const BASE_CATEGORIES = ["전체", "신발", "의류", "잡화"];
+// 기록 탭: 결제완료 계열 주문만 매출/주문 집계
+const HISTORY_PAID_STATUSES = ["입금확인", "수동입금확인", "자동입금확인", "출고대기", "출고완료", "카드결제완료"];
 
 // --- pick helpers ---
 function pickString(row: ProductRow | null | undefined, keys: string[], fallback = "") {
@@ -223,7 +225,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         const { data: ord } = await supabase
           .from("orders")
           .select("broadcast_id, total_price")
-          .in("broadcast_id", ids);
+          .in("broadcast_id", ids)
+          .in("admin_order_status_v2", HISTORY_PAID_STATUSES);
         ((ord as Array<{ broadcast_id: unknown; total_price: unknown }>) || []).forEach((o) => {
           const bid = String(o.broadcast_id);
           const cur = stats.get(bid) || { sales: 0, count: 0 };
@@ -233,7 +236,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         });
       }
       // 쇼핑몰(broadcast_id NULL) 주문 집계 → __shop__ 키(전체 합계) + shopOrders(년/월 필터용)
-      const { data: shopOrd } = await supabase.from("orders").select("total_price, created_at").is("broadcast_id", null);
+      const { data: shopOrd } = await supabase
+        .from("orders")
+        .select("total_price, created_at")
+        .is("broadcast_id", null)
+        .in("admin_order_status_v2", HISTORY_PAID_STATUSES);
       const shopList = ((shopOrd as Array<{ total_price: unknown; created_at: unknown }>) || []).map((o) => ({
         total_price: Number(o.total_price || 0),
         created_at: String(o.created_at || ""),
@@ -334,6 +341,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     try {
       let q = supabase.from("orders").select("product_id, product_name, color, size, qty, product_price");
       q = entryId === "__shop__" ? q.is("broadcast_id", null) : q.eq("broadcast_id", entryId);
+      q = q.in("admin_order_status_v2", HISTORY_PAID_STATUSES);
       const { data: ord } = await q;
       const map = new Map<string, { key: string; name: string; productId: string; thumb: string; qty: number; price: number; sales: number; opts: Map<string, number> }>();
       ((ord as Array<Record<string, unknown>>) || []).forEach((o) => {
