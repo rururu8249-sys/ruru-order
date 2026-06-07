@@ -106,7 +106,7 @@ function SettingInput({
           min={min}
           max={max}
           inputMode={inputMode}
-          className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-lg font-black outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+          className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-lg font-black outline-none transition focus:border-rose-deep focus:ring-4 focus:ring-rose-soft"
         />
         <span className="text-sm font-black text-slate-500">{suffix}</span>
       </div>
