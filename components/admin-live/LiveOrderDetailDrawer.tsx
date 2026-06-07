@@ -492,33 +492,35 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 
 
   return (
-    <aside className="fixed bottom-5 right-5 top-[118px] z-40 flex w-[520px] max-w-[calc(100vw-24px)] flex-col rounded-3xl border border-slate-200 bg-white shadow-2xl">
-      <header className="shrink-0 border-b border-slate-100 px-4 py-3">
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="text-[10px] font-black tracking-[0.18em] text-rose-deep">ORDER DETAIL</div>
-            <h2 className="mt-0.5 text-lg font-black tracking-[-0.04em] text-slate-950">주문 상세</h2>
-          </div>
-
-          <button
-            type="button"
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              onClose?.();
-            }}
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 hover:bg-slate-50"
-            aria-label="주문상세 닫기"
-          >
-            닫기
-          </button>
-        </div>
+    <aside className="flex h-full min-h-0 w-full flex-col bg-white">
+      {/* 목업 B panel-header */}
+      <header className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3">
+        <span className="text-[15px] font-black text-slate-950">주문 상세</span>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onClose?.();
+          }}
+          className="text-2xl leading-none text-slate-400 transition hover:text-slate-700"
+          aria-label="주문상세 닫기"
+        >
+          ×
+        </button>
       </header>
 
+      {/* 목업 B panel-body */}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        <section className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-          <div className="flex items-center justify-between">
-            <div className="text-[11px] font-black text-slate-400">배송주소 · 고객정보</div>
+        {/* 주문번호 · 날짜 */}
+        <div className="mb-2.5 text-[11px] font-bold text-slate-400">
+          {order.orderNo || "주문번호 없음"} · {formatFullDateTime(order.createdAt, orderForView.submittedAt)}
+        </div>
+
+        {/* 배송주소 rose박스 + 고객정보 편집(기존 핸들러 유지) */}
+        <section className="mb-3">
+          <div className="mb-1 flex items-center justify-between">
+            <div className="text-[11px] font-black text-slate-400">배송주소</div>
             {!isCanceled ? (
               editingCustomer ? (
                 <button type="button" onClick={() => setEditingCustomer(false)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-black text-slate-500">취소</button>
@@ -529,7 +531,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           </div>
 
           {editingCustomer ? (
-            <div className="mt-2 grid gap-2">
+            <div className="grid gap-2">
               <div className="grid grid-cols-2 gap-2">
                 <label className="grid gap-1 text-[10px] font-black text-slate-400">이름
                   <input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] font-bold text-slate-900 outline-none focus:border-rose-deep" />
@@ -555,40 +557,75 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               <div className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-[10px] font-bold leading-4 text-amber-700">상품명·옵션·금액은 아래 상품 카드에서 수정합니다. 여기선 고객·주소·메모만 저장됩니다(배송비/합계 미변경).</div>
             </div>
           ) : (
-            <div className="mt-1 whitespace-pre-wrap break-keep rounded-lg bg-rose-soft px-3 py-2 text-sm font-bold leading-5 text-rose-deep">
+            <div className="whitespace-pre-wrap break-keep rounded-lg bg-rose-soft px-3 py-2 text-[12px] font-bold leading-5 text-rose-deep">
               {customerAddressText || "주소 정보 없음"}
             </div>
           )}
         </section>
-        <section className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-          <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-            <Info label="닉네임" value={orderForView.nickname || "-"} strong />
-            <Info label="이름" value={order.name || "-"} />
-            <Info label="연락처" value={orderForView.phone || "-"} />
-            <Info label="주문번호" value={order.orderNo || "-"} />
-            <Info label="제출시간" value={formatFullDateTime(order.createdAt, orderForView.submittedAt)} />
-            <Info label="입금시간" value={formatFullDateTime(orderForView.paidAtFull, orderForView.paidAt || "-")} />
-            <Info label="결제방법" value={orderForView.paymentMethod || "-"} />
+
+        {/* 고객정보 그리드 (목업 B: 닉네임/이름/연락처/결제방법) */}
+        <div className="mb-3 grid grid-cols-2 gap-x-3 gap-y-2.5">
+          <Info label="닉네임" value={orderForView.nickname || "-"} strong />
+          <Info label="이름" value={order.name || "-"} />
+          <Info label="연락처" value={orderForView.phone || "-"} />
+          <Info label="결제방법" value={orderForView.paymentMethod || "-"} />
+        </div>
+
+        {/* 상태 배지 + 안내 (기존 로직) */}
+        <div className={`rounded-xl border px-3 py-2 text-xs font-black ${getPaymentStatusClass(orderForView)}`}>
+          {getPaymentStatusLabel(orderForView)}
+          {orderForView.paidAt ? <span className="ml-2 font-bold opacity-70">{orderForView.paidAt}</span> : null}
+        </div>
+
+        {["manual_paid", "auto_paid", "paid"].includes(orderForView.paymentStatus) ? (
+          <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-bold leading-4 text-slate-500">
+            입금확인 주문입니다. 입금확인을 잘못 처리한 경우에는 [입금확인 취소]를 사용하세요. 주문 자체를 없애야 하는 경우에만 [주문서 자체 취소]를 사용하세요.
           </div>
+        ) : null}
 
-          <div className={`mt-3 rounded-xl border px-3 py-2 text-xs font-black ${getPaymentStatusClass(orderForView)}`}>
-            {getPaymentStatusLabel(orderForView)}
+        {paymentCancelError ? (
+          <div className="mt-2 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-[11px] font-black leading-4 text-red-700">
+            입금확인 취소 오류: {paymentCancelError}
           </div>
+        ) : null}
 
-          {["manual_paid", "auto_paid", "paid"].includes(orderForView.paymentStatus) ? (
-            <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-bold leading-4 text-slate-500">
-              입금확인 주문입니다. 입금확인을 잘못 처리한 경우에는 [입금확인 취소]를 사용하세요. 주문 자체를 없애야 하는 경우에만 [주문서 자체 취소]를 사용하세요.
-            </div>
-          ) : null}
-
-          {paymentCancelError ? (
-            <div className="mt-2 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-[11px] font-black leading-4 text-red-700">
-              입금확인 취소 오류: {paymentCancelError}
-            </div>
-          ) : null}
+        {/* 주문 내역 (목업 B) */}
+        <section className="mt-3">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-[11px] font-black text-slate-400">주문 내역 ({items.length}건)</h3>
+            {refreshingDetail ? (
+              <span className="rounded-full bg-rose-soft px-2 py-1 text-[10px] font-black text-rose-deep">상세정보 갱신중...</span>
+            ) : null}
+          </div>
+          <div className="max-h-[240px] space-y-2 overflow-y-auto pr-1">
+            {items.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 p-4 text-center text-xs font-bold text-slate-400">주문 품목이 없습니다.</div>
+            ) : (
+              items.map((item, index) => (
+                <LiveOrderItemEditCard key={`${item.id}-${index}`} item={item} index={index} disabled={isCanceled} onAfterSave={handleItemSaved} />
+              ))
+            )}
+          </div>
         </section>
 
-        <div className="mt-3 grid grid-cols-1 gap-2">
+        {/* 금액 요약 (목업 B) */}
+        <div className="mt-3 border-t border-slate-100 pt-2">
+          <div className="flex items-center justify-between py-1 text-[12px]"><span className="text-slate-500">상품금액</span><span className="font-black text-slate-900">{money(productAmount)}</span></div>
+          <div className="flex items-center justify-between py-1 text-[12px]"><span className="text-slate-500">배송비</span><span className="font-black text-slate-900">{money(shippingFee)}</span></div>
+          {isCardPaymentDisplay && cardPaymentExtraAmount > 0 ? (
+            <div className="flex items-center justify-between py-1 text-[12px]"><span className="text-slate-500">카드추가금</span><span className="font-black text-slate-900">{money(cardPaymentExtraAmount)}</span></div>
+          ) : null}
+          {pointUsedAmount > 0 ? (
+            <div className="flex items-center justify-between py-1 text-[12px]"><span className="text-slate-500">포인트 사용</span><span className="font-black text-rose-deep">-{money(pointUsedAmount)}</span></div>
+          ) : null}
+          <div className="mt-1 flex items-center justify-between border-t border-slate-100 pt-2 text-[14px] font-black">
+            <span className="text-slate-900">{pointUsedAmount > 0 ? "최종 결제금액" : "총 결제금액"}</span>
+            <span className="text-rose-deep">{money(pointUsedAmount > 0 ? finalPaymentAmount : cardPaymentExpectedTotal)}</span>
+          </div>
+        </div>
+
+        {/* 액션 버튼 (목업 B action-btns: 수동입금확인 green / 입금매칭 rose / 취소 red) — 기존 조건/핸들러 그대로 */}
+        <div className="mt-4 grid grid-cols-1 gap-2 border-t border-slate-100 pt-3">
           {!isCanceled && canCancelPaymentConfirm ? (
             <button
               type="button"
@@ -695,58 +732,8 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         </div>
 
         <section className="mt-3">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-black text-slate-950">주문내역 ({items.length}건)</h3>
-            {refreshingDetail ? (
-              <span className="rounded-full bg-rose-soft px-2 py-1 text-[11px] font-black text-rose-deep">
-                상세정보 갱신중...
-              </span>
-            ) : null}
-            <span className="text-xs font-black text-slate-400">수량 / 금액</span>
-          </div>
-
-          <div className="max-h-[240px] space-y-2 overflow-y-auto pr-1">
-            {items.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 p-4 text-center text-xs font-bold text-slate-400">
-                주문 품목이 없습니다.
-              </div>
-            ) : (
-              items.map((item, index) => (
-                <LiveOrderItemEditCard
-                  key={`${item.id}-${index}`}
-                  item={item}
-                  index={index}
-                  disabled={isCanceled}
-                  onAfterSave={handleItemSaved}
-                />
-              ))
-            )}
-          </div>
-        </section>
-
-        <section className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
-          <PriceRow label="상품금액" value={productAmount} />
-          <PriceRow label="배송비" value={shippingFee} />
-          {isCardPaymentDisplay && cardPaymentExtraAmount > 0 ? (
-            <PriceRow label="카드추가금" value={cardPaymentExtraAmount} />
-          ) : null}
-          {pointUsedAmount > 0 ? (
-            <PriceRow label="포인트 사용" value={-pointUsedAmount} />
-          ) : null}
-          <div className="my-2 h-px bg-slate-100" />
-          <div className="flex items-center justify-between">
-            <span className="text-[13px] font-black text-slate-600">
-              {pointUsedAmount > 0 ? "최종 결제금액" : "총 결제예정금액"}
-            </span>
-            <span className="text-2xl font-black tracking-[-0.05em] text-rose-deep">
-              {money(pointUsedAmount > 0 ? finalPaymentAmount : cardPaymentExpectedTotal)}
-            </span>
-          </div>
-        </section>
-
-        <section className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
-          <h3 className="mb-2 text-sm font-black text-slate-950">배송메모 / 특이사항</h3>
-          <div className="min-h-[74px] rounded-2xl bg-slate-50 p-3 text-sm font-bold leading-6 text-slate-600">
+          <div className="mb-1 text-[11px] font-black text-slate-400">배송메모 / 특이사항</div>
+          <div className="min-h-[56px] rounded-lg bg-slate-50 p-3 text-[12px] font-bold leading-6 text-slate-600">
             {customerDeliveryMemoText || "입력 없음"}
           </div>
         </section>

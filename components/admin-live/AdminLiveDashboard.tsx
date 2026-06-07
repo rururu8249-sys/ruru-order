@@ -1209,8 +1209,9 @@ export default function AdminLiveDashboard() {
               </button>
             </div>
 
-            <section className="mt-2 grid grid-cols-12 gap-3">
-              <div className="col-span-12">
+            {/* 목업 B 2-col: 왼쪽 주문 테이블 / 오른쪽 380px 주문상세 사이드 패널(닉네임 클릭 시 슬라이드인) */}
+            <section className="mt-2 flex items-start gap-3">
+              <div className="min-w-0 flex-1">
                 <LiveOrderTable
                   orders={filteredOrders}
                   allOrderCount={orders.length}
@@ -1231,7 +1232,22 @@ export default function AdminLiveDashboard() {
                   onMatched={refreshAfterManualMatch}
                 />
               </div>
+
+              {selectedOrder && orderDetailOpen ? (
+                <div
+                  className="sticky top-2 block h-[calc(100vh-110px)] w-[380px] shrink-0 self-start overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
+                  style={{ animation: "ruruSidePanelIn 0.22s ease" }}
+                >
+                  <LiveOrderDetailDrawer
+                    order={selectedOrder}
+                    onOpenManualMatch={openManualMatchForOrder}
+                    onClose={closeOrderDetail}
+                    onAfterStatusChange={loadOrders}
+                  />
+                </div>
+              ) : null}
             </section>
+            <style>{`@keyframes ruruSidePanelIn { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }`}</style>
           </div>
 
           {/* 주문관리 팝업 */}
@@ -1350,14 +1366,7 @@ export default function AdminLiveDashboard() {
             <AdminLiveMenuPlaceholder menuKey={activeMenu} />
           )}
 
-          {selectedOrder && orderDetailOpen ? (
-            <LiveOrderDetailDrawer
-              order={selectedOrder}
-              onOpenManualMatch={openManualMatchForOrder}
-              onClose={closeOrderDetail}
-              onAfterStatusChange={loadOrders}
-            />
-          ) : null}
+          {/* 주문상세는 위 2-col 사이드 패널로 이동(목업 B). 기존 fixed 렌더 제거. */}
 
           <ManualPaymentMatchDrawer
             group={manualMatchGroup}

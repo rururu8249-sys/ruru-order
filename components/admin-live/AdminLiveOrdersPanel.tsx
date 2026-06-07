@@ -109,7 +109,9 @@ export default function AdminLiveOrdersPanel({
       </div>
 
       {orderDetailOpen && selectedOrder ? (
-        <LiveOrderDetailDrawer order={selectedOrder} onClose={onCloseOrderDetail} onAfterStatusChange={onRefresh} />
+        <div className="h-[70vh] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <LiveOrderDetailDrawer order={selectedOrder} onClose={onCloseOrderDetail} onAfterStatusChange={onRefresh} />
+        </div>
       ) : null}
     </section>
   );
