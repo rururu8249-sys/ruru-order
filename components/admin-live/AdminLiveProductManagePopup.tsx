@@ -135,7 +135,6 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [tab, setTab] = useState<"products" | "history">("products");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("전체");
-  const [extraCategories, setExtraCategories] = useState<string[]>([]);
   const [visibleCount, setVisibleCount] = useState(PAGE_STEP);
   const [lightbox, setLightbox] = useState("");
   const [copied, setCopied] = useState(false);
@@ -209,16 +208,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     return () => io.disconnect();
   }, [tab, filtered.length, visibleCount]);
 
-  const categories = useMemo(() => {
-    const found = new Set<string>();
-    products.forEach((p) => {
-      const c = productCategory(p);
-      if (c) found.add(c);
-    });
-    const dataExtras = [...found].filter((c) => !BASE_CATEGORIES.includes(c));
-    const manualExtras = extraCategories.filter((c) => !BASE_CATEGORIES.includes(c) && !dataExtras.includes(c));
-    return [...BASE_CATEGORIES, ...dataExtras, ...manualExtras];
-  }, [products, extraCategories]);
+  const categories = BASE_CATEGORIES;
 
   // --- 위젯 단건 액션 (기존 addToRotation / pinSelected 로직 재사용) ---
   const widgetState = (p: ProductRow): "rotating" | "pinned" | "none" => {
@@ -342,14 +332,6 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     showAdminToast("위젯 설정은 준비 중입니다.", "info");
   };
 
-  const onAddCategory = () => {
-    const c = window.prompt("필터할 카테고리 이름을 입력해주세요");
-    const name = (c || "").trim();
-    if (!name) return;
-    setExtraCategories((prev) => Array.from(new Set([...prev, name])));
-    setCategory(name);
-  };
-
   if (typeof document === "undefined") return null;
 
   const chipBase: React.CSSProperties = { padding: "5px 12px", borderRadius: "16px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid #D9C5CC" };
@@ -412,7 +394,6 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   {c}
                 </button>
               ))}
-              <button type="button" onClick={onAddCategory} style={{ ...chipBase, background: "#fff", color: "#999", borderStyle: "dashed" }}>+ 추가</button>
             </div>
 
             {/* 상품 목록 (무한스크롤) */}
