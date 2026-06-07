@@ -505,7 +505,8 @@ export default function QuickProductFastForm({
   initialProduct = null,
   onClose,
 }: QuickProductFastFormProps) {
-  const [productType, setProductType] = useState<"broadcast" | "group_buy">("broadcast");
+  const [saleMode, setSaleMode] = useState<"broadcast" | "shop" | "both">("both");
+  const [category, setCategory] = useState("");
   const [productName, setProductName] = useState("");
   const [priceText, setPriceText] = useState("");
   const [stockManagementEnabled, setStockManagementEnabled] = useState(false);
@@ -596,13 +597,18 @@ export default function QuickProductFastForm({
     setNameSuggestionEnabled(productNote?.name_suggestion_enabled !== false);
     setSuggestionKeywordsText(Array.isArray(productNote?.suggestion_keywords) ? productNote.suggestion_keywords.join(", ") : "");
 
-    setProductType(
-      pickString(initialProduct, ["product_type", "type"], "broadcast") === "group_buy"
-        ? "group_buy"
-        : "broadcast",
+    const initSaleMode = pickString(initialProduct, ["sale_mode"], "");
+    const initType = pickString(initialProduct, ["product_type", "type"], "broadcast");
+    setSaleMode(
+      initSaleMode === "broadcast" || initSaleMode === "shop" || initSaleMode === "both"
+        ? initSaleMode
+        : initType === "group_buy"
+          ? "shop"
+          : "broadcast",
     );
+    setCategory(String((productNote as { category?: unknown } | null)?.category || ""));
     setProductName(pickString(initialProduct, ["product_name", "name", "title"], ""));
-    setPriceText(String(pickNumber(initialProduct, ["price", "sale_price", "selling_price"], 0)));
+    setPriceText(formatNumberWithComma(pickNumber(initialProduct, ["price", "sale_price", "selling_price"], 0)));
     setShippingType(pickString(initialProduct, ["shipping_type", "delivery_type"], "normal"));
     setIsVisible(pickBoolean(initialProduct, ["is_visible", "visible"], true));
     setIsPinned(pickBoolean(initialProduct, ["is_pinned", "pinned"], false));
@@ -726,7 +732,8 @@ export default function QuickProductFastForm({
   };
 
   const resetForm = () => {
-    setProductType("broadcast");
+    setSaleMode("both");
+    setCategory("");
     setProductName("");
     setPriceText("");
     setShippingType("normal");
@@ -753,6 +760,8 @@ export default function QuickProductFastForm({
 
     const name = productName.trim();
     const price = moneyNumber(priceText);
+    // sale_mode → product_type 자동파생 (broadcast → 방송상품 / shop·both → 상시판매)
+    const productType: "broadcast" | "group_buy" = saleMode === "broadcast" ? "broadcast" : "group_buy";
 
     if (!name) {
       showAdminToast("상품명을 입력해주세요.", "error");
@@ -788,6 +797,7 @@ export default function QuickProductFastForm({
           .split(",")
           .map((keyword) => keyword.trim())
           .filter(Boolean),
+        category: category.trim(),
       });
 
       const payload: Record<string, unknown> = {
@@ -796,6 +806,7 @@ export default function QuickProductFastForm({
         stock: totalStock,
         status: isVisible ? "판매중" : "숨김",
         product_type: productType,
+        sale_mode: saleMode,
         shipping_type: shippingType,
         combine_shipping: shippingType === "vendor" ? "N" : "Y",
         sort_order: 0,
@@ -889,25 +900,57 @@ export default function QuickProductFastForm({
             </div>
             <div>
               <label className="fl">가격 (비우면 손님 직접입력)</label>
-              <input className="ipt" style={{ width: "100%" }} placeholder="59000" value={priceText} onChange={(e) => setPriceText(e.target.value)} />
+              <input className="ipt" style={{ width: "100%" }} placeholder="59,000" inputMode="numeric" value={priceText} onChange={(e) => setPriceText(formatNumberWithComma(e.target.value))} />
             </div>
-            <div style={{ display: "flex", gap: "8px" }}>
-              <div style={{ flex: 1 }}>
-                <label className="fl">배송 구분</label>
-                <select className="ipt" style={{ width: "100%" }} value={shippingType} onChange={(e) => setShippingType(e.target.value)}>
-                  <option value="normal">일반배송</option>
-                  <option value="vendor">업체배송1</option>
-                  <option value="vendor2">업체배송2</option>
-                </select>
-              </div>
-              <div style={{ width: "108px" }}>
-                <label className="fl">상품 종류</label>
-                <select className="ipt" style={{ width: "100%" }} value={productType} onChange={(e) => setProductType(e.target.value as "broadcast" | "group_buy")}>
-                  <option value="broadcast">방송상품</option>
-                  <option value="group_buy">상시판매</option>
-                </select>
-              </div>
+            <div>
+              <label className="fl">배송 구분</label>
+              <select className="ipt" style={{ width: "100%" }} value={shippingType} onChange={(e) => setShippingType(e.target.value)}>
+                <option value="normal">일반배송</option>
+                <option value="vendor">업체배송1</option>
+                <option value="vendor2">업체배송2</option>
+              </select>
             </div>
+          </div>
+        </div>
+
+        {/* 판매 모드 (sale_mode) — 시안 '상품 종류'를 대체. product_type 자동파생 */}
+        <div style={{ marginBottom: "11px" }}>
+          <label className="fl">판매 모드</label>
+          <div style={{ display: "flex", gap: "6px" }}>
+            {([["broadcast", "방송에서만"], ["shop", "쇼핑몰에서만"], ["both", "방송+쇼핑몰"]] as const).map(([v, l]) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setSaleMode(v)}
+                style={{ flex: 1, height: "34px", borderRadius: "8px", fontSize: "11px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (saleMode === v ? "#7B2D43" : "#E8E2DD"), background: saleMode === v ? "#7B2D43" : "#fff", color: saleMode === v ? "#fff" : "#666" }}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 카테고리 → product_note.category (상품관리 칩 필터와 연동) */}
+        <div style={{ marginBottom: "11px" }}>
+          <label className="fl">카테고리</label>
+          <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+            {["신발", "의류", "잡화"].map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCategory((cur) => (cur === c ? "" : c))}
+                style={{ height: "32px", padding: "0 14px", borderRadius: "16px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (category === c ? "#D9C5CC" : "#E8E2DD"), background: category === c ? "#F5E6EB" : "#fff", color: category === c ? "#7B2D43" : "#888" }}
+              >
+                {c}
+              </button>
+            ))}
+            <input
+              className="ipt"
+              style={{ flex: 1, minWidth: "120px" }}
+              placeholder="직접 입력"
+              value={["신발", "의류", "잡화"].includes(category) ? "" : category}
+              onChange={(e) => setCategory(e.target.value)}
+            />
           </div>
         </div>
 
