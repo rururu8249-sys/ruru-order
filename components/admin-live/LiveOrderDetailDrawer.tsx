@@ -115,6 +115,16 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const [paymentCancelError, setPaymentCancelError] = useState("");
   const [manualConfirmAction, setManualConfirmAction] = useState(false);
 
+  // 고객/배송 정보 인라인 편집 (돈 무관 필드만: 이름/전화/우편·주소·상세주소/배송메모)
+  const [editingCustomer, setEditingCustomer] = useState(false);
+  const [savingCustomer, setSavingCustomer] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editZipcode, setEditZipcode] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editDetailAddress, setEditDetailAddress] = useState("");
+  const [editMemo, setEditMemo] = useState("");
+
   const [localOrder, setLocalOrder] = useState(order);
   const [refreshingDetail, setRefreshingDetail] = useState(false);
 
@@ -288,6 +298,90 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     }
   };
 
+  // 카카오(다음) 주소검색 — order/page.tsx와 동일 방식 재사용
+  const loadDaumPostcodeScript = () =>
+    new Promise<void>((resolve, reject) => {
+      if (typeof window === "undefined") return reject();
+      if ((window as any).daum?.Postcode) return resolve();
+      const existing = document.querySelector<HTMLScriptElement>("script[data-daum-postcode='true']");
+      if (existing) {
+        existing.addEventListener("load", () => resolve());
+        existing.addEventListener("error", reject);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
+      script.async = true;
+      script.dataset.daumPostcode = "true";
+      script.onload = () => resolve();
+      script.onerror = reject;
+      document.body.appendChild(script);
+    });
+
+  const openAddressSearch = async () => {
+    try {
+      await loadDaumPostcodeScript();
+      if (!(window as any).daum?.Postcode) {
+        showAdminToast("주소검색을 불러오지 못했습니다. 직접 입력해주세요.", "warning");
+        return;
+      }
+      new (window as any).daum.Postcode({
+        oncomplete: (data: any) => {
+          setEditAddress(data.roadAddress || data.jibunAddress || "");
+          setEditZipcode(data.zonecode || "");
+        },
+      }).open();
+    } catch {
+      showAdminToast("주소검색을 불러오지 못했습니다. 직접 입력해주세요.", "warning");
+    }
+  };
+
+  const startEditCustomer = () => {
+    const row = order as any;
+    setEditName(clean(row.name) || clean(row.customerName) || clean(row.customer_name));
+    setEditPhone(clean(orderForView.phone) || clean(row.phone) || clean(row.customer_phone));
+    setEditZipcode(clean(row.zipcode) || clean(row.zip_code));
+    setEditAddress(clean(row.address) || clean(row.customerAddress) || clean(row.shippingAddress));
+    setEditDetailAddress(clean(row.detailAddress) || clean(row.detail_address));
+    setEditMemo(clean(row.requestMemo) || clean(row.request_memo) || clean(row.deliveryMemo));
+    setEditingCustomer(true);
+  };
+
+  // 고객/배송 정보 저장: 돈/입금/포인트 컬럼은 건드리지 않고 고객·주소·메모만 orders UPDATE.
+  const handleSaveCustomerFields = async () => {
+    if (savingCustomer) return;
+    const rowIds = items.map((item) => Number(item.id)).filter((id) => Number.isFinite(id) && id > 0);
+    if (rowIds.length === 0) {
+      showAdminToast("저장할 주문 행을 찾지 못했습니다.", "warning");
+      return;
+    }
+    const phoneDigits = editPhone.replace(/[^0-9]/g, "");
+    setSavingCustomer(true);
+    try {
+      const { error } = await supabase
+        .from("orders")
+        .update({
+          customer_name: editName.trim(),
+          customer_phone: phoneDigits,
+          phone: phoneDigits,
+          zipcode: editZipcode.trim(),
+          address: editAddress.trim(),
+          detail_address: editDetailAddress.trim(),
+          request_memo: editMemo.trim(),
+        })
+        .in("id", rowIds);
+      if (error) {
+        showAdminToast("고객정보 저장 실패\n\n" + error.message, "error");
+        return;
+      }
+      showAdminToast("고객/배송 정보가 저장됐습니다.", "success");
+      setEditingCustomer(false);
+      await onAfterStatusChange?.();
+    } finally {
+      setSavingCustomer(false);
+    }
+  };
+
   // 입금대기 → 수동 입금확인: 기존 입금확인 로직(/api/admin-v2/manual-payment-confirm-without-deposit) 재사용. 새 로직 없음.
   const handleManualConfirm = async () => {
     if (manualConfirmAction) return;
@@ -422,11 +516,49 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        <section className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-          <div className="text-[11px] font-black text-slate-400">배송주소</div>
-          <div className="mt-1 whitespace-pre-wrap break-keep text-sm font-bold leading-5 text-slate-900">
-            {customerAddressText || "주소 정보 없음"}
+        <section className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+          <div className="flex items-center justify-between">
+            <div className="text-[11px] font-black text-slate-400">배송주소 · 고객정보</div>
+            {!isCanceled ? (
+              editingCustomer ? (
+                <button type="button" onClick={() => setEditingCustomer(false)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-black text-slate-500">취소</button>
+              ) : (
+                <button type="button" onClick={startEditCustomer} className="rounded-lg border border-rose-line bg-white px-2.5 py-1 text-[11px] font-black text-rose-deep hover:bg-rose-soft">✎ 편집</button>
+              )
+            ) : null}
           </div>
+
+          {editingCustomer ? (
+            <div className="mt-2 grid gap-2">
+              <div className="grid grid-cols-2 gap-2">
+                <label className="grid gap-1 text-[10px] font-black text-slate-400">이름
+                  <input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] font-bold text-slate-900 outline-none focus:border-rose-deep" />
+                </label>
+                <label className="grid gap-1 text-[10px] font-black text-slate-400">전화
+                  <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} inputMode="numeric" className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] font-bold text-slate-900 outline-none focus:border-rose-deep" />
+                </label>
+              </div>
+              <div className="grid gap-1 text-[10px] font-black text-slate-400">우편번호 · 주소
+                <div className="flex gap-2">
+                  <input value={editZipcode} onChange={(e) => setEditZipcode(e.target.value)} placeholder="우편번호" className="h-9 w-[96px] rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] font-bold text-slate-900 outline-none focus:border-rose-deep" />
+                  <button type="button" onClick={openAddressSearch} className="h-9 shrink-0 rounded-lg bg-rose-deep px-3 text-[12px] font-black text-white hover:bg-rose-deep">주소검색</button>
+                </div>
+                <input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} placeholder="기본주소" className="mt-1 h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] font-bold text-slate-900 outline-none focus:border-rose-deep" />
+                <input value={editDetailAddress} onChange={(e) => setEditDetailAddress(e.target.value)} placeholder="상세주소" className="mt-1 h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] font-bold text-slate-900 outline-none focus:border-rose-deep" />
+              </div>
+              <label className="grid gap-1 text-[10px] font-black text-slate-400">배송메모
+                <input value={editMemo} onChange={(e) => setEditMemo(e.target.value)} placeholder="배송 요청사항" className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] font-bold text-slate-900 outline-none focus:border-rose-deep" />
+              </label>
+              <button type="button" onClick={handleSaveCustomerFields} disabled={savingCustomer} className="mt-1 h-9 w-full rounded-lg bg-emerald-600 text-[13px] font-black text-white hover:bg-emerald-700 disabled:bg-slate-300">
+                {savingCustomer ? "저장중..." : "✔ 고객/배송 정보 저장"}
+              </button>
+              <div className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-[10px] font-bold leading-4 text-amber-700">상품명·옵션·금액은 아래 상품 카드에서 수정합니다. 여기선 고객·주소·메모만 저장됩니다(배송비/합계 미변경).</div>
+            </div>
+          ) : (
+            <div className="mt-1 whitespace-pre-wrap break-keep text-sm font-bold leading-5 text-slate-900">
+              {customerAddressText || "주소 정보 없음"}
+            </div>
+          )}
         </section>
         <section className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
           <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
