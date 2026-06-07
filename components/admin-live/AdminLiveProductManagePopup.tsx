@@ -139,6 +139,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [lightbox, setLightbox] = useState("");
   const [copied, setCopied] = useState(false);
   const [busyId, setBusyId] = useState("");
+  // 위젯 설정(일괄) 화면
+  const [widgetSettingsOpen, setWidgetSettingsOpen] = useState(false);
+  const [wsMode, setWsMode] = useState<"rotate" | "pin">("rotate");
+  const [wsSelected, setWsSelected] = useState<Set<string>>(new Set());
+  const [wsSaving, setWsSaving] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   // 상품 fetch (기존 loadProducts 재사용)
@@ -329,8 +334,80 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   };
 
   const openWidgetSettings = () => {
-    showAdminToast("위젯 설정은 준비 중입니다.", "info");
+    setWsSelected(new Set());
+    setWidgetSettingsOpen(true);
   };
+
+  // 일괄 전체선택/개별선택
+  const wsToggle = (id: string) => {
+    if (!id) return;
+    setWsSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const wsAllIds = useMemo(() => products.map(productId).filter(Boolean), [products]);
+  const wsAllChecked = wsAllIds.length > 0 && wsAllIds.every((id) => wsSelected.has(id));
+  const wsToggleAll = () => setWsSelected((prev) => (prev.size >= wsAllIds.length ? new Set() : new Set(wsAllIds)));
+
+  // 순환 일괄 담기 (기존 addToRotation 로직 재사용)
+  const wsAddToRotation = async () => {
+    const ids = [...wsSelected].filter(Boolean);
+    if (ids.length === 0) return;
+    if (!activeBroadcastId) {
+      showAdminToast("진행 중인 방송이 없습니다.\n\n방송을 먼저 시작한 뒤 순환에 담아주세요.", "warning");
+      return;
+    }
+    setWsSaving(true);
+    try {
+      await supabase.from("products").update({ is_pinned: false }).eq("is_pinned", true);
+      const { data: existing } = await supabase
+        .from("broadcast_products")
+        .select("product_id")
+        .eq("broadcast_id", activeBroadcastId);
+      const existingSet = new Set(((existing as { product_id: unknown }[]) || []).map((r) => String(r.product_id)));
+      const toInsert = ids
+        .filter((id) => !existingSet.has(String(id)))
+        .map((id) => ({ broadcast_id: activeBroadcastId, product_id: id, sort_order: 0 }));
+      if (toInsert.length > 0) {
+        const { error } = await supabase.from("broadcast_products").insert(toInsert);
+        if (error) throw error;
+      }
+      window.dispatchEvent(new Event("ruru-live-product-updated"));
+      const skipped = ids.length - toInsert.length;
+      showAdminToast(`방송 순환에 ${toInsert.length}개 담았어요.${skipped > 0 ? ` (이미 담긴 ${skipped}개 제외)` : ""}`, "success");
+      setWsSelected(new Set());
+      setWidgetSettingsOpen(false);
+    } catch (e) {
+      showAdminToast("순환 담기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally {
+      setWsSaving(false);
+    }
+  };
+
+  // 고정 일괄 (기존 pinSelected 로직 재사용)
+  const wsPinSelected = async () => {
+    const ids = [...wsSelected].filter(Boolean);
+    if (ids.length === 0) return;
+    setWsSaving(true);
+    try {
+      await supabase.from("products").update({ is_pinned: false }).eq("is_pinned", true);
+      const { error } = await supabase.from("products").update({ is_pinned: true }).in("id", ids);
+      if (error) throw error;
+      window.dispatchEvent(new Event("ruru-live-product-updated"));
+      showAdminToast(`${ids.length}개 상품을 고정(지금 띄움)했어요.`, "success");
+      setWsSelected(new Set());
+      setWidgetSettingsOpen(false);
+    } catch (e) {
+      showAdminToast("상품 고정 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally {
+      setWsSaving(false);
+    }
+  };
+
+  const wsConfirm = () => (wsMode === "pin" ? void wsPinSelected() : void wsAddToRotation());
 
   if (typeof document === "undefined") return null;
 
@@ -467,6 +544,75 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
           </>
         )}
       </div>
+
+      {/* 위젯 설정 (일괄 순환/고정) */}
+      {widgetSettingsOpen ? (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) setWidgetSettingsOpen(false); }}
+          style={{ position: "fixed", inset: 0, zIndex: 55, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(2,6,23,0.5)", padding: "16px" }}
+        >
+          <div style={{ width: "520px", maxWidth: "100%", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "14px", overflow: "hidden" }}>
+            {/* 헤더 */}
+            <div style={{ display: "flex", alignItems: "center", padding: "14px 18px", borderBottom: "1px solid #E8E2DD" }}>
+              <span style={{ fontSize: "15px", fontWeight: 800, color: "#7B2D43" }}>📺 위젯 설정</span>
+              <button type="button" onClick={() => setWidgetSettingsOpen(false)} style={{ marginLeft: "auto", border: "none", background: "none", fontSize: "20px", color: "#999", cursor: "pointer", lineHeight: 1 }}>✕</button>
+            </div>
+
+            {/* 순환 / 고정 모드 */}
+            <div style={{ display: "flex", gap: "6px", padding: "12px 18px 6px" }}>
+              <button type="button" onClick={() => setWsMode("rotate")} style={{ flex: 1, height: "36px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (wsMode === "rotate" ? "#7B2D43" : "#E8E2DD"), background: wsMode === "rotate" ? "#7B2D43" : "#fff", color: wsMode === "rotate" ? "#fff" : "#666" }}>🔁 순환모드</button>
+              <button type="button" onClick={() => setWsMode("pin")} style={{ flex: 1, height: "36px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (wsMode === "pin" ? "#7B2D43" : "#E8E2DD"), background: wsMode === "pin" ? "#7B2D43" : "#fff", color: wsMode === "pin" ? "#fff" : "#666" }}>📌 고정모드</button>
+            </div>
+            <div style={{ padding: "0 18px 8px", fontSize: "11px", color: "#999", fontWeight: 700 }}>
+              {wsMode === "rotate" ? "선택 상품을 방송 순환목록에 담습니다." : "선택 상품을 지금 띄운 상품으로 고정합니다."}
+            </div>
+
+            {/* 전체선택 */}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 18px", borderTop: "1px solid #F0EDEA", borderBottom: "1px solid #F0EDEA" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: 800, color: "#555", cursor: "pointer" }}>
+                <input type="checkbox" checked={wsAllChecked} onChange={wsToggleAll} />
+                전체선택
+              </label>
+              <span style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#7B2D43" }}>✓ {wsSelected.size}개 선택</span>
+            </div>
+
+            {/* 상품 목록(개별선택) */}
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "8px 18px" }}>
+              {products.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "30px 0", color: "#999", fontSize: "13px", fontWeight: 700 }}>상품이 없습니다.</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                  {products.map((p) => {
+                    const id = productId(p);
+                    const img = mainImage(p);
+                    const checked = wsSelected.has(id);
+                    return (
+                      <label key={id || productName(p)} style={{ display: "flex", gap: "9px", alignItems: "center", border: "1px solid " + (checked ? "#D9C5CC" : "#E8E2DD"), background: checked ? "#F5E6EB" : "#fff", borderRadius: "9px", padding: "7px 10px", cursor: "pointer" }}>
+                        <input type="checkbox" checked={checked} onChange={() => wsToggle(id)} />
+                        <span style={{ width: "34px", height: "34px", flexShrink: 0, borderRadius: "7px", overflow: "hidden", background: "#F5F2EF", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "16px" }}>🖼</span>}
+                        </span>
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: "block", fontSize: "12px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</span>
+                          <span style={{ fontSize: "11px", color: "#888" }}>{money(productPrice(p))}</span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 푸터 */}
+            <div style={{ display: "flex", gap: "6px", padding: "12px 18px", borderTop: "1px solid #E8E2DD" }}>
+              <button type="button" onClick={() => setWidgetSettingsOpen(false)} style={{ height: "38px", padding: "0 16px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid #E8E2DD", background: "#fff", color: "#666" }}>취소</button>
+              <button type="button" disabled={wsSaving || wsSelected.size === 0} onClick={wsConfirm} style={{ flex: 1, height: "38px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: wsSaving || wsSelected.size === 0 ? "default" : "pointer", border: "none", background: wsSaving || wsSelected.size === 0 ? "#D9C5CC" : "#7B2D43", color: "#fff" }}>
+                {wsSaving ? "처리중…" : wsMode === "rotate" ? `선택 ${wsSelected.size}개 순환 담기` : `선택 ${wsSelected.size}개 고정`}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* 사진 확대 lightbox */}
       {lightbox ? (

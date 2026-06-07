@@ -895,6 +895,10 @@ export default function QuickProductFastForm({
     setNewCategoryText("");
     setAddingCategory(false);
   };
+  const removeCustomCategory = (c: string) => {
+    setCustomCategories((prev) => prev.filter((x) => x !== c));
+    setCategory((cur) => (cur === c ? "" : cur));
+  };
 
   return (
     <div
@@ -957,16 +961,34 @@ export default function QuickProductFastForm({
         <div style={{ marginBottom: "11px" }}>
           <label className="fl">카테고리</label>
           <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
-            {categoryChips.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setCategory((cur) => (cur === c ? "" : c))}
-                style={{ height: "32px", padding: "0 14px", borderRadius: "16px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (category === c ? "#D9C5CC" : "#E8E2DD"), background: category === c ? "#F5E6EB" : "#fff", color: category === c ? "#7B2D43" : "#888" }}
-              >
-                {c}
-              </button>
-            ))}
+            {categoryChips.map((c) => {
+              const selected = category === c;
+              const isCustom = !PRESET_CATEGORIES.includes(c);
+              return (
+                <span
+                  key={c}
+                  style={{ display: "inline-flex", alignItems: "center", height: "32px", borderRadius: "16px", overflow: "hidden", border: "1px solid " + (selected ? "#D9C5CC" : "#E8E2DD"), background: selected ? "#F5E6EB" : "#fff" }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setCategory((cur) => (cur === c ? "" : c))}
+                    style={{ height: "100%", padding: isCustom ? "0 4px 0 14px" : "0 14px", border: "none", background: "transparent", fontSize: "12px", fontWeight: 800, cursor: "pointer", color: selected ? "#7B2D43" : "#888" }}
+                  >
+                    {c}
+                  </button>
+                  {isCustom ? (
+                    <button
+                      type="button"
+                      aria-label={`${c} 삭제`}
+                      onClick={() => removeCustomCategory(c)}
+                      style={{ height: "100%", padding: "0 9px 0 2px", border: "none", background: "transparent", fontSize: "13px", fontWeight: 800, cursor: "pointer", color: selected ? "#7B2D43" : "#bbb" }}
+                    >
+                      ×
+                    </button>
+                  ) : null}
+                </span>
+              );
+            })}
             {addingCategory ? (
               <span style={{ display: "flex", gap: "4px", alignItems: "center" }}>
                 <input
