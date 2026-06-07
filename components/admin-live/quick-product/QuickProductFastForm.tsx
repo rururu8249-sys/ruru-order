@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, DragEvent, type MouseEvent as ReactMouseEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, type CSSProperties, DragEvent, type MouseEvent as ReactMouseEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import { resolveProductImageUrl } from "./productImageUrl";
@@ -914,257 +914,278 @@ export default function QuickProductFastForm({
     setCategory((cur) => (cur === c ? "" : cur));
   };
 
+  // === ruru-product-form-mockup.html 스타일 1:1 ===
+  const sectionLabel: CSSProperties = { fontSize: "12px", fontWeight: 500, color: "#888780", marginBottom: "6px" };
+  const fieldLabel: CSSProperties = { display: "block", fontSize: "12px", color: "#888780", fontWeight: 500, marginBottom: "3px" };
+  const fieldInput: CSSProperties = { width: "100%", fontSize: "13px", padding: "9px 11px", border: "1px solid #E8E2DD", borderRadius: "7px", background: "#fff", color: "#1a1a1a", outline: "none" };
+  const optRow: CSSProperties = { display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" };
+  const optLabel: CSSProperties = { fontSize: "13px", color: "#1a1a1a", minWidth: "36px" };
+  const optInput: CSSProperties = { flex: 1, fontSize: "13px", padding: "6px 10px", border: "1px solid #E8E2DD", borderRadius: "6px", background: "#fff", outline: "none" };
+  const togglePill = (kind: "on-select" | "on-input" | "off"): CSSProperties => ({
+    padding: "3px 8px",
+    borderRadius: "20px",
+    fontSize: "11px",
+    fontWeight: 500,
+    cursor: "pointer",
+    border: "none",
+    ...(kind === "on-select"
+      ? { background: "#E8F5F0", color: "#0F6E56" }
+      : kind === "on-input"
+        ? { background: "#E8F0FA", color: "#185FA5" }
+        : { background: "#F1EFEC", color: "#888780" }),
+  });
+  const presetTag = (sel: boolean): CSSProperties => ({ padding: "4px 9px", borderRadius: "6px", fontSize: "11px", background: sel ? "#7B2D43" : "#FBF1E0", color: sel ? "#fff" : "#854F0B", cursor: "pointer", border: "none" });
+  const toggleRow: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderTop: "1px solid #E8E2DD" };
+  const tgStyle = (on: boolean): CSSProperties => ({ width: "40px", height: "22px", borderRadius: "11px", background: on ? "#0F6E56" : "#E8E2DD", position: "relative", cursor: "pointer", flexShrink: 0 });
+  const tgKnob = (on: boolean): CSSProperties => ({ position: "absolute", width: "18px", height: "18px", background: "#fff", borderRadius: "50%", top: "2px", ...(on ? { right: "2px" } : { left: "2px" }) });
+
   return (
     <div
       className="ruru-product-sian"
-      style={{ position: "fixed", inset: 0, zIndex: 90, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0)", padding: "16px" }}
+      style={{ position: "fixed", inset: 0, zIndex: 90, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", padding: "16px" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
     >
-      <div style={{ width: "560px", flexShrink: 0, maxHeight: "calc(100vh - 32px)", overflowY: "auto", background: "#fff", borderRadius: "12px", padding: "17px", boxShadow: "0 18px 60px rgba(0,0,0,0.35)", transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}>
+      {/* .modal */}
+      <div style={{ width: "560px", maxWidth: "100%", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "12px", boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden", transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}>
 
-        <div className="mh" onMouseDown={onHeaderMouseDown} style={{ cursor: "move", userSelect: "none" }}>
-          <span className="mt">＋ {isEditMode ? "상품 수정" : "새 상품 등록"}</span>
-          <button type="button" className="x" onClick={() => onClose?.()}>✕</button>
+        {/* .modal-hd */}
+        <div onMouseDown={onHeaderMouseDown} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: "1px solid #E8E2DD", background: "#F7F5F3", cursor: "grab", userSelect: "none" }}>
+          <h2 style={{ fontSize: "15px", fontWeight: 500, color: "#1a1a1a", margin: 0 }}>{isEditMode ? "✎ 상품 수정" : "+ 새 상품 등록"}</h2>
+          <span onClick={() => onClose?.()} style={{ fontSize: "20px", color: "#888780", cursor: "pointer", lineHeight: 1 }}>×</span>
         </div>
 
-        {/* 사진(120) + 필드(상품명/가격/배송) 나란히 — 시안 1:1 */}
-        <div style={{ display: "flex", gap: "12px", marginBottom: "13px" }}>
-          <div style={{ width: "120px", flexShrink: 0 }}>
-            <ImagePicker label="대표사진" value={coverImages} maxFiles={1} uploadKind="cover" mode="cover" onChange={setCoverImages} triggerRef={coverUploadRef} />
-            <button type="button" className="btn" style={{ width: "100%", marginTop: "6px", fontSize: "10px" }} onClick={() => void captureBroadcastScreen()}>📷 방송화면 캡처</button>
-            <button type="button" className="btn" style={{ width: "100%", marginTop: "4px", fontSize: "10px" }} onClick={() => coverUploadRef.current?.()}>⬆ 사진 직접 올림</button>
-          </div>
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px", minWidth: 0 }}>
-            <div>
-              <label className="fl">상품명 <span style={{ color: "var(--rose)" }}>*</span></label>
-              <input className="ipt" style={{ width: "100%" }} placeholder="예: 스웨이드 로퍼" value={productName} onChange={(e) => setProductName(e.target.value)} />
-            </div>
-            <div>
-              <label className="fl">가격 (비우면 손님 직접입력)</label>
-              <input className="ipt" style={{ width: "100%" }} placeholder="59,000" inputMode="numeric" value={priceText} onChange={(e) => setPriceText(formatNumberWithComma(e.target.value))} />
-            </div>
-            <div>
-              <label className="fl">배송</label>
-              <select className="ipt" style={{ width: "100%" }} value={shippingType} onChange={(e) => setShippingType(e.target.value)}>
-                <option value="normal">일반배송</option>
-                <option value="vendor">업체배송1</option>
-                <option value="vendor2">업체배송2</option>
-              </select>
-            </div>
-          </div>
-        </div>
+        {/* .modal-body */}
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 18px" }}>
 
-        {/* 3. 카테고리 → product_note.category (상품관리 칩 필터와 연동) */}
-        <div style={{ marginBottom: "11px" }}>
-          <label className="fl">카테고리</label>
-          <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
-            {categoryChips.map((c) => {
-              const selected = category === c;
-              const isCustom = !PRESET_CATEGORIES.includes(c);
-              return (
-                <span
-                  key={c}
-                  style={{ display: "inline-flex", alignItems: "center", height: "32px", borderRadius: "16px", overflow: "hidden", border: "1px solid " + (selected ? "#D9C5CC" : "#E8E2DD"), background: selected ? "#F5E6EB" : "#fff" }}
-                >
-                  <button
-                    type="button"
+          {/* .top-row : 사진(120) + 필드 */}
+          <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: "14px", marginBottom: "14px" }}>
+            <div style={{ width: "120px" }}>
+              <ImagePicker label="" value={coverImages} maxFiles={1} uploadKind="cover" mode="cover" onChange={setCoverImages} triggerRef={coverUploadRef} />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div>
+                <label style={fieldLabel}>상품명 <span style={{ color: "#7B2D43", marginLeft: "2px" }}>*</span></label>
+                <input style={fieldInput} type="text" placeholder="예: 스웨이드 로퍼" value={productName} onChange={(e) => setProductName(e.target.value)} />
+              </div>
+              <div>
+                <label style={fieldLabel}>가격 <span style={{ fontSize: "11px", fontWeight: 400, color: "#888780" }}>(비우면 손님 직접입력)</span></label>
+                <input style={fieldInput} type="text" inputMode="numeric" placeholder="59,000" value={priceText} onChange={(e) => setPriceText(formatNumberWithComma(e.target.value))} />
+              </div>
+              <div>
+                <label style={fieldLabel}>배송</label>
+                <select style={fieldInput} value={shippingType} onChange={(e) => setShippingType(e.target.value)}>
+                  <option value="normal">일반배송 (기본)</option>
+                  <option value="vendor">업체배송 1</option>
+                  <option value="vendor2">업체배송 2</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* 카테고리 */}
+          <div style={{ marginBottom: "14px" }}>
+            <div style={sectionLabel}>카테고리</div>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+              {categoryChips.map((c) => {
+                const on = category === c;
+                const isCustom = !PRESET_CATEGORIES.includes(c);
+                return (
+                  <div
+                    key={c}
                     onClick={() => setCategory((cur) => (cur === c ? "" : c))}
-                    style={{ height: "100%", padding: isCustom ? "0 4px 0 14px" : "0 14px", border: "none", background: "transparent", fontSize: "12px", fontWeight: 800, cursor: "pointer", color: selected ? "#7B2D43" : "#888" }}
+                    style={{ padding: "6px 13px", borderRadius: "20px", border: "1px solid " + (on ? "#D9C5CC" : "#E8E2DD"), fontSize: "12px", cursor: "pointer", color: on ? "#7B2D43" : "#888780", background: on ? "#F5E6EB" : "#fff", fontWeight: on ? 500 : 400, display: "flex", alignItems: "center", gap: "4px" }}
                   >
                     {c}
-                  </button>
-                  {isCustom ? (
-                    <button
-                      type="button"
-                      aria-label={`${c} 삭제`}
-                      onClick={() => removeCustomCategory(c)}
-                      style={{ height: "100%", padding: "0 9px 0 2px", border: "none", background: "transparent", fontSize: "13px", fontWeight: 800, cursor: "pointer", color: selected ? "#7B2D43" : "#bbb" }}
-                    >
-                      ×
-                    </button>
-                  ) : null}
-                </span>
-              );
-            })}
+                    {isCustom ? (
+                      <span onClick={(e) => { e.stopPropagation(); removeCustomCategory(c); }} style={{ fontSize: "14px", color: "#7B2D43", lineHeight: 1, marginLeft: "2px" }}>×</span>
+                    ) : null}
+                  </div>
+                );
+              })}
+              {!addingCategory ? (
+                <div onClick={() => setAddingCategory(true)} style={{ padding: "6px 13px", borderRadius: "20px", border: "1px dashed #E8E2DD", fontSize: "12px", cursor: "pointer", color: "#888780", background: "#fff" }}>+ 추가</div>
+              ) : null}
+            </div>
             {addingCategory ? (
-              <span style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: "6px", marginTop: "6px", alignItems: "center" }}>
                 <input
-                  className="ipt"
-                  style={{ width: "120px" }}
-                  placeholder="카테고리명"
                   autoFocus
+                  placeholder="카테고리명"
                   value={newCategoryText}
                   onChange={(e) => setNewCategoryText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      confirmAddCategory();
-                    }
-                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); confirmAddCategory(); } }}
+                  style={{ flex: 1, fontSize: "13px", padding: "7px 10px", border: "1px solid #7B2D43", borderRadius: "7px", outline: "none" }}
                 />
-                <button
-                  type="button"
-                  onClick={confirmAddCategory}
-                  style={{ height: "32px", padding: "0 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "none", background: "#7B2D43", color: "#fff" }}
-                >
-                  확인
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setAddingCategory(false); setNewCategoryText(""); }}
-                  style={{ height: "32px", padding: "0 10px", borderRadius: "8px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid #E8E2DD", background: "#fff", color: "#888" }}
-                >
-                  취소
-                </button>
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setAddingCategory(true)}
-                style={{ height: "32px", padding: "0 14px", borderRadius: "16px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px dashed #D9C5CC", background: "#fff", color: "#999" }}
-              >
-                + 추가
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* 판매채널 (유지) — product_type 자동파생(broadcast→broadcast, shop·both→group_buy) */}
-        <div style={{ marginBottom: "11px" }}>
-          <label className="fl">판매채널</label>
-          <div style={{ display: "flex", gap: "6px" }}>
-            {([["broadcast", "방송에서만"], ["shop", "쇼핑몰에서만"], ["both", "방송+쇼핑몰"]] as const).map(([v, l]) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setSaleMode(v)}
-                style={{ flex: 1, height: "34px", borderRadius: "8px", fontSize: "11px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (saleMode === v ? "#7B2D43" : "#E8E2DD"), background: saleMode === v ? "#7B2D43" : "#fff", color: saleMode === v ? "#fff" : "#666" }}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 8. 옵션 박스 */}
-        <div style={{ border: "1px solid var(--bd)", borderRadius: "8px", padding: "11px", marginBottom: "11px" }}>
-          <div style={{ fontSize: "11px", color: "var(--mut)", marginBottom: "9px" }}>옵션 (각각 켜고 / 직접입력·선택)</div>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", marginBottom: "7px" }}>
-            <span style={{ fontSize: "11px", width: "36px" }}>색상</span>
-            <span className={`badge ${colorEnabled ? "b-ok" : ""}`} onClick={() => setColorEnabled((v) => { const next = !v; if (!next) setColorText(""); return next; })} style={{ cursor: "pointer", ...(colorEnabled ? {} : { background: "#eee", color: "#888" }) }}>{colorEnabled ? "ON·선택" : "OFF"}</span>
-            {colorEnabled ? (
-              <>
-                <input className="ipt" style={{ flex: 1, minWidth: "110px" }} placeholder="화이트, 블랙, 베이지" value={colorText} onChange={(e) => setColorText(e.target.value)} />
-                {COLOR_PRESETS.map((preset) => (
-                  <span key={preset} className="tag" style={{ cursor: "pointer", color: splitOptions(colorText).includes(preset) ? "var(--rose)" : "var(--mut)" }} onClick={() => applyColorPreset(preset)}>{preset}</span>
-                ))}
-              </>
-            ) : (
-              <span className="note" style={{ color: "#999" }}>고객 직접입력</span>
-            )}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", marginBottom: "7px" }}>
-            <span style={{ fontSize: "11px", width: "36px" }}>사이즈</span>
-            <span className={`badge ${sizeEnabled ? "b-ok" : ""}`} onClick={() => setSizeEnabled((v) => { const next = !v; if (!next) { setSizeText(""); setSizePresetOpen(false); } return next; })} style={{ cursor: "pointer", ...(sizeEnabled ? {} : { background: "#eee", color: "#888" }) }}>{sizeEnabled ? "ON·선택" : "OFF"}</span>
-            {sizeEnabled ? (
-              <>
-                <input className="ipt" style={{ flex: 1, minWidth: "110px" }} placeholder="220, 230, 240" value={sizeText} onChange={(e) => setSizeText(e.target.value)} />
-                <span style={{ position: "relative" }}>
-                  <button type="button" onClick={() => setSizePresetOpen((v) => !v)} style={{ fontSize: "10px", fontWeight: 800, color: "var(--rose)", background: "none", border: "none", cursor: "pointer", whiteSpace: "nowrap", padding: "2px 4px" }}>프리셋 ▾</button>
-                  {sizePresetOpen ? (
-                    <div style={{ position: "absolute", top: "100%", right: 0, zIndex: 5, marginTop: "4px", minWidth: "140px", background: "#fff", border: "1px solid var(--bd)", borderRadius: "8px", boxShadow: "0 6px 20px rgba(0,0,0,0.12)", overflow: "hidden" }}>
-                      {SIZE_PRESETS.map((preset) => {
-                        const on = normalizePresetOptions(preset).some((o) => splitOptions(sizeText).includes(o));
-                        return (
-                          <button
-                            key={preset}
-                            type="button"
-                            onClick={() => applySizePreset(preset)}
-                            style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 11px", fontSize: "12px", fontWeight: 700, border: "none", borderBottom: "1px solid #F0EDEA", background: on ? "#F5E6EB" : "#fff", color: on ? "var(--rose)" : "#555", cursor: "pointer" }}
-                          >
-                            {on ? "✓ " : ""}{preset}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-                </span>
-              </>
-            ) : (
-              <span className="note" style={{ color: "#999" }}>고객 직접입력</span>
-            )}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "9px", marginBottom: "7px" }}>
-            <span style={{ fontSize: "11px", width: "36px" }}>수량</span>
-            <span className="badge" style={{ background: "var(--blue-bg)", color: "var(--blue)" }}>ON·직접입력</span>
-            <span className="note">손님이 숫자 입력</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "9px" }}>
-            <span style={{ fontSize: "11px", width: "36px" }}>금액</span>
-            <span className={`badge ${priceText.trim() ? "b-ok" : ""}`} style={priceText.trim() ? {} : { background: "#eee", color: "#888" }}>{priceText.trim() ? "위 가격" : "OFF"}</span>
-            <span className="note">{priceText.trim() ? "위 가격 사용" : "비우면 손님 직접입력"}</span>
-          </div>
-        </div>
-
-        {/* 재고관리 / 고객 노출 */}
-        <div style={{ display: "flex", gap: "18px", fontSize: "11px", marginBottom: "4px", alignItems: "center" }}>
-          <span style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }} onClick={() => setStockManagementEnabled((v) => !v)}>
-            재고관리 <span className="note">(끄면 무제한)</span> <span className={`tog ${stockManagementEnabled ? "on" : "off"}`}><i /></span>
-          </span>
-          <span style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }} onClick={() => setIsVisible((v) => !v)}>
-            고객 노출 <span className={`tog ${isVisible ? "on" : "off"}`}><i /></span>
-          </span>
-        </div>
-
-        {/* 재고관리 ON: 옵션 있으면 조합별 재고 / 없으면 총 재고 1칸 */}
-        {stockManagementEnabled ? (
-          colors.length > 0 || sizes.length > 0 ? (
-            <div style={{ border: "1px solid var(--bd)", borderRadius: "8px", padding: "10px", marginTop: "8px", marginBottom: "11px" }}>
-              <div style={{ fontSize: "11px", color: "var(--mut)", marginBottom: "7px" }}>옵션별 재고 (색상 × 사이즈)</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "5px", maxHeight: "180px", overflowY: "auto", paddingRight: "6px" }}>
-                {resolvedVariantRows.map((row) => (
-                  <div key={row.key} style={{ display: "flex", alignItems: "flex-end", gap: "8px" }}>
-                    <span style={{ flex: 1, minWidth: 0, fontSize: "11px", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", borderBottom: "1px dotted var(--bd)", paddingBottom: "3px" }}>{[row.color, row.size].filter(Boolean).join(" / ") || "기본"}</span>
-                    <input className="ipt" style={{ width: "70px", flexShrink: 0, textAlign: "right" }} type="number" min={0} value={row.stock} onChange={(e) => updateVariantStock(row.key, Math.max(0, Number(e.target.value) || 0))} />
-                    <span className="note" style={{ flexShrink: 0, minWidth: "12px" }}>개</span>
-                  </div>
-                ))}
+                <button type="button" onClick={confirmAddCategory} style={{ padding: "7px 12px", borderRadius: "7px", background: "#7B2D43", color: "#fff", border: "none", fontSize: "12px", cursor: "pointer" }}>확인</button>
+                <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryText(""); }} style={{ padding: "7px 10px", borderRadius: "7px", border: "1px solid #E8E2DD", background: "#fff", fontSize: "12px", cursor: "pointer", color: "#888780" }}>취소</button>
               </div>
-              <div style={{ marginTop: "7px", fontSize: "11px", color: "var(--mut)", textAlign: "right" }}>총 재고 {totalStock.toLocaleString("ko-KR")}개</div>
-            </div>
-          ) : (
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px", marginBottom: "11px" }}>
-              <span style={{ fontSize: "11px", color: "var(--mut)" }}>총 재고 수량</span>
-              <input className="ipt" style={{ width: "120px" }} type="number" min={0} value={totalStockText} onChange={(e) => setTotalStockText(e.target.value)} />
-              <span className="note">개</span>
-            </div>
-          )
-        ) : null}
+            ) : null}
+          </div>
 
-        {/* 상세사진 (최대 5장) */}
-        <div style={{ marginTop: "11px", marginBottom: "11px" }}>
-          <ImagePicker label="상세사진 (최대 5장)" value={detailImages} maxFiles={5} uploadKind="detail" mode="detail" onChange={setDetailImages} />
+          {/* 판매채널 */}
+          <div style={{ marginBottom: "14px" }}>
+            <div style={sectionLabel}>판매채널</div>
+            <div style={{ display: "flex", gap: "6px" }}>
+              {([["broadcast", "📺 방송에서만"], ["shop", "🛍 쇼핑몰에서만"], ["both", "✅ 방송+쇼핑몰"]] as const).map(([v, l]) => {
+                const on = saleMode === v;
+                return (
+                  <div
+                    key={v}
+                    onClick={() => setSaleMode(v)}
+                    style={{ flex: 1, padding: "10px 6px", borderRadius: "8px", border: (on ? "2px" : "1px") + " solid " + (on ? "#7B2D43" : "#E8E2DD"), textAlign: "center", fontSize: "13px", cursor: "pointer", color: on ? "#7B2D43" : "#888780", background: on ? "#F5E6EB" : "#fff", fontWeight: on ? 500 : 400 }}
+                  >
+                    {l}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 옵션 박스 */}
+          <div style={{ marginBottom: "14px" }}>
+            <div style={{ border: "1px solid #E8E2DD", borderRadius: "8px", padding: "12px", background: "#F7F5F3" }}>
+              <div style={{ fontSize: "12px", color: "#888780", marginBottom: "10px" }}>옵션 (각각 켜고 / 직접입력·선택)</div>
+
+              {/* 색상 */}
+              <div style={optRow}>
+                <span style={optLabel}>색상</span>
+                <button type="button" onClick={() => setColorEnabled((v) => { const next = !v; if (!next) setColorText(""); return next; })} style={togglePill(colorEnabled ? "on-select" : "off")}>{colorEnabled ? "ON·선택" : "OFF"}</button>
+                {colorEnabled ? (
+                  <>
+                    <input style={optInput} type="text" placeholder="화이트, 블랙, 베이지" value={colorText} onChange={(e) => setColorText(e.target.value)} />
+                    <div style={{ display: "flex", gap: "4px" }}>
+                      {COLOR_PRESETS.map((preset) => (
+                        <button key={preset} type="button" onClick={() => applyColorPreset(preset)} style={presetTag(splitOptions(colorText).includes(preset))}>{preset}</button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <span style={{ fontSize: "12px", color: "#888780" }}>고객 직접입력</span>
+                )}
+              </div>
+
+              {/* 사이즈 */}
+              <div style={optRow}>
+                <span style={optLabel}>사이즈</span>
+                <button type="button" onClick={() => setSizeEnabled((v) => { const next = !v; if (!next) { setSizeText(""); setSizePresetOpen(false); } return next; })} style={togglePill(sizeEnabled ? "on-select" : "off")}>{sizeEnabled ? "ON·선택" : "OFF"}</button>
+                {sizeEnabled ? (
+                  <>
+                    <input style={optInput} type="text" placeholder="220, 230, 240" value={sizeText} onChange={(e) => setSizeText(e.target.value)} />
+                    <div style={{ position: "relative", display: "inline-block" }}>
+                      <button type="button" onClick={() => setSizePresetOpen((v) => !v)} style={{ padding: "5px 10px", borderRadius: "6px", fontSize: "11px", background: "#FBF1E0", color: "#854F0B", cursor: "pointer", border: "none", display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>프리셋 ▾</button>
+                      {sizePresetOpen ? (
+                        <div style={{ position: "absolute", top: "100%", right: 0, background: "#fff", border: "1px solid #E8E2DD", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, minWidth: "160px", marginTop: "4px", overflow: "hidden" }}>
+                          {SIZE_PRESETS.map((preset) => {
+                            const on = normalizePresetOptions(preset).some((o) => splitOptions(sizeText).includes(o));
+                            return (
+                              <div key={preset} onClick={() => applySizePreset(preset)} style={{ padding: "8px 14px", fontSize: "12px", cursor: "pointer", color: on ? "#7B2D43" : "#1a1a1a", background: on ? "#F5E6EB" : "#fff" }}>{on ? "✓ " : ""}{preset}</div>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
+                  </>
+                ) : (
+                  <span style={{ fontSize: "12px", color: "#888780" }}>고객 직접입력</span>
+                )}
+              </div>
+
+              {/* 수량 */}
+              <div style={optRow}>
+                <span style={optLabel}>수량</span>
+                <button type="button" style={togglePill("on-input")}>ON·직접입력</button>
+                <span style={{ fontSize: "12px", color: "#888780" }}>손님이 숫자 입력</span>
+              </div>
+
+              {/* 금액 */}
+              <div style={{ ...optRow, marginBottom: 0 }}>
+                <span style={optLabel}>금액</span>
+                {priceText.trim() ? (
+                  <>
+                    <button type="button" style={togglePill("off")}>OFF</button>
+                    <span style={{ fontSize: "12px", color: "#888780" }}>위 가격 사용</span>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" style={togglePill("on-input")}>ON·직접입력</button>
+                    <span style={{ fontSize: "12px", color: "#888780" }}>손님이 금액 입력</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 재고관리 / 고객노출 */}
+          <div style={{ marginBottom: "14px" }}>
+            <div style={toggleRow}>
+              <div>
+                <div style={{ fontSize: "13px", color: "#1a1a1a" }}>재고관리</div>
+                <div style={{ fontSize: "11px", color: "#888780", marginTop: "1px" }}>{stockManagementEnabled ? "재고 수량 관리 중" : "(끄면 무제한)"}</div>
+              </div>
+              <div onClick={() => setStockManagementEnabled((v) => !v)} style={tgStyle(stockManagementEnabled)}><span style={tgKnob(stockManagementEnabled)} /></div>
+            </div>
+
+            {stockManagementEnabled ? (
+              colors.length > 0 || sizes.length > 0 ? (
+                <div style={{ background: "#F7F5F3", borderRadius: "8px", padding: "10px", marginTop: "8px" }}>
+                  <div style={{ fontSize: "12px", color: "#888780", marginBottom: "8px" }}>옵션별 재고 수량</div>
+                  <div style={{ maxHeight: "200px", overflowY: "auto" }}>
+                    {resolvedVariantRows.map((row) => (
+                      <div key={row.key} style={{ display: "grid", gridTemplateColumns: "1fr 80px 24px", gap: "8px", alignItems: "center", padding: "5px 0", borderBottom: "1px solid #E8E2DD" }}>
+                        <div style={{ fontSize: "12px", color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[row.color, row.size].filter(Boolean).join(" / ") || "기본"}</div>
+                        <input style={{ fontSize: "12px", padding: "5px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "100%" }} type="number" min={0} value={row.stock} onChange={(e) => updateVariantStock(row.key, Math.max(0, Number(e.target.value) || 0))} />
+                        <span style={{ fontSize: "11px", color: "#888780" }}>개</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: "7px", fontSize: "11px", color: "#888780", textAlign: "right" }}>총 재고 {totalStock.toLocaleString("ko-KR")}개</div>
+                </div>
+              ) : (
+                <div style={{ background: "#F7F5F3", borderRadius: "8px", padding: "10px", marginTop: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "12px", color: "#1a1a1a", flex: 1 }}>총 재고 수량</span>
+                  <input style={{ fontSize: "12px", padding: "5px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "80px" }} type="number" min={0} value={totalStockText} onChange={(e) => setTotalStockText(e.target.value)} />
+                  <span style={{ fontSize: "11px", color: "#888780" }}>개</span>
+                </div>
+              )
+            ) : null}
+
+            <div style={toggleRow}>
+              <div>
+                <div style={{ fontSize: "13px", color: "#1a1a1a" }}>고객 노출</div>
+                <div style={{ fontSize: "11px", color: "#888780", marginTop: "1px" }}>손님 주문 페이지에 표시</div>
+              </div>
+              <div onClick={() => setIsVisible((v) => !v)} style={tgStyle(isVisible)}><span style={tgKnob(isVisible)} /></div>
+            </div>
+          </div>
+
+          {/* 구분선 */}
+          <div style={{ height: "1px", background: "#E8E2DD", margin: "12px 0" }} />
+
+          {/* 상세사진 (최대 5장) */}
+          <div style={{ marginBottom: "14px" }}>
+            <ImagePicker label="상세사진 (최대 5장)" value={detailImages} maxFiles={5} uploadKind="detail" mode="detail" onChange={setDetailImages} />
+          </div>
+
+          {/* 상세설명 */}
+          <div style={{ marginBottom: "14px" }}>
+            <div style={sectionLabel}>상세설명</div>
+            <textarea
+              style={{ width: "100%", fontSize: "13px", padding: "10px 12px", border: "1px solid #E8E2DD", borderRadius: "8px", minHeight: "90px", resize: "vertical", background: "#fff", fontFamily: "inherit", outline: "none" }}
+              placeholder="상품 상세 설명 (선택)"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+
         </div>
 
-        {/* 상세설명 */}
-        <div style={{ marginBottom: "11px" }}>
-          <label className="fl">상세설명</label>
-          <textarea
-            className="ipt"
-            style={{ width: "100%", minHeight: "84px", resize: "vertical", padding: "8px 10px", lineHeight: 1.5 }}
-            placeholder="상품 상세 설명 (선택)"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </div>
-
-        {/* 푸터 */}
-        <div className="mfoot">
-          <span className="note">⚡ 빠른등록: 사진·이름만 넣고 바로</span>
-          <span className="r">
-            <button type="button" className="btn" onClick={() => onClose?.()}>취소</button>
-            <button type="button" className="btn rose" disabled={saving} onClick={() => void saveProduct()}>{saving ? "저장중..." : "등록"}</button>
-          </span>
+        {/* footer */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", borderTop: "1px solid #E8E2DD", background: "#F7F5F3", flexShrink: 0 }}>
+          <div style={{ fontSize: "12px", color: "#888780" }}><span style={{ color: "#854F0B" }}>⚡ 빠른등록:</span> 사진·이름만 넣고 바로</div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button type="button" onClick={() => onClose?.()} disabled={saving} style={{ padding: "10px 18px", borderRadius: "8px", border: "1px solid #E8E2DD", background: "#fff", fontSize: "13px", cursor: saving ? "default" : "pointer", color: "#1a1a1a", opacity: saving ? 0.5 : 1 }}>취소</button>
+            <button type="button" onClick={() => void saveProduct()} disabled={saving} style={{ padding: "10px 22px", borderRadius: "8px", background: saving ? "#ccc" : isEditMode ? "#0F6E56" : "#7B2D43", color: "#fff", border: "none", fontSize: "13px", fontWeight: 500, cursor: saving ? "not-allowed" : "pointer" }}>{saving ? "저장 중..." : isEditMode ? "저장" : "등록"}</button>
+          </div>
         </div>
 
       </div>
