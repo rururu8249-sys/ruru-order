@@ -399,6 +399,7 @@ export default function AdminLiveEventRoulettePanel({
     const gAmount = Number(giftPointAmount || 0);
     const gReason = (winnerNote || title || "이벤트 당첨").trim();
     const isLive = mode === "live";
+    const gEventId = currentEvent?.id || ""; // 중복지급 가드 키
 
     setCenterWinner("");
     angleRef.current = 0;
@@ -416,7 +417,7 @@ export default function AdminLiveEventRoulettePanel({
         // 포인트 선물 + 금액 있으면 자동지급 (운영 모드만)
         if (gType === "point" && gAmount > 0) {
           if (isLive) {
-            void grantPointToWinner(winner, gAmount, gReason);
+            void grantPointToWinner(winner, gAmount, gReason, gEventId);
           } else {
             showAdminToast("테스트 모드라 포인트 자동지급은 건너뜁니다.", "info");
           }
@@ -430,8 +431,27 @@ export default function AdminLiveEventRoulettePanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentEvent?.winner_nickname, currentEvent?.status, currentEvent?.result_at, currentEvent?.id]);
 
+  // 같은 이벤트(event.id)에 대해 이번 세션에서 이미 지급했는지 기록(effect 재실행 중복지급 방지)
+  const grantedEventIdsRef = useRef<Set<string>>(new Set());
+
   // 당첨자 닉네임 → orders 최신 주문 전화번호 매핑 → 기존 포인트 API로 자동지급
-  const grantPointToWinner = async (nickname: string, amount: number, reason: string) => {
+  // 중복지급 가드: ① 이번 세션 ref ② 영구 게이트 is_reward_done. 지급 성공 시 is_reward_done=true로 잠금.
+  const grantPointToWinner = async (nickname: string, amount: number, reason: string, eventId = "") => {
+    const evId = String(eventId || "").trim();
+
+    if (evId) {
+      // 이번 세션에서 이미 지급/진행 중이면 skip
+      if (grantedEventIdsRef.current.has(evId)) return;
+      // 이미 지급완료(is_reward_done) 표시된 이벤트면 skip (재로드/다른탭 포함)
+      const alreadyPaid = winners.some((w) => String(w.event_id) === evId && w.is_reward_done);
+      if (alreadyPaid) {
+        grantedEventIdsRef.current.add(evId);
+        return;
+      }
+      // 동시/연속 재실행 선점 잠금 (지급 실패 시 catch에서 해제)
+      grantedEventIdsRef.current.add(evId);
+    }
+
     try {
       const { data, error } = await supabase
         .from("orders")
@@ -443,6 +463,7 @@ export default function AdminLiveEventRoulettePanel({
       if (error) throw error;
       const phone = String((data as { customer_phone?: unknown } | null)?.customer_phone || "").replace(/[^0-9]/g, "");
       if (!phone) {
+        if (evId) grantedEventIdsRef.current.delete(evId); // 지급 안 됐으니 잠금 해제
         showAdminToast(`${nickname}의 전화번호를 찾지 못해 포인트 자동지급을 건너뜁니다.`, "warning");
         return;
       }
@@ -459,7 +480,27 @@ export default function AdminLiveEventRoulettePanel({
       });
       if (!payload.ok) throw new Error(payload.message || "포인트 지급 실패");
       showAdminToast(`${nickname}님에게 ${amount.toLocaleString("ko-KR")}P 자동지급 완료.`, "success");
+
+      // 지급 성공 → 해당 당첨자 레코드 is_reward_done=true (영구 중복지급 게이트). 기존 mark_reward_done API 재사용.
+      if (evId) {
+        const { data: wRow } = await supabase
+          .from("event_roulette_winners")
+          .select("id")
+          .eq("event_id", evId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const winnerId = (wRow as { id?: string } | null)?.id;
+        if (winnerId) {
+          await requestJson<{ ok: boolean }>("/api/admin-live/event-roulette", {
+            method: "POST",
+            body: JSON.stringify({ action: "mark_reward_done", winnerId, isRewardDone: true }),
+          }).catch(() => {});
+          await loadEventsAndWinners();
+        }
+      }
     } catch (e) {
+      if (evId) grantedEventIdsRef.current.delete(evId); // 실패 시 잠금 해제(재시도 허용)
       showAdminToast("포인트 자동지급 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
     }
   };
