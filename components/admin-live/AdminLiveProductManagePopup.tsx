@@ -341,6 +341,26 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         });
         rows.forEach((r) => { r.thumb = thumbs.get(r.productId) || ""; });
       }
+      // product_id로 못 찾은 행(또는 product_id 없는 행) → product_name으로 보조 매칭
+      const nameRows = rows.filter((r) => !r.thumb && r.name);
+      if (nameRows.length > 0) {
+        const names = [...new Set(nameRows.map((r) => r.name))];
+        const { data: nprods } = await supabase
+          .from("products")
+          .select("product_name, image_url, cover_image_url, main_image_url, thumbnail_url, images, image_urls, detail_image_urls")
+          .in("product_name", names);
+        const nameThumbs = new Map<string, string>();
+        ((nprods as ProductRow[]) || []).forEach((p) => {
+          const nm = pickString(p, ["product_name", "name", "title"], "").toLowerCase();
+          if (!nm || nameThumbs.has(nm)) return;
+          const url = pickString(p, ["image_url", "cover_image_url", "main_image_url", "thumbnail_url"], "");
+          nameThumbs.set(nm, url ? resolveProductImageUrl(url) : mainImage(p));
+        });
+        nameRows.forEach((r) => {
+          const t = nameThumbs.get(r.name.toLowerCase());
+          if (t) r.thumb = t;
+        });
+      }
       const detailRows = rows
         .sort((a, b) => b.sales - a.sales)
         .map((r) => ({ key: r.key, name: r.name, productId: r.productId, thumb: r.thumb, qty: r.qty, price: r.price, sales: r.sales, option: [...r.opts.keys()].join(" · ") }));
