@@ -151,6 +151,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [histLoading, setHistLoading] = useState(false);
   const [histBroadcasts, setHistBroadcasts] = useState<Array<{ id: string; title: string; started_at: string; ended_at: string }>>([]);
   const [histStats, setHistStats] = useState<Map<string, { sales: number; count: number }>>(new Map());
+  const [shopOrders, setShopOrders] = useState<Array<{ total_price: number; created_at: string }>>([]);
   const [histYear, setHistYear] = useState("전체");
   const [histMonth, setHistMonth] = useState("전체");
   const [histMode, setHistMode] = useState<"all" | "broadcast" | "shop">("all");
@@ -231,14 +232,16 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
           stats.set(bid, cur);
         });
       }
-      // 쇼핑몰(broadcast_id NULL) 주문 집계 → __shop__ 키
-      const { data: shopOrd } = await supabase.from("orders").select("total_price").is("broadcast_id", null);
+      // 쇼핑몰(broadcast_id NULL) 주문 집계 → __shop__ 키(전체 합계) + shopOrders(년/월 필터용)
+      const { data: shopOrd } = await supabase.from("orders").select("total_price, created_at").is("broadcast_id", null);
+      const shopList = ((shopOrd as Array<{ total_price: unknown; created_at: unknown }>) || []).map((o) => ({
+        total_price: Number(o.total_price || 0),
+        created_at: String(o.created_at || ""),
+      }));
+      setShopOrders(shopList);
       let shopSales = 0;
       let shopCount = 0;
-      ((shopOrd as Array<{ total_price: unknown }>) || []).forEach((o) => {
-        shopSales += Number(o.total_price || 0);
-        shopCount += 1;
-      });
+      shopList.forEach((o) => { shopSales += o.total_price; shopCount += 1; });
       if (shopCount > 0) stats.set("__shop__", { sales: shopSales, count: shopCount });
 
       setHistBroadcasts(broadcasts);
@@ -289,17 +292,36 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     });
   }, [histEntries, histMode, histSearch, histYear, histMonth]);
 
+  // 쇼핑몰 행: 년/월 기준 클라이언트 필터 (created_at)
+  const shopFilteredStat = useMemo(() => {
+    let sales = 0;
+    let count = 0;
+    shopOrders.forEach((o) => {
+      const d = new Date(o.created_at);
+      if (histYear !== "전체" && (Number.isNaN(d.getTime()) || String(d.getFullYear()) !== histYear)) return;
+      if (histMonth !== "전체" && (Number.isNaN(d.getTime()) || String(d.getMonth() + 1) !== histMonth)) return;
+      sales += o.total_price;
+      count += 1;
+    });
+    return { sales, count };
+  }, [shopOrders, histYear, histMonth]);
+
   const histSummary = useMemo(() => {
     let sales = 0;
     let count = 0;
     let broadcastCount = 0;
     histFiltered.forEach((b) => {
-      if (b.id !== "__shop__") broadcastCount += 1;
+      if (b.id === "__shop__") {
+        sales += shopFilteredStat.sales;
+        count += shopFilteredStat.count;
+        return;
+      }
+      broadcastCount += 1;
       const st = histStats.get(b.id);
       if (st) { sales += st.sales; count += st.count; }
     });
     return { broadcastCount, sales, count };
-  }, [histFiltered, histStats]);
+  }, [histFiltered, histStats, shopFilteredStat]);
 
   // 행 펼침 → 상품별 집계 (orders + products 썸네일). broadcast_id NULL이면 쇼핑몰.
   const loadBroadcastDetail = async (entryId: string) => {
@@ -344,12 +366,14 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       // product_id로 못 찾은 행(또는 product_id 없는 행) → products 전체 조회 후 product_name 클라이언트 매칭
       const nameRows = rows.filter((r) => !r.thumb && r.name);
       if (nameRows.length > 0) {
-        const { data: allProds } = await supabase.from("products").select("id, product_name, image_url");
+        const { data: allProds } = await supabase
+          .from("products")
+          .select("id, product_name, image_url, cover_image_url, main_image_url, external_image_url");
         const nameThumbs = new Map<string, string>();
         ((allProds as ProductRow[]) || []).forEach((p) => {
           const nm = String((p as { product_name?: unknown }).product_name || "").toLowerCase().trim();
           if (!nm || nameThumbs.has(nm)) return;
-          const url = String((p as { image_url?: unknown }).image_url || "");
+          const url = pickString(p, ["image_url", "cover_image_url", "main_image_url", "external_image_url"], "");
           if (url) nameThumbs.set(nm, resolveProductImageUrl(url));
         });
         nameRows.forEach((r) => {
@@ -520,10 +544,24 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     setWidgetSettingsOpen(true);
   };
 
-  // 일괄 전체선택/개별선택
+  // 모드 전환: 고정모드 진입 시 현재 고정(is_pinned) 상품을 초기선택
+  const wsSetMode = (mode: "rotate" | "pin") => {
+    setWsMode(mode);
+    if (mode === "pin") {
+      const pinned = products.filter((p) => pickBoolean(p, ["is_pinned", "pinned"], false)).map(productId).filter(Boolean);
+      setWsSelected(new Set(pinned));
+    } else {
+      setWsSelected(new Set());
+    }
+  };
+
+  // 일괄 전체선택/개별선택 (고정모드는 단일 선택)
   const wsToggle = (id: string) => {
     if (!id) return;
     setWsSelected((prev) => {
+      if (wsMode === "pin") {
+        return prev.has(id) ? new Set<string>() : new Set<string>([id]);
+      }
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -666,7 +704,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {histFiltered.map((b) => {
                   const isShop = b.id === "__shop__";
-                  const st = histStats.get(b.id) || { sales: 0, count: 0 };
+                  const st = isShop ? shopFilteredStat : (histStats.get(b.id) || { sales: 0, count: 0 });
                   const expanded = histExpand === b.id;
                   const d = new Date(b.started_at);
                   const dateLabel = isShop ? "상시 판매" : Number.isNaN(d.getTime()) ? "-" : `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
@@ -854,8 +892,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
             {/* 순환 / 고정 모드 */}
             <div style={{ display: "flex", gap: "6px", padding: "12px 18px 6px" }}>
-              <button type="button" onClick={() => setWsMode("rotate")} style={{ flex: 1, height: "36px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (wsMode === "rotate" ? "#7B2D43" : "#E8E2DD"), background: wsMode === "rotate" ? "#7B2D43" : "#fff", color: wsMode === "rotate" ? "#fff" : "#666" }}>🔁 순환모드</button>
-              <button type="button" onClick={() => setWsMode("pin")} style={{ flex: 1, height: "36px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (wsMode === "pin" ? "#7B2D43" : "#E8E2DD"), background: wsMode === "pin" ? "#7B2D43" : "#fff", color: wsMode === "pin" ? "#fff" : "#666" }}>📌 고정모드</button>
+              <button type="button" onClick={() => wsSetMode("rotate")} style={{ flex: 1, height: "36px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (wsMode === "rotate" ? "#7B2D43" : "#E8E2DD"), background: wsMode === "rotate" ? "#7B2D43" : "#fff", color: wsMode === "rotate" ? "#fff" : "#666" }}>🔁 순환모드</button>
+              <button type="button" onClick={() => wsSetMode("pin")} style={{ flex: 1, height: "36px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (wsMode === "pin" ? "#7B2D43" : "#E8E2DD"), background: wsMode === "pin" ? "#7B2D43" : "#fff", color: wsMode === "pin" ? "#fff" : "#666" }}>📌 고정모드</button>
             </div>
             <div style={{ padding: "0 18px 8px", fontSize: "11px", color: "#999", fontWeight: 700 }}>
               {wsMode === "rotate" ? "선택 상품을 방송 순환목록에 담습니다." : "선택 상품을 지금 띄운 상품으로 고정합니다."}

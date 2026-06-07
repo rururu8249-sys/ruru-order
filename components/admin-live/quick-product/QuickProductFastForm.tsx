@@ -508,7 +508,7 @@ export default function QuickProductFastForm({
   initialProduct = null,
   onClose,
 }: QuickProductFastFormProps) {
-  const [saleMode, setSaleMode] = useState<"broadcast" | "shop" | "both">("both");
+  const [saleMode, setSaleMode] = useState<"broadcast" | "shop" | "both">("broadcast");
   const [category, setCategory] = useState("");
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [addingCategory, setAddingCategory] = useState(false);
@@ -741,7 +741,7 @@ export default function QuickProductFastForm({
   };
 
   const resetForm = () => {
-    setSaleMode("both");
+    setSaleMode("broadcast");
     setCategory("");
     setProductName("");
     setPriceText("");
@@ -968,7 +968,10 @@ export default function QuickProductFastForm({
               </div>
               <div>
                 <label style={fieldLabel}>가격 <span style={{ fontSize: "11px", fontWeight: 400, color: "#888780" }}>(비우면 손님 직접입력)</span></label>
-                <input style={fieldInput} type="text" inputMode="numeric" placeholder="59,000" value={priceText} onChange={(e) => setPriceText(formatNumberWithComma(e.target.value))} />
+                <div style={{ position: "relative" }}>
+                  <input style={{ ...fieldInput, paddingRight: "30px" }} type="text" inputMode="numeric" placeholder="59,000" value={priceText} onChange={(e) => setPriceText(formatNumberWithComma(e.target.value))} />
+                  <span style={{ position: "absolute", right: "11px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", color: "#888780", pointerEvents: "none" }}>원</span>
+                </div>
               </div>
               <div>
                 <label style={fieldLabel}>배송</label>
