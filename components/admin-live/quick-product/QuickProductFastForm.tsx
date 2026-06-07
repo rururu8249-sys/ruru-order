@@ -28,6 +28,7 @@ type ImagePickerProps = {
   uploadKind: "cover" | "detail";
   mode: "cover" | "detail";
   onChange: (nextValue: string[]) => void;
+  triggerRef?: { current: (() => void) | null };
 };
 
 const COLOR_PRESETS = ["블랙", "화이트"];
@@ -312,8 +313,18 @@ function ImagePicker({
   uploadKind,
   mode,
   onChange,
+  triggerRef,
 }: ImagePickerProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // 외부(폼의 '⬆ 사진 직접 올림' 버튼)에서 파일 선택을 열 수 있도록 트리거 노출
+  useEffect(() => {
+    if (!triggerRef) return;
+    triggerRef.current = () => inputRef.current?.click();
+    return () => {
+      triggerRef.current = null;
+    };
+  }, [triggerRef]);
   const [uploading, setUploading] = useState(false);
   const [showAllDetailImages, setShowAllDetailImages] = useState(false);
 
@@ -534,6 +545,8 @@ export default function QuickProductFastForm({
 
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
+  const [sizePresetOpen, setSizePresetOpen] = useState(false);
+  const coverUploadRef = useRef<(() => void) | null>(null);
 
   // 팝업 드래그(헤더 잡고 이동)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -613,7 +626,8 @@ export default function QuickProductFastForm({
     setProductName(pickString(initialProduct, ["product_name", "name", "title"], ""));
     setPriceText(formatNumberWithComma(pickNumber(initialProduct, ["price", "sale_price", "selling_price"], 0)));
     setShippingType(pickString(initialProduct, ["shipping_type", "delivery_type"], "normal"));
-    setIsVisible(pickBoolean(initialProduct, ["is_visible", "visible"], true));
+    // is_visible 컬럼이 schema-safe로 빠진 경우에도 status("숨김"/"판매중")로 정확히 복원
+    setIsVisible(pickBoolean(initialProduct, ["is_visible", "visible", "status"], true));
     setIsPinned(pickBoolean(initialProduct, ["is_pinned", "pinned"], false));
     setCoverImages(pickImageArray(initialProduct, ["image_url", "cover_image_url", "main_image_url"]).slice(0, 1));
     setDetailImages(pickImageArray(initialProduct, ["detail_image_urls", "detail_images", "images"]).slice(0, 5));
@@ -913,10 +927,31 @@ export default function QuickProductFastForm({
           <button type="button" className="x" onClick={() => onClose?.()}>✕</button>
         </div>
 
-        {/* 2. 대표사진 */}
-        <div style={{ marginBottom: "11px" }}>
-          <ImagePicker label="대표사진" value={coverImages} maxFiles={1} uploadKind="cover" mode="cover" onChange={setCoverImages} />
-          <button type="button" className="btn" style={{ width: "100%", marginTop: "6px", fontSize: "10px" }} onClick={() => void captureBroadcastScreen()}>📷 방송화면 캡처</button>
+        {/* 사진(120) + 필드(상품명/가격/배송) 나란히 — 시안 1:1 */}
+        <div style={{ display: "flex", gap: "12px", marginBottom: "13px" }}>
+          <div style={{ width: "120px", flexShrink: 0 }}>
+            <ImagePicker label="대표사진" value={coverImages} maxFiles={1} uploadKind="cover" mode="cover" onChange={setCoverImages} triggerRef={coverUploadRef} />
+            <button type="button" className="btn" style={{ width: "100%", marginTop: "6px", fontSize: "10px" }} onClick={() => void captureBroadcastScreen()}>📷 방송화면 캡처</button>
+            <button type="button" className="btn" style={{ width: "100%", marginTop: "4px", fontSize: "10px" }} onClick={() => coverUploadRef.current?.()}>⬆ 사진 직접 올림</button>
+          </div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px", minWidth: 0 }}>
+            <div>
+              <label className="fl">상품명 <span style={{ color: "var(--rose)" }}>*</span></label>
+              <input className="ipt" style={{ width: "100%" }} placeholder="예: 스웨이드 로퍼" value={productName} onChange={(e) => setProductName(e.target.value)} />
+            </div>
+            <div>
+              <label className="fl">가격 (비우면 손님 직접입력)</label>
+              <input className="ipt" style={{ width: "100%" }} placeholder="59,000" inputMode="numeric" value={priceText} onChange={(e) => setPriceText(formatNumberWithComma(e.target.value))} />
+            </div>
+            <div>
+              <label className="fl">배송</label>
+              <select className="ipt" style={{ width: "100%" }} value={shippingType} onChange={(e) => setShippingType(e.target.value)}>
+                <option value="normal">일반배송</option>
+                <option value="vendor">업체배송1</option>
+                <option value="vendor2">업체배송2</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         {/* 3. 카테고리 → product_note.category (상품관리 칩 필터와 연동) */}
@@ -994,29 +1029,7 @@ export default function QuickProductFastForm({
           </div>
         </div>
 
-        {/* 4. 상품명 * 필수 */}
-        <div style={{ marginBottom: "11px" }}>
-          <label className="fl">상품명 <span style={{ color: "var(--rose)" }}>*</span></label>
-          <input className="ipt" style={{ width: "100%" }} placeholder="예: 스웨이드 로퍼" value={productName} onChange={(e) => setProductName(e.target.value)} />
-        </div>
-
-        {/* 5. 가격 */}
-        <div style={{ marginBottom: "11px" }}>
-          <label className="fl">가격 (비우면 손님 직접입력)</label>
-          <input className="ipt" style={{ width: "100%" }} placeholder="59,000" inputMode="numeric" value={priceText} onChange={(e) => setPriceText(formatNumberWithComma(e.target.value))} />
-        </div>
-
-        {/* 6. 배송 */}
-        <div style={{ marginBottom: "11px" }}>
-          <label className="fl">배송</label>
-          <select className="ipt" style={{ width: "100%" }} value={shippingType} onChange={(e) => setShippingType(e.target.value)}>
-            <option value="normal">일반배송</option>
-            <option value="vendor">업체배송1</option>
-            <option value="vendor2">업체배송2</option>
-          </select>
-        </div>
-
-        {/* 7. 판매채널 (sale_mode) — product_type 자동파생(broadcast→broadcast, shop·both→group_buy) */}
+        {/* 판매채널 (유지) — product_type 자동파생(broadcast→broadcast, shop·both→group_buy) */}
         <div style={{ marginBottom: "11px" }}>
           <label className="fl">판매채널</label>
           <div style={{ display: "flex", gap: "6px" }}>
@@ -1052,13 +1065,30 @@ export default function QuickProductFastForm({
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", marginBottom: "7px" }}>
             <span style={{ fontSize: "11px", width: "36px" }}>사이즈</span>
-            <span className={`badge ${sizeEnabled ? "b-ok" : ""}`} onClick={() => setSizeEnabled((v) => { const next = !v; if (!next) setSizeText(""); return next; })} style={{ cursor: "pointer", ...(sizeEnabled ? {} : { background: "#eee", color: "#888" }) }}>{sizeEnabled ? "ON·선택" : "OFF"}</span>
+            <span className={`badge ${sizeEnabled ? "b-ok" : ""}`} onClick={() => setSizeEnabled((v) => { const next = !v; if (!next) { setSizeText(""); setSizePresetOpen(false); } return next; })} style={{ cursor: "pointer", ...(sizeEnabled ? {} : { background: "#eee", color: "#888" }) }}>{sizeEnabled ? "ON·선택" : "OFF"}</span>
             {sizeEnabled ? (
               <>
                 <input className="ipt" style={{ flex: 1, minWidth: "110px" }} placeholder="220, 230, 240" value={sizeText} onChange={(e) => setSizeText(e.target.value)} />
-                {SIZE_PRESETS.map((preset) => (
-                  <span key={preset} className="tag" style={{ cursor: "pointer", color: normalizePresetOptions(preset).some((o) => splitOptions(sizeText).includes(o)) ? "var(--rose)" : "var(--mut)" }} onClick={() => applySizePreset(preset)}>{preset}</span>
-                ))}
+                <span style={{ position: "relative" }}>
+                  <button type="button" onClick={() => setSizePresetOpen((v) => !v)} style={{ fontSize: "10px", fontWeight: 800, color: "var(--rose)", background: "none", border: "none", cursor: "pointer", whiteSpace: "nowrap", padding: "2px 4px" }}>프리셋 ▾</button>
+                  {sizePresetOpen ? (
+                    <div style={{ position: "absolute", top: "100%", right: 0, zIndex: 5, marginTop: "4px", minWidth: "140px", background: "#fff", border: "1px solid var(--bd)", borderRadius: "8px", boxShadow: "0 6px 20px rgba(0,0,0,0.12)", overflow: "hidden" }}>
+                      {SIZE_PRESETS.map((preset) => {
+                        const on = normalizePresetOptions(preset).some((o) => splitOptions(sizeText).includes(o));
+                        return (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => applySizePreset(preset)}
+                            style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 11px", fontSize: "12px", fontWeight: 700, border: "none", borderBottom: "1px solid #F0EDEA", background: on ? "#F5E6EB" : "#fff", color: on ? "var(--rose)" : "#555", cursor: "pointer" }}
+                          >
+                            {on ? "✓ " : ""}{preset}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </span>
               </>
             ) : (
               <span className="note" style={{ color: "#999" }}>고객 직접입력</span>
