@@ -394,11 +394,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       if (q && !productName(p).toLowerCase().includes(q)) return false;
       return true;
     });
-    // 고정(is_pinned) 상품을 항상 최상단으로 (안정 정렬)
-    return list
-      .map((p, i) => ({ p, i, pinned: pickBoolean(p, ["is_pinned", "pinned"], false) }))
-      .sort((a, b) => (a.pinned === b.pinned ? a.i - b.i : a.pinned ? -1 : 1))
-      .map((x) => x.p);
+    // 고정(is_pinned) 상품을 배열 앞으로 (true → 0, false → 1)
+    return list.sort(
+      (a, b) =>
+        (pickBoolean(a, ["is_pinned", "pinned"], false) ? 0 : 1) -
+        (pickBoolean(b, ["is_pinned", "pinned"], false) ? 0 : 1),
+    );
   }, [products, search, category]);
 
   const visible = filtered.slice(0, visibleCount);
@@ -639,7 +640,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       style={{ position: "fixed", inset: 0, zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", padding: "16px" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{ width: "600px", maxWidth: "100%", flexShrink: 0, maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "14px", overflow: "hidden" }}>
+      <div style={{ width: "600px", maxWidth: "100%", flexShrink: 0, height: "calc(100vh - 32px)", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "14px", overflow: "hidden" }}>
         {/* 헤더 */}
         <div style={{ display: "flex", alignItems: "center", padding: "14px 18px", borderBottom: "1px solid #E8E2DD" }}>
           <span style={{ fontSize: "16px", fontWeight: 800, color: "#7B2D43" }}>📦 상품 관리</span>
