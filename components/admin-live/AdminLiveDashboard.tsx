@@ -1227,6 +1227,8 @@ export default function AdminLiveDashboard() {
                   onRefresh={loadOrders}
                   onOpenManualMatch={openManualMatchForOrder}
                   onOpenCardPay={setCardPayOrder}
+                  deposits={deposits}
+                  onMatched={refreshAfterManualMatch}
                 />
               </div>
             </section>

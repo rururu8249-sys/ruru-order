@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import type { LiveOrder } from "./types";
 import { exportLiveOrdersForPicking, exportLiveOrdersForRosen } from "./adminLiveOrderExcelExport";
 import { supabase } from "@/lib/supabase";
+import { showAdminToast } from "@/lib/adminToast";
 import LiveOrderCancelViewFilter, { type LiveOrderCancelViewFilterValue } from "./LiveOrderCancelViewFilter";
 import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
 import { openPaysterRightHalf } from "./AdminLiveCardPayPopup";
@@ -266,6 +267,44 @@ function inventoryStatusBadge(order: LiveOrder) {
 }
 
 
+// 인라인 매칭 패널용 입금 타입/헬퍼 (ManualPaymentMatchDrawer와 동일 기준 — 표시·정렬용. 확정은 기존 API 호출)
+type LiveMatchDeposit = {
+  id?: number | string;
+  depositor_name?: string;
+  amount?: number;
+  deposited_time?: string;
+  created_at?: string;
+  match_status?: string;
+  confirmed_at?: string | null;
+};
+
+function isUnmatchedLiveDeposit(d: LiveMatchDeposit) {
+  const status = String(d.match_status || "").trim();
+  if (!status || status === "미확인" || status === "미매칭") return !d.confirmed_at;
+  return !(Boolean(d.confirmed_at) || ["수동입금확인", "자동입금확인", "입금확인", "매칭완료", "처리완료", "완료"].includes(status));
+}
+
+function liveDepositNameScore(depositName: string, nickname: string, customerName: string) {
+  const norm = (s: string) => String(s || "").replace(/\s+/g, "").toLowerCase();
+  const d = norm(depositName);
+  const n = norm(nickname);
+  const c = norm(customerName);
+  if (!d) return 0;
+  if (n && d === n) return 100;
+  if (c && d === c) return 95;
+  if (n && (d.includes(n) || n.includes(d))) return 80;
+  if (c && (d.includes(c) || c.includes(d))) return 75;
+  return 0;
+}
+
+function liveDepositDateLabel(d: LiveMatchDeposit) {
+  const src = String(d.deposited_time || d.created_at || "").trim();
+  if (!src) return "-";
+  const dt = new Date(src.replace(" ", "T"));
+  if (Number.isNaN(dt.getTime())) return src.slice(0, 10);
+  return `${dt.getMonth() + 1}/${dt.getDate()} ${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
+}
+
 type Props = {
   orders: LiveOrder[];
   allOrderCount: number;
@@ -279,6 +318,8 @@ type Props = {
   onFiltersChange: (filters: LiveOrderFilters) => void;
   broadcastOptions: BroadcastOption[];
   broadcastStartedAt?: string | null;
+  deposits?: readonly any[];
+  onMatched?: () => void | Promise<void>;
 };
 
 
@@ -297,11 +338,79 @@ export default function LiveOrderTable({
   onFiltersChange,
   broadcastOptions,
   broadcastStartedAt,
+  deposits,
+  onMatched,
 }: Props) {
   const [page, setPage] = useState(1);
   const [pendingKeyword, setPendingKeyword] = useState(filters.keyword);
   const [sortMode, setSortMode] = useState<SortMode>("latest");
   const [pageSize, setPageSize] = useState(10);
+  const [matchOpenOrderId, setMatchOpenOrderId] = useState("");
+  const [selectedDepositId, setSelectedDepositId] = useState("");
+  const [matchSaving, setMatchSaving] = useState(false);
+
+  // 주문의 매칭 키(그룹/행ID/금액) 도출
+  const deriveOrderMatchKeys = (order: LiveOrder) => {
+    const o = order as any;
+    const orderIds = (o.orderIds || o.order_ids || (Array.isArray(order.items) ? order.items.map((i: any) => Number(i.id)) : []))
+      .map((v: any) => Number(v))
+      .filter((v: number) => Number.isFinite(v) && v > 0);
+    const orderGroupId = o.groupId || o.orderGroupId || o.order_group_id || order.id || "";
+    const expectedAmount = Number(order.totalAmount || 0) || Number(order.finalAmount || 0) || 0;
+    return { orderIds, orderGroupId, expectedAmount };
+  };
+
+  // 선택 입금으로 입금확인 (기존 /api/admin-v2/manual-payment-match 재사용)
+  const confirmWithDeposit = async (order: LiveOrder, deposit: LiveMatchDeposit) => {
+    if (matchSaving) return;
+    const depositId = Number(deposit.id);
+    if (!Number.isFinite(depositId)) return;
+    const { orderIds, orderGroupId } = deriveOrderMatchKeys(order);
+    setMatchSaving(true);
+    try {
+      const res = await fetch("/api/admin-v2/manual-payment-match", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderGroupId, orderIds, depositIds: [depositId], depositId }),
+      });
+      const r = await res.json().catch(() => null);
+      if (!res.ok || !r?.ok) {
+        showAdminToast("입금확인 실패\n\n" + (r?.message || ""), "error");
+        return;
+      }
+      showAdminToast("입금확인 처리됐습니다.", "success");
+      setMatchOpenOrderId("");
+      setSelectedDepositId("");
+      await onMatched?.();
+    } finally {
+      setMatchSaving(false);
+    }
+  };
+
+  // 금액 무시하고 수동확인 (기존 /api/admin-v2/manual-payment-confirm-without-deposit 재사용)
+  const confirmWithoutDeposit = async (order: LiveOrder) => {
+    if (matchSaving) return;
+    const { orderIds, orderGroupId, expectedAmount } = deriveOrderMatchKeys(order);
+    setMatchSaving(true);
+    try {
+      const res = await fetch("/api/admin-v2/manual-payment-confirm-without-deposit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderGroupId, orderIds, expectedAmount }),
+      });
+      const r = await res.json().catch(() => null);
+      if (!res.ok || !r?.ok) {
+        showAdminToast("수동확인 실패\n\n" + (r?.message || ""), "error");
+        return;
+      }
+      showAdminToast("수동 입금확인 처리됐습니다.", "success");
+      setMatchOpenOrderId("");
+      setSelectedDepositId("");
+      await onMatched?.();
+    } finally {
+      setMatchSaving(false);
+    }
+  };
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState<"" | "rozen" | "picking">("");
   const [cancelViewFilter, setCancelViewFilter] = useState<LiveOrderCancelViewFilterValue>("all");
@@ -702,7 +811,8 @@ export default function LiveOrderTable({
                 visibleOrders.map((order) => {
                   const selected = order.id === selectedOrderId;
                   return (
-                    <div key={order.id} className={`grid grid-cols-[108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 items-start text-[14px] transition ${selected ? "bg-rose-soft/70" : "hover:bg-slate-50"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}>
+                    <Fragment key={order.id}>
+                    <div className={`grid grid-cols-[108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 items-start text-[14px] transition ${selected ? "bg-rose-soft/70" : "hover:bg-slate-50"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}>
                       {/* 1. 주문일 */}
                       <div className="px-3 py-3 text-center text-[11px] leading-tight text-slate-500">
                         {(() => {
@@ -767,9 +877,9 @@ export default function LiveOrderTable({
                       <div className="px-3 py-3 text-center">
                         <div>{statusBadge(order)}</div>
                         {order.paidAt && <div className="mt-0.5 text-[10px] text-slate-400">{order.paidAt}</div>}
-                        {order.paymentStatus === "manual_match_needed" && onOpenManualMatch ? (
-                          <button type="button" onClick={() => onOpenManualMatch(order)} className="mt-1 rounded-lg border border-orange-300 bg-orange-50 px-2 py-0.5 text-[10px] font-black text-orange-700 hover:bg-orange-100">
-                            매칭
+                        {order.paymentStatus === "manual_match_needed" ? (
+                          <button type="button" onClick={() => { setMatchOpenOrderId((cur) => (cur === order.id ? "" : order.id)); setSelectedDepositId(""); }} className="mt-1 rounded-lg border border-orange-300 bg-orange-50 px-2 py-0.5 text-[10px] font-black text-orange-700 hover:bg-orange-100">
+                            {matchOpenOrderId === order.id ? "매칭 ▲" : "매칭 ▼"}
                           </button>
                         ) : null}
                         {order.paymentStatus === "card_unpaid" && onOpenCardPay ? (
@@ -787,6 +897,91 @@ export default function LiveOrderTable({
                         )}
                       </div>
                     </div>
+
+                    {matchOpenOrderId === order.id ? (() => {
+                      const { expectedAmount } = deriveOrderMatchKeys(order);
+                      const sorted = (deposits || [])
+                        .filter(isUnmatchedLiveDeposit)
+                        .slice()
+                        .sort((a, b) => {
+                          const da = Math.abs(Number(a.amount || 0) - expectedAmount);
+                          const db = Math.abs(Number(b.amount || 0) - expectedAmount);
+                          if (da !== db) return da - db;
+                          return (
+                            liveDepositNameScore(String(b.depositor_name || ""), order.nickname || "", order.name || "") -
+                            liveDepositNameScore(String(a.depositor_name || ""), order.nickname || "", order.name || "")
+                          );
+                        })
+                        .slice(0, 8);
+                      return (
+                        <div style={{ background: "#FFF8FA", borderTop: "1px solid #D9C5CC", borderBottom: "1px solid #D9C5CC", padding: "12px 16px 14px" }}>
+                          <div style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43", marginBottom: "8px" }}>
+                            🔗 입금내역에서 연결할 건을 선택해주세요 — 금액 근사순 정렬 (주문금액 {money(expectedAmount)})
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "10px" }}>
+                            {sorted.length === 0 ? (
+                              <div style={{ fontSize: "12px", color: "#888", padding: "8px 0" }}>미매칭 입금내역이 없습니다.</div>
+                            ) : (
+                              sorted.map((dep, idx) => {
+                                const id = String(dep.id);
+                                const isSel = selectedDepositId === id;
+                                const diff = Number(dep.amount || 0) - expectedAmount;
+                                const best = idx === 0 && diff === 0;
+                                const score = liveDepositNameScore(String(dep.depositor_name || ""), order.nickname || "", order.name || "");
+                                return (
+                                  <button
+                                    key={id}
+                                    type="button"
+                                    onClick={() => setSelectedDepositId(isSel ? "" : id)}
+                                    style={{ display: "flex", alignItems: "center", gap: "10px", padding: "7px 10px", borderRadius: "8px", textAlign: "left", border: "1px solid " + (isSel || best ? "#0F6E56" : "#E8E2DD"), background: isSel || best ? "#E7F3EE" : "#fff", cursor: "pointer" }}
+                                  >
+                                    <span style={{ width: "14px", height: "14px", borderRadius: "50%", flexShrink: 0, border: "1.5px solid " + (isSel ? "#0F6E56" : "#D9C5CC"), background: isSel ? "#0F6E56" : "transparent" }} />
+                                    <span style={{ flex: 1, minWidth: 0 }}>
+                                      <span style={{ fontSize: "12px", fontWeight: 800 }}>{dep.depositor_name || "-"}</span>
+                                      {score >= 75 ? <span style={{ marginLeft: "6px", fontSize: "10px", fontWeight: 800, color: "#0F6E56" }}>닉네임 유사</span> : null}
+                                      <span style={{ display: "block", fontSize: "11px", color: "#888" }}>{liveDepositDateLabel(dep)}</span>
+                                    </span>
+                                    <span style={{ fontSize: "12px", fontWeight: 800 }}>{money(Number(dep.amount || 0))}</span>
+                                    <span style={{ fontSize: "10px", fontWeight: 800, padding: "2px 6px", borderRadius: "4px", background: diff === 0 ? "#E7F3EE" : "#FBF1E0", color: diff === 0 ? "#0F6E56" : "#854F0B" }}>
+                                      {diff === 0 ? "일치" : (diff > 0 ? "+" : "") + diff.toLocaleString("ko-KR")}
+                                    </span>
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+                          <div style={{ display: "flex", gap: "6px" }}>
+                            <button
+                              type="button"
+                              disabled={matchSaving || !selectedDepositId}
+                              onClick={() => {
+                                const dep = sorted.find((d) => String(d.id) === selectedDepositId);
+                                if (dep) void confirmWithDeposit(order, dep);
+                              }}
+                              style={{ padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 800, color: "#fff", background: "#0F6E56", border: "none", cursor: "pointer", opacity: matchSaving || !selectedDepositId ? 0.5 : 1 }}
+                            >
+                              선택 후 입금확인
+                            </button>
+                            <button
+                              type="button"
+                              disabled={matchSaving}
+                              onClick={() => void confirmWithoutDeposit(order)}
+                              style={{ padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 800, color: "#fff", background: "#7B2D43", border: "none", cursor: "pointer", opacity: matchSaving ? 0.6 : 1 }}
+                            >
+                              금액 무시하고 수동확인
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setMatchOpenOrderId(""); setSelectedDepositId(""); }}
+                              style={{ padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 800, color: "#555", background: "#fff", border: "1px solid #E8E2DD", cursor: "pointer" }}
+                            >
+                              닫기
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })() : null}
+                    </Fragment>
                   );
                 })
               )}
