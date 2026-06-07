@@ -15,7 +15,9 @@ export type LiveOrderStatusFilter =
   | "paid"
   | "manual_match_needed"
   | "card_paid"
-  | "card_unpaid";
+  | "card_unpaid"
+  | "canceled"
+  | "shipped";
 
 export type LiveOrderFilters = {
   broadcast: string;
@@ -335,6 +337,10 @@ export default function LiveOrderTable({
     const unpaid = baseOrders.filter((order) =>
       ["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus)
     ).length;
+    const shipped = baseOrders.filter((order) => {
+      const ship = String((order as { shippingStatus?: unknown }).shippingStatus || "").trim();
+      return /출고|발송|배송/.test(ship) && !/대기/.test(ship);
+    }).length;
 
     return {
       total: baseOrders.length,
@@ -342,6 +348,7 @@ export default function LiveOrderTable({
       paid,
       manual,
       canceled,
+      shipped,
     };
   }, [baseOrders]);
 
@@ -464,6 +471,8 @@ export default function LiveOrderTable({
       manual_match_needed: "매칭필요",
       card_paid: "카드결제완료",
       card_unpaid: "카드미결제",
+      canceled: "주문서취소",
+      shipped: "출고완료",
     };
 
     return [
@@ -504,8 +513,10 @@ export default function LiveOrderTable({
         {[
           ["전체", counts.total, "all"],
           ["입금대기", counts.unpaid, "unpaid"],
+          ["매칭필요", counts.manual, "manual_match_needed"],
           ["입금확인", counts.paid, "paid"],
           ["주문서취소", counts.canceled, "canceled"],
+          ["출고완료", counts.shipped, "shipped"],
         ].map(([label, count, status]) => {
           const active = filters.status === status;
 

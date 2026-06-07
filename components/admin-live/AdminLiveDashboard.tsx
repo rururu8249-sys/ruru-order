@@ -145,6 +145,11 @@ function matchesStatus(order: LiveOrder, status: LiveOrderFilters["status"]) {
   if (status === "all") return true;
   if (status === "unpaid") return ["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus);
   if (status === "paid") return isPaid(order);
+  if (status === "shipped") {
+    // 출고완료: 배송상태에 '출고/발송/배송' 포함 + '대기' 아님 (주문/입금/금액 로직과 무관한 표시 필터)
+    const ship = String((order as { shippingStatus?: unknown }).shippingStatus || "").trim();
+    return /출고|발송|배송/.test(ship) && !/대기/.test(ship);
+  }
   return order.paymentStatus === status;
 }
 
@@ -240,6 +245,8 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
     manual_match_needed: "매칭필요",
     card_paid: "카드결제완료",
     card_unpaid: "카드미결제",
+    canceled: "주문서취소",
+    shipped: "출고완료",
   };
   parts.push(statusLabelMap[filters.status]);
 
@@ -1164,7 +1171,45 @@ export default function AdminLiveDashboard() {
 
             <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
 
-            <section className="grid grid-cols-12 gap-3">
+            {/* 주문 영역 서브탭(시안 ①): 각 탭은 기존 팝업/드로어 트리거에 연결 (딥로즈) */}
+            <div className="mt-2 flex items-center gap-1.5 border-b border-rose-line">
+              {[
+                { key: "live", label: "실시간 주문", onClick: () => setActiveMenu("broadcast") },
+                { key: "orders", label: "주문 관리", onClick: () => setActiveMenu("orders") },
+                { key: "payments", label: "입금 내역", onClick: () => setActiveMenu("payments") },
+                { key: "match", label: "입금 매칭", onClick: () => setActiveMenu("payments") },
+              ].map((tab) => {
+                const active =
+                  (tab.key === "live" && activeMenu !== "orders" && activeMenu !== "payments") ||
+                  (tab.key === "orders" && activeMenu === "orders") ||
+                  (tab.key === "payments" && activeMenu === "payments");
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={tab.onClick}
+                    className={[
+                      "-mb-px rounded-t-lg border-b-2 px-3.5 py-2 text-[13px] font-black transition",
+                      active
+                        ? "border-rose-deep bg-rose-soft/60 text-rose-deep"
+                        : "border-transparent text-slate-500 hover:bg-rose-soft hover:text-rose-deep",
+                    ].join(" ")}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => void loadOrders()}
+                title="새로고침"
+                className="ml-auto mb-1 rounded-lg border border-rose-line px-2.5 py-1.5 text-xs font-black text-rose-deep transition hover:bg-rose-soft"
+              >
+                ↻
+              </button>
+            </div>
+
+            <section className="mt-2 grid grid-cols-12 gap-3">
               <div className="col-span-12">
                 <LiveOrderTable
                   orders={filteredOrders}
