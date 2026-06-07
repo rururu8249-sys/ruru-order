@@ -87,7 +87,7 @@ function CompactFilterButton({
     <button
       type="button"
       onClick={onClick}
-      className="h-8 rounded-full border border-blue-100 bg-white px-3 text-xs font-black text-blue-700 shadow-[0_6px_16px_rgba(37,99,235,0.06)] transition hover:bg-blue-50"
+      className="h-8 rounded-full border border-rose-line bg-white px-3 text-xs font-black text-rose-deep shadow-[0_6px_16px_rgba(123,45,67,0.06)] transition hover:bg-rose-soft"
     >
       {label}
     </button>
@@ -114,7 +114,7 @@ function MoneyFlowCard({
         ? "border-orange-100 bg-orange-50/80"
         : tone === "dark"
           ? "border-slate-200 bg-white"
-          : "border-blue-100 bg-blue-50/80";
+          : "border-rose-line bg-rose-soft/70";
 
   const stepClass =
     tone === "green"
@@ -123,7 +123,7 @@ function MoneyFlowCard({
         ? "bg-orange-500 text-white"
         : tone === "dark"
           ? "bg-slate-900 text-white"
-          : "bg-blue-600 text-white";
+          : "bg-rose-deep text-white";
 
   const valueClass =
     tone === "green"
@@ -131,7 +131,7 @@ function MoneyFlowCard({
       : tone === "orange"
         ? "text-orange-700"
         : tone === "blue"
-          ? "text-blue-700"
+          ? "text-rose-deep"
           : "text-slate-950";
 
   return (
@@ -272,8 +272,8 @@ export default function SettlementMoneyFlowDashboard({
 
   return (
     <div className="grid gap-3">
-      <section className="overflow-hidden rounded-[30px] border border-blue-100 bg-white shadow-[0_14px_36px_rgba(37,99,235,0.07)]">
-        <div className="border-b border-blue-50 bg-gradient-to-r from-blue-50 via-white to-white px-5 py-3.5">
+      <section className="overflow-hidden rounded-[30px] border border-rose-line bg-white shadow-[0_14px_36px_rgba(123,45,67,0.07)]">
+        <div className="border-b border-rose-line bg-gradient-to-r from-rose-soft via-white to-white px-5 py-3.5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2 className="text-[29px] font-black tracking-[-0.06em] text-slate-950">정산통계</h2>
@@ -286,7 +286,7 @@ export default function SettlementMoneyFlowDashboard({
               <button
                 type="button"
                 onClick={onOpenManualPanel}
-                className="h-9 rounded-full bg-blue-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
+                className="h-9 rounded-full bg-rose-deep px-4 text-sm font-black text-white shadow-sm transition hover:bg-rose-deep"
               >
                 + 정산 추가 입력
               </button>
