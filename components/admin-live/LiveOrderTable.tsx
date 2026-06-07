@@ -267,8 +267,8 @@ function inventoryStatusBadge(order: LiveOrder) {
 }
 
 
-// 인라인 매칭 패널용 입금 타입/헬퍼 (ManualPaymentMatchDrawer와 동일 기준 — 표시·정렬용. 확정은 기존 API 호출)
-type LiveMatchDeposit = {
+// 인라인/플로팅 매칭 패널 공용 입금 타입/헬퍼 (ManualPaymentMatchDrawer와 동일 기준 — 표시·정렬용. 확정은 기존 API 호출)
+export type LiveMatchDeposit = {
   id?: number | string;
   depositor_name?: string;
   amount?: number;
@@ -278,13 +278,13 @@ type LiveMatchDeposit = {
   confirmed_at?: string | null;
 };
 
-function isUnmatchedLiveDeposit(d: LiveMatchDeposit) {
+export function isUnmatchedLiveDeposit(d: LiveMatchDeposit) {
   const status = String(d.match_status || "").trim();
   if (!status || status === "미확인" || status === "미매칭") return !d.confirmed_at;
   return !(Boolean(d.confirmed_at) || ["수동입금확인", "자동입금확인", "입금확인", "매칭완료", "처리완료", "완료"].includes(status));
 }
 
-function liveDepositNameScore(depositName: string, nickname: string, customerName: string) {
+export function liveDepositNameScore(depositName: string, nickname: string, customerName: string) {
   const norm = (s: string) => String(s || "").replace(/\s+/g, "").toLowerCase();
   const d = norm(depositName);
   const n = norm(nickname);
@@ -297,12 +297,41 @@ function liveDepositNameScore(depositName: string, nickname: string, customerNam
   return 0;
 }
 
-function liveDepositDateLabel(d: LiveMatchDeposit) {
+const LIVE_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+// 날짜 형식: 2026.06.05(금) 20:54
+export function liveDepositDateLabel(d: LiveMatchDeposit) {
   const src = String(d.deposited_time || d.created_at || "").trim();
   if (!src) return "-";
   const dt = new Date(src.replace(" ", "T"));
   if (Number.isNaN(dt.getTime())) return src.slice(0, 10);
-  return `${dt.getMonth() + 1}/${dt.getDate()} ${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
+  const yyyy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  const hh = String(dt.getHours()).padStart(2, "0");
+  const mi = String(dt.getMinutes()).padStart(2, "0");
+  return `${yyyy}.${mm}.${dd}(${LIVE_WEEKDAYS[dt.getDay()]}) ${hh}:${mi}`;
+}
+
+// 오늘(로컬) 입금 여부
+export function isLiveDepositToday(d: LiveMatchDeposit) {
+  const src = String(d.deposited_time || d.created_at || "").trim();
+  if (!src) return false;
+  const dt = new Date(src.replace(" ", "T"));
+  if (Number.isNaN(dt.getTime())) return false;
+  const now = new Date();
+  return dt.getFullYear() === now.getFullYear() && dt.getMonth() === now.getMonth() && dt.getDate() === now.getDate();
+}
+
+// 주문의 매칭 키(그룹/행ID/금액) — 인라인/플로팅 공용
+export function deriveLiveOrderMatchKeys(order: LiveOrder) {
+  const o = order as any;
+  const orderIds = (o.orderIds || o.order_ids || (Array.isArray(order.items) ? order.items.map((i: any) => Number(i.id)) : []))
+    .map((v: any) => Number(v))
+    .filter((v: number) => Number.isFinite(v) && v > 0);
+  const orderGroupId = o.groupId || o.orderGroupId || o.order_group_id || order.id || "";
+  const expectedAmount = Number(order.totalAmount || 0) || Number(order.finalAmount || 0) || 0;
+  return { orderIds, orderGroupId, expectedAmount };
 }
 
 type Props = {
@@ -348,6 +377,7 @@ export default function LiveOrderTable({
   const [matchOpenOrderId, setMatchOpenOrderId] = useState("");
   const [selectedDepositId, setSelectedDepositId] = useState("");
   const [matchSaving, setMatchSaving] = useState(false);
+  const [matchSearch, setMatchSearch] = useState("");
 
   // 주문의 매칭 키(그룹/행ID/금액) 도출
   const deriveOrderMatchKeys = (order: LiveOrder) => {
@@ -900,8 +930,16 @@ export default function LiveOrderTable({
 
                     {matchOpenOrderId === order.id ? (() => {
                       const { expectedAmount } = deriveOrderMatchKeys(order);
+                      const q = matchSearch.trim().toLowerCase();
+                      const qDigits = q.replace(/[^0-9]/g, "");
                       const sorted = (deposits || [])
                         .filter(isUnmatchedLiveDeposit)
+                        .filter((d) => {
+                          if (!q) return true;
+                          const nameHit = String(d.depositor_name || "").toLowerCase().includes(q);
+                          const amtHit = qDigits ? String(Number(d.amount || 0)).includes(qDigits) : false;
+                          return nameHit || amtHit;
+                        })
                         .slice()
                         .sort((a, b) => {
                           const da = Math.abs(Number(a.amount || 0) - expectedAmount);
@@ -915,9 +953,16 @@ export default function LiveOrderTable({
                         .slice(0, 8);
                       return (
                         <div style={{ background: "#FFF8FA", borderTop: "1px solid #D9C5CC", borderBottom: "1px solid #D9C5CC", padding: "12px 16px 14px" }}>
-                          <div style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43", marginBottom: "8px" }}>
+                          <div style={{ maxWidth: "580px", margin: "0 auto" }}>
+                          <div style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43", marginBottom: "8px", textAlign: "center" }}>
                             🔗 입금내역에서 연결할 건을 선택해주세요 — 금액 근사순 정렬 (주문금액 {money(expectedAmount)})
                           </div>
+                          <input
+                            value={matchSearch}
+                            onChange={(e) => setMatchSearch(e.target.value)}
+                            placeholder="🔍 입금자명 / 금액 검색"
+                            style={{ width: "100%", height: "34px", borderRadius: "8px", border: "1px solid #E8E2DD", padding: "0 10px", fontSize: "12px", fontWeight: 700, marginBottom: "8px", outline: "none" }}
+                          />
                           <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "10px" }}>
                             {sorted.length === 0 ? (
                               <div style={{ fontSize: "12px", color: "#888", padding: "8px 0" }}>미매칭 입금내역이 없습니다.</div>
@@ -977,6 +1022,7 @@ export default function LiveOrderTable({
                             >
                               닫기
                             </button>
+                          </div>
                           </div>
                         </div>
                       );
