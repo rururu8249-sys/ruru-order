@@ -18,7 +18,7 @@ import {
 } from "./LiveOrderTable";
 
 type Props = {
-  deposits: readonly LiveMatchDeposit[];
+  deposits: readonly any[];
   orders: LiveOrder[];
   onClose: () => void;
   onMatched: () => void | Promise<void>;

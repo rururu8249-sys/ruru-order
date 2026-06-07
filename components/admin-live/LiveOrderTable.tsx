@@ -378,6 +378,16 @@ export default function LiveOrderTable({
   const [selectedDepositId, setSelectedDepositId] = useState("");
   const [matchSaving, setMatchSaving] = useState(false);
   const [matchSearch, setMatchSearch] = useState("");
+  const [dropHoverOrderId, setDropHoverOrderId] = useState("");
+
+  // 플로팅 패널에서 드래그한 입금을 주문 행에 드롭 → 기존 confirmWithDeposit 재사용
+  const handleDepositDropOnOrder = (order: LiveOrder, depositId: string) => {
+    setDropHoverOrderId("");
+    const dep = (deposits || []).find((d) => String(d.id) === String(depositId));
+    if (dep) void confirmWithDeposit(order, dep);
+  };
+  const isMatchableOrder = (order: LiveOrder) =>
+    ["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus);
 
   // 주문의 매칭 키(그룹/행ID/금액) 도출
   const deriveOrderMatchKeys = (order: LiveOrder) => {
@@ -842,7 +852,12 @@ export default function LiveOrderTable({
                   const selected = order.id === selectedOrderId;
                   return (
                     <Fragment key={order.id}>
-                    <div className={`grid grid-cols-[108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 items-start text-[14px] transition ${selected ? "bg-rose-soft/70" : "hover:bg-slate-50"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}>
+                    <div
+                      onDragOver={isMatchableOrder(order) ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (dropHoverOrderId !== order.id) setDropHoverOrderId(order.id); } : undefined}
+                      onDragLeave={isMatchableOrder(order) ? () => setDropHoverOrderId((cur) => (cur === order.id ? "" : cur)) : undefined}
+                      onDrop={isMatchableOrder(order) ? (e) => { e.preventDefault(); handleDepositDropOnOrder(order, e.dataTransfer.getData("text/plain")); } : undefined}
+                      className={`grid grid-cols-[108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 items-start text-[14px] transition ${dropHoverOrderId === order.id ? "bg-emerald-50 ring-2 ring-inset ring-emerald-500" : selected ? "bg-rose-soft/70" : "hover:bg-slate-50"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}
+                    >
                       {/* 1. 주문일 */}
                       <div className="px-3 py-3 text-center text-[11px] leading-tight text-slate-500">
                         {(() => {

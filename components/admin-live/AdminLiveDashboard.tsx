@@ -33,6 +33,7 @@ import LiveBroadcastPanels from "./LiveBroadcastPanels";
 import LiveBroadcastEndSummaryModal, { type LiveBroadcastEndSummary } from "./LiveBroadcastEndSummaryModal";
 import LiveOrderTable, { type LiveOrderFilters } from "./LiveOrderTable";
 import LiveOrderDetailDrawer from "./LiveOrderDetailDrawer";
+import LiveFloatingMatchPanel from "./LiveFloatingMatchPanel";
 import {
   endAdminLiveBroadcast,
   getActiveBroadcast,
@@ -535,6 +536,7 @@ export default function AdminLiveDashboard() {
   const [cardPayOrder, setCardPayOrder] = useState<LiveOrder | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string>("");
   const [orderDetailOpen, setOrderDetailOpen] = useState(false);
+  const [matchPanelOpen, setMatchPanelOpen] = useState(false);
   const [videoRatio, setVideoRatio] = useState<VideoRatio>("vertical");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -1177,12 +1179,13 @@ export default function AdminLiveDashboard() {
                 { key: "live", label: "실시간 주문", onClick: () => setActiveMenu("broadcast") },
                 { key: "orders", label: "주문 관리", onClick: () => setActiveMenu("orders") },
                 { key: "payments", label: "입금 내역", onClick: () => setActiveMenu("payments") },
-                { key: "match", label: "입금 매칭", onClick: () => setActiveMenu("payments") },
+                { key: "match", label: "입금 매칭", onClick: () => setMatchPanelOpen((v) => !v) },
               ].map((tab) => {
                 const active =
                   (tab.key === "live" && activeMenu !== "orders" && activeMenu !== "payments") ||
                   (tab.key === "orders" && activeMenu === "orders") ||
-                  (tab.key === "payments" && activeMenu === "payments");
+                  (tab.key === "payments" && activeMenu === "payments") ||
+                  (tab.key === "match" && matchPanelOpen);
                 return (
                   <button
                     key={tab.key}
@@ -1374,6 +1377,17 @@ export default function AdminLiveDashboard() {
             onClose={() => setManualMatchGroup(null)}
             onMatched={refreshAfterManualMatch}
           />
+
+          {/* 입금매칭 탭: 플로팅 드래그 패널(목업 C) */}
+          {matchPanelOpen ? (
+            <LiveFloatingMatchPanel
+              deposits={deposits}
+              orders={filteredOrders}
+              onClose={() => setMatchPanelOpen(false)}
+              onMatched={refreshAfterManualMatch}
+              onSearchFilter={(keyword) => setFilters((prev) => ({ ...prev, keyword }))}
+            />
+          ) : null}
 
           {broadcastEndSummary ? (
             <LiveBroadcastEndSummaryModal
