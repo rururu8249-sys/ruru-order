@@ -341,23 +341,19 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         });
         rows.forEach((r) => { r.thumb = thumbs.get(r.productId) || ""; });
       }
-      // product_id로 못 찾은 행(또는 product_id 없는 행) → product_name으로 보조 매칭
+      // product_id로 못 찾은 행(또는 product_id 없는 행) → products 전체 조회 후 product_name 클라이언트 매칭
       const nameRows = rows.filter((r) => !r.thumb && r.name);
       if (nameRows.length > 0) {
-        const names = [...new Set(nameRows.map((r) => r.name))];
-        const { data: nprods } = await supabase
-          .from("products")
-          .select("product_name, image_url, cover_image_url, main_image_url, thumbnail_url, images, image_urls, detail_image_urls")
-          .in("product_name", names);
+        const { data: allProds } = await supabase.from("products").select("id, product_name, image_url");
         const nameThumbs = new Map<string, string>();
-        ((nprods as ProductRow[]) || []).forEach((p) => {
-          const nm = pickString(p, ["product_name", "name", "title"], "").toLowerCase();
+        ((allProds as ProductRow[]) || []).forEach((p) => {
+          const nm = String((p as { product_name?: unknown }).product_name || "").toLowerCase().trim();
           if (!nm || nameThumbs.has(nm)) return;
-          const url = pickString(p, ["image_url", "cover_image_url", "main_image_url", "thumbnail_url"], "");
-          nameThumbs.set(nm, url ? resolveProductImageUrl(url) : mainImage(p));
+          const url = String((p as { image_url?: unknown }).image_url || "");
+          if (url) nameThumbs.set(nm, resolveProductImageUrl(url));
         });
         nameRows.forEach((r) => {
-          const t = nameThumbs.get(r.name.toLowerCase());
+          const t = nameThumbs.get(r.name.toLowerCase().trim());
           if (t) r.thumb = t;
         });
       }
