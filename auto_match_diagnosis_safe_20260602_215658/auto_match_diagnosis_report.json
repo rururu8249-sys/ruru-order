@@ -1,0 +1,3494 @@
+{
+  "generatedAt": "2026-06-02T12:56:59.679Z",
+  "summary": {
+    "fetchedOrders": 700,
+    "fetchedDeposits": 336,
+    "eligibleOrderGroups": 87,
+    "eligibleDeposits": 37,
+    "currentRunCandidates": 1,
+    "blockedGroups": 86
+  },
+  "candidates": [
+    {
+      "groupId": "4c8b4f04-ee43-47bd-8bf4-f28a5d3d2447",
+      "orderIds": [
+        1012,
+        1011
+      ],
+      "nickname": "날쒼날쒼쟁이",
+      "name": "이희영",
+      "orderAmount": 94000,
+      "depositId": 336,
+      "depositor": "날쒼날쒼쟁이",
+      "depositAmount": 94000,
+      "reason": "현재 run 코드 기준 자동매칭 가능"
+    }
+  ],
+  "blocked": [
+    {
+      "groupId": "20236426-169c-4110-b989-7c14f96c2f0a",
+      "orderIds": [
+        1024
+      ],
+      "rowCount": 1,
+      "nickname": "강윤경",
+      "name": "강윤경",
+      "currentRunAmount": 73000,
+      "firstRowAmount": 73000,
+      "rowAmounts": [
+        73000
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": []
+    },
+    {
+      "groupId": "f79157fb-9974-492f-bec4-1e51a6270fe3",
+      "orderIds": [
+        1020
+      ],
+      "rowCount": 1,
+      "nickname": "칠성사이다",
+      "name": "박성혜",
+      "currentRunAmount": 49000,
+      "firstRowAmount": 49000,
+      "rowAmounts": [
+        49000
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "55ff373b-6364-42fd-a654-e11c04cb0f1f",
+      "orderIds": [
+        1019
+      ],
+      "rowCount": 1,
+      "nickname": "사사야",
+      "name": "박찬순",
+      "currentRunAmount": 53000,
+      "firstRowAmount": 53000,
+      "rowAmounts": [
+        53000
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 337,
+          "depositor": "Borahae_Ju",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 70,
+          "depositor": "은경이",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 337,
+          "depositor": "Borahae_Ju",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 70,
+          "depositor": "은경이",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "78eb2a82-ff4c-4399-bca3-f1dfb2290ad1",
+      "orderIds": [
+        1018
+      ],
+      "rowCount": 1,
+      "nickname": "몽실-이야",
+      "name": "임아름",
+      "currentRunAmount": 53000,
+      "firstRowAmount": 53000,
+      "rowAmounts": [
+        53000
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 337,
+          "depositor": "Borahae_Ju",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 70,
+          "depositor": "은경이",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 337,
+          "depositor": "Borahae_Ju",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 70,
+          "depositor": "은경이",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "edad5319-f56d-43ef-b64e-65dd6e6b8c51",
+      "orderIds": [
+        1017
+      ],
+      "rowCount": 1,
+      "nickname": "해치우쟈",
+      "name": "이해진",
+      "currentRunAmount": 49000,
+      "firstRowAmount": 49000,
+      "rowAmounts": [
+        49000
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "32578eb6-57f9-4761-87ea-4505f8837874",
+      "orderIds": [
+        1016
+      ],
+      "rowCount": 1,
+      "nickname": "개구쟁쟁이",
+      "name": "이하나",
+      "currentRunAmount": 73000,
+      "firstRowAmount": 73000,
+      "rowAmounts": [
+        73000
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": []
+    },
+    {
+      "groupId": "5055806e-194b-4e34-b404-19aa859c83c8",
+      "orderIds": [
+        1015
+      ],
+      "rowCount": 1,
+      "nickname": "리치",
+      "name": "최종임",
+      "currentRunAmount": 102000,
+      "firstRowAmount": 102000,
+      "rowAmounts": [
+        102000
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": []
+    },
+    {
+      "groupId": "bc00caa3-52b4-4c63-8855-a3c4b7bff3ee",
+      "orderIds": [
+        1013
+      ],
+      "rowCount": 1,
+      "nickname": "@Borahae_Ju",
+      "name": "강신주",
+      "currentRunAmount": 53000,
+      "firstRowAmount": 53000,
+      "rowAmounts": [
+        53000
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "@ 제거 시 이름은 같은데 현재 완전일치 기준에서 제외 가능성",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 337,
+          "depositor": "Borahae_Ju",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": true
+        },
+        {
+          "id": 70,
+          "depositor": "은경이",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 337,
+          "depositor": "Borahae_Ju",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": true
+        },
+        {
+          "id": 70,
+          "depositor": "은경이",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "c190aa46-1752-4496-b88b-684668bec0ff",
+      "orderIds": [
+        1010
+      ],
+      "rowCount": 1,
+      "nickname": "헬로지니",
+      "name": "한혜진",
+      "currentRunAmount": 45000,
+      "firstRowAmount": 45000,
+      "rowAmounts": [
+        45000
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 52,
+          "depositor": "ellell5996",
+          "amount": 45000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 52,
+          "depositor": "ellell5996",
+          "amount": 45000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "6c36c915-d6c3-4052-aea0-2df1ac51724c",
+      "orderIds": [
+        1009
+      ],
+      "rowCount": 1,
+      "nickname": "헬로지니",
+      "name": "한혜진",
+      "currentRunAmount": 49000,
+      "firstRowAmount": 49000,
+      "rowAmounts": [
+        49000
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "ca7364f8-09c2-4349-b132-3c3c102567ac",
+      "orderIds": [
+        1005
+      ],
+      "rowCount": 1,
+      "nickname": "블랙선영",
+      "name": "박선영",
+      "currentRunAmount": 93000,
+      "firstRowAmount": 93000,
+      "rowAmounts": [
+        93000
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "8ce3a1af-502e-491d-aeeb-724b5e794289",
+      "orderIds": [
+        503
+      ],
+      "rowCount": 1,
+      "nickname": "유키맘",
+      "name": "정진희",
+      "currentRunAmount": 74000,
+      "firstRowAmount": 74000,
+      "rowAmounts": [
+        74000
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": []
+    },
+    {
+      "groupId": "b92ef254-906e-4daa-8d42-56c04bdd7573",
+      "orderIds": [
+        462
+      ],
+      "rowCount": 1,
+      "nickname": "동실장",
+      "name": "한두희",
+      "currentRunAmount": 1000,
+      "firstRowAmount": 1000,
+      "rowAmounts": [
+        1000
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "@ 제거 시 이름은 같은데 현재 완전일치 기준에서 제외 가능성",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 80,
+          "depositor": "동실장",
+          "amount": 1000,
+          "status": "미확인",
+          "atNameMatch": true
+        },
+        {
+          "id": 79,
+          "depositor": "한두희",
+          "amount": 1000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 78,
+          "depositor": "한두희",
+          "amount": 1000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 77,
+          "depositor": "동실장",
+          "amount": 1000,
+          "status": "미확인",
+          "atNameMatch": true
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 80,
+          "depositor": "동실장",
+          "amount": 1000,
+          "status": "미확인",
+          "atNameMatch": true
+        },
+        {
+          "id": 79,
+          "depositor": "한두희",
+          "amount": 1000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 78,
+          "depositor": "한두희",
+          "amount": 1000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 77,
+          "depositor": "동실장",
+          "amount": 1000,
+          "status": "미확인",
+          "atNameMatch": true
+        }
+      ]
+    },
+    {
+      "groupId": "4bdc840b-6b9b-4a81-b107-89a5beaea2d5",
+      "orderIds": [
+        461,
+        460,
+        459
+      ],
+      "rowCount": 3,
+      "nickname": "꾸리꾸리",
+      "name": "은재이",
+      "currentRunAmount": 191000,
+      "firstRowAmount": 93000,
+      "rowAmounts": [
+        93000,
+        49000,
+        49000
+      ],
+      "status": "출고완료 / 출고완료 / 주문완료",
+      "method": "무통장입금",
+      "reason": "다상품 주문에서 주문행 금액 합산 때문에 입금액과 달라졌을 가능성",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "ea8c8a73-2601-4a63-9aec-683454b7e067",
+      "orderIds": [
+        457
+      ],
+      "rowCount": 1,
+      "nickname": "에이치더블",
+      "name": "가한혜",
+      "currentRunAmount": 89000,
+      "firstRowAmount": 89000,
+      "rowAmounts": [
+        89000
+      ],
+      "status": "출고완료 / 출고완료 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 58,
+          "depositor": "임영순",
+          "amount": 89000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 58,
+          "depositor": "임영순",
+          "amount": 89000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "d923708f-54d9-403d-bc04-54f41d0570b2",
+      "orderIds": [
+        455
+      ],
+      "rowCount": 1,
+      "nickname": "민이채널",
+      "name": "송혜선",
+      "currentRunAmount": 93000,
+      "firstRowAmount": 93000,
+      "rowAmounts": [
+        93000
+      ],
+      "status": "출고완료 / 출고완료 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "c6a16573-aa71-4c32-a7fc-746aa6e9b460",
+      "orderIds": [
+        454
+      ],
+      "rowCount": 1,
+      "nickname": "아지라엘",
+      "name": "아지라엘",
+      "currentRunAmount": 93000,
+      "firstRowAmount": 93000,
+      "rowAmounts": [
+        93000
+      ],
+      "status": "출고완료 / 출고완료 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "3014394d-6d53-47c6-a61b-bfbe9d0d5b39",
+      "orderIds": [
+        453
+      ],
+      "rowCount": 1,
+      "nickname": "단심",
+      "name": "최소은",
+      "currentRunAmount": 45000,
+      "firstRowAmount": 45000,
+      "rowAmounts": [
+        45000
+      ],
+      "status": "출고완료 / 출고완료 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 52,
+          "depositor": "ellell5996",
+          "amount": 45000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 52,
+          "depositor": "ellell5996",
+          "amount": 45000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "d6b7d728-e7b5-4f5d-97ca-2e86e31c94cd",
+      "orderIds": [
+        451,
+        452
+      ],
+      "rowCount": 2,
+      "nickname": "쩡쩡",
+      "name": "김지영",
+      "currentRunAmount": 102000,
+      "firstRowAmount": 53000,
+      "rowAmounts": [
+        53000,
+        49000
+      ],
+      "status": "출고완료 / 출고완료 / 주문완료",
+      "method": "무통장입금",
+      "reason": "다상품 주문에서 주문행 금액 합산 때문에 입금액과 달라졌을 가능성",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 337,
+          "depositor": "Borahae_Ju",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 70,
+          "depositor": "은경이",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "8f37c58b-8f93-4c2c-850c-4f80b9219b46",
+      "orderIds": [
+        450
+      ],
+      "rowCount": 1,
+      "nickname": "신디",
+      "name": "김애경",
+      "currentRunAmount": 49000,
+      "firstRowAmount": 49000,
+      "rowAmounts": [
+        49000
+      ],
+      "status": "출고완료 / 출고완료 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "67ea3d3e-c4ce-4328-a512-25547231e70c",
+      "orderIds": [
+        449
+      ],
+      "rowCount": 1,
+      "nickname": "얇은 방값",
+      "name": "권나영",
+      "currentRunAmount": 63000,
+      "firstRowAmount": 63000,
+      "rowAmounts": [
+        63000
+      ],
+      "status": "출고완료 / 출고완료 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": []
+    },
+    {
+      "groupId": "bd16ada3-90d0-47f3-b9da-2b69fb875e59",
+      "orderIds": [
+        448
+      ],
+      "rowCount": 1,
+      "nickname": "찌니s2",
+      "name": "배윤진",
+      "currentRunAmount": 53000,
+      "firstRowAmount": 53000,
+      "rowAmounts": [
+        53000
+      ],
+      "status": "출고완료 / 출고완료 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 337,
+          "depositor": "Borahae_Ju",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 70,
+          "depositor": "은경이",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 337,
+          "depositor": "Borahae_Ju",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 70,
+          "depositor": "은경이",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "ade7a23f-a543-4973-b5c5-1d10f867c905",
+      "orderIds": [
+        447
+      ],
+      "rowCount": 1,
+      "nickname": "몰리22",
+      "name": "조영숙",
+      "currentRunAmount": 93000,
+      "firstRowAmount": 93000,
+      "rowAmounts": [
+        93000
+      ],
+      "status": "출고완료 / 출고완료 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "8bf64137-8a9d-4e48-9294-814816c9c33e",
+      "orderIds": [
+        446
+      ],
+      "rowCount": 1,
+      "nickname": "ORORA",
+      "name": "김지은",
+      "currentRunAmount": 89000,
+      "firstRowAmount": 89000,
+      "rowAmounts": [
+        89000
+      ],
+      "status": "출고완료 / 출고완료 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 58,
+          "depositor": "임영순",
+          "amount": 89000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 58,
+          "depositor": "임영순",
+          "amount": 89000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "c4551a0b-1c8d-4d8b-be10-04a271059f3f",
+      "orderIds": [
+        445
+      ],
+      "rowCount": 1,
+      "nickname": "단심",
+      "name": "최소은",
+      "currentRunAmount": 49000,
+      "firstRowAmount": 49000,
+      "rowAmounts": [
+        49000
+      ],
+      "status": "출고완료 / 출고완료 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "aaac0b95-ac61-407b-a0de-42e7db0c6071",
+      "orderIds": [
+        442
+      ],
+      "rowCount": 1,
+      "nickname": "신디",
+      "name": "김애경",
+      "currentRunAmount": 93000,
+      "firstRowAmount": 93000,
+      "rowAmounts": [
+        93000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "659f6aa9-0b14-4287-880a-1e22053ffa42",
+      "orderIds": [
+        441
+      ],
+      "rowCount": 1,
+      "nickname": "소심이",
+      "name": "강미라",
+      "currentRunAmount": 182000,
+      "firstRowAmount": 182000,
+      "rowAmounts": [
+        182000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 10,
+          "depositor": "김태현",
+          "amount": 182000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 3,
+          "depositor": "썬0218",
+          "amount": 182000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 10,
+          "depositor": "김태현",
+          "amount": 182000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 3,
+          "depositor": "썬0218",
+          "amount": 182000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "a25512d3-5ce8-438b-bbae-2761d34b4bee",
+      "orderIds": [
+        433,
+        434
+      ],
+      "rowCount": 2,
+      "nickname": "윤이상",
+      "name": "윤아영",
+      "currentRunAmount": 104000,
+      "firstRowAmount": 59000,
+      "rowAmounts": [
+        59000,
+        45000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "다상품 주문에서 주문행 금액 합산 때문에 입금액과 달라졌을 가능성",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 13,
+          "depositor": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 9,
+          "depositor": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "644dbc82-b944-4787-a4b5-6fb88c674bb5",
+      "orderIds": [
+        430,
+        431
+      ],
+      "rowCount": 2,
+      "nickname": "나는나",
+      "name": "민원경",
+      "currentRunAmount": 178000,
+      "firstRowAmount": 89000,
+      "rowAmounts": [
+        89000,
+        89000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "다상품 주문에서 주문행 금액 합산 때문에 입금액과 달라졌을 가능성",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 58,
+          "depositor": "임영순",
+          "amount": 89000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "81a6c99d-9758-4fc8-b96c-bf2851dd4c37",
+      "orderIds": [
+        429
+      ],
+      "rowCount": 1,
+      "nickname": "임-d5t",
+      "name": "임영순",
+      "currentRunAmount": 93000,
+      "firstRowAmount": 93000,
+      "rowAmounts": [
+        93000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "b9063e3e-5988-473f-bb78-fca806f989dc",
+      "orderIds": [
+        428
+      ],
+      "rowCount": 1,
+      "nickname": "귯걸김희수",
+      "name": "김희수",
+      "currentRunAmount": 73000,
+      "firstRowAmount": 73000,
+      "rowAmounts": [
+        73000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": []
+    },
+    {
+      "groupId": "74e1ed88-66b8-4d85-a126-4e422502352d",
+      "orderIds": [
+        427
+      ],
+      "rowCount": 1,
+      "nickname": "다야정",
+      "name": "정다야",
+      "currentRunAmount": 93000,
+      "firstRowAmount": 93000,
+      "rowAmounts": [
+        93000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "477ae3fe-a37b-477a-9a09-1adf9b785070",
+      "orderIds": [
+        425
+      ],
+      "rowCount": 1,
+      "nickname": "@Borahae_Ju",
+      "name": "강신주",
+      "currentRunAmount": 93000,
+      "firstRowAmount": 93000,
+      "rowAmounts": [
+        93000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "074a10d7-1ec3-436a-92b8-290c5ba458d1",
+      "orderIds": [
+        421
+      ],
+      "rowCount": 1,
+      "nickname": "임-d5t",
+      "name": "임영순",
+      "currentRunAmount": 49000,
+      "firstRowAmount": 49000,
+      "rowAmounts": [
+        49000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "85f26ef1-eedb-47da-9793-1133a2b4db2d",
+      "orderIds": [
+        419
+      ],
+      "rowCount": 1,
+      "nickname": "개구쟁쟁이",
+      "name": "이하나",
+      "currentRunAmount": 89000,
+      "firstRowAmount": 89000,
+      "rowAmounts": [
+        89000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 58,
+          "depositor": "임영순",
+          "amount": 89000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 58,
+          "depositor": "임영순",
+          "amount": 89000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "93babd66-994c-4d8f-be53-8cc905101ea7",
+      "orderIds": [
+        418
+      ],
+      "rowCount": 1,
+      "nickname": "결이",
+      "name": "박영지",
+      "currentRunAmount": 97900,
+      "firstRowAmount": 97900,
+      "rowAmounts": [
+        97900
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": []
+    },
+    {
+      "groupId": "d24938a3-c857-4b78-b598-10b60018ca55",
+      "orderIds": [
+        416,
+        417
+      ],
+      "rowCount": 2,
+      "nickname": "수안정",
+      "name": "정수안",
+      "currentRunAmount": 62000,
+      "firstRowAmount": 31000,
+      "rowAmounts": [
+        31000,
+        31000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": []
+    },
+    {
+      "groupId": "8a647940-0981-4f22-a5c0-7b17c8a272ab",
+      "orderIds": [
+        412
+      ],
+      "rowCount": 1,
+      "nickname": "팝콩냉이",
+      "name": "최선영",
+      "currentRunAmount": 49000,
+      "firstRowAmount": 49000,
+      "rowAmounts": [
+        49000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "dcb3de98-eb60-4bee-af3a-9024e13b400a",
+      "orderIds": [
+        411
+      ],
+      "rowCount": 1,
+      "nickname": "뮤즈-12",
+      "name": "민희정",
+      "currentRunAmount": 53000,
+      "firstRowAmount": 53000,
+      "rowAmounts": [
+        53000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 337,
+          "depositor": "Borahae_Ju",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 70,
+          "depositor": "은경이",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 337,
+          "depositor": "Borahae_Ju",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 70,
+          "depositor": "은경이",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "a3111f82-2a9c-4872-9f13-ec4130377e59",
+      "orderIds": [
+        410
+      ],
+      "rowCount": 1,
+      "nickname": "은경이",
+      "name": "원은경",
+      "currentRunAmount": 49000,
+      "firstRowAmount": 49000,
+      "rowAmounts": [
+        49000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "90f26c58-16d1-464e-927c-ad37bead81b6",
+      "orderIds": [
+        409
+      ],
+      "rowCount": 1,
+      "nickname": "1002woo",
+      "name": "정민",
+      "currentRunAmount": 59000,
+      "firstRowAmount": 59000,
+      "rowAmounts": [
+        59000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 13,
+          "depositor": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 9,
+          "depositor": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 13,
+          "depositor": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 9,
+          "depositor": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "397acf0e-7e3a-42a2-9ad8-e43db0411c3d",
+      "orderIds": [
+        408
+      ],
+      "rowCount": 1,
+      "nickname": "@모찌-y3r6h",
+      "name": "강소현",
+      "currentRunAmount": 103000,
+      "firstRowAmount": 103000,
+      "rowAmounts": [
+        103000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 261,
+          "depositor": "김수선(곰 )",
+          "amount": 103000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 4,
+          "depositor": "박운영",
+          "amount": 103000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 261,
+          "depositor": "김수선(곰 )",
+          "amount": 103000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 4,
+          "depositor": "박운영",
+          "amount": 103000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "9b17e445-cb2e-48f1-880a-1528ed448c4e",
+      "orderIds": [
+        407
+      ],
+      "rowCount": 1,
+      "nickname": "연유라떼",
+      "name": "최하정",
+      "currentRunAmount": 53000,
+      "firstRowAmount": 53000,
+      "rowAmounts": [
+        53000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 337,
+          "depositor": "Borahae_Ju",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 70,
+          "depositor": "은경이",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 337,
+          "depositor": "Borahae_Ju",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 70,
+          "depositor": "은경이",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "02bf216f-1e22-4b31-90b2-8af8dbd4dcbc",
+      "orderIds": [
+        405
+      ],
+      "rowCount": 1,
+      "nickname": "나난",
+      "name": "이화연",
+      "currentRunAmount": 53000,
+      "firstRowAmount": 53000,
+      "rowAmounts": [
+        53000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 337,
+          "depositor": "Borahae_Ju",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 70,
+          "depositor": "은경이",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 337,
+          "depositor": "Borahae_Ju",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 70,
+          "depositor": "은경이",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "4c66fe7e-19e9-45fa-af79-e63c68503511",
+      "orderIds": [
+        404
+      ],
+      "rowCount": 1,
+      "nickname": "1002woo",
+      "name": "정민",
+      "currentRunAmount": 53000,
+      "firstRowAmount": 53000,
+      "rowAmounts": [
+        53000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 337,
+          "depositor": "Borahae_Ju",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 70,
+          "depositor": "은경이",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 337,
+          "depositor": "Borahae_Ju",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 70,
+          "depositor": "은경이",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "fcff347b-c9fa-4064-a7ef-b382ae8a402b",
+      "orderIds": [
+        403,
+        402
+      ],
+      "rowCount": 2,
+      "nickname": "으닝22",
+      "name": "정보은",
+      "currentRunAmount": 148000,
+      "firstRowAmount": 99000,
+      "rowAmounts": [
+        99000,
+        49000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": []
+    },
+    {
+      "groupId": "c4cc80b5-b7ad-48cc-a284-9c27e7f0e6a2",
+      "orderIds": [
+        401
+      ],
+      "rowCount": 1,
+      "nickname": "jj",
+      "name": "홍경화",
+      "currentRunAmount": 53000,
+      "firstRowAmount": 53000,
+      "rowAmounts": [
+        53000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 337,
+          "depositor": "Borahae_Ju",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 70,
+          "depositor": "은경이",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 337,
+          "depositor": "Borahae_Ju",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 70,
+          "depositor": "은경이",
+          "amount": 53000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "ef53000e-1c80-4cbe-9e5e-6fcd904851ba",
+      "orderIds": [
+        400
+      ],
+      "rowCount": 1,
+      "nickname": "나비맘",
+      "name": "김윤이",
+      "currentRunAmount": 49000,
+      "firstRowAmount": 49000,
+      "rowAmounts": [
+        49000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "e7965c68-9fa9-48ad-b5c3-07ace325be8f",
+      "orderIds": [
+        398
+      ],
+      "rowCount": 1,
+      "nickname": "수박조앗수박조앗",
+      "name": "최수진",
+      "currentRunAmount": 49000,
+      "firstRowAmount": 49000,
+      "rowAmounts": [
+        49000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "7081e2b3-36d4-4157-8ca7-f1115e8b3099",
+      "orderIds": [
+        397
+      ],
+      "rowCount": 1,
+      "nickname": "나는나",
+      "name": "민원경",
+      "currentRunAmount": 49000,
+      "firstRowAmount": 49000,
+      "rowAmounts": [
+        49000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "ed85cbf8-18d2-45bc-ae65-208e47798e66",
+      "orderIds": [
+        396
+      ],
+      "rowCount": 1,
+      "nickname": "은경이",
+      "name": "원은경",
+      "currentRunAmount": 103000,
+      "firstRowAmount": 103000,
+      "rowAmounts": [
+        103000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 261,
+          "depositor": "김수선(곰 )",
+          "amount": 103000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 4,
+          "depositor": "박운영",
+          "amount": 103000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 261,
+          "depositor": "김수선(곰 )",
+          "amount": 103000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 4,
+          "depositor": "박운영",
+          "amount": 103000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "1b55064c-6dbc-40b5-83e1-332fe291f4a2",
+      "orderIds": [
+        394,
+        395
+      ],
+      "rowCount": 2,
+      "nickname": "ORORA",
+      "name": "김지은",
+      "currentRunAmount": 98000,
+      "firstRowAmount": 49000,
+      "rowAmounts": [
+        49000,
+        49000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "다상품 주문에서 주문행 금액 합산 때문에 입금액과 달라졌을 가능성",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "0d9e8d55-490e-4f86-a98e-0a36cab99f96",
+      "orderIds": [
+        393,
+        392
+      ],
+      "rowCount": 2,
+      "nickname": "개구쟁쟁이",
+      "name": "이하나",
+      "currentRunAmount": 102000,
+      "firstRowAmount": 49000,
+      "rowAmounts": [
+        49000,
+        53000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "다상품 주문에서 주문행 금액 합산 때문에 입금액과 달라졌을 가능성",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "d1564f5b-911c-4f88-9b17-0541f97c2145",
+      "orderIds": [
+        391
+      ],
+      "rowCount": 1,
+      "nickname": "Olivia lagom",
+      "name": "문지원",
+      "currentRunAmount": 49000,
+      "firstRowAmount": 49000,
+      "rowAmounts": [
+        49000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "fd1f9e33-5c52-41a1-9a9c-f9bb3744c7bc",
+      "orderIds": [
+        390
+      ],
+      "rowCount": 1,
+      "nickname": "세이지",
+      "name": "손지은",
+      "currentRunAmount": 49000,
+      "firstRowAmount": 49000,
+      "rowAmounts": [
+        49000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "29ba11cc-44c5-43bf-a390-e9290bf43259",
+      "orderIds": [
+        388
+      ],
+      "rowCount": 1,
+      "nickname": "가을바람",
+      "name": "양소영",
+      "currentRunAmount": 49000,
+      "firstRowAmount": 49000,
+      "rowAmounts": [
+        49000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "674f47be-dcb5-4dba-ba94-30f9f7c14e25",
+      "orderIds": [
+        387
+      ],
+      "rowCount": 1,
+      "nickname": "리치쮸리",
+      "name": "정은주",
+      "currentRunAmount": 49000,
+      "firstRowAmount": 49000,
+      "rowAmounts": [
+        49000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "030bb863-62f3-4814-a344-3d6b8cb3e0e6",
+      "orderIds": [
+        385
+      ],
+      "rowCount": 1,
+      "nickname": "Ky",
+      "name": "임경환",
+      "currentRunAmount": 49000,
+      "firstRowAmount": 49000,
+      "rowAmounts": [
+        49000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "ea8933d6-5658-4591-8cac-19f0cfd76ead",
+      "orderIds": [
+        384
+      ],
+      "rowCount": 1,
+      "nickname": "동실장",
+      "name": "한두희",
+      "currentRunAmount": 79000,
+      "firstRowAmount": 79000,
+      "rowAmounts": [
+        79000
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": []
+    },
+    {
+      "groupId": "f6e0f583-2b43-4a25-9e8d-1d7d4a216783",
+      "orderIds": [
+        383
+      ],
+      "rowCount": 1,
+      "nickname": "아싸뵹",
+      "name": "아싸아",
+      "currentRunAmount": 1111111,
+      "firstRowAmount": 1111111,
+      "rowAmounts": [
+        1111111
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": []
+    },
+    {
+      "groupId": "ad02d2e8-3943-4d6d-b6d5-2ffcfd44fa45",
+      "orderIds": [
+        382
+      ],
+      "rowCount": 1,
+      "nickname": "아싸뵹",
+      "name": "아싸아",
+      "currentRunAmount": 64000,
+      "firstRowAmount": 64000,
+      "rowAmounts": [
+        64000
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 2건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 284,
+          "depositor": "송예린",
+          "amount": 64000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 284,
+          "depositor": "송예린",
+          "amount": 64000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "f9e4cb30-eb1d-491f-9132-456507647a4d",
+      "orderIds": [
+        381
+      ],
+      "rowCount": 1,
+      "nickname": "아싸뵹",
+      "name": "아싸아",
+      "currentRunAmount": 64000,
+      "firstRowAmount": 64000,
+      "rowAmounts": [
+        64000
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 2건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 284,
+          "depositor": "송예린",
+          "amount": 64000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 284,
+          "depositor": "송예린",
+          "amount": 64000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "ae7291be-5c15-4857-a0e8-de036f35052d",
+      "orderIds": [
+        380
+      ],
+      "rowCount": 1,
+      "nickname": "동실장",
+      "name": "한두희",
+      "currentRunAmount": 10000,
+      "firstRowAmount": 10000,
+      "rowAmounts": [
+        10000
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 75,
+          "depositor": "윤금희",
+          "amount": 10000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 75,
+          "depositor": "윤금희",
+          "amount": 10000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "d18e920e-bc79-4ff3-988f-e50d159699f9",
+      "orderIds": [
+        379
+      ],
+      "rowCount": 1,
+      "nickname": "동실장",
+      "name": "한두희",
+      "currentRunAmount": 8000,
+      "firstRowAmount": 8000,
+      "rowAmounts": [
+        8000
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": []
+    },
+    {
+      "groupId": "2c30b980-a0e5-484f-b173-66cb49366339",
+      "orderIds": [
+        378
+      ],
+      "rowCount": 1,
+      "nickname": "동실장",
+      "name": "한두희",
+      "currentRunAmount": 104000,
+      "firstRowAmount": 104000,
+      "rowAmounts": [
+        104000
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": []
+    },
+    {
+      "groupId": "9906d350-6e7a-44be-83f1-a0b95fc25f49",
+      "orderIds": [
+        377
+      ],
+      "rowCount": 1,
+      "nickname": "동실장",
+      "name": "한두희",
+      "currentRunAmount": 83000,
+      "firstRowAmount": 83000,
+      "rowAmounts": [
+        83000
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 312,
+          "depositor": "골목대장똘팍",
+          "amount": 83000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 312,
+          "depositor": "골목대장똘팍",
+          "amount": 83000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "703a3994-5021-4d3b-9087-6e80595ff473",
+      "orderIds": [
+        376
+      ],
+      "rowCount": 1,
+      "nickname": "dsf",
+      "name": "sdf",
+      "currentRunAmount": 704000,
+      "firstRowAmount": 704000,
+      "rowAmounts": [
+        704000
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": []
+    },
+    {
+      "groupId": "d00b10fb-87ca-4541-97e3-181db62e083a",
+      "orderIds": [
+        375
+      ],
+      "rowCount": 1,
+      "nickname": "dsf",
+      "name": "sdf",
+      "currentRunAmount": 74000,
+      "firstRowAmount": 74000,
+      "rowAmounts": [
+        74000
+      ],
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": []
+    },
+    {
+      "groupId": "947a8b3d-b87f-40dd-8977-c91e03059219",
+      "orderIds": [
+        368
+      ],
+      "rowCount": 1,
+      "nickname": "제이엠비",
+      "name": "정경아",
+      "currentRunAmount": 49000,
+      "firstRowAmount": 49000,
+      "rowAmounts": [
+        49000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "7da3f70d-87c0-417d-8b31-1283a1dcc1bd",
+      "orderIds": [
+        366,
+        365,
+        367
+      ],
+      "rowCount": 3,
+      "nickname": "수안정",
+      "name": "정수안",
+      "currentRunAmount": 153000,
+      "firstRowAmount": 45000,
+      "rowAmounts": [
+        45000,
+        49000,
+        59000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "다상품 주문에서 주문행 금액 합산 때문에 입금액과 달라졌을 가능성",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 52,
+          "depositor": "ellell5996",
+          "amount": 45000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "c96afbd6-9446-490e-81fe-55d630c08403",
+      "orderIds": [
+        364
+      ],
+      "rowCount": 1,
+      "nickname": "수구리당당당",
+      "name": "박홍준",
+      "currentRunAmount": 93000,
+      "firstRowAmount": 93000,
+      "rowAmounts": [
+        93000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "0c3c25db-a497-4ef4-abea-7c728e36b8bb",
+      "orderIds": [
+        363
+      ],
+      "rowCount": 1,
+      "nickname": "율이hyss",
+      "name": "최유리",
+      "currentRunAmount": 93000,
+      "firstRowAmount": 93000,
+      "rowAmounts": [
+        93000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "8d3b3483-6df5-4734-92ea-c223e13387d7",
+      "orderIds": [
+        362,
+        361
+      ],
+      "rowCount": 2,
+      "nickname": "냥이가멍멍",
+      "name": "김태현",
+      "currentRunAmount": 182000,
+      "firstRowAmount": 89000,
+      "rowAmounts": [
+        89000,
+        93000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 10,
+          "depositor": "김태현",
+          "amount": 182000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 3,
+          "depositor": "썬0218",
+          "amount": 182000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 58,
+          "depositor": "임영순",
+          "amount": 89000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "b9717f53-da93-4f7b-a16b-06e9e3025050",
+      "orderIds": [
+        360
+      ],
+      "rowCount": 1,
+      "nickname": "단지",
+      "name": "박운영",
+      "currentRunAmount": 103000,
+      "firstRowAmount": 103000,
+      "rowAmounts": [
+        103000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 261,
+          "depositor": "김수선(곰 )",
+          "amount": 103000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 4,
+          "depositor": "박운영",
+          "amount": 103000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 261,
+          "depositor": "김수선(곰 )",
+          "amount": 103000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 4,
+          "depositor": "박운영",
+          "amount": 103000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "4b05b963-13b7-4947-b1ed-c38581b0652d",
+      "orderIds": [
+        359,
+        358
+      ],
+      "rowCount": 2,
+      "nickname": "금옥어멈",
+      "name": "김미영",
+      "currentRunAmount": 94000,
+      "firstRowAmount": 45000,
+      "rowAmounts": [
+        45000,
+        49000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 53,
+          "depositor": "BorahaeJu",
+          "amount": 94000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 336,
+          "depositor": "날쒼날쒼쟁이",
+          "amount": 94000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 14,
+          "depositor": "김미영",
+          "amount": 94000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 71,
+          "depositor": "단심",
+          "amount": 94000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 52,
+          "depositor": "ellell5996",
+          "amount": 45000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "3fae4a26-853b-4ec7-bace-acbe8c3d825c",
+      "orderIds": [
+        342,
+        343,
+        344
+      ],
+      "rowCount": 3,
+      "nickname": "둥탕탓",
+      "name": "하예진",
+      "currentRunAmount": 139000,
+      "firstRowAmount": 49000,
+      "rowAmounts": [
+        49000,
+        45000,
+        45000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "다상품 주문에서 주문행 금액 합산 때문에 입금액과 달라졌을 가능성",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "47e982ff-716c-40e6-a4b1-21a49c18d939",
+      "orderIds": [
+        341
+      ],
+      "rowCount": 1,
+      "nickname": "단심",
+      "name": "최소은",
+      "currentRunAmount": 73000,
+      "firstRowAmount": 73000,
+      "rowAmounts": [
+        73000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": []
+    },
+    {
+      "groupId": "492cc6fd-96d5-4b4a-ba5c-6402de7589a6",
+      "orderIds": [
+        340
+      ],
+      "rowCount": 1,
+      "nickname": "놀맘7952",
+      "name": "이지영",
+      "currentRunAmount": 63000,
+      "firstRowAmount": 63000,
+      "rowAmounts": [
+        63000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": []
+    },
+    {
+      "groupId": "950eec80-b997-4db0-a124-75c838ac48c5",
+      "orderIds": [
+        339
+      ],
+      "rowCount": 1,
+      "nickname": "채지영",
+      "name": "채지영",
+      "currentRunAmount": 59000,
+      "firstRowAmount": 59000,
+      "rowAmounts": [
+        59000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "@ 제거 시 이름은 같은데 현재 완전일치 기준에서 제외 가능성",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 13,
+          "depositor": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "atNameMatch": true
+        },
+        {
+          "id": 9,
+          "depositor": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "atNameMatch": true
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 13,
+          "depositor": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "atNameMatch": true
+        },
+        {
+          "id": 9,
+          "depositor": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "atNameMatch": true
+        }
+      ]
+    },
+    {
+      "groupId": "f1b4b080-bbb2-40ba-a1c8-8db03159fac6",
+      "orderIds": [
+        337,
+        338
+      ],
+      "rowCount": 2,
+      "nickname": "리치쮸리",
+      "name": "정은주",
+      "currentRunAmount": 104000,
+      "firstRowAmount": 59000,
+      "rowAmounts": [
+        59000,
+        45000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "다상품 주문에서 주문행 금액 합산 때문에 입금액과 달라졌을 가능성",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 13,
+          "depositor": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 9,
+          "depositor": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "bcb19598-01fa-4308-91f7-d0040e438a82",
+      "orderIds": [
+        332,
+        333
+      ],
+      "rowCount": 2,
+      "nickname": "후야",
+      "name": "이하나",
+      "currentRunAmount": 104000,
+      "firstRowAmount": 49000,
+      "rowAmounts": [
+        49000,
+        55000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "다상품 주문에서 주문행 금액 합산 때문에 입금액과 달라졌을 가능성",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "ffe79dfc-ede7-40bc-bd62-ecaeee054d68",
+      "orderIds": [
+        331
+      ],
+      "rowCount": 1,
+      "nickname": "세희0",
+      "name": "이세희",
+      "currentRunAmount": 93000,
+      "firstRowAmount": 93000,
+      "rowAmounts": [
+        93000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 12,
+          "depositor": "박홍준",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 11,
+          "depositor": "최유리",
+          "amount": 93000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "b24bb1b0-82ca-482f-99ba-94215a91253c",
+      "orderIds": [
+        326
+      ],
+      "rowCount": 1,
+      "nickname": "알더블.케이",
+      "name": "최연우",
+      "currentRunAmount": 49000,
+      "firstRowAmount": 49000,
+      "rowAmounts": [
+        49000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 335,
+          "depositor": "한혜진",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 18,
+          "depositor": "문숙영",
+          "amount": 49000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "f88ff1e4-829b-461d-b4ac-7e1d274b0596",
+      "orderIds": [
+        324
+      ],
+      "rowCount": 1,
+      "nickname": "hyunji1456",
+      "name": "박현지",
+      "currentRunAmount": 59000,
+      "firstRowAmount": 59000,
+      "rowAmounts": [
+        59000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "1:1 단일 후보 아님 - 주문그룹 1건 / 입금 0건",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 13,
+          "depositor": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 9,
+          "depositor": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 13,
+          "depositor": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 9,
+          "depositor": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "7ddb9925-7a7e-435d-b7c7-9258d7c625fc",
+      "orderIds": [
+        321,
+        323,
+        322
+      ],
+      "rowCount": 3,
+      "nickname": "하늘펄",
+      "name": "김샛별",
+      "currentRunAmount": 149000,
+      "firstRowAmount": 59000,
+      "rowAmounts": [
+        59000,
+        45000,
+        45000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "다상품 주문에서 주문행 금액 합산 때문에 입금액과 달라졌을 가능성",
+      "sameCurrentAmountDeposits": [],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 13,
+          "depositor": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "atNameMatch": false
+        },
+        {
+          "id": 9,
+          "depositor": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "atNameMatch": false
+        }
+      ]
+    },
+    {
+      "groupId": "2e8dc21d-adda-44c9-8b88-4e46878214b4",
+      "orderIds": [
+        317
+      ],
+      "rowCount": 1,
+      "nickname": "채지영",
+      "name": "채지영",
+      "currentRunAmount": 59000,
+      "firstRowAmount": 59000,
+      "rowAmounts": [
+        59000
+      ],
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "method": "무통장입금",
+      "reason": "@ 제거 시 이름은 같은데 현재 완전일치 기준에서 제외 가능성",
+      "sameCurrentAmountDeposits": [
+        {
+          "id": 13,
+          "depositor": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "atNameMatch": true
+        },
+        {
+          "id": 9,
+          "depositor": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "atNameMatch": true
+        }
+      ],
+      "sameFirstAmountDeposits": [
+        {
+          "id": 13,
+          "depositor": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "atNameMatch": true
+        },
+        {
+          "id": 9,
+          "depositor": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "atNameMatch": true
+        }
+      ]
+    }
+  ]
+}

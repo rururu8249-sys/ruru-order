@@ -31,7 +31,7 @@ type ImagePickerProps = {
   triggerRef?: { current: (() => void) | null };
 };
 
-const COLOR_PRESETS = ["블랙", "화이트"];
+const COLOR_PRESETS = ["블랙", "화이트", "베이지", "그린", "네이비", "그레이"];
 const SIZE_PRESETS = ["FREE", "XS-XXL", "90-115", "신발 220-290"];
 
 function onlyNumber(value: string) {
@@ -528,8 +528,6 @@ export default function QuickProductFastForm({
 
   const [colorText, setColorText] = useState("");
   const [sizeText, setSizeText] = useState("");
-  const [colorEnabled, setColorEnabled] = useState(true);
-  const [sizeEnabled, setSizeEnabled] = useState(true);
 
   const [stockMode, setStockMode] = useState<"total" | "option">("total");
   const [totalStockText, setTotalStockText] = useState("0");
@@ -538,6 +536,8 @@ export default function QuickProductFastForm({
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [sizePresetOpen, setSizePresetOpen] = useState(false);
+  const [colorPresetOpen, setColorPresetOpen] = useState(false);
+  const [nameError, setNameError] = useState(false);
   const coverUploadRef = useRef<(() => void) | null>(null);
 
   // 팝업 드래그(헤더 잡고 이동)
@@ -773,7 +773,7 @@ export default function QuickProductFastForm({
     const productType: "broadcast" | "group_buy" = saleMode === "broadcast" ? "broadcast" : "group_buy";
 
     if (!name) {
-      showAdminToast("상품명을 입력해주세요.", "error");
+      setNameError(true);
       return;
     }
 
@@ -957,7 +957,14 @@ export default function QuickProductFastForm({
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <div>
                 <label style={fieldLabel}>상품명 <span style={{ color: "#7B2D43", marginLeft: "2px" }}>*</span></label>
-                <input style={fieldInput} type="text" placeholder="예: 스웨이드 로퍼" value={productName} onChange={(e) => setProductName(e.target.value)} />
+                <input
+                  style={{ ...fieldInput, borderColor: nameError ? "#C0392B" : "#E8E2DD" }}
+                  type="text"
+                  placeholder="예: 스웨이드 로퍼"
+                  value={productName}
+                  onChange={(e) => { setProductName(e.target.value); if (nameError) setNameError(false); }}
+                />
+                {nameError ? <div style={{ marginTop: "4px", fontSize: "11px", color: "#C0392B" }}>상품명은 필수입니다</div> : null}
               </div>
               <div>
                 <label style={fieldLabel}>가격 <span style={{ fontSize: "11px", fontWeight: 400, color: "#888780" }}>(비우면 손님 직접입력)</span></label>
@@ -1038,71 +1045,56 @@ export default function QuickProductFastForm({
             <div style={{ border: "1px solid #E8E2DD", borderRadius: "8px", padding: "12px", background: "#F7F5F3" }}>
               <div style={{ fontSize: "12px", color: "#888780", marginBottom: "10px" }}>옵션 (각각 켜고 / 직접입력·선택)</div>
 
-              {/* 색상 */}
+              {/* 색상 — togglePill 제거, 프리셋 드롭다운(사이즈와 동일 구조) */}
               <div style={optRow}>
                 <span style={optLabel}>색상</span>
-                <button type="button" onClick={() => setColorEnabled((v) => { const next = !v; if (!next) setColorText(""); return next; })} style={togglePill(colorEnabled ? "on-select" : "off")}>{colorEnabled ? "ON·선택" : "OFF"}</button>
-                {colorEnabled ? (
-                  <>
-                    <input style={optInput} type="text" placeholder="화이트, 블랙, 베이지" value={colorText} onChange={(e) => setColorText(e.target.value)} />
-                    <div style={{ display: "flex", gap: "4px" }}>
-                      {COLOR_PRESETS.map((preset) => (
-                        <button key={preset} type="button" onClick={() => applyColorPreset(preset)} style={presetTag(splitOptions(colorText).includes(preset))}>{preset}</button>
-                      ))}
+                <input style={optInput} type="text" placeholder="화이트, 블랙, 베이지" value={colorText} onChange={(e) => setColorText(e.target.value)} />
+                <div style={{ position: "relative", display: "inline-block" }}>
+                  <button type="button" onClick={() => setColorPresetOpen((v) => !v)} style={{ padding: "5px 10px", borderRadius: "6px", fontSize: "11px", background: "#FBF1E0", color: "#854F0B", cursor: "pointer", border: "none", display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>프리셋 ▾</button>
+                  {colorPresetOpen ? (
+                    <div style={{ position: "absolute", top: "100%", right: 0, background: "#fff", border: "1px solid #E8E2DD", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, minWidth: "160px", marginTop: "4px", overflow: "hidden" }}>
+                      {COLOR_PRESETS.map((preset) => {
+                        const on = splitOptions(colorText).includes(preset);
+                        return (
+                          <div key={preset} onClick={() => applyColorPreset(preset)} style={{ padding: "8px 14px", fontSize: "12px", cursor: "pointer", color: on ? "#7B2D43" : "#1a1a1a", background: on ? "#F5E6EB" : "#fff" }}>{on ? "✓ " : ""}{preset}</div>
+                        );
+                      })}
                     </div>
-                  </>
-                ) : (
-                  <span style={{ fontSize: "12px", color: "#888780" }}>고객 직접입력</span>
-                )}
+                  ) : null}
+                </div>
+                {!colorText.trim() ? <span style={{ fontSize: "12px", color: "#888780" }}>고객 직접입력</span> : null}
               </div>
 
-              {/* 사이즈 */}
+              {/* 사이즈 — togglePill 제거, 프리셋 드롭다운 */}
               <div style={optRow}>
                 <span style={optLabel}>사이즈</span>
-                <button type="button" onClick={() => setSizeEnabled((v) => { const next = !v; if (!next) { setSizeText(""); setSizePresetOpen(false); } return next; })} style={togglePill(sizeEnabled ? "on-select" : "off")}>{sizeEnabled ? "ON·선택" : "OFF"}</button>
-                {sizeEnabled ? (
-                  <>
-                    <input style={optInput} type="text" placeholder="220, 230, 240" value={sizeText} onChange={(e) => setSizeText(e.target.value)} />
-                    <div style={{ position: "relative", display: "inline-block" }}>
-                      <button type="button" onClick={() => setSizePresetOpen((v) => !v)} style={{ padding: "5px 10px", borderRadius: "6px", fontSize: "11px", background: "#FBF1E0", color: "#854F0B", cursor: "pointer", border: "none", display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>프리셋 ▾</button>
-                      {sizePresetOpen ? (
-                        <div style={{ position: "absolute", top: "100%", right: 0, background: "#fff", border: "1px solid #E8E2DD", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, minWidth: "160px", marginTop: "4px", overflow: "hidden" }}>
-                          {SIZE_PRESETS.map((preset) => {
-                            const on = normalizePresetOptions(preset).some((o) => splitOptions(sizeText).includes(o));
-                            return (
-                              <div key={preset} onClick={() => applySizePreset(preset)} style={{ padding: "8px 14px", fontSize: "12px", cursor: "pointer", color: on ? "#7B2D43" : "#1a1a1a", background: on ? "#F5E6EB" : "#fff" }}>{on ? "✓ " : ""}{preset}</div>
-                            );
-                          })}
-                        </div>
-                      ) : null}
+                <input style={optInput} type="text" placeholder="220, 230, 240" value={sizeText} onChange={(e) => setSizeText(e.target.value)} />
+                <div style={{ position: "relative", display: "inline-block" }}>
+                  <button type="button" onClick={() => setSizePresetOpen((v) => !v)} style={{ padding: "5px 10px", borderRadius: "6px", fontSize: "11px", background: "#FBF1E0", color: "#854F0B", cursor: "pointer", border: "none", display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>프리셋 ▾</button>
+                  {sizePresetOpen ? (
+                    <div style={{ position: "absolute", top: "100%", right: 0, background: "#fff", border: "1px solid #E8E2DD", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, minWidth: "160px", marginTop: "4px", overflow: "hidden" }}>
+                      {SIZE_PRESETS.map((preset) => {
+                        const on = normalizePresetOptions(preset).some((o) => splitOptions(sizeText).includes(o));
+                        return (
+                          <div key={preset} onClick={() => applySizePreset(preset)} style={{ padding: "8px 14px", fontSize: "12px", cursor: "pointer", color: on ? "#7B2D43" : "#1a1a1a", background: on ? "#F5E6EB" : "#fff" }}>{on ? "✓ " : ""}{preset}</div>
+                        );
+                      })}
                     </div>
-                  </>
-                ) : (
-                  <span style={{ fontSize: "12px", color: "#888780" }}>고객 직접입력</span>
-                )}
+                  ) : null}
+                </div>
+                {!sizeText.trim() ? <span style={{ fontSize: "12px", color: "#888780" }}>고객 직접입력</span> : null}
               </div>
 
-              {/* 수량 */}
+              {/* 수량 — togglePill 제거, 안내텍스트만 */}
               <div style={optRow}>
                 <span style={optLabel}>수량</span>
-                <button type="button" style={togglePill("on-input")}>ON·직접입력</button>
                 <span style={{ fontSize: "12px", color: "#888780" }}>손님이 숫자 입력</span>
               </div>
 
-              {/* 금액 */}
+              {/* 금액 — togglePill 제거, 안내텍스트만 */}
               <div style={{ ...optRow, marginBottom: 0 }}>
                 <span style={optLabel}>금액</span>
-                {priceText.trim() ? (
-                  <>
-                    <button type="button" style={togglePill("off")}>OFF</button>
-                    <span style={{ fontSize: "12px", color: "#888780" }}>위 가격 사용</span>
-                  </>
-                ) : (
-                  <>
-                    <button type="button" style={togglePill("on-input")}>ON·직접입력</button>
-                    <span style={{ fontSize: "12px", color: "#888780" }}>손님이 금액 입력</span>
-                  </>
-                )}
+                <span style={{ fontSize: "12px", color: "#888780" }}>{priceText.trim() ? "위 가격 사용" : "비우면 손님 직접입력"}</span>
               </div>
             </div>
           </div>

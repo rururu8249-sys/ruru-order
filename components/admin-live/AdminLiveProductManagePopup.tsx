@@ -117,8 +117,8 @@ function shippingLabel(p: ProductRow) {
 function saleModeLabel(p: ProductRow) {
   const m = pickString(p, ["sale_mode"], "both");
   if (m === "broadcast") return "방송전용";
-  if (m === "shop") return "상시전용";
-  return "방송+상시";
+  if (m === "shop") return "쇼핑몰전용";
+  return "방송+쇼핑몰";
 }
 
 function productCategory(p: ProductRow) {
@@ -145,6 +145,14 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [wsSelected, setWsSelected] = useState<Set<string>>(new Set());
   const [wsSaving, setWsSaving] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  // 기록 탭(방송별 매출/주문)
+  const [histLoaded, setHistLoaded] = useState(false);
+  const [histLoading, setHistLoading] = useState(false);
+  const [histBroadcasts, setHistBroadcasts] = useState<Array<{ id: string; title: string; started_at: string; ended_at: string }>>([]);
+  const [histStats, setHistStats] = useState<Map<string, { sales: number; count: number }>>(new Map());
+  const [histYear, setHistYear] = useState("전체");
+  const [histMonth, setHistMonth] = useState("전체");
+  const [histSelectedId, setHistSelectedId] = useState("");
 
   // 상품 fetch (기존 loadProducts 재사용)
   const loadProducts = async () => {
@@ -189,9 +197,84 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     setVisibleCount(PAGE_STEP);
   }, [tab, search, category]);
 
+  // 기록 탭: 방송 목록 + 방송별 매출/주문수 집계 (broadcasts + orders)
+  const loadHistory = async () => {
+    setHistLoading(true);
+    try {
+      const { data: bc } = await supabase
+        .from("broadcasts")
+        .select("id, public_title, started_at, ended_at")
+        .order("started_at", { ascending: false });
+      const broadcasts = ((bc as Array<Record<string, unknown>>) || []).map((b) => ({
+        id: String(b.id),
+        title: String(b.public_title || "제목 없음"),
+        started_at: String(b.started_at || ""),
+        ended_at: String(b.ended_at || ""),
+      }));
+      const ids = broadcasts.map((b) => b.id).filter(Boolean);
+      const stats = new Map<string, { sales: number; count: number }>();
+      if (ids.length > 0) {
+        const { data: ord } = await supabase
+          .from("orders")
+          .select("broadcast_id, total_price")
+          .in("broadcast_id", ids);
+        ((ord as Array<{ broadcast_id: unknown; total_price: unknown }>) || []).forEach((o) => {
+          const bid = String(o.broadcast_id);
+          const cur = stats.get(bid) || { sales: 0, count: 0 };
+          cur.sales += Number(o.total_price || 0);
+          cur.count += 1;
+          stats.set(bid, cur);
+        });
+      }
+      setHistBroadcasts(broadcasts);
+      setHistStats(stats);
+      setHistLoaded(true);
+    } catch (e) {
+      showAdminToast("기록 불러오기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally {
+      setHistLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tab === "history" && !histLoaded) void loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, histLoaded]);
+
+  // 년/월 옵션 + 필터된 방송 + 요약
+  const histYearOptions = useMemo(() => {
+    const set = new Set<string>();
+    histBroadcasts.forEach((b) => {
+      const d = new Date(b.started_at);
+      if (!Number.isNaN(d.getTime())) set.add(String(d.getFullYear()));
+    });
+    return [...set].sort((a, b) => Number(b) - Number(a));
+  }, [histBroadcasts]);
+
+  const histFiltered = useMemo(() => {
+    return histBroadcasts.filter((b) => {
+      const d = new Date(b.started_at);
+      if (Number.isNaN(d.getTime())) return histYear === "전체" && histMonth === "전체";
+      if (histYear !== "전체" && String(d.getFullYear()) !== histYear) return false;
+      if (histMonth !== "전체" && String(d.getMonth() + 1) !== histMonth) return false;
+      return true;
+    });
+  }, [histBroadcasts, histYear, histMonth]);
+
+  const histSummary = useMemo(() => {
+    let sales = 0;
+    let count = 0;
+    histFiltered.forEach((b) => {
+      const st = histStats.get(b.id);
+      if (st) { sales += st.sales; count += st.count; }
+    });
+    return { broadcastCount: histFiltered.length, sales, count };
+  }, [histFiltered, histStats]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return products.filter((p) => {
+      if (pickString(p, ["status", "product_status"], "") === "deleted") return false;
       if (category !== "전체" && productCategory(p) !== category) return false;
       if (q && !productName(p).toLowerCase().includes(q)) return false;
       return true;
@@ -309,15 +392,15 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const deleteProduct = async (p: ProductRow) => {
     const id = productId(p);
     if (!id) return;
-    if (!window.confirm(`"${productName(p)}" 상품을 삭제할까요?\n\n삭제 후 복구할 수 없습니다.`)) return;
+    if (!window.confirm(`"${productName(p)}" 상품을 삭제할까요?\n\n숨김 처리됩니다 (복구 가능)`)) return;
     try {
-      const { error } = await supabase.from("products").delete().eq("id", id);
+      const { error } = await supabase.from("products").update({ status: "deleted" }).eq("id", id);
       if (error) throw error;
-      showAdminToast("상품을 삭제했어요.", "success");
+      showAdminToast("상품을 숨김 처리했어요. (복구 가능)", "success");
       window.dispatchEvent(new Event("ruru-live-product-updated"));
       await loadProducts();
     } catch (e) {
-      showAdminToast("상품 삭제 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+      showAdminToast("상품 숨김 처리 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
     }
   };
 
@@ -417,8 +500,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   return createPortal(
     <div
       className="ruru-product-sian"
-      style={{ position: "fixed", inset: 0, zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(2,6,23,0.45)", padding: "16px" }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position: "fixed", inset: 0, zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", padding: "16px" }}
     >
       <div style={{ width: "600px", maxWidth: "100%", flexShrink: 0, maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "14px", overflow: "hidden" }}>
         {/* 헤더 */}
@@ -442,7 +524,67 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         </div>
 
         {tab === "history" ? (
-          <div style={{ padding: "70px 0", textAlign: "center", color: "#999", fontSize: "13px", fontWeight: 700 }}>기록 기능은 준비 중입니다.</div>
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "14px 18px 16px" }}>
+            {/* 요약카드 3개 */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "12px" }}>
+              {([
+                ["방송 수", `${histSummary.broadcastCount}회`],
+                ["총 매출", money(histSummary.sales)],
+                ["총 주문", `${histSummary.count.toLocaleString("ko-KR")}건`],
+              ] as const).map(([label, value]) => (
+                <div key={label} style={{ border: "1px solid #E8E2DD", borderRadius: "10px", padding: "12px 10px", textAlign: "center", background: "#F7F5F3" }}>
+                  <div style={{ fontSize: "11px", color: "#888780", marginBottom: "4px" }}>{label}</div>
+                  <div style={{ fontSize: "16px", fontWeight: 800, color: "#7B2D43" }}>{value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* 년/월 드롭다운 */}
+            <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
+              <select value={histYear} onChange={(e) => setHistYear(e.target.value)} style={{ height: "34px", borderRadius: "8px", border: "1px solid #E8E2DD", padding: "0 10px", fontSize: "13px", background: "#fff", cursor: "pointer" }}>
+                <option value="전체">전체 연도</option>
+                {histYearOptions.map((y) => <option key={y} value={y}>{y}년</option>)}
+              </select>
+              <select value={histMonth} onChange={(e) => setHistMonth(e.target.value)} style={{ height: "34px", borderRadius: "8px", border: "1px solid #E8E2DD", padding: "0 10px", fontSize: "13px", background: "#fff", cursor: "pointer" }}>
+                <option value="전체">전체 월</option>
+                {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((m) => <option key={m} value={m}>{m}월</option>)}
+              </select>
+            </div>
+
+            {/* 방송 목록 */}
+            {histLoading ? (
+              <div style={{ textAlign: "center", padding: "40px 0", color: "#999", fontSize: "13px", fontWeight: 700 }}>불러오는 중…</div>
+            ) : histFiltered.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "40px 0", color: "#999", fontSize: "13px", fontWeight: 700 }}>방송 기록이 없습니다.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                {histFiltered.map((b) => {
+                  const st = histStats.get(b.id) || { sales: 0, count: 0 };
+                  const sel = histSelectedId === b.id;
+                  const d = new Date(b.started_at);
+                  const dateLabel = Number.isNaN(d.getTime()) ? "-" : `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+                  return (
+                    <div
+                      key={b.id}
+                      onClick={() => setHistSelectedId(sel ? "" : b.id)}
+                      style={{ border: "1px solid " + (sel ? "#D9C5CC" : "#E8E2DD"), background: sel ? "#F5E6EB" : "#fff", borderRadius: "10px", padding: "11px 13px", cursor: "pointer" }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: "13px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</div>
+                          <div style={{ fontSize: "11px", color: "#888780", marginTop: "2px" }}>{dateLabel}</div>
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div style={{ fontSize: "13px", fontWeight: 800, color: "#7B2D43" }}>{money(st.sales)}</div>
+                          <div style={{ fontSize: "11px", color: "#888780", marginTop: "2px" }}>주문 {st.count.toLocaleString("ko-KR")}건</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         ) : (
           <>
             {/* 상단 버튼 3개 */}

@@ -1,0 +1,171 @@
+{
+  "openOrderCount": 270,
+  "openDepositCount": 40,
+  "report": [
+    {
+      "kind": "✅ 자동처리 가능 후보처럼 보임",
+      "orderId": 1068,
+      "groupId": "6760d2ca-1693-4161-bdc4-255a8142383c",
+      "orderTime": "2026-06-02T14:46:55.819797+00:00",
+      "names": [
+        "임-d5t",
+        "임영순"
+      ],
+      "amount": 49000,
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "matchedCount": 1,
+      "deposits": [
+        {
+          "id": 374,
+          "name": "임영순",
+          "amount": 49000,
+          "status": "미확인",
+          "confirmed_at": ""
+        }
+      ]
+    },
+    {
+      "kind": "✅ 자동처리 가능 후보처럼 보임",
+      "orderId": 1031,
+      "groupId": "d01c30a5-9224-441c-979f-5e6f61a39907",
+      "orderTime": "2026-06-02T13:09:16.02529+00:00",
+      "names": [
+        "임-d5t",
+        "임영순"
+      ],
+      "amount": 49000,
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "matchedCount": 1,
+      "deposits": [
+        {
+          "id": 374,
+          "name": "임영순",
+          "amount": 49000,
+          "status": "미확인",
+          "confirmed_at": ""
+        }
+      ]
+    },
+    {
+      "kind": "⚠️ 중복 후보라 자동 제외 정상",
+      "orderId": 462,
+      "groupId": "b92ef254-906e-4daa-8d42-56c04bdd7573",
+      "orderTime": "2026-05-22T04:11:25.811706+00:00",
+      "names": [
+        "동실장",
+        "한두희"
+      ],
+      "amount": 1000,
+      "status": "미설정 / 주문확인전 / 주문완료",
+      "matchedCount": 4,
+      "deposits": [
+        {
+          "id": 80,
+          "name": "동실장",
+          "amount": 1000,
+          "status": "미확인",
+          "confirmed_at": ""
+        },
+        {
+          "id": 77,
+          "name": "동실장",
+          "amount": 1000,
+          "status": "미확인",
+          "confirmed_at": ""
+        },
+        {
+          "id": 79,
+          "name": "한두희",
+          "amount": 1000,
+          "status": "미확인",
+          "confirmed_at": ""
+        },
+        {
+          "id": 78,
+          "name": "한두희",
+          "amount": 1000,
+          "status": "미확인",
+          "confirmed_at": ""
+        }
+      ]
+    },
+    {
+      "kind": "✅ 자동처리 가능 후보처럼 보임",
+      "orderId": 421,
+      "groupId": "074a10d7-1ec3-436a-92b8-290c5ba458d1",
+      "orderTime": "2026-05-21T14:27:29.593144+00:00",
+      "names": [
+        "임-d5t",
+        "임영순"
+      ],
+      "amount": 49000,
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "matchedCount": 1,
+      "deposits": [
+        {
+          "id": 374,
+          "name": "임영순",
+          "amount": 49000,
+          "status": "미확인",
+          "confirmed_at": ""
+        }
+      ]
+    },
+    {
+      "kind": "⚠️ 중복 후보라 자동 제외 정상",
+      "orderId": 339,
+      "groupId": "950eec80-b997-4db0-a124-75c838ac48c5",
+      "orderTime": "2026-05-19T14:34:15.562827+00:00",
+      "names": [
+        "채지영"
+      ],
+      "amount": 59000,
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "matchedCount": 2,
+      "deposits": [
+        {
+          "id": 13,
+          "name": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "confirmed_at": ""
+        },
+        {
+          "id": 9,
+          "name": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "confirmed_at": ""
+        }
+      ]
+    },
+    {
+      "kind": "⚠️ 중복 후보라 자동 제외 정상",
+      "orderId": 317,
+      "groupId": "2e8dc21d-adda-44c9-8b88-4e46878214b4",
+      "orderTime": "2026-05-19T14:06:51.137403+00:00",
+      "names": [
+        "채지영"
+      ],
+      "amount": 59000,
+      "status": "출고대기 / 출고대기 / 주문완료",
+      "matchedCount": 2,
+      "deposits": [
+        {
+          "id": 13,
+          "name": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "confirmed_at": ""
+        },
+        {
+          "id": 9,
+          "name": "채지영",
+          "amount": 59000,
+          "status": "미확인",
+          "confirmed_at": ""
+        }
+      ]
+    }
+  ]
+}

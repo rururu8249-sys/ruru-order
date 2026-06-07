@@ -1,0 +1,1264 @@
+============================================================
+[0] git 상태
+============================================================
+?? point_regrant_audit_20260602_202741/
+44178b1 align roulette slices to pointer center
+b8028b3 fix customer current address display across admin views
+f6993a8 fix admin live customer current address display
+8c68fee fix roulette label layout by participant count
+278a53d fix roulette mid count label layout only
+ebe0465 add participant count based roulette label layout
+028d227 adjust roulette final stop half slice
+5830815 remove roulette pointer shift
+
+============================================================
+[1] 포인트 관련 파일/테이블/RPC 전체 grep
+============================================================
+app/order/page.tsx:135:  pointUsedAmount: number;
+app/order/page.tsx:202:  pointUseInput?: string;
+app/order/page.tsx:785:    document.addEventListener("pointerdown", handleProductSearchOutsidePointerDown);
+app/order/page.tsx:788:      document.removeEventListener("pointerdown", handleProductSearchOutsidePointerDown);
+app/order/page.tsx:913:  const [pointUseInput, setPointUseInput] = useState("");
+app/order/page.tsx:970:      if (typeof draft.pointUseInput === "string") {
+app/order/page.tsx:971:        setPointUseInput(onlyNumber(draft.pointUseInput));
+app/order/page.tsx:985:      pointUseInput.trim() ||
+app/order/page.tsx:997:      pointUseInput,
+app/order/page.tsx:1000:  }, [orderDraftRestored, items, paymentMethod, requestMemo, pointUseInput, done]);
+app/order/page.tsx:2346:    const requestedPoints = toNumber(pointUseInput);
+app/order/page.tsx:2354:  }, [customerPointBalance, pointUseInput, totalAmount]);
+app/order/page.tsx:2376:        const response = await fetch(`/api/customer-points?phone=${encodeURIComponent(cleanPhone)}`, {
+app/order/page.tsx:2384:          throw new Error(payload?.message || "포인트 조회 실패");
+app/order/page.tsx:2387:        const nextPoints = Math.max(0, Number(payload.current_points || 0));
+app/order/page.tsx:2934:      const requestedPointUseAmount = toNumber(pointUseInput);
+app/order/page.tsx:2948:          point_use_amount: appliedPointUseAmount,
+app/order/page.tsx:2961:      const savedPointUsedAmount = toNumber(orderSubmitPayload?.point_used_amount);
+app/order/page.tsx:2962:      const savedPointOriginalAmount = toNumber(orderSubmitPayload?.point_original_amount) || appliedTotalAmount;
+app/order/page.tsx:2980:        pointUsedAmount: savedPointUsedAmount,
+app/order/page.tsx:3477:              RD포인트 {safePointText}
+app/order/page.tsx:3881:                상품금액, 배송비, 포인트 사용 금액을 확인해주세요.
+app/order/page.tsx:3906:                pointUseInput={commaNumberText(pointUseInput)}
+app/order/page.tsx:3907:                pointUsedAmount={selectedPointUseAmount}
+app/order/page.tsx:3916:              <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-[22px] bg-blue-50 p-4 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-blue-900 ring-1 ring-blue-100 active:scale-[0.99]">
+app/order/page.tsx:4377:          pointUsedAmount={done?.pointUsedAmount || 0}
+app/order/page.tsx:4423:        pointUsedAmount={selectedPointUseAmount}
+app/admin/widget/orders/page.tsx:145:          pointer-events: none;
+app/admin/page.tsx:3146:                        className={`p-4 rounded-3xl border cursor-pointer active:scale-[0.98] ${
+app/admin/page.tsx:3719:                                    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-gray-950 px-4 py-3 font-black text-white active:scale-[0.98]">
+app/components/AdminRealtimeOrderAlert.tsx:51:    "default" | "granted" | "denied" | "unsupported"
+app/components/AdminRealtimeOrderAlert.tsx:107:      if (Notification.permission !== "granted") return;
+app/components/AdminRealtimeOrderAlert.tsx:243:    notificationPermission === "granted"
+app/api/customer-orders/submit/route.ts:12:  point_use_amount?: number;
+app/api/customer-orders/submit/route.ts:13:  pointUseAmount?: number;
+app/api/customer-orders/submit/route.ts:156:    if ("point_original_amount" in row && submitNumberValue(row?.point_used_amount, 0) <= 0) {
+app/api/customer-orders/submit/route.ts:157:      nextRow.point_original_amount = nextTotal;
+app/api/customer-orders/submit/route.ts:197:    const pointUseAmount = toWon(body.point_use_amount ?? body.pointUseAmount ?? 0);
+app/api/customer-orders/submit/route.ts:212:    const { data, error } = await supabase.rpc("submit_customer_order_with_points", {
+app/api/customer-orders/submit/route.ts:214:      p_point_use_amount: pointUseAmount,
+app/api/auth/kakao/route.ts:62:      grant_type: "authorization_code",
+app/api/customer-points/route.ts:45:      .from("customer_point_balances")
+app/api/customer-points/route.ts:46:      .select("customer_phone, current_points, total_granted_points, total_used_points, total_canceled_points, total_adjusted_points, updated_at")
+app/api/customer-points/route.ts:51:      throw new Error(error.message || "포인트 조회 실패");
+app/api/customer-points/route.ts:54:    const balance = (data || null) as CustomerPointBalanceRow | null;
+app/api/customer-points/route.ts:55:    const currentPoints = readCurrentCustomerPoints(balance);
+app/api/customer-points/route.ts:59:      current_points: currentPoints,
+app/api/customer-points/route.ts:60:      current_points_text: formatCustomerPointMoney(currentPoints),
+app/api/customer-points/route.ts:61:      has_balance: Boolean(balance),
+app/api/customer-points/route.ts:64:    return jsonError(error instanceof Error ? error.message : "포인트 조회 실패", 400);
+app/api/customer-point-gifts/route.ts:12:  balance_after: number | null;
+app/api/customer-point-gifts/route.ts:55:function readBalanceAfter(row: Pick<PointGiftRow, "balance_after">): number {
+app/api/customer-point-gifts/route.ts:56:  const balanceAfter = Math.floor(Number(row.balance_after || 0));
+app/api/customer-point-gifts/route.ts:58:  if (!Number.isFinite(balanceAfter) || balanceAfter < 0) {
+app/api/customer-point-gifts/route.ts:62:  return balanceAfter;
+app/api/customer-point-gifts/route.ts:67:  const balanceAfter = readBalanceAfter(row);
+app/api/customer-point-gifts/route.ts:73:    balance_after: balanceAfter,
+app/api/customer-point-gifts/route.ts:74:    balance_after_text: formatCustomerPointMoney(balanceAfter),
+app/api/customer-point-gifts/route.ts:88:      .from("customer_point_ledger")
+app/api/customer-point-gifts/route.ts:89:      .select("id, customer_phone, amount, balance_after, reason, created_at")
+app/api/customer-point-gifts/route.ts:92:      .is("customer_seen_at", null)
+app/api/customer-point-gifts/route.ts:98:      throw new Error(error.message || "포인트 선물 조회 실패");
+app/api/customer-point-gifts/route.ts:101:    const gifts = Array.isArray(data) ? (data as PointGiftRow[]).map(toGiftPayload).filter((gift) => gift.amount > 0) : [];
+app/api/customer-point-gifts/route.ts:105:      gift: gifts[0] || null,
+app/api/customer-point-gifts/route.ts:106:      has_gift: gifts.length > 0,
+app/api/customer-point-gifts/route.ts:109:    return jsonError(error instanceof Error ? error.message : "포인트 선물 조회 실패", 400);
+app/api/customer-point-gifts/route.ts:117:    const giftId = cleanId((body as any)?.gift_id || (body as any)?.id);
+app/api/customer-point-gifts/route.ts:119:    if (!giftId) {
+app/api/customer-point-gifts/route.ts:120:      return jsonError("확인할 포인트 알림을 찾을 수 없습니다.", 400);
+app/api/customer-point-gifts/route.ts:127:      .from("customer_point_ledger")
+app/api/customer-point-gifts/route.ts:128:      .update({ customer_seen_at: now })
+app/api/customer-point-gifts/route.ts:129:      .eq("id", giftId)
+app/api/customer-point-gifts/route.ts:132:      .is("customer_seen_at", null)
+app/api/customer-point-gifts/route.ts:134:      .select("id, customer_seen_at")
+app/api/customer-point-gifts/route.ts:138:      throw new Error(error.message || "포인트 알림 확인 실패");
+app/api/customer-point-gifts/route.ts:144:      customer_seen_at: data?.customer_seen_at || now,
+app/api/customer-point-gifts/route.ts:147:    return jsonError(error instanceof Error ? error.message : "포인트 알림 확인 실패", 400);
+app/api/customer-test-account/route.ts:51:        "customer_phone, display_label, is_active, allow_point_test, allow_amount_test, exclude_from_settlement, exclude_from_payment_match, exclude_from_shipping, exclude_from_picking"
+app/api/admin-live/customer-points/route.ts:61:    .from("customer_point_balances")
+app/api/admin-live/customer-points/route.ts:67:    throw new Error(error.message || "포인트 잔액 조회 실패");
+app/api/admin-live/customer-points/route.ts:77:    .from("customer_point_ledger")
+app/api/admin-live/customer-points/route.ts:84:    throw new Error(error.message || "포인트 이력 조회 실패");
+app/api/admin-live/customer-points/route.ts:99:    const balance = await fetchPointBalance(supabase, phone);
+app/api/admin-live/customer-points/route.ts:100:    const ledger = await fetchPointLedger(supabase, phone, limit);
+app/api/admin-live/customer-points/route.ts:101:    const currentPoints = readCurrentCustomerPoints(balance);
+app/api/admin-live/customer-points/route.ts:106:      current_points: currentPoints,
+app/api/admin-live/customer-points/route.ts:107:      current_points_text: formatCustomerPointMoney(currentPoints),
+app/api/admin-live/customer-points/route.ts:108:      balance: balance || {
+app/api/admin-live/customer-points/route.ts:110:        current_points: 0,
+app/api/admin-live/customer-points/route.ts:111:        total_granted_points: 0,
+app/api/admin-live/customer-points/route.ts:112:        total_used_points: 0,
+app/api/admin-live/customer-points/route.ts:113:        total_canceled_points: 0,
+app/api/admin-live/customer-points/route.ts:114:        total_adjusted_points: 0,
+app/api/admin-live/customer-points/route.ts:116:      ledger,
+app/api/admin-live/customer-points/route.ts:119:    return jsonError(error instanceof Error ? error.message : "포인트 조회 실패", 400);
+app/api/admin-live/customer-points/route.ts:124:  let ledgerIdForRollback = "";
+app/api/admin-live/customer-points/route.ts:145:      return jsonError(action === "grant" ? "지급 사유를 입력해주세요." : "차감 사유를 입력해주세요.");
+app/api/admin-live/customer-points/route.ts:156:    ledgerIdForRollback = randomUUID();
+app/api/admin-live/customer-points/route.ts:158:    const ledgerPayload = buildCustomerPointLedgerPayload({
+app/api/admin-live/customer-points/route.ts:159:      id: ledgerIdForRollback,
+app/api/admin-live/customer-points/route.ts:170:    const balancePayload = buildCustomerPointBalancePayload({
+app/api/admin-live/customer-points/route.ts:179:    const { error: ledgerError } = await supabase.from("customer_point_ledger").insert(ledgerPayload);
+app/api/admin-live/customer-points/route.ts:181:    if (ledgerError) {
+app/api/admin-live/customer-points/route.ts:182:      throw new Error(ledgerError.message || "포인트 이력 저장 실패");
+app/api/admin-live/customer-points/route.ts:185:    const { data: savedBalance, error: balanceError } = await supabase
+app/api/admin-live/customer-points/route.ts:186:      .from("customer_point_balances")
+app/api/admin-live/customer-points/route.ts:187:      .upsert(balancePayload, { onConflict: "customer_phone" })
+app/api/admin-live/customer-points/route.ts:191:    if (balanceError) {
+app/api/admin-live/customer-points/route.ts:192:      await supabase.from("customer_point_ledger").delete().eq("id", ledgerIdForRollback);
+app/api/admin-live/customer-points/route.ts:193:      throw new Error(balanceError.message || "포인트 잔액 저장 실패");
+app/api/admin-live/customer-points/route.ts:198:      message: change.action === "grant" ? "포인트 지급이 완료되었습니다." : "포인트 차감이 완료되었습니다.",
+app/api/admin-live/customer-points/route.ts:204:      current_points_before: currentPoints,
+app/api/admin-live/customer-points/route.ts:205:      current_points_after: change.nextPoints,
+app/api/admin-live/customer-points/route.ts:206:      current_points_text: formatCustomerPointMoney(change.nextPoints),
+app/api/admin-live/customer-points/route.ts:207:      summary: `${change.action === "grant" ? "포인트 지급" : "포인트 차감"} ${formatCustomerPointMoney(
+app/api/admin-live/customer-points/route.ts:210:      balance: savedBalance,
+app/api/admin-live/customer-points/route.ts:211:      ledger_id: ledgerIdForRollback,
+app/api/admin-live/customer-points/route.ts:214:    return jsonError(error instanceof Error ? error.message : "포인트 처리 실패", 400);
+components/order/OrderEntryGateV2.tsx:48:          <div className="pointer-events-none absolute -left-10 top-8 h-36 w-36 rounded-full bg-white/70 blur-2xl" />
+components/order/OrderEntryGateV2.tsx:49:          <div className="pointer-events-none absolute -right-10 bottom-5 h-40 w-40 rounded-full bg-blue-300/35 blur-2xl" />
+components/order/OrderEntryGateV2.tsx:50:          <div className="pointer-events-none absolute left-1/2 top-1/2 h-36 w-36 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#fee500]/18 blur-3xl" />
+components/order/OrderDepositConfirmModal.tsx:13:  pointUsedAmount?: number;
+components/order/OrderDepositConfirmModal.tsx:28:  pointUsedAmount = 0,
+components/order/OrderDepositConfirmModal.tsx:35:  const safePointUsedAmount = Math.max(0, Number(pointUsedAmount || 0));
+components/order/OrderDepositConfirmModal.tsx:118:                    <span>포인트 차감</span>
+components/order/OrderDepositConfirmModal.tsx:139:                  포인트로 전액 결제되어 추가 입금금액은 0원입니다.
+components/order/OrderCompletePaymentNotice.tsx:27:  pointUsedAmount?: number;
+components/order/OrderCompletePaymentNotice.tsx:56:  pointUsedAmount = 0,
+components/order/OrderCompletePaymentNotice.tsx:65:  const safePointUsedAmount = Math.max(0, Number(pointUsedAmount || 0));
+components/order/OrderCompletePaymentNotice.tsx:98:              포인트로 결제완료
+components/order/OrderCompletePaymentNotice.tsx:103:            사용 포인트가 주문금액과 같아 추가 입금 없이 주문이 접수됐습니다.
+components/order/OrderCompletePaymentNotice.tsx:248:              <span>포인트 사용</span>
+components/order/OrderPriceSummaryBox.tsx:13:  pointUseInput?: string;
+components/order/OrderPriceSummaryBox.tsx:14:  pointUsedAmount?: number;
+components/order/OrderPriceSummaryBox.tsx:31:  pointUseInput = "",
+components/order/OrderPriceSummaryBox.tsx:32:  pointUsedAmount = 0,
+components/order/OrderPriceSummaryBox.tsx:39:  const safePointUsedAmount = Math.max(0, Number(pointUsedAmount || 0));
+components/order/OrderPriceSummaryBox.tsx:44:      data-ruru-price-summary-box="flat-balanced"
+components/order/OrderPriceSummaryBox.tsx:67:            포인트 확인중...
+components/order/OrderPriceSummaryBox.tsx:72:              <span>보유 포인트</span>
+components/order/OrderPriceSummaryBox.tsx:76:            <div className="mt-3 grid gap-2.5" data-ruru-point-input-stack>
+components/order/OrderPriceSummaryBox.tsx:77:              <div className="relative w-full" data-ruru-point-input-layout>
+components/order/OrderPriceSummaryBox.tsx:79:                  value={pointUseInput}
+components/order/OrderPriceSummaryBox.tsx:85:                <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[13px] font-black text-blue-500">
+components/order/OrderPriceSummaryBox.tsx:100:              포인트는 1,000원 이상부터 사용 가능하며, 주문금액을 초과해 사용할 수 없습니다.
+components/order/OrderPriceSummaryBox.tsx:105:            보유 포인트 {won(safePointBalance)}
+components/order/OrderPriceSummaryBox.tsx:107:            포인트는 1,000원 이상부터 사용할 수 있습니다.
+components/order/OrderPriceSummaryBox.tsx:113:            <span>포인트 사용</span>
+components/home/CustomerHomeHero.tsx:22:        <div className="pointer-events-none absolute -left-12 -top-12 h-36 w-36 rounded-full bg-white/10" />
+components/home/CustomerHomeHero.tsx:23:        <div className="pointer-events-none absolute -bottom-14 -right-12 h-44 w-44 rounded-full bg-white/10" />
+components/admin-v2/settlement/SettlementFilterBar.tsx:124:                      className="mb-1 flex cursor-pointer items-center gap-3 rounded-2xl px-3 py-2 hover:bg-blue-50"
+components/admin-v2/settlement/SettlementManualEntryPanel.tsx:340:              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400">원</span>
+components/admin-v2/today/AdminTodayIssueControlPanel.tsx:200:      <div className="pointer-events-none absolute right-2 top-1 rotate-12 text-[24px] opacity-70">
+components/admin-v2/today/AdminTodayQuickIssueCreate.tsx:254:      <div className="pointer-events-none absolute right-3 top-2 rotate-12 text-[34px] text-neutral-400">📎</div>
+components/admin-v2/today/AdminTodayQuickIssueCreate.tsx:338:                className={`flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border text-[13px] font-black ${
+components/admin-v2/payment/ledger/DepositLedgerFilters.tsx:42:          <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-slate-400">⌕</span>
+components/admin-v2/payment/PaymentMatchPanel.tsx:4:import DepositDetailModal from "@/components/admin-v2/payment/ledger/DepositDetailModal";
+components/admin-v2/payment/PaymentMatchPanel.tsx:5:import DepositLedgerFilters from "@/components/admin-v2/payment/ledger/DepositLedgerFilters";
+components/admin-v2/payment/PaymentMatchPanel.tsx:6:import DepositLedgerSummary from "@/components/admin-v2/payment/ledger/DepositLedgerSummary";
+components/admin-v2/payment/PaymentMatchPanel.tsx:7:import DepositLedgerTable from "@/components/admin-v2/payment/ledger/DepositLedgerTable";
+components/admin-v2/payment/PaymentMatchPanel.tsx:14:} from "@/components/admin-v2/payment/ledger/depositLedgerTypes";
+components/admin-v2/payment/PaymentMatchPanel.tsx:24:} from "@/components/admin-v2/payment/ledger/depositLedgerUtils";
+components/admin-v2/orders/AdminOrderDetailBlock.tsx:117:      <summary className="cursor-pointer list-none">
+components/admin-v2/orders/AdminOrderDetailBlock.tsx:165:      <summary className="cursor-pointer list-none">
+components/admin-v2/orders/AdminOrderBulkActionBar.tsx:34:        <label className="flex cursor-pointer items-center gap-2">
+components/admin-v2/AdminV2Client.tsx:1723:          <label className="cursor-pointer rounded-lg border border-neutral-300 bg-white px-3 py-2 text-[13px] font-black text-neutral-800 hover:bg-neutral-50">
+components/event-claw/EventClawOverlayClient.tsx:374:          pointer-events: none;
+components/myorder/MyOrderResultCard.tsx:21:const pointWon = (value: unknown) => `${toMoneyNumber(value).toLocaleString("ko-KR")}원`;
+components/myorder/MyOrderResultCard.tsx:80:  const pointUsedAmount = toMoneyNumber(order.point_used_amount ?? order.pointUsedAmount);
+components/myorder/MyOrderResultCard.tsx:89:  const pointOriginalAmount = toMoneyNumber(
+components/myorder/MyOrderResultCard.tsx:90:    order.point_original_amount ??
+components/myorder/MyOrderResultCard.tsx:91:      order.pointOriginalAmount ??
+components/myorder/MyOrderResultCard.tsx:92:      (pointUsedAmount > 0 ? finalPaymentAmount + pointUsedAmount : finalPaymentAmount)
+components/myorder/MyOrderResultCard.tsx:161:      {pointUsedAmount > 0 ? (
+components/myorder/MyOrderResultCard.tsx:165:            <span>{pointWon(pointOriginalAmount)}</span>
+components/myorder/MyOrderResultCard.tsx:168:            <span>포인트 사용</span>
+components/myorder/MyOrderResultCard.tsx:169:            <span>-{pointWon(pointUsedAmount)}</span>
+components/myorder/MyOrderResultCard.tsx:173:            <span>{pointWon(finalPaymentAmount)}</span>
+components/admin-live/adminLiveMenu.ts:17:  checkpoints: string[];
+components/admin-live/adminLiveMenu.ts:29:    checkpoints: ["방송 시작/종료", "유튜브 영상·채팅", "실시간 주문", "입금대기 주문"],
+components/admin-live/adminLiveMenu.ts:39:    checkpoints: ["주문 목록", "주문 상세", "입금상태 필터", "배송상태 필터", "일괄 처리"],
+components/admin-live/adminLiveMenu.ts:49:    checkpoints: ["입금내역 조회", "자동입금확인", "수동입금확인", "미매칭 입금", "입금 새로고침"],
+components/admin-live/adminLiveMenu.ts:59:    checkpoints: ["고객 검색", "차단회원", "고객 특이사항", "고객이슈", "최근 주문"],
+components/admin-live/adminLiveMenu.ts:69:    checkpoints: ["방송별 매출", "날짜별 통계", "결제상태", "카드결제", "상품 랭킹"],
+components/admin-live/adminLiveMenu.ts:79:    checkpoints: ["방송 설정", "주문서 설정", "알림 설정", "입금 안내", "관리자 설정"],
+components/admin-live/AdminLiveCustomerPointPanel.tsx:16:  balance_after?: number | null;
+components/admin-live/AdminLiveCustomerPointPanel.tsx:22:type PointActionMode = "grant" | "deduct";
+components/admin-live/AdminLiveCustomerPointPanel.tsx:39:  ledger: PointLedgerRow[];
+components/admin-live/AdminLiveCustomerPointPanel.tsx:49:  ledger: [],
+components/admin-live/AdminLiveCustomerPointPanel.tsx:102:function ledgerLabel(row: PointLedgerRow) {
+components/admin-live/AdminLiveCustomerPointPanel.tsx:105:  if (row.change_type === "grant" || amount > 0) return "지급";
+components/admin-live/AdminLiveCustomerPointPanel.tsx:131:function ledgerKey(row: PointLedgerRow, index: number) {
+components/admin-live/AdminLiveCustomerPointPanel.tsx:132:  return row.id || `${row.created_at || "point"}-${index}`;
+components/admin-live/AdminLiveCustomerPointPanel.tsx:152:  const isGrant = form.mode === "grant";
+components/admin-live/AdminLiveCustomerPointPanel.tsx:153:  const title = isGrant ? "포인트 지급" : "포인트 회수";
+components/admin-live/AdminLiveCustomerPointPanel.tsx:168:            <span className="mb-1 block text-xs font-black text-slate-500">{actionLabel} 포인트</span>
+components/admin-live/AdminLiveCustomerPointPanel.tsx:206:            고객 화면 포인트 알림에 표시
+components/admin-live/AdminLiveCustomerPointPanel.tsx:216:            관리자 지급/회수 포인트는 정산에 바로 반영되지 않습니다. 고객이 주문서에서 실제 사용하는 단계는 나중에 별도 작업합니다.
+components/admin-live/AdminLiveCustomerPointPanel.tsx:248:  const [pointState, setPointState] = useState<PointState>(EMPTY_POINT_STATE);
+components/admin-live/AdminLiveCustomerPointPanel.tsx:250:    mode: "grant",
+components/admin-live/AdminLiveCustomerPointPanel.tsx:258:  const recentLedger = pointState.ledger.slice(0, 8);
+components/admin-live/AdminLiveCustomerPointPanel.tsx:264:        errorMessage: "전화번호가 없어 포인트를 조회할 수 없습니다.",
+components/admin-live/AdminLiveCustomerPointPanel.tsx:276:      const response = await fetch(`/api/admin-live/customer-points?phone=${encodeURIComponent(phoneKey)}&limit=20`, {
+components/admin-live/AdminLiveCustomerPointPanel.tsx:283:        throw new Error(payload?.message || "포인트 조회 실패");
+components/admin-live/AdminLiveCustomerPointPanel.tsx:291:        currentPoints: Number(payload.current_points || 0),
+components/admin-live/AdminLiveCustomerPointPanel.tsx:292:        currentPointsText: clean(payload.current_points_text) || money(payload.current_points),
+components/admin-live/AdminLiveCustomerPointPanel.tsx:293:        ledger: Array.isArray(payload.ledger) ? payload.ledger : [],
+components/admin-live/AdminLiveCustomerPointPanel.tsx:300:        errorMessage: error instanceof Error ? error.message : "포인트 조회 실패",
+components/admin-live/AdminLiveCustomerPointPanel.tsx:326:    if (pointState.saving) return;
+components/admin-live/AdminLiveCustomerPointPanel.tsx:334:        errorMessage: "전화번호가 없어 포인트를 처리할 수 없습니다.",
+components/admin-live/AdminLiveCustomerPointPanel.tsx:347:      const response = await fetch("/api/admin-live/customer-points", {
+components/admin-live/AdminLiveCustomerPointPanel.tsx:368:        throw new Error(payload?.message || "포인트 처리 실패");
+components/admin-live/AdminLiveCustomerPointPanel.tsx:375:        statusMessage: payload.message || "포인트 처리가 완료되었습니다.",
+components/admin-live/AdminLiveCustomerPointPanel.tsx:384:        errorMessage: error instanceof Error ? error.message : "포인트 처리 실패",
+components/admin-live/AdminLiveCustomerPointPanel.tsx:393:          <h3 className="text-base font-black text-slate-950">🎁 포인트 관리</h3>
+components/admin-live/AdminLiveCustomerPointPanel.tsx:395:            회원별 포인트 지급/회수와 최근 이력을 확인합니다.
+components/admin-live/AdminLiveCustomerPointPanel.tsx:402:          disabled={pointState.loading || pointState.saving}
+components/admin-live/AdminLiveCustomerPointPanel.tsx:411:          <div className="text-xs font-black text-slate-500">현재 포인트</div>
+components/admin-live/AdminLiveCustomerPointPanel.tsx:413:            {pointState.loading ? "불러오는중..." : pointState.currentPointsText}
+components/admin-live/AdminLiveCustomerPointPanel.tsx:416:            지급/회수는 포인트 잔액과 이력만 변경합니다. 정산·입금·주문금액에는 아직 반영하지 않습니다.
+components/admin-live/AdminLiveCustomerPointPanel.tsx:423:            onClick={() => openModal("grant")}
+components/admin-live/AdminLiveCustomerPointPanel.tsx:424:            disabled={pointState.loading || pointState.saving || !phoneKey}
+components/admin-live/AdminLiveCustomerPointPanel.tsx:427:            포인트 지급
+components/admin-live/AdminLiveCustomerPointPanel.tsx:432:            disabled={pointState.loading || pointState.saving || !phoneKey}
+components/admin-live/AdminLiveCustomerPointPanel.tsx:435:            포인트 회수
+components/admin-live/AdminLiveCustomerPointPanel.tsx:440:      {pointState.statusMessage ? (
+components/admin-live/AdminLiveCustomerPointPanel.tsx:442:          {pointState.statusMessage}
+components/admin-live/AdminLiveCustomerPointPanel.tsx:446:      {pointState.errorMessage ? (
+components/admin-live/AdminLiveCustomerPointPanel.tsx:448:          {pointState.errorMessage}
+components/admin-live/AdminLiveCustomerPointPanel.tsx:454:          <div className="text-sm font-black text-slate-900">최근 포인트 이력</div>
+components/admin-live/AdminLiveCustomerPointPanel.tsx:460:            아직 포인트 이력이 없습니다.
+components/admin-live/AdminLiveCustomerPointPanel.tsx:465:              <div key={ledgerKey(item, index)} className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[96px_72px_150px_minmax(0,1fr)]">
+components/admin-live/AdminLiveCustomerPointPanel.tsx:467:                <div className="font-black text-slate-900">{ledgerLabel(item)}</div>
+components/admin-live/AdminLiveCustomerPointPanel.tsx:473:                    처리 후 {money(item.balance_after)}
+components/admin-live/AdminLiveCustomerPointPanel.tsx:490:          saving={pointState.saving}
+components/admin-live/AdminLiveCustomerPointPanel.tsx:491:          errorMessage={pointState.errorMessage}
+components/admin-live/useLiveOrderCancelRestore.ts:85:        const { data, error } = await (supabase as any).rpc("cancel_order_and_restore_points", {
+components/admin-live/useLiveOrderCancelRestore.ts:88:          p_admin_memo: "admin-live 주문서취소 자동 포인트 복구",
+components/admin-live/useLiveOrderCancelRestore.ts:99:            ? `\n포인트 ${restoredTotal.toLocaleString("ko-KR")}원 자동복구 완료`
+components/admin-live/types.ts:83:  pointOriginalAmount?: number;
+components/admin-live/types.ts:84:  pointUsedAmount?: number;
+components/admin-live/LiveOrderTable.tsx:714:                      {Number(order.pointUsedAmount || 0) > 0 ? (
+components/admin-live/LiveOrderTable.tsx:716:                          <div className="text-emerald-700">포인트 -{money(Number(order.pointUsedAmount || 0))}</div>
+components/admin-live/LiveOrderTable.tsx:720:                                Math.max(0, Number(order.pointOriginalAmount || order.totalAmount || order.productAmount || 0) - Number(order.pointUsedAmount || 0))
+components/admin-live/LiveOpsStatusBox.tsx:462:                notice.title === "새 주문서 제출" ? "cursor-pointer hover:bg-blue-50 active:scale-[0.99]" : "cursor-default",
+components/admin-live/LiveOrderDetailDrawer.tsx:206:  const pointOriginalAmount =
+components/admin-live/LiveOrderDetailDrawer.tsx:208:      (orderForView as any).pointOriginalAmount ??
+components/admin-live/LiveOrderDetailDrawer.tsx:209:        (orderForView as any).point_original_amount ??
+components/admin-live/LiveOrderDetailDrawer.tsx:210:        rawOrderForCardDisplay.pointOriginalAmount ??
+components/admin-live/LiveOrderDetailDrawer.tsx:211:        rawOrderForCardDisplay.point_original_amount ??
+components/admin-live/LiveOrderDetailDrawer.tsx:214:  const pointUsedAmount =
+components/admin-live/LiveOrderDetailDrawer.tsx:216:      (orderForView as any).pointUsedAmount ??
+components/admin-live/LiveOrderDetailDrawer.tsx:217:        (orderForView as any).point_used_amount ??
+components/admin-live/LiveOrderDetailDrawer.tsx:218:        rawOrderForCardDisplay.pointUsedAmount ??
+components/admin-live/LiveOrderDetailDrawer.tsx:219:        rawOrderForCardDisplay.point_used_amount ??
+components/admin-live/LiveOrderDetailDrawer.tsx:229:    ) || (pointUsedAmount > 0 ? Math.max(0, pointOriginalAmount - pointUsedAmount) : totalAmount);
+components/admin-live/LiveOrderDetailDrawer.tsx:542:          {pointUsedAmount > 0 ? (
+components/admin-live/LiveOrderDetailDrawer.tsx:543:            <PriceRow label="포인트 사용" value={-pointUsedAmount} />
+components/admin-live/LiveOrderDetailDrawer.tsx:548:              {pointUsedAmount > 0 ? "최종 결제금액" : "총 결제예정금액"}
+components/admin-live/LiveOrderDetailDrawer.tsx:551:              {money(pointUsedAmount > 0 ? finalPaymentAmount : cardPaymentExpectedTotal)}
+components/admin-live/AdminLiveDashboard.tsx:1580:                      setQuickPointMessage("포인트 금액을 1원 이상 입력해주세요.");
+components/admin-live/AdminLiveDashboard.tsx:1585:                    const memo = quickPointMemo.trim() || (mode === "add" ? "방송 중 빠른보기 포인트 지급" : "방송 중 빠른보기 포인트 회수");
+components/admin-live/AdminLiveDashboard.tsx:1591:                      const response = await fetch("/api/admin-live/customer-points", {
+components/admin-live/AdminLiveDashboard.tsx:1595:                          action: mode === "add" ? "grant" : "revoke",
+components/admin-live/AdminLiveDashboard.tsx:1596:                          type: mode === "add" ? "grant" : "revoke",
+components/admin-live/AdminLiveDashboard.tsx:1601:                          point: amount,
+components/admin-live/AdminLiveDashboard.tsx:1602:                          points: amount,
+components/admin-live/AdminLiveDashboard.tsx:1603:                          point_amount: amount,
+components/admin-live/AdminLiveDashboard.tsx:1605:                          point_delta: signedAmount,
+components/admin-live/AdminLiveDashboard.tsx:1623:                        throw new Error(result?.message || result?.error || "포인트 처리에 실패했습니다.");
+components/admin-live/AdminLiveDashboard.tsx:1626:                      setQuickPointMessage(`포인트 ${mode === "add" ? "지급" : "회수"} 완료: ${money(amount)}`);
+components/admin-live/AdminLiveDashboard.tsx:1630:                      setQuickPointMessage(error instanceof Error ? error.message : "포인트 처리 중 오류가 발생했습니다.");
+components/admin-live/AdminLiveDashboard.tsx:1715:                                    <h3 className="text-lg font-black text-slate-950">🎁 포인트 관리</h3>
+components/admin-live/AdminLiveDashboard.tsx:1723:                                    <span className="text-xs font-black text-slate-500">포인트 금액</span>
+components/admin-live/AdminLiveDashboard.tsx:1757:                                      {quickPointSaving === "add" ? "지급 중..." : "포인트 지급"}
+components/admin-live/AdminLiveDashboard.tsx:1765:                                      {quickPointSaving === "subtract" ? "회수 중..." : "포인트 회수"}
+components/admin-live/AdminLiveMenuPlaceholder.tsx:39:          {menu.checkpoints.map((item) => (
+components/admin-live/liveOrderAdapter.ts:257:    return sum + safeNumber(row.point_original_amount ?? row.pointOriginalAmount ?? 0);
+components/admin-live/liveOrderAdapter.ts:265:    return sum + safeNumber(row.point_used_amount ?? row.pointUsedAmount ?? 0);
+components/admin-live/liveOrderAdapter.ts:277:  const pointOriginalAmount = getGroupPointOriginalAmount(group);
+components/admin-live/liveOrderAdapter.ts:278:  const pointUsedAmount = getGroupPointUsedAmount(group);
+components/admin-live/liveOrderAdapter.ts:280:  if (pointUsedAmount > 0) {
+components/admin-live/liveOrderAdapter.ts:281:    return Math.max(0, pointOriginalAmount - pointUsedAmount);
+components/admin-live/liveOrderAdapter.ts:328:    pointOriginalAmount: getGroupPointOriginalAmount(group),
+components/admin-live/liveOrderAdapter.ts:329:    pointUsedAmount: getGroupPointUsedAmount(group),
+components/event-roulette/EventRouletteOverlayClient.tsx:484:                                <div className="pointer-wrap" aria-hidden="true">
+components/event-roulette/EventRouletteOverlayClient.tsx:485:          <div className="pointer-shadow" />
+components/event-roulette/EventRouletteOverlayClient.tsx:486:          <div className="pointer-outline" />
+components/event-roulette/EventRouletteOverlayClient.tsx:487:          <div className="pointer-main" />
+components/event-roulette/EventRouletteOverlayClient.tsx:488:          <div className="pointer-dot" />
+components/event-roulette/EventRouletteOverlayClient.tsx:502:              const point = getLabelPoint(index, participantCount);
+components/event-roulette/EventRouletteOverlayClient.tsx:509:                    left: `${point.x}%`,
+components/event-roulette/EventRouletteOverlayClient.tsx:510:                    top: `${point.y}%`,
+components/event-roulette/EventRouletteOverlayClient.tsx:511:                    transform: `translate(-50%, -50%) rotate(${point.rotation}deg)`,
+components/event-roulette/EventRouletteOverlayClient.tsx:576:        .pointer-wrap {
+components/event-roulette/EventRouletteOverlayClient.tsx:587:          pointer-events: none;
+components/event-roulette/EventRouletteOverlayClient.tsx:590:        .pointer-shadow {
+components/event-roulette/EventRouletteOverlayClient.tsx:602:        .pointer-outline {
+components/event-roulette/EventRouletteOverlayClient.tsx:617:        .pointer-main {
+components/event-roulette/EventRouletteOverlayClient.tsx:632:        .pointer-dot {
+components/event-roulette/EventRouletteOverlayClient.tsx:681:          pointer-events: none;
+components/event-roulette/EventRouletteOverlayClient.tsx:707:          pointer-events: none;
+components/event-roulette/EventRouletteOverlayClient.tsx:742:          pointer-events: none;
+components/customer/CustomerPointBadge.tsx:4:// 목적: 고객 화면 공통 포인트 표시 UI
+components/customer/CustomerPointBadge.tsx:5:// 주의: 고객 전화번호 기준 read-only 조회만 수행합니다. 주문금액/정산/입금/배송/포인트 차감 로직 없음.
+components/customer/CustomerPointBadge.tsx:26:    return "포인트 0원";
+components/customer/CustomerPointBadge.tsx:29:  return `포인트 ${amount.toLocaleString("ko-KR")}원`;
+components/customer/CustomerPointBadge.tsx:33:  const [pointState, setPointState] = useState<PointState>({
+components/customer/CustomerPointBadge.tsx:35:    text: "포인트 0원",
+components/customer/CustomerPointBadge.tsx:44:      setPointState({ loading: false, text: "포인트 0원" });
+components/customer/CustomerPointBadge.tsx:54:        const response = await fetch(`/api/customer-points?phone=${encodeURIComponent(phone)}`, {
+components/customer/CustomerPointBadge.tsx:62:          throw new Error(payload?.message || "포인트 조회 실패");
+components/customer/CustomerPointBadge.tsx:68:          typeof payload.current_points_text === "string" && payload.current_points_text.trim()
+components/customer/CustomerPointBadge.tsx:69:            ? `포인트 ${payload.current_points_text.trim()}`
+components/customer/CustomerPointBadge.tsx:70:            : formatPointText(payload.current_points);
+components/customer/CustomerPointBadge.tsx:81:          text: "포인트 0원",
+components/customer/CustomerPointBadge.tsx:96:      title="보유 포인트"
+components/customer/CustomerPointBadge.tsx:99:      <span>{pointState.loading ? "포인트 조회중" : pointState.text}</span>
+components/customer/CustomerPointGiftPopup.tsx:4:// 목적: 고객 포인트 선물/지급 알림 팝업
+components/customer/CustomerPointGiftPopup.tsx:5:// 주의: customer_point_ledger.customer_seen_at 확인 시각만 저장합니다.
+components/customer/CustomerPointGiftPopup.tsx:6:// 주문금액/입금/정산/배송/포인트 잔액/포인트 차감/포인트 사용 로직 없음.
+components/customer/CustomerPointGiftPopup.tsx:14:  balance_after: number;
+components/customer/CustomerPointGiftPopup.tsx:15:  balance_after_text: string;
+components/customer/CustomerPointGiftPopup.tsx:22:  gift: PointGift | null;
+components/customer/CustomerPointGiftPopup.tsx:41:  const [giftState, setGiftState] = useState<GiftState>({
+components/customer/CustomerPointGiftPopup.tsx:43:    gift: null,
+components/customer/CustomerPointGiftPopup.tsx:62:        const response = await fetch(`/api/customer-point-gifts?phone=${encodeURIComponent(phone)}`, {
+components/customer/CustomerPointGiftPopup.tsx:70:          throw new Error(payload?.message || "포인트 선물 조회 실패");
+components/customer/CustomerPointGiftPopup.tsx:77:          gift: payload.gift || null,
+components/customer/CustomerPointGiftPopup.tsx:85:          gift: null,
+components/customer/CustomerPointGiftPopup.tsx:100:    const gift = giftState.gift;
+components/customer/CustomerPointGiftPopup.tsx:102:    if (!gift || !gift.id || phone.length < 10) {
+components/customer/CustomerPointGiftPopup.tsx:103:      setGiftState({ loading: false, gift: null, closing: false });
+components/customer/CustomerPointGiftPopup.tsx:110:      await fetch("/api/customer-point-gifts", {
+components/customer/CustomerPointGiftPopup.tsx:118:          gift_id: gift.id,
+components/customer/CustomerPointGiftPopup.tsx:124:      setGiftState({ loading: false, gift: null, closing: false });
+components/customer/CustomerPointGiftPopup.tsx:128:  if (!giftState.gift) {
+components/customer/CustomerPointGiftPopup.tsx:132:  const amountText = giftState.gift.amount_text || fallbackMoney(giftState.gift.amount);
+components/customer/CustomerPointGiftPopup.tsx:133:  const balanceText = giftState.gift.balance_after_text || fallbackMoney(giftState.gift.balance_after);
+components/customer/CustomerPointGiftPopup.tsx:134:  const reasonText = String(giftState.gift.reason || "").trim();
+components/customer/CustomerPointGiftPopup.tsx:141:        aria-label="포인트 선물 알림"
+components/customer/CustomerPointGiftPopup.tsx:150:            포인트가 도착했어요
+components/customer/CustomerPointGiftPopup.tsx:154:            루루동이에서 고객님께 포인트를 선물했어요.
+components/customer/CustomerPointGiftPopup.tsx:160:            <div className="text-[13px] font-black tracking-[-0.04em] text-blue-700">지급 포인트</div>
+components/customer/CustomerPointGiftPopup.tsx:167:            <div className="text-[12px] font-black tracking-[-0.04em] text-slate-500">현재 보유 포인트</div>
+components/customer/CustomerPointGiftPopup.tsx:168:            <div className="mt-1 text-[18px] font-black tracking-[-0.05em] text-slate-900">{balanceText}</div>
+components/customer/CustomerPointGiftPopup.tsx:178:            아직 주문 결제에 자동 차감되지는 않아요. 포인트 사용 기능은 별도 안내 후 적용됩니다.
+components/customer/CustomerPointGiftPopup.tsx:184:            disabled={giftState.closing}
+components/customer/CustomerPointGiftPopup.tsx:187:            {giftState.closing ? "확인 저장중" : "확인했어요"}
+components/customer/CustomerTopNav.tsx:5:// - 로그인: HOME / 주문조회 / 정보수정 / 로그아웃 / 포인트 표시
+components/customer/CustomerPaymentGuideBottomSheet.tsx:31:  pointUsedAmount?: number;
+components/customer/CustomerPaymentGuideBottomSheet.tsx:66:  pointUsedAmount = 0,
+components/customer/CustomerPaymentGuideBottomSheet.tsx:82:  const safePointUsedAmount = Math.max(0, Number(pointUsedAmount || 0));
+components/customer/CustomerPaymentGuideBottomSheet.tsx:141:                    포인트로 결제완료
+components/customer/CustomerPaymentGuideBottomSheet.tsx:297:                    <span>포인트 사용</span>
+lib/admin-v2/types.ts:50:  inventory_ledger_id?: string | null;
+lib/admin-v2/types.ts:54:  inventory_restore_ledger_id?: string | null;
+lib/customerToast.ts:98:  close.style.cursor = "pointer";
+lib/customerTestAccounts.ts:16:  allow_point_test?: boolean | null;
+lib/customerTestAccounts.ts:53:    allowPointTest: row.allow_point_test !== false,
+lib/adminToast.ts:129:  close.style.cursor = "pointer";
+lib/customerPoints.ts:1:export type CustomerPointAction = "grant" | "deduct";
+lib/customerPoints.ts:2:export type CustomerPointChangeType = "grant" | "adjust";
+lib/customerPoints.ts:9:  current_points?: number | null;
+lib/customerPoints.ts:10:  total_granted_points?: number | null;
+lib/customerPoints.ts:11:  total_used_points?: number | null;
+lib/customerPoints.ts:12:  total_canceled_points?: number | null;
+lib/customerPoints.ts:13:  total_adjusted_points?: number | null;
+lib/customerPoints.ts:14:  last_granted_at?: string | null;
+lib/customerPoints.ts:16:  last_customer_seen_at?: string | null;
+lib/customerPoints.ts:54:    throw new Error("포인트 금액을 입력해주세요.");
+lib/customerPoints.ts:60:    throw new Error("포인트 금액은 숫자만 입력해주세요.");
+lib/customerPoints.ts:66:    throw new Error("포인트 금액은 1원 이상이어야 합니다.");
+lib/customerPoints.ts:70:    throw new Error("포인트 금액이 너무 큽니다. 한 번에 10,000,000원 이하로 처리해주세요.");
+lib/customerPoints.ts:79:  if (action === "grant" || action === "deduct") {
+lib/customerPoints.ts:83:  throw new Error("포인트 처리 구분이 올바르지 않습니다.");
+lib/customerPoints.ts:87:  const current = Number(row?.current_points ?? 0);
+lib/customerPoints.ts:101:  const signedAmount = action === "grant" ? requestedAmount : -requestedAmount;
+lib/customerPoints.ts:106:      `현재 포인트가 부족합니다. 현재 ${formatCustomerPointMoney(currentPoints)}, 차감 요청 ${formatCustomerPointMoney(
+lib/customerPoints.ts:114:    changeType: action === "grant" ? "grant" : "adjust",
+lib/customerPoints.ts:148:    balance_after: input.change.nextPoints,
+lib/customerPoints.ts:154:    customer_seen_at: null,
+lib/customerPoints.ts:169:  const isGrant = input.change.action === "grant";
+lib/customerPoints.ts:176:    current_points: input.change.nextPoints,
+lib/customerPoints.ts:177:    total_granted_points: Math.max(0, Number(previous?.total_granted_points ?? 0)) + (isGrant ? input.change.requestedAmount : 0),
+lib/customerPoints.ts:178:    total_used_points: Math.max(0, Number(previous?.total_used_points ?? 0)),
+lib/customerPoints.ts:179:    total_canceled_points: Math.max(0, Number(previous?.total_canceled_points ?? 0)),
+lib/customerPoints.ts:180:    total_adjusted_points: Number(previous?.total_adjusted_points ?? 0) + (isGrant ? 0 : input.change.signedAmount),
+lib/customerPoints.ts:181:    last_granted_at: isGrant ? now : previous?.last_granted_at ?? null,
+lib/customerPoints.ts:183:    last_customer_seen_at: previous?.last_customer_seen_at ?? null,
+supabase/sql/operator_test_accounts.sql:4:-- - 테스트 계정은 포인트 테스트, 금액 테스트, 주문서 테스트를 실제 운영 데이터와 분리하기 위한 기준입니다.
+supabase/sql/operator_test_accounts.sql:15:  allow_point_test boolean not null default true,
+supabase/sql/operator_test_accounts.sql:33:'운영자/관리자 테스트 계정 목록. 전화번호 기준으로 테스트 주문/포인트/금액 테스트를 실제 정산에서 분리하기 위한 기준 테이블.';
+supabase/sql/operator_test_accounts.sql:74:  allow_point_test,
+supabase/sql/operator_test_accounts.sql:93:    '금액테스트/포인트테스트 운영자 테스트 계정'
+supabase/sql/operator_test_accounts.sql:105:    '금액테스트/포인트테스트 운영자 테스트 계정'
+supabase/sql/operator_test_accounts.sql:111:  allow_point_test = true,
+supabase/sql/operator_test_accounts.sql:124:  allow_point_test,
+supabase/sql/order_point_usage_columns.sql:1:-- supabase/sql/order_point_usage_columns.sql
+supabase/sql/order_point_usage_columns.sql:2:-- 목적: 주문서 포인트 사용 기능을 위한 orders 컬럼 준비
+supabase/sql/order_point_usage_columns.sql:6:-- - 포인트 잔액 차감, ledger insert, 주문 저장 로직은 이 SQL에 포함하지 않습니다.
+supabase/sql/order_point_usage_columns.sql:7:-- - 실제 주문서 포인트 사용 반영은 별도 코드 단계에서 build/시뮬레이션 후 진행합니다.
+supabase/sql/order_point_usage_columns.sql:12:  add column if not exists point_original_amount integer not null default 0;
+supabase/sql/order_point_usage_columns.sql:14:comment on column public.orders.point_original_amount is
+supabase/sql/order_point_usage_columns.sql:15:  '포인트 차감 전 고객 결제 예정 금액. 기존 주문은 0 기본값 유지. 실제 적용 시 신규 주문 저장 로직에서만 기록.';
+supabase/sql/order_point_usage_columns.sql:18:  add column if not exists point_used_amount integer not null default 0;
+supabase/sql/order_point_usage_columns.sql:20:comment on column public.orders.point_used_amount is
+supabase/sql/order_point_usage_columns.sql:21:  '주문서에서 사용한 포인트 금액. 1원=1포인트 기준. 기존 주문은 0 기본값 유지.';
+supabase/sql/order_point_usage_columns.sql:24:  add column if not exists point_balance_before integer;
+supabase/sql/order_point_usage_columns.sql:26:comment on column public.orders.point_balance_before is
+supabase/sql/order_point_usage_columns.sql:27:  '포인트 사용 직전 고객 보유 포인트. 운영 추적용. 기존 주문 재계산 금지.';
+supabase/sql/order_point_usage_columns.sql:30:  add column if not exists point_balance_after integer;
+supabase/sql/order_point_usage_columns.sql:32:comment on column public.orders.point_balance_after is
+supabase/sql/order_point_usage_columns.sql:33:  '포인트 사용 직후 고객 보유 포인트. 운영 추적용. 기존 주문 재계산 금지.';
+supabase/sql/order_point_usage_columns.sql:36:  add column if not exists point_ledger_id uuid;
+supabase/sql/order_point_usage_columns.sql:38:comment on column public.orders.point_ledger_id is
+supabase/sql/order_point_usage_columns.sql:39:  '포인트 사용 차감 이력 customer_point_ledger.id 연결용. 실제 연결은 주문 저장 성공 후 별도 단계에서 처리.';
+supabase/sql/order_point_usage_columns.sql:42:  add column if not exists point_used_at timestamptz;
+supabase/sql/order_point_usage_columns.sql:44:comment on column public.orders.point_used_at is
+supabase/sql/order_point_usage_columns.sql:45:  '주문서에서 포인트 사용이 확정된 시각. 기존 주문은 null 유지.';
+supabase/sql/order_point_usage_columns.sql:52:    where conname = 'orders_point_original_amount_non_negative'
+supabase/sql/order_point_usage_columns.sql:55:      add constraint orders_point_original_amount_non_negative
+supabase/sql/order_point_usage_columns.sql:56:      check (point_original_amount >= 0);
+supabase/sql/order_point_usage_columns.sql:62:    where conname = 'orders_point_used_amount_non_negative'
+supabase/sql/order_point_usage_columns.sql:65:      add constraint orders_point_used_amount_non_negative
+supabase/sql/order_point_usage_columns.sql:66:      check (point_used_amount >= 0);
+supabase/sql/order_point_usage_columns.sql:72:    where conname = 'orders_point_balance_before_non_negative'
+supabase/sql/order_point_usage_columns.sql:75:      add constraint orders_point_balance_before_non_negative
+supabase/sql/order_point_usage_columns.sql:76:      check (point_balance_before is null or point_balance_before >= 0);
+supabase/sql/order_point_usage_columns.sql:82:    where conname = 'orders_point_balance_after_non_negative'
+supabase/sql/order_point_usage_columns.sql:85:      add constraint orders_point_balance_after_non_negative
+supabase/sql/order_point_usage_columns.sql:86:      check (point_balance_after is null or point_balance_after >= 0);
+supabase/sql/order_point_usage_columns.sql:90:create index if not exists orders_point_ledger_id_idx
+supabase/sql/order_point_usage_columns.sql:91:  on public.orders (point_ledger_id)
+supabase/sql/order_point_usage_columns.sql:92:  where point_ledger_id is not null;
+supabase/sql/order_point_cancel_restore_rpc.sql:1:-- supabase/sql/order_point_cancel_restore_rpc.sql
+supabase/sql/order_point_cancel_restore_rpc.sql:3:-- - /admin-live 주문서 자체 취소 시 포인트 사용 주문의 사용 포인트를 자동 복구한다.
+supabase/sql/order_point_cancel_restore_rpc.sql:4:-- - 주문상태 변경 + 포인트 ledger insert + 포인트 잔액 증가 + orders 복구 기록을 DB 트랜잭션으로 묶는다.
+supabase/sql/order_point_cancel_restore_rpc.sql:7:-- - customer_point_ledger에는 memo 컬럼이 없고 admin_memo 컬럼이 있다.
+supabase/sql/order_point_cancel_restore_rpc.sql:8:-- - customer_point_ledger.related_order_id는 text 타입이다.
+supabase/sql/order_point_cancel_restore_rpc.sql:9:-- - customer_point_ledger에는 balance_before 컬럼이 없고 balance_after 컬럼만 사용한다.
+supabase/sql/order_point_cancel_restore_rpc.sql:13:-- - point_used_amount > 0 인 주문만 포인트 복구 대상이다.
+supabase/sql/order_point_cancel_restore_rpc.sql:14:-- - point_refund_ledger_id / point_refunded_at / point_refunded_amount 로 중복복구를 차단한다.
+supabase/sql/order_point_cancel_restore_rpc.sql:16:-- - 주문복구 시 복구 포인트 재차감은 1차 자동화 대상이 아니다.
+supabase/sql/order_point_cancel_restore_rpc.sql:24:  add column if not exists point_refunded_amount integer not null default 0;
+supabase/sql/order_point_cancel_restore_rpc.sql:26:comment on column public.orders.point_refunded_amount is
+supabase/sql/order_point_cancel_restore_rpc.sql:27:  '주문취소 등으로 자동 복구된 포인트 금액. 중복복구 방지와 운영 추적용.';
+supabase/sql/order_point_cancel_restore_rpc.sql:30:  add column if not exists point_refund_ledger_id uuid;
+supabase/sql/order_point_cancel_restore_rpc.sql:32:comment on column public.orders.point_refund_ledger_id is
+supabase/sql/order_point_cancel_restore_rpc.sql:33:  '포인트 복구 이력 customer_point_ledger.id 연결용. 값이 있으면 자동 중복복구 금지.';
+supabase/sql/order_point_cancel_restore_rpc.sql:36:  add column if not exists point_refunded_at timestamptz;
+supabase/sql/order_point_cancel_restore_rpc.sql:38:comment on column public.orders.point_refunded_at is
+supabase/sql/order_point_cancel_restore_rpc.sql:39:  '주문취소 등으로 포인트가 자동 복구된 시각. 값이 있으면 자동 중복복구 금지.';
+supabase/sql/order_point_cancel_restore_rpc.sql:42:  add column if not exists point_refund_memo text;
+supabase/sql/order_point_cancel_restore_rpc.sql:44:comment on column public.orders.point_refund_memo is
+supabase/sql/order_point_cancel_restore_rpc.sql:45:  '포인트 자동복구 사유/메모.';
+supabase/sql/order_point_cancel_restore_rpc.sql:52:    where conname = 'orders_point_refunded_amount_non_negative'
+supabase/sql/order_point_cancel_restore_rpc.sql:55:      add constraint orders_point_refunded_amount_non_negative
+supabase/sql/order_point_cancel_restore_rpc.sql:56:      check (point_refunded_amount >= 0);
+supabase/sql/order_point_cancel_restore_rpc.sql:60:create index if not exists orders_point_refund_ledger_id_idx
+supabase/sql/order_point_cancel_restore_rpc.sql:61:  on public.orders (point_refund_ledger_id)
+supabase/sql/order_point_cancel_restore_rpc.sql:62:  where point_refund_ledger_id is not null;
+supabase/sql/order_point_cancel_restore_rpc.sql:64:create index if not exists orders_point_refunded_at_idx
+supabase/sql/order_point_cancel_restore_rpc.sql:65:  on public.orders (point_refunded_at)
+supabase/sql/order_point_cancel_restore_rpc.sql:66:  where point_refunded_at is not null;
+supabase/sql/order_point_cancel_restore_rpc.sql:68:create or replace function public.cancel_order_and_restore_points(
+supabase/sql/order_point_cancel_restore_rpc.sql:71:  p_admin_memo text default '주문서취소 자동 포인트 복구'
+supabase/sql/order_point_cancel_restore_rpc.sql:81:  v_current_points integer;
+supabase/sql/order_point_cancel_restore_rpc.sql:82:  v_next_points integer;
+supabase/sql/order_point_cancel_restore_rpc.sql:84:  v_ledger_id uuid;
+supabase/sql/order_point_cancel_restore_rpc.sql:88:  v_skipped_no_point integer := 0;
+supabase/sql/order_point_cancel_restore_rpc.sql:90:  v_clean_memo text := coalesce(nullif(trim(p_admin_memo), ''), '주문서취소 자동 포인트 복구');
+supabase/sql/order_point_cancel_restore_rpc.sql:100:      'skipped_no_point', 0,
+supabase/sql/order_point_cancel_restore_rpc.sql:111:      point_used_amount,
+supabase/sql/order_point_cancel_restore_rpc.sql:112:      point_refunded_amount,
+supabase/sql/order_point_cancel_restore_rpc.sql:113:      point_refund_ledger_id,
+supabase/sql/order_point_cancel_restore_rpc.sql:114:      point_refunded_at
+supabase/sql/order_point_cancel_restore_rpc.sql:126:    v_restore_amount := greatest(0, coalesce(v_order.point_used_amount, 0));
+supabase/sql/order_point_cancel_restore_rpc.sql:129:      v_skipped_no_point := v_skipped_no_point + 1;
+supabase/sql/order_point_cancel_restore_rpc.sql:133:    if coalesce(v_order.point_refunded_amount, 0) > 0
+supabase/sql/order_point_cancel_restore_rpc.sql:134:      or v_order.point_refund_ledger_id is not null
+supabase/sql/order_point_cancel_restore_rpc.sql:135:      or v_order.point_refunded_at is not null
+supabase/sql/order_point_cancel_restore_rpc.sql:142:      raise exception '포인트 복구 실패: 주문 % 고객 전화번호가 없습니다.', v_order.id;
+supabase/sql/order_point_cancel_restore_rpc.sql:145:    select coalesce(current_points, 0)
+supabase/sql/order_point_cancel_restore_rpc.sql:146:      into v_current_points
+supabase/sql/order_point_cancel_restore_rpc.sql:147:    from public.customer_point_balances
+supabase/sql/order_point_cancel_restore_rpc.sql:152:      raise exception '포인트 복구 실패: 주문 % 고객 포인트 잔액 row가 없습니다.', v_order.id;
+supabase/sql/order_point_cancel_restore_rpc.sql:155:    v_next_points := greatest(0, coalesce(v_current_points, 0)) + v_restore_amount;
+supabase/sql/order_point_cancel_restore_rpc.sql:156:    v_ledger_id := gen_random_uuid();
+supabase/sql/order_point_cancel_restore_rpc.sql:158:    insert into public.customer_point_ledger (
+supabase/sql/order_point_cancel_restore_rpc.sql:165:      balance_after,
+supabase/sql/order_point_cancel_restore_rpc.sql:173:      v_ledger_id,
+supabase/sql/order_point_cancel_restore_rpc.sql:179:      v_next_points,
+supabase/sql/order_point_cancel_restore_rpc.sql:180:      '주문취소 포인트 자동복구',
+supabase/sql/order_point_cancel_restore_rpc.sql:188:    update public.customer_point_balances
+supabase/sql/order_point_cancel_restore_rpc.sql:192:        current_points = v_next_points,
+supabase/sql/order_point_cancel_restore_rpc.sql:193:        total_canceled_points = coalesce(total_canceled_points, 0) + v_restore_amount
+supabase/sql/order_point_cancel_restore_rpc.sql:198:        point_refunded_amount = v_restore_amount,
+supabase/sql/order_point_cancel_restore_rpc.sql:199:        point_refund_ledger_id = v_ledger_id,
+supabase/sql/order_point_cancel_restore_rpc.sql:200:        point_refunded_at = v_now,
+
+============================================================
+[2] 핵심 파일 실제 블록
+============================================================
+
+----- app/api/admin-live/customer-points/route.ts -----
+61:    .from("customer_point_balances")
+67:    throw new Error(error.message || "포인트 잔액 조회 실패");
+77:    .from("customer_point_ledger")
+84:    throw new Error(error.message || "포인트 이력 조회 실패");
+99:    const balance = await fetchPointBalance(supabase, phone);
+100:    const ledger = await fetchPointLedger(supabase, phone, limit);
+101:    const currentPoints = readCurrentCustomerPoints(balance);
+106:      current_points: currentPoints,
+107:      current_points_text: formatCustomerPointMoney(currentPoints),
+108:      balance: balance || {
+110:        current_points: 0,
+111:        total_granted_points: 0,
+112:        total_used_points: 0,
+113:        total_canceled_points: 0,
+114:        total_adjusted_points: 0,
+116:      ledger,
+119:    return jsonError(error instanceof Error ? error.message : "포인트 조회 실패", 400);
+124:  let ledgerIdForRollback = "";
+145:      return jsonError(action === "grant" ? "지급 사유를 입력해주세요." : "차감 사유를 입력해주세요.");
+156:    ledgerIdForRollback = randomUUID();
+158:    const ledgerPayload = buildCustomerPointLedgerPayload({
+159:      id: ledgerIdForRollback,
+170:    const balancePayload = buildCustomerPointBalancePayload({
+179:    const { error: ledgerError } = await supabase.from("customer_point_ledger").insert(ledgerPayload);
+181:    if (ledgerError) {
+182:      throw new Error(ledgerError.message || "포인트 이력 저장 실패");
+185:    const { data: savedBalance, error: balanceError } = await supabase
+186:      .from("customer_point_balances")
+187:      .upsert(balancePayload, { onConflict: "customer_phone" })
+191:    if (balanceError) {
+192:      await supabase.from("customer_point_ledger").delete().eq("id", ledgerIdForRollback);
+193:      throw new Error(balanceError.message || "포인트 잔액 저장 실패");
+198:      message: change.action === "grant" ? "포인트 지급이 완료되었습니다." : "포인트 차감이 완료되었습니다.",
+204:      current_points_before: currentPoints,
+205:      current_points_after: change.nextPoints,
+206:      current_points_text: formatCustomerPointMoney(change.nextPoints),
+207:      summary: `${change.action === "grant" ? "포인트 지급" : "포인트 차감"} ${formatCustomerPointMoney(
+210:      balance: savedBalance,
+211:      ledger_id: ledgerIdForRollback,
+214:    return jsonError(error instanceof Error ? error.message : "포인트 처리 실패", 400);
+
+----- app/api/customer-points/route.ts -----
+45:      .from("customer_point_balances")
+46:      .select("customer_phone, current_points, total_granted_points, total_used_points, total_canceled_points, total_adjusted_points, updated_at")
+51:      throw new Error(error.message || "포인트 조회 실패");
+54:    const balance = (data || null) as CustomerPointBalanceRow | null;
+55:    const currentPoints = readCurrentCustomerPoints(balance);
+59:      current_points: currentPoints,
+60:      current_points_text: formatCustomerPointMoney(currentPoints),
+61:      has_balance: Boolean(balance),
+64:    return jsonError(error instanceof Error ? error.message : "포인트 조회 실패", 400);
+
+----- app/api/customer-point-gifts/route.ts -----
+12:  balance_after: number | null;
+55:function readBalanceAfter(row: Pick<PointGiftRow, "balance_after">): number {
+56:  const balanceAfter = Math.floor(Number(row.balance_after || 0));
+58:  if (!Number.isFinite(balanceAfter) || balanceAfter < 0) {
+62:  return balanceAfter;
+67:  const balanceAfter = readBalanceAfter(row);
+73:    balance_after: balanceAfter,
+74:    balance_after_text: formatCustomerPointMoney(balanceAfter),
+88:      .from("customer_point_ledger")
+89:      .select("id, customer_phone, amount, balance_after, reason, created_at")
+92:      .is("customer_seen_at", null)
+98:      throw new Error(error.message || "포인트 선물 조회 실패");
+101:    const gifts = Array.isArray(data) ? (data as PointGiftRow[]).map(toGiftPayload).filter((gift) => gift.amount > 0) : [];
+105:      gift: gifts[0] || null,
+106:      has_gift: gifts.length > 0,
+109:    return jsonError(error instanceof Error ? error.message : "포인트 선물 조회 실패", 400);
+117:    const giftId = cleanId((body as any)?.gift_id || (body as any)?.id);
+119:    if (!giftId) {
+120:      return jsonError("확인할 포인트 알림을 찾을 수 없습니다.", 400);
+127:      .from("customer_point_ledger")
+128:      .update({ customer_seen_at: now })
+129:      .eq("id", giftId)
+132:      .is("customer_seen_at", null)
+134:      .select("id, customer_seen_at")
+138:      throw new Error(error.message || "포인트 알림 확인 실패");
+144:      customer_seen_at: data?.customer_seen_at || now,
+147:    return jsonError(error instanceof Error ? error.message : "포인트 알림 확인 실패", 400);
+
+----- app/api/customer-orders/submit/route.ts -----
+12:  point_use_amount?: number;
+13:  pointUseAmount?: number;
+156:    if ("point_original_amount" in row && submitNumberValue(row?.point_used_amount, 0) <= 0) {
+157:      nextRow.point_original_amount = nextTotal;
+197:    const pointUseAmount = toWon(body.point_use_amount ?? body.pointUseAmount ?? 0);
+212:    const { data, error } = await supabase.rpc("submit_customer_order_with_points", {
+214:      p_point_use_amount: pointUseAmount,
+
+----- lib/customerPoints.ts -----
+1:export type CustomerPointAction = "grant" | "deduct";
+2:export type CustomerPointChangeType = "grant" | "adjust";
+9:  current_points?: number | null;
+10:  total_granted_points?: number | null;
+11:  total_used_points?: number | null;
+12:  total_canceled_points?: number | null;
+13:  total_adjusted_points?: number | null;
+14:  last_granted_at?: string | null;
+15:  last_used_at?: string | null;
+16:  last_customer_seen_at?: string | null;
+19:  updated_at?: string | null;
+54:    throw new Error("포인트 금액을 입력해주세요.");
+60:    throw new Error("포인트 금액은 숫자만 입력해주세요.");
+66:    throw new Error("포인트 금액은 1원 이상이어야 합니다.");
+70:    throw new Error("포인트 금액이 너무 큽니다. 한 번에 10,000,000원 이하로 처리해주세요.");
+79:  if (action === "grant" || action === "deduct") {
+83:  throw new Error("포인트 처리 구분이 올바르지 않습니다.");
+87:  const current = Number(row?.current_points ?? 0);
+101:  const signedAmount = action === "grant" ? requestedAmount : -requestedAmount;
+106:      `현재 포인트가 부족합니다. 현재 ${formatCustomerPointMoney(currentPoints)}, 차감 요청 ${formatCustomerPointMoney(
+114:    changeType: action === "grant" ? "grant" : "adjust",
+148:    balance_after: input.change.nextPoints,
+154:    customer_seen_at: null,
+169:  const isGrant = input.change.action === "grant";
+176:    current_points: input.change.nextPoints,
+177:    total_granted_points: Math.max(0, Number(previous?.total_granted_points ?? 0)) + (isGrant ? input.change.requestedAmount : 0),
+178:    total_used_points: Math.max(0, Number(previous?.total_used_points ?? 0)),
+179:    total_canceled_points: Math.max(0, Number(previous?.total_canceled_points ?? 0)),
+180:    total_adjusted_points: Number(previous?.total_adjusted_points ?? 0) + (isGrant ? 0 : input.change.signedAmount),
+181:    last_granted_at: isGrant ? now : previous?.last_granted_at ?? null,
+182:    last_used_at: previous?.last_used_at ?? null,
+183:    last_customer_seen_at: previous?.last_customer_seen_at ?? null,
+
+----- app/order/page.tsx -----
+22:"use client";
+40:import { useEffect, useMemo, useState } from "react";
+118:  updated_at?: string;
+135:  pointUsedAmount: number;
+202:  pointUseInput?: string;
+679:      onMouseDown={(event) => event.preventDefault()}
+754:    updated_at: String(product?.updated_at ?? ""),
+765:  const [isEditMode, setIsEditMode] = useState(false);
+766:  const [broadcast, setBroadcast] = useState<any | null>(null);
+767:  const [broadcastProducts, setBroadcastProducts] = useState<BroadcastProduct[]>([]);
+768:  const [groupBuyQuickProductsFromCatalog, setGroupBuyQuickProductsFromCatalog] = useState<BroadcastProduct[]>([]);
+769:  const [productSearchOpenIndex, setProductSearchOpenIndex] = useState<number | null>(null);
+770:  const [productSearchText, setProductSearchText] = useState("");
+771:  const [showAllGroupBuyQuickProducts, setShowAllGroupBuyQuickProducts] = useState(false);
+773:  useEffect(() => {
+785:    document.addEventListener("pointerdown", handleProductSearchOutsidePointerDown);
+788:      document.removeEventListener("pointerdown", handleProductSearchOutsidePointerDown);
+793:  const [youtubeNickname, setYoutubeNickname] = useState("");
+794:  const [customerName, setCustomerName] = useState("");
+795:  const [customerPhone, setCustomerPhone] = useState("");
+796:  const [zipcode, setZipcode] = useState("");
+797:  const [address, setAddress] = useState("");
+798:  const [detailAddress, setDetailAddress] = useState("");
+799:  const [requestMemo, setRequestMemo] = useState("");
+801:  const [pin, setPin] = useState("");
+802:  const [autoSaveInfo, setAutoSaveInfo] = useState(true);
+803:  const [hasSavedInfo, setHasSavedInfo] = useState(false);
+804:  const [isEditingCustomerInfo, setIsEditingCustomerInfo] = useState(false);
+805:  const [isCustomerInfoOpen, setIsCustomerInfoOpen] = useState(false);
+806:  const [showSavedCustomerDetail, setShowSavedCustomerDetail] = useState(false);
+807:  const [customerMode, setCustomerMode] = useState<"load" | "new">("load");
+808:  const [loginName, setLoginName] = useState("");
+809:  const [loginPhone, setLoginPhone] = useState("");
+810:  const [kakaoNickname, setKakaoNickname] = useState("");
+811:  const [youtubeNicknameError, setYoutubeNicknameError] = useState("");
+812:  const [isKakaoLoginReturn, setIsKakaoLoginReturn] = useState(false);
+814:  const [paymentMethod, setPaymentMethod] = useState<"무통장입금" | "카드결제">("무통장입금");
+815:  const [items, setItems] = useState<OrderItem[]>([{ ...emptyItem }]);
+816:  const [submitting, setSubmitting] = useState(false);
+817:  const [customerBlockStatus, setCustomerBlockStatus] = useState<CustomerBlockStatus>({
+822:  const [customerNotice, setCustomerNotice] = useState<{
+855:  const [manualAddressOpen, setManualAddressOpen] = useState(false);
+856:  const [missingDetailAddressConfirmOpen, setMissingDetailAddressConfirmOpen] = useState(false);
+857:  const [showDepositConfirmModal, setShowDepositConfirmModal] = useState(false);
+860:  const [hasPrivacyConsent, setHasPrivacyConsent] = useState(false);
+861:  const [privacyConsentChecked, setPrivacyConsentChecked] = useState(false);
+865:  const [done, setDone] = useState<DoneData | null>(null);
+866:  const [copyDone, setCopyDone] = useState(false);
+867:  const [nicknameCopyDone, setNicknameCopyDone] = useState(false);
+868:  const [paymentGuideOpen, setPaymentGuideOpen] = useState(false);
+869:  const [firstOrderGuideOpen, setFirstOrderGuideOpen] = useState(false);
+871:  useEffect(() => {
+889:  const [customerInfoEditSheetOpen, setCustomerInfoEditSheetOpen] = useState(false);
+890:  const [customerInfoEditSnapshot, setCustomerInfoEditSnapshot] = useState<{
+897:  const [orderLookupOpen, setOrderLookupOpen] = useState(false);
+898:  const [orderLookupLoading, setOrderLookupLoading] = useState(false);
+899:  const [orderLookupOrders, setOrderLookupOrders] = useState<any[]>([]);
+900:  const [orderLookupFilter, setOrderLookupFilter] = useState<CustomerOrderLookupFilter>("전체");
+901:  const [orderLookupPage, setOrderLookupPage] = useState(1);
+902:  const [customerCardRate, setCustomerCardRate] = useState(10);
+903:  const [actualCardFeeRate, setActualCardFeeRate] = useState(7);
+904:  const [cardPaymentMinAmount, setCardPaymentMinAmount] = useState(100000);
+905:  const [defaultShippingFee, setDefaultShippingFee] = useState(4000);
+906:  const [remoteAreaShippingFee, setRemoteAreaShippingFee] = useState(6000);
+908:    useState<CombineShippingSettings>(DEFAULT_COMBINE_SHIPPING_SETTINGS);
+909:  const [alreadyPaidShipping, setAlreadyPaidShipping] = useState(false);
+910:  const [paidShippingGroups, setPaidShippingGroups] = useState<PaidShippingGroups>({ ...EMPTY_PAID_SHIPPING_GROUPS });
+911:  const [customerPointBalance, setCustomerPointBalance] = useState(0);
+912:  const [customerPointLoading, setCustomerPointLoading] = useState(false);
+913:  const [pointUseInput, setPointUseInput] = useState("");
+914:  const [directInputOpen, setDirectInputOpen] = useState(false);
+915:  const [directInputKeyboardInset, setDirectInputKeyboardInset] = useState(0);
+916:  const [directInputProductSearchMode, setDirectInputProductSearchMode] = useState(false);
+917:  const [directInputTargetIndex, setDirectInputTargetIndex] = useState(0);
+918:  const [registeredOptionSelectProduct, setRegisteredOptionSelectProduct] = useState<BroadcastProduct | null>(null);
+919:  const [registeredOptionColor, setRegisteredOptionColor] = useState("");
+920:  const [registeredOptionSize, setRegisteredOptionSize] = useState("");
+921:  const [registeredOptionQty, setRegisteredOptionQty] = useState(1);
+923:  useEffect(() => {
+931:    const updateKeyboardInset = () => {
+939:    updateKeyboardInset();
+941:    viewport?.addEventListener("resize", updateKeyboardInset);
+942:    viewport?.addEventListener("scroll", updateKeyboardInset);
+943:    window.addEventListener("resize", updateKeyboardInset);
+946:      viewport?.removeEventListener("resize", updateKeyboardInset);
+947:      viewport?.removeEventListener("scroll", updateKeyboardInset);
+948:      window.removeEventListener("resize", updateKeyboardInset);
+952:  const [orderDraftRestored, setOrderDraftRestored] = useState(false);
+954:  useEffect(() => {
+970:      if (typeof draft.pointUseInput === "string") {
+971:        setPointUseInput(onlyNumber(draft.pointUseInput));
+978:  useEffect(() => {
+985:      pointUseInput.trim() ||
+997:      pointUseInput,
+1000:  }, [orderDraftRestored, items, paymentMethod, requestMemo, pointUseInput, done]);
+1031:    return /주문서취소|주문취소|취소|환불|cancel|refund/.test(statusText);
+1223:  useEffect(() => {
+1230:  useEffect(() => {
+1247:  useEffect(() => {
+1258:  useEffect(() => {
+1275:  useEffect(() => {
+1381:  useEffect(() => {
+1393:  useEffect(() => {
+1406:  useEffect(() => {
+1410:  useEffect(() => {
+1432:  useEffect(() => {
+1699:        updated_at: String(product.updated_at ?? ""),
+1997:  const cancelEditCustomerInfo = () => {
+2328:  const productAmount = useMemo(() => {
+2334:  const totalQty = useMemo(() => {
+2344:  const selectedPointUseAmount = useMemo(() => {
+2346:    const requestedPoints = toNumber(pointUseInput);
+2354:  }, [customerPointBalance, pointUseInput, totalAmount]);
+2358:  useEffect(() => {
+2376:        const response = await fetch(`/api/customer-points?phone=${encodeURIComponent(cleanPhone)}`, {
+2384:          throw new Error(payload?.message || "포인트 조회 실패");
+2387:        const nextPoints = Math.max(0, Number(payload.current_points || 0));
+2415:  useEffect(() => {
+2436:  const filteredBroadcastProducts = useMemo(() => {
+2446:  const quickGroupBuyProducts = useMemo(() => {
+2490:      return String(b.created_at || b.updated_at || b.id).localeCompare(String(a.created_at || a.updated_at || a.id));
+2519:    updateItem(index, "color", normalizeEmptyProductOptionValue(productColor));
+2520:    updateItem(index, "size", normalizeEmptyProductOptionValue(productSize));
+2524:    updateItem(index, "product_id", String(product.id ?? ""));
+2525:    updateItem(index, "product_name", product.product_name);
+2527:    updateItem(index, "shipping_type", product.shipping_type || "일반");
+2528:    updateItem(index, "combine_shipping", product.combine_shipping || "Y");
+2531:      updateItem(index, "qty", "1");
+2535:      updateItem(index, "product_price", String(Math.round(productPrice)));
+2537:      updateItem(index, "product_price", "");
+2651:  const updateItem = (index: number, key: keyof OrderItem, value: string) => {
+2705:        .update(customerData)
+2710:      const { error } = await supabase.from("customers").insert(customerData);
+2934:      const requestedPointUseAmount = toNumber(pointUseInput);
+2948:          point_use_amount: appliedPointUseAmount,
+2961:      const savedPointUsedAmount = toNumber(orderSubmitPayload?.point_used_amount);
+2962:      const savedPointOriginalAmount = toNumber(orderSubmitPayload?.point_original_amount) || appliedTotalAmount;
+2980:        pointUsedAmount: savedPointUsedAmount,
+3477:              RD포인트 {safePointText}
+3570:            onCancel={cancelEditCustomerInfo}
+3764:                              onClick={() => updateItem(index, "qty", String(Math.max(1, (toNumber(item.qty) || 1) - 1)))}
+3775:                              onClick={() => updateItem(index, "qty", String((toNumber(item.qty) || 1) + 1))}
+3881:                상품금액, 배송비, 포인트 사용 금액을 확인해주세요.
+3906:                pointUseInput={commaNumberText(pointUseInput)}
+3907:                pointUsedAmount={selectedPointUseAmount}
+3916:              <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-[22px] bg-blue-50 p-4 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-blue-900 ring-1 ring-blue-100 active:scale-[0.99]">
+4118:                            updateItem(directInputTargetIndex, "product_name", nextValue);
+4208:                          onChange={(event) => updateItem(directInputTargetIndex, "color", event.target.value)}
+4218:                          onChange={(event) => updateItem(directInputTargetIndex, "size", event.target.value)}
+4231:                            onClick={() => updateItem(directInputTargetIndex, "qty", String(Math.max(1, (toNumber(directInputItem.qty) || 1) - 1)))}
+4238:                            onChange={(event) => updateItem(directInputTargetIndex, "qty", onlyNumber(event.target.value))}
+4244:                            onClick={() => updateItem(directInputTargetIndex, "qty", String((toNumber(directInputItem.qty) || 0) + 1))}
+4257:                            onChange={(event) => updateItem(directInputTargetIndex, "product_price", onlyNumber(event.target.value))}
+4377:          pointUsedAmount={done?.pointUsedAmount || 0}
+4423:        pointUsedAmount={selectedPointUseAmount}
+
+----- components/customer/CustomerPointGiftPopup.tsx -----
+1:"use client";
+4:// 목적: 고객 포인트 선물/지급 알림 팝업
+5:// 주의: customer_point_ledger.customer_seen_at 확인 시각만 저장합니다.
+6:// 주문금액/입금/정산/배송/포인트 잔액/포인트 차감/포인트 사용 로직 없음.
+8:import { useEffect, useState } from "react";
+14:  balance_after: number;
+15:  balance_after_text: string;
+22:  gift: PointGift | null;
+41:  const [giftState, setGiftState] = useState<GiftState>({
+43:    gift: null,
+47:  useEffect(() => {
+62:        const response = await fetch(`/api/customer-point-gifts?phone=${encodeURIComponent(phone)}`, {
+70:          throw new Error(payload?.message || "포인트 선물 조회 실패");
+77:          gift: payload.gift || null,
+85:          gift: null,
+100:    const gift = giftState.gift;
+102:    if (!gift || !gift.id || phone.length < 10) {
+103:      setGiftState({ loading: false, gift: null, closing: false });
+110:      await fetch("/api/customer-point-gifts", {
+118:          gift_id: gift.id,
+124:      setGiftState({ loading: false, gift: null, closing: false });
+128:  if (!giftState.gift) {
+132:  const amountText = giftState.gift.amount_text || fallbackMoney(giftState.gift.amount);
+133:  const balanceText = giftState.gift.balance_after_text || fallbackMoney(giftState.gift.balance_after);
+134:  const reasonText = String(giftState.gift.reason || "").trim();
+141:        aria-label="포인트 선물 알림"
+150:            포인트가 도착했어요
+154:            루루동이에서 고객님께 포인트를 선물했어요.
+160:            <div className="text-[13px] font-black tracking-[-0.04em] text-blue-700">지급 포인트</div>
+167:            <div className="text-[12px] font-black tracking-[-0.04em] text-slate-500">현재 보유 포인트</div>
+168:            <div className="mt-1 text-[18px] font-black tracking-[-0.05em] text-slate-900">{balanceText}</div>
+178:            아직 주문 결제에 자동 차감되지는 않아요. 포인트 사용 기능은 별도 안내 후 적용됩니다.
+184:            disabled={giftState.closing}
+187:            {giftState.closing ? "확인 저장중" : "확인했어요"}
+
+----- components/customer/CustomerPointBadge.tsx -----
+1:"use client";
+4:// 목적: 고객 화면 공통 포인트 표시 UI
+5:// 주의: 고객 전화번호 기준 read-only 조회만 수행합니다. 주문금액/정산/입금/배송/포인트 차감 로직 없음.
+7:import { useEffect, useState } from "react";
+26:    return "포인트 0원";
+29:  return `포인트 ${amount.toLocaleString("ko-KR")}원`;
+33:  const [pointState, setPointState] = useState<PointState>({
+35:    text: "포인트 0원",
+38:  useEffect(() => {
+44:      setPointState({ loading: false, text: "포인트 0원" });
+54:        const response = await fetch(`/api/customer-points?phone=${encodeURIComponent(phone)}`, {
+62:          throw new Error(payload?.message || "포인트 조회 실패");
+68:          typeof payload.current_points_text === "string" && payload.current_points_text.trim()
+69:            ? `포인트 ${payload.current_points_text.trim()}`
+70:            : formatPointText(payload.current_points);
+81:          text: "포인트 0원",
+96:      title="보유 포인트"
+99:      <span>{pointState.loading ? "포인트 조회중" : pointState.text}</span>
+
+----- components/admin-live/AdminLiveCustomerPointPanel.tsx -----
+1:"use client";
+3:import { useEffect, useMemo, useState } from "react";
+16:  balance_after?: number | null;
+22:type PointActionMode = "grant" | "deduct";
+39:  ledger: PointLedgerRow[];
+49:  ledger: [],
+102:function ledgerLabel(row: PointLedgerRow) {
+105:  if (row.change_type === "grant" || amount > 0) return "지급";
+106:  if (row.change_type === "use") return "사용";
+107:  if (row.change_type === "cancel") return "취소";
+131:function ledgerKey(row: PointLedgerRow, index: number) {
+132:  return row.id || `${row.created_at || "point"}-${index}`;
+152:  const isGrant = form.mode === "grant";
+153:  const title = isGrant ? "포인트 지급" : "포인트 회수";
+168:            <span className="mb-1 block text-xs font-black text-slate-500">{actionLabel} 포인트</span>
+206:            고객 화면 포인트 알림에 표시
+216:            관리자 지급/회수 포인트는 정산에 바로 반영되지 않습니다. 고객이 주문서에서 실제 사용하는 단계는 나중에 별도 작업합니다.
+247:  const phoneKey = useMemo(() => digitsOnly(customer.phone), [customer.phone]);
+248:  const [pointState, setPointState] = useState<PointState>(EMPTY_POINT_STATE);
+249:  const [form, setForm] = useState<PointFormState>({
+250:    mode: "grant",
+256:  const [modalOpen, setModalOpen] = useState(false);
+258:  const recentLedger = pointState.ledger.slice(0, 8);
+264:        errorMessage: "전화번호가 없어 포인트를 조회할 수 없습니다.",
+276:      const response = await fetch(`/api/admin-live/customer-points?phone=${encodeURIComponent(phoneKey)}&limit=20`, {
+283:        throw new Error(payload?.message || "포인트 조회 실패");
+291:        currentPoints: Number(payload.current_points || 0),
+292:        currentPointsText: clean(payload.current_points_text) || money(payload.current_points),
+293:        ledger: Array.isArray(payload.ledger) ? payload.ledger : [],
+300:        errorMessage: error instanceof Error ? error.message : "포인트 조회 실패",
+305:  useEffect(() => {
+326:    if (pointState.saving) return;
+334:        errorMessage: "전화번호가 없어 포인트를 처리할 수 없습니다.",
+347:      const response = await fetch("/api/admin-live/customer-points", {
+368:        throw new Error(payload?.message || "포인트 처리 실패");
+375:        statusMessage: payload.message || "포인트 처리가 완료되었습니다.",
+384:        errorMessage: error instanceof Error ? error.message : "포인트 처리 실패",
+393:          <h3 className="text-base font-black text-slate-950">🎁 포인트 관리</h3>
+395:            회원별 포인트 지급/회수와 최근 이력을 확인합니다.
+402:          disabled={pointState.loading || pointState.saving}
+411:          <div className="text-xs font-black text-slate-500">현재 포인트</div>
+413:            {pointState.loading ? "불러오는중..." : pointState.currentPointsText}
+416:            지급/회수는 포인트 잔액과 이력만 변경합니다. 정산·입금·주문금액에는 아직 반영하지 않습니다.
+423:            onClick={() => openModal("grant")}
+424:            disabled={pointState.loading || pointState.saving || !phoneKey}
+427:            포인트 지급
+432:            disabled={pointState.loading || pointState.saving || !phoneKey}
+435:            포인트 회수
+440:      {pointState.statusMessage ? (
+442:          {pointState.statusMessage}
+446:      {pointState.errorMessage ? (
+448:          {pointState.errorMessage}
+454:          <div className="text-sm font-black text-slate-900">최근 포인트 이력</div>
+460:            아직 포인트 이력이 없습니다.
+465:              <div key={ledgerKey(item, index)} className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[96px_72px_150px_minmax(0,1fr)]">
+467:                <div className="font-black text-slate-900">{ledgerLabel(item)}</div>
+473:                    처리 후 {money(item.balance_after)}
+490:          saving={pointState.saving}
+491:          errorMessage={pointState.errorMessage}
+
+----- components/admin-live/AdminLiveDashboard.tsx -----
+1:"use client";
+20:import { useEffect, useMemo, useState } from "react";
+42:  updateAdminLiveBroadcast,
+53:import { useAutoBankdaPaymentSync } from "./useAutoBankdaPaymentSync";
+295:  return order.paymentStatus === "canceled";
+373:  const canceledOrders = broadcastOrders.filter(isBroadcastEndCanceled);
+410:    canceledCount: canceledOrders.length,
+440:    canceledCount: 1,
+478:      canceledCount: summary.canceledCount,
+511:  useAutoBankdaPaymentSync();
+512:  const [activeMenu, setActiveMenu] = useState<AdminLiveMenuKey>(() => readMenuFromUrl());
+513:  const [orders, setOrders] = useState<LiveOrder[]>([]);
+514:  const [broadcasts, setBroadcasts] = useState<AdminLiveBroadcast[]>([]);
+515:  const [savingBroadcast, setSavingBroadcast] = useState(false);
+516:  const [orderGroups, setOrderGroups] = useState<OrderGroup[]>([]);
+517:  const [deposits, setDeposits] = useState<DepositRow[]>([]);
+518:  const [manualMatchGroup, setManualMatchGroup] = useState<OrderGroup | null>(null);
+519:  const [selectedOrderId, setSelectedOrderId] = useState<string>("");
+520:  const [orderDetailOpen, setOrderDetailOpen] = useState(false);
+521:  const [videoRatio, setVideoRatio] = useState<VideoRatio>("vertical");
+522:  const [loading, setLoading] = useState(true);
+523:  const [loadError, setLoadError] = useState("");
+524:  const [filters, setFilters] = useState<LiveOrderFilters>(DEFAULT_FILTERS);
+525:  const [broadcastEndSummary, setBroadcastEndSummary] = useState<LiveBroadcastEndSummary | null>(null);
+526:  const [quickModal, setQuickModal] = useState<"orders" | "payments" | "customers" | "settlement" | null>(null);
+527:  const [quickModalSearch, setQuickModalSearch] = useState("");
+528:  const [quickModalPage, setQuickModalPage] = useState(1);
+529:  const [quickModalCustomerDetail, setQuickModalCustomerDetail] = useState<any | null>(null);
+531:  const [quickCustomerProfiles, setQuickCustomerProfiles] = useState<any[]>([]);
+533:  useEffect(() => {
+558:  const [quickPointAmount, setQuickPointAmount] = useState("");
+559:  const [quickPointMemo, setQuickPointMemo] = useState("");
+560:  const [quickPointSaving, setQuickPointSaving] = useState<"add" | "subtract" | null>(null);
+561:  const [quickPointMessage, setQuickPointMessage] = useState("");
+644:  useEffect(() => {
+669:  useEffect(() => {
+673:  useEffect(() => {
+696:  useEffect(() => {
+707:  const activeBroadcast = useMemo(() => getActiveBroadcast(broadcasts), [broadcasts]);
+709:  const broadcastOptions = useMemo(() => {
+725:  const filteredOrders = useMemo(() => {
+772:  useEffect(() => {
+785:  const selectedOrder = useMemo(() => {
+845:      await updateAdminLiveBroadcast({
+957:  const quickCustomerProfileAddressByPhone = useMemo(() => {
+1267:                            lowerKey.includes("cancel") ||
+1298:                      order?.cancel_status,
+1299:                      order?.cancelStatus,
+1309:                      order?.is_canceled === true ||
+1311:                      order?.is_cancelled === true ||
+1313:                      order?.cancelled === true ||
+1314:                      order?.canceled === true ||
+1315:                      Boolean(order?.cancelled_at || order?.canceled_at || order?.cancelAt || order?.canceledAt) ||
+1319:                      status.includes("cancel") ||
+1320:                      status.includes("cancelled") ||
+1321:                      status.includes("canceled") ||
+1322:                      status.includes("refund") ||
+1323:                      status.includes("refunded")
+1389:                  const customerMap = new Map<string, { key: string; nickname: string; name: string; phone: string; address: string; count: number; activeCount: number; cancelCount: number; amount: number; latestOrder: any; latestAt: string }>();
+1394:                    const canceled = isCanceledOrder(order);
+1404:                      cancelCount: 0,
+1410:                    current.activeCount += canceled ? 0 : 1;
+1411:                    current.cancelCount += canceled ? 1 : 0;
+1412:                    current.amount += canceled ? 0 : orderAmount(order);
+1420:                  const canceledOrders = modalAllOrders.filter((order: any) => isCanceledOrder(order));
+1438:                    [customer.nickname, customer.name, customer.phone, customer.address, `${customer.count}`, `${customer.cancelCount}`, money(customer.amount)].join(" "),
+1500:                  const openCustomerDetail = (customer: { latestOrder: any; nickname: string; name: string; phone: string; address: string; count: number; activeCount: number; cancelCount: number; amount: number; latestAt: string }) => {
+1562:                    const canceled = isCanceledOrder(order);
+1565:                    const label = canceled ? "주문서취소" : paid ? "입금확인" : "입금매칭 필요";
+1566:                    const klass = canceled
+1580:                      setQuickPointMessage("포인트 금액을 1원 이상 입력해주세요.");
+1585:                    const memo = quickPointMemo.trim() || (mode === "add" ? "방송 중 빠른보기 포인트 지급" : "방송 중 빠른보기 포인트 회수");
+1591:                      const response = await fetch("/api/admin-live/customer-points", {
+1595:                          action: mode === "add" ? "grant" : "revoke",
+1596:                          type: mode === "add" ? "grant" : "revoke",
+1601:                          point: amount,
+1602:                          points: amount,
+1603:                          point_amount: amount,
+1605:                          point_delta: signedAmount,
+1623:                        throw new Error(result?.message || result?.error || "포인트 처리에 실패했습니다.");
+1626:                      setQuickPointMessage(`포인트 ${mode === "add" ? "지급" : "회수"} 완료: ${money(amount)}`);
+1630:                      setQuickPointMessage(error instanceof Error ? error.message : "포인트 처리 중 오류가 발생했습니다.");
+1715:                                    <h3 className="text-lg font-black text-slate-950">🎁 포인트 관리</h3>
+1723:                                    <span className="text-xs font-black text-slate-500">포인트 금액</span>
+1757:                                      {quickPointSaving === "add" ? "지급 중..." : "포인트 지급"}
+1765:                                      {quickPointSaving === "subtract" ? "회수 중..." : "포인트 회수"}
+1885:                                      <div className="mt-2 text-3xl font-black text-red-600">{canceledOrders.length}건</div>
+1898:                                          const canceled = isCanceledOrder(order);
+1901:                                            <div key={String(order?.id || `${activePage}-${index}`)} className={["grid grid-cols-[32px_1fr_130px_160px] items-center gap-3 py-3", canceled ? "bg-red-50/40" : ""].join(" ")}>
+1910:                                              <div className={["text-right text-sm font-black", canceled ? "text-red-500 line-through" : "text-slate-950"].join(" ")}>{money(orderAmount(order))}</div>
+1912:                                                {!paid && !canceled ? (
+1997:                                          <div key={customer.key || `${activePage}-${index}`} className={["grid grid-cols-[32px_1fr_150px_110px] items-center gap-3 py-3", customer.cancelCount > 0 && customer.activeCount === 0 ? "bg-red-50/40" : ""].join(" ")}>
+2002:                                                {customer.cancelCount > 0 ? <span className="rounded-full bg-red-50 px-2 py-1 text-[11px] font-black text-red-600">취소 {customer.cancelCount}건</span> : null}
+
+===== table 조회 결과 =====
+[
+  {
+    "table": "customer_point_balances",
+    "ok": "Y",
+    "row_count": 10,
+    "error": ""
+  },
+  {
+    "table": "customer_point_ledger",
+    "ok": "Y",
+    "row_count": 40,
+    "error": ""
+  },
+  {
+    "table": "customer_point_gifts",
+    "ok": "N",
+    "row_count": 0,
+    "error": "Could not find the table 'public.customer_point_gifts' in the schema cache"
+  },
+  {
+    "table": "customer_points",
+    "ok": "N",
+    "row_count": 0,
+    "error": "Could not find the table 'public.customer_points' in the schema cache"
+  },
+  {
+    "table": "point_balances",
+    "ok": "N",
+    "row_count": 0,
+    "error": "Could not find the table 'public.point_balances' in the schema cache"
+  },
+  {
+    "table": "point_ledger",
+    "ok": "N",
+    "row_count": 0,
+    "error": "Could not find the table 'public.point_ledger' in the schema cache"
+  },
+  {
+    "table": "point_gifts",
+    "ok": "N",
+    "row_count": 0,
+    "error": "Could not find the table 'public.point_gifts' in the schema cache"
+  },
+  {
+    "table": "points",
+    "ok": "N",
+    "row_count": 0,
+    "error": "Could not find the table 'public.points' in the schema cache"
+  },
+  {
+    "table": "orders",
+    "ok": "Y",
+    "row_count": 983,
+    "error": ""
+  },
+  {
+    "table": "customers",
+    "ok": "Y",
+    "row_count": 308,
+    "error": ""
+  }
+]
+
+===== 포인트 전수조사 요약 =====
+{
+  "checked_at": "2026-06-02T11:27:45.083Z",
+  "tables": {
+    "ledgerTable": "customer_point_ledger",
+    "balanceTable": "customer_point_balances",
+    "giftTable": ""
+  },
+  "counts": {
+    "ledger_rows": 40,
+    "balance_rows": 10,
+    "gift_rows": 0,
+    "orders_total": 983,
+    "orders_with_point_used": 13,
+    "suspicious_positive_after_point_use": 10,
+    "duplicate_point_use_same_order": 0,
+    "duplicate_point_refund_same_order": 0,
+    "balance_vs_ledger_mismatch": 0,
+    "gift_seen_but_repeated_ledger": 0,
+    "point_phone_format_risk": 9
+  },
+  "files": [
+    "point_regrant_audit_20260602_202741/01_orders_with_point_used.csv",
+    "point_regrant_audit_20260602_202741/02_suspicious_positive_after_point_use.csv",
+    "point_regrant_audit_20260602_202741/03_duplicate_point_use_same_order.csv",
+    "point_regrant_audit_20260602_202741/04_duplicate_point_refund_same_order.csv",
+    "point_regrant_audit_20260602_202741/05_balance_vs_ledger_mismatch.csv",
+    "point_regrant_audit_20260602_202741/06_gift_seen_but_repeated_ledger.csv",
+    "point_regrant_audit_20260602_202741/07_point_phone_format_risk.csv"
+  ]
+}
+
+⚠️ 포인트 사용 후 의심 양수 ledger 샘플
+[
+  {
+    "canonical_phone": "01099992420",
+    "use_ledger_id": "eff66ecc-256e-462a-a2d2-f1a077aa1d0d",
+    "use_amount": -1000000,
+    "use_kind": "",
+    "use_reason": "테스트",
+    "use_order_ref": "",
+    "use_created_at": "2026-05-28T18:41:17.548192+00:00",
+    "later_positive_ledger_id": "4b1dffe7-e351-4fe6-ac44-8f889b1b7a00",
+    "later_positive_amount": 9999999,
+    "later_positive_kind": "",
+    "later_positive_reason": "테스트",
+    "later_positive_created_at": "2026-05-28T19:51:37.289069+00:00",
+    "risk": "포인트 사용 후 관리자지급/취소복구/선물로 보이지 않는 양수 ledger 발생"
+  },
+  {
+    "canonical_phone": "01081912420",
+    "use_ledger_id": "e92d36ee-a0da-4294-9c13-e9f0879f347f",
+    "use_amount": -59000,
+    "use_kind": "",
+    "use_reason": "주문서 포인트 사용",
+    "use_order_ref": "922",
+    "use_created_at": "2026-05-29T11:52:46.734481+00:00",
+    "later_positive_ledger_id": "a3f0b5ae-ef79-4247-898a-c222c93eb2f4",
+    "later_positive_amount": 5000,
+    "later_positive_kind": "",
+    "later_positive_reason": "테스트포인트",
+    "later_positive_created_at": "2026-05-30T21:00:57.013687+00:00",
+    "risk": "포인트 사용 후 관리자지급/취소복구/선물로 보이지 않는 양수 ledger 발생"
+  },
+  {
+    "canonical_phone": "01081912420",
+    "use_ledger_id": "ed49e919-2cfd-4b19-9fa4-68bd425e4489",
+    "use_amount": -59000,
+    "use_kind": "",
+    "use_reason": "주문서 포인트 사용",
+    "use_order_ref": "925",
+    "use_created_at": "2026-05-29T12:07:09.837131+00:00",
+    "later_positive_ledger_id": "a3f0b5ae-ef79-4247-898a-c222c93eb2f4",
+    "later_positive_amount": 5000,
+    "later_positive_kind": "",
+    "later_positive_reason": "테스트포인트",
+    "later_positive_created_at": "2026-05-30T21:00:57.013687+00:00",
+    "risk": "포인트 사용 후 관리자지급/취소복구/선물로 보이지 않는 양수 ledger 발생"
+  },
+  {
+    "canonical_phone": "01081912420",
+    "use_ledger_id": "2e9ae203-7057-4a1e-88b2-25ffac896037",
+    "use_amount": -55000,
+    "use_kind": "",
+    "use_reason": "주문서 포인트 사용",
+    "use_order_ref": "932",
+    "use_created_at": "2026-05-29T12:29:49.107753+00:00",
+    "later_positive_ledger_id": "a3f0b5ae-ef79-4247-898a-c222c93eb2f4",
+    "later_positive_amount": 5000,
+    "later_positive_kind": "",
+    "later_positive_reason": "테스트포인트",
+    "later_positive_created_at": "2026-05-30T21:00:57.013687+00:00",
+    "risk": "포인트 사용 후 관리자지급/취소복구/선물로 보이지 않는 양수 ledger 발생"
+  },
+  {
+    "canonical_phone": "01081912420",
+    "use_ledger_id": "15f6e1a5-eac8-4dff-abd8-94c5cb80ea8d",
+    "use_amount": -55000,
+    "use_kind": "",
+    "use_reason": "주문서 포인트 사용",
+    "use_order_ref": "933",
+    "use_created_at": "2026-05-29T12:30:17.668717+00:00",
+    "later_positive_ledger_id": "a3f0b5ae-ef79-4247-898a-c222c93eb2f4",
+    "later_positive_amount": 5000,
+    "later_positive_kind": "",
+    "later_positive_reason": "테스트포인트",
+    "later_positive_created_at": "2026-05-30T21:00:57.013687+00:00",
+    "risk": "포인트 사용 후 관리자지급/취소복구/선물로 보이지 않는 양수 ledger 발생"
+  },
+  {
+    "canonical_phone": "01081912420",
+    "use_ledger_id": "2e23e4a8-7c2e-4137-a121-10e693f1266a",
+    "use_amount": -73000,
+    "use_kind": "",
+    "use_reason": "주문서 포인트 사용",
+    "use_order_ref": "958",
+    "use_created_at": "2026-05-29T21:52:04.714482+00:00",
+    "later_positive_ledger_id": "a3f0b5ae-ef79-4247-898a-c222c93eb2f4",
+    "later_positive_amount": 5000,
+    "later_positive_kind": "",
+    "later_positive_reason": "테스트포인트",
+    "later_positive_created_at": "2026-05-30T21:00:57.013687+00:00",
+    "risk": "포인트 사용 후 관리자지급/취소복구/선물로 보이지 않는 양수 ledger 발생"
+  },
+  {
+    "canonical_phone": "01081912420",
+    "use_ledger_id": "4507a3df-7c59-4288-be82-8fec527f207d",
+    "use_amount": -69000,
+    "use_kind": "",
+    "use_reason": "주문서 포인트 사용",
+    "use_order_ref": "959",
+    "use_created_at": "2026-05-29T21:54:07.625923+00:00",
+    "later_positive_ledger_id": "a3f0b5ae-ef79-4247-898a-c222c93eb2f4",
+    "later_positive_amount": 5000,
+    "later_positive_kind": "",
+    "later_positive_reason": "테스트포인트",
+    "later_positive_created_at": "2026-05-30T21:00:57.013687+00:00",
+    "risk": "포인트 사용 후 관리자지급/취소복구/선물로 보이지 않는 양수 ledger 발생"
+  },
+  {
+    "canonical_phone": "01081912420",
+    "use_ledger_id": "10fcb51f-3d47-4cbf-80e8-c479624909a0",
+    "use_amount": -40750,
+    "use_kind": "",
+    "use_reason": "주문서 포인트 사용",
+    "use_order_ref": "968",
+    "use_created_at": "2026-05-29T22:23:13.594434+00:00",
+    "later_positive_ledger_id": "a3f0b5ae-ef79-4247-898a-c222c93eb2f4",
+    "later_positive_amount": 5000,
+    "later_positive_kind": "",
+    "later_positive_reason": "테스트포인트",
+    "later_positive_created_at": "2026-05-30T21:00:57.013687+00:00",
+    "risk": "포인트 사용 후 관리자지급/취소복구/선물로 보이지 않는 양수 ledger 발생"
+  },
+  {
+    "canonical_phone": "01081912420",
+    "use_ledger_id": "0f52adef-2aa9-45cb-8788-8b55d3c5f6e9",
+    "use_amount": -40750,
+    "use_kind": "",
+    "use_reason": "주문서 포인트 사용",
+    "use_order_ref": "973",
+    "use_created_at": "2026-05-29T22:38:44.89254+00:00",
+    "later_positive_ledger_id": "a3f0b5ae-ef79-4247-898a-c222c93eb2f4",
+    "later_positive_amount": 5000,
+    "later_positive_kind": "",
+    "later_positive_reason": "테스트포인트",
+    "later_positive_created_at": "2026-05-30T21:00:57.013687+00:00",
+    "risk": "포인트 사용 후 관리자지급/취소복구/선물로 보이지 않는 양수 ledger 발생"
+  },
+  {
+    "canonical_phone": "01081912420",
+    "use_ledger_id": "5a7d41d5-f226-40e6-97d4-70155de09711",
+    "use_amount": -279000,
+    "use_kind": "",
+    "use_reason": "주문서 포인트 사용",
+    "use_order_ref": "974",
+    "use_created_at": "2026-05-29T22:39:50.989817+00:00",
+    "later_positive_ledger_id": "a3f0b5ae-ef79-4247-898a-c222c93eb2f4",
+    "later_positive_amount": 5000,
+    "later_positive_kind": "",
+    "later_positive_reason": "테스트포인트",
+    "later_positive_created_at": "2026-05-30T21:00:57.013687+00:00",
+    "risk": "포인트 사용 후 관리자지급/취소복구/선물로 보이지 않는 양수 ledger 발생"
+  }
+]

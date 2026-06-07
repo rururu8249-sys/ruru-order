@@ -1,0 +1,1389 @@
+============================================================
+[0] git 상태
+============================================================
+?? order_submit_missing_audit_20260602_204051/
+?? point_regrant_audit_20260602_202741/
+?? point_regrant_detail_20260602_203011/
+?? point_regrant_detail_20260602_203103/
+44178b1 align roulette slices to pointer center
+b8028b3 fix customer current address display across admin views
+f6993a8 fix admin live customer current address display
+8c68fee fix roulette label layout by participant count
+278a53d fix roulette mid count label layout only
+ebe0465 add participant count based roulette label layout
+028d227 adjust roulette final stop half slice
+5830815 remove roulette pointer shift
+4410d36 remove roulette pointer shift
+d146dd2 remove roulette pointer shift
+
+============================================================
+[1] 주문 제출 코드 흐름 실제 블록 확인
+============================================================
+
+----- app/order/page.tsx 주문 payload 생성/전송 주변 -----
+  2860	        let rowShippingFee = 0;
+  2861	
+  2862	        if (rowShippingGroup === "normal") {
+  2863	          if (!paidShippingGroupsBeforeSubmit.normal && !chargedShippingGroups.has("normal")) {
+  2864	            rowShippingFee = baseShippingFee;
+  2865	          }
+  2866	        } else if (!paidShippingGroupsBeforeSubmit.vendor && !chargedShippingGroups.has("vendor")) {
+  2867	          rowShippingFee = baseShippingFee;
+  2868	        }
+  2869	
+  2870	        chargedShippingGroups.add(rowShippingGroup);
+  2871	        const rowCardExtra =
+  2872	          paymentMethod === "카드결제"
+  2873	            ? Math.round((itemTotal + rowShippingFee) * (cardRateForCustomer / 100))
+  2874	            : 0;
+  2875	
+  2876	        return {
+  2877	          order_group_id: groupId,
+  2878	          order_lookup_code: lookupCode,
+  2879	
+  2880	          broadcast_id: broadcast?.id || null,
+  2881	          broadcast_name: broadcastName,
+  2882	          broadcast_public_title: broadcastName,
+  2883	          broadcast_admin_subtitle:
+  2884	            broadcast?.broadcast_admin_subtitle ||
+  2885	            broadcast?.admin_subtitle ||
+  2886	            "",
+  2887	
+  2888	          youtube_nickname: youtubeNickname.trim(),
+  2889	          customer_name: customerName.trim(),
+  2890	          customer_phone: cleanPhone,
+  2891	          phone: cleanPhone,
+  2892	
+  2893	          zipcode: zipcode.trim(),
+  2894	          address: address.trim(),
+  2895	          detail_address: detailAddress.trim(),
+  2896	          request_memo: requestMemo.trim(),
+  2897	
+  2898	          product_id: item.product_id ? item.product_id : null,
+  2899	          product_name: item.product_name.trim(),
+  2900	          color: String(item.color || "").trim(),
+  2901	          size: String(item.size || "").trim(),
+  2902	          qty,
+  2903	          product_price: price,
+  2904	          shipping_fee: rowShippingFee,
+  2905	          total_price: itemTotal + rowShippingFee + rowCardExtra,
+  2906	
+  2907	          adjusted_product_price: itemTotal,
+  2908	          adjusted_shipping_fee: rowShippingFee,
+  2909	          adjusted_total_price: itemTotal + rowShippingFee + rowCardExtra,
+  2910	
+  2911	          payment_method: paymentMethod,
+  2912	          vat_amount: rowCardExtra,
+  2913	          customer_card_extra_rate_applied: paymentMethod === "카드결제" ? cardRateForCustomer : 0,
+  2914	          actual_card_fee_rate_applied: paymentMethod === "카드결제" ? actualCardFeeRate : 0,
+  2915	
+  2916	          order_status: "주문완료",
+  2917	          admin_status: "관리자 확인 전",
+  2918	          order_manage_status: "주문확인전",
+  2919	          shipping_status: "합배송중",
+  2920	
+  2921	          is_test_order: operatorTestOrderFlags.isTestOrder,
+  2922	          test_order_reason: operatorTestOrderFlags.isTestOrder ? operatorTestOrderFlags.testOrderReason : null,
+  2923	          operator_test_phone: operatorTestOrderFlags.isTestOrder ? operatorTestOrderFlags.operatorTestPhone : null,
+  2924	          exclude_from_settlement: operatorTestOrderFlags.excludeFromSettlement,
+  2925	          exclude_from_payment_match: operatorTestOrderFlags.excludeFromPaymentMatch,
+  2926	          exclude_from_shipping: operatorTestOrderFlags.excludeFromShipping,
+  2927	          exclude_from_picking: operatorTestOrderFlags.excludeFromPicking,
+  2928	
+  2929	          memo: itemLabel(item),
+  2930	          special_note: requestMemo.trim(),
+  2931	        };
+  2932	      });
+  2933	
+  2934	      const requestedPointUseAmount = toNumber(pointUseInput);
+  2935	      const appliedPointUseAmount =
+  2936	        customerPointBalance >= 1000
+  2937	          ? Math.min(requestedPointUseAmount, customerPointBalance, appliedTotalAmount)
+  2938	          : 0;
+  2939	
+  2940	      const orderSubmitResponse = await fetch("/api/customer-orders/submit", {
+  2941	        method: "POST",
+  2942	        headers: {
+  2943	          "Content-Type": "application/json",
+  2944	        },
+  2945	        cache: "no-store",
+  2946	        body: JSON.stringify({
+  2947	          orderRows,
+  2948	          point_use_amount: appliedPointUseAmount,
+  2949	          customer_phone: cleanPhone,
+  2950	          youtube_nickname: youtubeNickname.trim(),
+  2951	          customer_name: customerName.trim(),
+  2952	        }),
+  2953	      });
+  2954	
+  2955	      const orderSubmitPayload = await orderSubmitResponse.json().catch(() => null);
+  2956	
+  2957	      if (!orderSubmitResponse.ok || !orderSubmitPayload?.ok) {
+  2958	        throw new Error(orderSubmitPayload?.message || "주문 저장 실패");
+  2959	      }
+  2960	
+  2961	      const savedPointUsedAmount = toNumber(orderSubmitPayload?.point_used_amount);
+  2962	      const savedPointOriginalAmount = toNumber(orderSubmitPayload?.point_original_amount) || appliedTotalAmount;
+  2963	      const savedFinalAmount = Math.max(0, savedPointOriginalAmount - savedPointUsedAmount);
+  2964	
+  2965	      if (savedPointUsedAmount > 0) {
+  2966	        setCustomerPointBalance((current) => Math.max(0, Number(current || 0) - savedPointUsedAmount));
+  2967	      }
+  2968	
+  2969	      setDone({
+  2970	        nickname: youtubeNickname.trim(),
+  2971	        name: customerName.trim(),
+  2972	        paymentMethod,
+  2973	        items: validItems,
+  2974	        totalQty,
+  2975	        productAmount,
+  2976	        shippingFee: appliedShippingFee,
+  2977	        cardExtra: appliedCardExtra,
+  2978	        customerCardRate: cardRateForCustomer,
+  2979	        totalAmount: appliedTotalAmount,
+  2980	        pointUsedAmount: savedPointUsedAmount,
+  2981	        finalAmount: savedFinalAmount,
+  2982	      });
+  2983	
+  2984	      setPaymentGuideOpen(true);
+  2985	
+  2986	      clearOrderDraftData();
+  2987	
+  2988	      setItems([{ ...emptyItem }]);
+  2989	      setRequestMemo("");
+  2990	      setPaymentMethod("무통장입금");
+  2991	      setPointUseInput("");
+  2992	      setPin("");
+  2993	
+  2994	      const nextPaidShippingGroupsAfterSubmit: PaidShippingGroups = {
+  2995	        normal: paidShippingGroupsBeforeSubmit.normal || appliedShippingFeeBreakdown.normalShippingFee > 0,
+  2996	        vendor: paidShippingGroupsBeforeSubmit.vendor || appliedShippingFeeBreakdown.vendorShippingFee > 0,
+  2997	      };
+  2998	
+  2999	      if (appliedShippingFeeBreakdown.totalShippingFee > 0) {
+  3000	        markPaidShippingInThisBrowser(cleanPhone, markCombineSettings);
+  3001	      }
+  3002	
+  3003	      setPaidShippingGroups(nextPaidShippingGroupsAfterSubmit);
+  3004	      setAlreadyPaidShipping(nextPaidShippingGroupsAfterSubmit.normal || nextPaidShippingGroupsAfterSubmit.vendor);
+  3005	
+  3006	      setIsEditingCustomerInfo(false);
+  3007	      setIsCustomerInfoOpen(false);
+  3008	
+  3009	      window.scrollTo({ top: 0, behavior: "smooth" });
+  3010	    } catch (error: any) {
+  3011	      showCustomerNotice("주문서 제출 오류: " + error.message);
+  3012	    }
+  3013	
+  3014	    setSubmitting(false);
+  3015	  };
+
+----- app/api/customer-orders/submit/route.ts 전체 핵심 -----
+     1	import { NextRequest, NextResponse } from "next/server";
+     2	import { createClient } from "@supabase/supabase-js";
+     3	
+     4	import { assertValidCustomerPointPhone } from "@/lib/customerPoints";
+     5	
+     6	export const dynamic = "force-dynamic";
+     7	
+     8	type AnyRow = Record<string, any>;
+     9	
+    10	type OrderSubmitPayload = {
+    11	  orderRows?: AnyRow[];
+    12	  point_use_amount?: number;
+    13	  pointUseAmount?: number;
+    14	  customer_phone?: string;
+    15	  customerPhone?: string;
+    16	  youtube_nickname?: string;
+    17	  youtubeNickname?: string;
+    18	  customer_name?: string;
+    19	  customerName?: string;
+    20	};
+    21	
+    22	function jsonError(message: string, status = 400) {
+    23	  return NextResponse.json({ ok: false, message }, { status });
+    24	}
+    25	
+    26	function getSupabaseOrderSubmitClient() {
+    27	  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
+    28	  const serviceRoleKey =
+    29	    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    30	    process.env.SUPABASE_SERVICE_KEY ||
+    31	    process.env.SUPABASE_SERVICE_ROLE ||
+    32	    "";
+    33	
+    34	  if (!supabaseUrl || !serviceRoleKey) {
+    35	    throw new Error("Supabase 환경변수가 설정되지 않았습니다.");
+    36	  }
+    37	
+    38	  return createClient(supabaseUrl, serviceRoleKey, {
+    39	    auth: {
+    40	      persistSession: false,
+    41	      autoRefreshToken: false,
+    42	    },
+    43	  });
+    44	}
+    45	
+    46	function toWon(value: unknown): number {
+    47	  const amount = Math.floor(Number(value || 0));
+    48	
+    49	  if (!Number.isFinite(amount) || amount < 0) {
+    50	    return 0;
+    51	  }
+    52	
+    53	  return amount;
+    54	}
+    55	
+    56	function text(value: unknown): string {
+    57	  return String(value ?? "").trim();
+    58	}
+    59	
+    60	function firstOrderValue(orderRows: AnyRow[], key: string): unknown {
+    61	  return orderRows[0]?.[key];
+    62	}
+    63	
+    64	const submitNumberValue = (value: unknown, fallback = 0) => {
+    65	  const numeric =
+    66	    typeof value === "number"
+    67	      ? value
+    68	      : typeof value === "string"
+    69	        ? Number(value.replace(/,/g, ""))
+    70	        : Number(value ?? fallback);
+    71	
+    72	  return Number.isFinite(numeric) ? numeric : fallback;
+    73	};
+    74	
+    75	const readSubmitSettingNumber = async (
+    76	  supabase: any,
+    77	  key: string,
+    78	  fallback: number,
+    79	) => {
+    80	  const { data, error } = await supabase
+    81	    .from("settings")
+    82	    .select("value")
+    83	    .eq("key", key)
+    84	    .maybeSingle();
+    85	
+    86	  if (error) return fallback;
+    87	
+    88	  return submitNumberValue(data?.value, fallback);
+    89	};
+    90	
+    91	const normalizeOrderRowsForSubmitSettings = async (
+    92	  supabase: any,
+    93	  orderRows: AnyRow[],
+    94	) => {
+    95	  const defaultShippingFee = Math.max(
+    96	    0,
+    97	    await readSubmitSettingNumber(supabase, "default_shipping_fee", 4000),
+    98	  );
+    99	  const remoteAreaShippingFee = Math.max(
+   100	    0,
+   101	    await readSubmitSettingNumber(supabase, "remote_area_shipping_fee", 6000),
+   102	  );
+   103	
+   104	  if (defaultShippingFee !== 0 || remoteAreaShippingFee !== 0) {
+   105	    return {
+   106	      orderRows,
+   107	      defaultShippingFee,
+   108	      remoteAreaShippingFee,
+   109	      normalizedCount: 0,
+   110	    };
+   111	  }
+   112	
+   113	  let normalizedCount = 0;
+   114	
+   115	  const normalizedRows = orderRows.map((row) => {
+   116	    const shippingFee = submitNumberValue(row?.shipping_fee, 0);
+   117	    const adjustedShippingFee = submitNumberValue(row?.adjusted_shipping_fee, shippingFee);
+   118	
+   119	    if (shippingFee <= 0 && adjustedShippingFee <= 0) return row;
+   120	
+   121	    normalizedCount += 1;
+   122	
+   123	    const qty = Math.max(1, Math.round(submitNumberValue(row?.qty, 1)));
+   124	    const unitProductPrice = submitNumberValue(row?.adjusted_product_price ?? row?.product_price, 0);
+   125	    const productAmount = Math.max(0, unitProductPrice * qty);
+   126	    const paymentMethod = String(row?.payment_method || "");
+   127	    const customerCardRate = submitNumberValue(row?.customer_card_extra_rate_applied, 0);
+   128	    const actualCardRate = submitNumberValue(row?.actual_card_fee_rate_applied, 0);
+   129	    const cardExtra = paymentMethod === "카드결제"
+   130	      ? Math.round(productAmount * (customerCardRate / 100))
+   131	      : 0;
+   132	    const actualCardFee = paymentMethod === "카드결제"
+   133	      ? Math.round(productAmount * (actualCardRate / 100))
+   134	      : 0;
+   135	    const nextTotal = productAmount + cardExtra;
+   136	
+   137	    const nextRow: AnyRow = {
+   138	      ...row,
+   139	      shipping_fee: 0,
+   140	      adjusted_shipping_fee: 0,
+   141	      original_shipping_fee: row?.original_shipping_fee ?? shippingFee,
+   142	      vat_amount: cardExtra,
+   143	      total_price: nextTotal,
+   144	      adjusted_total_price: nextTotal,
+   145	      final_amount: nextTotal,
+   146	    };
+   147	
+   148	    if ("final_shipping_fee" in row) {
+   149	      nextRow.final_shipping_fee = 0;
+   150	    }
+   151	
+   152	    if ("actual_card_fee_amount" in row) {
+   153	      nextRow.actual_card_fee_amount = actualCardFee;
+   154	    }
+   155	
+   156	    if ("point_original_amount" in row && submitNumberValue(row?.point_used_amount, 0) <= 0) {
+   157	      nextRow.point_original_amount = nextTotal;
+   158	    }
+   159	
+   160	    if ("combine_shipping_memo" in row) {
+   161	      nextRow.combine_shipping_memo = row?.combine_shipping_memo || "배송비 0원 설정 서버 보정";
+   162	    }
+   163	
+   164	    return nextRow;
+   165	  });
+   166	
+   167	  return {
+   168	    orderRows: normalizedRows,
+   169	    defaultShippingFee,
+   170	    remoteAreaShippingFee,
+   171	    normalizedCount,
+   172	  };
+   173	};
+   174	
+   175	
+   176	export async function POST(request: NextRequest) {
+   177	  try {
+   178	    const body = (await request.json().catch(() => null)) as OrderSubmitPayload | null;
+   179	
+   180	    if (!body || typeof body !== "object") {
+   181	      return jsonError("주문 요청 내용이 올바르지 않습니다.");
+   182	    }
+   183	
+   184	    const orderRows = Array.isArray(body.orderRows) ? body.orderRows : [];
+   185	
+   186	    if (orderRows.length === 0) {
+   187	      return jsonError("주문 상품이 없습니다.");
+   188	    }
+   189	
+   190	    const phone = assertValidCustomerPointPhone(
+   191	      body.customer_phone ||
+   192	        body.customerPhone ||
+   193	        firstOrderValue(orderRows, "customer_phone") ||
+   194	        firstOrderValue(orderRows, "phone")
+   195	    );
+   196	
+   197	    const pointUseAmount = toWon(body.point_use_amount ?? body.pointUseAmount ?? 0);
+   198	    const youtubeNickname = text(
+   199	      body.youtube_nickname ||
+   200	        body.youtubeNickname ||
+   201	        firstOrderValue(orderRows, "youtube_nickname")
+   202	    );
+   203	    const customerName = text(
+   204	      body.customer_name ||
+   205	        body.customerName ||
+   206	        firstOrderValue(orderRows, "customer_name")
+   207	    );
+   208	
+   209	    const supabase = getSupabaseOrderSubmitClient();
+   210	    const normalizedSubmit = await normalizeOrderRowsForSubmitSettings(supabase, orderRows);
+   211	
+   212	    const { data, error } = await supabase.rpc("submit_customer_order_with_points", {
+   213	      p_order_rows: normalizedSubmit.orderRows,
+   214	      p_point_use_amount: pointUseAmount,
+   215	      p_customer_phone: phone,
+   216	      p_youtube_nickname: youtubeNickname,
+   217	      p_customer_name: customerName,
+   218	    });
+   219	
+   220	    if (error) {
+   221	      throw new Error(error.message || "주문 저장 실패");
+   222	    }
+   223	
+   224	    if (!data || typeof data !== "object") {
+   225	      return NextResponse.json({
+   226	        ok: true,
+   227	        result: data,
+   228	      });
+   229	    }
+   230	
+   231	    return NextResponse.json(data);
+   232	  } catch (error) {
+   233	    return jsonError(error instanceof Error ? error.message : "주문 저장 실패", 400);
+   234	  }
+   235	}
+
+----- 주문 저장 RPC/SQL 파일 grep -----
+app/order/page.tsx:2855:      const orderRows = validItems.map((item) => {
+app/order/page.tsx:2877:          order_group_id: groupId,
+app/order/page.tsx:2878:          order_lookup_code: lookupCode,
+app/order/page.tsx:2947:          orderRows,
+app/order/page.tsx:2958:        throw new Error(orderSubmitPayload?.message || "주문 저장 실패");
+app/order/page.tsx:2961:      const savedPointUsedAmount = toNumber(orderSubmitPayload?.point_used_amount);
+app/order/page.tsx:3153:      ruruOrderLookupText(order?.order_lookup_code) ||
+app/admin/page.tsx:67:  order_group_id?: string;
+app/admin/page.tsx:68:  order_lookup_code?: string;
+app/admin/page.tsx:318:            row.order_group_id || row.order_lookup_code || row.id || crypto.randomUUID()
+app/admin/page.tsx:556:        order.order_lookup_code,
+app/admin/page.tsx:577:      const key = String(order.order_group_id || order.order_lookup_code || order.id || "");
+app/admin/page.tsx:942:        orderCode: String(first.order_lookup_code || first.order_group_id || first.id || "").slice(0, 20),
+app/admin/page.tsx:1411:            rows.map((row) => row.order_group_id || row.order_lookup_code || row.id)
+app/admin/page.tsx:1991:        order.order_group_id || order.order_lookup_code || order.id || ""
+app/components/AdminRealtimeOrderAlert.tsx:40:  order_lookup_code?: string;
+app/components/AdminRealtimeOrderAlert.tsx:311:            {newOrder.order_lookup_code && (
+app/components/AdminRealtimeOrderAlert.tsx:312:              <div>조회번호: {newOrder.order_lookup_code}</div>
+app/api/customer-orders/submit/route.ts:11:  orderRows?: AnyRow[];
+app/api/customer-orders/submit/route.ts:22:function jsonError(message: string, status = 400) {
+app/api/customer-orders/submit/route.ts:60:function firstOrderValue(orderRows: AnyRow[], key: string): unknown {
+app/api/customer-orders/submit/route.ts:61:  return orderRows[0]?.[key];
+app/api/customer-orders/submit/route.ts:93:  orderRows: AnyRow[],
+app/api/customer-orders/submit/route.ts:106:      orderRows,
+app/api/customer-orders/submit/route.ts:115:  const normalizedRows = orderRows.map((row) => {
+app/api/customer-orders/submit/route.ts:156:    if ("point_original_amount" in row && submitNumberValue(row?.point_used_amount, 0) <= 0) {
+app/api/customer-orders/submit/route.ts:168:    orderRows: normalizedRows,
+app/api/customer-orders/submit/route.ts:181:      return jsonError("주문 요청 내용이 올바르지 않습니다.");
+app/api/customer-orders/submit/route.ts:184:    const orderRows = Array.isArray(body.orderRows) ? body.orderRows : [];
+app/api/customer-orders/submit/route.ts:186:    if (orderRows.length === 0) {
+app/api/customer-orders/submit/route.ts:187:      return jsonError("주문 상품이 없습니다.");
+app/api/customer-orders/submit/route.ts:193:        firstOrderValue(orderRows, "customer_phone") ||
+app/api/customer-orders/submit/route.ts:194:        firstOrderValue(orderRows, "phone")
+app/api/customer-orders/submit/route.ts:201:        firstOrderValue(orderRows, "youtube_nickname")
+app/api/customer-orders/submit/route.ts:206:        firstOrderValue(orderRows, "customer_name")
+app/api/customer-orders/submit/route.ts:210:    const normalizedSubmit = await normalizeOrderRowsForSubmitSettings(supabase, orderRows);
+app/api/customer-orders/submit/route.ts:212:    const { data, error } = await supabase.rpc("submit_customer_order_with_points", {
+app/api/customer-orders/submit/route.ts:213:      p_order_rows: normalizedSubmit.orderRows,
+app/api/customer-orders/submit/route.ts:221:      throw new Error(error.message || "주문 저장 실패");
+app/api/customer-orders/submit/route.ts:233:    return jsonError(error instanceof Error ? error.message : "주문 저장 실패", 400);
+app/api/admin-v2/manual-payment-match/route.ts:59:  if (deposit?.match_order_group_id || deposit?.match_customer_id) return true;
+app/api/admin-v2/manual-payment-match/route.ts:133:      orderQuery = orderQuery.eq("order_group_id", orderGroupId);
+app/api/admin-v2/manual-payment-match/route.ts:229:        match_order_group_id: orderGroupId || firstOrder.order_group_id || null,
+app/api/admin-v2/payment-confirm-cancel/route.ts:76:  if ("match_order_group_id" in sample) patch.match_order_group_id = null;
+app/api/admin-v2/payment-confirm-cancel/route.ts:77:  if ("matched_order_group_id" in sample) patch.matched_order_group_id = null;
+app/api/admin-v2/payment-confirm-cancel/route.ts:93:      .map((order) => clean(order.order_group_id))
+app/api/admin-v2/payment-confirm-cancel/route.ts:99:      .map((order) => clean(order.order_lookup_code))
+app/api/admin-v2/payment-confirm-cancel/route.ts:110:    deposit.match_order_group_id,
+app/api/admin-v2/payment-confirm-cancel/route.ts:111:    deposit.matched_order_group_id,
+app/api/admin-v2/payment-confirm-cancel/route.ts:155:      orderQuery = orderQuery.eq("order_group_id", orderGroupId);
+app/api/admin-v2/payment-confirm-cancel/route.ts:157:      orderQuery = orderQuery.eq("order_lookup_code", orderLookupCode);
+app/api/admin-v2/payment-confirm-cancel/route.ts:201:        order_lookup_code: order.order_lookup_code || null,
+app/api/admin-v2/payment-confirm-cancel/route.ts:202:        order_group_id: order.order_group_id || null,
+app/api/admin-v2/payment-confirm-cancel/route.ts:240:        match_order_group_id: deposit.match_order_group_id || null,
+app/api/admin-v2/payment-confirm-cancel/route.ts:247:        match_order_group_id: null,
+app/api/admin-v2/payment-confirm-cancel/route.ts:288:        .select("id, order_lookup_code, order_group_id, youtube_nickname, product_name, payment_method, admin_order_status_v2, order_manage_status, deposit_confirmed_at");
+app/api/admin-v2/payment-confirm-cancel/route.ts:317:          .select("id, match_order_group_id, match_status, confirmed_at");
+app/api/admin-v2/deposits/route.ts:47:    const key = cleanText(first(row, ["id", "order_id", "order_lookup_code", "order_group_id"])) || JSON.stringify(row);
+app/api/admin-v2/deposits/route.ts:60:    first(deposit, ["match_order_group_id", "matched_order_group_id", "order_group_id", "matched_group_id"]),
+app/api/admin-v2/deposits/route.ts:61:    first(deposit, ["order_lookup_code", "lookup_code"]),
+app/api/admin-v2/deposits/route.ts:82:    addKey(byGroup, first(order, ["order_group_id", "group_id"]), order);
+app/api/admin-v2/deposits/route.ts:83:    addKey(byGroup, first(order, ["order_lookup_code", "lookup_code"]), order);
+app/api/admin-v2/auto-payment-match/preview/route.ts:33:  return text(first(order, ["id", "order_id", "order_no", "order_number", "order_group_id"]));
+app/api/admin-v2/auto-payment-match/preview/route.ts:37:  return text(first(order, ["order_group_id", "group_id", "id", "order_id"]));
+app/api/admin-v2/auto-payment-match/preview/route.ts:134:  order_group_id: string;
+app/api/admin-v2/auto-payment-match/preview/route.ts:161:      order_group_id: groupId,
+app/api/admin-v2/auto-payment-match/preview/route.ts:228:  const matchedOrderGroupId = text(first(deposit, ["match_order_group_id", "matched_order_group_id"]));
+app/api/admin-v2/auto-payment-match/preview/route.ts:350:          id: group.order_group_id,
+app/api/admin-v2/auto-payment-match/preview/route.ts:362:          id: group.order_group_id,
+app/api/admin-v2/auto-payment-match/preview/route.ts:376:        order_group_id: group.order_group_id,
+app/api/admin-v2/auto-payment-match/run/route.ts:18:  order_group_id: string;
+app/api/admin-v2/auto-payment-match/run/route.ts:81:  return text(order.order_group_id || order.group_id || order.id);
+app/api/admin-v2/auto-payment-match/run/route.ts:189:  if (deposit.match_order_group_id || deposit.match_customer_id) {
+app/api/admin-v2/auto-payment-match/run/route.ts:269:        order_group_id: group.orderGroupId,
+app/api/admin-v2/auto-payment-match/run/route.ts:377:          match_order_group_id: candidate.order_group_id,
+app/api/admin-v2/auto-payment-match/strict-run/route.ts:148:    deposit.match_order_group_id ||
+app/api/admin-v2/auto-payment-match/strict-run/route.ts:187:  const groupId = order.group_id || order.order_group_id || order.id;
+app/api/admin-v2/auto-payment-match/strict-run/route.ts:194:  if (hasColumn(deposit, "match_order_group_id")) patch.match_order_group_id = groupId;
+app/api/admin-v2/auto-payment-match/strict-run/route.ts:276:    for (const [key, orderRows] of ordersByKey.entries()) {
+app/api/admin-v2/auto-payment-match/strict-run/route.ts:279:      if (orderRows.length === 1 && depositRows.length === 1) {
+app/api/admin-v2/auto-payment-match/strict-run/route.ts:282:          order: orderRows[0],
+app/api/admin-v2/auto-payment-match/strict-run/route.ts:346:        order_code: order.order_lookup_code,
+app/api/admin-v2/manual-payment-confirm-without-deposit/route.ts:102:      orderQuery = orderQuery.eq("order_group_id", orderGroupId);
+app/api/admin-v2/manual-payment-confirm-without-deposit/route.ts:184:      .select("id, order_lookup_code, order_group_id, youtube_nickname, product_name, payment_method, admin_order_status_v2, order_manage_status, deposit_confirmed_at");
+app/api/customer-points/route.ts:13:function jsonError(message: string, status = 400) {
+app/api/customer-points/route.ts:64:    return jsonError(error instanceof Error ? error.message : "포인트 조회 실패", 400);
+app/api/customer-point-gifts/route.ts:17:function jsonError(message: string, status = 400) {
+app/api/customer-point-gifts/route.ts:109:    return jsonError(error instanceof Error ? error.message : "포인트 선물 조회 실패", 400);
+app/api/customer-point-gifts/route.ts:120:      return jsonError("확인할 포인트 알림을 찾을 수 없습니다.", 400);
+app/api/customer-point-gifts/route.ts:147:    return jsonError(error instanceof Error ? error.message : "포인트 알림 확인 실패", 400);
+app/api/bankda/sync-deposits/route.ts.backup-rls-service-role:91:        match_order_group_id: null,
+app/api/bankda/sync-deposits/route.ts.backup-service-role-final:113:        match_order_group_id: null,
+app/api/bankda/sync-deposits/route.ts.backup-time-fix:58:        match_order_group_id: null,
+app/api/bankda/sync-deposits/route.ts:129:        match_order_group_id: null,
+app/api/bankda/sync-deposits/route.ts.backup-auto-match:113:        match_order_group_id: null,
+app/api/admin-live/customer-points/route.ts:25:function jsonError(message: string, status = 400) {
+app/api/admin-live/customer-points/route.ts:119:    return jsonError(error instanceof Error ? error.message : "포인트 조회 실패", 400);
+app/api/admin-live/customer-points/route.ts:132:      return jsonError("요청 내용이 올바르지 않습니다.");
+app/api/admin-live/customer-points/route.ts:145:      return jsonError(action === "grant" ? "지급 사유를 입력해주세요." : "차감 사유를 입력해주세요.");
+app/api/admin-live/customer-points/route.ts:214:    return jsonError(error instanceof Error ? error.message : "포인트 처리 실패", 400);
+app/api/admin-live/broadcast-end-reports/route.ts:37:function jsonError(message: string, status = 400) {
+app/api/admin-live/broadcast-end-reports/route.ts:138:    return jsonError(auth.message, auth.status);
+app/api/admin-live/broadcast-end-reports/route.ts:180:    return jsonError(auth.message, auth.status);
+app/api/admin-live/broadcast-end-reports/route.ts:188:    return jsonError("요청 본문을 읽지 못했습니다.", 400);
+app/api/admin-live/broadcast-end-reports/route.ts:194:    return jsonError("broadcastId가 없습니다.", 400);
+app/api/admin-live/ops-status/route.ts:66:    const groupId = clean(row?.order_group_id || row?.order_lookup_code || row?.id);
+app/api/admin-live/ops-status/route.ts:125:        "id, order_group_id, order_lookup_code, created_at, youtube_nickname, customer_name, final_amount, adjusted_total_price, total_price, product_price, product_name, color, size, qty, admin_order_status_v2, order_manage_status, deposit_confirmed_at"
+app/api/admin-live/product-images/delete/route.ts:7:function jsonError(message: string, status = 400) {
+app/api/admin-live/product-images/delete/route.ts:31:    return jsonError("관리자 로그인이 필요합니다. /admin-login에서 다시 로그인 후 새로고침해주세요.", 401);
+app/api/admin-live/product-images/delete/route.ts:47:      return jsonError("삭제할 이미지 경로가 없습니다.");
+app/api/admin-live/product-images/delete/route.ts:55:      return jsonError(error.message, 500);
+app/api/admin-live/product-images/delete/route.ts:64:    return jsonError(message, 500);
+app/api/admin-live/product-images/upload/route.ts:7:function jsonError(message: string, status = 400) {
+app/api/admin-live/product-images/upload/route.ts:57:    return jsonError("관리자 로그인이 필요합니다. /admin-login에서 다시 로그인 후 새로고침해주세요.", 401);
+app/api/admin-live/product-images/upload/route.ts:66:      return jsonError("업로드할 파일이 없습니다.");
+app/api/admin-live/product-images/upload/route.ts:70:      return jsonError("이미지 파일만 업로드할 수 있습니다.");
+app/api/admin-live/product-images/upload/route.ts:74:      return jsonError("압축 후에도 파일이 5MB를 초과합니다.");
+app/api/admin-live/product-images/upload/route.ts:101:      return jsonError(uploadError.message, 500);
+app/api/admin-live/product-images/upload/route.ts:116:    return jsonError(message, 500);
+components/admin-v2/settlement/settlementUtils.ts:231:        const key = cleanText(row?.id || row?.order_id || `${row?.order_lookup_code}-${row?.product_name}`);
+components/admin-v2/settlement/settlementUtils.ts:242:      const key = cleanText(row?.id || row?.order_id || `${row?.order_lookup_code}-${row?.product_name}`);
+components/admin-v2/today/adminTodayUtils.ts:235:    const fullOrderCode = String(first.order_lookup_code || group.groupId || first.id || "-");
+components/admin-v2/payment/ledger/DepositLinkedOrderInfo.tsx:39:      "order_lookup_code",
+components/admin-v2/payment/ledger/DepositLinkedOrderInfo.tsx:43:      "order_group_id",
+components/admin-v2/payment/ledger/depositLedgerUtils.ts:157:        "match_order_group_id",
+components/admin-v2/payment/ledger/depositLedgerUtils.ts:158:        "matched_order_group_id",
+components/admin-v2/payment/ledger/depositLedgerUtils.ts:191:      "match_order_group_id",
+components/admin-v2/payment/ledger/depositLedgerUtils.ts:192:      "matched_order_group_id",
+components/admin-v2/payment/ledger/depositLedgerUtils.ts:195:      "order_lookup_code",
+components/admin-v2/payment/ledger/depositLedgerUtils.ts:196:      "order_group_id",
+components/admin-v2/payment/useStrictAutoPaymentConfirm.ts:7:  order_group_id?: string | number | null;
+components/admin-v2/payment/useStrictAutoPaymentConfirm.ts:61:    const orderId = cleanText(candidate.order_id || candidate.order_group_id);
+components/admin-v2/payment/useStrictAutoPaymentConfirm.ts:81:        cleanText(candidate.order_id || candidate.order_group_id),
+components/admin-v2/payment/parts/AutoMatchPreviewBox.tsx:107:                {candidate.order_group_id || candidate.order_id || "-"}
+components/admin-v2/orders/AdminOrderDetailDrawer.tsx:60:  const orderCode = first.order_lookup_code || group.groupId || "-";
+components/admin-v2/orders/AdminOrderPaymentCancelAction.tsx:87:          orderGroupId: group.groupId || first.order_group_id || first.order_lookup_code || "",
+components/admin-v2/orders/AdminOrderPaymentCancelAction.tsx:88:          orderLookupCode: first.order_lookup_code || "",
+components/admin-v2/AdminV2Client.tsx:156:  // order_group_id, order_lookup_code, 고객명, 전화번호, 주소가 같아도 합치지 않습니다.
+components/admin-v2/AdminV2Client.tsx:181:  // 송장관리에서는 order_lookup_code 기준으로도 합치지 않습니다.
+components/admin-v2/AdminV2Client.tsx:559:      const groupId = String(order.order_group_id || order.order_lookup_code || order.id || "");
+components/admin-v2/AdminV2Client.tsx:679:        group.first.order_lookup_code,
+components/admin-v2/AdminV2Client.tsx:739:    // 같은 고객/전화/주소/order_group_id/order_lookup_code여도 그대로 각각 출력합니다.
+components/admin-v2/AdminV2Client.tsx:883:        order_group_id: row.order_group_id,
+components/admin-v2/AdminV2Client.tsx:884:        order_lookup_code: row.order_lookup_code,
+components/admin-v2/AdminV2Client.tsx:944:        match_order_group_id: group.groupId,
+components/admin-v2/AdminV2Client.tsx:1033:        order_group_id: row.order_group_id,
+components/admin-v2/AdminV2Client.tsx:1034:        order_lookup_code: row.order_lookup_code,
+components/admin-v2/AdminV2Client.tsx:1663:              public/templates/rozen_template.xlsx 원본 양식에 맞춰 로젠 송장 다운로드용 xlsx를 생성합니다. 송장관리에서는 어떤 기준으로도 합치지 않습니다. DB 주문행 1개를 로젠 엑셀 1줄로 그대로 내보냅니다. 같은 고객/전화/주소/order_lookup_code여도 사이트에서 합치지 않습니다. 사이트에서는 DB 주문행 1개를 로젠 엑셀 1줄로 그대로 내보내며, 로젠 프로그램이 동일 수하인 자동합배송을 처리합니다.
+components/admin-v2/AdminV2Client.tsx:1711:          ⚠️ 사이트에서는 송장을 절대 합치지 않습니다. 같은 고객/전화/주소/order_lookup_code라도 DB 주문행마다 각각 한 줄로 내려갑니다. 다운로드한 파일은 로젠 프로그램에서 송장 출력용으로만 사용하세요. 사이트에는 다시 업로드하지 않습니다. 동일 수하인 자동합배송은 로젠 프로그램이 처리합니다. TSV는 템플릿 A1부터 붙여넣기용입니다.
+components/admin/orders/AdminOrderRow.tsx:40:                        first.order_lookup_code ||
+components/admin/orders/AdminOrderRow.tsx:41:                        first.order_group_id ||
+components/admin/orders/AdminOrderDetailPanel.tsx:27:                          {selectedOrderDetail.first.order_lookup_code ||
+components/admin/orders/AdminOrderDetailPanel.tsx:28:                            selectedOrderDetail.first.order_group_id ||
+components/myorder/MyOrderResultCard.tsx:32:    order.order_lookup_code ||
+components/myorder/MyOrderResultCard.tsx:33:    order.order_group_id ||
+components/myorder/MyOrderResultCard.tsx:80:  const pointUsedAmount = toMoneyNumber(order.point_used_amount ?? order.pointUsedAmount);
+components/admin-live/LiveOpsOrderCopyModal.tsx:13:  order_group_id?: string | null;
+components/admin-live/LiveOpsOrderCopyModal.tsx:39:      order.order_group_id ||
+components/admin-live/AdminLiveSettlementPanel.tsx:124:    id: firstText(order.id, order.order_id, order.orderId, order.groupId, order.order_lookup_code) || `admin-live-order-${index}`,
+components/admin-live/AdminLiveSettlementPanel.tsx:126:    order_lookup_code: firstText(order.order_lookup_code, order.orderLookupCode, order.orderNumber, order.groupId),
+components/admin-live/LiveOrderDetailDrawer.tsx:217:        (orderForView as any).point_used_amount ??
+components/admin-live/LiveOrderDetailDrawer.tsx:219:        rawOrderForCardDisplay.point_used_amount ??
+components/admin-live/LiveOrderDetailDrawer.tsx:264:            currentOrder.order_group_id ||
+components/admin-live/LiveOrderDetailDrawer.tsx:269:            currentOrder.order_lookup_code ||
+components/admin-live/AdminLiveDashboard.tsx:1423:                  const orderRows = filterBySearch(modalOrders, (order: any) =>
+components/admin-live/AdminLiveDashboard.tsx:1427:                  const activePeriodOrderAmount = orderRows.reduce((sum: number, order: any) => sum + (isCanceledOrder(order) ? 0 : orderAmount(order)), 0);
+components/admin-live/AdminLiveDashboard.tsx:1443:                      ? orderRows.length
+components/admin-live/AdminLiveDashboard.tsx:1454:                  const pagedOrders = orderRows.slice(pageStart, pageEnd);
+components/admin-live/AdminLiveDashboard.tsx:1873:                                      <div className="mt-2 text-3xl font-black text-slate-950">{orderRows.length}건</div>
+components/admin-live/liveOrderAdapter.ts:87:  return String(order.order_group_id || order.order_lookup_code || order.id || "");
+components/admin-live/liveOrderAdapter.ts:265:    return sum + safeNumber(row.point_used_amount ?? row.pointUsedAmount ?? 0);
+components/admin-live/liveOrderAdapter.ts:308:    orderNo: first.order_lookup_code || group.groupId || String(first.id || "-"),
+lib/admin-v2/autoPaymentMatch.ts:46:  return String(order.order_group_id || order.order_lookup_code || order.id || "");
+lib/admin-v2/autoPaymentMatch.ts:186:        match_order_group_id: pair.groupId,
+lib/admin-v2/types.ts:10:  order_group_id: string | null;
+lib/admin-v2/types.ts:11:  order_lookup_code: string | null;
+lib/admin-v2/types.ts:80:  match_order_group_id: string | null;
+lib/admin-v2/types.ts:91:  order_group_id: string | null;
+lib/admin-v2/types.ts:92:  order_lookup_code: string | null;
+lib/admin-v2/types.ts:107:  order_group_id: string | null;
+lib/admin-v2/types.ts:108:  order_lookup_code: string | null;
+lib/admin-v2/orderHelpers.ts:195:  return String(group.first.order_lookup_code || group.groupId || group.first.id || "-").replace("RURU-", "");
+supabase/sql/order_point_usage_columns.sql:18:  add column if not exists point_used_amount integer not null default 0;
+supabase/sql/order_point_usage_columns.sql:20:comment on column public.orders.point_used_amount is
+supabase/sql/order_point_usage_columns.sql:62:    where conname = 'orders_point_used_amount_non_negative'
+supabase/sql/order_point_usage_columns.sql:65:      add constraint orders_point_used_amount_non_negative
+supabase/sql/order_point_usage_columns.sql:66:      check (point_used_amount >= 0);
+supabase/sql/order_point_cancel_restore_rpc.sql:13:-- - point_used_amount > 0 인 주문만 포인트 복구 대상이다.
+supabase/sql/order_point_cancel_restore_rpc.sql:111:      point_used_amount,
+supabase/sql/order_point_cancel_restore_rpc.sql:126:    v_restore_amount := greatest(0, coalesce(v_order.point_used_amount, 0));
+supabase/sql/inventory_auto_deduct_rpc.sql:81:  order_group_id text,
+supabase/sql/inventory_auto_deduct_rpc.sql:204:create or replace function public.submit_customer_order_with_points(
+supabase/sql/inventory_auto_deduct_rpc.sql:205:  p_order_rows jsonb,
+supabase/sql/inventory_auto_deduct_rpc.sql:226:  v_point_used_amount integer := 0;
+supabase/sql/inventory_auto_deduct_rpc.sql:237:  v_row_point_used_amount integer := 0;
+supabase/sql/inventory_auto_deduct_rpc.sql:260:  if p_order_rows is null or jsonb_typeof(p_order_rows) <> 'array' then
+supabase/sql/inventory_auto_deduct_rpc.sql:264:  v_order_count := jsonb_array_length(p_order_rows);
+supabase/sql/inventory_auto_deduct_rpc.sql:273:      p_order_rows->0->>'customer_phone',
+supabase/sql/inventory_auto_deduct_rpc.sql:274:      p_order_rows->0->>'phone',
+supabase/sql/inventory_auto_deduct_rpc.sql:288:    p_order_rows->0->>'youtube_nickname',
+supabase/sql/inventory_auto_deduct_rpc.sql:294:    p_order_rows->0->>'customer_name',
+supabase/sql/inventory_auto_deduct_rpc.sql:310:    from jsonb_array_elements(p_order_rows) with ordinality as source(row_value, ordinality)
+supabase/sql/inventory_auto_deduct_rpc.sql:328:    v_point_used_amount := 0;
+supabase/sql/inventory_auto_deduct_rpc.sql:330:    v_point_used_amount := least(v_current_points, v_point_use_request, v_payable_before_points);
+supabase/sql/inventory_auto_deduct_rpc.sql:333:  v_point_balance_after := v_current_points - v_point_used_amount;
+supabase/sql/inventory_auto_deduct_rpc.sql:337:    from jsonb_array_elements(p_order_rows) with ordinality as source(row_value, ordinality)
+supabase/sql/inventory_auto_deduct_rpc.sql:353:    v_row_point_used_amount := least(v_row_original_amount, greatest(0, v_point_used_amount - v_point_used_so_far));
+supabase/sql/inventory_auto_deduct_rpc.sql:354:    v_row_final_amount := greatest(0, v_row_original_amount - v_row_point_used_amount);
+supabase/sql/inventory_auto_deduct_rpc.sql:355:    v_point_used_so_far := v_point_used_so_far + v_row_point_used_amount;
+supabase/sql/inventory_auto_deduct_rpc.sql:369:    insert into public.orders (
+supabase/sql/inventory_auto_deduct_rpc.sql:370:      order_group_id,
+supabase/sql/inventory_auto_deduct_rpc.sql:371:      order_lookup_code,
+supabase/sql/inventory_auto_deduct_rpc.sql:413:      point_used_amount,
+supabase/sql/inventory_auto_deduct_rpc.sql:420:      v_row_value->>'order_group_id',
+supabase/sql/inventory_auto_deduct_rpc.sql:421:      v_row_value->>'order_lookup_code',
+supabase/sql/inventory_auto_deduct_rpc.sql:467:      v_row_point_used_amount,
+supabase/sql/inventory_auto_deduct_rpc.sql:468:      case when v_point_used_amount > 0 then v_current_points else null end,
+supabase/sql/inventory_auto_deduct_rpc.sql:469:      case when v_point_used_amount > 0 then v_point_balance_after else null end,
+supabase/sql/inventory_auto_deduct_rpc.sql:470:      case when v_point_used_amount > 0 then v_now else null end,
+supabase/sql/inventory_auto_deduct_rpc.sql:609:        order_group_id,
+supabase/sql/inventory_auto_deduct_rpc.sql:621:        v_row_value->>'order_group_id',
+supabase/sql/inventory_auto_deduct_rpc.sql:688:        order_group_id,
+supabase/sql/inventory_auto_deduct_rpc.sql:700:        v_row_value->>'order_group_id',
+supabase/sql/inventory_auto_deduct_rpc.sql:722:  if v_point_used_amount > 0 then
+supabase/sql/inventory_auto_deduct_rpc.sql:745:      -v_point_used_amount,
+supabase/sql/inventory_auto_deduct_rpc.sql:776:      v_point_used_amount,
+supabase/sql/inventory_auto_deduct_rpc.sql:789:        total_used_points = coalesce(public.customer_point_balances.total_used_points, 0) + v_point_used_amount,
+supabase/sql/inventory_auto_deduct_rpc.sql:804:    'point_used_amount', v_point_used_amount,
+supabase/sql/inventory_auto_deduct_rpc.sql:805:    'point_balance_before', case when v_point_used_amount > 0 then v_current_points else null end,
+supabase/sql/inventory_auto_deduct_rpc.sql:806:    'point_balance_after', case when v_point_used_amount > 0 then v_point_balance_after else null end,
+supabase/sql/inventory_auto_deduct_rpc.sql:807:    'point_ledger_id', case when v_point_used_amount > 0 then v_point_ledger_id else null end,
+supabase/sql/inventory_auto_deduct_rpc.sql:814:comment on function public.submit_customer_order_with_points(jsonb, integer, text, text, text) is
+supabase/sql/customer_order_submit_with_points_rpc.sql:15:create or replace function public.submit_customer_order_with_points(
+supabase/sql/customer_order_submit_with_points_rpc.sql:16:  p_order_rows jsonb,
+supabase/sql/customer_order_submit_with_points_rpc.sql:37:  v_point_used_amount integer := 0;
+supabase/sql/customer_order_submit_with_points_rpc.sql:44:  if p_order_rows is null or jsonb_typeof(p_order_rows) <> 'array' then
+supabase/sql/customer_order_submit_with_points_rpc.sql:48:  v_order_count := jsonb_array_length(p_order_rows);
+supabase/sql/customer_order_submit_with_points_rpc.sql:57:      p_order_rows->0->>'customer_phone',
+supabase/sql/customer_order_submit_with_points_rpc.sql:58:      p_order_rows->0->>'phone',
+supabase/sql/customer_order_submit_with_points_rpc.sql:72:    p_order_rows->0->>'youtube_nickname',
+supabase/sql/customer_order_submit_with_points_rpc.sql:78:    p_order_rows->0->>'customer_name',
+supabase/sql/customer_order_submit_with_points_rpc.sql:102:    from jsonb_array_elements(p_order_rows) with ordinality as source(row_value, ordinality)
+supabase/sql/customer_order_submit_with_points_rpc.sql:109:    v_point_used_amount := 0;
+supabase/sql/customer_order_submit_with_points_rpc.sql:111:    v_point_used_amount := least(v_current_points, v_point_use_request, v_payable_before_points);
+supabase/sql/customer_order_submit_with_points_rpc.sql:114:  v_point_balance_after := v_current_points - v_point_used_amount;
+supabase/sql/customer_order_submit_with_points_rpc.sql:126:    from jsonb_array_elements(p_order_rows) with ordinality as source(row_value, ordinality)
+supabase/sql/customer_order_submit_with_points_rpc.sql:137:          v_point_used_amount - coalesce(
+supabase/sql/customer_order_submit_with_points_rpc.sql:145:      )::integer as point_used_amount
+supabase/sql/customer_order_submit_with_points_rpc.sql:152:      point_used_amount,
+supabase/sql/customer_order_submit_with_points_rpc.sql:153:      greatest(0, point_original_amount - point_used_amount)::integer as final_amount
+supabase/sql/customer_order_submit_with_points_rpc.sql:157:    insert into public.orders (
+supabase/sql/customer_order_submit_with_points_rpc.sql:158:      order_group_id,
+supabase/sql/customer_order_submit_with_points_rpc.sql:159:      order_lookup_code,
+supabase/sql/customer_order_submit_with_points_rpc.sql:200:      point_used_amount,
+supabase/sql/customer_order_submit_with_points_rpc.sql:207:      row_value->>'order_group_id',
+supabase/sql/customer_order_submit_with_points_rpc.sql:208:      row_value->>'order_lookup_code',
+supabase/sql/customer_order_submit_with_points_rpc.sql:249:      point_used_amount,
+supabase/sql/customer_order_submit_with_points_rpc.sql:250:      case when v_point_used_amount > 0 then v_current_points else null end,
+supabase/sql/customer_order_submit_with_points_rpc.sql:251:      case when v_point_used_amount > 0 then v_point_balance_after else null end,
+supabase/sql/customer_order_submit_with_points_rpc.sql:252:      case when v_point_used_amount > 0 then v_now else null end,
+supabase/sql/customer_order_submit_with_points_rpc.sql:265:  if v_point_used_amount > 0 then
+supabase/sql/customer_order_submit_with_points_rpc.sql:288:      -v_point_used_amount,
+supabase/sql/customer_order_submit_with_points_rpc.sql:319:      v_point_used_amount,
+supabase/sql/customer_order_submit_with_points_rpc.sql:332:        total_used_points = coalesce(public.customer_point_balances.total_used_points, 0) + v_point_used_amount,
+supabase/sql/customer_order_submit_with_points_rpc.sql:347:    'point_used_amount', v_point_used_amount,
+supabase/sql/customer_order_submit_with_points_rpc.sql:348:    'point_balance_before', case when v_point_used_amount > 0 then v_current_points else null end,
+supabase/sql/customer_order_submit_with_points_rpc.sql:349:    'point_balance_after', case when v_point_used_amount > 0 then v_point_balance_after else null end,
+supabase/sql/customer_order_submit_with_points_rpc.sql:350:    'point_ledger_id', case when v_point_used_amount > 0 then v_ledger_id else null end
+supabase/sql/customer_order_submit_with_points_rpc.sql:355:comment on function public.submit_customer_order_with_points(jsonb, integer, text, text, text) is
+
+----- 관리자 주문 조회/표시 관련 grep -----
+app/order/page.tsx:1028:  const isCanceledOrderForCombineShipping = (order: { order_manage_status?: unknown }) => {
+app/order/page.tsx:1029:    const statusText = String(order?.order_manage_status || "").trim().toLowerCase();
+app/order/page.tsx:1603:      .limit(1);
+app/order/page.tsx:1623:      .limit(80);
+app/order/page.tsx:1647:      .limit(1)
+app/order/page.tsx:1871:      .from("orders")
+app/order/page.tsx:1872:      .select("id, product_id, customer_phone, shipping_fee, adjusted_shipping_fee, order_manage_status, created_at, zipcode, address, detail_address")
+app/order/page.tsx:1876:      .limit(100);
+app/order/page.tsx:2067:      .limit(3);
+app/order/page.tsx:2159:        .limit(1);
+app/order/page.tsx:2698:      .limit(1);
+app/order/page.tsx:2877:          order_group_id: groupId,
+app/order/page.tsx:2918:          order_manage_status: "주문확인전",
+app/order/page.tsx:3103:      order?.order_manage_status,
+app/order/page.tsx:3117:      order?.order_manage_status,
+app/order/page.tsx:3207:      .from("orders")
+app/order/page.tsx:3212:      .limit(50);
+app/admin-v2/pick-list/page.tsx:34:  order_manage_status?: string | null;
+app/admin-v2/pick-list/page.tsx:96:  const status = normalizeText(order.order_manage_status);
+app/admin-v2/pick-list/page.tsx:110:  const status = normalizeText(order.order_manage_status);
+app/admin-v2/pick-list/page.tsx:125:  const status = normalizeText(order.order_manage_status);
+app/admin-v2/pick-list/page.tsx:137:  const status = normalizeText(order.order_manage_status);
+app/admin-v2/pick-list/page.tsx:225:  const [orders, setOrders] = useState<OrderRow[]>([]);
+app/admin-v2/pick-list/page.tsx:275:      .from("orders")
+app/admin-v2/pick-list/page.tsx:277:        "id, created_at, youtube_nickname, customer_name, customer_phone, product_name, color, size, qty, payment_method, order_manage_status"
+app/admin-v2/pick-list/page.tsx:282:      .limit(2000);
+app/admin-v2/pick-list/page.tsx:291:    setOrders(data || []);
+app/admin-v2/pick-list/page.tsx:294:  const filteredOrders = useMemo(() => {
+app/admin-v2/pick-list/page.tsx:313:        order.order_manage_status,
+app/admin-v2/pick-list/page.tsx:326:    filteredOrders.forEach((order) => {
+app/admin-v2/pick-list/page.tsx:333:      const status = normalizeText(order.order_manage_status) || "상태없음";
+app/admin-v2/pick-list/page.tsx:396:  }, [filteredOrders, sortField, sortDirection]);
+app/admin-v2/pick-list/page.tsx:402:  const filteredOrderLineCount = filteredOrders.length;
+app/admin/broadcasts/page.tsx:32:  const [orders, setOrders] = useState<any[]>([]);
+app/admin/broadcasts/page.tsx:63:        .neq("is_deleted", true)
+app/admin/broadcasts/page.tsx:66:        .from("orders")
+app/admin/broadcasts/page.tsx:81:    setOrders(orderResult.data || []);
+app/admin/broadcasts/page.tsx:91:      .filter((order) => order.is_deleted !== true)
+app/admin/broadcasts/page.tsx:110:        is_deleted: true,
+app/admin/widget/orders/page.tsx:50:      .from("orders")
+app/admin/widget/orders/page.tsx:53:      .limit(1)
+app/admin/adminUtils.ts:136:  if (order.order_manage_status !== "환불") return 0;
+app/admin/adminUtils.ts:146:  if (order.order_manage_status === "주문서취소") return 0;
+app/admin/adminUtils.ts:155:  if (order.order_manage_status === "주문서취소") return "주문서취소";
+app/admin/adminUtils.ts:158:    order.order_manage_status === "환불" &&
+app/admin/adminUtils.ts:164:  if (order.order_manage_status === "환불") return "환불";
+app/admin/adminUtils.ts:166:  return order.order_manage_status || "주문확인전";
+app/admin/adminUtils.ts:198:    .filter((order) => order.order_manage_status !== "주문서취소")
+app/admin/page.tsx:67:  order_group_id?: string;
+app/admin/page.tsx:91:  order_manage_status?: string;
+app/admin/page.tsx:95:  is_deleted?: boolean;
+app/admin/page.tsx:255:  const [orders, setOrders] = useState<AdminOrder[]>([]);
+app/admin/page.tsx:318:            row.order_group_id || row.order_lookup_code || row.id || crypto.randomUUID()
+app/admin/page.tsx:417:      .from("orders")
+app/admin/page.tsx:420:      .limit(300);
+app/admin/page.tsx:424:      setOrders([]);
+app/admin/page.tsx:429:    setOrders(((data || []) as AdminOrder[]).filter((order) => order.is_deleted !== true));
+app/admin/page.tsx:437:      .limit(1000);
+app/admin/page.tsx:471:      .neq("is_deleted", true)
+app/admin/page.tsx:474:      .limit(20);
+app/admin/page.tsx:544:  const filteredOrders = useMemo(() => {
+app/admin/page.tsx:576:    filteredOrders.forEach((order) => {
+app/admin/page.tsx:577:      const key = String(order.order_group_id || order.order_lookup_code || order.id || "");
+app/admin/page.tsx:598:  }, [filteredOrders]);
+app/admin/page.tsx:942:        orderCode: String(first.order_lookup_code || first.order_group_id || first.id || "").slice(0, 20),
+app/admin/page.tsx:964:        currentStatus: first.admin_order_status || first.order_manage_status || "미설정",
+app/admin/page.tsx:1092:        status: first.admin_order_status || first.order_manage_status || "미설정",
+app/admin/page.tsx:1319:      order.order_manage_status,
+app/admin/page.tsx:1411:            rows.map((row) => row.order_group_id || row.order_lookup_code || row.id)
+app/admin/page.tsx:1671:      .limit(1);
+app/admin/page.tsx:1875:      .update({ is_deleted: true })
+app/admin/page.tsx:1943:      .from("orders")
+app/admin/page.tsx:1944:      .update({ is_deleted: true })
+app/admin/page.tsx:1958:    return order.admin_order_status || order.order_manage_status || "미설정";
+app/admin/page.tsx:1991:        order.order_group_id || order.order_lookup_code || order.id || ""
+app/admin/page.tsx:2003:    setOrders((prev) =>
+app/admin/page.tsx:2010:              order_manage_status: nextStatus,
+app/admin/page.tsx:2017:      .from("orders")
+app/admin/page.tsx:2019:        order_manage_status: nextStatus,
+app/admin/page.tsx:2036:    setOrders((prev) =>
+app/admin/page.tsx:2066:          .from("orders")
+app/myorder/page.tsx:70:  const manageStatus = String(order.order_manage_status || order.admin_order_status_v2 || "");
+app/myorder/page.tsx:165:  const [orders, setOrders] = useState<any[]>([]);
+app/myorder/page.tsx:235:      .from("orders")
+app/myorder/page.tsx:258:    setOrders(data || []);
+app/myorder/page.tsx:296:  const filteredOrders =
+app/myorder/page.tsx:303:  const totalOrderPages = Math.max(1, Math.ceil(filteredOrders.length / ORDERS_PER_PAGE));
+app/myorder/page.tsx:305:  const visibleOrders = filteredOrders.slice(
+app/myorder/page.tsx:421:                  {filteredOrders.length}/{orders.length}건
+app/myorder/page.tsx:446:            {filteredOrders.length > 0 ? (
+app/api/customer-block-check/route.ts:84:    .limit(1);
+app/api/customer-block-check/route.ts:116:    .limit(20);
+app/api/admin-v2/manual-payment-match/route.ts:59:  if (deposit?.match_order_group_id || deposit?.match_customer_id) return true;
+app/api/admin-v2/manual-payment-match/route.ts:126:      .from("orders")
+app/api/admin-v2/manual-payment-match/route.ts:128:      .neq("is_deleted", true);
+app/api/admin-v2/manual-payment-match/route.ts:133:      orderQuery = orderQuery.eq("order_group_id", orderGroupId);
+app/api/admin-v2/manual-payment-match/route.ts:211:      .from("orders")
+app/api/admin-v2/manual-payment-match/route.ts:214:        order_manage_status: "수동입금확인",
+app/api/admin-v2/manual-payment-match/route.ts:229:        match_order_group_id: orderGroupId || firstOrder.order_group_id || null,
+app/api/admin-v2/admin-tasks/route.ts:62:      .limit(240);
+app/api/admin-v2/payment-confirm-cancel/route.ts:50:    order.order_manage_status,
+app/api/admin-v2/payment-confirm-cancel/route.ts:76:  if ("match_order_group_id" in sample) patch.match_order_group_id = null;
+app/api/admin-v2/payment-confirm-cancel/route.ts:77:  if ("matched_order_group_id" in sample) patch.matched_order_group_id = null;
+app/api/admin-v2/payment-confirm-cancel/route.ts:93:      .map((order) => clean(order.order_group_id))
+app/api/admin-v2/payment-confirm-cancel/route.ts:110:    deposit.match_order_group_id,
+app/api/admin-v2/payment-confirm-cancel/route.ts:111:    deposit.matched_order_group_id,
+app/api/admin-v2/payment-confirm-cancel/route.ts:148:      .from("orders")
+app/api/admin-v2/payment-confirm-cancel/route.ts:150:      .neq("is_deleted", true);
+app/api/admin-v2/payment-confirm-cancel/route.ts:155:      orderQuery = orderQuery.eq("order_group_id", orderGroupId);
+app/api/admin-v2/payment-confirm-cancel/route.ts:202:        order_group_id: order.order_group_id || null,
+app/api/admin-v2/payment-confirm-cancel/route.ts:207:          order_manage_status: order.order_manage_status || null,
+app/api/admin-v2/payment-confirm-cancel/route.ts:212:          order_manage_status: keepCanceled ? order.order_manage_status || null : RESTORE_UNPAID_STATUS,
+app/api/admin-v2/payment-confirm-cancel/route.ts:222:      .limit(3000);
+app/api/admin-v2/payment-confirm-cancel/route.ts:240:        match_order_group_id: deposit.match_order_group_id || null,
+app/api/admin-v2/payment-confirm-cancel/route.ts:247:        match_order_group_id: null,
+app/api/admin-v2/payment-confirm-cancel/route.ts:281:        patch.order_manage_status = RESTORE_UNPAID_STATUS;
+app/api/admin-v2/payment-confirm-cancel/route.ts:285:        .from("orders")
+app/api/admin-v2/payment-confirm-cancel/route.ts:288:        .select("id, order_lookup_code, order_group_id, youtube_nickname, product_name, payment_method, admin_order_status_v2, order_manage_status, deposit_confirmed_at");
+app/api/admin-v2/payment-confirm-cancel/route.ts:317:          .select("id, match_order_group_id, match_status, confirmed_at");
+app/api/admin-v2/deposits/route.ts:47:    const key = cleanText(first(row, ["id", "order_id", "order_lookup_code", "order_group_id"])) || JSON.stringify(row);
+app/api/admin-v2/deposits/route.ts:60:    first(deposit, ["match_order_group_id", "matched_order_group_id", "order_group_id", "matched_group_id"]),
+app/api/admin-v2/deposits/route.ts:82:    addKey(byGroup, first(order, ["order_group_id", "group_id"]), order);
+app/api/admin-v2/deposits/route.ts:112:    .limit(3000);
+app/api/admin-v2/deposits/route.ts:116:  return supabase.from("deposits").select("*").limit(3000);
+app/api/admin-v2/deposits/route.ts:155:      .from("orders")
+app/api/admin-v2/deposits/route.ts:157:      .limit(5000);
+app/api/admin-v2/auto-payment-match/preview/route.ts:33:  return text(first(order, ["id", "order_id", "order_no", "order_number", "order_group_id"]));
+app/api/admin-v2/auto-payment-match/preview/route.ts:37:  return text(first(order, ["order_group_id", "group_id", "id", "order_id"]));
+app/api/admin-v2/auto-payment-match/preview/route.ts:68:    first(order, ["order_manage_status"]),
+app/api/admin-v2/auto-payment-match/preview/route.ts:134:  order_group_id: string;
+app/api/admin-v2/auto-payment-match/preview/route.ts:161:      order_group_id: groupId,
+app/api/admin-v2/auto-payment-match/preview/route.ts:228:  const matchedOrderGroupId = text(first(deposit, ["match_order_group_id", "matched_order_group_id"]));
+app/api/admin-v2/auto-payment-match/preview/route.ts:269:    supabase.from("orders").select("*").limit(1000),
+app/api/admin-v2/auto-payment-match/preview/route.ts:270:    supabase.from("deposits").select("*").limit(1000),
+app/api/admin-v2/auto-payment-match/preview/route.ts:350:          id: group.order_group_id,
+app/api/admin-v2/auto-payment-match/preview/route.ts:362:          id: group.order_group_id,
+app/api/admin-v2/auto-payment-match/preview/route.ts:376:        order_group_id: group.order_group_id,
+app/api/admin-v2/auto-payment-match/run/route.ts:18:  order_group_id: string;
+app/api/admin-v2/auto-payment-match/run/route.ts:81:  return text(order.order_group_id || order.group_id || order.id);
+app/api/admin-v2/auto-payment-match/run/route.ts:93:    order.order_manage_status,
+app/api/admin-v2/auto-payment-match/run/route.ts:189:  if (deposit.match_order_group_id || deposit.match_customer_id) {
+app/api/admin-v2/auto-payment-match/run/route.ts:269:        order_group_id: group.orderGroupId,
+app/api/admin-v2/auto-payment-match/run/route.ts:305:      supabase.from("orders").select("*").neq("is_deleted", true).limit(2000),
+app/api/admin-v2/auto-payment-match/run/route.ts:306:      supabase.from("deposits").select("*").limit(2000),
+app/api/admin-v2/auto-payment-match/run/route.ts:355:        .from("orders")
+app/api/admin-v2/auto-payment-match/run/route.ts:358:          order_manage_status: "자동입금확인",
+app/api/admin-v2/auto-payment-match/run/route.ts:377:          match_order_group_id: candidate.order_group_id,
+app/api/admin-v2/auto-payment-match/strict-run/route.ts:66:    order.order_manage_status,
+app/api/admin-v2/auto-payment-match/strict-run/route.ts:148:    deposit.match_order_group_id ||
+app/api/admin-v2/auto-payment-match/strict-run/route.ts:166:  if (hasColumn(order, "order_manage_status")) patch.order_manage_status = "자동입금확인";
+app/api/admin-v2/auto-payment-match/strict-run/route.ts:187:  const groupId = order.group_id || order.order_group_id || order.id;
+app/api/admin-v2/auto-payment-match/strict-run/route.ts:194:  if (hasColumn(deposit, "match_order_group_id")) patch.match_order_group_id = groupId;
+app/api/admin-v2/auto-payment-match/strict-run/route.ts:218:      supabase.from("orders").select("*").order("created_at", { ascending: false }).limit(1000),
+app/api/admin-v2/auto-payment-match/strict-run/route.ts:219:      supabase.from("deposits").select("*").order("created_at", { ascending: false }).limit(1000),
+app/api/admin-v2/auto-payment-match/strict-run/route.ts:308:        .from("orders")
+app/api/admin-v2/manual-payment-confirm-without-deposit/route.ts:51:    order.order_manage_status,
+app/api/admin-v2/manual-payment-confirm-without-deposit/route.ts:64:    order.order_manage_status,
+app/api/admin-v2/manual-payment-confirm-without-deposit/route.ts:95:      .from("orders")
+app/api/admin-v2/manual-payment-confirm-without-deposit/route.ts:97:      .neq("is_deleted", true);
+app/api/admin-v2/manual-payment-confirm-without-deposit/route.ts:102:      orderQuery = orderQuery.eq("order_group_id", orderGroupId);
+app/api/admin-v2/manual-payment-confirm-without-deposit/route.ts:177:      .from("orders")
+app/api/admin-v2/manual-payment-confirm-without-deposit/route.ts:180:        order_manage_status: "수동입금확인",
+app/api/admin-v2/manual-payment-confirm-without-deposit/route.ts:184:      .select("id, order_lookup_code, order_group_id, youtube_nickname, product_name, payment_method, admin_order_status_v2, order_manage_status, deposit_confirmed_at");
+app/api/customer-login-sync/route.ts:151:      .limit(1);
+app/api/customer-login-sync/route.ts:229:      .limit(1);
+app/api/event-claw/overlay/route.ts:87:      .limit(1)
+app/api/customer-point-gifts/route.ts:95:      .limit(1);
+app/api/bankda/sync-deposits/route.ts.backup-rls-service-role:66:      .limit(5000);
+app/api/bankda/sync-deposits/route.ts.backup-rls-service-role:91:        match_order_group_id: null,
+app/api/bankda/sync-deposits/route.ts.backup-service-role-final:88:      .limit(5000);
+app/api/bankda/sync-deposits/route.ts.backup-service-role-final:113:        match_order_group_id: null,
+app/api/bankda/sync-deposits/route.ts.backup-time-fix:33:      .limit(5000);
+app/api/bankda/sync-deposits/route.ts.backup-time-fix:58:        match_order_group_id: null,
+app/api/bankda/sync-deposits/route.ts:104:      .limit(5000);
+app/api/bankda/sync-deposits/route.ts:129:        match_order_group_id: null,
+app/api/bankda/sync-deposits/route.ts.backup-auto-match:88:      .limit(5000);
+app/api/bankda/sync-deposits/route.ts.backup-auto-match:113:        match_order_group_id: null,
+app/api/admin-live/customer-points/route.ts:81:    .limit(safeLimit);
+app/api/admin-live/broadcast-end-reports/route.ts:149:      .limit(300);
+app/api/admin-live/event-roulette/route.ts:240:    .limit(80);
+app/api/admin-live/event-roulette/route.ts:280:    .from("orders")
+app/api/admin-live/event-roulette/route.ts:292:        "order_manage_status",
+app/api/admin-live/event-roulette/route.ts:299:    .limit(1000);
+app/api/admin-live/event-roulette/route.ts:312:    .from("orders")
+app/api/admin-live/event-roulette/route.ts:324:        "order_manage_status",
+app/api/admin-live/event-roulette/route.ts:331:    .limit(1000);
+app/api/admin-live/event-roulette/route.ts:394:    .limit(300);
+app/api/admin-live/event-roulette/route.ts:427:    .limit(1000);
+app/api/admin-live/event-roulette/route.ts:602:    .limit(30);
+app/api/admin-live/event-roulette/route.ts:631:    .limit(100);
+app/api/admin-live/event-roulette/route.ts:722:    .limit(1)
+app/api/admin-live/ops-status/route.ts:66:    const groupId = clean(row?.order_group_id || row?.order_lookup_code || row?.id);
+app/api/admin-live/ops-status/route.ts:103:  const status = clean(row.admin_order_status_v2 || row.order_manage_status);
+app/api/admin-live/ops-status/route.ts:123:      .from("orders")
+app/api/admin-live/ops-status/route.ts:125:        "id, order_group_id, order_lookup_code, created_at, youtube_nickname, customer_name, final_amount, adjusted_total_price, total_price, product_price, product_name, color, size, qty, admin_order_status_v2, order_manage_status, deposit_confirmed_at"
+app/api/admin-live/ops-status/route.ts:129:      .limit(80);
+app/api/admin-live/ops-status/route.ts:157:      .limit(30);
+app/api/event-roulette/overlay/route.ts:83:        .limit(1)
+app/admin-live/page.tsx:1:import AdminLiveDashboard from "@/components/admin-live/AdminLiveDashboard";
+app/admin-live/page.tsx:3:export default function AdminLivePage() {
+app/admin-live/page.tsx:4:  return <AdminLiveDashboard />;
+components/admin-v2/settlement/settlementUtils.ts:71:    row.order_manage_status,
+components/admin-v2/payment/ledger/DepositLinkedOrderInfo.tsx:43:      "order_group_id",
+components/admin-v2/payment/ledger/DepositLinkedOrderInfo.tsx:135:      "order_manage_status",
+components/admin-v2/payment/ledger/depositLedgerUtils.ts:157:        "match_order_group_id",
+components/admin-v2/payment/ledger/depositLedgerUtils.ts:158:        "matched_order_group_id",
+components/admin-v2/payment/ledger/depositLedgerUtils.ts:191:      "match_order_group_id",
+components/admin-v2/payment/ledger/depositLedgerUtils.ts:192:      "matched_order_group_id",
+components/admin-v2/payment/ledger/depositLedgerUtils.ts:196:      "order_group_id",
+components/admin-v2/payment/useStrictAutoPaymentConfirm.ts:7:  order_group_id?: string | number | null;
+components/admin-v2/payment/useStrictAutoPaymentConfirm.ts:61:    const orderId = cleanText(candidate.order_id || candidate.order_group_id);
+components/admin-v2/payment/useStrictAutoPaymentConfirm.ts:81:        cleanText(candidate.order_id || candidate.order_group_id),
+components/admin-v2/payment/parts/AutoMatchPreviewBox.tsx:107:                {candidate.order_group_id || candidate.order_id || "-"}
+components/admin-v2/orders/adminOrderPaymentFilterUtils.ts:41:    "payment_method" | "admin_order_status_v2" | "order_manage_status" | "deposit_confirmed_at"
+components/admin-v2/orders/adminOrderPaymentFilterUtils.ts:53:    row.order_manage_status,
+components/admin-v2/orders/adminOrderStatusFilterUtils.ts:43:    | "order_manage_status"
+components/admin-v2/orders/adminOrderStatusFilterUtils.ts:57:    row.order_manage_status,
+components/admin-v2/orders/AdminOrderPaymentCancelAction.tsx:22:    row.order_manage_status,
+components/admin-v2/orders/AdminOrderPaymentCancelAction.tsx:87:          orderGroupId: group.groupId || first.order_group_id || first.order_lookup_code || "",
+components/admin-v2/AdminV2Client.tsx:156:  // order_group_id, order_lookup_code, 고객명, 전화번호, 주소가 같아도 합치지 않습니다.
+components/admin-v2/AdminV2Client.tsx:489:  const [orders, setOrders] = useState<OrderRow[]>([]);
+components/admin-v2/AdminV2Client.tsx:511:      supabase.from("orders").select("*").neq("is_deleted", true).order("created_at", { ascending: false }).limit(500),
+components/admin-v2/AdminV2Client.tsx:512:      supabase.from("customers").select("*").order("last_order_at", { ascending: false, nullsFirst: false }).limit(500),
+components/admin-v2/AdminV2Client.tsx:513:      supabase.from("deposits").select("*").order("created_at", { ascending: false }).limit(500),
+components/admin-v2/AdminV2Client.tsx:516:      supabase.from("broadcasts").select("*").order("started_at", { ascending: false }).limit(120),
+components/admin-v2/AdminV2Client.tsx:521:    else setOrders((ordersResult.data || []) as OrderRow[]);
+components/admin-v2/AdminV2Client.tsx:559:      const groupId = String(order.order_group_id || order.order_lookup_code || order.id || "");
+components/admin-v2/AdminV2Client.tsx:739:    // 같은 고객/전화/주소/order_group_id/order_lookup_code여도 그대로 각각 출력합니다.
+components/admin-v2/AdminV2Client.tsx:883:        order_group_id: row.order_group_id,
+components/admin-v2/AdminV2Client.tsx:889:        before_order_manage_status: row.order_manage_status || beforeStatus,
+components/admin-v2/AdminV2Client.tsx:890:        after_order_manage_status: "수동입금확인",
+components/admin-v2/AdminV2Client.tsx:897:          order_manage_status: row.order_manage_status,
+components/admin-v2/AdminV2Client.tsx:905:          order_manage_status: "수동입금확인",
+components/admin-v2/AdminV2Client.tsx:913:    setOrders((prev) =>
+components/admin-v2/AdminV2Client.tsx:919:              order_manage_status: "수동입금확인",
+components/admin-v2/AdminV2Client.tsx:927:      .from("orders")
+components/admin-v2/AdminV2Client.tsx:930:        order_manage_status: "수동입금확인",
+components/admin-v2/AdminV2Client.tsx:944:        match_order_group_id: group.groupId,
+components/admin-v2/AdminV2Client.tsx:999:      order_manage_status: nextStatus,
+components/admin-v2/AdminV2Client.tsx:1033:        order_group_id: row.order_group_id,
+components/admin-v2/AdminV2Client.tsx:1039:        before_order_manage_status: row.order_manage_status || beforeStatus,
+components/admin-v2/AdminV2Client.tsx:1040:        after_order_manage_status: nextStatus,
+components/admin-v2/AdminV2Client.tsx:1047:          order_manage_status: row.order_manage_status,
+components/admin-v2/AdminV2Client.tsx:1057:          order_manage_status: nextStatus,
+components/admin-v2/AdminV2Client.tsx:1067:    setOrders((prev) =>
+components/admin-v2/AdminV2Client.tsx:1074:          order_manage_status: nextStatus,
+components/admin-v2/AdminV2Client.tsx:1088:      .from("orders")
+components/admin-v2/AdminV2Client.tsx:1191:          "실제 삭제가 아니라 is_deleted=true 숨김 처리입니다.\\n\\n" +
+components/admin-v2/AdminV2Client.tsx:1207:      .from("orders")
+components/admin-v2/AdminV2Client.tsx:1208:      .update({ is_deleted: true })
+components/admin-v2/AdminV2Client.tsx:1242:    setOrders((prev) =>
+components/admin-v2/AdminV2Client.tsx:1255:      .from("orders")
+components/admin-v2/AdminV2Client.tsx:1320:    setOrders((prev) =>
+components/admin-v2/AdminV2Client.tsx:1345:    const { data, error: selectError } = await supabase.from("settings").select("id").eq("key", key).limit(1);
+components/admin/OrderTable.tsx:173:        order.order_manage_status ||
+components/admin/orders/AdminOrderRow.tsx:41:                        first.order_group_id ||
+components/admin/orders/AdminOrderDetailPanel.tsx:28:                            selectedOrderDetail.first.order_group_id ||
+components/myorder/MyOrderResultCard.tsx:33:    order.order_group_id ||
+components/admin-live/AdminLiveCustomersPanel.tsx:3:// components/admin-live/AdminLiveCustomersPanel.tsx
+components/admin-live/AdminLiveCustomersPanel.tsx:10:import AdminLiveCustomerIssueRail from "./AdminLiveCustomerIssueRail";
+components/admin-live/AdminLiveCustomersPanel.tsx:11:import AdminLivePhoneBlockPanel from "./AdminLivePhoneBlockPanel";
+components/admin-live/AdminLiveCustomersPanel.tsx:12:import AdminLiveCustomerBlockReasonModal from "./AdminLiveCustomerBlockReasonModal";
+components/admin-live/AdminLiveCustomersPanel.tsx:13:import AdminLiveCustomerPointPanel from "./AdminLiveCustomerPointPanel";
+components/admin-live/AdminLiveCustomersPanel.tsx:251:  return clean(order.paymentStatus || order.payment_status || order.order_manage_status || order.admin_order_status_v2);
+components/admin-live/AdminLiveCustomersPanel.tsx:518:        <AdminLiveCustomerPointPanel customer={customer} />
+components/admin-live/AdminLiveCustomersPanel.tsx:561:export default function AdminLiveCustomersPanel({ orders }: Props) {
+components/admin-live/AdminLiveCustomersPanel.tsx:627:        .limit(1000);
+components/admin-live/AdminLiveCustomersPanel.tsx:1034:      <AdminLivePhoneBlockPanel onSaved={applyBlockResult} />
+components/admin-live/AdminLiveCustomersPanel.tsx:1197:        <AdminLiveCustomerIssueRail
+components/admin-live/AdminLiveCustomersPanel.tsx:1434:      <AdminLiveCustomerBlockReasonModal
+components/admin-live/adminLiveMenu.ts:1:export type AdminLiveMenuKey =
+components/admin-live/adminLiveMenu.ts:9:export type AdminLiveMenuItem = {
+components/admin-live/adminLiveMenu.ts:10:  key: AdminLiveMenuKey;
+components/admin-live/adminLiveMenu.ts:20:export const ADMIN_LIVE_MENUS: AdminLiveMenuItem[] = [
+components/admin-live/adminLiveMenu.ts:83:export function getAdminLiveMenu(key: AdminLiveMenuKey) {
+components/admin-live/AdminLiveSidebar.tsx:1:import { ADMIN_LIVE_MENUS, type AdminLiveMenuKey } from "./adminLiveMenu";
+components/admin-live/AdminLiveSidebar.tsx:3:import AdminLiveLogoutButton from "./AdminLiveLogoutButton";
+components/admin-live/AdminLiveSidebar.tsx:4:import AdminLiveCustomerIssueSummaryCard from "./AdminLiveCustomerIssueSummaryCard";
+components/admin-live/AdminLiveSidebar.tsx:7:  activeMenu: AdminLiveMenuKey;
+components/admin-live/AdminLiveSidebar.tsx:8:  onMenuChange: (menuKey: AdminLiveMenuKey) => void;
+components/admin-live/AdminLiveSidebar.tsx:11:export default function AdminLiveSidebar({ activeMenu, onMenuChange }: Props) {
+components/admin-live/AdminLiveSidebar.tsx:102:        <AdminLiveCustomerIssueSummaryCard onOpenCustomers={() => onMenuChange("customers")} />
+components/admin-live/AdminLiveSidebar.tsx:103:        <AdminLiveLogoutButton />
+components/admin-live/useLiveOrderItemEdit.ts:213:        .from("orders")
+components/admin-live/useLiveOrderItemEdit.ts:294:        .from("orders")
+components/admin-live/AdminLiveOrdersPanel.tsx:2:import LiveOrderTable, { type LiveOrderFilters } from "./LiveOrderTable";
+components/admin-live/AdminLiveOrdersPanel.tsx:39:export default function AdminLiveOrdersPanel({
+components/admin-live/AdminLiveOrdersPanel.tsx:95:      <LiveOrderTable
+components/admin-live/AdminLiveProductListPanel.tsx:9:type AdminLiveProductListPanelProps = {
+components/admin-live/AdminLiveProductListPanel.tsx:434:export default function AdminLiveProductListPanel(props: AdminLiveProductListPanelProps) {
+components/admin-live/AdminLiveCustomerPointPanel.tsx:246:export default function AdminLiveCustomerPointPanel({ customer }: { customer: PointPanelCustomer }) {
+components/admin-live/useLiveOrderCancelRestore.ts:77:            order_manage_status: CANCELED_STATUS,
+components/admin-live/useLiveOrderCancelRestore.ts:81:            order_manage_status: RESTORED_MANAGE_STATUS,
+components/admin-live/useLiveOrderCancelRestore.ts:105:          .from("orders")
+components/admin-live/LiveOpsOrderCopyModal.tsx:13:  order_group_id?: string | null;
+components/admin-live/LiveOpsOrderCopyModal.tsx:39:      order.order_group_id ||
+components/admin-live/AdminLivePaymentPanel.tsx:22:export default function AdminLivePaymentPanel({
+components/admin-live/LiveHeader.tsx:4:import type { AdminLiveBroadcast } from "./liveBroadcastController";
+components/admin-live/LiveHeader.tsx:6:import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
+components/admin-live/LiveHeader.tsx:13:  activeBroadcast: AdminLiveBroadcast | null;
+components/admin-live/LiveHeader.tsx:85:          <AdminLiveEventRoulettePanel
+components/admin-live/AdminLiveCustomerBlockReasonModal.tsx:3:// components/admin-live/AdminLiveCustomerBlockReasonModal.tsx
+components/admin-live/AdminLiveCustomerBlockReasonModal.tsx:38:export default function AdminLiveCustomerBlockReasonModal({
+components/admin-live/AdminLivePhoneBlockPanel.tsx:3:// components/admin-live/AdminLivePhoneBlockPanel.tsx
+components/admin-live/AdminLivePhoneBlockPanel.tsx:34:export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
+components/admin-live/LiveProductRegistrationPanel.tsx:158:      .limit(12);
+components/admin-live/LiveProductRegistrationPanel.tsx:291:          .limit(1);
+components/admin-live/AdminLiveSettingsPanel.tsx:96:export default function AdminLiveSettingsPanel() {
+components/admin-live/LiveOrderTable.tsx:8:import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
+components/admin-live/LiveOrderTable.tsx:275:export default function LiveOrderTable({
+components/admin-live/LiveOrderTable.tsx:527:          <AdminLiveEventRoulettePanel
+components/admin-live/AdminLiveCustomerIssueRail.tsx:3:// components/admin-live/AdminLiveCustomerIssueRail.tsx
+components/admin-live/AdminLiveCustomerIssueRail.tsx:434:export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Props) {
+components/admin-live/AdminLiveSettlementPanel.tsx:61:    order.order_manage_status,
+components/admin-live/AdminLiveSettlementPanel.tsx:154:export default function AdminLiveSettlementPanel({ orders }: Props) {
+components/admin-live/AdminLiveSettlementPanel.tsx:168:          supabase.from("deposits").select("*").order("created_at", { ascending: false }).limit(500),
+components/admin-live/AdminLiveSettlementPanel.tsx:169:          supabase.from("broadcasts").select("*").order("started_at", { ascending: false }).limit(120),
+components/admin-live/AdminLiveQuickProductDrawer.tsx:8:type AdminLiveQuickProductDrawerProps = {
+components/admin-live/AdminLiveQuickProductDrawer.tsx:12:export default function AdminLiveQuickProductDrawer({
+components/admin-live/AdminLiveQuickProductDrawer.tsx:14:}: AdminLiveQuickProductDrawerProps) {
+components/admin-live/AdminLiveCustomerIssueSummaryCard.tsx:22:type AdminLiveCustomerIssueSummaryCardProps = {
+components/admin-live/AdminLiveCustomerIssueSummaryCard.tsx:124:export default function AdminLiveCustomerIssueSummaryCard({
+components/admin-live/AdminLiveCustomerIssueSummaryCard.tsx:126:}: AdminLiveCustomerIssueSummaryCardProps) {
+components/admin-live/AdminLiveLogoutButton.tsx:3:export default function AdminLiveLogoutButton() {
+components/admin-live/liveBroadcastController.ts:3:export type AdminLiveBroadcast = {
+components/admin-live/liveBroadcastController.ts:13:  is_deleted?: boolean | null;
+components/admin-live/liveBroadcastController.ts:27:export async function loadAdminLiveBroadcasts() {
+components/admin-live/liveBroadcastController.ts:31:    .neq("is_deleted", true)
+components/admin-live/liveBroadcastController.ts:33:    .limit(120);
+components/admin-live/liveBroadcastController.ts:37:  return (data || []) as AdminLiveBroadcast[];
+components/admin-live/liveBroadcastController.ts:40:export function getActiveBroadcast(broadcasts: AdminLiveBroadcast[]) {
+components/admin-live/liveBroadcastController.ts:58:export async function startAdminLiveBroadcast(input: StartBroadcastInput) {
+components/admin-live/liveBroadcastController.ts:88:    is_deleted: false,
+components/admin-live/liveBroadcastController.ts:102:  return data as AdminLiveBroadcast;
+components/admin-live/liveBroadcastController.ts:105:export async function updateAdminLiveBroadcast(input: UpdateBroadcastInput) {
+components/admin-live/liveBroadcastController.ts:132:  return data as AdminLiveBroadcast;
+components/admin-live/liveBroadcastController.ts:135:export async function endAdminLiveBroadcast(broadcastId: string) {
+components/admin-live/liveBroadcastController.ts:158:  return data as AdminLiveBroadcast;
+components/admin-live/liveBroadcastController.ts:175:export function isOrderInsideBroadcastTime(orderCreatedAt: string | null | undefined, broadcast: AdminLiveBroadcast | null) {
+components/admin-live/LiveOrderDetailDrawer.tsx:264:            currentOrder.order_group_id ||
+components/admin-live/LiveOrderDetailDrawer.tsx:330:        .from("orders")
+components/admin-live/LiveOrderDetailDrawer.tsx:333:          order_manage_status: nextStatus,
+components/admin-live/AdminLiveDashboard.tsx:23:import AdminLiveCustomersPanel from "./AdminLiveCustomersPanel";
+components/admin-live/AdminLiveDashboard.tsx:24:import AdminLiveMenuPlaceholder from "./AdminLiveMenuPlaceholder";
+components/admin-live/AdminLiveDashboard.tsx:25:import AdminLiveOrdersPanel from "./AdminLiveOrdersPanel";
+components/admin-live/AdminLiveDashboard.tsx:26:import AdminLivePaymentPanel from "./AdminLivePaymentPanel";
+components/admin-live/AdminLiveDashboard.tsx:27:import AdminLiveSettlementPanel from "./AdminLiveSettlementPanel";
+components/admin-live/AdminLiveDashboard.tsx:28:import AdminLiveSettingsPanel from "./AdminLiveSettingsPanel";
+components/admin-live/AdminLiveDashboard.tsx:29:import AdminLiveSidebar from "./AdminLiveSidebar";
+components/admin-live/AdminLiveDashboard.tsx:34:import LiveOrderTable, { type LiveOrderFilters } from "./LiveOrderTable";
+components/admin-live/AdminLiveDashboard.tsx:37:  endAdminLiveBroadcast,
+components/admin-live/AdminLiveDashboard.tsx:40:  loadAdminLiveBroadcasts,
+components/admin-live/AdminLiveDashboard.tsx:41:  startAdminLiveBroadcast,
+components/admin-live/AdminLiveDashboard.tsx:42:  updateAdminLiveBroadcast,
+components/admin-live/AdminLiveDashboard.tsx:43:  type AdminLiveBroadcast,
+components/admin-live/AdminLiveDashboard.tsx:46:import type { AdminLiveMenuKey } from "./adminLiveMenu";
+components/admin-live/AdminLiveDashboard.tsx:49:  buildAdminLiveOrderGroups,
+components/admin-live/AdminLiveDashboard.tsx:51:  toAdminLiveOrder,
+components/admin-live/AdminLiveDashboard.tsx:52:} from "./liveOrderAdapter";
+components/admin-live/AdminLiveDashboard.tsx:54:import AdminLiveQuickProductDrawer from "./AdminLiveQuickProductDrawer";
+components/admin-live/AdminLiveDashboard.tsx:55:import AdminLiveProductListPanel from "./AdminLiveProductListPanel";
+components/admin-live/AdminLiveDashboard.tsx:123:function formatBroadcastDisplayTitle(broadcast: AdminLiveBroadcast | null | undefined) {
+components/admin-live/AdminLiveDashboard.tsx:248:const MENU_KEYS_FOR_URL: AdminLiveMenuKey[] = [
+components/admin-live/AdminLiveDashboard.tsx:257:function isMenuKeyForUrl(value: string | null): value is AdminLiveMenuKey {
+components/admin-live/AdminLiveDashboard.tsx:258:  return Boolean(value && MENU_KEYS_FOR_URL.includes(value as AdminLiveMenuKey));
+components/admin-live/AdminLiveDashboard.tsx:261:function readMenuFromUrl(): AdminLiveMenuKey {
+components/admin-live/AdminLiveDashboard.tsx:270:function replacePanelInUrl(menu: AdminLiveMenuKey) {
+components/admin-live/AdminLiveDashboard.tsx:348:function isOrderInsideBroadcastEndSummary(order: LiveOrder, broadcast: AdminLiveBroadcast, endedAtIso: string) {
+components/admin-live/AdminLiveDashboard.tsx:366:  broadcast: AdminLiveBroadcast;
+components/admin-live/AdminLiveDashboard.tsx:463:  broadcast: AdminLiveBroadcast;
+components/admin-live/AdminLiveDashboard.tsx:510:export default function AdminLiveDashboard() {
+components/admin-live/AdminLiveDashboard.tsx:512:  const [activeMenu, setActiveMenu] = useState<AdminLiveMenuKey>(() => readMenuFromUrl());
+components/admin-live/AdminLiveDashboard.tsx:513:  const [orders, setOrders] = useState<LiveOrder[]>([]);
+components/admin-live/AdminLiveDashboard.tsx:514:  const [broadcasts, setBroadcasts] = useState<AdminLiveBroadcast[]>([]);
+components/admin-live/AdminLiveDashboard.tsx:540:        .limit(1000);
+components/admin-live/AdminLiveDashboard.tsx:603:      const rows = await loadAdminLiveBroadcasts();
+components/admin-live/AdminLiveDashboard.tsx:616:      .from("orders")
+components/admin-live/AdminLiveDashboard.tsx:618:      .neq("is_deleted", true)
+components/admin-live/AdminLiveDashboard.tsx:620:      .limit(500);
+components/admin-live/AdminLiveDashboard.tsx:623:      setOrders([]);
+components/admin-live/AdminLiveDashboard.tsx:631:      buildAdminLiveOrderGroups((data || []) as OrderRow[])
+components/admin-live/AdminLiveDashboard.tsx:633:    const liveOrders = groups.map(toAdminLiveOrder);
+components/admin-live/AdminLiveDashboard.tsx:636:    setOrders(liveOrders);
+components/admin-live/AdminLiveDashboard.tsx:725:  const filteredOrders = useMemo(() => {
+components/admin-live/AdminLiveDashboard.tsx:773:    if (!filteredOrders.length) {
+components/admin-live/AdminLiveDashboard.tsx:780:      if (current && filteredOrders.some((order) => order.id === current)) return current;
+components/admin-live/AdminLiveDashboard.tsx:781:      return filteredOrders.find((order) => order.paymentStatus === "manual_match_needed")?.id || filteredOrders[0].id;
+components/admin-live/AdminLiveDashboard.tsx:783:  }, [filteredOrders]);
+components/admin-live/AdminLiveDashboard.tsx:786:    return filteredOrders.find((order) => order.id === selectedOrderId) || filteredOrders[0] || null;
+components/admin-live/AdminLiveDashboard.tsx:787:  }, [filteredOrders, selectedOrderId]);
+components/admin-live/AdminLiveDashboard.tsx:825:      await startAdminLiveBroadcast(input);
+components/admin-live/AdminLiveDashboard.tsx:845:      await updateAdminLiveBroadcast({
+components/admin-live/AdminLiveDashboard.tsx:886:      await endAdminLiveBroadcast(activeBroadcast.id);
+components/admin-live/AdminLiveDashboard.tsx:990:  const quickOrderRows = filteredOrders.slice(0, 8);
+components/admin-live/AdminLiveDashboard.tsx:1003:  const quickPaidOrders = filteredOrders.filter((order) => {
+components/admin-live/AdminLiveDashboard.tsx:1009:  const quickUnpaidOrders = filteredOrders.filter((order) => {
+components/admin-live/AdminLiveDashboard.tsx:1015:  const quickCanceledOrders = filteredOrders.filter((order) => {
+components/admin-live/AdminLiveDashboard.tsx:1049:        <AdminLiveSidebar
+components/admin-live/AdminLiveDashboard.tsx:1070:              <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
+components/admin-live/AdminLiveDashboard.tsx:1078:                  <AdminLiveProductListPanel fillHeight className="h-full min-w-0" />
+components/admin-live/AdminLiveDashboard.tsx:1090:                  <LiveOrderTable
+components/admin-live/AdminLiveDashboard.tsx:1091:                    orders={filteredOrders}
+components/admin-live/AdminLiveDashboard.tsx:1109:            <AdminLiveOrdersPanel
+components/admin-live/AdminLiveDashboard.tsx:1110:              orders={filteredOrders}
+components/admin-live/AdminLiveDashboard.tsx:1126:            <AdminLivePaymentPanel
+components/admin-live/AdminLiveDashboard.tsx:1134:            <AdminLiveCustomersPanel orders={orders} />
+components/admin-live/AdminLiveDashboard.tsx:1136:            <AdminLiveSettlementPanel orders={orders} />
+components/admin-live/AdminLiveDashboard.tsx:1138:            <AdminLiveSettingsPanel />
+components/admin-live/AdminLiveDashboard.tsx:1140:            <AdminLiveMenuPlaceholder menuKey={activeMenu} />
+components/admin-live/AdminLiveDashboard.tsx:1173:                  const modalOrders = Array.isArray(filteredOrders) ? filteredOrders : [];
+components/admin-live/AdminLiveDashboard.tsx:2060:          <AdminLiveQuickProductDrawer activeBroadcastId={activeBroadcast?.id || null} />
+components/admin-live/AdminLiveEventRoulettePanel.tsx:90:type AdminLiveEventRoulettePanelProps = {
+components/admin-live/AdminLiveEventRoulettePanel.tsx:186:export default function AdminLiveEventRoulettePanel({
+components/admin-live/AdminLiveEventRoulettePanel.tsx:189:}: AdminLiveEventRoulettePanelProps) {
+components/admin-live/LiveBroadcastPanels.tsx:419:        .limit(8);
+components/admin-live/AdminLiveMenuPlaceholder.tsx:1:import { getAdminLiveMenu, type AdminLiveMenuKey } from "./adminLiveMenu";
+components/admin-live/AdminLiveMenuPlaceholder.tsx:4:  menuKey: AdminLiveMenuKey;
+components/admin-live/AdminLiveMenuPlaceholder.tsx:7:export default function AdminLiveMenuPlaceholder({ menuKey }: Props) {
+components/admin-live/AdminLiveMenuPlaceholder.tsx:8:  const menu = getAdminLiveMenu(menuKey);
+components/admin-live/AdminLiveCustomersPanel.tsx.bak.current-address-priority.20260602_181756:3:// components/admin-live/AdminLiveCustomersPanel.tsx
+components/admin-live/AdminLiveCustomersPanel.tsx.bak.current-address-priority.20260602_181756:10:import AdminLiveCustomerIssueRail from "./AdminLiveCustomerIssueRail";
+components/admin-live/AdminLiveCustomersPanel.tsx.bak.current-address-priority.20260602_181756:11:import AdminLivePhoneBlockPanel from "./AdminLivePhoneBlockPanel";
+components/admin-live/AdminLiveCustomersPanel.tsx.bak.current-address-priority.20260602_181756:12:import AdminLiveCustomerBlockReasonModal from "./AdminLiveCustomerBlockReasonModal";
+components/admin-live/AdminLiveCustomersPanel.tsx.bak.current-address-priority.20260602_181756:13:import AdminLiveCustomerPointPanel from "./AdminLiveCustomerPointPanel";
+components/admin-live/AdminLiveCustomersPanel.tsx.bak.current-address-priority.20260602_181756:251:  return clean(order.paymentStatus || order.payment_status || order.order_manage_status || order.admin_order_status_v2);
+components/admin-live/AdminLiveCustomersPanel.tsx.bak.current-address-priority.20260602_181756:518:        <AdminLiveCustomerPointPanel customer={customer} />
+components/admin-live/AdminLiveCustomersPanel.tsx.bak.current-address-priority.20260602_181756:561:export default function AdminLiveCustomersPanel({ orders }: Props) {
+components/admin-live/AdminLiveCustomersPanel.tsx.bak.current-address-priority.20260602_181756:627:        .limit(1000);
+components/admin-live/AdminLiveCustomersPanel.tsx.bak.current-address-priority.20260602_181756:1034:      <AdminLivePhoneBlockPanel onSaved={applyBlockResult} />
+components/admin-live/AdminLiveCustomersPanel.tsx.bak.current-address-priority.20260602_181756:1197:        <AdminLiveCustomerIssueRail
+components/admin-live/AdminLiveCustomersPanel.tsx.bak.current-address-priority.20260602_181756:1434:      <AdminLiveCustomerBlockReasonModal
+components/admin-live/liveOrderAdapter.ts:87:  return String(order.order_group_id || order.order_lookup_code || order.id || "");
+components/admin-live/liveOrderAdapter.ts:90:export function buildAdminLiveOrderGroups(orders: OrderRow[]): OrderGroup[] {
+components/admin-live/liveOrderAdapter.ts:126:  const manageStatus = String(first.order_manage_status || "").trim();
+components/admin-live/liveOrderAdapter.ts:298:export function toAdminLiveOrder(group: OrderGroup): LiveOrder {
+lib/admin-v2/autoPaymentMatch.ts:19:  return String(order.admin_order_status_v2 || order.order_manage_status || "미설정").trim();
+lib/admin-v2/autoPaymentMatch.ts:46:  return String(order.order_group_id || order.order_lookup_code || order.id || "");
+lib/admin-v2/autoPaymentMatch.ts:97:    .from("orders")
+lib/admin-v2/autoPaymentMatch.ts:99:    .neq("is_deleted", true)
+lib/admin-v2/autoPaymentMatch.ts:101:    .limit(3000);
+lib/admin-v2/autoPaymentMatch.ts:111:    .limit(3000);
+lib/admin-v2/autoPaymentMatch.ts:173:      .from("orders")
+lib/admin-v2/autoPaymentMatch.ts:176:        order_manage_status: "입금확인",
+lib/admin-v2/autoPaymentMatch.ts:186:        match_order_group_id: pair.groupId,
+lib/admin-v2/types.ts:10:  order_group_id: string | null;
+lib/admin-v2/types.ts:43:  order_manage_status: string | null;
+lib/admin-v2/types.ts:57:  is_deleted: boolean | null;
+lib/admin-v2/types.ts:80:  match_order_group_id: string | null;
+lib/admin-v2/types.ts:91:  order_group_id: string | null;
+lib/admin-v2/types.ts:107:  order_group_id: string | null;
+lib/admin-v2/types.ts:114:  before_order_manage_status: string | null;
+lib/admin-v2/types.ts:115:  after_order_manage_status: string | null;
+lib/admin-v2/orderHelpers.ts:36:  row: Pick<OrderRow, "admin_order_status_v2" | "order_manage_status" | "final_amount" | "adjusted_total_price" | "total_price">
+lib/admin-v2/orderHelpers.ts:46:  row: Pick<OrderRow, "admin_order_status_v2" | "order_manage_status" | "final_amount" | "adjusted_total_price" | "total_price" | "refund_amount">
+lib/admin-v2/orderHelpers.ts:66:export const orderCustomerCardExtraAmount = (row: Pick<OrderRow, "payment_method" | "vat_amount" | "admin_order_status_v2" | "order_manage_status">) => {
+lib/admin-v2/orderHelpers.ts:72:  row: Pick<OrderRow, "payment_method" | "admin_order_status_v2" | "order_manage_status" | "final_amount" | "adjusted_total_price" | "total_price" | "refund_amount" | "actual_card_fee_rate_applied">,
+lib/admin-v2/orderHelpers.ts:99:export const getOrderStatusValue = (row: Pick<OrderRow, "admin_order_status_v2" | "order_manage_status">) => {
+lib/admin-v2/orderHelpers.ts:100:  return String(row.admin_order_status_v2 || row.order_manage_status || "미설정").trim() || "미설정";
+lib/admin-v2/orderHelpers.ts:107:export const isOrderCanceled = (row: Pick<OrderRow, "admin_order_status_v2" | "order_manage_status">) => {
+lib/admin-v2/orderHelpers.ts:111:export const isOrderPaid = (row: Pick<OrderRow, "admin_order_status_v2" | "order_manage_status">) => {
+lib/admin-v2/orderHelpers.ts:124:  row: Pick<OrderRow, "admin_order_status_v2" | "order_manage_status" | "payment_method">
+lib/admin-v2/orderHelpers.ts:129:export const isBankPaid = (row: Pick<OrderRow, "payment_method" | "admin_order_status_v2" | "order_manage_status">) =>
+lib/admin-v2/orderHelpers.ts:132:export const isCardPaid = (row: Pick<OrderRow, "payment_method" | "admin_order_status_v2" | "order_manage_status">) =>
+lib/admin-v2/orderHelpers.ts:135:export const isBankUnpaid = (row: Pick<OrderRow, "payment_method" | "admin_order_status_v2" | "order_manage_status">) =>
+lib/admin-v2/orderHelpers.ts:138:export const isCardUnpaid = (row: Pick<OrderRow, "payment_method" | "admin_order_status_v2" | "order_manage_status">) =>
+lib/admin-v2/orderHelpers.ts:142:  row: Pick<OrderRow, "admin_order_status_v2" | "order_manage_status" | "payment_method">
+lib/admin-v2/combineShipping.ts:56:  const status = String(order?.order_manage_status || "");
+lib/admin-v2/orderSoftHide.ts:22:    group?.order_manage_status,
+lib/admin-v2/orderSoftHide.ts:33:      row?.order_manage_status,
+lib/eventRoulette.ts:21:  order_manage_status?: string | null;
+lib/eventRoulette.ts:102:    order.order_manage_status,
+lib/adminAuth.ts:219:      .limit(1);
+
+===== 주문 제출 누락 전수조사 요약 =====
+{
+  "checked_at": "2026-06-02T11:40:53.058Z",
+  "counts": {
+    "orders_total": 983,
+    "customers_total": 308,
+    "recent_orders_24h": 12,
+    "recent_orders_72h": 19,
+    "recent_orders_7d": 284,
+    "missing_required_order_fields": 14,
+    "missing_customer_info_orders": 1,
+    "hidden_from_admin_risk_orders": 166,
+    "orders_without_customer_row": 0,
+    "order_group_integrity_risk": 13,
+    "possible_partial_order_groups": 1,
+    "point_use_without_ledger": 0,
+    "point_ledger_without_order": 0,
+    "order_phone_format_risk": 9
+  },
+  "latest20": [
+    {
+      "id": 1004,
+      "group": "d9017868-c649-43de-bb35-434b28275767",
+      "code": "RURU-MPWEWN0U",
+      "nick": "에이치더블",
+      "phone": "01053567038",
+      "product": "룰루반바지",
+      "created_at": "2026-06-02T09:05:25.542744+00:00"
+    },
+    {
+      "id": 1003,
+      "group": "d9017868-c649-43de-bb35-434b28275767",
+      "code": "RURU-MPWEWN0U",
+      "nick": "에이치더블",
+      "phone": "01053567038",
+      "product": "지수씨 비건 멀티 미스트 | 연예인 추천 | 수분 물광 광채 엑소좀, 100ml",
+      "created_at": "2026-06-02T09:05:25.542744+00:00"
+    },
+    {
+      "id": 1002,
+      "group": "3927b3a5-14e5-4391-9981-cbcba1e88d95",
+      "code": "RURU-MPVHLIVW",
+      "nick": "욤욤",
+      "phone": "01058942813",
+      "product": "잇츠쏘미 콜라겐 필오프 마스크",
+      "created_at": "2026-06-01T17:32:58.88298+00:00"
+    },
+    {
+      "id": 1001,
+      "group": "2efaa94e-7d29-4016-92fb-84c5ec437c88",
+      "code": "RURU-MPVDUK63",
+      "nick": "두두",
+      "phone": "01081912420",
+      "product": "잇츠쏘미 콜라겐 필오프 마스크",
+      "created_at": "2026-06-01T15:48:02.03141+00:00"
+    },
+    {
+      "id": 1000,
+      "group": "1481be2a-e15f-4397-9489-a0b3c446896a",
+      "code": "RURU-MPVDJRUN",
+      "nick": "두두",
+      "phone": "01081912420",
+      "product": "잇츠쏘미 콜라겐 필오프 마스크",
+      "created_at": "2026-06-01T15:39:39.425317+00:00"
+    },
+    {
+      "id": 999,
+      "group": "e60e0ff5-5433-40e2-a4ed-5ea8dc79b5c3",
+      "code": "RURU-MPVCZ6TY",
+      "nick": "두두",
+      "phone": "01081912420",
+      "product": "잇츠쏘미 콜라겐 필오프 마스크",
+      "created_at": "2026-06-01T15:23:37.638209+00:00"
+    },
+    {
+      "id": 998,
+      "group": "5b6fc8c6-6ddb-4bb3-9744-cc443ca4351b",
+      "code": "RURU-MPV7KO7H",
+      "nick": "두두",
+      "phone": "01081912420",
+      "product": "잇츠쏘미 콜라겐 필오프 마스크",
+      "created_at": "2026-06-01T12:52:22.028971+00:00"
+    },
+    {
+      "id": 997,
+      "group": "b35cbf28-f980-4e6c-b4a0-b40bdc5297a3",
+      "code": "RURU-MPV7K384",
+      "nick": "두두",
+      "phone": "01081912420",
+      "product": "잇츠쏘미 콜라겐 필오프 마스크",
+      "created_at": "2026-06-01T12:51:54.138166+00:00"
+    },
+    {
+      "id": 996,
+      "group": "75c662ab-8216-4055-8313-8634462fe848",
+      "code": "RURU-MPV7BTRC",
+      "nick": "두두",
+      "phone": "01081912420",
+      "product": "잇츠쏘미 콜라겐 필오프 마스크",
+      "created_at": "2026-06-01T12:45:28.598633+00:00"
+    },
+    {
+      "id": 995,
+      "group": "6980c22b-1513-4609-acc1-9bccf2a8edab",
+      "code": "RURU-MPV719VC",
+      "nick": "두두",
+      "phone": "01081912420",
+      "product": "잇츠쏘미 페미닌워시 2종세트",
+      "created_at": "2026-06-01T12:37:16.46334+00:00"
+    },
+    {
+      "id": 994,
+      "group": "6980c22b-1513-4609-acc1-9bccf2a8edab",
+      "code": "RURU-MPV719VC",
+      "nick": "두두",
+      "phone": "01081912420",
+      "product": "잇츠쏘미 콜라겐 필오프 마스크",
+      "created_at": "2026-06-01T12:37:16.46334+00:00"
+    },
+    {
+      "id": 993,
+      "group": "4cfbfa79-5070-4c19-b463-34dd2c30c33a",
+      "code": "RURU-MPV59NO0",
+      "nick": "두두",
+      "phone": "01081912420",
+      "product": "잇츠쏘미 콜라겐 필오프 마스크",
+      "created_at": "2026-06-01T11:47:48.382802+00:00"
+    },
+    {
+      "id": 992,
+      "group": "5c13187c-d12e-49fe-a332-21502ecd5246",
+      "code": "RURU-MPV4V9QV",
+      "nick": "두두",
+      "phone": "01081912420",
+      "product": "잇츠쏘미 콜라겐 필오프 마스크",
+      "created_at": "2026-06-01T11:36:37.207582+00:00"
+    },
+    {
+      "id": 991,
+      "group": "70bd0f8f-3806-4454-bdc3-21bd21c52641",
+      "code": "RURU-MPV4N368",
+      "nick": "두두",
+      "phone": "01081912420",
+      "product": "잇츠쏘미 그린티 페미닌워시",
+      "created_at": "2026-06-01T11:30:15.86508+00:00"
+    },
+    {
+      "id": 990,
+      "group": "8006a194-112a-4764-8a50-fc22f180cf2a",
+      "code": "RURU-MPV4LYVA",
+      "nick": "두두",
+      "phone": "01081912420",
+      "product": "텐셀티",
+      "created_at": "2026-06-01T11:29:23.673462+00:00"
+    },
+    {
+      "id": 987,
+      "group": "7810c821-7297-4e71-bc08-c1baa60b8b67",
+      "code": "RURU-MPU92G9M",
+      "nick": "두두",
+      "phone": "01081912420",
+      "product": "잇츠쏘미 콜라겐 필오프 마스크",
+      "created_at": "2026-05-31T20:46:25.710253+00:00"
+    },
+    {
+      "id": 982,
+      "group": "e0efaf78-7538-4617-919c-73c9dbe118de",
+      "code": "RURU-MPTF3R7C",
+      "nick": "두두",
+      "phone": "01081912420",
+      "product": "지수씨 선크림",
+      "created_at": "2026-05-31T06:47:39.96272+00:00"
+    },
+    {
+      "id": 981,
+      "group": "e0efaf78-7538-4617-919c-73c9dbe118de",
+      "code": "RURU-MPTF3R7C",
+      "nick": "두두",
+      "phone": "01081912420",
+      "product": "나이키 문슈",
+      "created_at": "2026-05-31T06:47:39.96272+00:00"
+    },
+    {
+      "id": 980,
+      "group": "997af20b-094d-488d-8a44-a5b383bfabde",
+      "code": "RURU-MPSWAKBE",
+      "nick": "두두",
+      "phone": "01081912420",
+      "product": "라메르크림 100ml",
+      "created_at": "2026-05-30T22:01:03.141386+00:00"
+    },
+    {
+      "id": 979,
+      "group": "747ad0d0-c276-481f-9d09-6058fad7e075",
+      "code": "RURU-MPRNX69M",
+      "nick": "타미v",
+      "phone": "01030518708",
+      "product": "아디다스도쿄",
+      "created_at": "2026-05-30T01:18:55.591115+00:00"
+    }
+  ],
+  "interpretation": {
+    "can_confirm_db_saved_orders": "orders 테이블에 최근 주문이 있으면 서버 저장은 된 것",
+    "cannot_prove_browser_success_without_log": "고객 브라우저에서 성공 화면을 봤는데 DB에 없는 경우는 브라우저/서버 로그 없이는 완전 입증 불가",
+    "critical_red_flags": [
+      "missing_required_order_fields > 0",
+      "possible_partial_order_groups > 0",
+      "point_use_without_ledger > 0",
+      "point_ledger_without_order > 0"
+    ]
+  },
+  "files": [
+    "order_submit_missing_audit_20260602_204051/01_recent_orders_24h.csv",
+    "order_submit_missing_audit_20260602_204051/02_recent_orders_72h.csv",
+    "order_submit_missing_audit_20260602_204051/03_missing_required_order_fields.csv",
+    "order_submit_missing_audit_20260602_204051/04_missing_customer_info_orders.csv",
+    "order_submit_missing_audit_20260602_204051/05_hidden_from_admin_risk_orders.csv",
+    "order_submit_missing_audit_20260602_204051/06_orders_without_customer_row.csv",
+    "order_submit_missing_audit_20260602_204051/07_order_group_integrity_risk.csv",
+    "order_submit_missing_audit_20260602_204051/08_possible_partial_order_groups.csv",
+    "order_submit_missing_audit_20260602_204051/09_point_use_without_ledger.csv",
+    "order_submit_missing_audit_20260602_204051/10_point_ledger_without_order.csv",
+    "order_submit_missing_audit_20260602_204051/11_order_phone_format_risk.csv"
+  ]
+}
+
+⚠️ 중요 위험 신호 있음. CSV 확인 필요.
