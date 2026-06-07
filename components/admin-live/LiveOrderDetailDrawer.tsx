@@ -555,7 +555,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               <div className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-[10px] font-bold leading-4 text-amber-700">상품명·옵션·금액은 아래 상품 카드에서 수정합니다. 여기선 고객·주소·메모만 저장됩니다(배송비/합계 미변경).</div>
             </div>
           ) : (
-            <div className="mt-1 whitespace-pre-wrap break-keep text-sm font-bold leading-5 text-slate-900">
+            <div className="mt-1 whitespace-pre-wrap break-keep rounded-lg bg-rose-soft px-3 py-2 text-sm font-bold leading-5 text-rose-deep">
               {customerAddressText || "주소 정보 없음"}
             </div>
           )}
@@ -646,7 +646,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             <button
               type="button"
               onClick={() => onOpenManualMatch(order)}
-              className="h-10 w-full rounded-xl bg-orange-500 text-[13px] font-black text-white shadow-sm hover:bg-orange-600 active:scale-[0.99]"
+              className="h-10 w-full rounded-xl border border-rose-line bg-rose-soft text-[13px] font-black text-rose-deep shadow-sm hover:bg-rose-soft active:scale-[0.99]"
             >
               입금 매칭에서 찾기
             </button>
@@ -738,7 +738,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             <span className="text-[13px] font-black text-slate-600">
               {pointUsedAmount > 0 ? "최종 결제금액" : "총 결제예정금액"}
             </span>
-            <span className="text-2xl font-black tracking-[-0.05em] text-orange-600">
+            <span className="text-2xl font-black tracking-[-0.05em] text-rose-deep">
               {money(pointUsedAmount > 0 ? finalPaymentAmount : cardPaymentExpectedTotal)}
             </span>
           </div>
