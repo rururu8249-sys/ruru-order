@@ -50,6 +50,11 @@ type CustomerProfile = {
   customer_memo?: string | null;
   last_order_at?: string | null;
   created_at?: string | null;
+  kakao_id?: string | null;
+  kakao_nickname?: string | null;
+  first_login_at?: string | null;
+  last_login_at?: string | null;
+  customer_history?: Array<{ field: string; old_value: string; new_value: string; changed_at: string }> | null;
 };
 
 type SortMode = "latest" | "amount" | "orders" | "nickname";
@@ -380,6 +385,7 @@ function SummaryCard({
 
 function CustomerDetailDrawer({
   customer,
+  profile,
   page,
   setPage,
   onClose,
@@ -387,6 +393,7 @@ function CustomerDetailDrawer({
   blockSaving,
 }: {
   customer: CustomerSummary | null;
+  profile?: CustomerProfile | null;
   page: number;
   setPage: (value: number) => void;
   onClose: () => void;
@@ -440,6 +447,9 @@ function CustomerDetailDrawer({
                 📞 {formatPhone(customer.phone) || "-"}<br />
                 📍 {customer.address || "주소 정보 없음"}<br />
                 🕒 {customer.orderCount > 0 ? formatOrderDateTime(customer.latestOrderAt) : "주문 전 회원"}
+                {profile?.kakao_nickname ? <><br />💬 카카오: {profile.kakao_nickname}</> : null}
+                {profile?.first_login_at ? <><br />📅 최초 로그인: {formatOrderDateTime(profile.first_login_at)}</> : null}
+                {profile?.last_login_at ? <><br />🕒 최근 로그인: {formatOrderDateTime(profile.last_login_at)}</> : null}
               </div>
             </div>
           </div>
@@ -492,6 +502,30 @@ function CustomerDetailDrawer({
             <AdminLiveCustomerPointPanel customer={customer} />
           </div>
 
+          {/* 정보 변경 이력 */}
+          {profile?.customer_history && profile.customer_history.length > 0 ? (
+            <div style={{ marginTop: "16px" }}>
+              <div style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43", marginBottom: "8px" }}>정보 변경 이력</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                {[...profile.customer_history]
+                  .sort((a, b) => String(b.changed_at).localeCompare(String(a.changed_at)))
+                  .map((h, index) => (
+                    <div key={`${h.field}-${h.changed_at}-${index}`} style={{ border: "1px solid #E8E2DD", borderRadius: "9px", padding: "8px 11px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px" }}>
+                        <span style={{ fontSize: "11px", fontWeight: 800, color: "#7B2D43" }}>{h.field}</span>
+                        <span style={{ marginLeft: "auto", fontSize: "10px", color: "#999" }}>{formatOrderDateTime(h.changed_at)}</span>
+                      </div>
+                      <div style={{ fontSize: "11px", color: "#666" }}>
+                        <span style={{ color: "#999" }}>{h.old_value || "(없음)"}</span>
+                        <span style={{ margin: "0 5px", color: "#7B2D43", fontWeight: 800 }}>→</span>
+                        <span style={{ color: "#222", fontWeight: 700 }}>{h.new_value || "(없음)"}</span>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ) : null}
+
           {/* 푸터: 차단 / 닫기 */}
           <div style={{ display: "flex", alignItems: "center", marginTop: "16px", paddingTop: "12px", borderTop: "1px solid #E8E2DD" }}>
             <button
@@ -524,6 +558,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
   const [sortMode, setSortMode] = useState<SortMode>("latest");
   const [page, setPage] = useState(1);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerSummary | null>(null);
+  const [selectedProfile, setSelectedProfile] = useState<CustomerProfile | null>(null);
   const [detailPage, setDetailPage] = useState(1);
   const [blockOverrides, setBlockOverrides] = useState<Record<string, BlockOverride>>({});
   const [blockModalTarget, setBlockModalTarget] = useState<BlockModalTarget | null>(null);
@@ -581,7 +616,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
       const { data, error } = await supabase
         .from("customers")
         .select(
-          "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, is_blocked, block_reason, customer_memo, last_order_at, created_at"
+          "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, is_blocked, block_reason, customer_memo, last_order_at, created_at, kakao_id, kakao_nickname, first_login_at, last_login_at, customer_history"
         )
         .order("created_at", { ascending: false })
         .limit(1000);
@@ -830,6 +865,12 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
   const openDetail = (customer: CustomerSummary) => {
     setSelectedCustomer(customer);
     setDetailPage(1);
+    // customers 프로필을 전화번호(숫자) 기준으로 매칭
+    const phoneKey = digitsOnly(customer.phone);
+    const profile = phoneKey
+      ? customerProfiles.find((p) => digitsOnly(p.customer_phone) === phoneKey) || null
+      : null;
+    setSelectedProfile(profile);
   };
 
   const applyBlockResult = (result: { phone: string; blocked: boolean; reason: string }) => {
@@ -1365,9 +1406,10 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
 
       <CustomerDetailDrawer
         customer={selectedCustomer}
+        profile={selectedProfile}
         page={detailPage}
         setPage={setDetailPage}
-        onClose={() => setSelectedCustomer(null)}
+        onClose={() => { setSelectedCustomer(null); setSelectedProfile(null); }}
         onBlockAction={handleCustomerBlockButton}
         blockSaving={blockSaving}
       />
