@@ -113,6 +113,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const [cardStatusAction, setCardStatusAction] = useState<"" | "card-paid" | "card-unpaid">("");
   const [paymentCancelAction, setPaymentCancelAction] = useState(false);
   const [paymentCancelError, setPaymentCancelError] = useState("");
+  const [manualConfirmAction, setManualConfirmAction] = useState(false);
 
   const [localOrder, setLocalOrder] = useState(order);
   const [refreshingDetail, setRefreshingDetail] = useState(false);
@@ -287,6 +288,53 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     }
   };
 
+  // 입금대기 → 수동 입금확인: 기존 입금확인 로직(/api/admin-v2/manual-payment-confirm-without-deposit) 재사용. 새 로직 없음.
+  const handleManualConfirm = async () => {
+    if (manualConfirmAction) return;
+
+    const ok = await showAdminConfirm(
+      [
+        "이 주문을 수동 입금확인 처리할까요?",
+        "",
+        "통장 입금내역 없이 관리자가 직접 입금확인합니다.",
+        "실제 입금이 확인된 경우에만 진행하세요.",
+      ].join("\n"),
+    );
+    if (!ok) return;
+
+    setManualConfirmAction(true);
+    try {
+      const currentOrder = orderForView as any;
+      const orderIds =
+        currentOrder.orderIds ||
+        currentOrder.order_ids ||
+        items.map((item) => item.id).filter(Boolean);
+      const response = await fetch("/api/admin-v2/manual-payment-confirm-without-deposit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderGroupId:
+            currentOrder.groupId ||
+            currentOrder.orderGroupId ||
+            currentOrder.order_group_id ||
+            "",
+          orderIds,
+          expectedAmount: finalPaymentAmount || totalAmount,
+        }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.ok) {
+        showAdminToast("수동 입금확인 실패\n\n" + (result?.message || ""), "error");
+        return;
+      }
+      showAdminToast("수동 입금확인 처리됐습니다.", "success");
+      await onAfterStatusChange?.();
+      onClose?.();
+    } finally {
+      setManualConfirmAction(false);
+    }
+  };
+
   const handleCardPaymentStatusChange = async (
     nextStatus: "카드결제완료" | "주문확인전",
     action: "card-paid" | "card-unpaid"
@@ -355,7 +403,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <div className="text-[10px] font-black tracking-[0.18em] text-rose-deep">ORDER DETAIL</div>
-            <h2 className="mt-0.5 text-lg font-black tracking-[-0.04em] text-slate-950">✎ 주문서 수정</h2>
+            <h2 className="mt-0.5 text-lg font-black tracking-[-0.04em] text-slate-950">주문 상세</h2>
           </div>
 
           <button
@@ -451,13 +499,24 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             </>
           ) : null}
 
+          {!isCanceled && orderForView.paymentStatus === "unpaid" ? (
+            <button
+              type="button"
+              onClick={handleManualConfirm}
+              disabled={manualConfirmAction}
+              className="h-10 w-full rounded-xl bg-emerald-600 text-[13px] font-black text-white shadow-sm hover:bg-emerald-700 active:scale-[0.99] disabled:bg-slate-300"
+            >
+              {manualConfirmAction ? "처리중..." : "수동 입금확인"}
+            </button>
+          ) : null}
+
           {!isCanceled && orderForView.paymentStatus === "manual_match_needed" && onOpenManualMatch ? (
             <button
               type="button"
               onClick={() => onOpenManualMatch(order)}
               className="h-10 w-full rounded-xl bg-orange-500 text-[13px] font-black text-white shadow-sm hover:bg-orange-600 active:scale-[0.99]"
             >
-              입금확인 화면 열기
+              입금 매칭에서 찾기
             </button>
           ) : null}
 
