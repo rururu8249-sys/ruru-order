@@ -368,12 +368,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       if (nameRows.length > 0) {
         const { data: allProds } = await supabase
           .from("products")
-          .select("id, product_name, image_url, cover_image_url, main_image_url, external_image_url");
+          .select("id, product_name, image_url, cover_image_url, main_image_url");
         const nameThumbs = new Map<string, string>();
         ((allProds as ProductRow[]) || []).forEach((p) => {
           const nm = String((p as { product_name?: unknown }).product_name || "").toLowerCase().trim();
           if (!nm || nameThumbs.has(nm)) return;
-          const url = pickString(p, ["image_url", "cover_image_url", "main_image_url", "external_image_url"], "");
+          const url = pickString(p, ["image_url", "cover_image_url", "main_image_url"], "");
           if (url) nameThumbs.set(nm, resolveProductImageUrl(url));
         });
         nameRows.forEach((r) => {
