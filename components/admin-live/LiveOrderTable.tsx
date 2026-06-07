@@ -299,28 +299,41 @@ export function liveDepositNameScore(depositName: string, nickname: string, cust
 
 const LIVE_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
+// deposited_time이 "HH:MM[:SS]" 시간만이면 날짜는 created_at에서, 시간은 deposited_time에서 (드로어 getDepositTimeLabel과 동일 기준)
+function resolveLiveDepositDate(d: LiveMatchDeposit): { date: Date | null; timeText: string } {
+  const raw = String(d.deposited_time || "").trim();
+  const createdRaw = String(d.created_at || "").trim();
+  let timeText = "";
+  let dateSource = raw;
+  if (/^\d{1,2}:\d{2}$/.test(raw)) {
+    timeText = raw.length === 4 ? `0${raw}` : raw;
+    dateSource = createdRaw;
+  } else if (/^\d{1,2}:\d{2}:\d{2}$/.test(raw)) {
+    timeText = raw.slice(0, 5);
+    dateSource = createdRaw;
+  }
+  const dt = new Date((dateSource || createdRaw || raw).replace(" ", "T"));
+  if (Number.isNaN(dt.getTime())) return { date: null, timeText };
+  if (!timeText) timeText = `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
+  return { date: dt, timeText };
+}
+
 // 날짜 형식: 2026.06.05(금) 20:54
 export function liveDepositDateLabel(d: LiveMatchDeposit) {
-  const src = String(d.deposited_time || d.created_at || "").trim();
-  if (!src) return "-";
-  const dt = new Date(src.replace(" ", "T"));
-  if (Number.isNaN(dt.getTime())) return src.slice(0, 10);
-  const yyyy = dt.getFullYear();
-  const mm = String(dt.getMonth() + 1).padStart(2, "0");
-  const dd = String(dt.getDate()).padStart(2, "0");
-  const hh = String(dt.getHours()).padStart(2, "0");
-  const mi = String(dt.getMinutes()).padStart(2, "0");
-  return `${yyyy}.${mm}.${dd}(${LIVE_WEEKDAYS[dt.getDay()]}) ${hh}:${mi}`;
+  const { date, timeText } = resolveLiveDepositDate(d);
+  if (!date) return String(d.deposited_time || d.created_at || "-").trim() || "-";
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}.${mm}.${dd}(${LIVE_WEEKDAYS[date.getDay()]}) ${timeText || "-"}`;
 }
 
 // 오늘(로컬) 입금 여부
 export function isLiveDepositToday(d: LiveMatchDeposit) {
-  const src = String(d.deposited_time || d.created_at || "").trim();
-  if (!src) return false;
-  const dt = new Date(src.replace(" ", "T"));
-  if (Number.isNaN(dt.getTime())) return false;
+  const { date } = resolveLiveDepositDate(d);
+  if (!date) return false;
   const now = new Date();
-  return dt.getFullYear() === now.getFullYear() && dt.getMonth() === now.getMonth() && dt.getDate() === now.getDate();
+  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
 }
 
 // 주문의 매칭 키(그룹/행ID/금액) — 인라인/플로팅 공용

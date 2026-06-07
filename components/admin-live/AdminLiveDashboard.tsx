@@ -1236,7 +1236,21 @@ export default function AdminLiveDashboard() {
                 />
               </div>
 
-              {selectedOrder && orderDetailOpen ? (
+              {/* 우측 사이드 패널: 입금매칭(목업 C) 우선, 없으면 주문상세(목업 B) */}
+              {matchPanelOpen ? (
+                <div
+                  className="sticky top-2 block h-[calc(100vh-110px)] w-[380px] shrink-0 self-start overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
+                  style={{ animation: "ruruSidePanelIn 0.22s ease" }}
+                >
+                  <LiveFloatingMatchPanel
+                    deposits={deposits}
+                    orders={filteredOrders}
+                    onClose={() => setMatchPanelOpen(false)}
+                    onMatched={refreshAfterManualMatch}
+                    onSearchFilter={(keyword) => setFilters((prev) => ({ ...prev, keyword }))}
+                  />
+                </div>
+              ) : selectedOrder && orderDetailOpen ? (
                 <div
                   className="sticky top-2 block h-[calc(100vh-110px)] w-[380px] shrink-0 self-start overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
                   style={{ animation: "ruruSidePanelIn 0.22s ease" }}
@@ -1378,16 +1392,7 @@ export default function AdminLiveDashboard() {
             onMatched={refreshAfterManualMatch}
           />
 
-          {/* 입금매칭 탭: 플로팅 드래그 패널(목업 C) */}
-          {matchPanelOpen ? (
-            <LiveFloatingMatchPanel
-              deposits={deposits}
-              orders={filteredOrders}
-              onClose={() => setMatchPanelOpen(false)}
-              onMatched={refreshAfterManualMatch}
-              onSearchFilter={(keyword) => setFilters((prev) => ({ ...prev, keyword }))}
-            />
-          ) : null}
+          {/* 입금매칭은 위 2-col 우측 사이드 패널로 이동(목업 C). */}
 
           {broadcastEndSummary ? (
             <LiveBroadcastEndSummaryModal
