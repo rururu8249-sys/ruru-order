@@ -23,6 +23,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 (없음)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-06-06 세션16(시안 화면 교체 다건 + 주문 realtime): ①주문서 실시간 새로고침 버그수정(907d1de) — useAutoBankdaPaymentSync가 매 폴링마다(successCount 0이어도) onSynced+window이벤트로 loadOrders 2번 호출해 주문표 계속 리셋되던 것을, onSynced는 detail.successCount>0일 때만 loadOrders + window핸들러는 입금내역만 + supabase realtime orders INSERT/UPDATE 구독→디바운스 loadOrders 추가(새주문 즉시반영). BANKDA setInterval·가드 무변경. ②회원상세(CustomerDetailDrawer) 시안⑥ 중앙모달 딥로즈(59d1189). ③정산(admin-v2 SettlementMoneyFlowDashboard) 리스킨 파랑→딥로즈, 계산·방송별테이블·연월필터 유지(0e77d6b). ④설정 입력 포커스링 딥로즈(f408179). ⑤입금매칭(admin-v2 ManualPaymentMatchDrawer) 검색/새로고침 파랑→딥로즈, 매칭로직 무변경(b2fc232). ※admin-v2는 사장님 명시 허용. ⚠️포인트 일괄지급(시안⑩)은 빈 placeholder=신규기능이라 이번 건너뜀(별도 spec 필요)
 - 2026-06-06 세션15(이벤트 입금완료 필터 서버연동·P2): app/api/admin-live/event-roulette/route.ts handleParticipants가 paidOnly 파라미터 읽어 buildParticipantsForRequest(…,paidOnly) 전달 → paidOnly면 주문 rows를 admin_order_status_v2/order_manage_status가 자동입금확인·수동입금확인·카드결제완료인 것만 필터 후 참가자 구성(isPaidOrderRowForRoulette). 기존엔 서버가 paidOnly 무시해 전체와 동일했음. buildRouletteparticipants(import)·추첨/포인트 로직 무변경. PUSH 0b30e29
 - 2026-06-06 세션15(당첨자 목록 종류뱃지): AdminLiveEventRoulettePanel 당첨자행에 🎡룰렛/🪆인형뽑기 표시 — winners엔 종류정보 없어 w.event_id로 events 매칭→overlay_token 접두사(roulette/claw) 판별, 매칭실패 시 "이벤트". 프론트 표시만. PUSH 7d1731a ※events 응답이 과거 당첨자 이벤트 다 포함 안하면 "이벤트"로만 뜸 → 그땐 winners API에 종류 내려주기 보강 필요
 - 2026-06-06 세션15(고객정보 중복row 재발방지): app/order/page.tsx saveCustomer가 customer_phone으로만 조회/갱신해 번호변경 시 새 row INSERT(중복 원인 — 471/475 같은). saveCustomer(previousPhone?) 추가 → lookupPhone=옛번호≠새번호면 옛번호로 조회/update(customer_phone을 새번호로 갱신). 정보수정 호출(2374)만 customerInfoEditSnapshot?.customerPhone 전달, 주문제출(3037)·돈로직 무변경. sed 다중매칭(cleanPhone 7곳) 위험 회피 위해 Edit으로 saveCustomer에만 적용
@@ -58,7 +59,8 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 1. 화면 전체 용어·버튼·라벨·문구 시안 기준 전수 통일 (입금상태뿐 아니라 전 화면 일괄, 일부만 고치지 말 것) — 입금상태·메뉴·주요 팝업제목(정산·입금내역·입금매칭 포함) 통일 완료. 잔여 세부 라벨은 화면별 점검 시 추가
 2. 이벤트 — P1 완료. ✅완료: 시안⑨ 인라인, canvas 실제스핀, 인형뽑기 탭, 당첨 포인트 자동지급(운영모드만), 중복당첨 토글(excludeDailyDup), **입금완료 서버필터(paidOnly)**, 당첨자목록 종류뱃지. 잔여: P2-나머지(winners 기간필터 서버연동), P3(가중치 추첨공식 서버 — 토글UI만), ⚠️**당첨 자동지급 중복 가드 없음**(effect 재실행 시 재지급 가능 — 돈 위험, 가드 추가 권장), 자동지급↔지급완료(is_reward_done) 배지 미연동
 3. 수동매칭 설정 팝업 메뉴
-4. (사장님 추가 예정 — 그 외 작업 생각나는 대로 여기 누적)
+4. ⚠️ 포인트 일괄지급(시안⑩) 신규 구축 — 현재 빈 placeholder. 명단추가→한번에 지급(grant API 반복)+기간별 기록. 새 지급로직이라 spec 받고 진행
+5. (사장님 추가 예정 — 그 외 작업 생각나는 대로 여기 누적)
    ※ 후속: 상품관리 팝업 — 상시판매 별도 type 도입 / 올림날짜 전용 필드 / 기존 AdminLiveProductListPanel 정리 여부
 
 [포인트 자동적립] — 코드(설정 UI·주문서 멘트·트리거 SQL·소급 SQL)는 완료. 운영 적용/검증 남음:
