@@ -23,6 +23,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 (없음)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-06-06 세션16(주문서 배지·입금매칭 리스킨 + 가드): ①닉네임 클릭→주문상세 드로어는 이미 연결돼 있음(onSelectOrder→setOrderDetailOpen→LiveOrderDetailDrawer), 변경 불필요. ②LiveOrderTable 상태배지 시안① 팔레트 인라인(입금확인green/매칭필요amber/대기·미결제red/취소muted/카드완료blue), 상태칩(전체/입금대기/입금확인/주문서취소)은 이미 딥로즈+로직 그대로(8cd4dec). ③입금매칭(admin-v2) 시안⑧ 추가 리스킨: 헤더 '⇄ 입금매칭' 딥로즈+확정버튼 slate→녹색, 매칭 로직 무변경(9a5b82d). ④금지사항에 'LiveOrderTable 임의 전체교체 금지·최소수정만' 추가. ⑤룰렛 자동지급 중복가드(5a235d5)
 - 2026-06-06 세션16(시안 화면 교체 다건 + 주문 realtime): ①주문서 실시간 새로고침 버그수정(907d1de) — useAutoBankdaPaymentSync가 매 폴링마다(successCount 0이어도) onSynced+window이벤트로 loadOrders 2번 호출해 주문표 계속 리셋되던 것을, onSynced는 detail.successCount>0일 때만 loadOrders + window핸들러는 입금내역만 + supabase realtime orders INSERT/UPDATE 구독→디바운스 loadOrders 추가(새주문 즉시반영). BANKDA setInterval·가드 무변경. ②회원상세(CustomerDetailDrawer) 시안⑥ 중앙모달 딥로즈(59d1189). ③정산(admin-v2 SettlementMoneyFlowDashboard) 리스킨 파랑→딥로즈, 계산·방송별테이블·연월필터 유지(0e77d6b). ④설정 입력 포커스링 딥로즈(f408179). ⑤입금매칭(admin-v2 ManualPaymentMatchDrawer) 검색/새로고침 파랑→딥로즈, 매칭로직 무변경(b2fc232). ※admin-v2는 사장님 명시 허용. ⚠️포인트 일괄지급(시안⑩)은 빈 placeholder=신규기능이라 이번 건너뜀(별도 spec 필요)
 - 2026-06-06 세션15(이벤트 입금완료 필터 서버연동·P2): app/api/admin-live/event-roulette/route.ts handleParticipants가 paidOnly 파라미터 읽어 buildParticipantsForRequest(…,paidOnly) 전달 → paidOnly면 주문 rows를 admin_order_status_v2/order_manage_status가 자동입금확인·수동입금확인·카드결제완료인 것만 필터 후 참가자 구성(isPaidOrderRowForRoulette). 기존엔 서버가 paidOnly 무시해 전체와 동일했음. buildRouletteparticipants(import)·추첨/포인트 로직 무변경. PUSH 0b30e29
 - 2026-06-06 세션15(당첨자 목록 종류뱃지): AdminLiveEventRoulettePanel 당첨자행에 🎡룰렛/🪆인형뽑기 표시 — winners엔 종류정보 없어 w.event_id로 events 매칭→overlay_token 접두사(roulette/claw) 판별, 매칭실패 시 "이벤트". 프론트 표시만. PUSH 7d1731a ※events 응답이 과거 당첨자 이벤트 다 포함 안하면 "이벤트"로만 뜸 → 그땐 winners API에 종류 내려주기 보강 필요
@@ -99,6 +100,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 - order_items 테이블 신규 write 금지 (deprecated)
 - localStorage에 운영 데이터 저장 금지
 - admin / admin-v2 폴더, DB schema·RLS 건드리지 말 것
+- **LiveOrderTable.tsx는 임의로 전체 교체 금지. 기존 필터/로직(상태칩·정렬·페이지·검색·onSelectOrder 등) 유지하며 최소 수정만.** (닉네임 클릭→onSelectOrder→주문상세 드로어 연결은 이미 동작 중)
 
 ## 빌드 및 검수
 npm run build (반드시 "✅ BANKDA 안전가드 통과" 메시지 확인)
