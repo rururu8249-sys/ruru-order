@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabase";
 import { resolveProductImageUrl } from "./quick-product/productImageUrl";
@@ -13,12 +13,12 @@ type Props = {
   onClose: () => void;
 };
 
-type ProductTab = "broadcast" | "group_buy" | "all" | "manage";
+const PAGE_STEP = 10;
+const BASE_CATEGORIES = ["전체", "신발", "의류", "잡화"];
 
-const PAGE_SIZE = 8;
-
-// --- pick helpers (AdminLiveProductListPanel과 동일 규칙) ---
-function pickString(row: ProductRow, keys: string[], fallback = "") {
+// --- pick helpers ---
+function pickString(row: ProductRow | null | undefined, keys: string[], fallback = "") {
+  if (!row) return fallback;
   for (const key of keys) {
     const value = row[key];
     if (typeof value === "string" && value.trim()) return value.trim();
@@ -73,6 +73,20 @@ function pickArray(row: ProductRow, keys: string[]) {
   return [];
 }
 
+function parseProductNote(p: ProductRow): Record<string, unknown> {
+  const raw = (p as { product_note?: unknown }).product_note;
+  if (raw && typeof raw === "object") return raw as Record<string, unknown>;
+  if (typeof raw === "string" && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") return parsed as Record<string, unknown>;
+    } catch {
+      // ignore
+    }
+  }
+  return {};
+}
+
 function productName(p: ProductRow) {
   return pickString(p, ["product_name", "name", "title"], "상품명 없음");
 }
@@ -93,42 +107,42 @@ function mainImage(p: ProductRow) {
   return "";
 }
 
-function productTypeLabel(p: ProductRow) {
-  return pickString(p, ["product_type", "type"], "broadcast") === "group_buy" ? "공구" : "방송상품";
-}
-
 function shippingLabel(p: ProductRow) {
   const t = pickString(p, ["shipping_type", "delivery_type"], "normal");
-  if (t === "vendor") return "업체배송";
+  if (t === "vendor" || t === "vendor2") return "업체배송";
   if (t === "free") return "무료배송";
   return "일반배송";
 }
 
-function statusLabel(p: ProductRow): { label: string; cls: string } {
-  const isSoldout = pickBoolean(p, ["is_soldout", "soldout"], false);
-  const isVisible = pickBoolean(p, ["is_visible", "visible"], true);
-  const status = pickString(p, ["status", "product_status"], "");
-  if (isSoldout || status.includes("품절")) return { label: "품절", cls: "bg-rose-50 text-rose-700" };
-  if (!isVisible || status.includes("숨김")) return { label: "숨김", cls: "bg-slate-100 text-slate-500" };
-  return { label: "노출", cls: "bg-emerald-50 text-emerald-700" };
+function saleModeLabel(p: ProductRow) {
+  const m = pickString(p, ["sale_mode"], "both");
+  if (m === "broadcast") return "방송전용";
+  if (m === "shop") return "상시전용";
+  return "방송+상시";
 }
 
-function createdDateKey(p: ProductRow) {
-  const c = pickString(p, ["created_at", "updated_at"], "");
-  return c ? c.slice(0, 10) : "";
+function productCategory(p: ProductRow) {
+  const note = parseProductNote(p);
+  return String((note as { category?: unknown }).category || "").trim();
 }
+
+const productId = (p: ProductRow) => pickString(p, ["id", "product_id"], "");
 
 export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose }: Props) {
   const [products, setProducts] = useState<ProductRow[]>([]);
+  const [rotationIds, setRotationIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState<ProductTab>("all");
+  const [tab, setTab] = useState<"products" | "history">("products");
   const [search, setSearch] = useState("");
-  const [dateKey, setDateKey] = useState("");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [page, setPage] = useState(1);
-  const [saving, setSaving] = useState(false);
-  const [mode, setMode] = useState<"rotate" | "pin">("rotate"); // 순환 / 고정
+  const [category, setCategory] = useState("전체");
+  const [extraCategories, setExtraCategories] = useState<string[]>([]);
+  const [visibleCount, setVisibleCount] = useState(PAGE_STEP);
+  const [lightbox, setLightbox] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [busyId, setBusyId] = useState("");
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
+  // 상품 fetch (기존 loadProducts 재사용)
   const loadProducts = async () => {
     setLoading(true);
     try {
@@ -142,133 +156,161 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     }
   };
 
+  // 현재 방송의 순환 목록(broadcast_products) product_id 세트
+  const loadRotationIds = async () => {
+    if (!activeBroadcastId) {
+      setRotationIds(new Set());
+      return;
+    }
+    const { data } = await supabase
+      .from("broadcast_products")
+      .select("product_id")
+      .eq("broadcast_id", activeBroadcastId);
+    setRotationIds(new Set(((data as { product_id: unknown }[]) || []).map((r) => String(r.product_id))));
+  };
+
   useEffect(() => {
-    loadProducts();
-    const onUpdated = () => loadProducts();
+    void loadProducts();
+    void loadRotationIds();
+    const onUpdated = () => {
+      void loadProducts();
+      void loadRotationIds();
+    };
     window.addEventListener("ruru-live-product-updated", onUpdated);
     return () => window.removeEventListener("ruru-live-product-updated", onUpdated);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBroadcastId]);
 
   useEffect(() => {
-    setPage(1);
-  }, [tab, search, dateKey]);
-
-  // 고정모드로 바꾸면 선택은 1개만 유지
-  useEffect(() => {
-    setSelected((prev) => (mode === "pin" && prev.size > 1 ? new Set([...prev].slice(0, 1)) : prev));
-  }, [mode]);
-
-  const productId = (p: ProductRow) => pickString(p, ["id", "product_id"], "");
-
-  const dateOptions = useMemo(() => {
-    const set = new Set<string>();
-    products.forEach((p) => {
-      const k = createdDateKey(p);
-      if (k) set.add(k);
-    });
-    return [...set].sort((a, b) => b.localeCompare(a));
-  }, [products]);
+    setVisibleCount(PAGE_STEP);
+  }, [tab, search, category]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return products.filter((p) => {
-      const type = pickString(p, ["product_type", "type"], "broadcast");
-      if (tab === "broadcast" && type === "group_buy") return false;
-      if (tab === "group_buy" && type !== "group_buy") return false;
-      if (dateKey && createdDateKey(p) !== dateKey) return false;
+      if (category !== "전체" && productCategory(p) !== category) return false;
       if (q && !productName(p).toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [products, tab, search, dateKey]);
+  }, [products, search, category]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, (page - 1) * PAGE_SIZE + PAGE_SIZE);
+  const visible = filtered.slice(0, visibleCount);
 
-  const toggleSelect = (id: string) => {
-    if (!id) return;
-    setSelected((prev) => {
-      // 고정모드: 1개만 선택(다른 선택 자동 해제). 순환모드: 다중선택.
-      if (mode === "pin") {
-        return prev.has(id) ? new Set<string>() : new Set<string>([id]);
+  // 무한스크롤: sentinel 보이면 PAGE_STEP씩 누적
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || tab !== "products") return;
+    const io = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting) {
+        setVisibleCount((v) => (v < filtered.length ? v + PAGE_STEP : v));
       }
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
     });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [tab, filtered.length, visibleCount]);
+
+  const categories = useMemo(() => {
+    const found = new Set<string>();
+    products.forEach((p) => {
+      const c = productCategory(p);
+      if (c) found.add(c);
+    });
+    const dataExtras = [...found].filter((c) => !BASE_CATEGORIES.includes(c));
+    const manualExtras = extraCategories.filter((c) => !BASE_CATEGORIES.includes(c) && !dataExtras.includes(c));
+    return [...BASE_CATEGORIES, ...dataExtras, ...manualExtras];
+  }, [products, extraCategories]);
+
+  // --- 위젯 단건 액션 (기존 addToRotation / pinSelected 로직 재사용) ---
+  const widgetState = (p: ProductRow): "rotating" | "pinned" | "none" => {
+    if (pickBoolean(p, ["is_pinned", "pinned"], false)) return "pinned";
+    if (rotationIds.has(productId(p))) return "rotating";
+    return "none";
   };
 
-  const openCreate = () => {
-    window.dispatchEvent(new Event("ruru-open-quick-product-panel"));
-  };
-
-  const addToRotation = async () => {
-    const ids = [...selected].filter(Boolean);
-    if (ids.length === 0) return;
+  const addRotationSingle = async (p: ProductRow) => {
+    const id = productId(p);
+    if (!id) return;
     if (!activeBroadcastId) {
       showAdminToast("진행 중인 방송이 없습니다.\n\n방송을 먼저 시작한 뒤 순환에 담아주세요.", "warning");
       return;
     }
-    setSaving(true);
+    setBusyId(id);
     try {
-      // 순환모드 전환: 기존 고정(is_pinned) 해제 → '지금 띄운 상품' 패널이 고정 1개가 아닌 순환목록을 표시하도록.
+      // 기존 addToRotation과 동일: 고정 해제 후 순환에 추가(중복 제외)
       await supabase.from("products").update({ is_pinned: false }).eq("is_pinned", true);
-
       const { data: existing } = await supabase
         .from("broadcast_products")
         .select("product_id")
-        .eq("broadcast_id", activeBroadcastId);
-      const existingSet = new Set(((existing as { product_id: unknown }[]) || []).map((r) => String(r.product_id)));
-      const toInsert = ids
-        .filter((id) => !existingSet.has(String(id)))
-        .map((id) => ({ broadcast_id: activeBroadcastId, product_id: id, sort_order: 0 }));
-      if (toInsert.length > 0) {
-        const { error } = await supabase.from("broadcast_products").insert(toInsert);
+        .eq("broadcast_id", activeBroadcastId)
+        .eq("product_id", id);
+      if (!existing || existing.length === 0) {
+        const { error } = await supabase
+          .from("broadcast_products")
+          .insert({ broadcast_id: activeBroadcastId, product_id: id, sort_order: 0 });
         if (error) throw error;
       }
       window.dispatchEvent(new Event("ruru-live-product-updated"));
-      const added = toInsert.length;
-      const skipped = ids.length - added;
-      showAdminToast(
-        `방송 순환에 ${added}개 담았어요.${skipped > 0 ? ` (이미 담긴 ${skipped}개 제외)` : ""}`,
-        "success",
-      );
-      setSelected(new Set());
+      showAdminToast("방송 순환에 담았어요.", "success");
     } catch (e) {
       showAdminToast("순환 담기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
     } finally {
-      setSaving(false);
+      setBusyId("");
     }
   };
 
-  // 고정모드: 선택 상품을 is_pinned로 고정(지금 띄운 상품). 기존 고정은 해제하고 선택만 고정.
-  const pinSelected = async () => {
-    const ids = [...selected].filter(Boolean);
-    if (ids.length === 0) return;
-    setSaving(true);
+  const removeRotationSingle = async (p: ProductRow) => {
+    const id = productId(p);
+    if (!id || !activeBroadcastId) return;
+    setBusyId(id);
     try {
-      await supabase.from("products").update({ is_pinned: false }).eq("is_pinned", true);
-      const { error } = await supabase.from("products").update({ is_pinned: true }).in("id", ids);
+      const { error } = await supabase
+        .from("broadcast_products")
+        .delete()
+        .eq("broadcast_id", activeBroadcastId)
+        .eq("product_id", id);
       if (error) throw error;
       window.dispatchEvent(new Event("ruru-live-product-updated"));
-      showAdminToast(`${ids.length}개 상품을 고정(지금 띄움)했어요.`, "success");
-      setSelected(new Set());
+      showAdminToast("순환에서 뺐어요.", "success");
     } catch (e) {
-      showAdminToast("상품 고정 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+      showAdminToast("순환 해제 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
     } finally {
-      setSaving(false);
+      setBusyId("");
     }
   };
 
-  const confirmAction = () => (mode === "pin" ? pinSelected() : addToRotation());
+  const unpinSingle = async (p: ProductRow) => {
+    const id = productId(p);
+    if (!id) return;
+    setBusyId(id);
+    try {
+      // 기존 pinSelected와 동일 테이블/컬럼: is_pinned 해제
+      const { error } = await supabase.from("products").update({ is_pinned: false }).eq("id", id);
+      if (error) throw error;
+      window.dispatchEvent(new Event("ruru-live-product-updated"));
+      showAdminToast("고정을 해제했어요.", "success");
+    } catch (e) {
+      showAdminToast("고정 해제 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally {
+      setBusyId("");
+    }
+  };
 
-  // 수정: 관리 팝업은 유지한 채 새 상품 등록 폼을 edit 모드로 (상품 detail 전달).
-  // edit 드로어(z-90)가 관리 팝업(z-40) 위에 뜨고, 저장 후 ruru-live-product-updated로 목록 갱신됨.
+  const onWidgetClick = (p: ProductRow) => {
+    const state = widgetState(p);
+    if (state === "rotating") return void removeRotationSingle(p);
+    if (state === "pinned") return void unpinSingle(p);
+    return void addRotationSingle(p);
+  };
+
+  // --- 등록/수정/삭제 (기존 이벤트/로직 재사용) ---
+  const openCreate = () => {
+    window.dispatchEvent(new Event("ruru-open-quick-product-panel"));
+  };
+
   const editProduct = (p: ProductRow) => {
     window.dispatchEvent(new CustomEvent("ruru-edit-quick-product", { detail: p }));
   };
 
-  // 삭제: confirm 후 products delete + 재로드
   const deleteProduct = async (p: ProductRow) => {
     const id = productId(p);
     if (!id) return;
@@ -284,14 +326,34 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     }
   };
 
-  const tabs: [ProductTab, string][] = [
-    ["broadcast", "방송상품"],
-    ["group_buy", "공구·상시판매"],
-    ["all", "전체 창고"],
-    ["manage", "관리"],
-  ];
+  // --- 위젯 설정 / 주소 복사 ---
+  const copyWidgetUrl = async () => {
+    try {
+      const url = `${window.location.origin}/product-widget`;
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      showAdminToast("복사 실패 — 주소창에서 직접 복사해주세요.", "warning");
+    }
+  };
+
+  const openWidgetSettings = () => {
+    showAdminToast("위젯 설정은 준비 중입니다.", "info");
+  };
+
+  const onAddCategory = () => {
+    const c = window.prompt("필터할 카테고리 이름을 입력해주세요");
+    const name = (c || "").trim();
+    if (!name) return;
+    setExtraCategories((prev) => Array.from(new Set([...prev, name])));
+    setCategory(name);
+  };
 
   if (typeof document === "undefined") return null;
+
+  const chipBase: React.CSSProperties = { padding: "5px 12px", borderRadius: "16px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid #D9C5CC" };
+  const topBtn: React.CSSProperties = { height: "36px", borderRadius: "9px", padding: "0 12px", fontSize: "12px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" };
 
   return createPortal(
     <div
@@ -299,118 +361,141 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       style={{ position: "fixed", inset: 0, zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(2,6,23,0.45)", padding: "16px" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{ width: "560px", flexShrink: 0, maxHeight: "calc(100vh - 32px)", overflowY: "auto", background: "#fff", borderRadius: "12px", padding: "17px" }}>
-
+      <div style={{ width: "600px", maxWidth: "100%", flexShrink: 0, maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "14px", overflow: "hidden" }}>
         {/* 헤더 */}
-        <div className="mh">
-          <span className="mt" style={{ color: "#222" }}>📦 관리</span>
-          <button type="button" className="x" onClick={onClose}>✕</button>
+        <div style={{ display: "flex", alignItems: "center", padding: "14px 18px", borderBottom: "1px solid #E8E2DD" }}>
+          <span style={{ fontSize: "16px", fontWeight: 800, color: "#7B2D43" }}>📦 상품 관리</span>
+          <button type="button" onClick={onClose} style={{ marginLeft: "auto", border: "none", background: "none", fontSize: "20px", color: "#999", cursor: "pointer", lineHeight: 1 }}>✕</button>
         </div>
 
-        {/* 순환 / 고정 모드 토글 */}
-        <div style={{ display: "flex", gap: "5px", marginBottom: "11px" }}>
-          <button type="button" onClick={() => setMode("rotate")}
-            className="btn" style={mode === "rotate" ? { background: "var(--rose)", color: "#fff", borderColor: "var(--rose)" } : {}}>🔁 순환모드</button>
-          <button type="button" onClick={() => setMode("pin")}
-            className="btn" style={mode === "pin" ? { background: "var(--rose)", color: "#fff", borderColor: "var(--rose)" } : {}}>📌 고정모드</button>
-          <span className="note" style={{ marginLeft: "auto", alignSelf: "center" }}>{mode === "rotate" ? "선택 상품을 방송 순환목록에 담습니다" : "선택 상품을 지금 띄운 상품으로 고정합니다"}</span>
-        </div>
-
-        {/* 서브탭 */}
-        <div className="subtabs">
-          {tabs.map(([key, label]) => (
-            <span key={key} className={`st ${tab === key ? "on" : ""}`} onClick={() => setTab(key)}>{label}</span>
-          ))}
-          <button type="button" className="btn rose" style={{ marginLeft: "auto" }} onClick={openCreate}>+ 새 상품 등록</button>
-        </div>
-
-        {/* 필터 */}
-        <div className="filters">
-          <input className="ipt" style={{ flex: 1 }} placeholder="🔍 상품명 검색" value={search} onChange={(e) => setSearch(e.target.value)} />
-          <select className="ipt" value={dateKey} onChange={(e) => setDateKey(e.target.value)}>
-            <option value="">전체 기간</option>
-            {dateOptions.map((d) => (<option key={d} value={d}>{d} 올림</option>))}
-          </select>
-          {selected.size > 0 ? (
-            <span style={{ fontSize: "11px", color: "var(--rose)" }}>✓ {selected.size}개 선택 → {mode === "rotate" ? "순환" : "고정"}</span>
-          ) : null}
-        </div>
-
-        {/* 상품 그리드 */}
-        {loading ? (
-          <div className="note" style={{ textAlign: "center", padding: "30px 0" }}>불러오는 중…</div>
-        ) : pageItems.length === 0 ? (
-          <div className="note" style={{ textAlign: "center", padding: "30px 0" }}>상품이 없습니다.</div>
-        ) : tab === "manage" ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            {pageItems.map((p) => {
-              const id = productId(p);
-              const img = mainImage(p);
-              return (
-                <div key={id || productName(p)} style={{ display: "flex", gap: "10px", alignItems: "center", border: "1px solid var(--bd)", borderRadius: "8px", padding: "9px 11px" }}>
-                  <span className="ph2" style={{ width: "40px", height: "40px" }}>
-                    {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🖼"}
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
-                    <div style={{ marginTop: "2px", display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
-                      <span style={{ fontSize: "11px", color: "var(--mut)" }}>{money(productPrice(p))}</span>
-                      <span className="badge" style={{ background: "var(--rose-bg)", color: "var(--rose)" }}>{productTypeLabel(p)}</span>
-                      <span className="badge" style={{ background: "var(--blue-bg)", color: "var(--blue)" }}>{shippingLabel(p)}</span>
-                    </div>
-                  </div>
-                  <button type="button" onClick={() => editProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "var(--blue)", background: "var(--blue-bg)", border: "none", borderRadius: "6px", padding: "6px 12px", cursor: "pointer", flexShrink: 0 }}>수정</button>
-                  <button type="button" onClick={() => void deleteProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "var(--red)", background: "#fdecec", border: "none", borderRadius: "6px", padding: "6px 12px", cursor: "pointer", flexShrink: 0 }}>삭제</button>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="grid2">
-            {pageItems.map((p) => {
-              const id = productId(p);
-              const isSel = selected.has(id);
-              const img = mainImage(p);
-              return (
-                <div key={id || productName(p)} className={`pgrid ${isSel ? "sel" : ""}`} onClick={() => toggleSelect(id)}>
-                  <input type="checkbox" readOnly checked={isSel} />
-                  <span className="ph2" style={{ width: "42px", height: "42px" }}>
-                    {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🖼"}
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
-                    <div style={{ fontSize: "11px", color: "var(--mut)" }}>{money(productPrice(p))}</div>
-                    <div style={{ marginTop: "3px", display: "flex", gap: "4px", flexWrap: "wrap" }}>
-                      <span className="badge" style={{ background: "var(--rose-bg)", color: "var(--rose)" }}>{productTypeLabel(p)}</span>
-                      <span className="badge" style={{ background: "var(--blue-bg)", color: "var(--blue)" }}>{shippingLabel(p)}</span>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", flexShrink: 0 }}>
-                    <button type="button" onClick={(e) => { e.stopPropagation(); editProduct(p); }} style={{ fontSize: "10px", fontWeight: 700, color: "var(--blue)", background: "var(--blue-bg)", border: "none", borderRadius: "5px", padding: "4px 8px", cursor: "pointer" }}>수정</button>
-                    <button type="button" onClick={(e) => { e.stopPropagation(); void deleteProduct(p); }} style={{ fontSize: "10px", fontWeight: 700, color: "var(--red)", background: "#fdecec", border: "none", borderRadius: "5px", padding: "4px 8px", cursor: "pointer" }}>삭제</button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* 푸터 */}
-        <div className="mfoot">
-          <span className="note">
-            <span style={{ cursor: page > 1 ? "pointer" : "default", opacity: page > 1 ? 1 : 0.3 }} onClick={() => page > 1 && setPage((v) => v - 1)}>‹ </span>
-            {page} / {totalPages}
-            <span style={{ cursor: page < totalPages ? "pointer" : "default", opacity: page < totalPages ? 1 : 0.3 }} onClick={() => page < totalPages && setPage((v) => v + 1)}> ›</span>
-          </span>
-          <span className="r">
-            <button type="button" className="btn" onClick={onClose}>취소</button>
-            <button type="button" className="btn rose" disabled={saving || selected.size === 0} onClick={confirmAction}>
-              {saving ? "처리중…" : mode === "rotate" ? `선택 상품 순환 담기${selected.size > 0 ? ` (${selected.size})` : ""}` : `선택 상품 고정${selected.size > 0 ? ` (${selected.size})` : ""}`}
+        {/* 탭 2개 */}
+        <div style={{ display: "flex", gap: "2px", padding: "0 18px", borderBottom: "1px solid #E8E2DD" }}>
+          {([["products", "상품"], ["history", "기록"]] as const).map(([k, l]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setTab(k)}
+              style={{ padding: "11px 16px", fontSize: "13px", fontWeight: 800, background: "none", border: "none", borderBottom: "2px solid " + (tab === k ? "#7B2D43" : "transparent"), color: tab === k ? "#7B2D43" : "#888", cursor: "pointer" }}
+            >
+              {l}
             </button>
-          </span>
+          ))}
         </div>
 
+        {tab === "history" ? (
+          <div style={{ padding: "70px 0", textAlign: "center", color: "#999", fontSize: "13px", fontWeight: 700 }}>기록 기능은 준비 중입니다.</div>
+        ) : (
+          <>
+            {/* 상단 버튼 3개 */}
+            <div style={{ display: "flex", gap: "6px", padding: "12px 18px 8px" }}>
+              <button type="button" onClick={openCreate} style={{ ...topBtn, background: "#7B2D43", color: "#fff", border: "none" }}>+ 상품 등록</button>
+              <button type="button" onClick={openWidgetSettings} style={{ ...topBtn, background: "#fff", color: "#555", border: "1px solid #E8E2DD" }}>📺 위젯 설정</button>
+              <button type="button" onClick={copyWidgetUrl} style={{ ...topBtn, background: copied ? "#E7F3EE" : "#fff", color: copied ? "#0F6E56" : "#555", border: "1px solid " + (copied ? "#0F6E56" : "#E8E2DD") }}>
+                {copied ? "복사됐어요!" : "🔗 위젯 주소 복사"}
+              </button>
+            </div>
+
+            {/* 검색 */}
+            <div style={{ padding: "0 18px 8px" }}>
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid #E8E2DD", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none" }} />
+            </div>
+
+            {/* 카테고리 칩 */}
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", padding: "0 18px 10px" }}>
+              {categories.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setCategory(c)}
+                  style={{ ...chipBase, background: category === c ? "#F5E6EB" : "#fff", color: category === c ? "#7B2D43" : "#888", borderColor: category === c ? "#D9C5CC" : "#E8E2DD" }}
+                >
+                  {c}
+                </button>
+              ))}
+              <button type="button" onClick={onAddCategory} style={{ ...chipBase, background: "#fff", color: "#999", borderStyle: "dashed" }}>+ 추가</button>
+            </div>
+
+            {/* 상품 목록 (무한스크롤) */}
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 18px 16px" }}>
+              {loading ? (
+                <div style={{ textAlign: "center", padding: "40px 0", color: "#999", fontSize: "13px", fontWeight: 700 }}>불러오는 중…</div>
+              ) : visible.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px 0", color: "#999", fontSize: "13px", fontWeight: 700 }}>상품이 없습니다.</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {visible.map((p) => {
+                    const id = productId(p);
+                    const img = mainImage(p);
+                    const state = widgetState(p);
+                    const busy = busyId === id;
+                    const widgetStyle: React.CSSProperties =
+                      state === "rotating"
+                        ? { background: "#F5E6EB", color: "#7B2D43", border: "1px solid #D9C5CC" }
+                        : state === "pinned"
+                          ? { background: "#E7F3EE", color: "#0F6E56", border: "1px solid #0F6E56" }
+                          : { background: "#7B2D43", color: "#fff", border: "none" };
+                    const widgetText = state === "rotating" ? "▶ 순환 해제" : state === "pinned" ? "📌 고정 해제" : "▶ 순환 추가";
+                    return (
+                      <div key={id || productName(p)} style={{ display: "flex", gap: "12px", alignItems: "center", border: "1px solid #E8E2DD", borderRadius: "12px", padding: "10px" }}>
+                        {/* 사진 88px 클릭 확대 */}
+                        <button
+                          type="button"
+                          onClick={() => img && setLightbox(img)}
+                          style={{ width: "88px", height: "88px", flexShrink: 0, borderRadius: "10px", overflow: "hidden", background: "#F5F2EF", border: "none", padding: 0, cursor: img ? "zoom-in" : "default", display: "flex", alignItems: "center", justifyContent: "center" }}
+                        >
+                          {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "26px" }}>🖼</span>}
+                        </button>
+
+                        {/* 정보 */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: "14px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
+                          <div style={{ marginTop: "3px", fontSize: "14px", fontWeight: 800, color: "#7B2D43" }}>{money(productPrice(p))}</div>
+                          <div style={{ marginTop: "5px", display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                            <span style={{ fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: "#F5E6EB", color: "#7B2D43" }}>{saleModeLabel(p)}</span>
+                            <span style={{ fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: "#E8F0FA", color: "#185FA5" }}>{shippingLabel(p)}</span>
+                            {productCategory(p) ? <span style={{ fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: "#F1EFEC", color: "#777" }}>{productCategory(p)}</span> : null}
+                          </div>
+                          {/* 원버튼 위젯 */}
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => onWidgetClick(p)}
+                            style={{ marginTop: "8px", height: "28px", borderRadius: "7px", padding: "0 12px", fontSize: "11px", fontWeight: 800, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.5 : 1, ...widgetStyle }}
+                          >
+                            {busy ? "처리중…" : widgetText}
+                          </button>
+                        </div>
+
+                        {/* 수정 / 삭제 */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: "5px", flexShrink: 0 }}>
+                          <button type="button" onClick={() => editProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "#185FA5", background: "#E8F0FA", border: "none", borderRadius: "6px", padding: "6px 11px", cursor: "pointer" }}>수정</button>
+                          <button type="button" onClick={() => void deleteProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "#C0392B", background: "#FBEAE7", border: "none", borderRadius: "6px", padding: "6px 11px", cursor: "pointer" }}>삭제</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {/* 무한스크롤 sentinel */}
+                  {visibleCount < filtered.length ? (
+                    <div ref={sentinelRef} style={{ height: "1px" }} />
+                  ) : (
+                    <div style={{ textAlign: "center", padding: "10px 0", fontSize: "11px", color: "#bbb" }}>총 {filtered.length}개</div>
+                  )}
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
+
+      {/* 사진 확대 lightbox */}
+      {lightbox ? (
+        <div
+          onClick={() => setLightbox("")}
+          style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}
+        >
+          <img src={lightbox} alt="" style={{ maxWidth: "92%", maxHeight: "92%", objectFit: "contain", borderRadius: "12px" }} onClick={(e) => e.stopPropagation()} />
+        </div>
+      ) : null}
     </div>,
     document.body,
   );
