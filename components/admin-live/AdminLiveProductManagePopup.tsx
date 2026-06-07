@@ -152,7 +152,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [histStats, setHistStats] = useState<Map<string, { sales: number; count: number }>>(new Map());
   const [histYear, setHistYear] = useState("전체");
   const [histMonth, setHistMonth] = useState("전체");
-  const [histSelectedId, setHistSelectedId] = useState("");
+  const [histMode, setHistMode] = useState<"all" | "broadcast" | "shop">("all");
+  const [histSearch, setHistSearch] = useState("");
+  const [histExpand, setHistExpand] = useState("");
+  const [histDetail, setHistDetail] = useState<Map<string, Array<{ key: string; name: string; productId: string; thumb: string; qty: number; price: number; sales: number; option: string }>>>(new Map());
+  const [histDetailLoading, setHistDetailLoading] = useState("");
 
   // 상품 fetch (기존 loadProducts 재사용)
   const loadProducts = async () => {
@@ -226,6 +230,16 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
           stats.set(bid, cur);
         });
       }
+      // 쇼핑몰(broadcast_id NULL) 주문 집계 → __shop__ 키
+      const { data: shopOrd } = await supabase.from("orders").select("total_price").is("broadcast_id", null);
+      let shopSales = 0;
+      let shopCount = 0;
+      ((shopOrd as Array<{ total_price: unknown }>) || []).forEach((o) => {
+        shopSales += Number(o.total_price || 0);
+        shopCount += 1;
+      });
+      if (shopCount > 0) stats.set("__shop__", { sales: shopSales, count: shopCount });
+
       setHistBroadcasts(broadcasts);
       setHistStats(stats);
       setHistLoaded(true);
@@ -251,25 +265,84 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     return [...set].sort((a, b) => Number(b) - Number(a));
   }, [histBroadcasts]);
 
+  // 방송 목록 + 쇼핑몰(__shop__) 가상행
+  const histEntries = useMemo(() => {
+    const entries: Array<{ id: string; title: string; started_at: string; ended_at: string }> = [...histBroadcasts];
+    if (histStats.has("__shop__")) entries.push({ id: "__shop__", title: "쇼핑몰 주문", started_at: "", ended_at: "" });
+    return entries;
+  }, [histBroadcasts, histStats]);
+
   const histFiltered = useMemo(() => {
-    return histBroadcasts.filter((b) => {
+    const q = histSearch.trim().toLowerCase();
+    return histEntries.filter((b) => {
+      const isShop = b.id === "__shop__";
+      if (histMode === "broadcast" && isShop) return false;
+      if (histMode === "shop" && !isShop) return false;
+      if (q && !b.title.toLowerCase().includes(q)) return false;
+      if (isShop) return true;
       const d = new Date(b.started_at);
       if (Number.isNaN(d.getTime())) return histYear === "전체" && histMonth === "전체";
       if (histYear !== "전체" && String(d.getFullYear()) !== histYear) return false;
       if (histMonth !== "전체" && String(d.getMonth() + 1) !== histMonth) return false;
       return true;
     });
-  }, [histBroadcasts, histYear, histMonth]);
+  }, [histEntries, histMode, histSearch, histYear, histMonth]);
 
   const histSummary = useMemo(() => {
     let sales = 0;
     let count = 0;
+    let broadcastCount = 0;
     histFiltered.forEach((b) => {
+      if (b.id !== "__shop__") broadcastCount += 1;
       const st = histStats.get(b.id);
       if (st) { sales += st.sales; count += st.count; }
     });
-    return { broadcastCount: histFiltered.length, sales, count };
+    return { broadcastCount, sales, count };
   }, [histFiltered, histStats]);
+
+  // 행 펼침 → 상품별 집계 (orders + products 썸네일). broadcast_id NULL이면 쇼핑몰.
+  const loadBroadcastDetail = async (entryId: string) => {
+    if (histDetail.has(entryId)) {
+      setHistExpand((cur) => (cur === entryId ? "" : entryId));
+      return;
+    }
+    setHistDetailLoading(entryId);
+    setHistExpand(entryId);
+    try {
+      let q = supabase.from("orders").select("product_id, product_name, color, size, qty, product_price");
+      q = entryId === "__shop__" ? q.is("broadcast_id", null) : q.eq("broadcast_id", entryId);
+      const { data: ord } = await q;
+      const map = new Map<string, { key: string; name: string; productId: string; thumb: string; qty: number; price: number; sales: number; opts: Map<string, number> }>();
+      ((ord as Array<Record<string, unknown>>) || []).forEach((o) => {
+        const pid = o.product_id ? String(o.product_id) : "";
+        const key = pid || String(o.product_name || "상품");
+        const cur = map.get(key) || { key, name: String(o.product_name || "상품"), productId: pid, thumb: "", qty: 0, price: Number(o.product_price || 0), sales: 0, opts: new Map<string, number>() };
+        const qty = Number(o.qty || 0);
+        cur.qty += qty;
+        cur.price = Number(o.product_price || 0);
+        cur.sales += Number(o.product_price || 0) * qty;
+        const opt = [o.color, o.size].filter(Boolean).join("/");
+        if (opt) cur.opts.set(opt, (cur.opts.get(opt) || 0) + qty);
+        map.set(key, cur);
+      });
+      const rows = [...map.values()];
+      const pids = rows.map((r) => r.productId).filter(Boolean);
+      if (pids.length > 0) {
+        const { data: prods } = await supabase.from("products").select("*").in("id", pids);
+        const thumbs = new Map<string, string>();
+        ((prods as ProductRow[]) || []).forEach((p) => { thumbs.set(String((p as { id?: unknown }).id), mainImage(p)); });
+        rows.forEach((r) => { r.thumb = thumbs.get(r.productId) || ""; });
+      }
+      const detailRows = rows
+        .sort((a, b) => b.sales - a.sales)
+        .map((r) => ({ key: r.key, name: r.name, productId: r.productId, thumb: r.thumb, qty: r.qty, price: r.price, sales: r.sales, option: [...r.opts.keys()].join(" · ") }));
+      setHistDetail((prev) => new Map(prev).set(entryId, detailRows));
+    } catch (e) {
+      showAdminToast("상세 불러오기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally {
+      setHistDetailLoading("");
+    }
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -539,8 +612,13 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               ))}
             </div>
 
-            {/* 년/월 드롭다운 */}
+            {/* 필터: 모드 + 년/월 */}
             <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
+              <select value={histMode} onChange={(e) => setHistMode(e.target.value as "all" | "broadcast" | "shop")} style={{ height: "34px", borderRadius: "8px", border: "1px solid #E8E2DD", padding: "0 10px", fontSize: "13px", background: "#fff", cursor: "pointer" }}>
+                <option value="all">전체</option>
+                <option value="broadcast">방송모드</option>
+                <option value="shop">쇼핑몰모드</option>
+              </select>
               <select value={histYear} onChange={(e) => setHistYear(e.target.value)} style={{ height: "34px", borderRadius: "8px", border: "1px solid #E8E2DD", padding: "0 10px", fontSize: "13px", background: "#fff", cursor: "pointer" }}>
                 <option value="전체">전체 연도</option>
                 {histYearOptions.map((y) => <option key={y} value={y}>{y}년</option>)}
@@ -549,27 +627,29 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 <option value="전체">전체 월</option>
                 {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((m) => <option key={m} value={m}>{m}월</option>)}
               </select>
+              <input value={histSearch} onChange={(e) => setHistSearch(e.target.value)} placeholder="🔍 방송명 검색" style={{ flex: 1, minWidth: "120px", height: "34px", borderRadius: "8px", border: "1px solid #E8E2DD", padding: "0 10px", fontSize: "13px", outline: "none" }} />
             </div>
 
-            {/* 방송 목록 */}
+            {/* 방송/쇼핑몰 목록 */}
             {histLoading ? (
               <div style={{ textAlign: "center", padding: "40px 0", color: "#999", fontSize: "13px", fontWeight: 700 }}>불러오는 중…</div>
             ) : histFiltered.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "40px 0", color: "#999", fontSize: "13px", fontWeight: 700 }}>방송 기록이 없습니다.</div>
+              <div style={{ textAlign: "center", padding: "40px 0", color: "#999", fontSize: "13px", fontWeight: 700 }}>기록이 없습니다.</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {histFiltered.map((b) => {
+                  const isShop = b.id === "__shop__";
                   const st = histStats.get(b.id) || { sales: 0, count: 0 };
-                  const sel = histSelectedId === b.id;
+                  const expanded = histExpand === b.id;
                   const d = new Date(b.started_at);
-                  const dateLabel = Number.isNaN(d.getTime()) ? "-" : `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+                  const dateLabel = isShop ? "상시 판매" : Number.isNaN(d.getTime()) ? "-" : `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+                  const detail = histDetail.get(b.id);
+                  const detailSubtotal = (detail || []).reduce((acc, r) => ({ sales: acc.sales + r.sales, qty: acc.qty + r.qty }), { sales: 0, qty: 0 });
                   return (
-                    <div
-                      key={b.id}
-                      onClick={() => setHistSelectedId(sel ? "" : b.id)}
-                      style={{ border: "1px solid " + (sel ? "#D9C5CC" : "#E8E2DD"), background: sel ? "#F5E6EB" : "#fff", borderRadius: "10px", padding: "11px 13px", cursor: "pointer" }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <div key={b.id} style={{ border: "1px solid " + (expanded ? "#D9C5CC" : "#E8E2DD"), borderRadius: "10px", overflow: "hidden", background: "#fff" }}>
+                      {/* 헤더 행 */}
+                      <div onClick={() => void loadBroadcastDetail(b.id)} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "11px 13px", cursor: "pointer", background: expanded ? "#F5E6EB" : "#fff" }}>
+                        <span style={{ flexShrink: 0, fontSize: "10px", fontWeight: 800, padding: "3px 8px", borderRadius: "6px", background: isShop ? "#E7F3EE" : "#FBF1E0", color: isShop ? "#0F6E56" : "#854F0B" }}>{isShop ? "🛍 쇼핑몰" : "📺 방송"}</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: "13px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</div>
                           <div style={{ fontSize: "11px", color: "#888780", marginTop: "2px" }}>{dateLabel}</div>
@@ -578,7 +658,49 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           <div style={{ fontSize: "13px", fontWeight: 800, color: "#7B2D43" }}>{money(st.sales)}</div>
                           <div style={{ fontSize: "11px", color: "#888780", marginTop: "2px" }}>주문 {st.count.toLocaleString("ko-KR")}건</div>
                         </div>
+                        <span style={{ flexShrink: 0, color: "#888780", fontSize: "12px" }}>{expanded ? "▴" : "▾"}</span>
                       </div>
+
+                      {/* 펼침: 상품별 상세 */}
+                      {expanded ? (
+                        <div style={{ borderTop: "1px solid #E8E2DD", padding: "10px 13px", background: "#F7F5F3" }}>
+                          {histDetailLoading === b.id && !detail ? (
+                            <div style={{ textAlign: "center", padding: "16px 0", color: "#999", fontSize: "12px", fontWeight: 700 }}>불러오는 중…</div>
+                          ) : !detail || detail.length === 0 ? (
+                            <div style={{ textAlign: "center", padding: "16px 0", color: "#999", fontSize: "12px", fontWeight: 700 }}>주문이 없습니다.</div>
+                          ) : (
+                            <>
+                              {/* 펼침 헤더: 빈칸 / 상품명·옵션 / 수량 / 단가 / 매출 */}
+                              <div style={{ display: "grid", gridTemplateColumns: "32px 1fr 44px 72px 84px", gap: "8px", alignItems: "center", padding: "0 0 6px", fontSize: "10px", fontWeight: 700, color: "#888780", borderBottom: "1px solid #E8E2DD" }}>
+                                <span />
+                                <span>상품명·옵션</span>
+                                <span style={{ textAlign: "right" }}>수량</span>
+                                <span style={{ textAlign: "right" }}>단가</span>
+                                <span style={{ textAlign: "right" }}>매출</span>
+                              </div>
+                              {detail.map((r) => (
+                                <div key={r.key} style={{ display: "grid", gridTemplateColumns: "32px 1fr 44px 72px 84px", gap: "8px", alignItems: "center", padding: "7px 0", borderBottom: "1px solid #E8E2DD" }}>
+                                  <span style={{ width: "32px", height: "32px", flexShrink: 0, borderRadius: "6px", overflow: "hidden", background: "#fff", border: "1px solid #E8E2DD", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                    {r.thumb ? <img src={r.thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "14px" }}>🖼</span>}
+                                  </span>
+                                  <div style={{ minWidth: 0 }}>
+                                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
+                                    {r.option ? <div style={{ fontSize: "11px", color: "#888780", marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.option}</div> : null}
+                                  </div>
+                                  <div style={{ textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#222" }}>{r.qty.toLocaleString("ko-KR")}개</div>
+                                  <div style={{ textAlign: "right", fontSize: "11px", color: "#888780" }}>{money(r.price)}</div>
+                                  <div style={{ textAlign: "right", fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>{money(r.sales)}</div>
+                                </div>
+                              ))}
+                              {/* 상품 소계 (N종) */}
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "8px", fontSize: "12px", fontWeight: 800 }}>
+                                <span style={{ color: "#222" }}>상품 소계 ({detail.length}종)</span>
+                                <span style={{ color: "#7B2D43" }}>{money(detailSubtotal.sales)}</span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ) : null}
                     </div>
                   );
                 })}
