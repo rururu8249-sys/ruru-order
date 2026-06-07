@@ -537,6 +537,7 @@ export default function AdminLiveDashboard() {
   const [selectedOrderId, setSelectedOrderId] = useState<string>("");
   const [orderDetailOpen, setOrderDetailOpen] = useState(false);
   const [matchPanelOpen, setMatchPanelOpen] = useState(false);
+  const [externalMatchOrderId, setExternalMatchOrderId] = useState("");
   const [videoRatio, setVideoRatio] = useState<VideoRatio>("vertical");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -876,15 +877,11 @@ export default function AdminLiveDashboard() {
   };
 
   const openManualMatchForOrder = (order: LiveOrder) => {
-    const group = orderGroups.find((item) => item.groupId === order.groupId) || null;
-
-    if (!group) {
-      showAdminToast("수동매칭할 주문그룹을 찾지 못했습니다. 새로고침 후 다시 시도해주세요.", "warning");
-      return;
-    }
-
+    // 옛 admin-v2 드로어 대신 해당 주문의 인라인 매칭 패널을 연다.
+    // (입금내역 패널은 setManualMatchGroup 직접 호출로 ManualPaymentMatchDrawer 유지)
     setOrderDetailOpen(false);
-    setManualMatchGroup(group);
+    setMatchPanelOpen(false);
+    setExternalMatchOrderId(order.id);
   };
 
   const refreshAfterManualMatch = async () => {
@@ -1233,6 +1230,7 @@ export default function AdminLiveDashboard() {
                   onOpenCardPay={setCardPayOrder}
                   deposits={deposits}
                   onMatched={refreshAfterManualMatch}
+                  externalMatchOpenOrderId={externalMatchOrderId}
                 />
               </div>
 

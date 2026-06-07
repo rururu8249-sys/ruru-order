@@ -362,6 +362,7 @@ type Props = {
   broadcastStartedAt?: string | null;
   deposits?: readonly any[];
   onMatched?: () => void | Promise<void>;
+  externalMatchOpenOrderId?: string;
 };
 
 
@@ -382,6 +383,7 @@ export default function LiveOrderTable({
   broadcastStartedAt,
   deposits,
   onMatched,
+  externalMatchOpenOrderId,
 }: Props) {
   const [page, setPage] = useState(1);
   const [pendingKeyword, setPendingKeyword] = useState(filters.keyword);
@@ -391,6 +393,15 @@ export default function LiveOrderTable({
   const [selectedDepositId, setSelectedDepositId] = useState("");
   const [matchSaving, setMatchSaving] = useState(false);
   const [matchSearch, setMatchSearch] = useState("");
+
+  // 외부(Dashboard "입금 매칭에서 찾기")에서 특정 주문의 인라인 매칭 패널을 연다
+  useEffect(() => {
+    if (externalMatchOpenOrderId) {
+      setMatchOpenOrderId(externalMatchOpenOrderId);
+      setSelectedDepositId("");
+      setMatchSearch("");
+    }
+  }, [externalMatchOpenOrderId]);
   const [dropHoverOrderId, setDropHoverOrderId] = useState("");
 
   // 플로팅 패널에서 드래그한 입금을 주문 행에 드롭 → 기존 confirmWithDeposit 재사용
