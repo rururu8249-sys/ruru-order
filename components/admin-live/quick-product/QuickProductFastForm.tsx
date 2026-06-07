@@ -326,7 +326,6 @@ function ImagePicker({
     };
   }, [triggerRef]);
   const [uploading, setUploading] = useState(false);
-  const [showAllDetailImages, setShowAllDetailImages] = useState(false);
 
   const uploadFiles = async (files: FileList | File[]) => {
     const safeFiles = Array.from(files).filter((file) => file.type.startsWith("image/"));
@@ -393,17 +392,17 @@ function ImagePicker({
     onChange(value.filter((_, removeIndex) => removeIndex !== index));
   };
 
-  const visibleDetailCount = showAllDetailImages ? maxFiles : Math.min(2, maxFiles);
-  const detailSlots = Array.from({ length: visibleDetailCount }, (_, index) => value[index] || "");
   const coverImage = value[0] || "";
 
   if (mode === "cover") {
     return (
       <div className="min-w-0">
-        <div className="mb-1 flex items-center justify-between">
-          <span className="text-[11px] font-black text-slate-700">{label}</span>
-          <span className="text-[10px] font-black text-slate-400">{value.length}/{maxFiles}</span>
-        </div>
+        {label ? (
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-[11px] font-black text-slate-700">{label}</span>
+            <span className="text-[10px] font-black text-slate-400">{value.length}/{maxFiles}</span>
+          </div>
+        ) : null}
 
         <input
           ref={inputRef}
@@ -413,22 +412,22 @@ function ImagePicker({
           onChange={handleFileChange}
         />
 
-        <div className="relative">
+        {/* 목업 .photo-box : 120×120 정사각형 */}
+        <div style={{ position: "relative", width: "120px", height: "120px" }}>
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
             onDragOver={(event) => event.preventDefault()}
             onDrop={handleDrop}
-            className="flex h-[150px] w-full items-center justify-center overflow-hidden rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-xs font-black text-slate-400 hover:border-rose-line"
+            style={{ width: "120px", height: "120px", border: coverImage ? "1px solid #E8E2DD" : "1.5px dashed #E8E2DD", borderRadius: "8px", background: "#F7F5F3", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px", cursor: "pointer", overflow: "hidden", color: "#888780", fontSize: "11px", textAlign: "center", padding: 0 }}
           >
             {coverImage ? (
-              <img
-                src={resolveProductImageUrl(coverImage)}
-                alt=""
-                className="h-full w-full object-cover"
-              />
+              <img src={resolveProductImageUrl(coverImage)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
-              <span>{uploading ? "업로드 중..." : "클릭/드래그"}</span>
+              <>
+                <span style={{ fontSize: "28px" }}>📷</span>
+                <span style={{ lineHeight: 1.3 }}>{uploading ? "업로드 중..." : <>클릭 또는<br />드래그</>}</span>
+              </>
             )}
           </button>
 
@@ -436,7 +435,7 @@ function ImagePicker({
             <button
               type="button"
               onClick={() => onChange([])}
-              className="absolute right-2 top-2 rounded-full bg-slate-950/75 px-2 py-1 text-[10px] font-black text-white"
+              style={{ position: "absolute", right: "6px", top: "6px", borderRadius: "9999px", background: "rgba(0,0,0,0.55)", color: "#fff", fontSize: "10px", fontWeight: 700, padding: "2px 7px", border: "none", cursor: "pointer" }}
             >
               삭제
             </button>
@@ -448,10 +447,9 @@ function ImagePicker({
 
   return (
     <div className="min-w-0">
-      <div className="mb-1 flex items-center justify-between">
-        <span className="text-[11px] font-black text-slate-700">{label}</span>
-        <span className="text-[10px] font-black text-slate-400">{value.length}/{maxFiles}</span>
-      </div>
+      {label ? (
+        <div style={{ fontSize: "12px", fontWeight: 500, color: "#888780", marginBottom: "6px" }}>{label}</div>
+      ) : null}
 
       <input
         ref={inputRef}
@@ -462,51 +460,45 @@ function ImagePicker({
         onChange={handleFileChange}
       />
 
-      <div className="grid grid-cols-3 gap-2">
-        {detailSlots.map((image, index) => (
-          <div key={`${image || "empty"}-${index}`} className="relative">
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={handleDrop}
-              className="flex h-[64px] w-full items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-200 bg-slate-50 text-[10px] font-black text-slate-400 hover:border-rose-line"
-            >
-              {image ? (
-                <img
-                  src={resolveProductImageUrl(image)}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-              ) : index === value.length ? (
-                <span>{uploading ? "업로드" : "+ 추가"}</span>
-              ) : (
-                <span>사진 없음</span>
-              )}
-            </button>
-
-            {image ? (
+      {/* 목업 .detail-photos : 5칸 그리드 */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "6px" }}>
+        {Array.from({ length: maxFiles }, (_, index) => {
+          const image = value[index] || "";
+          const isAddSlot = index === value.length;
+          return (
+            <div key={`${image || "empty"}-${index}`} style={{ position: "relative", aspectRatio: "1" }}>
               <button
                 type="button"
-                onClick={() => removeImage(index)}
-                className="absolute right-1 top-1 rounded-full bg-slate-950/75 px-1.5 py-0.5 text-[9px] font-black text-white"
+                onClick={() => inputRef.current?.click()}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={handleDrop}
+                style={{ width: "100%", height: "100%", borderRadius: "8px", border: image ? "1px solid #E8E2DD" : "1px dashed #E8E2DD", background: "#F7F5F3", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", fontSize: "10px", color: "#888780", cursor: "pointer", overflow: "hidden", padding: 0 }}
               >
-                ×
+                {image ? (
+                  <img src={resolveProductImageUrl(image)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "8px" }} />
+                ) : isAddSlot ? (
+                  <>
+                    <span style={{ fontSize: "20px" }}>＋</span>
+                    <span>{uploading ? "업로드" : "추가"}</span>
+                  </>
+                ) : (
+                  <span style={{ opacity: 0.5 }}>사진 없음</span>
+                )}
               </button>
-            ) : null}
-          </div>
-        ))}
 
-        {!showAllDetailImages && maxFiles > 2 ? (
-          <button
-            type="button"
-            onClick={() => setShowAllDetailImages(true)}
-            className="flex h-[64px] items-center justify-center rounded-xl border border-dashed border-rose-line bg-rose-soft text-[11px] font-black text-rose-deep"
-          >
-            +{maxFiles - 2}장 더
-          </button>
-        ) : null}
+              {image ? (
+                <div
+                  onClick={() => removeImage(index)}
+                  style={{ position: "absolute", top: "3px", right: "3px", width: "16px", height: "16px", background: "rgba(0,0,0,0.5)", color: "#fff", borderRadius: "50%", fontSize: "10px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+                >
+                  ×
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
+      <div style={{ fontSize: "11px", color: "#888780", textAlign: "right", marginTop: "4px" }}>{value.length} / {maxFiles}</div>
     </div>
   );
 }
