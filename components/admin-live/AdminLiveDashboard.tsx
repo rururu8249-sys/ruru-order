@@ -881,7 +881,8 @@ export default function AdminLiveDashboard() {
     // (입금내역 패널은 setManualMatchGroup 직접 호출로 ManualPaymentMatchDrawer 유지)
     setOrderDetailOpen(false);
     setMatchPanelOpen(false);
-    setExternalMatchOrderId(order.id);
+    // nonce(#timestamp)로 같은 주문 연속 클릭 시에도 prop 값이 바뀌어 effect 재발화되게 한다
+    setExternalMatchOrderId(`${order.id}#${Date.now()}`);
   };
 
   const refreshAfterManualMatch = async () => {

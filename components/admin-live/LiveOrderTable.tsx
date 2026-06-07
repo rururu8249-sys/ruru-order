@@ -394,10 +394,13 @@ export default function LiveOrderTable({
   const [matchSaving, setMatchSaving] = useState(false);
   const [matchSearch, setMatchSearch] = useState("");
 
-  // 외부(Dashboard "입금 매칭에서 찾기")에서 특정 주문의 인라인 매칭 패널을 연다
+  // 외부(Dashboard "입금 매칭에서 찾기")에서 특정 주문의 인라인 매칭 패널을 연다.
+  // 값은 "order.id#nonce" 형태 → nonce 떼고 order.id만 사용(같은 주문 연속 클릭에도 재발화).
   useEffect(() => {
-    if (externalMatchOpenOrderId) {
-      setMatchOpenOrderId(externalMatchOpenOrderId);
+    if (!externalMatchOpenOrderId) return;
+    const id = externalMatchOpenOrderId.split("#")[0];
+    if (id) {
+      setMatchOpenOrderId(id);
       setSelectedDepositId("");
       setMatchSearch("");
     }
