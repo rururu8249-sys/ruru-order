@@ -524,8 +524,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           </button>
                         </div>
 
-                        {/* 수정 / 삭제 */}
-                        <div style={{ display: "flex", flexDirection: "column", gap: "5px", flexShrink: 0 }}>
+                        {/* 수정 / 삭제 — 오른쪽 끝 나란히 */}
+                        <div style={{ display: "flex", flexDirection: "row", gap: "5px", flexShrink: 0, alignSelf: "flex-start" }}>
                           <button type="button" onClick={() => editProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "#185FA5", background: "#E8F0FA", border: "none", borderRadius: "6px", padding: "6px 11px", cursor: "pointer" }}>수정</button>
                           <button type="button" onClick={() => void deleteProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "#C0392B", background: "#FBEAE7", border: "none", borderRadius: "6px", padding: "6px 11px", cursor: "pointer" }}>삭제</button>
                         </div>
