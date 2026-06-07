@@ -540,7 +540,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   };
 
   const openWidgetSettings = () => {
-    setWsSelected(new Set());
+    // 고정 상품 있으면 고정모드 자동 진입(+초기선택), 없으면 순환모드
+    const hasPinned = products.some((p) => pickBoolean(p, ["is_pinned", "pinned"], false));
+    wsSetMode(hasPinned ? "pin" : "rotate");
     setWidgetSettingsOpen(true);
   };
 
@@ -896,10 +898,10 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               {wsMode === "rotate" ? "선택 상품을 방송 순환목록에 담습니다." : "선택 상품을 지금 띄운 상품으로 고정합니다."}
             </div>
 
-            {/* 전체선택 */}
+            {/* 전체선택 (고정모드는 단일 선택이라 비활성) */}
             <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 18px", borderTop: "1px solid #F0EDEA", borderBottom: "1px solid #F0EDEA" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: 800, color: "#555", cursor: "pointer" }}>
-                <input type="checkbox" checked={wsAllChecked} onChange={wsToggleAll} />
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: 800, color: wsMode === "pin" ? "#bbb" : "#555", cursor: wsMode === "pin" ? "default" : "pointer" }}>
+                <input type="checkbox" checked={wsMode === "pin" ? false : wsAllChecked} disabled={wsMode === "pin"} onChange={wsToggleAll} />
                 전체선택
               </label>
               <span style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#7B2D43" }}>✓ {wsSelected.size}개 선택</span>
@@ -911,7 +913,13 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 <div style={{ textAlign: "center", padding: "30px 0", color: "#999", fontSize: "13px", fontWeight: 700 }}>상품이 없습니다.</div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-                  {products.map((p) => {
+                  {[...products]
+                    .sort(
+                      (a, b) =>
+                        (pickBoolean(a, ["is_pinned", "pinned"], false) ? 0 : 1) -
+                        (pickBoolean(b, ["is_pinned", "pinned"], false) ? 0 : 1),
+                    )
+                    .map((p) => {
                     const id = productId(p);
                     const img = mainImage(p);
                     const checked = wsSelected.has(id);
