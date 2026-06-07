@@ -357,7 +357,7 @@ export default function ManualPaymentMatchDrawer(props: Props) {
                   setShowAll(false);
                 }}
                 placeholder="입금자명 또는 금액 검색"
-                className="h-10 rounded-xl border border-slate-200 px-3 text-sm font-black outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
+                className="h-10 rounded-xl border border-slate-200 px-3 text-sm font-black outline-none focus:border-rose-deep focus:ring-4 focus:ring-rose-soft"
               />
 
               <button
@@ -375,7 +375,7 @@ export default function ManualPaymentMatchDrawer(props: Props) {
                 type="button"
                 onClick={loadDeposits}
                 disabled={loading}
-                className="h-10 rounded-xl bg-blue-600 text-xs font-black text-white active:scale-[0.98] disabled:bg-slate-300"
+                className="h-10 rounded-xl bg-rose-deep text-xs font-black text-white active:scale-[0.98] disabled:bg-slate-300"
               >
                 {loading ? "로딩중" : "새로고침"}
               </button>
