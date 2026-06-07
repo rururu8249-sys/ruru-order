@@ -156,29 +156,36 @@ function renderOrderSummary(order: LiveOrder) {
 }
 
 function statusBadge(order: LiveOrder) {
-  if (order.paymentStatus === "canceled") {
-    return <span className="rounded-lg bg-red-100 px-2 py-1 text-xs font-black text-red-700">주문서취소</span>;
-  }
+  // 시안 ① 팔레트(딥로즈 테마): 입금확인=green / 매칭필요=amber / 대기·미결제=red / 취소=muted / 카드완료=blue
+  const base = { borderRadius: "8px", padding: "3px 9px", fontSize: "11px", fontWeight: 800, display: "inline-block" } as const;
+  const green = { background: "#E7F3EE", color: "#0F6E56" };
+  const amber = { background: "#FBF1E0", color: "#854F0B" };
+  const red = { background: "#FBEAE7", color: "#C0392B" };
+  const blue = { background: "#E8F0FA", color: "#185FA5" };
+  const muted = { background: "#F1EFEC", color: "#777" };
 
+  if (order.paymentStatus === "canceled") {
+    return <span style={{ ...base, ...muted }}>주문서취소</span>;
+  }
   if (order.paymentStatus === "manual_match_needed") {
-    return <span className="rounded-lg bg-orange-100 px-2 py-1 text-xs font-black text-orange-700">매칭필요</span>;
+    return <span style={{ ...base, ...amber }}>매칭필요</span>;
   }
   if (order.paymentStatus === "card_unpaid") {
-    return <span className="rounded-lg bg-red-100 px-2 py-1 text-xs font-black text-red-700">카드미결제</span>;
+    return <span style={{ ...base, ...red }}>카드미결제</span>;
   }
   if (order.paymentStatus === "unpaid") {
-    return <span className="rounded-lg bg-red-100 px-2 py-1 text-xs font-black text-red-700">입금대기</span>;
+    return <span style={{ ...base, ...red }}>입금대기</span>;
   }
   if (order.paymentStatus === "card_paid") {
-    return <span className="rounded-lg bg-violet-100 px-2 py-1 text-xs font-black text-violet-700">카드결제완료</span>;
+    return <span style={{ ...base, ...blue }}>카드결제완료</span>;
   }
   if (order.paymentStatus === "auto_paid") {
-    return <span className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-700">자동입금확인</span>;
+    return <span style={{ ...base, ...green }}>자동입금확인</span>;
   }
   if (order.paymentStatus === "manual_paid") {
-    return <span className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-700">수동입금확인</span>;
+    return <span style={{ ...base, ...green }}>수동입금확인</span>;
   }
-  return <span className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-700">입금확인</span>;
+  return <span style={{ ...base, ...green }}>입금확인</span>;
 }
 
 function testOrderBadge(order: LiveOrder) {
