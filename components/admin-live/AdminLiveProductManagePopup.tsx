@@ -351,29 +351,23 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       const rows = [...map.values()];
       const pids = rows.map((r) => r.productId).filter(Boolean);
       if (pids.length > 0) {
-        // image_url 명시 포함 (썸네일용)
-        const { data: prods } = await supabase
-          .from("products")
-          .select("id, image_url, cover_image_url, main_image_url, thumbnail_url, images, image_urls, detail_image_urls")
-          .in("id", pids);
+        const { data: prods } = await supabase.from("products").select("id, image_url").in("id", pids);
         const thumbs = new Map<string, string>();
         ((prods as ProductRow[]) || []).forEach((p) => {
-          const url = pickString(p, ["image_url", "cover_image_url", "main_image_url", "thumbnail_url"], "");
-          thumbs.set(String((p as { id?: unknown }).id), url ? resolveProductImageUrl(url) : mainImage(p));
+          const url = String((p as { image_url?: unknown }).image_url || "");
+          if (url) thumbs.set(String((p as { id?: unknown }).id), resolveProductImageUrl(url));
         });
         rows.forEach((r) => { r.thumb = thumbs.get(r.productId) || ""; });
       }
       // product_id로 못 찾은 행(또는 product_id 없는 행) → products 전체 조회 후 product_name 클라이언트 매칭
       const nameRows = rows.filter((r) => !r.thumb && r.name);
       if (nameRows.length > 0) {
-        const { data: allProds } = await supabase
-          .from("products")
-          .select("id, product_name, image_url, cover_image_url, main_image_url");
+        const { data: allProds } = await supabase.from("products").select("id, product_name, image_url");
         const nameThumbs = new Map<string, string>();
         ((allProds as ProductRow[]) || []).forEach((p) => {
           const nm = String((p as { product_name?: unknown }).product_name || "").toLowerCase().trim();
           if (!nm || nameThumbs.has(nm)) return;
-          const url = pickString(p, ["image_url", "cover_image_url", "main_image_url"], "");
+          const url = String((p as { image_url?: unknown }).image_url || "");
           if (url) nameThumbs.set(nm, resolveProductImageUrl(url));
         });
         nameRows.forEach((r) => {
@@ -394,12 +388,17 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return products.filter((p) => {
+    const list = products.filter((p) => {
       if (pickString(p, ["status", "product_status"], "") === "deleted") return false;
       if (category !== "전체" && productCategory(p) !== category) return false;
       if (q && !productName(p).toLowerCase().includes(q)) return false;
       return true;
     });
+    // 고정(is_pinned) 상품을 항상 최상단으로 (안정 정렬)
+    return list
+      .map((p, i) => ({ p, i, pinned: pickBoolean(p, ["is_pinned", "pinned"], false) }))
+      .sort((a, b) => (a.pinned === b.pinned ? a.i - b.i : a.pinned ? -1 : 1))
+      .map((x) => x.p);
   }, [products, search, category]);
 
   const visible = filtered.slice(0, visibleCount);
@@ -679,20 +678,20 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
             {/* 필터: 모드 + 년/월 */}
             <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
-              <select value={histMode} onChange={(e) => setHistMode(e.target.value as "all" | "broadcast" | "shop")} style={{ height: "34px", borderRadius: "8px", border: "1px solid #E8E2DD", padding: "0 10px", fontSize: "13px", background: "#fff", cursor: "pointer" }}>
+              <select value={histMode} onChange={(e) => setHistMode(e.target.value as "all" | "broadcast" | "shop")} style={{ height: "34px", borderRadius: "8px", border: "1px solid #E8E2DD", padding: "0 10px", fontSize: "13px", background: "#fff", cursor: "pointer", color: "#1a1a1a" }}>
                 <option value="all">전체</option>
                 <option value="broadcast">방송모드</option>
                 <option value="shop">쇼핑몰모드</option>
               </select>
-              <select value={histYear} onChange={(e) => setHistYear(e.target.value)} style={{ height: "34px", borderRadius: "8px", border: "1px solid #E8E2DD", padding: "0 10px", fontSize: "13px", background: "#fff", cursor: "pointer" }}>
+              <select value={histYear} onChange={(e) => setHistYear(e.target.value)} style={{ height: "34px", borderRadius: "8px", border: "1px solid #E8E2DD", padding: "0 10px", fontSize: "13px", background: "#fff", cursor: "pointer", color: "#1a1a1a" }}>
                 <option value="전체">전체 연도</option>
                 {histYearOptions.map((y) => <option key={y} value={y}>{y}년</option>)}
               </select>
-              <select value={histMonth} onChange={(e) => setHistMonth(e.target.value)} style={{ height: "34px", borderRadius: "8px", border: "1px solid #E8E2DD", padding: "0 10px", fontSize: "13px", background: "#fff", cursor: "pointer" }}>
+              <select value={histMonth} onChange={(e) => setHistMonth(e.target.value)} style={{ height: "34px", borderRadius: "8px", border: "1px solid #E8E2DD", padding: "0 10px", fontSize: "13px", background: "#fff", cursor: "pointer", color: "#1a1a1a" }}>
                 <option value="전체">전체 월</option>
                 {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((m) => <option key={m} value={m}>{m}월</option>)}
               </select>
-              <input value={histSearch} onChange={(e) => setHistSearch(e.target.value)} placeholder="🔍 방송명 검색" style={{ flex: 1, minWidth: "120px", height: "34px", borderRadius: "8px", border: "1px solid #E8E2DD", padding: "0 10px", fontSize: "13px", outline: "none" }} />
+              <input value={histSearch} onChange={(e) => setHistSearch(e.target.value)} placeholder="🔍 방송명 검색" style={{ flex: 1, minWidth: "120px", height: "34px", borderRadius: "8px", border: "1px solid #E8E2DD", padding: "0 10px", fontSize: "13px", outline: "none", color: "#1a1a1a" }} />
             </div>
 
             {/* 방송/쇼핑몰 목록 */}
@@ -777,18 +776,15 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
           </div>
         ) : (
           <>
-            {/* 상단 버튼 3개 */}
+            {/* 상단 버튼 2개 (위젯 주소 복사는 위젯 설정 모달로 이동) */}
             <div style={{ display: "flex", gap: "6px", padding: "12px 18px 8px" }}>
               <button type="button" onClick={openCreate} style={{ ...topBtn, background: "#7B2D43", color: "#fff", border: "none" }}>+ 상품 등록</button>
               <button type="button" onClick={openWidgetSettings} style={{ ...topBtn, background: "#fff", color: "#555", border: "1px solid #E8E2DD" }}>📺 위젯 설정</button>
-              <button type="button" onClick={copyWidgetUrl} style={{ ...topBtn, background: copied ? "#E7F3EE" : "#fff", color: copied ? "#0F6E56" : "#555", border: "1px solid " + (copied ? "#0F6E56" : "#E8E2DD") }}>
-                {copied ? "복사됐어요!" : "🔗 위젯 주소 복사"}
-              </button>
             </div>
 
             {/* 검색 */}
             <div style={{ padding: "0 18px 8px" }}>
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid #E8E2DD", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none" }} />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid #E8E2DD", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none", color: "#1a1a1a" }} />
             </div>
 
             {/* 카테고리 칩 */}
@@ -806,7 +802,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             </div>
 
             {/* 상품 목록 (무한스크롤) */}
-            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 18px 16px" }}>
+            <div style={{ flex: 1, minHeight: "400px", overflowY: "auto", padding: "0 18px 16px" }}>
               {loading ? (
                 <div style={{ textAlign: "center", padding: "40px 0", color: "#999", fontSize: "13px", fontWeight: 700 }}>불러오는 중…</div>
               ) : visible.length === 0 ? (
@@ -938,6 +934,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             {/* 푸터 */}
             <div style={{ display: "flex", gap: "6px", padding: "12px 18px", borderTop: "1px solid #E8E2DD" }}>
               <button type="button" onClick={() => setWidgetSettingsOpen(false)} style={{ height: "38px", padding: "0 16px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid #E8E2DD", background: "#fff", color: "#666" }}>취소</button>
+              <button type="button" onClick={copyWidgetUrl} style={{ height: "38px", padding: "0 14px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (copied ? "#0F6E56" : "#E8E2DD"), background: copied ? "#E7F3EE" : "#fff", color: copied ? "#0F6E56" : "#555", whiteSpace: "nowrap" }}>
+                {copied ? "복사됐어요!" : "🔗 위젯 주소 복사"}
+              </button>
               <button type="button" disabled={wsSaving || wsSelected.size === 0} onClick={wsConfirm} style={{ flex: 1, height: "38px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: wsSaving || wsSelected.size === 0 ? "default" : "pointer", border: "none", background: wsSaving || wsSelected.size === 0 ? "#D9C5CC" : "#7B2D43", color: "#fff" }}>
                 {wsSaving ? "처리중…" : wsMode === "rotate" ? `선택 ${wsSelected.size}개 순환 담기` : `선택 ${wsSelected.size}개 고정`}
               </button>
