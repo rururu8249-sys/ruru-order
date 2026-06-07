@@ -913,51 +913,13 @@ export default function QuickProductFastForm({
           <button type="button" className="x" onClick={() => onClose?.()}>✕</button>
         </div>
 
-        {/* 사진 + 우측 필드 */}
-        <div style={{ display: "flex", gap: "12px", marginBottom: "13px" }}>
-          <div style={{ width: "120px", flexShrink: 0 }}>
-            <ImagePicker label="사진" value={coverImages} maxFiles={1} uploadKind="cover" mode="cover" onChange={setCoverImages} />
-            <button type="button" className="btn" style={{ width: "100%", marginTop: "6px", fontSize: "10px" }}
-              onClick={() => void captureBroadcastScreen()}>📷 방송화면 캡처</button>
-          </div>
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px", minWidth: 0 }}>
-            <div>
-              <label className="fl">상품 이름</label>
-              <input className="ipt" style={{ width: "100%" }} placeholder="예: 스웨이드 로퍼" value={productName} onChange={(e) => setProductName(e.target.value)} />
-            </div>
-            <div>
-              <label className="fl">가격 (비우면 손님 직접입력)</label>
-              <input className="ipt" style={{ width: "100%" }} placeholder="59,000" inputMode="numeric" value={priceText} onChange={(e) => setPriceText(formatNumberWithComma(e.target.value))} />
-            </div>
-            <div>
-              <label className="fl">배송 구분</label>
-              <select className="ipt" style={{ width: "100%" }} value={shippingType} onChange={(e) => setShippingType(e.target.value)}>
-                <option value="normal">일반배송</option>
-                <option value="vendor">업체배송1</option>
-                <option value="vendor2">업체배송2</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* 판매 모드 (sale_mode) — 시안 '상품 종류'를 대체. product_type 자동파생 */}
+        {/* 2. 대표사진 */}
         <div style={{ marginBottom: "11px" }}>
-          <label className="fl">판매 모드</label>
-          <div style={{ display: "flex", gap: "6px" }}>
-            {([["broadcast", "방송에서만"], ["shop", "쇼핑몰에서만"], ["both", "방송+쇼핑몰"]] as const).map(([v, l]) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setSaleMode(v)}
-                style={{ flex: 1, height: "34px", borderRadius: "8px", fontSize: "11px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (saleMode === v ? "#7B2D43" : "#E8E2DD"), background: saleMode === v ? "#7B2D43" : "#fff", color: saleMode === v ? "#fff" : "#666" }}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
+          <ImagePicker label="대표사진" value={coverImages} maxFiles={1} uploadKind="cover" mode="cover" onChange={setCoverImages} />
+          <button type="button" className="btn" style={{ width: "100%", marginTop: "6px", fontSize: "10px" }} onClick={() => void captureBroadcastScreen()}>📷 방송화면 캡처</button>
         </div>
 
-        {/* 카테고리 → product_note.category (상품관리 칩 필터와 연동) */}
+        {/* 3. 카테고리 → product_note.category (상품관리 칩 필터와 연동) */}
         <div style={{ marginBottom: "11px" }}>
           <label className="fl">카테고리</label>
           <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
@@ -1032,7 +994,46 @@ export default function QuickProductFastForm({
           </div>
         </div>
 
-        {/* 옵션 박스 */}
+        {/* 4. 상품명 * 필수 */}
+        <div style={{ marginBottom: "11px" }}>
+          <label className="fl">상품명 <span style={{ color: "var(--rose)" }}>*</span></label>
+          <input className="ipt" style={{ width: "100%" }} placeholder="예: 스웨이드 로퍼" value={productName} onChange={(e) => setProductName(e.target.value)} />
+        </div>
+
+        {/* 5. 가격 */}
+        <div style={{ marginBottom: "11px" }}>
+          <label className="fl">가격 (비우면 손님 직접입력)</label>
+          <input className="ipt" style={{ width: "100%" }} placeholder="59,000" inputMode="numeric" value={priceText} onChange={(e) => setPriceText(formatNumberWithComma(e.target.value))} />
+        </div>
+
+        {/* 6. 배송 */}
+        <div style={{ marginBottom: "11px" }}>
+          <label className="fl">배송</label>
+          <select className="ipt" style={{ width: "100%" }} value={shippingType} onChange={(e) => setShippingType(e.target.value)}>
+            <option value="normal">일반배송</option>
+            <option value="vendor">업체배송1</option>
+            <option value="vendor2">업체배송2</option>
+          </select>
+        </div>
+
+        {/* 7. 판매채널 (sale_mode) — product_type 자동파생(broadcast→broadcast, shop·both→group_buy) */}
+        <div style={{ marginBottom: "11px" }}>
+          <label className="fl">판매채널</label>
+          <div style={{ display: "flex", gap: "6px" }}>
+            {([["broadcast", "방송에서만"], ["shop", "쇼핑몰에서만"], ["both", "방송+쇼핑몰"]] as const).map(([v, l]) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setSaleMode(v)}
+                style={{ flex: 1, height: "34px", borderRadius: "8px", fontSize: "11px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (saleMode === v ? "#7B2D43" : "#E8E2DD"), background: saleMode === v ? "#7B2D43" : "#fff", color: saleMode === v ? "#fff" : "#666" }}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 8. 옵션 박스 */}
         <div style={{ border: "1px solid var(--bd)", borderRadius: "8px", padding: "11px", marginBottom: "11px" }}>
           <div style={{ fontSize: "11px", color: "var(--mut)", marginBottom: "9px" }}>옵션 (각각 켜고 / 직접입력·선택)</div>
           <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", marginBottom: "7px" }}>
@@ -1109,6 +1110,23 @@ export default function QuickProductFastForm({
             </div>
           )
         ) : null}
+
+        {/* 상세사진 (최대 5장) */}
+        <div style={{ marginTop: "11px", marginBottom: "11px" }}>
+          <ImagePicker label="상세사진 (최대 5장)" value={detailImages} maxFiles={5} uploadKind="detail" mode="detail" onChange={setDetailImages} />
+        </div>
+
+        {/* 상세설명 */}
+        <div style={{ marginBottom: "11px" }}>
+          <label className="fl">상세설명</label>
+          <textarea
+            className="ipt"
+            style={{ width: "100%", minHeight: "84px", resize: "vertical", padding: "8px 10px", lineHeight: 1.5 }}
+            placeholder="상품 상세 설명 (선택)"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </div>
 
         {/* 푸터 */}
         <div className="mfoot">
