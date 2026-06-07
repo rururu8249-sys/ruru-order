@@ -792,6 +792,13 @@ export default function AdminLiveDashboard() {
     setBroadcastYoutubeUrl(activeBroadcast.youtube_live_url || "");
   }, [activeBroadcast?.id]);
 
+  // 등록/수정 폼 닫힘 → 상품관리 팝업 자동 복귀
+  useEffect(() => {
+    const reopenManage = () => setActiveMenu("products");
+    window.addEventListener("ruru-reopen-product-manage", reopenManage);
+    return () => window.removeEventListener("ruru-reopen-product-manage", reopenManage);
+  }, []);
+
   const broadcastOptions = useMemo(() => {
     const todayDateKey = getAlwaysOrderDateKey(new Date().toISOString());
     const alwaysOptions = buildAlwaysOrderOptions(orders as any[], todayDateKey);

@@ -137,6 +137,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [category, setCategory] = useState("전체");
   const [visibleCount, setVisibleCount] = useState(PAGE_STEP);
   const [lightbox, setLightbox] = useState("");
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   const [copied, setCopied] = useState(false);
   const [busyId, setBusyId] = useState("");
   // 위젯 설정(일괄) 화면
@@ -328,9 +329,16 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       const rows = [...map.values()];
       const pids = rows.map((r) => r.productId).filter(Boolean);
       if (pids.length > 0) {
-        const { data: prods } = await supabase.from("products").select("*").in("id", pids);
+        // image_url 명시 포함 (썸네일용)
+        const { data: prods } = await supabase
+          .from("products")
+          .select("id, image_url, cover_image_url, main_image_url, thumbnail_url, images, image_urls, detail_image_urls")
+          .in("id", pids);
         const thumbs = new Map<string, string>();
-        ((prods as ProductRow[]) || []).forEach((p) => { thumbs.set(String((p as { id?: unknown }).id), mainImage(p)); });
+        ((prods as ProductRow[]) || []).forEach((p) => {
+          const url = pickString(p, ["image_url", "cover_image_url", "main_image_url", "thumbnail_url"], "");
+          thumbs.set(String((p as { id?: unknown }).id), url ? resolveProductImageUrl(url) : mainImage(p));
+        });
         rows.forEach((r) => { r.thumb = thumbs.get(r.productId) || ""; });
       }
       const detailRows = rows
@@ -456,10 +464,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   // --- 등록/수정/삭제 (기존 이벤트/로직 재사용) ---
   const openCreate = () => {
     window.dispatchEvent(new Event("ruru-open-quick-product-panel"));
+    onClose();
   };
 
   const editProduct = (p: ProductRow) => {
     window.dispatchEvent(new CustomEvent("ruru-edit-quick-product", { detail: p }));
+    onClose();
   };
 
   const deleteProduct = async (p: ProductRow) => {
@@ -573,7 +583,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   return createPortal(
     <div
       className="ruru-product-sian"
-      style={{ position: "fixed", inset: 0, zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", padding: "16px" }}
+      style={{ position: "fixed", inset: 0, zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", padding: "16px" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div style={{ width: "600px", maxWidth: "100%", flexShrink: 0, maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "14px", overflow: "hidden" }}>
         {/* 헤더 */}
@@ -680,7 +691,10 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                               </div>
                               {detail.map((r) => (
                                 <div key={r.key} style={{ display: "grid", gridTemplateColumns: "32px 1fr 44px 72px 84px", gap: "8px", alignItems: "center", padding: "7px 0", borderBottom: "1px solid #E8E2DD" }}>
-                                  <span style={{ width: "32px", height: "32px", flexShrink: 0, borderRadius: "6px", overflow: "hidden", background: "#fff", border: "1px solid #E8E2DD", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                  <span
+                                    onClick={(e) => { e.stopPropagation(); if (r.thumb) setImagePreviewUrl(r.thumb); }}
+                                    style={{ width: "32px", height: "32px", flexShrink: 0, borderRadius: "6px", overflow: "hidden", background: "#fff", border: "1px solid #E8E2DD", display: "flex", alignItems: "center", justifyContent: "center", cursor: r.thumb ? "zoom-in" : "default" }}
+                                  >
                                     {r.thumb ? <img src={r.thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "14px" }}>🖼</span>}
                                   </span>
                                   <div style={{ minWidth: 0 }}>
@@ -885,6 +899,16 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
           style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}
         >
           <img src={lightbox} alt="" style={{ maxWidth: "92%", maxHeight: "92%", objectFit: "contain", borderRadius: "12px" }} onClick={(e) => e.stopPropagation()} />
+        </div>
+      ) : null}
+
+      {/* 기록 탭 썸네일 확대 보기 */}
+      {imagePreviewUrl ? (
+        <div
+          onClick={() => setImagePreviewUrl("")}
+          style={{ position: "fixed", inset: 0, zIndex: 65, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}
+        >
+          <img src={imagePreviewUrl} alt="" style={{ maxWidth: "480px", maxHeight: "480px", objectFit: "contain", borderRadius: "12px" }} />
         </div>
       ) : null}
     </div>,

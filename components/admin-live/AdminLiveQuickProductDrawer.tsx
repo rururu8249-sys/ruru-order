@@ -50,7 +50,11 @@ export default function AdminLiveQuickProductDrawer({
       key={editingProduct ? String(editingProduct.id || "edit") : "new"}
       activeBroadcastId={activeBroadcastId}
       initialProduct={editingProduct}
-      onClose={() => setIsOpen(false)}
+      onClose={() => {
+        setIsOpen(false);
+        // 등록/수정 폼 닫힘(저장완료·취소 공통) → 상품관리 팝업 자동 복귀
+        window.dispatchEvent(new CustomEvent("ruru-reopen-product-manage"));
+      }}
     />
   );
 }
