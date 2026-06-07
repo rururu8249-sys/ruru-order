@@ -325,8 +325,8 @@ export default function ManualPaymentMatchDrawer(props: Props) {
         <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-3">
           <div className="mb-3 flex items-start justify-between gap-4">
             <div>
-              <div className="text-[10px] font-black tracking-[0.18em] text-slate-400">MANUAL PAYMENT MATCH</div>
-              <h2 className="mt-0.5 text-lg font-black tracking-[-0.04em] text-slate-950">입금매칭</h2>
+              <div className="text-[10px] font-black tracking-[0.18em] text-rose-deep">MANUAL PAYMENT MATCH</div>
+              <h2 className="mt-0.5 text-lg font-black tracking-[-0.04em] text-slate-950">⇄ 입금매칭</h2>
             </div>
 
             <div className="flex items-start gap-2">
@@ -455,7 +455,7 @@ export default function ManualPaymentMatchDrawer(props: Props) {
             type="button"
             onClick={confirmManualMatch}
             disabled={saving}
-            className="h-10 w-full rounded-xl bg-slate-950 text-[13px] font-black text-white active:scale-[0.98] disabled:bg-slate-300"
+            className="h-10 w-full rounded-xl bg-emerald-600 text-[13px] font-black text-white transition active:scale-[0.98] hover:bg-emerald-700 disabled:bg-slate-300"
           >
             {saving
               ? "처리중..."
