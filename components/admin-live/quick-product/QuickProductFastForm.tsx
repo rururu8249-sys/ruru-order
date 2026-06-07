@@ -507,6 +507,9 @@ export default function QuickProductFastForm({
 }: QuickProductFastFormProps) {
   const [saleMode, setSaleMode] = useState<"broadcast" | "shop" | "both">("both");
   const [category, setCategory] = useState("");
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [newCategoryText, setNewCategoryText] = useState("");
   const [productName, setProductName] = useState("");
   const [priceText, setPriceText] = useState("");
   const [stockManagementEnabled, setStockManagementEnabled] = useState(false);
@@ -873,6 +876,26 @@ export default function QuickProductFastForm({
   const choiceButton = "h-9 rounded-xl px-3.5 text-[12px] font-black transition active:scale-[0.98]";
   const inactiveChoice = "bg-slate-100 text-slate-600 hover:bg-slate-200";
 
+  // 카테고리 칩: 기본(신발/의류/잡화) + 직접 추가한 것 + (수정 모드 등) 현재값이 커스텀이면 포함
+  const PRESET_CATEGORIES = ["신발", "의류", "잡화"];
+  const categoryChips = Array.from(
+    new Set([
+      ...PRESET_CATEGORIES,
+      ...customCategories,
+      ...(category && !PRESET_CATEGORIES.includes(category) ? [category] : []),
+    ]),
+  );
+  const confirmAddCategory = () => {
+    const name = newCategoryText.trim();
+    if (!name) return;
+    if (!PRESET_CATEGORIES.includes(name)) {
+      setCustomCategories((prev) => Array.from(new Set([...prev, name])));
+    }
+    setCategory(name);
+    setNewCategoryText("");
+    setAddingCategory(false);
+  };
+
   return (
     <div
       className="ruru-product-sian"
@@ -934,7 +957,7 @@ export default function QuickProductFastForm({
         <div style={{ marginBottom: "11px" }}>
           <label className="fl">카테고리</label>
           <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
-            {["신발", "의류", "잡화"].map((c) => (
+            {categoryChips.map((c) => (
               <button
                 key={c}
                 type="button"
@@ -944,13 +967,46 @@ export default function QuickProductFastForm({
                 {c}
               </button>
             ))}
-            <input
-              className="ipt"
-              style={{ flex: 1, minWidth: "120px" }}
-              placeholder="직접 입력"
-              value={["신발", "의류", "잡화"].includes(category) ? "" : category}
-              onChange={(e) => setCategory(e.target.value)}
-            />
+            {addingCategory ? (
+              <span style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                <input
+                  className="ipt"
+                  style={{ width: "120px" }}
+                  placeholder="카테고리명"
+                  autoFocus
+                  value={newCategoryText}
+                  onChange={(e) => setNewCategoryText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      confirmAddCategory();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={confirmAddCategory}
+                  style={{ height: "32px", padding: "0 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "none", background: "#7B2D43", color: "#fff" }}
+                >
+                  확인
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAddingCategory(false); setNewCategoryText(""); }}
+                  style={{ height: "32px", padding: "0 10px", borderRadius: "8px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid #E8E2DD", background: "#fff", color: "#888" }}
+                >
+                  취소
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAddingCategory(true)}
+                style={{ height: "32px", padding: "0 14px", borderRadius: "16px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px dashed #D9C5CC", background: "#fff", color: "#999" }}
+              >
+                + 추가
+              </button>
+            )}
           </div>
         </div>
 
