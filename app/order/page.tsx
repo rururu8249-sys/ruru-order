@@ -104,6 +104,7 @@ type BroadcastProduct = {
   product_type: string;
   shipping_type: string;
   combine_shipping: string;
+  badge_type?: string;
   color_options?: unknown;
   size_options?: unknown;
   size_option_enabled?: unknown;
@@ -1834,6 +1835,7 @@ export default function OrderPage() {
         product_type: product.product_type || "방송상품",
         shipping_type: product.shipping_type || "일반",
         combine_shipping: product.combine_shipping || "Y",
+        badge_type: String(product.badge_type || "none"),
         // 옵션/없음입력 토글 신호: 고객 옵션 판단(getRegisteredOptionMode)이 읽을 수 있게 그대로 통과시킨다.
         color_options: product.color_options ?? null,
         size_options: product.size_options ?? null,
