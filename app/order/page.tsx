@@ -4653,18 +4653,31 @@ export default function OrderPage() {
                 <button type="button" onClick={() => setMenuSheetOpen(false)} aria-label="닫기" style={{ border: "none", background: "none", fontSize: "20px", color: "#999", cursor: "pointer" }}>✕</button>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                <button type="button" onClick={() => { setMenuSheetOpen(false); openOrderLookupBottomSheet(); }} style={MENU_ITEM_STYLE}>📦 주문조회</button>
-                <button type="button" onClick={() => { setMenuSheetOpen(false); openCustomerInfoEditBottomSheet(); }} style={MENU_ITEM_STYLE}>✎ 정보수정</button>
+                <button type="button" onClick={() => { setMenuSheetOpen(false); openOrderLookupBottomSheet(); }} style={MENU_ITEM_STYLE}>📦 최근 7일 주문</button>
+                <button type="button" onClick={() => { setMenuSheetOpen(false); openCustomerInfoEditBottomSheet(); }} style={MENU_ITEM_STYLE}>✏️ 정보수정</button>
                 <div style={{ ...MENU_ITEM_STYLE, cursor: "default", justifyContent: "space-between" }}>
-                  <span>🪙 내 포인트</span>
+                  <span>🌐 내 포인트</span>
                   <span style={{ color: "#7B2D43", fontWeight: 800 }}>{`${Math.max(0, Number(customerPointBalance || 0)).toLocaleString()}P`}</span>
                 </div>
-                <a href="https://www.youtube.com" target="_blank" rel="noreferrer" style={MENU_ITEM_STYLE}>▶ 유튜브 방송</a>
-                <a href="https://pf.kakao.com" target="_blank" rel="noreferrer" style={MENU_ITEM_STYLE}>💬 카카오톡 채널</a>
-                <a href="https://band.us" target="_blank" rel="noreferrer" style={MENU_ITEM_STYLE}>🎵 밴드</a>
-                <a href="https://www.instagram.com" target="_blank" rel="noreferrer" style={MENU_ITEM_STYLE}>📷 인스타그램</a>
               </div>
-              <div style={{ marginTop: "12px", fontSize: "11px", color: "#999", textAlign: "center" }}>링크는 설정에서 입력됩니다</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", marginTop: "12px" }}>
+                <a href="https://youtube.com/channel/UCBbrUWUnHvq5Ldpxgy5GdMw?si=2wsmT_wEinvKzzEF" target="_blank" rel="noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", padding: "10px 4px", borderRadius: "10px", background: "#F5F3F0", cursor: "pointer", textDecoration: "none" }}>
+                  <span style={{ fontSize: "18px" }}>▶️</span>
+                  <span style={{ fontSize: "10px", color: "#6B6460", fontWeight: 500 }}>유튜브</span>
+                </a>
+                <a href="https://pf.kakao.com/_RMxaqX" target="_blank" rel="noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", padding: "10px 4px", borderRadius: "10px", background: "#F5F3F0", cursor: "pointer", textDecoration: "none" }}>
+                  <span style={{ fontSize: "18px" }}>💬</span>
+                  <span style={{ fontSize: "10px", color: "#6B6460", fontWeight: 500 }}>카톡채널</span>
+                </a>
+                <a href="https://band.us/@ruru8249" target="_blank" rel="noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", padding: "10px 4px", borderRadius: "10px", background: "#F5F3F0", cursor: "pointer", textDecoration: "none" }}>
+                  <span style={{ fontSize: "18px" }}>🎵</span>
+                  <span style={{ fontSize: "10px", color: "#6B6460", fontWeight: 500 }}>밴드</span>
+                </a>
+                <a href="https://www.instagram.com/ruru8249_?igsh=MXR3Z2xnYmI1cG0ybQ==" target="_blank" rel="noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", padding: "10px 4px", borderRadius: "10px", background: "#F5F3F0", cursor: "pointer", textDecoration: "none" }}>
+                  <span style={{ fontSize: "18px" }}>📷</span>
+                  <span style={{ fontSize: "10px", color: "#6B6460", fontWeight: 500 }}>인스타</span>
+                </a>
+              </div>
             </div>
           </div>
         ) : null}
