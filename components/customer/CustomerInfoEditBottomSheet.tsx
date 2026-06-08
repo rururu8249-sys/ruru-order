@@ -30,6 +30,7 @@ type CustomerInfoEditBottomSheetProps = {
   shippingAddresses?: any[];
   onSaveShippingAddresses?: (addresses: any[]) => Promise<void>;
   onSelectShippingAddress?: (address: string, detailAddress: string) => void;
+  onOpenAddressSearchForForm?: (onPicked: (addr: string, zipcode: string) => void) => void;
 
   saving?: boolean;
 };
@@ -95,6 +96,7 @@ export default function CustomerInfoEditBottomSheet({
   shippingAddresses = [],
   onSaveShippingAddresses,
   onSelectShippingAddress,
+  onOpenAddressSearchForForm,
   saving = false,
 }: CustomerInfoEditBottomSheetProps) {
   const addressTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -241,7 +243,10 @@ export default function CustomerInfoEditBottomSheet({
                     <div style={{ background: "#F5F3F0", borderRadius: "10px", padding: "14px", marginTop: "8px" }}>
                       <input value={addrForm.name} onChange={(e) => setAddrForm((f) => ({ ...f, name: e.target.value }))} placeholder="이름" style={{ ...inputStyle, height: "42px", fontSize: "14px" }} />
                       <input value={addrForm.phone} onChange={(e) => setAddrForm((f) => ({ ...f, phone: e.target.value }))} placeholder="전화번호" inputMode="numeric" style={{ ...inputStyle, height: "42px", fontSize: "14px", marginTop: "8px" }} />
-                      <textarea value={addrForm.address} onChange={(e) => setAddrForm((f) => ({ ...f, address: e.target.value }))} placeholder="주소" rows={2} style={{ ...textareaStyle, marginTop: "8px" }} />
+                      <div style={{ display: "flex", gap: "6px", alignItems: "flex-end", marginTop: "8px" }}>
+                        <input value={addrForm.address} onChange={(e) => setAddrForm((f) => ({ ...f, address: e.target.value }))} placeholder="주소" style={{ ...inputStyle, flex: 1, height: "42px", fontSize: "14px" }} />
+                        <button type="button" onClick={() => onOpenAddressSearchForForm?.((addr) => setAddrForm((f) => ({ ...f, address: addr })))} style={{ padding: "0 12px", height: "42px", background: "#7A1E47", color: "white", border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>주소검색</button>
+                      </div>
                       <input value={addrForm.detailAddress} onChange={(e) => setAddrForm((f) => ({ ...f, detailAddress: e.target.value }))} placeholder="상세주소" style={{ ...inputStyle, height: "42px", fontSize: "14px", marginTop: "8px" }} />
                       <div style={{ display: "flex", gap: "6px", marginTop: "10px" }}>
                         <button type="button" onClick={() => { setAddrFormOpen(false); setEditingAddrIndex(null); }} style={{ flex: 1, padding: "10px", border: "1px solid #D9C5CC", background: "#fff", color: "#666", borderRadius: "8px", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}>취소</button>

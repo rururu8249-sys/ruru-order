@@ -2455,7 +2455,7 @@ export default function OrderPage() {
     }, 80);
   };
 
-  const openAddressSearch = async () => {
+  const openAddressSearch = async (onPicked?: (addr: string, zipcode: string) => void) => {
     const manualAddress = () => {
       setManualAddressOpen(true);
     };
@@ -2472,6 +2472,11 @@ export default function OrderPage() {
         oncomplete: (data: any) => {
           const nextAddress = data.roadAddress || data.jibunAddress || "";
           const nextZipcode = data.zonecode || "";
+
+          if (onPicked) {
+            onPicked(nextAddress, nextZipcode);
+            return;
+          }
 
           setAddress(nextAddress);
           setZipcode(nextZipcode);
@@ -4713,6 +4718,7 @@ export default function OrderPage() {
           shippingAddresses={shippingAddresses}
           onSaveShippingAddresses={saveShippingAddresses}
           onSelectShippingAddress={(addr, detail) => { setAddress(addr); setDetailAddress(detail); }}
+          onOpenAddressSearchForForm={(onPicked) => openAddressSearch(onPicked)}
           onClose={closeCustomerInfoEditBottomSheet}
           onSave={completeEditCustomerInfo}
         />
