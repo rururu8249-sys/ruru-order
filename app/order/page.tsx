@@ -995,7 +995,11 @@ export default function OrderPage() {
   const [orderLookupOpen, setOrderLookupOpen] = useState(false);
   const [orderLookupLoading, setOrderLookupLoading] = useState(false);
   const [menuSheetOpen, setMenuSheetOpen] = useState(false);
-  const [howToOpen, setHowToOpen] = useState(false);
+  const [howToOpen, setHowToOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const hideUntil = Number(localStorage.getItem("ruru_howto_hide_until") || 0);
+    return Date.now() > hideUntil;
+  });
   const [videoOpen, setVideoOpen] = useState(true);
   const [productPage, setProductPage] = useState(1);
   const [cartAddedOpen, setCartAddedOpen] = useState(false);
@@ -3803,36 +3807,6 @@ export default function OrderPage() {
 
       <CustomerPointGiftPopup />
 
-      {/* P2. 주문방법 접기/펼치기 (시안) */}
-      {hasSavedInfo ? (
-        <section style={{ margin: "10px auto 0", width: "100%", maxWidth: "560px" }}>
-          <button
-            type="button"
-            onClick={() => setHowToOpen((v) => !v)}
-            style={{ width: "100%", display: "flex", alignItems: "center", gap: "8px", border: "1px solid #D9C5CC", background: "#F5E6EB", borderRadius: "12px", padding: "12px 14px", fontSize: "14px", fontWeight: 800, color: "#7B2D43", cursor: "pointer" }}
-          >
-            📌 주문방법 보기
-            <span style={{ marginLeft: "auto", fontSize: "12px", color: "#7B2D43" }}>{howToOpen ? "▲" : "▼"}</span>
-          </button>
-          {howToOpen ? (
-            <div style={{ marginTop: "6px", border: "1px solid #D9C5CC", borderRadius: "12px", background: "#fff", padding: "14px 16px", display: "flex", flexDirection: "column", gap: "10px" }}>
-              <div style={{ display: "flex", gap: "9px", alignItems: "flex-start" }}>
-                <span style={{ flexShrink: 0, width: "22px", height: "22px", borderRadius: "50%", background: "#7B2D43", color: "#fff", fontSize: "12px", fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>1</span>
-                <span style={{ fontSize: "14px", fontWeight: 700, color: "#333", lineHeight: 1.5 }}>방송 채팅에 상품 + <b style={{ color: "#7B2D43" }}>"저요!"</b> 접수 후</span>
-              </div>
-              <div style={{ display: "flex", gap: "9px", alignItems: "flex-start" }}>
-                <span style={{ flexShrink: 0, width: "22px", height: "22px", borderRadius: "50%", background: "#7B2D43", color: "#fff", fontSize: "12px", fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>2</span>
-                <span style={{ fontSize: "14px", fontWeight: 700, color: "#333", lineHeight: 1.5 }}>여기서 그 상품 담기</span>
-              </div>
-              <div style={{ display: "flex", gap: "9px", alignItems: "flex-start" }}>
-                <span style={{ flexShrink: 0, width: "22px", height: "22px", borderRadius: "50%", background: "#7B2D43", color: "#fff", fontSize: "12px", fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>3</span>
-                <span style={{ fontSize: "14px", fontWeight: 700, color: "#333", lineHeight: 1.5 }}>안내된 계좌로 입금</span>
-              </div>
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-
       {/* P3. 방송 영상 — 방송 ON/OFF 상관없이 항상 표시 (좌:영상 / 우:라이브참여·공지) */}
       {hasSavedInfo ? (
         <section style={{ margin: "8px auto 0", width: "100%", maxWidth: "560px" }}>
@@ -4641,6 +4615,63 @@ export default function OrderPage() {
         </>
       )}
 
+        {howToOpen ? (
+          <div
+            style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+            onClick={(e) => { if (e.target === e.currentTarget) setHowToOpen(false); }}
+          >
+            <div style={{ background: "#fff", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: "430px", paddingBottom: "24px", maxHeight: "92dvh", overflowY: "auto" }}>
+              <div style={{ width: "40px", height: "4px", borderRadius: "2px", background: "#E5E1DC", margin: "12px auto 18px" }} />
+              <div style={{ fontSize: "18px", fontWeight: 800, color: "#1A1A1A", padding: "0 20px", marginBottom: "18px" }}>📌 주문 방법</div>
+
+              <div style={{ padding: "0 20px" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", padding: "13px 0", borderBottom: "0.5px solid #E5E1DC" }}>
+                  <span style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#7A1E47", color: "#fff", fontSize: "14px", fontWeight: 800, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>1</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#1A1A1A" }}>방송 채팅창에 이렇게 입력해 주세요!</div>
+                    <div style={{ fontSize: "12px", color: "#6B6460", marginTop: "3px" }}>상품명 + 사이즈/색상 + 수량 + 저요!</div>
+                    <span style={{ fontSize: "11px", color: "#7A1E47", background: "#F9EEF3", borderRadius: "6px", padding: "4px 8px", display: "inline-block", marginTop: "4px" }}>예) 운동화 블랙 255 1개 저요!</span>
+                    <span style={{ fontSize: "11px", color: "#7A1E47", background: "#F9EEF3", borderRadius: "6px", padding: "4px 8px", display: "inline-block", marginTop: "3px" }}>예) 페미닌워시 핑크 150ml 2개 저요!</span>
+                    <span style={{ fontSize: "11px", color: "#7A1E47", fontWeight: 700, marginTop: "8px", display: "block" }}>✅ 루루언니 접수 완료 확인 후 →</span>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", padding: "13px 0", borderBottom: "0.5px solid #E5E1DC" }}>
+                  <span style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#7A1E47", color: "#fff", fontSize: "14px", fontWeight: 800, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>2</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#1A1A1A" }}>여기서 그 상품 담고 주문서 제출</div>
+                    <div style={{ fontSize: "12px", color: "#6B6460", marginTop: "3px" }}>목록에서 찾아 담기를 눌러주세요</div>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", padding: "13px 0" }}>
+                  <span style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#7A1E47", color: "#fff", fontSize: "14px", fontWeight: 800, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>3</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#1A1A1A" }}>안내 계좌로 입금</div>
+                    <span style={{ fontSize: "11px", color: "#C0392B", background: "#FFF0F0", borderRadius: "6px", padding: "4px 8px", display: "inline-block", marginTop: "4px" }}>⚠️ 입금자명 · 금액이 닉네임 · 주문서와 정확히 일치해야 자동 확인돼요</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "0 20px", marginTop: "16px" }}>
+                <button
+                  type="button"
+                  onClick={() => { localStorage.setItem("ruru_howto_hide_until", String(Date.now() + 86400000)); setHowToOpen(false); }}
+                  style={{ border: "1px solid #E5E1DC", background: "#fff", borderRadius: "10px", padding: "11px", fontSize: "13px", color: "#ABA5A0", cursor: "pointer", width: "100%" }}
+                >
+                  오늘 하루 열지 않기
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHowToOpen(false)}
+                  style={{ background: "#7A1E47", color: "#fff", border: "none", borderRadius: "12px", padding: "14px", fontSize: "15px", fontWeight: 700, cursor: "pointer", width: "100%" }}
+                >
+                  확인
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {menuSheetOpen ? (
           <div
