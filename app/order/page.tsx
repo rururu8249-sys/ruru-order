@@ -4211,9 +4211,9 @@ export default function OrderPage() {
               <div style={{ width: "100%", maxWidth: "430px", maxHeight: "92dvh", display: "flex", flexDirection: "column", background: "#fff", borderTopLeftRadius: "26px", borderTopRightRadius: "26px", overflow: "hidden" }}>
                 <div style={{ flexShrink: 0, borderBottom: "1px solid #F0EAE0", padding: "16px" }}>
                   <div style={{ margin: "0 auto 12px", width: "52px", height: "5px", borderRadius: "3px", background: "#E8E2DD" }} />
-                  <div style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>옵션을 선택해 주세요</div>
+                  <div style={{ fontSize: "12px", fontWeight: 800, color: "#7A1E47" }}>옵션을 선택해 주세요</div>
                   <div style={{ marginTop: "4px", fontSize: "17px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{registeredOptionSelectProduct.product_name}</div>
-                  <div style={{ marginTop: "2px", fontSize: "15px", fontWeight: 800, color: "#7B2D43" }}>{registeredOptionPrice > 0 ? won(registeredOptionPrice) : "가격 직접입력"}</div>
+                  <div style={{ marginTop: "2px", fontSize: "15px", fontWeight: 800, color: "#7A1E47" }}>{registeredOptionPrice > 0 ? won(registeredOptionPrice) : "가격 직접입력"}</div>
                 </div>
 
                 <div style={{ minHeight: 0, flex: 1, overflowY: "auto", padding: "16px" }}>
@@ -4228,7 +4228,7 @@ export default function OrderPage() {
                       ) : (
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                           {registeredOptionColorChoices.map((option) => (
-                            <button key={`c-${option}`} type="button" onClick={() => setRegisteredOptionColor(option)} style={{ minHeight: "46px", borderRadius: "14px", border: `1.5px solid ${registeredOptionColor === option ? "#7B2D43" : "#E8E2DD"}`, background: registeredOptionColor === option ? "#7B2D43" : "#fff", color: registeredOptionColor === option ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}>{option}</button>
+                            <button key={`c-${option}`} type="button" onClick={() => setRegisteredOptionColor(option)} style={{ minHeight: "46px", borderRadius: "14px", border: `1.5px solid ${registeredOptionColor === option ? "#7A1E47" : "#E8E2DD"}`, background: registeredOptionColor === option ? "#7A1E47" : "#fff", color: registeredOptionColor === option ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}>{option}</button>
                           ))}
                         </div>
                       )}
@@ -4248,14 +4248,25 @@ export default function OrderPage() {
                     <div style={{ marginBottom: "16px" }}>
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>사이즈</div>
                       {registeredOptionSizeChoices.length >= 3 ? (
-                        <select value={registeredOptionSize} onChange={(e) => setRegisteredOptionSize(e.target.value)} style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: `1.5px solid ${!registeredOptionSize.trim() ? "#E8B5B0" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: registeredOptionSize ? "#222" : "#999", outline: "none" }}>
-                          <option value="">사이즈 선택</option>
-                          {registeredOptionSizeChoices.map((option) => <option key={`s-${option}`} value={option}>{option}</option>)}
-                        </select>
+                        <div style={{ overflowX: "auto", display: "flex", gap: "6px", paddingBottom: "4px", WebkitOverflowScrolling: "touch", marginBottom: "14px" }}>
+                          {registeredOptionSizeChoices.map((option) => {
+                            const selected = registeredOptionSize === option;
+                            return (
+                              <button
+                                key={`s-${option}`}
+                                type="button"
+                                onClick={() => setRegisteredOptionSize(option)}
+                                style={{ flexShrink: 0, minWidth: "44px", height: "40px", borderRadius: "10px", border: selected ? "1.5px solid #7A1E47" : "1.5px solid #E8E2DD", background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", cursor: "pointer", fontSize: "13px", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 12px" }}
+                              >
+                                {option}
+                              </button>
+                            );
+                          })}
+                        </div>
                       ) : (
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
                           {registeredOptionSizeChoices.map((option) => (
-                            <button key={`s-${option}`} type="button" onClick={() => setRegisteredOptionSize(option)} style={{ minHeight: "46px", borderRadius: "14px", border: `1.5px solid ${registeredOptionSize === option ? "#7B2D43" : "#E8E2DD"}`, background: registeredOptionSize === option ? "#7B2D43" : "#fff", color: registeredOptionSize === option ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}>{option}</button>
+                            <button key={`s-${option}`} type="button" onClick={() => setRegisteredOptionSize(option)} style={{ minHeight: "46px", borderRadius: "14px", border: `1.5px solid ${registeredOptionSize === option ? "#7A1E47" : "#E8E2DD"}`, background: registeredOptionSize === option ? "#7A1E47" : "#fff", color: registeredOptionSize === option ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}>{option}</button>
                           ))}
                         </div>
                       )}
@@ -4277,7 +4288,7 @@ export default function OrderPage() {
                       <div style={{ display: "grid", gridTemplateColumns: "42px 1fr 42px", height: "46px", borderRadius: "14px", border: "1px solid #E8E2DD", overflow: "hidden" }}>
                         <button type="button" onClick={() => setRegisteredOptionQty((c) => Math.max(1, c - 1))} style={{ borderRight: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#555", cursor: "pointer" }}>−</button>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionQty}</div>
-                        <button type="button" onClick={() => setRegisteredOptionQty((c) => c + 1)} style={{ borderLeft: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#7B2D43", cursor: "pointer" }}>+</button>
+                        <button type="button" onClick={() => setRegisteredOptionQty((c) => c + 1)} style={{ borderLeft: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+</button>
                       </div>
                     </div>
                     <div>
@@ -4289,7 +4300,7 @@ export default function OrderPage() {
 
                 <div style={{ flexShrink: 0, display: "grid", gridTemplateColumns: "0.85fr 1.15fr", gap: "10px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "12px 12px calc(12px + env(safe-area-inset-bottom))" }}>
                   <button type="button" onClick={closeRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#F1ECEE", fontSize: "16px", fontWeight: 800, color: "#666", cursor: "pointer" }}>닫기</button>
-                  <button type="button" onClick={confirmRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#7B2D43", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>주문서에 담기</button>
+                  <button type="button" onClick={confirmRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#7A1E47", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>주문서에 담기</button>
                 </div>
               </div>
             </div>
