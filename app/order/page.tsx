@@ -2782,6 +2782,8 @@ export default function OrderPage() {
       combine_shipping: product.combine_shipping || "Y",
     };
 
+    const normColor = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
+    let didAdd = true;
     setItems((prev) => {
       const maxQty = (() => {
         try {
@@ -2790,17 +2792,16 @@ export default function OrderPage() {
           if (!mgmtOn) return 999;
           const variants = Array.isArray((note as any)?.stock_variants) ? (note as any).stock_variants : [];
           if (variants.length === 0) return 999;
-          const normColor = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
           const matched = variants.find((v: any) => normColor(String(v.color ?? "")) === normColor(nextItem.color) && normColor(String(v.size ?? "")) === normColor(nextItem.size));
           return matched ? Number(matched.stock) : 999;
         } catch { return 999; }
       })();
       const addQty = Number(nextItem.qty) || 1;
-      const sameIndex = nextItem.product_id ? prev.findIndex((item) => item.product_id === nextItem.product_id && item.color === nextItem.color && item.size === nextItem.size && item.product_name.trim() !== "") : -1;
+      const sameIndex = nextItem.product_id ? prev.findIndex((item) => item.product_id === nextItem.product_id && normColor(item.color) === normColor(nextItem.color) && normColor(item.size) === normColor(nextItem.size) && item.product_name.trim() !== "") : -1;
       if (sameIndex >= 0) {
         const existingQty = Number(prev[sameIndex].qty) || 1;
         const newQty = Math.min(existingQty + addQty, maxQty);
-        if (newQty <= existingQty) { showCustomerNotice("재고가 부족해요. 최대 " + maxQty + "개까지 담을 수 있어요."); return prev; }
+        if (newQty <= existingQty) { showCustomerNotice("재고가 부족해요. 최대 " + maxQty + "개까지 담을 수 있어요."); didAdd = false; return prev; }
         return prev.map((item, index) => index === sameIndex ? { ...item, qty: String(newQty) } : item);
       }
       const clampedQty = Math.min(addQty, maxQty);
@@ -2814,7 +2815,7 @@ export default function OrderPage() {
     setProductSearchOpenIndex(null);
     setProductSearchText("");
     // P6. 담기 완료 — confetti + "주문서에 담았어요!" 토스트(주문서 보기 / 계속 담기)
-    setCartAddedOpen(true);
+    if (didAdd) setCartAddedOpen(true);
   };
 
   const openRegisteredOptionSelectSheet = (product: BroadcastProduct) => {
@@ -4004,8 +4005,13 @@ export default function OrderPage() {
                           key={String(product.id)}
                           style={{ display: "flex", gap: "12px", alignItems: "center", padding: "13px 0", borderBottom: "0.5px solid #E5E1DC", opacity: sold ? 0.5 : 1 }}
                         >
-                          <div onClick={() => { if (img) setLightboxImage(img); }} style={{ flexShrink: 0, width: "84px", height: "84px", borderRadius: "10px", background: "#F0EBE8", overflow: "hidden", cursor: img ? "zoom-in" : "default" }}>
+                          <div onClick={() => { if (img) setLightboxImage(img); }} style={{ position: "relative", flexShrink: 0, width: "84px", height: "84px", borderRadius: "10px", background: "#F0EBE8", overflow: "hidden", cursor: img ? "zoom-in" : "default" }}>
                             {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
+                            {isSoldOutOrderProduct(product) ? (
+                              <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)", borderRadius: "inherit", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <span style={{ color: "white", fontSize: "10px", fontWeight: 800, letterSpacing: "0.05em" }}>SOLD OUT</span>
+                              </div>
+                            ) : null}
                           </div>
                           <div style={{ minWidth: 0, flex: 1 }}>
                             <div style={{ display: "flex", gap: "4px", marginBottom: "4px", flexWrap: "wrap" }}>
