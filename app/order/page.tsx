@@ -4450,28 +4450,28 @@ export default function OrderPage() {
                       {!registeredOptionSize.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>사이즈를 입력해주세요</div> : null}
                     </div>
                   ) : null}
+                </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "0.82fr 1.18fr", gap: "12px" }}>
-                    <div>
-                      <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>수량</div>
-                      <div style={{ display: "grid", gridTemplateColumns: "42px 1fr 42px", height: "46px", borderRadius: "14px", border: "1px solid #E8E2DD", overflow: "hidden" }}>
-                        <button type="button" onClick={() => setRegisteredOptionQty((c) => Math.max(1, c - 1))} style={{ borderRight: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#555", cursor: "pointer" }}>−</button>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionQty}</div>
-                        <button type="button" onClick={() => {
-                          const maxStock = (() => {
-                            if (!registeredOptionSelectProduct || registeredOptionStockVariants.length === 0) return 999;
-                            const nm2 = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
-                            const matched = registeredOptionStockVariants.find((v: any) => nm2(v.color) === nm2(registeredOptionColor) && nm2(v.size) === nm2(registeredOptionSize));
-                            return matched ? Number(matched.stock) : 999;
-                          })();
-                          setRegisteredOptionQty((c) => Math.min(c + 1, maxStock));
-                        }} style={{ borderLeft: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+</button>
-                      </div>
+                <div style={{ flexShrink: 0, display: "grid", gridTemplateColumns: "0.82fr 1.18fr", gap: "12px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "12px 16px 0" }}>
+                  <div>
+                    <div style={{ marginBottom: "6px", fontSize: "13px", fontWeight: 800, color: "#333" }}>수량</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "42px 1fr 42px", height: "46px", borderRadius: "14px", border: "1px solid #E8E2DD", overflow: "hidden" }}>
+                      <button type="button" onClick={() => setRegisteredOptionQty((c) => Math.max(1, c - 1))} style={{ borderRight: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#555", cursor: "pointer" }}>−</button>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionQty}</div>
+                      <button type="button" onClick={() => {
+                        const maxStock = (() => {
+                          if (!registeredOptionSelectProduct || registeredOptionStockVariants.length === 0) return 999;
+                          const nm2 = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
+                          const matched = registeredOptionStockVariants.find((v: any) => nm2(v.color) === nm2(registeredOptionColor) && nm2(v.size) === nm2(registeredOptionSize));
+                          return matched ? Number(matched.stock) : 999;
+                        })();
+                        setRegisteredOptionQty((c) => Math.min(c + 1, maxStock));
+                      }} style={{ borderLeft: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+</button>
                     </div>
-                    <div>
-                      <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>선택금액</div>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", height: "46px", borderRadius: "14px", border: "1px solid #E8E2DD", background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 800, color: "#222" }}>{registeredOptionTotalPrice > 0 ? won(registeredOptionTotalPrice) : "가격 직접입력"}</div>
-                    </div>
+                  </div>
+                  <div>
+                    <div style={{ marginBottom: "6px", fontSize: "13px", fontWeight: 800, color: "#333" }}>선택금액</div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", height: "46px", borderRadius: "14px", border: "1px solid #E8E2DD", background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 800, color: "#222" }}>{registeredOptionTotalPrice > 0 ? won(registeredOptionTotalPrice) : "가격 직접입력"}</div>
                   </div>
                 </div>
 
