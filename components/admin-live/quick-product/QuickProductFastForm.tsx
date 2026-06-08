@@ -510,6 +510,7 @@ export default function QuickProductFastForm({
 }: QuickProductFastFormProps) {
   const [saleMode, setSaleMode] = useState<"broadcast" | "shop" | "both">("broadcast");
   const [category, setCategory] = useState("");
+  const [badgeType, setBadgeType] = useState("none");
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [addingCategory, setAddingCategory] = useState(false);
   const [newCategoryText, setNewCategoryText] = useState("");
@@ -615,6 +616,7 @@ export default function QuickProductFastForm({
           : "broadcast",
     );
     setCategory(String((productNote as { category?: unknown } | null)?.category || ""));
+    setBadgeType(String(pickString(initialProduct || {}, ["badge_type"], "none") || "none"));
     setProductName(pickString(initialProduct, ["product_name", "name", "title"], ""));
     setPriceText(formatNumberWithComma(pickNumber(initialProduct, ["price", "sale_price", "selling_price"], 0)));
     setShippingType(pickString(initialProduct, ["shipping_type", "delivery_type"], "normal"));
@@ -816,6 +818,7 @@ export default function QuickProductFastForm({
         status: isVisible ? "판매중" : "숨김",
         product_type: productType,
         sale_mode: saleMode,
+        badge_type: badgeType === "none" ? null : badgeType,
         shipping_type: shippingType,
         combine_shipping: shippingType === "vendor" ? "N" : "Y",
         sort_order: 0,
@@ -1022,6 +1025,26 @@ export default function QuickProductFastForm({
                 <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryText(""); }} style={{ padding: "7px 10px", borderRadius: "7px", border: "1px solid #E8E2DD", background: "#fff", fontSize: "12px", cursor: "pointer", color: "#888780" }}>취소</button>
               </div>
             ) : null}
+          </div>
+
+          {/* 상품 뱃지 */}
+          <div style={{ marginBottom: "14px" }}>
+            <div style={sectionLabel}>상품 뱃지</div>
+            <div style={{ fontSize: "11px", color: "#888780", marginBottom: "6px" }}>손님 상품 목록에 표시되는 뱃지</div>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+              {([["none", "없음"], ["new", "✨ NEW"], ["hot", "🔥 HOT"], ["limit", "⏰ 한정"]] as const).map(([v, l]) => {
+                const on = badgeType === v;
+                return (
+                  <div
+                    key={v}
+                    onClick={() => setBadgeType(v)}
+                    style={{ padding: "6px 12px", borderRadius: "8px", border: "1px solid " + (on ? "#7A1E47" : "#E5E1DC"), fontSize: "12px", fontWeight: 600, cursor: "pointer", color: on ? "#fff" : "#6B6460", background: on ? "#7A1E47" : "#fff" }}
+                  >
+                    {l}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* 판매채널 */}
