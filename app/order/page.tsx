@@ -4007,7 +4007,26 @@ export default function OrderPage() {
                     {visibleItems.map((product) => {
                       const img = pickOrderProductImageUrl(product);
                       const pinned = isPinnedOrderProduct(product);
-                      const sold = isSoldOutOrderProduct(product);
+                      const sold = (() => {
+                        if (isSoldOutOrderProduct(product)) return true;
+                        // 주문서에 담긴 수량 합산 후 재고 초과 체크
+                        const productIdStr = String(product.id ?? "");
+                        if (!productIdStr) return false;
+                        try {
+                          const note = typeof product.product_note === "string" ? JSON.parse(product.product_note) : product.product_note;
+                          if (note?.stock_management_enabled !== true) return false;
+                          const variants = Array.isArray(note?.stock_variants) ? note.stock_variants : [];
+                          if (variants.length === 0) return false;
+                          return variants.every((v: any) => {
+                            const maxStock = Number(v.stock ?? 0);
+                            const normC = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
+                            const inCart = items
+                              .filter((item) => item.product_id === productIdStr && normC(item.color) === normC(String(v.color ?? "")) && normC(item.size) === normC(String(v.size ?? "")))
+                              .reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+                            return inCart >= maxStock;
+                          });
+                        } catch { return false; }
+                      })();
                       const badgeType = String((product as unknown as Record<string, unknown>)?.badge_type || "").trim().toLowerCase();
                       return (
                         <div
