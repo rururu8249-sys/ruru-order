@@ -2765,8 +2765,8 @@ export default function OrderPage() {
     const nextItem: OrderItem = {
       product_id: String(product.id ?? ""),
       product_name: product.product_name,
-      color: normalizeEmptyProductOptionValue(options?.color ?? fallbackColor),
-      size: normalizeEmptyProductOptionValue(options?.size ?? fallbackSize),
+      color: options?.color ?? normalizeEmptyProductOptionValue(fallbackColor),
+      size: options?.size ?? normalizeEmptyProductOptionValue(fallbackSize),
       qty: String(Math.max(1, Number(options?.qty || 1))),
       product_price: nextProductPrice,
       shipping_type: product.shipping_type || "일반",
@@ -2827,6 +2827,16 @@ export default function OrderPage() {
           : "사이즈를 선택해주세요."
       );
       return;
+    }
+
+    const note = (() => { try { return typeof product.product_note === "string" ? JSON.parse(product.product_note) : product.product_note; } catch { return null; } })();
+    const variants = Array.isArray((note as any)?.stock_variants) ? (note as any).stock_variants : [];
+    if (variants.length > 0 && (product as any).stock_management_enabled === true) {
+      const matched = variants.find((v: any) => v.color === registeredOptionColor && v.size === registeredOptionSize);
+      if (matched && Number(matched.stock) <= 0) {
+        showCustomerNotice("선택한 옵션(" + [registeredOptionColor, registeredOptionSize].filter(Boolean).join("/") + ")의 재고가 없습니다.");
+        return;
+      }
     }
 
     addRegisteredProductToOrderItems(product, {
@@ -3838,7 +3848,7 @@ export default function OrderPage() {
       {hasSavedInfo ? (
         <section style={{ margin: "8px auto 0", width: "100%", maxWidth: "560px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "0.5px solid #E5E1DC" }}>
-            <div style={{ background: "#141414", aspectRatio: "1 / 1.15", position: "relative", overflow: "hidden" }}>
+            <div style={{ background: "#141414", minHeight: "200px", position: "relative", overflow: "hidden" }}>
               {isBroadcastOn && videoEmbedSrc ? (
                 <iframe
                   src={videoEmbedSrc}
@@ -3854,7 +3864,7 @@ export default function OrderPage() {
                 </div>
               )}
             </div>
-            <div style={{ background: "#fff", display: "flex", flexDirection: "column", padding: "10px", gap: "8px" }}>
+            <div style={{ background: "#fff", minHeight: "200px", display: "flex", flexDirection: "column", padding: "10px", gap: "8px" }}>
               <button
                 type="button"
                 disabled={!(isBroadcastOn && broadcastYoutubeUrl)}
@@ -3863,7 +3873,7 @@ export default function OrderPage() {
               >
                 🔴 라이브 참여하기
               </button>
-              <div style={{ flex: 1, background: "#F9EEF3", borderRadius: "8px", padding: "12px 14px", borderLeft: "3px solid #7A1E47", overflow: "hidden" }}>
+              <div style={{ flex: 1, background: "#F9EEF3", borderRadius: "8px", padding: "12px 14px", borderLeft: "3px solid #7A1E47", overflowY: "auto" }}>
                 {noticeText.trim() ? (
                   <>
                     <div style={{ fontSize: "13px", fontWeight: 700, color: "#7A1E47", marginBottom: "5px" }}>📌 공지</div>
