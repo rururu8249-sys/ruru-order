@@ -4,7 +4,7 @@
 // 목적: 주문서 화면 안에서 사용하는 고객 정보수정 바텀시트
 // 주의: UI 전용. DB, API, 주문저장, 입금매칭, 정산, 배송 로직 없음. (시안 딥로즈 #7B2D43 인라인)
 
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 type CustomerInfoEditBottomSheetProps = {
   open: boolean;
@@ -26,6 +26,9 @@ type CustomerInfoEditBottomSheetProps = {
   onOpenAddressSearch: () => void;
   onClose: () => void;
   onSave: () => void | Promise<void>;
+
+  shippingAddresses?: any[];
+  onSaveShippingAddresses?: (addresses: any[]) => Promise<void>;
 
   saving?: boolean;
 };
@@ -88,9 +91,14 @@ export default function CustomerInfoEditBottomSheet({
   onOpenAddressSearch,
   onClose,
   onSave,
+  shippingAddresses = [],
+  onSaveShippingAddresses,
   saving = false,
 }: CustomerInfoEditBottomSheetProps) {
   const addressTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [editingAddrIndex, setEditingAddrIndex] = useState<number | null>(null);
+  const [addrForm, setAddrForm] = useState({ name: "", phone: "", address: "", detailAddress: "" });
+  const [addrFormOpen, setAddrFormOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -113,7 +121,7 @@ export default function CustomerInfoEditBottomSheet({
         <div style={{ display: "flex", maxHeight: "88dvh", flexDirection: "column" }}>
           <header style={{ flexShrink: 0, padding: "20px 16px 12px" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: "8px", whiteSpace: "nowrap" }}>
-              <h2 style={{ fontSize: "26px", fontWeight: 800, lineHeight: 1, letterSpacing: "-0.08em", color: "#7B2D43" }}>정보수정</h2>
+              <h2 style={{ fontSize: "26px", fontWeight: 800, lineHeight: 1, letterSpacing: "-0.08em", color: "#7A1E47" }}>정보수정</h2>
               <span style={{ fontSize: "12px", fontWeight: 800, color: "#999" }}>배송정보 확인</span>
             </div>
             <p style={{ marginTop: "8px", fontSize: "12px", fontWeight: 700, lineHeight: 1.6, color: "#999" }}>
@@ -173,7 +181,7 @@ export default function CustomerInfoEditBottomSheet({
                   <button
                     type="button"
                     onClick={onOpenAddressSearch}
-                    style={{ borderRadius: "999px", border: "none", background: "#7B2D43", padding: "6px 14px", fontSize: "11px", fontWeight: 800, color: "#fff", cursor: "pointer" }}
+                    style={{ borderRadius: "999px", border: "none", background: "#7A1E47", padding: "6px 14px", fontSize: "11px", fontWeight: 800, color: "#fff", cursor: "pointer" }}
                   >
                     주소검색
                   </button>
@@ -202,6 +210,55 @@ export default function CustomerInfoEditBottomSheet({
                   autoComplete="address-line2"
                 />
               </div>
+
+              {onSaveShippingAddresses ? (
+                <div>
+                  <div style={{ fontSize: "12px", fontWeight: 800, color: "#888", marginBottom: "2px" }}>배송지 관리</div>
+
+                  {shippingAddresses.map((a, index) => (
+                    <div key={index} style={{ background: "#fff", border: "1px solid #E5E1DC", borderRadius: "10px", padding: "12px 14px", marginTop: "8px" }}>
+                      <div style={{ fontSize: "13px", fontWeight: 700, color: "#1A1A1A", display: "flex", alignItems: "center", gap: "6px" }}>
+                        {a.name || "-"} · {a.phone || "-"}
+                        {a.isDefault ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#7A1E47", background: "#F9EEF3", borderRadius: "5px", padding: "2px 6px" }}>기본</span> : null}
+                      </div>
+                      <div style={{ fontSize: "12px", color: "#6B6460", marginTop: "3px" }}>{[a.address, a.detailAddress].filter(Boolean).join(" ") || "-"}</div>
+                      <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
+                        <button type="button" onClick={() => { setEditingAddrIndex(index); setAddrForm({ name: a.name || "", phone: a.phone || "", address: a.address || "", detailAddress: a.detailAddress || "" }); setAddrFormOpen(true); }} style={{ border: "1px solid #7A1E47", color: "#7A1E47", background: "#fff", borderRadius: "6px", padding: "4px 10px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>수정</button>
+                        <button type="button" onClick={() => onSaveShippingAddresses(shippingAddresses.filter((_, i) => i !== index))} style={{ border: "1px solid #FFCCCC", color: "#C0392B", background: "#FFF5F5", borderRadius: "6px", padding: "4px 10px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>삭제</button>
+                        {!a.isDefault ? (
+                          <button type="button" onClick={() => onSaveShippingAddresses(shippingAddresses.map((x, i) => ({ ...x, isDefault: i === index })))} style={{ border: "1px solid #E5E1DC", color: "#6B6460", background: "#F5F3F0", borderRadius: "6px", padding: "4px 10px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>기본으로</button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+
+                  {!addrFormOpen ? (
+                    <button type="button" onClick={() => { setAddrFormOpen(true); setEditingAddrIndex(null); setAddrForm({ name: "", phone: "", address: "", detailAddress: "" }); }} style={{ width: "100%", padding: "11px", border: "1px dashed #E5E1DC", borderRadius: "10px", background: "#fff", fontSize: "13px", color: "#ABA5A0", marginTop: "8px", cursor: "pointer" }}>+ 배송지 추가</button>
+                  ) : (
+                    <div style={{ background: "#F5F3F0", borderRadius: "10px", padding: "14px", marginTop: "8px" }}>
+                      <input value={addrForm.name} onChange={(e) => setAddrForm((f) => ({ ...f, name: e.target.value }))} placeholder="이름" style={{ ...inputStyle, height: "42px", fontSize: "14px" }} />
+                      <input value={addrForm.phone} onChange={(e) => setAddrForm((f) => ({ ...f, phone: e.target.value }))} placeholder="전화번호" inputMode="numeric" style={{ ...inputStyle, height: "42px", fontSize: "14px", marginTop: "8px" }} />
+                      <textarea value={addrForm.address} onChange={(e) => setAddrForm((f) => ({ ...f, address: e.target.value }))} placeholder="주소" rows={2} style={{ ...textareaStyle, marginTop: "8px" }} />
+                      <input value={addrForm.detailAddress} onChange={(e) => setAddrForm((f) => ({ ...f, detailAddress: e.target.value }))} placeholder="상세주소" style={{ ...inputStyle, height: "42px", fontSize: "14px", marginTop: "8px" }} />
+                      <div style={{ display: "flex", gap: "6px", marginTop: "10px" }}>
+                        <button type="button" onClick={() => { setAddrFormOpen(false); setEditingAddrIndex(null); }} style={{ flex: 1, padding: "10px", border: "1px solid #D9C5CC", background: "#fff", color: "#666", borderRadius: "8px", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}>취소</button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (editingAddrIndex !== null) onSaveShippingAddresses(shippingAddresses.map((a, i) => (i === editingAddrIndex ? { ...addrForm } : a)));
+                            else onSaveShippingAddresses([...shippingAddresses, { ...addrForm, isDefault: shippingAddresses.length === 0 }]);
+                            setAddrFormOpen(false);
+                            setEditingAddrIndex(null);
+                          }}
+                          style={{ flex: 1, padding: "10px", border: "none", background: "#7A1E47", color: "#fff", borderRadius: "8px", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}
+                        >
+                          저장
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -219,7 +276,7 @@ export default function CustomerInfoEditBottomSheet({
               type="button"
               onClick={onSave}
               disabled={saving}
-              style={{ display: "flex", minHeight: "50px", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "none", background: saving ? "#cbd5e1" : "#7B2D43", padding: "0 12px", fontSize: "15px", fontWeight: 800, color: "#fff", cursor: saving ? "default" : "pointer" }}
+              style={{ display: "flex", minHeight: "50px", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "none", background: saving ? "#cbd5e1" : "#7A1E47", padding: "0 12px", fontSize: "15px", fontWeight: 800, color: "#fff", cursor: saving ? "default" : "pointer" }}
             >
               {saving ? "저장 중..." : "저장"}
             </button>

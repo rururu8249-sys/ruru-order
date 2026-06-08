@@ -1022,6 +1022,7 @@ export default function OrderPage() {
   const [alreadyPaidShipping, setAlreadyPaidShipping] = useState(false);
   const [paidShippingGroups, setPaidShippingGroups] = useState<PaidShippingGroups>({ ...EMPTY_PAID_SHIPPING_GROUPS });
   const [customerPointBalance, setCustomerPointBalance] = useState(0);
+  const [shippingAddresses, setShippingAddresses] = useState<any[]>([]);
   const [customerPointLoading, setCustomerPointLoading] = useState(false);
   const [pointUseInput, setPointUseInput] = useState("");
   const [directInputOpen, setDirectInputOpen] = useState(false);
@@ -1645,6 +1646,9 @@ export default function OrderPage() {
   };
 
   const applyCustomerFromRow = (customer: any, fallbackPhone = "") => {
+    if (Array.isArray(customer?.shipping_addresses)) {
+      setShippingAddresses(customer.shipping_addresses);
+    }
     const nextNickname = String(customer?.youtube_nickname || "").trim();
     const nextName = String(customer?.customer_name || "").trim();
     const nextPhone = normalizePhone(customer?.customer_phone || fallbackPhone);
@@ -2913,6 +2917,13 @@ export default function OrderPage() {
       setHasSavedInfo(true);
       setCustomerMode("load");
     }
+  };
+
+  const saveShippingAddresses = async (addresses: any[]) => {
+    const cleanPhone = normalizePhone(customerPhone);
+    if (!cleanPhone || cleanPhone.length < 10) return;
+    await supabase.from("customers").update({ shipping_addresses: addresses }).eq("customer_phone", cleanPhone);
+    setShippingAddresses(addresses);
   };
 
   const validate = (options?: { allowMissingDetailAddress?: boolean }) => {
@@ -4670,6 +4681,8 @@ export default function OrderPage() {
           onAddressChange={setAddress}
           onDetailAddressChange={setDetailAddress}
           onOpenAddressSearch={openAddressSearch}
+          shippingAddresses={shippingAddresses}
+          onSaveShippingAddresses={saveShippingAddresses}
           onClose={closeCustomerInfoEditBottomSheet}
           onSave={completeEditCustomerInfo}
         />
