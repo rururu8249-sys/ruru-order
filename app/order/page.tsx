@@ -1004,6 +1004,8 @@ export default function OrderPage() {
   });
   const [videoOpen, setVideoOpen] = useState(true);
   const [productPage, setProductPage] = useState(1);
+  const [visibleProductCount, setVisibleProductCount] = useState(10);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [cartAddedOpen, setCartAddedOpen] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string>("");
   const [orderLookupOrders, setOrderLookupOrders] = useState<any[]>([]);
@@ -2672,6 +2674,17 @@ export default function OrderPage() {
     });
   }, [broadcastProducts, groupBuyQuickProductsFromCatalog]);
 
+  // P4 상품목록 무한스크롤: 센티넬이 보이면 10개씩 더 노출 (센티넬이 조건부로 (재)마운트되므로 재부착)
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) setVisibleProductCount((c) => c + 10);
+    }, { threshold: 0.1 });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [visibleProductCount, quickGroupBuyProducts.length]);
+
   const visibleQuickGroupBuyProducts = showAllGroupBuyQuickProducts
     ? quickGroupBuyProducts
     : quickGroupBuyProducts.slice(0, 3);
@@ -3905,23 +3918,20 @@ export default function OrderPage() {
           {(() => {
             const q = productSearchText.trim();
             const filtered = quickGroupBuyProducts.filter((p) => !q || productMatchesSuggestion(p as BroadcastProduct, q));
-            const PAGE = 6;
-            const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE));
-            const safePage = Math.min(productPage, totalPages);
-            const pageItems = filtered.slice((safePage - 1) * PAGE, safePage * PAGE);
+            const visibleItems = filtered.slice(0, visibleProductCount);
             return (
               <section style={{ margin: "12px auto 0", width: "100%", maxWidth: "560px" }}>
                 <input
                   value={productSearchText}
-                  onChange={(e) => { setProductSearchText(e.target.value); setProductPage(1); }}
+                  onChange={(e) => { setProductSearchText(e.target.value); setProductPage(1); setVisibleProductCount(10); }}
                   placeholder="🔍 상품 이름 검색"
                   style={{ width: "100%", height: "48px", boxSizing: "border-box", border: "1px solid #D9C5CC", borderRadius: "14px", padding: "0 16px", fontSize: "15px", fontWeight: 700, color: "#333", outline: "none" }}
                 />
-                {pageItems.length === 0 ? (
+                {visibleItems.length === 0 ? (
                   <div style={{ marginTop: "14px", padding: "26px", textAlign: "center", color: "#999", fontSize: "14px", fontWeight: 700 }}>찾는 상품이 없어요. 아래 직접 입력으로 담아주세요.</div>
                 ) : (
                   <div style={{ marginTop: "8px", display: "flex", flexDirection: "column" }}>
-                    {pageItems.map((product) => {
+                    {visibleItems.map((product) => {
                       const img = pickOrderProductImageUrl(product);
                       const pinned = isPinnedOrderProduct(product);
                       const sold = isSoldOutOrderProduct(product);
@@ -3960,17 +3970,11 @@ export default function OrderPage() {
                     })}
                   </div>
                 )}
-                {totalPages > 1 ? (
-                  <div style={{ marginTop: "14px", display: "flex", justifyContent: "center", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-                    <button type="button" onClick={() => setProductPage((p) => Math.max(1, p - 1))} disabled={safePage <= 1} style={{ width: "32px", height: "32px", borderRadius: "8px", border: "1px solid #D9C5CC", background: "#fff", color: "#7B2D43", fontWeight: 800, cursor: safePage <= 1 ? "default" : "pointer", opacity: safePage <= 1 ? 0.4 : 1 }}>‹</button>
-                    {Array.from({ length: totalPages }).map((_, i) => (
-                      <button key={i} type="button" onClick={() => setProductPage(i + 1)} style={{ minWidth: "32px", height: "32px", borderRadius: "8px", border: "1px solid #D9C5CC", background: safePage === i + 1 ? "#7B2D43" : "#fff", color: safePage === i + 1 ? "#fff" : "#7B2D43", fontWeight: 800, fontSize: "13px", cursor: "pointer", padding: "0 6px" }}>{i + 1}</button>
-                    ))}
-                    <button type="button" onClick={() => setProductPage((p) => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages} style={{ width: "32px", height: "32px", borderRadius: "8px", border: "1px solid #D9C5CC", background: "#fff", color: "#7B2D43", fontWeight: 800, cursor: safePage >= totalPages ? "default" : "pointer", opacity: safePage >= totalPages ? 0.4 : 1 }}>›</button>
-                  </div>
+                {filtered.length > visibleProductCount ? (
+                  <div ref={sentinelRef} style={{ height: "1px", marginBottom: "8px" }} />
                 ) : null}
                 {directInputEnabled ? (
-                  <button type="button" onClick={openDirectInputSheet} style={{ marginTop: "12px", width: "100%", border: "1px solid #D9C5CC", background: "#fff", borderRadius: "14px", padding: "13px", fontSize: "14px", fontWeight: 800, color: "#7B2D43", cursor: "pointer" }}>+ 상품을 못 찾으셨나요? 직접 입력하기</button>
+                  <button type="button" onClick={openDirectInputSheet} style={{ marginTop: "12px", width: "100%", border: "1px solid #D9C5CC", background: "#fff", borderRadius: "14px", padding: "13px", fontSize: "14px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+ 상품을 못 찾으셨나요? 직접 입력하기</button>
                 ) : null}
               </section>
             );
