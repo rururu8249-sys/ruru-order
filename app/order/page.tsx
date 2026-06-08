@@ -612,10 +612,7 @@ function getRegisteredOptionMode(product: BroadcastProduct, field: "color" | "si
 function registeredProductNeedsOptionSelect(product: BroadcastProduct): boolean {
   // 옵션을 골라야 하거나(select) 직접 입력해야 하는(input) 필드가 하나라도 있으면 시트를 거친다.
   // 둘 다 "none"(없음입력 토글 ON)인 상품만 시트 없이 바로 담긴다.
-  return (
-    getRegisteredOptionMode(product, "color") !== "none" ||
-    getRegisteredOptionMode(product, "size") !== "none"
-  );
+  return true;
 }
 
 function findMatchedBroadcastProduct(item: OrderItem, products: BroadcastProduct[]): BroadcastProduct | null {
@@ -4247,14 +4244,30 @@ export default function OrderPage() {
                 </div>
 
                 <div style={{ minHeight: 0, flex: 1, overflowY: "auto", padding: "16px" }}>
+                  {registeredOptionColorChoices.length === 0 && registeredOptionSizeChoices.length === 0 ? (
+                    <div style={{ padding: "12px 16px 0", fontSize: "12px", color: "#ABA5A0" }}>
+                      이 상품은 옵션이 없습니다. 수량만 선택해 주세요.
+                    </div>
+                  ) : null}
                   {registeredOptionColorChoices.length > 0 ? (
                     <div style={{ marginBottom: "16px" }}>
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>색상</div>
                       {registeredOptionColorChoices.length >= 3 ? (
-                        <select value={registeredOptionColor} onChange={(e) => setRegisteredOptionColor(e.target.value)} style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: `1.5px solid ${!registeredOptionColor.trim() ? "#E8B5B0" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: registeredOptionColor ? "#222" : "#999", outline: "none" }}>
-                          <option value="">색상 선택</option>
-                          {registeredOptionColorChoices.map((option) => <option key={`c-${option}`} value={option}>{option}</option>)}
-                        </select>
+                        <div style={{ overflowX: "auto", display: "flex", gap: "6px", paddingBottom: "4px", WebkitOverflowScrolling: "touch", marginBottom: "14px" }}>
+                          {registeredOptionColorChoices.map((option) => {
+                            const selected = registeredOptionColor === option;
+                            return (
+                              <button
+                                key={`c-${option}`}
+                                type="button"
+                                onClick={() => setRegisteredOptionColor(option)}
+                                style={{ flexShrink: 0, minWidth: "44px", height: "40px", borderRadius: "10px", border: selected ? "1.5px solid #7A1E47" : "1.5px solid #E8E2DD", background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", cursor: "pointer", fontSize: "13px", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 12px" }}
+                              >
+                                {option}
+                              </button>
+                            );
+                          })}
+                        </div>
                       ) : (
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                           {registeredOptionColorChoices.map((option) => (
