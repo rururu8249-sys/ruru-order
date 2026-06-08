@@ -4031,13 +4031,13 @@ export default function OrderPage() {
                       return (
                         <div
                           key={String(product.id)}
-                          style={{ display: "flex", gap: "12px", alignItems: "center", padding: "13px 0", borderBottom: "0.5px solid #E5E1DC", opacity: sold ? 0.5 : 1 }}
+                          style={{ display: "flex", gap: "12px", alignItems: "center", padding: "13px 0", borderBottom: "0.5px solid #E5E1DC" }}
                         >
                           <div onClick={() => { if (img) setLightboxImage(img); }} style={{ position: "relative", flexShrink: 0, width: "84px", height: "84px", borderRadius: "10px", background: "#F0EBE8", overflow: "hidden", cursor: img ? "zoom-in" : "default" }}>
                             {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
-                            {isSoldOutOrderProduct(product) ? (
-                              <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)", borderRadius: "inherit", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                <span style={{ color: "white", fontSize: "10px", fontWeight: 800, letterSpacing: "0.05em" }}>SOLD OUT</span>
+                            {sold ? (
+                              <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", borderRadius: "inherit", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                                <span style={{ color: "white", fontSize: "11px", fontWeight: 800, letterSpacing: "0.1em" }}>SOLD OUT</span>
                               </div>
                             ) : null}
                           </div>
