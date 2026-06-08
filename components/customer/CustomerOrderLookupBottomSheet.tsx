@@ -4,7 +4,7 @@
 
 import type { CSSProperties } from "react";
 
-export type CustomerOrderLookupFilter = "전체" | "입금대기" | "입금확인" | "출고완료";
+export type CustomerOrderLookupFilter = "전체" | "입금대기" | "입금확인" | "출고완료" | "주문취소";
 
 const BAND_TRACKING_URL = "https://band.us/@ruru8249";
 
@@ -39,11 +39,12 @@ const clampPage = (page: number, totalPages: number) => {
   return Math.min(Math.max(1, safePage), safeTotalPages);
 };
 
-// 시안 배지색(정확 hex): 입금확인 초록#0F6E56 / 택배출고(출고완료) 파랑#185FA5 / 입금대기 노랑#854F0B / 그 외(출고대기) 회색
+// 시안 배지색(정확 hex): 입금확인 초록#0F6E56 / 택배출고(출고완료) 파랑#185FA5 / 입금대기 노랑#854F0B / 주문취소 빨강#C0392B / 그 외(출고대기) 회색
 const paymentChipStyle = (statusLabel: CustomerOrderLookupFilter): CSSProperties => {
   if (statusLabel === "입금확인") return { background: "#E1F5EE", color: "#0F6E56" };
   if (statusLabel === "출고완료") return { background: "#E6F1FB", color: "#185FA5" };
   if (statusLabel === "입금대기") return { background: "#FAEEDA", color: "#854F0B" };
+  if (statusLabel === "주문취소") return { background: "#FBEAE7", color: "#C0392B" };
   return { background: "#EEEEEE", color: "#888888" };
 };
 
@@ -90,7 +91,7 @@ export default function CustomerOrderLookupBottomSheet({
               <span style={{ fontSize: "12px", fontWeight: 800, color: "#999" }}>최근 7일 주문내역</span>
             </div>
 
-            <div style={{ marginTop: "14px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", borderRadius: "14px", background: "#F5F1F2", padding: "4px", gap: "2px" }}>
+            <div style={{ marginTop: "14px", display: "grid", gridTemplateColumns: `repeat(${filters.length}, 1fr)`, borderRadius: "14px", background: "#F5F1F2", padding: "4px", gap: "2px" }}>
               {filters.map((filter) => {
                 const selected = activeFilter === filter;
                 return (
@@ -98,7 +99,7 @@ export default function CustomerOrderLookupBottomSheet({
                     key={filter}
                     type="button"
                     onClick={() => onFilterChange(filter)}
-                    style={{ minHeight: "38px", borderRadius: "11px", border: "none", padding: "0 6px", fontSize: "12px", fontWeight: 800, cursor: "pointer", background: selected ? "#7B2D43" : "transparent", color: selected ? "#fff" : "#888" }}
+                    style={{ minHeight: "38px", borderRadius: "11px", border: "none", padding: "0 4px", fontSize: "12px", fontWeight: 800, cursor: "pointer", background: selected ? "#7B2D43" : "transparent", color: selected ? "#fff" : "#888", whiteSpace: "nowrap" }}
                   >
                     {filter}
                   </button>

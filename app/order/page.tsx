@@ -189,7 +189,7 @@ const BANK_NAME = "새마을금고";
 const BANK_ACCOUNT = "9002186993725";
 const BANK_HOLDER = "유혜원";
 
-const ORDER_LOOKUP_FILTERS = ["전체", "입금대기", "입금확인", "출고완료"] as const;
+const ORDER_LOOKUP_FILTERS = ["전체", "입금대기", "입금확인", "출고완료", "주문취소"] as const;
 const ORDER_LOOKUP_PER_PAGE = 2;
 const FOOTER_TEXT = "© since 2024 루루동이 | All Rights Reserved.";
 const MENU_ITEM_STYLE: CSSProperties = {
@@ -3302,6 +3302,23 @@ export default function OrderPage() {
   const ruruOrderLookupText = (value: unknown) => String(value || "").trim();
 
   const ruruOrderLookupStatusLabel = (order: any): CustomerOrderLookupFilter => {
+    // 주문취소 최우선 판정 (관리자와 동일하게 payment_status="canceled"도 포함)
+    const cancelText = [
+      order?.payment_status,
+      order?.paymentStatus,
+      order?.order_manage_status,
+      order?.order_status,
+      order?.admin_status,
+      order?.admin_order_status_v2,
+      order?.status,
+    ]
+      .map(ruruOrderLookupText)
+      .join(" ");
+
+    if (/주문서취소|주문취소|취소|환불|cancel|refund/i.test(cancelText)) {
+      return "주문취소";
+    }
+
     const deliveryText = [
       order?.delivery_status,
       order?.shipping_status,
