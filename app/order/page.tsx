@@ -758,6 +758,14 @@ function isPinnedOrderProduct(product: any): boolean {
 function isSoldOutOrderProduct(product: any): boolean {
   const note = readOrderNoteObject(product);
   if (note?.stock_management_enabled !== true) return false; // 재고관리 OFF면 품절 처리 안 함(주문 막지 않음)
+
+  // 옵션별 재고가 있으면 → 모든 옵션 stock<=0인지 체크
+  const variants = Array.isArray(note?.stock_variants) ? note.stock_variants : [];
+  if (variants.length > 0) {
+    return variants.every((v: any) => Number(v.stock ?? 0) <= 0);
+  }
+
+  // 옵션 없는 상품 → 기존대로 전체 stock 체크
   const stock = Number(product?.stock ?? product?.total_stock);
   return Number.isFinite(stock) && stock <= 0;
 }
@@ -3874,6 +3882,7 @@ export default function OrderPage() {
     : "none";
   const registeredOptionPrice = registeredOptionSelectProduct ? Number(registeredOptionSelectProduct.price || 0) : 0;
   const registeredOptionTotalPrice = Math.max(1, registeredOptionQty) * (Number.isFinite(registeredOptionPrice) ? registeredOptionPrice : 0);
+  const allOptionsSoldOut = registeredOptionSelectProduct ? isSoldOutOrderProduct(registeredOptionSelectProduct) : false;
 
   if (isKakaoLoginReturn && !isAutoLoggedIn) {
     return (
@@ -4449,7 +4458,11 @@ export default function OrderPage() {
 
                 <div style={{ flexShrink: 0, display: "grid", gridTemplateColumns: "0.85fr 1.15fr", gap: "10px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "12px 12px calc(12px + env(safe-area-inset-bottom))" }}>
                   <button type="button" onClick={closeRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#F1ECEE", fontSize: "16px", fontWeight: 800, color: "#666", cursor: "pointer" }}>닫기</button>
-                  <button type="button" onClick={confirmRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#7A1E47", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>주문서에 담기</button>
+                  {allOptionsSoldOut ? (
+                    <button type="button" disabled style={{ height: "52px", borderRadius: "16px", border: "none", background: "#ccc", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "not-allowed" }}>품절</button>
+                  ) : (
+                    <button type="button" onClick={confirmRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#7A1E47", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>주문서에 담기</button>
+                  )}
                 </div>
               </div>
             </div>
