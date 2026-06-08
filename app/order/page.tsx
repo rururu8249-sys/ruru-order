@@ -2783,13 +2783,31 @@ export default function OrderPage() {
     };
 
     setItems((prev) => {
-      const emptyIndex = prev.findIndex((item) => !item.product_name.trim());
-
-      if (emptyIndex >= 0) {
-        return prev.map((item, index) => (index === emptyIndex ? nextItem : item));
+      const maxQty = (() => {
+        try {
+          const note = typeof product.product_note === "string" ? JSON.parse(product.product_note) : product.product_note;
+          const mgmtOn = (note as any)?.stock_management_enabled === true || (product as any).stock_management_enabled === true;
+          if (!mgmtOn) return 999;
+          const variants = Array.isArray((note as any)?.stock_variants) ? (note as any).stock_variants : [];
+          if (variants.length === 0) return 999;
+          const matched = variants.find((v: any) => String(v.color ?? "").trim() === nextItem.color.trim() && String(v.size ?? "").trim() === nextItem.size.trim());
+          return matched ? Number(matched.stock) : 999;
+        } catch { return 999; }
+      })();
+      const addQty = Number(nextItem.qty) || 1;
+      const sameIndex = nextItem.product_id ? prev.findIndex((item) => item.product_id === nextItem.product_id && item.color === nextItem.color && item.size === nextItem.size && item.product_name.trim() !== "") : -1;
+      if (sameIndex >= 0) {
+        const existingQty = Number(prev[sameIndex].qty) || 1;
+        const newQty = Math.min(existingQty + addQty, maxQty);
+        if (newQty <= existingQty) { showCustomerNotice("재고가 부족해요. 최대 " + maxQty + "개까지 담을 수 있어요."); return prev; }
+        return prev.map((item, index) => index === sameIndex ? { ...item, qty: String(newQty) } : item);
       }
-
-      return [...prev, nextItem];
+      const clampedQty = Math.min(addQty, maxQty);
+      if (clampedQty < addQty) showCustomerNotice("재고가 부족해요. " + clampedQty + "개로 조정했어요.");
+      const clampedItem = clampedQty !== addQty ? { ...nextItem, qty: String(clampedQty) } : nextItem;
+      const emptyIndex = prev.findIndex((item) => !item.product_name.trim());
+      if (emptyIndex >= 0) return prev.map((item, index) => (index === emptyIndex ? clampedItem : item));
+      return [...prev, clampedItem];
     });
 
     setProductSearchOpenIndex(null);
@@ -4078,7 +4096,23 @@ export default function OrderPage() {
                               <div style={{ display: "flex", alignItems: "center", border: "1px solid #E5E1DC", borderRadius: "8px", overflow: "hidden" }}>
                                 <button type="button" onClick={() => updateItem(index, "qty", String(Math.max(1, (toNumber(item.qty) || 1) - 1)))} aria-label="수량 줄이기" style={{ width: "28px", height: "28px", border: "none", background: "#fff", fontSize: "15px", fontWeight: 800, color: "#555", cursor: "pointer" }}>−</button>
                                 <span style={{ minWidth: "28px", textAlign: "center", fontSize: "13px", fontWeight: 800, color: "#1A1A1A" }}>{toNumber(item.qty) || 1}</span>
-                                <button type="button" onClick={() => updateItem(index, "qty", String((toNumber(item.qty) || 1) + 1))} aria-label="수량 늘리기" style={{ width: "28px", height: "28px", border: "none", background: "#fff", fontSize: "15px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+</button>
+                                <button type="button" onClick={() => {
+                                  const maxStock = (() => {
+                                    if (!matchedRegisteredProduct) return 999;
+                                    try {
+                                      const note = typeof matchedRegisteredProduct.product_note === "string" ? JSON.parse(matchedRegisteredProduct.product_note) : matchedRegisteredProduct.product_note;
+                                      const mgmtOn = (note as any)?.stock_management_enabled === true || (matchedRegisteredProduct as any).stock_management_enabled === true;
+                                      if (!mgmtOn) return 999;
+                                      const variants = Array.isArray((note as any)?.stock_variants) ? (note as any).stock_variants : [];
+                                      if (variants.length === 0) return 999;
+                                      const matched = variants.find((v: any) => String(v.color ?? "").trim() === item.color.trim() && String(v.size ?? "").trim() === item.size.trim());
+                                      return matched ? Number(matched.stock) : 999;
+                                    } catch { return 999; }
+                                  })();
+                                  const cur = toNumber(item.qty) || 1;
+                                  if (cur >= maxStock) { showCustomerNotice("재고가 부족해요. 최대 " + maxStock + "개까지 담을 수 있어요."); return; }
+                                  updateItem(index, "qty", String(cur + 1));
+                                }} aria-label="수량 늘리기" style={{ width: "28px", height: "28px", border: "none", background: "#fff", fontSize: "15px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+</button>
                               </div>
                             ) : (
                               <span style={{ fontSize: "12px", fontWeight: 700, color: "#6B6460" }}>수량 {toNumber(item.qty) || 1}개</span>
@@ -4385,7 +4419,14 @@ export default function OrderPage() {
                       <div style={{ display: "grid", gridTemplateColumns: "42px 1fr 42px", height: "46px", borderRadius: "14px", border: "1px solid #E8E2DD", overflow: "hidden" }}>
                         <button type="button" onClick={() => setRegisteredOptionQty((c) => Math.max(1, c - 1))} style={{ borderRight: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#555", cursor: "pointer" }}>−</button>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionQty}</div>
-                        <button type="button" onClick={() => setRegisteredOptionQty((c) => c + 1)} style={{ borderLeft: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+</button>
+                        <button type="button" onClick={() => {
+                          const maxStock = (() => {
+                            if (!registeredOptionSelectProduct || registeredOptionStockVariants.length === 0) return 999;
+                            const matched = registeredOptionStockVariants.find((v: any) => String(v.color ?? "").trim() === registeredOptionColor.trim() && String(v.size ?? "").trim() === registeredOptionSize.trim());
+                            return matched ? Number(matched.stock) : 999;
+                          })();
+                          setRegisteredOptionQty((c) => Math.min(c + 1, maxStock));
+                        }} style={{ borderLeft: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+</button>
                       </div>
                     </div>
                     <div>
