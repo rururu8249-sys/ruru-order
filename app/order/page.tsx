@@ -3963,34 +3963,25 @@ export default function OrderPage() {
           })()}
 
           {orderSheetOpen && (
-          <div style={{ position: "fixed", inset: 0, zIndex: 35, background: "rgba(0,0,0,0.45)" }} onClick={(e) => { if (e.target === e.currentTarget) setOrderSheetOpen(false); }}>
-            <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: "430px", maxHeight: "90vh", overflowY: "auto", borderTopLeftRadius: "24px", borderTopRightRadius: "24px", background: "#fff", boxShadow: "0 -20px 60px rgba(0,0,0,0.25)" }}>
-              <div style={{ position: "sticky", top: 0, zIndex: 1, background: "#fff", padding: "10px 0 6px" }}>
-                <div style={{ margin: "0 auto", height: "5px", width: "44px", borderRadius: "3px", background: "#D9C5CC" }} />
-                <button type="button" onClick={() => setOrderSheetOpen(false)} aria-label="닫기" style={{ position: "absolute", top: "8px", right: "12px", width: "32px", height: "32px", borderRadius: "50%", border: "1px solid #D9C5CC", background: "#fff", color: "#7B2D43", fontSize: "16px", fontWeight: 800, cursor: "pointer" }}>✕</button>
+          <div style={{ position: "fixed", inset: 0, zIndex: 35, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={(e) => { if (e.target === e.currentTarget) setOrderSheetOpen(false); }}>
+            <div style={{ background: "#fff", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: "430px", maxHeight: "92dvh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              <div style={{ width: "40px", height: "4px", borderRadius: "2px", background: "#E5E1DC", margin: "12px auto 0", flexShrink: 0 }} />
+              <div style={{ flexShrink: 0, padding: "12px 18px", borderBottom: "0.5px solid #E5E1DC", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "17px", fontWeight: 800, color: "#1A1A1A" }}>주문서 확인</span>
+                <button type="button" onClick={() => setOrderSheetOpen(false)} aria-label="닫기" style={{ width: "28px", height: "28px", borderRadius: "50%", background: "#F5F3F0", border: "none", color: "#888", fontSize: "15px", cursor: "pointer" }}>✕</button>
               </div>
-              <div style={{ padding: "0 12px 96px" }}>
-          <section id="orderSheetSection" className="mt-3 w-full max-w-full overflow-hidden rounded-[24px] border border-rose-line bg-rose-soft/40 p-3 shadow-sm">
-            <div className="mb-4">
-              <h2 className="text-[17px] font-black tracking-[-0.06em] text-slate-950">
-                주문서 확인
-              </h2>
-              <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
-                담은 상품과 금액을 확인해 주세요.
-              </p>
-            </div>
-
+              <div style={{ flexShrink: 0, margin: "10px 16px 0", background: "#FFF0F0", borderRadius: "10px", padding: "11px 14px", borderLeft: "3px solid #E8340A" }}>
+                <div style={{ fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>⚠️ 임의로 주문 내용을 수정하시면 안돼요!</div>
+                <div style={{ fontSize: "11px", color: "#C0392B", lineHeight: 1.6, marginTop: "3px" }}>방송에서 루루언니에게 확인 후 수정해 주세요.</div>
+              </div>
+              <div style={{ overflowY: "auto", flex: 1 }}>
             {selectedItemEntries.length === 0 ? (
-              <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50 p-5 text-center">
-                <p className="text-[14px] font-black tracking-[-0.04em] text-slate-700">
-                  아직 담은 상품이 없습니다.
-                </p>
-                <p className="mt-1 break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
-                  상품목록에서 [담기]를 누르거나 [직접 입력]으로 담아주세요.
-                </p>
+              <div style={{ padding: "40px 18px", textAlign: "center" }}>
+                <p style={{ fontSize: "14px", fontWeight: 800, color: "#1A1A1A" }}>아직 담은 상품이 없습니다.</p>
+                <p style={{ marginTop: "6px", fontSize: "12px", fontWeight: 600, color: "#ABA5A0", lineHeight: 1.6 }}>상품목록에서 [담기]를 누르거나 [직접 입력]으로 담아주세요.</p>
               </div>
             ) : (
-              <div className="grid w-full max-w-full gap-2 overflow-hidden">
+              <div>
                 {selectedItemEntries.map(({ item, index }) => {
                   const matchedRegisteredProduct = findMatchedBroadcastProduct(item, broadcastProducts);
                   const itemIsRegisteredProduct = Boolean(item.product_id || matchedRegisteredProduct);
@@ -4007,117 +3998,37 @@ export default function OrderPage() {
                   return (
                     <article
                       key={`selected-item-${index}`}
-                      data-ruru-selected-item-card="wide-compact-v1"
-                      className="rounded-[22px] border border-slate-200 bg-white p-2.5 shadow-[0_8px_20px_rgba(15,23,42,0.05)]"
+                      style={{ padding: "12px 18px", borderBottom: "0.5px solid #E5E1DC", display: "flex", gap: "10px", alignItems: "flex-start" }}
                     >
-                      <div className="grid grid-cols-[78px_minmax(0,1fr)] gap-2.5">
-                        <div className="h-[78px] w-[78px] overflow-hidden rounded-[16px] bg-slate-100 ring-1 ring-slate-200">
-                          {imageUrl ? (
-                            <img
-                              src={imageUrl}
-                              alt={item.product_name}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center px-2 text-center text-[10px] font-black leading-tight tracking-[-0.04em] text-slate-400">
-                              {itemSourceLabel}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="min-w-0">
-                          <div className="flex min-w-0 items-start justify-between gap-2">
-                            <div className="min-w-0 flex-1">
-                              <div className="mb-1 flex min-w-0 flex-wrap items-center gap-1">
-                                <span className="rounded-full px-1.5 py-0.5 text-[10px] font-black tracking-[-0.04em]" style={{ background: "#F5E6EB", color: "#7B2D43" }}>
-                                  상품 {index + 1}
-                                </span>
-                                <span
-                                  className={`rounded-full px-1.5 py-0.5 text-[10px] font-black tracking-[-0.04em] ring-1 ${
-                                    itemIsRegisteredProduct
-                                      ? "bg-rose-soft text-rose-deep ring-rose-line"
-                                      : "bg-amber-50 text-amber-700 ring-amber-100"
-                                  }`}
-                                >
-                                  {itemSourceLabel}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="flex shrink-0 items-center gap-1">
-                              {!canInlineChangeQty && (
-                                <button
-                                  type="button"
-                                  onClick={() => openDirectInputEditSheet(index)}
-                                  className={`${buttonBase} rounded-full px-2 py-1 text-[11px] font-black tracking-[-0.04em]`}
-                                  style={{ border: "1px solid #D9C5CC", background: "#F5E6EB", color: "#7B2D43" }}
-                                >
-                                  수정
-                                </button>
-                              )}
-
-                              <button
-                                type="button"
-                                onClick={() => removeItem(index)}
-                                className={`${buttonBase} rounded-full border border-red-100 bg-white px-2 py-1 text-[11px] font-black tracking-[-0.04em] text-red-500`}
-                              >
-                                삭제
-                              </button>
-                            </div>
-                          </div>
-
-                          <h3 className="mt-0.5 line-clamp-2 break-keep pr-1 text-[16px] font-black leading-snug tracking-[-0.06em] text-slate-950">
-                            {item.product_name || "상품명 없음"}
-                          </h3>
-
-                          <p className="mt-1 min-w-0 truncate text-[12px] font-bold tracking-[-0.04em] text-slate-500">
-                            {itemHasNoOptions ? "옵션 없음" : `${optionColorText} / ${optionSizeText}`} · 단가 {won(toNumber(item.product_price))}
-                          </p>
-                        </div>
+                      <div style={{ width: "54px", height: "54px", borderRadius: "8px", background: "#F0EBE8", flexShrink: 0, overflow: "hidden" }}>
+                        {imageUrl ? (
+                          <img src={imageUrl} alt={item.product_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        ) : (
+                          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", fontWeight: 800, color: "#ABA5A0", textAlign: "center", padding: "0 4px" }}>{itemSourceLabel}</div>
+                        )}
                       </div>
 
-                      <div className="mt-2 flex items-center justify-between gap-2 rounded-[16px] bg-slate-50 px-2.5 py-2 ring-1 ring-slate-100">
-                        {canInlineChangeQty ? (
-                          <div
-                            data-ruru-selected-item-inline-qty="enabled"
-                            className="grid h-10 w-[116px] grid-cols-3 overflow-hidden rounded-[14px] border border-slate-200 bg-white"
-                          >
-                            <button
-                              type="button"
-                              onClick={() => updateItem(index, "qty", String(Math.max(1, (toNumber(item.qty) || 1) - 1)))}
-                              className="flex items-center justify-center text-[18px] font-black text-slate-700 active:bg-slate-50"
-                              aria-label="수량 줄이기"
-                            >
-                              -
-                            </button>
-                            <div className="flex items-center justify-center border-x border-slate-100 text-[15px] font-black tracking-[-0.04em] text-slate-950">
-                              {toNumber(item.qty) || 1}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => updateItem(index, "qty", String((toNumber(item.qty) || 1) + 1))}
-                              className="flex items-center justify-center text-[18px] font-black text-rose-deep active:bg-rose-soft"
-                              aria-label="수량 늘리기"
-                            >
-                              +
-                            </button>
-                          </div>
-                        ) : (
-                          <div
-                            data-ruru-selected-item-qty-readonly="enabled"
-                            className="rounded-[14px] bg-white px-3 py-2 text-[13px] font-black tracking-[-0.04em] text-slate-600 ring-1 ring-slate-200"
-                          >
-                            수량 {toNumber(item.qty) || 1}개
-                          </div>
-                        )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: "13px", fontWeight: 600, color: "#1A1A1A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.product_name || "상품명 없음"}</div>
+                        <div style={{ fontSize: "11px", color: "#ABA5A0", marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{itemHasNoOptions ? "옵션 없음" : `${optionColorText} / ${optionSizeText}`} · 단가 {won(toNumber(item.product_price))}</div>
 
-                        <div className="min-w-0 text-right">
-                          <p className="text-[10px] font-black tracking-[-0.04em] text-slate-400">
-                            상품금액
-                          </p>
-                          <p className="text-[21px] font-black leading-tight tracking-[-0.07em]" style={{ color: "#7B2D43" }}>
-                            {won(itemAmount)}
-                          </p>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "6px", gap: "8px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                            {canInlineChangeQty ? (
+                              <div style={{ display: "flex", alignItems: "center", border: "1px solid #E5E1DC", borderRadius: "8px", overflow: "hidden" }}>
+                                <button type="button" onClick={() => updateItem(index, "qty", String(Math.max(1, (toNumber(item.qty) || 1) - 1)))} aria-label="수량 줄이기" style={{ width: "28px", height: "28px", border: "none", background: "#fff", fontSize: "15px", fontWeight: 800, color: "#555", cursor: "pointer" }}>−</button>
+                                <span style={{ minWidth: "28px", textAlign: "center", fontSize: "13px", fontWeight: 800, color: "#1A1A1A" }}>{toNumber(item.qty) || 1}</span>
+                                <button type="button" onClick={() => updateItem(index, "qty", String((toNumber(item.qty) || 1) + 1))} aria-label="수량 늘리기" style={{ width: "28px", height: "28px", border: "none", background: "#fff", fontSize: "15px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+</button>
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: "12px", fontWeight: 700, color: "#6B6460" }}>수량 {toNumber(item.qty) || 1}개</span>
+                            )}
+                            {!canInlineChangeQty && (
+                              <button type="button" onClick={() => openDirectInputEditSheet(index)} style={{ border: "none", background: "none", padding: "2px 4px", fontSize: "12px", fontWeight: 700, color: "#7A1E47", cursor: "pointer" }}>수정</button>
+                            )}
+                            <button type="button" onClick={() => removeItem(index)} style={{ border: "none", background: "none", padding: "2px 4px", fontSize: "12px", fontWeight: 700, color: "#C0392B", cursor: "pointer" }}>삭제</button>
+                          </div>
+                          <span style={{ flexShrink: 0, fontSize: "14px", fontWeight: 700, color: "#7A1E47" }}>{won(itemAmount)}</span>
                         </div>
                       </div>
                     </article>
@@ -4125,131 +4036,128 @@ export default function OrderPage() {
                 })}
               </div>
             )}
-          </section>
 
-          <section className="mt-3 rounded-[24px] border border-rose-line bg-white p-3 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
+            <section style={{ padding: "16px 18px", borderTop: "0.5px solid #E5E1DC" }}>
+              <div style={{ fontSize: "14px", fontWeight: 800, color: "#1A1A1A", marginBottom: "12px" }}>결제 방법을 선택해 주세요.</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                {(["무통장입금", "카드결제"] as const).map((method) => (
+                  <button
+                    key={method}
+                    type="button"
+                    onClick={() => setPaymentMethod(method)}
+                    style={{ minHeight: "68px", borderRadius: "16px", padding: "12px", textAlign: "left", border: paymentMethod === method ? "2px solid #7A1E47" : "1px solid #E5E1DC", background: paymentMethod === method ? "#F9EEF3" : "#fff", cursor: "pointer" }}
+                  >
+                    <span style={{ display: "block", fontSize: "15px", fontWeight: 800, color: paymentMethod === method ? "#7A1E47" : "#444" }}>
+                      {method === "카드결제" ? `카드결제 (+${cardRateForCustomer}%)` : method}
+                    </span>
+                    <span style={{ marginTop: "4px", display: "block", fontSize: "11px", fontWeight: 800, lineHeight: 1.3, color: paymentMethod === method ? "#7A1E47" : "#999" }}>
+                      {method === "무통장입금" ? "입금자명·금액 확인" : "카톡채널 결제 문의"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {paymentMethod === "카드결제" && (
+                <div style={{ marginTop: "12px", borderRadius: "16px", border: "1px solid #E5E1DC", background: "#F9EEF3", padding: "12px", fontSize: "13px", fontWeight: 800, lineHeight: 1.6, color: "#7A1E47" }}>
+                  ⓘ 카드결제는 {cardPaymentMinAmount.toLocaleString()}원 이상 구매 시 가능합니다.
+                  <br />
+                  주문서 제출 후 카톡채널로 문의 남겨주세요.
+                </div>
+              )}
+
+              <label className="mt-4 block">
+                <span className="mb-2 block text-[13px] font-black tracking-[-0.04em] text-slate-700">
+                  요청사항
+                </span>
+                <textarea
+                  value={requestMemo}
+                  onChange={(event) => setRequestMemo(event.target.value)}
+                  placeholder="예) 문 앞에 놓아주세요 / 배송 전 연락주세요"
+                  className="min-h-[88px] w-full resize-none rounded-[20px] border border-slate-200 bg-slate-50 p-4 text-[15px] font-bold leading-relaxed tracking-[-0.04em] outline-none focus:border-rose-deep"
+                />
+              </label>
+            </section>
+
+            <section
+              data-ruru-price-section="redesigned"
+              style={{ padding: "16px 18px", borderTop: "0.5px solid #E5E1DC" }}
+            >
               <div className="min-w-0">
-                <p className="text-[12px] font-black tracking-[-0.04em] text-rose-deep">
-                  결제방식
+                <p className="text-[12px] font-black tracking-[-0.04em]" style={{ color: "#7A1E47" }}>
+                  최종 확인
                 </p>
                 <h2 className="mt-1 text-[18px] font-black tracking-[-0.06em] text-slate-950">
-                  결제 방법을 선택해 주세요.
+                  결제금액 확인
                 </h2>
+                <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
+                  상품금액, 배송비, 포인트 사용 금액을 확인해주세요.
+                </p>
               </div>
-              <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-black tracking-[-0.04em] text-slate-500">
-                필수 확인
-              </span>
-            </div>
 
-            <div style={{ marginTop: "16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-              {(["무통장입금", "카드결제"] as const).map((method) => (
-                <button
-                  key={method}
-                  type="button"
-                  onClick={() => setPaymentMethod(method)}
-                  style={{ minHeight: "68px", borderRadius: "16px", padding: "12px", textAlign: "left", border: paymentMethod === method ? "2px solid #7B2D43" : "1px solid #E8E2DD", background: paymentMethod === method ? "#F5E6EB" : "#fff", cursor: "pointer" }}
+              {shippingNoticeText && (
+                <div
+                  className={`mt-3 rounded-[20px] p-3 text-[13px] font-black leading-relaxed tracking-[-0.04em] ${
+                    shippingFee > 0
+                      ? "bg-amber-50 text-amber-800 ring-1 ring-amber-100"
+                      : "bg-green-50 text-green-700 ring-1 ring-green-100"
+                  }`}
                 >
-                  <span style={{ display: "block", fontSize: "15px", fontWeight: 800, color: paymentMethod === method ? "#7B2D43" : "#444" }}>
-                    {method === "카드결제" ? `카드결제 (+${cardRateForCustomer}%)` : method}
-                  </span>
-                  <span style={{ marginTop: "4px", display: "block", fontSize: "11px", fontWeight: 800, lineHeight: 1.3, color: paymentMethod === method ? "#7B2D43" : "#999" }}>
-                    {method === "무통장입금" ? "입금자명·금액 확인" : "카톡채널 결제 문의"}
-                  </span>
-                </button>
-              ))}
-            </div>
+                  {shippingFee > 0 ? "🚚" : "✅"} {shippingNoticeText}
+                </div>
+              )}
 
-            {paymentMethod === "카드결제" && (
-              <div style={{ marginTop: "12px", borderRadius: "16px", border: "1px solid #D9C5CC", background: "#F5E6EB", padding: "12px", fontSize: "13px", fontWeight: 800, lineHeight: 1.6, color: "#7B2D43" }}>
-                ⓘ 카드결제는 {cardPaymentMinAmount.toLocaleString()}원 이상 구매 시 가능합니다.
-                <br />
-                주문서 제출 후 카톡채널로 문의 남겨주세요.
-              </div>
-            )}
-
-            <label className="mt-4 block">
-              <span className="mb-2 block text-[13px] font-black tracking-[-0.04em] text-slate-700">
-                요청사항
-              </span>
-              <textarea
-                value={requestMemo}
-                onChange={(event) => setRequestMemo(event.target.value)}
-                placeholder="예) 문 앞에 놓아주세요 / 배송 전 연락주세요"
-                className="min-h-[88px] w-full resize-none rounded-[20px] border border-slate-200 bg-slate-50 p-4 text-[15px] font-bold leading-relaxed tracking-[-0.04em] outline-none focus:border-rose-deep"
-              />
-            </label>
-          </section>
-
-          <section
-            data-ruru-price-section="redesigned"
-            className="mt-3 rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm"
-          >
-            <div className="min-w-0">
-              <p className="text-[12px] font-black tracking-[-0.04em] text-rose-deep">
-                최종 확인
-              </p>
-              <h2 className="mt-1 text-[18px] font-black tracking-[-0.06em] text-slate-950">
-                결제금액 확인
-              </h2>
-              <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
-                상품금액, 배송비, 포인트 사용 금액을 확인해주세요.
-              </p>
-            </div>
-
-            {shippingNoticeText && (
-              <div
-                className={`mt-3 rounded-[20px] p-3 text-[13px] font-black leading-relaxed tracking-[-0.04em] ${
-                  shippingFee > 0
-                    ? "bg-amber-50 text-amber-800 ring-1 ring-amber-100"
-                    : "bg-green-50 text-green-700 ring-1 ring-green-100"
-                }`}
-              >
-                {shippingFee > 0 ? "🚚" : "✅"} {shippingNoticeText}
-              </div>
-            )}
-
-            <div data-ruru-price-summary-wrapper="flat" className="mt-4">
-              <OrderPriceSummaryBox
-                productAmount={productAmount}
-                shippingFee={shippingFee}
-                cardExtra={cardExtra}
-                totalAmount={totalAmount}
-                paymentMethod={paymentMethod}
-                customerPointBalance={customerPointBalance}
-                customerPointLoading={customerPointLoading}
-                pointUseInput={commaNumberText(pointUseInput)}
-                pointUsedAmount={selectedPointUseAmount}
-                finalAmount={finalPaymentAmount}
-                pointEarnRate={pointEarnRateForDisplay}
-                showPointUse={customerPointBalance >= 1000 && totalAmount > 0}
-                onPointUseInputChange={(value) => setPointUseInput(onlyNumber(value))}
-                onUseAllPoints={() => setPointUseInput(String(Math.min(customerPointBalance, totalAmount)))}
-              />
-            </div>
-
-            {!hasPrivacyConsent && !hasSavedOrderCustomerInfo && (
-              <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-[22px] bg-rose-soft p-4 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-rose-deep ring-1 ring-rose-line active:scale-[0.99]">
-                <input
-                  type="checkbox"
-                  checked={privacyConsentChecked}
-                  onChange={(event) => {
-                    const checked = event.target.checked;
-                    setPrivacyConsentChecked(checked);
-                    if (checked && typeof window !== "undefined") {
-                      window.localStorage.setItem(PRIVACY_CONSENT_STORAGE_KEY, PRIVACY_CONSENT_VERSION);
-                    }
-                  }}
-                  className="mt-1 h-5 w-5 shrink-0 accent-rose-deep"
+              <div data-ruru-price-summary-wrapper="flat" className="mt-4">
+                <OrderPriceSummaryBox
+                  productAmount={productAmount}
+                  shippingFee={shippingFee}
+                  cardExtra={cardExtra}
+                  totalAmount={totalAmount}
+                  paymentMethod={paymentMethod}
+                  customerPointBalance={customerPointBalance}
+                  customerPointLoading={customerPointLoading}
+                  pointUseInput={commaNumberText(pointUseInput)}
+                  pointUsedAmount={selectedPointUseAmount}
+                  finalAmount={finalPaymentAmount}
+                  pointEarnRate={pointEarnRateForDisplay}
+                  showPointUse={customerPointBalance >= 1000 && totalAmount > 0}
+                  onPointUseInputChange={(value) => setPointUseInput(onlyNumber(value))}
+                  onUseAllPoints={() => setPointUseInput(String(Math.min(customerPointBalance, totalAmount)))}
                 />
-                <span>
-                  [필수] 개인정보 수집·이용 및 배송정보 제공 안내를 확인했습니다.
-                  <br />
-                  <span className="text-slate-500">한 번 동의하면 다음부터 다시 묻지 않습니다.</span>
-                </span>
-              </label>
-            )}
-          </section>
+              </div>
+
+              {!hasPrivacyConsent && !hasSavedOrderCustomerInfo && (
+                <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-[22px] bg-rose-soft p-4 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-rose-deep ring-1 ring-rose-line active:scale-[0.99]">
+                  <input
+                    type="checkbox"
+                    checked={privacyConsentChecked}
+                    onChange={(event) => {
+                      const checked = event.target.checked;
+                      setPrivacyConsentChecked(checked);
+                      if (checked && typeof window !== "undefined") {
+                        window.localStorage.setItem(PRIVACY_CONSENT_STORAGE_KEY, PRIVACY_CONSENT_VERSION);
+                      }
+                    }}
+                    className="mt-1 h-5 w-5 shrink-0 accent-rose-deep"
+                  />
+                  <span>
+                    [필수] 개인정보 수집·이용 및 배송정보 제공 안내를 확인했습니다.
+                    <br />
+                    <span className="text-slate-500">한 번 동의하면 다음부터 다시 묻지 않습니다.</span>
+                  </span>
+                </label>
+              )}
+            </section>
+              </div>
+
+              <div style={{ flexShrink: 0, padding: "12px 18px calc(12px + env(safe-area-inset-bottom))", borderTop: "0.5px solid #E5E1DC", background: "#fff" }}>
+                <button
+                  type="button"
+                  onClick={handleSubmitOrderClick}
+                  disabled={submitting || customerBlockStatus.blocked}
+                  style={{ width: "100%", padding: "14px", background: submitting || customerBlockStatus.blocked ? "#cbd5e1" : "#7A1E47", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: submitting || customerBlockStatus.blocked ? "default" : "pointer" }}
+                >
+                  {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : "주문서 제출 →"}
+                </button>
               </div>
             </div>
           </div>
