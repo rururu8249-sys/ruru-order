@@ -3863,11 +3863,11 @@ export default function OrderPage() {
               >
                 🔴 라이브 참여하기
               </button>
-              <div style={{ flex: 1, background: "#F9EEF3", borderRadius: "8px", padding: "9px 10px", borderLeft: "3px solid #7A1E47", overflow: "hidden" }}>
+              <div style={{ flex: 1, background: "#F9EEF3", borderRadius: "8px", padding: "12px 14px", borderLeft: "3px solid #7A1E47", overflow: "hidden" }}>
                 {noticeText.trim() ? (
                   <>
-                    <div style={{ fontSize: "10px", fontWeight: 700, color: "#7A1E47", marginBottom: "5px" }}>📌 공지</div>
-                    <div style={{ fontSize: "11px", color: "#1A1A1A", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{noticeText}</div>
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: "#7A1E47", marginBottom: "5px" }}>📌 공지</div>
+                    <div style={{ fontSize: "14px", color: "#1A1A1A", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{noticeText}</div>
                   </>
                 ) : null}
               </div>
