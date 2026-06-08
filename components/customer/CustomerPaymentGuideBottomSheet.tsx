@@ -101,29 +101,30 @@ export default function CustomerPaymentGuideBottomSheet({
       aria-modal="true"
       aria-label={isOrderComplete ? "주문 접수 완료 및 입금 안내" : "입금 안내"}
     >
+      <style>{`
+  @keyframes point-right {
+    0%, 100% { transform: translateY(-50%) translateX(0); }
+    50% { transform: translateY(-50%) translateX(-8px); }
+  }
+`}</style>
       <div style={{ width: "100%", maxWidth: "430px", overflow: "hidden", borderTopLeftRadius: "28px", borderTopRightRadius: "28px", background: "#fff", boxShadow: "0 -22px 70px rgba(15,23,42,0.22)" }}>
         <div style={{ margin: "12px auto 0", height: "5px", width: "52px", borderRadius: "3px", background: "#E8E2DD" }} />
 
         <div style={{ maxHeight: "86dvh", overflowY: "auto", padding: "20px 16px calc(16px + env(safe-area-inset-bottom))" }}>
-          <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
-            <div style={{ minWidth: 0 }}>
-              <p style={{ fontSize: "12px", fontWeight: 800, letterSpacing: "-0.04em", color: "#7B2D43" }}>루루동이 LIVE</p>
-              <h2 style={{ marginTop: "4px", fontSize: "26px", fontWeight: 800, lineHeight: 1.2, letterSpacing: "-0.07em", color: "#222" }}>
-                {isOrderComplete ? "주문 접수 완료" : "입금 안내"}
-              </h2>
-              <p style={{ marginTop: "8px", wordBreak: "keep-all", fontSize: "14px", fontWeight: 700, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#666" }}>
-                {isOrderComplete ? "입금자명과 계좌번호를 확인해주세요." : "현재 보이는 닉네임으로 입금해주세요."}
-              </p>
-            </div>
-            <div style={{ display: "flex", height: "48px", width: "48px", flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: "16px", background: "#F5E6EB", border: "1px solid #D9C5CC", fontSize: "25px" }}>
-              {isOrderComplete ? "✅" : "💙"}
-            </div>
-          </header>
-
-          {isOrderComplete && showBankGuide && (
-            <div style={{ marginTop: "16px", borderRadius: "14px", background: "#7B2D43", padding: "12px 16px", fontSize: "13px", fontWeight: 800, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#fff" }}>
-              닉네임과 결제금액이 정확히 맞아야 자동 입금확인이 됩니다.
-            </div>
+          {isOrderComplete ? (
+            <header>
+              <div style={{ fontSize: "13px", color: "#6B6460" }}>✅ 주문 접수됐어요</div>
+              <div style={{ fontSize: "12px", color: "#ABA5A0", marginTop: "3px" }}>아래 안내대로 입금해 주세요</div>
+            </header>
+          ) : (
+            <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontSize: "12px", fontWeight: 800, letterSpacing: "-0.04em", color: "#7B2D43" }}>루루동이 LIVE</p>
+                <h2 style={{ marginTop: "4px", fontSize: "26px", fontWeight: 800, lineHeight: 1.2, letterSpacing: "-0.07em", color: "#222" }}>입금 안내</h2>
+                <p style={{ marginTop: "8px", wordBreak: "keep-all", fontSize: "14px", fontWeight: 700, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#666" }}>현재 보이는 닉네임으로 입금해주세요.</p>
+              </div>
+              <div style={{ display: "flex", height: "48px", width: "48px", flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: "16px", background: "#F5E6EB", border: "1px solid #D9C5CC", fontSize: "25px" }}>💙</div>
+            </header>
           )}
 
           {isFullyPaidByPoints && (
@@ -139,12 +140,12 @@ export default function CustomerPaymentGuideBottomSheet({
           )}
 
           {showCardGuide && (
-            <section style={{ marginTop: "16px", borderRadius: "18px", background: "#F5E6EB", border: "1px solid #D9C5CC", padding: "16px" }}>
+            <section style={{ marginTop: "16px", borderRadius: "18px", background: "#F9EEF3", border: "1px solid #D9C5CC", padding: "16px" }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
                 <div style={{ display: "flex", height: "44px", width: "44px", flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: "14px", background: "#fff", fontSize: "23px" }}>💳</div>
                 <div style={{ minWidth: 0 }}>
-                  <h3 style={{ fontSize: "18px", fontWeight: 800, letterSpacing: "-0.06em", color: "#7B2D43" }}>카드결제 안내</h3>
-                  <p style={{ marginTop: "4px", wordBreak: "keep-all", fontSize: "13px", fontWeight: 700, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#7B2D43" }}>카드결제는 카톡채널 안내에 따라 진행해주세요.</p>
+                  <h3 style={{ fontSize: "18px", fontWeight: 800, letterSpacing: "-0.06em", color: "#7A1E47" }}>카드결제 안내</h3>
+                  <p style={{ marginTop: "4px", wordBreak: "keep-all", fontSize: "13px", fontWeight: 700, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#7A1E47" }}>카드결제는 카톡채널 안내에 따라 진행해주세요.</p>
                 </div>
               </div>
             </section>
@@ -152,39 +153,27 @@ export default function CustomerPaymentGuideBottomSheet({
 
           {showBankGuide && (
             <>
-              <section style={{ marginTop: "16px", borderRadius: "18px", background: "#F5E6EB", border: "1px solid #D9C5CC", padding: "16px" }}>
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
-                  <div style={{ minWidth: 0 }}>
-                    <p style={{ fontSize: "12px", fontWeight: 800, letterSpacing: "-0.04em", color: "#888" }}>입금자명</p>
-                    <p style={{ marginTop: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "30px", fontWeight: 800, lineHeight: 1.2, letterSpacing: "-0.08em", color: "#7B2D43" }} title={safeNickname}>
-                      {safeNickname}
-                    </p>
-                    <p style={{ marginTop: "8px", wordBreak: "keep-all", fontSize: "12px", fontWeight: 700, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#666" }}>이 닉네임으로 입금해주세요.</p>
-                  </div>
-                  <div style={{ display: "flex", height: "48px", width: "48px", flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: "16px", background: "rgba(255,255,255,0.8)", border: "1px solid #D9C5CC", fontSize: "24px" }}>👤</div>
-                </div>
-              </section>
-
-              <section style={{ marginTop: "12px", borderRadius: "18px", background: "#FAF6F2", border: "1px solid #E8E2DD", padding: "16px" }}>
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <p style={{ fontSize: "12px", fontWeight: 800, letterSpacing: "-0.04em", color: "#888" }}>계좌번호</p>
-                    <p style={{ marginTop: "4px", wordBreak: "break-all", fontSize: "19px", fontWeight: 800, lineHeight: 1.35, letterSpacing: "-0.06em", color: "#222" }} title={`${safeBankName} ${safeBankAccount}`}>
-                      {safeBankName} {safeBankAccount}
-                    </p>
-                    <p style={{ marginTop: "8px", fontSize: "13px", fontWeight: 800, letterSpacing: "-0.04em", color: "#555" }}>예금주 {safeBankHolder}</p>
-                  </div>
-                  <div style={{ display: "flex", height: "48px", width: "48px", flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: "16px", background: "rgba(255,255,255,0.8)", border: "1px solid #E8E2DD", fontSize: "24px" }}>🏦</div>
-                </div>
-              </section>
-
-              <div style={{ marginTop: "12px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                <button type="button" onClick={onCopyNickname} style={nicknameCopyDone ? doneButtonStyle : normalButtonStyle}>
+              <div style={{ position: "relative", marginTop: "16px", background: "#FFFBEB", borderRadius: "12px", padding: "16px", paddingRight: "28px" }}>
+                <div style={{ fontSize: "11px", color: "#6B6460", marginBottom: "6px" }}>입금자명 (닉네임)</div>
+                <div style={{ fontSize: "26px", fontWeight: 800, color: "#1A1A1A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={safeNickname}>{safeNickname}</div>
+                <div style={{ fontSize: "11px", color: "#854F0B", marginTop: "6px" }}>⚠️ 반드시 이 닉네임으로 입금해 주세요</div>
+                <button type="button" onClick={onCopyNickname} style={{ ...(nicknameCopyDone ? doneButtonStyle : normalButtonStyle), marginTop: "12px", width: "100%" }}>
                   {nicknameCopyDone ? "고객 닉네임 복사완료" : "입금자명(닉네임) 복사"}
                 </button>
-                <button type="button" onClick={onCopyBankAccount} style={bankCopyDone ? doneButtonStyle : normalButtonStyle}>
+                <span style={{ position: "absolute", right: "-8px", top: "50%", fontSize: "22px", animation: "point-right 1s ease-in-out infinite" }}>👈</span>
+              </div>
+
+              <div style={{ textAlign: "center", fontSize: "18px", color: "#ABA5A0", margin: "8px 0" }}>↓</div>
+
+              <div style={{ position: "relative", background: "#F9EEF3", borderRadius: "12px", padding: "16px", paddingRight: "28px" }}>
+                <div style={{ fontSize: "11px", color: "#6B6460", marginBottom: "6px" }}>입금금액</div>
+                <div style={{ fontSize: "26px", fontWeight: 800, color: "#7A1E47" }}>{won(safeFinalAmount)}</div>
+                <div style={{ fontSize: "13px", color: "#555", marginTop: "6px" }}>{safeBankName} {safeBankAccount}</div>
+                <div style={{ fontSize: "11px", color: "#ABA5A0", marginTop: "3px" }}>예금주 {safeBankHolder}</div>
+                <button type="button" onClick={onCopyBankAccount} style={{ ...(bankCopyDone ? doneButtonStyle : normalButtonStyle), marginTop: "12px", width: "100%" }}>
                   {bankCopyDone ? "계좌번호 복사완료" : "계좌번호 복사"}
                 </button>
+                <span style={{ position: "absolute", right: "-8px", top: "50%", fontSize: "22px", animation: "point-right 1s ease-in-out infinite" }}>👈</span>
               </div>
             </>
           )}
@@ -226,7 +215,7 @@ export default function CustomerPaymentGuideBottomSheet({
                 )}
                 <div style={{ marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid #D9C5CC", paddingTop: "12px", fontSize: "17px", fontWeight: 800, color: "#222" }}>
                   <span>{safePointUsedAmount > 0 ? "최종 결제금액" : "결제금액"}</span>
-                  <span style={{ color: "#7B2D43" }}>{won(safeFinalAmount)}</span>
+                  <span style={{ color: "#7A1E47" }}>{won(safeFinalAmount)}</span>
                 </div>
               </div>
             </section>
@@ -235,7 +224,7 @@ export default function CustomerPaymentGuideBottomSheet({
           <button
             type="button"
             onClick={onClose}
-            style={{ marginTop: "16px", display: "flex", minHeight: "52px", width: "100%", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "none", background: "#7B2D43", padding: "0 16px", fontSize: "16px", fontWeight: 800, letterSpacing: "-0.05em", color: "#fff", cursor: "pointer" }}
+            style={{ marginTop: "16px", display: "flex", minHeight: "52px", width: "100%", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "none", background: "#7A1E47", padding: "0 16px", fontSize: "16px", fontWeight: 800, letterSpacing: "-0.05em", color: "#fff", cursor: "pointer" }}
           >
             확인
           </button>
