@@ -3801,12 +3801,6 @@ export default function OrderPage() {
     <OrderPageShell>
       {hasSavedInfo && <TopCustomerNav />}
 
-      {noticeText.trim() ? (
-        <div style={{ margin: "10px auto 0", width: "100%", maxWidth: "560px", background: "#F9EEF3", borderLeft: "3px solid #7A1E47", borderRadius: "8px", padding: "11px 14px", fontSize: "13px", fontWeight: 700, lineHeight: 1.6, color: "#7A1E47", whiteSpace: "pre-wrap" }}>
-          {noticeText}
-        </div>
-      ) : null}
-
       <CustomerPointGiftPopup />
 
       {/* P2. 주문방법 접기/펼치기 (시안) */}
@@ -3839,29 +3833,52 @@ export default function OrderPage() {
         </section>
       ) : null}
 
-      {/* P3. 방송 영상 (방송 ON + URL 있을 때만) */}
-      {hasSavedInfo && isBroadcastOn && videoEmbedSrc ? (
+      {/* P3. 방송 영상 — 방송 ON/OFF 상관없이 항상 표시 (좌:영상 / 우:라이브참여·공지) */}
+      {hasSavedInfo ? (
         <section style={{ margin: "8px auto 0", width: "100%", maxWidth: "560px" }}>
-          <button
-            type="button"
-            onClick={() => setVideoOpen((v) => !v)}
-            style={{ width: "100%", display: "flex", alignItems: "center", gap: "8px", border: "1px solid #D9C5CC", background: "#fff", borderRadius: "12px", padding: "12px 14px", fontSize: "14px", fontWeight: 800, color: "#7B2D43", cursor: "pointer" }}
-          >
-            📺 라이브 방송
-            <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#C0392B", borderRadius: "4px", padding: "2px 6px" }}>LIVE</span>
-            <span style={{ marginLeft: "auto", fontSize: "12px", color: "#7B2D43" }}>{videoOpen ? "접기 ▲" : "보기 ▼"}</span>
-          </button>
-          {videoOpen ? (
-            <div style={{ marginTop: "6px", borderRadius: "12px", overflow: "hidden", background: "#000", aspectRatio: "16 / 9" }}>
-              <iframe
-                src={videoEmbedSrc}
-                title="루루동이 라이브"
-                style={{ width: "100%", height: "100%", border: 0 }}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-              />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "0.5px solid #E5E1DC" }}>
+            <div style={{ background: "#141414", aspectRatio: "1 / 1.15", position: "relative", overflow: "hidden" }}>
+              {isBroadcastOn && videoEmbedSrc ? (
+                <iframe
+                  src={videoEmbedSrc}
+                  title="루루동이 라이브"
+                  style={{ width: "100%", height: "100%", border: "none", position: "absolute", inset: 0 }}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+              ) : (
+                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ fontSize: "28px", opacity: 0.3 }}>📺</span>
+                  <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", textAlign: "center", lineHeight: 1.5, marginTop: "6px" }}>현재 방송 중이<br />아닙니다</span>
+                </div>
+              )}
             </div>
-          ) : null}
+            <div style={{ background: "#fff", display: "flex", flexDirection: "column", padding: "10px", gap: "8px" }}>
+              <button
+                type="button"
+                disabled={!(isBroadcastOn && broadcastYoutubeUrl)}
+                onClick={isBroadcastOn && broadcastYoutubeUrl ? () => window.open(broadcastYoutubeUrl, "_blank") : undefined}
+                style={{ background: "#E8340A", color: "#fff", border: "none", borderRadius: "8px", padding: "11px 6px", fontSize: "12px", fontWeight: 700, opacity: isBroadcastOn && broadcastYoutubeUrl ? 1 : 0.4, cursor: isBroadcastOn && broadcastYoutubeUrl ? "pointer" : "default" }}
+              >
+                🔴 라이브 참여하기
+              </button>
+              <div style={{ flex: 1, background: "#F9EEF3", borderRadius: "8px", padding: "9px 10px", borderLeft: "3px solid #7A1E47", overflow: "hidden" }}>
+                {noticeText.trim() ? (
+                  <>
+                    <div style={{ fontSize: "10px", fontWeight: 700, color: "#7A1E47", marginBottom: "5px" }}>📌 공지</div>
+                    <div style={{ fontSize: "11px", color: "#1A1A1A", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{noticeText}</div>
+                  </>
+                ) : null}
+              </div>
+            </div>
+          </div>
+          <div style={{ padding: "9px 14px", borderBottom: "0.5px solid #E5E1DC", fontSize: "12px", fontWeight: 700, color: "#555" }}>
+            {broadcast ? (
+              <span>{ruruOrderLookupDateText(broadcast.started_at)} · {String(broadcast.broadcast_public_title || broadcast.public_title || "").trim() || "라이브 방송"}</span>
+            ) : (
+              <span>다음 방송을 기다려주세요 🙏</span>
+            )}
+          </div>
         </section>
       ) : null}
 
@@ -3915,43 +3932,41 @@ export default function OrderPage() {
                 {pageItems.length === 0 ? (
                   <div style={{ marginTop: "14px", padding: "26px", textAlign: "center", color: "#999", fontSize: "14px", fontWeight: 700 }}>찾는 상품이 없어요. 아래 직접 입력으로 담아주세요.</div>
                 ) : (
-                  <div style={{ marginTop: "12px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <div style={{ marginTop: "8px", display: "flex", flexDirection: "column" }}>
                     {pageItems.map((product) => {
                       const img = pickOrderProductImageUrl(product);
                       const pinned = isPinnedOrderProduct(product);
                       const sold = isSoldOutOrderProduct(product);
+                      const badgeType = String((product as unknown as Record<string, unknown>)?.badge_type || "").trim().toLowerCase();
                       return (
                         <div
                           key={String(product.id)}
-                          style={{ position: "relative", textAlign: "left", border: `1.5px solid ${pinned ? "#7B2D43" : "#E8E2DD"}`, borderRadius: "14px", background: "#fff", overflow: "hidden", opacity: sold ? 0.6 : 1, display: "flex", flexDirection: "column" }}
+                          style={{ display: "flex", gap: "12px", alignItems: "center", padding: "13px 0", borderBottom: "0.5px solid #E5E1DC", opacity: sold ? 0.5 : 1 }}
                         >
-                          <div onClick={() => { if (img) setLightboxImage(img); }} style={{ position: "relative", width: "100%", height: "120px", background: "#f3f0ee", cursor: img ? "zoom-in" : "default" }}>
-                            {img ? (
-                              <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                            ) : (
-                              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "32px" }}>👟</div>
-                            )}
-                            {pinned ? (
-                              <span style={{ position: "absolute", top: "6px", left: "6px", fontSize: "10px", fontWeight: 800, color: "#fff", background: "#7B2D43", borderRadius: "5px", padding: "3px 7px" }}>방송중</span>
-                            ) : null}
-                            {sold ? (
-                              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.22)" }}>
-                                <span style={{ transform: "rotate(-12deg)", color: "#C0392B", fontSize: "20px", fontWeight: 800, letterSpacing: "1px", textShadow: "0 1px 3px #fff" }}>SOLD OUT</span>
-                              </div>
-                            ) : null}
+                          <div onClick={() => { if (img) setLightboxImage(img); }} style={{ flexShrink: 0, width: "84px", height: "84px", borderRadius: "10px", background: "#F0EBE8", overflow: "hidden", cursor: img ? "zoom-in" : "default" }}>
+                            {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
                           </div>
-                          <div style={{ padding: "8px 10px 6px" }}>
-                            <div style={{ fontSize: "13px", fontWeight: 700, color: "#222", lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", minHeight: "34px" }}>{product.product_name}</div>
-                            <div style={{ marginTop: "3px", fontSize: "15px", fontWeight: 800, color: "#7B2D43" }}>{won(Number(product.price || 0))}</div>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ display: "flex", gap: "4px", marginBottom: "4px", flexWrap: "wrap" }}>
+                              {isBroadcastOn && pinned ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#E8340A", borderRadius: "5px", padding: "2px 6px" }}>🔴 라이브</span> : null}
+                              {!isBroadcastOn && pinned ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#7A1E47", borderRadius: "5px", padding: "2px 6px" }}>📌 추천</span> : null}
+                              {badgeType === "new" ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#0F6E56", background: "#E7F3EE", borderRadius: "5px", padding: "2px 6px" }}>NEW</span> : null}
+                              {badgeType === "hot" ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px" }}>HOT</span> : null}
+                              {badgeType === "limit" ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#854F0B", background: "#FBF1E0", borderRadius: "5px", padding: "2px 6px" }}>한정</span> : null}
+                            </div>
+                            <div style={{ fontSize: "13px", fontWeight: 700, color: "#222", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.product_name}</div>
+                            <div style={{ marginTop: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                              <span style={{ fontSize: "15px", fontWeight: 800, color: "#7A1E47" }}>{won(Number(product.price || 0))}</span>
+                              <button
+                                type="button"
+                                disabled={sold}
+                                onClick={() => selectQuickGroupBuyProduct(product as BroadcastProduct)}
+                                style={{ flexShrink: 0, height: "32px", padding: "0 16px", borderRadius: "8px", border: "none", background: sold ? "#ccc" : "#7A1E47", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: sold ? "default" : "pointer" }}
+                              >
+                                {sold ? "품절" : "담기"}
+                              </button>
+                            </div>
                           </div>
-                          <button
-                            type="button"
-                            disabled={sold}
-                            onClick={() => selectQuickGroupBuyProduct(product as BroadcastProduct)}
-                            style={{ margin: "0 10px 10px", height: "34px", borderRadius: "9px", border: "none", background: sold ? "#ccc" : "#7B2D43", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: sold ? "default" : "pointer" }}
-                          >
-                            {sold ? "품절" : "담기"}
-                          </button>
                         </div>
                       );
                     })}
@@ -4605,18 +4620,19 @@ export default function OrderPage() {
           )}
 
           <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 pb-[max(16px,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:px-4">
-            <div className="mx-auto flex max-w-[560px] items-center gap-3">
-              <div style={{ minWidth: 0, flex: 1, display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", fontSize: "14px", fontWeight: 800 }}>
-                <span style={{ color: "#7B2D43" }}>🧾 {items.filter((it) => it.product_name.trim()).length}개 담음</span>
-                <span style={{ color: "#bbb", fontWeight: 700 }}>·</span>
-                <span style={{ color: "#222", fontSize: "17px" }}>{won(finalPaymentAmount)}</span>
-              </div>
-
+            <div className="mx-auto max-w-[560px]" style={{ display: "flex", gap: "8px" }}>
+              <button
+                type="button"
+                onClick={() => { setOrderSheetOpen(true); window.setTimeout(() => document.getElementById("orderSheetSection")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}
+                style={{ flex: 1, height: "52px", borderRadius: "14px", border: "none", background: "#F9EEF3", color: "#7A1E47", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}
+              >
+                🛒 담은 상품 보기 ({items.filter((it) => it.product_name.trim()).length}개)
+              </button>
               <button
                 type="button"
                 onClick={handleSubmitOrderClick}
                 disabled={submitting || customerBlockStatus.blocked}
-                style={{ height: "56px", minWidth: "150px", flexShrink: 0, borderRadius: "18px", border: "none", padding: "0 20px", fontSize: "16px", fontWeight: 800, color: "#fff", background: submitting || customerBlockStatus.blocked ? "#cbd5e1" : "#7B2D43", cursor: submitting || customerBlockStatus.blocked ? "default" : "pointer" }}
+                style={{ flex: 1, height: "52px", borderRadius: "14px", border: "none", background: submitting || customerBlockStatus.blocked ? "#cbd5e1" : "#7A1E47", color: "#fff", fontSize: "14px", fontWeight: 800, cursor: submitting || customerBlockStatus.blocked ? "default" : "pointer" }}
               >
                 {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : "주문서 제출 →"}
               </button>
