@@ -2790,7 +2790,8 @@ export default function OrderPage() {
           if (!mgmtOn) return 999;
           const variants = Array.isArray((note as any)?.stock_variants) ? (note as any).stock_variants : [];
           if (variants.length === 0) return 999;
-          const matched = variants.find((v: any) => String(v.color ?? "").trim() === nextItem.color.trim() && String(v.size ?? "").trim() === nextItem.size.trim());
+          const normColor = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
+          const matched = variants.find((v: any) => normColor(String(v.color ?? "")) === normColor(nextItem.color) && normColor(String(v.size ?? "")) === normColor(nextItem.size));
           return matched ? Number(matched.stock) : 999;
         } catch { return 999; }
       })();
@@ -2860,7 +2861,8 @@ export default function OrderPage() {
     const variants = Array.isArray((note as any)?.stock_variants) ? (note as any).stock_variants : [];
     const stockMgmtEnabled = (() => { try { const n = typeof product.product_note === "string" ? JSON.parse(product.product_note) : product.product_note; return (n as any)?.stock_management_enabled === true || (product as any).stock_management_enabled === true; } catch { return false; } })();
     if (variants.length > 0 && stockMgmtEnabled) {
-      const matched = variants.find((v: any) => String(v.color ?? "").trim() === registeredOptionColor.trim() && String(v.size ?? "").trim() === registeredOptionSize.trim());
+      const nm = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
+      const matched = variants.find((v: any) => nm(v.color) === nm(registeredOptionColor) && nm(v.size) === nm(registeredOptionSize));
       if (matched && Number(matched.stock) <= 0) {
         showCustomerNotice("선택한 옵션(" + [registeredOptionColor, registeredOptionSize].filter(Boolean).join("/") + ")의 재고가 없습니다.");
         return;
@@ -3852,9 +3854,11 @@ export default function OrderPage() {
       return Array.isArray((note as any)?.stock_variants) ? (note as any).stock_variants : [];
     } catch { return []; }
   })();
-  const isSoldOutColorSize = (color: string, size: string) =>
-    registeredOptionStockVariants.length > 0 &&
-    registeredOptionStockVariants.some((v) => String(v.color ?? "").trim() === color.trim() && String(v.size ?? "").trim() === size.trim() && Number(v.stock) <= 0);
+  const isSoldOutColorSize = (color: string, size: string) => {
+    const nc = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
+    return registeredOptionStockVariants.length > 0 &&
+      registeredOptionStockVariants.some((v) => nc(v.color) === nc(color) && nc(v.size) === nc(size) && Number(v.stock) <= 0);
+  };
   const registeredOptionColorChoices = registeredOptionSelectProduct
     ? getSelectableRegisteredOptions(registeredOptionSelectProduct, "color")
     : [];
@@ -4422,7 +4426,8 @@ export default function OrderPage() {
                         <button type="button" onClick={() => {
                           const maxStock = (() => {
                             if (!registeredOptionSelectProduct || registeredOptionStockVariants.length === 0) return 999;
-                            const matched = registeredOptionStockVariants.find((v: any) => String(v.color ?? "").trim() === registeredOptionColor.trim() && String(v.size ?? "").trim() === registeredOptionSize.trim());
+                            const nm2 = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
+                            const matched = registeredOptionStockVariants.find((v: any) => nm2(v.color) === nm2(registeredOptionColor) && nm2(v.size) === nm2(registeredOptionSize));
                             return matched ? Number(matched.stock) : 999;
                           })();
                           setRegisteredOptionQty((c) => Math.min(c + 1, maxStock));
