@@ -207,7 +207,7 @@ function buildVariantRows(colors: string[], sizes: string[], previous: VariantSt
 
   return safeColors.flatMap((color) =>
     safeSizes.map((size) => {
-      const key = `${color}__${size}`;
+      const key = `${color || "__EMPTY_COLOR__"}__${size || "__EMPTY_SIZE__"}`;
 
       return {
         key,
