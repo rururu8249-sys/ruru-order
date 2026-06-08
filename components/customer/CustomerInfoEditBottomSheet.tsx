@@ -112,6 +112,30 @@ export default function CustomerInfoEditBottomSheet({
   if (!open) return null;
 
   return (
+    <>
+    {addrFormOpen ? (
+      <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(15,23,42,0.45)", padding: "0 12px" }} role="dialog" aria-modal="true" aria-label="배송지">
+        <section style={{ width: "100%", maxWidth: "430px", overflow: "hidden", borderTopLeftRadius: "28px", borderTopRightRadius: "28px", background: "#fff", boxShadow: "0 -22px 70px rgba(15,23,42,0.22)" }}>
+          <div style={{ margin: "12px auto 0", height: "5px", width: "52px", borderRadius: "3px", background: "#E8E2DD" }} />
+          <div style={{ padding: "14px 20px 10px", borderBottom: "1px solid #F0EBE6" }}>
+            <div style={{ fontSize: "18px", fontWeight: 800, color: "#7A1E47" }}>{editingAddrIndex !== null ? "배송지 수정" : "배송지 추가"}</div>
+          </div>
+          <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: "8px" }}>
+            <input value={addrForm.name} onChange={(e) => setAddrForm((f) => ({ ...f, name: e.target.value }))} placeholder="이름" style={{ ...inputStyle, height: "44px", fontSize: "14px" }} />
+            <input value={addrForm.phone} onChange={(e) => setAddrForm((f) => ({ ...f, phone: e.target.value }))} placeholder="전화번호" inputMode="numeric" style={{ ...inputStyle, height: "44px", fontSize: "14px" }} />
+            <div style={{ display: "flex", gap: "6px", alignItems: "flex-end" }}>
+              <input value={addrForm.address} onChange={(e) => setAddrForm((f) => ({ ...f, address: e.target.value }))} placeholder="주소" style={{ ...inputStyle, flex: 1, height: "44px", fontSize: "14px" }} />
+              <button type="button" onClick={() => onOpenAddressSearchForForm?.((addr) => setAddrForm((f) => ({ ...f, address: addr })))} style={{ padding: "0 14px", height: "44px", background: "#7A1E47", color: "white", border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>주소검색</button>
+            </div>
+            <input value={addrForm.detailAddress} onChange={(e) => setAddrForm((f) => ({ ...f, detailAddress: e.target.value }))} placeholder="상세주소" style={{ ...inputStyle, height: "44px", fontSize: "14px" }} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "0.78fr 1.22fr", gap: "8px", borderTop: "1px solid #E8E2DD", background: "#fff", padding: "12px 16px calc(14px + env(safe-area-inset-bottom))" }}>
+            <button type="button" onClick={() => { setAddrFormOpen(false); setEditingAddrIndex(null); }} style={{ display: "flex", minHeight: "50px", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", fontSize: "15px", fontWeight: 800, color: "#666", cursor: "pointer" }}>취소</button>
+            <button type="button" onClick={() => { if (editingAddrIndex !== null) onSaveShippingAddresses?.(shippingAddresses.map((a, i) => (i === editingAddrIndex ? { ...addrForm } : a))); else onSaveShippingAddresses?.([...shippingAddresses, { ...addrForm, isDefault: shippingAddresses.length === 0 }]); setAddrFormOpen(false); setEditingAddrIndex(null); }} style={{ display: "flex", minHeight: "50px", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "none", background: "#7A1E47", color: "#fff", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}>저장</button>
+          </div>
+        </section>
+      </div>
+    ) : null}
     <div
       data-ruru-customer-info-edit-sheet="shell-v2"
       style={{ position: "fixed", inset: 0, zIndex: 90, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(15,23,42,0.45)", padding: "0 12px" }}
@@ -237,34 +261,7 @@ export default function CustomerInfoEditBottomSheet({
                     </div>
                   ))}
 
-                  {!addrFormOpen ? (
-                    <button type="button" onClick={() => { setAddrFormOpen(true); setEditingAddrIndex(null); setAddrForm({ name: "", phone: "", address: "", detailAddress: "" }); }} style={{ width: "100%", padding: "11px", border: "1px dashed #E5E1DC", borderRadius: "10px", background: "#fff", fontSize: "13px", color: "#ABA5A0", marginTop: "8px", cursor: "pointer" }}>+ 배송지 추가</button>
-                  ) : (
-                    <div style={{ background: "#F5F3F0", borderRadius: "10px", padding: "14px", marginTop: "8px" }}>
-                      <input value={addrForm.name} onChange={(e) => setAddrForm((f) => ({ ...f, name: e.target.value }))} placeholder="이름" style={{ ...inputStyle, height: "42px", fontSize: "14px" }} />
-                      <input value={addrForm.phone} onChange={(e) => setAddrForm((f) => ({ ...f, phone: e.target.value }))} placeholder="전화번호" inputMode="numeric" style={{ ...inputStyle, height: "42px", fontSize: "14px", marginTop: "8px" }} />
-                      <div style={{ display: "flex", gap: "6px", alignItems: "flex-end", marginTop: "8px" }}>
-                        <input value={addrForm.address} onChange={(e) => setAddrForm((f) => ({ ...f, address: e.target.value }))} placeholder="주소" style={{ ...inputStyle, flex: 1, height: "42px", fontSize: "14px" }} />
-                        <button type="button" onClick={() => onOpenAddressSearchForForm?.((addr) => setAddrForm((f) => ({ ...f, address: addr })))} style={{ padding: "0 12px", height: "42px", background: "#7A1E47", color: "white", border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>주소검색</button>
-                      </div>
-                      <input value={addrForm.detailAddress} onChange={(e) => setAddrForm((f) => ({ ...f, detailAddress: e.target.value }))} placeholder="상세주소" style={{ ...inputStyle, height: "42px", fontSize: "14px", marginTop: "8px" }} />
-                      <div style={{ display: "flex", gap: "6px", marginTop: "10px" }}>
-                        <button type="button" onClick={() => { setAddrFormOpen(false); setEditingAddrIndex(null); }} style={{ flex: 1, padding: "10px", border: "1px solid #D9C5CC", background: "#fff", color: "#666", borderRadius: "8px", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}>취소</button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (editingAddrIndex !== null) onSaveShippingAddresses(shippingAddresses.map((a, i) => (i === editingAddrIndex ? { ...addrForm } : a)));
-                            else onSaveShippingAddresses([...shippingAddresses, { ...addrForm, isDefault: shippingAddresses.length === 0 }]);
-                            setAddrFormOpen(false);
-                            setEditingAddrIndex(null);
-                          }}
-                          style={{ flex: 1, padding: "10px", border: "none", background: "#7A1E47", color: "#fff", borderRadius: "8px", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}
-                        >
-                          저장
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <button type="button" onClick={() => { setAddrFormOpen(true); setEditingAddrIndex(null); setAddrForm({ name: "", phone: "", address: "", detailAddress: "" }); }} style={{ width: "100%", padding: "11px", border: "1px dashed #E5E1DC", borderRadius: "10px", background: "#fff", fontSize: "13px", color: "#ABA5A0", marginTop: "8px", cursor: "pointer" }}>+ 배송지 추가</button>
                 </div>
               ) : null}
             </div>
@@ -292,5 +289,6 @@ export default function CustomerInfoEditBottomSheet({
         </div>
       </section>
     </div>
+    </>
   );
 }
