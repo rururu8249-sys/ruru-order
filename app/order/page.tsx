@@ -2840,7 +2840,8 @@ export default function OrderPage() {
 
     const note = (() => { try { return typeof product.product_note === "string" ? JSON.parse(product.product_note) : product.product_note; } catch { return null; } })();
     const variants = Array.isArray((note as any)?.stock_variants) ? (note as any).stock_variants : [];
-    if (variants.length > 0 && (product as any).stock_management_enabled === true) {
+    const stockMgmtEnabled = (() => { try { const n = typeof product.product_note === "string" ? JSON.parse(product.product_note) : product.product_note; return (n as any)?.stock_management_enabled === true || (product as any).stock_management_enabled === true; } catch { return false; } })();
+    if (variants.length > 0 && stockMgmtEnabled) {
       const matched = variants.find((v: any) => String(v.color ?? "").trim() === registeredOptionColor.trim() && String(v.size ?? "").trim() === registeredOptionSize.trim());
       if (matched && Number(matched.stock) <= 0) {
         showCustomerNotice("선택한 옵션(" + [registeredOptionColor, registeredOptionSize].filter(Boolean).join("/") + ")의 재고가 없습니다.");
@@ -3823,11 +3824,13 @@ export default function OrderPage() {
     ? String(registeredOptionSelectProduct.product_description || registeredOptionSelectProduct.detail_description || registeredOptionSelectProduct.description || "").trim()
     : "";
   const registeredOptionStockVariants: { color: string; size: string; stock: number }[] = (() => {
-    if (!(registeredOptionSelectProduct as any)?.stock_management_enabled) return [];
+    if (!registeredOptionSelectProduct) return [];
     try {
-      const note = typeof registeredOptionSelectProduct?.product_note === "string"
+      const note = typeof registeredOptionSelectProduct.product_note === "string"
         ? JSON.parse(registeredOptionSelectProduct.product_note)
-        : (registeredOptionSelectProduct?.product_note as any);
+        : (registeredOptionSelectProduct.product_note as any);
+      const stockMgmtOn = (note as any)?.stock_management_enabled === true || (registeredOptionSelectProduct as any)?.stock_management_enabled === true;
+      if (!stockMgmtOn) return [];
       return Array.isArray((note as any)?.stock_variants) ? (note as any).stock_variants : [];
     } catch { return []; }
   })();
