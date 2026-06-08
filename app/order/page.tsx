@@ -715,6 +715,13 @@ function readOrderProductImageValue(value: unknown): string {
   }
 }
 
+const normalizeDetailImages = (value: unknown): string[] => {
+  if (!value) return [];
+  const arr: unknown[] = Array.isArray(value) ? value
+    : (typeof value === "string" ? (() => { try { const p = JSON.parse(value); return Array.isArray(p) ? p : [value]; } catch { return [value]; } })() : []);
+  return arr.map((v) => readOrderProductImageValue(v)).filter(Boolean);
+};
+
 function pickOrderProductImageUrl(product: any): string {
   return (
     readOrderProductImageValue(product?.image_url) ||
@@ -3809,6 +3816,12 @@ export default function OrderPage() {
   }, [broadcastYoutubeUrl]);
 
   const directInputItem = items[directInputTargetIndex] || null;
+  const registeredOptionDetailImages = registeredOptionSelectProduct
+    ? normalizeDetailImages(registeredOptionSelectProduct.detail_image_urls)
+    : [];
+  const registeredOptionDescription = registeredOptionSelectProduct
+    ? String(registeredOptionSelectProduct.product_description || registeredOptionSelectProduct.detail_description || registeredOptionSelectProduct.description || "").trim()
+    : "";
   const registeredOptionColorChoices = registeredOptionSelectProduct
     ? getSelectableRegisteredOptions(registeredOptionSelectProduct, "color")
     : [];
@@ -4249,6 +4262,19 @@ export default function OrderPage() {
                 </div>
 
                 <div style={{ minHeight: 0, flex: 1, overflowY: "auto", padding: "16px" }}>
+                  {registeredOptionDetailImages.length > 0 && (
+                    <div style={{ overflowX: "auto", display: "flex", gap: "8px", padding: "12px 16px 0", WebkitOverflowScrolling: "touch" }}>
+                      {registeredOptionDetailImages.map((img, i) => (
+                        <img key={i} src={img} alt="" onClick={() => setLightboxImage(img)}
+                          style={{ width: "90px", height: "90px", borderRadius: "8px", objectFit: "cover", flexShrink: 0, cursor: "pointer", background: "#F0EBE8" }} />
+                      ))}
+                    </div>
+                  )}
+                  {registeredOptionDescription && (
+                    <div style={{ padding: "10px 16px 0", fontSize: "12px", color: "#555", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
+                      {registeredOptionDescription}
+                    </div>
+                  )}
                   {registeredOptionColorChoices.length === 0 && registeredOptionSizeChoices.length === 0 ? (
                     <div style={{ padding: "12px 16px 0", fontSize: "12px", color: "#ABA5A0" }}>
                       이 상품은 옵션이 없습니다. 수량만 선택해 주세요.
