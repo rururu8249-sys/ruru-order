@@ -855,6 +855,7 @@ function normalizeOrderProductRow(product: any): BroadcastProduct {
     is_visible: product?.is_visible ?? null,
     product_type: String(product?.product_type ?? ""),
     shipping_type: String(product?.shipping_type ?? product?.delivery_type ?? ""),
+    badge_type: String(product?.badge_type ?? "none"),
     // 옵션/없음입력 토글 신호: 고객 옵션 판단(getRegisteredOptionMode)이 읽을 수 있게 그대로 통과시킨다.
     color_options: product?.color_options ?? null,
     size_options: product?.size_options ?? null,
