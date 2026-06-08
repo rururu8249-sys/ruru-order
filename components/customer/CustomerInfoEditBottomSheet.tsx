@@ -70,6 +70,13 @@ const textareaStyle: CSSProperties = {
 const labelStyle: CSSProperties = { marginBottom: "6px", display: "block", fontSize: "12px", fontWeight: 800, color: "#888" };
 const fieldBoxStyle: CSSProperties = { borderRadius: "16px", background: "#fff", padding: "12px", border: "1px solid #E8E2DD" };
 
+const formatKoreanPhone = (raw: string) => {
+  const d = (raw || "").replace(/[^0-9]/g, "").slice(0, 11);
+  if (d.length < 4) return d;
+  if (d.length < 8) return d.slice(0, 3) + "-" + d.slice(3);
+  return d.slice(0, 3) + "-" + d.slice(3, 7) + "-" + d.slice(7);
+};
+
 const resizeTextareaHeight = (textarea: HTMLTextAreaElement | null) => {
   if (!textarea) return;
 
@@ -122,7 +129,7 @@ export default function CustomerInfoEditBottomSheet({
           </div>
           <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: "8px" }}>
             <input value={addrForm.name} onChange={(e) => setAddrForm((f) => ({ ...f, name: e.target.value }))} placeholder="이름" style={{ ...inputStyle, height: "44px", fontSize: "14px" }} />
-            <input value={addrForm.phone} onChange={(e) => setAddrForm((f) => ({ ...f, phone: e.target.value }))} placeholder="전화번호" inputMode="numeric" style={{ ...inputStyle, height: "44px", fontSize: "14px" }} />
+            <input value={addrForm.phone} onChange={(e) => setAddrForm((f) => ({ ...f, phone: formatKoreanPhone(e.target.value) }))} placeholder="전화번호" inputMode="numeric" style={{ ...inputStyle, height: "44px", fontSize: "14px" }} />
             <div style={{ display: "flex", gap: "6px", alignItems: "flex-end" }}>
               <input value={addrForm.address} onChange={(e) => setAddrForm((f) => ({ ...f, address: e.target.value }))} placeholder="주소" style={{ ...inputStyle, flex: 1, height: "44px", fontSize: "14px" }} />
               <button type="button" onClick={() => onOpenAddressSearchForForm?.((addr) => setAddrForm((f) => ({ ...f, address: addr })))} style={{ padding: "0 14px", height: "44px", background: "#7A1E47", color: "white", border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>주소검색</button>
