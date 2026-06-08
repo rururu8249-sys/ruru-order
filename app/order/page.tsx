@@ -2841,7 +2841,7 @@ export default function OrderPage() {
     const note = (() => { try { return typeof product.product_note === "string" ? JSON.parse(product.product_note) : product.product_note; } catch { return null; } })();
     const variants = Array.isArray((note as any)?.stock_variants) ? (note as any).stock_variants : [];
     if (variants.length > 0 && (product as any).stock_management_enabled === true) {
-      const matched = variants.find((v: any) => v.color === registeredOptionColor && v.size === registeredOptionSize);
+      const matched = variants.find((v: any) => String(v.color ?? "").trim() === registeredOptionColor.trim() && String(v.size ?? "").trim() === registeredOptionSize.trim());
       if (matched && Number(matched.stock) <= 0) {
         showCustomerNotice("선택한 옵션(" + [registeredOptionColor, registeredOptionSize].filter(Boolean).join("/") + ")의 재고가 없습니다.");
         return;
@@ -3822,6 +3822,18 @@ export default function OrderPage() {
   const registeredOptionDescription = registeredOptionSelectProduct
     ? String(registeredOptionSelectProduct.product_description || registeredOptionSelectProduct.detail_description || registeredOptionSelectProduct.description || "").trim()
     : "";
+  const registeredOptionStockVariants: { color: string; size: string; stock: number }[] = (() => {
+    if (!(registeredOptionSelectProduct as any)?.stock_management_enabled) return [];
+    try {
+      const note = typeof registeredOptionSelectProduct?.product_note === "string"
+        ? JSON.parse(registeredOptionSelectProduct.product_note)
+        : (registeredOptionSelectProduct?.product_note as any);
+      return Array.isArray((note as any)?.stock_variants) ? (note as any).stock_variants : [];
+    } catch { return []; }
+  })();
+  const isSoldOutColorSize = (color: string, size: string) =>
+    registeredOptionStockVariants.length > 0 &&
+    registeredOptionStockVariants.some((v) => String(v.color ?? "").trim() === color.trim() && String(v.size ?? "").trim() === size.trim() && Number(v.stock) <= 0);
   const registeredOptionColorChoices = registeredOptionSelectProduct
     ? getSelectableRegisteredOptions(registeredOptionSelectProduct, "color")
     : [];
@@ -4287,23 +4299,27 @@ export default function OrderPage() {
                         <div style={{ overflowX: "auto", display: "flex", gap: "6px", paddingBottom: "4px", WebkitOverflowScrolling: "touch", marginBottom: "14px" }}>
                           {registeredOptionColorChoices.map((option) => {
                             const selected = registeredOptionColor === option;
+                            const soldOut = isSoldOutColorSize(option, registeredOptionSize);
                             return (
                               <button
                                 key={`c-${option}`}
                                 type="button"
-                                onClick={() => setRegisteredOptionColor(option)}
-                                style={{ flexShrink: 0, minWidth: "44px", height: "40px", borderRadius: "10px", border: selected ? "1.5px solid #7A1E47" : "1.5px solid #E8E2DD", background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", cursor: "pointer", fontSize: "13px", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 12px" }}
+                                onClick={() => { if (soldOut) return; setRegisteredOptionColor(option); }}
+                                style={{ flexShrink: 0, minWidth: "44px", height: "40px", borderRadius: "10px", border: selected ? "1.5px solid #7A1E47" : "1.5px solid #E8E2DD", background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", cursor: "pointer", fontSize: "13px", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 12px", opacity: soldOut ? 0.4 : 1 }}
                               >
-                                {option}
+                                {soldOut ? option + " (품절)" : option}
                               </button>
                             );
                           })}
                         </div>
                       ) : (
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                          {registeredOptionColorChoices.map((option) => (
-                            <button key={`c-${option}`} type="button" onClick={() => setRegisteredOptionColor(option)} style={{ minHeight: "46px", borderRadius: "14px", border: `1.5px solid ${registeredOptionColor === option ? "#7A1E47" : "#E8E2DD"}`, background: registeredOptionColor === option ? "#7A1E47" : "#fff", color: registeredOptionColor === option ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}>{option}</button>
-                          ))}
+                          {registeredOptionColorChoices.map((option) => {
+                            const soldOut = isSoldOutColorSize(option, registeredOptionSize);
+                            return (
+                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionColor(option); }} style={{ minHeight: "46px", borderRadius: "14px", border: `1.5px solid ${registeredOptionColor === option ? "#7A1E47" : "#E8E2DD"}`, background: registeredOptionColor === option ? "#7A1E47" : "#fff", color: registeredOptionColor === option ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
+                            );
+                          })}
                         </div>
                       )}
                       {!registeredOptionColor.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>색상을 선택해주세요</div> : null}
@@ -4325,23 +4341,27 @@ export default function OrderPage() {
                         <div style={{ overflowX: "auto", display: "flex", gap: "6px", paddingBottom: "4px", WebkitOverflowScrolling: "touch", marginBottom: "14px" }}>
                           {registeredOptionSizeChoices.map((option) => {
                             const selected = registeredOptionSize === option;
+                            const soldOut = isSoldOutColorSize(registeredOptionColor, option);
                             return (
                               <button
                                 key={`s-${option}`}
                                 type="button"
-                                onClick={() => setRegisteredOptionSize(option)}
-                                style={{ flexShrink: 0, minWidth: "44px", height: "40px", borderRadius: "10px", border: selected ? "1.5px solid #7A1E47" : "1.5px solid #E8E2DD", background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", cursor: "pointer", fontSize: "13px", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 12px" }}
+                                onClick={() => { if (soldOut) return; setRegisteredOptionSize(option); }}
+                                style={{ flexShrink: 0, minWidth: "44px", height: "40px", borderRadius: "10px", border: selected ? "1.5px solid #7A1E47" : "1.5px solid #E8E2DD", background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", cursor: "pointer", fontSize: "13px", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 12px", opacity: soldOut ? 0.4 : 1 }}
                               >
-                                {option}
+                                {soldOut ? option + " (품절)" : option}
                               </button>
                             );
                           })}
                         </div>
                       ) : (
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
-                          {registeredOptionSizeChoices.map((option) => (
-                            <button key={`s-${option}`} type="button" onClick={() => setRegisteredOptionSize(option)} style={{ minHeight: "46px", borderRadius: "14px", border: `1.5px solid ${registeredOptionSize === option ? "#7A1E47" : "#E8E2DD"}`, background: registeredOptionSize === option ? "#7A1E47" : "#fff", color: registeredOptionSize === option ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}>{option}</button>
-                          ))}
+                          {registeredOptionSizeChoices.map((option) => {
+                            const soldOut = isSoldOutColorSize(registeredOptionColor, option);
+                            return (
+                              <button key={`s-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionSize(option); }} style={{ minHeight: "46px", borderRadius: "14px", border: `1.5px solid ${registeredOptionSize === option ? "#7A1E47" : "#E8E2DD"}`, background: registeredOptionSize === option ? "#7A1E47" : "#fff", color: registeredOptionSize === option ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
+                            );
+                          })}
                         </div>
                       )}
                       {!registeredOptionSize.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>사이즈를 선택해주세요</div> : null}
