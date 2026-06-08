@@ -4683,6 +4683,7 @@ export default function OrderPage() {
           onOpenAddressSearch={openAddressSearch}
           shippingAddresses={shippingAddresses}
           onSaveShippingAddresses={saveShippingAddresses}
+          onSelectShippingAddress={(addr, detail) => { setAddress(addr); setDetailAddress(detail); }}
           onClose={closeCustomerInfoEditBottomSheet}
           onSave={completeEditCustomerInfo}
         />

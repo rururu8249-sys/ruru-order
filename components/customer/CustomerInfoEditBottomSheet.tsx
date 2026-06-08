@@ -29,6 +29,7 @@ type CustomerInfoEditBottomSheetProps = {
 
   shippingAddresses?: any[];
   onSaveShippingAddresses?: (addresses: any[]) => Promise<void>;
+  onSelectShippingAddress?: (address: string, detailAddress: string) => void;
 
   saving?: boolean;
 };
@@ -93,6 +94,7 @@ export default function CustomerInfoEditBottomSheet({
   onSave,
   shippingAddresses = [],
   onSaveShippingAddresses,
+  onSelectShippingAddress,
   saving = false,
 }: CustomerInfoEditBottomSheetProps) {
   const addressTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -222,7 +224,8 @@ export default function CustomerInfoEditBottomSheet({
                         {a.isDefault ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#7A1E47", background: "#F9EEF3", borderRadius: "5px", padding: "2px 6px" }}>기본</span> : null}
                       </div>
                       <div style={{ fontSize: "12px", color: "#6B6460", marginTop: "3px" }}>{[a.address, a.detailAddress].filter(Boolean).join(" ") || "-"}</div>
-                      <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
+                      <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
+                        <button type="button" onClick={() => { onSelectShippingAddress?.(a.address || "", a.detailAddress || ""); }} style={{ border: "1px solid #7A1E47", color: "#7A1E47", background: "#F9EEF3", borderRadius: "6px", padding: "4px 10px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>이 주소 사용</button>
                         <button type="button" onClick={() => { setEditingAddrIndex(index); setAddrForm({ name: a.name || "", phone: a.phone || "", address: a.address || "", detailAddress: a.detailAddress || "" }); setAddrFormOpen(true); }} style={{ border: "1px solid #7A1E47", color: "#7A1E47", background: "#fff", borderRadius: "6px", padding: "4px 10px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>수정</button>
                         <button type="button" onClick={() => onSaveShippingAddresses(shippingAddresses.filter((_, i) => i !== index))} style={{ border: "1px solid #FFCCCC", color: "#C0392B", background: "#FFF5F5", borderRadius: "6px", padding: "4px 10px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>삭제</button>
                         {!a.isDefault ? (
