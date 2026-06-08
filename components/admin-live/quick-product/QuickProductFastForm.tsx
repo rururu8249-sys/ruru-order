@@ -1031,14 +1031,15 @@ export default function QuickProductFastForm({
           <div style={{ marginBottom: "14px" }}>
             <div style={sectionLabel}>상품 뱃지</div>
             <div style={{ fontSize: "11px", color: "#888780", marginBottom: "6px" }}>손님 상품 목록에 표시되는 뱃지</div>
+            <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}`}</style>
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-              {([["none", "없음"], ["new", "✨ NEW"], ["hot", "🔥 HOT"], ["limit", "⏰ 한정"]] as const).map(([v, l]) => {
+              {([["none", "없음"], ["new", "✨ NEW"], ["hot", "🔥 HOT"], ["limit", "⏰ 한정"], ["pick", "⭐ MD픽"]] as const).map(([v, l]) => {
                 const on = badgeType === v;
                 return (
                   <div
                     key={v}
                     onClick={() => setBadgeType(v)}
-                    style={{ padding: "6px 12px", borderRadius: "8px", border: "1px solid " + (on ? "#7A1E47" : "#E5E1DC"), fontSize: "12px", fontWeight: 600, cursor: "pointer", color: on ? "#fff" : "#6B6460", background: on ? "#7A1E47" : "#fff" }}
+                    style={{ padding: "6px 12px", borderRadius: "8px", border: "1px solid " + (on ? "#7A1E47" : "#E5E1DC"), fontSize: "12px", fontWeight: 600, cursor: "pointer", color: on ? "#fff" : "#6B6460", background: on ? "#7A1E47" : "#fff", animation: v === "hot" ? "shimmer 1.5s ease-in-out infinite" : undefined }}
                   >
                     {l}
                   </div>

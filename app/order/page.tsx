@@ -3840,6 +3840,7 @@ export default function OrderPage() {
 
   return (
     <OrderPageShell>
+      <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}`}</style>
       {hasSavedInfo && <TopCustomerNav />}
 
       <CustomerPointGiftPopup />
@@ -3959,8 +3960,9 @@ export default function OrderPage() {
                               {isBroadcastOn && pinned ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#E8340A", borderRadius: "5px", padding: "2px 6px" }}>🔴 라이브</span> : null}
                               {!isBroadcastOn && pinned ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#7A1E47", borderRadius: "5px", padding: "2px 6px" }}>📌 추천</span> : null}
                               {badgeType === "new" ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#0F6E56", background: "#E7F3EE", borderRadius: "5px", padding: "2px 6px" }}>NEW</span> : null}
-                              {badgeType === "hot" ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px" }}>HOT</span> : null}
+                              {badgeType === "hot" ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>HOT</span> : null}
                               {badgeType === "limit" ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#854F0B", background: "#FBF1E0", borderRadius: "5px", padding: "2px 6px" }}>한정</span> : null}
+                              {badgeType === "pick" ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#FFF8E7", color: "#B8860B" }}>⭐ MD픽</span> : null}
                             </div>
                             <div style={{ fontSize: "13px", fontWeight: 700, color: "#222", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.product_name}</div>
                             <div style={{ marginTop: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
