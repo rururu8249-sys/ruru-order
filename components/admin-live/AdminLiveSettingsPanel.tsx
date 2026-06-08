@@ -12,7 +12,9 @@ type SettingKey =
   | "default_shipping_fee"
   | "remote_area_shipping_fee"
   | "point_auto_earn_enabled"
-  | "point_earn_rate";
+  | "point_earn_rate"
+  | "notice_text"
+  | "direct_input_enabled";
 
 type SettingRow = {
   key: string;
@@ -27,9 +29,13 @@ const SETTING_KEYS: SettingKey[] = [
   "remote_area_shipping_fee",
   "point_auto_earn_enabled",
   "point_earn_rate",
+  "notice_text",
+  "direct_input_enabled",
 ];
 
-const DEFAULTS: Record<SettingKey, number> = {
+type NumericSettingKey = Exclude<SettingKey, "notice_text" | "direct_input_enabled">;
+
+const DEFAULTS: Record<NumericSettingKey, number> = {
   customer_card_extra_rate: 10,
   actual_card_fee_rate: 7,
   card_payment_min_amount: 100000,
@@ -63,7 +69,7 @@ function formatMoneyInput(value: string | number) {
   return Number(digits).toLocaleString();
 }
 
-function readNumber(rows: SettingRow[], key: SettingKey) {
+function readNumber(rows: SettingRow[], key: NumericSettingKey) {
   const row = rows.find((item) => item.key === key);
   const value = toNumber(row?.value);
 
@@ -133,6 +139,8 @@ export default function AdminLiveSettingsPanel() {
   const [remoteShippingFee, setRemoteShippingFee] = useState(formatMoneyInput(DEFAULTS.remote_area_shipping_fee));
   const [pointAutoEarn, setPointAutoEarn] = useState(false);
   const [pointEarnRate, setPointEarnRate] = useState(String(DEFAULTS.point_earn_rate));
+  const [noticeText, setNoticeText] = useState("");
+  const [directInputEnabled, setDirectInputEnabled] = useState(true);
 
   useEffect(() => {
     let alive = true;
@@ -159,6 +167,8 @@ export default function AdminLiveSettingsPanel() {
         setRemoteShippingFee(formatMoneyInput(readNumber(rows, "remote_area_shipping_fee")));
         setPointAutoEarn(clean(rows.find((r) => r.key === "point_auto_earn_enabled")?.value) === "true");
         setPointEarnRate(String(readNumber(rows, "point_earn_rate")));
+        setNoticeText(String(rows.find((r) => r.key === "notice_text")?.value ?? ""));
+        setDirectInputEnabled(clean(rows.find((r) => r.key === "direct_input_enabled")?.value || "true") !== "false");
       } finally {
         if (alive) setLoading(false);
       }
@@ -201,6 +211,8 @@ export default function AdminLiveSettingsPanel() {
           { key: "remote_area_shipping_fee", value: String(nextRemoteShippingFee) },
           { key: "point_auto_earn_enabled", value: pointAutoEarn ? "true" : "false" },
           { key: "point_earn_rate", value: String(nextPointEarnRate) },
+          { key: "notice_text", value: noticeText },
+          { key: "direct_input_enabled", value: directInputEnabled ? "true" : "false" },
         ],
         { onConflict: "key" },
       );
@@ -338,6 +350,39 @@ export default function AdminLiveSettingsPanel() {
 
         <div className="mt-3 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3 text-[11px] font-bold leading-5 text-orange-800">
           결제완료 시 자동 지급되며, 자동적립은 알림 팝업이 뜨지 않습니다(주문서 안내 문구로만 표시). 실제 지급/차감 관리는 포인트 메뉴에서.
+        </div>
+      </div>
+
+      <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+        <div className="mb-4">
+          <h2 className="text-lg font-black text-slate-950">주문서 공지 / 직접입력</h2>
+          <p className="mt-1 text-xs font-bold text-slate-400">손님 주문서 상단 공지 문구와 “직접 입력하기” 버튼 노출 여부를 관리합니다.</p>
+        </div>
+
+        <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+          <div className="text-sm font-black text-slate-900">주문서 공지 문구</div>
+          <div className="mt-1 text-xs font-bold leading-5 text-slate-400">비워두면 공지 배너가 표시되지 않습니다. 줄바꿈 가능.</div>
+          <textarea
+            value={noticeText}
+            onChange={(event) => setNoticeText(event.target.value)}
+            placeholder="예) 오늘 방송은 21시 시작합니다. 입금자명은 닉네임과 동일하게 부탁드려요."
+            rows={3}
+            className="mt-3 w-full resize-none rounded-2xl border border-slate-200 bg-white p-4 text-sm font-bold leading-relaxed outline-none transition focus:border-rose-deep focus:ring-4 focus:ring-rose-soft"
+          />
+        </div>
+
+        <div className="mt-3 flex items-start justify-between gap-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+          <div>
+            <div className="text-sm font-black text-slate-900">직접 입력하기 버튼</div>
+            <div className="mt-1 text-xs font-bold leading-5 text-slate-400">상품 목록에서 못 찾은 상품을 손님이 직접 입력하는 버튼입니다. OFF 시 버튼이 숨겨집니다.</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDirectInputEnabled((v) => !v)}
+            className={`shrink-0 rounded-full px-4 py-2 text-xs font-black transition ${directInputEnabled ? "bg-rose-deep text-white" : "border border-slate-200 bg-white text-slate-500"}`}
+          >
+            {directInputEnabled ? "직접입력 ON" : "직접입력 OFF"}
+          </button>
         </div>
       </div>
 

@@ -1009,6 +1009,8 @@ export default function OrderPage() {
   const [defaultShippingFee, setDefaultShippingFee] = useState(4000);
   const [remoteAreaShippingFee, setRemoteAreaShippingFee] = useState(6000);
   const [pointEarnRateForDisplay, setPointEarnRateForDisplay] = useState(0);
+  const [noticeText, setNoticeText] = useState("");
+  const [directInputEnabled, setDirectInputEnabled] = useState(true);
   const [combineShippingSettings, setCombineShippingSettings] =
     useState<CombineShippingSettings>(DEFAULT_COMBINE_SHIPPING_SETTINGS);
   const [alreadyPaidShipping, setAlreadyPaidShipping] = useState(false);
@@ -1574,6 +1576,8 @@ export default function OrderPage() {
         "remote_area_shipping_fee",
         "point_auto_earn_enabled",
         "point_earn_rate",
+        "notice_text",
+        "direct_input_enabled",
         ...COMBINE_SHIPPING_SETTING_KEYS,
       ]);
 
@@ -1606,6 +1610,11 @@ export default function OrderPage() {
       String((data || []).find((item: any) => item.key === "point_auto_earn_enabled")?.value || "").trim() === "true";
     const pointEarnRate = Math.min(100, Math.max(0, readNumber("point_earn_rate", 0)));
     setPointEarnRateForDisplay(pointAutoEarnEnabled ? pointEarnRate : 0);
+
+    setNoticeText(String((data || []).find((i: any) => i.key === "notice_text")?.value || ""));
+    setDirectInputEnabled(
+      String((data || []).find((i: any) => i.key === "direct_input_enabled")?.value || "true").trim() !== "false",
+    );
   };
 
   const loadSavedCustomerInfo = () => {
@@ -3705,29 +3714,22 @@ export default function OrderPage() {
     return (
       <header style={{ position: "sticky", top: 0, zIndex: 30, background: "#fff", borderBottom: "1px solid #E8E2DD", padding: "10px 12px" }}>
         <div style={{ margin: "0 auto", width: "100%", maxWidth: "560px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "7px", minWidth: 0 }}>
-            <Link href="/order" style={{ fontSize: "19px", fontWeight: 800, letterSpacing: "-0.04em", color: "#7B2D43", textDecoration: "none" }}>루루동이</Link>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+            <Link href="/order" style={{ flexShrink: 0, fontSize: "19px", fontWeight: 800, letterSpacing: "-0.04em", color: "#7A1E47", textDecoration: "none" }}>루루동이</Link>
             {broadcast ? (
-              <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#C0392B", borderRadius: "4px", padding: "2px 6px", letterSpacing: "0.02em" }}>LIVE</span>
+              <span style={{ flexShrink: 0, fontSize: "10px", fontWeight: 800, color: "#fff", background: "#C0392B", borderRadius: "4px", padding: "2px 6px", letterSpacing: "0.02em" }}>LIVE</span>
             ) : null}
+            <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "14px", fontWeight: 800, color: "#7A1E47" }}>👋 {safeGreetingName}님!</span>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-            <button
-              type="button"
-              onClick={(e) => { handleTopNavOrderClick(e); setOrderSheetOpen(true); window.setTimeout(() => document.getElementById("orderSheetSection")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}
-              aria-label="담은 상품 보기"
-              style={{ display: "inline-flex", alignItems: "center", gap: "5px", justifyContent: "center", height: "38px", padding: "0 12px", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#FAF6F2", cursor: "pointer" }}
-            >
-              <span style={{ fontSize: "13px", fontWeight: 800, color: "#7B2D43" }}>🧾 담은 상품 {cartCount}개 보기</span>
-            </button>
+          <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
             <button
               type="button"
               onClick={() => setMenuSheetOpen(true)}
-              aria-label="메뉴"
-              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "40px", height: "38px", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", fontSize: "18px", color: "#7B2D43", cursor: "pointer" }}
+              aria-label="메뉴 보기"
+              style={{ display: "inline-flex", alignItems: "center", gap: "5px", justifyContent: "center", height: "38px", padding: "0 14px", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", fontSize: "13px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}
             >
-              ☰
+              ☰ 메뉴보기
             </button>
           </div>
         </div>
@@ -3798,6 +3800,12 @@ export default function OrderPage() {
   return (
     <OrderPageShell>
       {hasSavedInfo && <TopCustomerNav />}
+
+      {noticeText.trim() ? (
+        <div style={{ margin: "10px auto 0", width: "100%", maxWidth: "560px", background: "#F9EEF3", borderLeft: "3px solid #7A1E47", borderRadius: "8px", padding: "11px 14px", fontSize: "13px", fontWeight: 700, lineHeight: 1.6, color: "#7A1E47", whiteSpace: "pre-wrap" }}>
+          {noticeText}
+        </div>
+      ) : null}
 
       <CustomerPointGiftPopup />
 
@@ -3958,7 +3966,9 @@ export default function OrderPage() {
                     <button type="button" onClick={() => setProductPage((p) => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages} style={{ width: "32px", height: "32px", borderRadius: "8px", border: "1px solid #D9C5CC", background: "#fff", color: "#7B2D43", fontWeight: 800, cursor: safePage >= totalPages ? "default" : "pointer", opacity: safePage >= totalPages ? 0.4 : 1 }}>›</button>
                   </div>
                 ) : null}
-                <button type="button" onClick={openDirectInputSheet} style={{ marginTop: "12px", width: "100%", border: "1px solid #D9C5CC", background: "#fff", borderRadius: "14px", padding: "13px", fontSize: "14px", fontWeight: 800, color: "#7B2D43", cursor: "pointer" }}>+ 못 찾으면 직접 입력</button>
+                {directInputEnabled ? (
+                  <button type="button" onClick={openDirectInputSheet} style={{ marginTop: "12px", width: "100%", border: "1px solid #D9C5CC", background: "#fff", borderRadius: "14px", padding: "13px", fontSize: "14px", fontWeight: 800, color: "#7B2D43", cursor: "pointer" }}>+ 상품을 못 찾으셨나요? 직접 입력하기</button>
+                ) : null}
               </section>
             );
           })()}
