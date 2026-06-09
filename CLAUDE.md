@@ -167,3 +167,17 @@ git status
 Next.js / Supabase / Vercel
 관리자: /admin-live 경로 (/admin 은 구버전, 미사용)
 프로젝트 경로: /Users/ruru/Desktop/ruru-order-app
+
+## 2026-06-10 관리자 UI 정리 (실시간주문 중심 통합)
+- 테스트 주문 배지: 화면에서 숨김(testOrderBadge 항상 null). is_test_order 데이터/필터/정산제외 로직은 무변경. (8c436e3)
+- 주문 날짜 연도/월 필터 추가: 날짜 드롭다운에 "연·월 선택" + 연도(올해~3년전)/월(1~12) 드롭다운. LiveOrderFilters에 filterYear/filterMonth 추가, matchesDate에 yearmonth 판정. 기존 필터(all/today/yesterday/7days/month/custom) 무변경. (커밋)
+- 중복 새로고침 버튼 제거: 탭바 ↻ 삭제, 주문테이블 툴바 ↻(onRefresh)만 유지. 둘 다 loadOrders 호출하던 중복. (커밋)
+- 주문 관리 탭/팝업 제거: 실시간 주문서와 기능 완전 중복(둘 다 LiveOrderTable). 실시간 주문서에서 "방송: 전체보기"로 전체 주문 조회 가능(filteredOrders의 broadcast==="all"이면 true). 탭 3개로 축소(실시간주문/입금내역/입금매칭). AdminLiveOrdersPanel.tsx 파일은 보존(삭제 안 함). (f358d28)
+
+### 관리자 화면 원칙 (업계 표준 reconciliation/UX 검색 반영)
+- 메뉴/패널은 적을수록 좋고 중복 제거가 표준. 주문은 상태탭+날짜필터 하나로 관리(별도 주문관리 페이지 불필요).
+- 실시간 주문서 = 전체 주문 관리 겸용. "방송: 전체보기"가 전체 조회.
+
+### 남은 작업 후보
+- 실시간 주문서 "전체보기"에서 과거 전체 주문(1000건 초과)이 다 보이는지 검증 필요 — loadOrders도 행수 캡 영향 가능성. 안 보이면 페이지네이션 적용.
+- 포인트 일괄지급 UI, 관리자 고객정보 직접수정, 정산 메뉴.
