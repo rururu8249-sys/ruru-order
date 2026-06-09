@@ -216,10 +216,23 @@ export async function POST(request: Request) {
       };
     });
 
-    const { data: deposits, error: depositError } = await supabase
-      .from("deposits")
-      .select("*")
-      .limit(3000);
+    let deposits: any[] = [];
+    let depositError: any = null;
+    {
+      const pageSize = 1000;
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from("deposits")
+          .select("*")
+          .range(from, from + pageSize - 1);
+        if (error) { depositError = error; break; }
+        const rows = data || [];
+        deposits.push(...rows);
+        if (rows.length < pageSize) break;
+        from += pageSize;
+      }
+    }
 
     if (depositError) {
       return NextResponse.json(
