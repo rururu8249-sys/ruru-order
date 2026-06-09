@@ -4709,6 +4709,7 @@ export default function OrderPage() {
             </div>
           )}
 
+          {!orderSheetOpen && (
           <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 pb-[max(16px,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:px-4">
             <div className="mx-auto max-w-[560px]" style={{ display: "flex", gap: "8px" }}>
               <button
@@ -4728,6 +4729,7 @@ export default function OrderPage() {
               </button>
             </div>
           </div>
+          )}
         </>
       )}
 
