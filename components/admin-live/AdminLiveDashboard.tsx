@@ -22,7 +22,6 @@ import { supabase } from "@/lib/supabase";
 import ManualPaymentMatchDrawer from "@/components/admin-v2/payment/ManualPaymentMatchDrawer";
 import AdminLiveCustomersPanel from "./AdminLiveCustomersPanel";
 import AdminLiveMenuPlaceholder from "./AdminLiveMenuPlaceholder";
-import AdminLiveOrdersPanel from "./AdminLiveOrdersPanel";
 import AdminLivePaymentPanel from "./AdminLivePaymentPanel";
 import AdminLiveSettlementPanel from "./AdminLiveSettlementPanel";
 import AdminLiveSettingsPanel from "./AdminLiveSettingsPanel";
@@ -1215,13 +1214,11 @@ export default function AdminLiveDashboard() {
             <div className="mt-2 flex items-center gap-1.5 border-b border-rose-line">
               {[
                 { key: "live", label: "실시간 주문", onClick: () => setActiveMenu("broadcast") },
-                { key: "orders", label: "주문 관리", onClick: () => setActiveMenu("orders") },
                 { key: "payments", label: "입금 내역", onClick: () => setActiveMenu("payments") },
                 { key: "match", label: "입금 매칭", onClick: () => setMatchPanelOpen((v) => !v) },
               ].map((tab) => {
                 const active =
                   (tab.key === "live" && activeMenu !== "orders" && activeMenu !== "payments") ||
-                  (tab.key === "orders" && activeMenu === "orders") ||
                   (tab.key === "payments" && activeMenu === "payments") ||
                   (tab.key === "match" && matchPanelOpen);
                 return (
@@ -1305,36 +1302,6 @@ export default function AdminLiveDashboard() {
             </section>
             <style>{`@keyframes ruruSidePanelIn { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }`}</style>
           </div>
-
-          {/* 주문관리 팝업 */}
-          {activeMenu === "orders" && (
-            <div className="fixed inset-0 z-40 overflow-y-auto bg-slate-950/40 px-4 py-8" onClick={(e) => { if (e.target === e.currentTarget) setActiveMenu("broadcast"); }}>
-              <div className="mx-auto w-full max-w-[1100px] rounded-2xl bg-white shadow-2xl">
-                <div className="flex items-center justify-between border-b border-rose-line px-5 py-3">
-                  <span className="text-[15px] font-black text-slate-950">📋 주문관리</span>
-                  <button type="button" onClick={() => setActiveMenu("broadcast")} className="text-lg leading-none text-slate-400 hover:text-slate-700">✕</button>
-                </div>
-                <div className="p-5">
-                  <AdminLiveOrdersPanel
-                    orders={filteredOrders}
-                    allOrderCount={orders.length}
-                    selectedOrder={selectedOrder}
-                    selectedOrderId={selectedOrder?.id || ""}
-                    orderDetailOpen={orderDetailOpen}
-                    filters={filters}
-                    broadcastOptions={broadcastOptions}
-                    onSelectOrder={(order) => {
-                      setSelectedOrderId(order.id);
-                      setOrderDetailOpen(true);
-                    }}
-                    onCloseOrderDetail={() => setOrderDetailOpen(false)}
-                    onFiltersChange={setFilters}
-                    onRefresh={loadOrders}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* 입금확인 팝업 */}
           {activeMenu === "payments" && (
