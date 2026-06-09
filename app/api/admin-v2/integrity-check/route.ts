@@ -140,11 +140,18 @@ export async function GET() {
 
     const check2Items = Array.from(depositsByGroup.entries())
       .filter(([, deps]) => deps.length >= 2)
-      .map(([gid, deps]) => ({
-        order_group_id: gid,
-        deposit_ids: deps.map((d) => d.id),
-        total_deposit_amount: deps.reduce((sum, d) => sum + depositAmountNum(d), 0),
-      }));
+      .map(([gid, deps]) => {
+        const times = deps
+          .map((d) => d.deposited_time)
+          .filter(Boolean)
+          .sort();
+        return {
+          order_group_id: gid,
+          deposit_ids: deps.map((d) => d.id),
+          total_deposit_amount: deps.reduce((sum, d) => sum + depositAmountNum(d), 0),
+          latest_deposited_time: times.length ? times[times.length - 1] : null,
+        };
+      });
 
     // ── 점검3) 중복 입금내역 (depositor_name + amount + deposited_time 동일) ──
     const depositsByKey = new Map<string, AnyRow[]>();

@@ -526,6 +526,7 @@ export default function AdminLiveDashboard() {
   const [integrityOpen, setIntegrityOpen] = useState(false);
   const [integrityLoading, setIntegrityLoading] = useState(false);
   const [integrityResult, setIntegrityResult] = useState<any>(null);
+  const [integrityRecentOnly, setIntegrityRecentOnly] = useState(true);
   const [orders, setOrders] = useState<LiveOrder[]>([]);
   // [표시 전용] 금액 단독 추천(amount_only_suggestions). 읽기 전용 dry_run으로만 채우며 확정/쓰기 없음.
   const [paymentSuggestions, setPaymentSuggestions] = useState<any[]>([]);
@@ -2379,32 +2380,62 @@ export default function AdminLiveDashboard() {
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
+                    <button type="button" onClick={() => setIntegrityRecentOnly(true)}
+                      style={{ fontSize: "12px", fontWeight: 700, padding: "5px 12px", borderRadius: "8px", border: "1px solid #E5C7CE", cursor: "pointer", background: integrityRecentOnly ? "#7A1E47" : "#fff", color: integrityRecentOnly ? "#fff" : "#7A1E47" }}>최근 7일만</button>
+                    <button type="button" onClick={() => setIntegrityRecentOnly(false)}
+                      style={{ fontSize: "12px", fontWeight: 700, padding: "5px 12px", borderRadius: "8px", border: "1px solid #E5C7CE", cursor: "pointer", background: !integrityRecentOnly ? "#7A1E47" : "#fff", color: !integrityRecentOnly ? "#fff" : "#7A1E47" }}>전체 보기</button>
+                  </div>
                   {[
                     { title: "자동입금확인인데 입금없음", count: integrityResult.summary?.check1_auto_paid_no_deposit ?? 0, items: integrityResult.check1?.items ?? [], kind: "check1" },
                     { title: "주문그룹 중복입금", count: integrityResult.summary?.check2_group_multi_deposit ?? 0, items: integrityResult.check2?.items ?? [], kind: "check2" },
                     { title: "중복 입금내역", count: integrityResult.summary?.check3_duplicate_deposit ?? 0, items: integrityResult.check3?.items ?? [], kind: "check3" },
                   ].map((card) => {
-                    const isOk = Number(card.count) === 0;
+                    const now = Date.now();
+                    const SEVEN = 7 * 24 * 60 * 60 * 1000;
+                    const itemsWithDate = card.items.map((item: any) => {
+                      const dateRaw = card.kind === "check1" ? item.created_at
+                        : card.kind === "check2" ? item.latest_deposited_time
+                        : item.deposited_time;
+                      const t = dateRaw ? new Date(dateRaw).getTime() : NaN;
+                      const isRecent = Number.isFinite(t) ? (now - t) <= SEVEN : false;
+                      return { item, dateRaw, isRecent };
+                    });
+                    const shownItems = integrityRecentOnly ? itemsWithDate.filter((x: any) => x.isRecent) : itemsWithDate;
+                    const recentCount = itemsWithDate.filter((x: any) => x.isRecent).length;
+                    const shownCount = integrityRecentOnly ? recentCount : card.count;
+                    const isOk = shownCount === 0;
                     const color = isOk ? "#0F6E56" : "#B91C1C";
+                    const fmtDate = (raw: any) => {
+                      if (!raw) return "날짜없음";
+                      const d = new Date(raw);
+                      if (!Number.isFinite(d.getTime())) return "날짜없음";
+                      return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+                    };
                     return (
                       <div key={card.kind} style={{ border: `1px solid ${isOk ? "#D1E7DD" : "#F5C2C7"}`, borderRadius: "12px", padding: "12px 14px" }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                           <div style={{ fontSize: "14px", fontWeight: 800, color: "#333" }}>{card.title}</div>
-                          <div style={{ fontSize: "14px", fontWeight: 800, color }}>{isOk ? "정상" : `${card.count}건`}</div>
+                          <div style={{ fontSize: "14px", fontWeight: 800, color }}>{isOk ? "정상" : `${shownCount}건`}</div>
                         </div>
-                        {!isOk && card.items.length > 0 ? (
+                        {!isOk && shownItems.length > 0 ? (
                           <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "4px" }}>
-                            {card.items.slice(0, 10).map((item: any, idx: number) => (
-                              <div key={idx} style={{ fontSize: "12px", color: "#666", lineHeight: 1.5 }}>
-                                {card.kind === "check1"
-                                  ? `· ${item.nickname || "-"} / ${Number(item.amount || 0).toLocaleString("ko-KR")}원${item.order_lookup_code ? ` / ${item.order_lookup_code}` : ""}`
-                                  : card.kind === "check2"
-                                    ? `· 그룹 ${item.order_group_id} / 입금 ${item.deposit_ids?.length || 0}건 / ${Number(item.total_deposit_amount || 0).toLocaleString("ko-KR")}원`
-                                    : `· ${item.depositor_name || "-"} / ${Number(item.amount || 0).toLocaleString("ko-KR")}원 / ${item.deposit_ids?.length || 0}줄`}
-                              </div>
-                            ))}
-                            {card.items.length > 10 ? (
-                              <div style={{ fontSize: "11px", color: "#999" }}>… 외 {card.items.length - 10}건</div>
+                            {shownItems.slice(0, 10).map((x: any, idx: number) => {
+                              const item = x.item;
+                              const dateStr = fmtDate(x.dateRaw);
+                              const lineColor = x.isRecent ? "#666" : "#AAA";
+                              return (
+                                <div key={idx} style={{ fontSize: "12px", color: lineColor, lineHeight: 1.5 }}>
+                                  {card.kind === "check1"
+                                    ? `· ${item.nickname || "-"} / ${Number(item.amount || 0).toLocaleString("ko-KR")}원${item.order_lookup_code ? ` / ${item.order_lookup_code}` : ""} · ${dateStr}`
+                                    : card.kind === "check2"
+                                      ? `· 입금 ${item.deposit_ids?.length || 0}건 / ${Number(item.total_deposit_amount || 0).toLocaleString("ko-KR")}원 · ${dateStr}`
+                                      : `· ${item.depositor_name || "-"} / ${Number(item.amount || 0).toLocaleString("ko-KR")}원 / ${item.deposit_ids?.length || 0}줄 · ${dateStr}`}
+                                </div>
+                              );
+                            })}
+                            {shownItems.length > 10 ? (
+                              <div style={{ fontSize: "11px", color: "#999" }}>… 외 {shownItems.length - 10}건</div>
                             ) : null}
                           </div>
                         ) : null}
