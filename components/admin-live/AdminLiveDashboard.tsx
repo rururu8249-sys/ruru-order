@@ -523,6 +523,9 @@ async function saveLiveBroadcastEndReport({
 
 export default function AdminLiveDashboard() {
   const [activeMenu, setActiveMenu] = useState<AdminLiveMenuKey>(() => readMenuFromUrl());
+  const [integrityOpen, setIntegrityOpen] = useState(false);
+  const [integrityLoading, setIntegrityLoading] = useState(false);
+  const [integrityResult, setIntegrityResult] = useState<any>(null);
   const [orders, setOrders] = useState<LiveOrder[]>([]);
   // [표시 전용] 금액 단독 추천(amount_only_suggestions). 읽기 전용 dry_run으로만 채우며 확정/쓰기 없음.
   const [paymentSuggestions, setPaymentSuggestions] = useState<any[]>([]);
@@ -625,6 +628,21 @@ export default function AdminLiveDashboard() {
     } catch (error) {
       console.warn("[admin-live] 방송 목록 불러오기 실패", error);
       setBroadcasts([]);
+    }
+  };
+
+  const runIntegrityCheck = async () => {
+    setIntegrityOpen(true);
+    setIntegrityLoading(true);
+    setIntegrityResult(null);
+    try {
+      const res = await fetch("/api/admin-v2/integrity-check", { method: "GET", cache: "no-store" });
+      const data = await res.json();
+      setIntegrityResult(data);
+    } catch (e: any) {
+      setIntegrityResult({ ok: false, error: e?.message || "점검 실패" });
+    } finally {
+      setIntegrityLoading(false);
     }
   };
 
@@ -1209,9 +1227,17 @@ export default function AdminLiveDashboard() {
               })}
               <button
                 type="button"
+                onClick={() => void runIntegrityCheck()}
+                title="정합성 점검"
+                className="ml-auto mb-1 mr-1.5 rounded-lg border border-rose-line px-2.5 py-1.5 text-xs font-black text-rose-deep transition hover:bg-rose-soft"
+              >
+                🛡️ 점검
+              </button>
+              <button
+                type="button"
                 onClick={() => void loadOrders()}
                 title="새로고침"
-                className="ml-auto mb-1 rounded-lg border border-rose-line px-2.5 py-1.5 text-xs font-black text-rose-deep transition hover:bg-rose-soft"
+                className="mb-1 rounded-lg border border-rose-line px-2.5 py-1.5 text-xs font-black text-rose-deep transition hover:bg-rose-soft"
               >
                 ↻
               </button>
@@ -2323,6 +2349,77 @@ export default function AdminLiveDashboard() {
           <AdminLiveQuickProductDrawer activeBroadcastId={activeBroadcast?.id || null} />
         </main>
       </div>
+
+      {integrityOpen && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}
+          onClick={() => setIntegrityOpen(false)}
+        >
+          <div
+            style={{ background: "#fff", borderRadius: "16px", width: "100%", maxWidth: "560px", maxHeight: "80vh", overflowY: "auto", padding: "20px 22px", boxShadow: "0 18px 50px rgba(0,0,0,0.25)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+              <div style={{ fontSize: "18px", fontWeight: 800, color: "#7A1E47" }}>🛡️ 정합성 점검</div>
+              <button
+                type="button"
+                onClick={() => setIntegrityOpen(false)}
+                style={{ width: "30px", height: "30px", borderRadius: "50%", border: "none", background: "#F1ECEE", color: "#666", fontSize: "15px", cursor: "pointer" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {integrityLoading ? (
+              <div style={{ padding: "32px 0", textAlign: "center", fontSize: "14px", fontWeight: 700, color: "#888" }}>점검 중...</div>
+            ) : integrityResult ? (
+              integrityResult.ok === false ? (
+                <div style={{ padding: "16px", borderRadius: "12px", background: "#FEF2F2", color: "#B91C1C", fontSize: "14px", fontWeight: 700 }}>
+                  점검 실패: {integrityResult.error || integrityResult.message || "알 수 없는 오류"}
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  {[
+                    { title: "자동입금확인인데 입금없음", count: integrityResult.summary?.check1_auto_paid_no_deposit ?? 0, items: integrityResult.check1?.items ?? [], kind: "check1" },
+                    { title: "주문그룹 중복입금", count: integrityResult.summary?.check2_group_multi_deposit ?? 0, items: integrityResult.check2?.items ?? [], kind: "check2" },
+                    { title: "중복 입금내역", count: integrityResult.summary?.check3_duplicate_deposit ?? 0, items: integrityResult.check3?.items ?? [], kind: "check3" },
+                  ].map((card) => {
+                    const isOk = Number(card.count) === 0;
+                    const color = isOk ? "#0F6E56" : "#B91C1C";
+                    return (
+                      <div key={card.kind} style={{ border: `1px solid ${isOk ? "#D1E7DD" : "#F5C2C7"}`, borderRadius: "12px", padding: "12px 14px" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <div style={{ fontSize: "14px", fontWeight: 800, color: "#333" }}>{card.title}</div>
+                          <div style={{ fontSize: "14px", fontWeight: 800, color }}>{isOk ? "정상" : `${card.count}건`}</div>
+                        </div>
+                        {!isOk && card.items.length > 0 ? (
+                          <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                            {card.items.slice(0, 10).map((item: any, idx: number) => (
+                              <div key={idx} style={{ fontSize: "12px", color: "#666", lineHeight: 1.5 }}>
+                                {card.kind === "check1"
+                                  ? `· ${item.nickname || "-"} / ${Number(item.amount || 0).toLocaleString("ko-KR")}원${item.order_lookup_code ? ` / ${item.order_lookup_code}` : ""}`
+                                  : card.kind === "check2"
+                                    ? `· 그룹 ${item.order_group_id} / 입금 ${item.deposit_ids?.length || 0}건 / ${Number(item.total_deposit_amount || 0).toLocaleString("ko-KR")}원`
+                                    : `· ${item.depositor_name || "-"} / ${Number(item.amount || 0).toLocaleString("ko-KR")}원 / ${item.deposit_ids?.length || 0}줄`}
+                              </div>
+                            ))}
+                            {card.items.length > 10 ? (
+                              <div style={{ fontSize: "11px", color: "#999" }}>… 외 {card.items.length - 10}건</div>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                  {integrityResult.generated_at ? (
+                    <div style={{ fontSize: "11px", color: "#999", textAlign: "right" }}>점검 시각: {new Date(integrityResult.generated_at).toLocaleString("ko-KR")}</div>
+                  ) : null}
+                </div>
+              )
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
