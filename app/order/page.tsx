@@ -1710,21 +1710,6 @@ export default function OrderPage() {
       setCustomerMode("load");
     }
 
-    if (nextAddress || nextDetailAddress) {
-      setCustomerNotice({
-        type: "info",
-        message: [
-          "저장된 주문자 정보",
-          `닉네임: ${nextNickname || "-"} / 이름: ${nextName || "-"}`,
-          `전화번호: ${nextPhone || "-"}`,
-          `주소: ${[nextAddress, nextDetailAddress].filter(Boolean).join(" ") || "-"}`,
-          "주문자 정보가 다르면 상단메뉴 [정보수정]에서 변경해주세요.",
-        ]
-          .filter(Boolean)
-          .join("\n"),
-      });
-    }
-
     return Boolean(nextNickname && nextPhone);
   };
 
