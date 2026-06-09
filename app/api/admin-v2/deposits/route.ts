@@ -105,15 +105,38 @@ function attachLinkedOrders(deposit: AnyRow, maps: ReturnType<typeof buildOrderM
 }
 
 async function selectDeposits(supabase: any) {
-  const ordered = await supabase
-    .from("deposits")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(3000);
-
-  if (!ordered.error) return ordered;
-
-  return supabase.from("deposits").select("*").limit(3000);
+  const pageSize = 1000;
+  let from = 0;
+  const all: any[] = [];
+  while (true) {
+    const { data, error } = await supabase
+      .from("deposits")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (error) {
+      // 정렬 조회 실패 시: 정렬 없이 전체 페이지네이션 fallback
+      const fb: any[] = [];
+      let ffrom = 0;
+      while (true) {
+        const { data: fdata, error: ferror } = await supabase
+          .from("deposits")
+          .select("*")
+          .range(ffrom, ffrom + pageSize - 1);
+        if (ferror) return { data: null, error: ferror };
+        const frows = fdata || [];
+        fb.push(...frows);
+        if (frows.length < pageSize) break;
+        ffrom += pageSize;
+      }
+      return { data: fb, error: null };
+    }
+    const rows = data || [];
+    all.push(...rows);
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+  return { data: all, error: null };
 }
 
 export async function GET() {
@@ -151,10 +174,23 @@ export async function GET() {
 
     const deposits: AnyRow[] = Array.isArray(depositsResult.data) ? (depositsResult.data as AnyRow[]) : [];
 
-    const ordersResult = await supabase
-      .from("orders")
-      .select("*")
-      .limit(5000);
+    const ordersResult = await (async () => {
+      const pageSize = 1000;
+      let from = 0;
+      const all: any[] = [];
+      while (true) {
+        const { data, error } = await supabase
+          .from("orders")
+          .select("*")
+          .range(from, from + pageSize - 1);
+        if (error) return { data: null, error };
+        const rows = data || [];
+        all.push(...rows);
+        if (rows.length < pageSize) break;
+        from += pageSize;
+      }
+      return { data: all, error: null };
+    })();
 
     if (ordersResult.error) {
       return NextResponse.json({
