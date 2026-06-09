@@ -71,6 +71,8 @@ const DEFAULT_FILTERS: LiveOrderFilters = {
   date: "all",
   customStartDate: "",
   customEndDate: "",
+  filterYear: "",
+  filterMonth: "",
   status: "all",
   keyword: "",
 };
@@ -216,6 +218,14 @@ function matchesDate(order: LiveOrder, filters: LiveOrderFilters) {
     return orderDate.getFullYear() === now.getFullYear() && orderDate.getMonth() === now.getMonth();
   }
 
+  if (dateFilter === "yearmonth") {
+    const fy = filters.filterYear ? Number(filters.filterYear) : null;
+    const fm = filters.filterMonth ? Number(filters.filterMonth) : null;
+    if (fy && orderDate.getFullYear() !== fy) return false;
+    if (fm && orderDate.getMonth() + 1 !== fm) return false;
+    return true;
+  }
+
   return true;
 }
 
@@ -236,6 +246,10 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
       filters.customStartDate || filters.customEndDate
         ? `직접 선택 ${filters.customStartDate || "시작일"}~${filters.customEndDate || "종료일"}`
         : "직접 선택",
+    yearmonth:
+      filters.filterYear || filters.filterMonth
+        ? `${filters.filterYear ? `${filters.filterYear}년` : "연도전체"} ${filters.filterMonth ? `${filters.filterMonth}월` : "월전체"}`
+        : "연·월 선택",
   };
   parts.push(dateLabelMap[filters.date]);
 

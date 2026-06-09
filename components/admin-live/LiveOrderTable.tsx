@@ -9,7 +9,7 @@ import LiveOrderCancelViewFilter, { type LiveOrderCancelViewFilterValue } from "
 import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
 import { openPaysterRightHalf } from "./AdminLiveCardPayPopup";
 
-export type LiveOrderDateFilter = "all" | "today" | "yesterday" | "7days" | "month" | "custom";
+export type LiveOrderDateFilter = "all" | "today" | "yesterday" | "7days" | "month" | "custom" | "yearmonth";
 export type LiveOrderStatusFilter =
   | "all"
   | "unpaid"
@@ -25,6 +25,8 @@ export type LiveOrderFilters = {
   date: LiveOrderDateFilter;
   customStartDate: string;
   customEndDate: string;
+  filterYear: string;
+  filterMonth: string;
   status: LiveOrderStatusFilter;
   keyword: string;
 };
@@ -490,7 +492,7 @@ export default function LiveOrderTable({
 
   useEffect(() => {
     setPage(1);
-  }, [filters.broadcast, filters.date, filters.customStartDate, filters.customEndDate, filters.status, filters.keyword, sortMode, pageSize]);
+  }, [filters.broadcast, filters.date, filters.customStartDate, filters.customEndDate, filters.filterYear, filters.filterMonth, filters.status, filters.keyword, sortMode, pageSize]);
 
   useEffect(() => {
     setPendingKeyword(filters.keyword);
@@ -593,6 +595,8 @@ export default function LiveOrderTable({
       date: "all",
       customStartDate: "",
       customEndDate: "",
+      filterYear: "",
+      filterMonth: "",
       status: "all",
       keyword: "",
     });
@@ -640,6 +644,10 @@ export default function LiveOrderTable({
         filters.customStartDate || filters.customEndDate
           ? `직접 선택 ${filters.customStartDate || "시작일"}~${filters.customEndDate || "종료일"}`
           : "직접 선택",
+      yearmonth:
+        filters.filterYear || filters.filterMonth
+          ? `${filters.filterYear ? `${filters.filterYear}년` : "연도전체"} ${filters.filterMonth ? `${filters.filterMonth}월` : "월전체"}`
+          : "연·월 선택",
     };
 
     const statusLabelMap: Record<LiveOrderStatusFilter, string> = {
@@ -800,6 +808,7 @@ export default function LiveOrderTable({
           <option value="7days">최근 7일</option>
           <option value="month">이번 달</option>
           <option value="custom">직접 선택</option>
+          <option value="yearmonth">연·월 선택</option>
         </select>
 
         {filters.date === "custom" && (
@@ -816,6 +825,34 @@ export default function LiveOrderTable({
               onChange={(event) => updateFilter("customEndDate", event.target.value)}
               aria-label="종료일"
             />
+          </>
+        )}
+
+        {filters.date === "yearmonth" && (
+          <>
+            <select className="h-11 flex-none rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-black text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 sm:w-[100px]"
+              value={filters.filterYear}
+              onChange={(event) => updateFilter("filterYear", event.target.value)}
+              aria-label="연도"
+            >
+              <option value="">연도 전체</option>
+              {(() => {
+                const cy = new Date().getFullYear();
+                const years = [];
+                for (let y = cy; y >= cy - 3; y--) years.push(y);
+                return years.map((y) => <option key={y} value={String(y)}>{y}년</option>);
+              })()}
+            </select>
+            <select className="h-11 flex-none rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-black text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 sm:w-[90px]"
+              value={filters.filterMonth}
+              onChange={(event) => updateFilter("filterMonth", event.target.value)}
+              aria-label="월"
+            >
+              <option value="">월 전체</option>
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                <option key={m} value={String(m)}>{m}월</option>
+              ))}
+            </select>
           </>
         )}
 
