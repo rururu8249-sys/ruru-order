@@ -17,7 +17,7 @@ const clearLiveOrderAutoRefreshInterval = (intervalId: number | null) => {
 
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import ManualPaymentMatchDrawer from "@/components/admin-v2/payment/ManualPaymentMatchDrawer";
 import AdminLiveCustomersPanel from "./AdminLiveCustomersPanel";
@@ -817,6 +817,19 @@ export default function AdminLiveDashboard() {
   }, []);
 
   const activeBroadcast = useMemo(() => getActiveBroadcast(broadcasts), [broadcasts]);
+
+  // 처음 방송 데이터 로딩 후 1회: 방송 중이면 기본 필터를 현재 방송으로 맞춘다(라이브 표준).
+  // 사용자가 이미 필터를 바꿨으면(=초기 상태가 아니면) 건드리지 않는다.
+  const didInitBroadcastFilter = useRef(false);
+  useEffect(() => {
+    if (didInitBroadcastFilter.current) return;
+    if (broadcasts.length === 0) return; // 방송 목록 로딩 전이면 대기
+    didInitBroadcastFilter.current = true;
+    if (activeBroadcast) {
+      setFilters((prev) => (prev.broadcast === "all" ? { ...prev, broadcast: "current" } : prev));
+    }
+    // 방송 중이 아니면 기본값(all=전체/최근) 유지
+  }, [broadcasts, activeBroadcast]);
 
   useEffect(() => {
     if (!activeBroadcast) return;
