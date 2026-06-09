@@ -1019,6 +1019,7 @@ export default function OrderPage() {
   const [visibleProductCount, setVisibleProductCount] = useState(10);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [cartAddedOpen, setCartAddedOpen] = useState(false);
+  const [cartAddedItem, setCartAddedItem] = useState<any | null>(null);
   const [lightboxImage, setLightboxImage] = useState<string>("");
   const [orderLookupOrders, setOrderLookupOrders] = useState<any[]>([]);
   const [orderLookupFilter, setOrderLookupFilter] = useState<CustomerOrderLookupFilter>("전체");
@@ -2792,6 +2793,7 @@ export default function OrderPage() {
 
     const normColor = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
     let didAdd = true;
+    let clampedItem: any = null;
     setItems((prev) => {
       const maxQty = (() => {
         try {
@@ -2814,7 +2816,7 @@ export default function OrderPage() {
       }
       const clampedQty = Math.min(addQty, maxQty);
       if (clampedQty < addQty) showCustomerNotice("재고가 부족해요. " + clampedQty + "개로 조정했어요.");
-      const clampedItem = clampedQty !== addQty ? { ...nextItem, qty: String(clampedQty) } : nextItem;
+      clampedItem = clampedQty !== addQty ? { ...nextItem, qty: String(clampedQty) } : nextItem;
       const emptyIndex = prev.findIndex((item) => !item.product_name.trim());
       if (emptyIndex >= 0) return prev.map((item, index) => (index === emptyIndex ? clampedItem : item));
       return [...prev, clampedItem];
@@ -2823,7 +2825,7 @@ export default function OrderPage() {
     setProductSearchOpenIndex(null);
     setProductSearchText("");
     // P6. 담기 완료 — confetti + "주문서에 담았어요!" 토스트(주문서 보기 / 계속 담기)
-    if (didAdd) setCartAddedOpen(true);
+    if (didAdd) { setCartAddedItem(clampedItem); setCartAddedOpen(true); }
   };
 
   const openRegisteredOptionSelectSheet = (product: BroadcastProduct) => {
@@ -4328,11 +4330,24 @@ export default function OrderPage() {
           {/* 담기 완료 — 심플 (확인 ✓ + 주문서 보기 / 계속 담기) */}
           {cartAddedOpen && (
             <div style={{ position: "fixed", inset: 0, zIndex: 140, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.35)" }} onClick={(e) => { if (e.target === e.currentTarget) setCartAddedOpen(false); }}>
-              <div style={{ width: "300px", maxWidth: "86%", background: "#fff", borderRadius: "20px", padding: "24px 22px", textAlign: "center", boxShadow: "0 18px 50px rgba(0,0,0,0.25)" }}>
-                <div style={{ fontSize: "18px", fontWeight: 800, color: "#7B2D43" }}>담았어요 ✓</div>
-                <div style={{ marginTop: "18px", display: "flex", gap: "8px" }}>
-                  <button type="button" onClick={() => { setCartAddedOpen(false); setOrderSheetOpen(true); scrollToOrderProductList(); }} style={{ flex: 1, height: "48px", borderRadius: "14px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}>주문서 보기 ({items.filter((it) => it.product_name.trim()).length}개)</button>
-                  <button type="button" onClick={() => setCartAddedOpen(false)} style={{ flex: 1, height: "48px", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", color: "#7B2D43", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}>계속 담기</button>
+              <div style={{ width: "320px", maxWidth: "88%", background: "#fff", borderRadius: "20px", padding: "24px 22px", boxShadow: "0 18px 50px rgba(0,0,0,0.25)" }}>
+                <div style={{ fontSize: "18px", fontWeight: 800, color: "#7B2D43", textAlign: "center" }}>주문서에 담았어요 ✓</div>
+                {cartAddedItem ? (
+                  <div style={{ marginTop: "16px", background: "#FAF6F7", borderRadius: "14px", padding: "14px 16px" }}>
+                    <div style={{ fontSize: "15px", fontWeight: 800, color: "#222", lineHeight: 1.4 }}>{cartAddedItem.product_name}</div>
+                    {(() => {
+                      const norm = (s: any) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
+                      const opt = [norm(cartAddedItem.color), norm(cartAddedItem.size)].filter(Boolean).join(" / ");
+                      return opt ? <div style={{ marginTop: "4px", fontSize: "13px", fontWeight: 600, color: "#888" }}>{opt}</div> : null;
+                    })()}
+                    <div style={{ marginTop: "10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: "13px", fontWeight: 700, color: "#666" }}>수량 {cartAddedItem.qty}개</span>
+                      <span style={{ fontSize: "16px", fontWeight: 800, color: "#7B2D43" }}>{(() => { const total = (Number(cartAddedItem.product_price) || 0) * (Number(cartAddedItem.qty) || 1); return total > 0 ? won(total) : "가격 직접입력"; })()}</span>
+                    </div>
+                  </div>
+                ) : null}
+                <div style={{ marginTop: "18px" }}>
+                  <button type="button" onClick={() => setCartAddedOpen(false)} style={{ width: "100%", height: "50px", borderRadius: "14px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}>확인</button>
                 </div>
               </div>
             </div>
