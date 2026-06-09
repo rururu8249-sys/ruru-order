@@ -1248,14 +1248,6 @@ export default function AdminLiveDashboard() {
               >
                 🛡️ 점검
               </button>
-              <button
-                type="button"
-                onClick={() => void loadOrders()}
-                title="새로고침"
-                className="mb-1 rounded-lg border border-rose-line px-2.5 py-1.5 text-xs font-black text-rose-deep transition hover:bg-rose-soft"
-              >
-                ↻
-              </button>
             </div>
 
             {/* 목업 B 2-col: 왼쪽 주문 테이블 / 오른쪽 380px 주문상세 사이드 패널(닉네임 클릭 시 슬라이드인) */}
