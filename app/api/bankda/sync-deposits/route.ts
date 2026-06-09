@@ -98,10 +98,23 @@ export async function POST(request: NextRequest) {
 
     const bankdaDescription = String((raw as any)?.response?.description || "");
 
-    const { data: existing, error: existingError } = await supabase
-      .from("deposits")
-      .select("id,depositor_name,amount,deposited_time")
-      .limit(5000);
+    let existing: any[] = [];
+    let existingError: any = null;
+    {
+      const pageSize = 1000;
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from("deposits")
+          .select("id,depositor_name,amount,deposited_time")
+          .range(from, from + pageSize - 1);
+        if (error) { existingError = error; break; }
+        const rows = data || [];
+        existing.push(...rows);
+        if (rows.length < pageSize) break;
+        from += pageSize;
+      }
+    }
 
     if (existingError) {
       return NextResponse.json(
