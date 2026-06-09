@@ -664,12 +664,41 @@ export default function AdminLiveDashboard() {
     setLoading(true);
     setLoadError("");
 
-    const { data, error } = await supabase
-      .from("orders")
-      .select("*")
-      .neq("is_deleted", true)
-      .order("created_at", { ascending: false })
-      .limit(500);
+    // 과거 전체 조회가 필요한 필터(전체보기 / 연·월 선택)면 .range로 끝까지, 아니면 최근 500건만(빠름).
+    const needsFullLoad =
+      filters.broadcast === "all" || filters.date === "yearmonth";
+
+    let data: any[] | null = null;
+    let error: any = null;
+
+    if (needsFullLoad) {
+      const pageSize = 1000;
+      let from = 0;
+      const all: any[] = [];
+      while (true) {
+        const page = await supabase
+          .from("orders")
+          .select("*")
+          .neq("is_deleted", true)
+          .order("created_at", { ascending: false })
+          .range(from, from + pageSize - 1);
+        if (page.error) { error = page.error; break; }
+        const rows = page.data || [];
+        all.push(...rows);
+        if (rows.length < pageSize) break;
+        from += pageSize;
+      }
+      if (!error) data = all;
+    } else {
+      const res = await supabase
+        .from("orders")
+        .select("*")
+        .neq("is_deleted", true)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      data = res.data;
+      error = res.error;
+    }
 
     if (error) {
       setOrders([]);
@@ -755,6 +784,18 @@ export default function AdminLiveDashboard() {
       window.removeEventListener("ruru-admin-live-auto-bankda-synced", handleAutoBankdaSynced);
     };
   }, []);
+
+  // 조회 범위 필터(전체보기/연·월) 전환 시 주문을 다시 불러온다(loadOrders가 그 시점 filters로 범위 결정).
+  // 마운트 1회는 위 마운트 useEffect가 이미 loadOrders를 부르므로 스킵(중복 방지).
+  const didMountOrdersScope = useRef(false);
+  useEffect(() => {
+    if (!didMountOrdersScope.current) {
+      didMountOrdersScope.current = true;
+      return;
+    }
+    void loadOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.broadcast, filters.date]);
 
   // 실시간 주문 반영: orders INSERT/UPDATE 발생 시 주문목록을 재조회(디바운스 600ms로 연속 변경 묶음).
   // 새 고객 주문/상태변경이 수동 새로고침 없이 즉시 화면에 뜨도록 한다. (BANKDA setInterval과 무관)
