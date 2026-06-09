@@ -192,6 +192,8 @@ function statusBadge(order: LiveOrder) {
 }
 
 function testOrderBadge(order: LiveOrder) {
+  // 테스트 주문 배지는 화면에서 숨김(칸 차지 방지). isTestOrder 판정/필터/정산제외 로직은 그대로 유지됨.
+  return null;
   if (!order.isTestOrder) return null;
 
   return (
