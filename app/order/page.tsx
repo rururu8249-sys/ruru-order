@@ -2812,7 +2812,7 @@ export default function OrderPage() {
         const existingQty = Number(prev[sameIndex].qty) || 1;
         const newQty = Math.min(existingQty + addQty, maxQty);
         if (newQty <= existingQty) { showCustomerNotice("재고가 부족해요. 최대 " + maxQty + "개까지 담을 수 있어요."); didAdd = false; return prev; }
-        clampedItem = { ...prev[sameIndex], qty: String(newQty) };
+        clampedItem = { ...prev[sameIndex], qty: String(Math.min(addQty, maxQty)) };
         return prev.map((item, index) => index === sameIndex ? { ...item, qty: String(newQty) } : item);
       }
       const clampedQty = Math.min(addQty, maxQty);
