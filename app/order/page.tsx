@@ -4711,22 +4711,21 @@ export default function OrderPage() {
 
           {!orderSheetOpen && (
           <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 pb-[max(16px,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:px-4">
-            <div className="mx-auto max-w-[560px]" style={{ display: "flex", gap: "8px" }}>
-              <button
-                type="button"
-                onClick={() => { setOrderSheetOpen(true); window.setTimeout(() => document.getElementById("orderSheetSection")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}
-                style={{ flex: 1, height: "52px", borderRadius: "14px", border: "none", background: "#F9EEF3", color: "#7A1E47", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}
-              >
-                🛒 담은 상품 보기 ({items.filter((it) => it.product_name.trim()).length}개)
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmitOrderClick}
-                disabled={submitting || customerBlockStatus.blocked}
-                style={{ flex: 1, height: "52px", borderRadius: "14px", border: "none", background: submitting || customerBlockStatus.blocked ? "#cbd5e1" : "#7A1E47", color: "#fff", fontSize: "14px", fontWeight: 800, cursor: submitting || customerBlockStatus.blocked ? "default" : "pointer" }}
-              >
-                {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : "주문서 제출 →"}
-              </button>
+            <div className="mx-auto max-w-[560px]" style={{ display: "flex" }}>
+              {(() => {
+                const cartCount = items.filter((it) => it.product_name.trim()).length;
+                const isEmpty = cartCount === 0;
+                return (
+                  <button
+                    type="button"
+                    onClick={() => { if (isEmpty) return; setOrderSheetOpen(true); window.setTimeout(() => document.getElementById("orderSheetSection")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}
+                    disabled={isEmpty}
+                    style={{ flex: 1, height: "54px", borderRadius: "14px", border: "none", background: isEmpty ? "#E5E1DC" : "#7A1E47", color: isEmpty ? "#9A9590" : "#fff", fontSize: "15px", fontWeight: 800, cursor: isEmpty ? "default" : "pointer" }}
+                  >
+                    {isEmpty ? "담은 상품이 없어요" : `🛒 담은 상품 ${cartCount}개 · 확인하기 →`}
+                  </button>
+                );
+              })()}
             </div>
           </div>
           )}
