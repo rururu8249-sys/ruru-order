@@ -215,8 +215,42 @@ export async function POST() {
     const supabase = getSupabase();
 
     const [ordersResult, depositsResult] = await Promise.all([
-      supabase.from("orders").select("*").order("created_at", { ascending: false }).limit(1000),
-      supabase.from("deposits").select("*").order("created_at", { ascending: false }).limit(1000),
+      (async () => {
+        const pageSize = 1000;
+        let from = 0;
+        const all: any[] = [];
+        while (true) {
+          const { data, error } = await supabase
+            .from("orders")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .range(from, from + pageSize - 1);
+          if (error) return { data: null, error };
+          const rows = data || [];
+          all.push(...rows);
+          if (rows.length < pageSize) break;
+          from += pageSize;
+        }
+        return { data: all, error: null };
+      })(),
+      (async () => {
+        const pageSize = 1000;
+        let from = 0;
+        const all: any[] = [];
+        while (true) {
+          const { data, error } = await supabase
+            .from("deposits")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .range(from, from + pageSize - 1);
+          if (error) return { data: null, error };
+          const rows = data || [];
+          all.push(...rows);
+          if (rows.length < pageSize) break;
+          from += pageSize;
+        }
+        return { data: all, error: null };
+      })(),
     ]);
 
     if (ordersResult.error) {
