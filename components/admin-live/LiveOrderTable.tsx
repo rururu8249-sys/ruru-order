@@ -12,11 +12,12 @@ import { openPaysterRightHalf } from "./AdminLiveCardPayPopup";
 export type LiveOrderDateFilter = "all" | "today" | "yesterday" | "7days" | "month" | "custom" | "yearmonth";
 export type LiveOrderStatusFilter =
   | "all"
-  | "unpaid"
   | "paid"
+  | "unpaid"
   | "manual_match_needed"
-  | "card_paid"
+  | "bank_paid"
   | "card_unpaid"
+  | "card_paid"
   | "canceled"
   | "shipped";
 
@@ -512,6 +513,9 @@ export default function LiveOrderTable({
     const paid = baseOrders.filter((order) =>
       ["paid", "auto_paid", "manual_paid", "card_paid"].includes(order.paymentStatus)
     ).length;
+    const bankPaid = baseOrders.filter((order) =>
+      ["paid", "auto_paid", "manual_paid"].includes(order.paymentStatus) && order.paymentMethod === "무통장입금"
+    ).length;
     const manual = baseOrders.filter((order) => order.paymentStatus === "manual_match_needed").length;
     const canceled = baseOrders.filter((order) => order.paymentStatus === "canceled").length;
     const unpaid = baseOrders.filter((order) =>
@@ -524,9 +528,10 @@ export default function LiveOrderTable({
 
     return {
       total: baseOrders.length,
-      unpaid,
       paid,
+      unpaid,
       manual,
+      bankPaid,
       canceled,
       shipped,
     };
@@ -652,11 +657,12 @@ export default function LiveOrderTable({
 
     const statusLabelMap: Record<LiveOrderStatusFilter, string> = {
       all: "상태: 전체보기",
+      paid: "결제완료",
       unpaid: "입금대기",
-      paid: "입금확인",
       manual_match_needed: "매칭필요",
-      card_paid: "카드결제완료",
+      bank_paid: "입금확인",
       card_unpaid: "카드미결제",
+      card_paid: "카드결제완료",
       canceled: "주문서취소",
       shipped: "출고완료",
     };
@@ -698,9 +704,10 @@ export default function LiveOrderTable({
 
         {[
           ["전체", counts.total, "all"],
+          ["결제완료", counts.paid, "paid"],
           ["입금대기", counts.unpaid, "unpaid"],
           ["매칭필요", counts.manual, "manual_match_needed"],
-          ["입금확인", counts.paid, "paid"],
+          ["입금확인", counts.bankPaid, "bank_paid"],
           ["주문서취소", counts.canceled, "canceled"],
           ["출고완료", counts.shipped, "shipped"],
         ].map(([label, count, status]) => {
@@ -861,11 +868,14 @@ export default function LiveOrderTable({
           onChange={(event) => updateFilter("status", event.target.value as LiveOrderStatusFilter)}
         >
           <option value="all">상태: 전체보기</option>
+          <option value="paid">결제완료</option>
           <option value="unpaid">입금대기</option>
-          <option value="paid">입금확인</option>
           <option value="manual_match_needed">매칭필요</option>
-          <option value="card_paid">카드결제완료</option>
+          <option value="bank_paid">입금확인</option>
           <option value="card_unpaid">카드미결제</option>
+          <option value="card_paid">카드결제완료</option>
+          <option value="canceled">주문서취소</option>
+          <option value="shipped">출고완료</option>
         </select>
 
         <input className="h-11 min-w-[160px] flex-1 rounded-xl border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50"

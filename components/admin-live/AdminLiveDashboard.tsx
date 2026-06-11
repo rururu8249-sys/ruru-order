@@ -147,6 +147,7 @@ function matchesStatus(order: LiveOrder, status: LiveOrderFilters["status"]) {
   if (status === "all") return true;
   if (status === "unpaid") return ["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus);
   if (status === "paid") return isPaid(order);
+  if (status === "bank_paid") return ["paid", "auto_paid", "manual_paid"].includes(order.paymentStatus) && order.paymentMethod === "무통장입금";
   if (status === "shipped") {
     // 출고완료: 배송상태에 '출고/발송/배송' 포함 + '대기' 아님 (주문/입금/금액 로직과 무관한 표시 필터)
     const ship = String((order as { shippingStatus?: unknown }).shippingStatus || "").trim();
@@ -255,8 +256,9 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
   const statusLabelMap: Record<LiveOrderFilters["status"], string> = {
     all: "상태 전체보기",
     unpaid: "입금대기",
-    paid: "입금확인",
+    paid: "결제완료",
     manual_match_needed: "매칭필요",
+    bank_paid: "입금확인",
     card_paid: "카드결제완료",
     card_unpaid: "카드미결제",
     canceled: "주문서취소",
