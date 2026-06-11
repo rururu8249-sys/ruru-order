@@ -1032,21 +1032,15 @@ export default function LiveOrderTable({
                           return nameHit || amtHit;
                         })
                         .slice()
-                        .sort((a, b) => {
-                          const da = Math.abs(Number(a.amount || 0) - expectedAmount);
-                          const db = Math.abs(Number(b.amount || 0) - expectedAmount);
-                          if (da !== db) return da - db;
-                          const scoreA = liveDepositNameScore(String(a.depositor_name || ""), order.nickname || "", order.name || "");
-                            const scoreB = liveDepositNameScore(String(b.depositor_name || ""), order.nickname || "", order.name || "");
-                            if (scoreB !== scoreA) return scoreB - scoreA;
+                          .sort((a, b) => {
                             return new Date(b.deposited_time || 0).getTime() - new Date(a.deposited_time || 0).getTime();
-                        })
+                          })
                         .slice(0, 8);
                       return (
                         <div style={{ background: "#FFF8FA", borderTop: "1px solid #D9C5CC", borderBottom: "1px solid #D9C5CC", padding: "12px 16px 14px" }}>
                           <div style={{ maxWidth: "580px", margin: "0 auto" }}>
                           <div style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43", marginBottom: "8px", textAlign: "center" }}>
-                            🔗 입금내역에서 연결할 건을 선택해주세요 — 금액 근사순 정렬 (주문금액 {money(expectedAmount)})
+                            🔗 입금내역에서 연결할 건을 선택해주세요 — 최신 입금순 정렬 (주문금액 {money(expectedAmount)})
                           </div>
                           <input
                             value={matchSearch}
@@ -1062,8 +1056,8 @@ export default function LiveOrderTable({
                                 const id = String(dep.id);
                                 const isSel = selectedDepositId === id;
                                 const diff = Number(dep.amount || 0) - expectedAmount;
-                                const best = idx === 0 && diff === 0;
                                 const score = liveDepositNameScore(String(dep.depositor_name || ""), order.nickname || "", order.name || "");
+                                const best = diff === 0 && score >= 75;
                                 return (
                                   <button
                                     key={id}
@@ -1074,7 +1068,7 @@ export default function LiveOrderTable({
                                     <span style={{ width: "14px", height: "14px", borderRadius: "50%", flexShrink: 0, border: "1.5px solid " + (isSel ? "#0F6E56" : "#D9C5CC"), background: isSel ? "#0F6E56" : "transparent" }} />
                                     <span style={{ flex: 1, minWidth: 0 }}>
                                       <span style={{ fontSize: "12px", fontWeight: 800 }}>{dep.depositor_name || "-"}</span>
-                                      {score >= 75 ? <span style={{ marginLeft: "6px", fontSize: "10px", fontWeight: 800, color: "#0F6E56" }}>닉네임 유사</span> : null}
+                                      {best ? <span style={{ marginLeft: "4px", fontSize: "10px", fontWeight: 800, padding: "1px 5px", borderRadius: "3px", background: "#0F6E56", color: "#fff" }}>✅ 추천</span> : null}{score >= 75 && !best ? <span style={{ marginLeft: "4px", fontSize: "10px", fontWeight: 800, color: "#0F6E56" }}>👤 이름유사</span> : null}
                                       <span style={{ display: "block", fontSize: "11px", color: "#888" }}>{liveDepositDateLabel(dep)}</span>
                                     </span>
                                     <span style={{ fontSize: "12px", fontWeight: 800 }}>{money(Number(dep.amount || 0))}</span>
