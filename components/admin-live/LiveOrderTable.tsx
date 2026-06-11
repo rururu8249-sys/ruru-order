@@ -1036,10 +1036,10 @@ export default function LiveOrderTable({
                           const da = Math.abs(Number(a.amount || 0) - expectedAmount);
                           const db = Math.abs(Number(b.amount || 0) - expectedAmount);
                           if (da !== db) return da - db;
-                          return (
-                            liveDepositNameScore(String(b.depositor_name || ""), order.nickname || "", order.name || "") -
-                            liveDepositNameScore(String(a.depositor_name || ""), order.nickname || "", order.name || "")
-                          );
+                          const scoreA = liveDepositNameScore(String(a.depositor_name || ""), order.nickname || "", order.name || "");
+                            const scoreB = liveDepositNameScore(String(b.depositor_name || ""), order.nickname || "", order.name || "");
+                            if (scoreB !== scoreA) return scoreB - scoreA;
+                            return new Date(b.deposited_time || 0).getTime() - new Date(a.deposited_time || 0).getTime();
                         })
                         .slice(0, 8);
                       return (
