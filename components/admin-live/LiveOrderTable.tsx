@@ -395,7 +395,7 @@ export default function LiveOrderTable({
   const [sortMode, setSortMode] = useState<SortMode>("latest");
   const [pageSize, setPageSize] = useState(10);
   const [matchOpenOrderId, setMatchOpenOrderId] = useState("");
-  const [selectedDepositId, setSelectedDepositId] = useState("");
+  const [selectedDepositIds, setSelectedDepositIds] = useState<string[]>([]);
   const [matchSaving, setMatchSaving] = useState(false);
   const [matchSearch, setMatchSearch] = useState("");
 
@@ -406,7 +406,7 @@ export default function LiveOrderTable({
     const id = externalMatchOpenOrderId.split("#")[0];
     if (id) {
       setMatchOpenOrderId(id);
-      setSelectedDepositId("");
+      setSelectedDepositIds([]);
       setMatchSearch("");
     }
   }, [externalMatchOpenOrderId]);
@@ -416,7 +416,7 @@ export default function LiveOrderTable({
   const handleDepositDropOnOrder = (order: LiveOrder, depositId: string) => {
     setDropHoverOrderId("");
     const dep = (deposits || []).find((d) => String(d.id) === String(depositId));
-    if (dep) void confirmWithDeposit(order, dep);
+    if (dep) void confirmWithDeposit(order, [dep], [String(dep.id)]);
   };
   const isMatchableOrder = (order: LiveOrder) =>
     ["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus);
@@ -433,17 +433,17 @@ export default function LiveOrderTable({
   };
 
   // 선택 입금으로 입금확인 (기존 /api/admin-v2/manual-payment-match 재사용)
-  const confirmWithDeposit = async (order: LiveOrder, deposit: LiveMatchDeposit) => {
+  const confirmWithDeposit = async (order: LiveOrder, deposits: LiveMatchDeposit[], selectedIds: string[]) => {
     if (matchSaving) return;
-    const depositId = Number(deposit.id);
-    if (!Number.isFinite(depositId)) return;
+    const depositIds = deposits.map(d => Number(d.id)).filter(n => Number.isFinite(n));
+    if (depositIds.length === 0) return;
     const { orderIds, orderGroupId } = deriveOrderMatchKeys(order);
     setMatchSaving(true);
     try {
       const res = await fetch("/api/admin-v2/manual-payment-match", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderGroupId, orderIds, depositIds: [depositId], depositId }),
+        body: JSON.stringify({ orderGroupId, orderIds, depositIds, clientSelectedTotalAmount: deposits.reduce((s,d) => s + Number(d.amount||0), 0) }),
       });
       const r = await res.json().catch(() => null);
       if (!res.ok || !r?.ok) {
@@ -452,7 +452,7 @@ export default function LiveOrderTable({
       }
       showAdminToast("입금확인 처리됐습니다.", "success");
       setMatchOpenOrderId("");
-      setSelectedDepositId("");
+      setSelectedDepositIds([]);
       await onMatched?.();
     } finally {
       setMatchSaving(false);
@@ -477,7 +477,7 @@ export default function LiveOrderTable({
       }
       showAdminToast("수동 입금확인 처리됐습니다.", "success");
       setMatchOpenOrderId("");
-      setSelectedDepositId("");
+      setSelectedDepositIds([]);
       await onMatched?.();
     } finally {
       setMatchSaving(false);
@@ -999,7 +999,7 @@ export default function LiveOrderTable({
                         <div>{statusBadge(order)}</div>
                         {order.paidAt && <div className="mt-0.5 text-[10px] text-slate-400">{order.paidAt}</div>}
                         {order.paymentStatus === "manual_match_needed" ? (
-                          <button type="button" onClick={() => { setMatchOpenOrderId((cur) => (cur === order.id ? "" : order.id)); setSelectedDepositId(""); }} className="mt-1 rounded-lg border border-orange-300 bg-orange-50 px-2 py-0.5 text-[10px] font-black text-orange-700 hover:bg-orange-100">
+                          <button type="button" onClick={() => { setMatchOpenOrderId((cur) => (cur === order.id ? "" : order.id)); setSelectedDepositIds([]); }} className="mt-1 rounded-lg border border-orange-300 bg-orange-50 px-2 py-0.5 text-[10px] font-black text-orange-700 hover:bg-orange-100">
                             {matchOpenOrderId === order.id ? "매칭 ▲" : "매칭 ▼"}
                           </button>
                         ) : null}
@@ -1054,7 +1054,7 @@ export default function LiveOrderTable({
                             ) : (
                               sorted.map((dep, idx) => {
                                 const id = String(dep.id);
-                                const isSel = selectedDepositId === id;
+                                const isSel = selectedDepositIds.includes(id);
                                 const diff = Number(dep.amount || 0) - expectedAmount;
                                 const score = liveDepositNameScore(String(dep.depositor_name || ""), order.nickname || "", order.name || "");
                                 const best = diff === 0 && score >= 75;
@@ -1062,10 +1062,10 @@ export default function LiveOrderTable({
                                   <button
                                     key={id}
                                     type="button"
-                                    onClick={() => setSelectedDepositId(isSel ? "" : id)}
+                                    onClick={() => setSelectedDepositIds((prev) => (isSel ? prev.filter((x) => x !== id) : [...prev, id]))}
                                     style={{ display: "flex", alignItems: "center", gap: "10px", padding: "7px 10px", borderRadius: "8px", textAlign: "left", border: "1px solid " + (isSel || best ? "#0F6E56" : "#E8E2DD"), background: isSel || best ? "#E7F3EE" : "#fff", cursor: "pointer" }}
                                   >
-                                    <span style={{ width: "14px", height: "14px", borderRadius: "50%", flexShrink: 0, border: "1.5px solid " + (isSel ? "#0F6E56" : "#D9C5CC"), background: isSel ? "#0F6E56" : "transparent" }} />
+                                    <span style={{ width: "16px", height: "16px", borderRadius: "4px", flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "1.5px solid " + (isSel ? "#0F6E56" : "#D9C5CC"), background: isSel ? "#0F6E56" : "#fff", color: "#fff", fontSize: "11px", fontWeight: 900, lineHeight: 1 }}>{isSel ? "✓" : ""}</span>
                                     <span style={{ flex: 1, minWidth: 0 }}>
                                       <span style={{ fontSize: "12px", fontWeight: 800 }}>{dep.depositor_name || "-"}</span>
                                       {best ? <span style={{ marginLeft: "4px", fontSize: "10px", fontWeight: 800, padding: "1px 5px", borderRadius: "3px", background: "#0F6E56", color: "#fff" }}>✅ 추천</span> : null}{score >= 75 && !best ? <span style={{ marginLeft: "4px", fontSize: "10px", fontWeight: 800, color: "#0F6E56" }}>👤 이름유사</span> : null}
@@ -1080,18 +1080,34 @@ export default function LiveOrderTable({
                               })
                             )}
                           </div>
+                          {selectedDepositIds.length > 0 ? (() => {
+                            const selDeps = (deposits || []).filter((d) => selectedDepositIds.includes(String(d.id)));
+                            const selTotal = selDeps.reduce((s, d) => s + Number(d.amount || 0), 0);
+                            const amountMatch = selTotal === expectedAmount;
+                            return (
+                              <div style={{ fontSize: "11px", fontWeight: 800, textAlign: "center", padding: "0 0 6px", color: amountMatch ? "#0F6E56" : "#C0392B" }}>
+                                선택 {selDeps.length}건 합계 {money(selTotal)} / 주문금액 {money(expectedAmount)} {amountMatch ? "✓ 일치" : "✗ 불일치 (확정 불가)"}
+                              </div>
+                            );
+                          })() : null}
                           <div style={{ display: "flex", gap: "6px" }}>
+                            {(() => {
+                              const selDeps = (deposits || []).filter((d) => selectedDepositIds.includes(String(d.id)));
+                              const selTotal = selDeps.reduce((s, d) => s + Number(d.amount || 0), 0);
+                              const canConfirm = selDeps.length > 0 && selTotal === expectedAmount;
+                              return (
                             <button
                               type="button"
-                              disabled={matchSaving || !selectedDepositId}
+                              disabled={matchSaving || !canConfirm}
                               onClick={() => {
-                                const dep = sorted.find((d) => String(d.id) === selectedDepositId);
-                                if (dep) void confirmWithDeposit(order, dep);
+                                if (canConfirm) void confirmWithDeposit(order, selDeps, selectedDepositIds);
                               }}
-                              style={{ padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 800, color: "#fff", background: "#0F6E56", border: "none", cursor: "pointer", opacity: matchSaving || !selectedDepositId ? 0.5 : 1 }}
+                              style={{ padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 800, color: "#fff", background: "#0F6E56", border: "none", cursor: matchSaving || !canConfirm ? "default" : "pointer", opacity: matchSaving || !canConfirm ? 0.5 : 1 }}
                             >
                               선택 후 입금확인
                             </button>
+                              );
+                            })()}
                             <button
                               type="button"
                               disabled={matchSaving}
@@ -1102,7 +1118,7 @@ export default function LiveOrderTable({
                             </button>
                             <button
                               type="button"
-                              onClick={() => { setMatchOpenOrderId(""); setSelectedDepositId(""); }}
+                              onClick={() => { setMatchOpenOrderId(""); setSelectedDepositIds([]); }}
                               style={{ padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 800, color: "#555", background: "#fff", border: "1px solid #E8E2DD", cursor: "pointer" }}
                             >
                               닫기
