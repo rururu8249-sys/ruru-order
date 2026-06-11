@@ -891,7 +891,18 @@ export default function AdminLiveDashboard() {
     const todayDateKey = getAlwaysOrderDateKey(new Date().toISOString());
     const alwaysOptions = buildAlwaysOrderOptions(orders as any[], todayDateKey);
 
-    const options = broadcasts.map((broadcast) => ({
+    // 계단식: 선택된 기간(filters.date) 안에 시작된 방송만 노출. "전체(all)"면 모두.
+    const broadcastInPeriod = (broadcast: AdminLiveBroadcast) => {
+      if (filters.date === "all") return true;
+      const baseDate = broadcast.started_at || broadcast.created_at || null;
+      if (!baseDate) return true; // 날짜 없으면 일단 노출(누락 방지)
+      // matchesDate는 order.createdAt 기준으로 기간을 판정하므로, 방송 시작일을 createdAt 자리에 넣어 동일 판정 재활용
+      return matchesDate({ createdAt: baseDate } as LiveOrder, filters);
+    };
+
+    const visibleBroadcasts = broadcasts.filter(broadcastInPeriod);
+
+    const options = visibleBroadcasts.map((broadcast) => ({
       value: broadcast.id,
       label: `방송: ${formatBroadcastDisplayTitle(broadcast)}`,
     }));
@@ -901,7 +912,7 @@ export default function AdminLiveDashboard() {
     return activeBroadcast
       ? [{ value: "current", label: "현재 방송" }, ...mergedOptions]
       : mergedOptions;
-  }, [broadcasts, activeBroadcast, orders]);
+  }, [broadcasts, activeBroadcast, orders, filters.date, filters.filterYear, filters.filterMonth, filters.customStartDate, filters.customEndDate]);
 
   const filteredOrders = useMemo(() => {
     const keyword = normalizeText(filters.keyword);
