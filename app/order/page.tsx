@@ -4389,7 +4389,7 @@ export default function OrderPage() {
                   {registeredOptionColorChoices.length > 0 ? (
                     <div style={{ marginBottom: "16px" }}>
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>색상</div>
-                      {registeredOptionColorChoices.length >= 3 ? (
+                      {registeredOptionColorChoices.length >= 4 ? (
                         <div style={{ overflowX: "auto", display: "flex", gap: "6px", paddingBottom: "4px", WebkitOverflowScrolling: "touch", marginBottom: "14px" }}>
                           {registeredOptionColorChoices.map((option) => {
                             const selected = registeredOptionColor === option;
@@ -4420,6 +4420,13 @@ export default function OrderPage() {
                     </div>
                   ) : null}
 
+                  {registeredOptionColorMode === "none" ? (
+                    <div style={{ marginBottom: "16px" }}>
+                      <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>색상</div>
+                      <div style={{ height: "46px", display: "flex", alignItems: "center", padding: "0 14px", borderRadius: "14px", border: "1.5px solid #E8E2DD", background: "#F7F4F1", fontSize: "15px", fontWeight: 700, color: "#ABA5A0" }}>없음</div>
+                    </div>
+                  ) : null}
+
                   {registeredOptionColorMode === "input" ? (
                     <div style={{ marginBottom: "16px" }}>
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>색상</div>
@@ -4431,7 +4438,7 @@ export default function OrderPage() {
                   {registeredOptionSizeChoices.length > 0 ? (
                     <div style={{ marginBottom: "16px" }}>
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>사이즈</div>
-                      {registeredOptionSizeChoices.length >= 3 ? (
+                      {registeredOptionSizeChoices.length >= 4 ? (
                         <div style={{ overflowX: "auto", display: "flex", gap: "6px", paddingBottom: "4px", WebkitOverflowScrolling: "touch", marginBottom: "14px" }}>
                           {registeredOptionSizeChoices.map((option) => {
                             const selected = registeredOptionSize === option;
@@ -4459,6 +4466,13 @@ export default function OrderPage() {
                         </div>
                       )}
                       {!registeredOptionSize.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>사이즈를 선택해주세요</div> : null}
+                    </div>
+                  ) : null}
+
+                  {registeredOptionSizeMode === "none" ? (
+                    <div style={{ marginBottom: "16px" }}>
+                      <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>사이즈</div>
+                      <div style={{ height: "46px", display: "flex", alignItems: "center", padding: "0 14px", borderRadius: "14px", border: "1.5px solid #E8E2DD", background: "#F7F4F1", fontSize: "15px", fontWeight: 700, color: "#ABA5A0" }}>없음</div>
                     </div>
                   ) : null}
 
