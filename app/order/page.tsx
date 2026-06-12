@@ -1369,6 +1369,11 @@ export default function OrderPage() {
     loadBroadcast();
     clearLegacyCustomerSessionIfNeeded();
     loadSavedCustomerInfo();
+    // localStorage엔 배송지 목록이 없으므로, 저장된 번호가 있으면 DB에서 shipping_addresses를 채운다.
+    const savedPhone = (typeof window !== "undefined" && window.localStorage.getItem("ruru_customer_phone")) || "";
+    if (savedPhone.trim()) {
+      void loadExistingCustomerByKakaoPhone(savedPhone);
+    }
   }, []);
 
   useEffect(() => {
