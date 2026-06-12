@@ -2495,7 +2495,7 @@ export default function OrderPage() {
       embedInner.style.cssText = "width:100%;max-width:480px;height:80vh;background:#fff;border-radius:20px 20px 0 0;overflow:hidden;position:relative;";
       const closeBtn = document.createElement("button");
       closeBtn.textContent = "✕ 닫기";
-      closeBtn.style.cssText = "position:absolute;top:10px;right:14px;z-index:1;background:none;border:none;font-size:14px;color:#888;cursor:pointer;padding:4px 8px;";
+      closeBtn.style.cssText = "position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:1;background:#f1f1f1;border:none;border-radius:20px;font-size:14px;color:#555;cursor:pointer;padding:8px 24px;font-weight:700;";
       embedInner.appendChild(closeBtn);
       embedWrap.appendChild(embedInner);
       document.body.appendChild(embedWrap);
