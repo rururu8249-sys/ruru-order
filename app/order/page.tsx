@@ -2439,6 +2439,8 @@ export default function OrderPage() {
       );
 
       if (existingScript) {
+        // 이미 로드 완료된 경우 load 이벤트가 다시 안 떠서 promise가 멈추므로 바로 resolve
+        if (window.daum?.Postcode) { resolve(); return; }
         existingScript.addEventListener("load", () => resolve());
         existingScript.addEventListener("error", reject);
         return;
