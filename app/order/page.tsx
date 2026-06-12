@@ -1453,6 +1453,10 @@ export default function OrderPage() {
           setCustomerMode("load");
           setIsCustomerInfoOpen(false);
           setIsKakaoLoginReturn(!nicknameConfirmed);
+          // localStorage엔 배송지 목록이 없으므로 DB에서 shipping_addresses를 채운다.
+          if (savedPhone.trim()) {
+            await loadExistingCustomerByKakaoPhone(savedPhone);
+          }
           window.history.replaceState(null, "", "/order");
           return;
         }
