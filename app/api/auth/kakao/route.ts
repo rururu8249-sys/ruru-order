@@ -120,6 +120,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     kakao_id: String(userData.id || ""),
     kakao_nickname: kakaoAccount?.profile?.nickname || "",
+      kakao_profile_image: kakaoAccount?.profile?.profile_image_url || "",
 
     kakao_phone: kakaoPhone,
     kakao_phone_needs_agreement: Boolean(kakaoAccount?.phone_number_needs_agreement),

@@ -15,6 +15,7 @@ import { createClient } from "@supabase/supabase-js";
 type LoginSyncBody = {
   kakao_id?: unknown;
   kakao_nickname?: unknown;
+  kakao_profile_image?: unknown;
   customer_name?: unknown;
   customer_phone?: unknown;
   customer_zipcode?: unknown;
@@ -36,6 +37,7 @@ type CustomerRow = {
   created_at?: string | null;
   kakao_id?: string | null;
   kakao_nickname?: string | null;
+  kakao_profile_image?: string | null;
   customer_history?: unknown;
 };
 
@@ -131,6 +133,7 @@ export async function POST(request: NextRequest) {
   const detailAddress = cleanText(body.customer_detail_address);
   const kakaoId = cleanText(body.kakao_id);
   const kakaoNickname = cleanText(body.kakao_nickname);
+  const kakaoProfileImage = cleanText(body.kakao_profile_image);
   const nowIso = new Date().toISOString();
 
   if (customerPhoneDigits.length < 10) {
@@ -150,7 +153,7 @@ export async function POST(request: NextRequest) {
     const { data: existingRows, error: selectError } = await supabase
       .from("customers")
       .select(
-        "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, customer_memo, is_blocked, last_order_at, created_at, kakao_id, kakao_nickname, customer_history"
+        "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, customer_memo, is_blocked, last_order_at, created_at, kakao_id, kakao_nickname, kakao_profile_image, customer_history"
       )
       .in("customer_phone", phoneVariants)
       .order("created_at", { ascending: false })
@@ -204,6 +207,10 @@ export async function POST(request: NextRequest) {
       if (kakaoNickname) {
         updateData.kakao_nickname = kakaoNickname;
       }
+      // 프로필 이미지: 로그인마다 최신 값으로 갱신
+      if (kakaoProfileImage) {
+        updateData.kakao_profile_image = kakaoProfileImage;
+      }
 
       // 변경 이력이 생겼으면 저장
       if (history.length > historyBefore) {
@@ -245,6 +252,7 @@ export async function POST(request: NextRequest) {
       detail_address: detailAddress,
       kakao_id: kakaoId || null,
       kakao_nickname: kakaoNickname || null,
+      kakao_profile_image: kakaoProfileImage || null,
       first_login_at: nowIso,
       last_login_at: nowIso,
     };

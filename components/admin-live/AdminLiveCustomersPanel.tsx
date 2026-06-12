@@ -52,6 +52,7 @@ type CustomerProfile = {
   created_at?: string | null;
   kakao_id?: string | null;
   kakao_nickname?: string | null;
+  kakao_profile_image?: string | null;
   first_login_at?: string | null;
   last_login_at?: string | null;
   customer_history?: Array<{ field: string; old_value: string; new_value: string; changed_at: string }> | null;
@@ -400,6 +401,8 @@ function CustomerDetailDrawer({
   onBlockAction: (customer: CustomerSummary) => void | Promise<void>;
   blockSaving: boolean;
 }) {
+  const [avatarZoom, setAvatarZoom] = useState(false);
+
   if (!customer) return null;
 
   const totalPages = Math.max(1, Math.ceil(customer.orders.length / DETAIL_ORDER_PAGE_SIZE));
@@ -420,6 +423,18 @@ function CustomerDetailDrawer({
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.45)", padding: "24px 16px" }}
     >
+      {avatarZoom && clean(profile?.kakao_profile_image) ? (
+        <div
+          onClick={() => setAvatarZoom(false)}
+          style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.78)", padding: "24px", cursor: "zoom-out" }}
+        >
+          <img
+            src={clean(profile?.kakao_profile_image)}
+            alt={customer.nickname || customer.name || "프로필"}
+            style={{ maxWidth: "min(440px, 90vw)", maxHeight: "80vh", borderRadius: "16px", objectFit: "contain", boxShadow: "0 24px 70px rgba(0,0,0,0.5)" }}
+          />
+        </div>
+      ) : null}
       <section
         role="dialog"
         aria-modal="true"
@@ -434,7 +449,16 @@ function CustomerDetailDrawer({
         <div style={{ padding: "16px 18px 18px" }}>
           {/* 프로필 */}
           <div style={{ display: "flex", gap: "13px", marginBottom: "14px" }}>
-            <span style={{ width: "54px", height: "54px", flexShrink: 0, borderRadius: "50%", background: "#F5E6EB", color: "#7B2D43", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", fontWeight: 800 }}>{avatarChar}</span>
+            {clean(profile?.kakao_profile_image) ? (
+              <img
+                src={clean(profile?.kakao_profile_image)}
+                alt={customer.nickname || customer.name || "프로필"}
+                onClick={() => setAvatarZoom(true)}
+                style={{ width: "54px", height: "54px", flexShrink: 0, borderRadius: "50%", objectFit: "cover", background: "#F5E6EB", cursor: "zoom-in" }}
+              />
+            ) : (
+              <span style={{ width: "54px", height: "54px", flexShrink: 0, borderRadius: "50%", background: "#F5E6EB", color: "#7B2D43", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", fontWeight: 800 }}>{avatarChar}</span>
+            )}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: "15px", fontWeight: 800, color: "#222", marginBottom: "3px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                 {customer.nickname}
@@ -616,7 +640,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
       const { data, error } = await supabase
         .from("customers")
         .select(
-          "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, is_blocked, block_reason, customer_memo, last_order_at, created_at, kakao_id, kakao_nickname, first_login_at, last_login_at, customer_history"
+          "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, is_blocked, block_reason, customer_memo, last_order_at, created_at, kakao_id, kakao_nickname, kakao_profile_image, first_login_at, last_login_at, customer_history"
         )
         .order("created_at", { ascending: false })
         .limit(1000);

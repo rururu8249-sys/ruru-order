@@ -44,6 +44,7 @@ export default function KakaoCallbackPage() {
 
       setIfValue("ruru_kakao_id", data.kakao_id);
       setIfValue("ruru_kakao_nickname", data.kakao_nickname);
+      setIfValue("ruru_kakao_profile_image", data.kakao_profile_image);
 
       setIfValue("ruru_customer_name", data.customer_name);
       setIfValue("ruru_customer_phone", data.customer_phone);
@@ -61,6 +62,7 @@ export default function KakaoCallbackPage() {
           body: JSON.stringify({
             kakao_id: data.kakao_id,
             kakao_nickname: data.kakao_nickname,
+            kakao_profile_image: data.kakao_profile_image,
             customer_name: data.customer_name,
             customer_phone: data.customer_phone,
             customer_zipcode: data.customer_zipcode,
