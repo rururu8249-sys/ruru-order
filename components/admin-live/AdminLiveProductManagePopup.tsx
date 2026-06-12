@@ -525,7 +525,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     if (!id) return;
     if (!window.confirm(`"${productName(p)}" 상품을 삭제할까요?\n\n숨김 처리됩니다 (복구 가능)`)) return;
     try {
-      const { error } = await supabase.from("products").update({ status: "deleted" }).eq("id", id);
+      const { error } = await supabase.from("products").update({ status: "deleted", is_visible: false }).eq("id", id);
       if (error) throw error;
       showAdminToast("상품을 숨김 처리했어요. (복구 가능)", "success");
       window.dispatchEvent(new Event("ruru-live-product-updated"));
