@@ -126,10 +126,16 @@ export default function CustomerInfoEditBottomSheet({
   };
 
   const handleSetDefault = (index: number) => {
-    onSaveShippingAddresses?.(shippingAddresses.map((x, i) => ({ ...x, isDefault: i === index })));
+    const target = shippingAddresses[index];
+    if (!target) return;
+    // 기본 배송지로 설정한 항목을 배열 맨 앞으로 이동하고 isDefault 갱신.
+    const reordered = [
+      { ...target, isDefault: true },
+      ...shippingAddresses.filter((_, i) => i !== index).map((x) => ({ ...x, isDefault: false })),
+    ];
+    onSaveShippingAddresses?.(reordered);
     // 기본 배송지로 설정하면 곧 주문 주소로도 적용한다.
-    const addr = shippingAddresses[index];
-    if (addr) onSelectShippingAddress?.(addr.address, addr.detailAddress, addr.name, addr.phone, addr.zipcode);
+    onSelectShippingAddress?.(target.address, target.detailAddress, target.name, target.phone, target.zipcode);
   };
 
   // 주소검색 — 현재 팝업 위에서 열림 (order/page.tsx의 openAddressSearch가 최상위 zIndex로 처리)
