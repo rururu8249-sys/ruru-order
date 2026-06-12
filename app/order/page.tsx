@@ -2488,10 +2488,27 @@ export default function OrderPage() {
         return;
       }
 
+      // 카카오톡 인앱브라우저(iOS)에서 popup 방식이 막히는 문제 → embed 방식 오버레이 사용
+      const embedWrap = document.createElement("div");
+      embedWrap.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);display:flex;align-items:flex-end;justify-content:center;padding:0 12px;";
+      const embedInner = document.createElement("div");
+      embedInner.style.cssText = "width:100%;max-width:480px;height:80vh;background:#fff;border-radius:20px 20px 0 0;overflow:hidden;position:relative;";
+      const closeBtn = document.createElement("button");
+      closeBtn.textContent = "✕ 닫기";
+      closeBtn.style.cssText = "position:absolute;top:10px;right:14px;z-index:1;background:none;border:none;font-size:14px;color:#888;cursor:pointer;padding:4px 8px;";
+      embedInner.appendChild(closeBtn);
+      embedWrap.appendChild(embedInner);
+      document.body.appendChild(embedWrap);
+      const removeEmbed = () => { if (document.body.contains(embedWrap)) document.body.removeChild(embedWrap); };
+      closeBtn.onclick = removeEmbed;
+      embedWrap.onclick = (e) => { if (e.target === embedWrap) removeEmbed(); };
+
       new window.daum.Postcode({
         oncomplete: (data: any) => {
           const nextAddress = data.roadAddress || data.jibunAddress || "";
           const nextZipcode = data.zonecode || "";
+
+          removeEmbed();
 
           if (onPicked) {
             onPicked(nextAddress, nextZipcode);
@@ -2508,8 +2525,10 @@ export default function OrderPage() {
             detailInput?.focus();
           }, 100);
         },
-        onclose: () => {},
-      }).open();
+        onclose: () => { removeEmbed(); },
+        width: "100%",
+        height: "100%",
+      }).embed(embedInner, { autoClose: true });
     } catch (error) {
       manualAddress();
     }
