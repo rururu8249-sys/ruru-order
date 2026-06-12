@@ -703,29 +703,44 @@ export default function LiveOrderTable({
         <h2 className="mr-2 text-lg font-black text-slate-950">실시간 주문서</h2>
 
         {[
-          ["전체", counts.total, "all"],
-          ["결제완료", counts.paid, "paid"],
-          ["입금대기", counts.unpaid, "unpaid"],
-          ["매칭필요", counts.manual, "manual_match_needed"],
-          ["입금확인", counts.bankPaid, "bank_paid"],
-          ["주문서취소", counts.canceled, "canceled"],
-          ["출고완료", counts.shipped, "shipped"],
-        ].map(([label, count, status]) => {
+          ["전체", counts.total, "all", "rose"],
+          ["결제완료", counts.paid, "paid", "green"],
+          ["입금대기", counts.unpaid, "unpaid", "red"],
+          ["매칭필요", counts.manual, "manual_match_needed", "amber"],
+          ["입금확인", counts.bankPaid, "bank_paid", "green"],
+          ["주문서취소", counts.canceled, "canceled", "muted"],
+          ["출고완료", counts.shipped, "shipped", "blue"],
+        ].map(([label, count, status, tone]) => {
           const active = filters.status === status;
+          const toneStyle: Record<string, { bg: string; text: string; inactiveBg: string; inactiveText: string }> = {
+            rose:  { bg: "#7B2D43", text: "#fff", inactiveBg: "#F9F0F2", inactiveText: "#7B2D43" },
+            green: { bg: "#0F6E56", text: "#fff", inactiveBg: "#E7F3EE", inactiveText: "#0F6E56" },
+            red:   { bg: "#C0392B", text: "#fff", inactiveBg: "#FBEAE7", inactiveText: "#C0392B" },
+            amber: { bg: "#854F0B", text: "#fff", inactiveBg: "#FBF1E0", inactiveText: "#854F0B" },
+            blue:  { bg: "#185FA5", text: "#fff", inactiveBg: "#E8F0FA", inactiveText: "#185FA5" },
+            muted: { bg: "#777",    text: "#fff", inactiveBg: "#F1EFEC", inactiveText: "#777" },
+          };
+          const t = toneStyle[tone as string] ?? toneStyle.muted;
 
           return (
             <button
-              key={label}
+              key={label as string}
               type="button"
               onClick={() => updateFilter("status", status as LiveOrderStatusFilter)}
-              className={[
-                "rounded-full px-3 py-1.5 text-xs font-black transition",
-                active
-                  ? "bg-rose-deep text-white shadow-sm"
-                  : "bg-slate-100 text-slate-600 hover:bg-rose-soft hover:text-rose-deep",
-              ].join(" ")}
+              style={{
+                borderRadius: "999px",
+                padding: "4px 12px",
+                fontSize: "12px",
+                fontWeight: 800,
+                border: "none",
+                cursor: "pointer",
+                transition: "all 0.15s",
+                background: active ? t.bg : t.inactiveBg,
+                color: active ? t.text : t.inactiveText,
+                boxShadow: active ? "0 1px 4px rgba(0,0,0,0.13)" : "none",
+              }}
             >
-              {label} <span className="ml-1 opacity-80">{count}</span>
+              {label} <span style={{ opacity: 0.85 }}>{count}</span>
             </button>
           );
         })}

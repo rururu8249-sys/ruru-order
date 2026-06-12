@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import type { AdminLiveBroadcast } from "./liveBroadcastController";
 import { formatBroadcastTime } from "./liveBroadcastController";
-import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
 
 type VideoRatio = "vertical" | "wide" | "auto";
 
@@ -81,10 +80,6 @@ export default function LiveHeader({
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          <AdminLiveEventRoulettePanel
-            buttonLabel="🎁 이벤트"
-            buttonClassName="inline-flex shrink-0 rounded-xl font-black disabled:bg-slate-300 items-center justify-center whitespace-nowrap h-9 px-3 text-xs transition bg-violet-600 text-white hover:bg-violet-700"
-          />
           <button
             type="button"
             disabled={savingBroadcast || Boolean(activeBroadcast)}
