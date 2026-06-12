@@ -750,7 +750,7 @@ export default function LiveOrderTable({
             type="button"
             onClick={exportRosen}
             disabled={exporting !== "" || exportableOrders.length === 0}
-            className="rounded-xl bg-rose-deep px-3 py-2 text-xs font-black text-white shadow-sm hover:bg-rose-deep disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
             title="현재 필터 조건 그대로 로젠 송장 엑셀을 내보냅니다"
           >
             {exporting === "rozen" ? "내보내는중..." : "🚚 송장 출력"}
@@ -760,17 +760,13 @@ export default function LiveOrderTable({
             type="button"
             onClick={exportPicking}
             disabled={exporting !== "" || exportableOrders.length === 0}
-            className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
             title="현재 필터 조건 그대로 물건챙기기 엑셀을 내보냅니다"
           >
             {exporting === "picking" ? "내보내는중..." : "🛍 물건챙기기"}
           </button>
 
-            {canceledExportExcludedCount > 0 ? (
-              <span className="rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-600">
-                주문서취소 {canceledExportExcludedCount.toLocaleString("ko-KR")}건은 엑셀 내보내기에서 자동 제외됩니다.
-              </span>
-            ) : null}
+            
 
           <button
             type="button"
@@ -802,9 +798,6 @@ export default function LiveOrderTable({
         </div>
       </div>
 
-      <div className="mb-2 rounded-xl bg-rose-soft px-3 py-2 text-[11px] font-black text-rose-deep">
-        상단 카운트 버튼과 필터가 실제 주문서와 매출요약에 함께 적용됩니다. 검색은 Enter 또는 검색 버튼을 눌렀을 때만 적용됩니다.
-      </div>
 
       <div className="mb-3 flex w-full flex-wrap items-center gap-2 xl:flex-nowrap">
         <select className="h-11 w-full flex-none rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50 sm:w-[170px]"

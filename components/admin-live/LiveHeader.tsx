@@ -149,18 +149,7 @@ export default function LiveHeader({
           </div>
         </div>
 
-        <div>
-          <label className="mb-1 block text-[11px] font-black text-slate-500">방송화면 비율</label>
-          <select
-            value={videoRatio}
-            onChange={(event) => onVideoRatioChange(event.target.value as VideoRatio)}
-            className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 outline-none focus:border-rose-line focus:ring-4 focus:ring-blue-50"
-          >
-            <option value="vertical">세로 9:16</option>
-            <option value="wide">가로 16:9</option>
-            <option value="auto">자동</option>
-          </select>
-        </div>
+        <div className="text-sm font-black text-slate-700">세로 9:16</div>
       </div>
 
       <div className="mt-2 grid grid-cols-1 gap-1.5 text-[11px] font-black text-slate-500 md:grid-cols-2">
