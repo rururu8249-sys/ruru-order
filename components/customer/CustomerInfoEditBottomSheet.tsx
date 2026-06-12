@@ -29,7 +29,7 @@ type CustomerInfoEditBottomSheetProps = {
 
   shippingAddresses?: any[];
   onSaveShippingAddresses?: (addresses: any[]) => Promise<void>;
-  onSelectShippingAddress?: (address: string, detailAddress: string) => void;
+  onSelectShippingAddress?: (address: string, detailAddress: string, name?: string, phone?: string) => void;
   onOpenAddressSearchForForm?: (onPicked: (addr: string, zipcode: string) => void) => void;
 
   saving?: boolean;
@@ -258,11 +258,11 @@ export default function CustomerInfoEditBottomSheet({
                       </div>
                       <div style={{ fontSize: "12px", color: "#6B6460", marginTop: "3px" }}>{[a.address, a.detailAddress].filter(Boolean).join(" ") || "-"}</div>
                       <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
-                        <button type="button" onClick={() => { onSelectShippingAddress?.(a.address || "", a.detailAddress || ""); }} style={{ border: "1px solid #7A1E47", color: "#7A1E47", background: "#F9EEF3", borderRadius: "6px", padding: "4px 10px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>이 주소 사용</button>
+                        <button type="button" onClick={() => { onSelectShippingAddress?.(a.address || "", a.detailAddress || "", a.name || "", a.phone || ""); }} style={{ border: "1px solid #7A1E47", color: "#7A1E47", background: "#F9EEF3", borderRadius: "6px", padding: "4px 10px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>이 주소로 배송</button>
                         <button type="button" onClick={() => { setEditingAddrIndex(index); setAddrForm({ name: a.name || "", phone: a.phone || "", address: a.address || "", detailAddress: a.detailAddress || "" }); setAddrFormOpen(true); }} style={{ border: "1px solid #7A1E47", color: "#7A1E47", background: "#fff", borderRadius: "6px", padding: "4px 10px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>수정</button>
-                        <button type="button" onClick={() => onSaveShippingAddresses(shippingAddresses.filter((_, i) => i !== index))} style={{ border: "1px solid #FFCCCC", color: "#C0392B", background: "#FFF5F5", borderRadius: "6px", padding: "4px 10px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>삭제</button>
+                        <button type="button" onClick={() => { const next = shippingAddresses.filter((_, i) => i !== index); if (a.isDefault && next.length > 0) next[0] = { ...next[0], isDefault: true }; onSaveShippingAddresses(next); }} style={{ border: "1px solid #FFCCCC", color: "#C0392B", background: "#FFF5F5", borderRadius: "6px", padding: "4px 10px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>삭제</button>
                         {!a.isDefault ? (
-                          <button type="button" onClick={() => onSaveShippingAddresses(shippingAddresses.map((x, i) => ({ ...x, isDefault: i === index })))} style={{ border: "1px solid #E5E1DC", color: "#6B6460", background: "#F5F3F0", borderRadius: "6px", padding: "4px 10px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>기본으로</button>
+                          <button type="button" onClick={() => onSaveShippingAddresses(shippingAddresses.map((x, i) => ({ ...x, isDefault: i === index })))} style={{ border: "1px solid #0F6E56", color: "#0F6E56", background: "#E7F3EE", borderRadius: "6px", padding: "4px 10px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>기본으로 설정</button>
                         ) : null}
                       </div>
                     </div>
