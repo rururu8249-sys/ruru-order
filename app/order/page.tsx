@@ -2947,7 +2947,13 @@ export default function OrderPage() {
     setShippingAddresses(addresses);
     const cleanPhone = normalizePhone(customerPhone);
     if (!cleanPhone || cleanPhone.length < 10) return;
-    await supabase.from("customers").update({ shipping_addresses: addresses }).eq("customer_phone", cleanPhone);
+    // customers row가 아직 없으면(신규 사용자가 배송지부터 추가) insert로 보완해 DB 유실을 막는다.
+    const { data: existing } = await supabase.from("customers").select("id").eq("customer_phone", cleanPhone).limit(1);
+    if (existing && existing.length > 0) {
+      await supabase.from("customers").update({ shipping_addresses: addresses }).eq("customer_phone", cleanPhone);
+    } else {
+      await supabase.from("customers").insert({ customer_phone: cleanPhone, youtube_nickname: youtubeNickname.trim() || "", customer_name: customerName.trim() || "", shipping_addresses: addresses });
+    }
   };
 
   const validate = (options?: { allowMissingDetailAddress?: boolean }) => {
