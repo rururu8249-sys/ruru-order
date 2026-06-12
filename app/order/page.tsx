@@ -4879,11 +4879,12 @@ export default function OrderPage() {
           onCustomerPhoneChange={(value) => setCustomerPhone(normalizePhone(value))}
           shippingAddresses={shippingAddresses}
           onSaveShippingAddresses={saveShippingAddresses}
-          onSelectShippingAddress={(addr, detail, name, phone) => {
+          onSelectShippingAddress={(addr, detail, name, phone, zipcode) => {
             setAddress(addr);
             setDetailAddress(detail);
             if (name) setCustomerName(name);
             if (phone) setCustomerPhone(normalizePhone(phone));
+            if (zipcode) setZipcode(zipcode);
           }}
           onOpenAddressSearchForForm={(onPicked) => openAddressSearch(onPicked)}
           onClose={closeCustomerInfoEditBottomSheet}
