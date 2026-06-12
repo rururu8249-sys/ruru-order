@@ -127,11 +127,9 @@ export default function CustomerInfoEditBottomSheet({
 
   const handleSetDefault = (index: number) => {
     onSaveShippingAddresses?.(shippingAddresses.map((x, i) => ({ ...x, isDefault: i === index })));
-  };
-
-  const handleSelectAddr = (addr: ShippingAddress) => {
-    onSelectShippingAddress?.(addr.address, addr.detailAddress, addr.name, addr.phone, addr.zipcode);
-    setScreen("info");
+    // 기본 배송지로 설정하면 곧 주문 주소로도 적용한다.
+    const addr = shippingAddresses[index];
+    if (addr) onSelectShippingAddress?.(addr.address, addr.detailAddress, addr.name, addr.phone, addr.zipcode);
   };
 
   // 주소검색 — 현재 팝업 위에서 열림 (order/page.tsx의 openAddressSearch가 최상위 zIndex로 처리)
@@ -276,7 +274,7 @@ export default function CustomerInfoEditBottomSheet({
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                         {addr.isDefault && (
-                          <span style={{ background: "#7A1E47", color: "#fff", fontSize: "10px", fontWeight: 700, borderRadius: "4px", padding: "2px 7px" }}>기본</span>
+                          <span style={{ background: "#7A1E47", color: "#fff", fontSize: "10px", fontWeight: 700, borderRadius: "4px", padding: "2px 7px" }}>✅ 기본 배송지</span>
                         )}
                         <span style={{ fontSize: "15px", fontWeight: 800, color: "#222" }}>{addr.name || "이름 없음"}</span>
                       </div>
@@ -294,18 +292,12 @@ export default function CustomerInfoEditBottomSheet({
                     <div style={{ fontSize: "13px", color: "#666", marginBottom: "2px" }}>연락처: {addr.phone || "-"}</div>
                     {addr.zipcode && <div style={{ fontSize: "13px", color: "#888", marginBottom: "2px" }}>({addr.zipcode})</div>}
                     <div style={{ fontSize: "13px", color: "#555", marginBottom: "12px" }}>{addr.address}{addr.detailAddress ? ` ${addr.detailAddress}` : ""}</div>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      <button type="button" onClick={() => handleSelectAddr(addr)}
-                        style={{ flex: 1, height: "38px", border: "1.5px solid #7A1E47", color: "#7A1E47", background: "#FDF4F7", borderRadius: "10px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>
-                        이 주소로 배송
+                    {!addr.isDefault && (
+                      <button type="button" onClick={() => handleSetDefault(index)}
+                        style={{ width: "100%", height: "38px", border: "1px solid #0F6E56", color: "#0F6E56", background: "#E7F3EE", borderRadius: "10px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>
+                        기본 배송지로 설정
                       </button>
-                      {!addr.isDefault && (
-                        <button type="button" onClick={() => handleSetDefault(index)}
-                          style={{ flex: 1, height: "38px", border: "1px solid #0F6E56", color: "#0F6E56", background: "#E7F3EE", borderRadius: "10px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>
-                          기본으로 설정
-                        </button>
-                      )}
-                    </div>
+                    )}
                   </div>
                 ))}
               </div>
