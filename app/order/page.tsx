@@ -66,6 +66,7 @@ import OrderCustomerInfoFormCard from "@/components/order/OrderCustomerInfoFormC
 import CustomerPaymentGuideBottomSheet from "@/components/customer/CustomerPaymentGuideBottomSheet";
 import CustomerPointGiftPopup from "@/components/customer/CustomerPointGiftPopup";
 import CustomerInfoEditBottomSheet from "@/components/customer/CustomerInfoEditBottomSheet";
+import { KakaoPostcodeEmbed } from "react-daum-postcode";
 import CustomerOrderLookupBottomSheet, {
   type CustomerOrderLookupFilter,
   type CustomerOrderLookupItem,
@@ -77,11 +78,6 @@ import CustomerManualAddressPanel from "@/components/customer/CustomerManualAddr
 import CustomerMissingDetailAddressPanel from "@/components/customer/CustomerMissingDetailAddressPanel";
 import GroupBuyQuickSelect, { type GroupBuyQuickSelectProduct } from "@/components/order/GroupBuyQuickSelect";
 
-declare global {
-  interface Window {
-    daum?: any;
-  }
-}
 
 type OrderItem = {
   product_id?: string;
@@ -1001,6 +997,8 @@ export default function OrderPage() {
     }
   };
   const [manualAddressOpen, setManualAddressOpen] = useState(false);
+  const [addressSearchOpen, setAddressSearchOpen] = useState(false);
+  const addressPickedHandlerRef = useRef<((addr: string, zipcode: string) => void) | null>(null);
   const [missingDetailAddressConfirmOpen, setMissingDetailAddressConfirmOpen] = useState(false);
   const [showDepositConfirmModal, setShowDepositConfirmModal] = useState(false);
   const PRIVACY_CONSENT_VERSION = "2026-05-24-v1";
@@ -2422,40 +2420,6 @@ export default function OrderPage() {
     }
   };
 
-  const loadDaumPostcodeScript = () => {
-    return new Promise<void>((resolve, reject) => {
-      if (typeof window === "undefined") {
-        reject();
-        return;
-      }
-
-      if (window.daum?.Postcode) {
-        resolve();
-        return;
-      }
-
-      const existingScript = document.querySelector<HTMLScriptElement>(
-        "script[data-daum-postcode='true']"
-      );
-
-      if (existingScript) {
-        // 이미 로드 완료된 경우 load 이벤트가 다시 안 떠서 promise가 멈추므로 바로 resolve
-        if (window.daum?.Postcode) { resolve(); return; }
-        existingScript.addEventListener("load", () => resolve());
-        existingScript.addEventListener("error", reject);
-        return;
-      }
-
-      const script = document.createElement("script");
-      script.src = "https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
-      script.async = true;
-      script.dataset.daumPostcode = "true";
-      script.onload = () => resolve();
-      script.onerror = reject;
-      document.body.appendChild(script);
-    });
-  };
-
   const applyManualAddress = (nextAddress: string) => {
     const cleanAddress = nextAddress.trim();
 
@@ -2475,63 +2439,35 @@ export default function OrderPage() {
     }, 80);
   };
 
-  const openAddressSearch = async (onPicked?: (addr: string, zipcode: string) => void) => {
-    const manualAddress = () => {
-      setManualAddressOpen(true);
-    };
+  // react-daum-postcode(KakaoPostcodeEmbed)를 state로 띄운다.
+  // iOS 카카오톡 인앱브라우저의 about:blank/팝업차단 이슈를 라이브러리 embed 방식으로 회피.
+  const openAddressSearch = (onPicked?: (addr: string, zipcode: string) => void) => {
+    addressPickedHandlerRef.current = onPicked ?? null;
+    setAddressSearchOpen(true);
+  };
 
-    try {
-      await loadDaumPostcodeScript();
+  const handleAddressSearchComplete = (data: any) => {
+    const nextAddress = data.roadAddress || data.jibunAddress || "";
+    const nextZipcode = data.zonecode || "";
 
-      if (!window.daum?.Postcode) {
-        manualAddress();
-        return;
-      }
+    setAddressSearchOpen(false);
+    const onPicked = addressPickedHandlerRef.current;
+    addressPickedHandlerRef.current = null;
 
-      // 카카오톡 인앱브라우저(iOS)에서 popup 방식이 막히는 문제 → embed 방식 오버레이 사용
-      const embedWrap = document.createElement("div");
-      embedWrap.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);display:flex;align-items:flex-end;justify-content:center;padding:0 12px;";
-      const embedInner = document.createElement("div");
-      embedInner.style.cssText = "width:100%;max-width:480px;height:80vh;background:#fff;border-radius:20px 20px 0 0;overflow:hidden;position:relative;";
-      const closeBtn = document.createElement("button");
-      closeBtn.textContent = "✕ 닫기";
-      closeBtn.style.cssText = "position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:1;background:#f1f1f1;border:none;border-radius:20px;font-size:14px;color:#555;cursor:pointer;padding:8px 24px;font-weight:700;";
-      embedInner.appendChild(closeBtn);
-      embedWrap.appendChild(embedInner);
-      document.body.appendChild(embedWrap);
-      const removeEmbed = () => { if (document.body.contains(embedWrap)) document.body.removeChild(embedWrap); };
-      closeBtn.onclick = removeEmbed;
-      embedWrap.onclick = (e) => { if (e.target === embedWrap) removeEmbed(); };
-
-      new window.daum.Postcode({
-        oncomplete: (data: any) => {
-          const nextAddress = data.roadAddress || data.jibunAddress || "";
-          const nextZipcode = data.zonecode || "";
-
-          removeEmbed();
-
-          if (onPicked) {
-            onPicked(nextAddress, nextZipcode);
-            return;
-          }
-
-          setAddress(nextAddress);
-          setZipcode(nextZipcode);
-
-          setTimeout(() => {
-            const detailInput = document.querySelector<HTMLInputElement>(
-              "input[placeholder='상세주소를 입력해주세요']"
-            );
-            detailInput?.focus();
-          }, 100);
-        },
-        onclose: () => { removeEmbed(); },
-        width: "100%",
-        height: "100%",
-      }).embed(embedInner, { autoClose: true });
-    } catch (error) {
-      manualAddress();
+    if (onPicked) {
+      onPicked(nextAddress, nextZipcode);
+      return;
     }
+
+    setAddress(nextAddress);
+    setZipcode(nextZipcode);
+
+    setTimeout(() => {
+      const detailInput = document.querySelector<HTMLInputElement>(
+        "input[placeholder='상세주소를 입력해주세요']"
+      );
+      detailInput?.focus();
+    }, 100);
   };
 
   const productAmount = useMemo(() => {
@@ -4335,6 +4271,27 @@ export default function OrderPage() {
               onClose={() => setManualAddressOpen(false)}
               onSubmit={applyManualAddress}
             />
+
+            {addressSearchOpen ? (
+              <div
+                onClick={(e) => { if (e.target === e.currentTarget) setAddressSearchOpen(false); }}
+                style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: "0 12px" }}
+              >
+                <div style={{ width: "100%", maxWidth: "480px", height: "80vh", background: "#fff", borderRadius: "20px 20px 0 0", overflow: "hidden", position: "relative" }}>
+                  <KakaoPostcodeEmbed
+                    onComplete={handleAddressSearchComplete}
+                    onClose={(state) => { if (state === "FORCE_CLOSE") setAddressSearchOpen(false); }}
+                    autoClose={false}
+                    style={{ width: "100%", height: "100%" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setAddressSearchOpen(false)}
+                    style={{ position: "absolute", bottom: "16px", left: "50%", transform: "translateX(-50%)", zIndex: 1, background: "#f1f1f1", border: "none", borderRadius: "20px", fontSize: "14px", color: "#555", cursor: "pointer", padding: "8px 24px", fontWeight: 700 }}
+                  >✕ 닫기</button>
+                </div>
+              </div>
+            ) : null}
 
             <CustomerMissingDetailAddressPanel
               open={missingDetailAddressConfirmOpen}
