@@ -485,6 +485,7 @@ export default function LiveOrderTable({
   };
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState<"" | "rozen" | "picking">("");
+  const [exportConfirm, setExportConfirm] = useState<"" | "rozen" | "picking">("");
   const [cancelViewFilter, setCancelViewFilter] = useState<LiveOrderCancelViewFilterValue>("all");
 
   useEffect(() => {
@@ -579,6 +580,9 @@ export default function LiveOrderTable({
     [cancelViewFilteredOrders]
   );
   const canceledExportExcludedCount = cancelViewFilteredOrders.length - exportableOrders.length;
+  const paidOnlyExportOrders = exportableOrders.filter((order) =>
+    ["paid", "auto_paid", "manual_paid", "card_paid"].includes(order.paymentStatus ?? "")
+  );
 
   const updateFilter = <K extends keyof LiveOrderFilters>(key: K, value: LiveOrderFilters[K]) => {
     onFiltersChange({
@@ -677,27 +681,52 @@ export default function LiveOrderTable({
       .join(" · ");
   }, [broadcastOptions, filters]);
 
-  const exportRosen = async () => {
-    setExporting("rozen");
-
+  const runExport = async (kind: "rozen" | "picking", orders: LiveOrder[], filterLabel: string) => {
+    if (orders.length === 0) return;
+    setExporting(kind);
     try {
-      await exportLiveOrdersForRosen(exportableOrders, { filterLabel: currentFilterLabel });
-    } finally {
-      setExporting("");
-    }
-  };
-
-  const exportPicking = async () => {
-    setExporting("picking");
-
-    try {
-      await exportLiveOrdersForPicking(exportableOrders, { filterLabel: currentFilterLabel });
+      if (kind === "rozen") {
+        await exportLiveOrdersForRosen(orders, { filterLabel });
+      } else {
+        await exportLiveOrdersForPicking(orders, { filterLabel });
+      }
     } finally {
       setExporting("");
     }
   };
 
   return (
+    <>
+    {exportConfirm !== "" ? (
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setExportConfirm("")}>
+        <div style={{ background: "#fff", borderRadius: "16px", padding: "26px 30px", minWidth: "340px", boxShadow: "0 8px 40px rgba(0,0,0,0.18)" }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ fontSize: "16px", fontWeight: 900, color: "#0F172A", marginBottom: "14px" }}>
+            {exportConfirm === "rozen" ? "🚚 송장 출력" : "🛍 물건챙기기"}
+          </div>
+          <div style={{ fontSize: "13px", color: "#555", marginBottom: "20px", lineHeight: 1.8 }}>
+            <div>현재 필터 기준: <b>{exportableOrders.length.toLocaleString("ko-KR")}건</b></div>
+            <div>결제완료만: <b style={{ color: "#0F6E56" }}>{paidOnlyExportOrders.length.toLocaleString("ko-KR")}건</b></div>
+          </div>
+          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", flexWrap: "wrap" }}>
+            <button type="button" onClick={() => setExportConfirm("")}
+              style={{ padding: "8px 14px", borderRadius: "8px", border: "1px solid #E2E8F0", background: "#fff", color: "#555", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+              취소
+            </button>
+            <button type="button"
+              onClick={() => { const kind = exportConfirm as "rozen" | "picking"; setExportConfirm(""); void runExport(kind, exportableOrders, currentFilterLabel); }}
+              style={{ padding: "8px 14px", borderRadius: "8px", border: "none", background: "#F1EFEC", color: "#444", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+              현재 필터로 출력 ({exportableOrders.length.toLocaleString("ko-KR")}건)
+            </button>
+            <button type="button"
+              disabled={paidOnlyExportOrders.length === 0}
+              onClick={() => { const kind = exportConfirm as "rozen" | "picking"; setExportConfirm(""); void runExport(kind, paidOnlyExportOrders, "결제완료"); }}
+              style={{ padding: "8px 14px", borderRadius: "8px", border: "none", background: "#0F6E56", color: "#fff", fontWeight: 700, cursor: paidOnlyExportOrders.length === 0 ? "default" : "pointer", fontSize: "13px", opacity: paidOnlyExportOrders.length === 0 ? 0.4 : 1 }}>
+              결제완료만 출력 ({paidOnlyExportOrders.length.toLocaleString("ko-KR")}건)
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : null}
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h2 className="mr-2 text-lg font-black text-slate-950">실시간 주문서</h2>
@@ -748,7 +777,7 @@ export default function LiveOrderTable({
         <div className="ml-auto flex items-center gap-2">
           <button
             type="button"
-            onClick={exportRosen}
+            onClick={() => setExportConfirm("rozen")}
             disabled={exporting !== "" || exportableOrders.length === 0}
             className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
             title="현재 필터 조건 그대로 로젠 송장 엑셀을 내보냅니다"
@@ -758,7 +787,7 @@ export default function LiveOrderTable({
 
           <button
             type="button"
-            onClick={exportPicking}
+            onClick={() => setExportConfirm("picking")}
             disabled={exporting !== "" || exportableOrders.length === 0}
             className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
             title="현재 필터 조건 그대로 물건챙기기 엑셀을 내보냅니다"
@@ -1170,5 +1199,6 @@ export default function LiveOrderTable({
         </div>
       </div>
     </section>
+    </>
   );
 }
