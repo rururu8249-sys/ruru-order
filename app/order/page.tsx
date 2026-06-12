@@ -2970,10 +2970,10 @@ export default function OrderPage() {
   };
 
   const saveShippingAddresses = async (addresses: any[]) => {
+    setShippingAddresses(addresses);
     const cleanPhone = normalizePhone(customerPhone);
     if (!cleanPhone || cleanPhone.length < 10) return;
     await supabase.from("customers").update({ shipping_addresses: addresses }).eq("customer_phone", cleanPhone);
-    setShippingAddresses(addresses);
   };
 
   const validate = (options?: { allowMissingDetailAddress?: boolean }) => {
@@ -3265,6 +3265,7 @@ export default function OrderPage() {
       });
 
       setPaymentGuideOpen(true);
+      setOrderSheetOpen(false);
 
       clearOrderDraftData();
 
