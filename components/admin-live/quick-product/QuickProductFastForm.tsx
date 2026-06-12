@@ -538,6 +538,16 @@ export default function QuickProductFastForm({
   const [saving, setSaving] = useState(false);
   const [sizePresetOpen, setSizePresetOpen] = useState(false);
   const [colorPresetOpen, setColorPresetOpen] = useState(false);
+  const colorPresetRef = useRef<HTMLDivElement>(null);
+  const sizePresetRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const handler = (e: globalThis.MouseEvent) => {
+      if (colorPresetRef.current && !colorPresetRef.current.contains(e.target as Node)) setColorPresetOpen(false);
+      if (sizePresetRef.current && !sizePresetRef.current.contains(e.target as Node)) setSizePresetOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
   const [nameError, setNameError] = useState(false);
   const coverUploadRef = useRef<(() => void) | null>(null);
 
@@ -1076,7 +1086,7 @@ export default function QuickProductFastForm({
               <div style={optRow}>
                 <span style={optLabel}>색상</span>
                 <input style={optInput} type="text" placeholder="화이트, 블랙, 베이지" value={colorText} onChange={(e) => setColorText(e.target.value)} />
-                <div style={{ position: "relative", display: "inline-block" }}>
+                <div ref={colorPresetRef} style={{ position: "relative", display: "inline-block" }}>
                   <button type="button" onClick={() => setColorPresetOpen((v) => !v)} style={{ padding: "5px 10px", borderRadius: "6px", fontSize: "11px", background: "#FBF1E0", color: "#854F0B", cursor: "pointer", border: "none", display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>프리셋 ▾</button>
                   {colorPresetOpen ? (
                     <div style={{ position: "absolute", top: "100%", right: 0, background: "#fff", border: "1px solid #E8E2DD", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, minWidth: "160px", marginTop: "4px", overflow: "hidden" }}>
@@ -1096,7 +1106,7 @@ export default function QuickProductFastForm({
               <div style={optRow}>
                 <span style={optLabel}>사이즈</span>
                 <input style={optInput} type="text" placeholder="220, 230, 240" value={sizeText} onChange={(e) => setSizeText(e.target.value)} />
-                <div style={{ position: "relative", display: "inline-block" }}>
+                <div ref={sizePresetRef} style={{ position: "relative", display: "inline-block" }}>
                   <button type="button" onClick={() => setSizePresetOpen((v) => !v)} style={{ padding: "5px 10px", borderRadius: "6px", fontSize: "11px", background: "#FBF1E0", color: "#854F0B", cursor: "pointer", border: "none", display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>프리셋 ▾</button>
                   {sizePresetOpen ? (
                     <div style={{ position: "absolute", top: "100%", right: 0, background: "#fff", border: "1px solid #E8E2DD", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, minWidth: "160px", marginTop: "4px", overflow: "hidden" }}>
