@@ -188,7 +188,10 @@ function playTone(type: "order" | "auto_paid") {
 }
 
 export default function LiveOpsStatusBox() {
-  const [soundOn, setSoundOn] = useState(true);
+  const [soundOn, setSoundOn] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return window.localStorage.getItem("ruru_admin_sound_on") !== "false";
+  });
   const [openVisitors, setOpenVisitors] = useState(false);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [autoPaidOrders, setAutoPaidOrders] = useState<RecentOrder[]>([]);
@@ -358,9 +361,9 @@ export default function LiveOpsStatusBox() {
           setNotices((prev) => [...mergedNew, ...prev].slice(0, 5));
 
           if (soundOn) {
-            const hasOrder = newOrderNotices.length > 0;
+            // 새 주문 소리는 realtime 구독(AdminLiveDashboard)에서 즉시 전담. 여기선 입금확인만.
             const hasPaid = newAutoPaidNotices.length > 0;
-            if (hasOrder || hasPaid) playTone(hasOrder ? "order" : "auto_paid");
+            if (hasPaid) playTone("auto_paid");
           }
         }
 
@@ -400,7 +403,17 @@ export default function LiveOpsStatusBox() {
         <div className="text-xs font-black text-slate-900">실시간 운영상황</div>
         <button
           type="button"
-          onClick={() => setSoundOn((value) => !value)}
+          onClick={() =>
+            setSoundOn((value) => {
+              const next = !value;
+              try {
+                window.localStorage.setItem("ruru_admin_sound_on", String(next));
+              } catch {
+                /* localStorage 실패 시 무시 */
+              }
+              return next;
+            })
+          }
           className={[
             "rounded-full px-2 py-1 text-[10px] font-black",
             soundOn ? "bg-rose-deep text-white" : "bg-slate-200 text-slate-500",

@@ -800,6 +800,7 @@ export default function AdminLiveDashboard() {
   }, [filters.broadcast, filters.date]);
 
   // 실시간 주문 반영: orders INSERT/UPDATE 발생 시 주문목록을 재조회(디바운스 600ms로 연속 변경 묶음).
+  // INSERT 시 즉시 알림 소리(720Hz beep). UPDATE는 소리 없이 재조회만.
   // 새 고객 주문/상태변경이 수동 새로고침 없이 즉시 화면에 뜨도록 한다. (BANKDA setInterval과 무관)
   useEffect(() => {
     let debounce: ReturnType<typeof setTimeout> | null = null;
@@ -809,9 +810,35 @@ export default function AdminLiveDashboard() {
         void loadOrders();
       }, 600);
     };
+    const playNewOrderTone = () => {
+      try {
+        if (window.localStorage.getItem("ruru_admin_sound_on") === "false") return;
+        const AudioCtx =
+          window.AudioContext ||
+          (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 720;
+        osc.type = "sine";
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.24);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.24);
+        osc.onended = () => void ctx.close();
+      } catch {
+        /* 소리 실패 시 무시 */
+      }
+    };
     const channel = supabase
       .channel("ruru-admin-live-orders-realtime")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, scheduleReload)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, () => {
+        playNewOrderTone();
+        scheduleReload();
+      })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, scheduleReload)
       .subscribe();
     return () => {
@@ -1342,7 +1369,7 @@ export default function AdminLiveDashboard() {
               {/* 우측 사이드 패널: 입금매칭(목업 C) 우선, 없으면 주문상세(목업 B) */}
               {matchPanelOpen ? (
                 <div
-                  className="sticky top-2 block h-[calc(100vh-110px)] w-[380px] shrink-0 self-start overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
+                  className="sticky top-2 block h-[calc(100vh-110px)] w-[380px] shrink-0 self-start overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl"
                   style={{ animation: "ruruSidePanelIn 0.22s ease" }}
                 >
                   <LiveFloatingMatchPanel
@@ -1355,7 +1382,7 @@ export default function AdminLiveDashboard() {
                 </div>
               ) : selectedOrder && orderDetailOpen ? (
                 <div
-                  className="sticky top-2 block h-[calc(100vh-110px)] w-[380px] shrink-0 self-start overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
+                  className="sticky top-2 block h-[calc(100vh-110px)] w-[380px] shrink-0 self-start overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl"
                   style={{ animation: "ruruSidePanelIn 0.22s ease" }}
                 >
                   <LiveOrderDetailDrawer
