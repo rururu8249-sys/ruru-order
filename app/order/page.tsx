@@ -1014,6 +1014,7 @@ export default function OrderPage() {
   const [paymentGuideOpen, setPaymentGuideOpen] = useState(false);
   const [orderSheetOpen, setOrderSheetOpen] = useState(false);
   const [customerInfoEditSheetOpen, setCustomerInfoEditSheetOpen] = useState(false);
+  const [customerInfoEditInitialScreen, setCustomerInfoEditInitialScreen] = useState<"info" | "shipping_list" | "shipping_form">("info");
   const [customerInfoEditSnapshot, setCustomerInfoEditSnapshot] = useState<{
     youtubeNickname: string;
     customerName: string;
@@ -3321,7 +3322,7 @@ export default function OrderPage() {
     }
   };
 
-  const openCustomerInfoEditBottomSheet = () => {
+  const openCustomerInfoEditBottomSheet = (screen: "info" | "shipping_list" | "shipping_form" = "info") => {
     setCustomerInfoEditSnapshot({
       youtubeNickname,
       customerName,
@@ -3329,6 +3330,7 @@ export default function OrderPage() {
       address,
       detailAddress,
     });
+    setCustomerInfoEditInitialScreen(screen);
     setCustomerInfoEditSheetOpen(true);
   };
 
@@ -4060,15 +4062,26 @@ export default function OrderPage() {
           <div style={{ position: "fixed", inset: 0, zIndex: 35, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={(e) => { if (e.target === e.currentTarget) setOrderSheetOpen(false); }}>
             <div style={{ background: "#fff", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: "430px", maxHeight: "92dvh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
               <div style={{ width: "40px", height: "4px", borderRadius: "2px", background: "#E5E1DC", margin: "12px auto 0", flexShrink: 0 }} />
-              <div style={{ flexShrink: 0, padding: "12px 18px", borderBottom: "0.5px solid #E5E1DC", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: "17px", fontWeight: 800, color: "#1A1A1A" }}>주문서 확인</span>
-                <button type="button" onClick={() => setOrderSheetOpen(false)} aria-label="닫기" style={{ width: "28px", height: "28px", borderRadius: "50%", background: "#F5F3F0", border: "none", color: "#888", fontSize: "15px", cursor: "pointer" }}>✕</button>
-              </div>
-              <div style={{ flexShrink: 0, margin: "10px 16px 0", background: "#FFF0F0", borderRadius: "10px", padding: "11px 14px", borderLeft: "3px solid #E8340A" }}>
-                <div style={{ fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>⚠️ 임의로 주문 내용을 수정하시면 안돼요!</div>
-                <div style={{ fontSize: "11px", color: "#C0392B", lineHeight: 1.6, marginTop: "3px" }}>방송에서 루루언니에게 확인 후 수정해 주세요.</div>
+              <div style={{ flexShrink: 0, padding: "12px 18px", borderBottom: "0.5px solid #E5E1DC", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
+                <div style={{ minWidth: 0 }}>
+                  <span style={{ fontSize: "17px", fontWeight: 800, color: "#1A1A1A" }}>주문서 확인</span>
+                  <span style={{ marginLeft: "8px", fontSize: "11px", fontWeight: 600, color: "#9A938C" }}>임의 수정 금지 · 방송에서 확인 후 수정</span>
+                </div>
+                <button type="button" onClick={() => setOrderSheetOpen(false)} aria-label="닫기" style={{ flexShrink: 0, width: "28px", height: "28px", borderRadius: "50%", background: "#F5F3F0", border: "none", color: "#888", fontSize: "15px", cursor: "pointer" }}>✕</button>
               </div>
               <div style={{ overflowY: "auto", flex: 1 }}>
+                {/* 🚚 배송지 카드 */}
+                <div style={{ margin: "12px 16px 0", border: "1px solid #E5E1DC", borderRadius: "12px", padding: "12px 14px", background: "#FAF8F6" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                    <span style={{ fontSize: "13px", fontWeight: 800, color: "#1A1A1A" }}>🚚 배송지</span>
+                    <button type="button" onClick={() => openCustomerInfoEditBottomSheet("shipping_list")} style={{ border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", borderRadius: "8px", padding: "4px 12px", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>변경</button>
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#444", lineHeight: 1.8 }}>
+                    <div>받는 분: {customerName.trim() || "-"}</div>
+                    <div>연락처: {formatPhone(customerPhone) || "-"}</div>
+                    <div>주소: {address.trim() ? `${address.trim()}${detailAddress.trim() ? " " + detailAddress.trim() : ""}` : "주소 미입력"}</div>
+                  </div>
+                </div>
             {selectedItemEntries.length === 0 ? (
               <div style={{ padding: "40px 18px", textAlign: "center" }}>
                 <p style={{ fontSize: "14px", fontWeight: 800, color: "#1A1A1A" }}>아직 담은 상품이 없습니다.</p>
@@ -4882,6 +4895,7 @@ export default function OrderPage() {
           onOpenAddressSearchForForm={(onPicked) => openAddressSearch(onPicked)}
           onClose={closeCustomerInfoEditBottomSheet}
           onSave={completeEditCustomerInfo}
+          initialScreen={customerInfoEditInitialScreen}
         />
 
         <CustomerOrderLookupBottomSheet

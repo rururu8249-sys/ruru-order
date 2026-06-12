@@ -5,7 +5,7 @@
 // 주소검색은 항상 최상위에서 열림 (zIndex stacking context 문제 해결)
 // 주의: UI 전용. DB/API/주문/입금/정산 로직 없음.
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 type ShippingAddress = {
   name: string;
@@ -32,6 +32,7 @@ type CustomerInfoEditBottomSheetProps = {
   onSelectShippingAddress?: (address: string, detailAddress: string, name?: string, phone?: string, zipcode?: string) => void;
   onOpenAddressSearchForForm?: (onPicked: (addr: string, zipcode: string) => void) => void;
   saving?: boolean;
+  initialScreen?: "info" | "shipping_list" | "shipping_form";
 };
 
 const inputStyle: CSSProperties = {
@@ -82,10 +83,16 @@ export default function CustomerInfoEditBottomSheet({
   onSelectShippingAddress,
   onOpenAddressSearchForForm,
   saving = false,
+  initialScreen,
 }: CustomerInfoEditBottomSheetProps) {
-  const [screen, setScreen] = useState<Screen>("info");
+  const [screen, setScreen] = useState<Screen>(initialScreen ?? "info");
   const [editingAddrIndex, setEditingAddrIndex] = useState<number | null>(null);
   const [addrForm, setAddrForm] = useState<ShippingAddress>({ name: "", phone: "", address: "", detailAddress: "", zipcode: "" });
+
+  // 시트가 열릴 때마다 initialScreen으로 진입 화면을 맞춘다.
+  useEffect(() => {
+    if (open) setScreen(initialScreen ?? "info");
+  }, [open, initialScreen]);
 
   const defaultAddr = shippingAddresses.find((a) => a.isDefault) ?? shippingAddresses[0] ?? null;
 
