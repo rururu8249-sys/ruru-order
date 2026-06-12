@@ -31,8 +31,8 @@ type ImagePickerProps = {
   triggerRef?: { current: (() => void) | null };
 };
 
-const COLOR_PRESETS = ["블랙", "화이트", "베이지", "그린", "네이비", "그레이"];
-const SIZE_PRESETS = ["FREE", "XS-XXL", "90-115", "신발 220-290"];
+const COLOR_PRESETS = ["없음", "블랙", "화이트", "베이지", "그린", "네이비", "그레이"];
+const SIZE_PRESETS = ["없음", "FREE", "XS-XXL", "90-115", "신발 220-290"];
 
 function onlyNumber(value: string) {
   return String(value || "").replace(/[^0-9]/g, "");

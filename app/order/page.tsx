@@ -599,13 +599,30 @@ function registeredProductNoneOptionEnabled(product: BroadcastProduct): boolean 
   return rawHasExplicitNone("color") || rawHasExplicitNone("size");
 }
 
-// 등록상품의 색상/사이즈 필드가 어떤 모드인지 판별한다.
+// 등록상품의 색상/사이즈 필드가 어떤 모드인지 field별 독립 판별한다.
 // - "select": 실제 옵션값(블랙/화이트, 230~290 등)이 있어 고객이 골라야 함.
-// - "none":   없음입력 토글 ON(size_option_enabled=true 또는 "없음" 명시) → 자동 "없음", 입력 불필요.
+// - "none":   해당 field가 토글 ON(size/color_option_enabled=true) 또는 "없음" 명시 → 자동 "없음", 입력 불필요.
 // - "input":  실옵션도 없고 토글도 OFF → 고객이 직접 입력해야 함.
 function getRegisteredOptionMode(product: BroadcastProduct, field: "color" | "size"): "select" | "none" | "input" {
   if (getSelectableRegisteredOptions(product, field).length > 0) return "select";
-  if (registeredProductNoneOptionEnabled(product)) return "none";
+  // field별 독립 판단: color는 color_option_enabled, size는 size_option_enabled
+  const record = product as unknown as Record<string, unknown>;
+  const note = (parseProductSuggestionNote(product.product_note) || {}) as Record<string, unknown>;
+  const readFlag = (value: unknown) => {
+    if (value === true) return true;
+    if (typeof value === "number") return value === 1;
+    return ["true", "1", "y", "yes"].includes(String(value ?? "").trim().toLowerCase());
+  };
+  if (field === "color") {
+    if (readFlag(record.color_option_enabled) || readFlag(record.colorOptionEnabled) || readFlag(note.color_option_enabled)) return "none";
+  } else {
+    if (readFlag(record.size_option_enabled) || readFlag(record.sizeOptionEnabled) || readFlag(note.size_option_enabled)) return "none";
+  }
+  // 옵션값에 "없음" 계열이 명시된 경우도 해당 field만 none으로
+  const hasExplicitNone = getProductOptionSuggestions(product, field).some(
+    (value) => String(value).trim() !== "" && normalizeEmptyProductOptionValue(value) === ""
+  );
+  if (hasExplicitNone) return "none";
   return "input";
 }
 
