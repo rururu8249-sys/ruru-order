@@ -349,20 +349,6 @@ export default function CustomerInfoEditBottomSheet({
               )}
             </div>
 
-            {/* 이름 + 전화번호 */}
-            <div style={{ borderRadius: "16px", background: "#fff", padding: "14px", border: "1px solid #E8E2DD" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                <div>
-                  <label style={labelStyle}>이름</label>
-                  <input value={customerName} onChange={(e) => onCustomerNameChange(e.target.value)} style={inputStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>전화번호</label>
-                  <input value={customerPhone} onChange={(e) => onCustomerPhoneChange(formatKoreanPhone(e.target.value))} inputMode="numeric" style={inputStyle} />
-                </div>
-              </div>
-            </div>
-
             {/* 기본 배송지 */}
             <div style={{ borderRadius: "16px", background: "#fff", padding: "14px", border: "1px solid #E8E2DD" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
