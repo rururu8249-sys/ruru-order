@@ -4842,15 +4842,10 @@ export default function OrderPage() {
           youtubeNickname={youtubeNickname}
           customerName={customerName}
           customerPhone={formatPhone(customerPhone)}
-          address={address}
-          detailAddress={detailAddress}
           youtubeNicknameError={youtubeNicknameError}
           onYoutubeNicknameChange={setYoutubeNickname}
           onCustomerNameChange={setCustomerName}
           onCustomerPhoneChange={(value) => setCustomerPhone(normalizePhone(value))}
-          onAddressChange={setAddress}
-          onDetailAddressChange={setDetailAddress}
-          onOpenAddressSearch={openAddressSearch}
           shippingAddresses={shippingAddresses}
           onSaveShippingAddresses={saveShippingAddresses}
           onSelectShippingAddress={(addr, detail, name, phone) => {
