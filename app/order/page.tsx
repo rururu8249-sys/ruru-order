@@ -1780,7 +1780,7 @@ export default function OrderPage() {
     const nextProducts = (data || [])
       .map((product: any) => normalizeOrderProductRow(product))
       .filter((product) => product.product_name.trim())
-      .filter((product) => product.status !== "숨김" || productSuggestionEnabled(product));
+      .filter((product) => (product.status !== "숨김" || productSuggestionEnabled(product)) && product.status !== "deleted");
 
     setGroupBuyQuickProductsFromCatalog(nextProducts);
   };
@@ -2665,7 +2665,7 @@ export default function OrderPage() {
     const uniqueProducts = Array.from(
       new Map(
         mergedProducts
-          .filter((product) => product && product.status !== "숨김")
+          .filter((product) => product && product.status !== "숨김" && product.status !== "deleted")
           // 고객 노출(is_visible)이 명시적으로 false인 상품만 그리드에서 제외. (기존 registered_order_enabled 필터는 검색만(search_only) 상품을 빠뜨려서 교체)
           .filter((product) => (product as any).is_visible !== false)
           .map((product) => [String(product.id), product]),
