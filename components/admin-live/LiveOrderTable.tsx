@@ -8,6 +8,7 @@ import { showAdminToast } from "@/lib/adminToast";
 import LiveOrderCancelViewFilter, { type LiveOrderCancelViewFilterValue } from "./LiveOrderCancelViewFilter";
 import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
 import { openPaysterRightHalf } from "./AdminLiveCardPayPopup";
+import BroadcastSearchSelect from "./BroadcastSearchSelect";
 
 export type LiveOrderDateFilter = "all" | "today" | "yesterday" | "7days" | "month" | "custom" | "yearmonth";
 export type LiveOrderStatusFilter =
@@ -829,18 +830,12 @@ export default function LiveOrderTable({
 
 
       <div className="mb-3 flex w-full flex-wrap items-center gap-2 xl:flex-nowrap">
-        <select className="h-11 w-full flex-none rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50 sm:w-[170px]"
+        <BroadcastSearchSelect
+          options={broadcastOptions}
           value={filters.broadcast}
-          onChange={(event) => updateFilter("broadcast", event.target.value)}
-        >
-          <option value="all">방송: 전체보기</option>
-          {broadcastOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-          <option value="none">{todayAlwaysOrderLabel()}</option>
-        </select>
+          onChange={(v) => updateFilter("broadcast", v)}
+          todayAlwaysLabel={todayAlwaysOrderLabel()}
+        />
 
         <select className="h-11 w-full flex-none rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50 sm:w-[120px]"
           value={filters.date}
