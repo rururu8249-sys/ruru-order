@@ -1341,7 +1341,7 @@ export default function AdminLiveDashboard() {
 
             {/* 목업 B 2-col: 왼쪽 주문 테이블 / 오른쪽 380px 주문상세 사이드 패널(닉네임 클릭 시 슬라이드인) */}
             <section className="mt-2 flex items-start gap-3">
-              <div className="min-w-0 flex-1 sticky top-0 h-screen self-start overflow-hidden flex flex-col">
+              <div className="min-w-0 flex-1 sticky top-0 self-start">
                 <LiveOrderTable
                   orders={filteredOrders}
                   allOrderCount={orders.length}
