@@ -50,7 +50,7 @@ export default function BroadcastSearchSelect({ options, value, onChange, todayA
   };
 
   return (
-    <div ref={wrapRef} style={{ position: "relative", flexShrink: 0, width: "100%" }} className="sm:w-[185px]">
+    <div ref={wrapRef} style={{ position: "relative", flexShrink: 0 }} className="w-full sm:w-[185px]">
       {/* 트리거 */}
       <button
         type="button"

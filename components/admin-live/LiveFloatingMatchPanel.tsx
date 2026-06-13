@@ -74,7 +74,7 @@ export default function LiveFloatingMatchPanel({
   deposits, orders, onClose, onMatched, onSearchFilter,
   selectedOrderForMatch, onClearSelectedOrder,
 }: Props) {
-  const [period, setPeriod] = useState<Period>("today");
+  const [period, setPeriod] = useState<Period>("all");
   const [calOpen, setCalOpen] = useState(false);
   const today = new Date().toISOString().slice(0, 10);
   const [calFrom, setCalFrom] = useState(today.slice(0, 7) + "-01");
