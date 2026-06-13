@@ -556,7 +556,7 @@ export default function AdminLiveDashboard() {
   const [selectedOrderId, setSelectedOrderId] = useState<string>("");
   const [orderDetailOpen, setOrderDetailOpen] = useState(false);
   const [matchPanelOpen, setMatchPanelOpen] = useState(false);
-  const [externalMatchOrderId, setExternalMatchOrderId] = useState("");
+  const [selectedOrderForMatch, setSelectedOrderForMatch] = useState<LiveOrder | null>(null);
   const [videoRatio, setVideoRatio] = useState<VideoRatio>("vertical");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -1010,12 +1010,10 @@ export default function AdminLiveDashboard() {
   };
 
   const openManualMatchForOrder = (order: LiveOrder) => {
-    // 옛 admin-v2 드로어 대신 해당 주문의 인라인 매칭 패널을 연다.
-    // (입금내역 패널은 setManualMatchGroup 직접 호출로 ManualPaymentMatchDrawer 유지)
+    // 우측 입금매칭 패널을 해당 주문 매칭모드로 연다.
     setOrderDetailOpen(false);
-    setMatchPanelOpen(false);
-    // nonce(#timestamp)로 같은 주문 연속 클릭 시에도 prop 값이 바뀌어 effect 재발화되게 한다
-    setExternalMatchOrderId(`${order.id}#${Date.now()}`);
+    setSelectedOrderForMatch(order);
+    setMatchPanelOpen(true);
   };
 
   const refreshAfterManualMatch = async () => {
@@ -1362,7 +1360,7 @@ export default function AdminLiveDashboard() {
                   onOpenCardPay={setCardPayOrder}
                   deposits={deposits}
                   onMatched={refreshAfterManualMatch}
-                  externalMatchOpenOrderId={externalMatchOrderId}
+                  onSelectForMatch={(order) => { setSelectedOrderForMatch(order); setMatchPanelOpen(true); }}
                 />
               </div>
 
@@ -1375,9 +1373,11 @@ export default function AdminLiveDashboard() {
                   <LiveFloatingMatchPanel
                     deposits={deposits}
                     orders={filteredOrders}
-                    onClose={() => setMatchPanelOpen(false)}
+                    onClose={() => { setMatchPanelOpen(false); setSelectedOrderForMatch(null); }}
                     onMatched={refreshAfterManualMatch}
                     onSearchFilter={(keyword) => setFilters((prev) => ({ ...prev, keyword }))}
+                    selectedOrderForMatch={selectedOrderForMatch}
+                    onClearSelectedOrder={() => setSelectedOrderForMatch(null)}
                   />
                 </div>
               ) : selectedOrder && orderDetailOpen ? (
