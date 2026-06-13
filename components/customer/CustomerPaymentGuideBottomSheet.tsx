@@ -157,7 +157,7 @@ export default function CustomerPaymentGuideBottomSheet({
                 <div style={{ fontSize: "11px", color: "#6B6460", marginBottom: "6px" }}>입금자명 (닉네임)</div>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   <span style={{ minWidth: 0, fontSize: "26px", fontWeight: 800, color: "#1A1A1A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={safeNickname}>{safeNickname}</span>
-                  <span style={{ flexShrink: 0, fontSize: "22px", animation: "point-right 1s ease-in-out infinite" }}>👈</span>
+                  <span style={{ flexShrink: 0, fontSize: "22px", lineHeight: 1, animation: "point-right 1s ease-in-out infinite" }}>👈</span>
                 </div>
                 <div style={{ fontSize: "11px", color: "#854F0B", marginTop: "6px" }}>⚠️ 반드시 이 닉네임으로 입금해 주세요</div>
                 <button type="button" onClick={onCopyNickname} style={{ ...(nicknameCopyDone ? doneButtonStyle : normalButtonStyle), marginTop: "12px", width: "100%" }}>
@@ -171,7 +171,7 @@ export default function CustomerPaymentGuideBottomSheet({
                 <div style={{ fontSize: "26px", fontWeight: 800, color: "#7A1E47" }}>{won(safeFinalAmount)}</div>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "6px" }}>
                   <span style={{ minWidth: 0, fontSize: "18px", fontWeight: 800, color: "#555", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{safeBankName} {safeBankAccount}</span>
-                  <span style={{ flexShrink: 0, fontSize: "22px", animation: "point-right 1s ease-in-out infinite" }}>👈</span>
+                  <span style={{ flexShrink: 0, fontSize: "22px", lineHeight: 1, animation: "point-right 1s ease-in-out infinite" }}>👈</span>
                 </div>
                 <div style={{ fontSize: "15px", fontWeight: 700, color: "#555", marginTop: "3px" }}>예금주 {safeBankHolder}</div>
                 <button type="button" onClick={onCopyBankAccount} style={{ ...(bankCopyDone ? doneButtonStyle : normalButtonStyle), marginTop: "12px", width: "100%" }}>
