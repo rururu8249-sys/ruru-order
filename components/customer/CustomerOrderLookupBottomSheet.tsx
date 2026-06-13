@@ -1,42 +1,40 @@
 // components/customer/CustomerOrderLookupBottomSheet.tsx
-// 목적: 주문서 화면 안에서 사용하는 고객 주문조회 바텀시트
+// 목적: 주문서 화면 안에서 사용하는 고객 주문조회 바텀시트 (order_group_id 단위 그룹 표시 + 무한 스크롤)
 // 주의: UI 전용. DB, API, 주문저장, 입금매칭, 정산, 배송 로직 없음. (시안 딥로즈 #7B2D43 인라인)
 
-import type { CSSProperties } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 
 export type CustomerOrderLookupFilter = "전체" | "입금대기" | "입금확인" | "출고완료" | "주문취소";
 
 const BAND_TRACKING_URL = "https://band.us/@ruru8249";
 
-export type CustomerOrderLookupItem = {
-  id: string | number;
-  productName: string;
+export type CustomerOrderLookupGroupProduct = {
+  name: string;
   optionText?: string;
   quantityText?: string;
-  amountText: string;
+};
+
+export type CustomerOrderLookupGroup = {
+  id: string | number;
+  orderCode?: string;
+  dateText: string;
   statusLabel: CustomerOrderLookupFilter;
   deliveryLabel?: string;
-  dateText: string;
-  orderCode?: string;
+  paymentMethodLabel?: string;
+  totalAmountText: string;
+  products: CustomerOrderLookupGroupProduct[];
 };
 
 type CustomerOrderLookupBottomSheetProps = {
   open: boolean;
-  items: CustomerOrderLookupItem[];
+  groups: CustomerOrderLookupGroup[];
   activeFilter: CustomerOrderLookupFilter;
-  page: number;
-  totalPages: number;
   filters: readonly CustomerOrderLookupFilter[];
+  hasMore: boolean;
   onFilterChange: (filter: CustomerOrderLookupFilter) => void;
-  onPageChange: (page: number) => void;
+  onLoadMore: () => void;
   onClose: () => void;
   onOpenPaymentGuide: () => void;
-};
-
-const clampPage = (page: number, totalPages: number) => {
-  const safeTotalPages = Math.max(1, totalPages);
-  const safePage = Number.isFinite(page) ? page : 1;
-  return Math.min(Math.max(1, safePage), safeTotalPages);
 };
 
 // 시안 배지색(정확 hex): 입금확인 초록#0F6E56 / 택배출고(출고완료) 파랑#185FA5 / 입금대기 노랑#854F0B / 주문취소 빨강#C0392B / 그 외(출고대기) 회색
@@ -54,28 +52,39 @@ const deliveryChipStyle = (deliveryLabel: string): CSSProperties => {
 };
 
 const chipBaseStyle: CSSProperties = { borderRadius: "999px", padding: "4px 10px", fontSize: "11px", fontWeight: 800 };
-const pageArrowStyle: CSSProperties = { display: "flex", height: "40px", minWidth: "40px", alignItems: "center", justifyContent: "center", borderRadius: "999px", border: "1px solid #D9C5CC", background: "#fff", fontSize: "14px", fontWeight: 800, color: "#7B2D43", cursor: "pointer" };
 
 export default function CustomerOrderLookupBottomSheet({
   open,
-  items,
+  groups,
   activeFilter,
-  page,
-  totalPages,
   filters,
+  hasMore,
   onFilterChange,
-  onPageChange,
+  onLoadMore,
   onClose,
   onOpenPaymentGuide,
 }: CustomerOrderLookupBottomSheetProps) {
-  if (!open) return null;
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const safeTotalPages = Math.max(1, totalPages);
-  const safePage = clampPage(page, safeTotalPages);
+  // 스크롤 끝 근처 도달 시 추가 로드
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el || !hasMore) return;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 80) {
+      onLoadMore();
+    }
+  };
+
+  // 필터 변경 등으로 목록이 줄면 스크롤을 맨 위로
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [activeFilter]);
+
+  if (!open) return null;
 
   return (
     <div
-      data-ruru-order-lookup-bottom-sheet="shell-v2"
+      data-ruru-order-lookup-bottom-sheet="shell-v3-group"
       style={{ position: "fixed", inset: 0, zIndex: 90, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(15,23,42,0.45)", padding: "0 12px" }}
       role="dialog"
       aria-modal="true"
@@ -108,46 +117,62 @@ export default function CustomerOrderLookupBottomSheet({
             </div>
           </header>
 
-          <div style={{ minHeight: 0, overflowY: "auto", padding: "8px 16px" }}>
-            {items.length > 0 ? (
+          <div ref={scrollRef} onScroll={handleScroll} style={{ minHeight: 0, overflowY: "auto", padding: "8px 16px" }}>
+            {groups.length > 0 ? (
               <div style={{ display: "grid", gap: "10px" }}>
-                {items.map((item) => {
-                  const optionLine = [item.optionText, item.quantityText].filter(Boolean).join(" · ");
-                  const deliveryLabel = item.deliveryLabel || (item.statusLabel === "출고완료" ? "출고완료" : "확인중");
-                  const orderMeta = [item.orderCode, item.dateText].filter(Boolean).join(" · ");
+                {groups.map((group) => {
+                  const deliveryLabel = group.deliveryLabel || (group.statusLabel === "출고완료" ? "출고완료" : "확인중");
+                  const orderMeta = [group.orderCode, group.dateText].filter(Boolean).join(" · ");
 
                   return (
-                    <article key={item.id} style={{ borderRadius: "16px", background: "#fff", border: "1px solid #E8E2DD", padding: "8px 16px" }}>
+                    <article key={group.id} style={{ borderRadius: "16px", background: "#fff", border: "1px solid #E8E2DD", padding: "12px 16px" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                         <div style={{ display: "flex", minWidth: 0, alignItems: "center", gap: "6px" }}>
-                          <span style={{ ...chipBaseStyle, ...paymentChipStyle(item.statusLabel) }}>{item.statusLabel}</span>
+                          <span style={{ ...chipBaseStyle, ...paymentChipStyle(group.statusLabel) }}>{group.statusLabel}</span>
                           <span style={{ ...chipBaseStyle, ...deliveryChipStyle(deliveryLabel) }}>{deliveryLabel}</span>
                         </div>
-                        <p style={{ flexShrink: 0, fontSize: "10px", fontWeight: 800, color: "#999" }}>결제금액</p>
+                        {group.paymentMethodLabel ? (
+                          <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "#7B2D43" }}>{group.paymentMethodLabel}</span>
+                        ) : null}
                       </div>
 
-                      <div style={{ marginTop: "6px", display: "grid", gridTemplateColumns: "1fr auto", alignItems: "start", gap: "12px" }}>
-                        <div style={{ minWidth: 0 }}>
-                          <h3 style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "17px", fontWeight: 800, lineHeight: 1.2, letterSpacing: "-0.07em", color: "#222" }}>
-                            {item.productName || "주문상품"}
-                          </h3>
-                          <p style={{ marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "13px", fontWeight: 800, letterSpacing: "-0.05em", color: "#888" }}>
-                            {optionLine || "옵션 없음"}
-                          </p>
-                        </div>
-                        <p style={{ maxWidth: "112px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingTop: "2px", textAlign: "right", fontSize: "19px", fontWeight: 800, lineHeight: 1.2, letterSpacing: "-0.08em", color: "#222" }}>
-                          {item.amountText}
-                        </p>
+                      <div style={{ marginTop: "10px", display: "grid", gap: "6px" }}>
+                        {group.products.map((product, productIndex) => {
+                          const optionLine = [product.optionText, product.quantityText].filter(Boolean).join(" · ");
+                          return (
+                            <div key={`${group.id}-${productIndex}`} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "10px" }}>
+                              <div style={{ minWidth: 0 }}>
+                                <p style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "15px", fontWeight: 800, lineHeight: 1.3, letterSpacing: "-0.05em", color: "#222" }}>
+                                  {product.name || "주문상품"}
+                                </p>
+                                {optionLine ? (
+                                  <p style={{ marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "12px", fontWeight: 700, letterSpacing: "-0.04em", color: "#999" }}>
+                                    {optionLine}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
 
-                      <div style={{ marginTop: "6px", display: "flex", minWidth: 0, alignItems: "center", borderRadius: "12px", background: "#FAF6F2", padding: "6px 12px" }}>
-                        <p style={{ minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 800, color: "#888" }}>
+                      <div style={{ marginTop: "10px", display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid #F0EBE6", paddingTop: "8px" }}>
+                        <p style={{ minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 800, color: "#999" }}>
                           {orderMeta || "-"}
+                        </p>
+                        <p style={{ flexShrink: 0, fontSize: "18px", fontWeight: 800, letterSpacing: "-0.07em", color: "#222" }}>
+                          {group.totalAmountText}
                         </p>
                       </div>
                     </article>
                   );
                 })}
+
+                {hasMore ? (
+                  <div style={{ padding: "12px 0", textAlign: "center", fontSize: "12px", fontWeight: 700, color: "#ABA5A0" }}>
+                    더 불러오는 중…
+                  </div>
+                ) : null}
               </div>
             ) : (
               <div style={{ borderRadius: "16px", background: "#FAF6F2", padding: "20px", textAlign: "center", border: "1px solid #E8E2DD" }}>
@@ -155,22 +180,6 @@ export default function CustomerOrderLookupBottomSheet({
                 <p style={{ marginTop: "4px", fontSize: "12px", fontWeight: 700, color: "#999" }}>다른 상태를 눌러 확인해주세요.</p>
               </div>
             )}
-
-            <nav
-              data-ruru-order-lookup-pagination="compact-v3"
-              style={{ marginTop: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
-              aria-label="주문조회 페이지 이동"
-            >
-              <button type="button" onClick={() => onPageChange(Math.max(1, safePage - 1))} disabled={safePage <= 1} style={{ ...pageArrowStyle, opacity: safePage <= 1 ? 0.25 : 1, cursor: safePage <= 1 ? "default" : "pointer" }}>&lt;</button>
-
-              <div style={{ display: "flex", height: "40px", minWidth: "112px", alignItems: "center", justifyContent: "center", borderRadius: "999px", background: "#FAF6F2", padding: "0 16px", fontSize: "15px", fontWeight: 800, letterSpacing: "-0.05em", color: "#555" }}>
-                <span style={{ color: "#7B2D43" }}>{safePage}</span>
-                <span style={{ margin: "0 8px", color: "#ccc" }}>/</span>
-                <span>{safeTotalPages}</span>
-              </div>
-
-              <button type="button" onClick={() => onPageChange(Math.min(safeTotalPages, safePage + 1))} disabled={safePage >= safeTotalPages} style={{ ...pageArrowStyle, opacity: safePage >= safeTotalPages ? 0.25 : 1, cursor: safePage >= safeTotalPages ? "default" : "pointer" }}>&gt;</button>
-            </nav>
           </div>
 
           <footer style={{ display: "grid", flexShrink: 0, gridTemplateColumns: "0.78fr 1.22fr", columnGap: "8px", rowGap: "6px", borderTop: "1px solid #E8E2DD", background: "#fff", padding: "10px 16px calc(12px + env(safe-area-inset-bottom))" }}>

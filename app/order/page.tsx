@@ -69,7 +69,7 @@ import CustomerInfoEditBottomSheet from "@/components/customer/CustomerInfoEditB
 import { KakaoPostcodeEmbed } from "react-daum-postcode";
 import CustomerOrderLookupBottomSheet, {
   type CustomerOrderLookupFilter,
-  type CustomerOrderLookupItem,
+  type CustomerOrderLookupGroup,
 } from "@/components/customer/CustomerOrderLookupBottomSheet";
 import OrderKakaoNicknameNotice from "@/components/order/OrderKakaoNicknameNotice";
 import CustomerBlockedNotice from "@/components/customer/CustomerBlockedNotice";
@@ -1040,6 +1040,7 @@ export default function OrderPage() {
   const [orderLookupOrders, setOrderLookupOrders] = useState<any[]>([]);
   const [orderLookupFilter, setOrderLookupFilter] = useState<CustomerOrderLookupFilter>("전체");
   const [orderLookupPage, setOrderLookupPage] = useState(1);
+  const [orderLookupVisibleCount, setOrderLookupVisibleCount] = useState(10);
   const [customerCardRate, setCustomerCardRate] = useState(10);
   const [actualCardFeeRate, setActualCardFeeRate] = useState(7);
   const [cardPaymentMinAmount, setCardPaymentMinAmount] = useState(100000);
@@ -3486,6 +3487,7 @@ export default function OrderPage() {
     setOrderLookupOpen(true);
     setOrderLookupLoading(true);
     setOrderLookupPage(1);
+    setOrderLookupVisibleCount(10);
 
     if (!cleanPhone) {
       setOrderLookupOrders([]);
@@ -3522,42 +3524,59 @@ export default function OrderPage() {
     loadOrderLookupOrders();
   };
 
-  const orderLookupAllItems: CustomerOrderLookupItem[] = orderLookupOrders.map((order) => {
-    const statusLabel = ruruOrderLookupStatusLabel(order);
-    const finalAmount =
-      order?.final_amount ??
-      order?.adjusted_total_price ??
-      order?.total_price ??
-      order?.product_price ??
-      0;
+  const ruruOrderLookupPaymentMethod = (order: any) => {
+    const m = ruruOrderLookupText(order?.payment_method);
+    if (/카드/.test(m)) return "카드결제";
+    if (/무통장|계좌|이체|입금/.test(m)) return "무통장입금";
+    return m || "무통장입금";
+  };
 
-    return {
-      id: order?.id ?? `${order?.created_at || ""}-${ruruOrderLookupProductName(order)}`,
-      productName: ruruOrderLookupProductName(order),
-      optionText: ruruOrderLookupOptionText(order),
-      quantityText: ruruOrderLookupQuantityText(order),
-      amountText: ruruOrderLookupWon(finalAmount),
-      statusLabel,
-      deliveryLabel: statusLabel === "출고완료" ? "출고완료" : "확인중",
-      dateText: ruruOrderLookupDateText(order?.created_at),
-      orderCode: ruruOrderLookupOrderCode(order),
-    };
-  });
+  // 같은 order_group_id 끼리 묶어 주문서 단위 그룹으로 만든다. (orders는 created_at desc → 그룹도 최신순)
+  const orderLookupGroups: CustomerOrderLookupGroup[] = (() => {
+    const map = new Map<string, any[]>();
+    for (const order of orderLookupOrders) {
+      const key =
+        ruruOrderLookupText(order?.order_group_id) ||
+        ruruOrderLookupText(order?.id) ||
+        `${order?.created_at || ""}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(order);
+    }
 
-  const orderLookupFilteredItems =
+    return Array.from(map.entries()).map(([key, rows]) => {
+      const head = rows[0];
+      const statusLabel = ruruOrderLookupStatusLabel(head);
+      const total = rows.reduce((sum, o) => {
+        const amt = Number(
+          o?.final_amount ?? o?.adjusted_total_price ?? o?.total_price ?? o?.product_price ?? 0,
+        );
+        return sum + (Number.isFinite(amt) ? amt : 0);
+      }, 0);
+
+      return {
+        id: key,
+        orderCode: ruruOrderLookupOrderCode(head),
+        dateText: ruruOrderLookupDateText(head?.created_at),
+        statusLabel,
+        deliveryLabel: statusLabel === "출고완료" ? "출고완료" : "확인중",
+        paymentMethodLabel: ruruOrderLookupPaymentMethod(head),
+        totalAmountText: ruruOrderLookupWon(total),
+        products: rows.map((o) => ({
+          name: ruruOrderLookupProductName(o),
+          optionText: ruruOrderLookupOptionText(o),
+          quantityText: ruruOrderLookupQuantityText(o),
+        })),
+      };
+    });
+  })();
+
+  const orderLookupFilteredGroups =
     orderLookupFilter === "전체"
-      ? orderLookupAllItems
-      : orderLookupAllItems.filter((item) => item.statusLabel === orderLookupFilter);
+      ? orderLookupGroups
+      : orderLookupGroups.filter((g) => g.statusLabel === orderLookupFilter);
 
-  const orderLookupTotalPages = Math.max(
-    1,
-    Math.ceil(orderLookupFilteredItems.length / ORDER_LOOKUP_PER_PAGE),
-  );
-  const orderLookupSafePage = Math.min(orderLookupPage, orderLookupTotalPages);
-  const orderLookupVisibleItems = orderLookupFilteredItems.slice(
-    (orderLookupSafePage - 1) * ORDER_LOOKUP_PER_PAGE,
-    orderLookupSafePage * ORDER_LOOKUP_PER_PAGE,
-  );
+  const orderLookupVisibleGroups = orderLookupFilteredGroups.slice(0, orderLookupVisibleCount);
+  const orderLookupHasMore = orderLookupVisibleCount < orderLookupFilteredGroups.length;
 
   const buttonBase = "transition-all duration-150 active:scale-[0.97]";
 
@@ -4065,7 +4084,6 @@ export default function OrderPage() {
               <div style={{ flexShrink: 0, padding: "12px 18px", borderBottom: "0.5px solid #E5E1DC", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
                 <div style={{ minWidth: 0 }}>
                   <span style={{ fontSize: "17px", fontWeight: 800, color: "#1A1A1A" }}>주문서 확인</span>
-                  <span style={{ marginLeft: "8px", fontSize: "11px", fontWeight: 600, color: "#9A938C" }}>임의 수정 금지 · 방송에서 확인 후 수정</span>
                 </div>
                 <button type="button" onClick={() => setOrderSheetOpen(false)} aria-label="닫기" style={{ flexShrink: 0, width: "28px", height: "28px", borderRadius: "50%", background: "#F5F3F0", border: "none", color: "#888", fontSize: "15px", cursor: "pointer" }}>✕</button>
               </div>
@@ -4120,37 +4138,7 @@ export default function OrderPage() {
                         <div style={{ fontSize: "11px", color: "#ABA5A0", marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{itemHasNoOptions ? "옵션 없음" : `${optionColorText} / ${optionSizeText}`} · 단가 {won(toNumber(item.product_price))}</div>
 
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "6px", gap: "8px" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
-                            {canInlineChangeQty ? (
-                              <div style={{ display: "flex", alignItems: "center", border: "1px solid #E5E1DC", borderRadius: "8px", overflow: "hidden" }}>
-                                <button type="button" onClick={() => updateItem(index, "qty", String(Math.max(1, (toNumber(item.qty) || 1) - 1)))} aria-label="수량 줄이기" style={{ width: "28px", height: "28px", border: "none", background: "#fff", fontSize: "15px", fontWeight: 800, color: "#555", cursor: "pointer" }}>−</button>
-                                <span style={{ minWidth: "28px", textAlign: "center", fontSize: "13px", fontWeight: 800, color: "#1A1A1A" }}>{toNumber(item.qty) || 1}</span>
-                                <button type="button" onClick={() => {
-                                  const maxStock = (() => {
-                                    if (!matchedRegisteredProduct) return 999;
-                                    try {
-                                      const note = typeof matchedRegisteredProduct.product_note === "string" ? JSON.parse(matchedRegisteredProduct.product_note) : matchedRegisteredProduct.product_note;
-                                      const mgmtOn = (note as any)?.stock_management_enabled === true || (matchedRegisteredProduct as any).stock_management_enabled === true;
-                                      if (!mgmtOn) return 999;
-                                      const variants = Array.isArray((note as any)?.stock_variants) ? (note as any).stock_variants : [];
-                                      if (variants.length === 0) return 999;
-                                      const matched = variants.find((v: any) => String(v.color ?? "").trim() === item.color.trim() && String(v.size ?? "").trim() === item.size.trim());
-                                      return matched ? Number(matched.stock) : 999;
-                                    } catch { return 999; }
-                                  })();
-                                  const cur = toNumber(item.qty) || 1;
-                                  if (cur >= maxStock) { showCustomerNotice("재고가 부족해요. 최대 " + maxStock + "개까지 담을 수 있어요."); return; }
-                                  updateItem(index, "qty", String(cur + 1));
-                                }} aria-label="수량 늘리기" style={{ width: "28px", height: "28px", border: "none", background: "#fff", fontSize: "15px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+</button>
-                              </div>
-                            ) : (
-                              <span style={{ fontSize: "12px", fontWeight: 700, color: "#6B6460" }}>수량 {toNumber(item.qty) || 1}개</span>
-                            )}
-                            {!canInlineChangeQty && (
-                              <button type="button" onClick={() => openDirectInputEditSheet(index)} style={{ border: "none", background: "none", padding: "2px 4px", fontSize: "12px", fontWeight: 700, color: "#7A1E47", cursor: "pointer" }}>수정</button>
-                            )}
-                            <button type="button" onClick={() => removeItem(index)} style={{ border: "none", background: "none", padding: "2px 4px", fontSize: "12px", fontWeight: 700, color: "#C0392B", cursor: "pointer" }}>삭제</button>
-                          </div>
+                          <span style={{ fontSize: "12px", fontWeight: 700, color: "#6B6460" }}>수량 {toNumber(item.qty) || 1}개</span>
                           <span style={{ flexShrink: 0, fontSize: "14px", fontWeight: 700, color: "#7A1E47" }}>{won(itemAmount)}</span>
                         </div>
                       </div>
@@ -4900,16 +4888,15 @@ export default function OrderPage() {
 
         <CustomerOrderLookupBottomSheet
           open={orderLookupOpen}
-          items={orderLookupVisibleItems}
+          groups={orderLookupVisibleGroups}
           activeFilter={orderLookupFilter}
-          page={orderLookupSafePage}
-          totalPages={orderLookupTotalPages}
           filters={ORDER_LOOKUP_FILTERS}
+          hasMore={orderLookupHasMore}
           onFilterChange={(filter) => {
             setOrderLookupFilter(filter);
-            setOrderLookupPage(1);
+            setOrderLookupVisibleCount(10);
           }}
-          onPageChange={setOrderLookupPage}
+          onLoadMore={() => setOrderLookupVisibleCount((c) => c + 10)}
           onClose={() => setOrderLookupOpen(false)}
           onOpenPaymentGuide={() => {
             setOrderLookupOpen(false);
