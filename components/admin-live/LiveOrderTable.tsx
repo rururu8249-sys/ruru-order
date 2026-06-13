@@ -819,7 +819,7 @@ export default function LiveOrderTable({
             type="button"
             onClick={refreshOrders}
             disabled={!onRefresh || refreshing}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 active:bg-slate-100 active:scale-[0.94] transition-all duration-75 disabled:opacity-40"
             title="주문 새로고침"
           >
             {refreshing ? "…" : "↻"}
@@ -924,14 +924,14 @@ export default function LiveOrderTable({
           placeholder="🔍 닉네임·상품·금액 검색"
         />
 
-        <button className="h-11 w-full flex-none rounded-xl bg-rose-deep px-3 text-[12px] font-black text-white shadow-sm hover:bg-rose-deep active:scale-[0.99] sm:w-[84px]"
+        <button className="h-11 w-full flex-none rounded-xl bg-rose-deep px-3 text-[12px] font-black text-white shadow-sm hover:opacity-90 active:opacity-80 active:scale-[0.95] transition-all duration-75 sm:w-[84px]"
           type="button"
           onClick={applyKeyword}
         >
           검색
         </button>
 
-        <button className="h-11 w-full flex-none rounded-xl border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-600 shadow-sm hover:bg-slate-50 active:scale-[0.99] sm:w-[84px]"
+        <button className="h-11 w-full flex-none rounded-xl border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-600 shadow-sm hover:bg-slate-50 active:bg-slate-200 active:scale-[0.95] transition-all duration-75 sm:w-[84px]"
           type="button"
           onClick={resetFilters}
         >
