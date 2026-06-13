@@ -11,6 +11,7 @@ import {
   isUnmatchedLiveDeposit,
   liveDepositDateLabel,
   liveDepositNameScore,
+  resolveLiveDepositDate,
   type LiveMatchDeposit,
 } from "./LiveOrderTable";
 
@@ -28,18 +29,9 @@ type Period = "today" | "7days" | "30days" | "all" | "custom";
 
 const won = (v: number) => `${Number(v || 0).toLocaleString("ko-KR")}원`;
 
-function depDate(dep: any): Date | null {
-  const raw = dep.deposited_time ?? dep.created_at ?? "";
-  if (!raw) return null;
-  if (/^\d{2}:\d{2}/.test(raw)) {
-    const base = dep.created_at ? dep.created_at.slice(0, 10) : "";
-    return base ? new Date(`${base}T${raw}:00`) : null;
-  }
-  return new Date(raw);
-}
 
 function inPeriod(dep: any, period: Period, calFrom: string, calTo: string): boolean {
-  const d = depDate(dep);
+  const d = resolveLiveDepositDate(dep).date;
   if (!d) return true;
   if (period === "today") {
     const t = new Date(); t.setHours(0,0,0,0);
@@ -114,8 +106,8 @@ export default function LiveFloatingMatchPanel({
 
     // 최신순
     list.sort((a, b) => {
-      const da = depDate(a)?.getTime() ?? 0;
-      const db = depDate(b)?.getTime() ?? 0;
+      const da = resolveLiveDepositDate(a).date?.getTime() ?? 0;
+      const db = resolveLiveDepositDate(b).date?.getTime() ?? 0;
       return db - da;
     });
 

@@ -306,7 +306,7 @@ export function liveDepositNameScore(depositName: string, nickname: string, cust
 const LIVE_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
 // deposited_time이 "HH:MM[:SS]" 시간만이면 날짜는 created_at에서, 시간은 deposited_time에서 (드로어 getDepositTimeLabel과 동일 기준)
-function resolveLiveDepositDate(d: LiveMatchDeposit): { date: Date | null; timeText: string } {
+export function resolveLiveDepositDate(d: LiveMatchDeposit): { date: Date | null; timeText: string } {
   const raw = String(d.deposited_time || "").trim();
   const createdRaw = String(d.created_at || "").trim();
   let timeText = "";
