@@ -1033,6 +1033,7 @@ export default function OrderPage() {
   const [videoOpen, setVideoOpen] = useState(true);
   const [productPage, setProductPage] = useState(1);
   const [visibleProductCount, setVisibleProductCount] = useState(10);
+  const [categoryFilter, setCategoryFilter] = useState<"전체" | "의류" | "신발" | "잡화">("전체");
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [cartAddedOpen, setCartAddedOpen] = useState(false);
   const [cartAddedItem, setCartAddedItem] = useState<any | null>(null);
@@ -3947,6 +3948,18 @@ export default function OrderPage() {
       {/* P3. 방송 영상 — 방송 ON/OFF 상관없이 항상 표시 (좌:영상 / 우:라이브참여·공지) */}
       {hasSavedInfo ? (
         <section style={{ margin: "8px auto 0", width: "100%", maxWidth: "560px" }}>
+          {!isBroadcastOn ? (
+            <div style={{ padding: "12px 14px", borderBottom: "0.5px solid #E5E1DC", fontSize: "13px", fontWeight: 700, color: "#888" }}>📺 현재 방송 중이 아닙니다</div>
+          ) : (
+          <>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderBottom: "0.5px solid #E5E1DC" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", fontWeight: 800, color: "#C0392B" }}>
+              <span style={{ fontSize: "9px" }}>●</span> LIVE 방송 중
+            </span>
+            <button type="button" onClick={() => setVideoOpen((v) => !v)} style={{ background: "none", border: "none", fontSize: "13px", fontWeight: 700, color: "#7A1E47", cursor: "pointer" }}>{videoOpen ? "접기 ▲" : "펼치기 ▼"}</button>
+          </div>
+          {videoOpen ? (
+          <>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "0.5px solid #E5E1DC" }}>
             <div style={{ background: "#141414", minHeight: "200px", position: "relative", overflow: "hidden" }}>
               {isBroadcastOn && videoEmbedSrc ? (
@@ -3990,6 +4003,10 @@ export default function OrderPage() {
               <span>다음 방송을 기다려주세요 🙏</span>
             )}
           </div>
+          </>
+          ) : null}
+          </>
+          )}
         </section>
       ) : null}
 
@@ -4027,7 +4044,14 @@ export default function OrderPage() {
           {/* P4. 상품 목록 — 검색 + 2열 격자 + 페이지네이션 (시안). quickGroupBuyProducts / selectQuickGroupBuyProduct 재사용 */}
           {(() => {
             const q = productSearchText.trim();
-            const filtered = quickGroupBuyProducts.filter((p) => !q || productMatchesSuggestion(p as BroadcastProduct, q));
+            const filtered = quickGroupBuyProducts.filter((p) => {
+              if (q && !productMatchesSuggestion(p as BroadcastProduct, q)) return false;
+              if (categoryFilter !== "전체") {
+                const cat = String((p as any).category ?? (p as any).product_category ?? "").trim();
+                if (cat !== categoryFilter) return false;
+              }
+              return true;
+            });
             const visibleItems = filtered.slice(0, visibleProductCount);
             return (
               <section style={{ margin: "12px auto 0", width: "100%", maxWidth: "560px" }}>
@@ -4037,6 +4061,14 @@ export default function OrderPage() {
                   placeholder="🔍 상품 이름 검색"
                   style={{ width: "100%", height: "48px", boxSizing: "border-box", border: "1px solid #D9C5CC", borderRadius: "14px", padding: "0 16px", fontSize: "15px", fontWeight: 700, color: "#333", outline: "none" }}
                 />
+                <div style={{ marginTop: "8px", display: "flex", gap: "6px" }}>
+                  {(["전체", "의류", "신발", "잡화"] as const).map((cat) => {
+                    const on = categoryFilter === cat;
+                    return (
+                      <button key={cat} type="button" onClick={() => { setCategoryFilter(cat); setVisibleProductCount(10); }} style={{ flex: 1, height: "36px", borderRadius: "999px", border: on ? "none" : "1px solid #D9C5CC", background: on ? "#7A1E47" : "#fff", color: on ? "#fff" : "#7A1E47", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>{cat}</button>
+                    );
+                  })}
+                </div>
                 {visibleItems.length === 0 ? (
                   <div style={{ marginTop: "14px", padding: "26px", textAlign: "center", color: "#999", fontSize: "14px", fontWeight: 700 }}>찾는 상품이 없어요. 아래 직접 입력으로 담아주세요.</div>
                 ) : (
@@ -4798,19 +4830,16 @@ export default function OrderPage() {
                 <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", padding: "13px 0", borderBottom: "0.5px solid #E5E1DC" }}>
                   <span style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#7A1E47", color: "#fff", fontSize: "14px", fontWeight: 800, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>1</span>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#1A1A1A" }}>방송 채팅창에 이렇게 입력해 주세요!</div>
-                    <div style={{ fontSize: "12px", color: "#6B6460", marginTop: "3px" }}>상품명 + 사이즈/색상 + 수량 + 저요!</div>
-                    <span style={{ fontSize: "11px", color: "#7A1E47", background: "#F9EEF3", borderRadius: "6px", padding: "4px 8px", display: "inline-block", marginTop: "4px" }}>예) 운동화 블랙 255 1개 저요!</span>
-                    <span style={{ fontSize: "11px", color: "#7A1E47", background: "#F9EEF3", borderRadius: "6px", padding: "4px 8px", display: "inline-block", marginTop: "3px" }}>예) 페미닌워시 핑크 150ml 2개 저요!</span>
-                    <span style={{ fontSize: "11px", color: "#7A1E47", fontWeight: 700, marginTop: "8px", display: "block" }}>✅ 루루언니 접수 완료 확인 후 →</span>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#1A1A1A" }}>방송에서 루루언니에게 접수 확인</div>
+                    <div style={{ fontSize: "12px", color: "#6B6460", marginTop: "3px" }}>채팅창에 상품명 · 옵션 · 수량 입력 후 루루언니 접수 완료 확인</div>
                   </div>
                 </div>
 
                 <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", padding: "13px 0", borderBottom: "0.5px solid #E5E1DC" }}>
                   <span style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#7A1E47", color: "#fff", fontSize: "14px", fontWeight: 800, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>2</span>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#1A1A1A" }}>여기서 그 상품 담고 주문서 제출</div>
-                    <div style={{ fontSize: "12px", color: "#6B6460", marginTop: "3px" }}>목록에서 찾아 담기를 눌러주세요</div>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#1A1A1A" }}>여기서 상품 담고 주문서 제출</div>
+                    <div style={{ fontSize: "12px", color: "#6B6460", marginTop: "3px" }}>목록에서 상품 찾아 담기 → 주문서 제출</div>
                   </div>
                 </div>
 
@@ -4818,7 +4847,7 @@ export default function OrderPage() {
                   <span style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#7A1E47", color: "#fff", fontSize: "14px", fontWeight: 800, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>3</span>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: "14px", fontWeight: 700, color: "#1A1A1A" }}>안내 계좌로 입금</div>
-                    <span style={{ fontSize: "11px", color: "#C0392B", background: "#FFF0F0", borderRadius: "6px", padding: "4px 8px", display: "inline-block", marginTop: "4px" }}>⚠️ 입금자명 · 금액이 닉네임 · 주문서와 정확히 일치해야 자동 확인돼요</span>
+                    <span style={{ fontSize: "11px", color: "#C0392B", background: "#FFF0F0", borderRadius: "6px", padding: "4px 8px", display: "inline-block", marginTop: "4px", lineHeight: 1.6 }}>입금자명은 닉네임으로, 금액은 주문서 결제금액과 정확히 일치해야 자동 확인됩니다</span>
                   </div>
                 </div>
               </div>
