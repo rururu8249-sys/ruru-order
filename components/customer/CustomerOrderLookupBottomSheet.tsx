@@ -12,6 +12,7 @@ export type CustomerOrderLookupGroupProduct = {
   name: string;
   optionText?: string;
   quantityText?: string;
+  amountText?: string;
 };
 
 export type CustomerOrderLookupGroup = {
@@ -141,16 +142,15 @@ export default function CustomerOrderLookupBottomSheet({
                           const optionLine = [product.optionText, product.quantityText].filter(Boolean).join(" · ");
                           return (
                             <div key={`${group.id}-${productIndex}`} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "10px" }}>
-                              <div style={{ minWidth: 0 }}>
-                                <p style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "15px", fontWeight: 800, lineHeight: 1.3, letterSpacing: "-0.05em", color: "#222" }}>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <p style={{ wordBreak: "break-all", whiteSpace: "normal", fontSize: "13px", fontWeight: 800, lineHeight: 1.3, letterSpacing: "-0.04em", color: "#222" }}>
                                   {product.name || "주문상품"}
+                                  {optionLine ? <span style={{ fontWeight: 700, color: "#999" }}> {optionLine}</span> : null}
                                 </p>
-                                {optionLine ? (
-                                  <p style={{ marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "12px", fontWeight: 700, letterSpacing: "-0.04em", color: "#999" }}>
-                                    {optionLine}
-                                  </p>
-                                ) : null}
                               </div>
+                              {product.amountText ? (
+                                <span style={{ flexShrink: 0, fontSize: "13px", fontWeight: 800, letterSpacing: "-0.05em", color: "#7B2D43" }}>{product.amountText}</span>
+                              ) : null}
                             </div>
                           );
                         })}

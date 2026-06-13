@@ -3565,6 +3565,9 @@ export default function OrderPage() {
           name: ruruOrderLookupProductName(o),
           optionText: ruruOrderLookupOptionText(o),
           quantityText: ruruOrderLookupQuantityText(o),
+          amountText: ruruOrderLookupWon(
+            Number(o?.final_amount ?? o?.adjusted_total_price ?? o?.total_price ?? o?.product_price ?? 0),
+          ),
         })),
       };
     });
@@ -4095,6 +4098,7 @@ export default function OrderPage() {
                     <button type="button" onClick={() => openCustomerInfoEditBottomSheet("shipping_list")} style={{ border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", borderRadius: "8px", padding: "4px 12px", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>변경</button>
                   </div>
                   <div style={{ fontSize: "12px", color: "#444", lineHeight: 1.8 }}>
+                    <div>닉네임: {youtubeNickname.trim() || "-"}</div>
                     <div>받는 분: {customerName.trim() || "-"}</div>
                     <div>연락처: {formatPhone(customerPhone) || "-"}</div>
                     <div>주소: {address.trim() ? `${address.trim()}${detailAddress.trim() ? " " + detailAddress.trim() : ""}` : "주소 미입력"}</div>
