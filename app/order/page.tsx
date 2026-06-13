@@ -1067,6 +1067,8 @@ export default function OrderPage() {
   const [registeredOptionSize, setRegisteredOptionSize] = useState("");
   const [registeredOptionQty, setRegisteredOptionQty] = useState(1);
   const [showOptionDetail, setShowOptionDetail] = useState(false);
+  const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
+  const [duplicateWarningPendingAction, setDuplicateWarningPendingAction] = useState<(() => void) | null>(null);
 
   useEffect(() => {
     if (!directInputOpen || typeof window === "undefined") {
@@ -2817,7 +2819,42 @@ export default function OrderPage() {
     setShowOptionDetail(false);
   };
 
-  const confirmRegisteredOptionSelectSheet = () => {
+  // 동일 상품 + 동일 옵션(색상/사이즈)으로 이미 제출된 주문이 있는지 확인.
+  // 방송 모드: customer_phone + broadcast_id 일치, 쇼핑몰 모드: customer_phone + 오늘 날짜.
+  const checkDuplicateOrder = async (params: { productId?: string; productName: string; color: string; size: string }): Promise<boolean> => {
+    const cleanPhone = normalizePhone(customerPhone);
+    if (cleanPhone.length < 10) return false;
+    const nm = (s: unknown) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
+    try {
+      let query = supabase
+        .from("orders")
+        .select("id, product_id, product_name, color, size, broadcast_id, created_at")
+        .eq("customer_phone", cleanPhone);
+      if (broadcast?.id) {
+        query = query.eq("broadcast_id", broadcast.id);
+      } else {
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+        query = query.gte("created_at", start.toISOString());
+      }
+      const { data, error } = await query.limit(300);
+      if (error || !Array.isArray(data)) return false;
+      const targetId = String(params.productId ?? "").trim();
+      const targetName = String(params.productName ?? "").trim();
+      const tc = nm(params.color);
+      const ts = nm(params.size);
+      return data.some((o: any) => {
+        const sameProduct =
+          (targetId && String(o.product_id ?? "").trim() === targetId) ||
+          (targetName && String(o.product_name ?? "").trim() === targetName);
+        return sameProduct && nm(o.color) === tc && nm(o.size) === ts;
+      });
+    } catch {
+      return false;
+    }
+  };
+
+  const confirmRegisteredOptionSelectSheet = async () => {
     const product = registeredOptionSelectProduct;
     if (!product) return;
 
@@ -2855,13 +2892,27 @@ export default function OrderPage() {
       }
     }
 
-    addRegisteredProductToOrderItems(product, {
+    const doAdd = () => {
+      addRegisteredProductToOrderItems(product, {
+        color: registeredOptionColor,
+        size: registeredOptionSize,
+        qty: registeredOptionQty,
+      });
+      closeRegisteredOptionSelectSheet();
+    };
+
+    const isDuplicate = await checkDuplicateOrder({
+      productId: String(product.id ?? ""),
+      productName: product.product_name,
       color: registeredOptionColor,
       size: registeredOptionSize,
-      qty: registeredOptionQty,
     });
-
-    closeRegisteredOptionSelectSheet();
+    if (isDuplicate) {
+      setDuplicateWarningPendingAction(() => doAdd);
+      setDuplicateWarningOpen(true);
+      return;
+    }
+    doAdd();
   };
 
   const selectQuickGroupBuyProduct = (product: BroadcastProduct) => {
@@ -3763,7 +3814,7 @@ export default function OrderPage() {
     setDirectInputOpen(false);
   };
 
-  const confirmDirectInputSheet = () => {
+  const confirmDirectInputSheet = async () => {
     const targetItem = items[directInputTargetIndex];
 
     if (!targetItem) {
@@ -3797,11 +3848,26 @@ export default function OrderPage() {
       return;
     }
 
-    setProductSearchText("");
-    setProductSearchOpenIndex(null);
-    setDirectInputProductSearchMode(false);
-    setDirectInputOpen(false);
-    scrollToOrderProductList();
+    const doFinalize = () => {
+      setProductSearchText("");
+      setProductSearchOpenIndex(null);
+      setDirectInputProductSearchMode(false);
+      setDirectInputOpen(false);
+      scrollToOrderProductList();
+    };
+
+    const isDuplicate = await checkDuplicateOrder({
+      productId: String(targetItem.product_id ?? ""),
+      productName: targetItem.product_name,
+      color: targetItem.color,
+      size: targetItem.size,
+    });
+    if (isDuplicate) {
+      setDuplicateWarningPendingAction(() => doFinalize);
+      setDuplicateWarningOpen(true);
+      return;
+    }
+    doFinalize();
   };
 
   const TopCustomerNav = () => {
@@ -4417,6 +4483,19 @@ export default function OrderPage() {
                 ) : null}
                 <div style={{ marginTop: "18px" }}>
                   <button type="button" onClick={() => setCartAddedOpen(false)} style={{ width: "100%", height: "50px", borderRadius: "14px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}>확인</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {duplicateWarningOpen && (
+            <div style={{ position: "fixed", inset: 0, zIndex: 150, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", padding: "0 24px" }} onClick={(e) => { if (e.target === e.currentTarget) { setDuplicateWarningOpen(false); setDuplicateWarningPendingAction(null); } }}>
+              <div style={{ width: "320px", maxWidth: "100%", background: "#fff", borderRadius: "20px", padding: "24px 22px", boxShadow: "0 18px 50px rgba(0,0,0,0.25)" }}>
+                <div style={{ fontSize: "18px", fontWeight: 800, color: "#C0392B", textAlign: "center" }}>🚨 잠깐! 이미 담은 상품이에요</div>
+                <div style={{ marginTop: "10px", fontSize: "14px", fontWeight: 600, color: "#555", textAlign: "center", lineHeight: 1.6 }}>중복 주문 아닌가요? 그래도 추가하시겠어요?</div>
+                <div style={{ marginTop: "20px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <button type="button" onClick={() => { setDuplicateWarningOpen(false); setDuplicateWarningPendingAction(null); }} style={{ height: "50px", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", fontSize: "15px", fontWeight: 800, color: "#666", cursor: "pointer" }}>취소</button>
+                  <button type="button" onClick={() => { const action = duplicateWarningPendingAction; setDuplicateWarningOpen(false); setDuplicateWarningPendingAction(null); action?.(); }} style={{ height: "50px", borderRadius: "14px", border: "none", background: "#7A1E47", fontSize: "15px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>그래도 담기</button>
                 </div>
               </div>
             </div>
