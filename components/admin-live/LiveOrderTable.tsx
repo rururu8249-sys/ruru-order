@@ -558,9 +558,12 @@ export default function LiveOrderTable({
   const cancelFilteredActiveCount = sortedOrders.filter((order) => order.paymentStatus !== "canceled").length;
   const cancelFilteredCanceledCount = sortedOrders.length - cancelFilteredActiveCount;
 
-  const totalPages = Math.max(1, Math.ceil(cancelViewFilteredOrders.length / pageSize));
-  const safePage = Math.min(page, totalPages);
-  const visibleOrders = cancelViewFilteredOrders.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const isAllStatus = filters.status === "all";
+  const totalPages = isAllStatus ? 1 : Math.max(1, Math.ceil(cancelViewFilteredOrders.length / pageSize));
+  const safePage = isAllStatus ? 1 : Math.min(page, totalPages);
+  const visibleOrders = isAllStatus
+    ? cancelViewFilteredOrders
+    : cancelViewFilteredOrders.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const exportableOrders = useMemo(
     () => cancelViewFilteredOrders.filter((order) => order.paymentStatus !== "canceled"),
