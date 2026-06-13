@@ -3361,12 +3361,14 @@ export default function OrderPage() {
     const date = new Date(String(value));
     if (Number.isNaN(date.getTime())) return "-";
 
+    const year = date.getFullYear();
     const month = date.getMonth() + 1;
     const day = date.getDate();
+    const weekday = ["일", "월", "화", "수", "목", "금", "토"][date.getDay()];
     const hour = String(date.getHours()).padStart(2, "0");
     const minute = String(date.getMinutes()).padStart(2, "0");
 
-    return `${month}월 ${day}일 ${hour}:${minute}`;
+    return `${year}년 ${month}월 ${day}일 (${weekday}) ${hour}:${minute}`;
   };
 
   const ruruOrderLookupText = (value: unknown) => String(value || "").trim();
@@ -3546,22 +3548,25 @@ export default function OrderPage() {
     return Array.from(map.entries()).map(([key, rows]) => {
       const head = rows[0];
       const statusLabel = ruruOrderLookupStatusLabel(head);
-      // 상품금액(배송비 제외) = product_price × qty (adjusted_product_price 우선)
+      // 상품금액(배송비·카드수수료 제외) = product_price × qty (adjusted_product_price 우선)
       const rowProductAmount = (o: any) =>
         Number(o?.adjusted_product_price ?? Number(o?.product_price ?? 0) * Number(o?.qty ?? o?.quantity ?? 1));
-      // 결제금액(배송비·카드수수료 포함)
+      // 실배송비 / 카드수수료 / 결제금액(전부 포함)
+      const rowShippingFee = (o: any) => Number(o?.adjusted_shipping_fee ?? o?.shipping_fee ?? 0);
+      const rowCardExtra = (o: any) => Number(o?.vat_amount ?? 0);
       const rowTotalAmount = (o: any) =>
         Number(o?.final_amount ?? o?.adjusted_total_price ?? o?.total_price ?? o?.product_price ?? 0);
 
-      const productSubtotal = rows.reduce((sum, o) => {
-        const v = rowProductAmount(o);
-        return sum + (Number.isFinite(v) ? v : 0);
-      }, 0);
-      const total = rows.reduce((sum, o) => {
-        const v = rowTotalAmount(o);
-        return sum + (Number.isFinite(v) ? v : 0);
-      }, 0);
-      const shipping = Math.max(0, total - productSubtotal);
+      const sumBy = (fn: (o: any) => number) =>
+        rows.reduce((sum, o) => {
+          const v = fn(o);
+          return sum + (Number.isFinite(v) ? v : 0);
+        }, 0);
+
+      const productSubtotal = sumBy(rowProductAmount);
+      const shippingTotal = sumBy(rowShippingFee);
+      const cardExtraTotal = sumBy(rowCardExtra);
+      const total = sumBy(rowTotalAmount);
 
       return {
         id: key,
@@ -3571,7 +3576,8 @@ export default function OrderPage() {
         deliveryLabel: statusLabel === "출고완료" ? "출고완료" : "확인중",
         paymentMethodLabel: ruruOrderLookupPaymentMethod(head),
         productAmountText: ruruOrderLookupWon(productSubtotal),
-        shippingFeeText: shipping > 0 ? ruruOrderLookupWon(shipping) : "무료",
+        shippingFeeText: shippingTotal > 0 ? ruruOrderLookupWon(shippingTotal) : "무료",
+        cardExtraText: cardExtraTotal > 0 ? ruruOrderLookupWon(cardExtraTotal) : "",
         totalAmountText: ruruOrderLookupWon(total),
         products: rows.map((o) => ({
           name: ruruOrderLookupProductName(o),

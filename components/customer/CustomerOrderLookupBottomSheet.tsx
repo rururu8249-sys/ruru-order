@@ -24,6 +24,7 @@ export type CustomerOrderLookupGroup = {
   paymentMethodLabel?: string;
   productAmountText?: string;
   shippingFeeText?: string;
+  cardExtraText?: string;
   totalAmountText: string;
   products: CustomerOrderLookupGroupProduct[];
 };
@@ -167,10 +168,16 @@ export default function CustomerOrderLookupBottomSheet({
                           <span>상품금액</span>
                           <span style={{ fontWeight: 700, color: "#444" }}>{group.productAmountText ?? group.totalAmountText}</span>
                         </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#666", marginBottom: "6px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#666", marginBottom: group.cardExtraText ? "3px" : "6px" }}>
                           <span>배송비</span>
                           <span style={{ fontWeight: 700, color: "#444" }}>{group.shippingFeeText ?? "-"}</span>
                         </div>
+                        {group.cardExtraText ? (
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#666", marginBottom: "6px" }}>
+                            <span>카드수수료</span>
+                            <span style={{ fontWeight: 700, color: "#444" }}>{group.cardExtraText}</span>
+                          </div>
+                        ) : null}
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid #F0EBE6", paddingTop: "6px" }}>
                           <span style={{ fontSize: "13px", fontWeight: 800, color: "#222" }}>결제금액</span>
                           <span style={{ fontSize: "18px", fontWeight: 800, letterSpacing: "-0.07em", color: "#7B2D43" }}>{group.totalAmountText}</span>
