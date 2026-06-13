@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, type CSSProperties } from "react";
 
-export type CustomerOrderLookupFilter = "전체" | "입금대기" | "입금완료" | "출고완료" | "주문취소";
+export type CustomerOrderLookupFilter = "전체" | "결제대기" | "결제완료" | "출고완료" | "주문취소";
 
 const BAND_TRACKING_URL = "https://band.us/@ruru8249";
 
@@ -42,12 +42,12 @@ type CustomerOrderLookupBottomSheetProps = {
   onOpenPaymentGuide: () => void;
 };
 
-// 시안 배지색(정확 hex): 입금완료 초록#0F6E56 / 출고완료 파랑#185FA5 / 입금대기 노랑#854F0B / 주문취소 빨강#C0392B / 그 외 회색
-// (카결완료는 입금완료 카테고리=초록, 카결대기는 입금대기 카테고리=노랑으로 묶임)
+// 시안 배지색(정확 hex): 결제완료 초록#0F6E56 / 출고완료 파랑#185FA5 / 결제대기 노랑#854F0B / 주문취소 빨강#C0392B / 그 외 회색
+// (무통장 입금대기·카드 카결대기는 모두 결제대기=노랑, 무통장·카드 완료는 모두 결제완료=초록으로 묶임)
 const paymentChipStyle = (statusLabel: CustomerOrderLookupFilter): CSSProperties => {
-  if (statusLabel === "입금완료") return { background: "#E1F5EE", color: "#0F6E56" };
+  if (statusLabel === "결제완료") return { background: "#E1F5EE", color: "#0F6E56" };
   if (statusLabel === "출고완료") return { background: "#E6F1FB", color: "#185FA5" };
-  if (statusLabel === "입금대기") return { background: "#FAEEDA", color: "#854F0B" };
+  if (statusLabel === "결제대기") return { background: "#FAEEDA", color: "#854F0B" };
   if (statusLabel === "주문취소") return { background: "#FBEAE7", color: "#C0392B" };
   return { background: "#EEEEEE", color: "#888888" };
 };

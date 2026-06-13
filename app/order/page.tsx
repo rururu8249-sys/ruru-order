@@ -186,7 +186,7 @@ const BANK_NAME = "새마을금고";
 const BANK_ACCOUNT = "9002186993725";
 const BANK_HOLDER = "유혜원";
 
-const ORDER_LOOKUP_FILTERS = ["전체", "입금대기", "입금완료", "출고완료", "주문취소"] as const;
+const ORDER_LOOKUP_FILTERS = ["전체", "결제대기", "결제완료", "출고완료", "주문취소"] as const;
 const ORDER_LOOKUP_PER_PAGE = 2;
 const FOOTER_TEXT = "© since 2024 루루동이 | All Rights Reserved.";
 const MENU_ITEM_STYLE: CSSProperties = {
@@ -3429,17 +3429,17 @@ export default function OrderPage() {
 
     if (isCard) {
       if (/카드결제완료|card_paid|결제완료/i.test(paymentText)) {
-        return { filterKey: "입금완료", displayText: "✅ 카결완료" };
+        return { filterKey: "결제완료", displayText: "✅ 결제완료" };
       }
-      return { filterKey: "입금대기", displayText: "💳 카결대기" };
+      return { filterKey: "결제대기", displayText: "💳 카결대기" };
     }
 
     // 무통장입금
     if (/입금확인|자동입금|수동입금|입금완료|확인완료|출고준비|결제완료|bank_paid|auto_paid|manual_paid/i.test(paymentText)) {
-      return { filterKey: "입금완료", displayText: "✅ 입금완료" };
+      return { filterKey: "결제완료", displayText: "✅ 결제완료" };
     }
 
-    return { filterKey: "입금대기", displayText: "💰 입금대기" };
+    return { filterKey: "결제대기", displayText: "💰 입금대기" };
   };
 
   const ruruOrderLookupProductName = (order: any) =>
