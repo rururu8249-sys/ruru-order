@@ -666,9 +666,9 @@ export default function AdminLiveDashboard() {
     setLoading(true);
     setLoadError("");
 
-    // 과거 전체 조회가 필요한 필터(전체보기 / 연·월 선택)면 .range로 끝까지, 아니면 최근 500건만(빠름).
+    // 전체보기 / 연·월 선택 / 키워드 검색 시 .range로 전체 로드. (키워드는 최근 500건 밖 주문도 검색해야 하므로)
     const needsFullLoad =
-      filters.broadcast === "all" || filters.date === "yearmonth";
+      filters.broadcast === "all" || filters.date === "yearmonth" || (filters.keyword?.trim() ?? "").length > 0;
 
     let data: any[] | null = null;
     let error: any = null;
