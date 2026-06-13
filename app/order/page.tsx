@@ -4113,7 +4113,8 @@ export default function OrderPage() {
             const filtered = quickGroupBuyProducts.filter((p) => {
               if (q && !productMatchesSuggestion(p as BroadcastProduct, q)) return false;
               if (categoryFilter !== "전체") {
-                const cat = String((p as any).category ?? (p as any).product_category ?? "").trim();
+                const note = parseProductSuggestionNote((p as any).product_note);
+                const cat = String((note as any)?.category ?? (p as any).category ?? (p as any).product_category ?? "").trim();
                 if (cat !== categoryFilter) return false;
               }
               return true;
