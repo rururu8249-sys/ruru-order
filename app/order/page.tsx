@@ -1065,6 +1065,7 @@ export default function OrderPage() {
   const [registeredOptionColor, setRegisteredOptionColor] = useState("");
   const [registeredOptionSize, setRegisteredOptionSize] = useState("");
   const [registeredOptionQty, setRegisteredOptionQty] = useState(1);
+  const [showOptionDetail, setShowOptionDetail] = useState(false);
 
   useEffect(() => {
     if (!directInputOpen || typeof window === "undefined") {
@@ -2804,6 +2805,7 @@ export default function OrderPage() {
     setRegisteredOptionColor("");
     setRegisteredOptionSize("");
     setRegisteredOptionQty(1);
+    setShowOptionDetail(false);
   };
 
   const closeRegisteredOptionSelectSheet = () => {
@@ -2811,6 +2813,7 @@ export default function OrderPage() {
     setRegisteredOptionColor("");
     setRegisteredOptionSize("");
     setRegisteredOptionQty(1);
+    setShowOptionDetail(false);
   };
 
   const confirmRegisteredOptionSelectSheet = () => {
@@ -4390,27 +4393,22 @@ export default function OrderPage() {
           {registeredOptionSelectProduct && (
             <div style={{ position: "fixed", inset: 0, zIndex: 128, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(0,0,0,0.45)" }} onClick={(e) => { if (e.target === e.currentTarget) closeRegisteredOptionSelectSheet(); }}>
               <div style={{ width: "100%", maxWidth: "430px", maxHeight: "92dvh", display: "flex", flexDirection: "column", background: "#fff", borderTopLeftRadius: "26px", borderTopRightRadius: "26px", overflow: "hidden" }}>
-                <div style={{ flexShrink: 0, borderBottom: "1px solid #F0EAE0", padding: "16px" }}>
+                <div style={{ flexShrink: 0, borderBottom: "1px solid #F0EAE0", padding: "12px 16px 16px" }}>
                   <div style={{ margin: "0 auto 12px", width: "52px", height: "5px", borderRadius: "3px", background: "#E8E2DD" }} />
-                  <div style={{ fontSize: "12px", fontWeight: 800, color: "#7A1E47" }}>옵션을 선택해 주세요</div>
-                  <div style={{ marginTop: "4px", fontSize: "17px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{registeredOptionSelectProduct.product_name}</div>
-                  <div style={{ marginTop: "2px", fontSize: "15px", fontWeight: 800, color: "#7A1E47" }}>{registeredOptionPrice > 0 ? won(registeredOptionPrice) : "가격 직접입력"}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div style={{ width: "60px", height: "60px", flexShrink: 0, borderRadius: "12px", overflow: "hidden", background: "#F0EBE8" }}>
+                      {pickOrderProductImageUrl(registeredOptionSelectProduct) ? (
+                        <img src={pickOrderProductImageUrl(registeredOptionSelectProduct)} alt={registeredOptionSelectProduct.product_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ) : null}
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: "16px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{registeredOptionSelectProduct.product_name}</div>
+                      <div style={{ marginTop: "3px", fontSize: "15px", fontWeight: 800, color: "#7A1E47" }}>{registeredOptionPrice > 0 ? won(registeredOptionPrice) : "가격 직접입력"}</div>
+                    </div>
+                  </div>
                 </div>
 
                 <div style={{ minHeight: 0, flex: 1, overflowY: "auto", padding: "16px" }}>
-                  {registeredOptionDetailImages.length > 0 && (
-                    <div style={{ overflowX: "auto", display: "flex", gap: "8px", padding: "12px 16px 0", WebkitOverflowScrolling: "touch" }}>
-                      {registeredOptionDetailImages.map((img, i) => (
-                        <img key={i} src={img} alt="" onClick={() => setLightboxImage(img)}
-                          style={{ width: "90px", height: "90px", borderRadius: "8px", objectFit: "cover", flexShrink: 0, cursor: "pointer", background: "#F0EBE8" }} />
-                      ))}
-                    </div>
-                  )}
-                  {registeredOptionDescription && (
-                    <div style={{ padding: "10px 16px 0", fontSize: "12px", color: "#555", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
-                      {registeredOptionDescription}
-                    </div>
-                  )}
                   {registeredOptionColorChoices.length === 0 && registeredOptionSizeChoices.length === 0 ? (
                     <div style={{ padding: "12px 16px 0", fontSize: "12px", color: "#ABA5A0" }}>
                       이 상품은 옵션이 없습니다. 수량만 선택해 주세요.
@@ -4419,29 +4417,23 @@ export default function OrderPage() {
                   {registeredOptionColorChoices.length > 0 ? (
                     <div style={{ marginBottom: "16px" }}>
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>색상</div>
-                      {registeredOptionColorChoices.length >= 4 ? (
-                        <div style={{ overflowX: "auto", display: "flex", gap: "6px", paddingBottom: "4px", WebkitOverflowScrolling: "touch", marginBottom: "14px" }}>
+                      {registeredOptionColorChoices.length <= 4 ? (
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                           {registeredOptionColorChoices.map((option) => {
                             const selected = registeredOptionColor === option;
                             const soldOut = isSoldOutColorSize(option, registeredOptionSize);
                             return (
-                              <button
-                                key={`c-${option}`}
-                                type="button"
-                                onClick={() => { if (soldOut) return; setRegisteredOptionColor(option); }}
-                                style={{ flexShrink: 0, minWidth: "44px", height: "40px", borderRadius: "10px", border: selected ? "1.5px solid #7A1E47" : "1.5px solid #E8E2DD", background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", cursor: "pointer", fontSize: "13px", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 12px", opacity: soldOut ? 0.4 : 1 }}
-                              >
-                                {soldOut ? option + " (품절)" : option}
-                              </button>
+                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionColor(option); }} style={{ height: "44px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
                             );
                           })}
                         </div>
                       ) : (
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                           {registeredOptionColorChoices.map((option) => {
+                            const selected = registeredOptionColor === option;
                             const soldOut = isSoldOutColorSize(option, registeredOptionSize);
                             return (
-                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionColor(option); }} style={{ minHeight: "46px", borderRadius: "14px", border: `1.5px solid ${registeredOptionColor === option ? "#7A1E47" : "#E8E2DD"}`, background: registeredOptionColor === option ? "#7A1E47" : "#fff", color: registeredOptionColor === option ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
+                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionColor(option); }} style={{ height: "34px", borderRadius: "999px", padding: "0 14px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "13px", fontWeight: 700, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
                             );
                           })}
                         </div>
@@ -4468,29 +4460,23 @@ export default function OrderPage() {
                   {registeredOptionSizeChoices.length > 0 ? (
                     <div style={{ marginBottom: "16px" }}>
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>사이즈</div>
-                      {registeredOptionSizeChoices.length >= 4 ? (
-                        <div style={{ overflowX: "auto", display: "flex", gap: "6px", paddingBottom: "4px", WebkitOverflowScrolling: "touch", marginBottom: "14px" }}>
+                      {registeredOptionSizeChoices.length <= 4 ? (
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                           {registeredOptionSizeChoices.map((option) => {
                             const selected = registeredOptionSize === option;
                             const soldOut = isSoldOutColorSize(registeredOptionColor, option);
                             return (
-                              <button
-                                key={`s-${option}`}
-                                type="button"
-                                onClick={() => { if (soldOut) return; setRegisteredOptionSize(option); }}
-                                style={{ flexShrink: 0, minWidth: "44px", height: "40px", borderRadius: "10px", border: selected ? "1.5px solid #7A1E47" : "1.5px solid #E8E2DD", background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", cursor: "pointer", fontSize: "13px", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 12px", opacity: soldOut ? 0.4 : 1 }}
-                              >
-                                {soldOut ? option + " (품절)" : option}
-                              </button>
+                              <button key={`s-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionSize(option); }} style={{ height: "44px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
                             );
                           })}
                         </div>
                       ) : (
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                           {registeredOptionSizeChoices.map((option) => {
+                            const selected = registeredOptionSize === option;
                             const soldOut = isSoldOutColorSize(registeredOptionColor, option);
                             return (
-                              <button key={`s-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionSize(option); }} style={{ minHeight: "46px", borderRadius: "14px", border: `1.5px solid ${registeredOptionSize === option ? "#7A1E47" : "#E8E2DD"}`, background: registeredOptionSize === option ? "#7A1E47" : "#fff", color: registeredOptionSize === option ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
+                              <button key={`s-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionSize(option); }} style={{ height: "34px", borderRadius: "999px", padding: "0 14px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "13px", fontWeight: 700, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
                             );
                           })}
                         </div>
@@ -4513,28 +4499,48 @@ export default function OrderPage() {
                       {!registeredOptionSize.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>사이즈를 입력해주세요</div> : null}
                     </div>
                   ) : null}
+
+                  {registeredOptionDetailImages.length > 0 || registeredOptionDescription ? (
+                    <div style={{ marginTop: "4px" }}>
+                      <button type="button" onClick={() => setShowOptionDetail((v) => !v)} style={{ width: "100%", height: "44px", borderRadius: "12px", border: "1px solid #E8E2DD", background: "#FAF6F2", fontSize: "13px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>
+                        상품 상세 보기 {showOptionDetail ? "▲" : "▼"}
+                      </button>
+                      {showOptionDetail ? (
+                        <div style={{ marginTop: "12px" }}>
+                          {registeredOptionDetailImages.length > 0 ? (
+                            <div style={{ display: "grid", gap: "8px" }}>
+                              {registeredOptionDetailImages.map((img, i) => (
+                                <img key={i} src={img} alt="" onClick={() => setLightboxImage(img)} style={{ width: "100%", borderRadius: "10px", objectFit: "cover", cursor: "pointer", background: "#F0EBE8" }} />
+                              ))}
+                            </div>
+                          ) : null}
+                          {registeredOptionDescription ? (
+                            <div style={{ marginTop: "10px", fontSize: "13px", color: "#555", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{registeredOptionDescription}</div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
 
-                <div style={{ flexShrink: 0, display: "grid", gridTemplateColumns: "0.82fr 1.18fr", gap: "12px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "12px 16px 0" }}>
-                  <div>
-                    <div style={{ marginBottom: "6px", fontSize: "13px", fontWeight: 800, color: "#333" }}>수량</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "42px 1fr 42px", height: "46px", borderRadius: "14px", border: "1px solid #E8E2DD", overflow: "hidden" }}>
-                      <button type="button" onClick={() => setRegisteredOptionQty((c) => Math.max(1, c - 1))} style={{ borderRight: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#555", cursor: "pointer" }}>−</button>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionQty}</div>
-                      <button type="button" onClick={() => {
-                        const maxStock = (() => {
-                          if (!registeredOptionSelectProduct || registeredOptionStockVariants.length === 0) return 999;
-                          const nm2 = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
-                          const matched = registeredOptionStockVariants.find((v: any) => nm2(v.color) === nm2(registeredOptionColor) && nm2(v.size) === nm2(registeredOptionSize));
-                          return matched ? Number(matched.stock) : 999;
-                        })();
-                        setRegisteredOptionQty((c) => Math.min(c + 1, maxStock));
-                      }} style={{ borderLeft: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+</button>
-                    </div>
+                <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "12px 16px 0" }}>
+                  <span style={{ fontSize: "14px", fontWeight: 800, color: "#333" }}>수량</span>
+                  <div style={{ display: "grid", gridTemplateColumns: "40px 44px 40px", height: "44px", borderRadius: "12px", border: "1px solid #E8E2DD", overflow: "hidden" }}>
+                    <button type="button" onClick={() => setRegisteredOptionQty((c) => Math.max(1, c - 1))} style={{ borderRight: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#555", cursor: "pointer" }}>−</button>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionQty}</div>
+                    <button type="button" onClick={() => {
+                      const maxStock = (() => {
+                        if (!registeredOptionSelectProduct || registeredOptionStockVariants.length === 0) return 999;
+                        const nm2 = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
+                        const matched = registeredOptionStockVariants.find((v: any) => nm2(v.color) === nm2(registeredOptionColor) && nm2(v.size) === nm2(registeredOptionSize));
+                        return matched ? Number(matched.stock) : 999;
+                      })();
+                      setRegisteredOptionQty((c) => Math.min(c + 1, maxStock));
+                    }} style={{ borderLeft: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+</button>
                   </div>
-                  <div>
-                    <div style={{ marginBottom: "6px", fontSize: "13px", fontWeight: 800, color: "#333" }}>선택금액</div>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", height: "46px", borderRadius: "14px", border: "1px solid #E8E2DD", background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 800, color: "#222" }}>{registeredOptionTotalPrice > 0 ? won(registeredOptionTotalPrice) : "가격 직접입력"}</div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: "11px", fontWeight: 700, color: "#999" }}>선택금액</div>
+                    <div style={{ fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionTotalPrice > 0 ? won(registeredOptionTotalPrice) : "가격 직접입력"}</div>
                   </div>
                 </div>
 
