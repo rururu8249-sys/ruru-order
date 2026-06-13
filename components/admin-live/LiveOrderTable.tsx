@@ -395,6 +395,7 @@ export default function LiveOrderTable({
   const [pendingKeyword, setPendingKeyword] = useState(filters.keyword);
   const [sortMode, setSortMode] = useState<SortMode>("latest");
   const [pageSize, setPageSize] = useState(10);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [selectedDepositIds, setSelectedDepositIds] = useState<string[]>([]);
   const [matchSaving, setMatchSaving] = useState(false);
   const [matchSearch, setMatchSearch] = useState("");
@@ -570,6 +571,19 @@ export default function LiveOrderTable({
     ["paid", "auto_paid", "manual_paid", "card_paid"].includes(order.paymentStatus ?? "")
   );
 
+  const allVisibleSelected = visibleOrders.length > 0 && visibleOrders.every((o) => selectedOrderIds.has(String(o.id)));
+  const toggleSelectAll = () => {
+    if (allVisibleSelected) {
+      setSelectedOrderIds((prev) => { const n = new Set(prev); visibleOrders.forEach((o) => n.delete(String(o.id))); return n; });
+    } else {
+      setSelectedOrderIds((prev) => { const n = new Set(prev); visibleOrders.forEach((o) => n.add(String(o.id))); return n; });
+    }
+  };
+  const toggleSelectOrder = (id: string) => {
+    setSelectedOrderIds((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  };
+  const selectedExportOrders = cancelViewFilteredOrders.filter((o) => selectedOrderIds.has(String(o.id)));
+
   const updateFilter = <K extends keyof LiveOrderFilters>(key: K, value: LiveOrderFilters[K]) => {
     onFiltersChange({
       ...filters,
@@ -694,6 +708,13 @@ export default function LiveOrderTable({
             <div>결제완료만: <b style={{ color: "#0F6E56" }}>{paidOnlyExportOrders.length.toLocaleString("ko-KR")}건</b></div>
           </div>
           <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", flexWrap: "wrap" }}>
+            {selectedExportOrders.length > 0 ? (
+              <button type="button"
+                onClick={() => { const kind = exportConfirm as "rozen" | "picking"; setExportConfirm(""); void runExport(kind, selectedExportOrders, `선택 ${selectedExportOrders.length}건`); }}
+                style={{ padding: "8px 14px", borderRadius: "8px", border: "none", background: "#7B2D43", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+                ✓ 선택한 {selectedExportOrders.length.toLocaleString("ko-KR")}건 출력
+              </button>
+            ) : null}
             <button type="button" onClick={() => setExportConfirm("")}
               style={{ padding: "8px 14px", borderRadius: "8px", border: "1px solid #E2E8F0", background: "#fff", color: "#555", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
               취소
@@ -761,6 +782,9 @@ export default function LiveOrderTable({
         })}
 
         <div className="ml-auto flex items-center gap-2">
+          {selectedOrderIds.size > 0 && (
+            <span className="text-[12px] font-black text-[#7B2D43]">{selectedOrderIds.size}건 선택됨</span>
+          )}
           <button
             type="button"
             onClick={() => setExportConfirm("rozen")}
@@ -921,7 +945,10 @@ export default function LiveOrderTable({
 
       <div className="overflow-hidden rounded-xl border border-slate-200">
             {/* 헤더 행 */}
-            <div className="grid grid-cols-[108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 border-b border-rose-line bg-rose-soft/40 text-[12px] font-black text-slate-500">
+            <div className="grid grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 border-b border-rose-line bg-rose-soft/40 text-[12px] font-black text-slate-500">
+              <span className="flex items-center justify-center py-2.5">
+                <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} className="h-4 w-4 cursor-pointer accent-[#7B2D43]" />
+              </span>
               <span className="whitespace-nowrap px-3 py-2.5 text-center">주문일</span>
               <span className="whitespace-nowrap px-3 py-2.5 text-center">닉네임</span>
               <span className="whitespace-nowrap px-3 py-2.5 text-center">이름</span>
@@ -949,8 +976,12 @@ export default function LiveOrderTable({
                       onDragOver={isMatchableOrder(order) ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (dropHoverOrderId !== order.id) setDropHoverOrderId(order.id); } : undefined}
                       onDragLeave={isMatchableOrder(order) ? () => setDropHoverOrderId((cur) => (cur === order.id ? "" : cur)) : undefined}
                       onDrop={isMatchableOrder(order) ? (e) => { e.preventDefault(); handleDepositDropOnOrder(order, e.dataTransfer.getData("text/plain")); } : undefined}
-                      className={`grid grid-cols-[108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 items-start text-[14px] transition ${dropHoverOrderId === order.id ? "bg-emerald-50 ring-2 ring-inset ring-emerald-500" : selected ? "bg-rose-soft/70" : "hover:bg-slate-50"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}
+                      className={`grid grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 items-start text-[14px] transition ${dropHoverOrderId === order.id ? "bg-emerald-50 ring-2 ring-inset ring-emerald-500" : selected ? "bg-rose-soft/70" : "hover:bg-slate-50"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}
                     >
+                      {/* 0. 선택 체크박스 */}
+                      <div className="flex items-center justify-center py-3" onClick={(e) => e.stopPropagation()}>
+                        <input type="checkbox" checked={selectedOrderIds.has(String(order.id))} onChange={() => toggleSelectOrder(String(order.id))} className="h-4 w-4 cursor-pointer accent-[#7B2D43]" />
+                      </div>
                       {/* 1. 주문일 */}
                       <div className="px-3 py-3 text-center text-[11px] leading-tight text-slate-500">
                         {(() => {
