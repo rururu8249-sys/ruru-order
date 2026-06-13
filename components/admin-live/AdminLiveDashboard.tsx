@@ -1367,7 +1367,7 @@ export default function AdminLiveDashboard() {
               {/* 우측 사이드 패널: 입금매칭(목업 C) 우선, 없으면 주문상세(목업 B) */}
               {matchPanelOpen ? (
                 <div
-                  className="sticky top-0 block h-full w-[380px] shrink-0 overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl"
+                  className="sticky top-0 w-[380px] shrink-0 overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl"
                   style={{ animation: "ruruSidePanelIn 0.22s ease" }}
                 >
                   <LiveFloatingMatchPanel
@@ -1382,7 +1382,7 @@ export default function AdminLiveDashboard() {
                 </div>
               ) : selectedOrder && orderDetailOpen ? (
                 <div
-                  className="sticky top-0 block h-full w-[380px] shrink-0 overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl"
+                  className="sticky top-0 w-[380px] shrink-0 overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl"
                   style={{ animation: "ruruSidePanelIn 0.22s ease" }}
                 >
                   <LiveOrderDetailDrawer
