@@ -186,7 +186,7 @@ const BANK_NAME = "새마을금고";
 const BANK_ACCOUNT = "9002186993725";
 const BANK_HOLDER = "유혜원";
 
-const ORDER_LOOKUP_FILTERS = ["전체", "입금대기", "입금확인", "출고완료", "주문취소"] as const;
+const ORDER_LOOKUP_FILTERS = ["전체", "입금대기", "입금완료", "출고완료", "주문취소"] as const;
 const ORDER_LOOKUP_PER_PAGE = 2;
 const FOOTER_TEXT = "© since 2024 루루동이 | All Rights Reserved.";
 const MENU_ITEM_STYLE: CSSProperties = {
@@ -3373,8 +3373,12 @@ export default function OrderPage() {
 
   const ruruOrderLookupText = (value: unknown) => String(value || "").trim();
 
-  const ruruOrderLookupStatusLabel = (order: any): CustomerOrderLookupFilter => {
-    // 주문취소 최우선 판정 (관리자와 동일하게 payment_status="canceled"도 포함)
+  // 고객 표시용 상태: filterKey(필터 카테고리 4종)와 displayText(배지 6종, 이모지 포함)를 함께 반환.
+  // ⚠️ 관리자 페이지 용어/로직과 무관. 고객 주문조회 표시 전용.
+  const ruruOrderLookupStatus = (
+    order: any,
+  ): { filterKey: CustomerOrderLookupFilter; displayText: string } => {
+    // 1) 주문취소 최우선
     const cancelText = [
       order?.payment_status,
       order?.paymentStatus,
@@ -3388,9 +3392,10 @@ export default function OrderPage() {
       .join(" ");
 
     if (/주문서취소|주문취소|취소|환불|cancel|refund/i.test(cancelText)) {
-      return "주문취소";
+      return { filterKey: "주문취소", displayText: "❌ 주문취소" };
     }
 
+    // 2) 출고완료
     const deliveryText = [
       order?.delivery_status,
       order?.shipping_status,
@@ -3403,10 +3408,11 @@ export default function OrderPage() {
       .map(ruruOrderLookupText)
       .join(" ");
 
-    if (/출고완료|택배출고|배송출발|배송완료|송장/.test(deliveryText)) {
-      return "출고완료";
+    if (/출고완료|택배출고|배송출발|배송완료|송장|shipped/i.test(deliveryText)) {
+      return { filterKey: "출고완료", displayText: "🚚 출고완료" };
     }
 
+    // 3) 결제상태 (무통장 vs 카드)
     const paymentText = [
       order?.payment_status,
       order?.deposit_status,
@@ -3415,16 +3421,25 @@ export default function OrderPage() {
       order?.order_status,
       order?.admin_status,
       order?.status,
-      order?.payment_method,
     ]
       .map(ruruOrderLookupText)
       .join(" ");
 
-    if (/입금확인|자동입금|수동입금|결제완료|카드결제완료|확인완료|출고준비/.test(paymentText)) {
-      return "입금확인";
+    const isCard = /카드/.test(ruruOrderLookupText(order?.payment_method)) || /card/i.test(paymentText);
+
+    if (isCard) {
+      if (/카드결제완료|card_paid|결제완료/i.test(paymentText)) {
+        return { filterKey: "입금완료", displayText: "✅ 카결완료" };
+      }
+      return { filterKey: "입금대기", displayText: "💳 카결대기" };
     }
 
-    return "입금대기";
+    // 무통장입금
+    if (/입금확인|자동입금|수동입금|입금완료|확인완료|출고준비|결제완료|bank_paid|auto_paid|manual_paid/i.test(paymentText)) {
+      return { filterKey: "입금완료", displayText: "✅ 입금완료" };
+    }
+
+    return { filterKey: "입금대기", displayText: "💰 입금대기" };
   };
 
   const ruruOrderLookupProductName = (order: any) =>
@@ -3547,7 +3562,7 @@ export default function OrderPage() {
 
     return Array.from(map.entries()).map(([key, rows]) => {
       const head = rows[0];
-      const statusLabel = ruruOrderLookupStatusLabel(head);
+      const status = ruruOrderLookupStatus(head);
       // 상품금액(배송비·카드수수료 제외) = product_price × qty (adjusted_product_price 우선)
       const rowProductAmount = (o: any) =>
         Number(o?.adjusted_product_price ?? Number(o?.product_price ?? 0) * Number(o?.qty ?? o?.quantity ?? 1));
@@ -3572,8 +3587,9 @@ export default function OrderPage() {
         id: key,
         orderCode: ruruOrderLookupOrderCode(head),
         dateText: ruruOrderLookupDateText(head?.created_at),
-        statusLabel,
-        deliveryLabel: statusLabel === "출고완료" ? "출고완료" : "확인중",
+        statusLabel: status.filterKey,
+        statusDisplayText: status.displayText,
+        deliveryLabel: status.filterKey === "출고완료" ? "출고완료" : "확인중",
         paymentMethodLabel: ruruOrderLookupPaymentMethod(head),
         productAmountText: ruruOrderLookupWon(productSubtotal),
         shippingFeeText: shippingTotal > 0 ? ruruOrderLookupWon(shippingTotal) : "무료",

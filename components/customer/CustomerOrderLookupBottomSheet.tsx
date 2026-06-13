@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, type CSSProperties } from "react";
 
-export type CustomerOrderLookupFilter = "전체" | "입금대기" | "입금확인" | "출고완료" | "주문취소";
+export type CustomerOrderLookupFilter = "전체" | "입금대기" | "입금완료" | "출고완료" | "주문취소";
 
 const BAND_TRACKING_URL = "https://band.us/@ruru8249";
 
@@ -20,6 +20,7 @@ export type CustomerOrderLookupGroup = {
   orderCode?: string;
   dateText: string;
   statusLabel: CustomerOrderLookupFilter;
+  statusDisplayText: string;
   deliveryLabel?: string;
   paymentMethodLabel?: string;
   productAmountText?: string;
@@ -41,21 +42,14 @@ type CustomerOrderLookupBottomSheetProps = {
   onOpenPaymentGuide: () => void;
 };
 
-// 시안 배지색(정확 hex): 입금확인 초록#0F6E56 / 택배출고(출고완료) 파랑#185FA5 / 입금대기 노랑#854F0B / 주문취소 빨강#C0392B / 그 외(출고대기) 회색
+// 시안 배지색(정확 hex): 입금완료 초록#0F6E56 / 출고완료 파랑#185FA5 / 입금대기 노랑#854F0B / 주문취소 빨강#C0392B / 그 외 회색
+// (카결완료는 입금완료 카테고리=초록, 카결대기는 입금대기 카테고리=노랑으로 묶임)
 const paymentChipStyle = (statusLabel: CustomerOrderLookupFilter): CSSProperties => {
-  if (statusLabel === "입금확인") return { background: "#E1F5EE", color: "#0F6E56" };
+  if (statusLabel === "입금완료") return { background: "#E1F5EE", color: "#0F6E56" };
   if (statusLabel === "출고완료") return { background: "#E6F1FB", color: "#185FA5" };
   if (statusLabel === "입금대기") return { background: "#FAEEDA", color: "#854F0B" };
   if (statusLabel === "주문취소") return { background: "#FBEAE7", color: "#C0392B" };
   return { background: "#EEEEEE", color: "#888888" };
-};
-
-const statusLabelWithEmoji = (statusLabel: CustomerOrderLookupFilter): string => {
-  if (statusLabel === "입금대기") return "💰 입금대기";
-  if (statusLabel === "입금확인") return "✅ 입금확인";
-  if (statusLabel === "출고완료") return "🚚 출고완료";
-  if (statusLabel === "주문취소") return "❌ 주문취소";
-  return statusLabel;
 };
 
 const chipBaseStyle: CSSProperties = { borderRadius: "999px", padding: "4px 10px", fontSize: "11px", fontWeight: 800 };
@@ -134,7 +128,7 @@ export default function CustomerOrderLookupBottomSheet({
                     <article key={group.id} style={{ borderRadius: "16px", background: "#fff", border: "1px solid #E8E2DD", padding: "12px 16px" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                         <div style={{ display: "flex", minWidth: 0, alignItems: "center", gap: "6px" }}>
-                          <span style={{ ...chipBaseStyle, ...paymentChipStyle(group.statusLabel) }}>{statusLabelWithEmoji(group.statusLabel)}</span>
+                          <span style={{ ...chipBaseStyle, ...paymentChipStyle(group.statusLabel) }}>{group.statusDisplayText}</span>
                         </div>
                         {group.paymentMethodLabel ? (
                           <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "#7B2D43" }}>{group.paymentMethodLabel}</span>
