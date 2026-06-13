@@ -22,6 +22,8 @@ export type CustomerOrderLookupGroup = {
   statusLabel: CustomerOrderLookupFilter;
   deliveryLabel?: string;
   paymentMethodLabel?: string;
+  productAmountText?: string;
+  shippingFeeText?: string;
   totalAmountText: string;
   products: CustomerOrderLookupGroupProduct[];
 };
@@ -156,13 +158,22 @@ export default function CustomerOrderLookupBottomSheet({
                         })}
                       </div>
 
-                      <div style={{ marginTop: "10px", display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid #F0EBE6", paddingTop: "8px" }}>
-                        <p style={{ minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 800, color: "#999" }}>
+                      <div style={{ marginTop: "10px", borderTop: "1px solid #F0EBE6", paddingTop: "8px" }}>
+                        <p style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 800, color: "#999", marginBottom: "8px" }}>
                           {orderMeta || "-"}
                         </p>
-                        <p style={{ flexShrink: 0, fontSize: "18px", fontWeight: 800, letterSpacing: "-0.07em", color: "#222" }}>
-                          {group.totalAmountText}
-                        </p>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#666", marginBottom: "3px" }}>
+                          <span>상품금액</span>
+                          <span style={{ fontWeight: 700, color: "#444" }}>{group.productAmountText ?? group.totalAmountText}</span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#666", marginBottom: "6px" }}>
+                          <span>배송비</span>
+                          <span style={{ fontWeight: 700, color: "#444" }}>{group.shippingFeeText ?? "-"}</span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid #F0EBE6", paddingTop: "6px" }}>
+                          <span style={{ fontSize: "13px", fontWeight: 800, color: "#222" }}>결제금액</span>
+                          <span style={{ fontSize: "18px", fontWeight: 800, letterSpacing: "-0.07em", color: "#7B2D43" }}>{group.totalAmountText}</span>
+                        </div>
                       </div>
                     </article>
                   );

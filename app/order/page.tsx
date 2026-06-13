@@ -3546,12 +3546,22 @@ export default function OrderPage() {
     return Array.from(map.entries()).map(([key, rows]) => {
       const head = rows[0];
       const statusLabel = ruruOrderLookupStatusLabel(head);
-      const total = rows.reduce((sum, o) => {
-        const amt = Number(
-          o?.final_amount ?? o?.adjusted_total_price ?? o?.total_price ?? o?.product_price ?? 0,
-        );
-        return sum + (Number.isFinite(amt) ? amt : 0);
+      // 상품금액(배송비 제외) = product_price × qty (adjusted_product_price 우선)
+      const rowProductAmount = (o: any) =>
+        Number(o?.adjusted_product_price ?? Number(o?.product_price ?? 0) * Number(o?.qty ?? o?.quantity ?? 1));
+      // 결제금액(배송비·카드수수료 포함)
+      const rowTotalAmount = (o: any) =>
+        Number(o?.final_amount ?? o?.adjusted_total_price ?? o?.total_price ?? o?.product_price ?? 0);
+
+      const productSubtotal = rows.reduce((sum, o) => {
+        const v = rowProductAmount(o);
+        return sum + (Number.isFinite(v) ? v : 0);
       }, 0);
+      const total = rows.reduce((sum, o) => {
+        const v = rowTotalAmount(o);
+        return sum + (Number.isFinite(v) ? v : 0);
+      }, 0);
+      const shipping = Math.max(0, total - productSubtotal);
 
       return {
         id: key,
@@ -3560,14 +3570,14 @@ export default function OrderPage() {
         statusLabel,
         deliveryLabel: statusLabel === "출고완료" ? "출고완료" : "확인중",
         paymentMethodLabel: ruruOrderLookupPaymentMethod(head),
+        productAmountText: ruruOrderLookupWon(productSubtotal),
+        shippingFeeText: shipping > 0 ? ruruOrderLookupWon(shipping) : "무료",
         totalAmountText: ruruOrderLookupWon(total),
         products: rows.map((o) => ({
           name: ruruOrderLookupProductName(o),
           optionText: ruruOrderLookupOptionText(o),
           quantityText: ruruOrderLookupQuantityText(o),
-          amountText: ruruOrderLookupWon(
-            Number(o?.final_amount ?? o?.adjusted_total_price ?? o?.total_price ?? o?.product_price ?? 0),
-          ),
+          amountText: ruruOrderLookupWon(rowProductAmount(o)),
         })),
       };
     });
