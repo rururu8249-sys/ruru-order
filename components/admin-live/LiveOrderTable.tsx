@@ -582,7 +582,7 @@ export default function LiveOrderTable({
   const toggleSelectOrder = (id: string) => {
     setSelectedOrderIds((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   };
-  const selectedExportOrders = cancelViewFilteredOrders.filter((o) => selectedOrderIds.has(String(o.id)));
+  const selectedExportOrders = orders.filter((o) => selectedOrderIds.has(String(o.id)) && o.paymentStatus !== "canceled");
 
   const updateFilter = <K extends keyof LiveOrderFilters>(key: K, value: LiveOrderFilters[K]) => {
     onFiltersChange({
