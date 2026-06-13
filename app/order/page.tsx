@@ -4423,7 +4423,7 @@ export default function OrderPage() {
                             const selected = registeredOptionColor === option;
                             const soldOut = isSoldOutColorSize(option, registeredOptionSize);
                             return (
-                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionColor(option); }} style={{ height: "44px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
+                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionColor((prev) => prev === option ? "" : option); }} style={{ height: "44px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
                             );
                           })}
                         </div>
@@ -4433,7 +4433,7 @@ export default function OrderPage() {
                             const selected = registeredOptionColor === option;
                             const soldOut = isSoldOutColorSize(option, registeredOptionSize);
                             return (
-                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionColor(option); }} style={{ height: "34px", borderRadius: "999px", padding: "0 14px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "13px", fontWeight: 700, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
+                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionColor((prev) => prev === option ? "" : option); }} style={{ height: "34px", borderRadius: "999px", padding: "0 14px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "13px", fontWeight: 700, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
                             );
                           })}
                         </div>
@@ -4466,7 +4466,7 @@ export default function OrderPage() {
                             const selected = registeredOptionSize === option;
                             const soldOut = isSoldOutColorSize(registeredOptionColor, option);
                             return (
-                              <button key={`s-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionSize(option); }} style={{ height: "44px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
+                              <button key={`s-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionSize((prev) => prev === option ? "" : option); }} style={{ height: "44px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
                             );
                           })}
                         </div>
@@ -4476,7 +4476,7 @@ export default function OrderPage() {
                             const selected = registeredOptionSize === option;
                             const soldOut = isSoldOutColorSize(registeredOptionColor, option);
                             return (
-                              <button key={`s-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionSize(option); }} style={{ height: "34px", borderRadius: "999px", padding: "0 14px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "13px", fontWeight: 700, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
+                              <button key={`s-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionSize((prev) => prev === option ? "" : option); }} style={{ height: "34px", borderRadius: "999px", padding: "0 14px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "13px", fontWeight: 700, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
                             );
                           })}
                         </div>
