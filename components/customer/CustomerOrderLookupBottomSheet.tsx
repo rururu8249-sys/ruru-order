@@ -49,9 +49,12 @@ const paymentChipStyle = (statusLabel: CustomerOrderLookupFilter): CSSProperties
   return { background: "#EEEEEE", color: "#888888" };
 };
 
-const deliveryChipStyle = (deliveryLabel: string): CSSProperties => {
-  if (/출고완료|택배출고|배송완료/.test(deliveryLabel)) return { background: "#185FA5", color: "#ffffff" };
-  return { background: "#EEEEEE", color: "#888888" };
+const statusLabelWithEmoji = (statusLabel: CustomerOrderLookupFilter): string => {
+  if (statusLabel === "입금대기") return "💰 입금대기";
+  if (statusLabel === "입금확인") return "✅ 입금확인";
+  if (statusLabel === "출고완료") return "🚚 출고완료";
+  if (statusLabel === "주문취소") return "❌ 주문취소";
+  return statusLabel;
 };
 
 const chipBaseStyle: CSSProperties = { borderRadius: "999px", padding: "4px 10px", fontSize: "11px", fontWeight: 800 };
@@ -124,15 +127,13 @@ export default function CustomerOrderLookupBottomSheet({
             {groups.length > 0 ? (
               <div style={{ display: "grid", gap: "10px" }}>
                 {groups.map((group) => {
-                  const deliveryLabel = group.deliveryLabel || (group.statusLabel === "출고완료" ? "출고완료" : "확인중");
                   const orderMeta = [group.orderCode, group.dateText].filter(Boolean).join(" · ");
 
                   return (
                     <article key={group.id} style={{ borderRadius: "16px", background: "#fff", border: "1px solid #E8E2DD", padding: "12px 16px" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                         <div style={{ display: "flex", minWidth: 0, alignItems: "center", gap: "6px" }}>
-                          <span style={{ ...chipBaseStyle, ...paymentChipStyle(group.statusLabel) }}>{group.statusLabel}</span>
-                          <span style={{ ...chipBaseStyle, ...deliveryChipStyle(deliveryLabel) }}>{deliveryLabel}</span>
+                          <span style={{ ...chipBaseStyle, ...paymentChipStyle(group.statusLabel) }}>{statusLabelWithEmoji(group.statusLabel)}</span>
                         </div>
                         {group.paymentMethodLabel ? (
                           <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "#7B2D43" }}>{group.paymentMethodLabel}</span>
