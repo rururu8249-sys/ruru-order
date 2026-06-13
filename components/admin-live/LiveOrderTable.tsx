@@ -921,28 +921,30 @@ export default function LiveOrderTable({
           <option value="shipped">출고완료</option>
         </select>
 
-        <input className="h-11 min-w-[160px] flex-1 rounded-xl border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
-          value={pendingKeyword}
-          onChange={(event) => setPendingKeyword(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") applyKeyword();
-          }}
-          placeholder="🔍 닉네임·상품·금액 검색"
-        />
+        <div className="flex w-full flex-nowrap items-center gap-2 sm:w-auto sm:flex-1">
+          <input className="h-11 min-w-[120px] flex-1 rounded-xl border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
+            value={pendingKeyword}
+            onChange={(event) => setPendingKeyword(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") applyKeyword();
+            }}
+            placeholder="🔍 닉네임·상품·금액 검색"
+          />
 
-        <button className="h-11 w-full flex-none rounded-xl bg-rose-deep px-3 text-[12px] font-black text-white shadow-sm hover:opacity-90 active:opacity-80 active:scale-[0.95] transition-all duration-75 sm:w-[84px]"
-          type="button"
-          onClick={applyKeyword}
-        >
-          검색
-        </button>
+          <button className="h-11 flex-none rounded-xl bg-rose-deep px-3 text-[12px] font-black text-white shadow-sm hover:opacity-90 active:opacity-80 active:scale-[0.95] transition-all duration-75 w-[64px] sm:w-[84px]"
+            type="button"
+            onClick={applyKeyword}
+          >
+            검색
+          </button>
 
-        <button className="h-11 w-full flex-none rounded-xl border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-600 shadow-sm hover:bg-slate-50 active:bg-slate-200 active:scale-[0.95] transition-all duration-75 sm:w-[84px]"
-          type="button"
-          onClick={resetFilters}
-        >
-          초기화
-        </button>
+          <button className="h-11 flex-none rounded-xl border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-600 shadow-sm hover:bg-slate-50 active:bg-slate-200 active:scale-[0.95] transition-all duration-75 w-[64px] sm:w-[84px]"
+            type="button"
+            onClick={resetFilters}
+          >
+            초기화
+          </button>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200">
