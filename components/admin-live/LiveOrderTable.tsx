@@ -1081,8 +1081,12 @@ export default function LiveOrderTable({
         </div>
         <div className="mx-auto flex items-center gap-5 text-sm font-black">
           <button type="button" onClick={() => setPage(Math.max(1, safePage - 1))} className="text-slate-400">‹</button>
-          {Array.from({ length: Math.min(totalPages, 5) }).map((_, index) => {
-            const pageNumber = index + 1;
+          {(() => {
+            let start = Math.max(1, safePage - 2);
+            const end = Math.min(totalPages, start + 4);
+            start = Math.max(1, end - 4);
+            return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+          })().map((pageNumber) => {
             return (
               <button
                 key={pageNumber}
