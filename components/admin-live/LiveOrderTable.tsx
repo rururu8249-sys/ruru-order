@@ -735,7 +735,7 @@ export default function LiveOrderTable({
       </div>
     ) : null}
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm h-full flex flex-col">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2 flex-shrink-0">
         <h2 className="mr-2 text-lg font-black text-slate-950">실시간 주문서</h2>
 
         {[
@@ -840,7 +840,7 @@ export default function LiveOrderTable({
       </div>
 
 
-      <div className="mb-3 flex w-full flex-wrap items-center gap-2 xl:flex-nowrap">
+      <div className="mb-3 flex w-full flex-wrap items-center gap-2 xl:flex-nowrap flex-shrink-0">
         <BroadcastSearchSelect
           options={broadcastOptions}
           value={filters.broadcast}
@@ -947,7 +947,7 @@ export default function LiveOrderTable({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto rounded-xl border border-slate-200">
+      <div className="flex-1 min-h-0 overflow-y-auto rounded-xl border border-slate-200">
             {/* 헤더 행 */}
             <div className="grid grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 border-b border-rose-line bg-rose-soft/40 text-[12px] font-black text-slate-500">
               <span className="flex items-center justify-center py-2.5">
@@ -1077,7 +1077,7 @@ export default function LiveOrderTable({
             </div>
       </div>
 
-      <div className="mt-3 flex items-center">
+      <div className="mt-3 flex-shrink-0 flex items-center">
         <div className="text-xs font-black text-slate-500">
           총 {orders.length}건 / 전체 {allOrderCount}건
         </div>
