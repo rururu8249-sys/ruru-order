@@ -734,7 +734,7 @@ export default function LiveOrderTable({
         </div>
       </div>
     ) : null}
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm min-h-full">
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm min-h-[1000px]">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h2 className="mr-2 text-lg font-black text-slate-950">실시간 주문서</h2>
 

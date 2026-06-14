@@ -1340,8 +1340,8 @@ export default function AdminLiveDashboard() {
             </div>
 
             {/* 목업 B 2-col: 왼쪽 주문 테이블 / 오른쪽 380px 주문상세 사이드 패널(닉네임 클릭 시 슬라이드인) */}
-            <section className="mt-2 flex items-stretch gap-3">
-              <div className="min-w-0 flex-1 sticky top-0 self-start min-h-[1000px] flex flex-col">
+            <section className="mt-2 flex items-start gap-3">
+              <div className="min-w-0 flex-1 sticky top-0 self-start">
                 <LiveOrderTable
                   orders={filteredOrders}
                   allOrderCount={orders.length}
@@ -1367,7 +1367,7 @@ export default function AdminLiveDashboard() {
               {/* 우측 사이드 패널: 입금매칭(목업 C) 우선, 없으면 주문상세(목업 B) */}
               {matchPanelOpen ? (
                 <div
-                  className="sticky top-0 w-[380px] shrink-0 overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl"
+                  className="sticky top-0 w-[380px] shrink-0 min-h-[1000px] max-h-[1000px] overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl"
                   style={{ animation: "ruruSidePanelIn 0.22s ease" }}
                 >
                   <LiveFloatingMatchPanel
@@ -1382,7 +1382,7 @@ export default function AdminLiveDashboard() {
                 </div>
               ) : selectedOrder && orderDetailOpen ? (
                 <div
-                  className="sticky top-0 w-[380px] shrink-0 overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl"
+                  className="sticky top-0 w-[380px] shrink-0 min-h-[1000px] max-h-[1000px] overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl"
                   style={{ animation: "ruruSidePanelIn 0.22s ease" }}
                 >
                   <LiveOrderDetailDrawer
