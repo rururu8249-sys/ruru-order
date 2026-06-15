@@ -102,6 +102,43 @@ export async function startAdminLiveBroadcast(input: StartBroadcastInput) {
   return data as AdminLiveBroadcast;
 }
 
+// 준비된 OFF 방송을 켠다. 새 row를 만들지 않고 해당 id를 ON으로 UPDATE.
+// 기존 ON은 OFF 처리. youtube_live_url/정산·수수료 컬럼은 건드리지 않는다(껍데기가 보유한 값 유지).
+export async function activateBroadcast(broadcastId: string) {
+  if (!broadcastId) {
+    throw new Error("켤 방송 ID가 없습니다.");
+  }
+
+  const nowIso = new Date().toISOString();
+
+  const { error: closeError } = await supabase
+    .from("broadcasts")
+    .update({
+      status: "OFF",
+      ended_at: nowIso,
+    })
+    .eq("status", "ON");
+
+  if (closeError) throw closeError;
+
+  const { data, error } = await supabase
+    .from("broadcasts")
+    .update({
+      status: "ON",
+      started_at: nowIso,
+    })
+    .eq("id", broadcastId)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+
+  await safeUpsertSetting("broadcast_status", "ON");
+  await safeUpsertSetting("current_broadcast_name", String(data?.public_title || ""));
+
+  return data as AdminLiveBroadcast;
+}
+
 // 방송 껍데기 미리 만들기(켜지 않음). status:"OFF"로 insert만 — 기존 ON 방송은 절대 안 건드린다.
 // settings(broadcast_status/current_broadcast_name)도 안 바꾼다(현재 방송 상태 유지). 정산/수수료 컬럼은 default 그대로.
 export async function createDraftBroadcast(title: string) {

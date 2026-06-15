@@ -34,6 +34,7 @@ import LiveOrderTable, { type LiveOrderFilters } from "./LiveOrderTable";
 import LiveOrderDetailDrawer from "./LiveOrderDetailDrawer";
 import LiveFloatingMatchPanel from "./LiveFloatingMatchPanel";
 import {
+  activateBroadcast,
   endAdminLiveBroadcast,
   getActiveBroadcast,
   isOrderInsideBroadcastTime,
@@ -1036,7 +1037,21 @@ export default function AdminLiveDashboard() {
     setSavingBroadcast(true);
 
     try {
-      await startAdminLiveBroadcast(input);
+      // 준비된 OFF 껍데기(started_at 없음)가 있으면 그걸 켠다(새 row 안 만듦). 없으면 기존대로 새 방송 생성.
+      const draft = broadcasts
+        .filter(
+          (b) =>
+            String(b.status || "").toUpperCase() === "OFF" &&
+            !b.started_at &&
+            b.is_deleted !== true,
+        )
+        .sort((a, b) => String(b.created_at || b.id).localeCompare(String(a.created_at || a.id)))[0];
+
+      if (draft) {
+        await activateBroadcast(draft.id);
+      } else {
+        await startAdminLiveBroadcast(input);
+      }
       await loadBroadcasts();
       await loadOrders();
       setFilters((prev) => ({ ...prev, broadcast: "current" }));
