@@ -2868,13 +2868,22 @@ export default function OrderPage() {
   // 방송 모드: customer_phone + broadcast_id 일치, 쇼핑몰 모드: customer_phone + 오늘 날짜.
   const checkDuplicateOrder = async (params: { productId?: string; productName: string; color: string; size: string }): Promise<boolean> => {
     const cleanPhone = normalizePhone(customerPhone);
-    if (cleanPhone.length < 10) return false;
+    const nick = youtubeNickname.trim();
+    // 전화번호(10자리+) 또는 닉네임 중 하나라도 있어야 조회. 둘 다 없으면 검사 안 함.
+    if (cleanPhone.length < 10 && !nick) return false;
     const nm = (s: unknown) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
+    // 취소 주문 판정(기존 표준 정규식 재사용) — 취소된 주문은 중복으로 보지 않음.
+    const CANCELED_RE = /주문서취소|주문취소|취소|환불|cancel|refund/i;
     try {
+      // 번호 정확일치 OR 닉네임 정확일치(번호 오타 시에도 닉네임으로 잡음). 닉네임 값은 PostgREST or 구문 안전을 위해 따옴표 래핑.
+      const orParts: string[] = [];
+      if (cleanPhone.length >= 10) orParts.push(`customer_phone.eq.${cleanPhone}`);
+      if (nick && !nick.includes('"')) orParts.push(`youtube_nickname.eq."${nick}"`);
+      if (orParts.length === 0) return false;
       let query = supabase
         .from("orders")
-        .select("id, product_id, product_name, color, size, broadcast_id, created_at")
-        .eq("customer_phone", cleanPhone);
+        .select("id, product_id, product_name, color, size, broadcast_id, created_at, order_manage_status, admin_order_status_v2")
+        .or(orParts.join(","));
       if (broadcast?.id) {
         query = query.eq("broadcast_id", broadcast.id);
       } else {
@@ -2889,6 +2898,9 @@ export default function OrderPage() {
       const tc = nm(params.color);
       const ts = nm(params.size);
       return data.some((o: any) => {
+        // 취소된 주문은 제외(재주문 허용)
+        const statusText = `${o.order_manage_status ?? ""} ${o.admin_order_status_v2 ?? ""}`;
+        if (CANCELED_RE.test(statusText)) return false;
         const sameProduct =
           (targetId && String(o.product_id ?? "").trim() === targetId) ||
           (targetName && String(o.product_name ?? "").trim() === targetName);
