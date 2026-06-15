@@ -908,6 +908,8 @@ export default function OrderPage() {
   const [broadcast, setBroadcast] = useState<any | null>(null);
   const [broadcastProducts, setBroadcastProducts] = useState<BroadcastProduct[]>([]);
   const [groupBuyQuickProductsFromCatalog, setGroupBuyQuickProductsFromCatalog] = useState<BroadcastProduct[]>([]);
+  // 쇼핑몰 열기/닫기(settings.shop_open) — 방송 OFF일 때만 영향. 기본 열림.
+  const [shopOpen, setShopOpen] = useState(true);
   const [productSearchOpenIndex, setProductSearchOpenIndex] = useState<number | null>(null);
   const [productSearchText, setProductSearchText] = useState("");
   const [topProductSearchText, setTopProductSearchText] = useState("");
@@ -1805,6 +1807,14 @@ export default function OrderPage() {
 
   const loadBroadcast = async () => {
     await loadGroupBuyQuickProductsFromCatalog();
+
+    // 쇼핑몰 열기/닫기 상태(settings.shop_open) — 값 "false"면 닫힘, 그 외/없음은 열림(기본).
+    const { data: shopSetting } = await supabase
+      .from("settings")
+      .select("value")
+      .eq("key", "shop_open")
+      .maybeSingle();
+    setShopOpen(String(shopSetting?.value ?? "").trim().toLowerCase() !== "false");
 
     const { data, error } = await supabase
       .from("broadcasts")
@@ -4133,6 +4143,17 @@ export default function OrderPage() {
 
           {/* P4. 상품 목록 — 검색 + 2열 격자 + 페이지네이션 (시안). quickGroupBuyProducts / selectQuickGroupBuyProduct 재사용 */}
           {(() => {
+            // 쇼핑몰 닫힘(방송 OFF + shop_open=false)이면 그리드 대신 준비중 안내. 방송 ON이면 무관(항상 그리드).
+            if (!isBroadcastOn && !shopOpen) {
+              return (
+                <section style={{ margin: "12px auto 0", width: "100%", maxWidth: "560px" }}>
+                  <div style={{ padding: "44px 26px", textAlign: "center", color: "#7A1E47", fontSize: "16px", fontWeight: 800, border: "1px solid #D9C5CC", borderRadius: "16px", background: "#fff", lineHeight: 1.8 }}>
+                    🛍 쇼핑몰 준비 중입니다
+                    <div style={{ marginTop: "6px", fontSize: "13px", fontWeight: 600, color: "#ABA5A0" }}>잠시 후 다시 찾아주세요.</div>
+                  </div>
+                </section>
+              );
+            }
             const q = productSearchText.trim();
             const filtered = quickGroupBuyProducts.filter((p) => {
               if (q && !productMatchesSuggestion(p as BroadcastProduct, q)) return false;

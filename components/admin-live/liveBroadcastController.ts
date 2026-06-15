@@ -228,6 +228,24 @@ export async function endAdminLiveBroadcast(broadcastId: string) {
   return data as AdminLiveBroadcast;
 }
 
+// 쇼핑몰 열기/닫기 — settings.shop_open 영속(기존 safeUpsertSetting 재사용). 다른 키 안 건드림.
+export async function setShopOpen(open: boolean) {
+  await safeUpsertSetting("shop_open", open ? "true" : "false");
+}
+
+// settings.shop_open 읽기 — 값이 "false"면 닫힘(false), 그 외(없음 포함)는 열림(true) 기본값.
+export async function getShopOpen(): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("settings")
+    .select("value")
+    .eq("key", "shop_open")
+    .maybeSingle();
+
+  if (error) return true; // 조회 실패 시 기본 열림(쇼핑몰 사고 방지)
+
+  return String(data?.value ?? "").trim().toLowerCase() !== "false";
+}
+
 export function formatBroadcastTime(value?: string | null) {
   if (!value) return "-";
 

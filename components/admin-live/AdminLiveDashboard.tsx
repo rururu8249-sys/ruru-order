@@ -37,8 +37,10 @@ import {
   activateBroadcast,
   endAdminLiveBroadcast,
   getActiveBroadcast,
+  getShopOpen,
   isOrderInsideBroadcastTime,
   loadAdminLiveBroadcasts,
+  setShopOpen,
   startAdminLiveBroadcast,
   updateAdminLiveBroadcast,
   type AdminLiveBroadcast,
@@ -548,6 +550,7 @@ export default function AdminLiveDashboard() {
   const [paymentSuggestions, setPaymentSuggestions] = useState<any[]>([]);
   const [broadcasts, setBroadcasts] = useState<AdminLiveBroadcast[]>([]);
   const [broadcastProductCount, setBroadcastProductCount] = useState<number | null>(null);
+  const [shopOpen, setShopOpenState] = useState(true);
   const [savingBroadcast, setSavingBroadcast] = useState(false);
   const [broadcastTitle, setBroadcastTitle] = useState("루루동이LIVE");
   const [broadcastYoutubeUrl, setBroadcastYoutubeUrl] = useState("");
@@ -922,6 +925,22 @@ export default function AdminLiveDashboard() {
     window.addEventListener("ruru-broadcast-list-updated", onBroadcastListUpdated);
     return () => window.removeEventListener("ruru-broadcast-list-updated", onBroadcastListUpdated);
   }, []);
+
+  // 쇼핑몰 열기/닫기 상태 — 마운트 시 settings.shop_open 읽기(기본 열림)
+  useEffect(() => {
+    void getShopOpen().then(setShopOpenState);
+  }, []);
+
+  const handleToggleShopOpen = async () => {
+    const next = !shopOpen;
+    setShopOpenState(next); // 낙관적
+    try {
+      await setShopOpen(next);
+    } catch {
+      setShopOpenState(!next); // 실패 시 롤백
+      showAdminToast("쇼핑몰 상태 저장에 실패했어요.", "error");
+    }
+  };
 
   // 컨트롤타워 "상품 N개" — 활성 방송의 broadcast_products 연결 개수(읽기 전용 count)
   const loadBroadcastProductCount = async () => {
@@ -1334,6 +1353,8 @@ export default function AdminLiveDashboard() {
               youtubeUrl={broadcastYoutubeUrl}
               onYoutubeUrlChange={setBroadcastYoutubeUrl}
               productCount={broadcastProductCount ?? undefined}
+              shopOpen={shopOpen}
+              onToggleShopOpen={handleToggleShopOpen}
             />
 
             <div className="mb-4 mt-4 h-[420px] w-full min-h-0 [&>*]:h-full [&>*]:min-h-0 [&>*>*]:h-full [&>*>*]:min-h-0">

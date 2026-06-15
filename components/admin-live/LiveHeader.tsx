@@ -20,6 +20,8 @@ type Props = {
   onYoutubeUrlChange: (value: string) => void;
   // 자리만(다음 단계 연결): 진열 상품 수
   productCount?: number;
+  shopOpen?: boolean;
+  onToggleShopOpen?: () => void;
 };
 
 function todayLabel() {
@@ -44,12 +46,12 @@ export default function LiveHeader({
   youtubeUrl,
   onYoutubeUrlChange,
   productCount,
+  shopOpen = true,
+  onToggleShopOpen,
 }: Props) {
   const [titleSavedAt, setTitleSavedAt] = useState("");
   const [urlAppliedAt, setUrlAppliedAt] = useState("");
   const [editOpen, setEditOpen] = useState(false);
-  // 쇼핑몰 열기/닫기 토글 — 자리만(저장 컬럼 없음, 다음 단계 연결)
-  const [shopOpenPlaceholder, setShopOpenPlaceholder] = useState(true);
 
   const statusLabel = useMemo(() => {
     if (activeBroadcast) return "방송중";
@@ -118,17 +120,18 @@ export default function LiveHeader({
         <span className="hidden text-slate-400 md:inline">· 주문묶음=방송 시작~종료 기준</span>
 
         <div className="ml-auto flex items-center gap-2">
-          {/* 쇼핑몰 열기/닫기 — 자리만(저장 컬럼 없음, 다음 단계 연결) */}
+          {/* 쇼핑몰 열기/닫기 — settings.shop_open 영속. 방송 ON 중엔 의미 없어 비활성. */}
           <button
             type="button"
-            onClick={() => setShopOpenPlaceholder((v) => !v)}
+            disabled={Boolean(activeBroadcast)}
+            onClick={() => onToggleShopOpen?.()}
             className={[
-              "h-7 rounded-lg px-2.5 text-[11px] font-black transition",
-              shopOpenPlaceholder ? "bg-emerald-50 text-emerald-700" : "bg-slate-200 text-slate-500",
+              "h-7 rounded-lg px-2.5 text-[11px] font-black transition disabled:cursor-not-allowed disabled:opacity-40",
+              shopOpen ? "bg-emerald-50 text-emerald-700" : "bg-slate-200 text-slate-500",
             ].join(" ")}
-            title="쇼핑몰 열기/닫기 (다음 단계 연결)"
+            title={activeBroadcast ? "방송 중에는 쇼핑몰 토글을 사용할 수 없습니다" : "쇼핑몰 열기/닫기"}
           >
-            🛍 쇼핑몰 {shopOpenPlaceholder ? "열림" : "닫힘"}
+            🛍 쇼핑몰 {shopOpen ? "열림" : "닫힘"}
           </button>
           <button
             type="button"
