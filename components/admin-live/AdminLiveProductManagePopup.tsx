@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabase";
 import { resolveProductImageUrl } from "./quick-product/productImageUrl";
 import { showAdminToast } from "@/lib/adminToast";
+import { createDraftBroadcast } from "./liveBroadcastController";
 
 type ProductRow = Record<string, unknown>;
 
@@ -230,7 +231,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   }, [tab, search, category]);
 
   // 방송 상품 탭: 방송 목록 로드 (읽기 전용)
-  const loadBroadcastList = async () => {
+  const loadBroadcastList = async (preferId?: string) => {
     setBcLoading(true);
     try {
       const { data } = await supabase
@@ -247,12 +248,30 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       }));
       setBcList(list);
       setBcSelId((cur) => {
+        if (preferId && list.some((b) => b.id === preferId)) return preferId;
         if (cur && list.some((b) => b.id === cur)) return cur;
         const active = activeBroadcastId ? list.find((b) => b.id === String(activeBroadcastId)) : null;
         return active ? active.id : (list[0]?.id || "");
       });
     } finally {
       setBcLoading(false);
+    }
+  };
+
+  // ＋새 방송: 방송 껍데기 미리 만들기(켜지 않음). 기존 ON 방송은 안 건드림.
+  const createNewBroadcast = async () => {
+    const title = (typeof window !== "undefined" ? window.prompt("새 방송 제목을 입력하세요", "") : "")?.trim();
+    if (!title) return;
+    setBcBusy(true);
+    try {
+      const created = await createDraftBroadcast(title);
+      await loadBroadcastList(String(created.id));
+      showAdminToast("방송이 생성됐습니다. 상품을 담아주세요.", "success");
+    } catch (e) {
+      const err = e as { message?: string; code?: string };
+      showAdminToast("새 방송 생성 실패\n\n" + (err?.message ?? err?.code ?? "알 수 없는 오류"), "error");
+    } finally {
+      setBcBusy(false);
     }
   };
 
@@ -1088,7 +1107,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             <div style={{ width: "260px", flexShrink: 0, display: "flex", flexDirection: "column", border: "1px solid #E8E2DD", borderRadius: "10px", overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 12px", borderBottom: "1px solid #E8E2DD" }}>
                 <span style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>📺 방송 목록</span>
-                <button type="button" onClick={() => showAdminToast("방송 시작/종료는 상단 방송 토글에서 관리합니다.", "info")} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#7B2D43", background: "#F5E6EB", border: "1px solid #D9C5CC", borderRadius: "7px", padding: "4px 9px", cursor: "pointer" }}>+ 새 방송</button>
+                <button type="button" disabled={bcBusy} onClick={() => void createNewBroadcast()} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#7B2D43", background: "#F5E6EB", border: "1px solid #D9C5CC", borderRadius: "7px", padding: "4px 9px", cursor: bcBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>+ 새 방송</button>
               </div>
               <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
                 {bcLoading ? (

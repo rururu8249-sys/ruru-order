@@ -18,8 +18,7 @@ type Props = {
   onTitleChange: (value: string) => void;
   youtubeUrl: string;
   onYoutubeUrlChange: (value: string) => void;
-  // 자리만(다음 단계 연결): 새 방송 생성 / 진열 상품 수
-  onCreateBroadcast?: () => void;
+  // 자리만(다음 단계 연결): 진열 상품 수
   productCount?: number;
 };
 
@@ -44,7 +43,6 @@ export default function LiveHeader({
   onTitleChange,
   youtubeUrl,
   onYoutubeUrlChange,
-  onCreateBroadcast,
   productCount,
 }: Props) {
   const [titleSavedAt, setTitleSavedAt] = useState("");
@@ -89,14 +87,7 @@ export default function LiveHeader({
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          {/* ＋새 방송 — 자리만(다음 단계: onCreateBroadcast 연결). 방송시작과 분리된 별도 흐름 */}
-          <button
-            type="button"
-            onClick={() => onCreateBroadcast?.()}
-            className="h-9 rounded-xl border border-rose-line bg-rose-soft px-3.5 text-sm font-black text-rose-deep transition hover:bg-rose-soft/70"
-          >
-            ＋ 새 방송
-          </button>
+          {/* ＋새 방송은 상품 관리 팝업 > 방송 상품 탭으로 이동(중복 제거) */}
           <button
             type="button"
             disabled={savingBroadcast || Boolean(activeBroadcast)}

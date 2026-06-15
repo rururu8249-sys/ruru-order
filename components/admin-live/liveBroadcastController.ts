@@ -102,6 +102,39 @@ export async function startAdminLiveBroadcast(input: StartBroadcastInput) {
   return data as AdminLiveBroadcast;
 }
 
+// 방송 껍데기 미리 만들기(켜지 않음). status:"OFF"로 insert만 — 기존 ON 방송은 절대 안 건드린다.
+// settings(broadcast_status/current_broadcast_name)도 안 바꾼다(현재 방송 상태 유지). 정산/수수료 컬럼은 default 그대로.
+export async function createDraftBroadcast(title: string) {
+  const cleanTitle = String(title || "").trim();
+
+  if (!cleanTitle) {
+    throw new Error("방송 제목을 입력해주세요.");
+  }
+
+  const payload = {
+    public_title: cleanTitle,
+    admin_subtitle: "",
+    status: "OFF",
+    started_at: null,
+    ended_at: null,
+    shipping_fee: 4000,
+    youtube_live_url: "",
+    youtube_live_enabled: false,
+    order_form_enabled: true,
+    is_deleted: false,
+  };
+
+  const { data, error } = await supabase
+    .from("broadcasts")
+    .insert(payload)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+
+  return data as AdminLiveBroadcast;
+}
+
 export async function updateAdminLiveBroadcast(input: UpdateBroadcastInput) {
   const title = input.title.trim();
   const youtubeUrl = String(input.youtubeUrl || "").trim();
