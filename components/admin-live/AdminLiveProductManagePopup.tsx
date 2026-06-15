@@ -1221,6 +1221,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             <div style={{ fontSize: "13px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
                             <div style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43", marginTop: "2px" }}>{money(productPrice(p))}</div>
                           </div>
+                          <button type="button" onClick={() => editProduct(p)} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "#7B2D43", background: "#F5E6EB", border: "1px solid #D9C5CC", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }}>수정</button>
                           <button type="button" disabled={bcBusy} onClick={() => void removeBcProduct(pid)} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", border: "none", borderRadius: "6px", padding: "6px 10px", cursor: bcBusy ? "wait" : "pointer", opacity: bcBusy ? 0.6 : 1 }}>빼기</button>
                         </div>
                       );
@@ -1265,6 +1266,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           <div style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43", marginTop: "2px" }}>{money(productPrice(p))}</div>
                           {productCategory(p) ? <span style={{ display: "inline-block", marginTop: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: "#F1EFEC", color: "#777" }}>{productCategory(p)}</span> : null}
                         </div>
+                        <button type="button" onClick={() => editProduct(p)} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "#7B2D43", background: "#F5E6EB", border: "1px solid #D9C5CC", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }}>수정</button>
                         <button type="button" disabled={shopBusy} onClick={() => void removeFromShop(pid)} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", border: "none", borderRadius: "6px", padding: "6px 10px", cursor: shopBusy ? "wait" : "pointer", opacity: shopBusy ? 0.6 : 1 }}>빼기</button>
                       </div>
                     );
