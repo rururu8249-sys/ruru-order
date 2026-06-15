@@ -2385,9 +2385,14 @@ export default function OrderPage() {
 
       const nextNickname = customer.youtube_nickname || "";
       const nextName = customer.customer_name || "";
-      const nextZipcode = customer.zipcode || "";
-      const nextAddress = customer.address || "";
-      const nextDetailAddress = customer.detail_address || "";
+      // 배송지 배열 + 기본배송지(isDefault, 없으면 [0]) 우선 (applyCustomerFromRow와 동일 기준). 없으면 단일 컬럼 fallback.
+      if (Array.isArray(customer.shipping_addresses)) setShippingAddresses(customer.shipping_addresses);
+      const shippingArr = Array.isArray(customer.shipping_addresses) ? customer.shipping_addresses : null;
+      const defaultShippingAddr = shippingArr ? (shippingArr.find((a: any) => a?.isDefault) ?? shippingArr[0]) : null;
+      const useDefaultShipping = Boolean(defaultShippingAddr && String(defaultShippingAddr.address || "").trim());
+      const nextZipcode = useDefaultShipping ? String(defaultShippingAddr.zipcode || "").trim() : (customer.zipcode || "");
+      const nextAddress = useDefaultShipping ? String(defaultShippingAddr.address || "").trim() : (customer.address || "");
+      const nextDetailAddress = useDefaultShipping ? String(defaultShippingAddr.detailAddress || "").trim() : (customer.detail_address || "");
 
       setYoutubeNickname(nextNickname);
       setCustomerName(nextName);
@@ -3435,8 +3440,8 @@ export default function OrderPage() {
       setYoutubeNickname(customerInfoEditSnapshot.youtubeNickname);
       setCustomerName(customerInfoEditSnapshot.customerName);
       setCustomerPhone(customerInfoEditSnapshot.customerPhone);
-      setAddress(customerInfoEditSnapshot.address);
-      setDetailAddress(customerInfoEditSnapshot.detailAddress);
+      // 주소(address/detailAddress/zipcode)는 배송지 시트에서 확정된 현재 값을 유지한다.
+      // (배송지 변경은 저장된 동작이므로 취소가 옛 주소로 되돌리면 안 됨.) 닉네임/이름/전화만 복원.
     }
 
     setYoutubeNicknameError("");
