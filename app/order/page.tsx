@@ -2633,15 +2633,16 @@ export default function OrderPage() {
   }, [broadcastProducts, groupBuyQuickProductsFromCatalog, topProductSearchText]);
 
   const quickGroupBuyProducts = useMemo(() => {
-    // 방송 OFF(쇼핑몰 모드)일 때만 카탈로그를 in_shop=true 로 거른다(방송 상품은 손대지 않음).
-    // 단 in_shop=true 상품이 0개이면 빈 화면 사고 방지를 위해 전체 카탈로그를 그대로 보여준다(fallback).
+    // 두 모드 절대 안 섞임:
+    // - 방송 모드(ON): 방송에 담은 broadcast_products만 노출. 카탈로그(in_shop 포함) 전부 제외.
+    // - 쇼핑몰 모드(OFF): in_shop=true 진열분만. (진열 0개면 빈 화면 방지로 전체 카탈로그 fallback)
     const broadcastOn = String(broadcast?.status || "").toUpperCase() === "ON";
-    let catalogForGrid = groupBuyQuickProductsFromCatalog;
+    let catalogForGrid: BroadcastProduct[] = [];
     if (!broadcastOn) {
-      const inShopOnly = groupBuyQuickProductsFromCatalog.filter(
+      catalogForGrid = groupBuyQuickProductsFromCatalog.filter(
         (product) => (product as any)?.in_shop === true,
       );
-      if (inShopOnly.length > 0) catalogForGrid = inShopOnly;
+      if (catalogForGrid.length === 0) catalogForGrid = groupBuyQuickProductsFromCatalog;
     }
 
     const mergedProducts = [...catalogForGrid, ...broadcastProducts];
