@@ -266,6 +266,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     try {
       const created = await createDraftBroadcast(title);
       await loadBroadcastList(String(created.id));
+      // 방송 목록 전용 신호 — Dashboard가 broadcasts 배열을 다시 로드하도록(상품 패널용 ruru-live-product-updated와 분리)
+      window.dispatchEvent(new Event("ruru-broadcast-list-updated"));
       showAdminToast("방송이 생성됐습니다. 상품을 담아주세요.", "success");
     } catch (e) {
       const err = e as { message?: string; code?: string };

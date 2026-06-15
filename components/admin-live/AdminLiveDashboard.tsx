@@ -915,6 +915,13 @@ export default function AdminLiveDashboard() {
     return () => window.removeEventListener("ruru-reopen-product-manage", reopenManage);
   }, []);
 
+  // ＋새 방송(껍데기) 생성 → broadcasts 배열 갱신(방송시작 draft 분기가 즉시 인지하도록)
+  useEffect(() => {
+    const onBroadcastListUpdated = () => void loadBroadcasts();
+    window.addEventListener("ruru-broadcast-list-updated", onBroadcastListUpdated);
+    return () => window.removeEventListener("ruru-broadcast-list-updated", onBroadcastListUpdated);
+  }, []);
+
   const broadcastOptions = useMemo(() => {
     const todayDateKey = getAlwaysOrderDateKey(new Date().toISOString());
     const alwaysOptions = buildAlwaysOrderOptions(orders as any[], todayDateKey);
