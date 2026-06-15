@@ -123,6 +123,8 @@ type BroadcastProduct = {
   pinned_at?: string;
   sort_order?: number;
   display_order?: number;
+  in_shop?: boolean | null;
+  mall_sort_order?: number;
   created_at?: string;
   updated_at?: string;
   image_url?: string;
@@ -874,6 +876,9 @@ function normalizeOrderProductRow(product: any): BroadcastProduct {
     pinned_at: String(product?.pinned_at ?? ""),
     sort_order: Number(product?.sort_order ?? product?.display_order ?? 999999),
     display_order: Number(product?.display_order ?? product?.sort_order ?? 999999),
+    // 쇼핑몰 진열(관리자 쇼핑몰 진열 탭) 신호 — 고객 그리드가 방송 OFF일 때 읽는다(보존만).
+    in_shop: product?.in_shop ?? false,
+    mall_sort_order: Number(product?.mall_sort_order ?? 999999),
     created_at: String(product?.created_at ?? ""),
     updated_at: String(product?.updated_at ?? ""),
     status: String(product?.status ?? "판매중"),
@@ -2618,7 +2623,18 @@ export default function OrderPage() {
   }, [broadcastProducts, groupBuyQuickProductsFromCatalog, topProductSearchText]);
 
   const quickGroupBuyProducts = useMemo(() => {
-    const mergedProducts = [...groupBuyQuickProductsFromCatalog, ...broadcastProducts];
+    // 방송 OFF(쇼핑몰 모드)일 때만 카탈로그를 in_shop=true 로 거른다(방송 상품은 손대지 않음).
+    // 단 in_shop=true 상품이 0개이면 빈 화면 사고 방지를 위해 전체 카탈로그를 그대로 보여준다(fallback).
+    const broadcastOn = String(broadcast?.status || "").toUpperCase() === "ON";
+    let catalogForGrid = groupBuyQuickProductsFromCatalog;
+    if (!broadcastOn) {
+      const inShopOnly = groupBuyQuickProductsFromCatalog.filter(
+        (product) => (product as any)?.in_shop === true,
+      );
+      if (inShopOnly.length > 0) catalogForGrid = inShopOnly;
+    }
+
+    const mergedProducts = [...catalogForGrid, ...broadcastProducts];
 
     const readPinnedQuickProductValue = (value: unknown) => {
       if (typeof value === "boolean") return value;
@@ -2645,6 +2661,14 @@ export default function OrderPage() {
     );
 
     return uniqueProducts.sort((a, b) => {
+      // 방송 OFF(쇼핑몰 모드): mall_sort_order 오름차순 우선 (방송 ON은 아래 기존 로직 그대로)
+      if (!broadcastOn) {
+        const mallA = readQuickProductSortNumber((a as any).mall_sort_order);
+        const mallB = readQuickProductSortNumber((b as any).mall_sort_order);
+        if (mallA !== mallB) return mallA - mallB;
+        return String(b.created_at || b.updated_at || b.id).localeCompare(String(a.created_at || a.updated_at || a.id));
+      }
+
       const pinnedA = readPinnedQuickProductValue(a.is_pinned) || readPinnedQuickProductValue(a.pinned) ? 1 : 0;
       const pinnedB = readPinnedQuickProductValue(b.is_pinned) || readPinnedQuickProductValue(b.pinned) ? 1 : 0;
 
@@ -2664,7 +2688,7 @@ export default function OrderPage() {
 
       return String(b.created_at || b.updated_at || b.id).localeCompare(String(a.created_at || a.updated_at || a.id));
     });
-  }, [broadcastProducts, groupBuyQuickProductsFromCatalog]);
+  }, [broadcastProducts, groupBuyQuickProductsFromCatalog, broadcast?.status]);
 
   // P4 상품목록 무한스크롤: 센티넬이 보이면 10개씩 더 노출 (센티넬이 조건부로 (재)마운트되므로 재부착)
   useEffect(() => {
