@@ -705,30 +705,37 @@ export default function LiveOrderTable({
           </div>
           <div style={{ fontSize: "13px", color: "#555", marginBottom: "20px", lineHeight: 1.8 }}>
             <div>현재 필터 기준: <b>{exportableOrders.length.toLocaleString("ko-KR")}건</b></div>
-            <div>결제완료만: <b style={{ color: "#0F6E56" }}>{paidOnlyExportOrders.length.toLocaleString("ko-KR")}건</b></div>
+            <div style={{ fontSize: "15px" }}>✅ 돈 받은 것(결제완료): <b style={{ color: "#0F6E56", fontSize: "16px" }}>{paidOnlyExportOrders.length.toLocaleString("ko-KR")}건</b></div>
           </div>
-          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", flexWrap: "wrap" }}>
-            {selectedExportOrders.length > 0 ? (
-              <button type="button"
-                onClick={() => { const kind = exportConfirm as "rozen" | "picking"; setExportConfirm(""); void runExport(kind, selectedExportOrders, `선택 ${selectedExportOrders.length}건`); }}
-                style={{ padding: "8px 14px", borderRadius: "8px", border: "none", background: "#7B2D43", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
-                ✓ 선택한 {selectedExportOrders.length.toLocaleString("ko-KR")}건 출력
-              </button>
-            ) : null}
-            <button type="button" onClick={() => setExportConfirm("")}
-              style={{ padding: "8px 14px", borderRadius: "8px", border: "1px solid #E2E8F0", background: "#fff", color: "#555", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
-              취소
-            </button>
-            <button type="button"
-              onClick={() => { const kind = exportConfirm as "rozen" | "picking"; setExportConfirm(""); void runExport(kind, exportableOrders, currentFilterLabel); }}
-              style={{ padding: "8px 14px", borderRadius: "8px", border: "none", background: "#F1EFEC", color: "#444", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
-              현재 필터로 출력 ({exportableOrders.length.toLocaleString("ko-KR")}건)
-            </button>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {/* 기본 추천: 결제완료만 — 크게/녹색/맨 위 */}
             <button type="button"
               disabled={paidOnlyExportOrders.length === 0}
               onClick={() => { const kind = exportConfirm as "rozen" | "picking"; setExportConfirm(""); void runExport(kind, paidOnlyExportOrders, "결제완료"); }}
-              style={{ padding: "8px 14px", borderRadius: "8px", border: "none", background: "#0F6E56", color: "#fff", fontWeight: 700, cursor: paidOnlyExportOrders.length === 0 ? "default" : "pointer", fontSize: "13px", opacity: paidOnlyExportOrders.length === 0 ? 0.4 : 1 }}>
-              결제완료만 출력 ({paidOnlyExportOrders.length.toLocaleString("ko-KR")}건)
+              style={{ padding: "13px 16px", borderRadius: "10px", border: "none", background: "#0F6E56", color: "#fff", fontWeight: 800, cursor: paidOnlyExportOrders.length === 0 ? "default" : "pointer", fontSize: "15px", opacity: paidOnlyExportOrders.length === 0 ? 0.4 : 1, textAlign: "left" }}>
+              ✅ 돈 받은 것만 출력 ({paidOnlyExportOrders.length.toLocaleString("ko-KR")}건)
+              <div style={{ fontSize: "11px", fontWeight: 600, opacity: 0.85, marginTop: "2px" }}>입금확인·카드결제 완료분만</div>
+            </button>
+
+            {selectedExportOrders.length > 0 ? (
+              <button type="button"
+                onClick={() => { const kind = exportConfirm as "rozen" | "picking"; setExportConfirm(""); void runExport(kind, selectedExportOrders, `선택 ${selectedExportOrders.length}건`); }}
+                style={{ padding: "10px 16px", borderRadius: "10px", border: "none", background: "#7B2D43", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: "14px", textAlign: "left" }}>
+                ✓ 선택한 {selectedExportOrders.length.toLocaleString("ko-KR")}건 출력
+              </button>
+            ) : null}
+
+            {/* 미결제 포함 전체 — 작게/경고색/아래 */}
+            <button type="button"
+              onClick={() => { const kind = exportConfirm as "rozen" | "picking"; setExportConfirm(""); void runExport(kind, exportableOrders, currentFilterLabel); }}
+              style={{ padding: "9px 14px", borderRadius: "9px", border: "1px solid #E6C200", background: "#FFF8E1", color: "#8A6D00", fontWeight: 700, cursor: "pointer", fontSize: "12px", textAlign: "left" }}>
+              ⚠️ 미결제 포함 전체 ({exportableOrders.length.toLocaleString("ko-KR")}건)
+              <div style={{ fontSize: "10px", fontWeight: 600, opacity: 0.9, marginTop: "2px" }}>돈 안 들어온 주문도 포함됩니다</div>
+            </button>
+
+            <button type="button" onClick={() => setExportConfirm("")}
+              style={{ padding: "8px 14px", borderRadius: "8px", border: "1px solid #E2E8F0", background: "#fff", color: "#555", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+              취소
             </button>
           </div>
         </div>
@@ -757,6 +764,13 @@ export default function LiveOrderTable({
             muted: { bg: "#777",    text: "#fff", inactiveBg: "#F1EFEC", inactiveText: "#777" },
           };
           const t = toneStyle[tone as string] ?? toneStyle.muted;
+          // 보조텍스트(표시용) — 기존 counts 값 조합만 사용. 결제완료=무통장/카드 분해, 입금대기=매칭필요 포함.
+          const sub =
+            status === "paid"
+              ? `무통장 ${counts.bankPaid}·카드 ${Math.max(0, counts.paid - counts.bankPaid)}`
+              : status === "unpaid"
+                ? `매칭필요 ${counts.manual} 포함`
+                : "";
 
           return (
             <button
@@ -777,6 +791,7 @@ export default function LiveOrderTable({
               }}
             >
               {label} <span style={{ opacity: 0.85 }}>{count}</span>
+              {sub ? <span style={{ marginLeft: "5px", fontSize: "10px", fontWeight: 700, opacity: 0.6 }}>{sub}</span> : null}
             </button>
           );
         })}
