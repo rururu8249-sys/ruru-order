@@ -1281,11 +1281,6 @@ export default function AdminLiveDashboard() {
             setActiveMenu(nextMenu);
             replacePanelInUrl(nextMenu);
           }}
-          broadcastLive={Boolean(activeBroadcast)}
-          canStartBroadcast={broadcastYoutubeUrl.trim().length > 0}
-          savingBroadcast={savingBroadcast}
-          onStartBroadcast={() => startBroadcast({ title: broadcastTitle, youtubeUrl: broadcastYoutubeUrl })}
-          onEndBroadcast={endBroadcast}
         />
 
         <main className="min-w-0 flex-1 overflow-x-hidden px-5 py-4">
