@@ -158,6 +158,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [bcPickerOpen, setBcPickerOpen] = useState(false);
   const [bcPickerSel, setBcPickerSel] = useState<Set<string>>(new Set());
   const [bcPickerSearch, setBcPickerSearch] = useState("");
+  // 드래그 순서변경
+  const [bcDragFrom, setBcDragFrom] = useState<number | null>(null);
+  const [bcDragOver, setBcDragOver] = useState<number | null>(null);
 
   // 쇼핑몰 진열 탭(shop) — products.in_shop / mall_sort_order 사용
   const [shopRows, setShopRows] = useState<ProductRow[]>([]);
@@ -165,6 +168,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [shopPickerOpen, setShopPickerOpen] = useState(false);
   const [shopPickerSel, setShopPickerSel] = useState<Set<string>>(new Set());
   const [shopPickerSearch, setShopPickerSearch] = useState("");
+  // 드래그 순서변경
+  const [shopDragFrom, setShopDragFrom] = useState<number | null>(null);
+  const [shopDragOver, setShopDragOver] = useState<number | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   // 기록 탭(방송별 매출/주문)
   const [histLoaded, setHistLoaded] = useState(false);
@@ -355,12 +361,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   };
 
   // 순서 이동(↑↓): 새 순서대로 sort_order 0..n-1 재기록 (해당 방송만)
-  const moveBcProduct = async (index: number, dir: -1 | 1) => {
-    const target = index + dir;
-    if (bcBusy || target < 0 || target >= bcProducts.length) return;
+  // 드래그앤드롭 순서변경: from→to 재배열 후 sort_order 0..n-1 재기록 (해당 방송만)
+  const reorderBc = async (from: number, to: number) => {
+    if (bcBusy || from === to || from < 0 || to < 0 || from >= bcProducts.length || to >= bcProducts.length) return;
     const ordered = [...bcProducts];
-    const [moved] = ordered.splice(index, 1);
-    ordered.splice(target, 0, moved);
+    const [moved] = ordered.splice(from, 1);
+    ordered.splice(to, 0, moved);
     setBcProducts(ordered); // 낙관적 갱신
     setBcBusy(true);
     try {
@@ -376,7 +382,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       }
       window.dispatchEvent(new Event("ruru-live-product-updated"));
     } catch (e) {
-      showAdminToast("순서 변경 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+      const err = e as { message?: string; code?: string };
+      showAdminToast("순서 변경 실패\n\n" + (err?.message ?? err?.code ?? "알 수 없는 오류"), "error");
       await reloadBcProducts(bcSelId);
     } finally {
       setBcBusy(false);
@@ -683,19 +690,21 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       window.dispatchEvent(new Event("ruru-live-product-updated"));
       showAdminToast(`${ids.length}개 상품을 쇼핑몰에 진열했어요.`, "success");
     } catch (e) {
-      showAdminToast("쇼핑몰 진열 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+      // supabase 에러는 Error 인스턴스가 아니라 {message, code} 객체라 String(e)가 [object Object]가 된다.
+      const err = e as { message?: string; code?: string };
+      showAdminToast("쇼핑몰 진열 실패\n\n" + (err?.message ?? err?.code ?? "알 수 없는 오류"), "error");
     } finally {
       setShopBusy(false);
     }
   };
 
   // 순서 이동(↑↓): 새 순서대로 mall_sort_order 0..n-1 재기록 (in_shop 목록만, 다른 컬럼 무변경)
-  const moveShop = async (index: number, dir: -1 | 1) => {
-    const target = index + dir;
-    if (shopBusy || target < 0 || target >= shopRows.length) return;
+  // 드래그앤드롭 순서변경: from→to 재배열 후 mall_sort_order 0..n-1 재기록 (mall_sort_order 컬럼만)
+  const reorderShop = async (from: number, to: number) => {
+    if (shopBusy || from === to || from < 0 || to < 0 || from >= shopRows.length || to >= shopRows.length) return;
     const ordered = [...shopRows];
-    const [moved] = ordered.splice(index, 1);
-    ordered.splice(target, 0, moved);
+    const [moved] = ordered.splice(from, 1);
+    ordered.splice(to, 0, moved);
     setShopRows(ordered); // 낙관적 갱신
     setShopBusy(true);
     try {
@@ -707,7 +716,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       }
       window.dispatchEvent(new Event("ruru-live-product-updated"));
     } catch (e) {
-      showAdminToast("순서 변경 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+      const err = e as { message?: string; code?: string };
+      showAdminToast("순서 변경 실패\n\n" + (err?.message ?? err?.code ?? "알 수 없는 오류"), "error");
       reloadShop();
     } finally {
       setShopBusy(false);
@@ -1121,12 +1131,17 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       const img = mainImage(p);
                       const pid = productId(p);
                       return (
-                        <div key={pid || i} style={{ display: "flex", alignItems: "center", gap: "10px", border: "1px solid #E8E2DD", borderRadius: "9px", padding: "8px" }}>
-                          {/* 순서 이동 ↑↓ */}
-                          <div style={{ display: "flex", flexDirection: "column", gap: "2px", flexShrink: 0 }}>
-                            <button type="button" disabled={bcBusy || i === 0} onClick={() => void moveBcProduct(i, -1)} style={{ width: "20px", height: "18px", lineHeight: 1, fontSize: "11px", fontWeight: 800, color: i === 0 ? "#ccc" : "#7B2D43", background: "#F5E6EB", border: "none", borderRadius: "4px", cursor: bcBusy || i === 0 ? "default" : "pointer" }}>▲</button>
-                            <button type="button" disabled={bcBusy || i === bcProducts.length - 1} onClick={() => void moveBcProduct(i, 1)} style={{ width: "20px", height: "18px", lineHeight: 1, fontSize: "11px", fontWeight: 800, color: i === bcProducts.length - 1 ? "#ccc" : "#7B2D43", background: "#F5E6EB", border: "none", borderRadius: "4px", cursor: bcBusy || i === bcProducts.length - 1 ? "default" : "pointer" }}>▼</button>
-                          </div>
+                        <div
+                          key={pid || i}
+                          draggable={!bcBusy}
+                          onDragStart={() => { setBcDragFrom(i); setBcDragOver(i); }}
+                          onDragOver={(e) => { e.preventDefault(); if (bcDragOver !== i) setBcDragOver(i); }}
+                          onDrop={(e) => { e.preventDefault(); if (bcDragFrom !== null) void reorderBc(bcDragFrom, i); setBcDragFrom(null); setBcDragOver(null); }}
+                          onDragEnd={() => { setBcDragFrom(null); setBcDragOver(null); }}
+                          style={{ display: "flex", alignItems: "center", gap: "10px", border: "1px solid #E8E2DD", borderRadius: "9px", padding: "8px", background: bcDragFrom !== null && bcDragOver === i && bcDragFrom !== i ? "#FBF1E0" : "#fff", opacity: bcDragFrom === i ? 0.4 : 1, boxShadow: bcDragFrom !== null && bcDragOver === i && bcDragFrom !== i ? "inset 0 2px 0 #7B2D43" : undefined, cursor: bcBusy ? "default" : "grab" }}
+                        >
+                          {/* 드래그 핸들 */}
+                          <span style={{ flexShrink: 0, fontSize: "14px", color: "#bbb", userSelect: "none" }} title="드래그로 순서 변경">⠿</span>
                           <span style={{ fontSize: "11px", fontWeight: 800, color: "#888", width: "20px", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
                           <span style={{ width: "48px", height: "48px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "#F5F2EF", display: "flex", alignItems: "center", justifyContent: "center" }}>
                             {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "18px" }}>🖼</span>}
@@ -1159,12 +1174,17 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     const img = mainImage(p);
                     const pid = productId(p);
                     return (
-                      <div key={pid || i} style={{ display: "flex", alignItems: "center", gap: "10px", border: "1px solid #E8E2DD", borderRadius: "10px", padding: "9px" }}>
-                        {/* 순서 이동 ↑↓ */}
-                        <div style={{ display: "flex", flexDirection: "column", gap: "2px", flexShrink: 0 }}>
-                          <button type="button" disabled={shopBusy || i === 0} onClick={() => void moveShop(i, -1)} style={{ width: "20px", height: "18px", lineHeight: 1, fontSize: "11px", fontWeight: 800, color: i === 0 ? "#ccc" : "#7B2D43", background: "#F5E6EB", border: "none", borderRadius: "4px", cursor: shopBusy || i === 0 ? "default" : "pointer" }}>▲</button>
-                          <button type="button" disabled={shopBusy || i === shopRows.length - 1} onClick={() => void moveShop(i, 1)} style={{ width: "20px", height: "18px", lineHeight: 1, fontSize: "11px", fontWeight: 800, color: i === shopRows.length - 1 ? "#ccc" : "#7B2D43", background: "#F5E6EB", border: "none", borderRadius: "4px", cursor: shopBusy || i === shopRows.length - 1 ? "default" : "pointer" }}>▼</button>
-                        </div>
+                      <div
+                        key={pid || i}
+                        draggable={!shopBusy}
+                        onDragStart={() => { setShopDragFrom(i); setShopDragOver(i); }}
+                        onDragOver={(e) => { e.preventDefault(); if (shopDragOver !== i) setShopDragOver(i); }}
+                        onDrop={(e) => { e.preventDefault(); if (shopDragFrom !== null) void reorderShop(shopDragFrom, i); setShopDragFrom(null); setShopDragOver(null); }}
+                        onDragEnd={() => { setShopDragFrom(null); setShopDragOver(null); }}
+                        style={{ display: "flex", alignItems: "center", gap: "10px", border: "1px solid #E8E2DD", borderRadius: "10px", padding: "9px", background: shopDragFrom !== null && shopDragOver === i && shopDragFrom !== i ? "#FBF1E0" : "#fff", opacity: shopDragFrom === i ? 0.4 : 1, boxShadow: shopDragFrom !== null && shopDragOver === i && shopDragFrom !== i ? "inset 0 2px 0 #7B2D43" : undefined, cursor: shopBusy ? "default" : "grab" }}
+                      >
+                        {/* 드래그 핸들 */}
+                        <span style={{ flexShrink: 0, fontSize: "14px", color: "#bbb", userSelect: "none" }} title="드래그로 순서 변경">⠿</span>
                         <span style={{ fontSize: "11px", fontWeight: 800, color: "#888", width: "20px", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
                         <span style={{ width: "56px", height: "56px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "#F5F2EF", display: "flex", alignItems: "center", justifyContent: "center" }}>
                           {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "20px" }}>🖼</span>}
