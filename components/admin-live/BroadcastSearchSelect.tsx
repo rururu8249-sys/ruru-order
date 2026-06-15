@@ -8,9 +8,10 @@ interface Props {
   value: string;
   onChange: (value: string) => void;
   todayAlwaysLabel: string;
+  hideShopOption?: boolean;
 }
 
-export default function BroadcastSearchSelect({ options, value, onChange, todayAlwaysLabel }: Props) {
+export default function BroadcastSearchSelect({ options, value, onChange, todayAlwaysLabel, hideShopOption }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -132,7 +133,7 @@ export default function BroadcastSearchSelect({ options, value, onChange, todayA
             )}
 
             {/* 공구·상시 고정 */}
-            {!query && (
+            {!query && !hideShopOption && (
               <button type="button" onClick={() => select("none")}
                 style={{
                   width: "100%", textAlign: "left", padding: "9px 14px",

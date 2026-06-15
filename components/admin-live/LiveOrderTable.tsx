@@ -10,7 +10,8 @@ import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
 import { openPaysterRightHalf } from "./AdminLiveCardPayPopup";
 import BroadcastSearchSelect from "./BroadcastSearchSelect";
 
-export type LiveOrderDateFilter = "all" | "today" | "yesterday" | "7days" | "month" | "custom" | "yearmonth";
+export type LiveOrderDateFilter = "all" | "today" | "yesterday" | "7days" | "month" | "lastmonth" | "custom";
+export type LiveOrderScopeFilter = "all" | "broadcast" | "shop";
 export type LiveOrderStatusFilter =
   | "all"
   | "paid"
@@ -24,11 +25,10 @@ export type LiveOrderStatusFilter =
 
 export type LiveOrderFilters = {
   broadcast: string;
+  scope: LiveOrderScopeFilter;
   date: LiveOrderDateFilter;
   customStartDate: string;
   customEndDate: string;
-  filterYear: string;
-  filterMonth: string;
   status: LiveOrderStatusFilter;
   keyword: string;
 };
@@ -481,7 +481,7 @@ export default function LiveOrderTable({
 
   useEffect(() => {
     setPage(1);
-  }, [filters.broadcast, filters.date, filters.customStartDate, filters.customEndDate, filters.filterYear, filters.filterMonth, filters.status, filters.keyword, sortMode, pageSize]);
+  }, [filters.broadcast, filters.scope, filters.date, filters.customStartDate, filters.customEndDate, filters.status, filters.keyword, sortMode, pageSize]);
 
   useEffect(() => {
     setPendingKeyword(filters.keyword);
@@ -606,11 +606,10 @@ export default function LiveOrderTable({
     setPageSize(10);
     onFiltersChange({
       broadcast: "all",
+      scope: "all",
       date: "all",
       customStartDate: "",
       customEndDate: "",
-      filterYear: "",
-      filterMonth: "",
       status: "all",
       keyword: "",
     });
@@ -654,14 +653,11 @@ export default function LiveOrderTable({
       yesterday: "어제",
       "7days": "최근 7일",
       month: "이번 달",
+      lastmonth: "지난 달",
       custom:
         filters.customStartDate || filters.customEndDate
-          ? `직접 선택 ${filters.customStartDate || "시작일"}~${filters.customEndDate || "종료일"}`
-          : "직접 선택",
-      yearmonth:
-        filters.filterYear || filters.filterMonth
-          ? `${filters.filterYear ? `${filters.filterYear}년` : "연도전체"} ${filters.filterMonth ? `${filters.filterMonth}월` : "월전체"}`
-          : "연·월 선택",
+          ? `기간 선택 ${filters.customStartDate || "시작일"}~${filters.customEndDate || "종료일"}`
+          : "기간 선택",
     };
 
     const statusLabelMap: Record<LiveOrderStatusFilter, string> = {
@@ -865,24 +861,18 @@ export default function LiveOrderTable({
 
 
       <div className="mb-3 flex w-full flex-wrap items-center gap-2 xl:flex-nowrap">
-        <BroadcastSearchSelect
-          options={broadcastOptions}
-          value={filters.broadcast}
-          onChange={(v) => updateFilter("broadcast", v)}
-          todayAlwaysLabel={todayAlwaysOrderLabel()}
-        />
-
+        {/* [1] 기간 */}
         <select className="h-11 w-full flex-none rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50 sm:w-[120px]"
           value={filters.date}
           onChange={(event) => updateFilter("date", event.target.value as LiveOrderDateFilter)}
         >
-          <option value="all">날짜: 전체보기</option>
+          <option value="all">기간: 전체</option>
           <option value="today">오늘</option>
           <option value="yesterday">어제</option>
           <option value="7days">최근 7일</option>
           <option value="month">이번 달</option>
-          <option value="custom">직접 선택</option>
-          <option value="yearmonth">연·월 선택</option>
+          <option value="lastmonth">지난 달</option>
+          <option value="custom">기간 선택</option>
         </select>
 
         {filters.date === "custom" && (
@@ -902,34 +892,35 @@ export default function LiveOrderTable({
           </>
         )}
 
-        {filters.date === "yearmonth" && (
-          <>
-            <select className="h-11 flex-none rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-black text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 sm:w-[100px]"
-              value={filters.filterYear}
-              onChange={(event) => updateFilter("filterYear", event.target.value)}
-              aria-label="연도"
-            >
-              <option value="">연도 전체</option>
-              {(() => {
-                const cy = new Date().getFullYear();
-                const years = [];
-                for (let y = cy; y >= cy - 3; y--) years.push(y);
-                return years.map((y) => <option key={y} value={String(y)}>{y}년</option>);
-              })()}
-            </select>
-            <select className="h-11 flex-none rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-black text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 sm:w-[90px]"
-              value={filters.filterMonth}
-              onChange={(event) => updateFilter("filterMonth", event.target.value)}
-              aria-label="월"
-            >
-              <option value="">월 전체</option>
-              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                <option key={m} value={String(m)}>{m}월</option>
-              ))}
-            </select>
-          </>
+        {/* [2] 범위 */}
+        <select className="h-11 w-full flex-none rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50 sm:w-[130px]"
+          value={filters.scope}
+          onChange={(event) => {
+            const next = event.target.value as LiveOrderScopeFilter;
+            // 범위가 '방송'이 아니면 선택해둔 특정 방송을 전체로 되돌린다(빈 화면 방지).
+            onFiltersChange({
+              ...filters,
+              scope: next,
+              broadcast: next === "broadcast" ? filters.broadcast : "all",
+            });
+          }}
+        >
+          <option value="all">범위: 전체</option>
+          <option value="broadcast">방송 주문</option>
+          <option value="shop">쇼핑몰(상시) 주문</option>
+        </select>
+
+        {filters.scope === "broadcast" && (
+          <BroadcastSearchSelect
+            options={broadcastOptions.filter((option) => !option.value.startsWith("always:"))}
+            value={filters.broadcast}
+            onChange={(v) => updateFilter("broadcast", v)}
+            todayAlwaysLabel={todayAlwaysOrderLabel()}
+            hideShopOption
+          />
         )}
 
+        {/* [3] 상태 */}
         <select className="h-11 w-full flex-none rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-black text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50 sm:w-[128px]"
           value={filters.status}
           onChange={(event) => updateFilter("status", event.target.value as LiveOrderStatusFilter)}

@@ -70,11 +70,10 @@ type VideoRatio = "vertical" | "wide" | "auto";
 
 const DEFAULT_FILTERS: LiveOrderFilters = {
   broadcast: "all",
+  scope: "all",
   date: "all",
   customStartDate: "",
   customEndDate: "",
-  filterYear: "",
-  filterMonth: "",
   status: "all",
   keyword: "",
 };
@@ -221,12 +220,13 @@ function matchesDate(order: LiveOrder, filters: LiveOrderFilters) {
     return orderDate.getFullYear() === now.getFullYear() && orderDate.getMonth() === now.getMonth();
   }
 
-  if (dateFilter === "yearmonth") {
-    const fy = filters.filterYear ? Number(filters.filterYear) : null;
-    const fm = filters.filterMonth ? Number(filters.filterMonth) : null;
-    if (fy && orderDate.getFullYear() !== fy) return false;
-    if (fm && orderDate.getMonth() + 1 !== fm) return false;
-    return true;
+  if (dateFilter === "lastmonth") {
+    // 지난 달(전월) 1일~말일. 연초(1월)면 작년 12월로 넘어간다.
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return (
+      orderDate.getFullYear() === lastMonthDate.getFullYear() &&
+      orderDate.getMonth() === lastMonthDate.getMonth()
+    );
   }
 
   return true;
@@ -245,14 +245,11 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
     yesterday: "어제",
     "7days": "최근 7일",
     month: "이번 달",
+    lastmonth: "지난 달",
     custom:
       filters.customStartDate || filters.customEndDate
-        ? `직접 선택 ${filters.customStartDate || "시작일"}~${filters.customEndDate || "종료일"}`
-        : "직접 선택",
-    yearmonth:
-      filters.filterYear || filters.filterMonth
-        ? `${filters.filterYear ? `${filters.filterYear}년` : "연도전체"} ${filters.filterMonth ? `${filters.filterMonth}월` : "월전체"}`
-        : "연·월 선택",
+        ? `기간 선택 ${filters.customStartDate || "시작일"}~${filters.customEndDate || "종료일"}`
+        : "기간 선택",
   };
   parts.push(dateLabelMap[filters.date]);
 
@@ -672,9 +669,13 @@ export default function AdminLiveDashboard() {
     setLoading(true);
     setLoadError("");
 
-    // 전체보기 / 연·월 선택 / 키워드 검색 시 .range로 전체 로드. (키워드는 최근 500건 밖 주문도 검색해야 하므로)
+    // 전체보기 / 지난달·기간선택(과거 범위) / 키워드 검색 시 .range로 전체 로드.
+    // (키워드는 최근 500건 밖 주문도 검색해야 하고, 과거 기간은 500건 캡에 걸려 누락될 수 있으므로)
     const needsFullLoad =
-      filters.broadcast === "all" || filters.date === "yearmonth" || (filters.keyword?.trim() ?? "").length > 0;
+      filters.broadcast === "all" ||
+      filters.date === "lastmonth" ||
+      filters.date === "custom" ||
+      (filters.keyword?.trim() ?? "").length > 0;
 
     let data: any[] | null = null;
     let error: any = null;
@@ -902,7 +903,12 @@ export default function AdminLiveDashboard() {
     if (broadcasts.length === 0) return; // 방송 목록 로딩 전이면 대기
     didInitBroadcastFilter.current = true;
     if (activeBroadcast) {
-      setFilters((prev) => (prev.broadcast === "all" ? { ...prev, broadcast: "current" } : prev));
+      // 방송 중: 범위=방송 + 현재 방송으로 맞춘다(새 UI 일관). 사용자가 아직 안 건드린 초기 상태일 때만.
+      setFilters((prev) =>
+        prev.broadcast === "all" && prev.scope === "all"
+          ? { ...prev, scope: "broadcast", broadcast: "current" }
+          : prev
+      );
     }
     // 방송 중이 아니면 기본값(all=전체/최근) 유지
   }, [broadcasts, activeBroadcast]);
@@ -995,7 +1001,7 @@ export default function AdminLiveDashboard() {
     return activeBroadcast
       ? [{ value: "current", label: "현재 방송" }, ...mergedOptions]
       : mergedOptions;
-  }, [broadcasts, activeBroadcast, orders, filters.date, filters.filterYear, filters.filterMonth, filters.customStartDate, filters.customEndDate]);
+  }, [broadcasts, activeBroadcast, orders, filters.date, filters.customStartDate, filters.customEndDate]);
 
   const filteredOrders = useMemo(() => {
     const keyword = normalizeText(filters.keyword);
@@ -1022,6 +1028,15 @@ export default function AdminLiveDashboard() {
               ? order.broadcastId === selectedBroadcast.id || isOrderInsideBroadcastTime(order.createdAt, selectedBroadcast)
               : false;
 
+      // 범위(scope): 기존 방송 판정 위에 얹는 표시용 레이어. 돈/입금/방송 로직 무관.
+      // all=제한없음, broadcast=방송주문만(상시 제외), shop=쇼핑몰 상시주문만
+      const matchScope =
+        filters.scope === "all"
+          ? true
+          : filters.scope === "shop"
+            ? isAlwaysOrderLike(order as any)
+            : !isAlwaysOrderLike(order as any);
+
       const matchKeyword =
         !keyword ||
         normalizeText([
@@ -1037,6 +1052,7 @@ export default function AdminLiveDashboard() {
 
       return (
         matchBroadcast &&
+        matchScope &&
         matchesDate(order, filters) &&
         matchesStatus(order, filters.status) &&
         matchKeyword
