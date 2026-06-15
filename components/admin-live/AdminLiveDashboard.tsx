@@ -547,6 +547,7 @@ export default function AdminLiveDashboard() {
   // [표시 전용] 금액 단독 추천(amount_only_suggestions). 읽기 전용 dry_run으로만 채우며 확정/쓰기 없음.
   const [paymentSuggestions, setPaymentSuggestions] = useState<any[]>([]);
   const [broadcasts, setBroadcasts] = useState<AdminLiveBroadcast[]>([]);
+  const [broadcastProductCount, setBroadcastProductCount] = useState<number | null>(null);
   const [savingBroadcast, setSavingBroadcast] = useState(false);
   const [broadcastTitle, setBroadcastTitle] = useState("루루동이LIVE");
   const [broadcastYoutubeUrl, setBroadcastYoutubeUrl] = useState("");
@@ -921,6 +922,33 @@ export default function AdminLiveDashboard() {
     window.addEventListener("ruru-broadcast-list-updated", onBroadcastListUpdated);
     return () => window.removeEventListener("ruru-broadcast-list-updated", onBroadcastListUpdated);
   }, []);
+
+  // 컨트롤타워 "상품 N개" — 활성 방송의 broadcast_products 연결 개수(읽기 전용 count)
+  const loadBroadcastProductCount = async () => {
+    if (!activeBroadcast?.id) {
+      setBroadcastProductCount(null);
+      return;
+    }
+    const { count, error } = await supabase
+      .from("broadcast_products")
+      .select("id", { count: "exact", head: true })
+      .eq("broadcast_id", activeBroadcast.id);
+    if (error) return;
+    setBroadcastProductCount(count ?? 0);
+  };
+
+  useEffect(() => {
+    void loadBroadcastProductCount();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBroadcast?.id]);
+
+  // 상품 담기/빼기/순서 변경(ruru-live-product-updated) → 개수 즉시 갱신
+  useEffect(() => {
+    const onProductUpdated = () => void loadBroadcastProductCount();
+    window.addEventListener("ruru-live-product-updated", onProductUpdated);
+    return () => window.removeEventListener("ruru-live-product-updated", onProductUpdated);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBroadcast?.id]);
 
   const broadcastOptions = useMemo(() => {
     const todayDateKey = getAlwaysOrderDateKey(new Date().toISOString());
@@ -1305,6 +1333,7 @@ export default function AdminLiveDashboard() {
               onTitleChange={setBroadcastTitle}
               youtubeUrl={broadcastYoutubeUrl}
               onYoutubeUrlChange={setBroadcastYoutubeUrl}
+              productCount={broadcastProductCount ?? undefined}
             />
 
             <div className="mb-4 mt-4 h-[420px] w-full min-h-0 [&>*]:h-full [&>*]:min-h-0 [&>*>*]:h-full [&>*>*]:min-h-0">
