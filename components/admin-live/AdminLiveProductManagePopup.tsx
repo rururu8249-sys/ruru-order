@@ -134,7 +134,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [rotationIds, setRotationIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState<"products" | "history">("products");
+  const [tab, setTab] = useState<"broadcast" | "shop" | "products" | "history">("broadcast");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("전체");
   const [visibleCount, setVisibleCount] = useState(PAGE_STEP);
@@ -147,6 +147,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [wsMode, setWsMode] = useState<"rotate" | "pin">("rotate");
   const [wsSelected, setWsSelected] = useState<Set<string>>(new Set());
   const [wsSaving, setWsSaving] = useState(false);
+
+  // 방송 상품 탭(broadcast) — 읽기 전용 골격
+  const [bcList, setBcList] = useState<Array<{ id: string; title: string; started_at: string; status: string }>>([]);
+  const [bcSelId, setBcSelId] = useState("");
+  const [bcProducts, setBcProducts] = useState<ProductRow[]>([]);
+  const [bcLoading, setBcLoading] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   // 기록 탭(방송별 매출/주문)
   const [histLoaded, setHistLoaded] = useState(false);
@@ -204,6 +210,62 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   useEffect(() => {
     setVisibleCount(PAGE_STEP);
   }, [tab, search, category]);
+
+  // 방송 상품 탭: 방송 목록 로드 (읽기 전용)
+  const loadBroadcastList = async () => {
+    setBcLoading(true);
+    try {
+      const { data } = await supabase
+        .from("broadcasts")
+        .select("id, public_title, started_at, status")
+        .neq("is_deleted", true)
+        .order("started_at", { ascending: false })
+        .limit(120);
+      const list = ((data as Array<Record<string, unknown>>) || []).map((b) => ({
+        id: String(b.id),
+        title: String(b.public_title || "제목 없음"),
+        started_at: String(b.started_at || ""),
+        status: String(b.status || ""),
+      }));
+      setBcList(list);
+      setBcSelId((cur) => {
+        if (cur && list.some((b) => b.id === cur)) return cur;
+        const active = activeBroadcastId ? list.find((b) => b.id === String(activeBroadcastId)) : null;
+        return active ? active.id : (list[0]?.id || "");
+      });
+    } finally {
+      setBcLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tab === "broadcast" && bcList.length === 0) void loadBroadcastList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  // 선택 방송의 broadcast_products 목록 (sort_order순, products와 매칭, 읽기 전용)
+  useEffect(() => {
+    let alive = true;
+    if (tab !== "broadcast" || !bcSelId) {
+      setBcProducts([]);
+      return;
+    }
+    (async () => {
+      const { data: links } = await supabase
+        .from("broadcast_products")
+        .select("product_id, sort_order")
+        .eq("broadcast_id", bcSelId)
+        .order("sort_order", { ascending: true });
+      const ids = ((links as { product_id: unknown }[]) || []).map((r) => String(r.product_id));
+      const byId = new Map(products.map((p) => [productId(p), p]));
+      const rows = ids.map((pid) => byId.get(pid)).filter(Boolean) as ProductRow[];
+      if (alive) setBcProducts(rows);
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, bcSelId, products]);
 
   // 기록 탭: 방송 목록 + 방송별 매출/주문수 집계 (broadcasts + orders)
   const loadHistory = async () => {
@@ -426,6 +488,14 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   }, [tab, filtered.length, visibleCount]);
 
   const categories = BASE_CATEGORIES;
+
+  // 쇼핑몰 진열 탭(읽기 전용): is_visible=true & 삭제 아님. 순서/추가 저장은 2-B에서.
+  const shopProducts = useMemo(() => {
+    return products.filter((p) => {
+      if (pickString(p, ["status"], "") === "deleted") return false;
+      return pickBoolean(p, ["is_visible"], true);
+    });
+  }, [products]);
 
   // --- 위젯 단건 액션 (기존 addToRotation / pinSelected 로직 재사용) ---
   const widgetState = (p: ProductRow): "rotating" | "pinned" | "none" => {
@@ -650,7 +720,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       style={{ position: "fixed", inset: 0, zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", padding: "16px" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{ width: "600px", maxWidth: "100%", flexShrink: 0, height: "calc(100vh - 32px)", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "14px", overflow: "hidden" }}>
+      <div style={{ width: "960px", maxWidth: "100%", flexShrink: 0, height: "680px", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "14px", overflow: "hidden" }}>
         {/* 헤더 */}
         <div style={{ display: "flex", alignItems: "center", padding: "14px 18px", borderBottom: "1px solid #E8E2DD" }}>
           <span style={{ fontSize: "16px", fontWeight: 800, color: "#7B2D43" }}>📦 상품 관리</span>
@@ -659,7 +729,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
         {/* 탭 2개 */}
         <div style={{ display: "flex", gap: "2px", padding: "0 18px", borderBottom: "1px solid #E8E2DD" }}>
-          {([["products", "상품"], ["history", "기록"]] as const).map(([k, l]) => (
+          {([["broadcast", "방송 상품"], ["shop", "쇼핑몰 진열"], ["products", "전체 상품"], ["history", "판매 기록"]] as const).map(([k, l]) => (
             <button
               key={k}
               type="button"
@@ -785,12 +855,106 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               </div>
             )}
           </div>
+        ) : tab === "broadcast" ? (
+          <div style={{ flex: 1, minHeight: 0, display: "flex", gap: "12px", padding: "14px 18px 16px" }}>
+            {/* 좌측: 방송 목록 */}
+            <div style={{ width: "260px", flexShrink: 0, display: "flex", flexDirection: "column", border: "1px solid #E8E2DD", borderRadius: "10px", overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 12px", borderBottom: "1px solid #E8E2DD" }}>
+                <span style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>📺 방송 목록</span>
+                <button type="button" onClick={() => showAdminToast("방송 시작/종료는 상단 방송 토글에서 관리합니다.", "info")} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#7B2D43", background: "#F5E6EB", border: "1px solid #D9C5CC", borderRadius: "7px", padding: "4px 9px", cursor: "pointer" }}>+ 새 방송</button>
+              </div>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+                {bcLoading ? (
+                  <div style={{ textAlign: "center", padding: "30px 0", color: "#999", fontSize: "12px", fontWeight: 700 }}>불러오는 중…</div>
+                ) : bcList.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "30px 0", color: "#999", fontSize: "12px", fontWeight: 700 }}>방송이 없습니다.</div>
+                ) : (
+                  bcList.map((b) => {
+                    const on = b.id === bcSelId;
+                    const isOn = String(b.status || "").toUpperCase() === "ON";
+                    const d = new Date(b.started_at);
+                    const dateLabel = Number.isNaN(d.getTime()) ? "-" : `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+                    return (
+                      <button type="button" key={b.id} onClick={() => setBcSelId(b.id)} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", borderBottom: "1px solid #F0ECE8", background: on ? "#F5E6EB" : "#fff", cursor: "pointer", border: "none" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          {isOn ? <span style={{ flexShrink: 0, fontSize: "9px", fontWeight: 800, padding: "1px 6px", borderRadius: "5px", background: "#E7F3EE", color: "#0F6E56" }}>ON</span> : null}
+                          <span style={{ fontSize: "12px", fontWeight: 800, color: on ? "#7B2D43" : "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</span>
+                        </div>
+                        <div style={{ fontSize: "10px", color: "#888780", marginTop: "2px" }}>{dateLabel}</div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+            {/* 우측: 선택 방송의 진열 상품 (sort_order순, 읽기 전용) */}
+            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", border: "1px solid #E8E2DD", borderRadius: "10px", overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 12px", borderBottom: "1px solid #E8E2DD" }}>
+                <span style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>진열 상품 {bcProducts.length}개</span>
+                <button type="button" onClick={() => showAdminToast("상품 담기/순서 편집은 2-B 단계에서 제공됩니다.", "info")} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#fff", background: "#7B2D43", border: "none", borderRadius: "7px", padding: "5px 11px", cursor: "pointer" }}>+ 상품 담기</button>
+              </div>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "10px 12px" }}>
+                {!bcSelId ? (
+                  <div style={{ textAlign: "center", padding: "30px 0", color: "#999", fontSize: "12px", fontWeight: 700 }}>방송을 선택하세요.</div>
+                ) : bcProducts.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "30px 0", color: "#999", fontSize: "12px", fontWeight: 700 }}>진열된 상품이 없습니다.</div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
+                    {bcProducts.map((p, i) => {
+                      const img = mainImage(p);
+                      return (
+                        <div key={productId(p) || i} style={{ display: "flex", alignItems: "center", gap: "10px", border: "1px solid #E8E2DD", borderRadius: "9px", padding: "8px" }}>
+                          <span style={{ fontSize: "11px", fontWeight: 800, color: "#888", width: "20px", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
+                          <span style={{ width: "48px", height: "48px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "#F5F2EF", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "18px" }}>🖼</span>}
+                          </span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: "13px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
+                            <div style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43", marginTop: "2px" }}>{money(productPrice(p))}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : tab === "shop" ? (
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "14px 18px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>🛍 쇼핑몰 진열 {shopProducts.length}개</span>
+              <span style={{ fontSize: "11px", color: "#888780" }}>고객 노출(is_visible) 상품 · 드래그 순서/추가는 2-B에서</span>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+              {shopProducts.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px 0", color: "#999", fontSize: "13px", fontWeight: 700 }}>진열된 상품이 없습니다.</div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                  {shopProducts.map((p, i) => {
+                    const img = mainImage(p);
+                    return (
+                      <div key={productId(p) || i} style={{ display: "flex", alignItems: "center", gap: "10px", border: "1px solid #E8E2DD", borderRadius: "10px", padding: "9px" }}>
+                        <span style={{ width: "56px", height: "56px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "#F5F2EF", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "20px" }}>🖼</span>}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: "13px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
+                          <div style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43", marginTop: "2px" }}>{money(productPrice(p))}</div>
+                          {productCategory(p) ? <span style={{ display: "inline-block", marginTop: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: "#F1EFEC", color: "#777" }}>{productCategory(p)}</span> : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
         ) : (
           <>
-            {/* 상단 버튼 2개 (위젯 주소 복사는 위젯 설정 모달로 이동) */}
+            {/* 상단 버튼 (전체 상품) */}
             <div style={{ display: "flex", gap: "6px", padding: "12px 18px 8px" }}>
               <button type="button" onClick={openCreate} style={{ ...topBtn, background: "#7B2D43", color: "#fff", border: "none" }}>+ 상품 등록</button>
-              <button type="button" onClick={openWidgetSettings} style={{ ...topBtn, background: "#fff", color: "#555", border: "1px solid #E8E2DD" }}>📺 위젯 설정</button>
             </div>
 
             {/* 검색 */}
@@ -848,7 +1012,6 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           <div style={{ fontSize: "14px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
                           <div style={{ marginTop: "3px", fontSize: "14px", fontWeight: 800, color: "#7B2D43" }}>{money(productPrice(p))}</div>
                           <div style={{ marginTop: "5px", display: "flex", gap: "4px", flexWrap: "wrap" }}>
-                            <span style={{ fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: "#F5E6EB", color: "#7B2D43" }}>{saleModeLabel(p)}</span>
                             <span style={{ fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: "#E8F0FA", color: "#185FA5" }}>{shippingLabel(p)}</span>
                             {productCategory(p) ? <span style={{ fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: "#F1EFEC", color: "#777" }}>{productCategory(p)}</span> : null}
                           </div>
