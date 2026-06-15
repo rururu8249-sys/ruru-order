@@ -158,6 +158,13 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [bcPickerOpen, setBcPickerOpen] = useState(false);
   const [bcPickerSel, setBcPickerSel] = useState<Set<string>>(new Set());
   const [bcPickerSearch, setBcPickerSearch] = useState("");
+
+  // 쇼핑몰 진열 탭(shop) — products.in_shop / mall_sort_order 사용
+  const [shopRows, setShopRows] = useState<ProductRow[]>([]);
+  const [shopBusy, setShopBusy] = useState(false);
+  const [shopPickerOpen, setShopPickerOpen] = useState(false);
+  const [shopPickerSel, setShopPickerSel] = useState<Set<string>>(new Set());
+  const [shopPickerSearch, setShopPickerSearch] = useState("");
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   // 기록 탭(방송별 매출/주문)
   const [histLoaded, setHistLoaded] = useState(false);
@@ -598,13 +605,114 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
   const categories = BASE_CATEGORIES;
 
-  // 쇼핑몰 진열 탭(읽기 전용): is_visible=true & 삭제 아님. 순서/추가 저장은 2-B에서.
-  const shopProducts = useMemo(() => {
-    return products.filter((p) => {
-      if (pickString(p, ["status"], "") === "deleted") return false;
-      return pickBoolean(p, ["is_visible"], true);
+  // 쇼핑몰 진열 목록: in_shop=true & 삭제 아님 & is_visible, mall_sort_order 오름차순
+  const reloadShop = () => {
+    const rows = products
+      .filter((p) => {
+        if (pickString(p, ["status"], "") === "deleted") return false;
+        if (!pickBoolean(p, ["in_shop"], false)) return false;
+        return pickBoolean(p, ["is_visible"], true);
+      })
+      .sort((a, b) => pickNumber(a, ["mall_sort_order"], 999999) - pickNumber(b, ["mall_sort_order"], 999999));
+    setShopRows(rows);
+  };
+
+  useEffect(() => {
+    if (tab !== "shop") return;
+    reloadShop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, products]);
+
+  // 이미 진열(in_shop=true)인 product_id 세트 (피커 비활성용)
+  const shopAddedIds = useMemo(
+    () => new Set(products.filter((p) => pickBoolean(p, ["in_shop"], false)).map((p) => productId(p))),
+    [products],
+  );
+
+  // 쇼핑몰에서 빼기: in_shop 컬럼만 false (다른 컬럼 무변경)
+  const removeFromShop = async (pid: string) => {
+    if (!pid || shopBusy) return;
+    setShopBusy(true);
+    try {
+      const { error } = await supabase.from("products").update({ in_shop: false }).eq("id", pid);
+      if (error) throw error;
+      setShopRows((prev) => prev.filter((p) => productId(p) !== pid)); // 낙관적
+      window.dispatchEvent(new Event("ruru-live-product-updated"));
+    } catch (e) {
+      showAdminToast("쇼핑몰 빼기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+      reloadShop();
+    } finally {
+      setShopBusy(false);
+    }
+  };
+
+  const openShopPicker = () => {
+    setShopPickerSel(new Set());
+    setShopPickerSearch("");
+    setShopPickerOpen(true);
+  };
+
+  const toggleShopPick = (id: string) => {
+    setShopPickerSel((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
-  }, [products]);
+  };
+
+  // 쇼핑몰에 진열: in_shop=true + mall_sort_order(기존 최대+1, NOT NULL 채움). 다른 컬럼 무변경
+  const confirmShopPick = async () => {
+    if (shopPickerSel.size === 0 || shopBusy) return;
+    setShopBusy(true);
+    try {
+      let maxSort = -1;
+      products.forEach((p) => {
+        if (pickBoolean(p, ["in_shop"], false)) maxSort = Math.max(maxSort, pickNumber(p, ["mall_sort_order"], 0));
+      });
+      const ids = Array.from(shopPickerSel).filter((pid) => !shopAddedIds.has(pid));
+      for (const pid of ids) {
+        maxSort += 1;
+        const { error } = await supabase
+          .from("products")
+          .update({ in_shop: true, mall_sort_order: maxSort })
+          .eq("id", pid);
+        if (error) throw error;
+      }
+      setShopPickerOpen(false);
+      window.dispatchEvent(new Event("ruru-live-product-updated"));
+      showAdminToast(`${ids.length}개 상품을 쇼핑몰에 진열했어요.`, "success");
+    } catch (e) {
+      showAdminToast("쇼핑몰 진열 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally {
+      setShopBusy(false);
+    }
+  };
+
+  // 순서 이동(↑↓): 새 순서대로 mall_sort_order 0..n-1 재기록 (in_shop 목록만, 다른 컬럼 무변경)
+  const moveShop = async (index: number, dir: -1 | 1) => {
+    const target = index + dir;
+    if (shopBusy || target < 0 || target >= shopRows.length) return;
+    const ordered = [...shopRows];
+    const [moved] = ordered.splice(index, 1);
+    ordered.splice(target, 0, moved);
+    setShopRows(ordered); // 낙관적 갱신
+    setShopBusy(true);
+    try {
+      for (let i = 0; i < ordered.length; i++) {
+        const pid = productId(ordered[i]);
+        if (!pid) continue;
+        const { error } = await supabase.from("products").update({ mall_sort_order: i }).eq("id", pid);
+        if (error) throw error;
+      }
+      window.dispatchEvent(new Event("ruru-live-product-updated"));
+    } catch (e) {
+      showAdminToast("순서 변경 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+      reloadShop();
+    } finally {
+      setShopBusy(false);
+    }
+  };
 
   // --- 위젯 단건 액션 (기존 addToRotation / pinSelected 로직 재사용) ---
   const widgetState = (p: ProductRow): "rotating" | "pinned" | "none" => {
@@ -1039,18 +1147,25 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         ) : tab === "shop" ? (
           <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "14px 18px 16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>🛍 쇼핑몰 진열 {shopProducts.length}개</span>
-              <span style={{ fontSize: "11px", color: "#888780" }}>고객 노출(is_visible) 상품 · 드래그 순서/추가는 2-B에서</span>
+              <span style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>🛍 쇼핑몰 진열 {shopRows.length}개</span>
+              <button type="button" disabled={shopBusy} onClick={openShopPicker} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#fff", background: "#7B2D43", border: "none", borderRadius: "7px", padding: "5px 11px", cursor: shopBusy ? "wait" : "pointer", opacity: shopBusy ? 0.5 : 1 }}>+ 쇼핑몰에 상품 추가</button>
             </div>
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-              {shopProducts.length === 0 ? (
+              {shopRows.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "40px 0", color: "#999", fontSize: "13px", fontWeight: 700 }}>진열된 상품이 없습니다.</div>
               ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                  {shopProducts.map((p, i) => {
+                <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
+                  {shopRows.map((p, i) => {
                     const img = mainImage(p);
+                    const pid = productId(p);
                     return (
-                      <div key={productId(p) || i} style={{ display: "flex", alignItems: "center", gap: "10px", border: "1px solid #E8E2DD", borderRadius: "10px", padding: "9px" }}>
+                      <div key={pid || i} style={{ display: "flex", alignItems: "center", gap: "10px", border: "1px solid #E8E2DD", borderRadius: "10px", padding: "9px" }}>
+                        {/* 순서 이동 ↑↓ */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: "2px", flexShrink: 0 }}>
+                          <button type="button" disabled={shopBusy || i === 0} onClick={() => void moveShop(i, -1)} style={{ width: "20px", height: "18px", lineHeight: 1, fontSize: "11px", fontWeight: 800, color: i === 0 ? "#ccc" : "#7B2D43", background: "#F5E6EB", border: "none", borderRadius: "4px", cursor: shopBusy || i === 0 ? "default" : "pointer" }}>▲</button>
+                          <button type="button" disabled={shopBusy || i === shopRows.length - 1} onClick={() => void moveShop(i, 1)} style={{ width: "20px", height: "18px", lineHeight: 1, fontSize: "11px", fontWeight: 800, color: i === shopRows.length - 1 ? "#ccc" : "#7B2D43", background: "#F5E6EB", border: "none", borderRadius: "4px", cursor: shopBusy || i === shopRows.length - 1 ? "default" : "pointer" }}>▼</button>
+                        </div>
+                        <span style={{ fontSize: "11px", fontWeight: 800, color: "#888", width: "20px", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
                         <span style={{ width: "56px", height: "56px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "#F5F2EF", display: "flex", alignItems: "center", justifyContent: "center" }}>
                           {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "20px" }}>🖼</span>}
                         </span>
@@ -1059,6 +1174,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           <div style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43", marginTop: "2px" }}>{money(productPrice(p))}</div>
                           {productCategory(p) ? <span style={{ display: "inline-block", marginTop: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: "#F1EFEC", color: "#777" }}>{productCategory(p)}</span> : null}
                         </div>
+                        <button type="button" disabled={shopBusy} onClick={() => void removeFromShop(pid)} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", border: "none", borderRadius: "6px", padding: "6px 10px", cursor: shopBusy ? "wait" : "pointer", opacity: shopBusy ? 0.6 : 1 }}>빼기</button>
                       </div>
                     );
                   })}
@@ -1317,6 +1433,67 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             <div style={{ display: "flex", gap: "8px", padding: "12px 18px", borderTop: "1px solid #E8E2DD" }}>
               <button type="button" onClick={() => setBcPickerOpen(false)} style={{ flex: 1, height: "40px", borderRadius: "9px", fontSize: "13px", fontWeight: 800, color: "#666", background: "#fff", border: "1px solid #E8E2DD", cursor: "pointer" }}>취소</button>
               <button type="button" disabled={bcPickerSel.size === 0 || bcBusy} onClick={() => void confirmBcPick()} style={{ flex: 1, height: "40px", borderRadius: "9px", fontSize: "13px", fontWeight: 800, color: "#fff", background: "#7B2D43", border: "none", cursor: bcPickerSel.size === 0 || bcBusy ? "not-allowed" : "pointer", opacity: bcPickerSel.size === 0 || bcBusy ? 0.5 : 1 }}>{bcBusy ? "담는 중…" : `선택 ${bcPickerSel.size}개 담기`}</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* 쇼핑몰 진열 피커 (전체 창고에서 선택 → products.in_shop=true) */}
+      {shopPickerOpen ? (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) setShopPickerOpen(false); }}
+          style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(2,6,23,0.5)", padding: "16px" }}
+        >
+          <div style={{ width: "520px", maxWidth: "100%", height: "600px", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "14px", overflow: "hidden" }}>
+            {/* 헤더 */}
+            <div style={{ display: "flex", alignItems: "center", padding: "14px 18px", borderBottom: "1px solid #E8E2DD" }}>
+              <span style={{ fontSize: "15px", fontWeight: 800, color: "#7B2D43" }}>쇼핑몰에 상품 진열</span>
+              <button type="button" onClick={() => setShopPickerOpen(false)} style={{ marginLeft: "auto", border: "none", background: "none", fontSize: "20px", color: "#999", cursor: "pointer", lineHeight: 1 }}>✕</button>
+            </div>
+            {/* 검색 */}
+            <div style={{ padding: "12px 18px 8px" }}>
+              <input value={shopPickerSearch} onChange={(e) => setShopPickerSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid #E8E2DD", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none", color: "#1a1a1a" }} />
+            </div>
+            {/* 목록 */}
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 18px 8px" }}>
+              {(() => {
+                const q = shopPickerSearch.trim().toLowerCase();
+                const pickList = products.filter((p) => {
+                  if (pickString(p, ["status"], "") === "deleted") return false;
+                  if (q && !productName(p).toLowerCase().includes(q)) return false;
+                  return true;
+                });
+                if (pickList.length === 0) {
+                  return <div style={{ textAlign: "center", padding: "40px 0", color: "#999", fontSize: "13px", fontWeight: 700 }}>상품이 없습니다.</div>;
+                }
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    {pickList.map((p, i) => {
+                      const pid = productId(p);
+                      const already = shopAddedIds.has(pid);
+                      const checked = shopPickerSel.has(pid);
+                      const img = mainImage(p);
+                      return (
+                        <label key={pid || i} style={{ display: "flex", gap: "9px", alignItems: "center", border: "1px solid " + (checked ? "#D9C5CC" : "#E8E2DD"), background: already ? "#F4F2F0" : checked ? "#F5E6EB" : "#fff", borderRadius: "9px", padding: "7px 10px", cursor: already ? "not-allowed" : "pointer", opacity: already ? 0.55 : 1 }}>
+                          <input type="checkbox" disabled={already} checked={already || checked} onChange={() => !already && toggleShopPick(pid)} style={{ width: "16px", height: "16px", flexShrink: 0, accentColor: "#7B2D43" }} />
+                          <span style={{ width: "40px", height: "40px", flexShrink: 0, borderRadius: "7px", overflow: "hidden", background: "#F5F2EF", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "16px" }}>🖼</span>}
+                          </span>
+                          <span style={{ flex: 1, minWidth: 0 }}>
+                            <span style={{ display: "block", fontSize: "12px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</span>
+                            <span style={{ fontSize: "11px", color: "#888" }}>{money(productPrice(p))}{already ? " · 진열됨" : ""}</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+            {/* 푸터 */}
+            <div style={{ display: "flex", gap: "8px", padding: "12px 18px", borderTop: "1px solid #E8E2DD" }}>
+              <button type="button" onClick={() => setShopPickerOpen(false)} style={{ flex: 1, height: "40px", borderRadius: "9px", fontSize: "13px", fontWeight: 800, color: "#666", background: "#fff", border: "1px solid #E8E2DD", cursor: "pointer" }}>취소</button>
+              <button type="button" disabled={shopPickerSel.size === 0 || shopBusy} onClick={() => void confirmShopPick()} style={{ flex: 1, height: "40px", borderRadius: "9px", fontSize: "13px", fontWeight: 800, color: "#fff", background: "#7B2D43", border: "none", cursor: shopPickerSel.size === 0 || shopBusy ? "not-allowed" : "pointer", opacity: shopPickerSel.size === 0 || shopBusy ? 0.5 : 1 }}>{shopBusy ? "진열 중…" : `선택 ${shopPickerSel.size}개 진열`}</button>
             </div>
           </div>
         </div>
