@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
     return json({
       ok: true,
       event: {
-        title: cleanText(event.title) || "🎁 선물이모티콘이벤트",
+        title: cleanText(event.title) || "🎁 루루동이 선물 이벤트",
         mode: event.mode,
         is_test: event.is_test,
         status: event.status,

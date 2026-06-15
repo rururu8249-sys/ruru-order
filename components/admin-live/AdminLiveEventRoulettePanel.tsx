@@ -221,7 +221,7 @@ export default function AdminLiveEventRoulettePanel({
   const [sourceDate] = useState(todayText);
   const [broadcasts, setBroadcasts] = useState<RouletteBroadcast[]>([]);
   const [broadcastId, setBroadcastId] = useState("");
-  const [title, setTitle] = useState("🎁 선물이모티콘이벤트");
+  const [title, setTitle] = useState("🎁 루루동이 선물 이벤트");
   const [winnerNote, setWinnerNote] = useState("이벤트 당첨");
   const [participants, setParticipants] = useState<RouletteParticipant[]>([]);
   const [currentEvent, setCurrentEvent] = useState<RouletteEvent | null>(null);
