@@ -56,7 +56,7 @@ import {
 import { useAutoBankdaPaymentSync } from "./useAutoBankdaPaymentSync";
 import AdminLiveQuickProductDrawer from "./AdminLiveQuickProductDrawer";
 import AdminLiveProductListPanel from "./AdminLiveProductListPanel";
-import AdminLiveProductManagePopup from "./AdminLiveProductManagePopup";
+import AdminLiveProductManagePopup, { type ProductManageTab } from "./AdminLiveProductManagePopup";
 import AdminLiveCardPayPopup from "./AdminLiveCardPayPopup";
 import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
 import {
@@ -551,6 +551,7 @@ export default function AdminLiveDashboard() {
   const [broadcasts, setBroadcasts] = useState<AdminLiveBroadcast[]>([]);
   const [broadcastProductCount, setBroadcastProductCount] = useState<number | null>(null);
   const [shopOpen, setShopOpenState] = useState(true);
+  const [lastProductTab, setLastProductTab] = useState<ProductManageTab>("broadcast");
   const [savingBroadcast, setSavingBroadcast] = useState(false);
   const [broadcastTitle, setBroadcastTitle] = useState("루루동이LIVE");
   const [broadcastYoutubeUrl, setBroadcastYoutubeUrl] = useState("");
@@ -1490,6 +1491,8 @@ export default function AdminLiveDashboard() {
             <AdminLiveProductManagePopup
               activeBroadcastId={activeBroadcast?.id || null}
               onClose={() => setActiveMenu("broadcast")}
+              initialTab={lastProductTab}
+              onTabChange={setLastProductTab}
             />
           )}
 
