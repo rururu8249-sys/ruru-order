@@ -325,6 +325,8 @@ function CustomerIssueSummaryRow({
 export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroadcastId }: Props) {
   const [pinnedProduct, setPinnedProduct] = useState<any | null>(null);
   const [rotationProducts, setRotationProducts] = useState<any[]>([]);
+  const [liveIdx, setLiveIdx] = useState(0);
+  const [cycleOn, setCycleOn] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -362,6 +364,67 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
       window.removeEventListener("ruru-live-product-updated", onUpdated);
     };
   }, [activeBroadcastId]);
+
+  // 지금 방송 상품: 현재 인덱스/상품 (rotationProducts 단일 데이터원)
+  const liveCount = rotationProducts.length;
+  const safeIdx = liveCount ? (((liveIdx % liveCount) + liveCount) % liveCount) : 0;
+  const liveProduct = liveCount ? rotationProducts[safeIdx] : null;
+
+  // 선택 상품을 DB 고정(LIVE) 처리 — AdminLiveProductManagePopup과 동일 방식
+  const pinLiveProduct = async (productId: string) => {
+    if (!productId) return;
+    try {
+      await supabase.from("products").update({ is_pinned: false }).eq("is_pinned", true);
+      await supabase.from("products").update({ is_pinned: true }).eq("id", productId);
+      window.dispatchEvent(new Event("ruru-live-product-updated"));
+    } catch {
+      // 무시 (고정 실패해도 방송화면엔 영향 없음)
+    }
+  };
+
+  // 이전/다음/그리드 클릭 → 인덱스 점프 + 해당 상품 고정(수동 선택 시 자동순환 해제)
+  const goToLiveIdx = (idx: number) => {
+    if (liveCount === 0) return;
+    const safe = (((idx % liveCount) + liveCount) % liveCount);
+    setLiveIdx(safe);
+    if (cycleOn) setCycleOn(false);
+    const prod = rotationProducts[safe];
+    void pinLiveProduct(String(prod?.id ?? prod?.product_id ?? ""));
+  };
+
+  // 자동순환 토글: 켜면 모든 고정 해제(개별 고정 안 함), interval은 표시용
+  const toggleCycle = async () => {
+    const next = !cycleOn;
+    setCycleOn(next);
+    if (next) {
+      try {
+        await supabase.from("products").update({ is_pinned: false }).eq("is_pinned", true);
+        window.dispatchEvent(new Event("ruru-live-product-updated"));
+      } catch {
+        // 무시
+      }
+    }
+  };
+
+  // 자동순환 ON일 때 liveIdx만 자동 증가(화면 표시용)
+  useEffect(() => {
+    if (!cycleOn || liveCount === 0) return;
+    const timer = setInterval(() => {
+      setLiveIdx((i) => (i + 1) % liveCount);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [cycleOn, liveCount]);
+
+  // OBS 위젯(상품) 주소 복사
+  const copyObsWidgetUrl = async () => {
+    try {
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      await navigator.clipboard.writeText(`${origin}/product-widget`);
+      showAdminToast("OBS 위젯 주소를 복사했어요.", "success");
+    } catch {
+      showAdminToast("주소 복사에 실패했어요.", "error");
+    }
+  };
 
   const [showMemoAdd, setShowMemoAdd] = useState(false);
   const [statusFilter, setStatusFilter] = useState<IssueStatusFilter>("open");
@@ -802,64 +865,119 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
       </div>
 
       <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm h-[420px] flex flex-col" style={{ flex: "1.2 1 0%" }}>
+        {/* 헤더: 제목 + 자동순환 토글 */}
         <div className="mb-2 flex items-center gap-2 text-sm font-black text-slate-950">
-          지금 띄운 상품
-          <span className="rounded-md bg-rose-soft px-2 py-0.5 text-[11px] font-black text-rose-deep">📌</span>
+          지금 방송 상품
           <button
             type="button"
-            onClick={() => window.dispatchEvent(new Event("ruru-open-quick-product-panel"))}
-            className="ml-auto rounded-lg px-2.5 py-1 text-[11px] font-black text-white"
-            style={{ background: "#7B2D43" }}
+            onClick={toggleCycle}
+            className={[
+              "ml-auto rounded-lg px-2.5 py-1 text-[11px] font-black transition",
+              cycleOn ? "text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200",
+            ].join(" ")}
+            style={cycleOn ? { background: "#7B2D43" } : undefined}
           >
-            + 새 상품 등록
+            {cycleOn ? "⏸ 자동순환 ON" : "▶ 자동순환"}
           </button>
         </div>
-        {pinnedProduct ? (
+
+        {liveProduct ? (
           <div className="flex flex-1 min-h-0 flex-col">
-            <div className="flex-1 min-h-0 overflow-hidden rounded-2xl bg-slate-100">
-              {nowProdImageOf(pinnedProduct) ? (
-                <img src={nowProdImageOf(pinnedProduct)} alt="" className="h-full w-full object-cover" />
+            {/* 큰 카드: 지금 띄운 상품 1개 */}
+            <div className="relative flex-1 min-h-0 overflow-hidden rounded-2xl bg-slate-100">
+              {nowProdImageOf(liveProduct) ? (
+                <img src={nowProdImageOf(liveProduct)} alt="" className="h-full w-full object-cover" />
               ) : (
                 <div className="flex h-full items-center justify-center text-4xl">👟</div>
               )}
+              {/* LIVE 배지 + 카운터 */}
+              <div className="absolute left-2 top-2 flex items-center gap-1.5 rounded-lg bg-black/55 px-2 py-0.5 text-[10px] font-black text-white">
+                <span>🔴 LIVE</span>
+                <span className="opacity-90">{safeIdx + 1}/{liveCount}</span>
+              </div>
+              {/* 이전/다음 */}
+              {liveCount > 1 ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => goToLiveIdx(safeIdx - 1)}
+                    className="absolute left-1 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60"
+                  >
+                    ‹
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => goToLiveIdx(safeIdx + 1)}
+                    className="absolute right-1 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60"
+                  >
+                    ›
+                  </button>
+                </>
+              ) : null}
             </div>
+
+            {/* 상품명/가격 */}
             <div className="mt-2 truncate text-[14px] font-black text-slate-900">
-              {pinnedProduct.product_name || pinnedProduct.name || pinnedProduct.title || "상품명 없음"}
+              {liveProduct.product_name || liveProduct.name || liveProduct.title || "상품명 없음"}
             </div>
             <div className="text-[15px] font-black text-rose-deep">
-              {Number(pinnedProduct.price ?? pinnedProduct.sale_price ?? pinnedProduct.selling_price ?? 0).toLocaleString("ko-KR")}원
+              {Number(liveProduct.price ?? liveProduct.sale_price ?? liveProduct.selling_price ?? 0).toLocaleString("ko-KR")}원
             </div>
-            <div className="mt-1 flex flex-wrap gap-1">
-              {nowProdListSummary(pinnedProduct.color_options ?? pinnedProduct.colors) ? (
-                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">{nowProdListSummary(pinnedProduct.color_options ?? pinnedProduct.colors)}</span>
-              ) : null}
-              {nowProdListSummary(pinnedProduct.size_options ?? pinnedProduct.sizes) ? (
-                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">{nowProdListSummary(pinnedProduct.size_options ?? pinnedProduct.sizes)}</span>
-              ) : null}
-            </div>
-          </div>
-        ) : rotationProducts.length > 0 ? (
-          <div className="flex flex-1 min-h-0 flex-col">
-            <div className="mb-1 text-[11px] font-black text-slate-400">🔁 순환 {rotationProducts.length}개</div>
-            <div className="flex-1 min-h-0 space-y-1.5 overflow-y-auto">
-              {rotationProducts.map((p: any, i: number) => (
-                <div key={String(p?.id ?? i)} className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white p-1.5">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100 text-slate-300">
-                    {nowProdImageOf(p) ? <img src={nowProdImageOf(p)} alt="" className="h-full w-full object-cover" /> : "👟"}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[12px] font-black text-slate-900">{p?.product_name || p?.name || p?.title || "상품명 없음"}</span>
-                    <span className="block text-[12px] font-black text-rose-deep">{Number(p?.price ?? p?.sale_price ?? p?.selling_price ?? 0).toLocaleString("ko-KR")}원</span>
-                  </span>
-                </div>
-              ))}
+
+            {/* 썸네일 그리드 (4칸, 스크롤) */}
+            <div className="mt-2 grid grid-cols-4 gap-1.5 overflow-y-auto" style={{ maxHeight: "96px" }}>
+              {rotationProducts.map((p: any, i: number) => {
+                const on = i === safeIdx;
+                return (
+                  <button
+                    type="button"
+                    key={String(p?.id ?? i)}
+                    onClick={() => goToLiveIdx(i)}
+                    className="relative aspect-square overflow-hidden rounded-lg border bg-slate-100"
+                    style={on ? { borderWidth: "2px", borderColor: "#7B2D43" } : { borderColor: "#E5E7EB" }}
+                  >
+                    {nowProdImageOf(p) ? (
+                      <img src={nowProdImageOf(p)} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="flex h-full items-center justify-center text-lg">👟</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         ) : (
           <div className="flex flex-1 min-h-0 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 text-center text-xs font-bold leading-5 text-slate-400">
-            상품관리에서 순환 담기 또는<br />📌 고정하면 여기에 표시됩니다.
+            상품관리에서 순환 담기 또는<br />새 상품을 등록하면 여기에 표시됩니다.
           </div>
         )}
+
+        {/* 하단 버튼 */}
+        <div className="mt-2 flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event("ruru-open-quick-product-panel"))}
+            className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-black text-white"
+            style={{ background: "#7B2D43" }}
+          >
+            + 즉석
+          </button>
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event("ruru-reopen-product-manage"))}
+            className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-black text-slate-600 hover:bg-slate-50"
+          >
+            관리
+          </button>
+          <button
+            type="button"
+            onClick={copyObsWidgetUrl}
+            title="OBS 위젯 주소 복사"
+            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-black text-slate-600 hover:bg-slate-50"
+          >
+            🔗
+          </button>
+        </div>
       </div>
 </section>
   );
