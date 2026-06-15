@@ -71,6 +71,24 @@ function stockLabel(p: AnyProduct | null): string {
   return `남은 ${Math.max(0, stock)}`;
 }
 
+// 입금확인 폭죽 파티클(표시 전용) — 좌하단에서 위/바깥으로 흩어짐. 브랜드 톤(버건디/핑크/골드).
+const CONFETTI_PIECES = [
+  { tx: "-46px", ty: "-70px", r: "200deg", color: "#7B2D43", size: 8, round: false, dur: 1.2 },
+  { tx: "-18px", ty: "-96px", r: "-160deg", color: "#FFD9E0", size: 7, round: true, dur: 1.3 },
+  { tx: "16px", ty: "-104px", r: "140deg", color: "#F5C24B", size: 9, round: false, dur: 1.25 },
+  { tx: "48px", ty: "-88px", r: "-220deg", color: "#7B2D43", size: 7, round: true, dur: 1.15 },
+  { tx: "74px", ty: "-58px", r: "180deg", color: "#FFD9E0", size: 8, round: false, dur: 1.3 },
+  { tx: "-66px", ty: "-44px", r: "-120deg", color: "#F5C24B", size: 6, round: true, dur: 1.1 },
+  { tx: "90px", ty: "-30px", r: "240deg", color: "#FFD9E0", size: 9, round: false, dur: 1.35 },
+  { tx: "-30px", ty: "-80px", r: "160deg", color: "#F5C24B", size: 7, round: true, dur: 1.2 },
+  { tx: "34px", ty: "-72px", r: "-200deg", color: "#7B2D43", size: 8, round: false, dur: 1.25 },
+  { tx: "-86px", ty: "-58px", r: "120deg", color: "#FFD9E0", size: 6, round: true, dur: 1.15 },
+  { tx: "60px", ty: "-100px", r: "-140deg", color: "#F5C24B", size: 8, round: false, dur: 1.4 },
+  { tx: "4px", ty: "-118px", r: "260deg", color: "#7B2D43", size: 7, round: true, dur: 1.3 },
+  { tx: "-54px", ty: "-90px", r: "-180deg", color: "#FFD9E0", size: 9, round: false, dur: 1.35 },
+  { tx: "104px", ty: "-46px", r: "150deg", color: "#F5C24B", size: 6, round: true, dur: 1.2 },
+] as const;
+
 export default function ProductWidgetClient() {
   const [pinned, setPinned] = useState<AnyProduct | null>(null);
   const [rotation, setRotation] = useState<AnyProduct[]>([]);
@@ -79,6 +97,9 @@ export default function ProductWidgetClient() {
   const [toastQueue, setToastQueue] = useState<string[]>([]);
   const [currentToast, setCurrentToast] = useState("");
   const seenRef = useRef<Set<string>>(new Set());
+  // 입금확인 폭죽(표시 전용). key 증가로 애니메이션 재시작, on으로 1회 표시.
+  const [confettiKey, setConfettiKey] = useState(0);
+  const [confettiOn, setConfettiOn] = useState(false);
 
   // 배경 투명 (OBS 크로마키)
   useEffect(() => {
@@ -196,6 +217,9 @@ export default function ProductWidgetClient() {
     if (currentToast || toastQueue.length === 0) return;
     setCurrentToast(toastQueue[0]);
     setToastQueue((q) => q.slice(1));
+    // 어떤 토스트든(주문/입금확인/카드결제) 새로 표시되는 순간 폭죽 1회(표시 전용 — 큐/판정/금액 로직 무관)
+    setConfettiKey((k) => k + 1);
+    setConfettiOn(true);
   }, [currentToast, toastQueue]);
 
   // 자동 숨김: currentToast가 생기면 3초 뒤 비운다. (이 effect는 currentToast에만 의존 →
@@ -205,6 +229,13 @@ export default function ProductWidgetClient() {
     const t = window.setTimeout(() => setCurrentToast(""), 3000);
     return () => window.clearTimeout(t);
   }, [currentToast]);
+
+  // 폭죽 1회 재생 후 종료(1.4초). confettiKey가 바뀔 때마다 타이머 재무장.
+  useEffect(() => {
+    if (!confettiOn) return;
+    const t = window.setTimeout(() => setConfettiOn(false), 1400);
+    return () => window.clearTimeout(t);
+  }, [confettiKey, confettiOn]);
 
   const current = pinned || rotation[rotIndex] || null;
   const img = imageOf(current);
@@ -218,16 +249,16 @@ export default function ProductWidgetClient() {
           style={{
             position: "absolute",
             left: "24px",
-            bottom: "124px",
-            background: "rgba(123,45,67,0.92)",
+            bottom: "160px",
+            background: "rgba(123,45,67,0.95)",
             color: "#fff",
-            padding: "8px 12px",
-            borderRadius: "10px",
-            fontSize: "13px",
+            padding: "10px 16px",
+            borderRadius: "12px",
+            fontSize: "15px",
             fontWeight: 800,
             whiteSpace: "nowrap",
-            boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
-            animation: "ruruWidgetIn 0.4s ease",
+            boxShadow: "0 0 18px rgba(123,45,67,0.65), 0 4px 14px rgba(0,0,0,0.3)",
+            animation: "ruruToastPop 0.5s cubic-bezier(0.18,0.89,0.32,1.28)",
           }}
         >
           {currentToast}
@@ -241,21 +272,21 @@ export default function ProductWidgetClient() {
             position: "absolute",
             left: "24px",
             bottom: "24px",
-            width: "280px",
+            width: "336px",
             display: "flex",
-            gap: "10px",
+            gap: "12px",
             alignItems: "center",
             background: "rgba(38,38,44,0.60)",
             backdropFilter: "blur(9px)",
             WebkitBackdropFilter: "blur(9px)",
             border: "1px solid rgba(255,255,255,0.14)",
             borderRadius: "12px",
-            padding: "10px",
+            padding: "12px",
             color: "#fff",
             animation: "ruruWidgetIn 0.5s ease",
           }}
         >
-          <div style={{ position: "relative", width: "72px", height: "72px", flexShrink: 0, borderRadius: "9px", overflow: "hidden", background: "rgba(255,255,255,0.1)" }}>
+          <div style={{ position: "relative", width: "86px", height: "86px", flexShrink: 0, borderRadius: "9px", overflow: "hidden", background: "rgba(255,255,255,0.1)" }}>
             {img ? (
               <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
@@ -267,21 +298,54 @@ export default function ProductWidgetClient() {
           </div>
 
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: "14px", fontWeight: 800, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", wordBreak: "break-all" }}>
+            <div style={{ fontSize: "17px", fontWeight: 800, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", wordBreak: "break-all" }}>
               {nameOf(current)}
             </div>
             {colors ? (
-              <div style={{ marginTop: "4px", fontSize: "12px", color: "rgba(255,255,255,0.78)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{colors}</div>
+              <div style={{ marginTop: "4px", fontSize: "14px", color: "rgba(255,255,255,0.78)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{colors}</div>
             ) : null}
             <div style={{ marginTop: "5px", display: "flex", alignItems: "baseline", gap: "8px" }}>
-              <span style={{ fontSize: "16px", fontWeight: 800, color: "#FFD9E0" }}>{priceOf(current).toLocaleString("ko-KR")}원</span>
-              {stock ? <span style={{ fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>{stock}</span> : null}
+              <span style={{ fontSize: "19px", fontWeight: 800, color: "#FFD9E0" }}>{priceOf(current).toLocaleString("ko-KR")}원</span>
+              {stock ? <span style={{ fontSize: "13px", fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>{stock}</span> : null}
             </div>
           </div>
         </div>
       ) : null}
 
-      <style>{`@keyframes ruruWidgetIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+      {/* 입금/주문 토스트 폭죽 — 좌하단 국소, 표시 전용, pointerEvents none */}
+      {confettiOn ? (
+        <div key={confettiKey} style={{ position: "absolute", left: "78px", bottom: "150px", width: 0, height: 0, pointerEvents: "none" }}>
+          {CONFETTI_PIECES.map((p, i) => (
+            <span
+              key={i}
+              style={{
+                position: "absolute",
+                width: `${p.size}px`,
+                height: `${p.size}px`,
+                borderRadius: p.round ? "50%" : "2px",
+                background: p.color,
+                ["--tx" as any]: p.tx,
+                ["--ty" as any]: p.ty,
+                ["--r" as any]: p.r,
+                animation: `ruruConfetti ${p.dur}s ease-out forwards`,
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      <style>{`
+        @keyframes ruruWidgetIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes ruruToastPop {
+          0% { opacity: 0; transform: scale(0.8) translateY(8px); }
+          60% { opacity: 1; transform: scale(1.05) translateY(0); }
+          100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes ruruConfetti {
+          0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+          100% { transform: translate(var(--tx), var(--ty)) rotate(var(--r)); opacity: 0; }
+        }
+      `}</style>
     </div>
   );
 }
