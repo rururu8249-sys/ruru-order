@@ -281,6 +281,15 @@ export default function AdminLiveEventRoulettePanel({
   const autoParticipantCount = participants.length;
   const manualParticipantCount = manualParticipants.length;
 
+  // 명단(소스 전환·재로드 포함)이 바뀌어 고정 당첨자가 현재 명단에 없으면 자동 해제(유령 고정값 방지).
+  // 비교는 칩 클릭 토글과 동일하게 닉네임 정확 일치. 명단에 있으면 그대로 유지.
+  useEffect(() => {
+    if (!fixedWinnerNickname) return;
+    if (!finalParticipants.some((p) => p.nickname === fixedWinnerNickname)) {
+      setFixedWinnerNickname("");
+    }
+  }, [finalParticipants, fixedWinnerNickname]);
+
   // 룰렛 휠 색상(시안 팔레트) + conic-gradient (참가자 N등분)
   const WHEEL_COLORS = ["#ec4899", "#fb7185", "#f59e0b", "#22c55e", "#06b6d4", "#3b82f6", "#8b5cf6", "#7c3aed"];
   const wheelCount = Math.max(finalParticipants.length, 1);

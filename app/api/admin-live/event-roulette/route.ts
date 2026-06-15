@@ -799,10 +799,6 @@ async function spinEvent(body: Record<string, unknown>) {
   }
 
   const fixedWinnerNickname = cleanText(body.fixedWinnerNickname);
-  // [임시 디버그] 지정당첨 추적 - 확인 후 제거 예정
-  console.log("[ROULETTE_DEBUG] fixedWinnerNickname=", JSON.stringify(fixedWinnerNickname));
-  console.log("[ROULETTE_DEBUG] eligible nicknames=", JSON.stringify(eligibleParticipants.map((p:any)=>p.nickname)));
-  console.log("[ROULETTE_DEBUG] all participants nicknames=", JSON.stringify(participants.map((p:any)=>p.nickname)));
   // 지정 당첨자는 관리자가 명시적으로 고른 것이므로, 중복제외(eligible) 필터에 휘둘리지 않고
   // 원본 참가자 명단(participants)에서 직접 찾아 무조건 당첨시킨다.
   const fixedWinner = fixedWinnerNickname
@@ -813,7 +809,7 @@ async function spinEvent(body: Record<string, unknown>) {
   if (fixedWinnerNickname && !fixedWinner) {
     return json({
       ok: false,
-      message: "[디버그] 받은지정값=[" + fixedWinnerNickname + "] / 명단=[" + participants.map((p:any)=>p.nickname).join(", ") + "]",
+      message: "고정한 당첨자가 현재 참여자 명단에 없습니다. 당첨 고정을 해제하거나 명단을 다시 확인해주세요.",
     }, 400);
   }
 
