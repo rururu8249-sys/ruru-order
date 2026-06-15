@@ -1704,9 +1704,14 @@ export default function OrderPage() {
     const nextNickname = String(customer?.youtube_nickname || "").trim();
     const nextName = String(customer?.customer_name || "").trim();
     const nextPhone = normalizePhone(customer?.customer_phone || fallbackPhone);
-    const nextZipcode = String(customer?.zipcode || "").trim();
-    const nextAddress = String(customer?.address || "").trim();
-    const nextDetailAddress = String(customer?.detail_address || "").trim();
+    // 기본배송지(isDefault, 없으면 [0]) 우선 — 배열 항목은 camelCase(detailAddress/zipcode). 배열 기본주소가 있으면 그걸,
+    // 없으면 기존 단일 컬럼(snake_case) fallback. (배송지 변경이 배열에만 반영되던 주소 불일치 수정)
+    const shippingArr = Array.isArray(customer?.shipping_addresses) ? customer.shipping_addresses : null;
+    const defaultShippingAddr = shippingArr ? (shippingArr.find((a: any) => a?.isDefault) ?? shippingArr[0]) : null;
+    const useDefaultShipping = Boolean(defaultShippingAddr && String(defaultShippingAddr.address || "").trim());
+    const nextZipcode = useDefaultShipping ? String(defaultShippingAddr.zipcode || "").trim() : String(customer?.zipcode || "").trim();
+    const nextAddress = useDefaultShipping ? String(defaultShippingAddr.address || "").trim() : String(customer?.address || "").trim();
+    const nextDetailAddress = useDefaultShipping ? String(defaultShippingAddr.detailAddress || "").trim() : String(customer?.detail_address || "").trim();
 
     if (nextNickname) {
       setYoutubeNickname(nextNickname);
