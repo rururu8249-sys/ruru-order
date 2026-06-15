@@ -45,6 +45,7 @@ type CustomerProfile = {
   zipcode?: string | null;
   address?: string | null;
   detail_address?: string | null;
+  shipping_addresses?: Array<{ name?: string; phone?: string; address?: string; detailAddress?: string; zipcode?: string; isDefault?: boolean }> | null;
   is_blocked?: boolean | null;
   block_reason?: string | null;
   customer_memo?: string | null;
@@ -478,6 +479,34 @@ function CustomerDetailDrawer({
             </div>
           </div>
 
+          {/* 등록 배송지 (고객이 등록한 customers.shipping_addresses 배열 — 읽기 전용) */}
+          {Array.isArray(profile?.shipping_addresses) && profile.shipping_addresses.length > 0 ? (
+            <div style={{ marginBottom: "14px" }}>
+              <div style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43", marginBottom: "8px" }}>📦 등록 배송지 ({profile.shipping_addresses.length}건)</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                {[...profile.shipping_addresses]
+                  .sort((a, b) => (b?.isDefault ? 1 : 0) - (a?.isDefault ? 1 : 0))
+                  .map((addr, index) => {
+                    const fullAddr = [
+                      clean(addr?.zipcode) ? `(${clean(addr?.zipcode)})` : "",
+                      clean(addr?.address),
+                      clean(addr?.detailAddress),
+                    ].filter(Boolean).join(" ");
+                    return (
+                      <div key={`${clean(addr?.name)}-${index}`} style={{ border: "1px solid #E8E2DD", borderRadius: "9px", padding: "8px 11px", background: addr?.isDefault ? "#FAF6F2" : "#fff" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px" }}>
+                          <span style={{ fontSize: "12px", fontWeight: 800, color: "#222" }}>{clean(addr?.name) || "이름 없음"}</span>
+                          {clean(addr?.phone) ? <span style={{ fontSize: "11px", color: "#888" }}>{formatPhone(clean(addr?.phone))}</span> : null}
+                          {addr?.isDefault ? <span style={{ marginLeft: "auto", fontSize: "10px", fontWeight: 800, color: "#fff", background: "#7B2D43", borderRadius: "6px", padding: "2px 7px" }}>기본</span> : null}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "#666" }}>{fullAddr || "주소 없음"}</div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          ) : null}
+
           {/* 3 스탯 */}
           <div style={{ display: "flex", gap: "7px", marginBottom: "14px" }}>
             <div style={{ flex: 1, background: "#FAF6F2", borderRadius: "10px", padding: "10px", textAlign: "center" }}>
@@ -640,7 +669,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
       const { data, error } = await supabase
         .from("customers")
         .select(
-          "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, is_blocked, block_reason, customer_memo, last_order_at, created_at, kakao_id, kakao_nickname, kakao_profile_image, first_login_at, last_login_at, customer_history"
+          "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, shipping_addresses, is_blocked, block_reason, customer_memo, last_order_at, created_at, kakao_id, kakao_nickname, kakao_profile_image, first_login_at, last_login_at, customer_history"
         )
         .order("created_at", { ascending: false })
         .limit(1000);
