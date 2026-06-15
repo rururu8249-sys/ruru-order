@@ -2897,19 +2897,19 @@ export default function OrderPage() {
     const sizeMode = getRegisteredOptionMode(product, "size");
 
     // none(없음입력 토글 ON)은 입력/선택 불필요. select는 선택 강제, input은 직접입력 강제.
-    if (colorMode !== "none" && !registeredOptionColor.trim()) {
+    if (colorMode !== "none" && !normalizeEmptyProductOptionValue(registeredOptionColor)) {
       showCustomerNotice(
         colorMode === "input"
-          ? "색상을 입력해주세요. 색상이 없으면 “없음”이라고 적어주세요."
+          ? "색상을 입력해주세요."
           : "색상을 선택해주세요."
       );
       return;
     }
 
-    if (sizeMode !== "none" && !registeredOptionSize.trim()) {
+    if (sizeMode !== "none" && !normalizeEmptyProductOptionValue(registeredOptionSize)) {
       showCustomerNotice(
         sizeMode === "input"
-          ? "사이즈를 입력해주세요. 사이즈가 없으면 “없음”이라고 적어주세요."
+          ? "사이즈를 입력해주세요."
           : "사이즈를 선택해주세요."
       );
       return;
@@ -3129,13 +3129,13 @@ export default function OrderPage() {
       const matchedProduct = findMatchedBroadcastProduct(item, broadcastProducts);
       if (!matchedProduct) continue;
 
-      if (getRegisteredOptionMode(matchedProduct, "color") === "input" && !item.color.trim()) {
-        showCustomerNotice("색상을 입력해주세요. 색상이 없으면 “없음”이라고 적어주세요.");
+      if (getRegisteredOptionMode(matchedProduct, "color") === "input" && !normalizeEmptyProductOptionValue(item.color)) {
+        showCustomerNotice("색상을 입력해주세요.");
         return false;
       }
 
-      if (getRegisteredOptionMode(matchedProduct, "size") === "input" && !item.size.trim()) {
-        showCustomerNotice("사이즈를 입력해주세요. 사이즈가 없으면 “없음”이라고 적어주세요.");
+      if (getRegisteredOptionMode(matchedProduct, "size") === "input" && !normalizeEmptyProductOptionValue(item.size)) {
+        showCustomerNotice("사이즈를 입력해주세요.");
         return false;
       }
     }
@@ -3863,13 +3863,13 @@ export default function OrderPage() {
       return;
     }
 
-    if (!targetItem.color.trim()) {
-      showCustomerNotice("색상을 입력해주세요. 색상이 없으면 “없음”이라고 적어주세요.", "warning");
+    if (!normalizeEmptyProductOptionValue(targetItem.color)) {
+      showCustomerNotice("색상을 입력해주세요.", "warning");
       return;
     }
 
-    if (!targetItem.size.trim()) {
-      showCustomerNotice("사이즈를 입력해주세요. 사이즈가 없으면 “없음”이라고 적어주세요.", "warning");
+    if (!normalizeEmptyProductOptionValue(targetItem.size)) {
+      showCustomerNotice("사이즈를 입력해주세요.", "warning");
       return;
     }
 
@@ -4567,7 +4567,7 @@ export default function OrderPage() {
                 </div>
 
                 <div style={{ minHeight: 0, flex: 1, overflowY: "auto", padding: "16px" }}>
-                  {registeredOptionColorChoices.length === 0 && registeredOptionSizeChoices.length === 0 ? (
+                  {registeredOptionColorMode === "none" && registeredOptionSizeMode === "none" ? (
                     <div style={{ padding: "12px 16px 0", fontSize: "12px", color: "#ABA5A0" }}>
                       이 상품은 옵션이 없습니다. 수량만 선택해 주세요.
                     </div>
@@ -4610,7 +4610,7 @@ export default function OrderPage() {
                   {registeredOptionColorMode === "input" ? (
                     <div style={{ marginBottom: "16px" }}>
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>색상</div>
-                      <input value={registeredOptionColor} onChange={(e) => setRegisteredOptionColor(e.target.value)} placeholder="색상을 입력해주세요. 없으면 “없음”" style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: `1.5px solid ${!registeredOptionColor.trim() ? "#E8B5B0" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
+                      <input value={registeredOptionColor} onChange={(e) => setRegisteredOptionColor(e.target.value)} placeholder="색상을 입력해주세요" style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: `1.5px solid ${!registeredOptionColor.trim() ? "#E8B5B0" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
                       {!registeredOptionColor.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>색상을 입력해주세요</div> : null}
                     </div>
                   ) : null}
@@ -4653,7 +4653,7 @@ export default function OrderPage() {
                   {registeredOptionSizeMode === "input" ? (
                     <div style={{ marginBottom: "16px" }}>
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>사이즈</div>
-                      <input value={registeredOptionSize} onChange={(e) => setRegisteredOptionSize(e.target.value)} placeholder="사이즈를 입력해주세요. 없으면 “없음”" style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: `1.5px solid ${!registeredOptionSize.trim() ? "#E8B5B0" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
+                      <input value={registeredOptionSize} onChange={(e) => setRegisteredOptionSize(e.target.value)} placeholder="사이즈를 입력해주세요" style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: `1.5px solid ${!registeredOptionSize.trim() ? "#E8B5B0" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
                       {!registeredOptionSize.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>사이즈를 입력해주세요</div> : null}
                     </div>
                   ) : null}
@@ -4895,7 +4895,7 @@ export default function OrderPage() {
                     </div>
 
                     <div className="rounded-2xl bg-rose-soft px-4 py-3 text-[13px] font-black leading-5 tracking-[-0.04em] text-rose-deep">
-                      방송에서 안내받은 상품명, 옵션, 금액을 입력해 주세요. 옵션이 없으면 “없음”이라고 적어주세요.
+                      방송에서 안내받은 상품명, 옵션, 금액을 입력해 주세요. 색상·사이즈를 직접 입력해 주세요.
                     </div>
 
                     <div className="grid min-w-0 grid-cols-[0.8fr_1.2fr] gap-3 pt-2">
