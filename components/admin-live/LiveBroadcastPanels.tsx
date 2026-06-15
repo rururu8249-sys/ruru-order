@@ -924,8 +924,8 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
               {Number(liveProduct.price ?? liveProduct.sale_price ?? liveProduct.selling_price ?? 0).toLocaleString("ko-KR")}원
             </div>
 
-            {/* 썸네일 그리드 (4칸, 스크롤) */}
-            <div className="mt-2 grid grid-cols-4 gap-1.5 overflow-y-auto" style={{ maxHeight: "96px" }}>
+            {/* 썸네일 가로 1줄 (가로 스크롤) — 칸 겹침 방지 */}
+            <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
               {rotationProducts.map((p: any, i: number) => {
                 const on = i === safeIdx;
                 return (
@@ -933,7 +933,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
                     type="button"
                     key={String(p?.id ?? i)}
                     onClick={() => goToLiveIdx(i)}
-                    className="relative aspect-square overflow-hidden rounded-lg border bg-slate-100"
+                    className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border bg-slate-100"
                     style={on ? { borderWidth: "2px", borderColor: "#7B2D43" } : { borderColor: "#E5E7EB" }}
                   >
                     {nowProdImageOf(p) ? (
