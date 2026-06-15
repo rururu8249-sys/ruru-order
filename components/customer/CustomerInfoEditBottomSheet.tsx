@@ -117,11 +117,13 @@ export default function CustomerInfoEditBottomSheet({
   };
 
   const handleSaveAddrForm = () => {
-    if (editingAddrIndex !== null) {
-      onSaveShippingAddresses?.(shippingAddresses.map((a, i) => i === editingAddrIndex ? { ...addrForm } : a));
-    } else {
-      onSaveShippingAddresses?.([...shippingAddresses, { ...addrForm, isDefault: shippingAddresses.length === 0 }]);
-    }
+    const nextAddresses = editingAddrIndex !== null
+      ? shippingAddresses.map((a, i) => i === editingAddrIndex ? { ...addrForm } : a)
+      : [...shippingAddresses, { ...addrForm, isDefault: shippingAddresses.length === 0 }];
+    onSaveShippingAddresses?.(nextAddresses);
+    // 저장 직후 결과 배열의 기본배송지를 주문 단일 state에 즉시 동기화(추가/수정 후 바로 제출 시 옛 주소 박힘 방지).
+    const def = nextAddresses.find((a) => a.isDefault) ?? nextAddresses[0];
+    if (def) onSelectShippingAddress?.(def.address, def.detailAddress ?? "", def.name, def.phone, def.zipcode ?? "");
     setScreen("shipping_list");
     setEditingAddrIndex(null);
   };
@@ -130,6 +132,9 @@ export default function CustomerInfoEditBottomSheet({
     const next = shippingAddresses.filter((_, i) => i !== index);
     if (shippingAddresses[index].isDefault && next.length > 0) next[0].isDefault = true;
     onSaveShippingAddresses?.(next);
+    // 삭제 후 결과 배열의 기본배송지를 주문 단일 state에 즉시 동기화.
+    const def = next.find((a) => a.isDefault) ?? next[0];
+    if (def) onSelectShippingAddress?.(def.address, def.detailAddress ?? "", def.name, def.phone, def.zipcode ?? "");
   };
 
   const handleSetDefault = (index: number) => {
