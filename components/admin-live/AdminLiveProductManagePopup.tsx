@@ -148,11 +148,16 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [wsSelected, setWsSelected] = useState<Set<string>>(new Set());
   const [wsSaving, setWsSaving] = useState(false);
 
-  // 방송 상품 탭(broadcast) — 읽기 전용 골격
+  // 방송 상품 탭(broadcast)
   const [bcList, setBcList] = useState<Array<{ id: string; title: string; started_at: string; status: string }>>([]);
   const [bcSelId, setBcSelId] = useState("");
   const [bcProducts, setBcProducts] = useState<ProductRow[]>([]);
   const [bcLoading, setBcLoading] = useState(false);
+  const [bcBusy, setBcBusy] = useState(false);
+  // 상품 담기 피커
+  const [bcPickerOpen, setBcPickerOpen] = useState(false);
+  const [bcPickerSel, setBcPickerSel] = useState<Set<string>>(new Set());
+  const [bcPickerSearch, setBcPickerSearch] = useState("");
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   // 기록 탭(방송별 매출/주문)
   const [histLoaded, setHistLoaded] = useState(false);
@@ -243,29 +248,133 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
-  // 선택 방송의 broadcast_products 목록 (sort_order순, products와 매칭, 읽기 전용)
-  useEffect(() => {
-    let alive = true;
-    if (tab !== "broadcast" || !bcSelId) {
+  // 선택 방송의 broadcast_products 목록 로드 (sort_order순, products와 매칭)
+  const reloadBcProducts = async (selId: string) => {
+    if (!selId) {
       setBcProducts([]);
       return;
     }
-    (async () => {
-      const { data: links } = await supabase
-        .from("broadcast_products")
-        .select("product_id, sort_order")
-        .eq("broadcast_id", bcSelId)
-        .order("sort_order", { ascending: true });
-      const ids = ((links as { product_id: unknown }[]) || []).map((r) => String(r.product_id));
-      const byId = new Map(products.map((p) => [productId(p), p]));
-      const rows = ids.map((pid) => byId.get(pid)).filter(Boolean) as ProductRow[];
-      if (alive) setBcProducts(rows);
-    })();
-    return () => {
-      alive = false;
-    };
+    const { data: links } = await supabase
+      .from("broadcast_products")
+      .select("product_id, sort_order")
+      .eq("broadcast_id", selId)
+      .order("sort_order", { ascending: true });
+    const ids = ((links as { product_id: unknown }[]) || []).map((r) => String(r.product_id));
+    const byId = new Map(products.map((p) => [productId(p), p]));
+    const rows = ids.map((pid) => byId.get(pid)).filter(Boolean) as ProductRow[];
+    setBcProducts(rows);
+  };
+
+  useEffect(() => {
+    if (tab !== "broadcast") return;
+    void reloadBcProducts(bcSelId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, bcSelId, products]);
+
+  // 이미 담긴 product_id 세트 (피커 비활성용)
+  const bcAddedIds = useMemo(() => new Set(bcProducts.map((p) => productId(p))), [bcProducts]);
+
+  // 상품 빼기: 한 방송의 한 상품만 삭제 (다른 방송 영향 없음)
+  const removeBcProduct = async (pid: string) => {
+    if (!bcSelId || !pid || bcBusy) return;
+    setBcBusy(true);
+    try {
+      const { error } = await supabase
+        .from("broadcast_products")
+        .delete()
+        .eq("broadcast_id", bcSelId)
+        .eq("product_id", pid);
+      if (error) throw error;
+      await reloadBcProducts(bcSelId);
+      window.dispatchEvent(new Event("ruru-live-product-updated"));
+    } catch (e) {
+      showAdminToast("상품 빼기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally {
+      setBcBusy(false);
+    }
+  };
+
+  // 상품 담기 피커 열기
+  const openBcPicker = () => {
+    if (!bcSelId) {
+      showAdminToast("먼저 방송을 선택하세요.", "warning");
+      return;
+    }
+    setBcPickerSel(new Set());
+    setBcPickerSearch("");
+    setBcPickerOpen(true);
+  };
+
+  const toggleBcPick = (id: string) => {
+    setBcPickerSel((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // 선택 상품들을 broadcast_products에 담기 (sort_order = 기존 최대+1씩, NOT NULL 채움)
+  const confirmBcPick = async () => {
+    if (!bcSelId || bcPickerSel.size === 0 || bcBusy) return;
+    setBcBusy(true);
+    try {
+      const { data: existing } = await supabase
+        .from("broadcast_products")
+        .select("sort_order")
+        .eq("broadcast_id", bcSelId);
+      let maxSort = 0;
+      ((existing as { sort_order: unknown }[]) || []).forEach((r) => {
+        maxSort = Math.max(maxSort, Number(r.sort_order || 0));
+      });
+      const toInsert = Array.from(bcPickerSel)
+        .filter((pid) => !bcAddedIds.has(pid))
+        .map((pid) => ({ broadcast_id: bcSelId, product_id: pid, sort_order: ++maxSort, is_visible: true }));
+      if (toInsert.length === 0) {
+        setBcPickerOpen(false);
+        return;
+      }
+      const { error } = await supabase.from("broadcast_products").insert(toInsert);
+      if (error) throw error;
+      setBcPickerOpen(false);
+      await reloadBcProducts(bcSelId);
+      window.dispatchEvent(new Event("ruru-live-product-updated"));
+      showAdminToast(`${toInsert.length}개 상품을 방송에 담았어요.`, "success");
+    } catch (e) {
+      showAdminToast("상품 담기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally {
+      setBcBusy(false);
+    }
+  };
+
+  // 순서 이동(↑↓): 새 순서대로 sort_order 0..n-1 재기록 (해당 방송만)
+  const moveBcProduct = async (index: number, dir: -1 | 1) => {
+    const target = index + dir;
+    if (bcBusy || target < 0 || target >= bcProducts.length) return;
+    const ordered = [...bcProducts];
+    const [moved] = ordered.splice(index, 1);
+    ordered.splice(target, 0, moved);
+    setBcProducts(ordered); // 낙관적 갱신
+    setBcBusy(true);
+    try {
+      for (let i = 0; i < ordered.length; i++) {
+        const pid = productId(ordered[i]);
+        if (!pid) continue;
+        const { error } = await supabase
+          .from("broadcast_products")
+          .update({ sort_order: i })
+          .eq("broadcast_id", bcSelId)
+          .eq("product_id", pid);
+        if (error) throw error;
+      }
+      window.dispatchEvent(new Event("ruru-live-product-updated"));
+    } catch (e) {
+      showAdminToast("순서 변경 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+      await reloadBcProducts(bcSelId);
+    } finally {
+      setBcBusy(false);
+    }
+  };
 
   // 기록 탭: 방송 목록 + 방송별 매출/주문수 집계 (broadcasts + orders)
   const loadHistory = async () => {
@@ -891,7 +1000,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", border: "1px solid #E8E2DD", borderRadius: "10px", overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 12px", borderBottom: "1px solid #E8E2DD" }}>
                 <span style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>진열 상품 {bcProducts.length}개</span>
-                <button type="button" onClick={() => showAdminToast("상품 담기/순서 편집은 2-B 단계에서 제공됩니다.", "info")} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#fff", background: "#7B2D43", border: "none", borderRadius: "7px", padding: "5px 11px", cursor: "pointer" }}>+ 상품 담기</button>
+                <button type="button" disabled={!bcSelId || bcBusy} onClick={openBcPicker} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#fff", background: "#7B2D43", border: "none", borderRadius: "7px", padding: "5px 11px", cursor: !bcSelId || bcBusy ? "not-allowed" : "pointer", opacity: !bcSelId || bcBusy ? 0.5 : 1 }}>+ 상품 담기</button>
               </div>
               <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "10px 12px" }}>
                 {!bcSelId ? (
@@ -902,8 +1011,14 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
                     {bcProducts.map((p, i) => {
                       const img = mainImage(p);
+                      const pid = productId(p);
                       return (
-                        <div key={productId(p) || i} style={{ display: "flex", alignItems: "center", gap: "10px", border: "1px solid #E8E2DD", borderRadius: "9px", padding: "8px" }}>
+                        <div key={pid || i} style={{ display: "flex", alignItems: "center", gap: "10px", border: "1px solid #E8E2DD", borderRadius: "9px", padding: "8px" }}>
+                          {/* 순서 이동 ↑↓ */}
+                          <div style={{ display: "flex", flexDirection: "column", gap: "2px", flexShrink: 0 }}>
+                            <button type="button" disabled={bcBusy || i === 0} onClick={() => void moveBcProduct(i, -1)} style={{ width: "20px", height: "18px", lineHeight: 1, fontSize: "11px", fontWeight: 800, color: i === 0 ? "#ccc" : "#7B2D43", background: "#F5E6EB", border: "none", borderRadius: "4px", cursor: bcBusy || i === 0 ? "default" : "pointer" }}>▲</button>
+                            <button type="button" disabled={bcBusy || i === bcProducts.length - 1} onClick={() => void moveBcProduct(i, 1)} style={{ width: "20px", height: "18px", lineHeight: 1, fontSize: "11px", fontWeight: 800, color: i === bcProducts.length - 1 ? "#ccc" : "#7B2D43", background: "#F5E6EB", border: "none", borderRadius: "4px", cursor: bcBusy || i === bcProducts.length - 1 ? "default" : "pointer" }}>▼</button>
+                          </div>
                           <span style={{ fontSize: "11px", fontWeight: 800, color: "#888", width: "20px", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
                           <span style={{ width: "48px", height: "48px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "#F5F2EF", display: "flex", alignItems: "center", justifyContent: "center" }}>
                             {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "18px" }}>🖼</span>}
@@ -912,6 +1027,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             <div style={{ fontSize: "13px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
                             <div style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43", marginTop: "2px" }}>{money(productPrice(p))}</div>
                           </div>
+                          <button type="button" disabled={bcBusy} onClick={() => void removeBcProduct(pid)} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", border: "none", borderRadius: "6px", padding: "6px 10px", cursor: bcBusy ? "wait" : "pointer", opacity: bcBusy ? 0.6 : 1 }}>빼기</button>
                         </div>
                       );
                     })}
@@ -1142,6 +1258,67 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
           style={{ position: "fixed", inset: 0, zIndex: 65, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}
         >
           <img src={imagePreviewUrl} alt="" style={{ maxWidth: "480px", maxHeight: "480px", objectFit: "contain", borderRadius: "12px" }} />
+        </div>
+      ) : null}
+
+      {/* 상품 담기 피커 (전체 창고에서 선택 → broadcast_products insert) */}
+      {bcPickerOpen ? (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) setBcPickerOpen(false); }}
+          style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(2,6,23,0.5)", padding: "16px" }}
+        >
+          <div style={{ width: "520px", maxWidth: "100%", height: "600px", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "14px", overflow: "hidden" }}>
+            {/* 헤더 */}
+            <div style={{ display: "flex", alignItems: "center", padding: "14px 18px", borderBottom: "1px solid #E8E2DD" }}>
+              <span style={{ fontSize: "15px", fontWeight: 800, color: "#7B2D43" }}>방송에 상품 담기</span>
+              <button type="button" onClick={() => setBcPickerOpen(false)} style={{ marginLeft: "auto", border: "none", background: "none", fontSize: "20px", color: "#999", cursor: "pointer", lineHeight: 1 }}>✕</button>
+            </div>
+            {/* 검색 */}
+            <div style={{ padding: "12px 18px 8px" }}>
+              <input value={bcPickerSearch} onChange={(e) => setBcPickerSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid #E8E2DD", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none", color: "#1a1a1a" }} />
+            </div>
+            {/* 목록 */}
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 18px 8px" }}>
+              {(() => {
+                const q = bcPickerSearch.trim().toLowerCase();
+                const pickList = products.filter((p) => {
+                  if (pickString(p, ["status"], "") === "deleted") return false;
+                  if (q && !productName(p).toLowerCase().includes(q)) return false;
+                  return true;
+                });
+                if (pickList.length === 0) {
+                  return <div style={{ textAlign: "center", padding: "40px 0", color: "#999", fontSize: "13px", fontWeight: 700 }}>상품이 없습니다.</div>;
+                }
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    {pickList.map((p, i) => {
+                      const pid = productId(p);
+                      const already = bcAddedIds.has(pid);
+                      const checked = bcPickerSel.has(pid);
+                      const img = mainImage(p);
+                      return (
+                        <label key={pid || i} style={{ display: "flex", gap: "9px", alignItems: "center", border: "1px solid " + (checked ? "#D9C5CC" : "#E8E2DD"), background: already ? "#F4F2F0" : checked ? "#F5E6EB" : "#fff", borderRadius: "9px", padding: "7px 10px", cursor: already ? "not-allowed" : "pointer", opacity: already ? 0.55 : 1 }}>
+                          <input type="checkbox" disabled={already} checked={already || checked} onChange={() => !already && toggleBcPick(pid)} style={{ width: "16px", height: "16px", flexShrink: 0, accentColor: "#7B2D43" }} />
+                          <span style={{ width: "40px", height: "40px", flexShrink: 0, borderRadius: "7px", overflow: "hidden", background: "#F5F2EF", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "16px" }}>🖼</span>}
+                          </span>
+                          <span style={{ flex: 1, minWidth: 0 }}>
+                            <span style={{ display: "block", fontSize: "12px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</span>
+                            <span style={{ fontSize: "11px", color: "#888" }}>{money(productPrice(p))}{already ? " · 담김" : ""}</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+            {/* 푸터 */}
+            <div style={{ display: "flex", gap: "8px", padding: "12px 18px", borderTop: "1px solid #E8E2DD" }}>
+              <button type="button" onClick={() => setBcPickerOpen(false)} style={{ flex: 1, height: "40px", borderRadius: "9px", fontSize: "13px", fontWeight: 800, color: "#666", background: "#fff", border: "1px solid #E8E2DD", cursor: "pointer" }}>취소</button>
+              <button type="button" disabled={bcPickerSel.size === 0 || bcBusy} onClick={() => void confirmBcPick()} style={{ flex: 1, height: "40px", borderRadius: "9px", fontSize: "13px", fontWeight: 800, color: "#fff", background: "#7B2D43", border: "none", cursor: bcPickerSel.size === 0 || bcBusy ? "not-allowed" : "pointer", opacity: bcPickerSel.size === 0 || bcBusy ? 0.5 : 1 }}>{bcBusy ? "담는 중…" : `선택 ${bcPickerSel.size}개 담기`}</button>
+            </div>
+          </div>
         </div>
       ) : null}
     </div>,
