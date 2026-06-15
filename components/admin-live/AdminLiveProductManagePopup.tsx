@@ -155,6 +155,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [bcProducts, setBcProducts] = useState<ProductRow[]>([]);
   const [bcLoading, setBcLoading] = useState(false);
   const [bcBusy, setBcBusy] = useState(false);
+  // 새 방송 만들기 모달
+  const [newBcOpen, setNewBcOpen] = useState(false);
+  const [newBcTitle, setNewBcTitle] = useState("");
   // 상품 담기 피커
   const [bcPickerOpen, setBcPickerOpen] = useState(false);
   const [bcPickerSel, setBcPickerSel] = useState<Set<string>>(new Set());
@@ -258,20 +261,45 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     }
   };
 
-  // ＋새 방송: 방송 껍데기 미리 만들기(켜지 않음). 기존 ON 방송은 안 건드림.
-  const createNewBroadcast = async () => {
-    const title = (typeof window !== "undefined" ? window.prompt("새 방송 제목을 입력하세요", "") : "")?.trim();
-    if (!title) return;
+  // ＋새 방송: 모달의 제목으로 껍데기 생성(켜지 않음). 기존 ON 방송은 안 건드림.
+  const submitNewBroadcast = async () => {
+    const title = newBcTitle.trim();
+    if (!title || bcBusy) return;
     setBcBusy(true);
     try {
       const created = await createDraftBroadcast(title);
       await loadBroadcastList(String(created.id));
       // 방송 목록 전용 신호 — Dashboard가 broadcasts 배열을 다시 로드하도록(상품 패널용 ruru-live-product-updated와 분리)
       window.dispatchEvent(new Event("ruru-broadcast-list-updated"));
+      setNewBcOpen(false);
+      setNewBcTitle("");
       showAdminToast("방송이 생성됐습니다. 상품을 담아주세요.", "success");
     } catch (e) {
       const err = e as { message?: string; code?: string };
       showAdminToast("새 방송 생성 실패\n\n" + (err?.message ?? err?.code ?? "알 수 없는 오류"), "error");
+    } finally {
+      setBcBusy(false);
+    }
+  };
+
+  // 방송 숨기기(소프트 삭제): is_deleted=true만 update(진짜 DELETE 아님). ON 방송은 금지.
+  const handleHideBroadcast = async (b: { id: string; title: string; status: string }) => {
+    if (bcBusy) return;
+    if (String(b.status || "").toUpperCase() === "ON") {
+      showAdminToast("켜진 방송은 숨길 수 없습니다. 먼저 방송을 종료해주세요.", "warning");
+      return;
+    }
+    if (!window.confirm(`'${b.title}' 방송을 목록에서 숨길까요?\n\n데이터는 보존되며 복구 가능합니다.`)) return;
+    setBcBusy(true);
+    try {
+      const { error } = await supabase.from("broadcasts").update({ is_deleted: true }).eq("id", b.id);
+      if (error) throw error;
+      if (bcSelId === b.id) setBcSelId("");
+      await loadBroadcastList();
+      window.dispatchEvent(new Event("ruru-broadcast-list-updated"));
+    } catch (e) {
+      const err = e as { message?: string; code?: string };
+      showAdminToast("방송 숨기기 실패\n\n" + (err?.message ?? err?.code ?? "알 수 없는 오류"), "error");
     } finally {
       setBcBusy(false);
     }
@@ -1109,7 +1137,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             <div style={{ width: "260px", flexShrink: 0, display: "flex", flexDirection: "column", border: "1px solid #E8E2DD", borderRadius: "10px", overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 12px", borderBottom: "1px solid #E8E2DD" }}>
                 <span style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>📺 방송 목록</span>
-                <button type="button" disabled={bcBusy} onClick={() => void createNewBroadcast()} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#7B2D43", background: "#F5E6EB", border: "1px solid #D9C5CC", borderRadius: "7px", padding: "4px 9px", cursor: bcBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>+ 새 방송</button>
+                <button type="button" disabled={bcBusy} onClick={() => { setNewBcTitle(""); setNewBcOpen(true); }} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#7B2D43", background: "#F5E6EB", border: "1px solid #D9C5CC", borderRadius: "7px", padding: "4px 9px", cursor: bcBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>+ 새 방송</button>
               </div>
               <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
                 {bcLoading ? (
@@ -1126,7 +1154,18 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       <button type="button" key={b.id} onClick={() => setBcSelId(b.id)} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", borderBottom: "1px solid #F0ECE8", background: on ? "#F5E6EB" : "#fff", cursor: "pointer", border: "none" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                           {isOn ? <span style={{ flexShrink: 0, fontSize: "9px", fontWeight: 800, padding: "1px 6px", borderRadius: "5px", background: "#E7F3EE", color: "#0F6E56" }}>ON</span> : null}
-                          <span style={{ fontSize: "12px", fontWeight: 800, color: on ? "#7B2D43" : "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</span>
+                          <span style={{ flex: 1, minWidth: 0, fontSize: "12px", fontWeight: 800, color: on ? "#7B2D43" : "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</span>
+                          {/* 켜진 방송(isOn)은 숨기기 불가 — 가드: span 자체를 렌더하지 않음 */}
+                          {!isOn ? (
+                            <span
+                              role="button"
+                              title="목록에서 숨기기"
+                              onClick={(e) => { e.stopPropagation(); void handleHideBroadcast(b); }}
+                              style={{ flexShrink: 0, fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "1px 6px", cursor: bcBusy ? "default" : "pointer", opacity: bcBusy ? 0.5 : 1 }}
+                            >
+                              숨기기
+                            </span>
+                          ) : null}
                         </div>
                         <div style={{ fontSize: "10px", color: "#888780", marginTop: "2px" }}>{dateLabel}</div>
                       </button>
@@ -1535,6 +1574,39 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             <div style={{ display: "flex", gap: "8px", padding: "12px 18px", borderTop: "1px solid #E8E2DD" }}>
               <button type="button" onClick={() => setShopPickerOpen(false)} style={{ flex: 1, height: "40px", borderRadius: "9px", fontSize: "13px", fontWeight: 800, color: "#666", background: "#fff", border: "1px solid #E8E2DD", cursor: "pointer" }}>취소</button>
               <button type="button" disabled={shopPickerSel.size === 0 || shopBusy} onClick={() => void confirmShopPick()} style={{ flex: 1, height: "40px", borderRadius: "9px", fontSize: "13px", fontWeight: 800, color: "#fff", background: "#7B2D43", border: "none", cursor: shopPickerSel.size === 0 || shopBusy ? "not-allowed" : "pointer", opacity: shopPickerSel.size === 0 || shopBusy ? 0.5 : 1 }}>{shopBusy ? "진열 중…" : `선택 ${shopPickerSel.size}개 진열`}</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* 새 방송 만들기 모달 (prompt 대체) */}
+      {newBcOpen ? (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) setNewBcOpen(false); }}
+          style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(2,6,23,0.5)", padding: "16px" }}
+        >
+          <div style={{ width: "380px", maxWidth: "100%", background: "#fff", borderRadius: "14px", overflow: "hidden" }}>
+            <div style={{ display: "flex", alignItems: "center", padding: "14px 18px", borderBottom: "1px solid #E8E2DD" }}>
+              <span style={{ fontSize: "15px", fontWeight: 800, color: "#7B2D43" }}>새 방송 만들기</span>
+              <button type="button" onClick={() => setNewBcOpen(false)} style={{ marginLeft: "auto", border: "none", background: "none", fontSize: "20px", color: "#999", cursor: "pointer", lineHeight: 1 }}>✕</button>
+            </div>
+            <div style={{ padding: "16px 18px" }}>
+              <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#888780", marginBottom: "6px" }}>방송 제목</label>
+              <input
+                autoFocus
+                value={newBcTitle}
+                onChange={(e) => setNewBcTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void submitNewBroadcast();
+                  if (e.key === "Escape") setNewBcOpen(false);
+                }}
+                placeholder="예: 0617 저녁 라이브"
+                style={{ width: "100%", height: "40px", borderRadius: "9px", border: "1px solid #E8E2DD", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none", color: "#1a1a1a" }}
+              />
+            </div>
+            <div style={{ display: "flex", gap: "8px", padding: "0 18px 16px" }}>
+              <button type="button" onClick={() => setNewBcOpen(false)} style={{ flex: 1, height: "40px", borderRadius: "9px", fontSize: "13px", fontWeight: 800, color: "#666", background: "#fff", border: "1px solid #E8E2DD", cursor: "pointer" }}>취소</button>
+              <button type="button" disabled={!newBcTitle.trim() || bcBusy} onClick={() => void submitNewBroadcast()} style={{ flex: 1, height: "40px", borderRadius: "9px", fontSize: "13px", fontWeight: 800, color: "#fff", background: "#7B2D43", border: "none", cursor: !newBcTitle.trim() || bcBusy ? "not-allowed" : "pointer", opacity: !newBcTitle.trim() || bcBusy ? 0.5 : 1 }}>{bcBusy ? "만드는 중…" : "만들기"}</button>
             </div>
           </div>
         </div>
