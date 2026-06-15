@@ -508,7 +508,7 @@ export default function QuickProductFastForm({
   initialProduct = null,
   onClose,
 }: QuickProductFastFormProps) {
-  const [saleMode, setSaleMode] = useState<"broadcast" | "shop" | "both">("broadcast");
+  const [productType, setProductType] = useState<"broadcast" | "group_buy">("broadcast");
   const [category, setCategory] = useState("");
   const [badgeType, setBadgeType] = useState("none");
   const [customCategories, setCustomCategories] = useState<string[]>([]);
@@ -616,15 +616,8 @@ export default function QuickProductFastForm({
     setNameSuggestionEnabled(productNote?.name_suggestion_enabled !== false);
     setSuggestionKeywordsText(Array.isArray(productNote?.suggestion_keywords) ? productNote.suggestion_keywords.join(", ") : "");
 
-    const initSaleMode = pickString(initialProduct, ["sale_mode"], "");
-    const initType = pickString(initialProduct, ["product_type", "type"], "broadcast");
-    setSaleMode(
-      initSaleMode === "broadcast" || initSaleMode === "shop" || initSaleMode === "both"
-        ? initSaleMode
-        : initType === "group_buy"
-          ? "shop"
-          : "broadcast",
-    );
+    const initType = pickString(initialProduct, ["product_type", "type"], "broadcast").toLowerCase();
+    setProductType(initType === "group_buy" || initType.includes("group") || initType.includes("공구") ? "group_buy" : "broadcast");
     setCategory(String((productNote as { category?: unknown } | null)?.category || ""));
     setBadgeType(String(pickString(initialProduct || {}, ["badge_type"], "none") || "none"));
     setProductName(pickString(initialProduct, ["product_name", "name", "title"], ""));
@@ -753,7 +746,7 @@ export default function QuickProductFastForm({
   };
 
   const resetForm = () => {
-    setSaleMode("broadcast");
+    setProductType("broadcast");
     setCategory("");
     setProductName("");
     setPriceText("");
@@ -781,8 +774,7 @@ export default function QuickProductFastForm({
 
     const name = productName.trim();
     const price = moneyNumber(priceText);
-    // sale_mode → product_type 자동파생 (broadcast → 방송상품 / shop·both → 상시판매)
-    const productType: "broadcast" | "group_buy" = saleMode === "broadcast" ? "broadcast" : "group_buy";
+    // productType은 상품 종류 라디오(state)에서 직접 결정 (broadcast=방송상품 / group_buy=공구상품)
 
     if (!name) {
       setNameError(true);
@@ -827,7 +819,6 @@ export default function QuickProductFastForm({
         stock: totalStock,
         status: isVisible ? "판매중" : "숨김",
         product_type: productType,
-        sale_mode: saleMode,
         badge_type: badgeType === "none" ? null : badgeType,
         shipping_type: shippingType,
         combine_shipping: shippingType === "vendor" ? "N" : "Y",
@@ -1059,16 +1050,16 @@ export default function QuickProductFastForm({
             </div>
           </div>
 
-          {/* 판매채널 */}
+          {/* 상품 종류 */}
           <div style={{ marginBottom: "14px" }}>
-            <div style={sectionLabel}>판매채널</div>
+            <div style={sectionLabel}>상품 종류</div>
             <div style={{ display: "flex", gap: "6px" }}>
-              {([["broadcast", "📺 방송에서만"], ["shop", "🛍 쇼핑몰에서만"], ["both", "✅ 방송+쇼핑몰"]] as const).map(([v, l]) => {
-                const on = saleMode === v;
+              {([["broadcast", "📺 방송상품"], ["group_buy", "🛍 공구상품"]] as const).map(([v, l]) => {
+                const on = productType === v;
                 return (
                   <div
                     key={v}
-                    onClick={() => setSaleMode(v)}
+                    onClick={() => setProductType(v)}
                     style={{ flex: 1, padding: "10px 6px", borderRadius: "8px", border: (on ? "2px" : "1px") + " solid " + (on ? "#7B2D43" : "#E8E2DD"), textAlign: "center", fontSize: "13px", cursor: "pointer", color: on ? "#7B2D43" : "#888780", background: on ? "#F5E6EB" : "#fff", fontWeight: on ? 500 : 400 }}
                   >
                     {l}
