@@ -509,6 +509,9 @@ export default function LiveOrderTable({
     const unpaid = baseOrders.filter((order) =>
       ["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus)
     ).length;
+    // 표시용 분해 카운트(입금대기 칩 보조설명) — 기존 unpaid 합산식/manual 정의는 그대로.
+    const pureUnpaid = baseOrders.filter((order) => order.paymentStatus === "unpaid").length;
+    const cardUnpaid = baseOrders.filter((order) => order.paymentStatus === "card_unpaid").length;
     const shipped = baseOrders.filter((order) => {
       const ship = String((order as { shippingStatus?: unknown }).shippingStatus || "").trim();
       return /출고|발송|배송/.test(ship) && !/대기/.test(ship);
@@ -522,6 +525,8 @@ export default function LiveOrderTable({
       bankPaid,
       canceled,
       shipped,
+      pureUnpaid,
+      cardUnpaid,
     };
   }, [baseOrders]);
 
@@ -769,7 +774,11 @@ export default function LiveOrderTable({
             status === "paid"
               ? `무통장 ${counts.bankPaid}·카드 ${Math.max(0, counts.paid - counts.bankPaid)}`
               : status === "unpaid"
-                ? `매칭필요 ${counts.manual} 포함`
+                ? [
+                    counts.pureUnpaid ? `미입금 ${counts.pureUnpaid}` : "",
+                    counts.manual ? `매칭필요 ${counts.manual}` : "",
+                    counts.cardUnpaid ? `카드미결제 ${counts.cardUnpaid}` : "",
+                  ].filter(Boolean).join("·")
                 : "";
 
           return (
