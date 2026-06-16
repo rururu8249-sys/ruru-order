@@ -246,7 +246,7 @@ export async function POST(request: NextRequest) {
     const insertData: Record<string, unknown> = {
       youtube_nickname: "",
       customer_name: customerName,
-      customer_phone: customerPhone,
+      customer_phone: customerPhoneDigits, // DB customer_phone 키는 숫자만(2026-06-16 정규화 + 주문 RPC 정합)
       zipcode,
       address,
       detail_address: detailAddress,

@@ -1756,18 +1756,13 @@ export default function OrderPage() {
   };
 
   const loadExistingCustomerByKakaoPhone = async (phoneValue: string, retryCount = 0) => {
-    const cleanPhone = normalizePhone(phoneValue);
+    const cleanPhone = normalizePhone(phoneValue);          // 표시/applyCustomerFromRow fallback(하이픈)
+    const phoneKey = onlyNumber(phoneValue);                // DB customer_phone 키(숫자만, 2026-06-16 정규화)
 
-    if (cleanPhone.length < 10) return false;
+    if (phoneKey.length < 10) return false;
 
-    const phoneValues = Array.from(
-      new Set([
-        cleanPhone,
-        cleanPhone.length === 11
-          ? `${cleanPhone.slice(0, 3)}-${cleanPhone.slice(3, 7)}-${cleanPhone.slice(7, 11)}`
-          : cleanPhone,
-      ]),
-    );
+    // DB는 숫자만으로 통일됨. 안전하게 숫자/하이픈 둘 다 조회(하이픈은 잔존 시 대비).
+    const phoneValues = Array.from(new Set([phoneKey, cleanPhone].filter(Boolean)));
 
     // kakao_id가 있는 row 우선, 없으면 last_order_at 최신순
     const { data: allRows, error } = await supabase
@@ -2388,7 +2383,7 @@ export default function OrderPage() {
       const { data, error } = await supabase
         .from("customers")
         .select("*")
-        .eq("customer_phone", cleanPhone)
+        .eq("customer_phone", onlyNumber(loginPhone))
         .eq("customer_name", cleanName)
         .limit(1);
 
@@ -3035,15 +3030,16 @@ export default function OrderPage() {
   };
 
   const saveCustomer = async (previousPhone?: string) => {
-    const cleanPhone = normalizePhone(customerPhone);
-    // 번호 변경 시 옛 번호 row를 찾아 갱신해 중복 row 생성을 막는다(옛 번호 없으면 현재 번호로 조회).
-    const prevClean = normalizePhone(previousPhone || "");
-    const lookupPhone = prevClean && prevClean !== cleanPhone ? prevClean : cleanPhone;
+    const cleanPhone = normalizePhone(customerPhone);        // 표시/localStorage용(하이픈)
+    // DB customer_phone 키는 숫자만(2026-06-16 정규화 + 주문 RPC 정합). 번호변경 시 옛 키로 조회해 중복 방지.
+    const phoneKey = onlyNumber(customerPhone);
+    const prevClean = onlyNumber(previousPhone || "");
+    const lookupPhone = prevClean && prevClean !== phoneKey ? prevClean : phoneKey;
 
     const customerData: any = {
       youtube_nickname: youtubeNickname.trim(),
       customer_name: customerName.trim(),
-      customer_phone: cleanPhone,
+      customer_phone: phoneKey,
       zipcode: zipcode.trim(),
       address: address.trim(),
       detail_address: detailAddress.trim(),
@@ -3086,14 +3082,14 @@ export default function OrderPage() {
 
   const saveShippingAddresses = async (addresses: any[]) => {
     setShippingAddresses(addresses);
-    const cleanPhone = normalizePhone(customerPhone);
-    if (!cleanPhone || cleanPhone.length < 10) return;
+    const phoneKey = onlyNumber(customerPhone);  // DB customer_phone 키는 숫자만(2026-06-16 정규화)
+    if (!phoneKey || phoneKey.length < 10) return;
     // customers row가 아직 없으면(신규 사용자가 배송지부터 추가) insert로 보완해 DB 유실을 막는다.
-    const { data: existing } = await supabase.from("customers").select("id").eq("customer_phone", cleanPhone).limit(1);
+    const { data: existing } = await supabase.from("customers").select("id").eq("customer_phone", phoneKey).limit(1);
     if (existing && existing.length > 0) {
-      await supabase.from("customers").update({ shipping_addresses: addresses }).eq("customer_phone", cleanPhone);
+      await supabase.from("customers").update({ shipping_addresses: addresses }).eq("customer_phone", phoneKey);
     } else {
-      await supabase.from("customers").insert({ customer_phone: cleanPhone, youtube_nickname: youtubeNickname.trim() || "", customer_name: customerName.trim() || "", shipping_addresses: addresses });
+      await supabase.from("customers").insert({ customer_phone: phoneKey, youtube_nickname: youtubeNickname.trim() || "", customer_name: customerName.trim() || "", shipping_addresses: addresses });
     }
   };
 
