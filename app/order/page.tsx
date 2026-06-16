@@ -1755,7 +1755,7 @@ export default function OrderPage() {
     return Boolean(nextNickname && nextPhone);
   };
 
-  const loadExistingCustomerByKakaoPhone = async (phoneValue: string, retryCount = 0) => {
+  const loadExistingCustomerByKakaoPhone = async (phoneValue: string) => {
     const cleanPhone = normalizePhone(phoneValue);          // 표시/applyCustomerFromRow fallback(하이픈)
     const phoneKey = onlyNumber(phoneValue);                // DB customer_phone 키(숫자만, 2026-06-16 정규화)
 
@@ -1791,13 +1791,8 @@ export default function OrderPage() {
 
     if (!customer) return false;
 
-    // shipping_addresses가 빈배열이면 DB 커밋 지연 가능성 — 1회 재시도
-    const shippingArr = Array.isArray(customer.shipping_addresses) ? customer.shipping_addresses : [];
-    if (shippingArr.length === 0 && retryCount === 0) {
-      await new Promise((resolve) => setTimeout(resolve, 700));
-      return loadExistingCustomerByKakaoPhone(phoneValue, 1);
-    }
-
+    // Phase1-2(중복 row 병합 + 전화번호 숫자키 통일)로 단일 row가 확정 조회됨 →
+    // 빈배열 시 700ms 재조회 땜질 불필요(제거). 진실원천은 DB 단일 row 유지.
     return applyCustomerFromRow(customer, cleanPhone);
   };
 

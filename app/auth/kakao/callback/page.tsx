@@ -82,9 +82,10 @@ export default function KakaoCallbackPage() {
       setStatus("success");
       setMessage("확인 완료. 주문서로 이동합니다.");
 
+      // Phase1-2로 중복/타이밍 원인 제거됨 → 1800ms 대기 땜질을 원래값 800ms로 환원.
       setTimeout(() => {
         window.location.href = "/order?kakao=1";
-      }, 1800);
+      }, 800);
     };
 
     login();
