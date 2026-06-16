@@ -1003,6 +1003,19 @@ export default function AdminLiveDashboard() {
       : mergedOptions;
   }, [broadcasts, activeBroadcast, orders, filters.date, filters.customStartDate, filters.customEndDate]);
 
+  // 방송 달력용 데이터: 방송별 (id, 날짜키 KST, 이름). 기간 제한 없이 전부 — 달력은 달 단위라 안 쌓임.
+  const broadcastCalendar = useMemo(
+    () =>
+      broadcasts
+        .map((broadcast) => ({
+          id: broadcast.id,
+          dateKey: getAlwaysOrderDateKey(broadcast.started_at || broadcast.created_at || ""),
+          label: formatBroadcastDisplayTitle(broadcast),
+        }))
+        .filter((item) => /^\d{4}-\d{2}-\d{2}$/.test(item.dateKey)),
+    [broadcasts]
+  );
+
   const filteredOrders = useMemo(() => {
     const keyword = normalizeText(filters.keyword);
 
@@ -1433,6 +1446,7 @@ export default function AdminLiveDashboard() {
                   loading={loading}
                   filters={filters}
                   broadcastOptions={broadcastOptions}
+                  broadcastCalendar={broadcastCalendar}
                   broadcastStartedAt={activeBroadcast?.started_at || activeBroadcast?.created_at || null}
                   onSelectOrder={(order) => {
                     setSelectedOrderId(order.id);

@@ -8,7 +8,7 @@ import { showAdminToast } from "@/lib/adminToast";
 import LiveOrderCancelViewFilter, { type LiveOrderCancelViewFilterValue } from "./LiveOrderCancelViewFilter";
 import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
 import { openPaysterRightHalf } from "./AdminLiveCardPayPopup";
-import BroadcastSearchSelect from "./BroadcastSearchSelect";
+import BroadcastCalendarPicker, { type BroadcastCalendarItem } from "./BroadcastCalendarPicker";
 
 export type LiveOrderDateFilter = "all" | "today" | "yesterday" | "7days" | "month" | "lastmonth" | "custom";
 export type LiveOrderScopeFilter = "all" | "broadcast" | "shop";
@@ -365,6 +365,7 @@ type Props = {
   filters: LiveOrderFilters;
   onFiltersChange: (filters: LiveOrderFilters) => void;
   broadcastOptions: BroadcastOption[];
+  broadcastCalendar?: BroadcastCalendarItem[];
   broadcastStartedAt?: string | null;
   deposits?: readonly any[];
   onMatched?: () => void | Promise<void>;
@@ -386,6 +387,7 @@ export default function LiveOrderTable({
   filters,
   onFiltersChange,
   broadcastOptions,
+  broadcastCalendar = [],
   broadcastStartedAt,
   deposits,
   onMatched,
@@ -911,12 +913,10 @@ export default function LiveOrderTable({
         </select>
 
         {filters.scope === "broadcast" && (
-          <BroadcastSearchSelect
-            options={broadcastOptions.filter((option) => !option.value.startsWith("always:"))}
+          <BroadcastCalendarPicker
+            items={broadcastCalendar}
             value={filters.broadcast}
-            onChange={(v) => updateFilter("broadcast", v)}
-            todayAlwaysLabel={todayAlwaysOrderLabel()}
-            hideShopOption
+            onPick={(broadcastId) => onFiltersChange({ ...filters, scope: "broadcast", broadcast: broadcastId })}
           />
         )}
 
