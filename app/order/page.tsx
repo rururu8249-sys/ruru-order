@@ -1755,7 +1755,7 @@ export default function OrderPage() {
     return Boolean(nextNickname && nextPhone);
   };
 
-  const loadExistingCustomerByKakaoPhone = async (phoneValue: string) => {
+  const loadExistingCustomerByKakaoPhone = async (phoneValue: string, retryCount = 0) => {
     const cleanPhone = normalizePhone(phoneValue);
 
     if (cleanPhone.length < 10) return false;
@@ -1769,12 +1769,23 @@ export default function OrderPage() {
       ]),
     );
 
-    const { data, error } = await supabase
+    // kakao_id가 있는 row 우선, 없으면 last_order_at 최신순
+    const { data: allRows, error } = await supabase
       .from("customers")
       .select("*")
       .in("customer_phone", phoneValues)
       .order("last_order_at", { ascending: false })
-      .limit(1);
+      .limit(5);
+    const data = allRows
+      ? [...allRows].sort((a, b) => {
+          const aHasKakao = a.kakao_id ? 1 : 0;
+          const bHasKakao = b.kakao_id ? 1 : 0;
+          if (bHasKakao !== aHasKakao) return bHasKakao - aHasKakao;
+          const aAddr = Array.isArray(a.shipping_addresses) ? a.shipping_addresses.length : 0;
+          const bAddr = Array.isArray(b.shipping_addresses) ? b.shipping_addresses.length : 0;
+          return bAddr - aAddr;
+        })
+      : null;
 
     if (error) {
       console.error("카카오 기존 고객정보 조회 오류:", error.message);
@@ -1784,6 +1795,13 @@ export default function OrderPage() {
     const customer = data?.[0];
 
     if (!customer) return false;
+
+    // shipping_addresses가 빈배열이면 DB 커밋 지연 가능성 — 1회 재시도
+    const shippingArr = Array.isArray(customer.shipping_addresses) ? customer.shipping_addresses : [];
+    if (shippingArr.length === 0 && retryCount === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      return loadExistingCustomerByKakaoPhone(phoneValue, 1);
+    }
 
     return applyCustomerFromRow(customer, cleanPhone);
   };

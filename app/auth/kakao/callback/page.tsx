@@ -84,7 +84,7 @@ export default function KakaoCallbackPage() {
 
       setTimeout(() => {
         window.location.href = "/order?kakao=1";
-      }, 800);
+      }, 1800);
     };
 
     login();
