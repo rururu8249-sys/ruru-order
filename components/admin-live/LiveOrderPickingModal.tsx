@@ -22,6 +22,14 @@ type Panel = { key: string; nickname: string; paid: boolean; when: string; items
 const PAID_STATUSES = ["paid", "auto_paid", "manual_paid", "card_paid"];
 const clean = (v: unknown) => String(v ?? "").trim();
 
+// 제출시간 → KST "HH:mm" (정렬 기준 시각 표시용). 파싱 실패 시 빈 문자열.
+const timeText = (s: string) => {
+  if (!s) return "";
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+};
+
 export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: Props) {
   const [pickedIds, setPickedIds] = useState<Set<string>>(new Set());
   const [sortMode, setSortMode] = useState<"nickname" | "time">("nickname");
@@ -197,7 +205,10 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                     {/* 패널 헤더 = 주문서(닉네임) : 아바타(이니셜) + 이름 + 배지 + 진행. 체크박스 없음(상품과 구분). 클릭=그 주문 전체 챙김/해제 */}
                     <button type="button" onClick={() => togglePanel(panel)} className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left ${complete ? "bg-emerald-50" : "bg-rose-soft"}`}>
                       <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-black text-white ${complete ? "bg-emerald-500" : "bg-rose-deep"}`}>{complete ? "✓" : (panel.nickname.charAt(0) || "?")}</span>
-                      <span className="min-w-0 flex-1 truncate text-[15px] font-black text-slate-900">{panel.nickname}</span>
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate text-[15px] font-black text-slate-900">{panel.nickname}</span>
+                        {timeText(panel.when) ? <span className="text-[11px] font-semibold text-slate-400">제출 {timeText(panel.when)}</span> : null}
+                      </span>
                       {panel.paid ? (
                         <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700">결제완료</span>
                       ) : (
