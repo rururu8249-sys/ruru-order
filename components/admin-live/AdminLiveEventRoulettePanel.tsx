@@ -1083,7 +1083,7 @@ export default function AdminLiveEventRoulettePanel({
       {open ? (
         <div style={{ position: "fixed", inset: 0, zIndex: 130, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(2,6,23,0.55)", padding: "12px" }}>
           <div className="ruru-event-sian" style={{ width: "680px", flexShrink: 0, height: "88vh", overflowY: "auto" }}>
-            <div className="body">
+            <div className="body" style={{ minHeight: "100%", boxSizing: "border-box" }}>
 
               {/* 헤더 */}
               <div style={{ display: "flex", alignItems: "center", marginBottom: "13px" }}>
