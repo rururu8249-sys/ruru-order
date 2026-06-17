@@ -1357,8 +1357,9 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
                   <div className="mb-3 max-h-24 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2">
                     <div className="flex flex-wrap gap-1">
                       {selectedCustomersList.map((c) => (
-                        <span key={c.key} className="rounded-full bg-white px-2 py-1 text-[11px] font-black text-slate-700 ring-1 ring-slate-200">
+                        <span key={c.key} className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-[11px] font-black text-slate-700 ring-1 ring-slate-200">
                           {c.nickname || c.name || formatPhone(c.phone)}
+                          <button type="button" onClick={() => toggleSelectPhone(c.phone)} className="leading-none text-slate-400 hover:text-red-500" title="선택 해제">✕</button>
                         </span>
                       ))}
                     </div>
