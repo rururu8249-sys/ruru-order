@@ -1066,7 +1066,7 @@ export default function AdminLiveEventRoulettePanel({
 
       {open ? (
         <div style={{ position: "fixed", inset: 0, zIndex: 130, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(2,6,23,0.55)", padding: "12px" }}>
-          <div className="ruru-event-sian" style={{ width: "680px", flexShrink: 0, maxHeight: "calc(100vh-24px)", overflowY: "auto" }}>
+          <div className="ruru-event-sian" style={{ width: "680px", flexShrink: 0, height: "88vh", overflowY: "auto" }}>
             <div className="body">
 
               {/* 헤더 */}
@@ -1104,9 +1104,9 @@ export default function AdminLiveEventRoulettePanel({
                   )}
                   <button className="btn rose" style={{ height: "auto", padding: "9px 30px" }} onClick={startSpin} disabled={spinning || finalParticipants.length === 0}>{spinning ? "진행중..." : "▶ 돌리기"}</button>
 
-                  {/* 당첨자 발표 카드 — EventRouletteOverlayClient result-card 디자인 */}
+                  {/* 당첨자 발표 카드 — 룰렛 위(상단)에만 덮어서 아래 ▶돌리기 버튼은 가리지 않음. 클릭도 통과(pointerEvents none) */}
                   {centerWinner && currentEvent?.winner_nickname === centerWinner ? (
-                    <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: "min(90%,320px)", borderRadius: "28px", background: "rgba(255,255,255,0.96)", boxShadow: "0 24px 70px rgba(15,23,42,0.24)", padding: "24px", textAlign: "center", backdropFilter: "blur(6px)" }}>
+                    <div style={{ position: "absolute", left: "50%", top: "8px", transform: "translateX(-50%)", width: "min(90%,300px)", borderRadius: "24px", background: "rgba(255,255,255,0.96)", boxShadow: "0 24px 70px rgba(15,23,42,0.24)", padding: "18px", textAlign: "center", backdropFilter: "blur(6px)", pointerEvents: "none" }}>
                       <div style={{ color: "#7c3aed", fontSize: "18px", fontWeight: 950, letterSpacing: "-0.05em" }}>당첨</div>
                       <div style={{ marginTop: "6px", color: "#111827", fontSize: "40px", fontWeight: 950, lineHeight: 1.05, letterSpacing: "-0.08em", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{centerWinner}</div>
                       <div style={{ marginTop: "10px", color: "#475569", fontSize: "16px", fontWeight: 900, letterSpacing: "-0.05em" }}>{currentEvent?.winner_note || "이벤트 당첨"}</div>
