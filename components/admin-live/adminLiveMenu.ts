@@ -72,16 +72,6 @@ export const ADMIN_LIVE_MENUS: AdminLiveMenuItem[] = [
     checkpoints: ["룰렛/인형뽑기", "참가자 불러오기", "당첨고정", "당첨선물", "이벤트 기록"],
   },
   {
-    key: "point",
-    label: "포인트",
-    icon: "●",
-    desc: "포인트 일괄지급·기록",
-    sidebarNotice: "포인트 일괄지급·기록 화면(시안 ⑩)은 별도 화면으로 연결 예정입니다.",
-    readyTitle: "포인트",
-    readyDescription: "받을 사람 추가 → 한번에 지급, 기간별 지급/차감 기록을 관리합니다.",
-    checkpoints: ["받을 사람 추가", "일괄 지급", "당첨자 불러오기", "지급/차감 기록"],
-  },
-  {
     key: "settings",
     label: "설정",
     icon: "⚙",

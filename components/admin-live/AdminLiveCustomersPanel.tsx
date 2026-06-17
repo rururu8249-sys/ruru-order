@@ -5,6 +5,10 @@
 // 주의: 1차는 조회/화면 구성 전용. 고객 차단 저장, 메모 저장, 주문/입금/배송/정산 로직 없음.
 
 import { useEffect, useMemo, useState } from "react";
+import { useBulkPointGrant, type BulkGrantResult } from "./useBulkPointGrant";
+
+// 일괄지급 사유 프리셋(고객에게 보이는 문구). "직접입력" 선택 시 직접 작성.
+const BULK_POINT_REASON_PRESETS = ["방송 이벤트 당첨", "단골 감사", "리뷰 감사", "오지급 보정", "직접입력"];
 import { supabase } from "@/lib/supabase";
 import type { LiveOrder } from "./types";
 import AdminLiveCustomerIssueRail from "./AdminLiveCustomerIssueRail";
@@ -626,6 +630,19 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
   const [directPhoneBlocks, setDirectPhoneBlocks] = useState<DirectPhoneBlock[]>([]);
   const [customerProfiles, setCustomerProfiles] = useState<CustomerProfile[]>([]);
 
+  // 주문 있는 고객만(기본 ON) — 테스트·0건 계정 숨김(데이터는 유지)
+  const [buyersOnly, setBuyersOnly] = useState(true);
+  // 일괄 포인트지급 — 선택(전화번호 숫자 기준) + 모달
+  const [selectedPhones, setSelectedPhones] = useState<Set<string>>(new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkAmount, setBulkAmount] = useState("");
+  const [bulkReasonPreset, setBulkReasonPreset] = useState(BULK_POINT_REASON_PRESETS[0]);
+  const [bulkReasonCustom, setBulkReasonCustom] = useState("");
+  const [bulkMemo, setBulkMemo] = useState("");
+  const [bulkVisible, setBulkVisible] = useState(true);
+  const [bulkResult, setBulkResult] = useState<BulkGrantResult | null>(null);
+  const { running: bulkRunning, grant: bulkGrant } = useBulkPointGrant();
+
   useEffect(() => {
     let alive = true;
 
@@ -828,6 +845,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
           .toLowerCase();
 
         if (searchText && !haystack.includes(searchText)) return false;
+        // 주문 있는 고객만(기본 ON) — 테스트·0건 계정 숨김. 검색 중엔 적용 안 함(찾던 사람 가려지지 않게).
+        if (buyersOnly && !searchText && customer.orderCount <= 0) return false;
         if (statusFilter === "normal") return !customer.blocked;
         if (statusFilter === "blocked") return customer.blocked;
         if (statusFilter === "attention") return customer.manualNeededCount > 0 || customer.unpaidCount > 0;
@@ -840,11 +859,68 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
         if (sortMode === "nickname") return a.nickname.localeCompare(b.nickname, "ko");
         return b.latestOrderAt.localeCompare(a.latestOrderAt);
       });
-  }, [customers, keyword, sortMode, statusFilter]);
+  }, [customers, keyword, sortMode, statusFilter, buyersOnly]);
 
   const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / CUSTOMER_PAGE_SIZE));
   const safePage = Math.min(Math.max(1, page), totalPages);
   const visibleCustomers = filteredCustomers.slice((safePage - 1) * CUSTOMER_PAGE_SIZE, safePage * CUSTOMER_PAGE_SIZE);
+
+  // ── 일괄 포인트지급: 선택 헬퍼 ──
+  const pageSelectablePhones = visibleCustomers.map((c) => digitsOnly(c.phone)).filter(Boolean);
+  const allPageSelected = pageSelectablePhones.length > 0 && pageSelectablePhones.every((p) => selectedPhones.has(p));
+
+  const toggleSelectPhone = (phone: string) => {
+    const key = digitsOnly(phone);
+    if (!key) return;
+    setSelectedPhones((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+  const toggleSelectAllPage = () => {
+    setSelectedPhones((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) pageSelectablePhones.forEach((p) => next.delete(p));
+      else pageSelectablePhones.forEach((p) => next.add(p));
+      return next;
+    });
+  };
+  const clearSelection = () => setSelectedPhones(new Set());
+
+  const openBulk = () => {
+    setBulkAmount("");
+    setBulkReasonPreset(BULK_POINT_REASON_PRESETS[0]);
+    setBulkReasonCustom("");
+    setBulkMemo("");
+    setBulkVisible(true);
+    setBulkResult(null);
+    setBulkOpen(true);
+  };
+
+  const submitBulkGrant = async () => {
+    const amount = Number(String(bulkAmount).replace(/[^\d]/g, "")) || 0;
+    if (amount <= 0) return;
+    const reason = bulkReasonPreset === "직접입력" ? bulkReasonCustom.trim() : bulkReasonPreset;
+    if (!reason) return;
+    const byPhone = new Map(customers.map((c) => [digitsOnly(c.phone), c]));
+    const targets = Array.from(selectedPhones)
+      .map((p) => {
+        const c = byPhone.get(p);
+        return c ? { phone: p, label: c.nickname || c.name || p } : null;
+      })
+      .filter((t): t is { phone: string; label: string } => Boolean(t));
+    if (targets.length === 0) return;
+    const result = await bulkGrant(targets, {
+      amount,
+      reason,
+      adminMemo: bulkMemo.trim(),
+      customerVisible: bulkVisible,
+    });
+    setBulkResult(result);
+    if (result.success > 0) clearSelection();
+  };
 
   const normalCustomers = customers.filter((customer) => !customer.blocked);
   const blockedCustomers = customers.filter((customer) => customer.blocked);
@@ -1148,10 +1224,40 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
             />
           </div>
 
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <h2 className="text-lg font-black text-slate-950">고객 목록</h2>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-black text-slate-950">고객 목록</h2>
+              <button
+                type="button"
+                onClick={() => { setBuyersOnly((v) => !v); setPage(1); }}
+                className={`rounded-full px-3 py-1 text-[11px] font-black transition ${buyersOnly ? "bg-rose-deep text-white" : "border border-slate-200 bg-white text-slate-500"}`}
+              >
+                {buyersOnly ? "주문 있는 고객만 ✓" : "주문 있는 고객만"}
+              </button>
+            </div>
             <div className="text-xs font-black text-slate-400">
               표시 {visibleCustomers.length.toLocaleString("ko-KR")}명 / 검색결과 {filteredCustomers.length.toLocaleString("ko-KR")}명
+            </div>
+          </div>
+
+          {/* 선택 / 일괄 포인트지급 바 */}
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+            <label className="flex items-center gap-2 text-[12px] font-black text-slate-600">
+              <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAllPage} className="h-4 w-4 accent-rose-deep" />
+              이 페이지 전체선택
+            </label>
+            <div className="flex items-center gap-2">
+              {selectedPhones.size > 0 ? (
+                <button type="button" onClick={clearSelection} className="text-[11px] font-black text-slate-400 hover:text-slate-700">선택해제</button>
+              ) : null}
+              <button
+                type="button"
+                disabled={selectedPhones.size === 0}
+                onClick={openBulk}
+                className="rounded-lg bg-rose-deep px-3 py-1.5 text-[12px] font-black text-white disabled:opacity-40"
+              >
+                🪙 선택 {selectedPhones.size}명 일괄 포인트지급
+              </button>
             </div>
           </div>
 
@@ -1166,6 +1272,17 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
                       key={customer.key}
                       className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors ${customer.blocked ? "border-slate-200 bg-slate-50 opacity-60" : "border-slate-200 bg-white hover:border-rose-line hover:bg-rose-soft/30"}`}
                     >
+                      {digitsOnly(customer.phone) ? (
+                        <input
+                          type="checkbox"
+                          checked={selectedPhones.has(digitsOnly(customer.phone))}
+                          onChange={() => toggleSelectPhone(customer.phone)}
+                          className="h-4 w-4 shrink-0 accent-rose-deep"
+                          title="일괄지급 선택"
+                        />
+                      ) : (
+                        <span className="w-4 shrink-0" />
+                      )}
                       <button
                         type="button"
                         onClick={() => openDetail(customer)}
@@ -1225,6 +1342,75 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
               </button>
             </div>
           </div>
+
+          {/* 일괄 포인트지급 모달 */}
+          {bulkOpen ? (
+            <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4" onClick={() => !bulkRunning && setBulkOpen(false)}>
+              <div className="w-[min(460px,94vw)] rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <div className="mb-1 text-[16px] font-black text-rose-deep">🪙 포인트 일괄지급</div>
+                <div className="mb-3 text-xs font-bold text-slate-500">선택한 {selectedPhones.size}명에게 같은 금액을 지급합니다.</div>
+
+                {!bulkResult ? (
+                  <>
+                    <label className="block">
+                      <span className="text-xs font-black text-slate-500">1인당 지급 포인트</span>
+                      <input value={bulkAmount} onChange={(e) => setBulkAmount(e.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" placeholder="예: 5000"
+                        className="mt-1 h-11 w-full rounded-xl border border-slate-200 px-3 text-base font-black outline-none focus:border-rose-deep" />
+                    </label>
+
+                    <label className="mt-3 block">
+                      <span className="text-xs font-black text-slate-500">지급 사유 (고객에게 보임)</span>
+                      <select value={bulkReasonPreset} onChange={(e) => setBulkReasonPreset(e.target.value)}
+                        className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-rose-deep">
+                        {BULK_POINT_REASON_PRESETS.map((r) => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                    </label>
+                    {bulkReasonPreset === "직접입력" ? (
+                      <input value={bulkReasonCustom} onChange={(e) => setBulkReasonCustom(e.target.value)} placeholder="사유 직접 입력"
+                        className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold outline-none focus:border-rose-deep" />
+                    ) : null}
+
+                    <label className="mt-3 block">
+                      <span className="text-xs font-black text-slate-500">내부 메모 (관리자만, 선택)</span>
+                      <input value={bulkMemo} onChange={(e) => setBulkMemo(e.target.value)} placeholder="관리자만 참고할 내용"
+                        className="mt-1 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold outline-none focus:border-rose-deep" />
+                    </label>
+
+                    <label className="mt-3 flex items-center gap-2 rounded-xl bg-rose-soft/40 px-3 py-2 text-[12px] font-black text-rose-deep">
+                      <input type="checkbox" checked={bulkVisible} onChange={(e) => setBulkVisible(e.target.checked)} className="h-4 w-4 accent-rose-deep" />
+                      고객 화면 포인트 알림에 표시
+                    </label>
+
+                    <div className="mt-3 rounded-xl border border-orange-100 bg-orange-50 px-3 py-2 text-[11px] font-bold leading-5 text-orange-800">
+                      {selectedPhones.size}명 × {(Number(bulkAmount.replace(/[^\d]/g, "")) || 0).toLocaleString("ko-KR")}P = 합계 {((Number(bulkAmount.replace(/[^\d]/g, "")) || 0) * selectedPhones.size).toLocaleString("ko-KR")}P 지급(회수 아님).
+                    </div>
+
+                    <div className="mt-4 flex justify-end gap-2">
+                      <button type="button" onClick={() => setBulkOpen(false)} disabled={bulkRunning} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-black text-slate-600 disabled:opacity-50">취소</button>
+                      <button type="button" onClick={submitBulkGrant} disabled={bulkRunning || (Number(bulkAmount.replace(/[^\d]/g, "")) || 0) <= 0}
+                        className="rounded-xl bg-rose-deep px-5 py-2.5 text-sm font-black text-white disabled:opacity-50">
+                        {bulkRunning ? "지급 중..." : `${selectedPhones.size}명에게 지급`}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-sm font-black text-emerald-700">
+                      ✅ {bulkResult.success}명 지급 완료{bulkResult.failed.length > 0 ? ` · ❌ ${bulkResult.failed.length}명 실패` : ""}
+                    </div>
+                    {bulkResult.failed.length > 0 ? (
+                      <div className="mt-2 max-h-40 overflow-y-auto rounded-xl border border-red-100 bg-red-50 p-2 text-[11px] font-bold leading-5 text-red-700">
+                        {bulkResult.failed.map((f, i) => <div key={i}>{f.label}: {f.reason}</div>)}
+                      </div>
+                    ) : null}
+                    <div className="mt-4 flex justify-end">
+                      <button type="button" onClick={() => { setBulkOpen(false); setBulkResult(null); }} className="rounded-xl bg-rose-deep px-5 py-2.5 text-sm font-black text-white">닫기</button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          ) : null}
         </div>
         </div>
 
