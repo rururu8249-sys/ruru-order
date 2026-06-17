@@ -22,14 +22,6 @@ type Panel = { key: string; nickname: string; paid: boolean; when: string; items
 const PAID_STATUSES = ["paid", "auto_paid", "manual_paid", "card_paid"];
 const clean = (v: unknown) => String(v ?? "").trim();
 
-// 제출시간 → KST "HH:mm" (정렬 기준 시각 표시용). 파싱 실패 시 빈 문자열.
-const timeText = (s: string) => {
-  if (!s) return "";
-  const d = new Date(s);
-  if (isNaN(d.getTime())) return "";
-  return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
-};
-
 export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: Props) {
   const [pickedIds, setPickedIds] = useState<Set<string>>(new Set());
   const [sortMode, setSortMode] = useState<"nickname" | "time">("nickname");
@@ -207,7 +199,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                       <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-black text-white ${complete ? "bg-emerald-500" : "bg-rose-deep"}`}>{complete ? "✓" : (panel.nickname.charAt(0) || "?")}</span>
                       <span className="flex min-w-0 flex-1 flex-col">
                         <span className="truncate text-[15px] font-black text-slate-900">{panel.nickname}</span>
-                        {timeText(panel.when) ? <span className="text-[11px] font-semibold text-slate-400">제출 {timeText(panel.when)}</span> : null}
+                        {panel.when && panel.when !== "-" ? <span className="text-[11px] font-semibold text-slate-400">제출 {panel.when}</span> : null}
                       </span>
                       {panel.paid ? (
                         <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700">결제완료</span>
