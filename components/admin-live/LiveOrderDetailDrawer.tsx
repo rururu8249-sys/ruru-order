@@ -566,9 +566,15 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         {/* 고객정보 그리드 (목업 B: 닉네임/이름/연락처/결제방법) */}
         <div className="mb-3 grid grid-cols-2 gap-x-3 gap-y-2.5">
           <Info label="닉네임" value={orderForView.nickname || "-"} strong />
-          <Info label="이름" value={order.name || "-"} />
-          <Info label="연락처" value={orderForView.phone || "-"} />
+          <Info label="이름(주문자)" value={order.name || "-"} />
+          <Info label="연락처(주문자)" value={orderForView.phone || "-"} />
           <Info label="결제방법" value={orderForView.paymentMethod || "-"} />
+          {((order as any).recipientName || (order as any).recipientPhone) ? (
+            <>
+              <Info label="받는 분(배송)" value={(order as any).recipientName || order.name || "-"} strong />
+              <Info label="받는분 연락처" value={(order as any).recipientPhone || orderForView.phone || "-"} />
+            </>
+          ) : null}
         </div>
 
         {/* 상태 배지 + 안내 (기존 로직) */}
