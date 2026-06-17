@@ -1,12 +1,11 @@
 "use client";
 
-// 물건챙기기 체크리스트 팝업.
-//   - 주문 상품별 한 줄(닉네임 · 주문내역 · 수량) + "챙김" 체크.
-//   - 체크 상태는 orders.picked_at(서버)에 저장 → 다른 기기/새로고침에도 동일하게 유지.
-//   - "결제완료만" 토글(기본 ON): 끄면 미결제 포함 전체(취소건은 항상 제외).
-//   - 주문 취소/수정은 부모가 넘기는 orders(실시간)에 자동 반영.
-//   - 전체 초기화 / ㄱㄴㄷ·시간 정렬 / 엑셀 내보내기.
-//   - picked_at "한 칸만" update. 돈/입금/정산/주문상태 로직 무관.
+// 물건챙기기 체크리스트 팝업 (주문서 단위 패널).
+//   - 주문서 1건(같은 order_group_id) = 패널 1개. 같은 닉네임이라도 주문서 다르면 다른 패널.
+//   - 패널 안 상품별 "챙김" 체크 + 전부 체크되면 패널 자동 "완료". 패널 헤더로 일괄 체크/해제도 가능.
+//   - 체크는 orders.picked_at(서버)에 저장 → 다른 기기/새로고침에도 유지.
+//   - "결제완료만" 토글(기본 ON, 끄면 미결제 포함·취소건 항상 제외), ㄱㄴㄷ/시간 정렬, 전체 초기화, 엑셀.
+//   - 상단 "챙김 N개 / 전체 M개"는 수량 합계. picked_at 한 칸만 update(돈/주문 로직 무관).
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -15,26 +14,13 @@ import { showAdminToast } from "@/lib/adminToast";
 import type { LiveOrder, LiveOrderItem } from "./types";
 import { exportLiveOrdersForPicking } from "./adminLiveOrderExcelExport";
 
-type Props = {
-  orders: LiveOrder[];
-  filterLabel: string;
-  onClose: () => void;
-};
+type Props = { orders: LiveOrder[]; filterLabel: string; onClose: () => void };
 
-type PickRow = {
-  id: string; // orders 행 id (= 상품 1줄)
-  nickname: string;
-  itemText: string;
-  qty: number;
-  submittedAt: string;
-  paid: boolean;
-};
+type PickItem = { id: string; text: string; qty: number };
+type Panel = { key: string; nickname: string; paid: boolean; when: string; items: PickItem[]; totalQty: number };
 
 const PAID_STATUSES = ["paid", "auto_paid", "manual_paid", "card_paid"];
-
-function clean(v: unknown) {
-  return String(v ?? "").trim();
-}
+const clean = (v: unknown) => String(v ?? "").trim();
 
 export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: Props) {
   const [pickedIds, setPickedIds] = useState<Set<string>>(new Set());
@@ -43,78 +29,93 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   const [resetting, setResetting] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  // 주문 → 상품별 행 (취소건 제외)
-  const rows = useMemo<PickRow[]>(() => {
-    const list: PickRow[] = [];
+  // 주문서 단위 패널 (취소건 제외)
+  const panels = useMemo<Panel[]>(() => {
+    const list: Panel[] = [];
     for (const o of orders) {
       const status = clean(o.paymentStatus);
-      if (status === "canceled") continue; // 취소건은 항상 제외
+      if (status === "canceled") continue;
       const paid = PAID_STATUSES.includes(status);
-      const nick = clean((o as any).recipientName) || clean(o.nickname) || clean(o.name) || "-";
+      const nickname = clean((o as any).recipientName) || clean(o.nickname) || clean(o.name) || "-";
       const when = clean((o as any).submittedAt) || clean(o.createdAt);
-      const items = Array.isArray(o.items) ? (o.items as LiveOrderItem[]) : [];
-      if (items.length === 0) {
-        list.push({ id: String(o.id), nickname: nick, itemText: clean(o.orderSummary) || "상품", qty: 1, submittedAt: when, paid });
-      } else {
-        for (const it of items) {
-          const opt = [clean(it.color), clean(it.size)].filter(Boolean).join("/");
-          const name = (clean(it.productName) || "상품") + (opt ? ` (${opt})` : "");
-          list.push({ id: String(it.id), nickname: nick, itemText: name, qty: Number(it.qty || 1), submittedAt: when, paid });
-        }
-      }
+      const rawItems = Array.isArray(o.items) ? (o.items as LiveOrderItem[]) : [];
+      const items: PickItem[] =
+        rawItems.length === 0
+          ? [{ id: String(o.id), text: clean(o.orderSummary) || "상품", qty: 1 }]
+          : rawItems.map((it) => {
+              const opt = [clean(it.color), clean(it.size)].filter(Boolean).join("/");
+              return { id: String(it.id), text: (clean(it.productName) || "상품") + (opt ? ` (${opt})` : ""), qty: Number(it.qty || 1) };
+            });
+      const totalQty = items.reduce((s, it) => s + (Number.isFinite(it.qty) ? it.qty : 1), 0);
+      list.push({ key: String(o.groupId || o.id), nickname, paid, when, items, totalQty });
     }
     return list;
   }, [orders]);
 
-  const visibleRows = useMemo(() => {
-    const arr = rows.filter((r) => (paidOnly ? r.paid : true));
-    if (sortMode === "nickname") arr.sort((a, b) => a.nickname.localeCompare(b.nickname, "ko"));
-    else arr.sort((a, b) => a.submittedAt.localeCompare(b.submittedAt));
+  const visiblePanels = useMemo(() => {
+    const arr = panels.filter((p) => (paidOnly ? p.paid : true));
+    if (sortMode === "nickname") arr.sort((a, b) => a.nickname.localeCompare(b.nickname, "ko") || a.when.localeCompare(b.when));
+    else arr.sort((a, b) => a.when.localeCompare(b.when));
     return arr;
-  }, [rows, paidOnly, sortMode]);
+  }, [panels, paidOnly, sortMode]);
 
-  // 열 때 서버에서 picked_at 조회(여러 기기 동일 표시)
+  // 열 때 서버에서 picked_at 조회
   useEffect(() => {
     let alive = true;
     (async () => {
-      const ids = rows.map((r) => Number(r.id)).filter((n) => Number.isFinite(n) && n > 0);
+      const ids = panels.flatMap((p) => p.items.map((it) => Number(it.id))).filter((n) => Number.isFinite(n) && n > 0);
       if (ids.length === 0) { setPickedIds(new Set()); return; }
       const picked = new Set<string>();
       for (let i = 0; i < ids.length; i += 500) {
-        const chunk = ids.slice(i, i + 500);
-        const { data } = await supabase.from("orders").select("id, picked_at").in("id", chunk);
+        const { data } = await supabase.from("orders").select("id, picked_at").in("id", ids.slice(i, i + 500));
         (data || []).forEach((r: any) => { if (r.picked_at) picked.add(String(r.id)); });
       }
       if (alive) setPickedIds(picked);
     })();
     return () => { alive = false; };
-  }, [rows]);
+  }, [panels]);
+
+  const writePicked = async (ids: string[], makePicked: boolean) => {
+    const nums = ids.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0);
+    const value = makePicked ? new Date().toISOString() : null;
+    for (let i = 0; i < nums.length; i += 500) {
+      const { error } = await supabase.from("orders").update({ picked_at: value }).in("id", nums.slice(i, i + 500));
+      if (error) throw error;
+    }
+  };
 
   const togglePick = async (id: string) => {
-    const wasPicked = pickedIds.has(id);
-    setPickedIds((prev) => { const n = new Set(prev); if (wasPicked) n.delete(id); else n.add(id); return n; });
-    const { error } = await supabase
-      .from("orders")
-      .update({ picked_at: wasPicked ? null : new Date().toISOString() })
-      .eq("id", Number(id));
-    if (error) {
-      setPickedIds((prev) => { const n = new Set(prev); if (wasPicked) n.add(id); else n.delete(id); return n; });
-      showAdminToast("챙김 저장 실패\n\n" + error.message, "error");
+    const was = pickedIds.has(id);
+    setPickedIds((prev) => { const n = new Set(prev); if (was) n.delete(id); else n.add(id); return n; });
+    try {
+      await writePicked([id], !was);
+    } catch (e: any) {
+      setPickedIds((prev) => { const n = new Set(prev); if (was) n.add(id); else n.delete(id); return n; });
+      showAdminToast("챙김 저장 실패\n\n" + (e?.message || e), "error");
+    }
+  };
+
+  // 패널 전체 토글(전부 체크돼 있으면 해제, 아니면 전부 체크)
+  const togglePanel = async (panel: Panel) => {
+    const ids = panel.items.map((it) => it.id);
+    const allPicked = ids.every((id) => pickedIds.has(id));
+    const makePicked = !allPicked;
+    setPickedIds((prev) => { const n = new Set(prev); ids.forEach((id) => (makePicked ? n.add(id) : n.delete(id))); return n; });
+    try {
+      await writePicked(ids, makePicked);
+    } catch (e: any) {
+      // 롤백 위해 재조회
+      showAdminToast("패널 일괄 체크 실패\n\n" + (e?.message || e), "error");
     }
   };
 
   const resetAll = async () => {
-    const ok = await showAdminConfirm("챙김 표시를 모두 초기화할까요?\n\n지금 보이는 목록의 모든 체크가 해제됩니다. (주문·금액엔 영향 없음)");
-    if (!ok) return;
+    if (!(await showAdminConfirm("챙김 표시를 모두 초기화할까요?\n\n지금 보이는 목록의 모든 체크가 해제됩니다. (주문·금액엔 영향 없음)"))) return;
     setResetting(true);
     try {
-      const ids = visibleRows.map((r) => Number(r.id)).filter((n) => Number.isFinite(n) && n > 0);
-      for (let i = 0; i < ids.length; i += 500) {
-        const chunk = ids.slice(i, i + 500);
-        const { error } = await supabase.from("orders").update({ picked_at: null }).in("id", chunk);
-        if (error) throw error;
-      }
-      setPickedIds((prev) => { const n = new Set(prev); ids.forEach((x) => n.delete(String(x))); return n; });
+      const ids = visiblePanels.flatMap((p) => p.items.map((it) => it.id));
+      await writePicked(ids, false);
+      setPickedIds((prev) => { const n = new Set(prev); ids.forEach((id) => n.delete(id)); return n; });
       showAdminToast("챙김 표시를 초기화했습니다.", "success");
     } catch (e: any) {
       showAdminToast("초기화 실패\n\n" + (e?.message || e), "error");
@@ -133,22 +134,26 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
     }
   };
 
-  const pickedCount = visibleRows.filter((r) => pickedIds.has(r.id)).length;
-  const total = visibleRows.length;
+  // 수량 합계
+  const { pickedQty, totalQty } = useMemo(() => {
+    let p = 0, t = 0;
+    for (const panel of visiblePanels) for (const it of panel.items) { t += it.qty; if (pickedIds.has(it.id)) p += it.qty; }
+    return { pickedQty: p, totalQty: t };
+  }, [visiblePanels, pickedIds]);
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="flex h-[88vh] w-[min(560px,96vw)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* 헤더 */}
         <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3">
-          <div className="text-[15px] font-black text-rose-deep">🛍 물건챙기기 <span className="ml-1 text-[12px] font-bold text-slate-500">({filterLabel})</span></div>
+          <div className="text-[15px] font-black text-rose-deep">🛍 물건챙기기</div>
           <button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-[18px] font-black text-slate-400 hover:bg-slate-100 hover:text-slate-700">✕</button>
         </div>
 
         {/* 툴바 */}
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-2">
-          <div className="text-[13px] font-black text-slate-700">
-            챙김 <span className="text-emerald-600">{pickedCount}</span> / {total}
+          <div className="text-[14px] font-black text-slate-800">
+            챙김 <span className="text-emerald-600">{pickedQty}개</span> <span className="text-slate-300">/</span> 전체 {totalQty}개
           </div>
           <div className="flex items-center gap-1.5">
             <button type="button" onClick={() => setPaidOnly((v) => !v)} className={`rounded-lg px-2.5 py-1 text-[11px] font-black ${paidOnly ? "bg-emerald-600 text-white" : "border border-amber-300 bg-amber-50 text-amber-700"}`}>{paidOnly ? "결제완료만 ✓" : "미결제 포함"}</button>
@@ -159,28 +164,45 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
           </div>
         </div>
 
-        {/* 목록 */}
-        <div className="flex-1 overflow-y-auto px-3 py-2">
-          {total === 0 ? (
+        {/* 패널 목록 */}
+        <div className="flex-1 overflow-y-auto bg-slate-50 px-3 py-3">
+          {visiblePanels.length === 0 ? (
             <div className="py-10 text-center text-sm font-bold text-slate-400">챙길 주문이 없습니다.</div>
           ) : (
-            <div className="space-y-1">
-              {visibleRows.map((r) => {
-                const picked = pickedIds.has(r.id);
+            <div className="space-y-2.5">
+              {visiblePanels.map((panel) => {
+                const pickedInPanel = panel.items.filter((it) => pickedIds.has(it.id)).length;
+                const complete = panel.items.length > 0 && pickedInPanel === panel.items.length;
                 return (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => togglePick(r.id)}
-                    className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition ${picked ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white hover:bg-slate-50"}`}
-                  >
-                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 text-[13px] font-black ${picked ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300 text-transparent"}`}>✓</span>
-                    <span className="min-w-0 flex-1">
-                      <span className={`block truncate text-[13px] font-black ${picked ? "text-slate-400 line-through" : "text-slate-900"}`}>{r.itemText}</span>
-                      <span className="block truncate text-[11px] font-bold text-slate-400">{r.nickname}{!r.paid ? " · 미결제" : ""}</span>
-                    </span>
-                    <span className={`shrink-0 text-[14px] font-black ${picked ? "text-slate-400" : "text-slate-900"}`}>{r.qty}개</span>
-                  </button>
+                  <div key={panel.key} className={`overflow-hidden rounded-2xl border-2 ${complete ? "border-emerald-300 bg-emerald-50/60" : "border-slate-200 bg-white"}`}>
+                    {/* 패널 헤더 = 주문서(닉네임) — 클릭하면 패널 전체 체크/해제 */}
+                    <button type="button" onClick={() => togglePanel(panel)} className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left ${complete ? "bg-emerald-100/70" : "bg-slate-100/70"}`}>
+                      <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 text-[13px] font-black ${complete ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-300 text-transparent"}`}>✓</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[15px] font-black text-slate-900">{panel.nickname}</span>
+                      </span>
+                      {panel.paid ? (
+                        <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700">결제완료</span>
+                      ) : (
+                        <span className="shrink-0 rounded-full bg-red-500 px-2.5 py-0.5 text-[11px] font-black text-white">미결제</span>
+                      )}
+                      <span className={`shrink-0 text-[12px] font-black ${complete ? "text-emerald-700" : "text-slate-400"}`}>{complete ? "✓ 완료" : `${pickedInPanel}/${panel.items.length}`}</span>
+                    </button>
+
+                    {/* 패널 안 상품들 */}
+                    <div className="divide-y divide-slate-100">
+                      {panel.items.map((it) => {
+                        const picked = pickedIds.has(it.id);
+                        return (
+                          <button key={it.id} type="button" onClick={() => togglePick(it.id)} className={`flex w-full items-center gap-3 px-3 py-2.5 text-left ${picked ? "bg-emerald-50/40" : "bg-white hover:bg-slate-50"}`}>
+                            <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 text-[11px] font-black ${picked ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300 text-transparent"}`}>✓</span>
+                            <span className={`min-w-0 flex-1 truncate text-[13px] font-bold ${picked ? "text-slate-400 line-through" : "text-slate-800"}`}>{it.text}</span>
+                            <span className={`shrink-0 text-[13px] font-black ${picked ? "text-slate-400" : "text-slate-900"}`}>{it.qty}개</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 );
               })}
             </div>
@@ -188,7 +210,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
         </div>
 
         <div className="shrink-0 border-t border-slate-100 px-4 py-2 text-[11px] font-bold leading-5 text-slate-400">
-          체크는 서버에 저장돼 다른 기기·새로고침에도 그대로 유지됩니다. 주문 취소·수정은 자동 반영돼요.
+          상품 줄을 누르면 챙김, 주문서(닉네임) 줄을 누르면 그 주문 전체 챙김/해제. 체크는 서버 저장(다른 기기·새로고침 유지)·주문 취소/수정 자동 반영.
         </div>
       </div>
     </div>
