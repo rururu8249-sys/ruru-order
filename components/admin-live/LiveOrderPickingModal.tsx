@@ -22,6 +22,36 @@ type Panel = { key: string; nickname: string; paid: boolean; when: string; items
 const PAID_STATUSES = ["paid", "auto_paid", "manual_paid", "card_paid"];
 const clean = (v: unknown) => String(v ?? "").trim();
 
+// 정렬용 raw 타임스탬프(ms). 파싱 실패 시 0.
+const ts = (s: string) => {
+  const t = new Date(s).getTime();
+  return Number.isFinite(t) ? t : 0;
+};
+
+// 제출시각 → KST "YYYY.MM.DD(요일) 오전/오후 h:mm" 보기 편한 형식. 파싱 실패 시 빈 문자열.
+//   오전/오후는 환경(ICU) 안 타게 24시 값에서 직접 계산.
+const whenText = (s: string) => {
+  if (!s) return "";
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  let h = parseInt(get("hour"), 10);
+  if (!Number.isFinite(h) || h === 24) h = 0;
+  const ampm = h < 12 ? "오전" : "오후";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${get("year")}.${get("month")}.${get("day")}(${get("weekday")}) ${ampm} ${h12}:${get("minute")}`;
+};
+
 export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: Props) {
   const [pickedIds, setPickedIds] = useState<Set<string>>(new Set());
   const [sortMode, setSortMode] = useState<"nickname" | "time">("nickname");
@@ -38,7 +68,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
       if (status === "canceled") continue;
       const paid = PAID_STATUSES.includes(status);
       const nickname = clean((o as any).recipientName) || clean(o.nickname) || clean(o.name) || "-";
-      const when = clean((o as any).submittedAt) || clean(o.createdAt);
+      const when = clean(o.createdAt) || clean((o as any).submittedAt);
       const rawItems = Array.isArray(o.items) ? (o.items as LiveOrderItem[]) : [];
       const items: PickItem[] =
         rawItems.length === 0
@@ -56,8 +86,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   // 범위(결제완료만 토글 + 정렬) — 진행률/초기화 기준
   const scopedPanels = useMemo(() => {
     const arr = panels.filter((p) => (paidOnly ? p.paid : true));
-    if (sortMode === "nickname") arr.sort((a, b) => a.nickname.localeCompare(b.nickname, "ko") || a.when.localeCompare(b.when));
-    else arr.sort((a, b) => a.when.localeCompare(b.when));
+    if (sortMode === "nickname") arr.sort((a, b) => a.nickname.localeCompare(b.nickname, "ko") || ts(a.when) - ts(b.when));
+    else arr.sort((a, b) => ts(a.when) - ts(b.when));
     return arr;
   }, [panels, paidOnly, sortMode]);
 
@@ -197,9 +227,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                     {/* 패널 헤더 = 주문서(닉네임) : 아바타(이니셜) + 이름 + 배지 + 진행. 체크박스 없음(상품과 구분). 클릭=그 주문 전체 챙김/해제 */}
                     <button type="button" onClick={() => togglePanel(panel)} className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left ${complete ? "bg-emerald-50" : "bg-rose-soft"}`}>
                       <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-black text-white ${complete ? "bg-emerald-500" : "bg-rose-deep"}`}>{complete ? "✓" : (panel.nickname.charAt(0) || "?")}</span>
-                      <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate text-[15px] font-black text-slate-900">{panel.nickname}</span>
-                        {panel.when && panel.when !== "-" ? <span className="text-[11px] font-semibold text-slate-400">제출 {panel.when}</span> : null}
+                      <span className="flex min-w-0 flex-1 items-baseline gap-2">
+                        <span className="shrink truncate text-[15px] font-black text-slate-900">{panel.nickname}</span>
+                        {whenText(panel.when) ? <span className="shrink-0 text-[11px] font-semibold text-slate-400">{whenText(panel.when)}</span> : null}
                       </span>
                       {panel.paid ? (
                         <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700">결제완료</span>
