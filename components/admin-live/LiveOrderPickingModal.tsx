@@ -26,6 +26,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   const [pickedIds, setPickedIds] = useState<Set<string>>(new Set());
   const [sortMode, setSortMode] = useState<"nickname" | "time">("nickname");
   const [paidOnly, setPaidOnly] = useState(true);
+  const [search, setSearch] = useState("");
   const [resetting, setResetting] = useState(false);
   const [exporting, setExporting] = useState(false);
 
@@ -52,12 +53,20 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
     return list;
   }, [orders]);
 
-  const visiblePanels = useMemo(() => {
+  // 범위(결제완료만 토글 + 정렬) — 진행률/초기화 기준
+  const scopedPanels = useMemo(() => {
     const arr = panels.filter((p) => (paidOnly ? p.paid : true));
     if (sortMode === "nickname") arr.sort((a, b) => a.nickname.localeCompare(b.nickname, "ko") || a.when.localeCompare(b.when));
     else arr.sort((a, b) => a.when.localeCompare(b.when));
     return arr;
   }, [panels, paidOnly, sortMode]);
+
+  // 검색(닉네임 또는 상품명) — 화면 표시용. 검색은 진행률/초기화 범위에 영향 없음.
+  const visiblePanels = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return scopedPanels;
+    return scopedPanels.filter((p) => p.nickname.toLowerCase().includes(q) || p.items.some((it) => it.text.toLowerCase().includes(q)));
+  }, [scopedPanels, search]);
 
   // 열 때 서버에서 picked_at 조회
   useEffect(() => {
@@ -113,7 +122,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
     if (!(await showAdminConfirm("챙김 표시를 모두 초기화할까요?\n\n지금 보이는 목록의 모든 체크가 해제됩니다. (주문·금액엔 영향 없음)"))) return;
     setResetting(true);
     try {
-      const ids = visiblePanels.flatMap((p) => p.items.map((it) => it.id));
+      const ids = scopedPanels.flatMap((p) => p.items.map((it) => it.id));
       await writePicked(ids, false);
       setPickedIds((prev) => { const n = new Set(prev); ids.forEach((id) => n.delete(id)); return n; });
       showAdminToast("챙김 표시를 초기화했습니다.", "success");
@@ -137,9 +146,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   // 수량 합계
   const { pickedQty, totalQty } = useMemo(() => {
     let p = 0, t = 0;
-    for (const panel of visiblePanels) for (const it of panel.items) { t += it.qty; if (pickedIds.has(it.id)) p += it.qty; }
+    for (const panel of scopedPanels) for (const it of panel.items) { t += it.qty; if (pickedIds.has(it.id)) p += it.qty; }
     return { pickedQty: p, totalQty: t };
-  }, [visiblePanels, pickedIds]);
+  }, [scopedPanels, pickedIds]);
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
@@ -164,7 +173,17 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
           </div>
         </div>
 
-        {/* 패널 목록 */}
+        {/* 검색 (고정 영역) */}
+        <div className="shrink-0 border-b border-slate-100 px-4 py-2">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="🔍 닉네임 · 상품명 검색"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] font-bold outline-none focus:border-rose-deep focus:bg-white"
+          />
+        </div>
+
+        {/* 패널 목록 (이 영역만 스크롤 — 모달 높이는 88vh 고정) */}
         <div className="flex-1 overflow-y-auto bg-slate-50 px-3 py-3">
           {visiblePanels.length === 0 ? (
             <div className="py-10 text-center text-sm font-bold text-slate-400">챙길 주문이 없습니다.</div>
@@ -175,27 +194,25 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                 const complete = panel.items.length > 0 && pickedInPanel === panel.items.length;
                 return (
                   <div key={panel.key} className={`overflow-hidden rounded-2xl border-2 ${complete ? "border-emerald-300 bg-emerald-50/60" : "border-slate-200 bg-white"}`}>
-                    {/* 패널 헤더 = 주문서(닉네임) — 클릭하면 패널 전체 체크/해제 */}
-                    <button type="button" onClick={() => togglePanel(panel)} className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left ${complete ? "bg-emerald-100/70" : "bg-slate-100/70"}`}>
-                      <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 text-[13px] font-black ${complete ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-300 text-transparent"}`}>✓</span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[15px] font-black text-slate-900">{panel.nickname}</span>
-                      </span>
+                    {/* 패널 헤더 = 주문서(닉네임) : 아바타(이니셜) + 이름 + 배지 + 진행. 체크박스 없음(상품과 구분). 클릭=그 주문 전체 챙김/해제 */}
+                    <button type="button" onClick={() => togglePanel(panel)} className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left ${complete ? "bg-emerald-50" : "bg-rose-soft"}`}>
+                      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-black text-white ${complete ? "bg-emerald-500" : "bg-rose-deep"}`}>{complete ? "✓" : (panel.nickname.charAt(0) || "?")}</span>
+                      <span className="min-w-0 flex-1 truncate text-[15px] font-black text-slate-900">{panel.nickname}</span>
                       {panel.paid ? (
                         <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700">결제완료</span>
                       ) : (
                         <span className="shrink-0 rounded-full bg-red-500 px-2.5 py-0.5 text-[11px] font-black text-white">미결제</span>
                       )}
-                      <span className={`shrink-0 text-[12px] font-black ${complete ? "text-emerald-700" : "text-slate-400"}`}>{complete ? "✓ 완료" : `${pickedInPanel}/${panel.items.length}`}</span>
+                      <span className={`shrink-0 text-[12px] font-black ${complete ? "text-emerald-600" : "text-rose-deep"}`}>{complete ? "✓ 완료" : `${pickedInPanel}/${panel.items.length}`}</span>
                     </button>
 
-                    {/* 패널 안 상품들 */}
+                    {/* 패널 안 상품들 : 들여쓰기 + 네모 체크박스(헤더와 구분) */}
                     <div className="divide-y divide-slate-100">
                       {panel.items.map((it) => {
                         const picked = pickedIds.has(it.id);
                         return (
-                          <button key={it.id} type="button" onClick={() => togglePick(it.id)} className={`flex w-full items-center gap-3 px-3 py-2.5 text-left ${picked ? "bg-emerald-50/40" : "bg-white hover:bg-slate-50"}`}>
-                            <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 text-[11px] font-black ${picked ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300 text-transparent"}`}>✓</span>
+                          <button key={it.id} type="button" onClick={() => togglePick(it.id)} className={`flex w-full items-center gap-3 py-2.5 pl-6 pr-3 text-left ${picked ? "bg-emerald-50" : "bg-white hover:bg-slate-50"}`}>
+                            <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 text-[11px] font-black ${picked ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300 text-transparent"}`}>✓</span>
                             <span className={`min-w-0 flex-1 truncate text-[13px] font-bold ${picked ? "text-slate-400 line-through" : "text-slate-800"}`}>{it.text}</span>
                             <span className={`shrink-0 text-[13px] font-black ${picked ? "text-slate-400" : "text-slate-900"}`}>{it.qty}개</span>
                           </button>
