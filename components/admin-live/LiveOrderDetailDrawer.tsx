@@ -9,6 +9,7 @@ import { isLiveOrderCanceled, useLiveOrderCancelRestore } from "./useLiveOrderCa
 import LiveOrderItemEditCard from "./LiveOrderItemEditCard";
 import type { LiveOrderItemEditSaveResult } from "./useLiveOrderItemEdit";
 import { useLiveOrderItemAdd, createInitialLiveOrderItemAddForm, type LiveOrderItemAddForm } from "./useLiveOrderItemAdd";
+import { useLiveOrderItemDelete } from "./useLiveOrderItemDelete";
 import LiveOrderDangerActionGuide from "./LiveOrderDangerActionGuide";
 
 type Props = {
@@ -182,6 +183,31 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const [showAddForm, setShowAddForm] = useState(false);
   const [addForm, setAddForm] = useState<LiveOrderItemAddForm>(createInitialLiveOrderItemAddForm());
   const { adding, addDirectItem } = useLiveOrderItemAdd();
+  const { deletingId, deleteItem } = useLiveOrderItemDelete();
+
+  const handleDeleteItem = async (item: LiveOrderItem) => {
+    const ok = await deleteItem(Number(item.id), clean(item.productName) || "상품");
+    if (!ok) return;
+
+    setRefreshingDetail(true);
+    try {
+      setLocalOrder((previousOrder) => {
+        const nextItems = (Array.isArray(previousOrder.items) ? previousOrder.items : []).filter(
+          (it) => String(it.id) !== String(item.id)
+        );
+        const nextProductAmount = nextItems.reduce((sum, it) => sum + Number(it.amount || 0), 0);
+        return {
+          ...previousOrder,
+          items: nextItems,
+          totalQty: nextItems.reduce((sum, it) => sum + Number(it.qty || 0), 0),
+          totalAmount: nextProductAmount + Number(previousOrder.shippingFee || 0),
+        };
+      });
+      await onAfterStatusChange?.();
+    } finally {
+      setRefreshingDetail(false);
+    }
+  };
 
   const handleAddDirectItem = async () => {
     const result = await addDirectItem(localOrder, addForm);
@@ -663,7 +689,21 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               <div className="rounded-2xl border border-dashed border-slate-200 p-4 text-center text-xs font-bold text-slate-400">주문 품목이 없습니다.</div>
             ) : (
               items.map((item, index) => (
-                <LiveOrderItemEditCard key={`${item.id}-${index}`} item={item} index={index} disabled={isCanceled} onAfterSave={handleItemSaved} />
+                <div key={`${item.id}-${index}`} className="relative">
+                  <LiveOrderItemEditCard item={item} index={index} disabled={isCanceled} onAfterSave={handleItemSaved} />
+                  {!isCanceled && items.length > 1 ? (
+                    <div className="mt-1 flex justify-end">
+                      <button
+                        type="button"
+                        disabled={deletingId === String(item.id)}
+                        onClick={() => handleDeleteItem(item)}
+                        className="rounded-lg border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-black text-[#C0392B] hover:bg-red-100 disabled:opacity-50"
+                      >
+                        {deletingId === String(item.id) ? "삭제 중..." : "🗑 이 상품 삭제"}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               ))
             )}
           </div>
