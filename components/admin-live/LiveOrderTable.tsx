@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { LiveOrder } from "./types";
 import { exportLiveOrdersForPicking, exportLiveOrdersForRosen } from "./adminLiveOrderExcelExport";
+import LiveOrderPickingModal from "./LiveOrderPickingModal";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import LiveOrderCancelViewFilter, { type LiveOrderCancelViewFilterValue } from "./LiveOrderCancelViewFilter";
@@ -489,6 +490,7 @@ export default function LiveOrderTable({
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState<"" | "rozen" | "picking">("");
   const [exportConfirm, setExportConfirm] = useState<"" | "rozen" | "picking">("");
+  const [pickingOpen, setPickingOpen] = useState(false);
   const [cancelViewFilter, setCancelViewFilter] = useState<LiveOrderCancelViewFilterValue>("all");
 
   // 필터/정렬 변경 시 1페이지로. 단, 첫 마운트(새로고침으로 복원된 페이지)에는 리셋하지 않음.
@@ -732,6 +734,9 @@ export default function LiveOrderTable({
 
   return (
     <>
+    {pickingOpen ? (
+      <LiveOrderPickingModal orders={exportableOrders} filterLabel={currentFilterLabel} onClose={() => setPickingOpen(false)} />
+    ) : null}
     {exportConfirm !== "" ? (
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setExportConfirm("")}>
         <div style={{ background: "#fff", borderRadius: "16px", padding: "26px 30px", minWidth: "340px", boxShadow: "0 8px 40px rgba(0,0,0,0.18)" }} onClick={(e) => e.stopPropagation()}>
@@ -873,12 +878,12 @@ export default function LiveOrderTable({
 
           <button
             type="button"
-            onClick={() => setExportConfirm("picking")}
-            disabled={exporting !== "" || exportableOrders.length === 0}
+            onClick={() => setPickingOpen(true)}
+            disabled={exportableOrders.length === 0}
             className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-            title="현재 필터 조건 그대로 물건챙기기 엑셀을 내보냅니다"
+            title="물건챙기기 체크리스트 팝업을 엽니다"
           >
-            {exporting === "picking" ? "내보내는중..." : "🛍 물건챙기기"}
+            🛍 물건챙기기
           </button>
 
             
