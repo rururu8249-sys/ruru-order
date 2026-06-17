@@ -118,27 +118,27 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
         ) : null}
       </div>
 
-      <div className="mt-4 grid gap-2 lg:grid-cols-[180px_1fr_110px_110px]">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         <input
           value={phone}
           onChange={(event) => setPhone(event.target.value)}
           placeholder="01012345678"
           inputMode="numeric"
-          className="h-11 rounded-xl border border-red-100 bg-white px-3 text-[13px] font-black text-slate-800 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-100"
+          className="h-11 w-full min-w-0 rounded-xl border border-red-100 bg-white px-3 text-[13px] font-black text-slate-800 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-100 sm:w-44"
         />
 
         <input
           value={reason}
           onChange={(event) => setReason(event.target.value)}
           placeholder="차단사유 입력"
-          className="h-11 rounded-xl border border-red-100 bg-white px-3 text-[13px] font-bold text-slate-800 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-100"
+          className="h-11 min-w-[150px] flex-1 rounded-xl border border-red-100 bg-white px-3 text-[13px] font-bold text-slate-800 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-100"
         />
 
         <button
           type="button"
           disabled={saving}
           onClick={() => submit(true)}
-          className="h-11 rounded-xl bg-red-600 px-3 text-[13px] font-black text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-200"
+          className="h-11 shrink-0 rounded-xl bg-red-600 px-4 text-[13px] font-black text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-200"
         >
           차단
         </button>
@@ -147,7 +147,7 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
           type="button"
           disabled={saving}
           onClick={() => submit(false)}
-          className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-black text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+          className="h-11 shrink-0 rounded-xl border border-slate-200 bg-white px-4 text-[13px] font-black text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
         >
           차단해제
         </button>

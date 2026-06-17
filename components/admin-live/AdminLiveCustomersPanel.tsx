@@ -845,8 +845,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
           .toLowerCase();
 
         if (searchText && !haystack.includes(searchText)) return false;
-        // 주문 있는 고객만(기본 ON) — 테스트·0건 계정 숨김. 검색 중엔 적용 안 함(찾던 사람 가려지지 않게).
-        if (buyersOnly && !searchText && customer.orderCount <= 0) return false;
+        // 주문 있는 고객만(기본 ON) — 테스트·0건 계정 숨김. 검색에도 적용(끄면 0건/테스트도 보임).
+        if (buyersOnly && customer.orderCount <= 0) return false;
         if (statusFilter === "normal") return !customer.blocked;
         if (statusFilter === "blocked") return customer.blocked;
         if (statusFilter === "attention") return customer.manualNeededCount > 0 || customer.unpaidCount > 0;
@@ -888,6 +888,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
     });
   };
   const clearSelection = () => setSelectedPhones(new Set());
+  // 선택된 회원(이름 표시용) — 전화번호 기준
+  const selectedCustomersList = customers.filter((c) => selectedPhones.has(digitsOnly(c.phone)));
 
   const openBulk = () => {
     setBulkAmount("");
@@ -1121,7 +1123,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}>
-      <div className="flex w-full max-w-[640px] max-h-[88vh] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <div className="flex h-[88vh] w-full max-w-[640px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-rose-line px-5 py-3 shrink-0">
           <span className="text-[15px] font-black text-slate-950">👥 고객·이슈</span>
           <button type="button" onClick={() => onClose?.()} className="text-slate-400 hover:text-slate-700 text-lg leading-none">✕</button>
@@ -1348,7 +1350,20 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
             <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4" onClick={() => !bulkRunning && setBulkOpen(false)}>
               <div className="w-[min(460px,94vw)] rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
                 <div className="mb-1 text-[16px] font-black text-rose-deep">🪙 포인트 일괄지급</div>
-                <div className="mb-3 text-xs font-bold text-slate-500">선택한 {selectedPhones.size}명에게 같은 금액을 지급합니다.</div>
+                <div className="mb-2 text-xs font-bold text-slate-500">선택한 {selectedPhones.size}명에게 같은 금액을 지급합니다.</div>
+
+                {/* 받는 사람 목록 */}
+                {selectedCustomersList.length > 0 && !bulkResult ? (
+                  <div className="mb-3 max-h-24 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2">
+                    <div className="flex flex-wrap gap-1">
+                      {selectedCustomersList.map((c) => (
+                        <span key={c.key} className="rounded-full bg-white px-2 py-1 text-[11px] font-black text-slate-700 ring-1 ring-slate-200">
+                          {c.nickname || c.name || formatPhone(c.phone)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
 
                 {!bulkResult ? (
                   <>
