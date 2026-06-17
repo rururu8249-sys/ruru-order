@@ -3021,7 +3021,10 @@ export default function OrderPage() {
   };
 
   const removeItem = (index: number) => {
-    setItems((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+    setItems((prev) => {
+      const next = prev.filter((_, itemIndex) => itemIndex !== index);
+      return next.length > 0 ? next : [{ ...emptyItem }];
+    });
   };
 
   const saveCustomer = async (previousPhone?: string) => {
@@ -3878,6 +3881,16 @@ export default function OrderPage() {
     setProductSearchOpenIndex(null);
     setDirectInputProductSearchMode(false);
     setDirectInputOpen(false);
+    // 직접입력 창을 미완성(상품명/수량/금액 누락)으로 닫으면 그 항목이 카트에 남아
+    // 수량0으로 제출을 막으므로 정리한다. 완성 항목/등록상품(product_id)은 보존.
+    setItems((prev) => {
+      const target = prev[directInputTargetIndex];
+      if (!target || target.product_id) return prev;
+      const incomplete = !target.product_name.trim() || !toNumber(target.qty) || !toNumber(target.product_price);
+      if (!incomplete) return prev;
+      const next = prev.filter((_, i) => i !== directInputTargetIndex);
+      return next.length > 0 ? next : [{ ...emptyItem }];
+    });
   };
 
   const confirmDirectInputSheet = async () => {
@@ -4333,7 +4346,7 @@ export default function OrderPage() {
                   const itemHasNoOptions = optionColorText === "없음" && optionSizeText === "없음";
                   const canInlineChangeQty = itemIsRegisteredProduct && itemHasNoOptions;
                   const itemSourceLabel = itemIsRegisteredProduct ? "선택상품" : "직접입력";
-                  const itemAmount = toNumber(item.product_price) * (toNumber(item.qty) || 1);
+                  const itemAmount = toNumber(item.product_price) * toNumber(item.qty);
 
                   return (
                     <article
@@ -4353,10 +4366,12 @@ export default function OrderPage() {
                         <div style={{ fontSize: "11px", color: "#ABA5A0", marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{itemHasNoOptions ? "옵션 없음" : `${optionColorText} / ${optionSizeText}`} · 단가 {won(toNumber(item.product_price))}</div>
 
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "6px", gap: "8px" }}>
-                          <span style={{ fontSize: "12px", fontWeight: 700, color: "#6B6460" }}>수량 {toNumber(item.qty) || 1}개</span>
+                          <span style={{ fontSize: "12px", fontWeight: 700, color: toNumber(item.qty) > 0 ? "#6B6460" : "#e74c3c" }}>수량 {toNumber(item.qty)}개</span>
                           <span style={{ flexShrink: 0, fontSize: "14px", fontWeight: 700, color: "#7A1E47" }}>{won(itemAmount)}</span>
                         </div>
                       </div>
+                      <button type="button" onClick={() => removeItem(index)} aria-label="상품 삭제"
+                        style={{ flexShrink: 0, width: "24px", height: "24px", borderRadius: "50%", border: "none", background: "#F0EBE8", color: "#999", fontSize: "13px", cursor: "pointer", lineHeight: 1, alignSelf: "flex-start" }}>✕</button>
                     </article>
                   );
                 })}
