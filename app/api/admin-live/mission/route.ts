@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       const alreadyPaid = await readMissionPaid(supabase, broadcastId);
 
       if (action === "payout_preview") {
-        return json({ ok: true, broadcastTitle, count: buyers.length, reward, total: buyers.length * reward, alreadyPaid });
+        return json({ ok: true, broadcastTitle, count: buyers.length, reward, total: buyers.length * reward, alreadyPaid, buyers });
       }
       // payout_confirm: 중복가드 → 통과 시 가드 선설정 후 지급대상 반환(클라이언트가 일괄지급)
       if (alreadyPaid) return json({ ok: false, already: true, message: "이미 이 방송 미션 지급이 완료됐어요." }, 409);

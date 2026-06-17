@@ -122,7 +122,7 @@ export async function computeMissionProgress(supabase: Client): Promise<MissionP
 //   - 같은 방송의 결제완료·비테스트 주문 구매자를 전화번호 기준으로 1명 1회씩 추출(중복 제거).
 //   - 중복지급 방지 가드는 settings의 mission_paid_<broadcastId> 키(값 있으면 지급완료).
 export const missionPaidKey = (broadcastId: string) => `mission_paid_${broadcastId}`;
-export type MissionBuyer = { phone: string; nickname: string };
+export type MissionBuyer = { phone: string; nickname: string; amount: number; when: string };
 
 export async function fetchMissionBuyers(
   supabase: Client
@@ -133,7 +133,7 @@ export async function fetchMissionBuyers(
   const end = bc.ended_at ? String(bc.ended_at) : new Date().toISOString();
   const { data } = await supabase
     .from("orders")
-    .select("customer_phone,youtube_nickname,customer_name,admin_order_status_v2,order_manage_status,is_test_order")
+    .select("customer_phone,youtube_nickname,customer_name,total_price,adjusted_total_price,final_amount,created_at,admin_order_status_v2,order_manage_status,is_test_order")
     .gte("created_at", start)
     .lte("created_at", end)
     .limit(2000);
@@ -144,8 +144,14 @@ export async function fetchMissionBuyers(
     if (!isPaidRow(r)) continue;
     const phone = String(r.customer_phone ?? "").replace(/[^0-9]/g, "");
     if (!phone) continue;
-    if (!map.has(phone)) {
-      map.set(phone, { phone, nickname: String(r.youtube_nickname || r.customer_name || "고객").trim() });
+    const amt = rowAmount(r);
+    const when = String(r.created_at ?? "");
+    const ex = map.get(phone);
+    if (ex) {
+      ex.amount += amt;
+      if (when > ex.when) ex.when = when;
+    } else {
+      map.set(phone, { phone, nickname: String(r.youtube_nickname || r.customer_name || "고객").trim(), amount: amt, when });
     }
   }
   return { broadcastId: String(bc.id ?? ""), broadcastTitle: String(bc.title ?? ""), buyers: [...map.values()] };

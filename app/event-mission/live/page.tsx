@@ -74,7 +74,7 @@ export default function MissionLiveWidget() {
   const done = pct >= 100;
   const near = !done && pct >= 90;
 
-  const panelBg = done ? "rgba(15,110,86,0.82)" : "rgba(123,45,67,0.62)";
+  const panelBg = done ? "rgba(15,110,86,0.72)" : "rgba(123,45,67,0.55)";
   const border = done ? "2px solid #F5C451" : near ? "2px solid #F5C451" : "1.5px solid rgba(245,196,81,0.6)";
   const fillBg = done ? "#F5C451" : near ? "#FFB12E" : "#FF5C8E";
 

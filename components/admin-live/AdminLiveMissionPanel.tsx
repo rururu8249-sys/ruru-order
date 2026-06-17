@@ -3,7 +3,7 @@
 // 미션 게이지(공동목표) 관리자 패널 — 1단계: 목표/보상 설정 + 진행률 조회 + OBS 위젯주소.
 //   - 설정은 /api/admin-live/mission(POST), 진행률은 GET. settings 키만 다룸.
 //   - "구매자 전원 지급"(돈)은 2단계라 여기엔 없음(읽기/설정 전용).
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useBulkPointGrant } from "./useBulkPointGrant";
 
 type GoalType = "count" | "amount";
@@ -19,6 +19,13 @@ type Progress = {
 };
 
 const won = (n: number) => n.toLocaleString("ko-KR");
+const whenText = (s: string) => {
+  if (!s) return "";
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+};
+type Buyer = { phone: string; nickname: string; amount: number; when: string };
 
 export default function AdminLiveMissionPanel() {
   const [active, setActive] = useState(false);
@@ -29,6 +36,7 @@ export default function AdminLiveMissionPanel() {
   const [prog, setProg] = useState<Progress | null>(null);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
+  const initRef = useRef(false);
 
   const widgetUrl =
     (typeof window !== "undefined" ? window.location.origin : "https://ruru-order.vercel.app") +
@@ -40,11 +48,15 @@ export default function AdminLiveMissionPanel() {
       const j = (await res.json()) as Progress & { ok: boolean };
       if (j.ok) {
         setProg(j);
-        setActive(j.active);
-        setGoalType(j.goalType === "amount" ? "amount" : "count");
-        setGoalValue(j.goal ? String(j.goal) : "");
-        setRewardAmount(j.reward ? String(j.reward) : "");
-        setTitle(j.title || "");
+        // 입력칸은 처음 1회만 채움 — 폴링이 편집 중인 값을 덮어쓰지 않게(저장 전 체크 풀림 방지)
+        if (!initRef.current) {
+          initRef.current = true;
+          setActive(j.active);
+          setGoalType(j.goalType === "amount" ? "amount" : "count");
+          setGoalValue(j.goal ? String(j.goal) : "");
+          setRewardAmount(j.reward ? String(j.reward) : "");
+          setTitle(j.title || "");
+        }
       }
     } catch {
       /* ignore */
@@ -78,7 +90,7 @@ export default function AdminLiveMissionPanel() {
 
   // ── 2단계: 구매자 전원 지급 ──
   const { running: paying, grant } = useBulkPointGrant();
-  const [payout, setPayout] = useState<{ count: number; reward: number; total: number; alreadyPaid: boolean; broadcastTitle: string } | null>(null);
+  const [payout, setPayout] = useState<{ count: number; reward: number; total: number; alreadyPaid: boolean; broadcastTitle: string; buyers: Buyer[] } | null>(null);
   const [payMsg, setPayMsg] = useState("");
 
   const openPayout = async () => {
@@ -87,7 +99,7 @@ export default function AdminLiveMissionPanel() {
       const res = await fetch("/api/admin-live/mission", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "payout_preview" }) });
       const j = await res.json();
       if (!j.ok) { setPayMsg(j.message || "조회 실패"); return; }
-      setPayout({ count: j.count, reward: j.reward, total: j.total, alreadyPaid: j.alreadyPaid, broadcastTitle: j.broadcastTitle || "" });
+      setPayout({ count: j.count, reward: j.reward, total: j.total, alreadyPaid: j.alreadyPaid, broadcastTitle: j.broadcastTitle || "", buyers: Array.isArray(j.buyers) ? j.buyers : [] });
     } catch (e) {
       setPayMsg("조회 실패: " + (e instanceof Error ? e.message : String(e)));
     }
@@ -238,21 +250,38 @@ export default function AdminLiveMissionPanel() {
 
       {payout ? (
         <div style={{ position: "fixed", inset: 0, zIndex: 140, background: "rgba(2,6,23,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={(e) => { if (e.target === e.currentTarget) setPayout(null); }}>
-          <div style={{ width: "min(420px,92vw)", background: "#fff", borderRadius: 16, padding: 20 }}>
-            <div style={{ fontSize: 16, fontWeight: 800, color: "#7B2D43" }}>구매자 전원 포인트 지급</div>
+          <div style={{ width: "min(500px,94vw)", maxHeight: "88vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: 16, padding: 20 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#7B2D43", flexShrink: 0 }}>구매자 전원 포인트 지급 — 최종 확인</div>
             {payout.alreadyPaid ? (
               <div style={{ marginTop: 12, fontSize: 14, color: "#C0392B", fontWeight: 700, lineHeight: 1.6 }}>이미 이 방송 미션 지급이 완료됐어요.<br />중복 지급되지 않습니다.</div>
             ) : (
-              <div style={{ marginTop: 12, fontSize: 14, color: "#333", lineHeight: 1.8 }}>
-                {payout.broadcastTitle ? <div style={{ color: "#888", fontSize: 13 }}>{payout.broadcastTitle}</div> : null}
-                결제완료 <b style={{ color: "#7B2D43" }}>{payout.count}명</b>에게<br />
-                1인당 <b style={{ color: "#7B2D43" }}>{won(payout.reward)}P</b> · 총 <b style={{ color: "#0F6E56" }}>{won(payout.total)}P</b> 지급합니다.
-              </div>
+              <>
+                <div style={{ marginTop: 8, fontSize: 13, color: "#888", flexShrink: 0 }}>
+                  {payout.broadcastTitle ? `${payout.broadcastTitle} · ` : ""}아래 <b style={{ color: "#7B2D43" }}>{payout.count}명</b>에게 1인당 <b style={{ color: "#7B2D43" }}>{won(payout.reward)}P</b> 지급
+                </div>
+                <div style={{ marginTop: 10, flex: 1, minHeight: 0, overflowY: "auto", border: "1px solid #eee", borderRadius: 10 }}>
+                  {payout.buyers.length === 0 ? (
+                    <div style={{ padding: "16px", textAlign: "center", color: "#999", fontSize: 13 }}>지급 대상(결제완료 구매자)이 없어요.</div>
+                  ) : (
+                    payout.buyers.map((b, i) => (
+                      <div key={`${b.phone}-${i}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderBottom: "1px solid #f4f4f4", fontSize: 13 }}>
+                        <span style={{ color: "#bbb", width: 22, flexShrink: 0 }}>{i + 1}</span>
+                        <span style={{ flex: 1, minWidth: 0, fontWeight: 700, color: "#333", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.nickname}</span>
+                        <span style={{ color: "#0F6E56", fontWeight: 700, flexShrink: 0 }}>{won(b.amount)}원</span>
+                        <span style={{ color: "#aaa", flexShrink: 0, fontSize: 12 }}>{whenText(b.when)}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div style={{ marginTop: 10, fontSize: 15, fontWeight: 800, color: "#7B2D43", flexShrink: 0 }}>
+                  총 {payout.count}명 · 총 지급 <span style={{ color: "#0F6E56" }}>{won(payout.total)}P</span>
+                </div>
+              </>
             )}
-            <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
-              <button type="button" onClick={() => setPayout(null)} style={{ flex: 1, padding: "10px", borderRadius: 10, border: "1.5px solid #D9C5CC", background: "#fff", color: "#777", fontWeight: 700, cursor: "pointer" }}>취소</button>
+            <div style={{ display: "flex", gap: 8, marginTop: 16, flexShrink: 0 }}>
+              <button type="button" onClick={() => setPayout(null)} style={{ flex: 1, padding: "11px", borderRadius: 10, border: "1.5px solid #D9C5CC", background: "#fff", color: "#777", fontWeight: 700, cursor: "pointer" }}>취소</button>
               {!payout.alreadyPaid && payout.count > 0 && payout.reward > 0 ? (
-                <button type="button" onClick={doPayout} disabled={paying} style={{ flex: 1, padding: "10px", borderRadius: 10, border: "none", background: "#0F6E56", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: paying ? 0.6 : 1 }}>{paying ? "지급 중…" : "지급 실행"}</button>
+                <button type="button" onClick={doPayout} disabled={paying} style={{ flex: 1, padding: "11px", borderRadius: 10, border: "none", background: "#0F6E56", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: paying ? 0.6 : 1 }}>{paying ? "지급 중…" : `${won(payout.total)}P 지급 실행`}</button>
               ) : null}
             </div>
           </div>
