@@ -1600,13 +1600,13 @@ export default function AdminLiveDashboard() {
 
           {/* 설정 팝업 */}
           {activeMenu === "settings" && (
-            <div className="fixed inset-0 z-40 overflow-y-auto bg-slate-950/40 px-4 py-8" onClick={(e) => { if (e.target === e.currentTarget) setActiveMenu("broadcast"); }}>
-              <div className="mx-auto w-full max-w-[700px] rounded-2xl bg-white shadow-2xl">
-                <div className="flex items-center justify-between border-b border-rose-line px-5 py-3">
+            <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 p-4" onClick={(e) => { if (e.target === e.currentTarget) setActiveMenu("broadcast"); }}>
+              <div className="flex h-[88vh] w-full max-w-[880px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+                <div className="flex shrink-0 items-center justify-between border-b border-rose-line px-5 py-3">
                   <span className="text-[15px] font-black text-slate-950">⚙ 설정</span>
                   <button type="button" onClick={() => setActiveMenu("broadcast")} className="text-lg leading-none text-slate-400 hover:text-slate-700">✕</button>
                 </div>
-                <div className="p-5">
+                <div className="min-h-0 flex-1">
                   <AdminLiveSettingsPanel />
                 </div>
               </div>
