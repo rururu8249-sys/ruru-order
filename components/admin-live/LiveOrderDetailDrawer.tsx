@@ -8,6 +8,7 @@ import type { LiveOrder, LiveOrderItem } from "./types";
 import { isLiveOrderCanceled, useLiveOrderCancelRestore } from "./useLiveOrderCancelRestore";
 import LiveOrderItemEditCard from "./LiveOrderItemEditCard";
 import type { LiveOrderItemEditSaveResult } from "./useLiveOrderItemEdit";
+import { useLiveOrderItemAdd, createInitialLiveOrderItemAddForm, type LiveOrderItemAddForm } from "./useLiveOrderItemAdd";
 import LiveOrderDangerActionGuide from "./LiveOrderDangerActionGuide";
 
 type Props = {
@@ -171,6 +172,49 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         };
       });
 
+      await onAfterStatusChange?.();
+    } finally {
+      setRefreshingDetail(false);
+    }
+  };
+
+  // 직접입력 상품 추가 (#3 1단계) — 재고 무관, 같은 그룹에 새 행 INSERT
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addForm, setAddForm] = useState<LiveOrderItemAddForm>(createInitialLiveOrderItemAddForm());
+  const { adding, addDirectItem } = useLiveOrderItemAdd();
+
+  const handleAddDirectItem = async () => {
+    const result = await addDirectItem(localOrder, addForm);
+    if (!result) return;
+
+    setRefreshingDetail(true);
+    try {
+      setLocalOrder((previousOrder) => {
+        const previousItems = Array.isArray(previousOrder.items) ? previousOrder.items : [];
+        const newItem = {
+          id: String(result.rowId),
+          productName: result.productName,
+          optionText: [result.color, result.size].filter(Boolean).join(" / ") || "옵션 없음",
+          color: result.color,
+          size: result.size,
+          qty: result.qty,
+          unitPrice: result.unitPrice,
+          amount: result.productTotal,
+        } as (typeof previousItems)[number];
+
+        const nextItems = [...previousItems, newItem];
+        const nextProductAmount = nextItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+        return {
+          ...previousOrder,
+          items: nextItems,
+          totalQty: nextItems.reduce((sum, item) => sum + Number(item.qty || 0), 0),
+          totalAmount: nextProductAmount + Number(previousOrder.shippingFee || 0),
+        };
+      });
+
+      setAddForm(createInitialLiveOrderItemAddForm());
+      setShowAddForm(false);
       await onAfterStatusChange?.();
     } finally {
       setRefreshingDetail(false);
@@ -599,9 +643,20 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         <section className="mt-3">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-[11px] font-black text-slate-400">주문 내역 ({items.length}건)</h3>
-            {refreshingDetail ? (
-              <span className="rounded-full bg-rose-soft px-2 py-1 text-[10px] font-black text-rose-deep">상세정보 갱신중...</span>
-            ) : null}
+            <div className="flex items-center gap-2">
+              {refreshingDetail ? (
+                <span className="rounded-full bg-rose-soft px-2 py-1 text-[10px] font-black text-rose-deep">상세정보 갱신중...</span>
+              ) : null}
+              {!isCanceled ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAddForm((v) => !v)}
+                  className="rounded-lg border border-rose-200 bg-rose-soft px-2 py-1 text-[11px] font-black text-rose-deep hover:bg-rose-100"
+                >
+                  {showAddForm ? "닫기" : "+ 직접입력 추가"}
+                </button>
+              ) : null}
+            </div>
           </div>
           <div className="max-h-[480px] space-y-2 overflow-y-auto pr-1">
             {items.length === 0 ? (
@@ -612,6 +667,56 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               ))
             )}
           </div>
+
+          {showAddForm && !isCanceled ? (
+            <div className="mt-2 space-y-2 rounded-2xl border border-rose-200 bg-rose-soft/50 p-3">
+              <div className="text-[11px] font-black text-rose-deep">직접입력 상품 추가 (재고 차감 없음)</div>
+              <input
+                value={addForm.productName}
+                onChange={(e) => setAddForm((f) => ({ ...f, productName: e.target.value }))}
+                placeholder="상품명"
+                className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-[13px] outline-none focus:border-rose-deep"
+              />
+              <div className="flex gap-2">
+                <input
+                  value={addForm.color}
+                  onChange={(e) => setAddForm((f) => ({ ...f, color: e.target.value }))}
+                  placeholder="색상(선택)"
+                  className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-[13px] outline-none focus:border-rose-deep"
+                />
+                <input
+                  value={addForm.size}
+                  onChange={(e) => setAddForm((f) => ({ ...f, size: e.target.value }))}
+                  placeholder="사이즈(선택)"
+                  className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-[13px] outline-none focus:border-rose-deep"
+                />
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={addForm.qty}
+                  onChange={(e) => setAddForm((f) => ({ ...f, qty: e.target.value.replace(/[^\d]/g, "") }))}
+                  inputMode="numeric"
+                  placeholder="수량"
+                  className="w-20 rounded-lg border border-slate-200 px-2 py-1.5 text-[13px] outline-none focus:border-rose-deep"
+                />
+                <input
+                  value={addForm.unitPrice}
+                  onChange={(e) => setAddForm((f) => ({ ...f, unitPrice: e.target.value.replace(/[^\d]/g, "") }))}
+                  inputMode="numeric"
+                  placeholder="단가(원)"
+                  className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-[13px] outline-none focus:border-rose-deep"
+                />
+              </div>
+              <button
+                type="button"
+                disabled={adding}
+                onClick={handleAddDirectItem}
+                className="w-full rounded-lg bg-rose-deep px-3 py-2 text-[13px] font-black text-white disabled:opacity-50"
+              >
+                {adding ? "추가 중..." : "이 주문에 추가"}
+              </button>
+            </div>
+          ) : null}
         </section>
 
         {/* 금액 요약 (목업 B) */}
