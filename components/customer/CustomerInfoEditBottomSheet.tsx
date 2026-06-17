@@ -105,7 +105,8 @@ export default function CustomerInfoEditBottomSheet({
 
   const openAddForm = () => {
     setEditingAddrIndex(null);
-    setAddrForm({ name: "", phone: "", address: "", detailAddress: "", zipcode: "" });
+    // 받는 분/연락처 기본값 = 주문자 본인(대부분 본인이 받음). 빈칸으로 두고 다른 사람으로 수정 가능.
+    setAddrForm({ name: customerName || "", phone: customerPhone || "", address: "", detailAddress: "", zipcode: "" });
     setScreen("shipping_form");
   };
 
