@@ -1220,7 +1220,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           {/* 드래그 핸들 */}
                           <span style={{ flexShrink: 0, fontSize: "14px", color: "#bbb", userSelect: "none" }} title="드래그로 순서 변경">⠿</span>
                           <span style={{ fontSize: "11px", fontWeight: 800, color: "#888", width: "20px", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
-                          <span style={{ width: "48px", height: "48px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "#F5F2EF", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <span
+                            onClick={(e) => { e.stopPropagation(); if (img) setLightbox(img); }}
+                            title={img ? "클릭하면 크게 보기" : undefined}
+                            style={{ width: "48px", height: "48px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "#F5F2EF", display: "flex", alignItems: "center", justifyContent: "center", cursor: img ? "zoom-in" : "default" }}
+                          >
                             {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "18px" }}>🖼</span>}
                           </span>
                           <div style={{ flex: 1, minWidth: 0 }}>
@@ -1264,7 +1268,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         {/* 드래그 핸들 */}
                         <span style={{ flexShrink: 0, fontSize: "14px", color: "#bbb", userSelect: "none" }} title="드래그로 순서 변경">⠿</span>
                         <span style={{ fontSize: "11px", fontWeight: 800, color: "#888", width: "20px", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
-                        <span style={{ width: "56px", height: "56px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "#F5F2EF", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <span
+                          onClick={(e) => { e.stopPropagation(); if (img) setLightbox(img); }}
+                          title={img ? "클릭하면 크게 보기" : undefined}
+                          style={{ width: "56px", height: "56px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "#F5F2EF", display: "flex", alignItems: "center", justifyContent: "center", cursor: img ? "zoom-in" : "default" }}
+                        >
                           {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "20px" }}>🖼</span>}
                         </span>
                         <div style={{ flex: 1, minWidth: 0 }}>
