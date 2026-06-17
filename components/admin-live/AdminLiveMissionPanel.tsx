@@ -1,0 +1,193 @@
+"use client";
+
+// 미션 게이지(공동목표) 관리자 패널 — 1단계: 목표/보상 설정 + 진행률 조회 + OBS 위젯주소.
+//   - 설정은 /api/admin-live/mission(POST), 진행률은 GET. settings 키만 다룸.
+//   - "구매자 전원 지급"(돈)은 2단계라 여기엔 없음(읽기/설정 전용).
+import { useCallback, useEffect, useState } from "react";
+
+type GoalType = "count" | "amount";
+type Progress = {
+  active: boolean;
+  goalType: GoalType;
+  goal: number;
+  reward: number;
+  title: string;
+  current: number;
+  pct: number;
+  broadcastTitle: string;
+};
+
+const won = (n: number) => n.toLocaleString("ko-KR");
+
+export default function AdminLiveMissionPanel() {
+  const [active, setActive] = useState(false);
+  const [goalType, setGoalType] = useState<GoalType>("count");
+  const [goalValue, setGoalValue] = useState("");
+  const [rewardAmount, setRewardAmount] = useState("");
+  const [title, setTitle] = useState("");
+  const [prog, setProg] = useState<Progress | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const widgetUrl =
+    (typeof window !== "undefined" ? window.location.origin : "https://ruru-order.vercel.app") +
+    "/event-mission/live";
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin-live/mission", { cache: "no-store" });
+      const j = (await res.json()) as Progress & { ok: boolean };
+      if (j.ok) {
+        setProg(j);
+        setActive(j.active);
+        setGoalType(j.goalType === "amount" ? "amount" : "count");
+        setGoalValue(j.goal ? String(j.goal) : "");
+        setRewardAmount(j.reward ? String(j.reward) : "");
+        setTitle(j.title || "");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 6000);
+    return () => clearInterval(t);
+  }, [load]);
+
+  const save = async () => {
+    setSaving(true);
+    setMsg("");
+    try {
+      const res = await fetch("/api/admin-live/mission", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active, goalType, goalValue, rewardAmount, title }),
+      });
+      const j = await res.json();
+      setMsg(j.ok ? "저장됐어요. 위젯에 바로 반영됩니다." : `저장 실패: ${j.message || ""}`);
+      if (j.ok) load();
+    } catch (e) {
+      setMsg("저장 실패: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const goal = Number(String(goalValue).replace(/[^0-9.]/g, "")) || 0;
+  const pct = prog ? prog.pct : 0;
+  const current = prog ? prog.current : 0;
+  const unit = goalType === "amount" ? "원" : "개";
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "9px 12px",
+    borderRadius: 10,
+    border: "1.5px solid #D9C5CC",
+    fontSize: 14,
+    outline: "none",
+  };
+  const labelStyle: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: "#7B2D43", marginBottom: 5, display: "block" };
+
+  return (
+    <div style={{ maxWidth: 720, margin: "0 auto", padding: "4px 2px" }}>
+      <div style={{ fontSize: 18, fontWeight: 800, color: "#7B2D43", marginBottom: 4 }}>◆ 미션 게이지 (공동목표)</div>
+      <div style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>
+        방송 중 목표(누적 판매/매출)를 정하면 OBS 위젯에 진행 막대가 뜹니다. “구매자 전원 지급”은 다음 단계에서 추가돼요.
+      </div>
+
+      {/* 진행률 */}
+      <div style={{ background: "#F5E6EB", borderRadius: 14, padding: "14px 16px", marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: "#7B2D43", fontWeight: 700 }}>
+          현재 진행 {prog?.broadcastTitle ? `· ${prog.broadcastTitle}` : "· (방송 OFF)"}
+        </div>
+        <div style={{ fontSize: 20, fontWeight: 800, color: "#7B2D43", marginTop: 3 }}>
+          {won(current)}
+          {unit} <span style={{ color: "#B68", fontSize: 15 }}>/ 목표 {won(goal)}{unit} ({pct}%)</span>
+        </div>
+        <div style={{ marginTop: 8, height: 14, background: "#fff", borderRadius: 7, overflow: "hidden", border: "1px solid #E3CDD5" }}>
+          <div style={{ width: `${pct}%`, height: "100%", background: pct >= 100 ? "#0F6E56" : "#D4537E", borderRadius: 7, transition: "width .5s" }} />
+        </div>
+      </div>
+
+      {/* 설정 */}
+      <div style={{ display: "grid", gap: 14 }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+          <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} style={{ width: 20, height: 20 }} />
+          <span style={{ fontSize: 15, fontWeight: 700, color: active ? "#0F6E56" : "#999" }}>
+            {active ? "미션 켜짐 (위젯 표시)" : "미션 꺼짐 (위젯 숨김)"}
+          </span>
+        </label>
+
+        <div>
+          <span style={labelStyle}>목표 종류</span>
+          <div style={{ display: "flex", gap: 8 }}>
+            {(["count", "amount"] as GoalType[]).map((g) => (
+              <button
+                key={g}
+                type="button"
+                onClick={() => setGoalType(g)}
+                style={{
+                  flex: 1,
+                  padding: "10px",
+                  borderRadius: 10,
+                  border: goalType === g ? "2px solid #7B2D43" : "1.5px solid #D9C5CC",
+                  background: goalType === g ? "#7B2D43" : "#fff",
+                  color: goalType === g ? "#fff" : "#7B2D43",
+                  fontWeight: 700,
+                  fontSize: 14,
+                  cursor: "pointer",
+                }}
+              >
+                {g === "count" ? "누적 판매 개수" : "매출 금액(원)"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div>
+            <span style={labelStyle}>목표 {goalType === "amount" ? "금액(원)" : "개수"}</span>
+            <input style={inputStyle} inputMode="numeric" value={goalValue} onChange={(e) => setGoalValue(e.target.value)} placeholder={goalType === "amount" ? "예: 5000000" : "예: 100"} />
+          </div>
+          <div>
+            <span style={labelStyle}>구매자 1인당 포인트</span>
+            <input style={inputStyle} inputMode="numeric" value={rewardAmount} onChange={(e) => setRewardAmount(e.target.value)} placeholder="예: 1000" />
+          </div>
+        </div>
+
+        <div>
+          <span style={labelStyle}>제목(선택)</span>
+          <input style={inputStyle} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 오늘의 공동목표" maxLength={80} />
+        </div>
+
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving}
+          style={{ padding: "12px", borderRadius: 12, border: "none", background: "#7B2D43", color: "#fff", fontWeight: 800, fontSize: 15, cursor: "pointer", opacity: saving ? 0.6 : 1 }}
+        >
+          {saving ? "저장 중…" : "저장"}
+        </button>
+        {msg ? <div style={{ fontSize: 13, color: msg.includes("실패") ? "#C0392B" : "#0F6E56", fontWeight: 700 }}>{msg}</div> : null}
+      </div>
+
+      {/* OBS 위젯 주소 */}
+      <div style={{ marginTop: 20, borderTop: "1px solid #E3CDD5", paddingTop: 14 }}>
+        <span style={labelStyle}>OBS 방송 위젯주소 (브라우저 소스)</span>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input style={{ ...inputStyle, background: "#FafAfA" }} readOnly value={widgetUrl} />
+          <button
+            type="button"
+            onClick={() => { void navigator.clipboard?.writeText(widgetUrl); setMsg("위젯주소 복사됨"); }}
+            style={{ padding: "9px 16px", borderRadius: 10, border: "none", background: "#7B2D43", color: "#fff", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
+          >
+            복사
+          </button>
+        </div>
+        <div style={{ fontSize: 12, color: "#999", marginTop: 6 }}>OBS에서 브라우저 소스로 추가 · 배경 투명 · 미션 꺼져 있으면 아무것도 안 보여요.</div>
+      </div>
+    </div>
+  );
+}
