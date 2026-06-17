@@ -101,6 +101,49 @@ export default function ProductWidgetClient() {
   const [confettiKey, setConfettiKey] = useState(0);
   const [confettiOn, setConfettiOn] = useState(false);
 
+  // 위젯 위치 — 운영자가 드래그해서 원하는 곳에 두면 기억(localStorage, 보기 상태 전용·돈 로직 무관).
+  // 저장 전(null)에는 기본 좌하단(left:24/bottom:24) 유지.
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const dragRef = useRef<{ dx: number; dy: number } | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem("ruru_product_widget_pos");
+      if (raw) setPos(JSON.parse(raw));
+    } catch {
+      // ignore
+    }
+  }, []);
+  const startDragWidget = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    dragRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current) return;
+      setPos({
+        x: Math.max(0, ev.clientX - dragRef.current.dx),
+        y: Math.max(0, ev.clientY - dragRef.current.dy),
+      });
+    };
+    const onUp = () => {
+      dragRef.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      setPos((p) => {
+        if (p && typeof window !== "undefined") {
+          try {
+            window.localStorage.setItem("ruru_product_widget_pos", JSON.stringify(p));
+          } catch {
+            // ignore
+          }
+        }
+        return p;
+      });
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    e.preventDefault();
+  };
+
   // 배경 투명 (OBS 크로마키)
   useEffect(() => {
     const prevBody = document.body.style.background;
@@ -268,11 +311,16 @@ export default function ProductWidgetClient() {
       {current ? (
         <div
           key={String(current?.id ?? rotIndex)}
+          onMouseDown={startDragWidget}
+          title="드래그해서 위치 이동 (위치 자동 저장)"
           style={{
             position: "absolute",
-            left: "24px",
-            bottom: "24px",
+            left: pos ? `${pos.x}px` : "24px",
+            top: pos ? `${pos.y}px` : undefined,
+            bottom: pos ? undefined : "24px",
             width: "336px",
+            cursor: "move",
+            pointerEvents: "auto",
             display: "flex",
             gap: "12px",
             alignItems: "center",
