@@ -881,15 +881,21 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     const id = productId(p);
     if (!id) return;
     if (!window.confirm(`"${productName(p)}" 상품을 삭제할까요?\n\n숨김 처리됩니다 (복구 가능)`)) return;
-    try {
-      const { error } = await supabase.from("products").update({ status: "deleted", is_visible: false }).eq("id", id);
-      if (error) throw error;
-      showAdminToast("상품을 숨김 처리했어요. (복구 가능)", "success");
-      window.dispatchEvent(new Event("ruru-live-product-updated"));
-      await loadProducts();
-    } catch (e) {
-      showAdminToast("상품 숨김 처리 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    // 소프트 삭제 마커 = status:"deleted".
+    //   관리자 목록(status==="deleted" 제외)·고객 목록(app/order: status!=="deleted") 양쪽 모두 이 마커로 숨김.
+    //   과거엔 is_visible도 함께 update했는데, is_visible 컬럼이 없으면 update 전체가 실패(=숨김 실패 [object Object]).
+    //   status 하나로 양쪽 다 숨겨지므로 status만 업데이트(불필요한 컬럼 제거로 실패 원인 차단).
+    const { error } = await supabase
+      .from("products")
+      .update({ status: "deleted" })
+      .eq("id", id);
+    if (error) {
+      showAdminToast("상품 숨김 처리 실패\n\n" + (error.message || JSON.stringify(error)), "error");
+      return;
     }
+    showAdminToast("상품을 숨김 처리했어요. (복구 가능)", "success");
+    window.dispatchEvent(new Event("ruru-live-product-updated"));
+    await loadProducts();
   };
 
   // --- 위젯 설정 / 주소 복사 ---
