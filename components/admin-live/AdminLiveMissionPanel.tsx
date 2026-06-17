@@ -26,6 +26,8 @@ const whenText = (s: string) => {
   return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
 };
 type Buyer = { phone: string; nickname: string; amount: number; when: string };
+// 폼 현재값 스냅샷(저장값과 비교해 "변경됨" 판단용)
+const snapOf = (a: boolean, gt: string, gv: string, ra: string, t: string) => JSON.stringify({ a, gt, gv: gv.trim(), ra: ra.trim(), t: t.trim() });
 
 export default function AdminLiveMissionPanel() {
   const [active, setActive] = useState(false);
@@ -36,6 +38,7 @@ export default function AdminLiveMissionPanel() {
   const [prog, setProg] = useState<Progress | null>(null);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
+  const [savedSnap, setSavedSnap] = useState<string | null>(null);
   const initRef = useRef(false);
 
   const widgetUrl =
@@ -51,11 +54,16 @@ export default function AdminLiveMissionPanel() {
         // 입력칸은 처음 1회만 채움 — 폴링이 편집 중인 값을 덮어쓰지 않게(저장 전 체크 풀림 방지)
         if (!initRef.current) {
           initRef.current = true;
+          const gt = j.goalType === "amount" ? "amount" : "count";
+          const gv = j.goal ? String(j.goal) : "";
+          const ra = j.reward ? String(j.reward) : "";
+          const tt = j.title || "";
           setActive(j.active);
-          setGoalType(j.goalType === "amount" ? "amount" : "count");
-          setGoalValue(j.goal ? String(j.goal) : "");
-          setRewardAmount(j.reward ? String(j.reward) : "");
-          setTitle(j.title || "");
+          setGoalType(gt);
+          setGoalValue(gv);
+          setRewardAmount(ra);
+          setTitle(tt);
+          setSavedSnap(snapOf(j.active, gt, gv, ra, tt));
         }
       }
     } catch {
@@ -80,7 +88,10 @@ export default function AdminLiveMissionPanel() {
       });
       const j = await res.json();
       setMsg(j.ok ? "저장됐어요. 위젯에 바로 반영됩니다." : `저장 실패: ${j.message || ""}`);
-      if (j.ok) load();
+      if (j.ok) {
+        setSavedSnap(snapOf(active, goalType, goalValue, rewardAmount, title));
+        load();
+      }
     } catch (e) {
       setMsg("저장 실패: " + (e instanceof Error ? e.message : String(e)));
     } finally {
@@ -125,6 +136,7 @@ export default function AdminLiveMissionPanel() {
   };
 
   const goal = Number(String(goalValue).replace(/[^0-9.]/g, "")) || 0;
+  const dirty = savedSnap !== null && savedSnap !== snapOf(active, goalType, goalValue, rewardAmount, title);
   const pct = prog ? prog.pct : 0;
   const current = prog ? prog.current : 0;
   const unit = goalType === "amount" ? "원" : "개";
@@ -211,13 +223,14 @@ export default function AdminLiveMissionPanel() {
           <input style={inputStyle} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 오늘의 공동목표" maxLength={80} />
         </div>
 
+        {dirty ? <div style={{ fontSize: 13, fontWeight: 700, color: "#C0392B" }}>● 변경됨 — 저장해야 적용돼요</div> : null}
         <button
           type="button"
           onClick={save}
           disabled={saving}
-          style={{ padding: "12px", borderRadius: 12, border: "none", background: "#7B2D43", color: "#fff", fontWeight: 800, fontSize: 15, cursor: "pointer", opacity: saving ? 0.6 : 1 }}
+          style={{ padding: "12px", borderRadius: 12, border: dirty ? "2px solid #C0392B" : "none", background: "#7B2D43", color: "#fff", fontWeight: 800, fontSize: 15, cursor: "pointer", opacity: saving ? 0.6 : 1 }}
         >
-          {saving ? "저장 중…" : "저장"}
+          {saving ? "저장 중…" : dirty ? "변경사항 저장하기" : "저장"}
         </button>
         {msg ? <div style={{ fontSize: 13, color: msg.includes("실패") ? "#C0392B" : "#0F6E56", fontWeight: 700 }}>{msg}</div> : null}
       </div>
