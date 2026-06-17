@@ -744,21 +744,16 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               <div className="rounded-2xl border border-dashed border-slate-200 p-4 text-center text-xs font-bold text-slate-400">주문 품목이 없습니다.</div>
             ) : (
               items.map((item, index) => (
-                <div key={`${item.id}-${index}`} className="relative">
-                  <LiveOrderItemEditCard item={item} index={index} disabled={isCanceled} onAfterSave={handleItemSaved} />
-                  {!isCanceled && items.length > 1 ? (
-                    <div className="mt-1 flex justify-end">
-                      <button
-                        type="button"
-                        disabled={deletingId === String(item.id)}
-                        onClick={() => handleDeleteItem(item)}
-                        className="rounded-lg border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-black text-[#C0392B] hover:bg-red-100 disabled:opacity-50"
-                      >
-                        {deletingId === String(item.id) ? "삭제 중..." : "🗑 이 상품 삭제"}
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
+                <LiveOrderItemEditCard
+                  key={`${item.id}-${index}`}
+                  item={item}
+                  index={index}
+                  disabled={isCanceled}
+                  onAfterSave={handleItemSaved}
+                  canDelete={!isCanceled && items.length > 1}
+                  deleting={deletingId === String(item.id)}
+                  onDelete={() => handleDeleteItem(item)}
+                />
               ))
             )}
           </div>
@@ -814,7 +809,11 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           ) : null}
 
           {showPicker && !isCanceled ? (
-            <LiveOrderRegisteredProductPicker onAdd={handleAddRegisteredItem} adding={adding} />
+            <LiveOrderRegisteredProductPicker
+              onAdd={handleAddRegisteredItem}
+              onClose={() => setShowPicker(false)}
+              adding={adding}
+            />
           ) : null}
         </section>
 

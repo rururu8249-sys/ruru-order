@@ -14,6 +14,9 @@ type Props = {
   index: number;
   disabled?: boolean;
   onAfterSave?: (result: LiveOrderItemEditSaveResult) => void | Promise<void>;
+  canDelete?: boolean;
+  deleting?: boolean;
+  onDelete?: () => void;
 };
 
 function money(value: unknown) {
@@ -157,7 +160,7 @@ function updateForm<K extends keyof LiveOrderItemEditForm>(
   };
 }
 
-export default function LiveOrderItemEditCard({ item, index, disabled = false, onAfterSave }: Props) {
+export default function LiveOrderItemEditCard({ item, index, disabled = false, onAfterSave, canDelete = false, deleting = false, onDelete }: Props) {
   const [editing, setEditing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [form, setForm] = useState(() => createInitialLiveOrderItemEditForm(item));
@@ -354,15 +357,27 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
               </div>
             );
           })()}
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            disabled={disabled || inventoryLocked}
-            title={inventoryLocked ? "재고복구완료 주문은 상품수정할 수 없습니다." : undefined}
-            className="mt-2 rounded-xl bg-slate-950 px-2.5 py-1.5 text-[11px] font-black text-white hover:bg-rose-deep disabled:bg-slate-200 disabled:text-slate-400"
-          >
-            {inventoryLocked ? "수정잠금" : "수정"}
-          </button>
+          <div className="mt-2 flex items-center justify-end gap-1.5">
+            {canDelete && onDelete && !disabled ? (
+              <button
+                type="button"
+                onClick={onDelete}
+                disabled={deleting}
+                className="rounded-xl border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] font-black text-[#C0392B] hover:bg-red-100 disabled:opacity-50"
+              >
+                {deleting ? "삭제중..." : "🗑 삭제"}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              disabled={disabled || inventoryLocked}
+              title={inventoryLocked ? "재고복구완료 주문은 상품수정할 수 없습니다." : undefined}
+              className="rounded-xl bg-slate-950 px-2.5 py-1.5 text-[11px] font-black text-white hover:bg-rose-deep disabled:bg-slate-200 disabled:text-slate-400"
+            >
+              {inventoryLocked ? "수정잠금" : "수정"}
+            </button>
+          </div>
         </div>
       </div>
       {showHistory && Array.isArray(item.changeHistory) && item.changeHistory.length > 0 ? (
