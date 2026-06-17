@@ -3,6 +3,7 @@
 import { showAdminToast } from "@/lib/adminToast";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
+import AdminLiveMissionPanel from "./AdminLiveMissionPanel";
 
 type RouletteMode = "live" | "test" | "preview";
 
@@ -229,7 +230,7 @@ export default function AdminLiveEventRoulettePanel({
   const [winners, setWinners] = useState<RouletteWinner[]>([]);
   const [loading, setLoading] = useState(false);
   const [spinning, setSpinning] = useState(false);
-  const [eventTab, setEventTab] = useState<"roulette" | "claw">("claw");
+  const [eventTab, setEventTab] = useState<"roulette" | "claw" | "mission">("claw");
   const [participantSource, setParticipantSource] = useState<"auto" | "paid" | "manual">("auto");
   const [manualParticipantText, setManualParticipantText] = useState("");
   const [fixedWinnerNickname, setFixedWinnerNickname] = useState("");
@@ -1093,6 +1094,8 @@ export default function AdminLiveEventRoulettePanel({
                     onClick={() => { setEventTab("roulette"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>룰렛</span>
                   <span className="badge" style={{ padding: "4px 16px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "claw" ? "var(--rose)" : "#fff", color: eventTab === "claw" ? "#fff" : "var(--mut)" }}
                     onClick={() => { setEventTab("claw"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>인형뽑기</span>
+                  <span className="badge" style={{ padding: "4px 14px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "mission" ? "var(--rose)" : "#fff", color: eventTab === "mission" ? "#fff" : "var(--mut)" }}
+                    onClick={() => { setEventTab("mission"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>🎯 미션 게이지</span>
                   <span style={{ width: "1px", height: "18px", background: "var(--bd)", margin: "0 3px" }} />
                   <span className="badge" style={{ padding: "4px 10px", cursor: "pointer", border: "1px solid var(--bd)", background: mode === "test" ? "var(--amber-bg)" : "#fff", color: mode === "test" ? "var(--amber)" : "var(--mut)" }} onClick={() => changeMode("test")}>테스트</span>
                   <span className="badge" style={{ padding: "4px 10px", cursor: "pointer", border: "1px solid var(--bd)", background: mode === "live" ? "var(--green-bg)" : "#fff", color: mode === "live" ? "var(--green)" : "var(--mut)" }} onClick={() => changeMode("live")}>운영</span>
@@ -1101,6 +1104,10 @@ export default function AdminLiveEventRoulettePanel({
                 </span>
               </div>
 
+              {eventTab === "mission" ? (
+                <AdminLiveMissionPanel />
+              ) : (
+              <>
               {/* 룰렛 + 참가자 */}
               <div style={{ display: "flex", gap: "14px", alignItems: "stretch", marginBottom: "13px" }}>
                 <div style={{ flex: 1, background: "#f7f5f1", borderRadius: "10px", minHeight: "190px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", position: "relative" }}>
@@ -1222,6 +1229,8 @@ export default function AdminLiveEventRoulettePanel({
                   ))
                 )}
               </div>
+              </>
+              )}
 
             </div>
           </div>

@@ -5,7 +5,6 @@ export type AdminLiveMenuKey =
   | "payments"
   | "customers"
   | "event"
-  | "mission"
   | "point"
   | "settlement"
   | "settings";
@@ -71,16 +70,6 @@ export const ADMIN_LIVE_MENUS: AdminLiveMenuItem[] = [
     readyTitle: "이벤트",
     readyDescription: "룰렛·인형뽑기 추첨과 당첨선물 지급을 한 화면에서 진행합니다.",
     checkpoints: ["룰렛/인형뽑기", "참가자 불러오기", "당첨고정", "당첨선물", "이벤트 기록"],
-  },
-  {
-    key: "mission",
-    label: "미션 게이지",
-    icon: "🎯",
-    desc: "공동목표 막대",
-    sidebarNotice: "방송 중 공동목표(누적 판매·매출)를 정하면 OBS 위젯에 진행 막대가 표시됩니다.",
-    readyTitle: "미션 게이지 (공동목표)",
-    readyDescription: "오늘의 목표를 정하고 진행률을 OBS 위젯으로 보여줍니다. 구매자 전원 포인트 지급은 다음 단계.",
-    checkpoints: ["목표 종류(개수/매출)", "목표값·1인당 포인트", "진행률 조회", "OBS 위젯주소"],
   },
   {
     key: "settings",

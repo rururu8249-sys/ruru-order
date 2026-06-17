@@ -25,7 +25,6 @@ import AdminLiveMenuPlaceholder from "./AdminLiveMenuPlaceholder";
 import AdminLivePaymentPanel from "./AdminLivePaymentPanel";
 import AdminLiveSettlementPanel from "./AdminLiveSettlementPanel";
 import AdminLiveSettingsPanel from "./AdminLiveSettingsPanel";
-import AdminLiveMissionPanel from "./AdminLiveMissionPanel";
 import AdminLiveSidebar from "./AdminLiveSidebar";
 import LiveHeader from "./LiveHeader";
 import LiveStatsCards from "./LiveStatsCards";
@@ -283,7 +282,6 @@ const MENU_KEYS_FOR_URL: AdminLiveMenuKey[] = [
   "orders",
   "payments",
   "customers",
-  "mission",
   "settlement",
   "settings",
 ];
@@ -1615,23 +1613,8 @@ export default function AdminLiveDashboard() {
             </div>
           )}
 
-          {/* 미션 게이지 팝업 */}
-          {activeMenu === "mission" && (
-            <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 p-4" onClick={(e) => { if (e.target === e.currentTarget) setActiveMenu("broadcast"); }}>
-              <div className="flex h-[88vh] w-full max-w-[760px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-                <div className="flex shrink-0 items-center justify-between border-b border-rose-line px-5 py-3">
-                  <span className="text-[15px] font-black text-slate-950">🎯 미션 게이지</span>
-                  <button type="button" onClick={() => setActiveMenu("broadcast")} className="text-lg leading-none text-slate-400 hover:text-slate-700">✕</button>
-                </div>
-                <div className="min-h-0 flex-1 overflow-y-auto p-5">
-                  <AdminLiveMissionPanel />
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* 알 수 없는 메뉴 */}
-          {activeMenu !== "broadcast" && activeMenu !== "products" && activeMenu !== "event" && activeMenu !== "orders" && activeMenu !== "payments" && activeMenu !== "customers" && activeMenu !== "mission" && activeMenu !== "settlement" && activeMenu !== "settings" && (
+          {activeMenu !== "broadcast" && activeMenu !== "products" && activeMenu !== "event" && activeMenu !== "orders" && activeMenu !== "payments" && activeMenu !== "customers" && activeMenu !== "settlement" && activeMenu !== "settings" && (
             <AdminLiveMenuPlaceholder menuKey={activeMenu} />
           )}
 
