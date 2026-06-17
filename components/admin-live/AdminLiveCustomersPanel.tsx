@@ -630,8 +630,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
   const [directPhoneBlocks, setDirectPhoneBlocks] = useState<DirectPhoneBlock[]>([]);
   const [customerProfiles, setCustomerProfiles] = useState<CustomerProfile[]>([]);
 
-  // 주문 있는 고객만(기본 ON) — 테스트·0건 계정 숨김(데이터는 유지)
-  const [buyersOnly, setBuyersOnly] = useState(true);
+  // 주문 있는 고객만 — 기본 OFF(모든 고객 표시: 아직 주문 안 한 가망고객도 보임). 구매자만 보고 싶을 때만 켜는 선택 토글.
+  const [buyersOnly, setBuyersOnly] = useState(false);
   // 일괄 포인트지급 — 선택(전화번호 숫자 기준) + 모달
   const [selectedPhones, setSelectedPhones] = useState<Set<string>>(new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
