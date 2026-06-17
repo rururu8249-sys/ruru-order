@@ -1,34 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
-import { assertAdminRequest, adminAuthErrorMessage } from "@/lib/adminAuth";
+import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import {
   getConnectionStatus,
-  saveLiveUrl,
   saveNotifySettings,
   postLiveChatMessage,
 } from "@/lib/youtube";
 
 export const runtime = "nodejs";
 
-// 관리자 전용: 유튜브 알림 상태 조회 / 라이브 URL 저장 / 설정 저장 / 테스트 발송
+// 관리자 전용: 유튜브 알림 상태 조회 / 설정 저장 / 테스트 발송
 export async function GET(request: NextRequest) {
-  const auth = assertAdminRequest(request);
-  if (!auth.ok) return NextResponse.json({ ok: false, error: adminAuthErrorMessage(auth) }, { status: 401 });
+  const session = await verifyAdminSessionFromRequest(request);
+  if (!session) return NextResponse.json({ ok: false, error: "관리자 로그인이 필요합니다." }, { status: 401 });
   const status = await getConnectionStatus();
   return NextResponse.json({ ok: true, ...status });
 }
 
 export async function POST(request: NextRequest) {
-  const auth = assertAdminRequest(request);
-  if (!auth.ok) return NextResponse.json({ ok: false, error: adminAuthErrorMessage(auth) }, { status: 401 });
+  const session = await verifyAdminSessionFromRequest(request);
+  if (!session) return NextResponse.json({ ok: false, error: "관리자 로그인이 필요합니다." }, { status: 401 });
 
   const body = await request.json().catch(() => ({}));
   const action = String(body?.action || "");
 
   try {
-    if (action === "save-url") {
-      await saveLiveUrl(String(body?.liveUrl || ""));
-      return NextResponse.json({ ok: true });
-    }
     if (action === "save-settings") {
       await saveNotifySettings({
         notifyEnabled: typeof body?.notifyEnabled === "boolean" ? body.notifyEnabled : undefined,

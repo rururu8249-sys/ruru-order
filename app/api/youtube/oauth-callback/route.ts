@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { assertAdminRequest } from "@/lib/adminAuth";
+import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { exchangeCodeForRefreshToken, saveRefreshToken } from "@/lib/youtube";
 
 export const runtime = "nodejs";
@@ -11,8 +11,8 @@ export async function GET(request: NextRequest) {
   const back = (ok: boolean, msg: string) =>
     NextResponse.redirect(`${origin}/admin-live?panel=settings&yt=${ok ? "connected" : "error"}&msg=${encodeURIComponent(msg)}`);
 
-  const auth = assertAdminRequest(request);
-  if (!auth.ok) return back(false, "관리자 로그인이 필요합니다. /admin-login 후 다시 시도하세요.");
+  const session = await verifyAdminSessionFromRequest(request);
+  if (!session) return back(false, "관리자 로그인이 필요합니다. /admin-login 후 다시 시도하세요.");
 
   const err = url.searchParams.get("error");
   if (err) return back(false, "구글 인증 취소/오류: " + err);

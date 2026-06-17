@@ -12,11 +12,13 @@ const TOKEN_URL = "https://oauth2.googleapis.com/token";
 export const YOUTUBE_OAUTH_SCOPE = "https://www.googleapis.com/auth/youtube.force-ssl";
 export const YOUTUBE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 
-const SETTING_LIVE_URL = "youtube_live_url";
 const SETTING_LIVE_CHAT_ID = "youtube_live_chat_id";
 const SETTING_LIVE_VIDEO_ID = "youtube_live_video_id";
 export const SETTING_NOTIFY_ENABLED = "youtube_notify_enabled";
 export const SETTING_MESSAGE_TEMPLATE = "youtube_message_template";
+
+// 기본 문구. {{nickname}} 닉네임 / {{items}} 주문요약(예: "뉴발2000 외 2건") / {{amount}} 총 결제금액(택배비 포함)
+export const DEFAULT_MESSAGE_TEMPLATE = "🛒 {{nickname}}님 주문 감사합니다! ({{items}} · {{amount}})";
 
 export function getYoutubeClientId(): string {
   return String(process.env.YOUTUBE_CLIENT_ID || "").trim();
@@ -61,12 +63,26 @@ async function readRefreshToken(sb: SupabaseClient): Promise<string> {
   return data ? String((data as any).refresh_token ?? "").trim() : "";
 }
 
+// 메인 컨트롤타워에서 저장한 "현재 방송(status=ON)"의 유튜브 라이브 URL을 그대로 사용한다.
+// (설정에서 또 입력할 필요 없음 — 한 곳에서만 관리)
+async function readActiveBroadcastLiveUrl(sb: SupabaseClient): Promise<string> {
+  const { data } = await sb
+    .from("broadcasts")
+    .select("youtube_live_url")
+    .eq("status", "ON")
+    .neq("is_deleted", true)
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data ? String((data as any).youtube_live_url ?? "").trim() : "";
+}
+
 export async function getConnectionStatus(): Promise<{ connected: boolean; liveUrl: string; notifyEnabled: boolean; messageTemplate: string }> {
   try {
     const sb = getServiceClient();
     const [token, liveUrl, notify, template] = await Promise.all([
       readRefreshToken(sb),
-      readSetting(sb, SETTING_LIVE_URL),
+      readActiveBroadcastLiveUrl(sb),
       readSetting(sb, SETTING_NOTIFY_ENABLED),
       readSetting(sb, SETTING_MESSAGE_TEMPLATE),
     ]);
@@ -74,19 +90,11 @@ export async function getConnectionStatus(): Promise<{ connected: boolean; liveU
       connected: !!token,
       liveUrl,
       notifyEnabled: notify === "true",
-      messageTemplate: template || "🛒 {{nickname}}님 주문 감사합니다!",
+      messageTemplate: template || DEFAULT_MESSAGE_TEMPLATE,
     };
   } catch {
-    return { connected: false, liveUrl: "", notifyEnabled: false, messageTemplate: "🛒 {{nickname}}님 주문 감사합니다!" };
+    return { connected: false, liveUrl: "", notifyEnabled: false, messageTemplate: DEFAULT_MESSAGE_TEMPLATE };
   }
-}
-
-// 라이브 URL 저장 + 캐시된 liveChatId/videoId 초기화(새 방송이면 다시 찾도록)
-export async function saveLiveUrl(liveUrl: string): Promise<void> {
-  const sb = getServiceClient();
-  await writeSetting(sb, SETTING_LIVE_URL, String(liveUrl || "").trim());
-  await writeSetting(sb, SETTING_LIVE_CHAT_ID, "");
-  await writeSetting(sb, SETTING_LIVE_VIDEO_ID, "");
 }
 
 export async function saveNotifySettings(opts: { notifyEnabled?: boolean; messageTemplate?: string }): Promise<void> {
@@ -158,12 +166,15 @@ export function extractVideoId(input: string): string {
 
 // ---- 활성 라이브 채팅 ID 조회(캐시) ----
 async function resolveLiveChatId(sb: SupabaseClient, accessToken: string): Promise<string> {
-  const cached = await readSetting(sb, SETTING_LIVE_CHAT_ID);
-  if (cached) return cached;
-
-  const liveUrl = await readSetting(sb, SETTING_LIVE_URL);
+  // 현재 방송(메인 컨트롤타워)의 라이브 URL → videoId
+  const liveUrl = await readActiveBroadcastLiveUrl(sb);
   const videoId = extractVideoId(liveUrl);
   if (!videoId) return "";
+
+  // 캐시: 같은 영상이면 재사용, 방송(영상)이 바뀌면 자동으로 다시 조회
+  const cachedChat = await readSetting(sb, SETTING_LIVE_CHAT_ID);
+  const cachedVid = await readSetting(sb, SETTING_LIVE_VIDEO_ID);
+  if (cachedChat && cachedVid === videoId) return cachedChat;
 
   const res = await fetch(
     `https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=${encodeURIComponent(videoId)}`,
@@ -239,10 +250,21 @@ export async function postLiveChatMessage(messageText: string, opts?: { forceEve
   }
 }
 
-// 문구 템플릿에 닉네임 채우기
-export async function buildOrderMessage(nickname: string): Promise<string> {
+// 문구 템플릿에 닉네임/주문요약/금액 채우기.
+//   nickname: 주문 닉네임 / itemsSummary: "뉴발2000 외 2건" 같은 요약 / amount: 총 결제금액(택배비 포함)
+//   (itemsSummary·amount는 3단계에서 주문 데이터로 만들어 전달)
+export async function buildOrderMessage(opts: { nickname: string; itemsSummary?: string; amount?: number }): Promise<string> {
   const sb = getServiceClient();
-  const template = (await readSetting(sb, SETTING_MESSAGE_TEMPLATE)) || "🛒 {{nickname}}님 주문 감사합니다!";
-  const nick = String(nickname || "").trim() || "고객";
-  return template.replace(/\{\{\s*nickname\s*\}\}/g, nick);
+  const template = (await readSetting(sb, SETTING_MESSAGE_TEMPLATE)) || DEFAULT_MESSAGE_TEMPLATE;
+  const nick = String(opts.nickname || "").trim() || "고객";
+  const items = String(opts.itemsSummary || "").trim();
+  const amountText = opts.amount && opts.amount > 0 ? `${Number(opts.amount).toLocaleString("ko-KR")}원` : "";
+  return template
+    .replace(/\{\{\s*nickname\s*\}\}/g, nick)
+    .replace(/\{\{\s*items\s*\}\}/g, items)
+    .replace(/\{\{\s*amount\s*\}\}/g, amountText)
+    // 빈 placeholder로 생긴 "( · )" 같은 잔여 기호 정리
+    .replace(/\(\s*[·\-/]?\s*\)/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }

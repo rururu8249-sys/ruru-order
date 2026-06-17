@@ -15,8 +15,7 @@ export default function YoutubeNotifyCard() {
   const [connected, setConnected] = useState(false);
   const [liveUrl, setLiveUrl] = useState("");
   const [notifyEnabled, setNotifyEnabled] = useState(false);
-  const [messageTemplate, setMessageTemplate] = useState("🛒 {{nickname}}님 주문 감사합니다!");
-  const [savingUrl, setSavingUrl] = useState(false);
+  const [messageTemplate, setMessageTemplate] = useState("🛒 {{nickname}}님 주문 감사합니다! ({{items}} · {{amount}})");
   const [savingSettings, setSavingSettings] = useState(false);
   const [testing, setTesting] = useState(false);
 
@@ -29,7 +28,7 @@ export default function YoutubeNotifyCard() {
         setConnected(!!json.connected);
         setLiveUrl(String(json.liveUrl || ""));
         setNotifyEnabled(!!json.notifyEnabled);
-        setMessageTemplate(String(json.messageTemplate || "🛒 {{nickname}}님 주문 감사합니다!"));
+        setMessageTemplate(String(json.messageTemplate || "🛒 {{nickname}}님 주문 감사합니다! ({{items}} · {{amount}})"));
       }
     } catch {
       // ignore
@@ -60,22 +59,6 @@ export default function YoutubeNotifyCard() {
 
   const connect = () => {
     window.location.href = "/api/youtube/oauth-start";
-  };
-
-  const saveUrl = async () => {
-    setSavingUrl(true);
-    try {
-      const res = await fetch("/api/youtube/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "save-url", liveUrl }),
-      });
-      const json = await res.json();
-      if (json?.ok) showAdminToast("라이브 URL을 저장했습니다.", "success");
-      else showAdminToast("저장 실패\n\n" + (json?.error || ""), "error");
-    } finally {
-      setSavingUrl(false);
-    }
   };
 
   const saveSettings = async () => {
@@ -139,25 +122,14 @@ export default function YoutubeNotifyCard() {
         </button>
       </div>
 
-      {/* 라이브 URL */}
+      {/* 라이브 주소 — 메인 컨트롤타워에서 입력한 주소를 자동 사용 */}
       <div className="mt-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-        <div className="text-sm font-black text-slate-900">현재 라이브 주소</div>
-        <div className="mt-1 text-xs font-bold leading-5 text-slate-400">방송 시작할 때마다 그날 유튜브 라이브 주소를 붙여넣고 저장하세요. (예: https://www.youtube.com/watch?v=… 또는 https://youtu.be/…)</div>
-        <div className="mt-3 flex gap-2">
-          <input
-            value={liveUrl}
-            onChange={(e) => setLiveUrl(e.target.value)}
-            placeholder="유튜브 라이브 주소 붙여넣기"
-            className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold outline-none transition focus:border-rose-deep focus:ring-4 focus:ring-rose-soft"
-          />
-          <button
-            type="button"
-            onClick={saveUrl}
-            disabled={savingUrl}
-            className="shrink-0 rounded-2xl bg-slate-950 px-5 text-sm font-black text-white transition hover:bg-rose-deep disabled:opacity-50"
-          >
-            {savingUrl ? "저장중" : "저장"}
-          </button>
+        <div className="text-sm font-black text-slate-900">현재 라이브 주소 (자동)</div>
+        <div className="mt-1 text-xs font-bold leading-5 text-slate-400">
+          메인 화면(방송 컨트롤타워)에서 입력·저장한 유튜브 라이브 주소를 그대로 사용합니다. 여기서 따로 넣을 필요 없어요.
+        </div>
+        <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700">
+          {liveUrl ? liveUrl : "아직 메인 화면에 라이브 주소가 저장되지 않았습니다."}
         </div>
       </div>
 
@@ -178,7 +150,9 @@ export default function YoutubeNotifyCard() {
         </div>
 
         <div className="mt-3 text-sm font-black text-slate-900">알림 문구</div>
-        <div className="mt-1 text-xs font-bold leading-5 text-slate-400"><code>{"{{nickname}}"}</code> 자리에 주문한 닉네임이 들어갑니다. (개인정보 보호를 위해 닉네임만 사용)</div>
+        <div className="mt-1 text-xs font-bold leading-5 text-slate-400">
+          넣을 수 있는 자동값: <code>{"{{nickname}}"}</code> 닉네임 · <code>{"{{items}}"}</code> 주문요약(예: “뉴발2000 외 2건”) · <code>{"{{amount}}"}</code> 총 결제금액(택배비 포함). 개인정보 보호를 위해 닉네임만 표시됩니다.
+        </div>
         <textarea
           value={messageTemplate}
           onChange={(e) => setMessageTemplate(e.target.value)}
