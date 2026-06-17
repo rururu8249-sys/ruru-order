@@ -941,6 +941,9 @@ export default function OrderPage() {
   const [zipcode, setZipcode] = useState("");
   const [address, setAddress] = useState("");
   const [detailAddress, setDetailAddress] = useState("");
+  // 받는사람(배송) — 주문자(입금/포인트 매칭 기준)와 분리. 비면 주문자 값으로 fallback.
+  const [recipientName, setRecipientName] = useState("");
+  const [recipientPhone, setRecipientPhone] = useState("");
   const [requestMemo, setRequestMemo] = useState("");
 
   const [pin, setPin] = useState("");
@@ -1747,6 +1750,10 @@ export default function OrderPage() {
       localStorage.setItem("ruru_customer_detail_address", nextDetailAddress);
     }
 
+    // 받는사람(배송) — 기본배송지의 받는 분/연락처. 없으면 주문자명/전화로 fallback.
+    setRecipientName((useDefaultShipping ? String(defaultShippingAddr?.name || "").trim() : "") || nextName);
+    setRecipientPhone((useDefaultShipping ? String(defaultShippingAddr?.phone || "").trim() : "") || nextPhone);
+
     if (nextPhone || nextNickname || nextName || nextAddress) {
       setHasSavedInfo(true);
       setCustomerMode("load");
@@ -2408,6 +2415,9 @@ export default function OrderPage() {
       setZipcode(nextZipcode);
       setAddress(nextAddress);
       setDetailAddress(nextDetailAddress);
+      // 받는사람(배송) — 기본배송지의 받는 분/연락처, 없으면 주문자로 fallback.
+      setRecipientName((useDefaultShipping ? String(defaultShippingAddr.name || "").trim() : "") || nextName);
+      setRecipientPhone((useDefaultShipping ? String(defaultShippingAddr.phone || "").trim() : "") || cleanPhone);
       setRequestMemo(customer.request_memo || "");
 
       localStorage.setItem("ruru_youtube_nickname", nextNickname);
@@ -3344,6 +3354,8 @@ export default function OrderPage() {
           customer_phone: cleanPhone,
           youtube_nickname: youtubeNickname.trim(),
           customer_name: customerName.trim(),
+          recipient_name: recipientName.trim() || customerName.trim(),
+          recipient_phone: onlyNumber(recipientPhone) || cleanPhone,
         }),
       });
 
@@ -4323,8 +4335,8 @@ export default function OrderPage() {
                   </div>
                   <div style={{ fontSize: "12px", color: "#444", lineHeight: 1.8 }}>
                     <div>닉네임: {youtubeNickname.trim() || "-"}</div>
-                    <div>받는 분: {customerName.trim() || "-"}</div>
-                    <div>연락처: {formatPhone(customerPhone) || "-"}</div>
+                    <div>받는 분: {(recipientName.trim() || customerName.trim()) || "-"}</div>
+                    <div>연락처: {formatPhone(recipientPhone.trim() || customerPhone) || "-"}</div>
                     <div>주소: {address.trim() ? `${address.trim()}${detailAddress.trim() ? " " + detailAddress.trim() : ""}` : "주소 미입력"}</div>
                   </div>
                 </div>
@@ -5119,8 +5131,9 @@ export default function OrderPage() {
           onSelectShippingAddress={(addr, detail, name, phone, zipcode) => {
             setAddress(addr);
             setDetailAddress(detail);
-            if (name) setCustomerName(name);
-            if (phone) setCustomerPhone(normalizePhone(phone));
+            // 배송지 선택 시 받는사람(이름/연락처)만 갱신. 주문자(입금/포인트 매칭 기준)는 불변.
+            if (name) setRecipientName(name);
+            if (phone) setRecipientPhone(phone);
             if (zipcode) setZipcode(zipcode);
           }}
           onOpenAddressSearchForForm={(onPicked) => openAddressSearch(onPicked)}

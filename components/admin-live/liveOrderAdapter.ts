@@ -315,6 +315,8 @@ export function toAdminLiveOrder(group: OrderGroup): LiveOrder {
     nickname: first.youtube_nickname || first.customer_name || "-",
     name: first.customer_name || "-",
     phone: first.customer_phone || first.phone || "-",
+    recipientName: (first as any).recipient_name || null,
+    recipientPhone: (first as any).recipient_phone || null,
     zipcode: first.zipcode || null,
     address: first.address || null,
     detailAddress: first.detail_address || null,

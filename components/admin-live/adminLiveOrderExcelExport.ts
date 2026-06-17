@@ -106,11 +106,13 @@ function itemSummary(order: LiveOrder) {
 }
 
 function recipientName(order: LiveOrder) {
-  return clean(order.nickname || order.name || "");
+  // 받는사람(배송) 우선, 없으면 기존 동작(닉네임/주문자명) — 옛 주문 호환.
+  return clean((order as any).recipientName || order.nickname || order.name || "");
 }
 
 function phoneText(order: LiveOrder) {
-  return clean(order.phone);
+  // 받는사람 연락처 우선, 없으면 주문자 전화 — 옛 주문 호환.
+  return clean((order as any).recipientPhone || order.phone);
 }
 
 function baseAddress(order: LiveOrder) {

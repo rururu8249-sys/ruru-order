@@ -70,6 +70,8 @@ export type LiveOrder = {
   nickname: string;
   name: string;
   phone: string;
+  recipientName?: string | null;
+  recipientPhone?: string | null;
   zipcode?: string | null;
   address?: string | null;
   detailAddress?: string | null;

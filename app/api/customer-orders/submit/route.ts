@@ -17,6 +17,8 @@ type OrderSubmitPayload = {
   youtubeNickname?: string;
   customer_name?: string;
   customerName?: string;
+  recipient_name?: string;
+  recipient_phone?: string;
 };
 
 function jsonError(message: string, status = 400) {
@@ -219,6 +221,21 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       throw new Error(error.message || "주문 저장 실패");
+    }
+
+    // 받는사람(배송) 저장 — 주문 RPC 무변경. 제출 직후 order_group_id로만 보강.
+    // 입금/정산/포인트와 무관(주문자 customer_name/phone은 그대로). 실패해도 주문은 성공 유지.
+    const recipientName = text(body.recipient_name);
+    const recipientPhone = text(body.recipient_phone);
+    const recipientGroupId = text(firstOrderValue(orderRows, "order_group_id"));
+    if (recipientGroupId && (recipientName || recipientPhone)) {
+      const { error: recipientError } = await supabase
+        .from("orders")
+        .update({ recipient_name: recipientName || null, recipient_phone: recipientPhone || null })
+        .eq("order_group_id", recipientGroupId);
+      if (recipientError) {
+        console.warn("받는사람 저장 실패(주문은 정상 저장됨):", recipientError.message);
+      }
     }
 
     if (!data || typeof data !== "object") {
