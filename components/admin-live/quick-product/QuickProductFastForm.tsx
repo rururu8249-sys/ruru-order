@@ -770,10 +770,13 @@ export default function QuickProductFastForm({
 
     const name = productName.trim();
     const price = moneyNumber(priceText);
-    // product_type: 신규는 "broadcast" 고정, 수정은 기존 값 보존(기존 group_buy 17개 덮어쓰기 금지).
+    // product_type: 수정은 기존 값 보존(기존 group_buy 17개 덮어쓰기 금지).
+    // 신규는 방송 중이면 "broadcast"(방송상품), 방송 OFF면 "group_buy"(상시판매)로 등록 → 방송 안 해도 상품 등록 가능.
     const resolvedProductType = isEditMode
       ? pickString(initialProduct, ["product_type", "type"], "broadcast") || "broadcast"
-      : "broadcast";
+      : activeBroadcastId
+        ? "broadcast"
+        : "group_buy";
 
     if (!name) {
       setNameError(true);

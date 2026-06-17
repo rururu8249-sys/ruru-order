@@ -1043,7 +1043,7 @@ export default function OrderPage() {
   const [videoOpen, setVideoOpen] = useState(true);
   const [productPage, setProductPage] = useState(1);
   const [visibleProductCount, setVisibleProductCount] = useState(10);
-  const [categoryFilter, setCategoryFilter] = useState<"전체" | "의류" | "신발" | "잡화">("전체");
+  const [categoryFilter, setCategoryFilter] = useState<string>("전체");
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [cartAddedOpen, setCartAddedOpen] = useState(false);
   const [cartAddedItem, setCartAddedItem] = useState<any | null>(null);
@@ -4222,6 +4222,20 @@ export default function OrderPage() {
               return true;
             });
             const visibleItems = filtered.slice(0, visibleProductCount);
+            // 카테고리 탭: 기본(의류/신발/잡화) + 상품에 실제로 쓰인 커스텀 카테고리(음식 등) 자동 노출
+            const PRESET_CATS = ["의류", "신발", "잡화"];
+            const presentCats = Array.from(
+              new Set(
+                quickGroupBuyProducts
+                  .map((p) => {
+                    const note = parseProductSuggestionNote((p as any).product_note);
+                    return String((note as any)?.category ?? (p as any).category ?? (p as any).product_category ?? "").trim();
+                  })
+                  .filter(Boolean)
+              )
+            );
+            const extraCats = presentCats.filter((c) => !PRESET_CATS.includes(c)).sort();
+            const categoryTabs = ["전체", ...PRESET_CATS, ...extraCats];
             return (
               <section style={{ margin: "12px auto 0", width: "100%", maxWidth: "560px" }}>
                 <input
@@ -4230,8 +4244,8 @@ export default function OrderPage() {
                   placeholder="🔍 상품 이름 검색"
                   style={{ width: "100%", height: "48px", boxSizing: "border-box", border: "1px solid #D9C5CC", borderRadius: "14px", padding: "0 16px", fontSize: "15px", fontWeight: 700, color: "#333", outline: "none" }}
                 />
-                <div style={{ marginTop: "8px", display: "flex", gap: "6px" }}>
-                  {(["전체", "의류", "신발", "잡화"] as const).map((cat) => {
+                <div style={{ marginTop: "8px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  {categoryTabs.map((cat) => {
                     const on = categoryFilter === cat;
                     return (
                       <button key={cat} type="button" onClick={() => { setCategoryFilter(cat); setVisibleProductCount(10); }} style={{ flex: 1, height: "36px", borderRadius: "999px", border: on ? "none" : "1px solid #D9C5CC", background: on ? "#7A1E47" : "#fff", color: on ? "#fff" : "#7A1E47", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>{cat}</button>
