@@ -1113,9 +1113,17 @@ export default function LiveOrderTable({
                         ) : null}
                       </div>
                       {/* 9. 출고 */}
-                      <div className="px-3 py-3 text-center">
+                      <div className="px-1 py-3 text-center">
                         {(order as any).shippingStatus ? (
-                          <span className="inline-flex items-center justify-center rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-500">{(order as any).shippingStatus}</span>
+                          <span
+                            className={`inline-flex items-center justify-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10px] font-black leading-none ${
+                              String((order as any).shippingStatus) === "출고완료"
+                                ? "bg-blue-50 text-[#185FA5]"
+                                : "bg-slate-100 text-slate-500"
+                            }`}
+                          >
+                            {(order as any).shippingStatus}
+                          </span>
                         ) : (
                           <span className="text-slate-300">-</span>
                         )}

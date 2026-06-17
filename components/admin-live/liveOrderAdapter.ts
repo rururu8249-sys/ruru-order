@@ -120,20 +120,33 @@ function isCanceledStatusText(value: unknown) {
   return text === "주문취소" || text === "주문서취소" || text.includes("주문취소") || text.includes("주문서취소");
 }
 
+// 배송단계 상태값(입금단계와 구분). 출고완료/출고대기로 올린 주문의 입금 배지 판정에 사용.
+const SHIPPING_STAGE_STATUSES = ["출고대기", "출고완료", "킵", "픽업", "픽업예정"];
+
 function getPaymentStatus(group: OrderGroup): LiveOrderPaymentStatus {
   const first = group.first;
-  const adminStatus = String(first.admin_order_status_v2 || "").trim();
-  const manageStatus = String(first.order_manage_status || "").trim();
+  // 출고완료/출고대기로 올린 주문은 직전 입금상태(shipped_prev_status)로 입금 배지 판정.
+  //  → 출고처리 후에도 자동입금확인/수동입금확인 등 원래 입금 배지가 유지됨.
+  //  → 직전상태가 없으면(기존 데이터/일반 진행) 현재 상태로 판정(기존 동작 그대로).
+  const currentStatus = String(first.admin_order_status_v2 || first.order_manage_status || "").trim();
+  const prevStatus = String((first as any).shipped_prev_status || "").trim();
+  const useBasis = SHIPPING_STAGE_STATUSES.includes(currentStatus) && prevStatus !== "";
+  const basisRow = useBasis
+    ? { ...first, admin_order_status_v2: prevStatus, order_manage_status: prevStatus }
+    : first;
+
+  const adminStatus = String(basisRow.admin_order_status_v2 || "").trim();
+  const manageStatus = String(basisRow.order_manage_status || "").trim();
   const status = adminStatus || manageStatus;
   if (isCanceledStatusText(adminStatus) || isCanceledStatusText(manageStatus)) return "canceled";
 
   if (isCanceledStatus(adminStatus) || isCanceledStatus(manageStatus)) return "canceled";
-  if (isCardPaid(first)) return "card_paid";
-  if (isCardUnpaid(first)) return "card_unpaid";
+  if (isCardPaid(basisRow)) return "card_paid";
+  if (isCardUnpaid(basisRow)) return "card_unpaid";
   if (status === "자동입금확인") return "auto_paid";
   if (status === "수동입금확인") return "manual_paid";
-  if (isBankPaid(first)) return "paid";
-  if (isBankUnpaid(first)) return "manual_match_needed";
+  if (isBankPaid(basisRow)) return "paid";
+  if (isBankUnpaid(basisRow)) return "manual_match_needed";
 
   return "unpaid";
 }
@@ -297,7 +310,6 @@ function getMemo(group: OrderGroup) {
 
 // 출고(배송단계) 표시 전용: 배송단계 상태값일 때만 노출(입금단계 상태는 출고칸에 안 보이게 null).
 // 돈/입금 판정과 무관 — '출고' 칼럼·출고완료 칩 표시용.
-const SHIPPING_STAGE_STATUSES = ["출고대기", "출고완료", "킵", "픽업", "픽업예정"];
 function getShippingStageText(group: OrderGroup): string | null {
   const first = group.first;
   const status = String(first.admin_order_status_v2 || first.order_manage_status || "").trim();

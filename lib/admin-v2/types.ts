@@ -44,6 +44,7 @@ export type OrderRow = {
   tracking_number: string | null;
   tracking_company: string | null;
   shipped_at: string | null;
+  shipped_prev_status?: string | null;
   customer_id: number | null;
   deposit_confirmed_at: string | null;
   inventory_deducted_at?: string | null;
