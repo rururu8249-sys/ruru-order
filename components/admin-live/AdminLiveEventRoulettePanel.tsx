@@ -462,18 +462,34 @@ export default function AdminLiveEventRoulettePanel({
     }
 
     try {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("customer_phone")
-        .eq("youtube_nickname", nickname)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      const phone = String((data as { customer_phone?: unknown } | null)?.customer_phone || "").replace(/[^0-9]/g, "");
+      const nick = String(nickname || "").trim();
+      const digitsOf = (v: unknown) => String(v || "").replace(/[^0-9]/g, "");
+      // 전화번호 조회: ① 주문(orders) 닉네임 → ② 고객(customers) 닉네임 → ③ 고객 카카오닉네임.
+      //   카카오 간편로그인은 customers에 전화번호가 항상 저장되므로, orders에 없어도 여기서 찾는다.
+      let phone = "";
+      {
+        const { data: oRow } = await supabase
+          .from("orders").select("customer_phone")
+          .eq("youtube_nickname", nick)
+          .order("created_at", { ascending: false }).limit(1).maybeSingle();
+        phone = digitsOf((oRow as { customer_phone?: unknown } | null)?.customer_phone);
+      }
+      if (!phone) {
+        const { data: cRows } = await supabase
+          .from("customers").select("customer_phone")
+          .eq("youtube_nickname", nick)
+          .order("last_order_at", { ascending: false }).limit(1);
+        phone = digitsOf((cRows as { customer_phone?: unknown }[] | null)?.[0]?.customer_phone);
+      }
+      if (!phone) {
+        const { data: kRows } = await supabase
+          .from("customers").select("customer_phone")
+          .eq("kakao_nickname", nick).limit(1);
+        phone = digitsOf((kRows as { customer_phone?: unknown }[] | null)?.[0]?.customer_phone);
+      }
       if (!phone) {
         if (evId) grantedEventIdsRef.current.delete(evId); // 지급 안 됐으니 잠금 해제
-        showAdminToast(`${nickname}의 전화번호를 찾지 못해 포인트 자동지급을 건너뜁니다.`, "warning");
+        showAdminToast(`${nick}의 전화번호를 어디서도 찾지 못해 자동지급을 건너뜁니다.`, "warning");
         return;
       }
       const payload = await requestJson<{ ok: boolean; message?: string }>("/api/admin-live/customer-points", {
