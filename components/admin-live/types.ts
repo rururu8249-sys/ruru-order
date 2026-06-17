@@ -63,6 +63,7 @@ export type LiveOrder = {
   orderNo: string;
   paymentStatus: LiveOrderPaymentStatus;
   paymentLabel: string;
+  shippingStatus?: string | null;
   createdAt: string | null;
   submittedAt: string;
   paidAt: string | null;

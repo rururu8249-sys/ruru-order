@@ -603,7 +603,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               <span className="rounded-full bg-rose-soft px-2 py-1 text-[10px] font-black text-rose-deep">상세정보 갱신중...</span>
             ) : null}
           </div>
-          <div className="max-h-[240px] space-y-2 overflow-y-auto pr-1">
+          <div className="max-h-[480px] space-y-2 overflow-y-auto pr-1">
             {items.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 p-4 text-center text-xs font-bold text-slate-400">주문 품목이 없습니다.</div>
             ) : (

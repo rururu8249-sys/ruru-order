@@ -9,6 +9,7 @@ import LiveOrderCancelViewFilter, { type LiveOrderCancelViewFilterValue } from "
 import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
 import { openPaysterRightHalf } from "./AdminLiveCardPayPopup";
 import BroadcastCalendarPicker, { type BroadcastCalendarItem } from "./BroadcastCalendarPicker";
+import { useLiveOrderShipped } from "./useLiveOrderShipped";
 
 export type LiveOrderDateFilter = "all" | "today" | "yesterday" | "7days" | "month" | "lastmonth" | "custom";
 export type LiveOrderScopeFilter = "all" | "broadcast" | "shop";
@@ -640,6 +641,19 @@ export default function LiveOrderTable({
     }
   };
 
+  // 출고완료 처리 / 해제 (선택 주문 일괄) — 주문상태만 변경, 돈/입금/포인트/정산 무변경
+  const { savingAction: shippedSaving, markShipped, unmarkShipped } = useLiveOrderShipped({
+    onAfterStatusChange: refreshOrders,
+  });
+  const handleMarkShipped = async () => {
+    const ok = await markShipped(selectedExportOrders);
+    if (ok) setSelectedOrderIds(new Set());
+  };
+  const handleUnmarkShipped = async () => {
+    const ok = await unmarkShipped(selectedExportOrders);
+    if (ok) setSelectedOrderIds(new Set());
+  };
+
 
   const currentFilterLabel = useMemo(() => {
     const broadcastLabel =
@@ -806,6 +820,28 @@ export default function LiveOrderTable({
         <div className="ml-auto flex items-center gap-2">
           {selectedOrderIds.size > 0 && (
             <span className="text-[12px] font-black text-[#7B2D43]">{selectedOrderIds.size}건 선택됨</span>
+          )}
+          {selectedOrderIds.size > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={handleMarkShipped}
+                disabled={shippedSaving !== ""}
+                className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-[#185FA5] hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-40"
+                title="선택한 결제완료 주문을 출고완료로 변경합니다 (출고시간 기록, 고객 주문조회 반영)"
+              >
+                {shippedSaving === "ship" ? "처리중..." : "📦 출고완료 처리"}
+              </button>
+              <button
+                type="button"
+                onClick={handleUnmarkShipped}
+                disabled={shippedSaving !== ""}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-500 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                title="잘못 누른 출고완료를 해제합니다 (출고대기로 되돌림)"
+              >
+                {shippedSaving === "unship" ? "해제중..." : "↩ 출고완료 해제"}
+              </button>
+            </>
           )}
           <button
             type="button"

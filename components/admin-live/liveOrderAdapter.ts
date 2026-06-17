@@ -295,6 +295,15 @@ function getMemo(group: OrderGroup) {
   );
 }
 
+// 출고(배송단계) 표시 전용: 배송단계 상태값일 때만 노출(입금단계 상태는 출고칸에 안 보이게 null).
+// 돈/입금 판정과 무관 — '출고' 칼럼·출고완료 칩 표시용.
+const SHIPPING_STAGE_STATUSES = ["출고대기", "출고완료", "킵", "픽업", "픽업예정"];
+function getShippingStageText(group: OrderGroup): string | null {
+  const first = group.first;
+  const status = String(first.admin_order_status_v2 || first.order_manage_status || "").trim();
+  return SHIPPING_STAGE_STATUSES.includes(status) ? status : null;
+}
+
 export function toAdminLiveOrder(group: OrderGroup): LiveOrder {
   const first = group.first;
   const meta = paymentStatusMeta(first);
@@ -308,6 +317,7 @@ export function toAdminLiveOrder(group: OrderGroup): LiveOrder {
     orderNo: first.order_lookup_code || group.groupId || String(first.id || "-"),
     paymentStatus,
     paymentLabel: meta.label,
+    shippingStatus: getShippingStageText(group),
     createdAt: first.created_at,
     submittedAt: formatTime(first.created_at),
     paidAt: first.deposit_confirmed_at ? formatTime(first.deposit_confirmed_at) : null,
