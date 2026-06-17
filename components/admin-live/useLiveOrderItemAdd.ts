@@ -35,6 +35,16 @@ export type LiveOrderItemAddResult = {
   productTotal: number; // 상품금액(단가×수량, vat 제외)
 };
 
+// 등록상품(재고차감) 추가 입력 — 옵션(색상/사이즈)은 상품 variant에서 그대로 전달(재고 키 일치 보장)
+export type LiveOrderRegisteredAddInput = {
+  productId: number;
+  productName: string;
+  color: string;
+  size: string;
+  qty: number;
+  unitPrice: number;
+};
+
 // 첫 행에서 그대로 복사할 "그룹 공유" 컬럼(주문자/받는사람/주소/방송/결제수단/상태/제외플래그 등)
 const SHARED_KEYS = [
   "created_at", // 원 주문 시각 복사 → 추가해도 주문일이 '오늘'로 튀지 않고 같은 그룹/날짜 유지
@@ -209,5 +219,98 @@ export function useLiveOrderItemAdd(onAfter?: (result: LiveOrderItemAddResult) =
     }
   };
 
-  return { adding, addDirectItem };
+  // 등록상품 추가 — admin_add_order_item RPC 호출(재고 차감/카드 vat/그룹필드 복사는 RPC가 처리).
+  //   색상/사이즈는 선택한 variant 객체에서 그대로 전달 → 재고 키 불일치 방지.
+  //   재고 부족·옵션 없음 시 RPC가 예외를 던지므로 추가가 막힘(돈/재고 보호).
+  const addRegisteredItem = async (
+    order: LiveOrder,
+    input: LiveOrderRegisteredAddInput
+  ): Promise<LiveOrderItemAddResult | false> => {
+    const firstRowId = Array.isArray(order.rowIds) && order.rowIds.length > 0
+      ? Number(order.rowIds[0])
+      : Number(order.items?.[0]?.id);
+
+    if (!Number.isFinite(firstRowId) || firstRowId <= 0) {
+      showAdminToast("기준 주문 행을 찾을 수 없습니다.", "warning");
+      return false;
+    }
+
+    const productId = Number(input.productId);
+    const productName = clean(input.productName);
+    const color = clean(input.color);
+    const size = clean(input.size);
+    const qty = toNumber(input.qty);
+    const unitPrice = toNumber(input.unitPrice);
+
+    if (!Number.isFinite(productId) || productId <= 0) {
+      showAdminToast("상품을 선택해주세요.", "warning");
+      return false;
+    }
+    if (!productName) {
+      showAdminToast("상품명이 없습니다.", "warning");
+      return false;
+    }
+    if (!qty || qty <= 0) {
+      showAdminToast("수량은 1개 이상이어야 합니다.", "warning");
+      return false;
+    }
+    if (unitPrice <= 0) {
+      showAdminToast("단가는 1원 이상이어야 합니다.", "warning");
+      return false;
+    }
+
+    const optionLabel = [color, size].filter(Boolean).join(" / ");
+    const confirmMessage = [
+      `이 주문에 등록상품을 추가할까요?`,
+      "",
+      `${productName}${optionLabel ? ` (${optionLabel})` : ""} · ${qty}개 · ${(unitPrice * qty).toLocaleString("ko-KR")}원`,
+      "",
+      "등록상품이라 재고가 그만큼 차감됩니다(재고 부족 시 추가되지 않습니다).",
+      "주문 총 결제금액이 추가 금액만큼 늘어납니다.",
+      "이미 입금확인된 주문이면 금액이 바뀌니, 필요 시 '입금확인 취소'로 다시 매칭하세요.",
+    ].join("\n");
+
+    if (!(await showAdminConfirm(confirmMessage))) return false;
+
+    setAdding(true);
+    try {
+      const { data, error } = await (supabase as any).rpc("admin_add_order_item", {
+        p_ref_order_id: firstRowId,
+        p_product_id: productId,
+        p_product_name: productName,
+        p_color: color,
+        p_size: size,
+        p_qty: qty,
+        p_unit_price: unitPrice,
+        p_admin_memo: "admin-live 주문상세 등록상품 추가",
+      });
+      const res = (data || {}) as any;
+
+      if (error || res?.ok !== true) {
+        showAdminToast("등록상품 추가 실패\n\n" + (error?.message || res?.message || "알 수 없는 오류"), "error");
+        return false;
+      }
+
+      const newId = Number(res.new_order_id);
+      const productTotal = Number(res.product_total) || unitPrice * qty;
+
+      const result: LiveOrderItemAddResult = {
+        rowId: newId,
+        productName,
+        color,
+        size,
+        qty,
+        unitPrice,
+        productTotal,
+      };
+
+      showAdminToast("등록상품을 추가하고 재고를 차감했습니다.", "success");
+      await onAfter?.(result);
+      return result;
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  return { adding, addDirectItem, addRegisteredItem };
 }

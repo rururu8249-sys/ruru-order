@@ -8,8 +8,9 @@ import type { LiveOrder, LiveOrderItem } from "./types";
 import { isLiveOrderCanceled, useLiveOrderCancelRestore } from "./useLiveOrderCancelRestore";
 import LiveOrderItemEditCard from "./LiveOrderItemEditCard";
 import type { LiveOrderItemEditSaveResult } from "./useLiveOrderItemEdit";
-import { useLiveOrderItemAdd, createInitialLiveOrderItemAddForm, type LiveOrderItemAddForm } from "./useLiveOrderItemAdd";
+import { useLiveOrderItemAdd, createInitialLiveOrderItemAddForm, type LiveOrderItemAddForm, type LiveOrderRegisteredAddInput } from "./useLiveOrderItemAdd";
 import { useLiveOrderItemDelete } from "./useLiveOrderItemDelete";
+import LiveOrderRegisteredProductPicker from "./LiveOrderRegisteredProductPicker";
 import LiveOrderDangerActionGuide from "./LiveOrderDangerActionGuide";
 
 type Props = {
@@ -181,8 +182,9 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 
   // 직접입력 상품 추가 (#3 1단계) — 재고 무관, 같은 그룹에 새 행 INSERT
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
   const [addForm, setAddForm] = useState<LiveOrderItemAddForm>(createInitialLiveOrderItemAddForm());
-  const { adding, addDirectItem } = useLiveOrderItemAdd();
+  const { adding, addDirectItem, addRegisteredItem } = useLiveOrderItemAdd();
   const { deletingId, deleteItem } = useLiveOrderItemDelete();
 
   const handleDeleteItem = async (item: LiveOrderItem) => {
@@ -245,6 +247,44 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     } finally {
       setRefreshingDetail(false);
     }
+  };
+
+  const handleAddRegisteredItem = async (input: LiveOrderRegisteredAddInput): Promise<boolean> => {
+    const result = await addRegisteredItem(localOrder, input);
+    if (!result) return false;
+
+    setRefreshingDetail(true);
+    try {
+      setLocalOrder((previousOrder) => {
+        const previousItems = Array.isArray(previousOrder.items) ? previousOrder.items : [];
+        const newItem = {
+          id: String(result.rowId),
+          productName: result.productName,
+          optionText: [result.color, result.size].filter(Boolean).join(" / ") || "옵션 없음",
+          color: result.color,
+          size: result.size,
+          qty: result.qty,
+          unitPrice: result.unitPrice,
+          amount: result.productTotal,
+        } as (typeof previousItems)[number];
+
+        const nextItems = [...previousItems, newItem];
+        const nextProductAmount = nextItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+        return {
+          ...previousOrder,
+          items: nextItems,
+          totalQty: nextItems.reduce((sum, item) => sum + Number(item.qty || 0), 0),
+          totalAmount: nextProductAmount + Number(previousOrder.shippingFee || 0),
+        };
+      });
+
+      setShowPicker(false);
+      await onAfterStatusChange?.();
+    } finally {
+      setRefreshingDetail(false);
+    }
+    return true;
   };
 
   const orderForView = localOrder;
@@ -674,13 +714,28 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 <span className="rounded-full bg-rose-soft px-2 py-1 text-[10px] font-black text-rose-deep">상세정보 갱신중...</span>
               ) : null}
               {!isCanceled ? (
-                <button
-                  type="button"
-                  onClick={() => setShowAddForm((v) => !v)}
-                  className="rounded-lg border border-rose-200 bg-rose-soft px-2 py-1 text-[11px] font-black text-rose-deep hover:bg-rose-100"
-                >
-                  {showAddForm ? "닫기" : "+ 직접입력 추가"}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPicker(false);
+                      setShowAddForm((v) => !v);
+                    }}
+                    className="rounded-lg border border-rose-200 bg-rose-soft px-2 py-1 text-[11px] font-black text-rose-deep hover:bg-rose-100"
+                  >
+                    {showAddForm ? "닫기" : "+ 직접입력 추가"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddForm(false);
+                      setShowPicker((v) => !v);
+                    }}
+                    className="rounded-lg border border-rose-200 bg-rose-soft px-2 py-1 text-[11px] font-black text-rose-deep hover:bg-rose-100"
+                  >
+                    {showPicker ? "닫기" : "+ 등록상품 추가"}
+                  </button>
+                </>
               ) : null}
             </div>
           </div>
@@ -756,6 +811,10 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 {adding ? "추가 중..." : "이 주문에 추가"}
               </button>
             </div>
+          ) : null}
+
+          {showPicker && !isCanceled ? (
+            <LiveOrderRegisteredProductPicker onAdd={handleAddRegisteredItem} adding={adding} />
           ) : null}
         </section>
 
