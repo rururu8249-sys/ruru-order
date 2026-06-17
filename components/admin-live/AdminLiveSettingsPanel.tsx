@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import YoutubeNotifyCard from "./YoutubeNotifyCard";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import AdminAuthSettingsPanel from "./AdminAuthSettingsPanel";
@@ -385,6 +386,8 @@ export default function AdminLiveSettingsPanel() {
           </button>
         </div>
       </div>
+
+      <YoutubeNotifyCard />
 
       <div className="rounded-[30px] border border-rose-line bg-rose-soft p-5">
         <h2 className="text-lg font-black text-slate-950">현재 설정 미리보기</h2>
