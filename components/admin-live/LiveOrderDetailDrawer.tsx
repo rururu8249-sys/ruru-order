@@ -658,7 +658,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               ) : null}
             </div>
           </div>
-          <div className="max-h-[480px] space-y-2 overflow-y-auto pr-1">
+          <div className="space-y-2">
             {items.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 p-4 text-center text-xs font-bold text-slate-400">주문 품목이 없습니다.</div>
             ) : (
