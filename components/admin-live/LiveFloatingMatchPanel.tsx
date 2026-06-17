@@ -328,6 +328,35 @@ export default function LiveFloatingMatchPanel({
         </div>
       )}
 
+      {/* 매칭 모드 확정 버튼 (상단 고정 — 스크롤해도 항상 보임) */}
+      {matchMode && (
+        <div style={{ padding: "10px 12px", borderBottom: "1px solid #f0f0f0", display: "flex", flexDirection: "column", gap: 6, flexShrink: 0, background: "#fff" }}>
+          {selDeps.length > 0 && (
+            <div style={{ fontSize: 11, fontWeight: 700, color: selTotal === expectedAmount ? "#15803d" : "#ef4444", textAlign: "center", marginBottom: 2 }}>
+              선택 합계 {won(selTotal)} {selTotal === expectedAmount ? "✓ 일치" : `✗ 불일치 (주문 ${won(expectedAmount)})`}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={handleConfirmWithDeposit} disabled={!canConfirm || matchSaving}
+              style={{
+                flex: 1, background: canConfirm ? "#3d7a57" : "#ccc", color: "#fff", border: "none",
+                borderRadius: 10, padding: "11px 6px", fontSize: 12, fontWeight: 800,
+                cursor: canConfirm ? "pointer" : "not-allowed",
+              }}>
+              {matchSaving ? "처리중…" : "선택 후 입금확인"}
+            </button>
+            <button onClick={handleConfirmWithoutDeposit} disabled={matchSaving}
+              style={{
+                flex: 1, background: "#7B2D43", color: "#fff", border: "none",
+                borderRadius: 10, padding: "11px 6px", fontSize: 12, fontWeight: 800,
+                cursor: matchSaving ? "not-allowed" : "pointer",
+              }}>
+              금액 무시하고 수동확인
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 입금 리스트 */}
       <div style={{ flex: 1, overflowY: "auto" }}>
         {grouped.length === 0 && (
@@ -431,34 +460,6 @@ export default function LiveFloatingMatchPanel({
         ))}
       </div>
 
-      {/* 매칭 모드 하단 확정 버튼 */}
-      {matchMode && (
-        <div style={{ padding: "10px 12px", borderTop: "1px solid #f0f0f0", display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
-          {selDeps.length > 0 && (
-            <div style={{ fontSize: 11, fontWeight: 700, color: selTotal === expectedAmount ? "#15803d" : "#ef4444", textAlign: "center", marginBottom: 2 }}>
-              선택 합계 {won(selTotal)} {selTotal === expectedAmount ? "✓ 일치" : `✗ 불일치 (주문 ${won(expectedAmount)})`}
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={handleConfirmWithDeposit} disabled={!canConfirm || matchSaving}
-              style={{
-                flex: 1, background: canConfirm ? "#3d7a57" : "#ccc", color: "#fff", border: "none",
-                borderRadius: 10, padding: "11px 6px", fontSize: 12, fontWeight: 800,
-                cursor: canConfirm ? "pointer" : "not-allowed",
-              }}>
-              {matchSaving ? "처리중…" : "선택 후 입금확인"}
-            </button>
-            <button onClick={handleConfirmWithoutDeposit} disabled={matchSaving}
-              style={{
-                flex: 1, background: "#7B2D43", color: "#fff", border: "none",
-                borderRadius: 10, padding: "11px 6px", fontSize: 12, fontWeight: 800,
-                cursor: matchSaving ? "not-allowed" : "pointer",
-              }}>
-              금액 무시하고 수동확인
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

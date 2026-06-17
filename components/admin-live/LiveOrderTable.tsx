@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { LiveOrder } from "./types";
 import { exportLiveOrdersForPicking, exportLiveOrdersForRosen } from "./adminLiveOrderExcelExport";
 import { supabase } from "@/lib/supabase";
@@ -10,6 +10,9 @@ import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
 import { openPaysterRightHalf } from "./AdminLiveCardPayPopup";
 import BroadcastCalendarPicker, { type BroadcastCalendarItem } from "./BroadcastCalendarPicker";
 import { useLiveOrderShipped } from "./useLiveOrderShipped";
+
+// 현재 페이지를 새로고침 사이에 보존하기 위한 sessionStorage 키(보기 상태 전용).
+const LIVE_ORDERS_PAGE_KEY = "ruru_live_orders_page";
 
 export type LiveOrderDateFilter = "all" | "today" | "yesterday" | "7days" | "month" | "lastmonth" | "custom";
 export type LiveOrderScopeFilter = "all" | "broadcast" | "shop";
@@ -394,7 +397,17 @@ export default function LiveOrderTable({
   onMatched,
   onSelectForMatch,
 }: Props) {
-  const [page, setPage] = useState(1);
+  // 현재 페이지를 새로고침(F5) 사이에 보존(보기 상태 전용). 1페이지면 저장 삭제 → 초기화 시 자연 정리.
+  const [page, setPage] = useState<number>(() => {
+    if (typeof window === "undefined") return 1;
+    const v = Number(window.sessionStorage.getItem(LIVE_ORDERS_PAGE_KEY));
+    return Number.isFinite(v) && v >= 1 ? v : 1;
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (page <= 1) window.sessionStorage.removeItem(LIVE_ORDERS_PAGE_KEY);
+    else window.sessionStorage.setItem(LIVE_ORDERS_PAGE_KEY, String(page));
+  }, [page]);
   const [pendingKeyword, setPendingKeyword] = useState(filters.keyword);
   const [sortMode, setSortMode] = useState<SortMode>("latest");
   const [pageSize, setPageSize] = useState(10);
@@ -478,11 +491,16 @@ export default function LiveOrderTable({
   const [exportConfirm, setExportConfirm] = useState<"" | "rozen" | "picking">("");
   const [cancelViewFilter, setCancelViewFilter] = useState<LiveOrderCancelViewFilterValue>("all");
 
+  // 필터/정렬 변경 시 1페이지로. 단, 첫 마운트(새로고침으로 복원된 페이지)에는 리셋하지 않음.
+  const cancelViewMountedRef = useRef(false);
   useEffect(() => {
+    if (!cancelViewMountedRef.current) { cancelViewMountedRef.current = true; return; }
     setPage(1);
   }, [cancelViewFilter]);
 
+  const filterChangeMountedRef = useRef(false);
   useEffect(() => {
+    if (!filterChangeMountedRef.current) { filterChangeMountedRef.current = true; return; }
     setPage(1);
   }, [filters.broadcast, filters.scope, filters.date, filters.customStartDate, filters.customEndDate, filters.status, filters.keyword, sortMode, pageSize]);
 

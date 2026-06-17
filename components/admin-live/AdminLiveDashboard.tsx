@@ -78,6 +78,9 @@ const DEFAULT_FILTERS: LiveOrderFilters = {
   keyword: "",
 };
 
+// 실시간 주문서 필터를 새로고침 사이에 보존하기 위한 sessionStorage 키(보기 상태 전용).
+const LIVE_ORDERS_FILTERS_KEY = "ruru_live_orders_filters";
+
 function toDateKey(value: string | null | undefined) {
   if (!value) return "";
   const date = new Date(value);
@@ -563,7 +566,21 @@ export default function AdminLiveDashboard() {
   const [videoRatio, setVideoRatio] = useState<VideoRatio>("vertical");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [filters, setFilters] = useState<LiveOrderFilters>(DEFAULT_FILTERS);
+  // 필터를 sessionStorage에 보존 → 브라우저 새로고침(F5)에도 보던 필터 유지(초기화 버튼 누르면 기본값=저장 삭제).
+  // (운영/돈 데이터 아님, 화면 보기 상태. 기존 ruru_admin_sound_on 등 UI 상태 저장과 동일 관행)
+  const [filters, setFilters] = useState<LiveOrderFilters>(() => {
+    if (typeof window === "undefined") return DEFAULT_FILTERS;
+    try {
+      const raw = window.sessionStorage.getItem(LIVE_ORDERS_FILTERS_KEY);
+      if (raw) return { ...DEFAULT_FILTERS, ...(JSON.parse(raw) as Partial<LiveOrderFilters>) };
+    } catch {
+      // ignore
+    }
+    return DEFAULT_FILTERS;
+  });
+  const filtersRestoredRef = useRef<boolean>(
+    typeof window !== "undefined" && !!window.sessionStorage.getItem(LIVE_ORDERS_FILTERS_KEY)
+  );
   const [broadcastEndSummary, setBroadcastEndSummary] = useState<LiveBroadcastEndSummary | null>(null);
   const [quickModal, setQuickModal] = useState<"orders" | "payments" | "customers" | "settlement" | null>(null);
   const [quickModalSearch, setQuickModalSearch] = useState("");
@@ -897,11 +914,26 @@ export default function AdminLiveDashboard() {
 
   // 처음 방송 데이터 로딩 후 1회: 방송 중이면 기본 필터를 현재 방송으로 맞춘다(라이브 표준).
   // 사용자가 이미 필터를 바꿨으면(=초기 상태가 아니면) 건드리지 않는다.
+  // 필터 변경 시 sessionStorage에 보존(기본값이면 삭제 → 다음 새 세션은 현재 방송 기본값으로 시작).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      if (JSON.stringify(filters) === JSON.stringify(DEFAULT_FILTERS)) {
+        window.sessionStorage.removeItem(LIVE_ORDERS_FILTERS_KEY);
+      } else {
+        window.sessionStorage.setItem(LIVE_ORDERS_FILTERS_KEY, JSON.stringify(filters));
+      }
+    } catch {
+      // ignore
+    }
+  }, [filters]);
+
   const didInitBroadcastFilter = useRef(false);
   useEffect(() => {
     if (didInitBroadcastFilter.current) return;
     if (broadcasts.length === 0) return; // 방송 목록 로딩 전이면 대기
     didInitBroadcastFilter.current = true;
+    if (filtersRestoredRef.current) return; // 새로고침으로 복원된 필터가 있으면 기본값으로 덮어쓰지 않음
     if (activeBroadcast) {
       // 방송 중: 범위=방송 + 현재 방송으로 맞춘다(새 UI 일관). 사용자가 아직 안 건드린 초기 상태일 때만.
       setFilters((prev) =>
@@ -1449,6 +1481,9 @@ export default function AdminLiveDashboard() {
                   broadcastCalendar={broadcastCalendar}
                   broadcastStartedAt={activeBroadcast?.started_at || activeBroadcast?.created_at || null}
                   onSelectOrder={(order) => {
+                    // 사이드 패널 단일 슬롯: 주문상세 열 때 입금매칭은 닫음(최신 액션에 반응)
+                    setMatchPanelOpen(false);
+                    setSelectedOrderForMatch(null);
                     setSelectedOrderId(order.id);
                     setOrderDetailOpen(true);
                   }}
@@ -1458,7 +1493,7 @@ export default function AdminLiveDashboard() {
                   onOpenCardPay={setCardPayOrder}
                   deposits={deposits}
                   onMatched={refreshAfterManualMatch}
-                  onSelectForMatch={(order) => { setSelectedOrderForMatch(order); setMatchPanelOpen(true); }}
+                  onSelectForMatch={(order) => { setOrderDetailOpen(false); setSelectedOrderForMatch(order); setMatchPanelOpen(true); }}
                 />
               </div>
 
@@ -1931,6 +1966,8 @@ export default function AdminLiveDashboard() {
                     const orderId = String(order?.id || "");
                     if (!orderId) return;
                     resetQuickModal();
+                    setMatchPanelOpen(false);
+                    setSelectedOrderForMatch(null);
                     setSelectedOrderId(orderId);
                     setOrderDetailOpen(true);
                   };
