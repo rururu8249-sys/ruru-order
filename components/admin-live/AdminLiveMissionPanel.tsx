@@ -4,6 +4,7 @@
 //   - 설정은 /api/admin-live/mission(POST), 진행률은 GET. settings 키만 다룸.
 //   - "구매자 전원 지급"(돈)은 2단계라 여기엔 없음(읽기/설정 전용).
 import { useCallback, useEffect, useState } from "react";
+import { useBulkPointGrant } from "./useBulkPointGrant";
 
 type GoalType = "count" | "amount";
 type Progress = {
@@ -72,6 +73,42 @@ export default function AdminLiveMissionPanel() {
       setMsg("저장 실패: " + (e instanceof Error ? e.message : String(e)));
     } finally {
       setSaving(false);
+    }
+  };
+
+  // ── 2단계: 구매자 전원 지급 ──
+  const { running: paying, grant } = useBulkPointGrant();
+  const [payout, setPayout] = useState<{ count: number; reward: number; total: number; alreadyPaid: boolean; broadcastTitle: string } | null>(null);
+  const [payMsg, setPayMsg] = useState("");
+
+  const openPayout = async () => {
+    setPayMsg("");
+    try {
+      const res = await fetch("/api/admin-live/mission", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "payout_preview" }) });
+      const j = await res.json();
+      if (!j.ok) { setPayMsg(j.message || "조회 실패"); return; }
+      setPayout({ count: j.count, reward: j.reward, total: j.total, alreadyPaid: j.alreadyPaid, broadcastTitle: j.broadcastTitle || "" });
+    } catch (e) {
+      setPayMsg("조회 실패: " + (e instanceof Error ? e.message : String(e)));
+    }
+  };
+
+  const doPayout = async () => {
+    try {
+      const res = await fetch("/api/admin-live/mission", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "payout_confirm" }) });
+      const j = await res.json();
+      if (!j.ok) { setPayout(null); setPayMsg(j.message || (j.already ? "이미 지급됨" : "지급 실패")); return; }
+      const targets = (j.buyers || []).map((x: { phone: string; nickname?: string }) => ({ phone: x.phone, label: x.nickname || x.phone }));
+      const r = await grant(targets, { amount: j.reward, reason: j.title || "미션 목표 달성 - 구매자 전원 지급", adminMemo: "미션 게이지 공동목표 달성 일괄지급", customerVisible: true });
+      if (r.success === 0) {
+        await fetch("/api/admin-live/mission", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "payout_reset" }) });
+      }
+      setPayout(null);
+      setPayMsg(`지급 완료: 성공 ${r.success}명${r.failed.length ? ` · 실패 ${r.failed.length}명` : ""}`);
+      load();
+    } catch (e) {
+      setPayout(null);
+      setPayMsg("지급 실패: " + (e instanceof Error ? e.message : String(e)));
     }
   };
 
@@ -173,6 +210,16 @@ export default function AdminLiveMissionPanel() {
         {msg ? <div style={{ fontSize: 13, color: msg.includes("실패") ? "#C0392B" : "#0F6E56", fontWeight: 700 }}>{msg}</div> : null}
       </div>
 
+      {/* 2단계: 구매자 전원 지급 */}
+      <div style={{ marginTop: 18, borderTop: "1px solid #E3CDD5", paddingTop: 14 }}>
+        <span style={labelStyle}>목표 달성 시 — 구매자 전원 포인트 지급</span>
+        <div style={{ fontSize: 12, color: "#999", marginBottom: 8 }}>현재 방송의 <b>결제완료 구매자 전원</b>에게 1인당 포인트를 한 번에 지급해요. 같은 방송은 한 번만 지급(중복 방지).</div>
+        <button type="button" onClick={openPayout} disabled={paying} style={{ width: "100%", padding: "12px", borderRadius: 12, border: "2px solid #0F6E56", background: "#fff", color: "#0F6E56", fontWeight: 800, fontSize: 15, cursor: "pointer", opacity: paying ? 0.6 : 1 }}>
+          🎁 구매자 전원에게 지급하기
+        </button>
+        {payMsg ? <div style={{ fontSize: 13, marginTop: 8, fontWeight: 700, color: payMsg.includes("실패") && !payMsg.includes("성공") ? "#C0392B" : "#0F6E56" }}>{payMsg}</div> : null}
+      </div>
+
       {/* OBS 위젯 주소 */}
       <div style={{ marginTop: 20, borderTop: "1px solid #E3CDD5", paddingTop: 14 }}>
         <span style={labelStyle}>OBS 방송 위젯주소 (브라우저 소스)</span>
@@ -186,8 +233,31 @@ export default function AdminLiveMissionPanel() {
             복사
           </button>
         </div>
-        <div style={{ fontSize: 12, color: "#999", marginTop: 6 }}>OBS에서 브라우저 소스로 추가 · 배경 투명 · 미션 꺼져 있으면 아무것도 안 보여요.</div>
+        <div style={{ fontSize: 12, color: "#999", marginTop: 6 }}>OBS에서 브라우저 소스로 추가 · 배경 투명 · 미션 꺼져 있으면 아무것도 안 보여요. (디자인 미리보기: 주소 끝에 <b>?preview=1</b>)</div>
       </div>
+
+      {payout ? (
+        <div style={{ position: "fixed", inset: 0, zIndex: 140, background: "rgba(2,6,23,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={(e) => { if (e.target === e.currentTarget) setPayout(null); }}>
+          <div style={{ width: "min(420px,92vw)", background: "#fff", borderRadius: 16, padding: 20 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#7B2D43" }}>구매자 전원 포인트 지급</div>
+            {payout.alreadyPaid ? (
+              <div style={{ marginTop: 12, fontSize: 14, color: "#C0392B", fontWeight: 700, lineHeight: 1.6 }}>이미 이 방송 미션 지급이 완료됐어요.<br />중복 지급되지 않습니다.</div>
+            ) : (
+              <div style={{ marginTop: 12, fontSize: 14, color: "#333", lineHeight: 1.8 }}>
+                {payout.broadcastTitle ? <div style={{ color: "#888", fontSize: 13 }}>{payout.broadcastTitle}</div> : null}
+                결제완료 <b style={{ color: "#7B2D43" }}>{payout.count}명</b>에게<br />
+                1인당 <b style={{ color: "#7B2D43" }}>{won(payout.reward)}P</b> · 총 <b style={{ color: "#0F6E56" }}>{won(payout.total)}P</b> 지급합니다.
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
+              <button type="button" onClick={() => setPayout(null)} style={{ flex: 1, padding: "10px", borderRadius: 10, border: "1.5px solid #D9C5CC", background: "#fff", color: "#777", fontWeight: 700, cursor: "pointer" }}>취소</button>
+              {!payout.alreadyPaid && payout.count > 0 && payout.reward > 0 ? (
+                <button type="button" onClick={doPayout} disabled={paying} style={{ flex: 1, padding: "10px", borderRadius: 10, border: "none", background: "#0F6E56", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: paying ? 0.6 : 1 }}>{paying ? "지급 중…" : "지급 실행"}</button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

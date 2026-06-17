@@ -3,7 +3,7 @@
 //   - 돈/포인트 로직 없음(1단계). 전원 지급은 별도(2단계).
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
-import { getMissionSupabase, computeMissionProgress } from "@/lib/mission";
+import { getMissionSupabase, computeMissionProgress, readMissionConfig, fetchMissionBuyers, readMissionPaid, setMissionPaid } from "@/lib/mission";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +36,32 @@ export async function POST(request: NextRequest) {
   if (auth) return auth;
   try {
     const b = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    const action = String(b.action ?? "");
+
+    // ── 2단계: 구매자 전원 지급 ──
+    if (action === "payout_preview" || action === "payout_confirm" || action === "payout_reset") {
+      const supabase = getMissionSupabase();
+      const { broadcastId, broadcastTitle, buyers } = await fetchMissionBuyers(supabase);
+      if (action === "payout_reset") {
+        if (broadcastId) await setMissionPaid(supabase, broadcastId, false);
+        return json({ ok: true });
+      }
+      if (!broadcastId) return json({ ok: false, message: "진행 중인 방송이 없습니다." }, 400);
+      const cfg = await readMissionConfig(supabase);
+      const reward = cfg.reward;
+      const alreadyPaid = await readMissionPaid(supabase, broadcastId);
+
+      if (action === "payout_preview") {
+        return json({ ok: true, broadcastTitle, count: buyers.length, reward, total: buyers.length * reward, alreadyPaid });
+      }
+      // payout_confirm: 중복가드 → 통과 시 가드 선설정 후 지급대상 반환(클라이언트가 일괄지급)
+      if (alreadyPaid) return json({ ok: false, already: true, message: "이미 이 방송 미션 지급이 완료됐어요." }, 409);
+      if (reward <= 0) return json({ ok: false, message: "1인당 포인트가 0이에요. 설정을 확인하세요." }, 400);
+      if (buyers.length === 0) return json({ ok: false, message: "지급 대상(결제완료 구매자)이 없어요." }, 400);
+      await setMissionPaid(supabase, broadcastId, true);
+      return json({ ok: true, reward, title: cfg.title, buyers });
+    }
+
     const goalType = b.goalType === "amount" ? "amount" : "count";
     const rows = [
       { key: "mission_active", value: b.active ? "true" : "false" },

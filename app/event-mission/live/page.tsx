@@ -23,10 +23,12 @@ const won = (n: number) => n.toLocaleString("ko-KR");
 
 export default function MissionLiveWidget() {
   const [data, setData] = useState<MissionData | null>(null);
+  const [preview, setPreview] = useState(false);
 
   useEffect(() => {
     document.documentElement.style.background = "transparent";
     document.body.style.background = "transparent";
+    setPreview(new URLSearchParams(window.location.search).get("preview") === "1");
     let alive = true;
     const load = async () => {
       try {
@@ -45,15 +47,18 @@ export default function MissionLiveWidget() {
     };
   }, []);
 
-  if (!data || !data.ok || !data.active || !data.goal || data.goal <= 0) {
+  const liveOk = !!(data && data.ok && data.active && data.goal && data.goal > 0);
+  if (!liveOk && !preview) {
     return <div style={{ background: "transparent" }} />;
   }
+  const useSample = !liveOk; // preview 인데 미션 OFF/미설정 → 샘플로 디자인만 보여줌
 
-  const goalType = data.goalType === "amount" ? "amount" : "count";
-  const goal = data.goal || 0;
-  const current = data.current || 0;
-  const reward = data.reward || 0;
-  const pct = Math.min(100, data.pct || 0);
+  const goalType: "count" | "amount" = useSample ? "count" : data!.goalType === "amount" ? "amount" : "count";
+  const goal = useSample ? 100 : data!.goal || 0;
+  const current = useSample ? 63 : data!.current || 0;
+  const reward = useSample ? 1000 : data!.reward || 0;
+  const pct = useSample ? 63 : Math.min(100, data!.pct || 0);
+  const title = useSample ? "미리보기" : data!.title || "";
   const remaining = Math.max(0, goal - current);
 
   const goalText =
@@ -103,7 +108,7 @@ export default function MissionLiveWidget() {
               {done ? "목표 달성! 모두 고마워요" : "다 같이 채우면 — 구매자 전원 포인트!"}
             </div>
             <div style={{ fontSize: 17, fontWeight: 800, marginTop: 1 }}>
-              {data.title ? `${data.title} · ` : ""}
+              {title ? `${title} · ` : ""}
               {goalText} <span style={{ color: done ? "#C7F0E2" : "#FFE3EC" }}>· {currentText}</span>
             </div>
           </div>
