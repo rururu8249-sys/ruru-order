@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
+import { PAID_STATUS_VALUES } from "@/lib/admin-v2/statusDisplay";
 import { createClient } from "@supabase/supabase-js";
 import {
   buildRouletteParticipants,
@@ -337,8 +338,9 @@ async function fetchOrderRowsForDate(supabase: SupabaseAdminClient, sourceDate: 
   return (Array.isArray(data) ? data : []) as EventRouletteOrderLike[];
 }
 
-// "입금완료한 사람만" 필터용 결제완료 상태값 (admin_order_status_v2 / order_manage_status 기준)
-const ROULETTE_PAID_STATUSES = new Set(["자동입금확인", "수동입금확인", "카드결제완료"]);
+// "입금완료한 사람만" 필터용 결제완료 상태값 — 앱 정식 기준(PAID_STATUS_VALUES)과 동일하게 통일.
+//   (기존 3개만 보던 것 → 입금확인·결제완료·출고대기·출고완료·킵·픽업 포함. 주문서 결제완료와 동일 집합)
+const ROULETTE_PAID_STATUSES = new Set(PAID_STATUS_VALUES);
 
 function isPaidOrderRowForRoulette(row: EventRouletteOrderLike): boolean {
   const a = String((row as { admin_order_status_v2?: unknown }).admin_order_status_v2 || "").trim();

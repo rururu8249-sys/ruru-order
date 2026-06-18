@@ -3,6 +3,7 @@
 //   - 진행률은 "현재 방송(broadcasts.status='ON')" 기간의 결제완료 주문을 세서 계산(읽기 전용).
 //   - 돈/입금/정산/포인트 로직과 무관. 여기서는 주문을 "읽기만" 한다.
 import { createClient } from "@supabase/supabase-js";
+import { PAID_STATUS_VALUES } from "@/lib/admin-v2/statusDisplay";
 
 export const MISSION_OVERLAY_TOKEN = "mission_luludongi_live";
 export const MISSION_SETTING_KEYS = [
@@ -13,8 +14,10 @@ export const MISSION_SETTING_KEYS = [
   "mission_title",
 ] as const;
 
-// 결제완료 판정(룰렛 참가자 paidOnly와 동일 기준)
-const PAID_STATUSES = new Set(["자동입금확인", "수동입금확인", "카드결제완료"]);
+// 결제완료 판정 — 앱 정식 기준(PAID_STATUS_VALUES)과 동일하게 통일.
+//   기존엔 자동/수동입금확인·카드결제완료 3개만 봐서, 입금확인·결제완료·출고대기·출고완료·킵·픽업 상태인
+//   결제완료 구매자가 미션 카운트/지급 대상에서 빠지던 불일치를 해소(주문서 결제완료와 동일 집합).
+const PAID_STATUSES = new Set(PAID_STATUS_VALUES);
 
 export type MissionGoalType = "count" | "amount";
 export type MissionConfig = {
