@@ -297,7 +297,7 @@ export async function postLiveChatMessage(messageText: string, opts?: { forceEve
     if (!liveChatId) return { ok: false, skipped: true, reason: "활성 라이브 채팅을 찾지 못함(라이브 URL 확인)" };
 
     const postOnce = async (chatId: string) => {
-      return fetch("https://www.googleapis.com/youtube/v3/liveChatMessages?part=snippet", {
+      return fetch("https://www.googleapis.com/youtube/v3/liveChat/messages?part=snippet", {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
         body: JSON.stringify({
