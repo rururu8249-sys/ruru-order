@@ -144,15 +144,46 @@ export async function computeMissionProgress(supabase: Client): Promise<MissionP
 
 // ── 2단계: 구매자 전원 지급용 ──
 //   - 같은 방송의 결제완료·비테스트 주문 구매자를 전화번호 기준으로 1명 1회씩 추출(중복 제거).
-//   - 중복지급 방지 가드는 settings의 mission_paid_<broadcastId> 키(값 있으면 지급완료).
+//   - 중복지급 방지(멱등): "진실원천"은 settings 플래그가 아니라 실제 지급기록(customer_point_ledger).
+//     한 방송에서 여러 번 지급해도 같은 사람(전화번호)은 1회만 → 이미 받은 사람은 ledger 기준으로 자동 제외.
+//   - 미션 지급 식별키 = admin_memo(아래 상수, 클라이언트 일괄지급이 동일 값을 ledger에 기록).
+//     ※ reason은 미션 제목(title)에 따라 바뀌므로 식별에 부적합 → admin_memo(상수)로 매칭.
 export const missionPaidKey = (broadcastId: string) => `mission_paid_${broadcastId}`;
+export const MISSION_PAYOUT_MEMO = "미션 게이지 공동목표 달성 일괄지급";
 export type MissionBuyer = { phone: string; nickname: string; amount: number; when: string };
+
+// 이 방송에서 이미 미션 지급을 받은 전화번호 집합(숫자만). 진실원천 = customer_point_ledger.
+//   - change_type='grant' + admin_memo=미션상수 + created_at >= 방송 시작.
+//   - 실패한 지급은 ledger에 안 남으므로 자동으로 다음 회차 대상에 다시 포함된다(재시도 안전).
+export async function fetchMissionPaidPhones(supabase: Client, startedAt: string): Promise<Set<string>> {
+  const paid = new Set<string>();
+  if (!startedAt) return paid;
+  const size = 1000;
+  for (let page = 0; page < 30; page++) {
+    const from = page * size;
+    const { data, error } = await supabase
+      .from("customer_point_ledger")
+      .select("customer_phone")
+      .eq("change_type", "grant")
+      .eq("admin_memo", MISSION_PAYOUT_MEMO)
+      .gte("created_at", startedAt)
+      .range(from, from + size - 1);
+    if (error) break;
+    const rows = (Array.isArray(data) ? data : []) as { customer_phone?: unknown }[];
+    for (const r of rows) {
+      const p = String(r.customer_phone ?? "").replace(/[^0-9]/g, "");
+      if (p) paid.add(p);
+    }
+    if (rows.length < size) break;
+  }
+  return paid;
+}
 
 export async function fetchMissionBuyers(
   supabase: Client
-): Promise<{ broadcastId: string; broadcastTitle: string; buyers: MissionBuyer[] }> {
+): Promise<{ broadcastId: string; broadcastTitle: string; startedAt: string; buyers: MissionBuyer[] }> {
   const bc = await fetchActiveBroadcast(supabase);
-  if (!bc || !bc.started_at) return { broadcastId: "", broadcastTitle: "", buyers: [] };
+  if (!bc || !bc.started_at) return { broadcastId: "", broadcastTitle: "", startedAt: "", buyers: [] };
   const start = String(bc.started_at);
   const end = bc.ended_at ? String(bc.ended_at) : new Date().toISOString();
   const rows = await fetchAllOrders(
@@ -177,7 +208,7 @@ export async function fetchMissionBuyers(
       map.set(phone, { phone, nickname: String(r.youtube_nickname || r.customer_name || "고객").trim(), amount: amt, when });
     }
   }
-  return { broadcastId: String(bc.id ?? ""), broadcastTitle: String(bc.public_title ?? bc.title ?? ""), buyers: [...map.values()] };
+  return { broadcastId: String(bc.id ?? ""), broadcastTitle: String(bc.public_title ?? bc.title ?? ""), startedAt: start, buyers: [...map.values()] };
 }
 
 export async function readMissionPaid(supabase: Client, broadcastId: string): Promise<boolean> {

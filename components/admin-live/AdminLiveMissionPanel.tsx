@@ -5,6 +5,7 @@
 //   - "구매자 전원 지급"(돈)은 2단계라 여기엔 없음(읽기/설정 전용).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useBulkPointGrant } from "./useBulkPointGrant";
+import { MISSION_PAYOUT_MEMO } from "@/lib/mission";
 
 type GoalType = "count" | "amount";
 type Progress = {
@@ -40,6 +41,11 @@ export default function AdminLiveMissionPanel() {
   const [msg, setMsg] = useState("");
   const [savedSnap, setSavedSnap] = useState<string | null>(null);
   const initRef = useRef(false);
+  // load() 콜백(빈 deps) 안에서 "현재 폼/저장값"을 읽기 위한 ref(스테일 클로저 회피).
+  const liveRef = useRef({ active, goalType, goalValue, rewardAmount, title });
+  liveRef.current = { active, goalType, goalValue, rewardAmount, title };
+  const savedSnapRef = useRef<string | null>(savedSnap);
+  savedSnapRef.current = savedSnap;
 
   const widgetUrl =
     (typeof window !== "undefined" ? window.location.origin : "https://ruru-order.vercel.app") +
@@ -51,19 +57,34 @@ export default function AdminLiveMissionPanel() {
       const j = (await res.json()) as Progress & { ok: boolean };
       if (j.ok) {
         setProg(j);
-        // 입력칸은 처음 1회만 채움 — 폴링이 편집 중인 값을 덮어쓰지 않게(저장 전 체크 풀림 방지)
-        if (!initRef.current) {
-          initRef.current = true;
-          const gt = j.goalType === "amount" ? "amount" : "count";
-          const gv = j.goal ? String(j.goal) : "";
-          const ra = j.reward ? String(j.reward) : "";
-          const tt = j.title || "";
+        const gt = j.goalType === "amount" ? "amount" : "count";
+        const gv = j.goal ? String(j.goal) : "";
+        const ra = j.reward ? String(j.reward) : "";
+        const tt = j.title || "";
+        const serverSnap = snapOf(j.active, gt, gv, ra, tt);
+        const applyServer = () => {
           setActive(j.active);
           setGoalType(gt);
           setGoalValue(gv);
           setRewardAmount(ra);
           setTitle(tt);
-          setSavedSnap(snapOf(j.active, gt, gv, ra, tt));
+          setSavedSnap(serverSnap);
+        };
+        if (!initRef.current) {
+          initRef.current = true;
+          applyServer();
+        } else {
+          // 편집 중이 아닐 때(폼이 저장값과 동일 = clean)만 서버 최신값을 폼에 반영.
+          //   → 이벤트 종료/외부 변경이 체크박스에 바로 반영(스테일 "켜짐" 방지),
+          //     편집 중(dirty)이면 덮어쓰지 않음(저장 전 체크 풀림 방지 — 기존 보호 유지).
+          const cur = snapOf(
+            liveRef.current.active,
+            liveRef.current.goalType,
+            liveRef.current.goalValue,
+            liveRef.current.rewardAmount,
+            liveRef.current.title
+          );
+          if (cur === savedSnapRef.current) applyServer();
         }
       }
     } catch {
@@ -101,7 +122,7 @@ export default function AdminLiveMissionPanel() {
 
   // ── 2단계: 구매자 전원 지급 ──
   const { running: paying, grant } = useBulkPointGrant();
-  const [payout, setPayout] = useState<{ count: number; reward: number; total: number; alreadyPaid: boolean; broadcastTitle: string; buyers: Buyer[] } | null>(null);
+  const [payout, setPayout] = useState<{ count: number; reward: number; total: number; alreadyPaidCount: number; broadcastTitle: string; buyers: Buyer[] } | null>(null);
   const [payMsg, setPayMsg] = useState("");
   const [executing, setExecuting] = useState(false);
   const [ending, setEnding] = useState(false);
@@ -113,7 +134,7 @@ export default function AdminLiveMissionPanel() {
       const res = await fetch("/api/admin-live/mission", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "payout_preview" }) });
       const j = await res.json();
       if (!j.ok) { setPayMsg(j.message || "조회 실패"); return; }
-      setPayout({ count: j.count, reward: j.reward, total: j.total, alreadyPaid: j.alreadyPaid, broadcastTitle: j.broadcastTitle || "", buyers: Array.isArray(j.buyers) ? j.buyers : [] });
+      setPayout({ count: j.count, reward: j.reward, total: j.total, alreadyPaidCount: j.alreadyPaidCount || 0, broadcastTitle: j.broadcastTitle || "", buyers: Array.isArray(j.buyers) ? j.buyers : [] });
     } catch (e) {
       setPayMsg("조회 실패: " + (e instanceof Error ? e.message : String(e)));
     }
@@ -127,7 +148,8 @@ export default function AdminLiveMissionPanel() {
       const j = await res.json();
       if (!j.ok) { setPayout(null); setPayMsg(j.message || (j.already ? "이미 지급됨" : "지급 실패")); return; }
       const targets = (j.buyers || []).map((x: { phone: string; nickname?: string }) => ({ phone: x.phone, label: x.nickname || x.phone }));
-      const r = await grant(targets, { amount: j.reward, reason: j.title || "미션 목표 달성 - 구매자 전원 지급", adminMemo: "미션 게이지 공동목표 달성 일괄지급", customerVisible: true });
+      // adminMemo는 ledger에 기록되어 "이 방송에서 이미 받은 사람" 식별(중복방지)에 쓰임 → 상수로 단일화(드리프트 방지).
+      const r = await grant(targets, { amount: j.reward, reason: j.title || "미션 목표 달성 - 구매자 전원 지급", adminMemo: MISSION_PAYOUT_MEMO, customerVisible: true });
       if (r.success === 0) {
         // 전부 실패 → 가드 해제(재시도 가능)
         await fetch("/api/admin-live/mission", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "payout_reset" }) });
@@ -280,7 +302,7 @@ export default function AdminLiveMissionPanel() {
       {/* 2단계: 구매자 전원 지급 */}
       <div style={{ marginTop: 18, borderTop: "1px solid #E3CDD5", paddingTop: 14 }}>
         <span style={labelStyle}>목표 달성 시 — 구매자 전원 포인트 지급</span>
-        <div style={{ fontSize: 12, color: "#999", marginBottom: 8 }}>현재 방송의 <b>결제완료 구매자 전원</b>에게 1인당 포인트를 한 번에 지급해요. 같은 방송은 한 번만 지급(중복 방지).</div>
+        <div style={{ fontSize: 12, color: "#999", marginBottom: 8 }}>현재 방송의 <b>결제완료 구매자 전원</b>에게 1인당 포인트를 한 번에 지급해요. <b>한 방송에서 여러 번</b> 지급할 수 있고, <b>같은 사람은 1회만</b>(이미 받은 사람은 자동 제외, 새 구매자에게만 지급).</div>
 
         {prog?.active ? (
           <button
@@ -338,12 +360,13 @@ export default function AdminLiveMissionPanel() {
         <div style={{ position: "fixed", inset: 0, zIndex: 140, background: "rgba(2,6,23,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={(e) => { if (e.target === e.currentTarget) setPayout(null); }}>
           <div style={{ width: "min(500px,94vw)", maxHeight: "88vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: 16, padding: 20 }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: "#7B2D43", flexShrink: 0 }}>구매자 전원 포인트 지급 — 최종 확인</div>
-            {payout.alreadyPaid ? (
-              <div style={{ marginTop: 12, fontSize: 14, color: "#C0392B", fontWeight: 700, lineHeight: 1.6 }}>이미 이 방송 미션 지급이 완료됐어요.<br />중복 지급되지 않습니다.</div>
+            {payout.count === 0 ? (
+              <div style={{ marginTop: 12, fontSize: 14, color: "#C0392B", fontWeight: 700, lineHeight: 1.6 }}>이미 이 방송 구매자 전원에게 지급됐어요.<br />같은 사람은 중복 지급되지 않습니다{payout.alreadyPaidCount > 0 ? ` (이미 ${payout.alreadyPaidCount}명 지급됨)` : ""}.</div>
             ) : (
               <>
                 <div style={{ marginTop: 8, fontSize: 13, color: "#888", flexShrink: 0 }}>
-                  {payout.broadcastTitle ? `${payout.broadcastTitle} · ` : ""}아래 <b style={{ color: "#7B2D43" }}>{payout.count}명</b>에게 1인당 <b style={{ color: "#7B2D43" }}>{won(payout.reward)}P</b> 지급
+                  {payout.broadcastTitle ? `${payout.broadcastTitle} · ` : ""}아래 <b style={{ color: "#7B2D43" }}>{payout.count}명</b>(신규)에게 1인당 <b style={{ color: "#7B2D43" }}>{won(payout.reward)}P</b> 지급
+                  {payout.alreadyPaidCount > 0 ? <span style={{ color: "#aaa" }}> · 이미 {payout.alreadyPaidCount}명은 지급됨(제외)</span> : null}
                 </div>
                 <div style={{ marginTop: 10, flex: 1, minHeight: 0, overflowY: "auto", border: "1px solid #eee", borderRadius: 10 }}>
                   {payout.buyers.length === 0 ? (
@@ -366,7 +389,7 @@ export default function AdminLiveMissionPanel() {
             )}
             <div style={{ display: "flex", gap: 8, marginTop: 16, flexShrink: 0 }}>
               <button type="button" onClick={() => setPayout(null)} style={{ flex: 1, padding: "11px", borderRadius: 10, border: "1.5px solid #D9C5CC", background: "#fff", color: "#777", fontWeight: 700, cursor: "pointer" }}>취소</button>
-              {!payout.alreadyPaid && payout.count > 0 && payout.reward > 0 ? (
+              {payout.count > 0 && payout.reward > 0 ? (
                 <button type="button" onClick={doPayout} disabled={paying || executing} style={{ flex: 1, padding: "11px", borderRadius: 10, border: "none", background: "#0F6E56", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: paying || executing ? 0.6 : 1 }}>{paying || executing ? "지급 중…" : `${won(payout.total)}P 지급 실행`}</button>
               ) : null}
             </div>
