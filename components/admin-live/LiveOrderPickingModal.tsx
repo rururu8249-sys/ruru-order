@@ -17,7 +17,7 @@ import { exportLiveOrdersForPicking } from "./adminLiveOrderExcelExport";
 type Props = { orders: LiveOrder[]; filterLabel: string; onClose: () => void };
 
 type PickItem = { id: string; text: string; qty: number };
-type Panel = { key: string; nickname: string; paid: boolean; when: string; items: PickItem[]; totalQty: number };
+type Panel = { key: string; nickname: string; search: string; paid: boolean; when: string; items: PickItem[]; totalQty: number };
 
 const PAID_STATUSES = ["paid", "auto_paid", "manual_paid", "card_paid"];
 const clean = (v: unknown) => String(v ?? "").trim();
@@ -68,6 +68,11 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
       if (status === "canceled") continue;
       const paid = PAID_STATUSES.includes(status);
       const nickname = clean((o as any).recipientName) || clean(o.nickname) || clean(o.name) || "-";
+      // 검색용: 닉네임·이름·받는사람 전부 포함(닉네임으로 검색해도, 이름으로 검색해도 잡히게)
+      const searchText = [clean(o.nickname), clean(o.name), clean((o as any).recipientName)]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
       const when = clean(o.createdAt) || clean((o as any).submittedAt);
       const rawItems = Array.isArray(o.items) ? (o.items as LiveOrderItem[]) : [];
       const items: PickItem[] =
@@ -78,7 +83,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
               return { id: String(it.id), text: (clean(it.productName) || "상품") + (opt ? ` (${opt})` : ""), qty: Number(it.qty || 1) };
             });
       const totalQty = items.reduce((s, it) => s + (Number.isFinite(it.qty) ? it.qty : 1), 0);
-      list.push({ key: String(o.groupId || o.id), nickname, paid, when, items, totalQty });
+      list.push({ key: String(o.groupId || o.id), nickname, search: searchText, paid, when, items, totalQty });
     }
     return list;
   }, [orders]);
@@ -95,7 +100,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   const visiblePanels = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return scopedPanels;
-    return scopedPanels.filter((p) => p.nickname.toLowerCase().includes(q) || p.items.some((it) => it.text.toLowerCase().includes(q)));
+    return scopedPanels.filter((p) => p.search.includes(q) || p.nickname.toLowerCase().includes(q) || p.items.some((it) => it.text.toLowerCase().includes(q)));
   }, [scopedPanels, search]);
 
   // 열 때 서버에서 picked_at 조회
