@@ -83,8 +83,8 @@ export default function MissionLiveWidget() {
   const done = pct >= 100;
   const near = !done && pct >= 90;
 
-  const panelBg = done ? "rgba(15,110,86,0.42)" : "rgba(123,45,67,0.34)";
-  const border = done ? "1.5px solid rgba(245,196,81,0.85)" : near ? "1.5px solid rgba(245,196,81,0.85)" : "1px solid rgba(245,196,81,0.5)";
+  const panelBg = done ? "rgba(15,110,86,0.58)" : "rgba(123,45,67,0.5)";
+  const border = done ? "2px solid rgba(245,196,81,0.9)" : near ? "2px solid rgba(245,196,81,0.9)" : "1.5px solid rgba(245,196,81,0.7)";
   const fillBg = done ? "#F5C451" : near ? "#FFB12E" : "#FF5C8E";
 
   return (
@@ -101,14 +101,14 @@ export default function MissionLiveWidget() {
       <div
         style={{
           width: "min(96vw, 1080px)",
-          borderRadius: 12,
+          borderRadius: 13,
           background: panelBg,
           border,
-          padding: "5px 14px",
+          padding: "9px 18px",
           color: "#fff",
           backdropFilter: "blur(3px)",
           WebkitBackdropFilter: "blur(3px)",
-          boxShadow: "0 4px 14px rgba(0,0,0,0.18)",
+          boxShadow: "0 6px 18px rgba(0,0,0,0.35)",
           animation: celebrate
             ? "ruruCelebrate 1.2s ease-in-out 2"
             : near
@@ -120,15 +120,15 @@ export default function MissionLiveWidget() {
           /* 달성 후: 바 없이 달성+선물 문구만 (정적) */
           <div
             style={{
-              height: 24,
+              height: 32,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: 8,
+              gap: 9,
               whiteSpace: "nowrap",
-              fontSize: "clamp(12px, 3vw, 16px)",
+              fontSize: "clamp(15px, 3.6vw, 22px)",
               fontWeight: 800,
-              textShadow: "0 1px 3px rgba(0,0,0,0.55)",
+              textShadow: "0 2px 5px rgba(0,0,0,0.8), 0 0 2px rgba(0,0,0,0.6)",
             }}
           >
             <span style={{ fontSize: "1.15em" }}>🏆</span>
@@ -140,7 +140,7 @@ export default function MissionLiveWidget() {
             </span>
           </div>
         ) : (
-          <div style={{ position: "relative", height: 24 }}>
+          <div style={{ position: "relative", height: 32 }}>
             {/* 장면 A: 설명 문구 (바 없음) */}
             <div
               style={{
@@ -149,13 +149,13 @@ export default function MissionLiveWidget() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: 7,
+                gap: 9,
                 whiteSpace: "nowrap",
                 opacity: phase === 0 ? 1 : 0,
                 transition: "opacity .55s ease",
-                fontSize: "clamp(12px, 3vw, 16px)",
+                fontSize: "clamp(15px, 3.6vw, 22px)",
                 fontWeight: 800,
-                textShadow: "0 1px 3px rgba(0,0,0,0.55)",
+                textShadow: "0 2px 5px rgba(0,0,0,0.8), 0 0 2px rgba(0,0,0,0.6)",
               }}
             >
               <span style={{ fontSize: "1.15em" }}>🛒</span>
@@ -174,15 +174,15 @@ export default function MissionLiveWidget() {
                 transition: "opacity .55s ease",
               }}
             >
-              <span style={{ fontSize: 17, flexShrink: 0, textShadow: "0 1px 3px rgba(0,0,0,0.55)" }}>🎁</span>
+              <span style={{ fontSize: 21, flexShrink: 0, textShadow: "0 2px 5px rgba(0,0,0,0.8)" }}>🎁</span>
               <span
                 style={{
                   position: "relative",
                   flex: 1,
                   minWidth: 40,
-                  height: 16,
-                  background: "rgba(255,255,255,0.24)",
-                  borderRadius: 7,
+                  height: 22,
+                  background: "rgba(255,255,255,0.3)",
+                  borderRadius: 10,
                   overflow: "hidden",
                   display: "block",
                 }}
@@ -195,7 +195,7 @@ export default function MissionLiveWidget() {
                     width: `${pct}%`,
                     height: "100%",
                     background: fillBg,
-                    borderRadius: 7,
+                    borderRadius: 10,
                     transition: "width .6s ease",
                     display: "block",
                   }}
@@ -207,10 +207,10 @@ export default function MissionLiveWidget() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: "clamp(10px, 2vw, 12px)",
+                    fontSize: "clamp(12px, 2.4vw, 15px)",
                     fontWeight: 800,
                     color: "#fff",
-                    textShadow: "0 1px 2px rgba(0,0,0,0.6)",
+                    textShadow: "0 1px 3px rgba(0,0,0,0.85)",
                   }}
                 >
                   {pctRounded}%
@@ -218,10 +218,10 @@ export default function MissionLiveWidget() {
               </span>
               <span
                 style={{
-                  fontSize: "clamp(11px, 2.6vw, 14px)",
+                  fontSize: "clamp(14px, 3vw, 18px)",
                   fontWeight: 800,
                   flexShrink: 0,
-                  textShadow: "0 1px 3px rgba(0,0,0,0.55)",
+                  textShadow: "0 2px 5px rgba(0,0,0,0.8), 0 0 2px rgba(0,0,0,0.6)",
                 }}
               >
                 {reward > 0 ? (

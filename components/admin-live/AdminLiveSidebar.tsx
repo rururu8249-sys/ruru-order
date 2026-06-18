@@ -1,5 +1,5 @@
 import { ADMIN_LIVE_MENUS, type AdminLiveMenuKey } from "./adminLiveMenu";
-import LiveOpsStatusBox from "./LiveOpsStatusBox";
+import AdminSoundControl from "./AdminSoundControl";
 import AdminLiveLogoutButton from "./AdminLiveLogoutButton";
 import AdminLiveCustomerIssueSummaryCard from "./AdminLiveCustomerIssueSummaryCard";
 
@@ -98,6 +98,8 @@ export default function AdminLiveSidebar({
           <div className="mt-2 rounded-xl bg-slate-50 px-2 py-2 text-[10px] font-bold leading-4 text-slate-500">
             방송 중 필요한 내용만 빠르게 확인
           </div>
+
+          <AdminSoundControl />
         </section>
       ) : null}
 

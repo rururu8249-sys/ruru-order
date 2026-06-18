@@ -22,7 +22,6 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import ManualPaymentMatchDrawer from "@/components/admin-v2/payment/ManualPaymentMatchDrawer";
 import AdminLiveCustomersPanel from "./AdminLiveCustomersPanel";
-import AdminSoundControl from "./AdminSoundControl";
 import AdminLiveMenuPlaceholder from "./AdminLiveMenuPlaceholder";
 import AdminLivePaymentPanel from "./AdminLivePaymentPanel";
 import AdminLiveSettlementPanel from "./AdminLiveSettlementPanel";
@@ -1446,17 +1445,14 @@ export default function AdminLiveDashboard() {
                   </button>
                 );
               })}
-              <div className="ml-auto mb-1 mr-1.5 flex items-center gap-2">
-                <AdminSoundControl />
-                <button
-                  type="button"
-                  onClick={() => void runIntegrityCheck()}
-                  title="정합성 점검"
-                  className="rounded-lg border border-rose-line px-2.5 py-1.5 text-xs font-black text-rose-deep transition hover:bg-rose-soft"
-                >
-                  🛡️ 점검
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => void runIntegrityCheck()}
+                title="정합성 점검"
+                className="ml-auto mb-1 mr-1.5 rounded-lg border border-rose-line px-2.5 py-1.5 text-xs font-black text-rose-deep transition hover:bg-rose-soft"
+              >
+                🛡️ 점검
+              </button>
             </div>
 
             {/* 목업 B 2-col: 왼쪽 주문 테이블 / 오른쪽 380px 주문상세 사이드 패널(닉네임 클릭 시 슬라이드인) */}
