@@ -26,6 +26,15 @@ const whenText = (s: string) => {
   if (isNaN(d.getTime())) return "";
   return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
 };
+// "2026.06.19(금) 01:14" 형태(룰렛 이벤트 목록과 동일).
+const whenFull = (s: string) => {
+  if (!s) return "";
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return "";
+  const date = new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", weekday: "short" }).format(d);
+  const time = new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+  return `${date} ${time}`;
+};
 type Buyer = { phone: string; nickname: string; amount: number; when: string };
 // 폼 현재값 스냅샷(저장값과 비교해 "변경됨" 판단용)
 const snapOf = (a: boolean, gt: string, gv: string, ra: string, t: string) => JSON.stringify({ a, gt, gv: gv.trim(), ra: ra.trim(), t: t.trim() });
@@ -104,6 +113,7 @@ export default function AdminLiveMissionPanel() {
       if (j.ok) {
         setHistory(Array.isArray(j.payouts) ? j.payouts : []);
         setHistTotal(Number(j.total) || 0);
+        setHistTitle(String(j.broadcastTitle || ""));
       }
     } catch {
       /* ignore */
@@ -148,6 +158,8 @@ export default function AdminLiveMissionPanel() {
   const [result, setResult] = useState<{ successList: { nickname: string; amount: number }[]; failed: { label: string; reason: string }[]; reward: number } | null>(null);
   const [history, setHistory] = useState<{ nickname: string; amount: number; when: string }[] | null>(null);
   const [histTotal, setHistTotal] = useState(0);
+  const [histTitle, setHistTitle] = useState(""); // 지급 내역 요약 줄의 방송 제목
+  const [histOpen, setHistOpen] = useState(false); // 지급 명단 팝업 열림(요약 줄 클릭 시)
 
   const openPayout = async () => {
     setPayMsg("");
@@ -244,43 +256,26 @@ export default function AdminLiveMissionPanel() {
         방송 중 목표(누적 판매/매출)를 정하면 OBS 위젯에 진행 막대가 뜹니다. “구매자 전원 지급”은 다음 단계에서 추가돼요.
       </div>
 
-      {/* 진행률 */}
-      <div style={{ background: "#F5E6EB", borderRadius: 14, padding: "14px 16px", marginBottom: 16 }}>
-        <div style={{ fontSize: 13, color: "#7B2D43", fontWeight: 700 }}>
-          {prog && !prog.active ? "이벤트 종료됨 (위젯 숨김)" : "현재 진행"}
-          {prog?.broadcastTitle ? ` · ${prog.broadcastTitle}` : prog && !prog.active ? "" : " · (방송 OFF)"}
-        </div>
-        <div style={{ fontSize: 20, fontWeight: 800, color: "#7B2D43", marginTop: 3 }}>
-          {won(current)}
-          {unit} <span style={{ color: "#B68", fontSize: 15 }}>/ 목표 {won(goal)}{unit} ({pct}%)</span>
-        </div>
-        <div style={{ marginTop: 8, height: 14, background: "#fff", borderRadius: 7, overflow: "hidden", border: "1px solid #E3CDD5" }}>
-          <div style={{ width: `${pct}%`, height: "100%", background: pct >= 100 ? "#0F6E56" : "#D4537E", borderRadius: 7, transition: "width .5s" }} />
-        </div>
-      </div>
-
-      {/* 이 방송 지급 내역(명단) — 룰렛 이벤트 목록과 동일한 스타일. 지급 기록 있을 때만. */}
-      {history && history.length > 0 ? (
-        <div style={{ background: "#fff", border: "1px solid #E3CDD5", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <span style={{ fontSize: 14, fontWeight: 800, color: "#0F6E56" }}>🎁 이 방송 지급 내역</span>
-            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 12, color: "#7B2D43", fontWeight: 700 }}>총 {won(history.length)}명 · {won(histTotal)}P</span>
-              <button type="button" onClick={loadHistory} style={{ fontSize: 12, color: "#7B2D43", background: "none", border: "none", cursor: "pointer", fontWeight: 700, textDecoration: "underline" }}>새로고침</button>
-            </span>
+      {/* 진행률 — 미션 켜진(진행 중) 동안만 표시. 종료되면 막대 숨기고 아래 "지급 내역"만 남김.
+          새 이벤트를 켜면 카운트가 0부터 다시 시작(이벤트 시작 시각 기준). */}
+      {prog && prog.active ? (
+        <div style={{ background: "#F5E6EB", borderRadius: 14, padding: "14px 16px", marginBottom: 16 }}>
+          <div style={{ fontSize: 13, color: "#7B2D43", fontWeight: 700 }}>
+            현재 진행{prog.broadcastTitle ? ` · ${prog.broadcastTitle}` : " · (방송 OFF)"}
           </div>
-          <div style={{ maxHeight: 240, overflowY: "auto", display: "grid", gap: 6 }}>
-            {history.map((h, i) => (
-              <div key={`${h.when}-${i}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 9, border: "1px solid #f0f0f0", fontSize: 13 }}>
-                <span style={{ color: "#aaa", fontSize: 12, flexShrink: 0 }}>{whenText(h.when)}</span>
-                <span style={{ flex: 1, minWidth: 0, fontWeight: 700, color: "#333", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.nickname}</span>
-                <span style={{ color: "#0F6E56", fontWeight: 800, flexShrink: 0 }}>+{won(h.amount)}P</span>
-                <span style={{ flexShrink: 0, fontSize: 11, color: "#0F6E56", background: "#E7F4EF", borderRadius: 6, padding: "2px 7px", fontWeight: 700 }}>지급완료</span>
-              </div>
-            ))}
+          <div style={{ fontSize: 20, fontWeight: 800, color: "#7B2D43", marginTop: 3 }}>
+            {won(current)}
+            {unit} <span style={{ color: "#B68", fontSize: 15 }}>/ 목표 {won(goal)}{unit} ({pct}%)</span>
+          </div>
+          <div style={{ marginTop: 8, height: 14, background: "#fff", borderRadius: 7, overflow: "hidden", border: "1px solid #E3CDD5" }}>
+            <div style={{ width: `${pct}%`, height: "100%", background: pct >= 100 ? "#0F6E56" : "#D4537E", borderRadius: 7, transition: "width .5s" }} />
           </div>
         </div>
-      ) : null}
+      ) : (
+        <div style={{ background: "#F5E6EB", borderRadius: 14, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#7B2D43", fontWeight: 700 }}>
+          미션 꺼짐 — 진행 막대는 미션을 켜면 0부터 표시돼요.
+        </div>
+      )}
 
       {/* 설정 */}
       <div style={{ display: "grid", gap: 14 }}>
@@ -386,6 +381,29 @@ export default function AdminLiveMissionPanel() {
         {payMsg ? <div style={{ fontSize: 13, marginTop: 8, fontWeight: 700, color: payMsg.includes("실패") && !payMsg.includes("성공") ? "#C0392B" : "#0F6E56" }}>{payMsg}</div> : null}
       </div>
 
+      {/* 지급 내역 — 룰렛 이벤트목록처럼 한 줄 요약(방송제목·날짜시간·총N명·총액), 클릭하면 명단 팝업. 기록 있을 때만. */}
+      {history && history.length > 0 ? (
+        <div style={{ marginTop: 18, borderTop: "1px solid #E3CDD5", paddingTop: 14 }}>
+          <span style={labelStyle}>지급 내역 (클릭하면 명단)</span>
+          <button
+            type="button"
+            onClick={() => setHistOpen(true)}
+            style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 12, border: "1px solid #E3CDD5", background: "#fff", cursor: "pointer", textAlign: "left" }}
+          >
+            <span style={{ fontSize: 18, flexShrink: 0 }}>🎁</span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: "block", fontSize: 13, fontWeight: 800, color: "#333", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {histTitle || "이 방송"} · {whenFull(history[0].when)}
+              </span>
+              <span style={{ display: "block", fontSize: 12, color: "#7B2D43", fontWeight: 700, marginTop: 2 }}>
+                총 {won(history.length)}명 · {won(histTotal)}P 지급완료
+              </span>
+            </span>
+            <span style={{ flexShrink: 0, color: "#aaa", fontSize: 18 }}>›</span>
+          </button>
+        </div>
+      ) : null}
+
       {/* OBS 위젯 주소 */}
       <div style={{ marginTop: 20, borderTop: "1px solid #E3CDD5", paddingTop: 14 }}>
         <span style={labelStyle}>OBS 방송 위젯주소 (브라우저 소스)</span>
@@ -470,6 +488,40 @@ export default function AdminLiveMissionPanel() {
             </div>
             {result.failed.length ? <div style={{ marginTop: 8, fontSize: 12, color: "#C0392B", flexShrink: 0 }}>실패자는 고객·이슈 메뉴에서 수동 지급해 주세요.</div> : null}
             <button type="button" onClick={() => setResult(null)} style={{ marginTop: 14, padding: "11px", borderRadius: 10, border: "none", background: "#7B2D43", color: "#fff", fontWeight: 800, cursor: "pointer", flexShrink: 0 }}>닫기</button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* 지급 명단 팝업 — 요약 줄 클릭 시. ledger 기준 읽기 전용. */}
+      {histOpen ? (
+        <div style={{ position: "fixed", inset: 0, zIndex: 142, background: "rgba(2,6,23,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={(e) => { if (e.target === e.currentTarget) setHistOpen(false); }}>
+          <div style={{ width: "min(520px,94vw)", maxHeight: "88vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: 16, padding: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "#0F6E56" }}>🎁 지급 명단</div>
+              <button type="button" onClick={loadHistory} style={{ fontSize: 12, color: "#7B2D43", background: "none", border: "none", cursor: "pointer", fontWeight: 700, textDecoration: "underline" }}>새로고침</button>
+            </div>
+            <div style={{ marginTop: 6, fontSize: 13, color: "#888", flexShrink: 0 }}>
+              {histTitle || "이 방송"} · {history && history.length > 0 ? whenFull(history[0].when) : ""}
+            </div>
+            <div style={{ marginTop: 4, fontSize: 14, fontWeight: 800, color: "#7B2D43", flexShrink: 0 }}>
+              총 {won(history?.length || 0)}명 · <span style={{ color: "#0F6E56" }}>{won(histTotal)}P</span>
+            </div>
+            <div style={{ marginTop: 10, flex: 1, minHeight: 0, overflowY: "auto", border: "1px solid #eee", borderRadius: 10 }}>
+              {history && history.length > 0 ? (
+                history.map((h, i) => (
+                  <div key={`${h.when}-${i}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderBottom: "1px solid #f4f4f4", fontSize: 13 }}>
+                    <span style={{ color: "#bbb", width: 22, flexShrink: 0 }}>{i + 1}</span>
+                    <span style={{ color: "#aaa", fontSize: 12, flexShrink: 0 }}>{whenText(h.when)}</span>
+                    <span style={{ flex: 1, minWidth: 0, fontWeight: 700, color: "#333", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.nickname}</span>
+                    <span style={{ color: "#0F6E56", fontWeight: 800, flexShrink: 0 }}>+{won(h.amount)}P</span>
+                    <span style={{ flexShrink: 0, fontSize: 11, color: "#0F6E56", background: "#E7F4EF", borderRadius: 6, padding: "2px 7px", fontWeight: 700 }}>지급완료</span>
+                  </div>
+                ))
+              ) : (
+                <div style={{ padding: "16px", textAlign: "center", color: "#999", fontSize: 13 }}>지급 기록이 없어요.</div>
+              )}
+            </div>
+            <button type="button" onClick={() => setHistOpen(false)} style={{ marginTop: 14, padding: "11px", borderRadius: 10, border: "none", background: "#7B2D43", color: "#fff", fontWeight: 800, cursor: "pointer", flexShrink: 0 }}>닫기</button>
           </div>
         </div>
       ) : null}
