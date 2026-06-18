@@ -1069,7 +1069,15 @@ export default function AdminLiveEventRoulettePanel({
   };
 
 
-  const startSpin = eventTab === "roulette" ? startRouletteOneClick : startClawEvent;
+  // 돌리기 가드: 운영모드 + 선물=포인트인데 금액이 0/빈칸이면 자동지급이 안 되므로 먼저 경고(막기).
+  //   → "당첨 내용(포인트)" 안 채우고 돌려서 당첨자가 포인트 못 받는 사고 방지. (지급/grant 로직은 무변경)
+  const startSpin = () => {
+    const amt = Number(String(giftPointAmount || "").replace(/[^0-9]/g, "")) || 0;
+    if (mode === "live" && giftType === "point" && amt <= 0) {
+      if (!window.confirm("⚠️ 당첨자에게 줄 포인트 금액이 비어 있어요 (0P).\n이대로 돌리면 포인트 자동지급이 안 됩니다.\n\n‘당첨 내용(포인트)’에 금액을 먼저 입력하세요.\n\n그래도 그냥 돌릴까요?")) return;
+    }
+    (eventTab === "roulette" ? startRouletteOneClick : startClawEvent)();
+  };
   const widgetUrl = eventTab === "roulette" ? overlayUrl : clawOverlayUrl;
   const periodChips: { key: "today" | "week" | "month" | "date"; label: string }[] = [
     { key: "today", label: "오늘" },
