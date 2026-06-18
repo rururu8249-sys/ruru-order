@@ -166,6 +166,20 @@ export function extractVideoId(input: string): string {
 
 // ---- 활성 라이브 채팅 ID 조회(캐시) ----
 async function resolveLiveChatId(sb: SupabaseClient, accessToken: string): Promise<string> {
+  // 0) 봇이 "방송 소유자" 계정이면: liveBroadcasts.list로 지금 라이브의 정확한 chatId를 직접 조회.
+  //    (videos.list activeLiveChatId 는 비소유자에겐 재시작 등으로 stale → 404 Not Found 유발하므로 소유자 경로 우선)
+  try {
+    const ownRes = await fetch(
+      "https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet&broadcastStatus=active&broadcastType=all&maxResults=1",
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const ownJson: any = await ownRes.json().catch(() => ({}));
+    const ownChat = String(ownJson?.items?.[0]?.snippet?.liveChatId || "").trim();
+    if (ownChat) return ownChat;
+  } catch {
+    /* 비소유자/실패 → 아래 videos.list 폴백 */
+  }
+
   // 현재 방송(메인 컨트롤타워)의 라이브 URL → videoId
   const liveUrl = await readActiveBroadcastLiveUrl(sb);
   const videoId = extractVideoId(liveUrl);
