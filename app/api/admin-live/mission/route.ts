@@ -3,7 +3,7 @@
 //   - 돈/포인트 로직 없음(1단계). 전원 지급은 별도(2단계).
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
-import { getMissionSupabase, computeMissionProgress, readMissionConfig, fetchMissionBuyers, fetchMissionPaidPhones } from "@/lib/mission";
+import { getMissionSupabase, computeMissionProgress, readMissionConfig, fetchMissionBuyers, fetchMissionPaidPhones, fetchMissionPayoutHistory } from "@/lib/mission";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +37,21 @@ export async function POST(request: NextRequest) {
   try {
     const b = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const action = String(b.action ?? "");
+
+    // ── 지급 내역(이 방송 미션 지급 명단) — 읽기 전용 ──
+    if (action === "payout_history") {
+      const supabase = getMissionSupabase();
+      const { broadcastTitle, startedAt, buyers } = await fetchMissionBuyers(supabase);
+      const nameMap = new Map(buyers.map((b) => [b.phone, b.nickname]));
+      const hist = await fetchMissionPayoutHistory(supabase, startedAt);
+      const payouts = hist.map((h) => ({
+        nickname: nameMap.get(h.phone) || (h.phone ? "…" + h.phone.slice(-4) : "고객"),
+        amount: h.amount,
+        when: h.when,
+      }));
+      const total = payouts.reduce((s, x) => s + x.amount, 0);
+      return json({ ok: true, broadcastTitle, payouts, count: payouts.length, total });
+    }
 
     // ── 2단계: 구매자 전원 지급 ──
     if (action === "payout_preview" || action === "payout_confirm" || action === "payout_reset") {

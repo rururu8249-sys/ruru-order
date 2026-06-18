@@ -92,11 +92,30 @@ export default function AdminLiveMissionPanel() {
     }
   }, []);
 
+  // 이 방송 지급 내역(명단) — ledger 기준 읽기 전용. 6초 폴링엔 안 넣음(마운트/지급후/새로고침에만).
+  const loadHistory = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin-live/mission", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "payout_history" }),
+      });
+      const j = await res.json();
+      if (j.ok) {
+        setHistory(Array.isArray(j.payouts) ? j.payouts : []);
+        setHistTotal(Number(j.total) || 0);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   useEffect(() => {
     load();
+    loadHistory();
     const t = setInterval(load, 6000);
     return () => clearInterval(t);
-  }, [load]);
+  }, [load, loadHistory]);
 
   const save = async () => {
     setSaving(true);
@@ -127,6 +146,8 @@ export default function AdminLiveMissionPanel() {
   const [executing, setExecuting] = useState(false);
   const [ending, setEnding] = useState(false);
   const [result, setResult] = useState<{ successList: { nickname: string; amount: number }[]; failed: { label: string; reason: string }[]; reward: number } | null>(null);
+  const [history, setHistory] = useState<{ nickname: string; amount: number; when: string }[] | null>(null);
+  const [histTotal, setHistTotal] = useState(0);
 
   const openPayout = async () => {
     setPayMsg("");
@@ -161,6 +182,7 @@ export default function AdminLiveMissionPanel() {
       setPayMsg("");
       setResult({ successList, failed: r.failed, reward: j.reward });
       load();
+      loadHistory();
     } catch (e) {
       setPayout(null);
       setPayMsg("지급 실패: " + (e instanceof Error ? e.message : String(e)));
@@ -225,7 +247,8 @@ export default function AdminLiveMissionPanel() {
       {/* 진행률 */}
       <div style={{ background: "#F5E6EB", borderRadius: 14, padding: "14px 16px", marginBottom: 16 }}>
         <div style={{ fontSize: 13, color: "#7B2D43", fontWeight: 700 }}>
-          현재 진행 {prog?.broadcastTitle ? `· ${prog.broadcastTitle}` : "· (방송 OFF)"}
+          {prog && !prog.active ? "이벤트 종료됨 (위젯 숨김)" : "현재 진행"}
+          {prog?.broadcastTitle ? ` · ${prog.broadcastTitle}` : prog && !prog.active ? "" : " · (방송 OFF)"}
         </div>
         <div style={{ fontSize: 20, fontWeight: 800, color: "#7B2D43", marginTop: 3 }}>
           {won(current)}
@@ -235,6 +258,29 @@ export default function AdminLiveMissionPanel() {
           <div style={{ width: `${pct}%`, height: "100%", background: pct >= 100 ? "#0F6E56" : "#D4537E", borderRadius: 7, transition: "width .5s" }} />
         </div>
       </div>
+
+      {/* 이 방송 지급 내역(명단) — 룰렛 이벤트 목록과 동일한 스타일. 지급 기록 있을 때만. */}
+      {history && history.length > 0 ? (
+        <div style={{ background: "#fff", border: "1px solid #E3CDD5", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <span style={{ fontSize: 14, fontWeight: 800, color: "#0F6E56" }}>🎁 이 방송 지급 내역</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 12, color: "#7B2D43", fontWeight: 700 }}>총 {won(history.length)}명 · {won(histTotal)}P</span>
+              <button type="button" onClick={loadHistory} style={{ fontSize: 12, color: "#7B2D43", background: "none", border: "none", cursor: "pointer", fontWeight: 700, textDecoration: "underline" }}>새로고침</button>
+            </span>
+          </div>
+          <div style={{ maxHeight: 240, overflowY: "auto", display: "grid", gap: 6 }}>
+            {history.map((h, i) => (
+              <div key={`${h.when}-${i}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 9, border: "1px solid #f0f0f0", fontSize: 13 }}>
+                <span style={{ color: "#aaa", fontSize: 12, flexShrink: 0 }}>{whenText(h.when)}</span>
+                <span style={{ flex: 1, minWidth: 0, fontWeight: 700, color: "#333", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.nickname}</span>
+                <span style={{ color: "#0F6E56", fontWeight: 800, flexShrink: 0 }}>+{won(h.amount)}P</span>
+                <span style={{ flexShrink: 0, fontSize: 11, color: "#0F6E56", background: "#E7F4EF", borderRadius: 6, padding: "2px 7px", fontWeight: 700 }}>지급완료</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {/* 설정 */}
       <div style={{ display: "grid", gap: 14 }}>

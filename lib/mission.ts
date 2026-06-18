@@ -179,6 +179,35 @@ export async function fetchMissionPaidPhones(supabase: Client, startedAt: string
   return paid;
 }
 
+// 이 방송 미션 지급 "기록"(목록 표시용). ledger의 미션 grant 행을 그대로 읽음(금액·시각).
+//   - 닉네임은 ledger에 없을 수 있어(일괄지급이 nickname 미저장) phone만 반환 → 표시 닉네임은 호출부에서 주문 매핑.
+export type MissionPaidEntry = { phone: string; amount: number; when: string };
+export async function fetchMissionPayoutHistory(supabase: Client, startedAt: string): Promise<MissionPaidEntry[]> {
+  const out: MissionPaidEntry[] = [];
+  if (!startedAt) return out;
+  const size = 1000;
+  for (let page = 0; page < 30; page++) {
+    const from = page * size;
+    const { data, error } = await supabase
+      .from("customer_point_ledger")
+      .select("customer_phone,amount,created_at")
+      .eq("change_type", "grant")
+      .eq("admin_memo", MISSION_PAYOUT_MEMO)
+      .gte("created_at", startedAt)
+      .order("created_at", { ascending: false })
+      .range(from, from + size - 1);
+    if (error) break;
+    const rows = (Array.isArray(data) ? data : []) as { customer_phone?: unknown; amount?: unknown; created_at?: unknown }[];
+    for (const r of rows) {
+      const phone = String(r.customer_phone ?? "").replace(/[^0-9]/g, "");
+      if (!phone) continue;
+      out.push({ phone, amount: Math.abs(Number(r.amount) || 0), when: String(r.created_at ?? "") });
+    }
+    if (rows.length < size) break;
+  }
+  return out;
+}
+
 export async function fetchMissionBuyers(
   supabase: Client
 ): Promise<{ broadcastId: string; broadcastTitle: string; startedAt: string; buyers: MissionBuyer[] }> {
