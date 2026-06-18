@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       const msg = String(body?.message || "").trim() || "🛒 루루동이 알림 테스트입니다";
       const result = await postLiveChatMessage(msg, { forceEvenIfDisabled: true });
       const _dbg = await getYoutubeDiag(); // 연결된 채널/소유자 활성방송 chatId 진단
-      const reason = result.ok ? result.reason : `${result.reason || ""} | 연결채널=${(_dbg as any)?.channel?.title || "?"} 영상=${(_dbg as any)?.videoId || "?"} 그영상챗=${(_dbg as any)?.idChatId || "?"}`;
+      const reason = result.ok ? result.reason : `${result.reason || ""} | 연결채널=${(_dbg as any)?.channel?.title || "?"} 영상=${(_dbg as any)?.videoId || "?"} 그영상챗=${(_dbg as any)?.idChatId || "?"} videos챗=${(_dbg as any)?.videosChatId || "?"}`;
       return NextResponse.json({ ok: result.ok, skipped: result.skipped, reason, _dbg });
     }
     return NextResponse.json({ ok: false, error: "알 수 없는 action" }, { status: 400 });
