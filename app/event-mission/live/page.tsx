@@ -24,6 +24,7 @@ const won = (n: number) => n.toLocaleString("ko-KR");
 export default function MissionLiveWidget() {
   const [data, setData] = useState<MissionData | null>(null);
   const [preview, setPreview] = useState(false);
+  const [phase, setPhase] = useState(0); // 0=설명 문구, 1=진행 바 (4초마다 전환)
 
   useEffect(() => {
     document.documentElement.style.background = "transparent";
@@ -47,35 +48,27 @@ export default function MissionLiveWidget() {
     };
   }, []);
 
+  // 문구 ↔ 진행 바 4초마다 전환
+  useEffect(() => {
+    const t = setInterval(() => setPhase((p) => (p === 0 ? 1 : 0)), 4000);
+    return () => clearInterval(t);
+  }, []);
+
   const liveOk = !!(data && data.ok && data.active && data.goal && data.goal > 0);
   if (!liveOk && !preview) {
     return <div style={{ background: "transparent" }} />;
   }
   const useSample = !liveOk; // preview 인데 미션 OFF/미설정 → 샘플로 디자인만 보여줌
 
-  const goalType: "count" | "amount" = useSample ? "count" : data!.goalType === "amount" ? "amount" : "count";
-  const goal = useSample ? 100 : data!.goal || 0;
-  const current = useSample ? 63 : data!.current || 0;
   const reward = useSample ? 1000 : data!.reward || 0;
   const pct = useSample ? 63 : Math.min(100, data!.pct || 0);
-  const title = useSample ? "미리보기" : data!.title || "";
-  const remaining = Math.max(0, goal - current);
-
-  const goalText =
-    goalType === "amount" ? `오늘 매출 ${won(goal)}원 목표` : `오늘 누적 판매 ${goal}개 목표`;
-  const currentText = goalType === "amount" ? `현재 ${won(current)}원` : `현재 ${current}개`;
-  const remainText =
-    pct >= 100
-      ? "목표 달성!"
-      : goalType === "amount"
-      ? `${won(remaining)}원 남았어요!`
-      : `${remaining}개 남았어요!`;
+  const pctRounded = Math.round(pct);
 
   const done = pct >= 100;
   const near = !done && pct >= 90;
 
-  const panelBg = done ? "rgba(15,110,86,0.72)" : "rgba(123,45,67,0.55)";
-  const border = done ? "2px solid #F5C451" : near ? "2px solid #F5C451" : "1.5px solid rgba(245,196,81,0.6)";
+  const panelBg = done ? "rgba(15,110,86,0.42)" : "rgba(123,45,67,0.34)";
+  const border = done ? "1.5px solid rgba(245,196,81,0.85)" : near ? "1.5px solid rgba(245,196,81,0.85)" : "1px solid rgba(245,196,81,0.5)";
   const fillBg = done ? "#F5C451" : near ? "#FFB12E" : "#FF5C8E";
 
   return (
@@ -84,7 +77,7 @@ export default function MissionLiveWidget() {
         fontFamily: "'Noto Sans KR', system-ui, sans-serif",
         display: "flex",
         justifyContent: "center",
-        padding: "10px 12px",
+        padding: "6px 10px",
         background: "transparent",
       }}
     >
@@ -92,55 +85,114 @@ export default function MissionLiveWidget() {
       <div
         style={{
           width: "min(96vw, 1080px)",
-          borderRadius: 16,
+          borderRadius: 12,
           background: panelBg,
           border,
-          padding: "10px 16px",
+          padding: "5px 14px",
           color: "#fff",
-          boxShadow: "0 6px 20px rgba(0,0,0,0.25)",
+          backdropFilter: "blur(3px)",
+          WebkitBackdropFilter: "blur(3px)",
+          boxShadow: "0 4px 14px rgba(0,0,0,0.18)",
           animation: near ? "ruruPulse 1s ease-in-out infinite" : "none",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 22 }}>{done ? "🏆" : near ? "🔥" : "🎁"}</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, color: done ? "#C7F0E2" : "#FFE3EC", fontWeight: 500 }}>
-              {done ? "목표 달성! 모두 고마워요" : "다 같이 채우면 — 구매자 전원 포인트!"}
-            </div>
-            <div style={{ fontSize: 17, fontWeight: 800, marginTop: 1 }}>
-              {title ? `${title} · ` : ""}
-              {goalText} <span style={{ color: done ? "#C7F0E2" : "#FFE3EC" }}>· {currentText}</span>
-            </div>
+        <div style={{ position: "relative", height: 24 }}>
+          {/* 장면 A: 설명 문구 (바 없음) */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 7,
+              whiteSpace: "nowrap",
+              opacity: !done && phase === 0 ? 1 : 0,
+              transition: "opacity .55s ease",
+              fontSize: "clamp(12px, 3vw, 16px)",
+              fontWeight: 800,
+              textShadow: "0 1px 3px rgba(0,0,0,0.55)",
+            }}
+          >
+            <span style={{ fontSize: "1.15em" }}>🛒</span>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>다 같이 구매할수록 바가 가득 차요!</span>
           </div>
-          {reward > 0 ? (
-            <div
+          {/* 장면 B: 진행 바 + 보상 (바 안에 % 오버레이) */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              whiteSpace: "nowrap",
+              opacity: done || phase === 1 ? 1 : 0,
+              transition: "opacity .55s ease",
+            }}
+          >
+            <span style={{ fontSize: 17, flexShrink: 0, textShadow: "0 1px 3px rgba(0,0,0,0.55)" }}>{done ? "🏆" : "🎁"}</span>
+            <span
               style={{
-                background: "#F5C451",
-                color: "#5A3A00",
-                fontSize: 14,
-                fontWeight: 800,
-                padding: "6px 12px",
-                borderRadius: 10,
-                whiteSpace: "nowrap",
+                position: "relative",
+                flex: 1,
+                minWidth: 40,
+                height: 16,
+                background: "rgba(255,255,255,0.24)",
+                borderRadius: 7,
+                overflow: "hidden",
+                display: "block",
               }}
             >
-              구매자 전원 {won(reward)}P
-            </div>
-          ) : null}
-        </div>
-        <div
-          style={{
-            marginTop: 9,
-            height: 16,
-            background: "rgba(255,255,255,0.24)",
-            borderRadius: 8,
-            overflow: "hidden",
-          }}
-        >
-          <div style={{ width: `${pct}%`, height: "100%", background: fillBg, borderRadius: 8, transition: "width .6s ease" }} />
-        </div>
-        <div style={{ fontSize: 13, color: done ? "#C7F0E2" : "#FFE3EC", marginTop: 5, fontWeight: 500 }}>
-          {done ? `구매자 전원에게 ${won(reward)}P 지급 예정! 🎉` : remainText}
+              <span
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  top: 0,
+                  width: `${pct}%`,
+                  height: "100%",
+                  background: fillBg,
+                  borderRadius: 7,
+                  transition: "width .6s ease",
+                  display: "block",
+                }}
+              />
+              <span
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "clamp(10px, 2vw, 12px)",
+                  fontWeight: 800,
+                  color: "#fff",
+                  textShadow: "0 1px 2px rgba(0,0,0,0.6)",
+                }}
+              >
+                {pctRounded}%
+              </span>
+            </span>
+            <span
+              style={{
+                fontSize: "clamp(11px, 2.6vw, 14px)",
+                fontWeight: 800,
+                flexShrink: 0,
+                textShadow: "0 1px 3px rgba(0,0,0,0.55)",
+              }}
+            >
+              {done ? (
+                <>
+                  목표 달성! <span style={{ color: "#F5C451" }}>전원 {won(reward)}P 선물 🎉</span>
+                </>
+              ) : reward > 0 ? (
+                <>
+                  100% 되면 <span style={{ color: "#F5C451" }}>전원 {won(reward)}P 선물!</span>
+                </>
+              ) : (
+                "100% 되면 목표 달성!"
+              )}
+            </span>
+          </div>
         </div>
       </div>
     </div>
