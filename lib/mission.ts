@@ -44,7 +44,9 @@ export function getMissionSupabase() {
 type Client = ReturnType<typeof getMissionSupabase>;
 
 const num = (v: unknown, d = 0) => {
-  const n = Number(String(v ?? "").replace(/[^0-9.-]/g, ""));
+  const s = String(v ?? "").replace(/[^0-9.-]/g, "");
+  if (s === "" || s === "-" || s === ".") return d; // 빈 값이면 기본값(Number("")=0 함정 회피)
+  const n = Number(s);
   return Number.isFinite(n) ? n : d;
 };
 
@@ -75,6 +77,27 @@ function rowAmount(row: Record<string, unknown>) {
   return num(row.final_amount ?? row.adjusted_total_price ?? row.total_price);
 }
 
+// Supabase는 요청당 최대 1000행만 반환 → .range로 전건 페이지네이션(방송 1000건 초과 누락 방지).
+async function fetchAllOrders(supabase: Client, start: string, end: string, columns: string): Promise<Record<string, unknown>[]> {
+  const all: Record<string, unknown>[] = [];
+  const size = 1000;
+  for (let page = 0; page < 30; page++) {
+    const from = page * size;
+    const { data, error } = await supabase
+      .from("orders")
+      .select(columns)
+      .gte("created_at", start)
+      .lte("created_at", end)
+      .order("created_at", { ascending: true })
+      .range(from, from + size - 1);
+    if (error) break;
+    const rows = (Array.isArray(data) ? data : []) as unknown as Record<string, unknown>[];
+    all.push(...rows);
+    if (rows.length < size) break;
+  }
+  return all;
+}
+
 async function fetchActiveBroadcast(supabase: Client) {
   const { data } = await supabase
     .from("broadcasts")
@@ -98,15 +121,12 @@ export async function computeMissionProgress(supabase: Client): Promise<MissionP
     broadcastTitle = String(bc.title ?? "");
     const start = String(bc.started_at);
     const end = bc.ended_at ? String(bc.ended_at) : new Date().toISOString();
-    const { data } = await supabase
-      .from("orders")
-      .select(
-        "qty,total_price,adjusted_total_price,final_amount,admin_order_status_v2,order_manage_status,is_test_order"
-      )
-      .gte("created_at", start)
-      .lte("created_at", end)
-      .limit(2000);
-    const rows = (Array.isArray(data) ? data : []) as Record<string, unknown>[];
+    const rows = await fetchAllOrders(
+      supabase,
+      start,
+      end,
+      "qty,total_price,adjusted_total_price,final_amount,admin_order_status_v2,order_manage_status,is_test_order"
+    );
     for (const r of rows) {
       if (r.is_test_order) continue;
       if (!isPaidRow(r)) continue;
@@ -131,13 +151,12 @@ export async function fetchMissionBuyers(
   if (!bc || !bc.started_at) return { broadcastId: "", broadcastTitle: "", buyers: [] };
   const start = String(bc.started_at);
   const end = bc.ended_at ? String(bc.ended_at) : new Date().toISOString();
-  const { data } = await supabase
-    .from("orders")
-    .select("customer_phone,youtube_nickname,customer_name,total_price,adjusted_total_price,final_amount,created_at,admin_order_status_v2,order_manage_status,is_test_order")
-    .gte("created_at", start)
-    .lte("created_at", end)
-    .limit(2000);
-  const rows = (Array.isArray(data) ? data : []) as Record<string, unknown>[];
+  const rows = await fetchAllOrders(
+    supabase,
+    start,
+    end,
+    "customer_phone,youtube_nickname,customer_name,total_price,adjusted_total_price,final_amount,created_at,admin_order_status_v2,order_manage_status,is_test_order"
+  );
   const map = new Map<string, MissionBuyer>();
   for (const r of rows) {
     if (r.is_test_order) continue;

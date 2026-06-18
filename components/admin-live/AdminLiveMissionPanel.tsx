@@ -103,6 +103,8 @@ export default function AdminLiveMissionPanel() {
   const { running: paying, grant } = useBulkPointGrant();
   const [payout, setPayout] = useState<{ count: number; reward: number; total: number; alreadyPaid: boolean; broadcastTitle: string; buyers: Buyer[] } | null>(null);
   const [payMsg, setPayMsg] = useState("");
+  const [executing, setExecuting] = useState(false);
+  const [result, setResult] = useState<{ successList: { nickname: string; amount: number }[]; failed: { label: string; reason: string }[]; reward: number } | null>(null);
 
   const openPayout = async () => {
     setPayMsg("");
@@ -117,6 +119,8 @@ export default function AdminLiveMissionPanel() {
   };
 
   const doPayout = async () => {
+    if (executing || paying) return; // 더블클릭/중복실행 방지
+    setExecuting(true);
     try {
       const res = await fetch("/api/admin-live/mission", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "payout_confirm" }) });
       const j = await res.json();
@@ -124,14 +128,21 @@ export default function AdminLiveMissionPanel() {
       const targets = (j.buyers || []).map((x: { phone: string; nickname?: string }) => ({ phone: x.phone, label: x.nickname || x.phone }));
       const r = await grant(targets, { amount: j.reward, reason: j.title || "미션 목표 달성 - 구매자 전원 지급", adminMemo: "미션 게이지 공동목표 달성 일괄지급", customerVisible: true });
       if (r.success === 0) {
+        // 전부 실패 → 가드 해제(재시도 가능)
         await fetch("/api/admin-live/mission", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "payout_reset" }) });
       }
+      const failedLabels = new Set(r.failed.map((f) => f.label));
+      const attempted = (j.buyers || []) as Buyer[];
+      const successList = attempted.filter((b) => !failedLabels.has(b.nickname || b.phone)).map((b) => ({ nickname: b.nickname, amount: b.amount }));
       setPayout(null);
-      setPayMsg(`지급 완료: 성공 ${r.success}명${r.failed.length ? ` · 실패 ${r.failed.length}명` : ""}`);
+      setPayMsg("");
+      setResult({ successList, failed: r.failed, reward: j.reward });
       load();
     } catch (e) {
       setPayout(null);
       setPayMsg("지급 실패: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setExecuting(false);
     }
   };
 
@@ -294,9 +305,40 @@ export default function AdminLiveMissionPanel() {
             <div style={{ display: "flex", gap: 8, marginTop: 16, flexShrink: 0 }}>
               <button type="button" onClick={() => setPayout(null)} style={{ flex: 1, padding: "11px", borderRadius: 10, border: "1.5px solid #D9C5CC", background: "#fff", color: "#777", fontWeight: 700, cursor: "pointer" }}>취소</button>
               {!payout.alreadyPaid && payout.count > 0 && payout.reward > 0 ? (
-                <button type="button" onClick={doPayout} disabled={paying} style={{ flex: 1, padding: "11px", borderRadius: 10, border: "none", background: "#0F6E56", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: paying ? 0.6 : 1 }}>{paying ? "지급 중…" : `${won(payout.total)}P 지급 실행`}</button>
+                <button type="button" onClick={doPayout} disabled={paying || executing} style={{ flex: 1, padding: "11px", borderRadius: 10, border: "none", background: "#0F6E56", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: paying || executing ? 0.6 : 1 }}>{paying || executing ? "지급 중…" : `${won(payout.total)}P 지급 실행`}</button>
               ) : null}
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {result ? (
+        <div style={{ position: "fixed", inset: 0, zIndex: 141, background: "rgba(2,6,23,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={(e) => { if (e.target === e.currentTarget) setResult(null); }}>
+          <div style={{ width: "min(500px,94vw)", maxHeight: "88vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: 16, padding: 20 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#0F6E56", flexShrink: 0 }}>지급 완료 — 지급 명단</div>
+            <div style={{ marginTop: 6, fontSize: 14, fontWeight: 700, color: "#333", flexShrink: 0 }}>
+              성공 <b style={{ color: "#0F6E56" }}>{result.successList.length}명</b>
+              {result.failed.length ? <> · 실패 <b style={{ color: "#C0392B" }}>{result.failed.length}명</b></> : null}
+              {" "}· 총 지급 <b style={{ color: "#0F6E56" }}>{won(result.successList.length * result.reward)}P</b>
+            </div>
+            <div style={{ marginTop: 10, flex: 1, minHeight: 0, overflowY: "auto", border: "1px solid #eee", borderRadius: 10 }}>
+              {result.successList.map((b, i) => (
+                <div key={`s-${i}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderBottom: "1px solid #f4f4f4", fontSize: 13 }}>
+                  <span style={{ color: "#0F6E56", flexShrink: 0, width: 16 }}>✓</span>
+                  <span style={{ flex: 1, minWidth: 0, fontWeight: 700, color: "#333", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.nickname}</span>
+                  <span style={{ color: "#0F6E56", fontWeight: 800, flexShrink: 0 }}>+{won(result.reward)}P</span>
+                </div>
+              ))}
+              {result.failed.map((f, i) => (
+                <div key={`f-${i}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderBottom: "1px solid #f4f4f4", fontSize: 13, background: "#fdf0ef" }}>
+                  <span style={{ color: "#C0392B", flexShrink: 0, width: 16 }}>✕</span>
+                  <span style={{ flex: 1, minWidth: 0, fontWeight: 700, color: "#C0392B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.label}</span>
+                  <span style={{ color: "#aaa", flexShrink: 0, fontSize: 11, maxWidth: 170, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.reason}</span>
+                </div>
+              ))}
+            </div>
+            {result.failed.length ? <div style={{ marginTop: 8, fontSize: 12, color: "#C0392B", flexShrink: 0 }}>실패자는 고객·이슈 메뉴에서 수동 지급해 주세요.</div> : null}
+            <button type="button" onClick={() => setResult(null)} style={{ marginTop: 14, padding: "11px", borderRadius: 10, border: "none", background: "#7B2D43", color: "#fff", fontWeight: 800, cursor: "pointer", flexShrink: 0 }}>닫기</button>
           </div>
         </div>
       ) : null}
