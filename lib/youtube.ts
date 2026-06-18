@@ -230,18 +230,22 @@ export async function postLiveChatMessage(messageText: string, opts?: { forceEve
       const raw = await r.text().catch(() => "");
       let j: any = {};
       try { j = JSON.parse(raw); } catch { /* non-json */ }
+      const hdr: Record<string, string> = {};
+      r.headers.forEach((v, k) => { hdr[k] = v; });
       return {
         status: r.status,
+        statusText: r.statusText,
         reason: String(j?.error?.errors?.[0]?.reason || j?.error?.status || ""),
         message: String(j?.error?.message || ""),
         raw,
+        hdr,
       };
     };
 
     let res = await postOnce(liveChatId);
     if (!res.ok) {
       const e1 = await readErr(res);
-      console.error("[youtube] insert#1 fail", { status: e1.status, reason: e1.reason, message: e1.message, chatLen: liveChatId.length, raw: e1.raw.slice(0, 300) });
+      console.error("[youtube] insert#1 fail", { status: e1.status, statusText: e1.statusText, reason: e1.reason, message: e1.message, chatId: liveChatId, raw: e1.raw.slice(0, 300), wwwAuth: e1.hdr["www-authenticate"] });
       if (e1.reason.includes("liveChatNotFound") || e1.reason.includes("liveChatEnded") || e1.status === 404 || e1.status === 403) {
         // 캐시된 chatId가 만료(이전 방송)일 수 있음 → 캐시 비우고 1회 재조회 후 재시도
         await writeSetting(sb, SETTING_LIVE_CHAT_ID, "");
@@ -250,13 +254,13 @@ export async function postLiveChatMessage(messageText: string, opts?: { forceEve
         res = await postOnce(liveChatId);
         if (!res.ok) {
           const e2 = await readErr(res);
-          console.error("[youtube] insert#2 fail", { status: e2.status, reason: e2.reason, message: e2.message, chatLen: liveChatId.length, raw: e2.raw.slice(0, 300) });
-          const detail = e2.reason || e2.message || (e2.raw ? e2.raw.slice(0, 120) : "(빈 응답)");
-          return { ok: false, reason: `발송실패 status=${e2.status} chat=${liveChatId.length > 0 ? "O" : "X"} ${detail}` };
+          console.error("[youtube] insert#2 fail", { status: e2.status, statusText: e2.statusText, reason: e2.reason, message: e2.message, chatId: liveChatId, raw: e2.raw.slice(0, 300), wwwAuth: e2.hdr["www-authenticate"] });
+          const detail = e2.reason || e2.message || e2.statusText || (e2.raw ? e2.raw.slice(0, 100) : "(빈 응답)");
+          return { ok: false, reason: `발송실패 status=${e2.status}${e2.statusText ? "/" + e2.statusText : ""} chat=${liveChatId.length > 0 ? "O" : "X"} ${detail}` };
         }
       } else {
-        const detail = e1.message || e1.reason || (e1.raw ? e1.raw.slice(0, 120) : "(빈 응답)");
-        return { ok: false, reason: `발송실패 status=${e1.status} ${detail}` };
+        const detail = e1.message || e1.reason || e1.statusText || (e1.raw ? e1.raw.slice(0, 100) : "(빈 응답)");
+        return { ok: false, reason: `발송실패 status=${e1.status}${e1.statusText ? "/" + e1.statusText : ""} ${detail}` };
       }
     }
     return { ok: true };
