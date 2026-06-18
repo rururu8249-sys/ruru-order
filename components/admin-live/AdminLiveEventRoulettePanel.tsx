@@ -729,10 +729,12 @@ export default function AdminLiveEventRoulettePanel({
       }
 
       setParticipants(payload.participants || []);
-      await ensureRoulettePreviewEvent(payload.participants || []);
+      // 목록·인원수는 즉시 표시하고 로딩 해제(버벅임 방지). 미리보기 이벤트 생성(추가 서버 왕복)은
+      //   화면을 막지 않게 백그라운드로 — 룰렛 휠은 잠시 뒤 채워짐. 추첨/지급 로직은 무변경.
+      setLoading(false);
+      void ensureRoulettePreviewEvent(payload.participants || []);
     } catch (error) {
       showAdminToast("룰렛 참여자 조회 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
-    } finally {
       setLoading(false);
     }
   };
