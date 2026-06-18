@@ -213,27 +213,34 @@ export async function fetchMissionPaidPhones(supabase: Client, startedAt: string
 
 // 이 방송 미션 지급 "기록"(목록 표시용). ledger의 미션 grant 행을 그대로 읽음(금액·시각).
 //   - 닉네임은 ledger에 없을 수 있어(일괄지급이 nickname 미저장) phone만 반환 → 표시 닉네임은 호출부에서 주문 매핑.
-export type MissionPaidEntry = { phone: string; amount: number; when: string };
-export async function fetchMissionPayoutHistory(supabase: Client, startedAt: string): Promise<MissionPaidEntry[]> {
+export type MissionPaidEntry = { phone: string; amount: number; when: string; nickname: string };
+// 미션 일괄지급 기록 조회. fromIso 이후(선택적으로 toIso 이전)의 미션 grant 행.
+//   - 닉네임: ledger의 youtube_nickname/customer_name(있으면). 없으면 호출부에서 주문 매핑/번호로 보완.
+export async function fetchMissionPayoutHistory(supabase: Client, fromIso: string, toIso?: string): Promise<MissionPaidEntry[]> {
   const out: MissionPaidEntry[] = [];
-  if (!startedAt) return out;
+  if (!fromIso) return out;
   const size = 1000;
   for (let page = 0; page < 30; page++) {
     const from = page * size;
-    const { data, error } = await supabase
+    let q = supabase
       .from("customer_point_ledger")
-      .select("customer_phone,amount,created_at")
+      .select("customer_phone,amount,created_at,youtube_nickname,customer_name")
       .eq("change_type", "grant")
       .eq("admin_memo", MISSION_PAYOUT_MEMO)
-      .gte("created_at", startedAt)
-      .order("created_at", { ascending: false })
-      .range(from, from + size - 1);
+      .gte("created_at", fromIso);
+    if (toIso) q = q.lte("created_at", toIso);
+    const { data, error } = await q.order("created_at", { ascending: false }).range(from, from + size - 1);
     if (error) break;
-    const rows = (Array.isArray(data) ? data : []) as { customer_phone?: unknown; amount?: unknown; created_at?: unknown }[];
+    const rows = (Array.isArray(data) ? data : []) as { customer_phone?: unknown; amount?: unknown; created_at?: unknown; youtube_nickname?: unknown; customer_name?: unknown }[];
     for (const r of rows) {
       const phone = String(r.customer_phone ?? "").replace(/[^0-9]/g, "");
       if (!phone) continue;
-      out.push({ phone, amount: Math.abs(Number(r.amount) || 0), when: String(r.created_at ?? "") });
+      out.push({
+        phone,
+        amount: Math.abs(Number(r.amount) || 0),
+        when: String(r.created_at ?? ""),
+        nickname: String(r.youtube_nickname || r.customer_name || "").trim(),
+      });
     }
     if (rows.length < size) break;
   }
@@ -242,12 +249,13 @@ export async function fetchMissionPayoutHistory(supabase: Client, startedAt: str
 
 export async function fetchMissionBuyers(
   supabase: Client
-): Promise<{ broadcastId: string; broadcastTitle: string; startedAt: string; buyers: MissionBuyer[] }> {
+): Promise<{ broadcastId: string; broadcastTitle: string; startedAt: string; broadcastStartedAt: string; buyers: MissionBuyer[] }> {
   const bc = await fetchActiveBroadcast(supabase);
-  if (!bc || !bc.started_at) return { broadcastId: "", broadcastTitle: "", startedAt: "", buyers: [] };
+  if (!bc || !bc.started_at) return { broadcastId: "", broadcastTitle: "", startedAt: "", broadcastStartedAt: "", buyers: [] };
   const cfg = await readMissionConfig(supabase);
   // 카운트/지급 구간 = 이벤트 시작~종료(진행 중이면 지금). 방송 시작 아님.
   const { start, end } = await resolveMissionWindow(supabase, bc, cfg.active);
+  const broadcastStartedAt = String(bc.started_at ?? "");
   const rows = await fetchAllOrders(
     supabase,
     start,
@@ -270,7 +278,7 @@ export async function fetchMissionBuyers(
       map.set(phone, { phone, nickname: String(r.youtube_nickname || r.customer_name || "고객").trim(), amount: amt, when });
     }
   }
-  return { broadcastId: String(bc.id ?? ""), broadcastTitle: String(bc.public_title ?? bc.title ?? ""), startedAt: start, buyers: [...map.values()] };
+  return { broadcastId: String(bc.id ?? ""), broadcastTitle: String(bc.public_title ?? bc.title ?? ""), startedAt: start, broadcastStartedAt, buyers: [...map.values()] };
 }
 
 export async function readMissionPaid(supabase: Client, broadcastId: string): Promise<boolean> {

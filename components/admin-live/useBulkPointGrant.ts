@@ -39,6 +39,7 @@ export function useBulkPointGrant() {
               reason: opts.reason,
               admin_memo: opts.adminMemo,
               customer_visible: opts.customerVisible,
+              youtube_nickname: t.label, // 지급 명단에 닉네임 남기기(표시용, 돈 로직 무관)
             }),
           });
           const json = await res.json().catch(() => ({} as any));

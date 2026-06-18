@@ -35,6 +35,12 @@ const whenFull = (s: string) => {
   const time = new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
   return `${date} ${time}`;
 };
+// KST 기준 yyyy-mm-dd (기간 필터 비교용)
+const kstKey = (s: string) => {
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+};
 type Buyer = { phone: string; nickname: string; amount: number; when: string };
 // 폼 현재값 스냅샷(저장값과 비교해 "변경됨" 판단용)
 const snapOf = (a: boolean, gt: string, gv: string, ra: string, t: string) => JSON.stringify({ a, gt, gv: gv.trim(), ra: ra.trim(), t: t.trim() });
@@ -101,6 +107,21 @@ export default function AdminLiveMissionPanel() {
     }
   }, []);
 
+  // 팝업용: 최근 60일 미션 지급 기록(기간 칩으로 클라이언트 필터).
+  const loadHistAll = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin-live/mission", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "payout_history", range: "recent" }),
+      });
+      const j = await res.json();
+      if (j.ok) setHistAll(Array.isArray(j.payouts) ? j.payouts : []);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   // 이 방송 지급 내역(명단) — ledger 기준 읽기 전용. 6초 폴링엔 안 넣음(마운트/지급후/새로고침에만).
   const loadHistory = useCallback(async () => {
     try {
@@ -151,7 +172,8 @@ export default function AdminLiveMissionPanel() {
 
   // ── 2단계: 구매자 전원 지급 ──
   const { running: paying, grant } = useBulkPointGrant();
-  const [payout, setPayout] = useState<{ count: number; reward: number; total: number; alreadyPaidCount: number; broadcastTitle: string; buyers: Buyer[] } | null>(null);
+  const [payout, setPayout] = useState<{ count: number; reward: number; total: number; alreadyPaidCount: number; broadcastTitle: string; allowDup: boolean; buyers: Buyer[] } | null>(null);
+  const [allowDup, setAllowDup] = useState(false); // 중복 지급 허용(이미 받은 사람도 다시)
   const [payMsg, setPayMsg] = useState("");
   const [executing, setExecuting] = useState(false);
   const [ending, setEnding] = useState(false);
@@ -160,14 +182,17 @@ export default function AdminLiveMissionPanel() {
   const [histTotal, setHistTotal] = useState(0);
   const [histTitle, setHistTitle] = useState(""); // 지급 내역 요약 줄의 방송 제목
   const [histOpen, setHistOpen] = useState(false); // 지급 명단 팝업 열림(요약 줄 클릭 시)
+  const [histAll, setHistAll] = useState<{ nickname: string; amount: number; when: string }[]>([]); // 최근 60일 지급(팝업 기간필터용)
+  const [histPeriod, setHistPeriod] = useState<"today" | "week" | "month" | "date">("today");
+  const [histDate, setHistDate] = useState(""); // 날짜선택 yyyy-mm-dd(KST)
 
   const openPayout = async () => {
     setPayMsg("");
     try {
-      const res = await fetch("/api/admin-live/mission", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "payout_preview" }) });
+      const res = await fetch("/api/admin-live/mission", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "payout_preview", allowDup }) });
       const j = await res.json();
       if (!j.ok) { setPayMsg(j.message || "조회 실패"); return; }
-      setPayout({ count: j.count, reward: j.reward, total: j.total, alreadyPaidCount: j.alreadyPaidCount || 0, broadcastTitle: j.broadcastTitle || "", buyers: Array.isArray(j.buyers) ? j.buyers : [] });
+      setPayout({ count: j.count, reward: j.reward, total: j.total, alreadyPaidCount: j.alreadyPaidCount || 0, broadcastTitle: j.broadcastTitle || "", allowDup: !!j.allowDup, buyers: Array.isArray(j.buyers) ? j.buyers : [] });
     } catch (e) {
       setPayMsg("조회 실패: " + (e instanceof Error ? e.message : String(e)));
     }
@@ -177,7 +202,7 @@ export default function AdminLiveMissionPanel() {
     if (executing || paying) return; // 더블클릭/중복실행 방지
     setExecuting(true);
     try {
-      const res = await fetch("/api/admin-live/mission", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "payout_confirm" }) });
+      const res = await fetch("/api/admin-live/mission", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "payout_confirm", allowDup }) });
       const j = await res.json();
       if (!j.ok) { setPayout(null); setPayMsg(j.message || (j.already ? "이미 지급됨" : "지급 실패")); return; }
       const targets = (j.buyers || []).map((x: { phone: string; nickname?: string }) => ({ phone: x.phone, label: x.nickname || x.phone }));
@@ -343,7 +368,7 @@ export default function AdminLiveMissionPanel() {
       {/* 2단계: 구매자 전원 지급 */}
       <div style={{ marginTop: 18, borderTop: "1px solid #E3CDD5", paddingTop: 14 }}>
         <span style={labelStyle}>목표 달성 시 — 구매자 전원 포인트 지급</span>
-        <div style={{ fontSize: 12, color: "#999", marginBottom: 8 }}>현재 방송의 <b>결제완료 구매자 전원</b>에게 1인당 포인트를 한 번에 지급해요. <b>한 방송에서 여러 번</b> 지급할 수 있고, <b>같은 사람은 1회만</b>(이미 받은 사람은 자동 제외, 새 구매자에게만 지급).</div>
+        <div style={{ fontSize: 12, color: "#999", marginBottom: 8 }}>현재 방송의 <b>결제완료 구매자 전원</b>에게 1인당 포인트를 한 번에 지급해요. 기본은 <b>같은 사람 1회만</b>(이미 받은 사람 자동 제외). 아래 <b>중복 허용</b>을 켜면 이미 받은 사람도 다시 지급돼요.</div>
 
         {prog?.active ? (
           <button
@@ -378,6 +403,15 @@ export default function AdminLiveMissionPanel() {
         {!payoutUnlocked ? (
           <div style={{ fontSize: 12, color: "#B68", marginTop: 6 }}>※ 위 “🛑 이벤트 종료”를 누르면 지급 버튼이 열려요.</div>
         ) : null}
+
+        {/* 중복 지급 허용 토글 (기본 OFF=같은 사람 1회만 / ON=이미 받은 사람도 다시 지급) */}
+        <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, cursor: "pointer" }}>
+          <input type="checkbox" checked={allowDup} onChange={(e) => setAllowDup(e.target.checked)} style={{ width: 17, height: 17 }} />
+          <span style={{ fontSize: 12, fontWeight: 700, color: allowDup ? "#C0392B" : "#888" }}>
+            중복 지급 허용 — 이미 받은 사람도 다시 지급 {allowDup ? "(켜짐 ⚠️ 한 번 더 줌)" : "(꺼짐 = 같은 사람 1회만)"}
+          </span>
+        </label>
+
         {payMsg ? <div style={{ fontSize: 13, marginTop: 8, fontWeight: 700, color: payMsg.includes("실패") && !payMsg.includes("성공") ? "#C0392B" : "#0F6E56" }}>{payMsg}</div> : null}
       </div>
 
@@ -387,7 +421,7 @@ export default function AdminLiveMissionPanel() {
           <span style={labelStyle}>지급 내역 (클릭하면 명단)</span>
           <button
             type="button"
-            onClick={() => setHistOpen(true)}
+            onClick={() => { setHistOpen(true); void loadHistAll(); }}
             style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 12, border: "1px solid #E3CDD5", background: "#fff", cursor: "pointer", textAlign: "left" }}
           >
             <span style={{ fontSize: 18, flexShrink: 0 }}>🎁</span>
@@ -429,8 +463,12 @@ export default function AdminLiveMissionPanel() {
             ) : (
               <>
                 <div style={{ marginTop: 8, fontSize: 13, color: "#888", flexShrink: 0 }}>
-                  {payout.broadcastTitle ? `${payout.broadcastTitle} · ` : ""}아래 <b style={{ color: "#7B2D43" }}>{payout.count}명</b>(신규)에게 1인당 <b style={{ color: "#7B2D43" }}>{won(payout.reward)}P</b> 지급
-                  {payout.alreadyPaidCount > 0 ? <span style={{ color: "#aaa" }}> · 이미 {payout.alreadyPaidCount}명은 지급됨(제외)</span> : null}
+                  {payout.broadcastTitle ? `${payout.broadcastTitle} · ` : ""}아래 <b style={{ color: "#7B2D43" }}>{payout.count}명</b>{payout.allowDup ? "(전원)" : "(신규)"}에게 1인당 <b style={{ color: "#7B2D43" }}>{won(payout.reward)}P</b> 지급
+                  {payout.alreadyPaidCount > 0 ? (
+                    payout.allowDup
+                      ? <span style={{ color: "#C0392B", fontWeight: 700 }}> · ⚠️ 이미 받은 {payout.alreadyPaidCount}명도 또 지급(중복)</span>
+                      : <span style={{ color: "#aaa" }}> · 이미 {payout.alreadyPaidCount}명은 지급됨(제외)</span>
+                  ) : null}
                 </div>
                 <div style={{ marginTop: 10, flex: 1, minHeight: 0, overflowY: "auto", border: "1px solid #eee", borderRadius: 10 }}>
                   {payout.buyers.length === 0 ? (
@@ -497,30 +535,59 @@ export default function AdminLiveMissionPanel() {
         <div style={{ position: "fixed", inset: 0, zIndex: 142, background: "rgba(2,6,23,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={(e) => { if (e.target === e.currentTarget) setHistOpen(false); }}>
           <div style={{ width: "min(520px,94vw)", maxHeight: "88vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: 16, padding: 20 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
-              <div style={{ fontSize: 16, fontWeight: 800, color: "#0F6E56" }}>🎁 지급 명단</div>
-              <button type="button" onClick={loadHistory} style={{ fontSize: 12, color: "#7B2D43", background: "none", border: "none", cursor: "pointer", fontWeight: 700, textDecoration: "underline" }}>새로고침</button>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "#0F6E56" }}>🎁 미션 지급 명단</div>
+              <button type="button" onClick={loadHistAll} style={{ fontSize: 12, color: "#7B2D43", background: "none", border: "none", cursor: "pointer", fontWeight: 700, textDecoration: "underline" }}>새로고침</button>
             </div>
-            <div style={{ marginTop: 6, fontSize: 13, color: "#888", flexShrink: 0 }}>
-              {histTitle || "이 방송"} · {history && history.length > 0 ? whenFull(history[0].when) : ""}
+            {/* 기간 칩 — 룰렛 이벤트 목록과 동일 UX */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 10, flexShrink: 0 }}>
+              {([["today", "오늘"], ["week", "이번주"], ["month", "이번달"], ["date", "날짜선택"]] as const).map(([key, label]) => (
+                <span
+                  key={key}
+                  onClick={() => setHistPeriod(key)}
+                  style={{ cursor: "pointer", fontSize: 12, fontWeight: 700, padding: "4px 11px", borderRadius: 999, border: "1px solid #D9C5CC", background: histPeriod === key ? "#7B2D43" : "#fff", color: histPeriod === key ? "#fff" : "#999" }}
+                >
+                  {label}
+                </span>
+              ))}
+              {histPeriod === "date" ? (
+                <input type="date" value={histDate} onChange={(e) => setHistDate(e.target.value)} style={{ fontSize: 12, padding: "3px 8px", borderRadius: 8, border: "1px solid #D9C5CC" }} />
+              ) : null}
             </div>
-            <div style={{ marginTop: 4, fontSize: 14, fontWeight: 800, color: "#7B2D43", flexShrink: 0 }}>
-              총 {won(history?.length || 0)}명 · <span style={{ color: "#0F6E56" }}>{won(histTotal)}P</span>
-            </div>
-            <div style={{ marginTop: 10, flex: 1, minHeight: 0, overflowY: "auto", border: "1px solid #eee", borderRadius: 10 }}>
-              {history && history.length > 0 ? (
-                history.map((h, i) => (
-                  <div key={`${h.when}-${i}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderBottom: "1px solid #f4f4f4", fontSize: 13 }}>
-                    <span style={{ color: "#bbb", width: 22, flexShrink: 0 }}>{i + 1}</span>
-                    <span style={{ color: "#aaa", fontSize: 12, flexShrink: 0 }}>{whenText(h.when)}</span>
-                    <span style={{ flex: 1, minWidth: 0, fontWeight: 700, color: "#333", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.nickname}</span>
-                    <span style={{ color: "#0F6E56", fontWeight: 800, flexShrink: 0 }}>+{won(h.amount)}P</span>
-                    <span style={{ flexShrink: 0, fontSize: 11, color: "#0F6E56", background: "#E7F4EF", borderRadius: 6, padding: "2px 7px", fontWeight: 700 }}>지급완료</span>
+            {(() => {
+              const today = kstKey(new Date().toISOString());
+              const weekAgo = kstKey(new Date(Date.now() - 6 * 86400000).toISOString());
+              const filtered = histAll.filter((h) => {
+                const k = kstKey(h.when);
+                if (!k) return false;
+                if (histPeriod === "today") return k === today;
+                if (histPeriod === "month") return k.slice(0, 7) === today.slice(0, 7);
+                if (histPeriod === "date") return histDate ? k === histDate : true;
+                return k >= weekAgo && k <= today; // 이번주 = 최근 7일
+              });
+              const total = filtered.reduce((s, x) => s + x.amount, 0);
+              return (
+                <>
+                  <div style={{ marginTop: 8, fontSize: 14, fontWeight: 800, color: "#7B2D43", flexShrink: 0 }}>
+                    총 {won(filtered.length)}명 · <span style={{ color: "#0F6E56" }}>{won(total)}P</span>
                   </div>
-                ))
-              ) : (
-                <div style={{ padding: "16px", textAlign: "center", color: "#999", fontSize: 13 }}>지급 기록이 없어요.</div>
-              )}
-            </div>
+                  <div style={{ marginTop: 8, flex: 1, minHeight: 0, overflowY: "auto", border: "1px solid #eee", borderRadius: 10 }}>
+                    {filtered.length > 0 ? (
+                      filtered.map((h, i) => (
+                        <div key={`${h.when}-${i}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderBottom: "1px solid #f4f4f4", fontSize: 13 }}>
+                          <span style={{ color: "#bbb", width: 22, flexShrink: 0 }}>{i + 1}</span>
+                          <span style={{ color: "#aaa", fontSize: 12, flexShrink: 0 }}>{whenFull(h.when)}</span>
+                          <span style={{ flex: 1, minWidth: 0, fontWeight: 700, color: "#333", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.nickname}</span>
+                          <span style={{ color: "#0F6E56", fontWeight: 800, flexShrink: 0 }}>+{won(h.amount)}P</span>
+                          <span style={{ flexShrink: 0, fontSize: 11, color: "#0F6E56", background: "#E7F4EF", borderRadius: 6, padding: "2px 7px", fontWeight: 700 }}>지급완료</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{ padding: "16px", textAlign: "center", color: "#999", fontSize: 13 }}>이 기간 지급 기록이 없어요.</div>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
             <button type="button" onClick={() => setHistOpen(false)} style={{ marginTop: 14, padding: "11px", borderRadius: 10, border: "none", background: "#7B2D43", color: "#fff", fontWeight: 800, cursor: "pointer", flexShrink: 0 }}>닫기</button>
           </div>
         </div>

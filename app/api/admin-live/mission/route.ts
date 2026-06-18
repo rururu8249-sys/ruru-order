@@ -41,11 +41,15 @@ export async function POST(request: NextRequest) {
     // ── 지급 내역(이 방송 미션 지급 명단) — 읽기 전용 ──
     if (action === "payout_history") {
       const supabase = getMissionSupabase();
-      const { broadcastTitle, startedAt, buyers } = await fetchMissionBuyers(supabase);
+      const { broadcastTitle, broadcastStartedAt, buyers } = await fetchMissionBuyers(supabase);
       const nameMap = new Map(buyers.map((b) => [b.phone, b.nickname]));
-      const hist = await fetchMissionPayoutHistory(supabase, startedAt);
+      // range: "broadcast"(기본=이 방송 전체, 요약 줄용) | "recent"(최근 60일, 기간필터 목록용).
+      const range = String(b.range ?? "broadcast");
+      const fromIso = range === "recent" ? new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString() : broadcastStartedAt;
+      const hist = await fetchMissionPayoutHistory(supabase, fromIso);
+      // 닉네임 우선순위: ledger 저장값 → 이 방송 주문 매핑 → 번호 뒤4자리.
       const payouts = hist.map((h) => ({
-        nickname: nameMap.get(h.phone) || (h.phone ? "…" + h.phone.slice(-4) : "고객"),
+        nickname: h.nickname || nameMap.get(h.phone) || (h.phone ? "…" + h.phone.slice(-4) : "고객"),
         amount: h.amount,
         when: h.when,
       }));
@@ -65,29 +69,33 @@ export async function POST(request: NextRequest) {
       const cfg = await readMissionConfig(supabase);
       const reward = cfg.reward;
 
-      // 멱등 중복방지: 이미 이 방송에서 미션 지급을 받은 사람(전화번호)은 ledger 기준으로 제외.
-      //   → 한 방송에서 여러 번 지급해도 같은 사람은 1회만, 매번 "새 구매자"에게만 지급.
+      // 중복 허용 토글(allowDup): 켜면 이미 받은 사람도 다시 지급(전원), 끄면(기본) 멱등 중복방지.
+      const allowDup = b.allowDup === true;
+
+      // 멱등 중복방지: 이미 이 이벤트에서 미션 지급을 받은 사람(전화번호)은 ledger 기준으로 제외.
+      //   → 같은 이벤트에서 여러 번 눌러도 같은 사람은 1회만, 매번 "새 구매자"에게만 지급. (allowDup면 제외 안 함)
       const paidPhones = await fetchMissionPaidPhones(supabase, startedAt);
-      const remaining = buyers.filter((b) => !paidPhones.has(b.phone));
-      const alreadyPaidCount = buyers.length - remaining.length;
+      const remaining = allowDup ? buyers : buyers.filter((b2) => !paidPhones.has(b2.phone));
+      const alreadyPaidCount = buyers.length - buyers.filter((b2) => !paidPhones.has(b2.phone)).length;
 
       if (action === "payout_preview") {
         return json({
           ok: true,
           broadcastTitle,
-          count: remaining.length, // 이번에 지급할 신규(미지급) 인원
+          count: remaining.length, // 이번에 지급할 인원(중복방지면 신규만, 중복허용이면 전원)
           reward,
           total: remaining.length * reward,
-          alreadyPaidCount, // 이미 받은 인원(중복 제외됨)
+          alreadyPaidCount, // 이미 받은 인원(중복방지면 제외됨 / 중복허용이면 이들도 다시 지급)
           totalBuyers: buyers.length,
+          allowDup,
           buyers: remaining,
         });
       }
-      // payout_confirm: 남은(미지급) 구매자만 반환 → 클라이언트가 그들에게만 일괄지급.
+      // payout_confirm: 대상 구매자만 반환 → 클라이언트가 그들에게 일괄지급.
       if (reward <= 0) return json({ ok: false, message: "1인당 포인트가 0이에요. 설정을 확인하세요." }, 400);
       if (buyers.length === 0) return json({ ok: false, message: "지급 대상(결제완료 구매자)이 없어요." }, 400);
       if (remaining.length === 0)
-        return json({ ok: false, already: true, message: "이미 이 방송 구매자 전원에게 지급됐어요. (같은 사람 중복지급 방지)" }, 409);
+        return json({ ok: false, already: true, message: "이미 이 이벤트 구매자 전원에게 지급됐어요. (중복 허용을 켜면 다시 지급할 수 있어요)" }, 409);
       return json({ ok: true, reward, title: cfg.title, buyers: remaining });
     }
 
