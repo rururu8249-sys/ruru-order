@@ -508,15 +508,20 @@ export default function AdminLiveEventRoulettePanel({
       showAdminToast(`${nickname}님에게 ${amount.toLocaleString("ko-KR")}P 자동지급 완료.`, "success");
 
       // 지급 성공 → 해당 당첨자 레코드 is_reward_done=true (영구 중복지급 게이트). 기존 mark_reward_done API 재사용.
+      //   당첨 레코드가 서버에서 막 생성된 직후라 조회가 빌 수 있어 최대 3회(0.6s 간격) 재시도 → 배지 마킹 안정화.
       if (evId) {
-        const { data: wRow } = await supabase
-          .from("event_roulette_winners")
-          .select("id")
-          .eq("event_id", evId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        const winnerId = (wRow as { id?: string } | null)?.id;
+        let winnerId: string | undefined;
+        for (let i = 0; i < 3 && !winnerId; i++) {
+          const { data: wRow } = await supabase
+            .from("event_roulette_winners")
+            .select("id")
+            .eq("event_id", evId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          winnerId = (wRow as { id?: string } | null)?.id;
+          if (!winnerId) await new Promise((r) => setTimeout(r, 600));
+        }
         if (winnerId) {
           await requestJson<{ ok: boolean }>("/api/admin-live/event-roulette", {
             method: "POST",
