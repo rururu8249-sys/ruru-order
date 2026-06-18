@@ -92,14 +92,37 @@ export async function POST(request: NextRequest) {
     }
 
     const goalType = b.goalType === "amount" ? "amount" : "count";
+    const supabase = getMissionSupabase();
+
+    // 이벤트 시작/종료 시각 기록 — 카운트·지급·명단 구간 기준.
+    //   - 새로 켜질 때(false→true): mission_started_at=지금(=이 이벤트 0부터 카운트), mission_ended_at 비움.
+    //   - 꺼질 때(true→false): mission_ended_at=지금(구간 끝 고정), 시작시각은 유지(종료 후 지급 가능).
+    //   - 켠 채로 목표/문구만 저장(true→true)이면 시작시각 그대로(카운트 안 깨짐).
+    const newActive = !!b.active;
+    const prev = await readMissionConfig(supabase); // 이전 active
+    const times = (
+      await supabase.from("settings").select("key,value").in("key", ["mission_started_at", "mission_ended_at"])
+    ).data as { key?: string; value?: string }[] | null;
+    const tmap = new Map((Array.isArray(times) ? times : []).map((r) => [String(r.key), String(r.value ?? "")]));
+    let startedAt = (tmap.get("mission_started_at") || "").trim();
+    let endedAt = (tmap.get("mission_ended_at") || "").trim();
+    const nowIso = new Date().toISOString();
+    if (newActive && !prev.active) {
+      startedAt = nowIso; // 새 이벤트 시작
+      endedAt = "";
+    } else if (!newActive && prev.active) {
+      endedAt = nowIso; // 이벤트 종료
+    }
+
     const rows = [
-      { key: "mission_active", value: b.active ? "true" : "false" },
+      { key: "mission_active", value: newActive ? "true" : "false" },
       { key: "mission_goal_type", value: goalType },
       { key: "mission_goal_value", value: String(num(b.goalValue)) },
       { key: "mission_reward_amount", value: String(num(b.rewardAmount)) },
       { key: "mission_title", value: String(b.title ?? "").slice(0, 80) },
+      { key: "mission_started_at", value: startedAt },
+      { key: "mission_ended_at", value: endedAt },
     ];
-    const supabase = getMissionSupabase();
     const { error } = await supabase.from("settings").upsert(rows, { onConflict: "key" });
     if (error) return json({ ok: false, message: error.message }, 500);
     return json({ ok: true });

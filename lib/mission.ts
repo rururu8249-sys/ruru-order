@@ -113,6 +113,39 @@ async function fetchActiveBroadcast(supabase: Client) {
   return active || null;
 }
 
+// 이벤트(미션) 시작/종료 시각 — 카운트·지급 대상 기준 구간.
+//   - mission_started_at: 미션을 켜는 순간 기록(= 새 이벤트 시작점). 없으면 방송 시작으로 fallback.
+//   - mission_ended_at: 이벤트 종료 시 기록(구간 끝 고정). 진행 중이면 지금까지.
+async function readMissionTimes(supabase: Client): Promise<{ startedAt: string; endedAt: string }> {
+  const { data } = await supabase
+    .from("settings")
+    .select("key,value")
+    .in("key", ["mission_started_at", "mission_ended_at"]);
+  const map = new Map<string, string>();
+  (Array.isArray(data) ? data : []).forEach((r: { key?: unknown; value?: unknown }) =>
+    map.set(String(r.key), String(r.value ?? ""))
+  );
+  return { startedAt: (map.get("mission_started_at") || "").trim(), endedAt: (map.get("mission_ended_at") || "").trim() };
+}
+
+// 카운트/지급/명단 구간 = [이벤트 시작, 종료(진행 중이면 지금)]. 기록 없으면 방송 시작~지금 fallback.
+async function resolveMissionWindow(
+  supabase: Client,
+  bc: Record<string, unknown>,
+  active: boolean
+): Promise<{ start: string; end: string }> {
+  const times = await readMissionTimes(supabase);
+  const bcStart = String(bc.started_at ?? "");
+  const nowIso = new Date().toISOString();
+  const start = times.startedAt || bcStart;
+  const end = active
+    ? bc.ended_at
+      ? String(bc.ended_at)
+      : nowIso
+    : times.endedAt || (bc.ended_at ? String(bc.ended_at) : nowIso);
+  return { start, end };
+}
+
 export async function computeMissionProgress(supabase: Client): Promise<MissionProgress> {
   const cfg = await readMissionConfig(supabase);
   const bc = await fetchActiveBroadcast(supabase);
@@ -123,8 +156,7 @@ export async function computeMissionProgress(supabase: Client): Promise<MissionP
   if (bc && bc.started_at) {
     broadcastId = String(bc.id ?? "");
     broadcastTitle = String(bc.public_title ?? bc.title ?? "");
-    const start = String(bc.started_at);
-    const end = bc.ended_at ? String(bc.ended_at) : new Date().toISOString();
+    const { start, end } = await resolveMissionWindow(supabase, bc, cfg.active);
     const rows = await fetchAllOrders(
       supabase,
       start,
@@ -213,8 +245,9 @@ export async function fetchMissionBuyers(
 ): Promise<{ broadcastId: string; broadcastTitle: string; startedAt: string; buyers: MissionBuyer[] }> {
   const bc = await fetchActiveBroadcast(supabase);
   if (!bc || !bc.started_at) return { broadcastId: "", broadcastTitle: "", startedAt: "", buyers: [] };
-  const start = String(bc.started_at);
-  const end = bc.ended_at ? String(bc.ended_at) : new Date().toISOString();
+  const cfg = await readMissionConfig(supabase);
+  // 카운트/지급 구간 = 이벤트 시작~종료(진행 중이면 지금). 방송 시작 아님.
+  const { start, end } = await resolveMissionWindow(supabase, bc, cfg.active);
   const rows = await fetchAllOrders(
     supabase,
     start,
