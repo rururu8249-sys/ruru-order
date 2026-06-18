@@ -103,7 +103,7 @@ async function fetchActiveBroadcast(supabase: Client) {
   //   - .eq("status","ON")(대문자 정확일치)는 DB값이 "on"/"On"이면 못 찾아 "방송 OFF"로 뜨던 버그 수정.
   const { data } = await supabase
     .from("broadcasts")
-    .select("id,title,started_at,ended_at,status,is_deleted")
+    .select("id,public_title,started_at,ended_at,status,is_deleted")
     .order("started_at", { ascending: false })
     .limit(20);
   const rows = (Array.isArray(data) ? data : []) as Record<string, unknown>[];
@@ -122,7 +122,7 @@ export async function computeMissionProgress(supabase: Client): Promise<MissionP
 
   if (bc && bc.started_at) {
     broadcastId = String(bc.id ?? "");
-    broadcastTitle = String(bc.title ?? "");
+    broadcastTitle = String(bc.public_title ?? bc.title ?? "");
     const start = String(bc.started_at);
     const end = bc.ended_at ? String(bc.ended_at) : new Date().toISOString();
     const rows = await fetchAllOrders(
@@ -177,7 +177,7 @@ export async function fetchMissionBuyers(
       map.set(phone, { phone, nickname: String(r.youtube_nickname || r.customer_name || "고객").trim(), amount: amt, when });
     }
   }
-  return { broadcastId: String(bc.id ?? ""), broadcastTitle: String(bc.title ?? ""), buyers: [...map.values()] };
+  return { broadcastId: String(bc.id ?? ""), broadcastTitle: String(bc.public_title ?? bc.title ?? ""), buyers: [...map.values()] };
 }
 
 export async function readMissionPaid(supabase: Client, broadcastId: string): Promise<boolean> {
