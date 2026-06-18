@@ -99,14 +99,18 @@ async function fetchAllOrders(supabase: Client, start: string, end: string, colu
 }
 
 async function fetchActiveBroadcast(supabase: Client) {
+  // 메인 대시보드(getActiveBroadcast)와 동일하게 status 대소문자 무시 + 삭제 제외로 현재 방송 탐지.
+  //   - .eq("status","ON")(대문자 정확일치)는 DB값이 "on"/"On"이면 못 찾아 "방송 OFF"로 뜨던 버그 수정.
   const { data } = await supabase
     .from("broadcasts")
-    .select("id,title,started_at,ended_at,status")
-    .eq("status", "ON")
+    .select("id,title,started_at,ended_at,status,is_deleted")
     .order("started_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return (data as Record<string, unknown> | null) || null;
+    .limit(20);
+  const rows = (Array.isArray(data) ? data : []) as Record<string, unknown>[];
+  const active = rows.find(
+    (b) => b.is_deleted !== true && String(b.status || "").toUpperCase() === "ON"
+  );
+  return active || null;
 }
 
 export async function computeMissionProgress(supabase: Client): Promise<MissionProgress> {
