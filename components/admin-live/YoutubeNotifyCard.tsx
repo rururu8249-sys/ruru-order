@@ -80,10 +80,19 @@ export default function YoutubeNotifyCard() {
   const sendTest = async () => {
     setTesting(true);
     try {
+      // 지금 입력칸 문구를 그대로 미리보기로 보냄(저장 안 해도 바뀐 이모지/문구가 바로 보임).
+      const preview =
+        messageTemplate
+          .replace(/\{\{\s*nickname\s*\}\}/g, "테스트")
+          .replace(/\{\{\s*items\s*\}\}/g, "샘플상품 외 1건")
+          .replace(/\{\{\s*amount\s*\}\}/g, "50,000원")
+          .replace(/\(\s*[·\-/]?\s*\)/g, "")
+          .replace(/\s{2,}/g, " ")
+          .trim() || "🛒 루루동이 알림 테스트입니다";
       const res = await fetch("/api/youtube/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "test" }),
+        body: JSON.stringify({ action: "test", message: preview }),
       });
       const json = await res.json();
       if (json?.ok) showAdminToast("테스트 메시지를 라이브 채팅에 올렸습니다 ✅", "success");

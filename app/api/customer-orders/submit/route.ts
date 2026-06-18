@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 import { assertValidCustomerPointPhone } from "@/lib/customerPoints";
@@ -237,6 +237,31 @@ export async function POST(request: NextRequest) {
         console.warn("받는사람 저장 실패(주문은 정상 저장됨):", recipientError.message);
       }
     }
+
+    // 유튜브 라이브 채팅 자동 게시(자동알림 ON일 때만). 주문 저장 완료 후 응답과 별개로 실행 →
+    //   - after()로 응답 보낸 뒤 실행하므로 주문 제출 속도/성공에 영향 0.
+    //   - postLiveChatMessage는 throw하지 않고 notify OFF면 내부에서 스킵. 실패해도 주문과 무관.
+    after(async () => {
+      try {
+        const rows = normalizedSubmit.orderRows;
+        const names = rows.map((r) => text(r?.product_name)).filter(Boolean);
+        const itemsSummary =
+          names.length === 0 ? "" : names.length === 1 ? names[0] : `${names[0]} 외 ${names.length - 1}건`;
+        const amount = rows.reduce(
+          (sum, r) => sum + toWon(r?.final_amount ?? r?.adjusted_total_price ?? r?.total_price),
+          0,
+        );
+        const { buildOrderMessage, postLiveChatMessage } = await import("@/lib/youtube");
+        const msg = await buildOrderMessage({
+          nickname: youtubeNickname || customerName,
+          itemsSummary,
+          amount,
+        });
+        await postLiveChatMessage(msg);
+      } catch {
+        /* 유튜브 게시 실패는 주문과 완전히 무관하게 무시 */
+      }
+    });
 
     if (!data || typeof data !== "object") {
       return NextResponse.json({
