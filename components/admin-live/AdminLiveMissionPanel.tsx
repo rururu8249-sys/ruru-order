@@ -122,31 +122,12 @@ export default function AdminLiveMissionPanel() {
     }
   }, []);
 
-  // 이 방송 지급 내역(명단) — ledger 기준 읽기 전용. 6초 폴링엔 안 넣음(마운트/지급후/새로고침에만).
-  const loadHistory = useCallback(async () => {
-    try {
-      const res = await fetch("/api/admin-live/mission", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "payout_history" }),
-      });
-      const j = await res.json();
-      if (j.ok) {
-        setHistory(Array.isArray(j.payouts) ? j.payouts : []);
-        setHistTotal(Number(j.total) || 0);
-        setHistTitle(String(j.broadcastTitle || ""));
-      }
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
   useEffect(() => {
     load();
-    loadHistory();
+    loadHistAll();
     const t = setInterval(load, 6000);
     return () => clearInterval(t);
-  }, [load, loadHistory]);
+  }, [load, loadHistAll]);
 
   const save = async () => {
     setSaving(true);
@@ -178,11 +159,7 @@ export default function AdminLiveMissionPanel() {
   const [executing, setExecuting] = useState(false);
   const [ending, setEnding] = useState(false);
   const [result, setResult] = useState<{ successList: { nickname: string; amount: number }[]; failed: { label: string; reason: string }[]; reward: number } | null>(null);
-  const [history, setHistory] = useState<{ nickname: string; amount: number; when: string }[] | null>(null);
-  const [histTotal, setHistTotal] = useState(0);
-  const [histTitle, setHistTitle] = useState(""); // 지급 내역 요약 줄의 방송 제목
-  const [histOpen, setHistOpen] = useState(false); // 지급 명단 팝업 열림(요약 줄 클릭 시)
-  const [histAll, setHistAll] = useState<{ nickname: string; amount: number; when: string }[]>([]); // 최근 60일 지급(팝업 기간필터용)
+  const [histAll, setHistAll] = useState<{ nickname: string; amount: number; when: string }[]>([]); // 최근 60일 지급(기간필터 목록용)
   const [histPeriod, setHistPeriod] = useState<"today" | "week" | "month" | "date">("today");
   const [histDate, setHistDate] = useState(""); // 날짜선택 yyyy-mm-dd(KST)
 
@@ -219,7 +196,7 @@ export default function AdminLiveMissionPanel() {
       setPayMsg("");
       setResult({ successList, failed: r.failed, reward: j.reward });
       load();
-      loadHistory();
+      loadHistAll();
     } catch (e) {
       setPayout(null);
       setPayMsg("지급 실패: " + (e instanceof Error ? e.message : String(e)));
@@ -415,28 +392,56 @@ export default function AdminLiveMissionPanel() {
         {payMsg ? <div style={{ fontSize: 13, marginTop: 8, fontWeight: 700, color: payMsg.includes("실패") && !payMsg.includes("성공") ? "#C0392B" : "#0F6E56" }}>{payMsg}</div> : null}
       </div>
 
-      {/* 지급 내역 — 룰렛 이벤트목록처럼 한 줄 요약(방송제목·날짜시간·총N명·총액), 클릭하면 명단 팝업. 기록 있을 때만. */}
-      {history && history.length > 0 ? (
-        <div style={{ marginTop: 18, borderTop: "1px solid #E3CDD5", paddingTop: 14 }}>
-          <span style={labelStyle}>지급 내역 (클릭하면 명단)</span>
-          <button
-            type="button"
-            onClick={() => { setHistOpen(true); void loadHistAll(); }}
-            style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 12, border: "1px solid #E3CDD5", background: "#fff", cursor: "pointer", textAlign: "left" }}
-          >
-            <span style={{ fontSize: 18, flexShrink: 0 }}>🎁</span>
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: "block", fontSize: 13, fontWeight: 800, color: "#333", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {histTitle || "이 방송"} · {whenFull(history[0].when)}
-              </span>
-              <span style={{ display: "block", fontSize: 12, color: "#7B2D43", fontWeight: 700, marginTop: 2 }}>
-                총 {won(history.length)}명 · {won(histTotal)}P 지급완료
-              </span>
+      {/* 지급 내역 — 룰렛/인형뽑기 "이벤트 목록"과 동일한 인라인 목록(.row/.note/.badge/.seclabel + 기간 칩). */}
+      <div style={{ marginTop: 18, borderTop: "1px solid var(--bd)", paddingTop: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+          <span className="seclabel" style={{ margin: 0 }}>🎯 미션 지급 내역 <span className="note">지난 기록</span></span>
+          {([["today", "오늘"], ["week", "이번주"], ["month", "이번달"], ["date", "날짜선택"]] as const).map(([key, label]) => (
+            <span
+              key={key}
+              className="badge"
+              style={{ cursor: "pointer", padding: "4px 10px", border: "1px solid var(--bd)", background: histPeriod === key ? "var(--rose)" : "#fff", color: histPeriod === key ? "#fff" : "var(--mut)" }}
+              onClick={() => setHistPeriod(key)}
+            >
+              {label}
             </span>
-            <span style={{ flexShrink: 0, color: "#aaa", fontSize: 18 }}>›</span>
-          </button>
+          ))}
+          {histPeriod === "date" ? (
+            <input type="date" className="ipt" style={{ height: 26 }} value={histDate} onChange={(e) => setHistDate(e.target.value)} />
+          ) : null}
+          <span style={{ marginLeft: "auto" }}>
+            <button className="btn" style={{ height: 26, padding: "0 8px" }} onClick={loadHistAll}>새로고침</button>
+          </span>
         </div>
-      ) : null}
+        {(() => {
+          const today = kstKey(new Date().toISOString());
+          const weekAgo = kstKey(new Date(Date.now() - 6 * 86400000).toISOString());
+          const filtered = histAll.filter((h) => {
+            const k = kstKey(h.when);
+            if (!k) return false;
+            if (histPeriod === "today") return k === today;
+            if (histPeriod === "month") return k.slice(0, 7) === today.slice(0, 7);
+            if (histPeriod === "date") return histDate ? k === histDate : true;
+            return k >= weekAgo && k <= today; // 이번주 = 최근 7일
+          });
+          if (filtered.length === 0) {
+            return <div className="note" style={{ textAlign: "center", padding: "20px 0" }}>해당 기간 지급 기록이 없습니다.</div>;
+          }
+          const total = filtered.reduce((s, x) => s + x.amount, 0);
+          return (
+            <>
+              {filtered.map((h, i) => (
+                <div key={`${h.when}-${i}`} className="row">
+                  <span className="note" style={{ width: 120, flexShrink: 0 }}>{whenFull(h.when)}</span>
+                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>🎯 미션 · 당첨 <b>{h.nickname}</b> · 포인트 {won(h.amount)}P</span>
+                  <span className="badge b-ok" style={{ flexShrink: 0 }}>지급완료</span>
+                </div>
+              ))}
+              <div className="note" style={{ textAlign: "right", marginTop: 4 }}>총 {won(filtered.length)}명 · {won(total)}P</div>
+            </>
+          );
+        })()}
+      </div>
 
       {/* OBS 위젯 주소 */}
       <div style={{ marginTop: 20, borderTop: "1px solid #E3CDD5", paddingTop: 14 }}>
@@ -530,68 +535,6 @@ export default function AdminLiveMissionPanel() {
         </div>
       ) : null}
 
-      {/* 지급 명단 팝업 — 요약 줄 클릭 시. ledger 기준 읽기 전용. */}
-      {histOpen ? (
-        <div style={{ position: "fixed", inset: 0, zIndex: 142, background: "rgba(2,6,23,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={(e) => { if (e.target === e.currentTarget) setHistOpen(false); }}>
-          <div style={{ width: "min(520px,94vw)", maxHeight: "88vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: 16, padding: 20 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
-              <div style={{ fontSize: 16, fontWeight: 800, color: "#0F6E56" }}>🎁 미션 지급 명단</div>
-              <button type="button" onClick={loadHistAll} style={{ fontSize: 12, color: "#7B2D43", background: "none", border: "none", cursor: "pointer", fontWeight: 700, textDecoration: "underline" }}>새로고침</button>
-            </div>
-            {/* 기간 칩 — 룰렛 이벤트 목록과 동일 UX */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 10, flexShrink: 0 }}>
-              {([["today", "오늘"], ["week", "이번주"], ["month", "이번달"], ["date", "날짜선택"]] as const).map(([key, label]) => (
-                <span
-                  key={key}
-                  onClick={() => setHistPeriod(key)}
-                  style={{ cursor: "pointer", fontSize: 12, fontWeight: 700, padding: "4px 11px", borderRadius: 999, border: "1px solid #D9C5CC", background: histPeriod === key ? "#7B2D43" : "#fff", color: histPeriod === key ? "#fff" : "#999" }}
-                >
-                  {label}
-                </span>
-              ))}
-              {histPeriod === "date" ? (
-                <input type="date" value={histDate} onChange={(e) => setHistDate(e.target.value)} style={{ fontSize: 12, padding: "3px 8px", borderRadius: 8, border: "1px solid #D9C5CC" }} />
-              ) : null}
-            </div>
-            {(() => {
-              const today = kstKey(new Date().toISOString());
-              const weekAgo = kstKey(new Date(Date.now() - 6 * 86400000).toISOString());
-              const filtered = histAll.filter((h) => {
-                const k = kstKey(h.when);
-                if (!k) return false;
-                if (histPeriod === "today") return k === today;
-                if (histPeriod === "month") return k.slice(0, 7) === today.slice(0, 7);
-                if (histPeriod === "date") return histDate ? k === histDate : true;
-                return k >= weekAgo && k <= today; // 이번주 = 최근 7일
-              });
-              const total = filtered.reduce((s, x) => s + x.amount, 0);
-              return (
-                <>
-                  <div style={{ marginTop: 8, fontSize: 14, fontWeight: 800, color: "#7B2D43", flexShrink: 0 }}>
-                    총 {won(filtered.length)}명 · <span style={{ color: "#0F6E56" }}>{won(total)}P</span>
-                  </div>
-                  <div style={{ marginTop: 8, flex: 1, minHeight: 0, overflowY: "auto", border: "1px solid #eee", borderRadius: 10 }}>
-                    {filtered.length > 0 ? (
-                      filtered.map((h, i) => (
-                        <div key={`${h.when}-${i}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderBottom: "1px solid #f4f4f4", fontSize: 13 }}>
-                          <span style={{ color: "#bbb", width: 22, flexShrink: 0 }}>{i + 1}</span>
-                          <span style={{ color: "#aaa", fontSize: 12, flexShrink: 0 }}>{whenFull(h.when)}</span>
-                          <span style={{ flex: 1, minWidth: 0, fontWeight: 700, color: "#333", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.nickname}</span>
-                          <span style={{ color: "#0F6E56", fontWeight: 800, flexShrink: 0 }}>+{won(h.amount)}P</span>
-                          <span style={{ flexShrink: 0, fontSize: 11, color: "#0F6E56", background: "#E7F4EF", borderRadius: 6, padding: "2px 7px", fontWeight: 700 }}>지급완료</span>
-                        </div>
-                      ))
-                    ) : (
-                      <div style={{ padding: "16px", textAlign: "center", color: "#999", fontSize: 13 }}>이 기간 지급 기록이 없어요.</div>
-                    )}
-                  </div>
-                </>
-              );
-            })()}
-            <button type="button" onClick={() => setHistOpen(false)} style={{ marginTop: 14, padding: "11px", borderRadius: 10, border: "none", background: "#7B2D43", color: "#fff", fontWeight: 800, cursor: "pointer", flexShrink: 0 }}>닫기</button>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
