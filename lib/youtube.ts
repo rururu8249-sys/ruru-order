@@ -97,6 +97,47 @@ export async function getConnectionStatus(): Promise<{ connected: boolean; liveU
   }
 }
 
+// 진단: 지금 봇 토큰이 "어느 채널"로 연결됐는지 + 소유자 활성방송 chatId가 잡히는지 확인.
+//   - 404 원인(비소유자 채널 연결 vs chatId 문제) 가르기 용도. 결과는 테스트 응답에 _dbg로 실림.
+export async function getYoutubeDiag(): Promise<Record<string, unknown>> {
+  try {
+    const sb = getServiceClient();
+    const refreshToken = await readRefreshToken(sb);
+    if (!refreshToken) return { connected: false };
+    const accessToken = await getAccessToken(refreshToken);
+    let channel: Record<string, unknown> = {};
+    try {
+      const r = await fetch("https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const j: any = await r.json().catch(() => ({}));
+      channel = {
+        count: Array.isArray(j?.items) ? j.items.length : 0,
+        id: j?.items?.[0]?.id || "",
+        title: j?.items?.[0]?.snippet?.title || "",
+        err: j?.error?.message || null,
+      };
+    } catch (e) {
+      channel = { ex: e instanceof Error ? e.message : String(e) };
+    }
+    let ownerActiveChatId = "(없음)";
+    try {
+      const r = await fetch(
+        "https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet&broadcastStatus=active&broadcastType=all&maxResults=1",
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      const j: any = await r.json().catch(() => ({}));
+      const c = String(j?.items?.[0]?.snippet?.liveChatId || "");
+      ownerActiveChatId = c ? c.slice(0, 14) + "…" : "(없음)";
+    } catch {
+      /* 무시 */
+    }
+    return { connected: true, channel, ownerActiveChatId };
+  } catch (e) {
+    return { err: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 export async function saveNotifySettings(opts: { notifyEnabled?: boolean; messageTemplate?: string }): Promise<void> {
   const sb = getServiceClient();
   if (typeof opts.notifyEnabled === "boolean") await writeSetting(sb, SETTING_NOTIFY_ENABLED, opts.notifyEnabled ? "true" : "false");
