@@ -17,10 +17,12 @@ const clearLiveOrderAutoRefreshInterval = (intervalId: number | null) => {
 
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
+import { speakAdmin } from "@/lib/adminVoice";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import ManualPaymentMatchDrawer from "@/components/admin-v2/payment/ManualPaymentMatchDrawer";
 import AdminLiveCustomersPanel from "./AdminLiveCustomersPanel";
+import AdminSoundControl from "./AdminSoundControl";
 import AdminLiveMenuPlaceholder from "./AdminLiveMenuPlaceholder";
 import AdminLivePaymentPanel from "./AdminLivePaymentPanel";
 import AdminLiveSettlementPanel from "./AdminLiveSettlementPanel";
@@ -837,22 +839,8 @@ export default function AdminLiveDashboard() {
     const playNewOrderTone = () => {
       try {
         if (window.localStorage.getItem("ruru_admin_sound_on") === "false") return;
-        const AudioCtx =
-          window.AudioContext ||
-          (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-        if (!AudioCtx) return;
-        const ctx = new AudioCtx();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.value = 720;
-        osc.type = "sine";
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.24);
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 0.24);
-        osc.onended = () => void ctx.close();
+        // 띵동 비프 대신 한국어 음성 "주문!" (미지원 브라우저는 비프 폴백)
+        speakAdmin("주문!");
       } catch {
         /* 소리 실패 시 무시 */
       }
@@ -1458,14 +1446,17 @@ export default function AdminLiveDashboard() {
                   </button>
                 );
               })}
-              <button
-                type="button"
-                onClick={() => void runIntegrityCheck()}
-                title="정합성 점검"
-                className="ml-auto mb-1 mr-1.5 rounded-lg border border-rose-line px-2.5 py-1.5 text-xs font-black text-rose-deep transition hover:bg-rose-soft"
-              >
-                🛡️ 점검
-              </button>
+              <div className="ml-auto mb-1 mr-1.5 flex items-center gap-2">
+                <AdminSoundControl />
+                <button
+                  type="button"
+                  onClick={() => void runIntegrityCheck()}
+                  title="정합성 점검"
+                  className="rounded-lg border border-rose-line px-2.5 py-1.5 text-xs font-black text-rose-deep transition hover:bg-rose-soft"
+                >
+                  🛡️ 점검
+                </button>
+              </div>
             </div>
 
             {/* 목업 B 2-col: 왼쪽 주문 테이블 / 오른쪽 380px 주문상세 사이드 패널(닉네임 클릭 시 슬라이드인) */}

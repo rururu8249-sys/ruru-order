@@ -1,6 +1,7 @@
 "use client";
 
 import { showAdminToast } from "@/lib/adminToast";
+import { speakAdmin } from "@/lib/adminVoice";
 import { useEffect, useMemo, useRef, useState } from "react";
 import LiveOpsOrderCopyModal, {
   ORDER_COPY_DONE_STORAGE_KEY,
@@ -159,33 +160,6 @@ function timeAgo(value: string) {
   return `${hour}시간 전`;
 }
 
-function playTone(type: "order" | "auto_paid") {
-  if (typeof window === "undefined") return;
-
-  const AudioContextClass =
-    window.AudioContext ||
-    (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-
-  if (!AudioContextClass) return;
-
-  const context = new AudioContextClass();
-  const oscillator = context.createOscillator();
-  const gain = context.createGain();
-
-  oscillator.type = "sine";
-  oscillator.frequency.value = type === "order" ? 720 : 980;
-  gain.gain.value = 0.09;
-
-  oscillator.connect(gain);
-  gain.connect(context.destination);
-
-  oscillator.start();
-  oscillator.stop(context.currentTime + 0.24);
-
-  oscillator.onended = () => {
-    void context.close();
-  };
-}
 
 export default function LiveOpsStatusBox() {
   const [soundOn, setSoundOn] = useState(() => {
@@ -363,7 +337,7 @@ export default function LiveOpsStatusBox() {
           if (soundOn) {
             // 새 주문 소리는 realtime 구독(AdminLiveDashboard)에서 즉시 전담. 여기선 입금확인만.
             const hasPaid = newAutoPaidNotices.length > 0;
-            if (hasPaid) playTone("auto_paid");
+            if (hasPaid) speakAdmin("입금!"); // 띵동 대신 한국어 음성
           }
         }
 
