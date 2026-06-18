@@ -104,6 +104,7 @@ export default function AdminLiveMissionPanel() {
   const [payout, setPayout] = useState<{ count: number; reward: number; total: number; alreadyPaid: boolean; broadcastTitle: string; buyers: Buyer[] } | null>(null);
   const [payMsg, setPayMsg] = useState("");
   const [executing, setExecuting] = useState(false);
+  const [ending, setEnding] = useState(false);
   const [result, setResult] = useState<{ successList: { nickname: string; amount: number }[]; failed: { label: string; reason: string }[]; reward: number } | null>(null);
 
   const openPayout = async () => {
@@ -145,6 +146,36 @@ export default function AdminLiveMissionPanel() {
       setExecuting(false);
     }
   };
+
+  // 이벤트 종료: 미션 끄기(active=false 저장 → 위젯 숨김) + 지급 버튼 열림
+  const endEvent = async () => {
+    if (ending) return;
+    if (!window.confirm("이벤트를 종료할까요?\n\n· 방송 위젯이 꺼집니다(숨김)\n· '구매자 전원 지급' 버튼이 열립니다\n(지급은 방송이 켜져 있는 동안 해주세요)")) return;
+    setEnding(true);
+    setMsg("");
+    try {
+      const res = await fetch("/api/admin-live/mission", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: false, goalType, goalValue, rewardAmount, title }),
+      });
+      const j = await res.json();
+      if (j.ok) {
+        setActive(false);
+        setSavedSnap(snapOf(false, goalType, goalValue, rewardAmount, title));
+        setMsg("이벤트 종료됨 — 위젯 숨김, 지급 버튼이 열렸어요.");
+        load();
+      } else {
+        setMsg("종료 실패: " + (j.message || ""));
+      }
+    } catch (e) {
+      setMsg("종료 실패: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setEnding(false);
+    }
+  };
+  // 지급은 이벤트 종료(미션 OFF = 서버 저장값 기준) 후에만 열림
+  const payoutUnlocked = !!prog && !prog.active;
 
   const goal = Number(String(goalValue).replace(/[^0-9.]/g, "")) || 0;
   const dirty = savedSnap !== null && savedSnap !== snapOf(active, goalType, goalValue, rewardAmount, title);
@@ -250,9 +281,40 @@ export default function AdminLiveMissionPanel() {
       <div style={{ marginTop: 18, borderTop: "1px solid #E3CDD5", paddingTop: 14 }}>
         <span style={labelStyle}>목표 달성 시 — 구매자 전원 포인트 지급</span>
         <div style={{ fontSize: 12, color: "#999", marginBottom: 8 }}>현재 방송의 <b>결제완료 구매자 전원</b>에게 1인당 포인트를 한 번에 지급해요. 같은 방송은 한 번만 지급(중복 방지).</div>
-        <button type="button" onClick={openPayout} disabled={paying} style={{ width: "100%", padding: "12px", borderRadius: 12, border: "2px solid #0F6E56", background: "#fff", color: "#0F6E56", fontWeight: 800, fontSize: 15, cursor: "pointer", opacity: paying ? 0.6 : 1 }}>
+
+        {prog?.active ? (
+          <button
+            type="button"
+            onClick={endEvent}
+            disabled={ending}
+            style={{ width: "100%", padding: "11px", borderRadius: 12, border: "2px solid #C0392B", background: "#fff", color: "#C0392B", fontWeight: 800, fontSize: 14, cursor: "pointer", marginBottom: 8, opacity: ending ? 0.6 : 1 }}
+          >
+            {ending ? "종료 중…" : "🛑 이벤트 종료 (위젯 끄고 지급 열기)"}
+          </button>
+        ) : null}
+
+        <button
+          type="button"
+          onClick={openPayout}
+          disabled={paying || !payoutUnlocked}
+          style={{
+            width: "100%",
+            padding: "12px",
+            borderRadius: 12,
+            border: "2px solid " + (payoutUnlocked ? "#0F6E56" : "#D9C5CC"),
+            background: payoutUnlocked ? "#fff" : "#F1EFE8",
+            color: payoutUnlocked ? "#0F6E56" : "#aaa",
+            fontWeight: 800,
+            fontSize: 15,
+            cursor: payoutUnlocked ? "pointer" : "not-allowed",
+            opacity: paying ? 0.6 : 1,
+          }}
+        >
           🎁 구매자 전원에게 지급하기
         </button>
+        {!payoutUnlocked ? (
+          <div style={{ fontSize: 12, color: "#B68", marginTop: 6 }}>※ 위 “🛑 이벤트 종료”를 누르면 지급 버튼이 열려요.</div>
+        ) : null}
         {payMsg ? <div style={{ fontSize: 13, marginTop: 8, fontWeight: 700, color: payMsg.includes("실패") && !payMsg.includes("성공") ? "#C0392B" : "#0F6E56" }}>{payMsg}</div> : null}
       </div>
 
