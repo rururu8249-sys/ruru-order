@@ -66,7 +66,20 @@ export default function AdminLiveSidebar({
           <div className="mt-1.5 grid grid-cols-2 gap-1.5">
             <button
               type="button"
-              onClick={() => window.open("https://business.kakao.com/_RMxaqX/chats?t_src=business_partnercenter&t_ch=lnb&t_obj=%EB%82%B4%EC%B1%84%ED%8C%85_%ED%81%B4%EB%A6%AD", "ruruKakaoConsult", "popup=yes,width=1200,height=860")}
+              onClick={() => {
+                const aw = window.screen.availWidth || 1600;
+                const ah = window.screen.availHeight || 1000;
+                const W = Math.min(1700, Math.round(aw * 0.92));
+                const H = Math.min(1050, Math.round(ah * 0.92));
+                const left = Math.max(0, Math.round((aw - W) / 2));
+                const top = Math.max(0, Math.round((ah - H) / 2));
+                const w = window.open(
+                  "https://business.kakao.com/_RMxaqX/chats?t_src=business_partnercenter&t_ch=lnb&t_obj=%EB%82%B4%EC%B1%84%ED%8C%85_%ED%81%B4%EB%A6%AD",
+                  "ruruKakaoConsult",
+                  `popup=yes,width=${W},height=${H},left=${left},top=${top}`
+                );
+                if (w) { try { w.resizeTo(W, H); w.moveTo(left, top); w.focus(); } catch { /* 무시 */ } }
+              }}
               className="flex h-10 items-center justify-center gap-1 rounded-xl border border-rose-line bg-rose-soft text-xs font-black text-rose-deep transition hover:bg-rose-soft active:scale-[0.98]"
             >
               <span>💬</span>
