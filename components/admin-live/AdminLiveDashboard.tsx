@@ -17,7 +17,7 @@ const clearLiveOrderAutoRefreshInterval = (intervalId: number | null) => {
 
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
-import { speakAdmin } from "@/lib/adminVoice";
+import { speakAdmin, primeAdminVoice } from "@/lib/adminVoice";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import ManualPaymentMatchDrawer from "@/components/admin-v2/payment/ManualPaymentMatchDrawer";
@@ -823,6 +823,17 @@ export default function AdminLiveDashboard() {
     void loadOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.broadcast, filters.date]);
+
+  // 브라우저 음성 잠금 해제: 첫 사용자 클릭/키 입력 때 1회 무음 워밍업 → 이후 자동 알림 음성이 막히지 않음.
+  useEffect(() => {
+    const prime = () => primeAdminVoice();
+    window.addEventListener("pointerdown", prime, { once: true });
+    window.addEventListener("keydown", prime, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", prime);
+      window.removeEventListener("keydown", prime);
+    };
+  }, []);
 
   // 실시간 주문 반영: orders INSERT/UPDATE 발생 시 주문목록을 재조회(디바운스 600ms로 연속 변경 묶음).
   // INSERT 시 즉시 알림 소리(720Hz beep). UPDATE는 소리 없이 재조회만.

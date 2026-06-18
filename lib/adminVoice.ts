@@ -56,6 +56,27 @@ function beepFallback() {
   }
 }
 
+// 브라우저 음성 잠금 해제용 — 사용자 제스처(클릭/키) 안에서 1회 무음 재생.
+//   - 이걸 호출해두면 이후 자동 알림(주문!/입금!) 음성이 정책에 막히지 않는다.
+export function primeAdminVoice() {
+  if (typeof window === "undefined") return;
+  try {
+    const synth = window.speechSynthesis;
+    if (synth && typeof SpeechSynthesisUtterance !== "undefined") {
+      try {
+        synth.resume();
+      } catch {
+        /* 무시 */
+      }
+      const u = new SpeechSynthesisUtterance(" ");
+      u.volume = 0;
+      synth.speak(u);
+    }
+  } catch {
+    /* 무시 */
+  }
+}
+
 export function speakAdmin(text: string) {
   if (typeof window === "undefined") return;
   try {
