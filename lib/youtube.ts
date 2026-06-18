@@ -226,25 +226,37 @@ export async function postLiveChatMessage(messageText: string, opts?: { forceEve
       });
     };
 
+    const readErr = async (r: Response) => {
+      const raw = await r.text().catch(() => "");
+      let j: any = {};
+      try { j = JSON.parse(raw); } catch { /* non-json */ }
+      return {
+        status: r.status,
+        reason: String(j?.error?.errors?.[0]?.reason || j?.error?.status || ""),
+        message: String(j?.error?.message || ""),
+        raw,
+      };
+    };
+
     let res = await postOnce(liveChatId);
     if (!res.ok) {
-      // 캐시된 chatId가 만료(이전 방송)일 수 있음 → 캐시 비우고 1회 재조회 후 재시도
-      const errJson: any = await res.json().catch(() => ({}));
-      const reason = errJson?.error?.errors?.[0]?.reason || errJson?.error?.status || res.status;
-      if (String(reason).includes("liveChatNotFound") || String(reason).includes("liveChatEnded") || res.status === 404 || res.status === 403) {
+      const e1 = await readErr(res);
+      console.error("[youtube] insert#1 fail", { status: e1.status, reason: e1.reason, message: e1.message, chatLen: liveChatId.length, raw: e1.raw.slice(0, 300) });
+      if (e1.reason.includes("liveChatNotFound") || e1.reason.includes("liveChatEnded") || e1.status === 404 || e1.status === 403) {
+        // 캐시된 chatId가 만료(이전 방송)일 수 있음 → 캐시 비우고 1회 재조회 후 재시도
         await writeSetting(sb, SETTING_LIVE_CHAT_ID, "");
         liveChatId = await resolveLiveChatId(sb, accessToken);
-        if (!liveChatId) return { ok: false, skipped: true, reason: "활성 라이브 채팅 없음" };
+        if (!liveChatId) return { ok: false, reason: "활성 라이브 채팅 없음(재조회 실패)" };
         res = await postOnce(liveChatId);
         if (!res.ok) {
-          const raw = await res.text().catch(() => "");
-          let e2: any = {};
-          try { e2 = JSON.parse(raw); } catch { /* non-json */ }
-          const r2 = e2?.error?.errors?.[0]?.reason || e2?.error?.message || `${res.status} ${raw.slice(0, 140)}`;
-          return { ok: false, reason: "발송 실패: " + r2 };
+          const e2 = await readErr(res);
+          console.error("[youtube] insert#2 fail", { status: e2.status, reason: e2.reason, message: e2.message, chatLen: liveChatId.length, raw: e2.raw.slice(0, 300) });
+          const detail = e2.reason || e2.message || (e2.raw ? e2.raw.slice(0, 120) : "(빈 응답)");
+          return { ok: false, reason: `발송실패 status=${e2.status} chat=${liveChatId.length > 0 ? "O" : "X"} ${detail}` };
         }
       } else {
-        return { ok: false, reason: "발송 실패: " + (errJson?.error?.message || errJson?.error?.errors?.[0]?.reason || reason) };
+        const detail = e1.message || e1.reason || (e1.raw ? e1.raw.slice(0, 120) : "(빈 응답)");
+        return { ok: false, reason: `발송실패 status=${e1.status} ${detail}` };
       }
     }
     return { ok: true };
