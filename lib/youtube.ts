@@ -120,19 +120,34 @@ export async function getYoutubeDiag(): Promise<Record<string, unknown>> {
     } catch (e) {
       channel = { ex: e instanceof Error ? e.message : String(e) };
     }
-    let ownerActiveChatId = "(없음)";
+    const liveUrl = await readActiveBroadcastLiveUrl(sb);
+    const videoId = extractVideoId(liveUrl);
+    // 소유자 경로(liveBroadcasts.list?id=) chatId
+    let idChatId = "(없음)";
+    // 비소유자 경로(videos.list activeLiveChatId) chatId — 봇 계정이 쓰는 값
+    let videosChatId = "(없음)";
     try {
-      const r = await fetch(
-        "https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet&broadcastStatus=active&broadcastType=all&maxResults=1",
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      const j: any = await r.json().catch(() => ({}));
-      const c = String(j?.items?.[0]?.snippet?.liveChatId || "");
-      ownerActiveChatId = c ? c.slice(0, 14) + "…" : "(없음)";
+      if (videoId) {
+        const r = await fetch(
+          `https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet&id=${encodeURIComponent(videoId)}`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        const j: any = await r.json().catch(() => ({}));
+        const c = String(j?.items?.[0]?.snippet?.liveChatId || "");
+        idChatId = c ? c.slice(0, 14) + "…" : `(없음·items=${Array.isArray(j?.items) ? j.items.length : 0}${j?.error?.message ? "·" + j.error.message : ""})`;
+
+        const r2 = await fetch(
+          `https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=${encodeURIComponent(videoId)}`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        const j2: any = await r2.json().catch(() => ({}));
+        const c2 = String(j2?.items?.[0]?.liveStreamingDetails?.activeLiveChatId || "");
+        videosChatId = c2 ? c2.slice(0, 14) + "…" : `(없음·items=${Array.isArray(j2?.items) ? j2.items.length : 0}${j2?.error?.message ? "·" + j2.error.message : ""})`;
+      }
     } catch {
       /* 무시 */
     }
-    return { connected: true, channel, ownerActiveChatId };
+    return { connected: true, channel, videoId, idChatId, videosChatId };
   } catch (e) {
     return { err: e instanceof Error ? e.message : String(e) };
   }
@@ -207,8 +222,27 @@ export function extractVideoId(input: string): string {
 
 // ---- 활성 라이브 채팅 ID 조회(캐시) ----
 async function resolveLiveChatId(sb: SupabaseClient, accessToken: string): Promise<string> {
-  // 0) 봇이 "방송 소유자" 계정이면: liveBroadcasts.list로 지금 라이브의 정확한 chatId를 직접 조회.
-  //    (videos.list activeLiveChatId 는 비소유자에겐 재시작 등으로 stale → 404 Not Found 유발하므로 소유자 경로 우선)
+  // 현재 방송(메인 컨트롤타워)의 라이브 URL → videoId
+  const liveUrl = await readActiveBroadcastLiveUrl(sb);
+  const videoId = extractVideoId(liveUrl);
+
+  // 0) 소유자 + 지금 그 영상(videoId)의 broadcast를 콕 집어 정확한 chatId 조회(가장 정확).
+  //    broadcastStatus=active 는 예전 'Stream now' 기본방송 등 엉뚱한 활성방송을 잡아 404 유발 → id로 특정.
+  if (videoId) {
+    try {
+      const r = await fetch(
+        `https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet&id=${encodeURIComponent(videoId)}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      const j: any = await r.json().catch(() => ({}));
+      const c = String(j?.items?.[0]?.snippet?.liveChatId || "").trim();
+      if (c) return c;
+    } catch {
+      /* 폴백 진행 */
+    }
+  }
+
+  // 1) 폴백: 소유자 활성 방송(첫 번째)
   try {
     const ownRes = await fetch(
       "https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet&broadcastStatus=active&broadcastType=all&maxResults=1",
@@ -221,9 +255,7 @@ async function resolveLiveChatId(sb: SupabaseClient, accessToken: string): Promi
     /* 비소유자/실패 → 아래 videos.list 폴백 */
   }
 
-  // 현재 방송(메인 컨트롤타워)의 라이브 URL → videoId
-  const liveUrl = await readActiveBroadcastLiveUrl(sb);
-  const videoId = extractVideoId(liveUrl);
+  // 2) 폴백: videos.list activeLiveChatId(비소유자용)
   if (!videoId) return "";
 
   // 캐시: 같은 영상이면 재사용, 방송(영상)이 바뀌면 자동으로 다시 조회
