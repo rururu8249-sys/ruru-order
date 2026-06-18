@@ -62,7 +62,7 @@ export default function KakaoStartPage() {
       client_id: restApiKey,
       redirect_uri: redirectUri,
       response_type: "code",
-      scope: "profile_nickname,phone_number,shipping_address",
+      scope: "profile_nickname,profile_image,phone_number,shipping_address",
     });
 
     window.location.href = `https://kauth.kakao.com/oauth/authorize?${params.toString()}`;
