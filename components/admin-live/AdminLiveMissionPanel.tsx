@@ -252,11 +252,11 @@ export default function AdminLiveMissionPanel() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div>
             <span style={labelStyle}>목표 {goalType === "amount" ? "금액(원)" : "개수"}</span>
-            <input style={inputStyle} inputMode="numeric" value={goalValue} onChange={(e) => setGoalValue(e.target.value)} placeholder={goalType === "amount" ? "예: 5000000" : "예: 100"} />
+            <input style={inputStyle} inputMode="numeric" value={goalValue ? won(Number(goalValue)) : ""} onChange={(e) => setGoalValue(e.target.value.replace(/[^0-9]/g, ""))} placeholder={goalType === "amount" ? "예: 5,000,000" : "예: 100"} />
           </div>
           <div>
             <span style={labelStyle}>구매자 1인당 포인트</span>
-            <input style={inputStyle} inputMode="numeric" value={rewardAmount} onChange={(e) => setRewardAmount(e.target.value)} placeholder="예: 1000" />
+            <input style={inputStyle} inputMode="numeric" value={rewardAmount ? won(Number(rewardAmount)) : ""} onChange={(e) => setRewardAmount(e.target.value.replace(/[^0-9]/g, ""))} placeholder="예: 1,000" />
           </div>
         </div>
 

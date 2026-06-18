@@ -469,10 +469,10 @@ export default function AdminLiveCustomerPointPanel({ customer }: { customer: Po
                   {signedMoney(item.amount)}
                 </div>
                 <div className="min-w-0">
-                  <div className="truncate font-bold text-slate-700">
+                  <div className="font-bold text-slate-700 break-words">
                     처리 후 {money(item.balance_after)}
                   </div>
-                  <div className="mt-1 truncate text-xs font-bold text-slate-400">
+                  <div className="mt-1 text-xs font-bold text-slate-400 break-words">
                     {item.reason || item.admin_memo || "사유 없음"}
                   </div>
                 </div>
