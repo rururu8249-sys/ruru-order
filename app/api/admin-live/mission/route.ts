@@ -47,7 +47,25 @@ export async function POST(request: NextRequest) {
       const range = String(b.range ?? "broadcast");
       const fromIso = range === "recent" ? new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString() : broadcastStartedAt;
       const hist = await fetchMissionPayoutHistory(supabase, fromIso);
-      // 닉네임 우선순위: ledger 저장값 → 이 방송 주문 매핑 → 번호 뒤4자리.
+
+      // 닉네임 보강: ledger·이방송 buyers에 없는 전화번호는 orders에서 직접 조회(과거 지급분 이름 복구).
+      const needPhones = [
+        ...new Set(hist.map((h) => h.phone).filter((p) => p && !nameMap.has(p))),
+      ].slice(0, 500);
+      if (needPhones.length) {
+        const { data: oRows } = await supabase
+          .from("orders")
+          .select("customer_phone,youtube_nickname,customer_name,created_at")
+          .in("customer_phone", needPhones)
+          .order("created_at", { ascending: false });
+        for (const r of (Array.isArray(oRows) ? oRows : []) as Record<string, unknown>[]) {
+          const p = String(r.customer_phone ?? "").replace(/[^0-9]/g, "");
+          const nk = String(r.youtube_nickname || r.customer_name || "").trim();
+          if (p && nk && !nameMap.has(p)) nameMap.set(p, nk);
+        }
+      }
+
+      // 닉네임 우선순위: ledger 저장값 → 주문 매핑(이 방송/전체) → 번호 뒤4자리.
       const payouts = hist.map((h) => ({
         nickname: h.nickname || nameMap.get(h.phone) || (h.phone ? "…" + h.phone.slice(-4) : "고객"),
         amount: h.amount,
