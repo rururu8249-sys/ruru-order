@@ -238,7 +238,8 @@ export async function postLiveChatMessage(messageText: string, opts?: { forceEve
         res = await postOnce(liveChatId);
         if (!res.ok) {
           const e2: any = await res.json().catch(() => ({}));
-          return { ok: false, reason: "발송 실패: " + (e2?.error?.message || res.status) };
+          const r2 = e2?.error?.errors?.[0]?.reason || e2?.error?.message || res.status;
+          return { ok: false, reason: "발송 실패: " + r2 };
         }
       } else {
         return { ok: false, reason: "발송 실패: " + (errJson?.error?.message || reason) };
