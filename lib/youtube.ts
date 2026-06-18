@@ -237,12 +237,14 @@ export async function postLiveChatMessage(messageText: string, opts?: { forceEve
         if (!liveChatId) return { ok: false, skipped: true, reason: "활성 라이브 채팅 없음" };
         res = await postOnce(liveChatId);
         if (!res.ok) {
-          const e2: any = await res.json().catch(() => ({}));
-          const r2 = e2?.error?.errors?.[0]?.reason || e2?.error?.message || res.status;
+          const raw = await res.text().catch(() => "");
+          let e2: any = {};
+          try { e2 = JSON.parse(raw); } catch { /* non-json */ }
+          const r2 = e2?.error?.errors?.[0]?.reason || e2?.error?.message || `${res.status} ${raw.slice(0, 140)}`;
           return { ok: false, reason: "발송 실패: " + r2 };
         }
       } else {
-        return { ok: false, reason: "발송 실패: " + (errJson?.error?.message || reason) };
+        return { ok: false, reason: "발송 실패: " + (errJson?.error?.message || errJson?.error?.errors?.[0]?.reason || reason) };
       }
     }
     return { ok: true };
