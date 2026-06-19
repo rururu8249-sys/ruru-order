@@ -667,7 +667,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               <div className="rounded-lg bg-warn-bg px-2.5 py-1.5 text-[10px] font-bold leading-4 text-warn-tx">상품명·옵션·금액은 아래 상품 카드에서 수정합니다. 여기선 고객·주소·메모만 저장됩니다(배송비/합계 미변경).</div>
             </div>
           ) : (
-            <div className="whitespace-pre-wrap break-keep rounded-lg bg-rose-soft px-3 py-2 text-[12px] font-bold leading-5 text-rose-deep">
+            <div className="whitespace-pre-wrap break-keep rounded-lg border border-line bg-surface-2 px-3 py-2 text-[12px] font-bold leading-5 text-ink">
               {customerAddressText || "주소 정보 없음"}
             </div>
           )}
@@ -760,7 +760,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 
           {showAddForm && !isCanceled ? (
             <div className="mt-2 space-y-2 rounded-2xl border border-rose-line bg-rose-soft/50 p-3">
-              <div className="text-[11px] font-black text-rose-deep">직접입력 상품 추가 (재고 차감 없음)</div>
+              <div className="text-[11px] font-black text-ink-soft">직접입력 상품 추가 (재고 차감 없음)</div>
               <input
                 value={addForm.productName}
                 onChange={(e) => setAddForm((f) => ({ ...f, productName: e.target.value }))}
@@ -829,7 +829,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           ) : null}
           <div className="mt-1 flex items-center justify-between border-t border-line pt-2 text-[14px] font-black">
             <span className="text-ink">{pointUsedAmount > 0 ? "최종 결제금액" : "총 결제금액"}</span>
-            <span className="text-rose-deep">{money(pointUsedAmount > 0 ? finalPaymentAmount : cardPaymentExpectedTotal)}</span>
+            <span className="text-ink">{money(pointUsedAmount > 0 ? finalPaymentAmount : cardPaymentExpectedTotal)}</span>
           </div>
         </div>
 
@@ -955,7 +955,7 @@ function Info({ label, value, strong = false }: { label: string; value: string; 
   return (
     <div className="min-w-0">
       <div className="text-[11px] font-black text-ink-mute">{label}</div>
-      <div className={["mt-0.5 truncate text-sm font-black", strong ? "text-rose-deep" : "text-ink"].join(" ")}>
+      <div className={["mt-0.5 truncate text-sm text-ink", strong ? "font-black" : "font-bold"].join(" ")}>
         {value}
       </div>
     </div>

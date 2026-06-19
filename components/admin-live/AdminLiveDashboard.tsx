@@ -2154,7 +2154,7 @@ export default function AdminLiveDashboard() {
                         <div className="shrink-0 border-b border-line px-6 py-4">
                           <div className="flex items-start justify-between gap-4">
                             <div>
-                              <div className="text-[10px] font-black tracking-[0.34em] text-rose-deep">
+                              <div className="text-[10px] font-black tracking-[0.34em] text-ink-mute">
                                 {quickModalCustomerDetail ? "CUSTOMER DETAIL" : "QUICK MODAL"}
                               </div>
                               <h2 className="mt-1 text-2xl font-black tracking-tight text-ink">{modalTitle}</h2>
@@ -2171,7 +2171,7 @@ export default function AdminLiveDashboard() {
                               <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="min-w-0">
-                                    <div className="text-[10px] font-black tracking-[0.3em] text-rose-deep">CUSTOMER DETAIL</div>
+                                    <div className="text-[10px] font-black tracking-[0.3em] text-ink-mute">CUSTOMER DETAIL</div>
                                     <h3 className="mt-2 text-3xl font-black text-ink">{quickModalCustomerDetail.nickname}</h3>
                                     <p className="mt-2 text-sm font-black text-ink-soft">
                                       {quickModalCustomerDetail.name || "이름 확인 필요"} · {quickModalCustomerDetail.phone || "전화번호 확인 필요"}
@@ -2212,7 +2212,7 @@ export default function AdminLiveDashboard() {
                                 </div>
                                 <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
                                   <div className="text-xs font-black text-ink-soft">누적구매금액</div>
-                                  <div className="mt-2 text-3xl font-black text-rose-deep">{money(customerDetailAmount)}</div>
+                                  <div className="mt-2 text-3xl font-black text-ink">{money(customerDetailAmount)}</div>
                                   <div className="mt-2 text-xs font-bold text-ink-mute">취소 주문 제외 표시</div>
                                 </div>
                                 <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
@@ -2385,8 +2385,8 @@ export default function AdminLiveDashboard() {
                                       <div className="mt-2 text-3xl font-black text-ink">{orderRows.length}건</div>
                                     </div>
                                     <div className="rounded-2xl border border-rose-line bg-surface p-4 shadow-sm">
-                                      <div className="text-xs font-black text-rose-deep">해당기간 주문금액</div>
-                                      <div className="mt-2 text-3xl font-black text-rose-deep">{money(activePeriodOrderAmount)}</div>
+                                      <div className="text-xs font-black text-ink-soft">해당기간 주문금액</div>
+                                      <div className="mt-2 text-3xl font-black text-ink">{money(activePeriodOrderAmount)}</div>
                                     </div>
                                     <div className="rounded-2xl border border-danger-tx bg-surface p-4 shadow-sm">
                                       <div className="text-xs font-black text-red-500">입금대기</div>
@@ -2465,8 +2465,8 @@ export default function AdminLiveDashboard() {
                                       <div className="mt-2 text-3xl font-black text-ink">{depositRows.length}건</div>
                                     </div>
                                     <div className="rounded-2xl border border-rose-line bg-surface p-4 shadow-sm">
-                                      <div className="text-xs font-black text-rose-deep">매칭 대상 주문</div>
-                                      <div className="mt-2 text-3xl font-black text-rose-deep">{unpaidOrders.length}건</div>
+                                      <div className="text-xs font-black text-ink-soft">매칭 대상 주문</div>
+                                      <div className="mt-2 text-3xl font-black text-ink">{unpaidOrders.length}건</div>
                                     </div>
                                     <div className="rounded-2xl border border-emerald-100 bg-surface p-4 shadow-sm">
                                       <div className="text-xs font-black text-emerald-500">최근 입금 합계</div>
@@ -2508,8 +2508,8 @@ export default function AdminLiveDashboard() {
                                       <div className="mt-2 text-3xl font-black text-ink">{customerRows.length}명</div>
                                     </div>
                                     <div className="rounded-2xl border border-rose-line bg-surface p-4 shadow-sm">
-                                      <div className="text-xs font-black text-rose-deep">현재 주문 기준</div>
-                                      <div className="mt-2 text-3xl font-black text-rose-deep">{modalAllOrders.length}건</div>
+                                      <div className="text-xs font-black text-ink-soft">현재 주문 기준</div>
+                                      <div className="mt-2 text-3xl font-black text-ink">{modalAllOrders.length}건</div>
                                     </div>
                                     <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
                                       <div className="text-xs font-black text-ink-soft">고객상세</div>
@@ -2557,8 +2557,8 @@ export default function AdminLiveDashboard() {
                                       <div className="mt-2 text-3xl font-black text-ink">{modalAllOrders.length}건</div>
                                     </div>
                                     <div className="rounded-2xl border border-rose-line bg-surface p-4 shadow-sm">
-                                      <div className="text-xs font-black text-rose-deep">주문 총액</div>
-                                      <div className="mt-2 text-2xl font-black text-rose-deep">{money(totalOrderAmount)}</div>
+                                      <div className="text-xs font-black text-ink-soft">주문 총액</div>
+                                      <div className="mt-2 text-2xl font-black text-ink">{money(totalOrderAmount)}</div>
                                     </div>
                                     <div className="rounded-2xl border border-emerald-100 bg-surface p-4 shadow-sm">
                                       <div className="text-xs font-black text-emerald-500">결제완료 매출</div>

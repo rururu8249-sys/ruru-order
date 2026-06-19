@@ -249,7 +249,7 @@ export default function AdminLiveMissionPanel() {
     fontSize: 14,
     outline: "none",
   };
-  const labelStyle: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: "var(--color-rose-deep)", marginBottom: 5, display: "block" };
+  const labelStyle: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: "var(--color-ink-soft)", marginBottom: 5, display: "block" };
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", padding: "4px 2px" }}>

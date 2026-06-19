@@ -447,7 +447,7 @@ function CustomerDetailDrawer({
       >
         {/* 헤더 */}
         <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid var(--color-line)", padding: "14px 18px" }}>
-          <span style={{ fontSize: "15px", fontWeight: 800, color: "var(--color-rose-deep)" }}>👤 회원 상세</span>
+          <span style={{ fontSize: "15px", fontWeight: 800, color: "var(--color-ink)" }}>👤 회원 상세</span>
           <button type="button" onClick={onClose} style={{ marginLeft: "auto", width: "27px", height: "27px", border: "none", background: "none", color: "#999", fontSize: "18px", cursor: "pointer" }}>✕</button>
         </div>
 
@@ -486,7 +486,7 @@ function CustomerDetailDrawer({
           {/* 등록 배송지 (고객이 등록한 customers.shipping_addresses 배열 — 읽기 전용) */}
           {Array.isArray(profile?.shipping_addresses) && profile.shipping_addresses.length > 0 ? (
             <div style={{ marginBottom: "14px" }}>
-              <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)", marginBottom: "8px" }}>📦 등록 배송지 ({profile.shipping_addresses.length}건)</div>
+              <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "8px" }}>📦 등록 배송지 ({profile.shipping_addresses.length}건)</div>
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {[...profile.shipping_addresses]
                   .sort((a, b) => (b?.isDefault ? 1 : 0) - (a?.isDefault ? 1 : 0))
@@ -529,7 +529,7 @@ function CustomerDetailDrawer({
 
           {/* 주문 이력 */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-            <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)" }}>주문 이력</span>
+            <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>주문 이력</span>
             <span style={{ fontSize: "11px", fontWeight: 700, color: "#999" }}>{safePage} / {totalPages}</span>
           </div>
           {visibleOrders.length === 0 ? (
@@ -562,19 +562,19 @@ function CustomerDetailDrawer({
           {/* 정보 변경 이력 */}
           {profile?.customer_history && profile.customer_history.length > 0 ? (
             <div style={{ marginTop: "16px" }}>
-              <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)", marginBottom: "8px" }}>정보 변경 이력</div>
+              <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "8px" }}>정보 변경 이력</div>
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {[...profile.customer_history]
                   .sort((a, b) => String(b.changed_at).localeCompare(String(a.changed_at)))
                   .map((h, index) => (
                     <div key={`${h.field}-${h.changed_at}-${index}`} style={{ border: "1px solid var(--color-line)", borderRadius: "9px", padding: "8px 11px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px" }}>
-                        <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{h.field}</span>
+                        <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)" }}>{h.field}</span>
                         <span style={{ marginLeft: "auto", fontSize: "10px", color: "#999" }}>{formatOrderDateTime(h.changed_at)}</span>
                       </div>
                       <div style={{ fontSize: "11px", color: "#666" }}>
                         <span style={{ color: "#999" }}>{h.old_value || "(없음)"}</span>
-                        <span style={{ margin: "0 5px", color: "var(--color-rose-deep)", fontWeight: 800 }}>→</span>
+                        <span style={{ margin: "0 5px", color: "var(--color-ink-mute)", fontWeight: 800 }}>→</span>
                         <span style={{ color: "#222", fontWeight: 700 }}>{h.new_value || "(없음)"}</span>
                       </div>
                     </div>
@@ -1130,7 +1130,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
         </div>
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-5 space-y-4">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-rose-soft/40 px-4 py-2.5 text-[12px] font-black text-ink-soft">
-            <span>전체 <span className="text-rose-deep">{customers.length.toLocaleString("ko-KR")}</span></span>
+            <span>전체 <span className="text-ink">{customers.length.toLocaleString("ko-KR")}</span></span>
             <span className="text-ink-mute">·</span>
             <span>정상 <span className="text-ok-tx">{normalCustomers.length.toLocaleString("ko-KR")}</span></span>
             <span className="text-ink-mute">·</span>
@@ -1349,7 +1349,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
           {bulkOpen ? (
             <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4" onClick={() => !bulkRunning && setBulkOpen(false)}>
               <div className="w-[min(460px,94vw)] rounded-2xl bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                <div className="mb-1 text-[16px] font-black text-rose-deep">🪙 포인트 일괄지급</div>
+                <div className="mb-1 text-[16px] font-black text-ink">🪙 포인트 일괄지급</div>
                 <div className="mb-2 text-xs font-bold text-ink-soft">선택한 {selectedPhones.size}명에게 같은 금액을 지급합니다.</div>
 
                 {/* 받는 사람 목록 */}
