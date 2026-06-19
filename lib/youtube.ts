@@ -277,6 +277,34 @@ export type PostResult = { ok: boolean; skipped?: boolean; reason?: string };
 
 // ---- 채팅 글 1건 작성 (핵심) ----
 // forceEvenIfDisabled: 테스트 발송은 ON/OFF 무시하고 보냄.
+// ---- 라이브 통계: 동시 시청자 수 + 좋아요 수 (공개 데이터) ----
+//   현재 방송(컨트롤타워 ON)의 영상 id를 서버에서 풀고, videos.list로 concurrentViewers/likeCount 조회.
+//   봇 토큰(refresh) 재사용. 읽기 전용, 돈/주문 로직 무관.
+export async function fetchYoutubeLiveStats(): Promise<{ concurrentViewers: number | null; likeCount: number | null; live: boolean }> {
+  const empty = { concurrentViewers: null as number | null, likeCount: null as number | null, live: false };
+  try {
+    const sb = getServiceClient();
+    const refreshToken = await readRefreshToken(sb);
+    if (!refreshToken) return empty;
+    const videoId = extractVideoId(await readActiveBroadcastLiveUrl(sb));
+    if (!videoId) return empty;
+    const accessToken = await getAccessToken(refreshToken);
+    const res = await fetch(
+      `https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails,statistics&id=${encodeURIComponent(videoId)}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const json: any = await res.json().catch(() => ({}));
+    const item = json?.items?.[0];
+    const lsd = item?.liveStreamingDetails || {};
+    const stats = item?.statistics || {};
+    const cv = lsd.concurrentViewers != null && Number.isFinite(Number(lsd.concurrentViewers)) ? Number(lsd.concurrentViewers) : null;
+    const lc = stats.likeCount != null && Number.isFinite(Number(stats.likeCount)) ? Number(stats.likeCount) : null;
+    return { concurrentViewers: cv, likeCount: lc, live: !!lsd.activeLiveChatId || cv != null };
+  } catch {
+    return empty;
+  }
+}
+
 export async function postLiveChatMessage(messageText: string, opts?: { forceEvenIfDisabled?: boolean }): Promise<PostResult> {
   try {
     const text = String(messageText || "").trim().slice(0, 200);
