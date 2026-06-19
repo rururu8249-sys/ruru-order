@@ -38,6 +38,7 @@ type Props = {
   videoRatio: VideoRatio;
   youtubeUrl?: string | null;
   activeBroadcastId?: string | number | null;
+  variant?: "row" | "column"; // row=가로 띠(기존) / column=우측 세로 컬럼(시안 2단)
 };
 
 type AdminIssueTask = {
@@ -74,7 +75,7 @@ const ISSUE_TYPES = [
   { label: "환불", taskType: "refund", className: "bg-red-100 text-red-700 border-red-200" },
   { label: "구매", taskType: "product", className: "bg-green-100 text-green-700 border-green-200" },
   { label: "진상", taskType: "complaint", className: "bg-rose-100 text-rose-700 border-rose-200" },
-  { label: "기타", taskType: "general", className: "bg-slate-100 text-slate-700 border-slate-200" },
+  { label: "기타", taskType: "general", className: "bg-surface-2 text-ink border-line" },
 ];
 
 function clean(value: unknown) {
@@ -297,14 +298,14 @@ function CustomerIssueSummaryRow({
     <button
       type="button"
       onClick={onDetail}
-      className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2 text-left hover:bg-rose-soft"
+      className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 text-left hover:bg-rose-soft"
       title="고객관리에서 자세히 보기"
     >
       <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-black text-orange-700">
         미해결
       </span>
 
-      <div className="min-w-0 truncate text-[12px] font-black text-slate-900">
+      <div className="min-w-0 truncate text-[12px] font-black text-ink">
         {displayName}
       </div>
 
@@ -322,7 +323,8 @@ function CustomerIssueSummaryRow({
   );
 }
 
-export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroadcastId }: Props) {
+export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroadcastId, variant = "row" }: Props) {
+  const isCol = variant === "column";
   const [pinnedProduct, setPinnedProduct] = useState<any | null>(null);
   const [rotationProducts, setRotationProducts] = useState<any[]>([]);
   const [liveIdx, setLiveIdx] = useState(0);
@@ -794,26 +796,26 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
   };
 
   return (
-    <section className="mb-4 flex w-full items-stretch gap-3">
-      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm h-[420px] flex flex-col" style={{ flex: "1 1 0%" }}>
+    <section className={isCol ? "flex w-full flex-col gap-3" : "mb-4 flex w-full items-stretch gap-3"}>
+      <div className={`min-w-0 rounded-2xl border border-line bg-surface p-3.5 shadow-sm flex flex-col ${isCol ? "h-[230px] w-full" : "h-[420px]"}`} style={isCol ? undefined : { flex: "1 1 0%" }}>
         <div className="mb-2 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm font-black text-slate-950">
+          <div className="flex items-center gap-2 text-sm font-black text-ink">
             방송화면
             <span
               className={[
                 "rounded-md px-2 py-0.5 text-[11px] font-black",
-                videoEmbedUrl ? "bg-emerald-600 text-white" : "bg-amber-100 text-amber-700",
+                videoEmbedUrl ? "bg-emerald-600 text-white" : "bg-warn-bg text-warn-tx",
               ].join(" ")}
             >
               {videoEmbedUrl ? "영상 연결" : "URL 대기"}
             </span>
           </div>
-          <div className="text-xs font-black text-slate-400">
+          <div className="text-xs font-black text-ink-mute">
             {videoRatio === "vertical" ? "9:16 세로" : videoRatio === "wide" ? "16:9 가로" : "자동"}
           </div>
         </div>
 
-        <div className="flex flex-1 min-h-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-100 p-1">
+        <div className="flex flex-1 min-h-0 items-center justify-center overflow-hidden rounded-2xl bg-surface-2 p-1">
           <div className={`relative overflow-hidden rounded-[1.5rem] bg-slate-950 shadow-sm ${videoSizeClass(videoRatio)}`}>
             {videoEmbedUrl ? (
               <iframe
@@ -825,10 +827,10 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
               />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-amber-100 via-stone-100 to-slate-100">
-                <div className="w-[78%] rounded-[2rem] bg-white/70 p-6 text-center shadow-sm backdrop-blur">
+                <div className="w-[78%] rounded-[2rem] bg-surface/70 p-6 text-center shadow-sm backdrop-blur">
                   <div className="text-5xl">👟</div>
-                  <div className="mt-4 text-lg font-black text-slate-900">루루동이LIVE</div>
-                  <div className="mt-2 text-xs font-bold text-slate-500">유튜브 라이브 URL을 적용하면 방송화면이 표시됩니다.</div>
+                  <div className="mt-4 text-lg font-black text-ink">루루동이LIVE</div>
+                  <div className="mt-2 text-xs font-bold text-ink-soft">유튜브 라이브 URL을 적용하면 방송화면이 표시됩니다.</div>
                 </div>
               </div>
             )}
@@ -836,25 +838,25 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
         </div>
       </div>
 
-      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm h-[420px] flex flex-col" style={{ flex: "3 1 0%" }}>
+      <div className={`min-w-0 rounded-2xl border border-line bg-surface p-3.5 shadow-sm flex flex-col ${isCol ? "h-[320px] w-full" : "h-[420px]"}`} style={isCol ? undefined : { flex: "3 1 0%" }}>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-black text-slate-950">라이브 채팅</h2>
-          <span className="text-xs font-bold text-slate-500">{chatEmbedUrl ? "채팅 연결" : "URL 대기"}</span>
+          <h2 className="text-sm font-black text-ink">라이브 채팅</h2>
+          <span className="text-xs font-bold text-ink-soft">{chatEmbedUrl ? "채팅 연결" : "URL 대기"}</span>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
+        <div className="flex-1 min-h-0 overflow-hidden rounded-2xl border border-line bg-surface-2">
           {chatEmbedUrl ? (
             <iframe
               title="YouTube live chat"
               src={chatEmbedUrl}
-              className="h-full w-full bg-white"
+              className="h-full w-full bg-surface"
             />
           ) : (
             <div className="flex h-full items-center justify-center p-6 text-center">
               <div>
                 <div className="text-4xl">💬</div>
-                <div className="mt-3 text-sm font-black text-slate-700">라이브 채팅 연결 대기</div>
-                <div className="mt-2 text-xs font-bold leading-5 text-slate-400">
+                <div className="mt-3 text-sm font-black text-ink">라이브 채팅 연결 대기</div>
+                <div className="mt-2 text-xs font-bold leading-5 text-ink-mute">
                   유튜브 라이브 URL을 입력하고 적용하면<br />
                   이 영역에 실제 채팅창이 표시됩니다.
                 </div>
@@ -864,16 +866,16 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
         </div>
       </div>
 
-      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm h-[420px] flex flex-col" style={{ flex: "1.2 1 0%" }}>
+      <div className={`min-w-0 rounded-2xl border border-line bg-surface p-3.5 shadow-sm flex flex-col ${isCol ? "h-[230px] w-full" : "h-[420px]"}`} style={isCol ? undefined : { flex: "1.2 1 0%" }}>
         {/* 헤더: 제목 + 자동순환 토글 */}
-        <div className="mb-2 flex items-center gap-2 text-sm font-black text-slate-950">
+        <div className="mb-2 flex items-center gap-2 text-sm font-black text-ink">
           지금 방송 상품
           <button
             type="button"
             onClick={toggleCycle}
             className={[
               "ml-auto rounded-lg px-2.5 py-1 text-[11px] font-black transition",
-              cycleOn ? "text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200",
+              cycleOn ? "text-white" : "bg-surface-2 text-ink-soft hover:bg-surface-3",
             ].join(" ")}
             style={cycleOn ? { background: "#7B2D43" } : undefined}
           >
@@ -884,7 +886,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
         {liveProduct ? (
           <div className="flex flex-1 min-h-0 flex-col">
             {/* 큰 카드: 지금 띄운 상품 1개 */}
-            <div className="relative flex-1 min-h-0 overflow-hidden rounded-2xl bg-slate-100">
+            <div className="relative flex-1 min-h-0 overflow-hidden rounded-2xl bg-surface-2">
               {nowProdImageOf(liveProduct) ? (
                 <img src={nowProdImageOf(liveProduct)} alt="" className="h-full w-full object-cover" />
               ) : (
@@ -917,7 +919,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
             </div>
 
             {/* 상품명/가격 */}
-            <div className="mt-2 truncate text-[14px] font-black text-slate-900">
+            <div className="mt-2 truncate text-[14px] font-black text-ink">
               {liveProduct.product_name || liveProduct.name || liveProduct.title || "상품명 없음"}
             </div>
             <div className="text-[15px] font-black text-rose-deep">
@@ -933,7 +935,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
                     type="button"
                     key={String(p?.id ?? i)}
                     onClick={() => goToLiveIdx(i)}
-                    className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border bg-slate-100"
+                    className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border bg-surface-2"
                     style={on ? { borderWidth: "2px", borderColor: "#7B2D43" } : { borderColor: "#E5E7EB" }}
                   >
                     {nowProdImageOf(p) ? (
@@ -947,7 +949,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
             </div>
           </div>
         ) : (
-          <div className="flex flex-1 min-h-0 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 text-center text-xs font-bold leading-5 text-slate-400">
+          <div className="flex flex-1 min-h-0 items-center justify-center rounded-2xl border border-dashed border-line bg-surface-2 px-4 text-center text-xs font-bold leading-5 text-ink-mute">
             상품관리에서 순환 담기 또는<br />새 상품을 등록하면 여기에 표시됩니다.
           </div>
         )}
@@ -965,7 +967,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
           <button
             type="button"
             onClick={() => window.dispatchEvent(new Event("ruru-reopen-product-manage"))}
-            className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-black text-slate-600 hover:bg-slate-50"
+            className="flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-[11px] font-black text-ink-soft hover:bg-surface-2"
           >
             관리
           </button>
@@ -973,7 +975,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
             type="button"
             onClick={copyObsWidgetUrl}
             title="OBS 위젯 주소 복사"
-            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-black text-slate-600 hover:bg-slate-50"
+            className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft hover:bg-surface-2"
           >
             🔗
           </button>
