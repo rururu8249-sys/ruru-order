@@ -419,7 +419,7 @@ function ImagePicker({
             onClick={() => inputRef.current?.click()}
             onDragOver={(event) => event.preventDefault()}
             onDrop={handleDrop}
-            style={{ width: "120px", height: "120px", border: coverImage ? "1px solid #E8E2DD" : "1.5px dashed #E8E2DD", borderRadius: "8px", background: "#F7F5F3", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px", cursor: "pointer", overflow: "hidden", color: "#888780", fontSize: "11px", textAlign: "center", padding: 0 }}
+            style={{ width: "120px", height: "120px", border: coverImage ? "1px solid #E8E2DD" : "1.5px dashed #E8E2DD", borderRadius: "8px", background: "#F7F5F3", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px", cursor: "pointer", overflow: "hidden", color: "var(--color-ink-mute)", fontSize: "11px", textAlign: "center", padding: 0 }}
           >
             {coverImage ? (
               <img src={resolveProductImageUrl(coverImage)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -448,7 +448,7 @@ function ImagePicker({
   return (
     <div className="min-w-0">
       {label ? (
-        <div style={{ fontSize: "12px", fontWeight: 500, color: "#888780", marginBottom: "6px" }}>{label}</div>
+        <div style={{ fontSize: "12px", fontWeight: 500, color: "var(--color-ink-mute)", marginBottom: "6px" }}>{label}</div>
       ) : null}
 
       <input
@@ -472,7 +472,7 @@ function ImagePicker({
                 onClick={() => inputRef.current?.click()}
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={handleDrop}
-                style={{ width: "100%", height: "100%", borderRadius: "8px", border: image ? "1px solid #E8E2DD" : "1px dashed #E8E2DD", background: "#F7F5F3", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", fontSize: "10px", color: "#888780", cursor: "pointer", overflow: "hidden", padding: 0 }}
+                style={{ width: "100%", height: "100%", borderRadius: "8px", border: image ? "1px solid #E8E2DD" : "1px dashed #E8E2DD", background: "#F7F5F3", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", fontSize: "10px", color: "var(--color-ink-mute)", cursor: "pointer", overflow: "hidden", padding: 0 }}
               >
                 {image ? (
                   <img src={resolveProductImageUrl(image)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "8px" }} />
@@ -498,7 +498,7 @@ function ImagePicker({
           );
         })}
       </div>
-      <div style={{ fontSize: "11px", color: "#888780", textAlign: "right", marginTop: "4px" }}>{value.length} / {maxFiles}</div>
+      <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", textAlign: "right", marginTop: "4px" }}>{value.length} / {maxFiles}</div>
     </div>
   );
 }
@@ -914,11 +914,11 @@ export default function QuickProductFastForm({
   };
 
   // === ruru-product-form-mockup.html 스타일 1:1 ===
-  const sectionLabel: CSSProperties = { fontSize: "12px", fontWeight: 500, color: "#888780", marginBottom: "6px" };
-  const fieldLabel: CSSProperties = { display: "block", fontSize: "12px", color: "#888780", fontWeight: 500, marginBottom: "3px" };
-  const fieldInput: CSSProperties = { width: "100%", fontSize: "13px", padding: "9px 11px", border: "1px solid #E8E2DD", borderRadius: "7px", background: "var(--color-surface)", color: "#1a1a1a", outline: "none" };
+  const sectionLabel: CSSProperties = { fontSize: "12px", fontWeight: 500, color: "var(--color-ink-mute)", marginBottom: "6px" };
+  const fieldLabel: CSSProperties = { display: "block", fontSize: "12px", color: "var(--color-ink-mute)", fontWeight: 500, marginBottom: "3px" };
+  const fieldInput: CSSProperties = { width: "100%", fontSize: "13px", padding: "9px 11px", border: "1px solid #E8E2DD", borderRadius: "7px", background: "var(--color-surface)", color: "var(--color-ink)", outline: "none" };
   const optRow: CSSProperties = { display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" };
-  const optLabel: CSSProperties = { fontSize: "13px", color: "#1a1a1a", minWidth: "36px" };
+  const optLabel: CSSProperties = { fontSize: "13px", color: "var(--color-ink)", minWidth: "36px" };
   const optInput: CSSProperties = { flex: 1, fontSize: "13px", padding: "6px 10px", border: "1px solid #E8E2DD", borderRadius: "6px", background: "var(--color-surface)", outline: "none" };
   const togglePill = (kind: "on-select" | "on-input" | "off"): CSSProperties => ({
     padding: "3px 8px",
@@ -928,10 +928,10 @@ export default function QuickProductFastForm({
     cursor: "pointer",
     border: "none",
     ...(kind === "on-select"
-      ? { background: "#E8F5F0", color: "#0F6E56" }
+      ? { background: "#E8F5F0", color: "var(--color-ok-tx)" }
       : kind === "on-input"
-        ? { background: "#E8F0FA", color: "#185FA5" }
-        : { background: "#F1EFEC", color: "#888780" }),
+        ? { background: "#E8F0FA", color: "var(--color-info-tx)" }
+        : { background: "#F1EFEC", color: "var(--color-ink-mute)" }),
   });
   const presetTag = (sel: boolean): CSSProperties => ({ padding: "4px 9px", borderRadius: "6px", fontSize: "11px", background: sel ? "#7B2D43" : "#FBF1E0", color: sel ? "#fff" : "#854F0B", cursor: "pointer", border: "none" });
   const toggleRow: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderTop: "1px solid #E8E2DD" };
@@ -949,8 +949,8 @@ export default function QuickProductFastForm({
 
         {/* .modal-hd */}
         <div onMouseDown={onHeaderMouseDown} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: "1px solid #E8E2DD", background: "#F7F5F3", cursor: "grab", userSelect: "none" }}>
-          <h2 style={{ fontSize: "15px", fontWeight: 500, color: "#1a1a1a", margin: 0 }}>{isEditMode ? "✎ 상품 수정" : "+ 새 상품 등록"}</h2>
-          <span onClick={() => onClose?.()} style={{ fontSize: "20px", color: "#888780", cursor: "pointer", lineHeight: 1 }}>×</span>
+          <h2 style={{ fontSize: "15px", fontWeight: 500, color: "var(--color-ink)", margin: 0 }}>{isEditMode ? "✎ 상품 수정" : "+ 새 상품 등록"}</h2>
+          <span onClick={() => onClose?.()} style={{ fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>×</span>
         </div>
 
         {/* .modal-body */}
@@ -963,7 +963,7 @@ export default function QuickProductFastForm({
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <div>
-                <label style={fieldLabel}>상품명 <span style={{ color: "#7B2D43", marginLeft: "2px" }}>*</span></label>
+                <label style={fieldLabel}>상품명 <span style={{ color: "var(--color-rose-deep)", marginLeft: "2px" }}>*</span></label>
                 <input
                   style={{ ...fieldInput, borderColor: nameError ? "#C0392B" : "#E8E2DD" }}
                   type="text"
@@ -971,13 +971,13 @@ export default function QuickProductFastForm({
                   value={productName}
                   onChange={(e) => { setProductName(e.target.value); if (nameError) setNameError(false); }}
                 />
-                {nameError ? <div style={{ marginTop: "4px", fontSize: "11px", color: "#C0392B" }}>상품명은 필수입니다</div> : null}
+                {nameError ? <div style={{ marginTop: "4px", fontSize: "11px", color: "var(--color-danger-tx)" }}>상품명은 필수입니다</div> : null}
               </div>
               <div>
-                <label style={fieldLabel}>가격 <span style={{ fontSize: "11px", fontWeight: 400, color: "#888780" }}>(비우면 손님 직접입력)</span></label>
+                <label style={fieldLabel}>가격 <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(비우면 손님 직접입력)</span></label>
                 <div style={{ position: "relative" }}>
                   <input style={{ ...fieldInput, paddingRight: "30px" }} type="text" inputMode="numeric" placeholder="59,000" value={priceText} onChange={(e) => setPriceText(formatNumberWithComma(e.target.value))} />
-                  <span style={{ position: "absolute", right: "11px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", color: "#888780", pointerEvents: "none" }}>원</span>
+                  <span style={{ position: "absolute", right: "11px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", color: "var(--color-ink-mute)", pointerEvents: "none" }}>원</span>
                 </div>
               </div>
               <div>
@@ -1006,13 +1006,13 @@ export default function QuickProductFastForm({
                   >
                     {c}
                     {isCustom ? (
-                      <span onClick={(e) => { e.stopPropagation(); removeCustomCategory(c); }} style={{ fontSize: "14px", color: "#7B2D43", lineHeight: 1, marginLeft: "2px" }}>×</span>
+                      <span onClick={(e) => { e.stopPropagation(); removeCustomCategory(c); }} style={{ fontSize: "14px", color: "var(--color-rose-deep)", lineHeight: 1, marginLeft: "2px" }}>×</span>
                     ) : null}
                   </div>
                 );
               })}
               {!addingCategory ? (
-                <div onClick={() => setAddingCategory(true)} style={{ padding: "6px 13px", borderRadius: "20px", border: "1px dashed #E8E2DD", fontSize: "12px", cursor: "pointer", color: "#888780", background: "var(--color-surface)" }}>+ 추가</div>
+                <div onClick={() => setAddingCategory(true)} style={{ padding: "6px 13px", borderRadius: "20px", border: "1px dashed #E8E2DD", fontSize: "12px", cursor: "pointer", color: "var(--color-ink-mute)", background: "var(--color-surface)" }}>+ 추가</div>
               ) : null}
             </div>
             {addingCategory ? (
@@ -1026,7 +1026,7 @@ export default function QuickProductFastForm({
                   style={{ flex: 1, fontSize: "13px", padding: "7px 10px", border: "1px solid #7B2D43", borderRadius: "7px", outline: "none" }}
                 />
                 <button type="button" onClick={confirmAddCategory} style={{ padding: "7px 12px", borderRadius: "7px", background: "#7B2D43", color: "#fff", border: "none", fontSize: "12px", cursor: "pointer" }}>확인</button>
-                <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryText(""); }} style={{ padding: "7px 10px", borderRadius: "7px", border: "1px solid #E8E2DD", background: "var(--color-surface)", fontSize: "12px", cursor: "pointer", color: "#888780" }}>취소</button>
+                <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryText(""); }} style={{ padding: "7px 10px", borderRadius: "7px", border: "1px solid #E8E2DD", background: "var(--color-surface)", fontSize: "12px", cursor: "pointer", color: "var(--color-ink-mute)" }}>취소</button>
               </div>
             ) : null}
           </div>
@@ -1034,7 +1034,7 @@ export default function QuickProductFastForm({
           {/* 상품 뱃지 */}
           <div style={{ marginBottom: "14px" }}>
             <div style={sectionLabel}>상품 뱃지</div>
-            <div style={{ fontSize: "11px", color: "#888780", marginBottom: "6px" }}>손님 상품 목록에 표시되는 뱃지</div>
+            <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginBottom: "6px" }}>손님 상품 목록에 표시되는 뱃지</div>
             <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}`}</style>
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
               {([["none", "없음"], ["new", "✨ NEW"], ["hot", "🔥 HOT"], ["limit", "⏰ 한정"], ["pick", "⭐ MD픽"]] as const).map(([v, l]) => {
@@ -1055,14 +1055,14 @@ export default function QuickProductFastForm({
           {/* 옵션 박스 */}
           <div style={{ marginBottom: "14px" }}>
             <div style={{ border: "1px solid #E8E2DD", borderRadius: "8px", padding: "12px", background: "#F7F5F3" }}>
-              <div style={{ fontSize: "12px", color: "#888780", marginBottom: "10px" }}>옵션 (각각 켜고 / 직접입력·선택)</div>
+              <div style={{ fontSize: "12px", color: "var(--color-ink-mute)", marginBottom: "10px" }}>옵션 (각각 켜고 / 직접입력·선택)</div>
 
               {/* 색상 — togglePill 제거, 프리셋 드롭다운(사이즈와 동일 구조) */}
               <div style={optRow}>
                 <span style={optLabel}>색상</span>
                 <input style={optInput} type="text" placeholder="화이트, 블랙, 베이지" value={colorText} onChange={(e) => setColorText(e.target.value)} />
                 <div ref={colorPresetRef} style={{ position: "relative", display: "inline-block" }}>
-                  <button type="button" onClick={() => setColorPresetOpen((v) => !v)} style={{ padding: "5px 10px", borderRadius: "6px", fontSize: "11px", background: "#FBF1E0", color: "#854F0B", cursor: "pointer", border: "none", display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>프리셋 ▾</button>
+                  <button type="button" onClick={() => setColorPresetOpen((v) => !v)} style={{ padding: "5px 10px", borderRadius: "6px", fontSize: "11px", background: "#FBF1E0", color: "var(--color-warn-tx)", cursor: "pointer", border: "none", display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>프리셋 ▾</button>
                   {colorPresetOpen ? (
                     <div style={{ position: "absolute", top: "100%", right: 0, background: "var(--color-surface)", border: "1px solid #E8E2DD", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, minWidth: "160px", marginTop: "4px", overflow: "hidden" }}>
                       {COLOR_PRESETS.map((preset) => {
@@ -1074,7 +1074,7 @@ export default function QuickProductFastForm({
                     </div>
                   ) : null}
                 </div>
-                {!colorText.trim() ? <span style={{ fontSize: "12px", color: "#888780" }}>고객 직접입력</span> : null}
+                {!colorText.trim() ? <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>고객 직접입력</span> : null}
               </div>
 
               {/* 사이즈 — togglePill 제거, 프리셋 드롭다운 */}
@@ -1082,7 +1082,7 @@ export default function QuickProductFastForm({
                 <span style={optLabel}>사이즈</span>
                 <input style={optInput} type="text" placeholder="220, 230, 240" value={sizeText} onChange={(e) => setSizeText(e.target.value)} />
                 <div ref={sizePresetRef} style={{ position: "relative", display: "inline-block" }}>
-                  <button type="button" onClick={() => setSizePresetOpen((v) => !v)} style={{ padding: "5px 10px", borderRadius: "6px", fontSize: "11px", background: "#FBF1E0", color: "#854F0B", cursor: "pointer", border: "none", display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>프리셋 ▾</button>
+                  <button type="button" onClick={() => setSizePresetOpen((v) => !v)} style={{ padding: "5px 10px", borderRadius: "6px", fontSize: "11px", background: "#FBF1E0", color: "var(--color-warn-tx)", cursor: "pointer", border: "none", display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>프리셋 ▾</button>
                   {sizePresetOpen ? (
                     <div style={{ position: "absolute", top: "100%", right: 0, background: "var(--color-surface)", border: "1px solid #E8E2DD", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, minWidth: "160px", marginTop: "4px", overflow: "hidden" }}>
                       {SIZE_PRESETS.map((preset) => {
@@ -1094,19 +1094,19 @@ export default function QuickProductFastForm({
                     </div>
                   ) : null}
                 </div>
-                {!sizeText.trim() ? <span style={{ fontSize: "12px", color: "#888780" }}>고객 직접입력</span> : null}
+                {!sizeText.trim() ? <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>고객 직접입력</span> : null}
               </div>
 
               {/* 수량 — togglePill 제거, 안내텍스트만 */}
               <div style={optRow}>
                 <span style={optLabel}>수량</span>
-                <span style={{ fontSize: "12px", color: "#888780" }}>손님이 숫자 입력</span>
+                <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>손님이 숫자 입력</span>
               </div>
 
               {/* 금액 — togglePill 제거, 안내텍스트만 */}
               <div style={{ ...optRow, marginBottom: 0 }}>
                 <span style={optLabel}>금액</span>
-                <span style={{ fontSize: "12px", color: "#888780" }}>{priceText.trim() ? "위 가격 사용" : "비우면 손님 직접입력"}</span>
+                <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>{priceText.trim() ? "위 가격 사용" : "비우면 손님 직접입력"}</span>
               </div>
             </div>
           </div>
@@ -1115,8 +1115,8 @@ export default function QuickProductFastForm({
           <div style={{ marginBottom: "14px" }}>
             <div style={toggleRow}>
               <div>
-                <div style={{ fontSize: "13px", color: "#1a1a1a" }}>재고관리</div>
-                <div style={{ fontSize: "11px", color: "#888780", marginTop: "1px" }}>{stockManagementEnabled ? "재고 수량 관리 중" : "(끄면 무제한)"}</div>
+                <div style={{ fontSize: "13px", color: "var(--color-ink)" }}>재고관리</div>
+                <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "1px" }}>{stockManagementEnabled ? "재고 수량 관리 중" : "(끄면 무제한)"}</div>
               </div>
               <div onClick={() => setStockManagementEnabled((v) => !v)} style={tgStyle(stockManagementEnabled)}><span style={tgKnob(stockManagementEnabled)} /></div>
             </div>
@@ -1124,31 +1124,31 @@ export default function QuickProductFastForm({
             {stockManagementEnabled ? (
               colors.length > 0 || sizes.length > 0 ? (
                 <div style={{ background: "#F7F5F3", borderRadius: "8px", padding: "10px", marginTop: "8px" }}>
-                  <div style={{ fontSize: "12px", color: "#888780", marginBottom: "8px" }}>옵션별 재고 수량</div>
+                  <div style={{ fontSize: "12px", color: "var(--color-ink-mute)", marginBottom: "8px" }}>옵션별 재고 수량</div>
                   <div style={{ maxHeight: "200px", overflowY: "auto" }}>
                     {resolvedVariantRows.map((row) => (
                       <div key={row.key} style={{ display: "grid", gridTemplateColumns: "1fr 80px 24px", gap: "8px", alignItems: "center", padding: "5px 0", borderBottom: "1px solid #E8E2DD" }}>
-                        <div style={{ fontSize: "12px", color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[row.color, row.size].filter(Boolean).join(" / ") || "기본"}</div>
+                        <div style={{ fontSize: "12px", color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[row.color, row.size].filter(Boolean).join(" / ") || "기본"}</div>
                         <input style={{ fontSize: "12px", padding: "5px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "100%" }} type="number" min={0} value={row.stock} onChange={(e) => updateVariantStock(row.key, Math.max(0, Number(e.target.value) || 0))} />
-                        <span style={{ fontSize: "11px", color: "#888780" }}>개</span>
+                        <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
                       </div>
                     ))}
                   </div>
-                  <div style={{ marginTop: "7px", fontSize: "11px", color: "#888780", textAlign: "right" }}>총 재고 {totalStock.toLocaleString("ko-KR")}개</div>
+                  <div style={{ marginTop: "7px", fontSize: "11px", color: "var(--color-ink-mute)", textAlign: "right" }}>총 재고 {totalStock.toLocaleString("ko-KR")}개</div>
                 </div>
               ) : (
                 <div style={{ background: "#F7F5F3", borderRadius: "8px", padding: "10px", marginTop: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span style={{ fontSize: "12px", color: "#1a1a1a", flex: 1 }}>총 재고 수량</span>
+                  <span style={{ fontSize: "12px", color: "var(--color-ink)", flex: 1 }}>총 재고 수량</span>
                   <input style={{ fontSize: "12px", padding: "5px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "80px" }} type="number" min={0} value={totalStockText} onChange={(e) => setTotalStockText(e.target.value)} />
-                  <span style={{ fontSize: "11px", color: "#888780" }}>개</span>
+                  <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
                 </div>
               )
             ) : null}
 
             <div style={toggleRow}>
               <div>
-                <div style={{ fontSize: "13px", color: "#1a1a1a" }}>고객 노출</div>
-                <div style={{ fontSize: "11px", color: "#888780", marginTop: "1px" }}>손님 주문 페이지에 표시</div>
+                <div style={{ fontSize: "13px", color: "var(--color-ink)" }}>고객 노출</div>
+                <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "1px" }}>손님 주문 페이지에 표시</div>
               </div>
               <div onClick={() => setIsVisible((v) => !v)} style={tgStyle(isVisible)}><span style={tgKnob(isVisible)} /></div>
             </div>
@@ -1177,9 +1177,9 @@ export default function QuickProductFastForm({
 
         {/* footer */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", borderTop: "1px solid #E8E2DD", background: "#F7F5F3", flexShrink: 0 }}>
-          <div style={{ fontSize: "12px", color: "#888780" }}><span style={{ color: "#854F0B" }}>⚡ 빠른등록:</span> 사진·이름만 넣고 바로</div>
+          <div style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}><span style={{ color: "var(--color-warn-tx)" }}>⚡ 빠른등록:</span> 사진·이름만 넣고 바로</div>
           <div style={{ display: "flex", gap: "8px" }}>
-            <button type="button" onClick={() => onClose?.()} disabled={saving} style={{ padding: "10px 18px", borderRadius: "8px", border: "1px solid #E8E2DD", background: "var(--color-surface)", fontSize: "13px", cursor: saving ? "default" : "pointer", color: "#1a1a1a", opacity: saving ? 0.5 : 1 }}>취소</button>
+            <button type="button" onClick={() => onClose?.()} disabled={saving} style={{ padding: "10px 18px", borderRadius: "8px", border: "1px solid #E8E2DD", background: "var(--color-surface)", fontSize: "13px", cursor: saving ? "default" : "pointer", color: "var(--color-ink)", opacity: saving ? 0.5 : 1 }}>취소</button>
             <button type="button" onClick={() => void saveProduct()} disabled={saving} style={{ padding: "10px 22px", borderRadius: "8px", background: saving ? "#ccc" : isEditMode ? "#0F6E56" : "#7B2D43", color: "#fff", border: "none", fontSize: "13px", fontWeight: 500, cursor: saving ? "not-allowed" : "pointer" }}>{saving ? "저장 중..." : isEditMode ? "저장" : "등록"}</button>
           </div>
         </div>

@@ -1430,27 +1430,28 @@ export default function AdminLiveDashboard() {
 
           {/* 방송화면 항상 렌더 (배경) */}
           <div className={activeMenu !== "broadcast" ? "pointer-events-none" : ""}>
-            <LiveHeader
-              activeBroadcast={activeBroadcast}
-              savingBroadcast={savingBroadcast}
-              videoRatio={videoRatio}
-              onVideoRatioChange={setVideoRatio}
-              onStartBroadcast={startBroadcast}
-              onEndBroadcast={endBroadcast}
-              onSaveBroadcast={saveBroadcast}
-              title={broadcastTitle}
-              onTitleChange={setBroadcastTitle}
-              youtubeUrl={broadcastYoutubeUrl}
-              onYoutubeUrlChange={setBroadcastYoutubeUrl}
-              productCount={broadcastProductCount ?? undefined}
-              shopOpen={shopOpen}
-              onToggleShopOpen={handleToggleShopOpen}
-            />
-
-            {/* 시안 2단: 왼쪽=통계+탭+주문서표 / 오른쪽=영상·채팅·지금상품(세로 컬럼). 모바일·태블릿은 자동 1단 세로. */}
-            <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-              {/* 왼쪽 본문 */}
+            {/* 2단: 왼쪽=헤더+통계+탭+주문서 / 오른쪽=영상·채팅(세로, 맨 위로 정렬). 헤더를 왼쪽 폭으로만 둬서 영상/채팅이 위로 올라옴. 모바일은 1단. */}
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+              {/* 왼쪽 본문 (헤더 포함) */}
               <div className="min-w-0 xl:flex xl:h-[calc(100vh-1.5rem)] xl:flex-col">
+                <div className="shrink-0">
+                  <LiveHeader
+                    activeBroadcast={activeBroadcast}
+                    savingBroadcast={savingBroadcast}
+                    videoRatio={videoRatio}
+                    onVideoRatioChange={setVideoRatio}
+                    onStartBroadcast={startBroadcast}
+                    onEndBroadcast={endBroadcast}
+                    onSaveBroadcast={saveBroadcast}
+                    title={broadcastTitle}
+                    onTitleChange={setBroadcastTitle}
+                    youtubeUrl={broadcastYoutubeUrl}
+                    onYoutubeUrlChange={setBroadcastYoutubeUrl}
+                    productCount={broadcastProductCount ?? undefined}
+                    shopOpen={shopOpen}
+                    onToggleShopOpen={handleToggleShopOpen}
+                  />
+                </div>
                 {loadError ? (
                   <div className="mb-3 rounded-2xl border border-danger-tx/40 bg-danger-bg px-4 py-3 text-sm font-black text-danger-tx">
                     주문 데이터 불러오기 실패: {loadError}
@@ -2602,21 +2603,21 @@ export default function AdminLiveDashboard() {
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-              <div style={{ fontSize: "18px", fontWeight: 800, color: "#7A1E47" }}>🛡️ 정합성 점검</div>
+              <div style={{ fontSize: "18px", fontWeight: 800, color: "var(--color-rose-deep)" }}>🛡️ 정합성 점검</div>
               <button
                 type="button"
                 onClick={() => setIntegrityOpen(false)}
-                style={{ width: "30px", height: "30px", borderRadius: "50%", border: "none", background: "#F1ECEE", color: "#666", fontSize: "15px", cursor: "pointer" }}
+                style={{ width: "30px", height: "30px", borderRadius: "50%", border: "none", background: "#F1ECEE", color: "var(--color-ink-soft)", fontSize: "15px", cursor: "pointer" }}
               >
                 ✕
               </button>
             </div>
 
             {integrityLoading ? (
-              <div style={{ padding: "32px 0", textAlign: "center", fontSize: "14px", fontWeight: 700, color: "#888" }}>점검 중...</div>
+              <div style={{ padding: "32px 0", textAlign: "center", fontSize: "14px", fontWeight: 700, color: "var(--color-ink-mute)" }}>점검 중...</div>
             ) : integrityResult ? (
               integrityResult.ok === false ? (
-                <div style={{ padding: "16px", borderRadius: "12px", background: "#FEF2F2", color: "#B91C1C", fontSize: "14px", fontWeight: 700 }}>
+                <div style={{ padding: "16px", borderRadius: "12px", background: "#FEF2F2", color: "var(--color-danger-tx)", fontSize: "14px", fontWeight: 700 }}>
                   점검 실패: {integrityResult.error || integrityResult.message || "알 수 없는 오류"}
                 </div>
               ) : (
@@ -2656,7 +2657,7 @@ export default function AdminLiveDashboard() {
                     return (
                       <div key={card.kind} style={{ border: `1px solid ${isOk ? "#D1E7DD" : "#F5C2C7"}`, borderRadius: "12px", padding: "12px 14px" }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <div style={{ fontSize: "14px", fontWeight: 800, color: "#333" }}>{card.title}</div>
+                          <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-ink)" }}>{card.title}</div>
                           <div style={{ fontSize: "14px", fontWeight: 800, color }}>{isOk ? "정상" : `${shownCount}건`}</div>
                         </div>
                         {!isOk && shownItems.length > 0 ? (
@@ -2676,7 +2677,7 @@ export default function AdminLiveDashboard() {
                               );
                             })}
                             {shownItems.length > 10 ? (
-                              <div style={{ fontSize: "11px", color: "#999" }}>… 외 {shownItems.length - 10}건</div>
+                              <div style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>… 외 {shownItems.length - 10}건</div>
                             ) : null}
                           </div>
                         ) : null}
@@ -2684,7 +2685,7 @@ export default function AdminLiveDashboard() {
                     );
                   })}
                   {integrityResult.generated_at ? (
-                    <div style={{ fontSize: "11px", color: "#999", textAlign: "right" }}>점검 시각: {new Date(integrityResult.generated_at).toLocaleString("ko-KR")}</div>
+                    <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", textAlign: "right" }}>점검 시각: {new Date(integrityResult.generated_at).toLocaleString("ko-KR")}</div>
                   ) : null}
                 </div>
               )

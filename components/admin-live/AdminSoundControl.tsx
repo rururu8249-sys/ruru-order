@@ -47,7 +47,7 @@ export default function AdminSoundControl() {
   return (
     <div style={{ marginTop: 8, border: "1px solid #E3CDD5", borderRadius: 12, padding: "10px 11px", background: "var(--color-surface)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 12, fontWeight: 800, color: "#7A1E47" }}>{soundOn ? "🔊" : "🔇"} 알림음</span>
+        <span style={{ fontSize: 12, fontWeight: 800, color: "var(--color-rose-deep)" }}>{soundOn ? "🔊" : "🔇"} 알림음</span>
         <button
           type="button"
           onClick={toggleSound}
@@ -66,7 +66,7 @@ export default function AdminSoundControl() {
         </button>
       </div>
 
-      <div style={{ fontSize: 11, fontWeight: 700, color: "#888", marginTop: 8, marginBottom: 4 }}>볼륨 {volume}%</div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-ink-mute)", marginTop: 8, marginBottom: 4 }}>볼륨 {volume}%</div>
       <input
         type="range"
         min={0}
@@ -74,21 +74,21 @@ export default function AdminSoundControl() {
         step={5}
         value={volume}
         onChange={(e) => changeVolume(Number(e.target.value))}
-        style={{ width: "100%", accentColor: "#7A1E47", cursor: "pointer" }}
+        style={{ width: "100%", accentColor: "var(--color-rose-deep)", cursor: "pointer" }}
       />
 
       <div style={{ display: "flex", gap: 6, marginTop: 9 }}>
         <button
           type="button"
           onClick={() => speakAdmin("주문!")}
-          style={{ flex: 1, padding: "7px 4px", borderRadius: 9, border: "1.5px solid #7A1E47", background: "var(--color-surface)", color: "#7A1E47", fontWeight: 800, fontSize: 11, cursor: "pointer" }}
+          style={{ flex: 1, padding: "7px 4px", borderRadius: 9, border: "1.5px solid #7A1E47", background: "var(--color-surface)", color: "var(--color-rose-deep)", fontWeight: 800, fontSize: 11, cursor: "pointer" }}
         >
           🛒 주문!
         </button>
         <button
           type="button"
           onClick={() => speakAdmin("입금!")}
-          style={{ flex: 1, padding: "7px 4px", borderRadius: 9, border: "1.5px solid #0F6E56", background: "var(--color-surface)", color: "#0F6E56", fontWeight: 800, fontSize: 11, cursor: "pointer" }}
+          style={{ flex: 1, padding: "7px 4px", borderRadius: 9, border: "1.5px solid #0F6E56", background: "var(--color-surface)", color: "var(--color-ok-tx)", fontWeight: 800, fontSize: 11, cursor: "pointer" }}
         >
           💰 입금!
         </button>

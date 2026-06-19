@@ -419,7 +419,7 @@ function CustomerDetailDrawer({
     if (/입금확인|결제완료/.test(t)) return { background: "var(--color-ok-bg)", color: "var(--color-ok-tx)" };
     if (/배송|출고/.test(t)) return { background: "var(--color-info-bg)", color: "var(--color-info-tx)" };
     if (/대기|미입금|필요/.test(t)) return { background: "var(--color-warn-bg)", color: "var(--color-warn-tx)" };
-    return { background: "var(--color-surface-3)", color: "#777" };
+    return { background: "var(--color-surface-3)", color: "var(--color-ink-soft)" };
   };
   const avatarChar = (customer.nickname || customer.name || "?").trim().charAt(0) || "?";
 
@@ -448,7 +448,7 @@ function CustomerDetailDrawer({
         {/* 헤더 */}
         <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid var(--color-line)", padding: "14px 18px" }}>
           <span style={{ fontSize: "15px", fontWeight: 800, color: "var(--color-ink)" }}>👤 회원 상세</span>
-          <button type="button" onClick={onClose} style={{ marginLeft: "auto", width: "27px", height: "27px", border: "none", background: "none", color: "#999", fontSize: "18px", cursor: "pointer" }}>✕</button>
+          <button type="button" onClick={onClose} style={{ marginLeft: "auto", width: "27px", height: "27px", border: "none", background: "none", color: "var(--color-ink-mute)", fontSize: "18px", cursor: "pointer" }}>✕</button>
         </div>
 
         <div style={{ padding: "16px 18px 18px" }}>
@@ -465,14 +465,14 @@ function CustomerDetailDrawer({
               <span style={{ width: "54px", height: "54px", flexShrink: 0, borderRadius: "50%", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", fontWeight: 800 }}>{avatarChar}</span>
             )}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: "15px", fontWeight: 800, color: "#222", marginBottom: "3px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+              <div style={{ fontSize: "15px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "3px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                 {customer.nickname}
-                <span style={{ fontSize: "12px", fontWeight: 700, color: "#999" }}>· {customer.name || "-"}</span>
+                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-ink-mute)" }}>· {customer.name || "-"}</span>
                 {customer.blocked ? (
                   <span style={{ fontSize: "10px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", borderRadius: "6px", padding: "2px 7px" }}>차단</span>
                 ) : null}
               </div>
-              <div style={{ fontSize: "11px", color: "#888", lineHeight: 1.8 }}>
+              <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", lineHeight: 1.8 }}>
                 📞 {formatPhone(customer.phone) || "-"}<br />
                 📍 {customer.address || "주소 정보 없음"}<br />
                 🕒 {customer.orderCount > 0 ? formatOrderDateTime(customer.latestOrderAt) : "주문 전 회원"}
@@ -499,11 +499,11 @@ function CustomerDetailDrawer({
                     return (
                       <div key={`${clean(addr?.name)}-${index}`} style={{ border: "1px solid var(--color-line)", borderRadius: "9px", padding: "8px 11px", background: addr?.isDefault ? "var(--color-surface-2)" : "#fff" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px" }}>
-                          <span style={{ fontSize: "12px", fontWeight: 800, color: "#222" }}>{clean(addr?.name) || "이름 없음"}</span>
-                          {clean(addr?.phone) ? <span style={{ fontSize: "11px", color: "#888" }}>{formatPhone(clean(addr?.phone))}</span> : null}
+                          <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>{clean(addr?.name) || "이름 없음"}</span>
+                          {clean(addr?.phone) ? <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>{formatPhone(clean(addr?.phone))}</span> : null}
                           {addr?.isDefault ? <span style={{ marginLeft: "auto", fontSize: "10px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", borderRadius: "6px", padding: "2px 7px" }}>기본</span> : null}
                         </div>
-                        <div style={{ fontSize: "11px", color: "#666" }}>{fullAddr || "주소 없음"}</div>
+                        <div style={{ fontSize: "11px", color: "var(--color-ink-soft)" }}>{fullAddr || "주소 없음"}</div>
                       </div>
                     );
                   })}
@@ -514,15 +514,15 @@ function CustomerDetailDrawer({
           {/* 3 스탯 */}
           <div style={{ display: "flex", gap: "7px", marginBottom: "14px" }}>
             <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "10px", padding: "10px", textAlign: "center" }}>
-              <div style={{ fontSize: "11px", fontWeight: 800, color: "#999" }}>누적 주문</div>
-              <div style={{ marginTop: "3px", fontSize: "16px", fontWeight: 800, color: "#222" }}>{customer.orderCount.toLocaleString("ko-KR")}건</div>
+              <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>누적 주문</div>
+              <div style={{ marginTop: "3px", fontSize: "16px", fontWeight: 800, color: "var(--color-ink)" }}>{customer.orderCount.toLocaleString("ko-KR")}건</div>
             </div>
             <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "10px", padding: "10px", textAlign: "center" }}>
-              <div style={{ fontSize: "11px", fontWeight: 800, color: "#999" }}>누적 결제</div>
-              <div style={{ marginTop: "3px", fontSize: "16px", fontWeight: 800, color: "#222" }}>{money(customer.totalAmount)}</div>
+              <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>누적 결제</div>
+              <div style={{ marginTop: "3px", fontSize: "16px", fontWeight: 800, color: "var(--color-ink)" }}>{money(customer.totalAmount)}</div>
             </div>
             <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "10px", padding: "10px", textAlign: "center" }}>
-              <div style={{ fontSize: "11px", fontWeight: 800, color: "#999" }}>미입금</div>
+              <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>미입금</div>
               <div style={{ marginTop: "3px", fontSize: "16px", fontWeight: 800, color: customer.unpaidCount > 0 ? "var(--color-warn-tx)" : "#222" }}>{customer.unpaidCount.toLocaleString("ko-KR")}건</div>
             </div>
           </div>
@@ -530,18 +530,18 @@ function CustomerDetailDrawer({
           {/* 주문 이력 */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
             <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>주문 이력</span>
-            <span style={{ fontSize: "11px", fontWeight: 700, color: "#999" }}>{safePage} / {totalPages}</span>
+            <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>{safePage} / {totalPages}</span>
           </div>
           {visibleOrders.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "18px 0", fontSize: "12px", color: "#999" }}>주문 내역이 없습니다.</div>
+            <div style={{ textAlign: "center", padding: "18px 0", fontSize: "12px", color: "var(--color-ink-mute)" }}>주문 내역이 없습니다.</div>
           ) : (
             visibleOrders.map((order, index) => {
               const badge = statusBadge(orderStatusText(order));
               return (
                 <div key={`${order.id || index}-${orderCreatedLabel(order)}`} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 0", borderBottom: "1px solid var(--color-surface-2)" }}>
-                  <span style={{ width: "92px", flexShrink: 0, fontSize: "11px", color: "#999" }}>{orderCreatedLabel(order)}</span>
-                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "12px", color: "#666" }} title={orderSummary(order)}>{orderSummary(order)}</span>
-                  <b style={{ fontSize: "12px", color: "#222" }}>{money(orderAmount(order))}</b>
+                  <span style={{ width: "92px", flexShrink: 0, fontSize: "11px", color: "var(--color-ink-mute)" }}>{orderCreatedLabel(order)}</span>
+                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "12px", color: "var(--color-ink-soft)" }} title={orderSummary(order)}>{orderSummary(order)}</span>
+                  <b style={{ fontSize: "12px", color: "var(--color-ink)" }}>{money(orderAmount(order))}</b>
                   <span style={{ flexShrink: 0, fontSize: "10px", fontWeight: 800, borderRadius: "6px", padding: "3px 7px", ...badge }}>{orderStatusText(order) || "-"}</span>
                 </div>
               );
@@ -549,8 +549,8 @@ function CustomerDetailDrawer({
           )}
           {totalPages > 1 ? (
             <div style={{ display: "flex", justifyContent: "center", gap: "8px", marginTop: "12px" }}>
-              <button type="button" onClick={() => setPage(Math.max(1, safePage - 1))} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", padding: "5px 12px", fontSize: "11px", fontWeight: 800, color: "#777", cursor: "pointer" }}>이전</button>
-              <button type="button" onClick={() => setPage(Math.min(totalPages, safePage + 1))} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", padding: "5px 12px", fontSize: "11px", fontWeight: 800, color: "#777", cursor: "pointer" }}>다음</button>
+              <button type="button" onClick={() => setPage(Math.max(1, safePage - 1))} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", padding: "5px 12px", fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", cursor: "pointer" }}>이전</button>
+              <button type="button" onClick={() => setPage(Math.min(totalPages, safePage + 1))} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", padding: "5px 12px", fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", cursor: "pointer" }}>다음</button>
             </div>
           ) : null}
 
@@ -570,12 +570,12 @@ function CustomerDetailDrawer({
                     <div key={`${h.field}-${h.changed_at}-${index}`} style={{ border: "1px solid var(--color-line)", borderRadius: "9px", padding: "8px 11px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px" }}>
                         <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)" }}>{h.field}</span>
-                        <span style={{ marginLeft: "auto", fontSize: "10px", color: "#999" }}>{formatOrderDateTime(h.changed_at)}</span>
+                        <span style={{ marginLeft: "auto", fontSize: "10px", color: "var(--color-ink-mute)" }}>{formatOrderDateTime(h.changed_at)}</span>
                       </div>
-                      <div style={{ fontSize: "11px", color: "#666" }}>
-                        <span style={{ color: "#999" }}>{h.old_value || "(없음)"}</span>
+                      <div style={{ fontSize: "11px", color: "var(--color-ink-soft)" }}>
+                        <span style={{ color: "var(--color-ink-mute)" }}>{h.old_value || "(없음)"}</span>
                         <span style={{ margin: "0 5px", color: "var(--color-ink-mute)", fontWeight: 800 }}>→</span>
-                        <span style={{ color: "#222", fontWeight: 700 }}>{h.new_value || "(없음)"}</span>
+                        <span style={{ color: "var(--color-ink)", fontWeight: 700 }}>{h.new_value || "(없음)"}</span>
                       </div>
                     </div>
                   ))}

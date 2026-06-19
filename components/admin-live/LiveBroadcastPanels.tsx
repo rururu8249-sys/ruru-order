@@ -327,6 +327,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
   const isCol = variant === "column";
   const [pinnedProduct, setPinnedProduct] = useState<any | null>(null);
   const [rotationProducts, setRotationProducts] = useState<any[]>([]);
+  const [lightbox, setLightbox] = useState<string | null>(null); // 상품 사진 클릭 확대
   // 라이브 통계(동접·좋아요) — 25초 폴링. 읽기 전용.
   const [liveStats, setLiveStats] = useState<{ concurrentViewers: number | null; likeCount: number | null } | null>(null);
   useEffect(() => {
@@ -892,33 +893,72 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
       </div>
 
       {isCol ? (
-        /* 컴팩트(우측 컬럼): "지금 띄운 상품" 한 줄 + [관리·변경]→상품관리 팝업. 상세 관리는 상품관리 메뉴에서. */
+        /* 컴팩트(우측 컬럼): 지금 띄운 상품 + 순환 토글 + 이전/다음 + 썸네일 목록 + 사진 클릭 확대 */
         <div className="min-w-0 w-full shrink-0 rounded-2xl border border-line bg-surface p-3 shadow-sm">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-black text-ink-mute">🛍 지금 띄운 상품</span>
-            <button
-              type="button"
-              onClick={() => window.dispatchEvent(new Event("ruru-reopen-product-manage"))}
-              className="rounded-lg border border-line bg-surface-2 px-2.5 py-1 text-[11px] font-black text-ink-soft transition hover:bg-surface-3"
-            >
-              관리·변경
-            </button>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="truncate text-xs font-black text-ink-mute">🛍 지금 띄운 상품{liveCount > 1 ? ` · ${safeIdx + 1}/${liveCount}` : ""}</span>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <button
+                type="button"
+                onClick={toggleCycle}
+                title="자동순환(여러 상품을 번갈아 표시)"
+                className={["rounded-lg px-2 py-1 text-[11px] font-black transition", cycleOn ? "bg-rose-deep text-white" : "border border-line bg-surface-2 text-ink-soft hover:bg-surface-3"].join(" ")}
+              >
+                {cycleOn ? "⏸ 순환 ON" : "▶ 순환"}
+              </button>
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new Event("ruru-reopen-product-manage"))}
+                className="rounded-lg border border-line bg-surface-2 px-2 py-1 text-[11px] font-black text-ink-soft transition hover:bg-surface-3"
+              >
+                관리·변경
+              </button>
+            </div>
           </div>
           {liveProduct ? (
-            <div className="flex items-center gap-2.5">
-              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-line bg-surface-2">
-                {nowProdImageOf(liveProduct) ? (
-                  <img src={nowProdImageOf(liveProduct)} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <span className="flex h-full items-center justify-center text-lg">👟</span>
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-black text-ink">{liveProduct.product_name || liveProduct.name || liveProduct.title || "상품명 없음"}</div>
-                <div className="text-[13px] font-black text-rose-deep">{Number(liveProduct.price ?? liveProduct.sale_price ?? liveProduct.selling_price ?? 0).toLocaleString("ko-KR")}원</div>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => { const u = nowProdImageOf(liveProduct); if (u) setLightbox(u); }}
+                  title="사진 크게 보기"
+                  className="h-14 w-14 shrink-0 cursor-zoom-in overflow-hidden rounded-lg border border-line bg-surface-2"
+                >
+                  {nowProdImageOf(liveProduct) ? (
+                    <img src={nowProdImageOf(liveProduct)} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="flex h-full items-center justify-center text-lg">👟</span>
+                  )}
+                </button>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-black text-ink">{liveProduct.product_name || liveProduct.name || liveProduct.title || "상품명 없음"}</div>
+                  <div className="text-[13px] font-black text-rose-deep">{Number(liveProduct.price ?? liveProduct.sale_price ?? liveProduct.selling_price ?? 0).toLocaleString("ko-KR")}원</div>
+                </div>
+                {liveCount > 1 ? (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button type="button" onClick={() => goToLiveIdx(safeIdx - 1)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-line bg-surface-2 text-ink-soft transition hover:bg-surface-3">‹</button>
+                    <button type="button" onClick={() => goToLiveIdx(safeIdx + 1)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-line bg-surface-2 text-ink-soft transition hover:bg-surface-3">›</button>
+                  </div>
+                ) : null}
               </div>
               {liveCount > 1 ? (
-                <span className="shrink-0 rounded-md bg-surface-2 px-2 py-0.5 text-[10px] font-black text-ink-soft">{safeIdx + 1}/{liveCount}</span>
+                <div className="flex gap-1.5 overflow-x-auto pb-1">
+                  {rotationProducts.map((p: any, i: number) => (
+                    <button
+                      type="button"
+                      key={String(p?.id ?? i)}
+                      onClick={() => goToLiveIdx(i)}
+                      title={p?.product_name || p?.name || ""}
+                      className={["relative h-10 w-10 shrink-0 overflow-hidden rounded-md border bg-surface-2 transition", i === safeIdx ? "border-rose-deep ring-1 ring-rose-deep" : "border-line hover:border-rose-line"].join(" ")}
+                    >
+                      {nowProdImageOf(p) ? (
+                        <img src={nowProdImageOf(p)} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="flex h-full items-center justify-center text-sm">👟</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
               ) : null}
             </div>
           ) : (
@@ -996,7 +1036,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
                     key={String(p?.id ?? i)}
                     onClick={() => goToLiveIdx(i)}
                     className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border bg-surface-2"
-                    style={on ? { borderWidth: "2px", borderColor: "#7B2D43" } : { borderColor: "#E5E7EB" }}
+                    style={on ? { borderWidth: "2px", borderColor: "var(--color-rose-deep)" } : { borderColor: "#E5E7EB" }}
                   >
                     {nowProdImageOf(p) ? (
                       <img src={nowProdImageOf(p)} alt="" className="h-full w-full object-cover" />

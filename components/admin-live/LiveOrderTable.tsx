@@ -174,7 +174,7 @@ function statusBadge(order: LiveOrder) {
   const amber = { background: "var(--color-warn-bg)", color: "var(--color-warn-tx)" };
   const red = { background: "var(--color-danger-bg)", color: "var(--color-danger-tx)" };
   const blue = { background: "var(--color-info-bg)", color: "var(--color-info-tx)" };
-  const muted = { background: "var(--color-surface-3)", color: "#777" };
+  const muted = { background: "var(--color-surface-3)", color: "var(--color-ink-soft)" };
 
   if (order.paymentStatus === "canceled") {
     return <span style={{ ...base, ...muted }}>주문서취소</span>;
@@ -743,7 +743,7 @@ export default function LiveOrderTable({
           <div style={{ fontSize: "16px", fontWeight: 900, color: "var(--color-ink)", marginBottom: "14px" }}>
             {exportConfirm === "rozen" ? "🚚 송장 출력" : "🛍 물건챙기기"}
           </div>
-          <div style={{ fontSize: "13px", color: "#555", marginBottom: "20px", lineHeight: 1.8 }}>
+          <div style={{ fontSize: "13px", color: "var(--color-ink-soft)", marginBottom: "20px", lineHeight: 1.8 }}>
             <div>현재 필터 기준: <b>{exportableOrders.length.toLocaleString("ko-KR")}건</b></div>
             <div style={{ fontSize: "15px" }}>✅ 돈 받은 것(결제완료): <b style={{ color: "var(--color-ok-tx)", fontSize: "16px" }}>{paidOnlyExportOrders.length.toLocaleString("ko-KR")}건</b></div>
           </div>
@@ -774,7 +774,7 @@ export default function LiveOrderTable({
             </button>
 
             <button type="button" onClick={() => setExportConfirm("")}
-              style={{ padding: "8px 14px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "#555", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+              style={{ padding: "8px 14px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
               취소
             </button>
           </div>

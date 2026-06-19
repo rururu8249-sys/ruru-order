@@ -59,7 +59,7 @@ export default function BroadcastSearchSelect({ options, value, onChange, todayA
         className="flex h-11 w-full items-center justify-between rounded-xl border border-line bg-surface px-3 text-[12px] font-black text-ink outline-none transition hover:border-rose-300 active:scale-[0.98] active:bg-surface-2 duration-75"
       >
         <span className="truncate">{currentLabel}</span>
-        <span style={{ marginLeft: 6, color: "#aaa", fontSize: 10, flexShrink: 0 }}>{open ? "▲" : "▼"}</span>
+        <span style={{ marginLeft: 6, color: "var(--color-ink-mute)", fontSize: 10, flexShrink: 0 }}>{open ? "▲" : "▼"}</span>
       </button>
 
       {/* 드롭다운 */}
@@ -111,7 +111,7 @@ export default function BroadcastSearchSelect({ options, value, onChange, todayA
 
             {/* 방송 목록 */}
             {filtered.length === 0 ? (
-              <div style={{ padding: "12px 14px", fontSize: 12, color: "#bbb", textAlign: "center" }}>
+              <div style={{ padding: "12px 14px", fontSize: 12, color: "var(--color-ink-mute)", textAlign: "center" }}>
                 검색 결과 없음
               </div>
             ) : (

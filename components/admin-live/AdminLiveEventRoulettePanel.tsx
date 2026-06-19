@@ -1145,7 +1145,7 @@ export default function AdminLiveEventRoulettePanel({
                   {/* 당첨자 발표 카드 — 룰렛 위(상단)에만 덮어서 아래 ▶돌리기 버튼은 가리지 않음. 클릭도 통과(pointerEvents none) */}
                   {centerWinner && currentEvent?.winner_nickname === centerWinner ? (
                     <div style={{ position: "absolute", left: "50%", top: "8px", transform: "translateX(-50%)", width: "min(90%,300px)", borderRadius: "24px", background: "var(--color-surface)", boxShadow: "0 24px 70px rgba(15,23,42,0.24)", padding: "18px", textAlign: "center", zIndex: 30, pointerEvents: "none" }}>
-                      <div style={{ color: "#7c3aed", fontSize: "18px", fontWeight: 950, letterSpacing: "-0.05em" }}>당첨</div>
+                      <div style={{ color: "var(--color-cardpay)", fontSize: "18px", fontWeight: 950, letterSpacing: "-0.05em" }}>당첨</div>
                       <div style={{ marginTop: "6px", color: "var(--color-ink)", fontSize: "40px", fontWeight: 950, lineHeight: 1.05, letterSpacing: "-0.08em", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{centerWinner}</div>
                       <div style={{ marginTop: "10px", color: "var(--color-ink-soft)", fontSize: "16px", fontWeight: 900, letterSpacing: "-0.05em" }}>{currentEvent?.winner_note || "이벤트 당첨"}</div>
                     </div>

@@ -116,7 +116,7 @@ export default function BroadcastCalendarPicker({ items, value, onPick }: Props)
           <span style={{ color: ROSE }}>📅</span>
           <span className="truncate">{currentLabel}</span>
         </span>
-        <span style={{ marginLeft: 6, color: "#aaa", fontSize: 10, flexShrink: 0 }}>{open ? "▲" : "▼"}</span>
+        <span style={{ marginLeft: 6, color: "var(--color-ink-mute)", fontSize: 10, flexShrink: 0 }}>{open ? "▲" : "▼"}</span>
       </button>
 
       {open && (
@@ -188,7 +188,7 @@ export default function BroadcastCalendarPicker({ items, value, onPick }: Props)
           {/* 하루에 방송 여러 개일 때 고르기 */}
           {dayPickList.length > 1 && (
             <div style={{ marginTop: 10, borderTop: "1px solid #f0e5e9", paddingTop: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#999", marginBottom: 6 }}>이 날 방송 선택</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-ink-mute)", marginBottom: 6 }}>이 날 방송 선택</div>
               {dayPickList.map((it) => (
                 <button key={it.id} type="button" onClick={() => pick(it.id)}
                   style={{ width: "100%", textAlign: "left", padding: "8px 10px", marginBottom: 4, borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", border: `1px solid ${ROSE_LINE}`, background: it.id === value ? ROSE : "#fff", color: it.id === value ? "#fff" : ROSE }}>
@@ -199,7 +199,7 @@ export default function BroadcastCalendarPicker({ items, value, onPick }: Props)
           )}
 
           {byDate.size === 0 && (
-            <div style={{ marginTop: 8, fontSize: 12, color: "#bbb", textAlign: "center" }}>등록된 방송이 없습니다</div>
+            <div style={{ marginTop: 8, fontSize: 12, color: "var(--color-ink-mute)", textAlign: "center" }}>등록된 방송이 없습니다</div>
           )}
         </div>
       )}
