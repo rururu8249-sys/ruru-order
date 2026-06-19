@@ -101,15 +101,15 @@ function getPaymentStatusLabel(order: LiveOrder) {
 }
 
 function getPaymentStatusClass(order: LiveOrder) {
-  if (order.paymentStatus === "canceled") return "border-red-200 bg-red-50 text-red-700";
-  if (order.paymentStatus === "manual_match_needed") return "border-orange-200 bg-orange-50 text-orange-700";
-  if (order.paymentStatus === "manual_paid") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (order.paymentStatus === "canceled") return "border-danger-tx bg-danger-bg text-danger-tx";
+  if (order.paymentStatus === "manual_match_needed") return "border-warn-tx bg-warn-bg text-warn-tx";
+  if (order.paymentStatus === "manual_paid") return "border-ok-tx bg-ok-bg text-ok-tx";
   if (["auto_paid", "paid"].includes(order.paymentStatus)) {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    return "border-ok-tx bg-ok-bg text-ok-tx";
   }
-  if (order.paymentStatus === "card_paid") return "border-violet-200 bg-violet-50 text-violet-700";
-  if (["unpaid", "card_unpaid"].includes(order.paymentStatus)) return "border-red-200 bg-red-50 text-red-700";
-  return "border-slate-200 bg-slate-50 text-slate-600";
+  if (order.paymentStatus === "card_paid") return "border-info-tx bg-info-bg text-info-tx";
+  if (["unpaid", "card_unpaid"].includes(order.paymentStatus)) return "border-danger-tx bg-danger-bg text-danger-tx";
+  return "border-line bg-surface-2 text-ink-soft";
 }
 
 export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClose, onAfterStatusChange }: Props) {
@@ -602,10 +602,10 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 
 
   return (
-    <aside className="flex h-full min-h-0 w-full flex-col bg-white">
+    <aside className="flex h-full min-h-0 w-full flex-col bg-surface">
       {/* 목업 B panel-header */}
-      <header className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3">
-        <span className="text-[15px] font-black text-slate-950">주문 상세</span>
+      <header className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
+        <span className="text-[15px] font-black text-ink">주문 상세</span>
         <button
           type="button"
           onClick={(event) => {
@@ -613,7 +613,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             event.stopPropagation();
             onClose?.();
           }}
-          className="text-2xl leading-none text-slate-400 transition hover:text-slate-700"
+          className="text-2xl leading-none text-ink-mute transition hover:text-ink"
           aria-label="주문상세 닫기"
         >
           ×
@@ -623,19 +623,19 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       {/* 목업 B panel-body */}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {/* 주문번호 · 날짜 */}
-        <div className="mb-2.5 text-[11px] font-bold text-slate-400">
+        <div className="mb-2.5 text-[11px] font-bold text-ink-mute">
           {order.orderNo || "주문번호 없음"} · {formatFullDateTime(order.createdAt, orderForView.submittedAt)}
         </div>
 
         {/* 배송주소 rose박스 + 고객정보 편집(기존 핸들러 유지) */}
         <section className="mb-3">
           <div className="mb-1 flex items-center justify-between">
-            <div className="text-[11px] font-black text-slate-400">배송주소</div>
+            <div className="text-[11px] font-black text-ink-mute">배송주소</div>
             {!isCanceled ? (
               editingCustomer ? (
-                <button type="button" onClick={() => setEditingCustomer(false)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-black text-slate-500">취소</button>
+                <button type="button" onClick={() => setEditingCustomer(false)} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft">취소</button>
               ) : (
-                <button type="button" onClick={startEditCustomer} className="rounded-lg border border-rose-line bg-white px-2.5 py-1 text-[11px] font-black text-rose-deep hover:bg-rose-soft">✎ 편집</button>
+                <button type="button" onClick={startEditCustomer} className="rounded-lg border border-rose-line bg-surface px-2.5 py-1 text-[11px] font-black text-rose-deep hover:bg-rose-soft">✎ 편집</button>
               )
             ) : null}
           </div>
@@ -643,28 +643,28 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           {editingCustomer ? (
             <div className="grid gap-2">
               <div className="grid grid-cols-2 gap-2">
-                <label className="grid gap-1 text-[10px] font-black text-slate-400">이름
-                  <input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] font-bold text-slate-900 outline-none focus:border-rose-deep" />
+                <label className="grid gap-1 text-[10px] font-black text-ink-mute">이름
+                  <input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
                 </label>
-                <label className="grid gap-1 text-[10px] font-black text-slate-400">전화
-                  <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} inputMode="numeric" className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] font-bold text-slate-900 outline-none focus:border-rose-deep" />
+                <label className="grid gap-1 text-[10px] font-black text-ink-mute">전화
+                  <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} inputMode="numeric" className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
                 </label>
               </div>
-              <div className="grid gap-1 text-[10px] font-black text-slate-400">우편번호 · 주소
+              <div className="grid gap-1 text-[10px] font-black text-ink-mute">우편번호 · 주소
                 <div className="flex gap-2">
-                  <input value={editZipcode} onChange={(e) => setEditZipcode(e.target.value)} placeholder="우편번호" className="h-9 w-[96px] rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] font-bold text-slate-900 outline-none focus:border-rose-deep" />
+                  <input value={editZipcode} onChange={(e) => setEditZipcode(e.target.value)} placeholder="우편번호" className="h-9 w-[96px] rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
                   <button type="button" onClick={openAddressSearch} className="h-9 shrink-0 rounded-lg bg-rose-deep px-3 text-[12px] font-black text-white hover:bg-rose-deep">주소검색</button>
                 </div>
-                <input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} placeholder="기본주소" className="mt-1 h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] font-bold text-slate-900 outline-none focus:border-rose-deep" />
-                <input value={editDetailAddress} onChange={(e) => setEditDetailAddress(e.target.value)} placeholder="상세주소" className="mt-1 h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] font-bold text-slate-900 outline-none focus:border-rose-deep" />
+                <input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} placeholder="기본주소" className="mt-1 h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
+                <input value={editDetailAddress} onChange={(e) => setEditDetailAddress(e.target.value)} placeholder="상세주소" className="mt-1 h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
               </div>
-              <label className="grid gap-1 text-[10px] font-black text-slate-400">배송메모
-                <input value={editMemo} onChange={(e) => setEditMemo(e.target.value)} placeholder="배송 요청사항" className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] font-bold text-slate-900 outline-none focus:border-rose-deep" />
+              <label className="grid gap-1 text-[10px] font-black text-ink-mute">배송메모
+                <input value={editMemo} onChange={(e) => setEditMemo(e.target.value)} placeholder="배송 요청사항" className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
               </label>
-              <button type="button" onClick={handleSaveCustomerFields} disabled={savingCustomer} className="mt-1 h-9 w-full rounded-lg bg-emerald-600 text-[13px] font-black text-white hover:bg-emerald-700 disabled:bg-slate-300">
+              <button type="button" onClick={handleSaveCustomerFields} disabled={savingCustomer} className="mt-1 h-9 w-full rounded-lg bg-emerald-600 text-[13px] font-black text-white hover:bg-emerald-700 disabled:bg-surface-3">
                 {savingCustomer ? "저장중..." : "✔ 고객/배송 정보 저장"}
               </button>
-              <div className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-[10px] font-bold leading-4 text-amber-700">상품명·옵션·금액은 아래 상품 카드에서 수정합니다. 여기선 고객·주소·메모만 저장됩니다(배송비/합계 미변경).</div>
+              <div className="rounded-lg bg-warn-bg px-2.5 py-1.5 text-[10px] font-bold leading-4 text-warn-tx">상품명·옵션·금액은 아래 상품 카드에서 수정합니다. 여기선 고객·주소·메모만 저장됩니다(배송비/합계 미변경).</div>
             </div>
           ) : (
             <div className="whitespace-pre-wrap break-keep rounded-lg bg-rose-soft px-3 py-2 text-[12px] font-bold leading-5 text-rose-deep">
@@ -694,13 +694,13 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         </div>
 
         {["manual_paid", "auto_paid", "paid"].includes(orderForView.paymentStatus) ? (
-          <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-bold leading-4 text-slate-500">
+          <div className="mt-2 rounded-xl border border-line bg-surface-2 px-3 py-2 text-[11px] font-bold leading-4 text-ink-soft">
             입금확인 주문입니다. 입금확인을 잘못 처리한 경우에는 [입금확인 취소]를 사용하세요. 주문 자체를 없애야 하는 경우에만 [주문서 자체 취소]를 사용하세요.
           </div>
         ) : null}
 
         {paymentCancelError ? (
-          <div className="mt-2 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-[11px] font-black leading-4 text-red-700">
+          <div className="mt-2 rounded-xl border border-danger-tx bg-danger-bg px-3 py-2 text-[11px] font-black leading-4 text-danger-tx">
             입금확인 취소 오류: {paymentCancelError}
           </div>
         ) : null}
@@ -708,7 +708,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         {/* 주문 내역 (목업 B) */}
         <section className="mt-3">
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-[11px] font-black text-slate-400">주문 내역 ({items.length}건)</h3>
+            <h3 className="text-[11px] font-black text-ink-mute">주문 내역 ({items.length}건)</h3>
             <div className="flex items-center gap-2">
               {refreshingDetail ? (
                 <span className="rounded-full bg-rose-soft px-2 py-1 text-[10px] font-black text-rose-deep">상세정보 갱신중...</span>
@@ -721,7 +721,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                       setShowPicker(false);
                       setShowAddForm((v) => !v);
                     }}
-                    className="rounded-lg border border-rose-200 bg-rose-soft px-2 py-1 text-[11px] font-black text-rose-deep hover:bg-rose-100"
+                    className="rounded-lg border border-rose-line bg-rose-soft px-2 py-1 text-[11px] font-black text-rose-deep hover:bg-rose-soft"
                   >
                     {showAddForm ? "닫기" : "+ 직접입력 추가"}
                   </button>
@@ -731,7 +731,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                       setShowAddForm(false);
                       setShowPicker((v) => !v);
                     }}
-                    className="rounded-lg border border-rose-200 bg-rose-soft px-2 py-1 text-[11px] font-black text-rose-deep hover:bg-rose-100"
+                    className="rounded-lg border border-rose-line bg-rose-soft px-2 py-1 text-[11px] font-black text-rose-deep hover:bg-rose-soft"
                   >
                     {showPicker ? "닫기" : "+ 등록상품 추가"}
                   </button>
@@ -741,7 +741,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           </div>
           <div className="space-y-2">
             {items.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 p-4 text-center text-xs font-bold text-slate-400">주문 품목이 없습니다.</div>
+              <div className="rounded-2xl border border-dashed border-line p-4 text-center text-xs font-bold text-ink-mute">주문 품목이 없습니다.</div>
             ) : (
               items.map((item, index) => (
                 <LiveOrderItemEditCard
@@ -759,26 +759,26 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           </div>
 
           {showAddForm && !isCanceled ? (
-            <div className="mt-2 space-y-2 rounded-2xl border border-rose-200 bg-rose-soft/50 p-3">
+            <div className="mt-2 space-y-2 rounded-2xl border border-rose-line bg-rose-soft/50 p-3">
               <div className="text-[11px] font-black text-rose-deep">직접입력 상품 추가 (재고 차감 없음)</div>
               <input
                 value={addForm.productName}
                 onChange={(e) => setAddForm((f) => ({ ...f, productName: e.target.value }))}
                 placeholder="상품명"
-                className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-[13px] outline-none focus:border-rose-deep"
+                className="w-full rounded-lg border border-line px-2 py-1.5 text-[13px] outline-none focus:border-rose-deep"
               />
               <div className="flex gap-2">
                 <input
                   value={addForm.color}
                   onChange={(e) => setAddForm((f) => ({ ...f, color: e.target.value }))}
                   placeholder="색상(선택)"
-                  className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-[13px] outline-none focus:border-rose-deep"
+                  className="flex-1 rounded-lg border border-line px-2 py-1.5 text-[13px] outline-none focus:border-rose-deep"
                 />
                 <input
                   value={addForm.size}
                   onChange={(e) => setAddForm((f) => ({ ...f, size: e.target.value }))}
                   placeholder="사이즈(선택)"
-                  className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-[13px] outline-none focus:border-rose-deep"
+                  className="flex-1 rounded-lg border border-line px-2 py-1.5 text-[13px] outline-none focus:border-rose-deep"
                 />
               </div>
               <div className="flex gap-2">
@@ -787,14 +787,14 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                   onChange={(e) => setAddForm((f) => ({ ...f, qty: e.target.value.replace(/[^\d]/g, "") }))}
                   inputMode="numeric"
                   placeholder="수량"
-                  className="w-20 rounded-lg border border-slate-200 px-2 py-1.5 text-[13px] outline-none focus:border-rose-deep"
+                  className="w-20 rounded-lg border border-line px-2 py-1.5 text-[13px] outline-none focus:border-rose-deep"
                 />
                 <input
                   value={addForm.unitPrice}
                   onChange={(e) => setAddForm((f) => ({ ...f, unitPrice: e.target.value.replace(/[^\d]/g, "") }))}
                   inputMode="numeric"
                   placeholder="단가(원)"
-                  className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-[13px] outline-none focus:border-rose-deep"
+                  className="flex-1 rounded-lg border border-line px-2 py-1.5 text-[13px] outline-none focus:border-rose-deep"
                 />
               </div>
               <button
@@ -818,29 +818,29 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         </section>
 
         {/* 금액 요약 (목업 B) */}
-        <div className="mt-3 border-t border-slate-100 pt-2">
-          <div className="flex items-center justify-between py-1 text-[12px]"><span className="text-slate-500">상품금액</span><span className="font-black text-slate-900">{money(productAmount)}</span></div>
-          <div className="flex items-center justify-between py-1 text-[12px]"><span className="text-slate-500">배송비</span><span className="font-black text-slate-900">{money(shippingFee)}</span></div>
+        <div className="mt-3 border-t border-line pt-2">
+          <div className="flex items-center justify-between py-1 text-[12px]"><span className="text-ink-soft">상품금액</span><span className="font-black text-ink">{money(productAmount)}</span></div>
+          <div className="flex items-center justify-between py-1 text-[12px]"><span className="text-ink-soft">배송비</span><span className="font-black text-ink">{money(shippingFee)}</span></div>
           {isCardPaymentDisplay && cardPaymentExtraAmount > 0 ? (
-            <div className="flex items-center justify-between py-1 text-[12px]"><span className="text-slate-500">카드추가금</span><span className="font-black text-slate-900">{money(cardPaymentExtraAmount)}</span></div>
+            <div className="flex items-center justify-between py-1 text-[12px]"><span className="text-ink-soft">카드추가금</span><span className="font-black text-ink">{money(cardPaymentExtraAmount)}</span></div>
           ) : null}
           {pointUsedAmount > 0 ? (
-            <div className="flex items-center justify-between py-1 text-[12px]"><span className="text-slate-500">포인트 사용</span><span className="font-black text-rose-deep">-{money(pointUsedAmount)}</span></div>
+            <div className="flex items-center justify-between py-1 text-[12px]"><span className="text-ink-soft">포인트 사용</span><span className="font-black text-rose-deep">-{money(pointUsedAmount)}</span></div>
           ) : null}
-          <div className="mt-1 flex items-center justify-between border-t border-slate-100 pt-2 text-[14px] font-black">
-            <span className="text-slate-900">{pointUsedAmount > 0 ? "최종 결제금액" : "총 결제금액"}</span>
+          <div className="mt-1 flex items-center justify-between border-t border-line pt-2 text-[14px] font-black">
+            <span className="text-ink">{pointUsedAmount > 0 ? "최종 결제금액" : "총 결제금액"}</span>
             <span className="text-rose-deep">{money(pointUsedAmount > 0 ? finalPaymentAmount : cardPaymentExpectedTotal)}</span>
           </div>
         </div>
 
         {/* 액션 버튼 (목업 B action-btns: 수동입금확인 green / 입금매칭 rose / 취소 red) — 기존 조건/핸들러 그대로 */}
-        <div className="mt-4 grid grid-cols-1 gap-2 border-t border-slate-100 pt-3">
+        <div className="mt-4 grid grid-cols-1 gap-2 border-t border-line pt-3">
           {!isCanceled && canCancelPaymentConfirm ? (
             <button
               type="button"
               onClick={handlePaymentConfirmCancel}
               disabled={paymentCancelAction}
-              className="h-10 w-full rounded-xl border border-slate-300 bg-white text-[13px] font-black text-slate-700 shadow-sm hover:bg-slate-50 active:scale-[0.99] disabled:bg-slate-100 disabled:text-slate-400"
+              className="h-10 w-full rounded-xl border border-line bg-surface text-[13px] font-black text-ink shadow-sm hover:bg-surface-2 active:scale-[0.99] disabled:bg-surface-2 disabled:text-ink-mute"
             >
               {paymentCancelAction ? "처리중..." : "입금확인 취소"}
             </button>
@@ -853,7 +853,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                   type="button"
                   onClick={() => handleCardPaymentStatusChange("카드결제완료", "card-paid")}
                   disabled={Boolean(cardStatusAction)}
-                  className="h-10 w-full rounded-xl bg-violet-600 text-[13px] font-black text-white shadow-sm hover:bg-violet-700 active:scale-[0.99] disabled:bg-slate-300"
+                  className="h-10 w-full rounded-xl bg-violet-600 text-[13px] font-black text-white shadow-sm hover:bg-violet-700 active:scale-[0.99] disabled:bg-surface-3"
                 >
                   {cardStatusAction === "card-paid" ? "처리중..." : "카드결제완료 처리"}
                 </button>
@@ -868,7 +868,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                     type="button"
                     onClick={() => handleCardPaymentStatusChange("주문확인전", "card-unpaid")}
                     disabled={Boolean(cardStatusAction)}
-                    className="h-10 w-full rounded-xl border border-rose-200 bg-rose-50 text-[13px] font-black text-rose-700 shadow-sm hover:bg-rose-100 active:scale-[0.99] disabled:bg-slate-100 disabled:text-slate-400"
+                    className="h-10 w-full rounded-xl border border-rose-line bg-rose-soft text-[13px] font-black text-rose-deep shadow-sm hover:bg-rose-soft active:scale-[0.99] disabled:bg-surface-2 disabled:text-ink-mute"
                   >
                     {cardStatusAction === "card-unpaid" ? "처리중..." : "카드미결제로 되돌리기"}
                   </button>
@@ -882,7 +882,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               type="button"
               onClick={handleManualConfirm}
               disabled={manualConfirmAction}
-              className="h-10 w-full rounded-xl bg-emerald-600 text-[13px] font-black text-white shadow-sm hover:bg-emerald-700 active:scale-[0.99] disabled:bg-slate-300"
+              className="h-10 w-full rounded-xl bg-emerald-600 text-[13px] font-black text-white shadow-sm hover:bg-emerald-700 active:scale-[0.99] disabled:bg-surface-3"
             >
               {manualConfirmAction ? "처리중..." : "수동 입금확인"}
             </button>
@@ -904,21 +904,21 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 type="button"
                 onClick={restoreOrder}
                 disabled={Boolean(savingAction)}
-                className="h-10 w-full rounded-xl bg-rose-deep text-[13px] font-black text-white shadow-sm hover:bg-rose-deep active:scale-[0.99] disabled:bg-slate-300"
+                className="h-10 w-full rounded-xl bg-rose-deep text-[13px] font-black text-white shadow-sm hover:bg-rose-deep active:scale-[0.99] disabled:bg-surface-3"
               >
                 {savingAction === "restore" ? "처리중..." : "주문서복구"}
               </button>
 
               {canCancelPaymentConfirm && !isCardOrder ? (
                 <>
-                  <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] font-bold leading-4 text-amber-800">
+                  <div className="rounded-xl border border-warn-tx bg-warn-bg px-3 py-2 text-[11px] font-bold leading-4 text-warn-tx">
                     주문서는 이미 취소된 상태입니다. 다만 입금확인 기록이 남아있어 정산에서 제외하려면 [취소주문 입금기록 정리]를 사용하세요.
                   </div>
                   <button
                     type="button"
                     onClick={handlePaymentConfirmCancel}
                     disabled={paymentCancelAction}
-                    className="h-10 w-full rounded-xl border border-amber-200 bg-white text-[13px] font-black text-amber-800 shadow-sm hover:bg-amber-50 active:scale-[0.99] disabled:bg-slate-100 disabled:text-slate-400"
+                    className="h-10 w-full rounded-xl border border-warn-tx bg-surface text-[13px] font-black text-warn-tx shadow-sm hover:bg-warn-bg active:scale-[0.99] disabled:bg-surface-2 disabled:text-ink-mute"
                   >
                     {paymentCancelAction ? "처리중..." : "취소주문 입금기록 정리"}
                   </button>
@@ -932,7 +932,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 type="button"
                 onClick={cancelOrder}
                 disabled={Boolean(savingAction)}
-                className="h-10 w-full rounded-xl border border-red-200 bg-red-50 text-[13px] font-black text-red-700 shadow-sm hover:bg-red-100 active:scale-[0.99] disabled:bg-slate-100 disabled:text-slate-400"
+                className="h-10 w-full rounded-xl border border-danger-tx bg-danger-bg text-[13px] font-black text-danger-tx shadow-sm hover:bg-danger-bg active:scale-[0.99] disabled:bg-surface-2 disabled:text-ink-mute"
               >
                 {savingAction === "cancel" ? "처리중..." : "주문서 자체 취소"}
               </button>
@@ -941,8 +941,8 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         </div>
 
         <section className="mt-3">
-          <div className="mb-1 text-[11px] font-black text-slate-400">배송메모 / 특이사항</div>
-          <div className="min-h-[56px] rounded-lg bg-slate-50 p-3 text-[12px] font-bold leading-6 text-slate-600">
+          <div className="mb-1 text-[11px] font-black text-ink-mute">배송메모 / 특이사항</div>
+          <div className="min-h-[56px] rounded-lg bg-surface-2 p-3 text-[12px] font-bold leading-6 text-ink-soft">
             {customerDeliveryMemoText || "입력 없음"}
           </div>
         </section>
@@ -954,8 +954,8 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 function Info({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
     <div className="min-w-0">
-      <div className="text-[11px] font-black text-slate-400">{label}</div>
-      <div className={["mt-0.5 truncate text-sm font-black", strong ? "text-rose-deep" : "text-slate-900"].join(" ")}>
+      <div className="text-[11px] font-black text-ink-mute">{label}</div>
+      <div className={["mt-0.5 truncate text-sm font-black", strong ? "text-rose-deep" : "text-ink"].join(" ")}>
         {value}
       </div>
     </div>
@@ -965,8 +965,8 @@ function Info({ label, value, strong = false }: { label: string; value: string; 
 function PriceRow({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex items-center justify-between py-1">
-      <span className="text-sm font-black text-slate-500">{label}</span>
-      <span className="text-base font-black text-slate-950">{money(value)}</span>
+      <span className="text-sm font-black text-ink-soft">{label}</span>
+      <span className="text-base font-black text-ink">{money(value)}</span>
     </div>
   );
 }
