@@ -739,7 +739,7 @@ export default function LiveOrderTable({
     ) : null}
     {exportConfirm !== "" ? (
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setExportConfirm("")}>
-        <div style={{ background: "#fff", borderRadius: "16px", padding: "26px 30px", minWidth: "340px", boxShadow: "0 8px 40px rgba(0,0,0,0.18)" }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ background: "var(--color-surface)", borderRadius: "16px", padding: "26px 30px", minWidth: "340px", boxShadow: "0 8px 40px rgba(0,0,0,0.18)" }} onClick={(e) => e.stopPropagation()}>
           <div style={{ fontSize: "16px", fontWeight: 900, color: "var(--color-ink)", marginBottom: "14px" }}>
             {exportConfirm === "rozen" ? "🚚 송장 출력" : "🛍 물건챙기기"}
           </div>
@@ -774,7 +774,7 @@ export default function LiveOrderTable({
             </button>
 
             <button type="button" onClick={() => setExportConfirm("")}
-              style={{ padding: "8px 14px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "#fff", color: "#555", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+              style={{ padding: "8px 14px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "#555", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
               취소
             </button>
           </div>
@@ -1125,7 +1125,7 @@ export default function LiveOrderTable({
                         <div>{statusBadge(order)}</div>
                         {order.paidAt && <div className="mt-0.5 text-[10px] text-ink-mute">{order.paidAt}</div>}
                         {order.paymentStatus === "manual_match_needed" ? (
-                          <button type="button" onClick={(e) => { e.stopPropagation(); onSelectForMatch?.(order); }} className="mt-1 rounded-lg border border-orange-300 bg-orange-50 px-2 py-0.5 text-[10px] font-black text-orange-700 hover:bg-orange-100">
+                          <button type="button" onClick={(e) => { e.stopPropagation(); onSelectForMatch?.(order); }} className="mt-1 rounded-lg border border-orange-300 bg-warn-bg px-2 py-0.5 text-[10px] font-black text-warn-tx hover:bg-orange-100">
                             🔗 입금매칭
                           </button>
                         ) : null}

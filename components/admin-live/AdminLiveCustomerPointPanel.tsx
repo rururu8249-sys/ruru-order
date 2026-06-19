@@ -465,7 +465,7 @@ export default function AdminLiveCustomerPointPanel({ customer }: { customer: Po
               <div key={ledgerKey(item, index)} className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[96px_72px_150px_minmax(0,1fr)]">
                 <div className="font-bold text-ink-soft">{dateLabel(item.created_at)}</div>
                 <div className="font-black text-ink">{ledgerLabel(item)}</div>
-                <div className={Number(item.amount || 0) >= 0 ? "whitespace-nowrap text-right font-black tabular-nums text-rose-deep" : "whitespace-nowrap text-right font-black tabular-nums text-red-600"}>
+                <div className={Number(item.amount || 0) >= 0 ? "whitespace-nowrap text-right font-black tabular-nums text-rose-deep" : "whitespace-nowrap text-right font-black tabular-nums text-danger-tx"}>
                   {signedMoney(item.amount)}
                 </div>
                 <div className="min-w-0">

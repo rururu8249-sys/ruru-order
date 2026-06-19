@@ -26,31 +26,31 @@ export default function ManualPaymentSelectionSummary({
   return (
     <div className={[
       "mt-3 grid gap-2 rounded-2xl border p-3 md:grid-cols-4",
-      exact ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50",
+      exact ? "border-emerald-200 bg-ok-bg" : "border-amber-200 bg-warn-bg",
     ].join(" ")}>
       <div>
-        <div className="text-[11px] font-black text-neutral-500">입금예정금액</div>
-        <div className="mt-1 text-lg font-black text-neutral-950">{money(expectedAmount)}</div>
+        <div className="text-[11px] font-black text-ink-soft">입금예정금액</div>
+        <div className="mt-1 text-lg font-black text-ink">{money(expectedAmount)}</div>
       </div>
 
       <div>
-        <div className="text-[11px] font-black text-neutral-500">선택한 입금</div>
-        <div className="mt-1 text-lg font-black text-neutral-950">{selectedCount.toLocaleString()}건</div>
+        <div className="text-[11px] font-black text-ink-soft">선택한 입금</div>
+        <div className="mt-1 text-lg font-black text-ink">{selectedCount.toLocaleString()}건</div>
       </div>
 
       <div>
-        <div className="text-[11px] font-black text-neutral-500">선택합계</div>
-        <div className="mt-1 text-lg font-black text-neutral-950">{money(selectedTotalAmount)}</div>
+        <div className="text-[11px] font-black text-ink-soft">선택합계</div>
+        <div className="mt-1 text-lg font-black text-ink">{money(selectedTotalAmount)}</div>
       </div>
 
       <div>
-        <div className="text-[11px] font-black text-neutral-500">차액</div>
-        <div className={`mt-1 text-lg font-black ${exact ? "text-emerald-700" : "text-red-700"}`}>
+        <div className="text-[11px] font-black text-ink-soft">차액</div>
+        <div className={`mt-1 text-lg font-black ${exact ? "text-ok-tx" : "text-danger-tx"}`}>
           {money(amountDifference)}
         </div>
       </div>
 
-      <div className={`md:col-span-4 rounded-xl px-3 py-2 text-[12px] font-black ${exact ? "bg-white/70 text-emerald-700" : "bg-white/70 text-amber-800"}`}>
+      <div className={`md:col-span-4 rounded-xl px-3 py-2 text-[12px] font-black ${exact ? "bg-surface-2 text-ok-tx" : "bg-surface-2 text-amber-800"}`}>
         {exact
           ? "선택합계가 입금예정금액과 정확히 일치합니다. 수동매칭 가능합니다."
           : "금액이 달라도 관리자 확인 후 수동매칭할 수 있습니다. 차액을 꼭 확인하세요."}

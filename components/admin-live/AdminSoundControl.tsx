@@ -45,7 +45,7 @@ export default function AdminSoundControl() {
   };
 
   return (
-    <div style={{ marginTop: 8, border: "1px solid #E3CDD5", borderRadius: 12, padding: "10px 11px", background: "#fff" }}>
+    <div style={{ marginTop: 8, border: "1px solid #E3CDD5", borderRadius: 12, padding: "10px 11px", background: "var(--color-surface)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: 12, fontWeight: 800, color: "#7A1E47" }}>{soundOn ? "🔊" : "🔇"} 알림음</span>
         <button
@@ -81,14 +81,14 @@ export default function AdminSoundControl() {
         <button
           type="button"
           onClick={() => speakAdmin("주문!")}
-          style={{ flex: 1, padding: "7px 4px", borderRadius: 9, border: "1.5px solid #7A1E47", background: "#fff", color: "#7A1E47", fontWeight: 800, fontSize: 11, cursor: "pointer" }}
+          style={{ flex: 1, padding: "7px 4px", borderRadius: 9, border: "1.5px solid #7A1E47", background: "var(--color-surface)", color: "#7A1E47", fontWeight: 800, fontSize: 11, cursor: "pointer" }}
         >
           🛒 주문!
         </button>
         <button
           type="button"
           onClick={() => speakAdmin("입금!")}
-          style={{ flex: 1, padding: "7px 4px", borderRadius: 9, border: "1.5px solid #0F6E56", background: "#fff", color: "#0F6E56", fontWeight: 800, fontSize: 11, cursor: "pointer" }}
+          style={{ flex: 1, padding: "7px 4px", borderRadius: 9, border: "1.5px solid #0F6E56", background: "var(--color-surface)", color: "#0F6E56", fontWeight: 800, fontSize: 11, cursor: "pointer" }}
         >
           💰 입금!
         </button>

@@ -20,21 +20,21 @@ function StatCard({
 }) {
   const toneClass =
     tone === "blue"
-      ? "border-blue-100 bg-blue-50/45"
+      ? "border-line bg-info-bg"
       : tone === "green"
-        ? "border-emerald-100 bg-emerald-50/45"
+        ? "border-line bg-ok-bg"
         : tone === "orange"
-          ? "border-orange-100 bg-orange-50/45"
-          : "border-slate-200 bg-white";
+          ? "border-line bg-warn-bg"
+          : "border-line bg-surface";
 
   const iconClass =
     tone === "blue"
-      ? "bg-blue-100 text-blue-700"
+      ? "bg-blue-100 text-info-tx"
       : tone === "green"
-        ? "bg-emerald-100 text-emerald-700"
+        ? "bg-emerald-100 text-ok-tx"
         : tone === "orange"
-          ? "bg-orange-100 text-orange-700"
-          : "bg-slate-100 text-slate-700";
+          ? "bg-orange-100 text-warn-tx"
+          : "bg-surface-3 text-ink";
 
   return (
     <div
@@ -42,17 +42,17 @@ function StatCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="truncate text-[12px] font-black leading-4 text-slate-500">{label}</div>
+          <div className="truncate text-[12px] font-black leading-4 text-ink-soft">{label}</div>
           <div
             className={
               strong
-                ? "mt-2 truncate text-[24px] font-black tracking-[-0.06em] text-slate-950"
-                : "mt-2 truncate text-[22px] font-black tracking-[-0.06em] text-slate-950"
+                ? "mt-2 truncate text-[24px] font-black tracking-[-0.06em] text-ink"
+                : "mt-2 truncate text-[22px] font-black tracking-[-0.06em] text-ink"
             }
           >
             {value}
           </div>
-          {sub ? <div className="mt-1 truncate text-[11px] font-bold leading-4 text-slate-400">{sub}</div> : null}
+          {sub ? <div className="mt-1 truncate text-[11px] font-bold leading-4 text-ink-mute">{sub}</div> : null}
         </div>
 
         <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-base shadow-sm ${iconClass}`}>

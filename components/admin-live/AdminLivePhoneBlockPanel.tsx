@@ -106,7 +106,7 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
         <div>
           <div className="text-[11px] font-black tracking-[0.16em] text-red-500">PHONE BLOCK</div>
           <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-ink">전화번호 직접 차단</h2>
-          <p className="mt-1 text-[12px] font-bold text-red-600">
+          <p className="mt-1 text-[12px] font-bold text-danger-tx">
             주문 이력이 없는 번호도 전화번호 전용 차단으로 저장합니다.
           </p>
         </div>

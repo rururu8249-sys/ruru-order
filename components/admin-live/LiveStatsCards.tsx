@@ -46,14 +46,14 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
       amount: money(bankPaid.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)),
       sub: `결제완료 ${bankPaid.length}건`,
       icon: "🏦",
-      color: "bg-emerald-50 text-emerald-700",
+      color: "bg-ok-bg text-ok-tx",
     },
     {
       label: "미입금",
       amount: money(bankUnpaid.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)),
       sub: `입금대기 ${bankUnpaid.length}건`,
       icon: "⏱",
-      color: "bg-red-50 text-red-700",
+      color: "bg-danger-bg text-danger-tx",
     },
     {
       label: "카드 결제완료",
@@ -67,7 +67,7 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
       amount: money(cardUnpaid.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)),
       sub: `카드미결제 ${cardUnpaid.length}건`,
       icon: "💳",
-      color: "bg-red-50 text-red-700",
+      color: "bg-danger-bg text-danger-tx",
     },
   ];
 

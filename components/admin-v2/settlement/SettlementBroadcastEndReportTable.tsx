@@ -124,11 +124,11 @@ export default function SettlementBroadcastEndReportTable({
   };
 
   return (
-    <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-4">
+    <div className="overflow-hidden rounded-[30px] border border-line bg-surface shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft px-6 py-4">
         <div>
-          <div className="text-lg font-black text-slate-950">방송종료 요약 리스트</div>
-          <div className="mt-1 text-xs font-bold text-slate-400">
+          <div className="text-lg font-black text-ink">방송종료 요약 리스트</div>
+          <div className="mt-1 text-xs font-bold text-ink-mute">
             방송 종료 시점에 저장된 주문서 수, 결제완료 매출, 아직 못 받은 금액, 기존회원/신규회원을 다시 확인합니다.
           </div>
         </div>
@@ -137,7 +137,7 @@ export default function SettlementBroadcastEndReportTable({
           <select
             value={pageSize}
             onChange={(event) => changePageSize(Number(event.target.value))}
-            className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+            className="h-10 rounded-2xl border border-line bg-surface px-3 text-sm font-black text-ink outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
           >
             {PAGE_SIZE_OPTIONS.map((size) => (
               <option key={size} value={size}>
@@ -146,18 +146,18 @@ export default function SettlementBroadcastEndReportTable({
             ))}
           </select>
 
-          <div className="rounded-full bg-slate-100 px-3 py-2 text-xs font-black text-slate-500">
+          <div className="rounded-full bg-surface-3 px-3 py-2 text-xs font-black text-ink-soft">
             총 {sortedRows.length.toLocaleString("ko-KR")}개
           </div>
         </div>
       </div>
 
       {!tableReady ? (
-        <div className="px-6 py-12 text-center text-sm font-bold text-slate-400">
+        <div className="px-6 py-12 text-center text-sm font-bold text-ink-mute">
           방송종료 요약 테이블이 아직 준비되지 않았습니다.
         </div>
       ) : loading ? (
-        <div className="px-6 py-12 text-center text-sm font-bold text-slate-400">
+        <div className="px-6 py-12 text-center text-sm font-bold text-ink-mute">
           방송종료 요약 리스트를 불러오는 중입니다.
         </div>
       ) : (
@@ -165,7 +165,7 @@ export default function SettlementBroadcastEndReportTable({
           <div className="overflow-auto">
             <table className="min-w-[1220px] w-full border-separate border-spacing-0">
               <thead>
-                <tr className="bg-slate-50 text-xs font-black text-slate-500">
+                <tr className="bg-surface-2 text-xs font-black text-ink-soft">
                   <th className="px-4 py-3 text-left">방송/날짜</th>
                   <th className="px-4 py-3 text-right">방송시간</th>
                   <th className="px-4 py-3 text-right">주문서 수</th>
@@ -183,48 +183,48 @@ export default function SettlementBroadcastEndReportTable({
               <tbody>
                 {visibleRows.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-4 py-16 text-center text-sm font-bold text-slate-400">
+                    <td colSpan={11} className="px-4 py-16 text-center text-sm font-bold text-ink-mute">
                       표시할 방송종료 요약이 없습니다.
                     </td>
                   </tr>
                 ) : (
                   visibleRows.map((row) => (
-                    <tr key={row.id} className="border-b border-slate-100 hover:bg-blue-50/30">
-                      <td className="border-b border-slate-100 px-4 py-4">
-                        <div className="max-w-[280px] truncate text-sm font-black text-slate-900">
+                    <tr key={row.id} className="border-b border-line-soft hover:bg-info-bg">
+                      <td className="border-b border-line-soft px-4 py-4">
+                        <div className="max-w-[280px] truncate text-sm font-black text-ink">
                           {row.broadcast_title || "방송제목 없음"}
                         </div>
-                        <div className="mt-1 text-xs font-bold text-slate-400">{dateText(reportDateKey(row))}</div>
+                        <div className="mt-1 text-xs font-bold text-ink-mute">{dateText(reportDateKey(row))}</div>
                       </td>
-                      <td className="border-b border-slate-100 px-4 py-4 text-right text-xs font-black text-slate-600">
+                      <td className="border-b border-line-soft px-4 py-4 text-right text-xs font-black text-ink-soft">
                         <div>{timeText(row.started_at)} ~ {timeText(row.ended_at)}</div>
-                        <div className="mt-1 text-slate-400">{durationText(row.duration_minutes)}</div>
+                        <div className="mt-1 text-ink-mute">{durationText(row.duration_minutes)}</div>
                       </td>
-                      <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black text-slate-700">
+                      <td className="border-b border-line-soft px-4 py-4 text-right text-sm font-black text-ink">
                         {countText(row.order_count)}
                       </td>
-                      <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-blue-700">
+                      <td className="border-b border-line-soft px-4 py-4 text-right text-sm font-black tabular-nums text-info-tx">
                         {won(row.paid_amount)}
                       </td>
-                      <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-orange-700">
+                      <td className="border-b border-line-soft px-4 py-4 text-right text-sm font-black tabular-nums text-warn-tx">
                         {won(row.unpaid_amount)}
                       </td>
-                      <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-emerald-700">
+                      <td className="border-b border-line-soft px-4 py-4 text-right text-sm font-black tabular-nums text-ok-tx">
                         {won(row.bank_paid_amount)}
                       </td>
-                      <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black tabular-nums text-blue-700">
+                      <td className="border-b border-line-soft px-4 py-4 text-right text-sm font-black tabular-nums text-info-tx">
                         {won(row.card_paid_amount)}
                       </td>
-                      <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black text-slate-700">
+                      <td className="border-b border-line-soft px-4 py-4 text-right text-sm font-black text-ink">
                         {countText(row.buyer_count, "명")}
                       </td>
-                      <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black text-emerald-700">
+                      <td className="border-b border-line-soft px-4 py-4 text-right text-sm font-black text-ok-tx">
                         {countText(row.existing_member_count, "명")}
                       </td>
-                      <td className="border-b border-slate-100 px-4 py-4 text-right text-sm font-black text-blue-700">
+                      <td className="border-b border-line-soft px-4 py-4 text-right text-sm font-black text-info-tx">
                         {countText(row.new_member_count, "명")}
                       </td>
-                      <td className="border-b border-slate-100 px-4 py-4 text-xs font-bold text-slate-500">
+                      <td className="border-b border-line-soft px-4 py-4 text-xs font-bold text-ink-soft">
                         {row.visitor_count == null ? row.visitor_note || "방문 로그 설정 후 표시" : countText(row.visitor_count, "명")}
                       </td>
                     </tr>
@@ -234,8 +234,8 @@ export default function SettlementBroadcastEndReportTable({
             </table>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-6 py-4">
-            <div className="text-xs font-bold text-slate-400">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft px-6 py-4">
+            <div className="text-xs font-bold text-ink-mute">
               {sortedRows.length === 0
                 ? "0개"
                 : `${(startIndex + 1).toLocaleString("ko-KR")}-${Math.min(endIndex, sortedRows.length).toLocaleString("ko-KR")} / ${sortedRows.length.toLocaleString("ko-KR")}개`}
@@ -246,7 +246,7 @@ export default function SettlementBroadcastEndReportTable({
                 type="button"
                 onClick={() => movePage(1)}
                 disabled={safePage === 1}
-                className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-600 shadow-sm disabled:cursor-not-allowed disabled:opacity-35"
+                className="h-10 rounded-2xl border border-line bg-surface px-3 text-sm font-black text-ink-soft shadow-sm disabled:cursor-not-allowed disabled:opacity-35"
               >
                 처음
               </button>
@@ -255,7 +255,7 @@ export default function SettlementBroadcastEndReportTable({
                 type="button"
                 onClick={() => movePage(safePage - 1)}
                 disabled={safePage === 1}
-                className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-600 shadow-sm disabled:cursor-not-allowed disabled:opacity-35"
+                className="h-10 rounded-2xl border border-line bg-surface px-3 text-sm font-black text-ink-soft shadow-sm disabled:cursor-not-allowed disabled:opacity-35"
               >
                 이전
               </button>
@@ -267,8 +267,8 @@ export default function SettlementBroadcastEndReportTable({
                   onClick={() => movePage(pageNumber)}
                   className={
                     pageNumber === safePage
-                      ? "h-10 min-w-10 rounded-2xl bg-blue-600 px-3 text-sm font-black text-white shadow-sm"
-                      : "h-10 min-w-10 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-600 shadow-sm hover:bg-slate-50"
+                      ? "h-10 min-w-10 rounded-2xl bg-rose-deep px-3 text-sm font-black text-white shadow-sm"
+                      : "h-10 min-w-10 rounded-2xl border border-line bg-surface px-3 text-sm font-black text-ink-soft shadow-sm hover:bg-surface-2"
                   }
                 >
                   {pageNumber}
@@ -279,7 +279,7 @@ export default function SettlementBroadcastEndReportTable({
                 type="button"
                 onClick={() => movePage(safePage + 1)}
                 disabled={safePage === pageCount}
-                className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-600 shadow-sm disabled:cursor-not-allowed disabled:opacity-35"
+                className="h-10 rounded-2xl border border-line bg-surface px-3 text-sm font-black text-ink-soft shadow-sm disabled:cursor-not-allowed disabled:opacity-35"
               >
                 다음
               </button>
@@ -288,7 +288,7 @@ export default function SettlementBroadcastEndReportTable({
                 type="button"
                 onClick={() => movePage(pageCount)}
                 disabled={safePage === pageCount}
-                className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-600 shadow-sm disabled:cursor-not-allowed disabled:opacity-35"
+                className="h-10 rounded-2xl border border-line bg-surface px-3 text-sm font-black text-ink-soft shadow-sm disabled:cursor-not-allowed disabled:opacity-35"
               >
                 마지막
               </button>

@@ -22,10 +22,10 @@ function CountCard({
       className={`rounded-lg border px-3 py-2 ${
         strong
           ? "border-neutral-900 bg-neutral-950 text-white"
-          : "border-neutral-200 bg-white text-neutral-900"
+          : "border-line bg-surface text-ink"
       }`}
     >
-      <div className={`text-[10px] font-bold ${strong ? "text-neutral-300" : "text-neutral-500"}`}>
+      <div className={`text-[10px] font-bold ${strong ? "text-ink-mute" : "text-ink-soft"}`}>
         {label}
       </div>
       <div className="mt-0.5 text-[16px] font-black">{value}</div>
@@ -44,16 +44,16 @@ export default function AutoMatchPreviewBox({
 
   if (candidateCount <= 0) {
     return (
-      <section className="mb-3 rounded-xl border border-neutral-200 bg-white px-3 py-2">
+      <section className="mb-3 rounded-xl border border-line bg-surface px-3 py-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <div className="text-[13px] font-black text-neutral-900">자동후보 없음</div>
-            <div className="mt-0.5 text-[11px] font-bold text-neutral-500">
+            <div className="text-[13px] font-black text-ink">자동후보 없음</div>
+            <div className="mt-0.5 text-[11px] font-bold text-ink-soft">
               닉네임+금액이 정확히 맞는 자동후보가 없습니다. 필요한 주문은 [입금 매칭하기]로 처리하세요.
             </div>
           </div>
 
-          <div className="rounded-full bg-neutral-100 px-3 py-1 text-[12px] font-black text-neutral-500">
+          <div className="rounded-full bg-surface-3 px-3 py-1 text-[12px] font-black text-ink-soft">
             후보 0건
           </div>
         </div>
@@ -62,7 +62,7 @@ export default function AutoMatchPreviewBox({
   }
 
   return (
-    <section className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+    <section className="mb-3 rounded-xl border border-amber-200 bg-warn-bg p-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-[14px] font-black text-amber-950">
@@ -77,7 +77,7 @@ export default function AutoMatchPreviewBox({
           type="button"
           onClick={onRun}
           disabled={autoRunLoading}
-          className="rounded-lg bg-emerald-600 px-4 py-2 text-[13px] font-black text-white active:scale-[0.98] disabled:bg-neutral-300"
+          className="rounded-lg bg-emerald-600 px-4 py-2 text-[13px] font-black text-white active:scale-[0.98] disabled:bg-surface-3"
         >
           {autoRunLoading ? "확정중..." : "후보 확정"}
         </button>
@@ -95,15 +95,15 @@ export default function AutoMatchPreviewBox({
         />
       </div>
 
-      <div className="mt-3 max-h-52 overflow-y-auto rounded-lg bg-white">
+      <div className="mt-3 max-h-52 overflow-y-auto rounded-lg bg-surface">
         {candidates.slice(0, 30).map((candidate: any, index: number) => (
           <div
             key={`${candidate.order_id || index}-${candidate.deposit_id || index}`}
-            className="grid grid-cols-[1fr_110px_1fr_110px] gap-2 border-b border-neutral-100 px-3 py-2 text-[12px] font-bold"
+            className="grid grid-cols-[1fr_110px_1fr_110px] gap-2 border-b border-line-soft px-3 py-2 text-[12px] font-bold"
           >
             <div className="truncate">
               주문: {candidate.order_nickname || "-"}
-              <div className="text-[10px] text-neutral-500">
+              <div className="text-[10px] text-ink-soft">
                 {candidate.order_group_id || candidate.order_id || "-"}
               </div>
             </div>
@@ -112,7 +112,7 @@ export default function AutoMatchPreviewBox({
 
             <div className="truncate">
               입금: {candidate.deposit_depositor || "-"}
-              <div className="text-[10px] text-neutral-500">
+              <div className="text-[10px] text-ink-soft">
                 {candidate.deposit_time_text || "-"}
               </div>
             </div>

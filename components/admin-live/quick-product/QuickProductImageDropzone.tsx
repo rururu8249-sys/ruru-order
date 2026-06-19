@@ -198,16 +198,16 @@ export default function QuickProductImageDropzone({
   const slots = Array.from({ length: slotCount }, (_, index) => images[index] || "");
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-3.5">
+    <section className="rounded-2xl border border-line bg-surface p-3.5">
       <div className="mb-3 flex items-end justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-sm font-black text-slate-950">{label}</h3>
+          <h3 className="text-sm font-black text-ink">{label}</h3>
           {description ? (
-            <p className="mt-1 text-[11px] font-bold text-slate-500">{description}</p>
+            <p className="mt-1 text-[11px] font-bold text-ink-soft">{description}</p>
           ) : null}
         </div>
 
-        <div className="shrink-0 text-[10px] font-black text-slate-400">
+        <div className="shrink-0 text-[10px] font-black text-ink-mute">
           {images.length}/{slotCount}
         </div>
       </div>
@@ -255,7 +255,7 @@ export default function QuickProductImageDropzone({
           "rounded-2xl border border-dashed p-2 transition",
           isDragging
             ? "border-rose-line bg-rose-soft"
-            : "border-slate-200 bg-slate-50 hover:border-rose-line hover:bg-rose-soft/40",
+            : "border-line bg-surface-2 hover:border-rose-line hover:bg-rose-soft/40",
         ].join(" ")}
       >
         {isMultiple ? (
@@ -263,7 +263,7 @@ export default function QuickProductImageDropzone({
             {slots.map((src, index) => (
               <div
                 key={index}
-                className="group relative aspect-square overflow-hidden rounded-xl bg-white ring-1 ring-slate-200"
+                className="group relative aspect-square overflow-hidden rounded-xl bg-surface ring-1 ring-line"
               >
                 {src && isPreviewable(resolveProductImageUrl(src)) ? (
                   <img
@@ -272,11 +272,11 @@ export default function QuickProductImageDropzone({
                     className="h-full w-full object-cover"
                   />
                 ) : src ? (
-                  <div className="flex h-full w-full items-center justify-center p-2 text-center text-[10px] font-black text-slate-500">
+                  <div className="flex h-full w-full items-center justify-center p-2 text-center text-[10px] font-black text-ink-soft">
                     등록됨
                   </div>
                 ) : (
-                  <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-slate-400">
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-ink-mute">
                     <span className="text-lg">{index === images.length ? "+" : "□"}</span>
                     <span className="text-[10px] font-black">
                       {index === images.length ? "추가" : "사진 없음"}
@@ -300,7 +300,7 @@ export default function QuickProductImageDropzone({
             ))}
           </div>
         ) : (
-          <div className="relative aspect-square overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
+          <div className="relative aspect-square overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
             {images[0] && isPreviewable(resolveProductImageUrl(images[0])) ? (
               <img
                 src={resolveProductImageUrl(images[0])}
@@ -308,11 +308,11 @@ export default function QuickProductImageDropzone({
                 className="h-full w-full object-cover"
               />
             ) : images[0] ? (
-              <div className="flex h-full w-full items-center justify-center p-3 text-center text-xs font-black text-slate-500">
+              <div className="flex h-full w-full items-center justify-center p-3 text-center text-xs font-black text-ink-soft">
                 대표사진 등록됨
               </div>
             ) : (
-              <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-slate-400">
+              <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-ink-mute">
                 <span className="text-3xl">📷</span>
                 <span className="text-xs font-black">대표사진 없음</span>
                 <span className="text-[10px] font-bold">클릭 또는 드래그앤드롭</span>
@@ -334,7 +334,7 @@ export default function QuickProductImageDropzone({
           </div>
         )}
 
-        <div className="mt-2 text-center text-[10px] font-bold text-slate-400">
+        <div className="mt-2 text-center text-[10px] font-bold text-ink-mute">
           {uploading ? "업로드 중..." : "클릭 또는 드래그앤드롭으로 등록"}
         </div>
       </div>

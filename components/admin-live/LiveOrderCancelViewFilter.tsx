@@ -17,7 +17,7 @@ function buttonClass(active: boolean, tone: "dark" | "blue" | "red") {
     return "bg-slate-950 text-white";
   }
 
-  if (tone === "red") return "bg-surface text-red-600 hover:bg-danger-bg";
+  if (tone === "red") return "bg-surface text-danger-tx hover:bg-danger-bg";
   if (tone === "blue") return "bg-surface text-ink-soft hover:bg-rose-soft";
   return "bg-surface text-ink-soft hover:bg-surface-2";
 }

@@ -66,17 +66,17 @@ export default function SettlementManualEntryDetailModal({
 }) {
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/40 px-4 backdrop-blur-[2px]">
-      <div className="flex max-h-[calc(100dvh-32px)] w-full max-w-[720px] flex-col overflow-hidden rounded-[30px] bg-white shadow-[0_30px_100px_rgba(15,23,42,0.35)]">
-        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
+      <div className="flex max-h-[calc(100dvh-32px)] w-full max-w-[720px] flex-col overflow-hidden rounded-[30px] bg-surface shadow-[0_30px_100px_rgba(15,23,42,0.35)]">
+        <div className="flex items-center justify-between gap-3 border-b border-line-soft px-6 py-5">
           <div>
             <div className="text-xs font-black tracking-[0.22em] text-violet-600">SETTLEMENT ENTRY DETAIL</div>
-            <h3 className="mt-1 text-2xl font-black tracking-[-0.04em] text-slate-950">추가 정산 내역 상세</h3>
+            <h3 className="mt-1 text-2xl font-black tracking-[-0.04em] text-ink">추가 정산 내역 상세</h3>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm hover:bg-slate-50"
+            className="rounded-2xl border border-line bg-surface px-5 py-3 text-sm font-black text-ink shadow-sm hover:bg-surface-2"
           >
             닫기
           </button>
@@ -84,64 +84,64 @@ export default function SettlementManualEntryDetailModal({
 
         <div className="min-h-0 flex-1 overflow-y-auto p-6">
           <div className="grid gap-3 md:grid-cols-2">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-xs font-black text-slate-400">구분</div>
-              <div className="mt-2 text-lg font-black text-slate-950">{entryTypeLabel(entry.entry_type)}</div>
+            <div className="rounded-2xl border border-line bg-surface-2 p-4">
+              <div className="text-xs font-black text-ink-mute">구분</div>
+              <div className="mt-2 text-lg font-black text-ink">{entryTypeLabel(entry.entry_type)}</div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-xs font-black text-slate-400">금액</div>
-              <div className="mt-2 text-lg font-black tabular-nums text-slate-950">
+            <div className="rounded-2xl border border-line bg-surface-2 p-4">
+              <div className="text-xs font-black text-ink-mute">금액</div>
+              <div className="mt-2 text-lg font-black tabular-nums text-ink">
                 {entry.entry_type === "expense" ? "-" : ""}
                 {won(entry.amount)}
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-xs font-black text-slate-400">날짜</div>
-              <div className="mt-2 text-lg font-black text-slate-950">{manualEntryDateKey(entry) || "-"}</div>
+            <div className="rounded-2xl border border-line bg-surface-2 p-4">
+              <div className="text-xs font-black text-ink-mute">날짜</div>
+              <div className="mt-2 text-lg font-black text-ink">{manualEntryDateKey(entry) || "-"}</div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-xs font-black text-slate-400">제목</div>
-              <div className="mt-2 text-lg font-black text-slate-950">{entry.title || "-"}</div>
+            <div className="rounded-2xl border border-line bg-surface-2 p-4">
+              <div className="text-xs font-black text-ink-mute">제목</div>
+              <div className="mt-2 text-lg font-black text-ink">{entry.title || "-"}</div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 md:col-span-2">
-              <div className="text-xs font-black text-slate-400">연결 방송</div>
-              <div className="mt-2 text-base font-black text-slate-950">{entry.broadcast_label || manualEntryLabel(entry)}</div>
+            <div className="rounded-2xl border border-line bg-surface-2 p-4 md:col-span-2">
+              <div className="text-xs font-black text-ink-mute">연결 방송</div>
+              <div className="mt-2 text-base font-black text-ink">{entry.broadcast_label || manualEntryLabel(entry)}</div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 md:col-span-2">
-              <div className="text-xs font-black text-slate-400">메모</div>
-              <div className="mt-2 whitespace-pre-wrap text-sm font-bold leading-6 text-slate-700">{entry.memo || "-"}</div>
+            <div className="rounded-2xl border border-line bg-surface-2 p-4 md:col-span-2">
+              <div className="text-xs font-black text-ink-mute">메모</div>
+              <div className="mt-2 whitespace-pre-wrap text-sm font-bold leading-6 text-ink">{entry.memo || "-"}</div>
             </div>
           </div>
 
-          <div className="mt-5 rounded-2xl border border-slate-200">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3">
-              <div className="text-sm font-black text-slate-900">수정이력</div>
-              <div className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-500">총 {logs.length.toLocaleString()}건</div>
+          <div className="mt-5 rounded-2xl border border-line">
+            <div className="flex items-center justify-between border-b border-line-soft bg-surface-2 px-4 py-3">
+              <div className="text-sm font-black text-ink">수정이력</div>
+              <div className="rounded-full bg-surface px-3 py-1 text-xs font-black text-ink-soft">총 {logs.length.toLocaleString()}건</div>
             </div>
 
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-line-soft">
               {loadingLogs ? (
-                <div className="px-4 py-8 text-center text-sm font-bold text-slate-400">이력을 불러오는 중...</div>
+                <div className="px-4 py-8 text-center text-sm font-bold text-ink-mute">이력을 불러오는 중...</div>
               ) : logs.length === 0 ? (
-                <div className="px-4 py-8 text-center text-sm font-bold text-slate-400">
+                <div className="px-4 py-8 text-center text-sm font-bold text-ink-mute">
                   아직 기록된 수정이력이 없습니다.
                 </div>
               ) : (
                 logs.map((log) => (
                   <div key={log.id || `${log.created_at}-${log.action}`} className="grid gap-2 px-4 py-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
+                      <span className="rounded-full bg-info-bg px-3 py-1 text-xs font-black text-info-tx">
                         {actionLabel(log.action)}
                       </span>
-                      <span className="text-xs font-bold text-slate-400">{formatDateTime(log.created_at)}</span>
+                      <span className="text-xs font-bold text-ink-mute">{formatDateTime(log.created_at)}</span>
                     </div>
 
-                    <div className="grid gap-1 text-xs font-bold leading-5 text-slate-500">
+                    <div className="grid gap-1 text-xs font-bold leading-5 text-ink-soft">
                       <div>변경 전: {getValueSummary(log.before_value)}</div>
                       <div>변경 후: {getValueSummary(log.after_value)}</div>
                       {log.memo ? <div>메모: {log.memo}</div> : null}
@@ -153,25 +153,25 @@ export default function SettlementManualEntryDetailModal({
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
+        <div className="flex justify-end gap-2 border-t border-line-soft bg-surface-2 px-6 py-4">
           <button
             type="button"
             onClick={onEdit}
-            className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm hover:bg-slate-50"
+            className="rounded-2xl border border-line bg-surface px-5 py-3 text-sm font-black text-ink shadow-sm hover:bg-surface-2"
           >
             수정
           </button>
           <button
             type="button"
             onClick={onDelete}
-            className="rounded-2xl border border-rose-200 bg-white px-5 py-3 text-sm font-black text-rose-600 shadow-sm hover:bg-rose-50"
+            className="rounded-2xl border border-rose-200 bg-surface px-5 py-3 text-sm font-black text-rose-600 shadow-sm hover:bg-rose-50"
           >
             삭제
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-2xl bg-blue-600 px-6 py-3 text-sm font-black text-white shadow-sm hover:bg-blue-700"
+            className="rounded-2xl bg-rose-deep px-6 py-3 text-sm font-black text-white shadow-sm hover:bg-rose-deep"
           >
             확인
           </button>

@@ -417,9 +417,9 @@ export default function LiveOpsStatusBox() {
           type="button"
           onClick={handleCopyAutoPaidNotices}
           disabled={!autoPaidOrders.length}
-          className="flex w-full items-center justify-between rounded-xl border border-emerald-100 bg-surface px-3 py-2 text-left hover:bg-ok-bg disabled:cursor-not-allowed disabled:opacity-45"
+          className="flex w-full items-center justify-between rounded-xl border border-line bg-surface px-3 py-2 text-left hover:bg-ok-bg disabled:cursor-not-allowed disabled:opacity-45"
         >
-          <span className="text-[11px] font-black text-emerald-800">💰 입금확인 복사</span>
+          <span className="text-[11px] font-black text-ok-tx">💰 입금확인 복사</span>
           <span className="text-[11px] font-black text-ok-tx">{Math.min(3, autoPaidOrders.length)}건</span>
         </button>
       </div>

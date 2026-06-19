@@ -447,7 +447,7 @@ export default function AdminLiveMissionPanel() {
       <div style={{ marginTop: 20, borderTop: "1px solid var(--color-rose-line)", paddingTop: 14 }}>
         <span style={labelStyle}>OBS 방송 위젯주소 (브라우저 소스)</span>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input style={{ ...inputStyle, background: "#FafAfA" }} readOnly value={widgetUrl} />
+          <input style={{ ...inputStyle, background: "var(--color-surface)" }} readOnly value={widgetUrl} />
           <button
             type="button"
             onClick={() => { void navigator.clipboard?.writeText(widgetUrl); setMsg("위젯주소 복사됨"); }}

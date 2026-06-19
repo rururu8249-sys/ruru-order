@@ -399,8 +399,8 @@ function ImagePicker({
       <div className="min-w-0">
         {label ? (
           <div className="mb-1 flex items-center justify-between">
-            <span className="text-[11px] font-black text-slate-700">{label}</span>
-            <span className="text-[10px] font-black text-slate-400">{value.length}/{maxFiles}</span>
+            <span className="text-[11px] font-black text-ink">{label}</span>
+            <span className="text-[10px] font-black text-ink-mute">{value.length}/{maxFiles}</span>
           </div>
         ) : null}
 
@@ -887,7 +887,7 @@ export default function QuickProductFastForm({
   };
 
   const choiceButton = "h-9 rounded-xl px-3.5 text-[12px] font-black transition active:scale-[0.98]";
-  const inactiveChoice = "bg-slate-100 text-slate-600 hover:bg-slate-200";
+  const inactiveChoice = "bg-surface-3 text-ink-soft hover:bg-surface-3";
 
   // 카테고리 칩: 기본(신발/의류/잡화) + 직접 추가한 것 + (수정 모드 등) 현재값이 커스텀이면 포함
   const PRESET_CATEGORIES = ["신발", "의류", "잡화"];
@@ -916,10 +916,10 @@ export default function QuickProductFastForm({
   // === ruru-product-form-mockup.html 스타일 1:1 ===
   const sectionLabel: CSSProperties = { fontSize: "12px", fontWeight: 500, color: "#888780", marginBottom: "6px" };
   const fieldLabel: CSSProperties = { display: "block", fontSize: "12px", color: "#888780", fontWeight: 500, marginBottom: "3px" };
-  const fieldInput: CSSProperties = { width: "100%", fontSize: "13px", padding: "9px 11px", border: "1px solid #E8E2DD", borderRadius: "7px", background: "#fff", color: "#1a1a1a", outline: "none" };
+  const fieldInput: CSSProperties = { width: "100%", fontSize: "13px", padding: "9px 11px", border: "1px solid #E8E2DD", borderRadius: "7px", background: "var(--color-surface)", color: "#1a1a1a", outline: "none" };
   const optRow: CSSProperties = { display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" };
   const optLabel: CSSProperties = { fontSize: "13px", color: "#1a1a1a", minWidth: "36px" };
-  const optInput: CSSProperties = { flex: 1, fontSize: "13px", padding: "6px 10px", border: "1px solid #E8E2DD", borderRadius: "6px", background: "#fff", outline: "none" };
+  const optInput: CSSProperties = { flex: 1, fontSize: "13px", padding: "6px 10px", border: "1px solid #E8E2DD", borderRadius: "6px", background: "var(--color-surface)", outline: "none" };
   const togglePill = (kind: "on-select" | "on-input" | "off"): CSSProperties => ({
     padding: "3px 8px",
     borderRadius: "20px",
@@ -936,7 +936,7 @@ export default function QuickProductFastForm({
   const presetTag = (sel: boolean): CSSProperties => ({ padding: "4px 9px", borderRadius: "6px", fontSize: "11px", background: sel ? "#7B2D43" : "#FBF1E0", color: sel ? "#fff" : "#854F0B", cursor: "pointer", border: "none" });
   const toggleRow: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderTop: "1px solid #E8E2DD" };
   const tgStyle = (on: boolean): CSSProperties => ({ width: "40px", height: "22px", borderRadius: "11px", background: on ? "#0F6E56" : "#E8E2DD", position: "relative", cursor: "pointer", flexShrink: 0 });
-  const tgKnob = (on: boolean): CSSProperties => ({ position: "absolute", width: "18px", height: "18px", background: "#fff", borderRadius: "50%", top: "2px", ...(on ? { right: "2px" } : { left: "2px" }) });
+  const tgKnob = (on: boolean): CSSProperties => ({ position: "absolute", width: "18px", height: "18px", background: "var(--color-surface)", borderRadius: "50%", top: "2px", ...(on ? { right: "2px" } : { left: "2px" }) });
 
   return (
     <div
@@ -945,7 +945,7 @@ export default function QuickProductFastForm({
       onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
     >
       {/* .modal */}
-      <div style={{ width: "560px", maxWidth: "100%", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "12px", boxShadow: "0 0 0 2px #7B2D43, 0 8px 40px rgba(0,0,0,0.35)", overflow: "hidden", transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}>
+      <div style={{ width: "560px", maxWidth: "100%", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "12px", boxShadow: "0 0 0 2px #7B2D43, 0 8px 40px rgba(0,0,0,0.35)", overflow: "hidden", transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}>
 
         {/* .modal-hd */}
         <div onMouseDown={onHeaderMouseDown} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: "1px solid #E8E2DD", background: "#F7F5F3", cursor: "grab", userSelect: "none" }}>
@@ -1012,7 +1012,7 @@ export default function QuickProductFastForm({
                 );
               })}
               {!addingCategory ? (
-                <div onClick={() => setAddingCategory(true)} style={{ padding: "6px 13px", borderRadius: "20px", border: "1px dashed #E8E2DD", fontSize: "12px", cursor: "pointer", color: "#888780", background: "#fff" }}>+ 추가</div>
+                <div onClick={() => setAddingCategory(true)} style={{ padding: "6px 13px", borderRadius: "20px", border: "1px dashed #E8E2DD", fontSize: "12px", cursor: "pointer", color: "#888780", background: "var(--color-surface)" }}>+ 추가</div>
               ) : null}
             </div>
             {addingCategory ? (
@@ -1026,7 +1026,7 @@ export default function QuickProductFastForm({
                   style={{ flex: 1, fontSize: "13px", padding: "7px 10px", border: "1px solid #7B2D43", borderRadius: "7px", outline: "none" }}
                 />
                 <button type="button" onClick={confirmAddCategory} style={{ padding: "7px 12px", borderRadius: "7px", background: "#7B2D43", color: "#fff", border: "none", fontSize: "12px", cursor: "pointer" }}>확인</button>
-                <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryText(""); }} style={{ padding: "7px 10px", borderRadius: "7px", border: "1px solid #E8E2DD", background: "#fff", fontSize: "12px", cursor: "pointer", color: "#888780" }}>취소</button>
+                <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryText(""); }} style={{ padding: "7px 10px", borderRadius: "7px", border: "1px solid #E8E2DD", background: "var(--color-surface)", fontSize: "12px", cursor: "pointer", color: "#888780" }}>취소</button>
               </div>
             ) : null}
           </div>
@@ -1064,7 +1064,7 @@ export default function QuickProductFastForm({
                 <div ref={colorPresetRef} style={{ position: "relative", display: "inline-block" }}>
                   <button type="button" onClick={() => setColorPresetOpen((v) => !v)} style={{ padding: "5px 10px", borderRadius: "6px", fontSize: "11px", background: "#FBF1E0", color: "#854F0B", cursor: "pointer", border: "none", display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>프리셋 ▾</button>
                   {colorPresetOpen ? (
-                    <div style={{ position: "absolute", top: "100%", right: 0, background: "#fff", border: "1px solid #E8E2DD", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, minWidth: "160px", marginTop: "4px", overflow: "hidden" }}>
+                    <div style={{ position: "absolute", top: "100%", right: 0, background: "var(--color-surface)", border: "1px solid #E8E2DD", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, minWidth: "160px", marginTop: "4px", overflow: "hidden" }}>
                       {COLOR_PRESETS.map((preset) => {
                         const on = splitOptions(colorText).includes(preset);
                         return (
@@ -1084,7 +1084,7 @@ export default function QuickProductFastForm({
                 <div ref={sizePresetRef} style={{ position: "relative", display: "inline-block" }}>
                   <button type="button" onClick={() => setSizePresetOpen((v) => !v)} style={{ padding: "5px 10px", borderRadius: "6px", fontSize: "11px", background: "#FBF1E0", color: "#854F0B", cursor: "pointer", border: "none", display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>프리셋 ▾</button>
                   {sizePresetOpen ? (
-                    <div style={{ position: "absolute", top: "100%", right: 0, background: "#fff", border: "1px solid #E8E2DD", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, minWidth: "160px", marginTop: "4px", overflow: "hidden" }}>
+                    <div style={{ position: "absolute", top: "100%", right: 0, background: "var(--color-surface)", border: "1px solid #E8E2DD", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, minWidth: "160px", marginTop: "4px", overflow: "hidden" }}>
                       {SIZE_PRESETS.map((preset) => {
                         const on = normalizePresetOptions(preset).some((o) => splitOptions(sizeText).includes(o));
                         return (
@@ -1166,7 +1166,7 @@ export default function QuickProductFastForm({
           <div style={{ marginBottom: "14px" }}>
             <div style={sectionLabel}>상세설명</div>
             <textarea
-              style={{ width: "100%", fontSize: "13px", padding: "10px 12px", border: "1px solid #E8E2DD", borderRadius: "8px", minHeight: "90px", resize: "vertical", background: "#fff", fontFamily: "inherit", outline: "none" }}
+              style={{ width: "100%", fontSize: "13px", padding: "10px 12px", border: "1px solid #E8E2DD", borderRadius: "8px", minHeight: "90px", resize: "vertical", background: "var(--color-surface)", fontFamily: "inherit", outline: "none" }}
               placeholder="상품 상세 설명 (선택)"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -1179,7 +1179,7 @@ export default function QuickProductFastForm({
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", borderTop: "1px solid #E8E2DD", background: "#F7F5F3", flexShrink: 0 }}>
           <div style={{ fontSize: "12px", color: "#888780" }}><span style={{ color: "#854F0B" }}>⚡ 빠른등록:</span> 사진·이름만 넣고 바로</div>
           <div style={{ display: "flex", gap: "8px" }}>
-            <button type="button" onClick={() => onClose?.()} disabled={saving} style={{ padding: "10px 18px", borderRadius: "8px", border: "1px solid #E8E2DD", background: "#fff", fontSize: "13px", cursor: saving ? "default" : "pointer", color: "#1a1a1a", opacity: saving ? 0.5 : 1 }}>취소</button>
+            <button type="button" onClick={() => onClose?.()} disabled={saving} style={{ padding: "10px 18px", borderRadius: "8px", border: "1px solid #E8E2DD", background: "var(--color-surface)", fontSize: "13px", cursor: saving ? "default" : "pointer", color: "#1a1a1a", opacity: saving ? 0.5 : 1 }}>취소</button>
             <button type="button" onClick={() => void saveProduct()} disabled={saving} style={{ padding: "10px 22px", borderRadius: "8px", background: saving ? "#ccc" : isEditMode ? "#0F6E56" : "#7B2D43", color: "#fff", border: "none", fontSize: "13px", fontWeight: 500, cursor: saving ? "not-allowed" : "pointer" }}>{saving ? "저장 중..." : isEditMode ? "저장" : "등록"}</button>
           </div>
         </div>

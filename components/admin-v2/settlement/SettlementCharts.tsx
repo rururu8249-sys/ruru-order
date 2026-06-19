@@ -184,25 +184,25 @@ export default function SettlementCharts({
   return (
     <>
       <div className="grid items-stretch gap-4 xl:grid-cols-[1.55fr_0.45fr]">
-        <div className="flex min-h-[430px] flex-col self-stretch overflow-hidden rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.045)]">
+        <div className="flex min-h-[430px] flex-col self-stretch overflow-hidden rounded-[28px] border border-line bg-surface p-4 shadow-[0_14px_34px_rgba(15,23,42,0.045)]">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="text-lg font-black text-slate-950">기간별 매출·지출 흐름</div>
-              <div className="mt-1 text-xs font-bold text-slate-400">
+              <div className="text-lg font-black text-ink">기간별 매출·지출 흐름</div>
+              <div className="mt-1 text-xs font-bold text-ink-mute">
                 막대에 마우스를 올리거나 터치하면 날짜별 금액을 확인할 수 있습니다.
               </div>
             </div>
-            <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500">{chartModeLabel}</div>
+            <div className="rounded-full bg-surface-3 px-3 py-1 text-xs font-black text-ink-soft">{chartModeLabel}</div>
           </div>
 
           {trendRows.length === 0 ? (
-            <div className="mt-4 flex flex-1 items-center justify-center rounded-[24px] bg-slate-50 text-sm font-black text-slate-400">
+            <div className="mt-4 flex flex-1 items-center justify-center rounded-[24px] bg-surface-2 text-sm font-black text-ink-mute">
               표시할 기간별 정산 데이터가 없습니다.
             </div>
           ) : (
-            <div className="mt-4 flex flex-1 flex-col justify-center rounded-[24px] bg-slate-50 p-4">
+            <div className="mt-4 flex flex-1 flex-col justify-center rounded-[24px] bg-surface-2 p-4">
               <div className="overflow-x-auto">
-                <div className="flex min-h-[250px] min-w-[520px] items-end gap-4 rounded-[22px] bg-white/60 px-3 pb-4 pt-6">
+                <div className="flex min-h-[250px] min-w-[520px] items-end gap-4 rounded-[22px] bg-surface-2 px-3 pb-4 pt-6">
                   {trendRows.map((item) => {
                     const totalExpense = toNumber(item.totalExpense ?? toNumber(item.fee) + toNumber(item.expense));
                     const salesHeight = percent(item.sales, maxTrend);
@@ -219,7 +219,7 @@ export default function SettlementCharts({
                         onClick={() => setActiveTrend(item)}
                         onTouchStart={() => setActiveTrend(item)}
                         className={`group flex min-w-[58px] flex-1 flex-col items-center justify-end gap-1.5 rounded-2xl px-2 py-2 transition ${
-                          isActive ? "bg-blue-50 shadow-[0_8px_24px_rgba(37,99,235,0.14)]" : "hover:bg-slate-50"
+                          isActive ? "bg-info-bg shadow-[0_8px_24px_rgba(37,99,235,0.14)]" : "hover:bg-surface-2"
                         }`}
                       >
                         <div className="flex h-[175px] items-end gap-1.5">
@@ -239,14 +239,14 @@ export default function SettlementCharts({
                             title={`지출 ${won(totalExpense)}`}
                           />
                         </div>
-                        <span className="text-[11px] font-black text-slate-400">{shortDateLabel(item.dateKey)}</span>
+                        <span className="text-[11px] font-black text-ink-mute">{shortDateLabel(item.dateKey)}</span>
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              <div className="mt-4 flex flex-wrap gap-3 text-xs font-black text-slate-500">
+              <div className="mt-4 flex flex-wrap gap-3 text-xs font-black text-ink-soft">
                 <span className="inline-flex items-center gap-1">
                   <span className="h-2 w-2 rounded-full bg-blue-500" />
                   결제완료 매출
@@ -262,26 +262,26 @@ export default function SettlementCharts({
               </div>
 
               {selectedTrend ? (
-                <div className="mt-3 rounded-[20px] border border-blue-100 bg-blue-50 px-4 py-3">
-                  <div className="text-sm font-black text-slate-950">{fullDateLabel(selectedTrend.dateKey)}</div>
-                  <div className="mt-2 grid gap-x-4 gap-y-1.5 text-xs font-bold text-slate-600 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="mt-3 rounded-[20px] border border-line bg-info-bg px-4 py-3">
+                  <div className="text-sm font-black text-ink">{fullDateLabel(selectedTrend.dateKey)}</div>
+                  <div className="mt-2 grid gap-x-4 gap-y-1.5 text-xs font-bold text-ink-soft sm:grid-cols-2 lg:grid-cols-4">
                     <div>
-                      주문 <span className="font-black text-slate-900">{toNumber(selectedTrend.orderCount).toLocaleString()}건</span>
+                      주문 <span className="font-black text-ink">{toNumber(selectedTrend.orderCount).toLocaleString()}건</span>
                     </div>
                     <div>
-                      결제완료 매출 <span className="font-black text-blue-700">{won(selectedTrend.sales)}</span>
+                      결제완료 매출 <span className="font-black text-info-tx">{won(selectedTrend.sales)}</span>
                     </div>
                     <div>
-                      무통장 <span className="font-black text-emerald-700">{won(selectedTrend.bank || 0)}</span>
+                      무통장 <span className="font-black text-ok-tx">{won(selectedTrend.bank || 0)}</span>
                     </div>
                     <div>
-                      카드 <span className="font-black text-blue-700">{won(selectedTrend.card || 0)}</span>
+                      카드 <span className="font-black text-info-tx">{won(selectedTrend.card || 0)}</span>
                     </div>
                     <div>
                       추가 정산 수익 <span className="font-black text-sky-700">{won(selectedTrend.manualIncome || 0)}</span>
                     </div>
                     <div>
-                      카드 수수료 <span className="font-black text-slate-700">{won(selectedTrend.fee)}</span>
+                      카드 수수료 <span className="font-black text-ink">{won(selectedTrend.fee)}</span>
                     </div>
                     <div>
                       창고/기타 지출 <span className="font-black text-violet-700">{won(selectedTrend.warehouseOtherExpense ?? selectedTrend.expense)}</span>
@@ -292,7 +292,7 @@ export default function SettlementCharts({
                   </div>
                 </div>
               ) : (
-                <div className="mt-3 rounded-[20px] border border-slate-100 bg-white px-4 py-3 text-xs font-bold text-slate-400">
+                <div className="mt-3 rounded-[20px] border border-line-soft bg-surface px-4 py-3 text-xs font-bold text-ink-mute">
                   그래프 막대에 마우스를 올리거나 터치하면 날짜별 상세 금액이 표시됩니다.
                 </div>
               )}
@@ -300,20 +300,20 @@ export default function SettlementCharts({
           )}
         </div>
 
-        <div className="flex min-h-[430px] flex-col self-stretch overflow-hidden rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.045)]">
+        <div className="flex min-h-[430px] flex-col self-stretch overflow-hidden rounded-[28px] border border-line bg-surface p-4 shadow-[0_14px_34px_rgba(15,23,42,0.045)]">
           <div>
-            <div className="text-lg font-black text-slate-950">매출·지출 TOP 요약</div>
-            <div className="mt-1 text-xs font-bold text-slate-400">
+            <div className="text-lg font-black text-ink">매출·지출 TOP 요약</div>
+            <div className="mt-1 text-xs font-bold text-ink-mute">
               {periodLabel} · 총 {toNumber(stats.orderCount).toLocaleString()}건
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-2 rounded-2xl bg-slate-100 p-1">
+          <div className="mt-4 grid grid-cols-2 rounded-2xl bg-surface-3 p-1">
             <button
               type="button"
               onClick={() => setRankTab("sales")}
               className={`rounded-xl px-3 py-2 text-sm font-black transition ${
-                rankTab === "sales" ? "bg-white text-blue-700 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                rankTab === "sales" ? "bg-surface text-info-tx shadow-sm" : "text-ink-soft hover:text-ink"
               }`}
             >
               👑 매출 TOP
@@ -322,7 +322,7 @@ export default function SettlementCharts({
               type="button"
               onClick={() => setRankTab("expense")}
               className={`rounded-xl px-3 py-2 text-sm font-black transition ${
-                rankTab === "expense" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                rankTab === "expense" ? "bg-surface text-ink shadow-sm" : "text-ink-soft hover:text-ink"
               }`}
             >
               🧾 지출 TOP
@@ -331,15 +331,15 @@ export default function SettlementCharts({
 
           <div
             className={`mt-4 flex min-h-0 flex-1 flex-col rounded-[22px] border p-3 ${
-              rankTab === "sales" ? "border-blue-100 bg-blue-50/50" : "border-slate-200 bg-slate-50"
+              rankTab === "sales" ? "border-line bg-info-bg" : "border-line bg-surface-2"
             }`}
           >
             <div className="flex items-center justify-between gap-3">
-              <div className="text-xs font-black text-slate-500">TOP 3 고정 표시</div>
+              <div className="text-xs font-black text-ink-soft">TOP 3 고정 표시</div>
               <button
                 type="button"
                 onClick={() => setRankModalOpen(true)}
-                className="text-xs font-black text-blue-600 underline-offset-4 hover:underline"
+                className="text-xs font-black text-info-tx underline-offset-4 hover:underline"
               >
                 더보기
               </button>
@@ -347,16 +347,16 @@ export default function SettlementCharts({
 
             <div className="mt-3 grid gap-2 pr-1">
               {activeTopItems.length === 0 ? (
-                <div className="rounded-2xl bg-white px-3 py-3 text-xs font-bold text-slate-400">{activeEmptyText}</div>
+                <div className="rounded-2xl bg-surface px-3 py-3 text-xs font-bold text-ink-mute">{activeEmptyText}</div>
               ) : (
                 activeTopItems.map((item) => (
-                  <div key={item.id} className="rounded-2xl bg-white px-3 py-2 shadow-sm">
-                    <div className={`text-[11px] font-black ${rankTab === "sales" ? "text-blue-700" : "text-slate-500"}`}>
+                  <div key={item.id} className="rounded-2xl bg-surface px-3 py-2 shadow-sm">
+                    <div className={`text-[11px] font-black ${rankTab === "sales" ? "text-info-tx" : "text-ink-soft"}`}>
                       {item.rank}위
                     </div>
-                    <div className="mt-1 line-clamp-2 text-xs font-black leading-5 text-slate-800">{item.title}</div>
-                    <div className="mt-1 text-sm font-black tabular-nums text-slate-950">{item.amountText}</div>
-                    <div className="mt-0.5 line-clamp-1 text-[11px] font-bold text-slate-400">{item.subLabel}</div>
+                    <div className="mt-1 line-clamp-2 text-xs font-black leading-5 text-ink">{item.title}</div>
+                    <div className="mt-1 text-sm font-black tabular-nums text-ink">{item.amountText}</div>
+                    <div className="mt-0.5 line-clamp-1 text-[11px] font-bold text-ink-mute">{item.subLabel}</div>
                   </div>
                 ))
               )}

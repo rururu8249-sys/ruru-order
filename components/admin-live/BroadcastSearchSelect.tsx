@@ -56,7 +56,7 @@ export default function BroadcastSearchSelect({ options, value, onChange, todayA
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-11 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-700 outline-none transition hover:border-rose-300 active:scale-[0.98] active:bg-slate-50 duration-75"
+        className="flex h-11 w-full items-center justify-between rounded-xl border border-line bg-surface px-3 text-[12px] font-black text-ink outline-none transition hover:border-rose-300 active:scale-[0.98] active:bg-surface-2 duration-75"
       >
         <span className="truncate">{currentLabel}</span>
         <span style={{ marginLeft: 6, color: "#aaa", fontSize: 10, flexShrink: 0 }}>{open ? "▲" : "▼"}</span>
@@ -67,7 +67,7 @@ export default function BroadcastSearchSelect({ options, value, onChange, todayA
         <div
           style={{
             position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 200,
-            width: 240, background: "#fff", borderRadius: 12,
+            width: 240, background: "var(--color-surface)", borderRadius: 12,
             boxShadow: "0 8px 28px rgba(0,0,0,0.13)",
             border: "1px solid #e5e5e5", overflow: "hidden",
           }}
@@ -83,7 +83,7 @@ export default function BroadcastSearchSelect({ options, value, onChange, todayA
               style={{
                 width: "100%", border: "1px solid #e5e5e5", borderRadius: 8,
                 padding: "7px 10px", fontSize: 12, outline: "none",
-                background: "#fafafa",
+                background: "var(--color-surface)",
               }}
               onFocus={(e) => { e.target.style.borderColor = "#7B2D43"; e.target.style.background = "#fff"; }}
               onBlur={(e) => { e.target.style.borderColor = "#e5e5e5"; e.target.style.background = "#fafafa"; }}

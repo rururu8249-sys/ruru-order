@@ -43,26 +43,26 @@ export default function PaymentOrderRow({
         )}
       </div>
 
-      <div className="font-black text-neutral-500">{orderCode}</div>
+      <div className="font-black text-ink-soft">{orderCode}</div>
 
-      <div className="text-[12px] font-bold text-neutral-500">{createdAtLabel}</div>
+      <div className="text-[12px] font-bold text-ink-soft">{createdAtLabel}</div>
 
       <div>
         <div className="font-black">{nickname || "-"}</div>
-        <div className="text-[11px] font-bold text-neutral-500">{customerName || "-"}</div>
+        <div className="text-[11px] font-bold text-ink-soft">{customerName || "-"}</div>
       </div>
 
-      <div className="break-keep font-bold text-neutral-700">{itemSummary}</div>
+      <div className="break-keep font-bold text-ink">{itemSummary}</div>
 
       <div className="text-left font-black lg:text-right">{expectedAmountText}</div>
 
       <div className="text-left lg:text-center">
         {candidateCount > 0 ? (
-          <span className="rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-black text-emerald-700">
+          <span className="rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-black text-ok-tx">
             {candidateCount}건
           </span>
         ) : (
-          <span className="text-[11px] font-black text-neutral-300">-</span>
+          <span className="text-[11px] font-black text-ink-mute">-</span>
         )}
       </div>
 

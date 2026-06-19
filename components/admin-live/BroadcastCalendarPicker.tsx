@@ -110,7 +110,7 @@ export default function BroadcastCalendarPicker({ items, value, onPick }: Props)
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-11 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-700 outline-none transition hover:border-rose-300 active:scale-[0.98] duration-75"
+        className="flex h-11 w-full items-center justify-between rounded-xl border border-line bg-surface px-3 text-[12px] font-black text-ink outline-none transition hover:border-rose-300 active:scale-[0.98] duration-75"
       >
         <span className="flex items-center gap-1 truncate">
           <span style={{ color: ROSE }}>📅</span>
@@ -123,7 +123,7 @@ export default function BroadcastCalendarPicker({ items, value, onPick }: Props)
         <div
           style={{
             position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 200,
-            width: 300, background: "#fff", borderRadius: 12,
+            width: 300, background: "var(--color-surface)", borderRadius: 12,
             boxShadow: "0 8px 28px rgba(0,0,0,0.16)", border: "1px solid #e5e5e5",
             padding: 12,
           }}
@@ -131,10 +131,10 @@ export default function BroadcastCalendarPicker({ items, value, onPick }: Props)
           {/* 헤더: 달 이동 + 전체 방송 */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
             <button type="button" onClick={() => moveMonth(-1)}
-              style={{ width: 28, height: 28, borderRadius: 8, border: `1px solid ${ROSE_LINE}`, background: "#fff", color: ROSE, cursor: "pointer", fontWeight: 900 }}>‹</button>
+              style={{ width: 28, height: 28, borderRadius: 8, border: `1px solid ${ROSE_LINE}`, background: "var(--color-surface)", color: ROSE, cursor: "pointer", fontWeight: 900 }}>‹</button>
             <span style={{ fontSize: 13, fontWeight: 800, color: ROSE }}>{view.year}년 {view.month}월</span>
             <button type="button" onClick={() => moveMonth(1)}
-              style={{ width: 28, height: 28, borderRadius: 8, border: `1px solid ${ROSE_LINE}`, background: "#fff", color: ROSE, cursor: "pointer", fontWeight: 900 }}>›</button>
+              style={{ width: 28, height: 28, borderRadius: 8, border: `1px solid ${ROSE_LINE}`, background: "var(--color-surface)", color: ROSE, cursor: "pointer", fontWeight: 900 }}>›</button>
           </div>
 
           <button type="button" onClick={() => pick("all")}

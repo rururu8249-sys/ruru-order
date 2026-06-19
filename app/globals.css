@@ -66,15 +66,15 @@
 
 .dark {
   /* 따뜻한 뉴트럴 그레이(푸른 기 없음, 부드러운 대비) — Claude 앱 톤 */
-  --color-canvas: #1a1a18;
-  --color-surface: #262521;
-  --color-surface-2: #302f2b;
+  --color-canvas: #161512;
+  --color-surface: #232220;
+  --color-surface-2: #2e2c28;
   --color-surface-3: #3a3833;
   --color-ink: #edece8;
-  --color-ink-soft: #b2afa7;
-  --color-ink-mute: #8a867d;
-  --color-line: #3a3833;
-  --color-line-soft: #2c2b27;
+  --color-ink-soft: #c4c0b7;     /* 보조: 대비 ↑(약 8:1) */
+  --color-ink-mute: #aaa69d;     /* 흐림: WCAG 4.5:1 통과(전 면에서) — 기존 4.2 미달 보정 */
+  --color-line: #45423b;         /* 테두리: 면보다 한 단계 밝게=경계 보임 */
+  --color-line-soft: #323029;
   /* 액센트(브랜드 로즈) — 다크에선 채도 ~40%↓(순분홍 진동/눈피로 완화, 밝기는 유지해 가독성 확보) */
   --color-rose-deep: #ce7f99;
   --color-rose-soft: #352a28;
@@ -189,5 +189,7 @@ body {
 .dark .ruru-product-sian .btn:not(.rose):not(.green),
 .dark .ruru-product-sian .ipt,
 .dark .ruru-product-sian .tag { background: var(--color-surface); color: var(--ink); }
-.dark .ruru-event-sian .nick.out { background: var(--color-surface-3); color: var(--color-ink-mute); }
+.dark .ruru-event-sian .nick { background: var(--color-surface-3); color: var(--color-ink); }
+.dark .ruru-event-sian .nick.win { background: var(--color-rose-deep); color: #1a1a18; }
+.dark .ruru-event-sian .nick.out { background: var(--color-surface-2); color: var(--color-ink-mute); }
 .dark .ruru-event-sian .tog.off { background: var(--color-surface-3); }

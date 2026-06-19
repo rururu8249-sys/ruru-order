@@ -272,7 +272,7 @@ export default function AdminLiveSettingsPanel() {
           {/* ── 결제·배송 ── */}
           {activeTab === "payment" && (
             <>
-              <div className="rounded-2xl border border-orange-100 bg-warn-bg px-4 py-3 text-xs font-bold leading-5 text-orange-800">
+              <div className="rounded-2xl border border-line bg-warn-bg px-4 py-3 text-xs font-bold leading-5 text-warn-tx">
                 결제·배송 설정은 주문금액 계산에 직접 영향을 줍니다. 저장 이후 새 주문부터 적용됩니다(기존 주문 재계산 없음).
               </div>
 
@@ -357,7 +357,7 @@ export default function AdminLiveSettingsPanel() {
                 />
               </div>
 
-              <div className="mt-3 rounded-2xl border border-orange-100 bg-warn-bg px-4 py-3 text-[11px] font-bold leading-5 text-orange-800">
+              <div className="mt-3 rounded-2xl border border-line bg-warn-bg px-4 py-3 text-[11px] font-bold leading-5 text-warn-tx">
                 결제완료 시 자동 지급되며, 자동적립은 알림 팝업이 뜨지 않습니다(주문서 안내 문구로만 표시). 실제 지급/차감 관리는 포인트 메뉴에서.
               </div>
             </div>

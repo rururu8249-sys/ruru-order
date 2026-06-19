@@ -2076,7 +2076,7 @@ export default function AdminLiveDashboard() {
 
                     const label = canceled ? "주문서취소" : paid ? "입금확인" : "매칭필요";
                     const klass = canceled
-                      ? "bg-danger-bg text-red-600"
+                      ? "bg-danger-bg text-danger-tx"
                       : paid
                         ? "bg-ok-bg text-ok-tx"
                         : "bg-warn-bg text-warn-tx";
@@ -2390,11 +2390,11 @@ export default function AdminLiveDashboard() {
                                     </div>
                                     <div className="rounded-2xl border border-danger-tx bg-surface p-4 shadow-sm">
                                       <div className="text-xs font-black text-red-500">입금대기</div>
-                                      <div className="mt-2 text-3xl font-black text-red-600">{unpaidOrders.length}건</div>
+                                      <div className="mt-2 text-3xl font-black text-danger-tx">{unpaidOrders.length}건</div>
                                     </div>
                                     <div className="rounded-2xl border border-danger-tx bg-surface p-4 shadow-sm">
-                                      <div className="text-xs font-black text-red-600">주문서취소</div>
-                                      <div className="mt-2 text-3xl font-black text-red-600">{canceledOrders.length}건</div>
+                                      <div className="text-xs font-black text-danger-tx">주문서취소</div>
+                                      <div className="mt-2 text-3xl font-black text-danger-tx">{canceledOrders.length}건</div>
                                     </div>
                                   </div>
 
@@ -2468,7 +2468,7 @@ export default function AdminLiveDashboard() {
                                       <div className="text-xs font-black text-ink-soft">매칭 대상 주문</div>
                                       <div className="mt-2 text-3xl font-black text-ink">{unpaidOrders.length}건</div>
                                     </div>
-                                    <div className="rounded-2xl border border-emerald-100 bg-surface p-4 shadow-sm">
+                                    <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
                                       <div className="text-xs font-black text-emerald-500">최근 입금 합계</div>
                                       <div className="mt-2 text-2xl font-black text-ok-tx">{money(recentDepositAmount)}</div>
                                     </div>
@@ -2530,7 +2530,7 @@ export default function AdminLiveDashboard() {
                                             <div className="min-w-0">
                                               <div className="flex flex-wrap items-center gap-2">
                                                 <span className="font-black text-ink">{customer.nickname}</span>
-                                                {customer.cancelCount > 0 ? <span className="rounded-full bg-danger-bg px-2 py-1 text-[11px] font-black text-red-600">취소 {customer.cancelCount}건</span> : null}
+                                                {customer.cancelCount > 0 ? <span className="rounded-full bg-danger-bg px-2 py-1 text-[11px] font-black text-danger-tx">취소 {customer.cancelCount}건</span> : null}
                                               </div>
                                               <div className="mt-1 truncate text-xs font-bold text-ink-soft">
                                                 {customer.name || "이름 확인 필요"} · {customer.phone || "전화번호 확인 필요"} · 정상 {customer.activeCount}건 / 전체 {customer.count}건
@@ -2560,7 +2560,7 @@ export default function AdminLiveDashboard() {
                                       <div className="text-xs font-black text-ink-soft">주문 총액</div>
                                       <div className="mt-2 text-2xl font-black text-ink">{money(totalOrderAmount)}</div>
                                     </div>
-                                    <div className="rounded-2xl border border-emerald-100 bg-surface p-4 shadow-sm">
+                                    <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
                                       <div className="text-xs font-black text-emerald-500">결제완료 매출</div>
                                       <div className="mt-2 text-2xl font-black text-ok-tx">{money(paidOrderAmount)}</div>
                                     </div>
@@ -2598,7 +2598,7 @@ export default function AdminLiveDashboard() {
           onClick={() => setIntegrityOpen(false)}
         >
           <div
-            style={{ background: "#fff", borderRadius: "16px", width: "100%", maxWidth: "560px", maxHeight: "80vh", overflowY: "auto", padding: "20px 22px", boxShadow: "0 18px 50px rgba(0,0,0,0.25)" }}
+            style={{ background: "var(--color-surface)", borderRadius: "16px", width: "100%", maxWidth: "560px", maxHeight: "80vh", overflowY: "auto", padding: "20px 22px", boxShadow: "0 18px 50px rgba(0,0,0,0.25)" }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>

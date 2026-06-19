@@ -155,9 +155,9 @@ function modeLabel(mode: RouletteMode) {
 }
 
 function modeBadgeClass(mode: RouletteMode) {
-  if (mode === "live") return "bg-emerald-50 text-emerald-700 ring-emerald-100";
-  if (mode === "test") return "bg-amber-50 text-amber-700 ring-amber-100";
-  return "bg-slate-100 text-slate-600 ring-slate-200";
+  if (mode === "live") return "bg-ok-bg text-ok-tx ring-emerald-100";
+  if (mode === "test") return "bg-warn-bg text-warn-tx ring-amber-100";
+  return "bg-surface-3 text-ink-soft ring-line";
 }
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {

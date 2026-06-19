@@ -443,7 +443,7 @@ function CustomerDetailDrawer({
       <section
         role="dialog"
         aria-modal="true"
-        style={{ width: "100%", maxWidth: "540px", maxHeight: "90vh", overflowY: "auto", borderRadius: "20px", border: "1px solid var(--color-rose-line)", background: "#fff", boxShadow: "0 24px 70px rgba(15,23,42,0.28)" }}
+        style={{ width: "100%", maxWidth: "540px", maxHeight: "90vh", overflowY: "auto", borderRadius: "20px", border: "1px solid var(--color-rose-line)", background: "var(--color-surface)", boxShadow: "0 24px 70px rgba(15,23,42,0.28)" }}
       >
         {/* 헤더 */}
         <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid var(--color-line)", padding: "14px 18px" }}>
@@ -549,8 +549,8 @@ function CustomerDetailDrawer({
           )}
           {totalPages > 1 ? (
             <div style={{ display: "flex", justifyContent: "center", gap: "8px", marginTop: "12px" }}>
-              <button type="button" onClick={() => setPage(Math.max(1, safePage - 1))} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", background: "#fff", padding: "5px 12px", fontSize: "11px", fontWeight: 800, color: "#777", cursor: "pointer" }}>이전</button>
-              <button type="button" onClick={() => setPage(Math.min(totalPages, safePage + 1))} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", background: "#fff", padding: "5px 12px", fontSize: "11px", fontWeight: 800, color: "#777", cursor: "pointer" }}>다음</button>
+              <button type="button" onClick={() => setPage(Math.max(1, safePage - 1))} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", padding: "5px 12px", fontSize: "11px", fontWeight: 800, color: "#777", cursor: "pointer" }}>이전</button>
+              <button type="button" onClick={() => setPage(Math.min(totalPages, safePage + 1))} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", padding: "5px 12px", fontSize: "11px", fontWeight: 800, color: "#777", cursor: "pointer" }}>다음</button>
             </div>
           ) : null}
 
@@ -1397,7 +1397,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
                       고객 화면 포인트 알림에 표시
                     </label>
 
-                    <div className="mt-3 rounded-xl border border-orange-100 bg-warn-bg px-3 py-2 text-[11px] font-bold leading-5 text-orange-800">
+                    <div className="mt-3 rounded-xl border border-line bg-warn-bg px-3 py-2 text-[11px] font-bold leading-5 text-warn-tx">
                       {selectedPhones.size}명 × {(Number(bulkAmount.replace(/[^\d]/g, "")) || 0).toLocaleString("ko-KR")}P = 합계 {((Number(bulkAmount.replace(/[^\d]/g, "")) || 0) * selectedPhones.size).toLocaleString("ko-KR")}P 지급(회수 아님).
                     </div>
 
@@ -1411,7 +1411,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
                   </>
                 ) : (
                   <>
-                    <div className="rounded-xl border border-emerald-100 bg-ok-bg px-3 py-3 text-sm font-black text-ok-tx">
+                    <div className="rounded-xl border border-line bg-ok-bg px-3 py-3 text-sm font-black text-ok-tx">
                       ✅ {bulkResult.success}명 지급 완료{bulkResult.failed.length > 0 ? ` · ❌ ${bulkResult.failed.length}명 실패` : ""}
                     </div>
                     {bulkResult.failed.length > 0 ? (

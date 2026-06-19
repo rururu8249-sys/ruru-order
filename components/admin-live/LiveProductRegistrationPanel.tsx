@@ -377,7 +377,7 @@ export default function LiveProductRegistrationPanel({
               className={[
                 "rounded-full px-4 py-2 text-[12px] font-black",
                 selectOrderEnabled
-                  ? "bg-blue-600 text-white"
+                  ? "bg-rose-deep text-white"
                   : "bg-surface text-ink-soft ring-1 ring-line",
               ].join(" ")}
             >
@@ -396,7 +396,7 @@ export default function LiveProductRegistrationPanel({
                       className={[
                         "rounded-full px-3 py-1.5 text-[12px] font-black",
                         productKind === "broadcast"
-                          ? "bg-blue-600 text-white"
+                          ? "bg-rose-deep text-white"
                           : "bg-surface-2 text-ink-soft",
                       ].join(" ")}
                     >
@@ -408,7 +408,7 @@ export default function LiveProductRegistrationPanel({
                       className={[
                         "rounded-full px-3 py-1.5 text-[12px] font-black",
                         productKind === "group"
-                          ? "bg-blue-600 text-white"
+                          ? "bg-rose-deep text-white"
                           : "bg-surface-2 text-ink-soft",
                       ].join(" ")}
                     >
@@ -480,7 +480,7 @@ export default function LiveProductRegistrationPanel({
                   className={[
                     "rounded-full px-4 py-2 text-sm font-black transition active:scale-[0.98]",
                     noneOptionAutofillEnabled
-                      ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-100"
+                      ? "bg-rose-deep text-white shadow-sm ring-2 ring-blue-100"
                       : "bg-surface text-ink-soft ring-1 ring-line hover:bg-surface-2",
                   ].join(" ")}
                 >
@@ -713,7 +713,7 @@ export default function LiveProductRegistrationPanel({
                   type="button"
                   onClick={saveProduct}
                   disabled={saving}
-                  className="rounded-xl bg-blue-600 px-6 py-3 text-[13px] font-black text-white shadow-sm disabled:cursor-wait disabled:opacity-50"
+                  className="rounded-xl bg-rose-deep px-6 py-3 text-[13px] font-black text-white shadow-sm disabled:cursor-wait disabled:opacity-50"
                 >
                   {saving ? "저장중..." : "상품 등록"}
                 </button>

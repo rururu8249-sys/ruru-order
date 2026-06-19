@@ -21,7 +21,7 @@ export default function ManualPaymentAmountSummary({
     <section
       className={[
         "rounded-2xl border px-3 py-2",
-        exact ? "border-emerald-200 bg-emerald-50" : "border-orange-200 bg-orange-50",
+        exact ? "border-emerald-200 bg-ok-bg" : "border-line bg-warn-bg",
       ].join(" ")}
     >
       <div className="grid grid-cols-3 gap-2">
@@ -33,7 +33,7 @@ export default function ManualPaymentAmountSummary({
       <div
         className={[
           "mt-2 rounded-xl px-3 py-1.5 text-[11px] font-black",
-          exact ? "bg-white text-emerald-700" : "bg-white text-orange-700",
+          exact ? "bg-surface text-ok-tx" : "bg-surface text-warn-tx",
         ].join(" ")}
       >
         {exact ? "금액이 정확히 일치합니다." : "금액이 다릅니다. 관리자 판단으로만 수동매칭하세요."}
@@ -54,12 +54,12 @@ function Amount({
   success?: boolean;
 }) {
   return (
-    <div className="rounded-xl bg-white px-3 py-2 shadow-sm">
-      <div className="text-[10px] font-black text-slate-400">{label}</div>
+    <div className="rounded-xl bg-surface px-3 py-2 shadow-sm">
+      <div className="text-[10px] font-black text-ink-mute">{label}</div>
       <div
         className={[
           "mt-0.5 text-sm font-black tracking-[-0.03em]",
-          danger ? "text-red-600" : success ? "text-emerald-600" : "text-slate-950",
+          danger ? "text-danger-tx" : success ? "text-emerald-600" : "text-ink",
         ].join(" ")}
       >
         {value}

@@ -72,8 +72,8 @@ type AdminIssueTask = {
 const ISSUE_TYPES = [
   { label: "교환", taskType: "exchange", className: "bg-rose-soft text-rose-deep border-rose-line" },
   { label: "반품", taskType: "return", className: "bg-violet-100 text-violet-700 border-violet-200" },
-  { label: "환불", taskType: "refund", className: "bg-red-100 text-red-700 border-red-200" },
-  { label: "구매", taskType: "product", className: "bg-green-100 text-green-700 border-green-200" },
+  { label: "환불", taskType: "refund", className: "bg-red-100 text-danger-tx border-line" },
+  { label: "구매", taskType: "product", className: "bg-green-100 text-ok-tx border-green-200" },
   { label: "진상", taskType: "complaint", className: "bg-rose-100 text-rose-700 border-rose-200" },
   { label: "기타", taskType: "general", className: "bg-surface-2 text-ink border-line" },
 ];
@@ -301,7 +301,7 @@ function CustomerIssueSummaryRow({
       className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 text-left hover:bg-rose-soft"
       title="고객관리에서 자세히 보기"
     >
-      <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-black text-orange-700">
+      <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-black text-warn-tx">
         미해결
       </span>
 

@@ -53,18 +53,18 @@ function StatCard({
     tone === "blue"
       ? "border-rose-line bg-rose-soft text-blue-900"
       : tone === "green"
-        ? "border-emerald-100 bg-emerald-50 text-emerald-900"
+        ? "border-line bg-ok-bg text-emerald-900"
         : tone === "orange"
-          ? "border-orange-100 bg-orange-50 text-orange-900"
+          ? "border-line bg-warn-bg text-orange-900"
           : tone === "violet"
             ? "border-violet-100 bg-violet-50 text-violet-900"
-            : "border-slate-200 bg-white text-slate-950";
+            : "border-line bg-surface text-ink";
 
   return (
     <div className={`rounded-2xl border px-4 py-3 shadow-sm ${toneClass}`}>
-      <div className="text-[11px] font-black text-slate-500">{label}</div>
+      <div className="text-[11px] font-black text-ink-soft">{label}</div>
       <div className="mt-1 text-[22px] font-black tracking-[-0.05em]">{value}</div>
-      {sub ? <div className="mt-1 text-[11px] font-bold text-slate-500">{sub}</div> : null}
+      {sub ? <div className="mt-1 text-[11px] font-bold text-ink-soft">{sub}</div> : null}
     </div>
   );
 }
@@ -75,50 +75,50 @@ export default function LiveBroadcastEndSummaryModal({ summary, onClose, onOpenS
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-3 py-5">
-      <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[32px] border border-white/80 bg-white p-5 shadow-[0_28px_90px_rgba(15,23,42,0.35)]">
-        <div className="border-b border-slate-100 pb-4">
+      <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[32px] border border-white/80 bg-surface p-5 shadow-[0_28px_90px_rgba(15,23,42,0.35)]">
+        <div className="border-b border-line-soft pb-4">
           <div className="text-xs font-black tracking-[0.2em] text-rose-deep">BROADCAST SUMMARY</div>
-          <h2 className="mt-2 text-3xl font-black tracking-[-0.05em] text-slate-950">방송 종료 요약</h2>
-          <p className="mt-2 text-sm font-bold text-slate-500">
+          <h2 className="mt-2 text-3xl font-black tracking-[-0.05em] text-ink">방송 종료 요약</h2>
+          <p className="mt-2 text-sm font-bold text-ink-soft">
             방송 종료 시점 기준으로 오늘 먼저 확인할 주문·결제 현황만 크게 정리했습니다.
           </p>
         </div>
 
-        <div className="mt-4 rounded-3xl border border-slate-200 bg-slate-50 p-4">
-          <div className="grid gap-3 text-sm font-bold text-slate-700 md:grid-cols-5">
+        <div className="mt-4 rounded-3xl border border-line bg-surface-2 p-4">
+          <div className="grid gap-3 text-sm font-bold text-ink md:grid-cols-5">
             <div className="md:col-span-2">
-              <div className="text-[11px] font-black text-slate-400">방송명</div>
-              <div className="mt-1 text-lg font-black text-slate-950">{summary.title}</div>
+              <div className="text-[11px] font-black text-ink-mute">방송명</div>
+              <div className="mt-1 text-lg font-black text-ink">{summary.title}</div>
             </div>
             <div>
-              <div className="text-[11px] font-black text-slate-400">방송일</div>
-              <div className="mt-1 font-black text-slate-950">{summary.broadcastDateText}</div>
+              <div className="text-[11px] font-black text-ink-mute">방송일</div>
+              <div className="mt-1 font-black text-ink">{summary.broadcastDateText}</div>
             </div>
             <div>
-              <div className="text-[11px] font-black text-slate-400">방송시간</div>
-              <div className="mt-1 font-black text-slate-950">
+              <div className="text-[11px] font-black text-ink-mute">방송시간</div>
+              <div className="mt-1 font-black text-ink">
                 {summary.startTimeText} ~ {summary.endTimeText}
               </div>
             </div>
             <div>
-              <div className="text-[11px] font-black text-slate-400">총 방송시간</div>
+              <div className="text-[11px] font-black text-ink-mute">총 방송시간</div>
               <div className="mt-1 font-black text-rose-deep">{summary.durationText}</div>
             </div>
           </div>
         </div>
 
-        <div className="mt-4 rounded-3xl border border-orange-100 bg-orange-50 px-4 py-3">
+        <div className="mt-4 rounded-3xl border border-line bg-warn-bg px-4 py-3">
           <div className="text-sm font-black text-orange-900">지금 확인할 일</div>
-          <div className="mt-2 grid gap-2 text-xs font-bold text-orange-800 md:grid-cols-3">
-            <div className="rounded-2xl bg-white/70 px-3 py-2">
+          <div className="mt-2 grid gap-2 text-xs font-bold text-warn-tx md:grid-cols-3">
+            <div className="rounded-2xl bg-surface-2 px-3 py-2">
               {hasUnpaid
                 ? `아직 못 받은 금액 ${count(summary.unpaidCount)} / ${money(summary.unpaidAmount)} 확인 필요`
                 : "아직 못 받은 금액 없음"}
             </div>
-            <div className="rounded-2xl bg-white/70 px-3 py-2">
+            <div className="rounded-2xl bg-surface-2 px-3 py-2">
               {hasCanceled ? `취소/환불 ${count(summary.canceledCount)} 참고` : "취소/환불 없음"}
             </div>
-            <div className="rounded-2xl bg-white/70 px-3 py-2">방문자 수는 로그 연결 후 표시</div>
+            <div className="rounded-2xl bg-surface-2 px-3 py-2">방문자 수는 로그 연결 후 표시</div>
           </div>
         </div>
 
@@ -138,23 +138,23 @@ export default function LiveBroadcastEndSummaryModal({ summary, onClose, onOpenS
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <div className="rounded-3xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs font-bold leading-5 text-amber-800">
+          <div className="rounded-3xl border border-amber-100 bg-warn-bg px-4 py-3 text-xs font-bold leading-5 text-amber-800">
             사이트 방문자 수: {summary.visitorText}
             <br />
             방문자 수는 방문 로그 테이블이 연결된 뒤 정확한 숫자로 표시하는 것이 안전합니다.
           </div>
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-bold leading-5 text-slate-600">
+          <div className="rounded-3xl border border-line bg-surface-2 px-4 py-3 text-xs font-bold leading-5 text-ink-soft">
             방송 리포트 저장은 다음 단계에서 DB 구조를 확인한 뒤 연결합니다.
             <br />
             지금 팝업은 주문·결제 현황을 빠르게 확인하는 읽기 전용 요약입니다.
           </div>
         </div>
 
-        <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
+        <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-line-soft pt-4">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+            className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-black text-ink hover:bg-surface-2"
           >
             닫기
           </button>

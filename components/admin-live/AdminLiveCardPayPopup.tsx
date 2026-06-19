@@ -111,7 +111,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
       style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}
     >
       <div style={{ display: "flex", flexDirection: "row", width: "960px", maxWidth: "95vw", height: "600px", borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
-        <div style={{ width: "50%", height: "100%", background: "#fff", overflowY: "auto" }}>
+        <div style={{ width: "50%", height: "100%", background: "var(--color-surface)", overflowY: "auto" }}>
         <div className="flex items-center justify-between border-b border-rose-line px-5 py-3">
           <span className="text-[15px] font-black text-ink">💳 카드결제 — {order.nickname}</span>
           <button type="button" onClick={onClose} className="text-lg leading-none text-ink-mute hover:text-ink">
@@ -167,7 +167,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
           </div>
         </div>
         </div>
-        <div style={{ width: "50%", height: "100%", background: "#fff", borderLeft: "1px solid var(--color-line)" }}>
+        <div style={{ width: "50%", height: "100%", background: "var(--color-surface)", borderLeft: "1px solid var(--color-line)" }}>
           <iframe src={PAYSTER_URL} title="페이스터 결제" style={{ width: "100%", height: "100%", border: 0 }} />
         </div>
       </div>
