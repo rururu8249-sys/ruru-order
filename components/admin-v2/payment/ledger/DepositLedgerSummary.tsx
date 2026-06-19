@@ -41,15 +41,15 @@ export default function DepositLedgerSummary({ summary }: Props) {
       {cards.map((card) => (
         <article
           key={card.label}
-          className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.06)]"
+          className="rounded-[26px] border border-line bg-surface p-5 shadow-[0_18px_45px_rgba(15,23,42,0.06)]"
         >
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-xs font-black text-slate-500">{card.label}</div>
-              <div className="mt-2 text-2xl font-black tracking-tight text-slate-950">{card.value}</div>
-              <div className="mt-1 text-xs font-bold text-slate-400">{card.sub}</div>
+              <div className="text-xs font-black text-ink-soft">{card.label}</div>
+              <div className="mt-2 text-2xl font-black tracking-tight text-ink">{card.value}</div>
+              <div className="mt-1 text-xs font-bold text-ink-mute">{card.sub}</div>
             </div>
-            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-blue-50 text-lg font-black text-blue-600">
+            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-info-bg text-lg font-black text-info-tx">
               {card.icon}
             </div>
           </div>

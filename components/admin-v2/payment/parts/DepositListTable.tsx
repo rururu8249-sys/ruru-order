@@ -34,7 +34,7 @@ function formatDateLabel(value: any) {
 
 function EmptyBox({ text }: { text: string }) {
   return (
-    <div className="px-4 py-10 text-center text-sm font-bold text-neutral-500">
+    <div className="px-4 py-10 text-center text-sm font-bold text-ink-soft">
       {text}
     </div>
   );
@@ -80,8 +80,8 @@ function statusView(value: any) {
 
 export default function DepositListTable({ deposits }: DepositListTableProps) {
   return (
-    <section className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
-      <div className="grid grid-cols-[1fr_120px_120px] bg-neutral-950 px-3 py-2 text-[12px] font-black text-white">
+    <section className="overflow-hidden rounded-xl border border-line bg-surface">
+      <div className="grid grid-cols-[1fr_120px_120px] bg-rose-deep px-3 py-2 text-[12px] font-black text-white">
         <div>입금자명</div>
         <div className="text-right">입금금액</div>
         <div className="text-center">처리 상태</div>
@@ -90,7 +90,7 @@ export default function DepositListTable({ deposits }: DepositListTableProps) {
       {deposits.length === 0 ? (
         <EmptyBox text="표시할 입금내역이 없습니다." />
       ) : (
-        <div className="divide-y divide-neutral-100">
+        <div className="divide-y divide-line">
           {deposits.map((deposit) => {
             const view = statusView(deposit.match_status);
 
@@ -101,7 +101,7 @@ export default function DepositListTable({ deposits }: DepositListTableProps) {
               >
                 <div>
                   <div className="font-black">{deposit.depositor_name || "-"}</div>
-                  <div className="text-[11px] font-bold text-neutral-500">
+                  <div className="text-[11px] font-bold text-ink-soft">
                     {formatDateLabel(deposit.deposited_time || deposit.created_at)}
                   </div>
                 </div>

@@ -187,28 +187,28 @@ export default function PaymentMatchPanel(_props: Props) {
 
   return (
     <div className="mx-auto grid w-full max-w-[1440px] gap-5">
-      <section className="flex flex-col gap-4 rounded-[34px] border border-slate-200 bg-gradient-to-br from-white via-white to-blue-50/40 p-6 shadow-[0_22px_60px_rgba(15,23,42,0.07)] lg:flex-row lg:items-center lg:justify-between">
+      <section className="flex flex-col gap-4 rounded-[34px] border border-line bg-gradient-to-br from-surface via-surface to-surface-2 p-6 shadow-[0_22px_60px_rgba(15,23,42,0.07)] lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-black tracking-[0.18em] text-blue-700">
+            <div className="inline-flex items-center rounded-full border border-line bg-info-bg px-3 py-1 text-xs font-black tracking-[0.18em] text-info-tx">
               MG
             </div>
-            <div className="text-xs font-black tracking-[0.18em] text-slate-500">
+            <div className="text-xs font-black tracking-[0.18em] text-ink-soft">
               SAEMAEUL GEUMGO
             </div>
-            <div className="text-sm font-black text-slate-300">×</div>
-            <div className="inline-flex items-center rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-black tracking-[0.18em] text-orange-700">
+            <div className="text-sm font-black text-ink-mute">×</div>
+            <div className="inline-flex items-center rounded-full border border-line bg-warn-bg px-3 py-1 text-xs font-black tracking-[0.18em] text-warn-tx">
               BANKDA
             </div>
           </div>
 
-          <div className="mt-2 text-[11px] font-black tracking-[0.22em] text-slate-400">
+          <div className="mt-2 text-[11px] font-black tracking-[0.22em] text-ink-mute">
             SAEMAEUL GEUMGO BANK DEPOSIT SYNC
           </div>
 
-          <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-950">입금내역</h1>
+          <h1 className="mt-3 text-3xl font-black tracking-tight text-ink">입금내역</h1>
 
-          <p className="mt-2 text-sm font-bold text-slate-500">
+          <p className="mt-2 text-sm font-bold text-ink-soft">
             Saemaeul Geumgo deposit records synced through BANKDA. 연결/처리 정보는 상세 버튼에서만 표시합니다.
           </p>
         </div>
@@ -217,7 +217,7 @@ export default function PaymentMatchPanel(_props: Props) {
           type="button"
           onClick={refreshBankdaDeposits}
           disabled={syncing || loading}
-          className="h-13 rounded-2xl bg-blue-600 px-6 py-4 text-sm font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.24)] transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+          className="h-13 rounded-2xl bg-rose-deep px-6 py-4 text-sm font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.24)] transition hover:bg-rose-deep disabled:cursor-not-allowed disabled:bg-surface-3"
         >
           {syncing ? "새로고침 중..." : "입금내역 새로고침"}
         </button>
@@ -239,15 +239,15 @@ export default function PaymentMatchPanel(_props: Props) {
       />
 
       {message ? (
-        <div className="rounded-[24px] border border-blue-100 bg-blue-50 px-5 py-4 text-sm font-black text-blue-700">
+        <div className="rounded-[24px] border border-line bg-info-bg px-5 py-4 text-sm font-black text-info-tx">
           {message}
         </div>
       ) : null}
 
       {loading ? (
-        <section className="rounded-[32px] border border-slate-200 bg-white p-12 text-center shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
-          <div className="text-lg font-black text-slate-700">입금내역을 불러오는 중입니다.</div>
-          <div className="mt-2 text-sm font-bold text-slate-400">뱅크다 저장 내역을 조회하고 있습니다.</div>
+        <section className="rounded-[32px] border border-line bg-surface p-12 text-center shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+          <div className="text-lg font-black text-ink">입금내역을 불러오는 중입니다.</div>
+          <div className="mt-2 text-sm font-bold text-ink-mute">뱅크다 저장 내역을 조회하고 있습니다.</div>
         </section>
       ) : (
         <DepositLedgerTable

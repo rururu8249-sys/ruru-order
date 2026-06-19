@@ -321,16 +321,16 @@ export default function ManualPaymentMatchDrawer(props: Props) {
 
   return (
     <div className="fixed inset-0 z-[90] bg-slate-950/30">
-      <aside className="fixed bottom-5 right-5 top-[118px] z-[95] flex w-[520px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
-        <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-3">
+      <aside className="fixed bottom-5 right-5 top-[118px] z-[95] flex w-[520px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-3xl border border-line bg-surface shadow-2xl">
+        <header className="shrink-0 border-b border-line bg-surface px-4 py-3">
           <div className="mb-3 flex items-start justify-between gap-4">
             <div>
               <div className="text-[10px] font-black tracking-[0.18em] text-rose-deep">MANUAL PAYMENT MATCH</div>
-              <h2 className="mt-0.5 text-lg font-black tracking-[-0.04em] text-slate-950">⇄ 입금매칭</h2>
+              <h2 className="mt-0.5 text-lg font-black tracking-[-0.04em] text-ink">⇄ 입금매칭</h2>
             </div>
 
             <div className="flex items-start gap-2">
-              <div className="rounded-xl bg-orange-50 px-3 py-2 text-right text-[11px] font-black text-orange-700">
+              <div className="rounded-xl bg-warn-bg px-3 py-2 text-right text-[11px] font-black text-warn-tx">
                 돈 관련 작업<br />입금자명·금액 확인
               </div>
               <button
@@ -338,7 +338,7 @@ export default function ManualPaymentMatchDrawer(props: Props) {
                 onClick={props.onClose}
                 disabled={saving}
                 aria-label="수동 입금매칭 닫기"
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                className="rounded-xl border border-line bg-surface px-4 py-2 text-sm font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50"
               >
                 닫기
               </button>
@@ -357,7 +357,7 @@ export default function ManualPaymentMatchDrawer(props: Props) {
                   setShowAll(false);
                 }}
                 placeholder="입금자명 또는 금액 검색"
-                className="h-10 rounded-xl border border-slate-200 px-3 text-sm font-black outline-none focus:border-rose-deep focus:ring-4 focus:ring-rose-soft"
+                className="h-10 rounded-xl border border-line px-3 text-sm font-black outline-none focus:border-rose-deep focus:ring-4 focus:ring-rose-soft"
               />
 
               <button
@@ -366,7 +366,7 @@ export default function ManualPaymentMatchDrawer(props: Props) {
                   setKeyword("");
                   setShowAll(true);
                 }}
-                className="h-10 rounded-xl bg-slate-950 text-xs font-black text-white active:scale-[0.98]"
+                className="h-10 rounded-xl bg-rose-deep text-xs font-black text-white active:scale-[0.98]"
               >
                 전체보기
               </button>
@@ -375,7 +375,7 @@ export default function ManualPaymentMatchDrawer(props: Props) {
                 type="button"
                 onClick={loadDeposits}
                 disabled={loading}
-                className="h-10 rounded-xl bg-rose-deep text-xs font-black text-white active:scale-[0.98] disabled:bg-slate-300"
+                className="h-10 rounded-xl bg-rose-deep text-xs font-black text-white active:scale-[0.98] disabled:bg-surface-3"
               >
                 {loading ? "로딩중" : "새로고침"}
               </button>
@@ -390,27 +390,27 @@ export default function ManualPaymentMatchDrawer(props: Props) {
           </div>
         </header>
 
-        <section className="min-h-0 flex-1 overflow-y-auto bg-slate-50 px-4 py-3">
+        <section className="min-h-0 flex-1 overflow-y-auto bg-surface-2 px-4 py-3">
           <div className="mb-2 flex items-center justify-between">
-            <div className="text-sm font-black text-slate-700">
+            <div className="text-sm font-black text-ink">
               미매칭 입금내역 {depositsForDisplay.length.toLocaleString()}건
             </div>
-            <div className="text-xs font-bold text-slate-400">
+            <div className="text-xs font-bold text-ink-mute">
               저장된 전체 입금내역 {serverDeposits.length.toLocaleString()}건
             </div>
           </div>
 
           {depositsForDisplay.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-14 text-center">
+            <div className="rounded-2xl border border-dashed border-line bg-surface px-4 py-14 text-center">
               <div className="text-3xl">🧾</div>
-              <div className="mt-3 text-base font-black text-slate-600">표시할 미확인 입금내역이 없습니다.</div>
-              <div className="mt-2 text-sm font-bold leading-6 text-slate-400">
+              <div className="mt-3 text-base font-black text-ink-soft">표시할 미확인 입금내역이 없습니다.</div>
+              <div className="mt-2 text-sm font-bold leading-6 text-ink-mute">
                 검색어를 지우거나 전체보기를 눌러주세요.<br />
                 방금 입금된 건은 새로고침으로 다시 확인할 수 있습니다.
               </div>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
               {depositsForDisplay.map((deposit) => {
                 const selected = selectedDepositIdSet.has(Number(deposit.id));
                 const amountMatch = Number(deposit.amount || 0) === expectedAmount;
@@ -445,17 +445,17 @@ export default function ManualPaymentMatchDrawer(props: Props) {
         </section>
 
         {actionError ? (
-          <div className="shrink-0 border-t border-red-100 bg-red-50 px-4 py-3 text-sm font-black leading-5 text-red-700">
+          <div className="shrink-0 border-t border-line bg-danger-bg px-4 py-3 text-sm font-black leading-5 text-danger-tx">
             수동입금 처리 오류: {actionError}
           </div>
         ) : null}
 
-        <footer className="shrink-0 border-t border-slate-200 bg-white p-3.5">
+        <footer className="shrink-0 border-t border-line bg-surface p-3.5">
           <button
             type="button"
             onClick={confirmManualMatch}
             disabled={saving}
-            className="h-10 w-full rounded-xl bg-emerald-600 text-[13px] font-black text-white transition active:scale-[0.98] hover:bg-emerald-700 disabled:bg-slate-300"
+            className="h-10 w-full rounded-xl bg-emerald-600 text-[13px] font-black text-white transition active:scale-[0.98] hover:bg-emerald-700 disabled:bg-surface-3"
           >
             {saving
               ? "처리중..."
