@@ -1125,7 +1125,7 @@ export default function AdminLiveEventRoulettePanel({
               <>
               {/* 룰렛 + 참가자 */}
               <div style={{ display: "flex", gap: "14px", alignItems: "stretch", marginBottom: "13px" }}>
-                <div style={{ flex: 1, background: "#f7f5f1", borderRadius: "10px", minHeight: "190px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", position: "relative" }}>
+                <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "10px", minHeight: "190px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", position: "relative" }}>
                   {eventTab === "roulette" ? (
                     <div className="wheel">
                       <span className="pt" style={{ top: "6px", fontSize: "24px" }}>▼</span>
@@ -1135,7 +1135,7 @@ export default function AdminLiveEventRoulettePanel({
                       </div>
                     </div>
                   ) : (
-                    <div style={{ width: "150px", height: "150px", borderRadius: "16px", background: "#fff", border: "1px solid var(--bd)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                    <div style={{ width: "150px", height: "150px", borderRadius: "16px", background: "var(--color-surface)", border: "1px solid var(--bd)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "6px" }}>
                       <span style={{ fontSize: "46px", lineHeight: 1 }}>🕹️</span>
                       <span style={{ fontSize: "12px", color: "var(--rose)", fontWeight: 600 }}>인형뽑기 · {finalParticipants.length}명</span>
                     </div>
@@ -1144,10 +1144,10 @@ export default function AdminLiveEventRoulettePanel({
 
                   {/* 당첨자 발표 카드 — 룰렛 위(상단)에만 덮어서 아래 ▶돌리기 버튼은 가리지 않음. 클릭도 통과(pointerEvents none) */}
                   {centerWinner && currentEvent?.winner_nickname === centerWinner ? (
-                    <div style={{ position: "absolute", left: "50%", top: "8px", transform: "translateX(-50%)", width: "min(90%,300px)", borderRadius: "24px", background: "#fff", boxShadow: "0 24px 70px rgba(15,23,42,0.24)", padding: "18px", textAlign: "center", zIndex: 30, pointerEvents: "none" }}>
+                    <div style={{ position: "absolute", left: "50%", top: "8px", transform: "translateX(-50%)", width: "min(90%,300px)", borderRadius: "24px", background: "var(--color-surface)", boxShadow: "0 24px 70px rgba(15,23,42,0.24)", padding: "18px", textAlign: "center", zIndex: 30, pointerEvents: "none" }}>
                       <div style={{ color: "#7c3aed", fontSize: "18px", fontWeight: 950, letterSpacing: "-0.05em" }}>당첨</div>
-                      <div style={{ marginTop: "6px", color: "#111827", fontSize: "40px", fontWeight: 950, lineHeight: 1.05, letterSpacing: "-0.08em", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{centerWinner}</div>
-                      <div style={{ marginTop: "10px", color: "#475569", fontSize: "16px", fontWeight: 900, letterSpacing: "-0.05em" }}>{currentEvent?.winner_note || "이벤트 당첨"}</div>
+                      <div style={{ marginTop: "6px", color: "var(--color-ink)", fontSize: "40px", fontWeight: 950, lineHeight: 1.05, letterSpacing: "-0.08em", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{centerWinner}</div>
+                      <div style={{ marginTop: "10px", color: "var(--color-ink-soft)", fontSize: "16px", fontWeight: 900, letterSpacing: "-0.05em" }}>{currentEvent?.winner_note || "이벤트 당첨"}</div>
                     </div>
                   ) : null}
                 </div>
@@ -1160,16 +1160,16 @@ export default function AdminLiveEventRoulettePanel({
                   {participantSource === "manual" ? (
                     <textarea value={manualParticipantText} onChange={(e) => setManualParticipantText(e.target.value)} onPaste={handleManualPaste}
                       placeholder={"닉네임/쉼표 구분. 채팅 붙여넣으면 @닉네임만 자동 추출."}
-                      style={{ width: "100%", height: "70px", resize: "none", fontSize: "11px", border: "1px solid var(--bd)", borderRadius: "7px", padding: "8px", background: "#fff" }} />
+                      style={{ width: "100%", height: "70px", resize: "none", fontSize: "11px", border: "1px solid var(--bd)", borderRadius: "7px", padding: "8px", background: "var(--color-surface)" }} />
                   ) : null}
                   {!liveBroadcastId && participantSource !== "manual" ? (
                     <div className="note" style={{ color: "var(--amber)" }}>⚠ 방송 OFF — 방송 시작 후 명단을 불러올 수 있어요.</div>
                   ) : null}
-                  <div style={{ background: "#f7f5f1", borderRadius: "7px", padding: "8px 11px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => setExcludeDailyDup((v) => !v)}>
+                  <div style={{ background: "var(--color-surface-2)", borderRadius: "7px", padding: "8px 11px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => setExcludeDailyDup((v) => !v)}>
                     <span style={{ fontSize: "11px" }}>당일 중복당첨 금지</span>
                     <span className={`tog ${excludeDailyDup ? "on" : "off"}`}><i /></span>
                   </div>
-                  <div style={{ background: "#f7f5f1", borderRadius: "7px", padding: "8px 11px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => setUseWeight((v) => !v)}>
+                  <div style={{ background: "var(--color-surface-2)", borderRadius: "7px", padding: "8px 11px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => setUseWeight((v) => !v)}>
                     <span style={{ fontSize: "11px" }}>많이 산 사람 확률 ↑ <span style={{ color: "var(--mut2)" }}>(금액40%+당일60%)</span></span>
                     <span className={`tog ${useWeight ? "on" : "off"}`}><i /></span>
                   </div>

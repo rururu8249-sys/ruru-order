@@ -171,3 +171,17 @@ body {
 .ruru-product-sian .tog.off { background: #ccc; }
 .ruru-product-sian .tog.off i { left: 2px; }
 .ruru-product-sian .tog i { position: absolute; top: 2px; width: 12px; height: 12px; background: #fff; border-radius: 50%; }
+
+/* === 이벤트/상품 시안 팝업 다크 오버라이드 (.dark 안에서만) === */
+.dark .ruru-event-sian, .dark .ruru-product-sian {
+  --bd: #3a3833; --ink: #edece8; --mut: #b2afa7; --mut2: #8a867d;
+  --rose-bg: #352a28; --rose-bg2: #2f2b28; --green-bg: #173026; --blue-bg: #16293a; --amber-bg: #352c18;
+}
+.dark .ruru-event-sian .body,
+.dark .ruru-event-sian .btn:not(.rose):not(.green),
+.dark .ruru-event-sian .ipt,
+.dark .ruru-product-sian .btn:not(.rose):not(.green),
+.dark .ruru-product-sian .ipt,
+.dark .ruru-product-sian .tag { background: var(--color-surface); color: var(--ink); }
+.dark .ruru-event-sian .nick.out { background: var(--color-surface-3); color: var(--color-ink-mute); }
+.dark .ruru-event-sian .tog.off { background: var(--color-surface-3); }
