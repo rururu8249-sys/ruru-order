@@ -1526,7 +1526,7 @@ export default function AdminLiveDashboard() {
               </div>
 
               {/* 오른쪽 컬럼: 영상·채팅·지금상품(세로). xl 이상에서 스티키. */}
-              <aside className="min-w-0 xl:self-stretch">
+              <aside className="min-w-0 xl:sticky xl:top-3 xl:self-start xl:h-[calc(100vh-1.5rem)]">
                 <LiveBroadcastPanels variant="column" videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} activeBroadcastId={activeBroadcast?.id || null} />
               </aside>
             </div>
