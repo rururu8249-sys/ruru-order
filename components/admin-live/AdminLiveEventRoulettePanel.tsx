@@ -1105,15 +1105,15 @@ export default function AdminLiveEventRoulettePanel({
               <div style={{ display: "flex", alignItems: "center", marginBottom: "13px" }}>
                 <span style={{ fontSize: "14px", fontWeight: 600 }}>◆ 이벤트</span>
                 <span style={{ marginLeft: "auto", display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap" }}>
-                  <span className="badge" style={{ padding: "4px 16px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "roulette" ? "var(--rose)" : "#fff", color: eventTab === "roulette" ? "#fff" : "var(--mut)" }}
+                  <span className="badge" style={{ padding: "4px 16px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "roulette" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "roulette" ? "#fff" : "var(--mut)" }}
                     onClick={() => { setEventTab("roulette"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>룰렛</span>
-                  <span className="badge" style={{ padding: "4px 16px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "claw" ? "var(--rose)" : "#fff", color: eventTab === "claw" ? "#fff" : "var(--mut)" }}
+                  <span className="badge" style={{ padding: "4px 16px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "claw" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "claw" ? "#fff" : "var(--mut)" }}
                     onClick={() => { setEventTab("claw"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>인형뽑기</span>
-                  <span className="badge" style={{ padding: "4px 14px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "mission" ? "var(--rose)" : "#fff", color: eventTab === "mission" ? "#fff" : "var(--mut)" }}
+                  <span className="badge" style={{ padding: "4px 14px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "mission" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "mission" ? "#fff" : "var(--mut)" }}
                     onClick={() => { setEventTab("mission"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>🎯 미션 게이지</span>
                   <span style={{ width: "1px", height: "18px", background: "var(--bd)", margin: "0 3px" }} />
-                  <span className="badge" style={{ padding: "4px 10px", cursor: "pointer", border: "1px solid var(--bd)", background: mode === "test" ? "var(--amber-bg)" : "#fff", color: mode === "test" ? "var(--amber)" : "var(--mut)" }} onClick={() => changeMode("test")}>테스트</span>
-                  <span className="badge" style={{ padding: "4px 10px", cursor: "pointer", border: "1px solid var(--bd)", background: mode === "live" ? "var(--green-bg)" : "#fff", color: mode === "live" ? "var(--green)" : "var(--mut)" }} onClick={() => changeMode("live")}>운영</span>
+                  <span className="badge" style={{ padding: "4px 10px", cursor: "pointer", border: "1px solid var(--bd)", background: mode === "test" ? "var(--amber-bg)" : "var(--color-surface)", color: mode === "test" ? "var(--amber)" : "var(--mut)" }} onClick={() => changeMode("test")}>테스트</span>
+                  <span className="badge" style={{ padding: "4px 10px", cursor: "pointer", border: "1px solid var(--bd)", background: mode === "live" ? "var(--green-bg)" : "var(--color-surface)", color: mode === "live" ? "var(--green)" : "var(--mut)" }} onClick={() => changeMode("live")}>운영</span>
                   <button className="btn" style={{ height: "auto", padding: "5px 10px" }} onClick={() => { resetEvent(); setCenterWinner(""); }}>↺ 초기화</button>
                   <button className="btn" style={{ height: "auto", padding: "5px 10px" }} onClick={closePanel}>✕</button>
                 </span>
@@ -1221,7 +1221,7 @@ export default function AdminLiveEventRoulettePanel({
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
                   <span className="seclabel" style={{ margin: 0 }}>이벤트 목록 <span className="note">지난 기록</span></span>
                   {periodChips.map((chip) => (
-                    <span key={chip.key} className="badge" style={{ cursor: "pointer", padding: "4px 10px", border: "1px solid var(--bd)", background: listPeriod === chip.key ? "var(--rose)" : "#fff", color: listPeriod === chip.key ? "#fff" : "var(--mut)" }} onClick={() => setListPeriod(chip.key)}>{chip.label}</span>
+                    <span key={chip.key} className="badge" style={{ cursor: "pointer", padding: "4px 10px", border: "1px solid var(--bd)", background: listPeriod === chip.key ? "var(--rose)" : "var(--color-surface)", color: listPeriod === chip.key ? "#fff" : "var(--mut)" }} onClick={() => setListPeriod(chip.key)}>{chip.label}</span>
                   ))}
                   {listPeriod === "date" ? (
                     <input type="date" className="ipt" style={{ height: "26px" }} value={listDate} onChange={(e) => setListDate(e.target.value)} />

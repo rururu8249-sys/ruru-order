@@ -301,7 +301,7 @@ export default function AdminLiveMissionPanel() {
                   padding: "10px",
                   borderRadius: 10,
                   border: goalType === g ? "2px solid var(--color-rose-deep)" : "1.5px solid var(--color-rose-line)",
-                  background: goalType === g ? "var(--color-rose-deep)" : "#fff",
+                  background: goalType === g ? "var(--color-rose-deep)" : "var(--color-surface)",
                   color: goalType === g ? "#fff" : "var(--color-rose-deep)",
                   fontWeight: 700,
                   fontSize: 14,
@@ -367,7 +367,7 @@ export default function AdminLiveMissionPanel() {
             padding: "12px",
             borderRadius: 12,
             border: "2px solid " + (payoutUnlocked ? "var(--color-ok-tx)" : "var(--color-rose-line)"),
-            background: payoutUnlocked ? "#fff" : "var(--color-surface-2)",
+            background: payoutUnlocked ? "var(--color-surface)" : "var(--color-surface-2)",
             color: payoutUnlocked ? "var(--color-ok-tx)" : "var(--color-ink-mute)",
             fontWeight: 800,
             fontSize: 15,
@@ -400,7 +400,7 @@ export default function AdminLiveMissionPanel() {
             <span
               key={key}
               className="badge"
-              style={{ cursor: "pointer", padding: "4px 10px", border: "1px solid var(--bd)", background: histPeriod === key ? "var(--rose)" : "#fff", color: histPeriod === key ? "#fff" : "var(--mut)" }}
+              style={{ cursor: "pointer", padding: "4px 10px", border: "1px solid var(--bd)", background: histPeriod === key ? "var(--rose)" : "var(--color-surface)", color: histPeriod === key ? "#fff" : "var(--mut)" }}
               onClick={() => setHistPeriod(key)}
             >
               {label}

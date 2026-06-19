@@ -33,6 +33,9 @@
   --color-rose-deep: #7b2d43;
   --color-rose-soft: #f5e6eb;
   --color-rose-line: #d9c5cc;
+  /* 카드결제 액센트(보라) — 라이트는 선명, 다크는 채도 낮춤(눈피로 완화) */
+  --color-cardpay: #7c3aed;
+  --color-cardpay-hover: #6d28d9;
 }
 
 /* ===== 관리자 다크모드 — 정공법: 시맨틱 토큰 + Tailwind v4 다크 variant =====
@@ -72,15 +75,18 @@
   --color-ink-mute: #8a867d;
   --color-line: #3a3833;
   --color-line-soft: #2c2b27;
-  /* 액센트(브랜드 로즈) — 따뜻한 면에서도 보이게 */
-  --color-rose-deep: #e06a90;
+  /* 액센트(브랜드 로즈) — 다크에선 채도 ~40%↓(순분홍 진동/눈피로 완화, 밝기는 유지해 가독성 확보) */
+  --color-rose-deep: #ce7f99;
   --color-rose-soft: #352a28;
   --color-rose-line: #4a3a35;
-  /* 상태 배지 다크 */
-  --color-ok-bg: #143028;   --color-ok-tx: #3dd39c;
-  --color-warn-bg: #3a2e16; --color-warn-tx: #e6a23c;
-  --color-danger-bg: #3a1f26; --color-danger-tx: #ff8a8a;
-  --color-info-bg: #16293f;   --color-info-tx: #6fb0ee;
+  /* 카드결제 보라도 다크에선 톤다운 */
+  --color-cardpay: #9576b8;
+  --color-cardpay-hover: #84669f;
+  /* 상태 배지 다크 — 채도 살짝 낮춰 진동 완화 */
+  --color-ok-bg: #143028;   --color-ok-tx: #4ec59a;
+  --color-warn-bg: #3a2e16; --color-warn-tx: #e0a653;
+  --color-danger-bg: #3a1f26; --color-danger-tx: #f29a9a;
+  --color-info-bg: #16293f;   --color-info-tx: #7bb2e6;
   color-scheme: dark;
 }
 

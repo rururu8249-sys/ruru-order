@@ -853,7 +853,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                   type="button"
                   onClick={() => handleCardPaymentStatusChange("카드결제완료", "card-paid")}
                   disabled={Boolean(cardStatusAction)}
-                  className="h-10 w-full rounded-xl bg-violet-600 text-[13px] font-black text-white shadow-sm hover:bg-violet-700 active:scale-[0.99] disabled:bg-surface-3"
+                  className="h-10 w-full rounded-xl bg-cardpay text-[13px] font-black text-white shadow-sm hover:bg-cardpay-hover active:scale-[0.99] disabled:bg-surface-3"
                 >
                   {cardStatusAction === "card-paid" ? "처리중..." : "카드결제완료 처리"}
                 </button>

@@ -1086,7 +1086,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   return (
                     <div key={b.id} style={{ border: "1px solid " + (expanded ? "var(--color-rose-line)" : "var(--color-line)"), borderRadius: "10px", overflow: "hidden", background: "var(--color-surface)" }}>
                       {/* 헤더 행 */}
-                      <div onClick={() => void loadBroadcastDetail(b.id)} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "11px 13px", cursor: "pointer", background: expanded ? "var(--color-rose-soft)" : "#fff" }}>
+                      <div onClick={() => void loadBroadcastDetail(b.id)} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "11px 13px", cursor: "pointer", background: expanded ? "var(--color-rose-soft)" : "var(--color-surface)" }}>
                         <span style={{ flexShrink: 0, fontSize: "10px", fontWeight: 800, padding: "3px 8px", borderRadius: "6px", background: isShop ? "var(--color-ok-bg)" : "var(--color-warn-bg)", color: isShop ? "var(--color-ok-tx)" : "var(--color-warn-tx)" }}>{isShop ? "🛍 쇼핑몰" : "📺 방송"}</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</div>
@@ -1168,7 +1168,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     const d = new Date(b.started_at);
                     const dateLabel = Number.isNaN(d.getTime()) ? "-" : `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
                     return (
-                      <button type="button" key={b.id} onClick={() => setBcSelId(b.id)} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", borderBottom: "1px solid #F0ECE8", background: on ? "var(--color-rose-soft)" : "#fff", cursor: "pointer", border: "none" }}>
+                      <button type="button" key={b.id} onClick={() => setBcSelId(b.id)} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", borderBottom: "1px solid var(--color-line)", background: on ? "var(--color-rose-soft)" : "var(--color-surface)", cursor: "pointer", border: "none" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                           {isOn ? <span style={{ flexShrink: 0, fontSize: "9px", fontWeight: 800, padding: "1px 6px", borderRadius: "5px", background: "var(--color-ok-bg)", color: "var(--color-ok-tx)" }}>ON</span> : null}
                           <span style={{ flex: 1, minWidth: 0, fontSize: "12px", fontWeight: 800, color: on ? "var(--color-rose-deep)" : "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</span>
@@ -1215,7 +1215,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           onDragOver={(e) => { e.preventDefault(); if (bcDragOver !== i) setBcDragOver(i); }}
                           onDrop={(e) => { e.preventDefault(); if (bcDragFrom !== null) void reorderBc(bcDragFrom, i); setBcDragFrom(null); setBcDragOver(null); }}
                           onDragEnd={() => { setBcDragFrom(null); setBcDragOver(null); }}
-                          style={{ display: "flex", alignItems: "center", gap: "10px", border: "1px solid var(--color-line)", borderRadius: "9px", padding: "8px", background: bcDragFrom !== null && bcDragOver === i && bcDragFrom !== i ? "var(--color-warn-bg)" : "#fff", opacity: bcDragFrom === i ? 0.4 : 1, boxShadow: bcDragFrom !== null && bcDragOver === i && bcDragFrom !== i ? "inset 0 2px 0 var(--color-rose-deep)" : undefined, cursor: bcBusy ? "default" : "grab" }}
+                          style={{ display: "flex", alignItems: "center", gap: "10px", border: "1px solid var(--color-line)", borderRadius: "9px", padding: "8px", background: bcDragFrom !== null && bcDragOver === i && bcDragFrom !== i ? "var(--color-warn-bg)" : "var(--color-surface)", opacity: bcDragFrom === i ? 0.4 : 1, boxShadow: bcDragFrom !== null && bcDragOver === i && bcDragFrom !== i ? "inset 0 2px 0 var(--color-rose-deep)" : undefined, cursor: bcBusy ? "default" : "grab" }}
                         >
                           {/* 드래그 핸들 */}
                           <span style={{ flexShrink: 0, fontSize: "14px", color: "var(--color-ink-mute)", userSelect: "none" }} title="드래그로 순서 변경">⠿</span>
@@ -1263,7 +1263,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         onDragOver={(e) => { e.preventDefault(); if (shopDragOver !== i) setShopDragOver(i); }}
                         onDrop={(e) => { e.preventDefault(); if (shopDragFrom !== null) void reorderShop(shopDragFrom, i); setShopDragFrom(null); setShopDragOver(null); }}
                         onDragEnd={() => { setShopDragFrom(null); setShopDragOver(null); }}
-                        style={{ display: "flex", alignItems: "center", gap: "10px", border: "1px solid var(--color-line)", borderRadius: "10px", padding: "9px", background: shopDragFrom !== null && shopDragOver === i && shopDragFrom !== i ? "var(--color-warn-bg)" : "#fff", opacity: shopDragFrom === i ? 0.4 : 1, boxShadow: shopDragFrom !== null && shopDragOver === i && shopDragFrom !== i ? "inset 0 2px 0 var(--color-rose-deep)" : undefined, cursor: shopBusy ? "default" : "grab" }}
+                        style={{ display: "flex", alignItems: "center", gap: "10px", border: "1px solid var(--color-line)", borderRadius: "10px", padding: "9px", background: shopDragFrom !== null && shopDragOver === i && shopDragFrom !== i ? "var(--color-warn-bg)" : "var(--color-surface)", opacity: shopDragFrom === i ? 0.4 : 1, boxShadow: shopDragFrom !== null && shopDragOver === i && shopDragFrom !== i ? "inset 0 2px 0 var(--color-rose-deep)" : undefined, cursor: shopBusy ? "default" : "grab" }}
                       >
                         {/* 드래그 핸들 */}
                         <span style={{ flexShrink: 0, fontSize: "14px", color: "var(--color-ink-mute)", userSelect: "none" }} title="드래그로 순서 변경">⠿</span>
@@ -1308,7 +1308,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   key={c}
                   type="button"
                   onClick={() => setCategory(c)}
-                  style={{ ...chipBase, background: category === c ? "var(--color-rose-soft)" : "#fff", color: category === c ? "var(--color-rose-deep)" : "var(--color-ink-soft)", borderColor: category === c ? "var(--color-rose-line)" : "var(--color-line)" }}
+                  style={{ ...chipBase, background: category === c ? "var(--color-rose-soft)" : "var(--color-surface)", color: category === c ? "var(--color-rose-deep)" : "var(--color-ink-soft)", borderColor: category === c ? "var(--color-rose-line)" : "var(--color-line)" }}
                 >
                   {c}
                 </button>
@@ -1401,8 +1401,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
             {/* 순환 / 고정 모드 */}
             <div style={{ display: "flex", gap: "6px", padding: "12px 18px 6px" }}>
-              <button type="button" onClick={() => wsSetMode("rotate")} style={{ flex: 1, height: "36px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (wsMode === "rotate" ? "var(--color-rose-deep)" : "var(--color-line)"), background: wsMode === "rotate" ? "var(--color-rose-deep)" : "#fff", color: wsMode === "rotate" ? "#fff" : "var(--color-ink-soft)" }}>🔁 순환모드</button>
-              <button type="button" onClick={() => wsSetMode("pin")} style={{ flex: 1, height: "36px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (wsMode === "pin" ? "var(--color-rose-deep)" : "var(--color-line)"), background: wsMode === "pin" ? "var(--color-rose-deep)" : "#fff", color: wsMode === "pin" ? "#fff" : "var(--color-ink-soft)" }}>📌 고정모드</button>
+              <button type="button" onClick={() => wsSetMode("rotate")} style={{ flex: 1, height: "36px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (wsMode === "rotate" ? "var(--color-rose-deep)" : "var(--color-line)"), background: wsMode === "rotate" ? "var(--color-rose-deep)" : "var(--color-surface)", color: wsMode === "rotate" ? "#fff" : "var(--color-ink-soft)" }}>🔁 순환모드</button>
+              <button type="button" onClick={() => wsSetMode("pin")} style={{ flex: 1, height: "36px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (wsMode === "pin" ? "var(--color-rose-deep)" : "var(--color-line)"), background: wsMode === "pin" ? "var(--color-rose-deep)" : "var(--color-surface)", color: wsMode === "pin" ? "#fff" : "var(--color-ink-soft)" }}>📌 고정모드</button>
             </div>
             <div style={{ padding: "0 18px 8px", fontSize: "11px", color: "var(--color-ink-mute)", fontWeight: 700 }}>
               {wsMode === "rotate" ? "선택 상품을 방송 순환목록에 담습니다." : "선택 상품을 지금 띄운 상품으로 고정합니다."}
@@ -1434,7 +1434,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     const img = mainImage(p);
                     const checked = wsSelected.has(id);
                     return (
-                      <label key={id || productName(p)} style={{ display: "flex", gap: "9px", alignItems: "center", border: "1px solid " + (checked ? "var(--color-rose-line)" : "var(--color-line)"), background: checked ? "var(--color-rose-soft)" : "#fff", borderRadius: "9px", padding: "7px 10px", cursor: "pointer" }}>
+                      <label key={id || productName(p)} style={{ display: "flex", gap: "9px", alignItems: "center", border: "1px solid " + (checked ? "var(--color-rose-line)" : "var(--color-line)"), background: checked ? "var(--color-rose-soft)" : "var(--color-surface)", borderRadius: "9px", padding: "7px 10px", cursor: "pointer" }}>
                         <input type="checkbox" checked={checked} onChange={() => wsToggle(id)} />
                         <span style={{ width: "34px", height: "34px", flexShrink: 0, borderRadius: "7px", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                           {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "16px" }}>🖼</span>}
@@ -1453,7 +1453,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             {/* 푸터 */}
             <div style={{ display: "flex", gap: "6px", padding: "12px 18px", borderTop: "1px solid var(--color-line)" }}>
               <button type="button" onClick={() => setWidgetSettingsOpen(false)} style={{ height: "38px", padding: "0 16px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)" }}>취소</button>
-              <button type="button" onClick={copyWidgetUrl} style={{ height: "38px", padding: "0 14px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (copied ? "var(--color-ok-tx)" : "var(--color-line)"), background: copied ? "var(--color-ok-bg)" : "#fff", color: copied ? "var(--color-ok-tx)" : "var(--color-ink-soft)", whiteSpace: "nowrap" }}>
+              <button type="button" onClick={copyWidgetUrl} style={{ height: "38px", padding: "0 14px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (copied ? "var(--color-ok-tx)" : "var(--color-line)"), background: copied ? "var(--color-ok-bg)" : "var(--color-surface)", color: copied ? "var(--color-ok-tx)" : "var(--color-ink-soft)", whiteSpace: "nowrap" }}>
                 {copied ? "복사됐어요!" : "🔗 위젯 주소 복사"}
               </button>
               <button type="button" disabled={wsSaving || wsSelected.size === 0} onClick={wsConfirm} style={{ flex: 1, height: "38px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: wsSaving || wsSelected.size === 0 ? "default" : "pointer", border: "none", background: wsSaving || wsSelected.size === 0 ? "var(--color-rose-line)" : "var(--color-rose-deep)", color: "#fff" }}>
@@ -1520,7 +1520,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       const checked = bcPickerSel.has(pid);
                       const img = mainImage(p);
                       return (
-                        <label key={pid || i} style={{ display: "flex", gap: "9px", alignItems: "center", border: "1px solid " + (checked ? "var(--color-rose-line)" : "var(--color-line)"), background: already ? "var(--color-surface-2)" : checked ? "var(--color-rose-soft)" : "#fff", borderRadius: "9px", padding: "7px 10px", cursor: already ? "not-allowed" : "pointer", opacity: already ? 0.55 : 1 }}>
+                        <label key={pid || i} style={{ display: "flex", gap: "9px", alignItems: "center", border: "1px solid " + (checked ? "var(--color-rose-line)" : "var(--color-line)"), background: already ? "var(--color-surface-2)" : checked ? "var(--color-rose-soft)" : "var(--color-surface)", borderRadius: "9px", padding: "7px 10px", cursor: already ? "not-allowed" : "pointer", opacity: already ? 0.55 : 1 }}>
                           <input type="checkbox" disabled={already} checked={already || checked} onChange={() => !already && toggleBcPick(pid)} style={{ width: "16px", height: "16px", flexShrink: 0, accentColor: "var(--color-rose-deep)" }} />
                           <span style={{ width: "40px", height: "40px", flexShrink: 0, borderRadius: "7px", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                             {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "16px" }}>🖼</span>}
@@ -1581,7 +1581,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       const checked = shopPickerSel.has(pid);
                       const img = mainImage(p);
                       return (
-                        <label key={pid || i} style={{ display: "flex", gap: "9px", alignItems: "center", border: "1px solid " + (checked ? "var(--color-rose-line)" : "var(--color-line)"), background: already ? "var(--color-surface-2)" : checked ? "var(--color-rose-soft)" : "#fff", borderRadius: "9px", padding: "7px 10px", cursor: already ? "not-allowed" : "pointer", opacity: already ? 0.55 : 1 }}>
+                        <label key={pid || i} style={{ display: "flex", gap: "9px", alignItems: "center", border: "1px solid " + (checked ? "var(--color-rose-line)" : "var(--color-line)"), background: already ? "var(--color-surface-2)" : checked ? "var(--color-rose-soft)" : "var(--color-surface)", borderRadius: "9px", padding: "7px 10px", cursor: already ? "not-allowed" : "pointer", opacity: already ? 0.55 : 1 }}>
                           <input type="checkbox" disabled={already} checked={already || checked} onChange={() => !already && toggleShopPick(pid)} style={{ width: "16px", height: "16px", flexShrink: 0, accentColor: "var(--color-rose-deep)" }} />
                           <span style={{ width: "40px", height: "40px", flexShrink: 0, borderRadius: "7px", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                             {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "16px" }}>🖼</span>}

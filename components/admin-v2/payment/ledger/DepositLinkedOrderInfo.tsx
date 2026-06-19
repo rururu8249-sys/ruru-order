@@ -153,9 +153,9 @@ export default function DepositLinkedOrderInfo({ row }: { row: RawDepositRow }) 
 
   if (orders.length === 0) {
     return (
-      <section className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3">
-        <div className="text-sm font-black text-slate-800">연결 주문 정보</div>
-        <div className="mt-1 text-xs font-bold leading-5 text-slate-500">
+      <section className="rounded-3xl border border-line bg-surface-2 px-4 py-3">
+        <div className="text-sm font-black text-ink">연결 주문 정보</div>
+        <div className="mt-1 text-xs font-bold leading-5 text-ink-soft">
           연결된 주문 상세가 현재 입금내역에 포함되어 있지 않습니다.
         </div>
       </section>
@@ -163,19 +163,19 @@ export default function DepositLinkedOrderInfo({ row }: { row: RawDepositRow }) 
   }
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-blue-100 bg-blue-50/40">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-blue-100 px-4 py-3">
+    <section className="overflow-hidden rounded-3xl border border-line bg-info-bg">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
         <div>
-          <div className="text-sm font-black text-slate-950">연결 주문 정보</div>
-          <div className="mt-1 text-xs font-bold text-slate-500">이 입금과 연결된 주문내역입니다.</div>
+          <div className="text-sm font-black text-ink">연결 주문 정보</div>
+          <div className="mt-1 text-xs font-bold text-ink-soft">이 입금과 연결된 주문내역입니다.</div>
         </div>
 
-        <div className="rounded-full bg-white px-3 py-1 text-xs font-black text-blue-700 shadow-sm">
+        <div className="rounded-full bg-surface px-3 py-1 text-xs font-black text-info-tx shadow-sm">
           {summaryAmountLabel(orders.length, totalOrderAmount, currentDepositAmount)}
         </div>
       </div>
 
-      <div className="divide-y divide-blue-100 bg-white">
+      <div className="divide-y divide-line bg-surface">
         {orders.map((order, index) => (
           <article
             key={`${safeOrderCode(order)}-${index}`}
@@ -183,23 +183,23 @@ export default function DepositLinkedOrderInfo({ row }: { row: RawDepositRow }) 
           >
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-600">
+                <span className="rounded-full bg-surface-3 px-3 py-1 text-[11px] font-black text-ink-soft">
                   {safeOrderCode(order)}
                 </span>
-                <span className="text-xs font-black text-slate-500">{orderNickname(order)}</span>
+                <span className="text-xs font-black text-ink-soft">{orderNickname(order)}</span>
               </div>
-              <div className="mt-2 break-words text-sm font-black leading-5 text-slate-950">
+              <div className="mt-2 break-words text-sm font-black leading-5 text-ink">
                 {productName(order)}
                 {qtyText(order)}
               </div>
             </div>
 
-            <div className="text-sm font-black tabular-nums text-slate-950 md:text-right">
+            <div className="text-sm font-black tabular-nums text-ink md:text-right">
               {amountLabel(orderAmount(order), currentDepositAmount)}
             </div>
 
             <div className="md:text-right">
-              <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-black text-slate-600">
+              <span className="inline-flex rounded-full border border-line bg-surface-2 px-3 py-1 text-[11px] font-black text-ink-soft">
                 {orderStatus(order)}
               </span>
             </div>
