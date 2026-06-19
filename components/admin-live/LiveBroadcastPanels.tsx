@@ -863,7 +863,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
         </div>
       </div>
 
-      <div className={`min-w-0 rounded-2xl border border-line bg-surface p-3.5 shadow-sm flex flex-col ${isCol ? "h-[320px] w-full" : "h-[420px]"}`} style={isCol ? undefined : { flex: "3 1 0%" }}>
+      <div className={`min-w-0 rounded-2xl border border-line bg-surface p-3.5 shadow-sm flex flex-col ${isCol ? "h-[560px] w-full" : "h-[420px]"}`} style={isCol ? undefined : { flex: "3 1 0%" }}>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-black text-ink">라이브 채팅</h2>
           <span className="text-xs font-bold text-ink-soft">{chatEmbedUrl ? "채팅 연결" : "URL 대기"}</span>
@@ -891,7 +891,42 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
         </div>
       </div>
 
-      <div className={`min-w-0 rounded-2xl border border-line bg-surface p-3.5 shadow-sm flex flex-col ${isCol ? "h-[330px] w-full" : "h-[420px]"}`} style={isCol ? undefined : { flex: "1.2 1 0%" }}>
+      {isCol ? (
+        /* 컴팩트(우측 컬럼): "지금 띄운 상품" 한 줄 + [관리·변경]→상품관리 팝업. 상세 관리는 상품관리 메뉴에서. */
+        <div className="min-w-0 w-full rounded-2xl border border-line bg-surface p-3 shadow-sm">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-black text-ink-mute">🛍 지금 띄운 상품</span>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new Event("ruru-reopen-product-manage"))}
+              className="rounded-lg border border-line bg-surface-2 px-2.5 py-1 text-[11px] font-black text-ink-soft transition hover:bg-surface-3"
+            >
+              관리·변경
+            </button>
+          </div>
+          {liveProduct ? (
+            <div className="flex items-center gap-2.5">
+              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-surface-2">
+                {nowProdImageOf(liveProduct) ? (
+                  <img src={nowProdImageOf(liveProduct)} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="flex h-full items-center justify-center text-lg">👟</span>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13px] font-black text-ink">{liveProduct.product_name || liveProduct.name || liveProduct.title || "상품명 없음"}</div>
+                <div className="text-[13px] font-black text-rose-deep">{Number(liveProduct.price ?? liveProduct.sale_price ?? liveProduct.selling_price ?? 0).toLocaleString("ko-KR")}원</div>
+              </div>
+              {liveCount > 1 ? (
+                <span className="shrink-0 rounded-md bg-surface-2 px-2 py-0.5 text-[10px] font-black text-ink-soft">{safeIdx + 1}/{liveCount}</span>
+              ) : null}
+            </div>
+          ) : (
+            <div className="text-xs font-bold leading-5 text-ink-mute">상품관리에서 순환 담기 또는 새 상품 등록 시 표시됩니다.</div>
+          )}
+        </div>
+      ) : (
+      <div className="min-w-0 rounded-2xl border border-line bg-surface p-3.5 shadow-sm flex flex-col h-[420px]" style={{ flex: "1.2 1 0%" }}>
         {/* 헤더: 제목 + 자동순환 토글 */}
         <div className="mb-2 flex items-center gap-2 text-sm font-black text-ink">
           지금 방송 상품
@@ -1006,6 +1041,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
           </button>
         </div>
       </div>
+      )}
 </section>
   );
 }
