@@ -35,6 +35,54 @@
   --color-rose-line: #d9c5cc;
 }
 
+/* ===== 관리자 다크모드 — 정공법: 시맨틱 토큰 + Tailwind v4 다크 variant =====
+   원칙: 컴포넌트는 surface/ink/line 등 "의미 토큰"만 쓰고, 라이트/다크는 아래 값만 바꾼다.
+   (dark:text-slate-100 식을 모든 요소에 붙이는 안티패턴 회피 — 색은 한 곳에서 관리)
+   .dark 클래스가 붙은 컨테이너 안에서만 적용 → 관리자 루트에만 토글로 부여(다른 페이지 영향 0). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* 면(배경) */
+  --color-canvas: #eef1f6;     /* 페이지 바탕 */
+  --color-surface: #ffffff;    /* 카드/패널 */
+  --color-surface-2: #f6f8fb;  /* 살짝 들어간 영역 */
+  --color-surface-3: #eef2f7;  /* 더 들어간 영역/헤더셀 */
+  /* 글자 */
+  --color-ink: #0f172a;        /* 본문/제목 */
+  --color-ink-soft: #475569;   /* 보조 */
+  --color-ink-mute: #94a3b8;   /* 흐림 */
+  /* 선 */
+  --color-line: #e2e8f0;       /* 일반 테두리 */
+  --color-line-soft: #eef2f7;  /* 옅은 구분선 */
+  /* 상태 배지(성공/주의/위험/정보) */
+  --color-ok-bg: #e7f3ee;   --color-ok-tx: #0f6e56;
+  --color-warn-bg: #fbf1e0; --color-warn-tx: #9a6212;
+  --color-danger-bg: #fbeae7; --color-danger-tx: #c0392b;
+  --color-info-bg: #e8f0fa;   --color-info-tx: #185fa5;
+}
+
+.dark {
+  --color-canvas: #0b0c11;
+  --color-surface: #181b25;
+  --color-surface-2: #1d2130;
+  --color-surface-3: #232838;
+  --color-ink: #e9ebf2;
+  --color-ink-soft: #aeb4c4;
+  --color-ink-mute: #7a8194;
+  --color-line: #2a2f3e;
+  --color-line-soft: #20242f;
+  /* 액센트 다크 보정(어두운 면에서 보이게) */
+  --color-rose-deep: #e0588a;
+  --color-rose-soft: #33202b;
+  --color-rose-line: #46293a;
+  /* 상태 배지 다크 */
+  --color-ok-bg: #143028;   --color-ok-tx: #3dd39c;
+  --color-warn-bg: #3a2e16; --color-warn-tx: #e6a23c;
+  --color-danger-bg: #3a1f26; --color-danger-tx: #ff8a8a;
+  --color-info-bg: #16293f;   --color-info-tx: #6fb0ee;
+  color-scheme: dark;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;

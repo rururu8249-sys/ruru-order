@@ -542,6 +542,23 @@ async function saveLiveBroadcastEndReport({
 
 export default function AdminLiveDashboard() {
   const [activeMenu, setActiveMenu] = useState<AdminLiveMenuKey>(() => readMenuFromUrl());
+  // 라이트/다크 테마 토글 — 관리자 루트에만 .dark 부여(다른 페이지 영향 0). localStorage 기억.
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("ruru_admin_theme");
+      if (saved === "dark" || saved === "light") setTheme(saved);
+    } catch { /* 무시 */ }
+  }, []);
+  const toggleTheme = () => {
+    setTheme((prev) => {
+      const next = prev === "dark" ? "light" : "dark";
+      try { localStorage.setItem("ruru_admin_theme", next); } catch { /* 무시 */ }
+      return next;
+    });
+  };
+  // 모바일 사이드바(드로어) 열림 상태 — 데스크탑(md+)에선 항상 보이므로 무관.
+  const [navOpen, setNavOpen] = useState(false);
   const [integrityOpen, setIntegrityOpen] = useState(false);
   const [integrityLoading, setIntegrityLoading] = useState(false);
   const [integrityResult, setIntegrityResult] = useState<any>(null);
@@ -1387,17 +1404,30 @@ export default function AdminLiveDashboard() {
       : "";
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-950" data-ruru-controltower-shell="broadcast-quick-modal-sidebar-dock-v2">
+    <div className={`min-h-screen bg-canvas text-ink ${theme === "dark" ? "dark" : ""}`} data-ruru-controltower-shell="broadcast-quick-modal-sidebar-dock-v2">
       <div className="flex min-h-screen">
         <AdminLiveSidebar
           activeMenu={activeMenu}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          navOpen={navOpen}
+          onCloseNav={() => setNavOpen(false)}
           onMenuChange={(nextMenu) => {
             setActiveMenu(nextMenu);
             replacePanelInUrl(nextMenu);
           }}
         />
 
-        <main className="min-w-0 flex-1 overflow-x-hidden px-5 py-4">
+        <main className="min-w-0 flex-1 overflow-x-hidden px-3 py-3 md:px-5 md:py-4">
+          {/* 모바일 전용: 사이드바(메뉴) 여는 햄버거. 데스크탑(md+)에선 사이드바가 항상 보여 숨김 */}
+          <button
+            type="button"
+            onClick={() => setNavOpen(true)}
+            className="mb-3 inline-flex items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 text-sm font-black text-ink shadow-sm md:hidden"
+          >
+            ☰ 메뉴
+          </button>
+
           {/* 방송화면 항상 렌더 (배경) */}
           <div className={activeMenu !== "broadcast" ? "pointer-events-none" : ""}>
             <LiveHeader
@@ -1417,114 +1447,123 @@ export default function AdminLiveDashboard() {
               onToggleShopOpen={handleToggleShopOpen}
             />
 
-            <div className="mb-4 mt-4 h-[420px] w-full min-h-0 [&>*]:h-full [&>*]:min-h-0 [&>*>*]:h-full [&>*>*]:min-h-0">
-              <LiveBroadcastPanels videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} activeBroadcastId={activeBroadcast?.id || null} />
-            </div>
+            {/* 시안 2단: 왼쪽=통계+탭+주문서표 / 오른쪽=영상·채팅·지금상품(세로 컬럼). 모바일·태블릿은 자동 1단 세로. */}
+            <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+              {/* 왼쪽 본문 */}
+              <div className="min-w-0">
+                {loadError ? (
+                  <div className="mb-3 rounded-2xl border border-danger-tx/40 bg-danger-bg px-4 py-3 text-sm font-black text-danger-tx">
+                    주문 데이터 불러오기 실패: {loadError}
+                  </div>
+                ) : null}
 
-            {loadError ? (
-              <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700">
-                주문 데이터 불러오기 실패: {loadError}
-              </div>
-            ) : null}
+                <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
 
-            <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
-
-            {/* 주문 영역 서브탭(시안 ①): 각 탭은 기존 팝업/드로어 트리거에 연결 (딥로즈) */}
-            <div className="mt-2 flex items-center gap-1.5 border-b border-rose-line">
-              {[
-                { key: "live", label: "실시간 주문", onClick: () => setActiveMenu("broadcast") },
-                { key: "payments", label: "입금 내역", onClick: () => setActiveMenu("payments") },
-                { key: "match", label: "입금 매칭", onClick: () => setMatchPanelOpen((v) => !v) },
-              ].map((tab) => {
-                const active =
-                  (tab.key === "live" && activeMenu !== "orders" && activeMenu !== "payments") ||
-                  (tab.key === "payments" && activeMenu === "payments") ||
-                  (tab.key === "match" && matchPanelOpen);
-                return (
+                {/* 주문 영역 서브탭: 각 탭은 기존 팝업/드로어 트리거에 연결 */}
+                <div className="mt-2 flex items-center gap-1.5 border-b border-rose-line">
+                  {[
+                    { key: "live", label: "실시간 주문", onClick: () => setActiveMenu("broadcast") },
+                    { key: "payments", label: "입금 내역", onClick: () => setActiveMenu("payments") },
+                    { key: "match", label: "입금 매칭", onClick: () => setMatchPanelOpen((v) => !v) },
+                  ].map((tab) => {
+                    const active =
+                      (tab.key === "live" && activeMenu !== "orders" && activeMenu !== "payments") ||
+                      (tab.key === "payments" && activeMenu === "payments") ||
+                      (tab.key === "match" && matchPanelOpen);
+                    return (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={tab.onClick}
+                        className={[
+                          "-mb-px rounded-t-lg border-b-2 px-3.5 py-2 text-[13px] font-black transition",
+                          active
+                            ? "border-rose-deep bg-rose-soft/60 text-rose-deep"
+                            : "border-transparent text-ink-soft hover:bg-rose-soft hover:text-rose-deep",
+                        ].join(" ")}
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
                   <button
-                    key={tab.key}
                     type="button"
-                    onClick={tab.onClick}
-                    className={[
-                      "-mb-px rounded-t-lg border-b-2 px-3.5 py-2 text-[13px] font-black transition",
-                      active
-                        ? "border-rose-deep bg-rose-soft/60 text-rose-deep"
-                        : "border-transparent text-slate-500 hover:bg-rose-soft hover:text-rose-deep",
-                    ].join(" ")}
+                    onClick={() => void runIntegrityCheck()}
+                    title="정합성 점검"
+                    className="ml-auto mb-1 mr-1.5 rounded-lg border border-rose-line px-2.5 py-1.5 text-xs font-black text-rose-deep transition hover:bg-rose-soft"
                   >
-                    {tab.label}
+                    🛡️ 점검
                   </button>
-                );
-              })}
-              <button
-                type="button"
-                onClick={() => void runIntegrityCheck()}
-                title="정합성 점검"
-                className="ml-auto mb-1 mr-1.5 rounded-lg border border-rose-line px-2.5 py-1.5 text-xs font-black text-rose-deep transition hover:bg-rose-soft"
-              >
-                🛡️ 점검
-              </button>
-            </div>
+                </div>
 
-            {/* 목업 B 2-col: 왼쪽 주문 테이블 / 오른쪽 380px 주문상세 사이드 패널(닉네임 클릭 시 슬라이드인) */}
-            <section className="mt-2 flex items-start gap-3">
-              <div className="min-w-0 flex-1 sticky top-0 self-start">
-                <LiveOrderTable
-                  orders={filteredOrders}
-                  allOrderCount={orders.length}
-                  selectedOrderId={selectedOrder?.id || ""}
-                  loading={loading}
-                  filters={filters}
-                  broadcastOptions={broadcastOptions}
-                  broadcastCalendar={broadcastCalendar}
-                  broadcastStartedAt={activeBroadcast?.started_at || activeBroadcast?.created_at || null}
-                  onSelectOrder={(order) => {
-                    // 사이드 패널 단일 슬롯: 주문상세 열 때 입금매칭은 닫음(최신 액션에 반응)
-                    setMatchPanelOpen(false);
-                    setSelectedOrderForMatch(null);
-                    setSelectedOrderId(order.id);
-                    setOrderDetailOpen(true);
-                  }}
-                  onFiltersChange={setFilters}
-                  onRefresh={loadOrders}
-                  onOpenManualMatch={openManualMatchForOrder}
-                  onOpenCardPay={setCardPayOrder}
-                  deposits={deposits}
-                  onMatched={refreshAfterManualMatch}
-                  onSelectForMatch={(order) => { setOrderDetailOpen(false); setSelectedOrderForMatch(order); setMatchPanelOpen(true); }}
-                />
+                <div className="mt-2 min-w-0">
+                  <LiveOrderTable
+                    orders={filteredOrders}
+                    allOrderCount={orders.length}
+                    selectedOrderId={selectedOrder?.id || ""}
+                    loading={loading}
+                    filters={filters}
+                    broadcastOptions={broadcastOptions}
+                    broadcastCalendar={broadcastCalendar}
+                    broadcastStartedAt={activeBroadcast?.started_at || activeBroadcast?.created_at || null}
+                    onSelectOrder={(order) => {
+                      // 사이드 패널 단일 슬롯: 주문상세 열 때 입금매칭은 닫음
+                      setMatchPanelOpen(false);
+                      setSelectedOrderForMatch(null);
+                      setSelectedOrderId(order.id);
+                      setOrderDetailOpen(true);
+                    }}
+                    onFiltersChange={setFilters}
+                    onRefresh={loadOrders}
+                    onOpenManualMatch={openManualMatchForOrder}
+                    onOpenCardPay={setCardPayOrder}
+                    deposits={deposits}
+                    onMatched={refreshAfterManualMatch}
+                    onSelectForMatch={(order) => { setOrderDetailOpen(false); setSelectedOrderForMatch(order); setMatchPanelOpen(true); }}
+                  />
+                </div>
               </div>
 
-              {/* 우측 사이드 패널: 입금매칭(목업 C) 우선, 없으면 주문상세(목업 B) */}
-              {matchPanelOpen ? (
+              {/* 오른쪽 컬럼: 영상·채팅·지금상품(세로). xl 이상에서 스티키. */}
+              <aside className="min-w-0 xl:sticky xl:top-3 xl:self-start">
+                <LiveBroadcastPanels variant="column" videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} activeBroadcastId={activeBroadcast?.id || null} />
+              </aside>
+            </div>
+
+            {/* 주문상세 / 입금매칭 — 우측 오버레이 드로어(슬라이드인, 위로 떠서 표를 밀지 않음). 단일 슬롯. */}
+            {(matchPanelOpen || (selectedOrder && orderDetailOpen)) ? (
+              <>
+                <button
+                  type="button"
+                  aria-label="패널 닫기"
+                  onClick={() => { setMatchPanelOpen(false); setSelectedOrderForMatch(null); setOrderDetailOpen(false); }}
+                  className="fixed inset-0 z-40 bg-black/40"
+                />
                 <div
-                  className="sticky top-0 w-[380px] shrink-0 min-h-[1000px] max-h-[1000px] overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl"
+                  className="fixed inset-y-0 right-0 z-50 w-full max-w-[420px] overflow-y-auto border-l border-line bg-surface shadow-2xl"
                   style={{ animation: "ruruSidePanelIn 0.22s ease" }}
                 >
-                  <LiveFloatingMatchPanel
-                    deposits={deposits}
-                    orders={filteredOrders}
-                    onClose={() => { setMatchPanelOpen(false); setSelectedOrderForMatch(null); }}
-                    onMatched={refreshAfterManualMatch}
-                    onSearchFilter={(keyword) => setFilters((prev) => ({ ...prev, keyword }))}
-                    selectedOrderForMatch={selectedOrderForMatch}
-                    onClearSelectedOrder={() => setSelectedOrderForMatch(null)}
-                  />
+                  {matchPanelOpen ? (
+                    <LiveFloatingMatchPanel
+                      deposits={deposits}
+                      orders={filteredOrders}
+                      onClose={() => { setMatchPanelOpen(false); setSelectedOrderForMatch(null); }}
+                      onMatched={refreshAfterManualMatch}
+                      onSearchFilter={(keyword) => setFilters((prev) => ({ ...prev, keyword }))}
+                      selectedOrderForMatch={selectedOrderForMatch}
+                      onClearSelectedOrder={() => setSelectedOrderForMatch(null)}
+                    />
+                  ) : selectedOrder && orderDetailOpen ? (
+                    <LiveOrderDetailDrawer
+                      order={selectedOrder}
+                      onOpenManualMatch={openManualMatchForOrder}
+                      onClose={closeOrderDetail}
+                      onAfterStatusChange={loadOrders}
+                    />
+                  ) : null}
                 </div>
-              ) : selectedOrder && orderDetailOpen ? (
-                <div
-                  className="sticky top-0 w-[380px] shrink-0 min-h-[1000px] max-h-[1000px] overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl"
-                  style={{ animation: "ruruSidePanelIn 0.22s ease" }}
-                >
-                  <LiveOrderDetailDrawer
-                    order={selectedOrder}
-                    onOpenManualMatch={openManualMatchForOrder}
-                    onClose={closeOrderDetail}
-                    onAfterStatusChange={loadOrders}
-                  />
-                </div>
-              ) : null}
-            </section>
+              </>
+            ) : null}
             <style>{`@keyframes ruruSidePanelIn { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }`}</style>
           </div>
 

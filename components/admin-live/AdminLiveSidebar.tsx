@@ -1,111 +1,156 @@
 import { ADMIN_LIVE_MENUS, type AdminLiveMenuKey } from "./adminLiveMenu";
 import AdminSoundControl from "./AdminSoundControl";
 import AdminLiveLogoutButton from "./AdminLiveLogoutButton";
-import AdminLiveCustomerIssueSummaryCard from "./AdminLiveCustomerIssueSummaryCard";
 
 type Props = {
   activeMenu: AdminLiveMenuKey;
   onMenuChange: (menuKey: AdminLiveMenuKey) => void;
+  theme: "light" | "dark";
+  onToggleTheme: () => void;
+  navOpen?: boolean;
+  onCloseNav?: () => void;
 };
 
 export default function AdminLiveSidebar({
   activeMenu,
   onMenuChange,
+  theme,
+  onToggleTheme,
+  navOpen = false,
+  onCloseNav,
 }: Props) {
   return (
-    <aside className="flex min-h-screen w-[220px] shrink-0 flex-col border-r border-slate-200 bg-white px-4 py-6">
-      <div className="mb-8 flex items-center gap-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-deep text-white">▶</div>
-        <div>
-          <div className="text-lg font-black tracking-tight text-slate-950">루루동이LIVE</div>
-          <div className="text-[11px] font-bold text-slate-400">운영 컨트롤타워</div>
-        </div>
-      </div>
-
-      <nav className="space-y-1.5">
-        {ADMIN_LIVE_MENUS.map((menu) => {
-          const active = menu.key === activeMenu;
-
-          return (
-            <button
-              key={menu.key}
-              type="button"
-              onClick={() => onMenuChange(menu.key)}
-              className={[
-                "flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition",
-                active
-                  ? "bg-rose-soft text-rose-deep shadow-sm ring-1 ring-rose-line"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-950",
-              ].join(" ")}
-            >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-base shadow-sm ring-1 ring-slate-100">
-                {menu.icon}
-              </span>
-              <span className="min-w-0">
-                <span className="block text-[15px] font-black">{menu.label}</span>
-                <span className="block truncate text-[10px] font-bold opacity-60">{menu.desc}</span>
-              </span>
-            </button>
-          );
-        })}
-      </nav>
-
-      {activeMenu === "broadcast" ? (
-        <section
-          className="mt-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm"
-          data-ruru-quick-modal-dock="sidebar-inline"
-        >
-          <div className="mb-2 flex items-center justify-between">
-            <div>
-              <div className="text-[10px] font-black tracking-[0.18em] text-slate-400">QUICK</div>
-              <div className="text-sm font-black text-slate-950">빠른보기</div>
-            </div>
-            <div className="rounded-full bg-rose-soft px-2 py-1 text-[10px] font-black text-rose-deep">방송중</div>
-          </div>
-
-          <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-            <button
-              type="button"
-              onClick={() => {
-                const aw = window.screen.availWidth || 1600;
-                const ah = window.screen.availHeight || 1000;
-                const W = Math.min(1700, Math.round(aw * 0.92));
-                const H = Math.min(1050, Math.round(ah * 0.92));
-                const left = Math.max(0, Math.round((aw - W) / 2));
-                const top = Math.max(0, Math.round((ah - H) / 2));
-                const w = window.open(
-                  "https://business.kakao.com/_RMxaqX/chats?t_src=business_partnercenter&t_ch=lnb&t_obj=%EB%82%B4%EC%B1%84%ED%8C%85_%ED%81%B4%EB%A6%AD",
-                  "ruruKakaoConsult",
-                  `popup=yes,width=${W},height=${H},left=${left},top=${top}`
-                );
-                if (w) { try { w.resizeTo(W, H); w.moveTo(left, top); w.focus(); } catch { /* 무시 */ } }
-              }}
-              className="flex h-10 items-center justify-center gap-1 rounded-xl border border-rose-line bg-rose-soft text-xs font-black text-rose-deep transition hover:bg-rose-soft active:scale-[0.98]"
-            >
-              <span>💬</span>
-              카톡채널
-            </button>
-            <button
-              type="button"
-              onClick={() => window.open("https://user.service.payster.co.kr/#/payment/smspayment", "ruruPayster", "popup=yes,width=480,height=720")}
-              className="flex h-10 items-center justify-center gap-1 rounded-xl border border-slate-200 bg-slate-50 text-xs font-black text-slate-700 transition hover:bg-slate-100 active:scale-[0.98]"
-            >
-              <span>💳</span>
-              카드결제
-            </button>
-          </div>
-
-          <div className="mt-2 rounded-xl bg-slate-50 px-2 py-2 text-[10px] font-bold leading-4 text-slate-500">
-            방송 중 필요한 내용만 빠르게 확인
-          </div>
-
-          <AdminSoundControl />
-        </section>
+    <>
+      {/* 모바일: 드로어 열렸을 때 뒤 어둡게(클릭하면 닫힘). 데스크탑(md+)에선 숨김 */}
+      {navOpen ? (
+        <button
+          type="button"
+          aria-label="메뉴 닫기"
+          onClick={onCloseNav}
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+        />
       ) : null}
 
-      <div className="mt-auto pt-4">
-        <AdminLiveLogoutButton />
-      </div>
-    </aside>
+      <aside
+        className={[
+          "fixed inset-y-0 left-0 z-40 flex w-[220px] shrink-0 flex-col border-r border-line bg-surface px-4 py-6 transition-transform duration-200",
+          "md:static md:z-auto md:translate-x-0",
+          navOpen ? "translate-x-0" : "-translate-x-full",
+        ].join(" ")}
+      >
+        <div className="mb-8 flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-deep text-white">▶</div>
+          <div className="min-w-0">
+            <div className="truncate text-lg font-black tracking-tight text-ink">루루동이LIVE</div>
+            <div className="text-[11px] font-bold text-ink-mute">운영 컨트롤타워</div>
+          </div>
+          {/* 모바일 닫기 버튼 */}
+          <button
+            type="button"
+            onClick={onCloseNav}
+            className="ml-auto rounded-lg p-1 text-ink-mute hover:bg-surface-2 md:hidden"
+            aria-label="메뉴 닫기"
+          >
+            ✕
+          </button>
+        </div>
+
+        <nav className="space-y-1.5">
+          {ADMIN_LIVE_MENUS.map((menu) => {
+            const active = menu.key === activeMenu;
+
+            return (
+              <button
+                key={menu.key}
+                type="button"
+                onClick={() => {
+                  onMenuChange(menu.key);
+                  onCloseNav?.();
+                }}
+                className={[
+                  "flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition",
+                  active
+                    ? "bg-rose-soft text-rose-deep shadow-sm ring-1 ring-rose-line"
+                    : "text-ink-soft hover:bg-surface-2 hover:text-ink",
+                ].join(" ")}
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-surface text-base shadow-sm ring-1 ring-line">
+                  {menu.icon}
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[15px] font-black">{menu.label}</span>
+                  <span className="block truncate text-[10px] font-bold opacity-60">{menu.desc}</span>
+                </span>
+              </button>
+            );
+          })}
+        </nav>
+
+        {activeMenu === "broadcast" ? (
+          <section
+            className="mt-4 rounded-2xl border border-line bg-surface p-3 shadow-sm"
+            data-ruru-quick-modal-dock="sidebar-inline"
+          >
+            <div className="mb-2 flex items-center justify-between">
+              <div>
+                <div className="text-[10px] font-black tracking-[0.18em] text-ink-mute">QUICK</div>
+                <div className="text-sm font-black text-ink">빠른보기</div>
+              </div>
+              <div className="rounded-full bg-rose-soft px-2 py-1 text-[10px] font-black text-rose-deep">방송중</div>
+            </div>
+
+            <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  const aw = window.screen.availWidth || 1600;
+                  const ah = window.screen.availHeight || 1000;
+                  const W = Math.min(1700, Math.round(aw * 0.92));
+                  const H = Math.min(1050, Math.round(ah * 0.92));
+                  const left = Math.max(0, Math.round((aw - W) / 2));
+                  const top = Math.max(0, Math.round((ah - H) / 2));
+                  const w = window.open(
+                    "https://business.kakao.com/_RMxaqX/chats?t_src=business_partnercenter&t_ch=lnb&t_obj=%EB%82%B4%EC%B1%84%ED%8C%85_%ED%81%B4%EB%A6%AD",
+                    "ruruKakaoConsult",
+                    `popup=yes,width=${W},height=${H},left=${left},top=${top}`
+                  );
+                  if (w) { try { w.resizeTo(W, H); w.moveTo(left, top); w.focus(); } catch { /* 무시 */ } }
+                }}
+                className="flex h-10 items-center justify-center gap-1 rounded-xl border border-rose-line bg-rose-soft text-xs font-black text-rose-deep transition hover:opacity-90 active:scale-[0.98]"
+              >
+                <span>💬</span>
+                카톡채널
+              </button>
+              <button
+                type="button"
+                onClick={() => window.open("https://user.service.payster.co.kr/#/payment/smspayment", "ruruPayster", "popup=yes,width=480,height=720")}
+                className="flex h-10 items-center justify-center gap-1 rounded-xl border border-line bg-surface-2 text-xs font-black text-ink-soft transition hover:bg-surface-3 active:scale-[0.98]"
+              >
+                <span>💳</span>
+                카드결제
+              </button>
+            </div>
+
+            <div className="mt-2 rounded-xl bg-surface-2 px-2 py-2 text-[10px] font-bold leading-4 text-ink-soft">
+              방송 중 필요한 내용만 빠르게 확인
+            </div>
+
+            <AdminSoundControl />
+          </section>
+        ) : null}
+
+        <div className="mt-auto space-y-2 pt-4">
+          {/* 라이트/다크 토글 */}
+          <button
+            type="button"
+            onClick={onToggleTheme}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface-2 py-2.5 text-xs font-black text-ink-soft transition hover:bg-surface-3"
+          >
+            {theme === "dark" ? "☀️ 라이트 모드" : "🌙 다크 모드"}
+          </button>
+          <AdminLiveLogoutButton />
+        </div>
+      </aside>
+    </>
   );
 }
