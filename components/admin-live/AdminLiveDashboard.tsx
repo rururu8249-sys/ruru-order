@@ -1433,7 +1433,7 @@ export default function AdminLiveDashboard() {
             {/* 2단: 왼쪽=헤더+통계+탭+주문서 / 오른쪽=영상·채팅(세로, 맨 위로 정렬). 헤더를 왼쪽 폭으로만 둬서 영상/채팅이 위로 올라옴. 모바일은 1단. */}
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
               {/* 왼쪽 본문 (헤더 포함) */}
-              <div className="min-w-0 xl:flex xl:h-[calc(100vh-1.5rem)] xl:flex-col">
+              <div className="min-w-0">
                 <div className="shrink-0">
                   <LiveHeader
                     activeBroadcast={activeBroadcast}
@@ -1497,7 +1497,7 @@ export default function AdminLiveDashboard() {
                   </button>
                 </div>
 
-                <div className="mt-2 min-w-0 xl:flex xl:flex-1 xl:min-h-0 xl:flex-col">
+                <div className="mt-2 min-w-0">
                   <LiveOrderTable
                     orders={filteredOrders}
                     allOrderCount={orders.length}
@@ -1526,7 +1526,7 @@ export default function AdminLiveDashboard() {
               </div>
 
               {/* 오른쪽 컬럼: 영상·채팅·지금상품(세로). xl 이상에서 스티키. */}
-              <aside className="min-w-0 xl:sticky xl:top-3 xl:self-start xl:h-[calc(100vh-1.5rem)]">
+              <aside className="min-w-0 xl:self-stretch">
                 <LiveBroadcastPanels variant="column" videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} activeBroadcastId={activeBroadcast?.id || null} />
               </aside>
             </div>

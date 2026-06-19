@@ -1082,6 +1082,14 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
         </div>
       </div>
       )}
+      {lightbox ? (
+        <div
+          onClick={() => setLightbox(null)}
+          style={{ position: "fixed", inset: 0, zIndex: 120, background: "rgba(0,0,0,0.82)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out", padding: 24 }}
+        >
+          <img src={lightbox} alt="" style={{ maxWidth: "92vw", maxHeight: "92vh", objectFit: "contain", borderRadius: 12 }} />
+        </div>
+      ) : null}
 </section>
   );
 }

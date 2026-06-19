@@ -1009,7 +1009,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
   return createPortal(
     <div
-      className="ruru-product-sian"
+      className={(typeof document !== "undefined" && document.querySelector(".dark") ? "dark " : "") + "ruru-product-sian"}
       style={{ position: "fixed", inset: 0, zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", padding: "16px" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >

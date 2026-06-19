@@ -781,7 +781,7 @@ export default function LiveOrderTable({
         </div>
       </div>
     ) : null}
-    <section className="rounded-2xl border border-line bg-surface p-4 shadow-sm min-h-[480px] xl:min-h-0 xl:h-[calc(100vh-1.5rem)] flex flex-col">
+    <section className="rounded-2xl border border-line bg-surface p-4 shadow-sm flex flex-col">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h2 className="mr-2 text-lg font-black text-ink">실시간 주문서</h2>
 
@@ -1021,7 +1021,7 @@ export default function LiveOrderTable({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-line">
+      <div className="max-h-[1180px] min-h-0 overflow-auto rounded-xl border border-line">
             {/* 헤더 행 */}
             <div className="grid grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 border-b border-rose-line bg-rose-soft/40 text-[12px] font-black text-ink-soft">
               <span className="flex items-center justify-center py-2.5">
