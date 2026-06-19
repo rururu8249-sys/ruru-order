@@ -1450,7 +1450,7 @@ export default function AdminLiveDashboard() {
             {/* 시안 2단: 왼쪽=통계+탭+주문서표 / 오른쪽=영상·채팅·지금상품(세로 컬럼). 모바일·태블릿은 자동 1단 세로. */}
             <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
               {/* 왼쪽 본문 */}
-              <div className="min-w-0">
+              <div className="min-w-0 xl:flex xl:h-[calc(100vh-1.5rem)] xl:flex-col">
                 {loadError ? (
                   <div className="mb-3 rounded-2xl border border-danger-tx/40 bg-danger-bg px-4 py-3 text-sm font-black text-danger-tx">
                     주문 데이터 불러오기 실패: {loadError}
@@ -1496,7 +1496,7 @@ export default function AdminLiveDashboard() {
                   </button>
                 </div>
 
-                <div className="mt-2 min-w-0">
+                <div className="mt-2 min-w-0 xl:flex xl:flex-1 xl:min-h-0 xl:flex-col">
                   <LiveOrderTable
                     orders={filteredOrders}
                     allOrderCount={orders.length}
@@ -1525,7 +1525,7 @@ export default function AdminLiveDashboard() {
               </div>
 
               {/* 오른쪽 컬럼: 영상·채팅·지금상품(세로). xl 이상에서 스티키. */}
-              <aside className="min-w-0 xl:sticky xl:top-3 xl:self-start">
+              <aside className="min-w-0 xl:sticky xl:top-3 xl:self-start xl:h-[calc(100vh-1.5rem)]">
                 <LiveBroadcastPanels variant="column" videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} activeBroadcastId={activeBroadcast?.id || null} />
               </aside>
             </div>

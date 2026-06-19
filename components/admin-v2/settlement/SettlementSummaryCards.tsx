@@ -20,11 +20,11 @@ function StatCard({
 }) {
   const toneClass =
     tone === "blue"
-      ? "border-line bg-info-bg"
+      ? "border-line bg-surface-2"
       : tone === "green"
-        ? "border-line bg-ok-bg"
+        ? "border-line bg-surface-2"
         : tone === "orange"
-          ? "border-line bg-warn-bg"
+          ? "border-line bg-surface-2"
           : "border-line bg-surface";
 
   const iconClass =

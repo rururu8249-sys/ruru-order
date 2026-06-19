@@ -107,14 +107,8 @@ function MoneyFlowCard({
   note: string;
   tone: "blue" | "orange" | "dark" | "green";
 }) {
-  const toneClass =
-    tone === "green"
-      ? "border-line bg-ok-bg"
-      : tone === "orange"
-        ? "border-line bg-warn-bg"
-        : tone === "dark"
-          ? "border-line bg-surface"
-          : "border-rose-line bg-rose-soft/70";
+  // 다크: 큰 카드는 중립 면(surface-2)으로, 색 구분은 숫자·배지에만 — 큰 면적 채도칠은 탁해짐
+  const toneClass = "border-line bg-surface-2";
 
   const stepClass =
     tone === "green"
@@ -157,17 +151,14 @@ function ActionCard({
   value: string;
   tone: "blue" | "orange" | "slate";
 }) {
-  const toneClass =
-    tone === "orange"
-      ? "border-line bg-warn-bg text-warn-tx"
-      : tone === "blue"
-        ? "border-line bg-info-bg text-info-tx"
-        : "border-line bg-surface-2 text-ink";
+  // 중립 카드 + 값 글자에만 색
+  const valTx =
+    tone === "orange" ? "text-warn-tx" : tone === "blue" ? "text-info-tx" : "text-ink";
 
   return (
-    <div className={`rounded-[18px] border px-4 py-3 shadow-[0_8px_18px_rgba(15,23,42,0.025)] ${toneClass}`}>
+    <div className="rounded-[18px] border border-line bg-surface-2 px-4 py-3">
       <div className="text-xs font-black text-ink-soft">{label}</div>
-      <div className="mt-1 text-xl font-black tracking-[-0.05em]">{value}</div>
+      <div className={`mt-1 text-xl font-black tracking-[-0.05em] ${valTx}`}>{value}</div>
     </div>
   );
 }
@@ -434,7 +425,7 @@ export default function SettlementMoneyFlowDashboard({
       </section>
 
       <section className="grid gap-3 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="rounded-[28px] border border-line bg-gradient-to-br from-info-bg via-surface to-surface p-5 shadow-[0_12px_30px_rgba(37,99,235,0.055)]">
+        <div className="rounded-[28px] border border-line bg-surface p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="text-[22px] font-black tracking-[-0.04em] text-ink">한 줄 요약</h3>
@@ -501,7 +492,7 @@ export default function SettlementMoneyFlowDashboard({
         <div className="overflow-auto rounded-[22px] border border-line-soft bg-surface">
           <table className="min-w-[920px] w-full border-separate border-spacing-0">
             <thead>
-              <tr className="bg-info-bg text-xs font-black text-ink-soft">
+              <tr className="bg-surface-3 text-xs font-black text-ink-soft">
                 <th className="px-4 py-2.5 text-left">날짜/방송명</th>
                 <th className="px-4 py-2.5 text-right">주문서 수</th>
                 <th className="px-4 py-2.5 text-right">결제완료 매출</th>
@@ -519,7 +510,7 @@ export default function SettlementMoneyFlowDashboard({
                 </tr>
               ) : (
                 visibleBroadcastRows.map((row) => (
-                  <tr key={row.key} className="hover:bg-info-bg">
+                  <tr key={row.key} className="hover:bg-surface-2">
                     <td className="border-b border-line-soft px-4 py-3.5">
                       <div className="max-w-[320px] truncate text-sm font-black text-ink">{row.label}</div>
                       <div className="mt-1 text-xs font-bold text-ink-mute">{row.dateKey}</div>
@@ -566,7 +557,7 @@ export default function SettlementMoneyFlowDashboard({
                   className={`h-9 min-w-9 rounded-full px-3 text-sm font-black shadow-sm transition ${
                     pageItem === safeBroadcastPage
                       ? "bg-rose-deep text-white"
-                      : "border border-line bg-surface text-ink-soft hover:bg-info-bg"
+                      : "border border-line bg-surface text-ink-soft hover:bg-surface-2"
                   }`}
                 >
                   {pageItem}
