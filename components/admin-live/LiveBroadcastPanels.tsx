@@ -840,7 +840,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
           </div>
         </div>
 
-        <div className="flex flex-1 min-h-0 items-center justify-center overflow-hidden rounded-2xl bg-surface-2 p-1">
+        <div className="flex flex-1 min-h-0 items-center justify-center overflow-hidden rounded-2xl border border-line bg-surface-2 p-1">
           <div className={`relative overflow-hidden rounded-[1.5rem] bg-slate-950 shadow-sm ${videoSizeClass(videoRatio)}`}>
             {videoEmbedUrl ? (
               <iframe
@@ -906,7 +906,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
           </div>
           {liveProduct ? (
             <div className="flex items-center gap-2.5">
-              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-surface-2">
+              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-line bg-surface-2">
                 {nowProdImageOf(liveProduct) ? (
                   <img src={nowProdImageOf(liveProduct)} alt="" className="h-full w-full object-cover" />
                 ) : (
@@ -946,7 +946,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
         {liveProduct ? (
           <div className="flex flex-1 min-h-0 flex-col">
             {/* 큰 카드: 지금 띄운 상품 1개 */}
-            <div className="relative flex-1 min-h-0 overflow-hidden rounded-2xl bg-surface-2">
+            <div className="relative flex-1 min-h-0 overflow-hidden rounded-2xl border border-line bg-surface-2">
               {nowProdImageOf(liveProduct) ? (
                 <img src={nowProdImageOf(liveProduct)} alt="" className="h-full w-full object-cover" />
               ) : (

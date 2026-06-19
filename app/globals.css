@@ -90,6 +90,12 @@
   color-scheme: dark;
 }
 
+/* 다크 스크롤바(얇고 은은하게 — 네이티브 밝은 스크롤바 글레어 방지) */
+.dark ::-webkit-scrollbar { width: 10px; height: 10px; }
+.dark ::-webkit-scrollbar-thumb { background: #45423b; border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #55524a; background-clip: padding-box; }
+.dark ::-webkit-scrollbar-track { background: transparent; }
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
