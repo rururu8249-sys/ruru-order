@@ -8,7 +8,7 @@ export default function AdminLiveMenuPlaceholder({ menuKey }: Props) {
   const menu = getAdminLiveMenu(menuKey);
 
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="rounded-3xl border border-line bg-surface p-6 shadow-sm">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <div className="mb-2 flex items-center gap-2">
@@ -16,22 +16,22 @@ export default function AdminLiveMenuPlaceholder({ menuKey }: Props) {
               {menu.icon}
             </span>
             <div>
-              <h1 className="text-2xl font-black tracking-[-0.04em] text-slate-950">
+              <h1 className="text-2xl font-black tracking-[-0.04em] text-ink">
                 {menu.label}
               </h1>
-              <p className="mt-1 text-sm font-bold text-slate-500">{menu.desc}</p>
+              <p className="mt-1 text-sm font-bold text-ink-soft">{menu.desc}</p>
             </div>
           </div>
         </div>
 
-        <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">
+        <span className="rounded-full bg-warn-bg px-3 py-1 text-xs font-black text-warn-tx">
           화면 연결 준비중
         </span>
       </div>
 
-      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5">
-        <h2 className="text-lg font-black text-slate-950">{menu.readyTitle}</h2>
-        <p className="mt-2 text-sm font-bold leading-6 text-slate-500">
+      <div className="rounded-2xl border border-dashed border-line bg-surface-2 p-5">
+        <h2 className="text-lg font-black text-ink">{menu.readyTitle}</h2>
+        <p className="mt-2 text-sm font-bold leading-6 text-ink-soft">
           {menu.readyDescription}
         </p>
 
@@ -39,7 +39,7 @@ export default function AdminLiveMenuPlaceholder({ menuKey }: Props) {
           {menu.checkpoints.map((item) => (
             <div
               key={item}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700"
+              className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-black text-ink"
             >
               ✓ {item}
             </div>

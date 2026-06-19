@@ -17,9 +17,9 @@ function buttonClass(active: boolean, tone: "dark" | "blue" | "red") {
     return "bg-slate-950 text-white";
   }
 
-  if (tone === "red") return "bg-white text-red-600 hover:bg-red-50";
-  if (tone === "blue") return "bg-white text-slate-600 hover:bg-rose-soft";
-  return "bg-white text-slate-600 hover:bg-slate-100";
+  if (tone === "red") return "bg-surface text-red-600 hover:bg-danger-bg";
+  if (tone === "blue") return "bg-surface text-ink-soft hover:bg-rose-soft";
+  return "bg-surface text-ink-soft hover:bg-surface-2";
 }
 
 export default function LiveOrderCancelViewFilter({
@@ -30,8 +30,8 @@ export default function LiveOrderCancelViewFilter({
   onChange,
 }: Props) {
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-      <span className="text-xs font-black text-slate-500">주문보기</span>
+    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface-2 px-3 py-2">
+      <span className="text-xs font-black text-ink-soft">주문보기</span>
 
       <button
         type="button"

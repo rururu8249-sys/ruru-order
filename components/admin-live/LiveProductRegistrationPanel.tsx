@@ -324,7 +324,7 @@ export default function LiveProductRegistrationPanel({
   };
 
   return (
-    <section className="rounded-[22px] border border-slate-200 bg-white shadow-sm">
+    <section className="rounded-[22px] border border-line bg-surface shadow-sm">
       <button
         type="button"
         onClick={() => setIsOpen((value) => !value)}
@@ -332,41 +332,41 @@ export default function LiveProductRegistrationPanel({
       >
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[15px] font-black text-slate-950">
+            <span className="text-[15px] font-black text-ink">
               방송상품 · 공구상품 등록
             </span>
-            <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-black text-blue-700">
+            <span className="rounded-full bg-info-bg px-2.5 py-1 text-[11px] font-black text-info-tx">
               저장 연결
             </span>
             <span
               className={[
                 "rounded-full px-2.5 py-1 text-[11px] font-black",
                 selectOrderEnabled
-                  ? "bg-emerald-50 text-emerald-700"
-                  : "bg-slate-100 text-slate-500",
+                  ? "bg-ok-bg text-ok-tx"
+                  : "bg-surface-2 text-ink-soft",
               ].join(" ")}
             >
               선택형 주문 {selectOrderEnabled ? "ON" : "OFF"}
             </span>
           </div>
-          <p className="mt-1 text-[12px] font-bold text-slate-500">
+          <p className="mt-1 text-[12px] font-bold text-ink-soft">
             상품 저장·사진 등록 전용입니다. 고객 주문서/배송비/정산 연결은 아직 건드리지 않습니다.
           </p>
         </div>
 
-        <span className="rounded-full border border-slate-200 px-3 py-1.5 text-[12px] font-black text-blue-700">
+        <span className="rounded-full border border-line px-3 py-1.5 text-[12px] font-black text-info-tx">
           {isOpen ? "접기 ▲" : "열기 ▼"}
         </span>
       </button>
 
       {isOpen ? (
-        <div className="border-t border-slate-100 px-5 pb-5 pt-4">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3">
+        <div className="border-t border-line px-5 pb-5 pt-4">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-surface-2 px-4 py-3">
             <div>
-              <p className="text-[13px] font-black text-slate-900">
+              <p className="text-[13px] font-black text-ink">
                 선택형 주문서 사용
               </p>
-              <p className="mt-0.5 text-[12px] font-bold text-slate-500">
+              <p className="mt-0.5 text-[12px] font-bold text-ink-soft">
                 현재는 관리자 상품 저장 단계입니다. 고객 주문서 노출은 다음 단계에서 별도로 연결합니다.
               </p>
             </div>
@@ -378,7 +378,7 @@ export default function LiveProductRegistrationPanel({
                 "rounded-full px-4 py-2 text-[12px] font-black",
                 selectOrderEnabled
                   ? "bg-blue-600 text-white"
-                  : "bg-white text-slate-600 ring-1 ring-slate-200",
+                  : "bg-surface text-ink-soft ring-1 ring-line",
               ].join(" ")}
             >
               {selectOrderEnabled ? "ON" : "OFF"}
@@ -386,7 +386,7 @@ export default function LiveProductRegistrationPanel({
           </div>
 
           <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-            <div className="rounded-2xl border border-slate-200 p-4">
+            <div className="rounded-2xl border border-line p-4">
               <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_170px]">
                 <div>
                   <div className="mb-3 flex flex-wrap gap-2">
@@ -397,7 +397,7 @@ export default function LiveProductRegistrationPanel({
                         "rounded-full px-3 py-1.5 text-[12px] font-black",
                         productKind === "broadcast"
                           ? "bg-blue-600 text-white"
-                          : "bg-slate-100 text-slate-600",
+                          : "bg-surface-2 text-ink-soft",
                       ].join(" ")}
                     >
                       방송상품
@@ -409,7 +409,7 @@ export default function LiveProductRegistrationPanel({
                         "rounded-full px-3 py-1.5 text-[12px] font-black",
                         productKind === "group"
                           ? "bg-blue-600 text-white"
-                          : "bg-slate-100 text-slate-600",
+                          : "bg-surface-2 text-ink-soft",
                       ].join(" ")}
                     >
                       공구상품
@@ -418,22 +418,22 @@ export default function LiveProductRegistrationPanel({
 
                   <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
                     <label className="block">
-                      <span className="mb-1 block text-[12px] font-black text-slate-600">
+                      <span className="mb-1 block text-[12px] font-black text-ink-soft">
                         상품명
                       </span>
                       <input
                         value={name}
                         onChange={(event) => setName(event.target.value)}
-                        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-[13px] font-bold outline-none focus:border-blue-400"
+                        className="h-11 w-full rounded-xl border border-line px-3 text-[13px] font-bold outline-none focus:border-blue-400"
                         placeholder="예: 룰루레몬 밴딩 바지"
                       />
                     </label>
 
                     <label className="block">
-                      <span className="mb-1 block text-[12px] font-black text-slate-600">
+                      <span className="mb-1 block text-[12px] font-black text-ink-soft">
                         판매가
                       </span>
-                      <div className="flex h-11 items-center rounded-xl border border-slate-200 px-3 focus-within:border-blue-400">
+                      <div className="flex h-11 items-center rounded-xl border border-line px-3 focus-within:border-blue-400">
                         <input
                           value={priceText}
                           onChange={(event) => setPriceText(formatNumberInput(event.target.value))}
@@ -441,7 +441,7 @@ export default function LiveProductRegistrationPanel({
                           inputMode="numeric"
                           placeholder="0"
                         />
-                        <span className="text-[12px] font-black text-slate-400">
+                        <span className="text-[12px] font-black text-ink-mute">
                           원
                         </span>
                       </div>
@@ -449,13 +449,13 @@ export default function LiveProductRegistrationPanel({
                   </div>
 
                   <label className="mt-3 block">
-                    <span className="mb-1 block text-[12px] font-black text-slate-600">
+                    <span className="mb-1 block text-[12px] font-black text-ink-soft">
                       상품 메모
                     </span>
                     <input
                       value={productNote}
                       onChange={(event) => setProductNote(event.target.value)}
-                      className="h-11 w-full rounded-xl border border-slate-200 px-3 text-[13px] font-bold outline-none focus:border-blue-400"
+                      className="h-11 w-full rounded-xl border border-line px-3 text-[13px] font-bold outline-none focus:border-blue-400"
                       placeholder="고객 노출용 짧은 안내 또는 관리자 메모"
                     />
                   </label>
@@ -472,7 +472,7 @@ export default function LiveProductRegistrationPanel({
                 />
               </div>
 
-              <div data-ruru-live-none-toggle className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              <div data-ruru-live-none-toggle className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface-2 p-3">
                 <button
                   type="button"
                   aria-pressed={noneOptionAutofillEnabled}
@@ -481,25 +481,25 @@ export default function LiveProductRegistrationPanel({
                     "rounded-full px-4 py-2 text-sm font-black transition active:scale-[0.98]",
                     noneOptionAutofillEnabled
                       ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-100"
-                      : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100",
+                      : "bg-surface text-ink-soft ring-1 ring-line hover:bg-surface-2",
                   ].join(" ")}
                 >
                   {noneOptionAutofillEnabled ? "없음입력 ON" : "없음입력 OFF"}
                 </button>
-                <span className="text-xs font-bold text-slate-500">
+                <span className="text-xs font-bold text-ink-soft">
                   ON이면 고객 주문서에서 색상/사이즈가 없음으로 자동입력됩니다.
                 </span>
               </div>
 
               <div className="mt-4 grid gap-3 lg:grid-cols-2">
                 <label className="block">
-                  <span className="mb-1 block text-[12px] font-black text-slate-600">
+                  <span className="mb-1 block text-[12px] font-black text-ink-soft">
                     색상 옵션
                   </span>
                   <input
                     value={colors}
                     onChange={(event) => setColors(event.target.value)}
-                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-[13px] font-bold outline-none focus:border-blue-400"
+                    className="h-11 w-full rounded-xl border border-line px-3 text-[13px] font-bold outline-none focus:border-blue-400"
                     placeholder="블랙, 레드, 화이트"
                   />
                   <div className="mt-2 flex flex-wrap gap-1.5">
@@ -507,13 +507,13 @@ export default function LiveProductRegistrationPanel({
                       parsedColors.map((color) => (
                         <span
                           key={color}
-                          className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-600"
+                          className="rounded-full bg-surface-2 px-2 py-1 text-[11px] font-black text-ink-soft"
                         >
                           {color}
                         </span>
                       ))
                     ) : (
-                      <span className="text-[11px] font-bold text-slate-400">
+                      <span className="text-[11px] font-bold text-ink-mute">
                         쉼표, 띄어쓰기, 줄바꿈으로 자동 옵션화
                       </span>
                     )}
@@ -521,35 +521,35 @@ export default function LiveProductRegistrationPanel({
                 </label>
 
                 <div>
-                  <span className="mb-1 block text-[12px] font-black text-slate-600">
+                  <span className="mb-1 block text-[12px] font-black text-ink-soft">
                     사이즈 옵션
                   </span>
                   <div className="mb-2 flex flex-wrap gap-1.5">
                     <button
                       type="button"
                       onClick={() => applyPreset("clothes")}
-                      className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600"
+                      className="rounded-full bg-surface-2 px-2.5 py-1 text-[11px] font-black text-ink-soft"
                     >
                       XS~XXL
                     </button>
                     <button
                       type="button"
                       onClick={() => applyPreset("top")}
-                      className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600"
+                      className="rounded-full bg-surface-2 px-2.5 py-1 text-[11px] font-black text-ink-soft"
                     >
                       90~115
                     </button>
                     <button
                       type="button"
                       onClick={() => applyPreset("shoes")}
-                      className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600"
+                      className="rounded-full bg-surface-2 px-2.5 py-1 text-[11px] font-black text-ink-soft"
                     >
                       신발 220~290
                     </button>
                     <button
                       type="button"
                       onClick={() => applyPreset("free")}
-                      className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600"
+                      className="rounded-full bg-surface-2 px-2.5 py-1 text-[11px] font-black text-ink-soft"
                     >
                       FREE
                     </button>
@@ -563,28 +563,28 @@ export default function LiveProductRegistrationPanel({
                     }}
                     disabled={sizeOptionDisabled}
                     className={[
-                      "h-11 w-full rounded-xl border border-slate-200 px-3 text-[13px] font-bold outline-none focus:border-blue-400",
-                      sizeOptionDisabled ? "bg-slate-100 text-slate-400" : "",
+                      "h-11 w-full rounded-xl border border-line px-3 text-[13px] font-bold outline-none focus:border-blue-400",
+                      sizeOptionDisabled ? "bg-surface-2 text-ink-mute" : "",
                     ].join(" ")}
                     placeholder={sizeOptionDisabled ? "사이즈 옵션 없이 등록" : "S, M, L 또는 240, 245 / 필요시 직접 입력"}
                   />
 
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {sizeOptionDisabled ? (
-                      <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-500">
+                      <span className="rounded-full bg-surface-2 px-2 py-1 text-[11px] font-black text-ink-soft">
                         사이즈 옵션 없음
                       </span>
                     ) : parsedSizes.length ? (
                       parsedSizes.slice(0, 20).map((size) => (
                         <span
                           key={size}
-                          className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-700"
+                          className="rounded-full bg-info-bg px-2 py-1 text-[11px] font-black text-info-tx"
                         >
                           {size}
                         </span>
                       ))
                     ) : (
-                      <span className="text-[11px] font-bold text-slate-400">
+                      <span className="text-[11px] font-bold text-ink-mute">
                         빠른 버튼 선택 후 필요하면 직접 수정
                       </span>
                     )}
@@ -594,7 +594,7 @@ export default function LiveProductRegistrationPanel({
 
               <div className="mt-3 grid gap-3 lg:grid-cols-3">
                 <label className="block">
-                  <span className="mb-1 block text-[12px] font-black text-slate-600">
+                  <span className="mb-1 block text-[12px] font-black text-ink-soft">
                     배송유형
                   </span>
                   <select
@@ -602,18 +602,18 @@ export default function LiveProductRegistrationPanel({
                     onChange={(event) =>
                       setDeliveryType(event.target.value as DeliveryType)
                     }
-                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-[13px] font-bold outline-none focus:border-blue-400"
+                    className="h-11 w-full rounded-xl border border-line px-3 text-[13px] font-bold outline-none focus:border-blue-400"
                   >
                     <option value="normal">일반배송</option>
                     <option value="vendor">업체배송</option>
                   </select>
-                  <p className="mt-1 text-[11px] font-bold text-slate-400">
+                  <p className="mt-1 text-[11px] font-bold text-ink-mute">
                     업체배송은 타 상품과 합배송불가/배송비 별도 기준입니다.
                   </p>
                 </label>
 
                 <label className="block">
-                  <span className="mb-1 block text-[12px] font-black text-slate-600">
+                  <span className="mb-1 block text-[12px] font-black text-ink-soft">
                     업체배송 그룹
                   </span>
                   <input
@@ -621,15 +621,15 @@ export default function LiveProductRegistrationPanel({
                     onChange={(event) => setDeliveryGroupKey(event.target.value)}
                     disabled={deliveryType !== "vendor"}
                     className={[
-                      "h-11 w-full rounded-xl border border-slate-200 px-3 text-[13px] font-bold outline-none focus:border-blue-400",
-                      deliveryType !== "vendor" ? "bg-slate-100 text-slate-400" : "",
+                      "h-11 w-full rounded-xl border border-line px-3 text-[13px] font-bold outline-none focus:border-blue-400",
+                      deliveryType !== "vendor" ? "bg-surface-2 text-ink-mute" : "",
                     ].join(" ")}
                     placeholder={deliveryType === "vendor" ? "예: vendor_lamer" : "일반배송은 입력 안 함"}
                   />
                 </label>
 
                 <div>
-                  <span className="mb-1 block text-[12px] font-black text-slate-600">
+                  <span className="mb-1 block text-[12px] font-black text-ink-soft">
                     상태
                   </span>
                   <div className="flex h-11 items-center gap-2">
@@ -639,8 +639,8 @@ export default function LiveProductRegistrationPanel({
                       className={[
                         "rounded-full px-2.5 py-1 text-[11px] font-black",
                         visible
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-slate-100 text-slate-500",
+                          ? "bg-ok-bg text-ok-tx"
+                          : "bg-surface-2 text-ink-soft",
                       ].join(" ")}
                     >
                       {visible ? "노출" : "숨김"}
@@ -651,8 +651,8 @@ export default function LiveProductRegistrationPanel({
                       className={[
                         "rounded-full px-2.5 py-1 text-[11px] font-black",
                         soldOut
-                          ? "bg-rose-50 text-rose-700"
-                          : "bg-slate-100 text-slate-500",
+                          ? "bg-rose-soft text-rose-deep"
+                          : "bg-surface-2 text-ink-soft",
                       ].join(" ")}
                     >
                       {soldOut ? "품절" : "판매중"}
@@ -663,8 +663,8 @@ export default function LiveProductRegistrationPanel({
                       className={[
                         "rounded-full px-2.5 py-1 text-[11px] font-black",
                         pinned
-                          ? "bg-amber-50 text-amber-700"
-                          : "bg-slate-100 text-slate-500",
+                          ? "bg-warn-bg text-warn-tx"
+                          : "bg-surface-2 text-ink-soft",
                       ].join(" ")}
                     >
                       {pinned ? "상단고정" : "고정OFF"}
@@ -675,13 +675,13 @@ export default function LiveProductRegistrationPanel({
 
               <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_260px]">
                 <label className="block">
-                  <span className="mb-1 block text-[12px] font-black text-slate-600">
+                  <span className="mb-1 block text-[12px] font-black text-ink-soft">
                     상품상세설명
                   </span>
                   <textarea
                     value={productDescription}
                     onChange={(event) => setProductDescription(event.target.value)}
-                    className="min-h-[160px] w-full resize-y rounded-xl border border-slate-200 px-3 py-3 text-[13px] font-bold leading-relaxed outline-none focus:border-blue-400"
+                    className="min-h-[160px] w-full resize-y rounded-xl border border-line px-3 py-3 text-[13px] font-bold leading-relaxed outline-none focus:border-blue-400"
                     placeholder="고객이 상품 상세에서 볼 설명을 입력하세요. 예: 소재, 핏, 주의사항, 교환/환불 안내 등"
                   />
                 </label>
@@ -720,20 +720,20 @@ export default function LiveProductRegistrationPanel({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 p-4">
+            <div className="rounded-2xl border border-line p-4">
               <div className="mb-3 flex items-center justify-between">
                 <div>
-                  <p className="text-[13px] font-black text-slate-900">
+                  <p className="text-[13px] font-black text-ink">
                     최근 등록상품
                   </p>
-                  <p className="text-[11px] font-bold text-slate-500">
+                  <p className="text-[11px] font-bold text-ink-soft">
                     상단고정/노출순서 기준으로 표시합니다.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={loadRecentProducts}
-                  className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600"
+                  className="rounded-full bg-surface-2 px-2.5 py-1 text-[11px] font-black text-ink-soft"
                 >
                   새로고침
                 </button>
@@ -741,17 +741,17 @@ export default function LiveProductRegistrationPanel({
 
               <div className="space-y-2">
                 {loadingProducts ? (
-                  <div className="rounded-xl bg-slate-50 px-3 py-6 text-center text-[12px] font-black text-slate-400">
+                  <div className="rounded-xl bg-surface-2 px-3 py-6 text-center text-[12px] font-black text-ink-mute">
                     상품 목록 불러오는 중
                   </div>
                 ) : recentProducts.length ? (
                   recentProducts.map((product) => (
                     <div
                       key={String(product.id)}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"
+                      className="flex items-center justify-between gap-3 rounded-xl border border-line bg-surface-2 px-3 py-2"
                     >
                       <div className="flex min-w-0 items-center gap-3">
-                        <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-slate-200">
+                        <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-surface ring-1 ring-line">
                           {product.image_url ? (
                             <img
                               src={product.image_url}
@@ -766,35 +766,35 @@ export default function LiveProductRegistrationPanel({
                         </div>
 
                         <div className="min-w-0">
-                          <p className="truncate text-[12px] font-black text-slate-900">
+                          <p className="truncate text-[12px] font-black text-ink">
                             {product.is_pinned ? "📌 " : ""}
                             {product.name || "상품명 없음"}
                           </p>
-                          <p className="mt-0.5 text-[11px] font-bold text-slate-500">
+                          <p className="mt-0.5 text-[11px] font-bold text-ink-soft">
                             {(product.product_type || "상품")} · {product.status || "-"} · {product.shipping_type || "-"}
                           </p>
-                          <p className="mt-0.5 text-[11px] font-black text-blue-700">
+                          <p className="mt-0.5 text-[11px] font-black text-info-tx">
                             {Number(product.price || 0).toLocaleString("ko-KR")}원 · 재고 {Number(product.stock || 0).toLocaleString("ko-KR")}개
                           </p>
-                          <p className="mt-0.5 text-[10px] font-bold text-slate-400">
+                          <p className="mt-0.5 text-[10px] font-bold text-ink-mute">
                             상세설명 {product.product_description ? "있음" : "없음"} · 상세사진 {Array.isArray(product.detail_image_urls) ? product.detail_image_urls.length : 0}장
                           </p>
                         </div>
                       </div>
 
-                      <span className="shrink-0 rounded-lg bg-white px-2 py-1 text-[11px] font-black text-slate-500 ring-1 ring-slate-200">
+                      <span className="shrink-0 rounded-lg bg-surface px-2 py-1 text-[11px] font-black text-ink-soft ring-1 ring-line">
                         #{product.sort_order || product.id}
                       </span>
                     </div>
                   ))
                 ) : (
-                  <div className="rounded-xl bg-slate-50 px-3 py-6 text-center text-[12px] font-black text-slate-400">
+                  <div className="rounded-xl bg-surface-2 px-3 py-6 text-center text-[12px] font-black text-ink-mute">
                     등록된 상품이 없거나 조회되지 않았습니다.
                   </div>
                 )}
               </div>
 
-              <div className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-[11px] font-bold leading-relaxed text-amber-800">
+              <div className="mt-3 rounded-xl bg-warn-bg px-3 py-2 text-[11px] font-bold leading-relaxed text-warn-tx">
                 고객 주문서 노출과 배송비 계산은 다음 단계에서 별도 연결합니다.
               </div>
             </div>

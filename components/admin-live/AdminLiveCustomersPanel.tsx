@@ -342,14 +342,14 @@ function customerProfileKey(profile: CustomerProfile) {
 
 function statusBadge(customer: CustomerSummary) {
   if (customer.blocked) {
-    return <span className="rounded-lg bg-red-100 px-2 py-1 text-xs font-black text-red-700">{CUSTOMER_TERMS.blocked}</span>;
+    return <span className="rounded-lg bg-danger-bg px-2 py-1 text-xs font-black text-danger-tx">{CUSTOMER_TERMS.blocked}</span>;
   }
 
   if (customer.manualNeededCount > 0 || customer.unpaidCount > 0) {
-    return <span className="rounded-lg bg-amber-100 px-2 py-1 text-xs font-black text-amber-700">관리필요</span>;
+    return <span className="rounded-lg bg-amber-100 px-2 py-1 text-xs font-black text-warn-tx">관리필요</span>;
   }
 
-  return <span className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-700">{CUSTOMER_TERMS.normal}</span>;
+  return <span className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-ok-tx">{CUSTOMER_TERMS.normal}</span>;
 }
 
 function SummaryCard({
@@ -370,19 +370,19 @@ function SummaryCard({
   subClassName?: string;
 }) {
   return (
-    <div className="min-h-[142px] rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
-      <div className={`flex items-center gap-2 text-[12px] font-black text-slate-500 ${labelClassName}`}>
+    <div className="min-h-[142px] rounded-[22px] border border-line bg-surface p-4 shadow-sm">
+      <div className={`flex items-center gap-2 text-[12px] font-black text-ink-soft ${labelClassName}`}>
         {icon ? <span className="text-[15px]">{icon}</span> : null}
         <span>{label}</span>
       </div>
 
       <div
-        className={`mt-2 break-keep text-[32px] font-black leading-[1.12] tracking-[-0.055em] text-slate-950 ${valueClassName}`}
+        className={`mt-2 break-keep text-[32px] font-black leading-[1.12] tracking-[-0.055em] text-ink ${valueClassName}`}
       >
         {value}
       </div>
 
-      <div className={`mt-2 break-keep text-[12px] font-bold leading-relaxed text-slate-400 ${subClassName}`}>
+      <div className={`mt-2 break-keep text-[12px] font-bold leading-relaxed text-ink-mute ${subClassName}`}>
         {sub}
       </div>
     </div>
@@ -416,10 +416,10 @@ function CustomerDetailDrawer({
 
   const statusBadge = (text: string) => {
     const t = String(text || "");
-    if (/입금확인|결제완료/.test(t)) return { background: "#E7F3EE", color: "#0F6E56" };
-    if (/배송|출고/.test(t)) return { background: "#E8F0FA", color: "#185FA5" };
-    if (/대기|미입금|필요/.test(t)) return { background: "#FBF1E0", color: "#854F0B" };
-    return { background: "#F1EFEC", color: "#777" };
+    if (/입금확인|결제완료/.test(t)) return { background: "var(--color-ok-bg)", color: "var(--color-ok-tx)" };
+    if (/배송|출고/.test(t)) return { background: "var(--color-info-bg)", color: "var(--color-info-tx)" };
+    if (/대기|미입금|필요/.test(t)) return { background: "var(--color-warn-bg)", color: "var(--color-warn-tx)" };
+    return { background: "var(--color-surface-3)", color: "#777" };
   };
   const avatarChar = (customer.nickname || customer.name || "?").trim().charAt(0) || "?";
 
@@ -443,11 +443,11 @@ function CustomerDetailDrawer({
       <section
         role="dialog"
         aria-modal="true"
-        style={{ width: "100%", maxWidth: "540px", maxHeight: "90vh", overflowY: "auto", borderRadius: "20px", border: "1px solid #D9C5CC", background: "#fff", boxShadow: "0 24px 70px rgba(15,23,42,0.28)" }}
+        style={{ width: "100%", maxWidth: "540px", maxHeight: "90vh", overflowY: "auto", borderRadius: "20px", border: "1px solid var(--color-rose-line)", background: "#fff", boxShadow: "0 24px 70px rgba(15,23,42,0.28)" }}
       >
         {/* 헤더 */}
-        <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid #E8E2DD", padding: "14px 18px" }}>
-          <span style={{ fontSize: "15px", fontWeight: 800, color: "#7B2D43" }}>👤 회원 상세</span>
+        <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid var(--color-line)", padding: "14px 18px" }}>
+          <span style={{ fontSize: "15px", fontWeight: 800, color: "var(--color-rose-deep)" }}>👤 회원 상세</span>
           <button type="button" onClick={onClose} style={{ marginLeft: "auto", width: "27px", height: "27px", border: "none", background: "none", color: "#999", fontSize: "18px", cursor: "pointer" }}>✕</button>
         </div>
 
@@ -459,17 +459,17 @@ function CustomerDetailDrawer({
                 src={clean(profile?.kakao_profile_image)}
                 alt={customer.nickname || customer.name || "프로필"}
                 onClick={() => setAvatarZoom(true)}
-                style={{ width: "54px", height: "54px", flexShrink: 0, borderRadius: "50%", objectFit: "cover", background: "#F5E6EB", cursor: "zoom-in" }}
+                style={{ width: "54px", height: "54px", flexShrink: 0, borderRadius: "50%", objectFit: "cover", background: "var(--color-rose-soft)", cursor: "zoom-in" }}
               />
             ) : (
-              <span style={{ width: "54px", height: "54px", flexShrink: 0, borderRadius: "50%", background: "#F5E6EB", color: "#7B2D43", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", fontWeight: 800 }}>{avatarChar}</span>
+              <span style={{ width: "54px", height: "54px", flexShrink: 0, borderRadius: "50%", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", fontWeight: 800 }}>{avatarChar}</span>
             )}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: "15px", fontWeight: 800, color: "#222", marginBottom: "3px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                 {customer.nickname}
                 <span style={{ fontSize: "12px", fontWeight: 700, color: "#999" }}>· {customer.name || "-"}</span>
                 {customer.blocked ? (
-                  <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "6px", padding: "2px 7px" }}>차단</span>
+                  <span style={{ fontSize: "10px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", borderRadius: "6px", padding: "2px 7px" }}>차단</span>
                 ) : null}
               </div>
               <div style={{ fontSize: "11px", color: "#888", lineHeight: 1.8 }}>
@@ -486,7 +486,7 @@ function CustomerDetailDrawer({
           {/* 등록 배송지 (고객이 등록한 customers.shipping_addresses 배열 — 읽기 전용) */}
           {Array.isArray(profile?.shipping_addresses) && profile.shipping_addresses.length > 0 ? (
             <div style={{ marginBottom: "14px" }}>
-              <div style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43", marginBottom: "8px" }}>📦 등록 배송지 ({profile.shipping_addresses.length}건)</div>
+              <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)", marginBottom: "8px" }}>📦 등록 배송지 ({profile.shipping_addresses.length}건)</div>
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {[...profile.shipping_addresses]
                   .sort((a, b) => (b?.isDefault ? 1 : 0) - (a?.isDefault ? 1 : 0))
@@ -497,11 +497,11 @@ function CustomerDetailDrawer({
                       clean(addr?.detailAddress),
                     ].filter(Boolean).join(" ");
                     return (
-                      <div key={`${clean(addr?.name)}-${index}`} style={{ border: "1px solid #E8E2DD", borderRadius: "9px", padding: "8px 11px", background: addr?.isDefault ? "#FAF6F2" : "#fff" }}>
+                      <div key={`${clean(addr?.name)}-${index}`} style={{ border: "1px solid var(--color-line)", borderRadius: "9px", padding: "8px 11px", background: addr?.isDefault ? "var(--color-surface-2)" : "#fff" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px" }}>
                           <span style={{ fontSize: "12px", fontWeight: 800, color: "#222" }}>{clean(addr?.name) || "이름 없음"}</span>
                           {clean(addr?.phone) ? <span style={{ fontSize: "11px", color: "#888" }}>{formatPhone(clean(addr?.phone))}</span> : null}
-                          {addr?.isDefault ? <span style={{ marginLeft: "auto", fontSize: "10px", fontWeight: 800, color: "#fff", background: "#7B2D43", borderRadius: "6px", padding: "2px 7px" }}>기본</span> : null}
+                          {addr?.isDefault ? <span style={{ marginLeft: "auto", fontSize: "10px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", borderRadius: "6px", padding: "2px 7px" }}>기본</span> : null}
                         </div>
                         <div style={{ fontSize: "11px", color: "#666" }}>{fullAddr || "주소 없음"}</div>
                       </div>
@@ -513,23 +513,23 @@ function CustomerDetailDrawer({
 
           {/* 3 스탯 */}
           <div style={{ display: "flex", gap: "7px", marginBottom: "14px" }}>
-            <div style={{ flex: 1, background: "#FAF6F2", borderRadius: "10px", padding: "10px", textAlign: "center" }}>
+            <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "10px", padding: "10px", textAlign: "center" }}>
               <div style={{ fontSize: "11px", fontWeight: 800, color: "#999" }}>누적 주문</div>
               <div style={{ marginTop: "3px", fontSize: "16px", fontWeight: 800, color: "#222" }}>{customer.orderCount.toLocaleString("ko-KR")}건</div>
             </div>
-            <div style={{ flex: 1, background: "#FAF6F2", borderRadius: "10px", padding: "10px", textAlign: "center" }}>
+            <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "10px", padding: "10px", textAlign: "center" }}>
               <div style={{ fontSize: "11px", fontWeight: 800, color: "#999" }}>누적 결제</div>
               <div style={{ marginTop: "3px", fontSize: "16px", fontWeight: 800, color: "#222" }}>{money(customer.totalAmount)}</div>
             </div>
-            <div style={{ flex: 1, background: "#FAF6F2", borderRadius: "10px", padding: "10px", textAlign: "center" }}>
+            <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "10px", padding: "10px", textAlign: "center" }}>
               <div style={{ fontSize: "11px", fontWeight: 800, color: "#999" }}>미입금</div>
-              <div style={{ marginTop: "3px", fontSize: "16px", fontWeight: 800, color: customer.unpaidCount > 0 ? "#854F0B" : "#222" }}>{customer.unpaidCount.toLocaleString("ko-KR")}건</div>
+              <div style={{ marginTop: "3px", fontSize: "16px", fontWeight: 800, color: customer.unpaidCount > 0 ? "var(--color-warn-tx)" : "#222" }}>{customer.unpaidCount.toLocaleString("ko-KR")}건</div>
             </div>
           </div>
 
           {/* 주문 이력 */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-            <span style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>주문 이력</span>
+            <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)" }}>주문 이력</span>
             <span style={{ fontSize: "11px", fontWeight: 700, color: "#999" }}>{safePage} / {totalPages}</span>
           </div>
           {visibleOrders.length === 0 ? (
@@ -538,7 +538,7 @@ function CustomerDetailDrawer({
             visibleOrders.map((order, index) => {
               const badge = statusBadge(orderStatusText(order));
               return (
-                <div key={`${order.id || index}-${orderCreatedLabel(order)}`} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 0", borderBottom: "1px solid #F0EDEA" }}>
+                <div key={`${order.id || index}-${orderCreatedLabel(order)}`} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 0", borderBottom: "1px solid var(--color-surface-2)" }}>
                   <span style={{ width: "92px", flexShrink: 0, fontSize: "11px", color: "#999" }}>{orderCreatedLabel(order)}</span>
                   <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "12px", color: "#666" }} title={orderSummary(order)}>{orderSummary(order)}</span>
                   <b style={{ fontSize: "12px", color: "#222" }}>{money(orderAmount(order))}</b>
@@ -549,8 +549,8 @@ function CustomerDetailDrawer({
           )}
           {totalPages > 1 ? (
             <div style={{ display: "flex", justifyContent: "center", gap: "8px", marginTop: "12px" }}>
-              <button type="button" onClick={() => setPage(Math.max(1, safePage - 1))} style={{ border: "1px solid #E8E2DD", borderRadius: "8px", background: "#fff", padding: "5px 12px", fontSize: "11px", fontWeight: 800, color: "#777", cursor: "pointer" }}>이전</button>
-              <button type="button" onClick={() => setPage(Math.min(totalPages, safePage + 1))} style={{ border: "1px solid #E8E2DD", borderRadius: "8px", background: "#fff", padding: "5px 12px", fontSize: "11px", fontWeight: 800, color: "#777", cursor: "pointer" }}>다음</button>
+              <button type="button" onClick={() => setPage(Math.max(1, safePage - 1))} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", background: "#fff", padding: "5px 12px", fontSize: "11px", fontWeight: 800, color: "#777", cursor: "pointer" }}>이전</button>
+              <button type="button" onClick={() => setPage(Math.min(totalPages, safePage + 1))} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", background: "#fff", padding: "5px 12px", fontSize: "11px", fontWeight: 800, color: "#777", cursor: "pointer" }}>다음</button>
             </div>
           ) : null}
 
@@ -562,19 +562,19 @@ function CustomerDetailDrawer({
           {/* 정보 변경 이력 */}
           {profile?.customer_history && profile.customer_history.length > 0 ? (
             <div style={{ marginTop: "16px" }}>
-              <div style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43", marginBottom: "8px" }}>정보 변경 이력</div>
+              <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)", marginBottom: "8px" }}>정보 변경 이력</div>
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {[...profile.customer_history]
                   .sort((a, b) => String(b.changed_at).localeCompare(String(a.changed_at)))
                   .map((h, index) => (
-                    <div key={`${h.field}-${h.changed_at}-${index}`} style={{ border: "1px solid #E8E2DD", borderRadius: "9px", padding: "8px 11px" }}>
+                    <div key={`${h.field}-${h.changed_at}-${index}`} style={{ border: "1px solid var(--color-line)", borderRadius: "9px", padding: "8px 11px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px" }}>
-                        <span style={{ fontSize: "11px", fontWeight: 800, color: "#7B2D43" }}>{h.field}</span>
+                        <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{h.field}</span>
                         <span style={{ marginLeft: "auto", fontSize: "10px", color: "#999" }}>{formatOrderDateTime(h.changed_at)}</span>
                       </div>
                       <div style={{ fontSize: "11px", color: "#666" }}>
                         <span style={{ color: "#999" }}>{h.old_value || "(없음)"}</span>
-                        <span style={{ margin: "0 5px", color: "#7B2D43", fontWeight: 800 }}>→</span>
+                        <span style={{ margin: "0 5px", color: "var(--color-rose-deep)", fontWeight: 800 }}>→</span>
                         <span style={{ color: "#222", fontWeight: 700 }}>{h.new_value || "(없음)"}</span>
                       </div>
                     </div>
@@ -584,19 +584,19 @@ function CustomerDetailDrawer({
           ) : null}
 
           {/* 푸터: 차단 / 닫기 */}
-          <div style={{ display: "flex", alignItems: "center", marginTop: "16px", paddingTop: "12px", borderTop: "1px solid #E8E2DD" }}>
+          <div style={{ display: "flex", alignItems: "center", marginTop: "16px", paddingTop: "12px", borderTop: "1px solid var(--color-line)" }}>
             <button
               type="button"
               onClick={() => onBlockAction(customer)}
               disabled={blockSaving}
-              style={{ border: "1px solid", borderColor: customer.blocked ? "#D9C5CC" : "#E5B4AE", borderRadius: "8px", background: customer.blocked ? "#fff" : "#FBEAE7", padding: "8px 12px", fontSize: "11px", fontWeight: 800, color: customer.blocked ? "#555" : "#C0392B", cursor: blockSaving ? "wait" : "pointer", opacity: blockSaving ? 0.5 : 1 }}
+              style={{ border: "1px solid", borderColor: customer.blocked ? "var(--color-rose-line)" : "var(--color-rose-line)", borderRadius: "8px", background: customer.blocked ? "#fff" : "var(--color-danger-bg)", padding: "8px 12px", fontSize: "11px", fontWeight: 800, color: customer.blocked ? "#555" : "var(--color-danger-tx)", cursor: blockSaving ? "wait" : "pointer", opacity: blockSaving ? 0.5 : 1 }}
             >
               {customer.blocked ? `✅ ${CUSTOMER_TERMS.unblock}` : `🚫 ${CUSTOMER_TERMS.block}`}
             </button>
             <button
               type="button"
               onClick={onClose}
-              style={{ marginLeft: "auto", borderRadius: "8px", border: "none", background: "#7B2D43", padding: "8px 18px", fontSize: "12px", fontWeight: 800, color: "#fff", cursor: "pointer" }}
+              style={{ marginLeft: "auto", borderRadius: "8px", border: "none", background: "var(--color-rose-deep)", padding: "8px 18px", fontSize: "12px", fontWeight: 800, color: "#fff", cursor: "pointer" }}
             >
               닫기
             </button>
@@ -1123,17 +1123,17 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}>
-      <div className="flex h-[88vh] w-full max-w-[640px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <div className="flex h-[88vh] w-full max-w-[640px] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
         <div className="flex items-center justify-between border-b border-rose-line px-5 py-3 shrink-0">
-          <span className="text-[15px] font-black text-slate-950">👥 고객·이슈</span>
-          <button type="button" onClick={() => onClose?.()} className="text-slate-400 hover:text-slate-700 text-lg leading-none">✕</button>
+          <span className="text-[15px] font-black text-ink">👥 고객·이슈</span>
+          <button type="button" onClick={() => onClose?.()} className="text-ink-mute hover:text-ink text-lg leading-none">✕</button>
         </div>
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-5 space-y-4">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-rose-soft/40 px-4 py-2.5 text-[12px] font-black text-slate-600">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-rose-soft/40 px-4 py-2.5 text-[12px] font-black text-ink-soft">
             <span>전체 <span className="text-rose-deep">{customers.length.toLocaleString("ko-KR")}</span></span>
-            <span className="text-slate-300">·</span>
-            <span>정상 <span className="text-emerald-600">{normalCustomers.length.toLocaleString("ko-KR")}</span></span>
-            <span className="text-slate-300">·</span>
+            <span className="text-ink-mute">·</span>
+            <span>정상 <span className="text-ok-tx">{normalCustomers.length.toLocaleString("ko-KR")}</span></span>
+            <span className="text-ink-mute">·</span>
             <button
               type="button"
               onClick={() => {
@@ -1146,11 +1146,11 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
             >
               차단 <span className="text-red-500">{blockedTotalCount.toLocaleString("ko-KR")}</span>
             </button>
-            <span className="text-slate-300">·</span>
+            <span className="text-ink-mute">·</span>
             <span>관리필요 <span className="text-amber-600">{attentionCustomers.length.toLocaleString("ko-KR")}</span></span>
           </div>
 
-      <div className="rounded-xl border border-red-100 bg-red-50/50">
+      <div className="rounded-xl border border-danger-tx bg-danger-bg/50">
         <button
           type="button"
           onClick={() => setPhoneBlockOpen((v) => !v)}
@@ -1167,12 +1167,12 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
       </div>
 
       <div className="flex gap-2 border-b border-rose-line">
-        <button type="button" onClick={() => setCustTab("members")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "members" ? "bg-rose-deep text-white" : "text-slate-500 hover:text-rose-deep"}`}>회원 목록</button>
-        <button type="button" onClick={() => setCustTab("issues")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "issues" ? "bg-rose-deep text-white" : "text-slate-500 hover:text-rose-deep"}`}>고객 이슈</button>
+        <button type="button" onClick={() => setCustTab("members")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "members" ? "bg-rose-deep text-white" : "text-ink-soft hover:text-rose-deep"}`}>회원 목록</button>
+        <button type="button" onClick={() => setCustTab("issues")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "issues" ? "bg-rose-deep text-white" : "text-ink-soft hover:text-rose-deep"}`}>고객 이슈</button>
       </div>
 
       <div className={custTab === "members" ? "" : "hidden"}>
-        <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="rounded-[28px] border border-line bg-surface p-4 shadow-sm">
           <div className="grid grid-cols-2 gap-2">
             <select
               value={statusFilter}
@@ -1180,7 +1180,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
                 setStatusFilter(event.target.value as StatusFilter);
                 setPage(1);
               }}
-              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-black text-slate-700"
+              className="h-11 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink"
             >
               <option value="all">고객상태: 전체</option>
               <option value="normal">정상</option>
@@ -1194,7 +1194,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
                 setSortMode(event.target.value as SortMode);
                 setPage(1);
               }}
-              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-black text-slate-700"
+              className="h-11 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink"
             >
               <option value="latest">최근주문순</option>
               <option value="amount">누적구매금액순</option>
@@ -1210,7 +1210,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
                 setSortMode("latest");
                 setPage(1);
               }}
-              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-black text-slate-600 hover:bg-slate-50"
+              className="h-11 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink-soft hover:bg-surface-2"
             >
               초기화
             </button>
@@ -1222,35 +1222,35 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
                 setPage(1);
               }}
               placeholder="닉네임 / 이름 / 전화번호 검색"
-              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-black text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
+              className="h-11 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink outline-none focus:border-info-tx focus:ring-4 focus:ring-info-bg"
             />
           </div>
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-black text-slate-950">고객 목록</h2>
+              <h2 className="text-lg font-black text-ink">고객 목록</h2>
               <button
                 type="button"
                 onClick={() => { setBuyersOnly((v) => !v); setPage(1); }}
-                className={`rounded-full px-3 py-1 text-[11px] font-black transition ${buyersOnly ? "bg-rose-deep text-white" : "border border-slate-200 bg-white text-slate-500"}`}
+                className={`rounded-full px-3 py-1 text-[11px] font-black transition ${buyersOnly ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}
               >
                 {buyersOnly ? "주문 있는 고객만 ✓" : "주문 있는 고객만"}
               </button>
             </div>
-            <div className="text-xs font-black text-slate-400">
+            <div className="text-xs font-black text-ink-mute">
               표시 {visibleCustomers.length.toLocaleString("ko-KR")}명 / 검색결과 {filteredCustomers.length.toLocaleString("ko-KR")}명
             </div>
           </div>
 
           {/* 선택 / 일괄 포인트지급 바 */}
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-            <label className="flex items-center gap-2 text-[12px] font-black text-slate-600">
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-surface-2 px-3 py-2">
+            <label className="flex items-center gap-2 text-[12px] font-black text-ink-soft">
               <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAllPage} className="h-4 w-4 accent-rose-deep" />
               이 페이지 전체선택
             </label>
             <div className="flex items-center gap-2">
               {selectedPhones.size > 0 ? (
-                <button type="button" onClick={clearSelection} className="text-[11px] font-black text-slate-400 hover:text-slate-700">선택해제</button>
+                <button type="button" onClick={clearSelection} className="text-[11px] font-black text-ink-mute hover:text-ink">선택해제</button>
               ) : null}
               <button
                 type="button"
@@ -1265,14 +1265,14 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
 
             <div className="mt-3 flex flex-col gap-1.5">
               {visibleCustomers.length === 0 ? (
-                <div className="py-10 text-center text-sm text-slate-400">표시할 고객이 없습니다.</div>
+                <div className="py-10 text-center text-sm text-ink-mute">표시할 고객이 없습니다.</div>
               ) : (
                 visibleCustomers.map((customer) => {
                   const initial = (customer.nickname || customer.name || "?").trim().charAt(0);
                   return (
                     <div
                       key={customer.key}
-                      className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors ${customer.blocked ? "border-slate-200 bg-slate-50 opacity-60" : "border-slate-200 bg-white hover:border-rose-line hover:bg-rose-soft/30"}`}
+                      className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors ${customer.blocked ? "border-line bg-surface-2 opacity-60" : "border-line bg-surface hover:border-rose-line hover:bg-rose-soft/30"}`}
                     >
                       {digitsOnly(customer.phone) ? (
                         <input
@@ -1288,27 +1288,27 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
                       <button
                         type="button"
                         onClick={() => openDetail(customer)}
-                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-black ${customer.blocked ? "bg-slate-200 text-slate-400" : "bg-rose-soft text-rose-deep"}`}
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-black ${customer.blocked ? "bg-surface-3 text-ink-mute" : "bg-rose-soft text-rose-deep"}`}
                       >
                         {initial}
                       </button>
                       <button type="button" onClick={() => openDetail(customer)} className="min-w-0 flex-1 text-left">
                         <div className="flex items-center gap-1.5">
-                          <span className="truncate text-[13px] font-black text-slate-900">{customer.nickname || "—"}</span>
-                          {customer.name ? <span className="shrink-0 text-xs text-slate-400">· {customer.name}</span> : null}
+                          <span className="truncate text-[13px] font-black text-ink">{customer.nickname || "—"}</span>
+                          {customer.name ? <span className="shrink-0 text-xs text-ink-mute">· {customer.name}</span> : null}
                         </div>
-                        <div className="mt-0.5 truncate text-[11px] text-slate-400">
+                        <div className="mt-0.5 truncate text-[11px] text-ink-mute">
                           누적 {customer.orderCount}건 · {money(customer.totalAmount)}원
                           {customer.phone ? ` · ${formatPhone(customer.phone)}` : ""}
                         </div>
                       </button>
                       {customer.blocked ? (
-                        <span className="shrink-0 rounded-md bg-red-50 px-2 py-0.5 text-[11px] font-black text-red-500">차단</span>
+                        <span className="shrink-0 rounded-md bg-danger-bg px-2 py-0.5 text-[11px] font-black text-red-500">차단</span>
                       ) : null}
                       <button
                         type="button"
                         onClick={() => handleCustomerBlockButton(customer)}
-                        className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-black transition-colors ${customer.blocked ? "border border-slate-200 text-slate-500 hover:bg-slate-100" : "text-red-500 hover:bg-red-50"}`}
+                        className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-black transition-colors ${customer.blocked ? "border border-line text-ink-soft hover:bg-surface-2" : "text-red-500 hover:bg-danger-bg"}`}
                       >
                         {customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}
                       </button>
@@ -1320,7 +1320,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
             </div>
 
           <div className="mt-4 flex items-center justify-between">
-            <div className="text-xs font-black text-slate-500">
+            <div className="text-xs font-black text-ink-soft">
               총 {filteredCustomers.length.toLocaleString("ko-KR")}명
             </div>
 
@@ -1328,7 +1328,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
               <button
                 type="button"
                 onClick={() => setPage(Math.max(1, safePage - 1))}
-                className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500"
+                className="rounded-xl border border-line px-3 py-2 text-sm font-black text-ink-soft"
               >
                 이전
               </button>
@@ -1338,7 +1338,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
               <button
                 type="button"
                 onClick={() => setPage(Math.min(totalPages, safePage + 1))}
-                className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500"
+                className="rounded-xl border border-line px-3 py-2 text-sm font-black text-ink-soft"
               >
                 다음
               </button>
@@ -1348,18 +1348,18 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
           {/* 일괄 포인트지급 모달 */}
           {bulkOpen ? (
             <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4" onClick={() => !bulkRunning && setBulkOpen(false)}>
-              <div className="w-[min(460px,94vw)] rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="w-[min(460px,94vw)] rounded-2xl bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
                 <div className="mb-1 text-[16px] font-black text-rose-deep">🪙 포인트 일괄지급</div>
-                <div className="mb-2 text-xs font-bold text-slate-500">선택한 {selectedPhones.size}명에게 같은 금액을 지급합니다.</div>
+                <div className="mb-2 text-xs font-bold text-ink-soft">선택한 {selectedPhones.size}명에게 같은 금액을 지급합니다.</div>
 
                 {/* 받는 사람 목록 */}
                 {selectedCustomersList.length > 0 && !bulkResult ? (
-                  <div className="mb-3 max-h-24 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2">
+                  <div className="mb-3 max-h-24 overflow-y-auto rounded-xl border border-line bg-surface-2 p-2">
                     <div className="flex flex-wrap gap-1">
                       {selectedCustomersList.map((c) => (
-                        <span key={c.key} className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-[11px] font-black text-slate-700 ring-1 ring-slate-200">
+                        <span key={c.key} className="inline-flex items-center gap-1 rounded-full bg-surface px-2 py-1 text-[11px] font-black text-ink ring-1 ring-line">
                           {c.nickname || c.name || formatPhone(c.phone)}
-                          <button type="button" onClick={() => toggleSelectPhone(c.phone)} className="leading-none text-slate-400 hover:text-red-500" title="선택 해제">✕</button>
+                          <button type="button" onClick={() => toggleSelectPhone(c.phone)} className="leading-none text-ink-mute hover:text-red-500" title="선택 해제">✕</button>
                         </span>
                       ))}
                     </div>
@@ -1369,27 +1369,27 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
                 {!bulkResult ? (
                   <>
                     <label className="block">
-                      <span className="text-xs font-black text-slate-500">1인당 지급 포인트</span>
+                      <span className="text-xs font-black text-ink-soft">1인당 지급 포인트</span>
                       <input value={bulkAmount} onChange={(e) => setBulkAmount(e.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" placeholder="예: 5000"
-                        className="mt-1 h-11 w-full rounded-xl border border-slate-200 px-3 text-base font-black outline-none focus:border-rose-deep" />
+                        className="mt-1 h-11 w-full rounded-xl border border-line px-3 text-base font-black outline-none focus:border-rose-deep" />
                     </label>
 
                     <label className="mt-3 block">
-                      <span className="text-xs font-black text-slate-500">지급 사유 (고객에게 보임)</span>
+                      <span className="text-xs font-black text-ink-soft">지급 사유 (고객에게 보임)</span>
                       <select value={bulkReasonPreset} onChange={(e) => setBulkReasonPreset(e.target.value)}
-                        className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-black outline-none focus:border-rose-deep">
+                        className="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-sm font-black outline-none focus:border-rose-deep">
                         {BULK_POINT_REASON_PRESETS.map((r) => <option key={r} value={r}>{r}</option>)}
                       </select>
                     </label>
                     {bulkReasonPreset === "직접입력" ? (
                       <input value={bulkReasonCustom} onChange={(e) => setBulkReasonCustom(e.target.value)} placeholder="사유 직접 입력"
-                        className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold outline-none focus:border-rose-deep" />
+                        className="mt-2 h-11 w-full rounded-xl border border-line px-3 text-sm font-bold outline-none focus:border-rose-deep" />
                     ) : null}
 
                     <label className="mt-3 block">
-                      <span className="text-xs font-black text-slate-500">내부 메모 (관리자만, 선택)</span>
+                      <span className="text-xs font-black text-ink-soft">내부 메모 (관리자만, 선택)</span>
                       <input value={bulkMemo} onChange={(e) => setBulkMemo(e.target.value)} placeholder="관리자만 참고할 내용"
-                        className="mt-1 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold outline-none focus:border-rose-deep" />
+                        className="mt-1 h-11 w-full rounded-xl border border-line px-3 text-sm font-bold outline-none focus:border-rose-deep" />
                     </label>
 
                     <label className="mt-3 flex items-center gap-2 rounded-xl bg-rose-soft/40 px-3 py-2 text-[12px] font-black text-rose-deep">
@@ -1397,12 +1397,12 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
                       고객 화면 포인트 알림에 표시
                     </label>
 
-                    <div className="mt-3 rounded-xl border border-orange-100 bg-orange-50 px-3 py-2 text-[11px] font-bold leading-5 text-orange-800">
+                    <div className="mt-3 rounded-xl border border-orange-100 bg-warn-bg px-3 py-2 text-[11px] font-bold leading-5 text-orange-800">
                       {selectedPhones.size}명 × {(Number(bulkAmount.replace(/[^\d]/g, "")) || 0).toLocaleString("ko-KR")}P = 합계 {((Number(bulkAmount.replace(/[^\d]/g, "")) || 0) * selectedPhones.size).toLocaleString("ko-KR")}P 지급(회수 아님).
                     </div>
 
                     <div className="mt-4 flex justify-end gap-2">
-                      <button type="button" onClick={() => setBulkOpen(false)} disabled={bulkRunning} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-black text-slate-600 disabled:opacity-50">취소</button>
+                      <button type="button" onClick={() => setBulkOpen(false)} disabled={bulkRunning} className="rounded-xl border border-line px-4 py-2.5 text-sm font-black text-ink-soft disabled:opacity-50">취소</button>
                       <button type="button" onClick={submitBulkGrant} disabled={bulkRunning || (Number(bulkAmount.replace(/[^\d]/g, "")) || 0) <= 0}
                         className="rounded-xl bg-rose-deep px-5 py-2.5 text-sm font-black text-white disabled:opacity-50">
                         {bulkRunning ? "지급 중..." : `${selectedPhones.size}명에게 지급`}
@@ -1411,11 +1411,11 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
                   </>
                 ) : (
                   <>
-                    <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-sm font-black text-emerald-700">
+                    <div className="rounded-xl border border-emerald-100 bg-ok-bg px-3 py-3 text-sm font-black text-ok-tx">
                       ✅ {bulkResult.success}명 지급 완료{bulkResult.failed.length > 0 ? ` · ❌ ${bulkResult.failed.length}명 실패` : ""}
                     </div>
                     {bulkResult.failed.length > 0 ? (
-                      <div className="mt-2 max-h-40 overflow-y-auto rounded-xl border border-red-100 bg-red-50 p-2 text-[11px] font-bold leading-5 text-red-700">
+                      <div className="mt-2 max-h-40 overflow-y-auto rounded-xl border border-danger-tx bg-danger-bg p-2 text-[11px] font-bold leading-5 text-danger-tx">
                         {bulkResult.failed.map((f, i) => <div key={i}>{f.label}: {f.reason}</div>)}
                       </div>
                     ) : null}
@@ -1443,14 +1443,14 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
 
       {showBlockedCustomers && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4">
-          <div className="max-h-[84vh] w-full max-w-[720px] overflow-y-auto rounded-[28px] border border-slate-200 bg-white p-5 shadow-2xl">
-            <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+          <div className="max-h-[84vh] w-full max-w-[720px] overflow-y-auto rounded-[28px] border border-line bg-surface p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-3 border-b border-line pb-4">
               <div>
                 <div className="text-[11px] font-black tracking-[0.18em] text-red-500">BLOCKED CUSTOMERS</div>
-                <h2 className="mt-1 text-2xl font-black tracking-[-0.04em] text-slate-950">
+                <h2 className="mt-1 text-2xl font-black tracking-[-0.04em] text-ink">
                   차단 고객 목록 {blockedTotalCount.toLocaleString("ko-KR")}명
                 </h2>
-                <p className="mt-1 text-sm font-bold text-slate-500">
+                <p className="mt-1 text-sm font-bold text-ink-soft">
                   현재 주문 데이터와 차단 저장 결과 기준으로 표시합니다.
                 </p>
               </div>
@@ -1463,13 +1463,13 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
                   setBlockedCustomerKeyword("");
                   setBlockedCustomerPage(1);
                 }}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 hover:bg-slate-50"
+                className="rounded-xl border border-line bg-surface px-4 py-2 text-sm font-black text-ink-soft hover:bg-surface-2"
               >
                 닫기
               </button>
             </div>
 
-            <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-3">
+            <div className="mt-4 rounded-2xl border border-line bg-surface-2 p-3">
               <div className="grid gap-2 md:grid-cols-[1fr_96px_96px]">
                 <input
                   value={blockedCustomerKeywordDraft}
@@ -1481,7 +1481,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
                     }
                   }}
                   placeholder="닉네임 / 이름 / 전화번호 / 주소 / 차단사유 검색"
-                  className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50"
+                  className="h-11 rounded-xl border border-line bg-surface px-3 text-sm font-black text-ink outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50"
                 />
 
                 <button
@@ -1502,14 +1502,14 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
                     setBlockedCustomerKeyword("");
                     setBlockedCustomerPage(1);
                   }}
-                  className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-600 hover:bg-slate-50"
+                  className="h-11 rounded-xl border border-line bg-surface px-3 text-sm font-black text-ink-soft hover:bg-surface-2"
                 >
                   초기화
                 </button>
               </div>
 
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                <div className="text-xs font-black text-slate-400">
+                <div className="text-xs font-black text-ink-mute">
                   현재페이지 {visibleBlockedCustomerRows.length.toLocaleString("ko-KR")}명 · 검색결과{" "}
                   {filteredBlockedTotalCount.toLocaleString("ko-KR")}명 / 전체 {blockedTotalCount.toLocaleString("ko-KR")}명
                 </div>
@@ -1521,7 +1521,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
                       setBlockedCustomerPageSize(Number(event.target.value));
                       setBlockedCustomerPage(1);
                     }}
-                    className="h-9 rounded-xl border border-slate-200 bg-white px-2 text-xs font-black text-slate-600"
+                    className="h-9 rounded-xl border border-line bg-surface px-2 text-xs font-black text-ink-soft"
                   >
                     <option value={10}>10개 보기</option>
                     <option value={20}>20개 보기</option>
@@ -1532,7 +1532,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
                     type="button"
                     onClick={() => setBlockedCustomerPage(Math.max(1, safeBlockedCustomerPage - 1))}
                     disabled={safeBlockedCustomerPage <= 1}
-                    className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                    className="h-9 rounded-xl border border-line bg-surface px-3 text-xs font-black text-ink-soft hover:bg-surface-2 disabled:opacity-40"
                   >
                     이전
                   </button>
@@ -1545,7 +1545,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
                     type="button"
                     onClick={() => setBlockedCustomerPage(Math.min(blockedCustomerTotalPages, safeBlockedCustomerPage + 1))}
                     disabled={safeBlockedCustomerPage >= blockedCustomerTotalPages}
-                    className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                    className="h-9 rounded-xl border border-line bg-surface px-3 text-xs font-black text-ink-soft hover:bg-surface-2 disabled:opacity-40"
                   >
                     다음
                   </button>
@@ -1555,11 +1555,11 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
 
             <div className="mt-4 space-y-2">
               {blockedTotalCount === 0 ? (
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-8 text-center text-sm font-black text-slate-400">
+                <div className="rounded-2xl border border-line bg-surface-2 px-4 py-8 text-center text-sm font-black text-ink-mute">
                   차단 고객이 없습니다.
                 </div>
               ) : filteredBlockedTotalCount === 0 ? (
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-8 text-center text-sm font-black text-slate-400">
+                <div className="rounded-2xl border border-line bg-surface-2 px-4 py-8 text-center text-sm font-black text-ink-mute">
                   검색 결과가 없습니다.
                 </div>
               ) : (
@@ -1567,15 +1567,15 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
                   {visibleStandalonePhoneBlocks.map((block) => (
                     <div
                       key={`phone-block-${digitsOnly(block.phone)}`}
-                      className="rounded-2xl border border-red-100 bg-red-50/60 p-4"
+                      className="rounded-2xl border border-danger-tx bg-danger-bg/60 p-4"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="text-base font-black text-slate-950">전화번호 전용 차단</div>
-                          <div className="mt-1 text-sm font-bold text-slate-600">
+                          <div className="text-base font-black text-ink">전화번호 전용 차단</div>
+                          <div className="mt-1 text-sm font-bold text-ink-soft">
                             {formatPhone(block.phone)}
                           </div>
-                          <div className="mt-2 rounded-xl bg-white px-3 py-2 text-xs font-bold leading-5 text-red-700">
+                          <div className="mt-2 rounded-xl bg-surface px-3 py-2 text-xs font-bold leading-5 text-danger-tx">
                             {block.reason || "차단사유 없음"}
                           </div>
                         </div>
@@ -1612,18 +1612,18 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
                   {visibleBlockedCustomers.map((customer) => (
                   <div
                     key={`blocked-${customer.key}`}
-                    className="rounded-2xl border border-red-100 bg-red-50/60 p-4"
+                    className="rounded-2xl border border-danger-tx bg-danger-bg/60 p-4"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="truncate text-base font-black text-slate-950">{customer.nickname}</div>
-                        <div className="mt-1 text-sm font-bold text-slate-600">
+                        <div className="truncate text-base font-black text-ink">{customer.nickname}</div>
+                        <div className="mt-1 text-sm font-bold text-ink-soft">
                           {customer.name} · {formatPhone(customer.phone)}
                         </div>
-                        <div className="mt-2 break-keep text-xs font-bold leading-5 text-slate-500">
+                        <div className="mt-2 break-keep text-xs font-bold leading-5 text-ink-soft">
                           📍 {customer.address || "주소 정보 없음"}
                         </div>
-                        <div className="mt-2 rounded-xl bg-white px-3 py-2 text-xs font-bold leading-5 text-red-700">
+                        <div className="mt-2 rounded-xl bg-surface px-3 py-2 text-xs font-bold leading-5 text-danger-tx">
                           {customer.blockReason || "차단사유 없음"}
                         </div>
                       </div>
@@ -1636,7 +1636,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
                             setDetailPage(1);
                             setShowBlockedCustomers(false);
                           }}
-                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"
+                          className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink hover:bg-surface-2"
                         >
                           상세
                         </button>

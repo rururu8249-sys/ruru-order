@@ -103,22 +103,22 @@ export default function YoutubeNotifyCard() {
   };
 
   return (
-    <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+    <div className="rounded-[30px] border border-line bg-surface p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-black text-slate-950">유튜브 라이브 알림</h2>
-          <p className="mt-1 text-xs font-bold text-slate-400">주문 제출 시 유튜브 라이브 채팅에 자동으로 알림을 올립니다. (봇 계정 기준)</p>
+          <h2 className="text-lg font-black text-ink">유튜브 라이브 알림</h2>
+          <p className="mt-1 text-xs font-bold text-ink-mute">주문 제출 시 유튜브 라이브 채팅에 자동으로 알림을 올립니다. (봇 계정 기준)</p>
         </div>
-        <span className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-black ${connected ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+        <span className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-black ${connected ? "bg-ok-bg text-ok-tx" : "bg-surface-2 text-ink-soft"}`}>
           {loading ? "확인 중..." : connected ? "● 연결됨" : "○ 미연결"}
         </span>
       </div>
 
       {/* 연결 */}
-      <div className="flex items-start justify-between gap-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+      <div className="flex items-start justify-between gap-3 rounded-[24px] border border-line bg-surface-2 p-4">
         <div>
-          <div className="text-sm font-black text-slate-900">봇 계정 연결</div>
-          <div className="mt-1 text-xs font-bold leading-5 text-slate-400">
+          <div className="text-sm font-black text-ink">봇 계정 연결</div>
+          <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
             알림을 올릴 유튜브(봇) 계정으로 한 번 로그인합니다. 한 번 연결하면 계속 유지됩니다.
           </div>
         </div>
@@ -132,41 +132,41 @@ export default function YoutubeNotifyCard() {
       </div>
 
       {/* 라이브 주소 — 메인 컨트롤타워에서 입력한 주소를 자동 사용 */}
-      <div className="mt-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-        <div className="text-sm font-black text-slate-900">현재 라이브 주소 (자동)</div>
-        <div className="mt-1 text-xs font-bold leading-5 text-slate-400">
+      <div className="mt-3 rounded-[24px] border border-line bg-surface-2 p-4">
+        <div className="text-sm font-black text-ink">현재 라이브 주소 (자동)</div>
+        <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
           메인 화면(방송 컨트롤타워)에서 입력·저장한 유튜브 라이브 주소를 그대로 사용합니다. 여기서 따로 넣을 필요 없어요.
         </div>
-        <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700">
+        <div className="mt-3 rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-bold text-ink">
           {liveUrl ? liveUrl : "아직 메인 화면에 라이브 주소가 저장되지 않았습니다."}
         </div>
       </div>
 
       {/* ON/OFF + 문구 */}
-      <div className="mt-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+      <div className="mt-3 rounded-[24px] border border-line bg-surface-2 p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-sm font-black text-slate-900">자동 알림</div>
-            <div className="mt-1 text-xs font-bold leading-5 text-slate-400">ON이면 손님이 주문서를 제출할 때마다 채팅에 알림을 올립니다.</div>
+            <div className="text-sm font-black text-ink">자동 알림</div>
+            <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">ON이면 손님이 주문서를 제출할 때마다 채팅에 알림을 올립니다.</div>
           </div>
           <button
             type="button"
             onClick={() => setNotifyEnabled((v) => !v)}
-            className={`shrink-0 rounded-full px-4 py-2 text-xs font-black transition ${notifyEnabled ? "bg-rose-deep text-white" : "border border-slate-200 bg-white text-slate-500"}`}
+            className={`shrink-0 rounded-full px-4 py-2 text-xs font-black transition ${notifyEnabled ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}
           >
             {notifyEnabled ? "알림 ON" : "알림 OFF"}
           </button>
         </div>
 
-        <div className="mt-3 text-sm font-black text-slate-900">알림 문구</div>
-        <div className="mt-1 text-xs font-bold leading-5 text-slate-400">
+        <div className="mt-3 text-sm font-black text-ink">알림 문구</div>
+        <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
           넣을 수 있는 자동값: <code>{"{{nickname}}"}</code> 닉네임 · <code>{"{{items}}"}</code> 주문요약(예: “뉴발2000 외 2건”) · <code>{"{{amount}}"}</code> 총 결제금액(택배비 포함). 개인정보 보호를 위해 닉네임만 표시됩니다.
         </div>
         <textarea
           value={messageTemplate}
           onChange={(e) => setMessageTemplate(e.target.value)}
           rows={2}
-          className="mt-2 w-full resize-none rounded-2xl border border-slate-200 bg-white p-4 text-sm font-bold leading-relaxed outline-none transition focus:border-rose-deep focus:ring-4 focus:ring-rose-soft"
+          className="mt-2 w-full resize-none rounded-2xl border border-line bg-surface p-4 text-sm font-bold leading-relaxed outline-none transition focus:border-rose-deep focus:ring-4 focus:ring-rose-soft"
         />
 
         <div className="mt-3 flex gap-2">
@@ -182,12 +182,12 @@ export default function YoutubeNotifyCard() {
             type="button"
             onClick={sendTest}
             disabled={testing}
-            className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:border-rose-deep disabled:opacity-50"
+            className="rounded-2xl border border-line bg-surface px-5 py-3 text-sm font-black text-ink transition hover:border-rose-deep disabled:opacity-50"
           >
             {testing ? "발송중..." : "테스트 발송"}
           </button>
         </div>
-        <div className="mt-2 text-[11px] font-bold leading-5 text-slate-400">※ 테스트 발송은 ON/OFF와 상관없이 1건 보냅니다. 연결 + 라이브 주소 저장 + 실제 방송 중일 때 채팅에 떠요.</div>
+        <div className="mt-2 text-[11px] font-bold leading-5 text-ink-mute">※ 테스트 발송은 ON/OFF와 상관없이 1건 보냅니다. 연결 + 라이브 주소 저장 + 실제 방송 중일 때 채팅에 떠요.</div>
       </div>
     </div>
   );

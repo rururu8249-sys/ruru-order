@@ -58,12 +58,12 @@ export default function AdminLiveCustomerBlockReasonModal({
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/35 px-4">
-      <section className="w-full max-w-[520px] rounded-[28px] border border-red-100 bg-white p-5 shadow-2xl">
+      <section className="w-full max-w-[520px] rounded-[28px] border border-danger-tx bg-surface p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-[11px] font-black tracking-[0.18em] text-red-500">BLOCK REASON</div>
-            <h2 className="mt-1 text-2xl font-black tracking-[-0.04em] text-slate-950">차단사유 입력</h2>
-            <p className="mt-2 text-sm font-bold text-slate-500">
+            <h2 className="mt-1 text-2xl font-black tracking-[-0.04em] text-ink">차단사유 입력</h2>
+            <p className="mt-2 text-sm font-bold text-ink-soft">
               차단은 사유를 남겨야 나중에 고객 응대할 때 헷갈리지 않습니다.
             </p>
           </div>
@@ -72,30 +72,30 @@ export default function AdminLiveCustomerBlockReasonModal({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-black text-slate-500 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+            className="rounded-xl border border-line bg-surface px-3 py-2 text-sm font-black text-ink-soft hover:bg-surface-2 disabled:cursor-not-allowed disabled:text-ink-mute"
           >
             닫기
           </button>
         </div>
 
-        <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-600">
-          <div>닉네임: <span className="font-black text-slate-950">{nickname || "-"}</span></div>
-          <div>이름: <span className="font-black text-slate-950">{name || "-"}</span></div>
-          <div>전화번호: <span className="font-black text-slate-950">{formatPhone(phone)}</span></div>
+        <div className="mt-4 rounded-2xl bg-surface-2 p-4 text-sm font-bold text-ink-soft">
+          <div>닉네임: <span className="font-black text-ink">{nickname || "-"}</span></div>
+          <div>이름: <span className="font-black text-ink">{name || "-"}</span></div>
+          <div>전화번호: <span className="font-black text-ink">{formatPhone(phone)}</span></div>
         </div>
 
         <label className="mt-4 block">
-          <span className="text-sm font-black text-slate-800">차단사유</span>
+          <span className="text-sm font-black text-ink">차단사유</span>
           <textarea
             value={reason}
             onChange={(event) => setReason(event.target.value)}
             placeholder="예: 환불 악용, 반복 미입금, 악성 문의 등"
-            className="mt-2 min-h-[120px] w-full resize-none rounded-2xl border border-slate-200 bg-white p-3 text-sm font-bold text-slate-800 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-100"
+            className="mt-2 min-h-[120px] w-full resize-none rounded-2xl border border-line bg-surface p-3 text-sm font-bold text-ink outline-none focus:border-red-400 focus:ring-4 focus:ring-red-100"
           />
         </label>
 
         {errorMessage ? (
-          <div className="mt-3 rounded-2xl bg-red-50 px-3 py-2 text-sm font-black text-red-700">
+          <div className="mt-3 rounded-2xl bg-danger-bg px-3 py-2 text-sm font-black text-danger-tx">
             {errorMessage}
           </div>
         ) : null}
@@ -105,7 +105,7 @@ export default function AdminLiveCustomerBlockReasonModal({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="h-11 rounded-xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+            className="h-11 rounded-xl border border-line bg-surface px-5 text-sm font-black text-ink-soft hover:bg-surface-2 disabled:cursor-not-allowed disabled:text-ink-mute"
           >
             취소
           </button>

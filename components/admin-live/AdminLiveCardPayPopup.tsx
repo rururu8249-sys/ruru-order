@@ -113,14 +113,14 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
       <div style={{ display: "flex", flexDirection: "row", width: "960px", maxWidth: "95vw", height: "600px", borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
         <div style={{ width: "50%", height: "100%", background: "#fff", overflowY: "auto" }}>
         <div className="flex items-center justify-between border-b border-rose-line px-5 py-3">
-          <span className="text-[15px] font-black text-slate-950">💳 카드결제 — {order.nickname}</span>
-          <button type="button" onClick={onClose} className="text-lg leading-none text-slate-400 hover:text-slate-700">
+          <span className="text-[15px] font-black text-ink">💳 카드결제 — {order.nickname}</span>
+          <button type="button" onClick={onClose} className="text-lg leading-none text-ink-mute hover:text-ink">
             ✕
           </button>
         </div>
 
         <div className="px-5 py-4">
-          <div className="mb-3 text-[12px] font-bold text-slate-500">필요한 칸 복사 → 페이스터에 붙여넣기</div>
+          <div className="mb-3 text-[12px] font-bold text-ink-soft">필요한 칸 복사 → 페이스터에 붙여넣기</div>
 
           <div className="space-y-2">
             {fields.map((f) => (
@@ -128,15 +128,15 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
                 key={f.key}
                 className={[
                   "flex items-center gap-2 rounded-xl border px-3 py-2",
-                  f.highlight ? "border-rose-line bg-rose-soft/50" : "border-slate-200",
+                  f.highlight ? "border-rose-line bg-rose-soft/50" : "border-line",
                 ].join(" ")}
               >
                 <div className="w-[64px] shrink-0">
-                  <div className={["text-[11px] font-black", f.highlight ? "text-rose-deep" : "text-slate-400"].join(" ")}>{f.label}</div>
-                  {f.hint ? <div className="text-[9px] font-bold text-slate-400">{f.hint}</div> : null}
+                  <div className={["text-[11px] font-black", f.highlight ? "text-rose-deep" : "text-ink-mute"].join(" ")}>{f.label}</div>
+                  {f.hint ? <div className="text-[9px] font-bold text-ink-mute">{f.hint}</div> : null}
                 </div>
-                <div className={["min-w-0 flex-1 truncate text-[14px] font-black", f.highlight ? "text-rose-deep" : "text-slate-900"].join(" ")}>
-                  {f.value || <span className="text-slate-300">없음</span>}
+                <div className={["min-w-0 flex-1 truncate text-[14px] font-black", f.highlight ? "text-rose-deep" : "text-ink"].join(" ")}>
+                  {f.value || <span className="text-ink-mute">없음</span>}
                 </div>
                 <button
                   type="button"
@@ -144,7 +144,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
                   disabled={!f.value}
                   className={[
                     "h-8 shrink-0 rounded-lg px-2.5 text-[11px] font-black transition disabled:opacity-40",
-                    copiedKey === f.key ? "bg-emerald-600 text-white" : "border border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100",
+                    copiedKey === f.key ? "bg-emerald-600 text-white" : "border border-info-tx bg-info-bg text-info-tx hover:bg-info-bg",
                   ].join(" ")}
                 >
                   {copiedKey === f.key ? "복사됨" : "⧉ 복사"}
@@ -157,17 +157,17 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
             type="button"
             disabled={saving}
             onClick={handleComplete}
-            className="mt-2 w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:bg-slate-300"
+            className="mt-2 w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:bg-surface-3"
           >
             {saving ? "처리 중…" : "✔ 카드결제완료 처리"}
           </button>
 
-          <div className="mt-3 rounded-xl bg-blue-50 px-3 py-2 text-[10px] font-bold leading-4 text-blue-700">
+          <div className="mt-3 rounded-xl bg-info-bg px-3 py-2 text-[10px] font-bold leading-4 text-info-tx">
             닉네임으로 넣어야 나중에 어느 주문인지 매칭됩니다(이름 X). 페이스터는 남의 서버라 자동 채우기가 안 돼요 — 칸별로 복사해 붙여넣어 주세요.
           </div>
         </div>
         </div>
-        <div style={{ width: "50%", height: "100%", background: "#fff", borderLeft: "1px solid #E8E2DD" }}>
+        <div style={{ width: "50%", height: "100%", background: "#fff", borderLeft: "1px solid var(--color-line)" }}>
           <iframe src={PAYSTER_URL} title="페이스터 결제" style={{ width: "100%", height: "100%", border: 0 }} />
         </div>
       </div>

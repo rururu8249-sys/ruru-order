@@ -155,44 +155,44 @@ function CustomerPointActionModal({
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-4 py-6">
-      <div className="w-full max-w-[520px] overflow-hidden rounded-[28px] bg-white shadow-2xl ring-1 ring-slate-200">
-        <div className="border-b border-slate-100 bg-slate-50 px-5 py-4">
-          <div className="text-lg font-black text-slate-950">{title}</div>
-          <div className="mt-1 text-xs font-bold text-slate-500">
+      <div className="w-full max-w-[520px] overflow-hidden rounded-[28px] bg-surface shadow-2xl ring-1 ring-line">
+        <div className="border-b border-line bg-surface-2 px-5 py-4">
+          <div className="text-lg font-black text-ink">{title}</div>
+          <div className="mt-1 text-xs font-bold text-ink-soft">
             {customer.nickname} · {customer.name} · {formatPhone(customer.phone)}
           </div>
         </div>
 
         <div className="space-y-4 p-5">
           <label className="block">
-            <span className="mb-1 block text-xs font-black text-slate-500">{actionLabel} 포인트</span>
+            <span className="mb-1 block text-xs font-black text-ink-soft">{actionLabel} 포인트</span>
             <input
               value={commaNumberText(form.amount)}
               onChange={(event) => setForm((current) => ({ ...current, amount: commaNumberText(event.target.value) }))}
               inputMode="numeric"
               placeholder="예: 10,000"
-              className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-lg font-black text-slate-950 outline-none focus:border-rose-line"
+              className="h-12 w-full rounded-2xl border border-line px-4 text-lg font-black text-ink outline-none focus:border-rose-line"
             />
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-xs font-black text-slate-500">{actionLabel} 사유</span>
+            <span className="mb-1 block text-xs font-black text-ink-soft">{actionLabel} 사유</span>
             <input
               value={form.reason}
               onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))}
               placeholder={isGrant ? "예: 방송 이벤트 당첨" : "예: 오지급 정정"}
-              className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-900 outline-none focus:border-rose-line"
+              className="h-12 w-full rounded-2xl border border-line px-4 text-sm font-bold text-ink outline-none focus:border-rose-line"
             />
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-xs font-black text-slate-500">관리자 메모</span>
+            <span className="mb-1 block text-xs font-black text-ink-soft">관리자 메모</span>
             <textarea
               value={form.adminMemo}
               onChange={(event) => setForm((current) => ({ ...current, adminMemo: event.target.value }))}
               placeholder="관리자만 참고할 내용을 적어주세요."
               rows={3}
-              className="w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-rose-line"
+              className="w-full resize-none rounded-2xl border border-line px-4 py-3 text-sm font-bold text-ink outline-none focus:border-rose-line"
             />
           </label>
 
@@ -207,22 +207,22 @@ function CustomerPointActionModal({
           </label>
 
           {errorMessage ? (
-            <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-black text-red-700 ring-1 ring-red-100">
+            <div className="rounded-2xl bg-danger-bg px-4 py-3 text-sm font-black text-danger-tx ring-1 ring-red-100">
               {errorMessage}
             </div>
           ) : null}
 
-          <div className="rounded-2xl bg-amber-50 px-4 py-3 text-xs font-bold leading-relaxed text-amber-800 ring-1 ring-amber-100">
+          <div className="rounded-2xl bg-warn-bg px-4 py-3 text-xs font-bold leading-relaxed text-warn-tx ring-1 ring-amber-100">
             관리자 지급/회수 포인트는 정산에 바로 반영되지 않습니다. 고객이 주문서에서 실제 사용하는 단계는 나중에 별도 작업합니다.
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4">
+        <div className="flex justify-end gap-2 border-t border-line bg-surface-2 px-5 py-4">
           <button
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            className="rounded-2xl border border-line bg-surface px-4 py-2 text-sm font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50"
           >
             취소
           </button>
@@ -390,8 +390,8 @@ export default function AdminLiveCustomerPointPanel({ customer }: { customer: Po
     <section className="mt-5 rounded-[24px] border border-rose-line bg-rose-soft/60 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-base font-black text-slate-950">🪙 포인트</h3>
-          <p className="mt-1 text-xs font-bold text-slate-500">
+          <h3 className="text-base font-black text-ink">🪙 포인트</h3>
+          <p className="mt-1 text-xs font-bold text-ink-soft">
             회원별 포인트 지급/회수와 최근 이력을 확인합니다.
           </p>
         </div>
@@ -400,24 +400,24 @@ export default function AdminLiveCustomerPointPanel({ customer }: { customer: Po
           type="button"
           onClick={() => void loadPoints()}
           disabled={pointState.loading || pointState.saving}
-          className="rounded-xl border border-rose-line bg-white px-3 py-2 text-xs font-black text-rose-deep hover:bg-rose-soft disabled:opacity-50"
+          className="rounded-xl border border-rose-line bg-surface px-3 py-2 text-xs font-black text-rose-deep hover:bg-rose-soft disabled:opacity-50"
         >
           새로고침
         </button>
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr]">
-        <div className="rounded-[22px] bg-white p-4 ring-1 ring-rose-line">
-          <div className="text-xs font-black text-slate-500">현재 포인트</div>
+        <div className="rounded-[22px] bg-surface p-4 ring-1 ring-rose-line">
+          <div className="text-xs font-black text-ink-soft">현재 포인트</div>
           <div className="mt-2 text-[30px] font-black tracking-[-0.06em] text-rose-deep">
             {pointState.loading ? "불러오는중..." : pointState.currentPointsText}
           </div>
-          <div className="mt-2 text-xs font-bold leading-relaxed text-slate-500">
+          <div className="mt-2 text-xs font-bold leading-relaxed text-ink-soft">
             지급/회수는 포인트 잔액과 이력만 변경합니다. 정산·입금·주문금액에는 아직 반영하지 않습니다.
           </div>
         </div>
 
-        <div className="grid content-start gap-2 rounded-[22px] bg-white p-4 ring-1 ring-rose-line">
+        <div className="grid content-start gap-2 rounded-[22px] bg-surface p-4 ring-1 ring-rose-line">
           <button
             type="button"
             onClick={() => openModal("grant")}
@@ -438,41 +438,41 @@ export default function AdminLiveCustomerPointPanel({ customer }: { customer: Po
       </div>
 
       {pointState.statusMessage ? (
-        <div className="mt-3 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-700 ring-1 ring-emerald-100">
+        <div className="mt-3 rounded-2xl bg-ok-bg px-4 py-3 text-sm font-black text-ok-tx ring-1 ring-emerald-100">
           {pointState.statusMessage}
         </div>
       ) : null}
 
       {pointState.errorMessage ? (
-        <div className="mt-3 rounded-2xl bg-red-50 px-4 py-3 text-sm font-black text-red-700 ring-1 ring-red-100">
+        <div className="mt-3 rounded-2xl bg-danger-bg px-4 py-3 text-sm font-black text-danger-tx ring-1 ring-red-100">
           {pointState.errorMessage}
         </div>
       ) : null}
 
-      <div className="mt-4 overflow-hidden rounded-2xl border border-rose-line bg-white">
+      <div className="mt-4 overflow-hidden rounded-2xl border border-rose-line bg-surface">
         <div className="flex items-center justify-between border-b border-rose-line px-4 py-3">
-          <div className="text-sm font-black text-slate-900">최근 포인트 이력</div>
-          <div className="text-xs font-bold text-slate-400">{recentLedger.length.toLocaleString("ko-KR")}건 표시</div>
+          <div className="text-sm font-black text-ink">최근 포인트 이력</div>
+          <div className="text-xs font-bold text-ink-mute">{recentLedger.length.toLocaleString("ko-KR")}건 표시</div>
         </div>
 
         {recentLedger.length === 0 ? (
-          <div className="px-4 py-6 text-center text-sm font-bold text-slate-400">
+          <div className="px-4 py-6 text-center text-sm font-bold text-ink-mute">
             아직 포인트 이력이 없습니다.
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-line">
             {recentLedger.map((item, index) => (
               <div key={ledgerKey(item, index)} className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[96px_72px_150px_minmax(0,1fr)]">
-                <div className="font-bold text-slate-500">{dateLabel(item.created_at)}</div>
-                <div className="font-black text-slate-900">{ledgerLabel(item)}</div>
+                <div className="font-bold text-ink-soft">{dateLabel(item.created_at)}</div>
+                <div className="font-black text-ink">{ledgerLabel(item)}</div>
                 <div className={Number(item.amount || 0) >= 0 ? "whitespace-nowrap text-right font-black tabular-nums text-rose-deep" : "whitespace-nowrap text-right font-black tabular-nums text-red-600"}>
                   {signedMoney(item.amount)}
                 </div>
                 <div className="min-w-0">
-                  <div className="font-bold text-slate-700 break-words">
+                  <div className="font-bold text-ink break-words">
                     처리 후 {money(item.balance_after)}
                   </div>
-                  <div className="mt-1 text-xs font-bold text-slate-400 break-words">
+                  <div className="mt-1 text-xs font-bold text-ink-mute break-words">
                     {item.reason || item.admin_memo || "사유 없음"}
                   </div>
                 </div>

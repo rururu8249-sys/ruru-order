@@ -276,11 +276,11 @@ function issueRows(task: AdminIssueTask) {
 
 function IssueRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div className="grid grid-cols-[62px_1fr] gap-2 border-b border-slate-100 py-1.5 last:border-b-0">
-      <div className="text-[11px] font-black text-slate-400">{label}</div>
+    <div className="grid grid-cols-[62px_1fr] gap-2 border-b border-line py-1.5 last:border-b-0">
+      <div className="text-[11px] font-black text-ink-mute">{label}</div>
       <div
         className={`min-w-0 break-words text-[12px] leading-5 ${
-          strong ? "font-black text-slate-950" : "font-bold text-slate-700"
+          strong ? "font-black text-ink" : "font-bold text-ink"
         }`}
         title={value}
       >
@@ -314,7 +314,7 @@ function IssueTypeChips({
               onChange(next.length > 0 ? next : ["general"]);
             }}
             className={`h-9 rounded-xl px-3 text-sm font-black ${
-              active ? "bg-rose-deep text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              active ? "bg-rose-deep text-white" : "bg-surface-2 text-ink-soft hover:bg-surface-3"
             }`}
           >
             {active ? "✓ " : ""}
@@ -346,7 +346,7 @@ function IssueCard({
   return (
     <article
       key={taskKey(task, index)}
-      className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-3 pl-4 shadow-sm"
+      className="relative overflow-hidden rounded-xl border border-line bg-surface p-3 pl-4 shadow-sm"
     >
       <span className={`absolute left-0 top-0 h-full w-1 ${done ? "bg-emerald-400" : "bg-red-400"}`} />
       <div className="flex items-start justify-between gap-2">
@@ -354,7 +354,7 @@ function IssueCard({
           <div className="flex flex-wrap items-center gap-1.5">
             <span
               className={`rounded-full px-2 py-0.5 text-[11px] font-black ${
-                done ? "bg-slate-200 text-slate-600" : "bg-red-100 text-red-700"
+                done ? "bg-surface-3 text-ink-soft" : "bg-danger-bg text-danger-tx"
               }`}
             >
               {done ? CUSTOMER_TERMS.issueResolved : CUSTOMER_TERMS.issueOpen}
@@ -363,28 +363,28 @@ function IssueCard({
             {issueTypes.map((type) => (
               <span
                 key={type}
-                className="rounded-full bg-white px-2 py-0.5 text-[11px] font-black text-slate-600 ring-1 ring-slate-100"
+                className="rounded-full bg-surface px-2 py-0.5 text-[11px] font-black text-ink-soft ring-1 ring-line"
               >
                 {getIssueTypeLabel(type)}
               </span>
             ))}
 
-            <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-black text-slate-500 ring-1 ring-slate-100">
+            <span className="rounded-full bg-surface px-2 py-0.5 text-[11px] font-black text-ink-soft ring-1 ring-line">
               {getPriorityLabel(task.priority)}
             </span>
           </div>
 
-          <div className="mt-2 truncate text-[15px] font-black text-slate-950" title={getNickname(task)}>
+          <div className="mt-2 truncate text-[15px] font-black text-ink" title={getNickname(task)}>
             {getNickname(task)}
           </div>
-          <div className="mt-0.5 text-[11px] font-black text-slate-400">{dateLabel(task.created_at)}</div>
+          <div className="mt-0.5 text-[11px] font-black text-ink-mute">{dateLabel(task.created_at)}</div>
         </div>
 
         <div className="flex shrink-0 flex-col gap-1.5">
           <button
             type="button"
             onClick={() => onEdit(task)}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-black text-slate-600 hover:bg-slate-50"
+            className="rounded-xl border border-line bg-surface px-3 py-2 text-[11px] font-black text-ink-soft hover:bg-surface-2"
           >
             수정
           </button>
@@ -393,7 +393,7 @@ function IssueCard({
             <button
               type="button"
               onClick={() => onHide(task)}
-              className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-[11px] font-black text-red-600 hover:bg-red-100"
+              className="rounded-xl border border-danger-tx bg-danger-bg px-3 py-2 text-[11px] font-black text-red-600 hover:bg-danger-bg"
               title="DB 완전삭제가 아니라 해결목록 숨김 처리"
             >
               목록삭제
@@ -402,7 +402,7 @@ function IssueCard({
             <button
               type="button"
               onClick={() => onResolve(task)}
-              className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-[11px] font-black text-emerald-700 hover:bg-emerald-100"
+              className="rounded-xl border border-emerald-100 bg-ok-bg px-3 py-2 text-[11px] font-black text-ok-tx hover:bg-emerald-100"
             >
               해결완료
             </button>
@@ -410,7 +410,7 @@ function IssueCard({
         </div>
       </div>
 
-      <div className="mt-3 rounded-2xl bg-white/70 px-3 py-2 ring-1 ring-white">
+      <div className="mt-3 rounded-2xl bg-surface/70 px-3 py-2 ring-1 ring-white">
         {rows.map(([label, value]) => (
           <IssueRow key={label} label={label} value={value} strong={label === "메모"} />
         ))}
@@ -761,13 +761,13 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           <button
             type="button"
             onClick={() => setReloadKey((value) => value + 1)}
-            className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-600 hover:bg-slate-50"
+            className="h-9 rounded-xl border border-line bg-surface px-3 text-[12px] font-black text-ink-soft hover:bg-surface-2"
           >
             새로고침
           </button>
         </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-1.5 rounded-2xl bg-slate-100 p-1">
+      <div className="mt-4 grid grid-cols-3 gap-1.5 rounded-2xl bg-surface-2 p-1">
         {[
           ["open", `미해결 전체 ${openCount}건`],
           ["all", `전체 ${tasks.length}건`],
@@ -781,7 +781,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               setIssuePage(1);
             }}
             className={`h-9 rounded-xl text-[12px] font-black ${
-              activeTab === key ? "bg-white text-rose-deep shadow-sm" : "text-slate-500"
+              activeTab === key ? "bg-surface text-rose-deep shadow-sm" : "text-ink-soft"
             }`}
           >
             {label}
@@ -791,11 +791,11 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
       <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
         {loading ? (
-          <div className="rounded-2xl bg-slate-50 p-6 text-center text-sm font-black text-slate-400">
+          <div className="rounded-2xl bg-surface-2 p-6 text-center text-sm font-black text-ink-mute">
             고객이슈 불러오는 중...
           </div>
         ) : visibleTasks.length === 0 ? (
-          <div className="rounded-2xl bg-slate-50 p-6 text-center text-sm font-black text-slate-400">
+          <div className="rounded-2xl bg-surface-2 p-6 text-center text-sm font-black text-ink-mute">
             표시할 고객이슈가 없습니다.
           </div>
         ) : (
@@ -812,13 +812,13 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
         )}
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-slate-50 p-2">
-        <div className="text-xs font-black text-slate-400">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-surface-2 p-2">
+        <div className="text-xs font-black text-ink-mute">
           현재페이지 {pageTasks.length.toLocaleString("ko-KR")}건 · 전체 {visibleTasks.length.toLocaleString("ko-KR")}건
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="h-9 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600">
+          <div className="h-9 rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft">
             3개씩 보기
           </div>
 
@@ -826,7 +826,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
             type="button"
             onClick={() => setIssuePage(Math.max(1, safeIssuePage - 1))}
             disabled={safeIssuePage <= 1}
-            className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+            className="h-9 rounded-xl border border-line bg-surface px-3 text-xs font-black text-ink-soft hover:bg-surface-2 disabled:opacity-40"
           >
             이전
           </button>
@@ -839,7 +839,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
             type="button"
             onClick={() => setIssuePage(Math.min(issueTotalPages, safeIssuePage + 1))}
             disabled={safeIssuePage >= issueTotalPages}
-            className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+            className="h-9 rounded-xl border border-line bg-surface px-3 text-xs font-black text-ink-soft hover:bg-surface-2 disabled:opacity-40"
           >
             다음
           </button>
@@ -848,24 +848,24 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
       {showMemoAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4">
-          <div className="max-h-[92vh] w-full max-w-[620px] overflow-y-auto rounded-[28px] border border-slate-200 bg-white p-5 shadow-2xl">
+          <div className="max-h-[92vh] w-full max-w-[620px] overflow-y-auto rounded-[28px] border border-line bg-surface p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-[11px] font-black tracking-[0.18em] text-rose-deep">ADD CUSTOMER ISSUE</div>
-                <h3 className="mt-1 text-lg font-black text-slate-950">고객이슈 메모 추가</h3>
+                <h3 className="mt-1 text-lg font-black text-ink">고객이슈 메모 추가</h3>
               </div>
 
               <button
                 type="button"
                 onClick={closeAdd}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-50"
+                className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2"
               >
                 닫기
               </button>
             </div>
 
             <div className="mt-4">
-              <div className="text-xs font-black text-slate-500">고객 검색</div>
+              <div className="text-xs font-black text-ink-soft">고객 검색</div>
               <div className="mt-2 grid gap-2 md:grid-cols-[1fr_96px]">
                 <input
                   value={customerSearchDraft}
@@ -879,7 +879,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
                     }
                   }}
                   placeholder="닉네임 / 이름 / 전화번호 검색"
-                  className="h-11 rounded-xl border border-slate-200 px-3 text-sm font-bold outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                  className="h-11 rounded-xl border border-line px-3 text-sm font-bold outline-none focus:border-blue-400 focus:ring-4 focus:ring-info-bg"
                 />
 
                 <button
@@ -891,13 +891,13 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
                 </button>
               </div>
 
-              <div className="mt-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-2">
+              <div className="mt-2 rounded-2xl border border-dashed border-line bg-surface-2 p-2">
                 {!clean(customerSearchDraft) ? (
-                  <div className="px-3 py-4 text-center text-xs font-black text-slate-400">
+                  <div className="px-3 py-4 text-center text-xs font-black text-ink-mute">
                     닉네임·이름·전화번호를 검색하면 고객 추천이 표시됩니다.
                   </div>
                 ) : customerSearchResults.length === 0 ? (
-                  <div className="px-3 py-4 text-center text-xs font-black text-slate-400">
+                  <div className="px-3 py-4 text-center text-xs font-black text-ink-mute">
                     검색 결과가 없습니다. 직접 입력도 가능합니다.
                   </div>
                 ) : (
@@ -907,10 +907,10 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
                         key={customer.key}
                         type="button"
                         onClick={() => selectCustomer(customer)}
-                        className="grid w-full grid-cols-[1fr_auto] gap-2 rounded-xl bg-white px-3 py-2 text-left text-xs font-bold text-slate-600 hover:bg-rose-soft"
+                        className="grid w-full grid-cols-[1fr_auto] gap-2 rounded-xl bg-surface px-3 py-2 text-left text-xs font-bold text-ink-soft hover:bg-rose-soft"
                       >
                         <span className="min-w-0 truncate">
-                          <b className="text-slate-950">{customer.nickname || "-"}</b> · {customer.name || "-"}
+                          <b className="text-ink">{customer.nickname || "-"}</b> · {customer.name || "-"}
                         </span>
                         <span className="font-black text-rose-deep">{formatPhone(customer.phone)}</span>
                       </button>
@@ -925,24 +925,24 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
                 value={newIssueForm.nickname}
                 onChange={(event) => updateNewIssueForm({ nickname: event.target.value })}
                 placeholder="닉네임"
-                className="h-11 rounded-xl border border-slate-200 px-3 text-sm font-bold outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                className="h-11 rounded-xl border border-line px-3 text-sm font-bold outline-none focus:border-blue-400 focus:ring-4 focus:ring-info-bg"
               />
               <input
                 value={newIssueForm.name}
                 onChange={(event) => updateNewIssueForm({ name: event.target.value })}
                 placeholder="이름"
-                className="h-11 rounded-xl border border-slate-200 px-3 text-sm font-bold outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                className="h-11 rounded-xl border border-line px-3 text-sm font-bold outline-none focus:border-blue-400 focus:ring-4 focus:ring-info-bg"
               />
               <input
                 value={newIssueForm.phone}
                 onChange={(event) => updateNewIssueForm({ phone: event.target.value })}
                 placeholder="전화번호"
-                className="h-11 rounded-xl border border-slate-200 px-3 text-sm font-bold outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                className="h-11 rounded-xl border border-line px-3 text-sm font-bold outline-none focus:border-blue-400 focus:ring-4 focus:ring-info-bg"
               />
             </div>
 
             <div className="mt-4">
-              <div className="mb-2 text-xs font-black text-slate-500">이슈유형 다중선택</div>
+              <div className="mb-2 text-xs font-black text-ink-soft">이슈유형 다중선택</div>
               <IssueTypeChips
                 value={newIssueForm.taskTypes}
                 onChange={(nextValue) => updateNewIssueForm({ taskTypes: nextValue })}
@@ -953,7 +953,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               <select
                 value={newIssueForm.priority}
                 onChange={(event) => updateNewIssueForm({ priority: event.target.value })}
-                className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-black text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                className="h-11 w-full rounded-xl border border-line px-3 text-sm font-black text-ink outline-none focus:border-blue-400 focus:ring-4 focus:ring-info-bg"
               >
                 {PRIORITY_OPTIONS.map(([value, label]) => (
                   <option key={value} value={value}>
@@ -967,14 +967,14 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               value={newIssueForm.memo}
               onChange={(event) => updateNewIssueForm({ memo: event.target.value })}
               placeholder="고객이슈 내용을 입력하세요."
-              className="mt-3 min-h-[180px] w-full resize-none rounded-2xl border border-slate-200 p-3 text-sm font-bold leading-6 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+              className="mt-3 min-h-[180px] w-full resize-none rounded-2xl border border-line p-3 text-sm font-bold leading-6 outline-none focus:border-blue-400 focus:ring-4 focus:ring-info-bg"
             />
 
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={closeAdd}
-                className="h-11 rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-600 hover:bg-slate-50"
+                className="h-11 rounded-xl border border-line bg-surface text-sm font-black text-ink-soft hover:bg-surface-2"
               >
                 취소
               </button>
@@ -993,12 +993,12 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
       {editingIssueTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4">
-          <div className="w-full max-w-[560px] rounded-[28px] border border-slate-200 bg-white p-5 shadow-2xl">
+          <div className="w-full max-w-[560px] rounded-[28px] border border-line bg-surface p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-[11px] font-black tracking-[0.18em] text-rose-deep">EDIT CUSTOMER ISSUE</div>
-                <h3 className="mt-1 text-lg font-black text-slate-950">고객이슈 메모 수정</h3>
-                <p className="mt-1 text-xs font-bold text-slate-500">
+                <h3 className="mt-1 text-lg font-black text-ink">고객이슈 메모 수정</h3>
+                <p className="mt-1 text-xs font-bold text-ink-soft">
                   {getNickname(editingIssueTask)} / {getName(editingIssueTask)}
                 </p>
                 <p className="mt-1 text-[11px] font-bold text-rose-deep">
@@ -1009,14 +1009,14 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               <button
                 type="button"
                 onClick={closeEdit}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-50"
+                className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2"
               >
                 닫기
               </button>
             </div>
 
             <div className="mt-4">
-              <div className="mb-2 text-xs font-black text-slate-500">이슈유형 다중선택</div>
+              <div className="mb-2 text-xs font-black text-ink-soft">이슈유형 다중선택</div>
               <IssueTypeChips value={editingIssueTypes} onChange={setEditingIssueTypes} />
             </div>
 
@@ -1024,7 +1024,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               <select
                 value={editingIssuePriority}
                 onChange={(event) => setEditingIssuePriority(event.target.value)}
-                className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-black text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                className="h-11 w-full rounded-xl border border-line px-3 text-sm font-black text-ink outline-none focus:border-blue-400 focus:ring-4 focus:ring-info-bg"
               >
                 {PRIORITY_OPTIONS.map(([value, label]) => (
                   <option key={value} value={value}>
@@ -1037,14 +1037,14 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
             <textarea
               value={editingIssueMemo}
               onChange={(event) => setEditingIssueMemo(event.target.value)}
-              className="mt-3 min-h-[220px] w-full resize-none rounded-2xl border border-slate-200 p-3 text-sm font-bold leading-6 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+              className="mt-3 min-h-[220px] w-full resize-none rounded-2xl border border-line p-3 text-sm font-bold leading-6 outline-none focus:border-blue-400 focus:ring-4 focus:ring-info-bg"
             />
 
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={closeEdit}
-                className="h-11 rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-600 hover:bg-slate-50"
+                className="h-11 rounded-xl border border-line bg-surface text-sm font-black text-ink-soft hover:bg-surface-2"
               >
                 취소
               </button>

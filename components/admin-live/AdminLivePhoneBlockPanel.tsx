@@ -101,18 +101,18 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
   };
 
   return (
-    <section className="rounded-[24px] border border-red-100 bg-red-50 p-4">
+    <section className="rounded-[24px] border border-danger-tx bg-danger-bg p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-[11px] font-black tracking-[0.16em] text-red-500">PHONE BLOCK</div>
-          <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-slate-950">전화번호 직접 차단</h2>
+          <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-ink">전화번호 직접 차단</h2>
           <p className="mt-1 text-[12px] font-bold text-red-600">
             주문 이력이 없는 번호도 전화번호 전용 차단으로 저장합니다.
           </p>
         </div>
 
         {message ? (
-          <div className="rounded-xl bg-white px-3 py-2 text-[12px] font-black text-red-700 ring-1 ring-red-100">
+          <div className="rounded-xl bg-surface px-3 py-2 text-[12px] font-black text-danger-tx ring-1 ring-red-100">
             {message}
           </div>
         ) : null}
@@ -124,14 +124,14 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
           onChange={(event) => setPhone(event.target.value)}
           placeholder="01012345678"
           inputMode="numeric"
-          className="h-11 w-full min-w-0 rounded-xl border border-red-100 bg-white px-3 text-[13px] font-black text-slate-800 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-100 sm:w-44"
+          className="h-11 w-full min-w-0 rounded-xl border border-danger-tx bg-surface px-3 text-[13px] font-black text-ink outline-none focus:border-red-400 focus:ring-4 focus:ring-red-100 sm:w-44"
         />
 
         <input
           value={reason}
           onChange={(event) => setReason(event.target.value)}
           placeholder="차단사유 입력"
-          className="h-11 min-w-[150px] flex-1 rounded-xl border border-red-100 bg-white px-3 text-[13px] font-bold text-slate-800 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-100"
+          className="h-11 min-w-[150px] flex-1 rounded-xl border border-danger-tx bg-surface px-3 text-[13px] font-bold text-ink outline-none focus:border-red-400 focus:ring-4 focus:ring-red-100"
         />
 
         <button
@@ -147,14 +147,14 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
           type="button"
           disabled={saving}
           onClick={() => submit(false)}
-          className="h-11 shrink-0 rounded-xl border border-slate-200 bg-white px-4 text-[13px] font-black text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+          className="h-11 shrink-0 rounded-xl border border-line bg-surface px-4 text-[13px] font-black text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:text-ink-mute"
         >
           차단해제
         </button>
       </div>
 
       {errorMessage ? (
-        <div className="mt-3 rounded-2xl bg-white px-3 py-2 text-[12px] font-black text-red-700 ring-1 ring-red-100">
+        <div className="mt-3 rounded-2xl bg-surface px-3 py-2 text-[12px] font-black text-danger-tx ring-1 ring-red-100">
           {errorMessage}
         </div>
       ) : null}

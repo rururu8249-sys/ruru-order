@@ -219,12 +219,12 @@ export default function LiveOpsOrderCopyModal({ open, orders, onClose, onCopied 
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 px-3 py-4">
-      <div className="flex max-h-[88vh] w-full max-w-[560px] flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
-        <div className="border-b border-slate-100 px-5 py-4">
+      <div className="flex max-h-[88vh] w-full max-w-[560px] flex-col overflow-hidden rounded-[28px] border border-line bg-surface shadow-2xl">
+        <div className="border-b border-line px-5 py-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-[22px] font-black tracking-[-0.04em] text-slate-950">📃 새 주문서 제출</div>
-              <div className="mt-1 text-sm font-bold text-slate-500">
+              <div className="text-[22px] font-black tracking-[-0.04em] text-ink">📃 새 주문서 제출</div>
+              <div className="mt-1 text-sm font-bold text-ink-soft">
                 선택한 알림을 유튜브 채팅창용 한 줄 문구로 복사합니다.
               </div>
             </div>
@@ -232,7 +232,7 @@ export default function LiveOpsOrderCopyModal({ open, orders, onClose, onCopied 
             <button
               type="button"
               onClick={onClose}
-              className="h-10 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-600 active:scale-[0.98]"
+              className="h-10 rounded-2xl border border-line bg-surface px-4 text-sm font-black text-ink-soft active:scale-[0.98]"
             >
               닫기
             </button>
@@ -245,7 +245,7 @@ export default function LiveOpsOrderCopyModal({ open, orders, onClose, onCopied 
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <div className="text-sm font-black text-slate-700">
+            <div className="text-sm font-black text-ink">
               미복사 알림 {visibleOrders.length.toLocaleString("ko-KR")}건 · 선택 {selectedOrders.length.toLocaleString("ko-KR")}건 · 최대 2건 복사
             </div>
 
@@ -254,7 +254,7 @@ export default function LiveOpsOrderCopyModal({ open, orders, onClose, onCopied 
                 type="button"
                 onClick={toggleAll}
                 disabled={!visibleOrders.length}
-                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 disabled:opacity-40"
+                className="h-9 rounded-xl border border-line bg-surface px-3 text-xs font-black text-ink disabled:opacity-40"
               >
                 {allSelected ? "전체해제" : "전체선택"}
               </button>
@@ -262,7 +262,7 @@ export default function LiveOpsOrderCopyModal({ open, orders, onClose, onCopied 
               <button
                 type="button"
                 onClick={resetHidden}
-                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-500"
+                className="h-9 rounded-xl border border-line bg-surface px-3 text-xs font-black text-ink-soft"
               >
                 숨김 초기화
               </button>
@@ -270,11 +270,11 @@ export default function LiveOpsOrderCopyModal({ open, orders, onClose, onCopied 
           </div>
 
           {visibleOrders.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-sm font-bold text-slate-400">
+            <div className="rounded-2xl border border-dashed border-line p-8 text-center text-sm font-bold text-ink-mute">
               복사할 새 주문서 제출 알림이 없습니다.
             </div>
           ) : (
-            <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-100">
+            <div className="divide-y divide-line overflow-hidden rounded-2xl border border-line">
               {visibleOrders.map((order) => {
                 const key = liveOpsOrderCopyKey(order);
                 const selected = selectedKeys.has(key);
@@ -285,22 +285,22 @@ export default function LiveOpsOrderCopyModal({ open, orders, onClose, onCopied 
                     type="button"
                     onClick={() => toggleOrder(key)}
                     className={`grid w-full grid-cols-[34px_1fr] gap-3 px-4 py-3 text-left active:scale-[0.995] ${
-                      selected ? "bg-rose-soft" : "bg-white hover:bg-slate-50"
+                      selected ? "bg-rose-soft" : "bg-surface hover:bg-surface-2"
                     }`}
                   >
                     <span
                       className={`mt-1 flex h-6 w-6 items-center justify-center rounded-lg border text-xs font-black ${
-                        selected ? "border-rose-line bg-rose-deep text-white" : "border-slate-300 text-transparent"
+                        selected ? "border-rose-line bg-rose-deep text-white" : "border-line text-transparent"
                       }`}
                     >
                       ✓
                     </span>
 
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-black text-slate-950">
+                      <span className="block truncate text-sm font-black text-ink">
                         {customerName(order)}님
                       </span>
-                      <span className="mt-0.5 block truncate text-sm font-black text-slate-500">
+                      <span className="mt-0.5 block truncate text-sm font-black text-ink-soft">
                         {money(order.amount)}
                       </span>
                     </span>
@@ -310,23 +310,23 @@ export default function LiveOpsOrderCopyModal({ open, orders, onClose, onCopied 
             </div>
           )}
 
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold leading-6 text-slate-800">
+          <div className="mt-4 rounded-2xl border border-line bg-surface-2 p-4 text-sm font-bold leading-6 text-ink">
             {previewText}
           </div>
 
           {copiedText ? (
-            <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-black leading-5 text-emerald-700">
+            <div className="mt-3 rounded-2xl border border-ok-tx bg-ok-bg p-3 text-xs font-black leading-5 text-ok-tx">
               복사 완료! 선택한 알림은 왼쪽 사이드바 목록에서 숨김 처리됩니다. 주문 DB는 변경되지 않았습니다.
             </div>
           ) : null}
         </div>
 
-        <div className="border-t border-slate-100 bg-white p-4">
+        <div className="border-t border-line bg-surface p-4">
           <button
             type="button"
             onClick={copySelected}
             disabled={copying || !selectedOrders.length}
-            className="h-12 w-full rounded-2xl bg-rose-deep text-sm font-black text-white shadow-sm active:scale-[0.99] disabled:bg-slate-300"
+            className="h-12 w-full rounded-2xl bg-rose-deep text-sm font-black text-white shadow-sm active:scale-[0.99] disabled:bg-surface-3"
           >
             {copying ? "복사중..." : `복사 확인 · 선택 ${selectedOrders.length.toLocaleString("ko-KR")}건`}
           </button>

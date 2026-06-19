@@ -47,9 +47,9 @@ export default function LiveProductStockEditor({
   const hiddenCount = Math.max(0, previews.length - visiblePreviews.length);
 
   return (
-    <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+    <div className="mt-3 rounded-2xl border border-line bg-surface-2 px-3 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <label className="flex items-center gap-2 text-[12px] font-black text-slate-700">
+        <label className="flex items-center gap-2 text-[12px] font-black text-ink">
           <input
             type="checkbox"
             checked={enabled}
@@ -60,31 +60,31 @@ export default function LiveProductStockEditor({
 
         {enabled ? (
           <label className="flex items-center gap-2">
-            <span className="text-[11px] font-black text-slate-500">
+            <span className="text-[11px] font-black text-ink-soft">
               전체 재고수량
             </span>
             <input
               value={stockText}
               onChange={(event) => onStockTextChange(formatNumberInput(event.target.value))}
               inputMode="numeric"
-              className="h-9 w-28 rounded-xl border border-slate-200 bg-white px-3 text-right text-[13px] font-black text-slate-900 outline-none focus:border-blue-400"
+              className="h-9 w-28 rounded-xl border border-line bg-surface px-3 text-right text-[13px] font-black text-ink outline-none focus:border-blue-400"
               placeholder="0"
             />
-            <span className="text-[11px] font-black text-slate-500">개</span>
+            <span className="text-[11px] font-black text-ink-soft">개</span>
           </label>
         ) : (
-          <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-slate-400 ring-1 ring-slate-200">
+          <span className="rounded-full bg-surface px-2.5 py-1 text-[11px] font-black text-ink-mute ring-1 ring-line">
             재고 미사용
           </span>
         )}
       </div>
 
       {enabled ? (
-        <div className="mt-3 rounded-xl bg-white px-3 py-2 ring-1 ring-slate-200">
-          <p className="text-[11px] font-black text-slate-700">
+        <div className="mt-3 rounded-xl bg-surface px-3 py-2 ring-1 ring-line">
+          <p className="text-[11px] font-black text-ink">
             옵션별 재고 설계 미리보기
           </p>
-          <p className="mt-1 text-[10px] font-bold leading-relaxed text-slate-500">
+          <p className="mt-1 text-[10px] font-bold leading-relaxed text-ink-soft">
             지금은 전체 재고수량만 products.stock에 저장합니다. 색상/사이즈별 차감은 다음 단계에서 별도 variant 테이블을 만든 뒤 주문저장 로직과 분리해서 연결해야 안전합니다.
           </p>
 
@@ -92,7 +92,7 @@ export default function LiveProductStockEditor({
             {visiblePreviews.map((item) => (
               <span
                 key={item}
-                className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600"
+                className="rounded-full bg-surface-2 px-2 py-1 text-[10px] font-black text-ink-soft"
               >
                 {item}
               </span>

@@ -178,10 +178,10 @@ export default function AdminLiveCustomerIssueSummaryCard({
   }, [tasks]);
 
   return (
-    <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3">
+    <div className="rounded-2xl border border-warn-tx bg-warn-bg p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2 text-sm font-black text-amber-900">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-amber-600 shadow-sm">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface text-amber-600 shadow-sm">
             !
           </span>
           <span className="truncate">고객이슈</span>
@@ -190,7 +190,7 @@ export default function AdminLiveCustomerIssueSummaryCard({
         <button
           type="button"
           onClick={loadIssues}
-          className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-amber-700 ring-1 ring-amber-100"
+          className="shrink-0 rounded-full bg-surface px-2 py-0.5 text-[10px] font-black text-warn-tx ring-1 ring-amber-100"
         >
           {loading ? "확인중" : `${tasks.length}건`}
         </button>
@@ -206,12 +206,12 @@ export default function AdminLiveCustomerIssueSummaryCard({
             {previewIssues.map((task, index) => (
               <div
                 key={String(task.id || `${getIssueName(task)}-${index}`)}
-                className="flex items-center justify-between gap-2 rounded-xl bg-white px-2.5 py-1.5 text-[11px] ring-1 ring-amber-100"
+                className="flex items-center justify-between gap-2 rounded-xl bg-surface px-2.5 py-1.5 text-[11px] ring-1 ring-amber-100"
               >
-                <span className="min-w-0 truncate font-black text-slate-800">
+                <span className="min-w-0 truncate font-black text-ink">
                   {getIssueName(task)}
                 </span>
-                <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 font-black text-amber-800">
+                <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 font-black text-warn-tx">
                   {getIssueType(task)}
                 </span>
               </div>
@@ -219,13 +219,13 @@ export default function AdminLiveCustomerIssueSummaryCard({
           </div>
 
           {tasks.length > previewIssues.length ? (
-            <p className="text-[10px] font-bold text-amber-700">
+            <p className="text-[10px] font-bold text-warn-tx">
               외 {tasks.length - previewIssues.length}건 더 있음
             </p>
           ) : null}
         </div>
       ) : (
-        <p className="text-[11px] font-bold leading-5 text-amber-800">
+        <p className="text-[11px] font-bold leading-5 text-warn-tx">
           {loading ? "고객이슈를 불러오는 중입니다." : "미해결 고객이슈가 없습니다."}
         </p>
       )}
@@ -233,7 +233,7 @@ export default function AdminLiveCustomerIssueSummaryCard({
       <button
         type="button"
         onClick={onOpenCustomers}
-        className="mt-2 w-full rounded-xl bg-white px-3 py-2 text-[11px] font-black text-amber-800 ring-1 ring-amber-100 transition hover:bg-amber-100"
+        className="mt-2 w-full rounded-xl bg-surface px-3 py-2 text-[11px] font-black text-warn-tx ring-1 ring-amber-100 transition hover:bg-amber-100"
       >
         고객관리로 이동
       </button>

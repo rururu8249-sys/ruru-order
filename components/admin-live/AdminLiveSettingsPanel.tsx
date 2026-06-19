@@ -101,9 +101,9 @@ function SettingInput({
   inputMode?: "numeric" | "decimal" | "text";
 }) {
   return (
-    <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-      <div className="text-sm font-black text-slate-900">{label}</div>
-      <div className="mt-1 text-xs font-bold leading-5 text-slate-400">{desc}</div>
+    <div className="rounded-[24px] border border-line bg-surface-2 p-4">
+      <div className="text-sm font-black text-ink">{label}</div>
+      <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">{desc}</div>
       <div className="mt-3 flex items-center gap-2">
         <input
           value={value}
@@ -113,9 +113,9 @@ function SettingInput({
           min={min}
           max={max}
           inputMode={inputMode}
-          className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-lg font-black outline-none transition focus:border-rose-deep focus:ring-4 focus:ring-rose-soft"
+          className="h-12 w-full rounded-2xl border border-line bg-surface px-4 text-lg font-black outline-none transition focus:border-rose-deep focus:ring-4 focus:ring-rose-soft"
         />
-        <span className="text-sm font-black text-slate-500">{suffix}</span>
+        <span className="text-sm font-black text-ink-soft">{suffix}</span>
       </div>
     </div>
   );
@@ -238,18 +238,18 @@ export default function AdminLiveSettingsPanel() {
     }
   };
 
-  const cardClass = "rounded-2xl border border-slate-200 bg-white p-5";
+  const cardClass = "rounded-2xl border border-line bg-surface p-5";
   const sectionTitle = (title: string, desc: string) => (
     <div className="mb-4">
-      <h2 className="text-base font-black text-slate-950">{title}</h2>
-      <p className="mt-1 text-xs font-bold text-slate-400">{desc}</p>
+      <h2 className="text-base font-black text-ink">{title}</h2>
+      <p className="mt-1 text-xs font-bold text-ink-mute">{desc}</p>
     </div>
   );
 
   return (
     <div className="flex h-full min-h-0">
       {/* 좌측 카테고리 네비 (업계표준: 카테고리로 나눠 스크롤 최소화) */}
-      <nav className="w-44 shrink-0 space-y-1 overflow-y-auto border-r border-slate-100 bg-slate-50/60 p-3">
+      <nav className="w-44 shrink-0 space-y-1 overflow-y-auto border-r border-line bg-surface-2/60 p-3">
         {SETTINGS_TABS.map((t) => {
           const active = activeTab === t.key;
           return (
@@ -257,10 +257,10 @@ export default function AdminLiveSettingsPanel() {
               key={t.key}
               type="button"
               onClick={() => setActiveTab(t.key)}
-              className={`flex w-full flex-col rounded-xl px-3 py-2.5 text-left transition ${active ? "bg-rose-deep text-white" : "text-slate-600 hover:bg-white"}`}
+              className={`flex w-full flex-col rounded-xl px-3 py-2.5 text-left transition ${active ? "bg-rose-deep text-white" : "text-ink-soft hover:bg-surface"}`}
             >
               <span className="text-sm font-black">{t.icon} {t.label}</span>
-              <span className={`mt-0.5 text-[11px] font-bold ${active ? "text-white/70" : "text-slate-400"}`}>{t.desc}</span>
+              <span className={`mt-0.5 text-[11px] font-bold ${active ? "text-white/70" : "text-ink-mute"}`}>{t.desc}</span>
             </button>
           );
         })}
@@ -272,7 +272,7 @@ export default function AdminLiveSettingsPanel() {
           {/* ── 결제·배송 ── */}
           {activeTab === "payment" && (
             <>
-              <div className="rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3 text-xs font-bold leading-5 text-orange-800">
+              <div className="rounded-2xl border border-orange-100 bg-warn-bg px-4 py-3 text-xs font-bold leading-5 text-orange-800">
                 결제·배송 설정은 주문금액 계산에 직접 영향을 줍니다. 저장 이후 새 주문부터 적용됩니다(기존 주문 재계산 없음).
               </div>
 
@@ -330,13 +330,13 @@ export default function AdminLiveSettingsPanel() {
             <div className={cardClass}>
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-base font-black text-slate-950">포인트 적립 규칙</h2>
-                  <p className="mt-1 text-xs font-bold text-slate-400">결제완료(자동·수동 입금확인, 카드결제완료) 시 구매금액(택배비 제외)의 일정 비율을 자동 적립합니다.</p>
+                  <h2 className="text-base font-black text-ink">포인트 적립 규칙</h2>
+                  <p className="mt-1 text-xs font-bold text-ink-mute">결제완료(자동·수동 입금확인, 카드결제완료) 시 구매금액(택배비 제외)의 일정 비율을 자동 적립합니다.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setPointAutoEarn((v) => !v)}
-                  className={`shrink-0 rounded-full px-4 py-2 text-xs font-black transition ${pointAutoEarn ? "bg-rose-deep text-white" : "border border-slate-200 bg-white text-slate-500"}`}
+                  className={`shrink-0 rounded-full px-4 py-2 text-xs font-black transition ${pointAutoEarn ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}
                 >
                   {pointAutoEarn ? "자동적립 ON" : "자동적립 OFF"}
                 </button>
@@ -357,7 +357,7 @@ export default function AdminLiveSettingsPanel() {
                 />
               </div>
 
-              <div className="mt-3 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3 text-[11px] font-bold leading-5 text-orange-800">
+              <div className="mt-3 rounded-2xl border border-orange-100 bg-warn-bg px-4 py-3 text-[11px] font-bold leading-5 text-orange-800">
                 결제완료 시 자동 지급되며, 자동적립은 알림 팝업이 뜨지 않습니다(주문서 안내 문구로만 표시). 실제 지급/차감 관리는 포인트 메뉴에서.
               </div>
             </div>
@@ -368,27 +368,27 @@ export default function AdminLiveSettingsPanel() {
             <div className={cardClass}>
               {sectionTitle("주문서 공지 / 직접입력", "손님 주문서 상단 공지 문구와 “직접 입력하기” 버튼 노출 여부를 관리합니다.")}
 
-              <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
-                <div className="text-sm font-black text-slate-900">주문서 공지 문구</div>
-                <div className="mt-1 text-xs font-bold leading-5 text-slate-400">비워두면 공지 배너가 표시되지 않습니다. 줄바꿈 가능.</div>
+              <div className="rounded-[20px] border border-line bg-surface-2 p-4">
+                <div className="text-sm font-black text-ink">주문서 공지 문구</div>
+                <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">비워두면 공지 배너가 표시되지 않습니다. 줄바꿈 가능.</div>
                 <textarea
                   value={noticeText}
                   onChange={(event) => setNoticeText(event.target.value)}
                   placeholder="예) 오늘 방송은 21시 시작합니다. 입금자명은 닉네임과 동일하게 부탁드려요."
                   rows={3}
-                  className="mt-3 w-full resize-none rounded-2xl border border-slate-200 bg-white p-4 text-sm font-bold leading-relaxed outline-none transition focus:border-rose-deep focus:ring-4 focus:ring-rose-soft"
+                  className="mt-3 w-full resize-none rounded-2xl border border-line bg-surface p-4 text-sm font-bold leading-relaxed outline-none transition focus:border-rose-deep focus:ring-4 focus:ring-rose-soft"
                 />
               </div>
 
-              <div className="mt-3 flex items-start justify-between gap-3 rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+              <div className="mt-3 flex items-start justify-between gap-3 rounded-[20px] border border-line bg-surface-2 p-4">
                 <div>
-                  <div className="text-sm font-black text-slate-900">직접 입력하기 버튼</div>
-                  <div className="mt-1 text-xs font-bold leading-5 text-slate-400">상품 목록에서 못 찾은 상품을 손님이 직접 입력하는 버튼입니다. OFF 시 버튼이 숨겨집니다.</div>
+                  <div className="text-sm font-black text-ink">직접 입력하기 버튼</div>
+                  <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">상품 목록에서 못 찾은 상품을 손님이 직접 입력하는 버튼입니다. OFF 시 버튼이 숨겨집니다.</div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setDirectInputEnabled((v) => !v)}
-                  className={`shrink-0 rounded-full px-4 py-2 text-xs font-black transition ${directInputEnabled ? "bg-rose-deep text-white" : "border border-slate-200 bg-white text-slate-500"}`}
+                  className={`shrink-0 rounded-full px-4 py-2 text-xs font-black transition ${directInputEnabled ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}
                 >
                   {directInputEnabled ? "직접입력 ON" : "직접입력 OFF"}
                 </button>
@@ -405,8 +405,8 @@ export default function AdminLiveSettingsPanel() {
 
         {/* 하단 고정 저장바 — 운영값(결제·배송/포인트/주문서) 탭에서만. 유튜브/보안은 자체 저장 */}
         {GLOBAL_SAVE_TABS.includes(activeTab) && (
-          <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 bg-white px-5 py-3">
-            <span className="text-xs font-bold text-slate-400">{loading ? "불러오는 중..." : "저장 후 새 주문부터 반영됩니다."}</span>
+          <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-surface px-5 py-3">
+            <span className="text-xs font-bold text-ink-mute">{loading ? "불러오는 중..." : "저장 후 새 주문부터 반영됩니다."}</span>
             <button
               type="button"
               onClick={saveSettings}

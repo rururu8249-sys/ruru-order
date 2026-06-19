@@ -187,72 +187,72 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="flex h-[88vh] w-[min(560px,96vw)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="flex h-[88vh] w-[min(560px,96vw)] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* 헤더 */}
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3">
+        <div className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
           <div className="text-[15px] font-black text-rose-deep">🛍 물건챙기기</div>
-          <button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-[18px] font-black text-slate-400 hover:bg-slate-100 hover:text-slate-700">✕</button>
+          <button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-[18px] font-black text-ink-mute hover:bg-surface-2 hover:text-ink">✕</button>
         </div>
 
         {/* 툴바 */}
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-2">
-          <div className="text-[14px] font-black text-slate-800">
-            챙김 <span className="text-emerald-600">{pickedQty}개</span> <span className="text-slate-300">/</span> 전체 {totalQty}개
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2">
+          <div className="text-[14px] font-black text-ink">
+            챙김 <span className="text-ok-tx">{pickedQty}개</span> <span className="text-ink-mute">/</span> 전체 {totalQty}개
           </div>
           <div className="flex items-center gap-1.5">
-            <button type="button" onClick={() => setPaidOnly((v) => !v)} className={`rounded-lg px-2.5 py-1 text-[11px] font-black ${paidOnly ? "bg-emerald-600 text-white" : "border border-amber-300 bg-amber-50 text-amber-700"}`}>{paidOnly ? "결제완료만 ✓" : "미결제 포함"}</button>
-            <button type="button" onClick={() => setSortMode("nickname")} className={`rounded-lg px-2.5 py-1 text-[11px] font-black ${sortMode === "nickname" ? "bg-rose-deep text-white" : "border border-slate-200 bg-white text-slate-500"}`}>ㄱㄴㄷ순</button>
-            <button type="button" onClick={() => setSortMode("time")} className={`rounded-lg px-2.5 py-1 text-[11px] font-black ${sortMode === "time" ? "bg-rose-deep text-white" : "border border-slate-200 bg-white text-slate-500"}`}>시간순</button>
-            <button type="button" onClick={resetAll} disabled={resetting} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-black text-[#C0392B] hover:bg-red-100 disabled:opacity-50">{resetting ? "초기화중" : "전체 초기화"}</button>
+            <button type="button" onClick={() => setPaidOnly((v) => !v)} className={`rounded-lg px-2.5 py-1 text-[11px] font-black ${paidOnly ? "bg-emerald-600 text-white" : "border border-amber-300 bg-warn-bg text-warn-tx"}`}>{paidOnly ? "결제완료만 ✓" : "미결제 포함"}</button>
+            <button type="button" onClick={() => setSortMode("nickname")} className={`rounded-lg px-2.5 py-1 text-[11px] font-black ${sortMode === "nickname" ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}>ㄱㄴㄷ순</button>
+            <button type="button" onClick={() => setSortMode("time")} className={`rounded-lg px-2.5 py-1 text-[11px] font-black ${sortMode === "time" ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}>시간순</button>
+            <button type="button" onClick={resetAll} disabled={resetting} className="rounded-lg border border-danger-tx bg-danger-bg px-2.5 py-1 text-[11px] font-black text-[var(--color-danger-tx)] hover:bg-danger-bg disabled:opacity-50">{resetting ? "초기화중" : "전체 초기화"}</button>
             <button type="button" onClick={runExcel} disabled={exporting} className="rounded-lg bg-slate-950 px-2.5 py-1 text-[11px] font-black text-white hover:bg-rose-deep disabled:opacity-50">{exporting ? "내보내는중" : "엑셀"}</button>
           </div>
         </div>
 
         {/* 검색 (고정 영역) */}
-        <div className="shrink-0 border-b border-slate-100 px-4 py-2">
+        <div className="shrink-0 border-b border-line px-4 py-2">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="🔍 닉네임 · 상품명 검색"
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] font-bold outline-none focus:border-rose-deep focus:bg-white"
+            className="w-full rounded-xl border border-line bg-surface-2 px-3 py-2 text-[13px] font-bold outline-none focus:border-rose-deep focus:bg-surface"
           />
         </div>
 
         {/* 패널 목록 (이 영역만 스크롤 — 모달 높이는 88vh 고정) */}
-        <div className="flex-1 overflow-y-auto bg-slate-50 px-3 py-3">
+        <div className="flex-1 overflow-y-auto bg-surface-2 px-3 py-3">
           {visiblePanels.length === 0 ? (
-            <div className="py-10 text-center text-sm font-bold text-slate-400">챙길 주문이 없습니다.</div>
+            <div className="py-10 text-center text-sm font-bold text-ink-mute">챙길 주문이 없습니다.</div>
           ) : (
             <div className="space-y-2.5">
               {visiblePanels.map((panel) => {
                 const pickedInPanel = panel.items.filter((it) => pickedIds.has(it.id)).length;
                 const complete = panel.items.length > 0 && pickedInPanel === panel.items.length;
                 return (
-                  <div key={panel.key} className={`overflow-hidden rounded-2xl border-2 ${complete ? "border-emerald-300 bg-emerald-50/60" : "border-slate-200 bg-white"}`}>
+                  <div key={panel.key} className={`overflow-hidden rounded-2xl border-2 ${complete ? "border-emerald-300 bg-ok-bg/60" : "border-line bg-surface"}`}>
                     {/* 패널 헤더 = 주문서(닉네임) : 아바타(이니셜) + 이름 + 배지 + 진행. 체크박스 없음(상품과 구분). 클릭=그 주문 전체 챙김/해제 */}
-                    <button type="button" onClick={() => togglePanel(panel)} className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left ${complete ? "bg-emerald-50" : "bg-rose-soft"}`}>
+                    <button type="button" onClick={() => togglePanel(panel)} className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left ${complete ? "bg-ok-bg" : "bg-rose-soft"}`}>
                       <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-black text-white ${complete ? "bg-emerald-500" : "bg-rose-deep"}`}>{complete ? "✓" : (panel.nickname.charAt(0) || "?")}</span>
                       <span className="flex min-w-0 flex-1 items-baseline gap-2">
-                        <span className="shrink truncate text-[15px] font-black text-slate-900">{panel.nickname}</span>
-                        {whenText(panel.when) ? <span className="shrink-0 text-[11px] font-semibold text-slate-400">{whenText(panel.when)}</span> : null}
+                        <span className="shrink truncate text-[15px] font-black text-ink">{panel.nickname}</span>
+                        {whenText(panel.when) ? <span className="shrink-0 text-[11px] font-semibold text-ink-mute">{whenText(panel.when)}</span> : null}
                       </span>
                       {panel.paid ? (
-                        <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700">결제완료</span>
+                        <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-ok-tx">결제완료</span>
                       ) : (
                         <span className="shrink-0 rounded-full bg-red-500 px-2.5 py-0.5 text-[11px] font-black text-white">미결제</span>
                       )}
-                      <span className={`shrink-0 text-[12px] font-black ${complete ? "text-emerald-600" : "text-rose-deep"}`}>{complete ? "✓ 완료" : `${pickedInPanel}/${panel.items.length}`}</span>
+                      <span className={`shrink-0 text-[12px] font-black ${complete ? "text-ok-tx" : "text-rose-deep"}`}>{complete ? "✓ 완료" : `${pickedInPanel}/${panel.items.length}`}</span>
                     </button>
 
                     {/* 패널 안 상품들 : 들여쓰기 + 네모 체크박스(헤더와 구분) */}
-                    <div className="divide-y divide-slate-100">
+                    <div className="divide-y divide-line">
                       {panel.items.map((it) => {
                         const picked = pickedIds.has(it.id);
                         return (
-                          <button key={it.id} type="button" onClick={() => togglePick(it.id)} className={`flex w-full items-center gap-3 py-2.5 pl-6 pr-3 text-left ${picked ? "bg-emerald-50" : "bg-white hover:bg-slate-50"}`}>
-                            <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 text-[11px] font-black ${picked ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300 text-transparent"}`}>✓</span>
-                            <span className={`min-w-0 flex-1 truncate text-[13px] font-bold ${picked ? "text-slate-400 line-through" : "text-slate-800"}`}>{it.text}</span>
-                            <span className={`shrink-0 text-[13px] font-black ${picked ? "text-slate-400" : "text-slate-900"}`}>{it.qty}개</span>
+                          <button key={it.id} type="button" onClick={() => togglePick(it.id)} className={`flex w-full items-center gap-3 py-2.5 pl-6 pr-3 text-left ${picked ? "bg-ok-bg" : "bg-surface hover:bg-surface-2"}`}>
+                            <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 text-[11px] font-black ${picked ? "border-emerald-500 bg-emerald-500 text-white" : "border-line text-transparent"}`}>✓</span>
+                            <span className={`min-w-0 flex-1 truncate text-[13px] font-bold ${picked ? "text-ink-mute line-through" : "text-ink"}`}>{it.text}</span>
+                            <span className={`shrink-0 text-[13px] font-black ${picked ? "text-ink-mute" : "text-ink"}`}>{it.qty}개</span>
                           </button>
                         );
                       })}
@@ -264,7 +264,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
           )}
         </div>
 
-        <div className="shrink-0 border-t border-slate-100 px-4 py-2 text-[11px] font-bold leading-5 text-slate-400">
+        <div className="shrink-0 border-t border-line px-4 py-2 text-[11px] font-bold leading-5 text-ink-mute">
           상품 줄을 누르면 챙김, 주문서(닉네임) 줄을 누르면 그 주문 전체 챙김/해제. 체크는 서버 저장(다른 기기·새로고침 유지)·주문 취소/수정 자동 반영.
         </div>
       </div>

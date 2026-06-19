@@ -249,7 +249,7 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
     if (mode === "none") return null;
     return (
       <div className="space-y-1">
-        <div className="text-[12px] font-black text-slate-600">{label}</div>
+        <div className="text-[12px] font-black text-ink-soft">{label}</div>
         {mode === "select" ? (
           <div className="flex flex-wrap gap-1.5">
             {options.map((opt) => {
@@ -260,7 +260,7 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
                   type="button"
                   onClick={() => setValue(opt)}
                   className={`rounded-lg border px-2.5 py-1.5 text-[13px] font-black ${
-                    active ? "border-rose-deep bg-rose-deep text-white" : "border-slate-200 bg-white text-slate-700 hover:border-rose-deep"
+                    active ? "border-rose-deep bg-rose-deep text-white" : "border-line bg-surface text-ink hover:border-rose-deep"
                   }`}
                 >
                   {opt}
@@ -273,7 +273,7 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder={`${label} 직접 입력`}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-[14px] outline-none focus:border-rose-deep"
+            className="w-full rounded-lg border border-line px-3 py-2 text-[14px] outline-none focus:border-rose-deep"
           />
         )}
       </div>
@@ -283,16 +283,16 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="flex max-h-[88vh] w-[min(560px,94vw)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        className="flex max-h-[88vh] w-[min(560px,94vw)] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 헤더 */}
-        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+        <div className="flex items-center justify-between border-b border-line px-4 py-3">
           <div className="text-[15px] font-black text-rose-deep">등록상품 추가 (재고 차감)</div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-2 py-1 text-[18px] font-black text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="rounded-lg px-2 py-1 text-[18px] font-black text-ink-mute hover:bg-surface-2 hover:text-ink"
           >
             ✕
           </button>
@@ -305,15 +305,15 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="상품명 검색"
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-[14px] outline-none focus:border-rose-deep"
+            className="w-full rounded-lg border border-line px-3 py-2 text-[14px] outline-none focus:border-rose-deep"
           />
 
           {/* 상품 목록 */}
-          <div className="max-h-[240px] space-y-1 overflow-y-auto rounded-xl border border-slate-100 p-1">
+          <div className="max-h-[240px] space-y-1 overflow-y-auto rounded-xl border border-line p-1">
             {loading ? (
-              <div className="py-4 text-center text-[13px] font-bold text-slate-400">불러오는 중...</div>
+              <div className="py-4 text-center text-[13px] font-bold text-ink-mute">불러오는 중...</div>
             ) : visibleProducts.length === 0 ? (
-              <div className="py-4 text-center text-[13px] font-bold text-slate-400">상품이 없습니다.</div>
+              <div className="py-4 text-center text-[13px] font-bold text-ink-mute">상품이 없습니다.</div>
             ) : (
               visibleProducts.map((p) => {
                 const id = productId(p);
@@ -325,18 +325,18 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
                     type="button"
                     onClick={() => onSelectProduct(p)}
                     className={`flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left ${
-                      active ? "border-rose-deep bg-rose-soft" : "border-transparent bg-white hover:bg-slate-50"
+                      active ? "border-rose-deep bg-rose-soft" : "border-transparent bg-surface hover:bg-surface-2"
                     }`}
                   >
                     {img ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={img} alt="" className="h-11 w-11 flex-none rounded-md object-cover" />
                     ) : (
-                      <span className="h-11 w-11 flex-none rounded-md bg-slate-100" />
+                      <span className="h-11 w-11 flex-none rounded-md bg-surface-2" />
                     )}
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[14px] font-black text-slate-900">{productName(p)}</span>
-                      <span className="block text-[12px] font-bold text-slate-500">
+                      <span className="block truncate text-[14px] font-black text-ink">{productName(p)}</span>
+                      <span className="block text-[12px] font-bold text-ink-soft">
                         {productPrice(p).toLocaleString("ko-KR")}원
                       </span>
                     </span>
@@ -349,47 +349,47 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
           {/* 선택된 상품 옵션 + 수량/단가 */}
           {selected ? (
             <div className="space-y-3 rounded-xl border border-rose-line bg-rose-soft/30 p-3">
-              <div className="text-[14px] font-black text-slate-900">{productName(selected)}</div>
+              <div className="text-[14px] font-black text-ink">{productName(selected)}</div>
 
               {renderOptionField("색상", colorMode, colorOptions, color, setColor)}
               {renderOptionField("사이즈", sizeMode, sizeOptions, size, setSize)}
 
               {colorMode === "none" && sizeMode === "none" ? (
-                <div className="text-[12px] font-bold text-slate-500">
+                <div className="text-[12px] font-bold text-ink-soft">
                   옵션 없음{managed ? ` · 총재고 ${productTotalStock(selected).toLocaleString("ko-KR")}` : " · 재고관리 안 함"}
                 </div>
               ) : null}
 
               <div className="flex gap-2">
                 <label className="w-24 space-y-1">
-                  <span className="text-[12px] font-black text-slate-600">수량</span>
+                  <span className="text-[12px] font-black text-ink-soft">수량</span>
                   <input
                     value={qty}
                     onChange={(e) => setQty(e.target.value.replace(/[^\d]/g, ""))}
                     inputMode="numeric"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-[14px] outline-none focus:border-rose-deep"
+                    className="w-full rounded-lg border border-line px-3 py-2 text-[14px] outline-none focus:border-rose-deep"
                   />
                 </label>
                 <label className="flex-1 space-y-1">
-                  <span className="text-[12px] font-black text-slate-600">단가(원)</span>
+                  <span className="text-[12px] font-black text-ink-soft">단가(원)</span>
                   <input
                     value={unitPrice}
                     onChange={(e) => setUnitPrice(e.target.value.replace(/[^\d]/g, ""))}
                     inputMode="numeric"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-[14px] outline-none focus:border-rose-deep"
+                    className="w-full rounded-lg border border-line px-3 py-2 text-[14px] outline-none focus:border-rose-deep"
                   />
                 </label>
               </div>
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed border-slate-200 py-6 text-center text-[13px] font-bold text-slate-400">
+            <div className="rounded-xl border border-dashed border-line py-6 text-center text-[13px] font-bold text-ink-mute">
               위에서 상품을 선택하세요.
             </div>
           )}
         </div>
 
         {/* 하단 추가 버튼 */}
-        <div className="border-t border-slate-100 px-4 py-3">
+        <div className="border-t border-line px-4 py-3">
           <button
             type="button"
             disabled={adding || !selected}

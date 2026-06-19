@@ -62,19 +62,20 @@
 }
 
 .dark {
-  --color-canvas: #0b0c11;
-  --color-surface: #181b25;
-  --color-surface-2: #1d2130;
-  --color-surface-3: #232838;
-  --color-ink: #e9ebf2;
-  --color-ink-soft: #aeb4c4;
-  --color-ink-mute: #7a8194;
-  --color-line: #2a2f3e;
-  --color-line-soft: #20242f;
-  /* 액센트 다크 보정(어두운 면에서 보이게) */
-  --color-rose-deep: #e0588a;
-  --color-rose-soft: #33202b;
-  --color-rose-line: #46293a;
+  /* 따뜻한 뉴트럴 그레이(푸른 기 없음, 부드러운 대비) — Claude 앱 톤 */
+  --color-canvas: #1a1a18;
+  --color-surface: #262521;
+  --color-surface-2: #302f2b;
+  --color-surface-3: #3a3833;
+  --color-ink: #edece8;
+  --color-ink-soft: #b2afa7;
+  --color-ink-mute: #8a867d;
+  --color-line: #3a3833;
+  --color-line-soft: #2c2b27;
+  /* 액센트(브랜드 로즈) — 따뜻한 면에서도 보이게 */
+  --color-rose-deep: #e06a90;
+  --color-rose-soft: #352a28;
+  --color-rose-line: #4a3a35;
   /* 상태 배지 다크 */
   --color-ok-bg: #143028;   --color-ok-tx: #3dd39c;
   --color-warn-bg: #3a2e16; --color-warn-tx: #e6a23c;

@@ -366,7 +366,7 @@ export default function LiveOpsStatusBox() {
   }, [soundOn]);
 
   return (
-    <div className="relative rounded-2xl border border-slate-200 bg-slate-50 p-3">
+    <div className="relative rounded-2xl border border-line bg-surface-2 p-3">
       <LiveOpsOrderCopyModal
         open={orderCopyModalOpen}
         orders={recentOrders}
@@ -374,7 +374,7 @@ export default function LiveOpsStatusBox() {
         onCopied={handleCopiedOrderNotices}
       />
       <div className="mb-2 flex items-center justify-between">
-        <div className="text-xs font-black text-slate-900">실시간 운영상황</div>
+        <div className="text-xs font-black text-ink">실시간 운영상황</div>
         <button
           type="button"
           onClick={() =>
@@ -390,7 +390,7 @@ export default function LiveOpsStatusBox() {
           }
           className={[
             "rounded-full px-2 py-1 text-[10px] font-black",
-            soundOn ? "bg-rose-deep text-white" : "bg-slate-200 text-slate-500",
+            soundOn ? "bg-rose-deep text-white" : "bg-surface-3 text-ink-soft",
           ].join(" ")}
         >
           {soundOn ? "🔔 ON" : "🔕 OFF"}
@@ -407,7 +407,7 @@ export default function LiveOpsStatusBox() {
           type="button"
           onClick={handleCopyRecentOrderNotices}
           disabled={!recentOrders.length}
-          className="flex w-full items-center justify-between rounded-xl border border-rose-line bg-white px-3 py-2 text-left hover:bg-rose-soft disabled:cursor-not-allowed disabled:opacity-45"
+          className="flex w-full items-center justify-between rounded-xl border border-rose-line bg-surface px-3 py-2 text-left hover:bg-rose-soft disabled:cursor-not-allowed disabled:opacity-45"
         >
           <span className="text-[11px] font-black text-rose-deep">📦 새 주문서 복사</span>
           <span className="text-[11px] font-black text-rose-deep">{Math.min(2, recentOrders.length)}건</span>
@@ -417,25 +417,25 @@ export default function LiveOpsStatusBox() {
           type="button"
           onClick={handleCopyAutoPaidNotices}
           disabled={!autoPaidOrders.length}
-          className="flex w-full items-center justify-between rounded-xl border border-emerald-100 bg-white px-3 py-2 text-left hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-45"
+          className="flex w-full items-center justify-between rounded-xl border border-emerald-100 bg-surface px-3 py-2 text-left hover:bg-ok-bg disabled:cursor-not-allowed disabled:opacity-45"
         >
           <span className="text-[11px] font-black text-emerald-800">💰 입금확인 복사</span>
-          <span className="text-[11px] font-black text-emerald-600">{Math.min(3, autoPaidOrders.length)}건</span>
+          <span className="text-[11px] font-black text-ok-tx">{Math.min(3, autoPaidOrders.length)}건</span>
         </button>
       </div>
 
       <button
         type="button"
         onClick={() => setOpenVisitors((value) => !value)}
-        className="mt-2 flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-left hover:bg-rose-soft"
+        className="mt-2 flex w-full items-center justify-between rounded-xl border border-line bg-surface px-3 py-2 text-left hover:bg-rose-soft"
       >
-        <span className="text-xs font-black text-slate-700">👀 접속중</span>
+        <span className="text-xs font-black text-ink">👀 접속중</span>
         <span className="text-sm font-black text-rose-deep">{activeVisitors.length}명</span>
       </button>
 
       <div className="mt-2 space-y-1.5">
         {notices.length === 0 ? (
-          <div className="rounded-xl bg-white px-3 py-2 text-[11px] font-bold text-slate-400">
+          <div className="rounded-xl bg-surface px-3 py-2 text-[11px] font-bold text-ink-mute">
             새 알림 대기중
           </div>
         ) : (
@@ -445,37 +445,37 @@ export default function LiveOpsStatusBox() {
               type="button"
               onClick={notice.title === "새 주문서 제출" ? () => setOrderCopyModalOpen(true) : undefined}
               className={[
-                "w-full rounded-xl bg-white px-3 py-2 text-left",
+                "w-full rounded-xl bg-surface px-3 py-2 text-left",
                 notice.title === "새 주문서 제출" ? "cursor-pointer hover:bg-rose-soft active:scale-[0.99]" : "cursor-default",
               ].join(" ")}
             >
-              <div className="text-[11px] font-black text-slate-800">
+              <div className="text-[11px] font-black text-ink">
                 {notice.type === "order" ? "🧾 " : "✅ "}
                 {notice.title}
               </div>
-              <div className="mt-0.5 truncate text-[11px] font-bold text-slate-500">{notice.body}</div>
+              <div className="mt-0.5 truncate text-[11px] font-bold text-ink-soft">{notice.body}</div>
             </button>
           ))
         )}
       </div>
 
       {loading && (
-        <div className="mt-2 text-center text-[10px] font-bold text-slate-400">갱신중...</div>
+        <div className="mt-2 text-center text-[10px] font-bold text-ink-mute">갱신중...</div>
       )}
 
       {openVisitors && (
-        <div className="absolute left-full top-0 z-[80] ml-3 w-[300px] rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl">
+        <div className="absolute left-full top-0 z-[80] ml-3 w-[300px] rounded-2xl border border-line bg-surface p-3 shadow-2xl">
           <div className="mb-2 flex items-center justify-between">
             <div>
-              <div className="text-sm font-black text-slate-950">현재 접속중</div>
-              <div className="mt-0.5 text-[11px] font-bold text-slate-400">
+              <div className="text-sm font-black text-ink">현재 접속중</div>
+              <div className="mt-0.5 text-[11px] font-bold text-ink-mute">
                 전체 {activeVisitors.length}명
               </div>
             </div>
             <button
               type="button"
               onClick={() => setOpenVisitors(false)}
-              className="rounded-lg px-2 py-1 text-sm font-black text-slate-400 hover:bg-slate-100"
+              className="rounded-lg px-2 py-1 text-sm font-black text-ink-mute hover:bg-surface-2"
             >
               ×
             </button>
@@ -488,23 +488,23 @@ export default function LiveOpsStatusBox() {
           </div>
 
           {!presenceAvailable ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] font-bold leading-5 text-amber-700">
+            <div className="rounded-xl border border-warn-tx bg-warn-bg p-3 text-[11px] font-bold leading-5 text-warn-tx">
               접속중 표시용 테이블이 아직 연결되지 않았습니다.
               <br />
               supabase/admin_live_presence.sql을 실행하면 표시됩니다.
             </div>
           ) : activeVisitors.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-[11px] font-bold text-slate-400">
+            <div className="rounded-xl border border-dashed border-line p-4 text-center text-[11px] font-bold text-ink-mute">
               현재 접속중인 방문자가 없습니다.
             </div>
           ) : (
             <div className="max-h-[260px] space-y-1.5 overflow-y-auto pr-1">
               {activeVisitors.map((visitor) => (
-                <div key={visitor.id || visitor.visitorKey} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
-                  <div className="truncate text-xs font-black text-slate-800">{visitor.nickname || "비회원 방문자"}</div>
+                <div key={visitor.id || visitor.visitorKey} className="rounded-xl border border-line bg-surface-2 px-3 py-2">
+                  <div className="truncate text-xs font-black text-ink">{visitor.nickname || "비회원 방문자"}</div>
                   <div className="mt-0.5 flex items-center justify-between gap-2">
-                    <span className="truncate text-[11px] font-bold text-slate-500">{visitor.pageLabel}</span>
-                    <span className="shrink-0 text-[10px] font-bold text-slate-400">{timeAgo(visitor.lastSeenAt)}</span>
+                    <span className="truncate text-[11px] font-bold text-ink-soft">{visitor.pageLabel}</span>
+                    <span className="shrink-0 text-[10px] font-bold text-ink-mute">{timeAgo(visitor.lastSeenAt)}</span>
                   </div>
                 </div>
               ))}
@@ -518,9 +518,9 @@ export default function LiveOpsStatusBox() {
 
 function MiniStat({ label, value, compact = false }: { label: string; value: number; compact?: boolean }) {
   return (
-    <div className={["rounded-xl bg-white text-center", compact ? "px-2 py-1.5" : "px-2 py-2"].join(" ")}>
-      <div className="text-[10px] font-black text-slate-400">{label}</div>
-      <div className={["font-black text-slate-900", compact ? "text-sm" : "text-lg"].join(" ")}>
+    <div className={["rounded-xl bg-surface text-center", compact ? "px-2 py-1.5" : "px-2 py-2"].join(" ")}>
+      <div className="text-[10px] font-black text-ink-mute">{label}</div>
+      <div className={["font-black text-ink", compact ? "text-sm" : "text-lg"].join(" ")}>
         {value.toLocaleString("ko-KR")}
       </div>
     </div>
