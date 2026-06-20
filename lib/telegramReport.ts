@@ -99,6 +99,32 @@ export async function buildTodayReport(): Promise<string> {
   let top: { name: string; sum: number } | null = null;
   for (const v of byCust.values()) if (!top || v.sum > top.sum) top = v;
 
+  // 미해결 고객이슈(교환·반품 등) — 나이 제한 없이 1일차부터 전부(open). 조회 실패해도 결산은 발송.
+  const ISSUE_LABEL: Record<string, string> = { exchange: "교환", return: "반품", refund: "환불", product: "구매", complaint: "진상", general: "기타" };
+  const DONE_STATUS = new Set(["done", "complete", "completed", "resolved", "closed", "완료", "해결"]);
+  let openIssues: { type: string; nick: string }[] = [];
+  try {
+    const { data: tasks } = await sb
+      .from("admin_tasks")
+      .select("task_type,status,is_done,completed_at,resolved_at,customer_nickname,title,created_at")
+      .order("created_at", { ascending: false })
+      .limit(500);
+    openIssues = ((Array.isArray(tasks) ? tasks : []) as Record<string, unknown>[])
+      .filter((r) => {
+        const st = String(r.status || "").toLowerCase();
+        if (st === "deleted") return false;
+        if (r.is_done || r.completed_at || r.resolved_at) return false;
+        if (DONE_STATUS.has(st)) return false;
+        return true;
+      })
+      .map((r) => ({
+        type: ISSUE_LABEL[String(r.task_type || "")] || "이슈",
+        nick: String(r.customer_nickname || r.title || "").replace("[고객이슈]", "").trim().slice(0, 12),
+      }));
+  } catch {
+    /* ignore */
+  }
+
   const lines = [
     `📊 <b>루루동이 오늘 결산</b> · ${label}`,
     ``,
@@ -106,6 +132,9 @@ export async function buildTodayReport(): Promise<string> {
     `✅ 결제완료 매출: <b>${won(paidSum)}</b> (${paid.length}건) · 무통장+카드`,
     `💸 무통장 미입금: ${unpaidBank.length}건 (${won(unpaidBankSum)})`,
     `💳 카드 미결제: ${unpaidCard.length}건 (${won(unpaidCardSum)})`,
+    `📌 미해결 고객이슈: ${openIssues.length}건${
+      openIssues.length > 0 ? ` (${openIssues.slice(0, 3).map((i) => `${i.type}${i.nick ? `·${i.nick}` : ""}`).join(", ")}${openIssues.length > 3 ? " 외" : ""})` : ""
+    }`,
   ];
   if (top && top.sum > 0) lines.push(`👑 오늘의 큰손: ${top.name} (${won(top.sum)})`);
   lines.push(``, `자세한 건 관리자 화면에서 확인하세요.`);
