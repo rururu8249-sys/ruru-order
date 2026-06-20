@@ -97,6 +97,7 @@ type AdminLiveEventRoulettePanelProps = {
   controlledOpen?: boolean;
   onRequestClose?: () => void;
   activeBroadcastId?: string | number | null;
+  filteredOrderGroupIds?: string[]; // 주문서 화면 필터로 현재 보이는 주문 group_id 목록(룰렛 참가자 기준)
 };
 
 type WinnersPayload = {
@@ -212,9 +213,14 @@ export default function AdminLiveEventRoulettePanel({
   controlledOpen,
   onRequestClose,
   activeBroadcastId,
+  filteredOrderGroupIds,
 }: AdminLiveEventRoulettePanelProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+
+  // 주문서 화면 필터로 현재 보이는 주문 group_id (룰렛 참가자 기준). 항상 최신값을 ref로 보관(스테일 클로저 방지).
+  const filteredIdsRef = useRef<string[] | null>(Array.isArray(filteredOrderGroupIds) ? filteredOrderGroupIds : null);
+  filteredIdsRef.current = Array.isArray(filteredOrderGroupIds) ? filteredOrderGroupIds : null;
   const closePanel = () => {
     if (controlledOpen !== undefined) onRequestClose?.();
     else setInternalOpen(false);
@@ -568,15 +574,17 @@ export default function AdminLiveEventRoulettePanel({
     void loadParticipants(mode, sourceDate, nextBroadcastId);
   };
 
-  // 참가자 불러오기 기준 = 현재 활성 방송(activeBroadcast) 기간. 방송 OFF면 안내.
+  // 참가자 기준 = 주문서 화면 필터로 보이는 주문(우선) / 없으면 현재 활성 방송.
   const liveBroadcastId = activeBroadcastId != null ? String(activeBroadcastId) : "";
+  const hasFilteredOrders = Array.isArray(filteredOrderGroupIds) && filteredOrderGroupIds.length > 0;
+  const canLoadParticipants = hasFilteredOrders || !!liveBroadcastId;
 
   const changeParticipantSource = (source: "auto" | "paid" | "manual") => {
     setParticipantSource(source);
 
     if (source === "auto" || source === "paid") {
-      if (!liveBroadcastId) {
-        showAdminToast("진행 중인 방송이 없습니다.\n\n방송을 시작한 뒤 참가자를 불러올 수 있어요.", "warning");
+      if (!canLoadParticipants) {
+        showAdminToast("불러올 주문이 없습니다.\n\n방송을 시작했거나 주문서에 주문이 보이는 상태여야 참가자를 불러올 수 있어요.", "warning");
         return;
       }
       void loadParticipants(mode, sourceDate, liveBroadcastId, source === "paid");
@@ -713,27 +721,20 @@ export default function AdminLiveEventRoulettePanel({
     setLoading(true);
 
     try {
-      const params = new URLSearchParams({
-        action: "participants",
-        mode: nextMode,
-        sourceDate: nextSourceDate,
+      // 참가자 = 주문서 화면 필터로 보이는 주문 기준. group_id 목록을 POST로 보냄(배열이면 그 기준, null이면 서버가 방송 fallback).
+      //   group_id가 많아 URL 길이 초과 위험이 있어 POST 사용. 서버가 동일한 dedup·중복당첨제외·가중치 로직으로 빌드.
+      const payload = await requestJson<ParticipantsPayload>("/api/admin-live/event-roulette", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "participants",
+          mode: nextMode,
+          sourceDate: nextSourceDate,
+          broadcastId: nextBroadcastId || undefined,
+          paidOnly: paidOnly || undefined,
+          excludeDailyDup,
+          orderGroupIds: filteredIdsRef.current ?? undefined,
+        }),
       });
-
-      if (nextBroadcastId) {
-        params.set("broadcastId", nextBroadcastId);
-      }
-
-      // 입금완료만 필터 (서버 지원 시 적용 · P2에서 서버 연동)
-      if (paidOnly) {
-        params.set("paidOnly", "true");
-      }
-
-      // 당일 중복당첨 금지 OFF면 중복체크 건너뛰기
-      if (!excludeDailyDup) {
-        params.set("excludeDailyDup", "false");
-      }
-
-      const payload = await requestJson<ParticipantsPayload>(`/api/admin-live/event-roulette?${params.toString()}`);
 
       if (!payload.ok) {
         throw new Error(payload.message || "참여자 조회 실패");
@@ -749,6 +750,20 @@ export default function AdminLiveEventRoulettePanel({
       setLoading(false);
     }
   };
+
+  // 주문서 화면 필터(보이는 주문)가 바뀌면 자동/입금완료 참가자를 다시 불러온다(수동 입력 모드는 제외).
+  const filterFirstRunRef = useRef(false);
+  const filteredKey = Array.isArray(filteredOrderGroupIds) ? filteredOrderGroupIds.join(",") : "";
+  useEffect(() => {
+    if (!open) return;
+    if (!filterFirstRunRef.current) {
+      filterFirstRunRef.current = true;
+      return; // 첫 마운트는 bootstrap 로드가 처리(중복 호출 방지)
+    }
+    if (participantSource !== "auto" && participantSource !== "paid") return;
+    void loadParticipants(mode, sourceDate, broadcastId, participantSource === "paid");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredKey]);
 
   const loadEventsAndWinners = async () => {
     try {
@@ -1166,16 +1181,18 @@ export default function AdminLiveEventRoulettePanel({
 
                 <div style={{ flex: 0.95, display: "flex", flexDirection: "column", gap: "9px" }}>
                   <div className="note">참가자 불러오기</div>
-                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "7px", borderColor: participantSource === "auto" ? "var(--rose)" : "var(--bd)", color: participantSource === "auto" ? "var(--rose)" : "var(--ink)" }} onClick={() => changeParticipantSource("auto")} disabled={!liveBroadcastId}>👥 주문서 제출자 전체 <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "auto" ? `${autoParticipantCount}명` : ""}</span></button>
-                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "7px", borderColor: participantSource === "paid" ? "var(--green)" : "var(--bd)", color: participantSource === "paid" ? "var(--green)" : "var(--ink)" }} onClick={() => changeParticipantSource("paid")} disabled={!liveBroadcastId}>💵 입금완료한 사람만 <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "paid" ? `${autoParticipantCount}명` : ""}</span></button>
+                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "7px", borderColor: participantSource === "auto" ? "var(--rose)" : "var(--bd)", color: participantSource === "auto" ? "var(--rose)" : "var(--ink)" }} onClick={() => changeParticipantSource("auto")} disabled={!canLoadParticipants}>👥 주문서 제출자 전체 <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "auto" ? `${autoParticipantCount}명` : ""}</span></button>
+                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "7px", borderColor: participantSource === "paid" ? "var(--green)" : "var(--bd)", color: participantSource === "paid" ? "var(--green)" : "var(--ink)" }} onClick={() => changeParticipantSource("paid")} disabled={!canLoadParticipants}>💵 입금완료한 사람만 <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "paid" ? `${autoParticipantCount}명` : ""}</span></button>
                   <button className="btn" style={{ textAlign: "left", height: "auto", padding: "7px", borderColor: participantSource === "manual" ? "var(--rose)" : "var(--bd)", color: participantSource === "manual" ? "var(--rose)" : "var(--ink)" }} onClick={() => changeParticipantSource("manual")}>✎ 수동 입력 (쉼표로 자동분리) <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "manual" ? `${manualParticipantCount}명` : ""}</span></button>
                   {participantSource === "manual" ? (
                     <textarea value={manualParticipantText} onChange={(e) => setManualParticipantText(e.target.value)} onPaste={handleManualPaste}
                       placeholder={"닉네임/쉼표 구분. 채팅 붙여넣으면 @닉네임만 자동 추출."}
                       style={{ width: "100%", height: "70px", resize: "none", fontSize: "11px", border: "1px solid var(--bd)", borderRadius: "7px", padding: "8px", background: "var(--color-surface)" }} />
                   ) : null}
-                  {!liveBroadcastId && participantSource !== "manual" ? (
-                    <div className="note" style={{ color: "var(--amber)" }}>⚠ 방송 OFF — 방송 시작 후 명단을 불러올 수 있어요.</div>
+                  {!canLoadParticipants && participantSource !== "manual" ? (
+                    <div className="note" style={{ color: "var(--amber)" }}>⚠ 불러올 주문 없음 — 방송 시작 또는 주문서에 주문이 보이면 명단을 불러올 수 있어요.</div>
+                  ) : participantSource !== "manual" ? (
+                    <div className="note" style={{ color: "var(--mut2)" }}>※ 주문서 화면 필터(기간/방송/상태)에 보이는 주문 기준으로 잡힙니다.</div>
                   ) : null}
                   <div style={{ background: "var(--color-surface-2)", borderRadius: "7px", padding: "8px 11px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => setExcludeDailyDup((v) => !v)}>
                     <span style={{ fontSize: "11px" }}>당일 중복당첨 금지</span>

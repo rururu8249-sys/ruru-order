@@ -338,6 +338,38 @@ async function fetchOrderRowsForDate(supabase: SupabaseAdminClient, sourceDate: 
   return (Array.isArray(data) ? data : []) as EventRouletteOrderLike[];
 }
 
+// 주문서 화면 필터로 현재 보이는 주문(order_group_id 목록)의 raw 행을 가져온다.
+//   → 룰렛 참가자를 "화면 필터 기준"으로 잡기 위함. select 필드는 위 fetch들과 동일(빌더 호환).
+async function fetchOrderRowsByGroupIds(supabase: SupabaseAdminClient, groupIds: string[]) {
+  const ids = Array.from(new Set(groupIds.map((v) => String(v || "").trim()).filter(Boolean)));
+  if (ids.length === 0) return [] as EventRouletteOrderLike[];
+
+  const cols = [
+    "id",
+    "order_group_id",
+    "created_at",
+    "youtube_nickname",
+    "customer_name",
+    "qty",
+    "total_price",
+    "adjusted_total_price",
+    "final_amount",
+    "admin_order_status_v2",
+    "order_manage_status",
+    "is_test_order",
+  ].join(", ");
+
+  const all: EventRouletteOrderLike[] = [];
+  const chunk = 200;
+  for (let i = 0; i < ids.length; i += chunk) {
+    const slice = ids.slice(i, i + chunk);
+    const { data, error } = await supabase.from("orders").select(cols).in("order_group_id", slice).limit(2000);
+    if (error) throw new Error(error.message || "필터 기준 룰렛 참여자 주문 조회 실패");
+    if (Array.isArray(data)) all.push(...(data as EventRouletteOrderLike[]));
+  }
+  return all;
+}
+
 // "입금완료한 사람만" 필터용 결제완료 상태값 — 앱 정식 기준(PAID_STATUS_VALUES)과 동일하게 통일.
 //   (기존 3개만 보던 것 → 입금확인·결제완료·출고대기·출고완료·킵·픽업 포함. 주문서 결제완료와 동일 집합)
 const ROULETTE_PAID_STATUSES = new Set(PAID_STATUS_VALUES);
@@ -353,15 +385,21 @@ async function buildParticipantsForRequest(
   mode: EventRouletteMode,
   sourceDate: string,
   broadcastId = "",
-  paidOnly = false
+  paidOnly = false,
+  orderGroupIds: string[] | null = null
 ) {
   if (mode === "preview") {
     return buildRoulettePreviewParticipants();
   }
 
-  const rows = broadcastId
-    ? await fetchOrderRowsForBroadcast(supabase, broadcastId)
-    : await fetchOrderRowsForDate(supabase, sourceDate);
+  // orderGroupIds가 배열이면(빈 배열 포함) "주문서 화면 필터 기준" → 그 주문들만 사용(0건이면 참가자 0명).
+  //   null이면 기존 방식(방송 전체 또는 날짜) fallback.
+  const rows =
+    orderGroupIds !== null
+      ? await fetchOrderRowsByGroupIds(supabase, orderGroupIds)
+      : broadcastId
+        ? await fetchOrderRowsForBroadcast(supabase, broadcastId)
+        : await fetchOrderRowsForDate(supabase, sourceDate);
 
   // 입금완료한 사람만: admin_order_status_v2/order_manage_status가 결제완료 상태인 주문만 남긴다.
   const targetRows = paidOnly ? rows.filter(isPaidOrderRowForRoulette) : rows;
@@ -573,17 +611,17 @@ async function handleBroadcasts(request: NextRequest) {
   });
 }
 
-async function handleParticipants(request: NextRequest) {
-  const authError = await requireAdmin(request);
-  if (authError) return authError;
-
+async function runParticipants(opts: {
+  mode: EventRouletteMode;
+  sourceDate: string;
+  broadcastId: string;
+  paidOnly: boolean;
+  excludeDailyDup: boolean;
+  orderGroupIds: string[] | null;
+}) {
   const supabase = getSupabaseAdmin();
-  const mode = normalizeEventRouletteMode(request.nextUrl.searchParams.get("mode"));
-  const sourceDate = normalizeDateText(request.nextUrl.searchParams.get("sourceDate"));
-  const broadcastId = cleanBroadcastId(request.nextUrl.searchParams.get("broadcastId"));
-  const paidOnly = request.nextUrl.searchParams.get("paidOnly") === "true"; // 입금완료한 사람만
-  const excludeDailyDup = request.nextUrl.searchParams.get("excludeDailyDup") !== "false"; // 기본 true. false면 중복체크 건너뜀
-  const rawParticipants = await buildParticipantsForRequest(supabase, mode, sourceDate, broadcastId, paidOnly);
+  const { mode, sourceDate, broadcastId, paidOnly, excludeDailyDup, orderGroupIds } = opts;
+  const rawParticipants = await buildParticipantsForRequest(supabase, mode, sourceDate, broadcastId, paidOnly, orderGroupIds);
   const deduped = excludeDailyDup
     ? await applyNoDuplicateWinnerRule(supabase, rawParticipants, {
         mode,
@@ -602,6 +640,35 @@ async function handleParticipants(request: NextRequest) {
     participant_count: participants.length,
     excluded_winner_count: deduped.excludedWinnerCount,
     participants: participants.map(sanitizeParticipantForAdmin),
+  });
+}
+
+async function handleParticipants(request: NextRequest) {
+  const authError = await requireAdmin(request);
+  if (authError) return authError;
+
+  return runParticipants({
+    mode: normalizeEventRouletteMode(request.nextUrl.searchParams.get("mode")),
+    sourceDate: normalizeDateText(request.nextUrl.searchParams.get("sourceDate")),
+    broadcastId: cleanBroadcastId(request.nextUrl.searchParams.get("broadcastId")),
+    paidOnly: request.nextUrl.searchParams.get("paidOnly") === "true",
+    excludeDailyDup: request.nextUrl.searchParams.get("excludeDailyDup") !== "false",
+    orderGroupIds: null,
+  });
+}
+
+// POST 버전: 주문서 화면 필터로 보이는 주문 group_id 목록(orderGroupIds)을 받아 참가자를 그 기준으로 만든다.
+//   (group_id가 많아 URL 길이 초과 위험이 있어 POST 사용. 인증은 POST 디스패처에서 이미 처리.)
+async function handleParticipantsPost(body: Record<string, unknown>) {
+  // orderGroupIds가 배열로 오면(빈 배열 포함) 필터 기준, 아니면 null(방송 fallback).
+  const orderGroupIds = Array.isArray(body.orderGroupIds) ? body.orderGroupIds.map((v) => String(v ?? "")) : null;
+  return runParticipants({
+    mode: normalizeEventRouletteMode(typeof body.mode === "string" ? body.mode : ""),
+    sourceDate: normalizeDateText(typeof body.sourceDate === "string" ? body.sourceDate : ""),
+    broadcastId: cleanBroadcastId(typeof body.broadcastId === "string" ? body.broadcastId : ""),
+    paidOnly: body.paidOnly === true || body.paidOnly === "true",
+    excludeDailyDup: body.excludeDailyDup !== false && body.excludeDailyDup !== "false",
+    orderGroupIds,
   });
 }
 
@@ -1107,6 +1174,7 @@ export async function POST(request: NextRequest) {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const action = cleanText(body.action);
 
+    if (action === "participants") return handleParticipantsPost(body);
     if (action === "create_event") return createEvent(body);
     if (action === "spin_event") return spinEvent(body);
     if (action === "mark_reward_done") return markRewardDone(body);

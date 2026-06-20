@@ -1621,6 +1621,7 @@ export default function AdminLiveDashboard() {
             controlledOpen={activeMenu === "event"}
             onRequestClose={() => setActiveMenu("broadcast")}
             activeBroadcastId={activeBroadcast?.id || null}
+            filteredOrderGroupIds={filteredOrders.map((o) => String(o.groupId))}
           />
 
           {/* 고객관리 (자체 모달) */}
