@@ -921,7 +921,7 @@ export default function LiveOrderTable({
       </div>
 
 
-      <div className="mb-3 flex w-full flex-wrap items-center gap-2 xl:flex-nowrap">
+      <div className="mb-3 flex w-full flex-wrap items-center gap-2">
         {/* [1] 기간 */}
         <select className="h-11 w-full flex-none rounded-xl border border-line bg-surface px-2 text-[12px] font-black text-ink outline-none transition focus:border-info-tx focus:ring-4 focus:ring-info-bg sm:w-[120px]"
           value={filters.date}

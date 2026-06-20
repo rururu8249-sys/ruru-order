@@ -25,15 +25,56 @@ function isPaidRow(r: Record<string, unknown>): boolean {
   const b = String(r.order_manage_status || "").trim();
   return PAID.has(a) || PAID.has(b);
 }
-function rowAmount(r: Record<string, unknown>): number {
-  return num(r.final_amount ?? r.adjusted_total_price ?? r.total_price);
-}
 function isCanceledRow(r: Record<string, unknown>): boolean {
   const a = String(r.admin_order_status_v2 || "");
   const b = String(r.order_manage_status || "");
   return a.includes("취소") || b.includes("취소");
 }
 const won = (n: number) => `${Math.round(n).toLocaleString("ko-KR")}원`;
+
+// ── 주문 그룹화 ──
+//   orders 테이블은 "상품 1줄 = 1행"이라, 한 주문(룰…외 N개)이 여러 행. 어드민(liveOrderAdapter)은 order_group_id 로 묶어 1건으로 셈.
+//   리포트도 동일하게 그룹 단위로 세야 건수/큰손이 맞음(금액은 그룹 내 final_amount 합).
+//   입금/취소 판정은 그룹의 "첫 행"(id 오름차순) 기준 — 어드민 getPaymentStatus 와 동일.
+type OrderGroup = {
+  phone: string;
+  name: string;
+  method: string;
+  amount: number;
+  paid: boolean;
+  canceled: boolean;
+  isTest: boolean;
+  createdAt: string;
+};
+
+function groupOrders(rows: Record<string, unknown>[]): OrderGroup[] {
+  const map = new Map<string, Record<string, unknown>[]>();
+  for (const r of rows) {
+    const gid = String(r.order_group_id || r.order_lookup_code || r.id || "");
+    if (!gid) continue;
+    if (!map.has(gid)) map.set(gid, []);
+    map.get(gid)!.push(r);
+  }
+  const groups: OrderGroup[] = [];
+  for (const list of map.values()) {
+    const sorted = [...list].sort((a, b) => num(a.id) - num(b.id));
+    const first = sorted[0];
+    // 그룹 금액 = 행별 final_amount 합(0이면 adjusted_total_price/total_price 합으로 fallback)
+    let amount = sorted.reduce((s, r) => s + num(r.final_amount), 0);
+    if (amount === 0) amount = sorted.reduce((s, r) => s + num(r.adjusted_total_price ?? r.total_price), 0);
+    groups.push({
+      phone: String(first.customer_phone ?? "").replace(/[^0-9]/g, ""),
+      name: String(first.youtube_nickname || first.customer_name || "고객").trim(),
+      method: String(first.payment_method || ""),
+      amount,
+      paid: isPaidRow(first),
+      canceled: isCanceledRow(first),
+      isTest: sorted.some((r) => r.is_test_order),
+      createdAt: String(first.created_at ?? ""),
+    });
+  }
+  return groups;
+}
 
 function kstDateLabel(iso: string): string {
   const d = new Date(iso);
@@ -107,7 +148,7 @@ async function fetchScopeBroadcast(sb: SupabaseClient): Promise<ScopeBc> {
 
 async function fetchOrders(sb: SupabaseClient, start: string, end: string): Promise<Record<string, unknown>[]> {
   const cols =
-    "customer_phone,youtube_nickname,customer_name,payment_method,total_price,adjusted_total_price,final_amount,admin_order_status_v2,order_manage_status,is_test_order,created_at";
+    "id,order_group_id,order_lookup_code,customer_phone,youtube_nickname,customer_name,payment_method,total_price,adjusted_total_price,final_amount,admin_order_status_v2,order_manage_status,is_test_order,created_at";
   const all: Record<string, unknown>[] = [];
   const size = 1000;
   let from = 0;
@@ -152,53 +193,52 @@ export async function buildTodayReport(): Promise<string> {
     scopeLine = `🛒 오늘(00:00~24:00) 기준`;
   }
 
-  const rows = (await fetchOrders(sb, start, end)).filter((r) => !r.is_test_order);
+  // raw 행 → 주문 그룹(어드민과 동일하게 order_group_id 로 묶어 1건). 테스트주문 그룹은 제외.
+  const allGroups = groupOrders(await fetchOrders(sb, start, end)).filter((g) => !g.isTest);
+  const orderCount = allGroups.length;
 
-  const active = rows.filter((r) => !isCanceledRow(r)); // 취소 제외
-  const paid = active.filter(isPaidRow);
-  const paidSum = paid.reduce((s, r) => s + rowAmount(r), 0);
-  const bankPaid = paid.filter((r) => String(r.payment_method || "") === "무통장입금");
-  const cardPaid = paid.filter((r) => String(r.payment_method || "") === "카드결제");
-  const bankPaidSum = bankPaid.reduce((s, r) => s + rowAmount(r), 0);
-  const cardPaidSum = cardPaid.reduce((s, r) => s + rowAmount(r), 0);
-  const unpaidBank = active.filter((r) => !isPaidRow(r) && String(r.payment_method || "") === "무통장입금");
-  const unpaidCard = active.filter((r) => !isPaidRow(r) && String(r.payment_method || "") === "카드결제");
-  const unpaidBankSum = unpaidBank.reduce((s, r) => s + rowAmount(r), 0);
-  const unpaidCardSum = unpaidCard.reduce((s, r) => s + rowAmount(r), 0);
+  const active = allGroups.filter((g) => !g.canceled); // 취소 제외
+  const paid = active.filter((g) => g.paid);
+  const paidSum = paid.reduce((s, g) => s + g.amount, 0);
+  const bankPaid = paid.filter((g) => g.method === "무통장입금");
+  const cardPaid = paid.filter((g) => g.method === "카드결제");
+  const bankPaidSum = bankPaid.reduce((s, g) => s + g.amount, 0);
+  const cardPaidSum = cardPaid.reduce((s, g) => s + g.amount, 0);
+  const unpaidBank = active.filter((g) => !g.paid && g.method === "무통장입금");
+  const unpaidCard = active.filter((g) => !g.paid && g.method === "카드결제");
+  const unpaidBankSum = unpaidBank.reduce((s, g) => s + g.amount, 0);
+  const unpaidCardSum = unpaidCard.reduce((s, g) => s + g.amount, 0);
 
   // 날짜별 결제완료 매출(방송이 날을 넘긴 경우 18·19·20 따로 보기). KST 날짜로 묶음.
   const dayMap = new Map<string, { label: string; sum: number; cnt: number }>();
-  for (const r of paid) {
-    const iso = String(r.created_at ?? "");
-    const d = new Date(iso);
+  for (const g of paid) {
+    const d = new Date(g.createdAt);
     if (Number.isNaN(d.getTime())) continue;
     const kst = new Date(d.getTime() + 9 * 3600 * 1000);
     const key = `${kst.getUTCFullYear()}.${String(kst.getUTCMonth() + 1).padStart(2, "0")}.${String(kst.getUTCDate()).padStart(2, "0")}`;
     const wd = ["일", "월", "화", "수", "목", "금", "토"][kst.getUTCDay()];
     const label = `${String(kst.getUTCMonth() + 1).padStart(2, "0")}.${String(kst.getUTCDate()).padStart(2, "0")}(${wd})`;
     const cur = dayMap.get(key) || { label, sum: 0, cnt: 0 };
-    cur.sum += rowAmount(r);
+    cur.sum += g.amount;
     cur.cnt += 1;
     dayMap.set(key, cur);
   }
   const dayRows = [...dayMap.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([, v]) => v);
 
-  // 이번 달(KST) 전체 결제완료 매출 — 방송 범위와 무관한 별도 집계(월 총매출).
+  // 이번 달(KST) 전체 결제완료 매출 — 방송 범위와 무관한 별도 집계(월 총매출). 동일하게 그룹 단위.
   const mr = monthKstRange();
-  const monthOrders = (await fetchOrders(sb, mr.start, mr.end)).filter((r) => !r.is_test_order);
-  const monthPaid = monthOrders.filter((r) => !isCanceledRow(r) && isPaidRow(r));
-  const monthSum = monthPaid.reduce((s, r) => s + rowAmount(r), 0);
+  const monthGroups = groupOrders(await fetchOrders(sb, mr.start, mr.end)).filter((g) => !g.isTest);
+  const monthPaid = monthGroups.filter((g) => !g.canceled && g.paid);
+  const monthSum = monthPaid.reduce((s, g) => s + g.amount, 0);
 
   // 오늘의 큰손(결제완료 기준, 전화번호로 합산)
   const byCust = new Map<string, { name: string; sum: number }>();
-  for (const r of paid) {
-    const phone = String(r.customer_phone ?? "").replace(/[^0-9]/g, "");
-    if (!phone) continue;
-    const name = String(r.youtube_nickname || r.customer_name || "고객").trim();
-    const cur = byCust.get(phone) || { name, sum: 0 };
-    cur.sum += rowAmount(r);
-    cur.name = name;
-    byCust.set(phone, cur);
+  for (const g of paid) {
+    if (!g.phone) continue;
+    const cur = byCust.get(g.phone) || { name: g.name, sum: 0 };
+    cur.sum += g.amount;
+    cur.name = g.name;
+    byCust.set(g.phone, cur);
   }
   let top: { name: string; sum: number } | null = null;
   for (const v of byCust.values()) if (!top || v.sum > top.sum) top = v;
@@ -237,7 +277,7 @@ export async function buildTodayReport(): Promise<string> {
     headline,
     scopeLine,
     ``,
-    `🛒 주문: ${rows.length}건`,
+    `🛒 주문: ${orderCount}건`,
     `✅ 결제완료 매출: <b>${won(paidSum)}</b> (${paid.length}건)`,
     `   ┗ 무통장 ${won(bankPaidSum)} · 카드 ${won(cardPaidSum)}`,
     ...(dayRows.length >= 2
