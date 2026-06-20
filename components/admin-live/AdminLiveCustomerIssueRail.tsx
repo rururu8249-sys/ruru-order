@@ -440,6 +440,71 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   const [newIssueForm, setNewIssueForm] = useState<IssueForm>(() => emptyIssueForm());
   const [customerSearchDraft, setCustomerSearchDraft] = useState("");
   const [customerSearchKeyword, setCustomerSearchKeyword] = useState("");
+  // 카톡 내용 붙여넣기 → 규칙(키워드) 기반 자동 분류로 아래 폼 채우기 (AI/API 불필요)
+  const [pasteDraft, setPasteDraft] = useState("");
+  const parseKakaoToForm = () => {
+    const raw = pasteDraft.replace(/\r/g, "").trim();
+    if (!raw) return;
+    const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+    const isDate = (l: string) => /^\d{4}[.\-]\s?\d{1,2}[.\-]\s?\d{1,2}/.test(l) || /요일$/.test(l);
+    const isTime = (l: string) => /^(오전|오후)\s*\d{1,2}:?\d{0,2}$/.test(l);
+    // 판매자/봇/관리자/안내 줄은 전부 버림(이 표식이 붙음)
+    const SELLER = ["보냄", "보낸 메시지", "메시지 가이드", "상담매니저", "챗봇", "채널 관리자", "(광고)", "Kanana", "카나나", "수신거부", "채널을 추가", "채널 추가"];
+    const isSeller = (l: string) => SELLER.some((k) => l.includes(k));
+    // 손님 이름줄: 짧고(≤12) 이름/닉형태, 문장부호 없음
+    const isNameish = (l: string) => l.length <= 12 && /^[가-힣A-Za-z0-9_]+( [가-힣A-Za-z0-9_]+)?$/.test(l) && !/[?!.…ㅠㅋ~]/.test(l);
+
+    let speaker: "customer" | "other" | null = null;
+    let custName = "";
+    const msgs: string[] = [];
+    for (const l of lines) {
+      if (isDate(l) || isTime(l)) { speaker = null; continue; }
+      if (isSeller(l)) { speaker = "other"; continue; }
+      if (speaker !== "customer" && isNameish(l)) { speaker = "customer"; if (!custName) custName = l; continue; }
+      if (speaker === "customer") { msgs.push(l); }
+    }
+
+    // 대화형이면 손님 말만, 아니면(한 줄 붙여넣기) 전체를 내용으로
+    const content = msgs.length > 0 ? msgs.join("\n") : raw;
+    let nickname = "";
+    let name = "";
+    if (custName) {
+      const t = custName.split(/\s+/).filter(Boolean);
+      if (t.length >= 2) { nickname = t[0]; name = t[1]; } else { name = t[0]; }
+    } else {
+      const t = (lines[0] || "").split(/\s+/).filter(Boolean);
+      if (t.length >= 1) { nickname = t[0].slice(0, 12); if (t.length >= 2 && /^[가-힣]{2,4}$/.test(t[1])) name = t[1]; }
+    }
+
+    const KW: [string, string][] = [
+      ["교환", "exchange"], ["반품", "return"], ["환불", "refund"], ["취소", "refund"],
+      ["불량", "exchange"], ["하자", "exchange"], ["진상", "complaint"],
+    ];
+    let type = "general";
+    for (const [kw, t] of KW) { if (content.includes(kw)) { type = t; break; } }
+
+    setNewIssueForm((f) => ({ ...f, nickname: nickname || f.nickname, name: name || f.name, taskTypes: [type], memo: content }));
+  };
+
+  // ChatGPT 새 창으로 분석(공짜) — 분석 지시문+대화를 클립보드에 담고 chatgpt.com 새 창 열기.
+  //   ChatGPT는 iframe 임베드를 막아서 끼워넣기는 불가 → 새 창 + 붙여넣기 방식.
+  const chatgptAnalyze = async () => {
+    const text = pasteDraft.trim();
+    if (!text) {
+      showAdminToast("먼저 카톡 대화를 붙여넣어주세요.");
+      return;
+    }
+    const prompt =
+      '아래는 우리 쇼핑몰 손님과의 카카오톡 대화입니다. 판매자(루루동이/유혜원/한두희/관리자)·자동봇(카나나 상담매니저/챗봇)·공지·시스템 안내 줄은 전부 무시하고, "손님"이 직접 한 말만 골라서 아래 형식으로 정리해줘:\n\n닉네임:\n이름:\n유형(교환/반품/환불/배송/기타 중 하나):\n핵심내용(2~3줄):\n\n[대화 내용]\n' +
+      text;
+    try {
+      await navigator.clipboard.writeText(prompt);
+      showAdminToast("분석문구를 복사했어요. 열린 ChatGPT 창에 붙여넣기(Ctrl/Cmd+V) → 결과를 복사해 아래 폼에 넣으세요.");
+    } catch {
+      showAdminToast("ChatGPT 창을 열었어요. 위 카톡 내용을 붙여넣어 분석을 요청하세요.");
+    }
+    window.open("https://chatgpt.com/", "_blank", "noopener");
+  };
   const issuePageSize = 3;
   const [issuePage, setIssuePage] = useState(1);
   const [editingIssueTask, setEditingIssueTask] = useState<AdminIssueTask | null>(null);
@@ -862,6 +927,37 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               >
                 닫기
               </button>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-line bg-surface-2 p-3">
+              <div className="text-xs font-black text-ink">📋 카톡 내용 붙여넣기 → 자동 분류</div>
+              <textarea
+                value={pasteDraft}
+                onChange={(event) => setPasteDraft(event.target.value)}
+                rows={3}
+                placeholder="예: 둘리 홍길동 245 작아서 교환하고 싶어요"
+                className="mt-2 w-full rounded-xl border border-line bg-surface p-2.5 text-sm font-bold text-ink outline-none focus:border-rose-deep"
+              />
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={chatgptAnalyze}
+                  className="h-9 rounded-lg bg-rose-deep px-3 text-xs font-black text-white"
+                >
+                  🤖 ChatGPT로 분석 (새 창·공짜)
+                </button>
+                <button
+                  type="button"
+                  onClick={parseKakaoToForm}
+                  className="h-9 rounded-lg border border-line bg-surface px-3 text-xs font-black text-ink-soft transition hover:bg-surface-2"
+                >
+                  규칙으로 빠르게(한글이름)
+                </button>
+              </div>
+              <div className="mt-1.5 text-[11px] font-bold leading-4 text-ink-mute">
+                🤖 ChatGPT(공짜): 분석문구가 복사돼요 → 열린 창에 붙여넣기 → 결과를 복사해 아래 폼에. 이모지·문장 이름도 정확.
+                <br />규칙(빠르게): 한글 이름·교환/반품/환불 단어면 바로 폼에 채움(이모지·괄호·문장 이름은 부정확).
+              </div>
             </div>
 
             <div className="mt-4">
