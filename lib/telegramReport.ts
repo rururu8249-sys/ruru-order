@@ -65,14 +65,25 @@ function todayKstRange(): { start: string; end: string; label: string } {
   };
 }
 
+// KST 이번 달 1일 0시 ~ 지금 범위(UTC ISO) — 월 총매출용
+function monthKstRange(): { start: string; end: string; label: string } {
+  const now = new Date();
+  const kst = new Date(now.getTime() + 9 * 3600 * 1000);
+  const y = kst.getUTCFullYear();
+  const m = kst.getUTCMonth();
+  const startUtc = new Date(Date.UTC(y, m, 1, 0, 0, 0) - 9 * 3600 * 1000);
+  return { start: startUtc.toISOString(), end: now.toISOString(), label: `${m + 1}월` };
+}
+
 type ScopeBc = { id: string; title: string; startedAt: string; endedAt: string; live: boolean } | null;
 
 // 가장 최근 방송(진행중이면 그 방송, 아니면 마지막으로 끝난 방송). 방송 종료 자동발송은 status가 OFF로 바뀐 뒤 호출되므로 "ON만"으로 찾으면 안 됨.
 async function fetchScopeBroadcast(sb: SupabaseClient): Promise<ScopeBc> {
   try {
+    // ⚠️ broadcasts 테이블 방송이름 컬럼은 public_title(= title 컬럼은 없음). title 을 select 하면 쿼리 전체가 에러나 방송을 못 찾으니 절대 넣지 말 것(mission.ts 와 동일).
     const { data } = await sb
       .from("broadcasts")
-      .select("id,public_title,title,started_at,ended_at,status,is_deleted")
+      .select("id,public_title,started_at,ended_at,status,is_deleted")
       .order("started_at", { ascending: false })
       .limit(10);
     const list = ((Array.isArray(data) ? data : []) as Record<string, unknown>[]).filter(
@@ -84,7 +95,7 @@ async function fetchScopeBroadcast(sb: SupabaseClient): Promise<ScopeBc> {
     const live = String(bc.status || "").toUpperCase() === "ON";
     return {
       id: String(bc.id ?? ""),
-      title: String(bc.public_title ?? bc.title ?? "").trim(),
+      title: String(bc.public_title ?? "").trim(),
       startedAt: String(bc.started_at ?? ""),
       endedAt: String(bc.ended_at ?? ""),
       live,
@@ -155,6 +166,29 @@ export async function buildTodayReport(): Promise<string> {
   const unpaidBankSum = unpaidBank.reduce((s, r) => s + rowAmount(r), 0);
   const unpaidCardSum = unpaidCard.reduce((s, r) => s + rowAmount(r), 0);
 
+  // 날짜별 결제완료 매출(방송이 날을 넘긴 경우 18·19·20 따로 보기). KST 날짜로 묶음.
+  const dayMap = new Map<string, { label: string; sum: number; cnt: number }>();
+  for (const r of paid) {
+    const iso = String(r.created_at ?? "");
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) continue;
+    const kst = new Date(d.getTime() + 9 * 3600 * 1000);
+    const key = `${kst.getUTCFullYear()}.${String(kst.getUTCMonth() + 1).padStart(2, "0")}.${String(kst.getUTCDate()).padStart(2, "0")}`;
+    const wd = ["일", "월", "화", "수", "목", "금", "토"][kst.getUTCDay()];
+    const label = `${String(kst.getUTCMonth() + 1).padStart(2, "0")}.${String(kst.getUTCDate()).padStart(2, "0")}(${wd})`;
+    const cur = dayMap.get(key) || { label, sum: 0, cnt: 0 };
+    cur.sum += rowAmount(r);
+    cur.cnt += 1;
+    dayMap.set(key, cur);
+  }
+  const dayRows = [...dayMap.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([, v]) => v);
+
+  // 이번 달(KST) 전체 결제완료 매출 — 방송 범위와 무관한 별도 집계(월 총매출).
+  const mr = monthKstRange();
+  const monthOrders = (await fetchOrders(sb, mr.start, mr.end)).filter((r) => !r.is_test_order);
+  const monthPaid = monthOrders.filter((r) => !isCanceledRow(r) && isPaidRow(r));
+  const monthSum = monthPaid.reduce((s, r) => s + rowAmount(r), 0);
+
   // 오늘의 큰손(결제완료 기준, 전화번호로 합산)
   const byCust = new Map<string, { name: string; sum: number }>();
   for (const r of paid) {
@@ -206,6 +240,9 @@ export async function buildTodayReport(): Promise<string> {
     `🛒 주문: ${rows.length}건`,
     `✅ 결제완료 매출: <b>${won(paidSum)}</b> (${paid.length}건)`,
     `   ┗ 무통장 ${won(bankPaidSum)} · 카드 ${won(cardPaidSum)}`,
+    ...(dayRows.length >= 2
+      ? [`📅 날짜별 매출`, ...dayRows.map((v) => `   · ${v.label} ${won(v.sum)} (${v.cnt}건)`)]
+      : []),
     `💸 무통장 미입금: ${unpaidBank.length}건 (${won(unpaidBankSum)})`,
     `💳 카드 미결제: ${unpaidCard.length}건 (${won(unpaidCardSum)})`,
     `📌 미해결 고객이슈: ${openIssues.length}건${
@@ -213,6 +250,7 @@ export async function buildTodayReport(): Promise<string> {
     }`,
   ];
   if (top && top.sum > 0) lines.push(`👑 오늘의 큰손: ${top.name} (${won(top.sum)})`);
+  lines.push(``, `🗓 ${mr.label} 총매출(이번 달 전체): <b>${won(monthSum)}</b> (${monthPaid.length}건)`);
   lines.push(``, `자세한 건 관리자 화면에서 확인하세요.`);
   return lines.join("\n");
 }
