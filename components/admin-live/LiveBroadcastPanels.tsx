@@ -846,7 +846,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
             <iframe
               title="YouTube live video"
               src={videoEmbedUrl}
-              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 min-h-full min-w-full aspect-[9/16]"
+              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[128%] w-auto max-w-none aspect-[9/16]"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
             />
