@@ -855,25 +855,34 @@ async function spinEvent(body: Record<string, unknown>) {
     .eq("event_id", eventId)
     .maybeSingle();
 
+  // 당첨자 레코드 id를 응답에 직접 담아 클라가 재조회(race/RLS) 없이 mark_reward_done 하도록 한다.
+  let winnerId = existingWinner ? String((existingWinner as { id?: unknown }).id ?? "") : "";
+
   if (!existingWinner) {
-    const { error: winnerError } = await supabase.from("event_roulette_winners").insert({
-      event_id: eventId,
-      nickname: picked.winner.nickname,
-      winner_note: winnerNote,
-      winner_at: now,
-      is_reward_done: false,
-      is_test: event.is_test,
-    });
+    const { data: insertedWinner, error: winnerError } = await supabase
+      .from("event_roulette_winners")
+      .insert({
+        event_id: eventId,
+        nickname: picked.winner.nickname,
+        winner_note: winnerNote,
+        winner_at: now,
+        is_reward_done: false,
+        is_test: event.is_test,
+      })
+      .select("id")
+      .single();
 
     if (winnerError) {
       return json({ ok: false, message: winnerError.message || "룰렛 당첨자 저장 실패" }, 500);
     }
+    winnerId = insertedWinner ? String((insertedWinner as { id?: unknown }).id ?? "") : "";
   }
 
   return json({
     ok: true,
     event: sanitizeEventForAdmin(updatedEvent as RouletteEventRow),
     overlay_event: sanitizeEventForOverlayProbe(updatedEvent as RouletteEventRow),
+    winnerId,
     picked: {
       nickname: picked.winner.nickname,
       total_weight: picked.totalWeight,

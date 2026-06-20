@@ -81,6 +81,7 @@ type EventPayload = {
   message?: string;
   event?: RouletteEvent;
   saved?: boolean;
+  winnerId?: string; // spin_event 응답: 방금 만든 당첨자 레코드 id(배지 마킹용, 재조회 없이 사용)
 };
 
 type EventsPayload = {
@@ -444,6 +445,9 @@ export default function AdminLiveEventRoulettePanel({
   // 같은 이벤트(event.id)에 대해 이번 세션에서 이미 지급했는지 기록(effect 재실행 중복지급 방지)
   const grantedEventIdsRef = useRef<Set<string>>(new Set());
 
+  // spin_event 응답이 준 당첨자 레코드 id(eventId→winnerId). 배지 마킹 시 재조회(race/RLS) 대신 직접 사용.
+  const winnerIdByEventRef = useRef<Map<string, string>>(new Map());
+
   // 당첨자 닉네임 → orders 최신 주문 전화번호 매핑 → 기존 포인트 API로 자동지급
   // 중복지급 가드: ① 이번 세션 ref ② 영구 게이트 is_reward_done. 지급 성공 시 is_reward_done=true로 잠금.
   const grantPointToWinner = async (nickname: string, amount: number, reason: string, eventId = "") => {
@@ -508,9 +512,9 @@ export default function AdminLiveEventRoulettePanel({
       showAdminToast(`${nickname}님에게 ${amount.toLocaleString("ko-KR")}P 자동지급 완료.`, "success");
 
       // 지급 성공 → 해당 당첨자 레코드 is_reward_done=true (영구 중복지급 게이트). 기존 mark_reward_done API 재사용.
-      //   당첨 레코드가 서버에서 막 생성된 직후라 조회가 빌 수 있어 최대 3회(0.6s 간격) 재시도 → 배지 마킹 안정화.
+      //   winnerId는 spin 응답이 직접 줌(winnerIdByEventRef) → 재조회(race/RLS) 불필요. 없을 때만 event_id로 재조회(최대 3회).
       if (evId) {
-        let winnerId: string | undefined;
+        let winnerId: string | undefined = winnerIdByEventRef.current.get(evId) || undefined;
         for (let i = 0; i < 3 && !winnerId; i++) {
           const { data: wRow } = await supabase
             .from("event_roulette_winners")
@@ -523,11 +527,17 @@ export default function AdminLiveEventRoulettePanel({
           if (!winnerId) await new Promise((r) => setTimeout(r, 600));
         }
         if (winnerId) {
-          await requestJson<{ ok: boolean }>("/api/admin-live/event-roulette", {
+          const markRes = await requestJson<{ ok: boolean; message?: string }>("/api/admin-live/event-roulette", {
             method: "POST",
             body: JSON.stringify({ action: "mark_reward_done", winnerId, isRewardDone: true }),
-          }).catch(() => {});
+          }).catch((e) => ({ ok: false, message: e instanceof Error ? e.message : String(e) }));
+          if (!markRes.ok) {
+            // 포인트는 이미 지급됨(재지급 X). 배지 마킹만 실패 → 운영자가 알도록 알리고 수동 처리 유도.
+            showAdminToast(`${nickname} 포인트는 지급됐지만 '지급완료' 배지 표시에 실패했어요. 당첨자 배지를 직접 눌러 지급완료로 바꿔주세요.`, "warning");
+          }
           await loadEventsAndWinners();
+        } else {
+          showAdminToast(`${nickname} 포인트는 지급됐지만 당첨 레코드를 못 찾아 배지 표시를 못 했어요. 새로고침 후 배지를 직접 눌러주세요.`, "warning");
         }
       }
     } catch (e) {
@@ -668,6 +678,7 @@ export default function AdminLiveEventRoulettePanel({
         throw new Error(spinPayload.message || "인형뽑기 시작 실패");
       }
 
+      if (spinPayload.event.id && spinPayload.winnerId) winnerIdByEventRef.current.set(String(spinPayload.event.id), String(spinPayload.winnerId));
       setCurrentEvent(spinPayload.event);
       setParticipants(spinPayload.event.participants || createPayload.event.participants || finalParticipants);
       await loadEventsAndWinners();
@@ -845,6 +856,7 @@ export default function AdminLiveEventRoulettePanel({
         throw new Error(payload.message || "룰렛 시작 실패");
       }
 
+      if (payload.event.id && payload.winnerId) winnerIdByEventRef.current.set(String(payload.event.id), String(payload.winnerId));
       setCurrentEvent(payload.event);
       await loadEventsAndWinners();
       showAdminToast(`당첨자: ${payload.event.winner_nickname || "-"}`, "success");
