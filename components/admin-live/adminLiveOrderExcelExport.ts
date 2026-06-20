@@ -102,12 +102,18 @@ function totalQty(order: LiveOrder) {
 function itemSummary(order: LiveOrder) {
   const items = order.items || [];
   if (!items.length) return clean(order.orderSummary) || "상품명없음 x1개";
-  return items.map(itemText).join(" / ");
+  return items.map(itemText).join(", ");
 }
 
 function recipientName(order: LiveOrder) {
-  // 받는사람(배송) 우선, 없으면 기존 동작(닉네임/주문자명) — 옛 주문 호환.
-  return clean((order as any).recipientName || order.nickname || order.name || "");
+  // 주소 뒤 "/실명" 에 쓰는 받는사람 실명(배송용). 받는사람 우선, 없으면 주문자명/닉네임 — 옛 주문 호환.
+  return clean((order as any).recipientName || order.name || order.nickname || "");
+}
+
+// 수하인명/닉네임 칼럼용: 유튜브 닉네임 우선(운영자가 방송 시청자와 매칭하는 기준). 없으면 받는사람/주문자명 fallback.
+//   ※ 받는사람 실명은 주소 뒤 "/실명"(recipientName)으로 남아 배송에는 지장 없음.
+function labelName(order: LiveOrder) {
+  return clean(order.nickname || (order as any).recipientName || order.name || "");
 }
 
 function phoneText(order: LiveOrder) {
@@ -171,7 +177,7 @@ function rosenRowCombined(order: LiveOrder): WorkbookRow {
   const phone = phoneText(order);
 
   return [
-    recipientName(order),
+    labelName(order),
     null,
     recipientAddress(order),
     phone,
@@ -191,7 +197,7 @@ function rosenRowSplit(order: LiveOrder): WorkbookRow {
   const address = splitAddress(order);
 
   return [
-    recipientName(order),
+    labelName(order),
     null,
     address.address1,
     address.address2,
@@ -342,7 +348,7 @@ function appendRosenCheckSheet(workbook: ExcelJS.Workbook, orders: LiveOrder[], 
     headers,
     ...orders.map((order) => [
       clean(order.orderNo || order.groupId || order.id),
-      recipientName(order),
+      labelName(order),
       clean(order.name),
       phoneText(order),
       recipientAddress(order),
@@ -429,7 +435,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
       itemRows.push([
         clean(order.broadcastName),
         clean(order.submittedAt),
-        recipientName(order),
+        labelName(order),
         clean(order.name),
         phoneText(order),
         clean(order.orderSummary) || "상품명없음",
@@ -446,7 +452,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
       itemRows.push([
         clean(order.broadcastName),
         clean(order.submittedAt),
-        recipientName(order),
+        labelName(order),
         clean(order.name),
         phoneText(order),
         itemName(item),
