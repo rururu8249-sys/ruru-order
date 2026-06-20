@@ -347,6 +347,7 @@ async function fetchOrderRowsByGroupIds(supabase: SupabaseAdminClient, groupIds:
   const cols = [
     "id",
     "order_group_id",
+    "order_lookup_code",
     "created_at",
     "youtube_nickname",
     "customer_name",
@@ -359,15 +360,31 @@ async function fetchOrderRowsByGroupIds(supabase: SupabaseAdminClient, groupIds:
     "is_test_order",
   ].join(", ");
 
-  const all: EventRouletteOrderLike[] = [];
+  // ⚠️ 클라 어댑터는 주문을 order_group_id || order_lookup_code || id 로 묶는다(getGroupId).
+  //   서버도 그 3개 키를 모두 매칭해야 누락이 없다(예: order_group_id가 빈 주문). id로 dedup.
+  const numericIds = ids.filter((s) => /^\d+$/.test(s));
+  const byId = new Map<string, EventRouletteOrderLike>();
+  const add = (rows: unknown) => {
+    if (Array.isArray(rows)) for (const r of rows as EventRouletteOrderLike[]) byId.set(String((r as { id?: unknown }).id ?? ""), r);
+  };
+
   const chunk = 200;
   for (let i = 0; i < ids.length; i += chunk) {
     const slice = ids.slice(i, i + chunk);
-    const { data, error } = await supabase.from("orders").select(cols).in("order_group_id", slice).limit(2000);
-    if (error) throw new Error(error.message || "필터 기준 룰렛 참여자 주문 조회 실패");
-    if (Array.isArray(data)) all.push(...(data as EventRouletteOrderLike[]));
+    const g = await supabase.from("orders").select(cols).in("order_group_id", slice).limit(2000);
+    if (g.error) throw new Error(g.error.message || "필터 기준 룰렛 참여자 주문 조회 실패");
+    add(g.data);
+    const l = await supabase.from("orders").select(cols).in("order_lookup_code", slice).limit(2000);
+    if (l.error) throw new Error(l.error.message || "필터 기준 룰렛 참여자 주문 조회 실패");
+    add(l.data);
   }
-  return all;
+  for (let i = 0; i < numericIds.length; i += chunk) {
+    const slice = numericIds.slice(i, i + chunk);
+    const d = await supabase.from("orders").select(cols).in("id", slice).limit(2000);
+    if (d.error) throw new Error(d.error.message || "필터 기준 룰렛 참여자 주문 조회 실패");
+    add(d.data);
+  }
+  return Array.from(byId.values());
 }
 
 // "입금완료한 사람만" 필터용 결제완료 상태값 — 앱 정식 기준(PAID_STATUS_VALUES)과 동일하게 통일.
