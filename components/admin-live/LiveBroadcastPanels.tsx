@@ -85,7 +85,7 @@ function clean(value: unknown) {
 function videoSizeClass(videoRatio: VideoRatio) {
   if (videoRatio === "wide") return "aspect-video h-[430px] w-full max-w-[760px]";
   if (videoRatio === "auto") return "aspect-[4/5] h-full max-w-full";
-  return "aspect-[9/16] h-full max-w-full";
+  return "aspect-[9/16] w-full";
 }
 
 function extractYoutubeVideoId(rawUrl?: string | null) {
@@ -841,26 +841,24 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
           </div>
         </div>
 
-        <div className="flex flex-1 min-h-0 items-center justify-center overflow-hidden rounded-2xl border border-line bg-surface-2 p-1">
-          <div className={`relative overflow-hidden rounded-[1.5rem] bg-slate-950 shadow-sm ${videoSizeClass(videoRatio)}`}>
-            {videoEmbedUrl ? (
-              <iframe
-                title="YouTube live video"
-                src={videoEmbedUrl}
-                className="h-full w-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-              />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-amber-100 via-stone-100 to-slate-100">
-                <div className="w-[78%] rounded-[2rem] bg-surface/70 p-6 text-center shadow-sm backdrop-blur">
-                  <div className="text-5xl">👟</div>
-                  <div className="mt-4 text-lg font-black text-ink">루루동이LIVE</div>
-                  <div className="mt-2 text-xs font-bold text-ink-soft">유튜브 라이브 URL을 적용하면 방송화면이 표시됩니다.</div>
-                </div>
+        <div className="relative flex-1 min-h-0 w-full overflow-hidden rounded-2xl border border-line bg-slate-950">
+          {videoEmbedUrl ? (
+            <iframe
+              title="YouTube live video"
+              src={videoEmbedUrl}
+              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 min-h-full min-w-full aspect-[9/16]"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-amber-100 via-stone-100 to-slate-100">
+              <div className="w-[78%] rounded-[2rem] bg-surface/70 p-6 text-center shadow-sm backdrop-blur">
+                <div className="text-5xl">👟</div>
+                <div className="mt-4 text-lg font-black text-ink">루루동이LIVE</div>
+                <div className="mt-2 text-xs font-bold text-ink-soft">유튜브 라이브 URL을 적용하면 방송화면이 표시됩니다.</div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
