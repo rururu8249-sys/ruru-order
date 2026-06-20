@@ -81,6 +81,25 @@ export default function TelegramNotifyCard() {
     }
   };
 
+  const [reporting, setReporting] = useState(false);
+  const sendReport = async () => {
+    setReporting(true);
+    setMsg("");
+    try {
+      const r = await fetch("/api/admin-live/telegram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "send-report" }),
+      });
+      const j = await r.json();
+      setMsg(j.ok ? "✅ 오늘 결산을 폰으로 보냈어요!" : `❌ 실패: ${j.reason || j.error || "설정을 확인하세요"}`);
+    } catch (e: any) {
+      setMsg("실패: " + (e?.message || e));
+    } finally {
+      setReporting(false);
+    }
+  };
+
   const sendTest = async () => {
     setTesting(true);
     setMsg("");
@@ -147,6 +166,12 @@ export default function TelegramNotifyCard() {
         <button type="button" onClick={sendTest} disabled={testing} className="h-10 rounded-xl border border-line bg-surface-2 px-4 text-sm font-black text-ink-soft transition hover:bg-surface-3 disabled:opacity-50">
           {testing ? "보내는 중…" : "🔔 테스트 보내기"}
         </button>
+      </div>
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={sendReport} disabled={reporting} className="h-10 rounded-xl bg-ok-tx px-4 text-sm font-black text-white disabled:opacity-50">
+          {reporting ? "보내는 중…" : "📊 지금 결산 보내기"}
+        </button>
+        <span className="text-[11px] font-bold text-ink-mute">오늘 매출·미입금·큰손을 폰으로 한 통</span>
       </div>
       <div className="rounded-xl border border-line bg-info-bg px-3 py-2 text-[11px] font-bold leading-5 text-info-tx">
         💡 "chat not found"가 뜨면: 그 봇 채팅에서 <b>/start</b> 한 번 누른 뒤 → 위 <b>🔍 내 chat id 자동 찾기</b>를 누르세요. chat id를 직접 안 넣어도 자동으로 맞는 값이 채워집니다.
