@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import YoutubeNotifyCard from "./YoutubeNotifyCard";
+import TelegramNotifyCard from "./TelegramNotifyCard";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import AdminAuthSettingsPanel from "./AdminAuthSettingsPanel";
@@ -130,12 +131,13 @@ function decimalInput(value: string) {
 }
 
 // 설정 카테고리(좌측 네비) — 업계 표준: 카테고리별로 나눠 스크롤 최소화
-type SettingsTab = "payment" | "point" | "order" | "youtube" | "security";
+type SettingsTab = "payment" | "point" | "order" | "youtube" | "telegram" | "security";
 const SETTINGS_TABS: { key: SettingsTab; label: string; icon: string; desc: string }[] = [
   { key: "payment", label: "결제·배송", icon: "💳", desc: "카드 수수료·배송비" },
   { key: "point", label: "포인트 적립", icon: "🪙", desc: "자동적립·적립률" },
   { key: "order", label: "주문서 표시", icon: "📝", desc: "공지·직접입력" },
   { key: "youtube", label: "유튜브 알림", icon: "📺", desc: "라이브 채팅 자동알림" },
+  { key: "telegram", label: "텔레그램 알림", icon: "📨", desc: "폰 푸시 알림" },
   { key: "security", label: "관리자 보안", icon: "🔒", desc: "로그인 정보" },
 ];
 // 하단 공통 저장바(운영값)를 쓰는 탭 — 유튜브/보안은 자체 저장
@@ -398,6 +400,8 @@ export default function AdminLiveSettingsPanel() {
 
           {/* ── 유튜브 알림 (자체 저장) ── */}
           {activeTab === "youtube" && <YoutubeNotifyCard />}
+
+          {activeTab === "telegram" && <TelegramNotifyCard />}
 
           {/* ── 관리자 보안 (읽기 전용) ── */}
           {activeTab === "security" && <AdminAuthSettingsPanel />}
