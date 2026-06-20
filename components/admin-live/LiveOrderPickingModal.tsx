@@ -17,7 +17,7 @@ import { exportLiveOrdersForPicking } from "./adminLiveOrderExcelExport";
 type Props = { orders: LiveOrder[]; filterLabel: string; onClose: () => void };
 
 type PickItem = { id: string; text: string; qty: number };
-type Panel = { key: string; nickname: string; search: string; paid: boolean; when: string; items: PickItem[]; totalQty: number };
+type Panel = { key: string; nickname: string; name: string; search: string; paid: boolean; when: string; items: PickItem[]; totalQty: number };
 
 const PAID_STATUSES = ["paid", "auto_paid", "manual_paid", "card_paid"];
 const clean = (v: unknown) => String(v ?? "").trim();
@@ -67,7 +67,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
       const status = clean(o.paymentStatus);
       if (status === "canceled") continue;
       const paid = PAID_STATUSES.includes(status);
-      const nickname = clean((o as any).recipientName) || clean(o.nickname) || clean(o.name) || "-";
+      const nickname = clean(o.nickname) || clean(o.name) || "-"; // 주문 닉네임(크게)
+      const name = clean((o as any).recipientName) || clean(o.name) || ""; // 받는사람/이름(옆에 함께 표시)
       // 검색용: 닉네임·이름·받는사람 전부 포함(닉네임으로 검색해도, 이름으로 검색해도 잡히게)
       const searchText = [clean(o.nickname), clean(o.name), clean((o as any).recipientName)]
         .filter(Boolean)
@@ -83,7 +84,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
               return { id: String(it.id), text: (clean(it.productName) || "상품") + (opt ? ` (${opt})` : ""), qty: Number(it.qty || 1) };
             });
       const totalQty = items.reduce((s, it) => s + (Number.isFinite(it.qty) ? it.qty : 1), 0);
-      list.push({ key: String(o.groupId || o.id), nickname, search: searchText, paid, when, items, totalQty });
+      list.push({ key: String(o.groupId || o.id), nickname, name, search: searchText, paid, when, items, totalQty });
     }
     return list;
   }, [orders]);
@@ -91,7 +92,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   // 범위(결제완료만 토글 + 정렬) — 진행률/초기화 기준
   const scopedPanels = useMemo(() => {
     const arr = panels.filter((p) => (paidOnly ? p.paid : true));
-    if (sortMode === "nickname") arr.sort((a, b) => a.nickname.localeCompare(b.nickname, "ko") || ts(a.when) - ts(b.when));
+    if (sortMode === "nickname") arr.sort((a, b) => (a.name || a.nickname).localeCompare(b.name || b.nickname, "ko") || ts(a.when) - ts(b.when));
     else arr.sort((a, b) => ts(a.when) - ts(b.when));
     return arr;
   }, [panels, paidOnly, sortMode]);
@@ -232,8 +233,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                     {/* 패널 헤더 = 주문서(닉네임) : 아바타(이니셜) + 이름 + 배지 + 진행. 체크박스 없음(상품과 구분). 클릭=그 주문 전체 챙김/해제 */}
                     <button type="button" onClick={() => togglePanel(panel)} className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left ${complete ? "bg-ok-bg" : "bg-rose-soft"}`}>
                       <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-black text-white ${complete ? "bg-emerald-500" : "bg-rose-deep"}`}>{complete ? "✓" : (panel.nickname.charAt(0) || "?")}</span>
-                      <span className="flex min-w-0 flex-1 items-baseline gap-2">
+                      <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
                         <span className="shrink truncate text-[15px] font-black text-ink">{panel.nickname}</span>
+                        {panel.name && panel.name !== panel.nickname ? <span className="shrink-0 text-[12px] font-bold text-ink-soft">· {panel.name}</span> : null}
                         {whenText(panel.when) ? <span className="shrink-0 text-[11px] font-semibold text-ink-mute">{whenText(panel.when)}</span> : null}
                       </span>
                       {panel.paid ? (
