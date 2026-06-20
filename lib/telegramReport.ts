@@ -1,9 +1,11 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { PAID_STATUS_VALUES } from "@/lib/admin-v2/statusDisplay";
 
-// 텔레그램 "오늘 결산" 리포트 생성(읽기 전용).
-//   매출/결제완료 판정은 앱 정식 기준(PAID_STATUS_VALUES) + final_amount 로, lib/mission.ts 와 동일하게 맞춤.
-//   돈을 옮기거나 상태를 바꾸지 않음. 숫자만 읽어 문장으로 정리.
+// 텔레그램 "방송 결산" 리포트 생성(읽기 전용).
+//   범위 = "현재(가장 최근) 방송" 의 주문 시간창[방송 시작 ~ 종료(진행중이면 지금)] — 어드민 상단 매출 통계와 동일 기준.
+//     ※ 예전엔 "KST 오늘 0~24시"만 읽어서, 방송이 날을 넘기면(예: 06.18 시작·주문은 06.19) 오늘 주문 0건 → 전부 0원으로 보이던 버그가 있었음.
+//   방송이 하나도 없으면(쇼핑몰 모드 등) "오늘" 으로 fallback.
+//   매출/결제완료 판정은 앱 정식 기준(PAID_STATUS_VALUES) + final_amount. 돈을 옮기거나 상태를 바꾸지 않음. 숫자만 읽어 문장으로 정리.
 
 const PAID = new Set(PAID_STATUS_VALUES);
 
@@ -33,7 +35,20 @@ function isCanceledRow(r: Record<string, unknown>): boolean {
 }
 const won = (n: number) => `${Math.round(n).toLocaleString("ko-KR")}원`;
 
-// KST 오늘 0시~24시 범위(UTC ISO)
+function kstDateLabel(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const kst = new Date(d.getTime() + 9 * 3600 * 1000);
+  const y = kst.getUTCFullYear();
+  const m = kst.getUTCMonth();
+  const day = kst.getUTCDate();
+  const wd = ["일", "월", "화", "수", "목", "금", "토"][kst.getUTCDay()];
+  const hh = String(kst.getUTCHours()).padStart(2, "0");
+  const mm = String(kst.getUTCMinutes()).padStart(2, "0");
+  return `${y}.${String(m + 1).padStart(2, "0")}.${String(day).padStart(2, "0")}(${wd}) ${hh}:${mm}`;
+}
+
+// KST 오늘 0시~24시 범위(UTC ISO) — 방송이 전혀 없을 때 fallback
 function todayKstRange(): { start: string; end: string; label: string } {
   const now = new Date();
   const kst = new Date(now.getTime() + 9 * 3600 * 1000);
@@ -48,6 +63,35 @@ function todayKstRange(): { start: string; end: string; label: string } {
     end: endUtc.toISOString(),
     label: `${y}.${String(m + 1).padStart(2, "0")}.${String(d).padStart(2, "0")}(${wd})`,
   };
+}
+
+type ScopeBc = { id: string; title: string; startedAt: string; endedAt: string; live: boolean } | null;
+
+// 가장 최근 방송(진행중이면 그 방송, 아니면 마지막으로 끝난 방송). 방송 종료 자동발송은 status가 OFF로 바뀐 뒤 호출되므로 "ON만"으로 찾으면 안 됨.
+async function fetchScopeBroadcast(sb: SupabaseClient): Promise<ScopeBc> {
+  try {
+    const { data } = await sb
+      .from("broadcasts")
+      .select("id,public_title,title,started_at,ended_at,status,is_deleted")
+      .order("started_at", { ascending: false })
+      .limit(10);
+    const list = ((Array.isArray(data) ? data : []) as Record<string, unknown>[]).filter(
+      (b) => b.is_deleted !== true && b.started_at,
+    );
+    if (list.length === 0) return null;
+    const on = list.find((b) => String(b.status || "").toUpperCase() === "ON");
+    const bc = on || list[0];
+    const live = String(bc.status || "").toUpperCase() === "ON";
+    return {
+      id: String(bc.id ?? ""),
+      title: String(bc.public_title ?? bc.title ?? "").trim(),
+      startedAt: String(bc.started_at ?? ""),
+      endedAt: String(bc.ended_at ?? ""),
+      live,
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function fetchOrders(sb: SupabaseClient, start: string, end: string): Promise<Record<string, unknown>[]> {
@@ -74,12 +118,38 @@ async function fetchOrders(sb: SupabaseClient, start: string, end: string): Prom
 
 export async function buildTodayReport(): Promise<string> {
   const sb = svc();
-  const { start, end, label } = todayKstRange();
+
+  // 1) 범위 결정: 현재(가장 최근) 방송 시간창. 없으면 오늘.
+  const bc = await fetchScopeBroadcast(sb);
+  let start: string;
+  let end: string;
+  let headline: string;
+  let scopeLine: string;
+  if (bc) {
+    start = bc.startedAt;
+    end = bc.live || !bc.endedAt ? new Date().toISOString() : bc.endedAt;
+    const title = bc.title || "방송";
+    headline = `📊 <b>루루동이 ${bc.live ? "중간 결산" : "방송 결산"}</b> · ${title}`;
+    scopeLine = bc.live
+      ? `🔴 방송중 · 시작 ${kstDateLabel(start)} ~ 현재`
+      : `⏹ 방송종료 · ${kstDateLabel(start)} ~ ${kstDateLabel(end)}`;
+  } else {
+    const t = todayKstRange();
+    start = t.start;
+    end = t.end;
+    headline = `📊 <b>루루동이 오늘 결산</b> · ${t.label}`;
+    scopeLine = `🛒 오늘(00:00~24:00) 기준`;
+  }
+
   const rows = (await fetchOrders(sb, start, end)).filter((r) => !r.is_test_order);
 
   const active = rows.filter((r) => !isCanceledRow(r)); // 취소 제외
   const paid = active.filter(isPaidRow);
   const paidSum = paid.reduce((s, r) => s + rowAmount(r), 0);
+  const bankPaid = paid.filter((r) => String(r.payment_method || "") === "무통장입금");
+  const cardPaid = paid.filter((r) => String(r.payment_method || "") === "카드결제");
+  const bankPaidSum = bankPaid.reduce((s, r) => s + rowAmount(r), 0);
+  const cardPaidSum = cardPaid.reduce((s, r) => s + rowAmount(r), 0);
   const unpaidBank = active.filter((r) => !isPaidRow(r) && String(r.payment_method || "") === "무통장입금");
   const unpaidCard = active.filter((r) => !isPaidRow(r) && String(r.payment_method || "") === "카드결제");
   const unpaidBankSum = unpaidBank.reduce((s, r) => s + rowAmount(r), 0);
@@ -99,37 +169,43 @@ export async function buildTodayReport(): Promise<string> {
   let top: { name: string; sum: number } | null = null;
   for (const v of byCust.values()) if (!top || v.sum > top.sum) top = v;
 
-  // 미해결 고객이슈(교환·반품 등) — 나이 제한 없이 1일차부터 전부(open). 조회 실패해도 결산은 발송.
-  const ISSUE_LABEL: Record<string, string> = { exchange: "교환", return: "반품", refund: "환불", product: "구매", complaint: "진상", general: "기타" };
-  const DONE_STATUS = new Set(["done", "complete", "completed", "resolved", "closed", "완료", "해결"]);
+  // 미해결 고객이슈(교환·반품 등) — 날짜 제한 없이 "미해결"이면 전부. 어드민 고객이슈 패널과 동일 기준.
+  //   ※ admin_tasks 실제 컬럼만 select(예전 is_done/completed_at 은 없는 컬럼 → 쿼리 에러로 0건 나오던 버그 수정).
+  const ISSUE_LABEL: Record<string, string> = { exchange: "교환", return: "반품", refund: "환불", product: "구매", complaint: "진상", general: "기타", payment: "입금", shipping: "배송", address: "주소" };
+  const RESOLVED = ["resolved", "done", "complete", "completed", "closed", "해결", "완료"];
   let openIssues: { type: string; nick: string }[] = [];
   try {
     const { data: tasks } = await sb
       .from("admin_tasks")
-      .select("task_type,status,is_done,completed_at,resolved_at,customer_nickname,title,created_at")
+      .select("task_type,status,resolved_at,customer_nickname,title,body,customer_id,created_at")
       .order("created_at", { ascending: false })
       .limit(500);
     openIssues = ((Array.isArray(tasks) ? tasks : []) as Record<string, unknown>[])
       .filter((r) => {
         const st = String(r.status || "").toLowerCase();
         if (st === "deleted") return false;
-        if (r.is_done || r.completed_at || r.resolved_at) return false;
-        if (DONE_STATUS.has(st)) return false;
+        if (r.resolved_at) return false;
+        if (RESOLVED.some((k) => st.includes(k))) return false;
+        // 어드민 고객이슈 패널과 동일: 제목/내용/유형에 "고객이슈"·"issue" 포함 또는 customer_id 있는 것
+        const hay = [r.title, r.body, r.task_type].map((x) => String(x || "")).join(" ");
+        if (!(hay.includes("고객이슈") || hay.includes("issue") || Boolean(r.customer_id))) return false;
         return true;
       })
       .map((r) => ({
         type: ISSUE_LABEL[String(r.task_type || "")] || "이슈",
-        nick: String(r.customer_nickname || r.title || "").replace("[고객이슈]", "").trim().slice(0, 12),
+        nick: String(r.customer_nickname || r.title || "").replace("[고객이슈]", "").split("-")[0].trim().slice(0, 12),
       }));
   } catch {
     /* ignore */
   }
 
   const lines = [
-    `📊 <b>루루동이 오늘 결산</b> · ${label}`,
+    headline,
+    scopeLine,
     ``,
-    `🛒 오늘 주문: ${rows.length}건`,
-    `✅ 결제완료 매출: <b>${won(paidSum)}</b> (${paid.length}건) · 무통장+카드`,
+    `🛒 주문: ${rows.length}건`,
+    `✅ 결제완료 매출: <b>${won(paidSum)}</b> (${paid.length}건)`,
+    `   ┗ 무통장 ${won(bankPaidSum)} · 카드 ${won(cardPaidSum)}`,
     `💸 무통장 미입금: ${unpaidBank.length}건 (${won(unpaidBankSum)})`,
     `💳 카드 미결제: ${unpaidCard.length}건 (${won(unpaidCardSum)})`,
     `📌 미해결 고객이슈: ${openIssues.length}건${
