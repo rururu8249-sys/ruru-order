@@ -434,6 +434,44 @@ function CustomerDetailDrawer({
     setEditOpen(true);
   };
 
+  // 카카오(다음) 우편번호 검색 — LiveOrderDetailDrawer/order page와 동일 방식. 주소·우편번호를 채운다(상세주소는 직접 입력).
+  const loadDaumPostcodeScript = () =>
+    new Promise<void>((resolve, reject) => {
+      if (typeof window === "undefined") return reject();
+      if ((window as any).daum?.Postcode) return resolve();
+      const existing = document.querySelector<HTMLScriptElement>("script[data-daum-postcode='true']");
+      if (existing) {
+        existing.addEventListener("load", () => resolve());
+        existing.addEventListener("error", reject);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
+      script.async = true;
+      script.dataset.daumPostcode = "true";
+      script.onload = () => resolve();
+      script.onerror = reject;
+      document.body.appendChild(script);
+    });
+
+  const searchEditAddress = async () => {
+    try {
+      await loadDaumPostcodeScript();
+      if (!(window as any).daum?.Postcode) {
+        showAdminToast("주소검색을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", "warning");
+        return;
+      }
+      new (window as any).daum.Postcode({
+        oncomplete: (data: any) => {
+          setFAddr(data.roadAddress || data.jibunAddress || "");
+          setFZip(data.zonecode || "");
+        },
+      }).open();
+    } catch {
+      showAdminToast("주소검색을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", "warning");
+    }
+  };
+
   const saveEdit = async () => {
     const phoneDigits = String(customer.phone || "").replace(/[^0-9]/g, "");
     if (!phoneDigits) { showAdminToast("전화번호가 없어 수정할 수 없습니다.", "error"); return; }
@@ -564,13 +602,10 @@ function CustomerDetailDrawer({
           {/* 정보 수정 폼 (닉네임/이름/주소 교정 — 전화번호는 안전상 제외) */}
           {editOpen ? (
             <div style={{ marginBottom: "14px", border: "1px solid var(--color-rose-line)", borderRadius: "12px", background: "var(--color-surface-2)", padding: "12px 13px" }}>
-              <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "9px" }}>✎ 회원 정보 수정</div>
+              <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "9px" }}>✎ 회원 정보 수정 <span style={{ fontWeight: 700, color: "var(--color-ink-mute)" }}>(기본배송지 기준)</span></div>
               {([
                 { label: "닉네임(유튜브 핸들명)", val: fNick, set: setFNick, ph: "예: @rur8249" },
                 { label: "이름", val: fName, set: setFName, ph: "주문자 이름" },
-                { label: "우편번호", val: fZip, set: setFZip, ph: "예: 06236" },
-                { label: "주소", val: fAddr, set: setFAddr, ph: "도로명/지번 주소" },
-                { label: "상세주소", val: fDetail, set: setFDetail, ph: "동/호수 등" },
               ] as const).map((f) => (
                 <label key={f.label} style={{ display: "block", marginBottom: "8px" }}>
                   <span style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", marginBottom: "3px" }}>{f.label}</span>
@@ -578,8 +613,24 @@ function CustomerDetailDrawer({
                     style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "0 11px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none" }} />
                 </label>
               ))}
+
+              {/* 주소: 우편번호 검색으로 채움(읽기전용) + 상세주소 직접 입력 */}
+              <div style={{ marginBottom: "8px" }}>
+                <span style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", marginBottom: "3px" }}>주소 (기본배송지)</span>
+                <div style={{ display: "flex", gap: "6px", marginBottom: "6px" }}>
+                  <input value={fZip} readOnly placeholder="우편번호"
+                    style={{ width: "110px", height: "38px", borderRadius: "9px", border: "1px solid var(--color-line)", background: "var(--color-surface-2)", padding: "0 11px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none" }} />
+                  <button type="button" onClick={searchEditAddress}
+                    style={{ flex: 1, height: "38px", borderRadius: "9px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}>🔍 주소 검색</button>
+                </div>
+                <input value={fAddr} readOnly placeholder="주소 검색을 눌러 선택하세요"
+                  style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid var(--color-line)", background: "var(--color-surface-2)", padding: "0 11px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none", marginBottom: "6px" }} />
+                <input value={fDetail} onChange={(e) => setFDetail(e.target.value)} placeholder="상세주소 (동/호수 등 직접 입력)"
+                  style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "0 11px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none" }} />
+              </div>
+
               <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-warn-tx)", lineHeight: 1.6, margin: "4px 0 9px" }}>
-                ※ 닉네임/이름은 이 회원의 주문서 표시에도 반영됩니다.<br />※ 미입금 주문은 입금 자동매칭 기준(입금자명)도 새 닉네임으로 바뀝니다.<br />※ 전화번호는 안전을 위해 수정하지 않습니다.
+                ※ 닉네임/이름은 이 회원의 주문서 표시에도 반영됩니다.<br />※ 주소는 회원의 <b>기본배송지</b>를 바꿉니다(손님 화면·다음 주문에 반영, 기존 주문 송장은 유지).<br />※ 미입금 주문은 입금 자동매칭 기준(입금자명)도 새 닉네임으로 바뀝니다.<br />※ 전화번호는 안전을 위해 수정하지 않습니다.
               </div>
               <button type="button" onClick={saveEdit} disabled={editSaving}
                 style={{ width: "100%", height: "42px", borderRadius: "10px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "14px", fontWeight: 800, cursor: editSaving ? "not-allowed" : "pointer", opacity: editSaving ? 0.6 : 1 }}>
