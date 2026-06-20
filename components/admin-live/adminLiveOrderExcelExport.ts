@@ -102,16 +102,12 @@ function totalQty(order: LiveOrder) {
 function itemSummary(order: LiveOrder) {
   const items = order.items || [];
   if (!items.length) return clean(order.orderSummary) || "상품명없음 x1개";
-  return items.map(itemText).join(", ");
+  // 상품 전체 출력, 상품 사이는 #, 맨 끝에 총 개수.
+  return `${items.map(itemText).join(" # ")} (총 ${totalQty(order)}개)`;
 }
 
-function recipientName(order: LiveOrder) {
-  // 주소 뒤 "/실명" 에 쓰는 받는사람 실명(배송용). 받는사람 우선, 없으면 주문자명/닉네임 — 옛 주문 호환.
-  return clean((order as any).recipientName || order.name || order.nickname || "");
-}
-
-// 수하인명/닉네임 칼럼용: 유튜브 닉네임 우선(운영자가 방송 시청자와 매칭하는 기준). 없으면 받는사람/주문자명 fallback.
-//   ※ 받는사람 실명은 주소 뒤 "/실명"(recipientName)으로 남아 배송에는 지장 없음.
+// 수하인명/닉네임 칼럼 + 주소 뒤 "/닉네임" 에 쓰는 표시 이름: 유튜브 닉네임 우선(운영자가 방송 시청자와 매칭하는 기준).
+//   없으면 받는사람/주문자명 fallback(옛 주문 호환).
 function labelName(order: LiveOrder) {
   return clean(order.nickname || (order as any).recipientName || order.name || "");
 }
@@ -132,7 +128,7 @@ function baseAddress(order: LiveOrder) {
 
 function recipientAddress(order: LiveOrder) {
   const address = baseAddress(order);
-  const nickname = recipientName(order);
+  const nickname = labelName(order);
 
   if (!address) return nickname ? `/${nickname}` : "";
   if (!nickname) return address;
@@ -146,7 +142,7 @@ function splitAddress(order: LiveOrder) {
     detailAddress?: string | null;
   };
 
-  const nickname = recipientName(order);
+  const nickname = labelName(order);
   const address1 = clean(row.address);
   const detail = clean(row.detailAddress);
   const address2Base = detail || "";
