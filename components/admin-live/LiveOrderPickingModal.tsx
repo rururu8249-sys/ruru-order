@@ -92,7 +92,21 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   // 범위(결제완료만 토글 + 정렬) — 진행률/초기화 기준
   const scopedPanels = useMemo(() => {
     const arr = panels.filter((p) => (paidOnly ? p.paid : true));
-    if (sortMode === "nickname") arr.sort((a, b) => (a.name || a.nickname).localeCompare(b.name || b.nickname, "ko") || ts(a.when) - ts(b.when));
+    if (sortMode === "nickname") {
+      // 화면 큰 글씨(닉네임) 기준 정렬. 순서: 한글 → 영어 → 숫자 → 기타. 같은 그룹 안은 가나다/알파벳순.
+      const rank = (s: string) => {
+        const c = (s || "").trim().charAt(0);
+        if (/[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(c)) return 0;
+        if (/[a-zA-Z]/.test(c)) return 1;
+        if (/[0-9]/.test(c)) return 2;
+        return 3;
+      };
+      arr.sort((a, b) => {
+        const ra = rank(a.nickname), rb = rank(b.nickname);
+        if (ra !== rb) return ra - rb;
+        return a.nickname.localeCompare(b.nickname, "ko") || ts(a.when) - ts(b.when);
+      });
+    }
     else arr.sort((a, b) => ts(a.when) - ts(b.when));
     return arr;
   }, [panels, paidOnly, sortMode]);
