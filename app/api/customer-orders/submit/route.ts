@@ -244,9 +244,16 @@ export async function POST(request: NextRequest) {
     after(async () => {
       try {
         const rows = normalizedSubmit.orderRows;
-        const names = rows.map((r) => text(r?.product_name)).filter(Boolean);
+        // 상품명 + 옵션(색상/사이즈). "없음" 계열은 옵션에서 제외(어댑터 표기와 동일).
+        const labelOf = (r: AnyRow) => {
+          const name = text(r?.product_name);
+          const opts = [text(r?.color), text(r?.size)].filter((v) => v && v !== "없음").join("/");
+          return opts ? `${name}(${opts})` : name;
+        };
+        const labels = rows.filter((r) => text(r?.product_name)).map(labelOf);
+        // 2건까지는 전부 정확히 표시, 3건 이상이면 첫 상품 + "외 N건".
         const itemsSummary =
-          names.length === 0 ? "" : names.length === 1 ? names[0] : `${names[0]} 외 ${names.length - 1}건`;
+          labels.length === 0 ? "" : labels.length <= 2 ? labels.join(", ") : `${labels[0]} 외 ${labels.length - 1}건`;
         const amount = rows.reduce(
           (sum, r) => sum + toWon(r?.final_amount ?? r?.adjusted_total_price ?? r?.total_price),
           0,
