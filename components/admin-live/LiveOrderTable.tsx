@@ -1021,7 +1021,7 @@ export default function LiveOrderTable({
         </div>
       </div>
 
-      <div className="max-h-[1180px] min-h-0 overflow-auto rounded-xl border border-line">
+      <div className="h-[1180px] overflow-auto rounded-xl border border-line">
             {/* 헤더 행 */}
             <div className="grid grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 border-b border-rose-line bg-rose-soft/40 text-[12px] font-black text-ink-soft">
               <span className="flex items-center justify-center py-2.5">
