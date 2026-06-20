@@ -1262,6 +1262,13 @@ export default function AdminLiveDashboard() {
       await loadBroadcasts();
       await loadOrders();
       setBroadcastEndSummary(summary);
+
+      // 방송 종료 → 텔레그램 결산 자동 발송(곁다리·실패해도 종료엔 영향 없음). 토글/연결은 서버에서 판단.
+      void fetch("/api/admin-live/telegram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "send-report", auto: true }),
+      }).catch(() => {});
     } catch (error) {
       showAdminToast("방송종료 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
     } finally {

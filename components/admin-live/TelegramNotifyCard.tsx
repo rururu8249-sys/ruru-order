@@ -8,6 +8,7 @@ export default function TelegramNotifyCard() {
   const [botToken, setBotToken] = useState("");
   const [chatId, setChatId] = useState("");
   const [enabled, setEnabled] = useState(true);
+  const [reportOnEnd, setReportOnEnd] = useState(true);
   const [connected, setConnected] = useState(false);
   const [chatIdSet, setChatIdSet] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -22,6 +23,7 @@ export default function TelegramNotifyCard() {
         setConnected(!!j.connected);
         setEnabled(j.enabled !== false);
         setChatIdSet(!!j.chatIdSet);
+        setReportOnEnd(j.reportOnEnd !== false);
       }
     } catch {
       /* ignore */
@@ -35,7 +37,7 @@ export default function TelegramNotifyCard() {
     setSaving(true);
     setMsg("");
     try {
-      const body: Record<string, unknown> = { action: "save", enabled };
+      const body: Record<string, unknown> = { action: "save", enabled, reportOnEnd };
       if (botToken.trim()) body.botToken = botToken.trim();
       if (chatId.trim()) body.chatId = chatId.trim();
       const r = await fetch("/api/admin-live/telegram", {
@@ -154,6 +156,10 @@ export default function TelegramNotifyCard() {
       <label className="flex items-center gap-2 text-sm font-black text-ink">
         <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="h-4 w-4 accent-rose-deep" />
         알림 켜짐
+      </label>
+      <label className="flex items-center gap-2 text-sm font-black text-ink">
+        <input type="checkbox" checked={reportOnEnd} onChange={(e) => setReportOnEnd(e.target.checked)} className="h-4 w-4 accent-rose-deep" />
+        방송 종료하면 결산 자동 발송
       </label>
 
       <div className="flex flex-wrap items-center gap-2">

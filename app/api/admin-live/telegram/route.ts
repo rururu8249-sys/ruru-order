@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
-import { detectChatIdFromUpdates, getTelegramStatus, saveTelegramConfig, sendTelegram } from "@/lib/telegram";
+import {
+  detectChatIdFromUpdates,
+  getTelegramStatus,
+  readReportOnEnd,
+  saveTelegramConfig,
+  sendTelegram,
+  writeReportOnEnd,
+} from "@/lib/telegram";
 import { buildTodayReport } from "@/lib/telegramReport";
 
 export const runtime = "nodejs";
@@ -11,7 +18,8 @@ export async function GET(request: NextRequest) {
   if (!session) return NextResponse.json({ ok: false, error: "관리자 로그인이 필요합니다." }, { status: 401 });
   try {
     const status = await getTelegramStatus();
-    return NextResponse.json({ ok: true, ...status });
+    const reportOnEnd = await readReportOnEnd();
+    return NextResponse.json({ ok: true, ...status, reportOnEnd });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
   }
@@ -31,6 +39,7 @@ export async function POST(request: NextRequest) {
         chatId: typeof (body as any)?.chatId === "string" ? (body as any).chatId : undefined,
         enabled: typeof (body as any)?.enabled === "boolean" ? (body as any).enabled : undefined,
       });
+      if (typeof (body as any)?.reportOnEnd === "boolean") await writeReportOnEnd((body as any).reportOnEnd);
       return NextResponse.json({ ok: true });
     }
     if (action === "detect-chat") {
@@ -38,8 +47,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(r);
     }
     if (action === "send-report") {
+      // 방송 종료 자동발송(auto)일 때는 토글 꺼져 있으면 스킵. 수동 버튼은 항상 보냄.
+      const auto = (body as any)?.auto === true;
+      if (auto && !(await readReportOnEnd())) {
+        return NextResponse.json({ ok: false, skipped: true, reason: "방송 종료 자동발송 꺼짐" });
+      }
       const text = await buildTodayReport();
-      const r = await sendTelegram(text, { forceEvenIfDisabled: true });
+      const r = await sendTelegram(text, { forceEvenIfDisabled: !auto });
       return NextResponse.json({ ok: r.ok, skipped: r.skipped, reason: r.reason, preview: text });
     }
     if (action === "test") {

@@ -26,6 +26,11 @@ function isPaidRow(r: Record<string, unknown>): boolean {
 function rowAmount(r: Record<string, unknown>): number {
   return num(r.final_amount ?? r.adjusted_total_price ?? r.total_price);
 }
+function isCanceledRow(r: Record<string, unknown>): boolean {
+  const a = String(r.admin_order_status_v2 || "");
+  const b = String(r.order_manage_status || "");
+  return a.includes("취소") || b.includes("취소");
+}
 const won = (n: number) => `${Math.round(n).toLocaleString("ko-KR")}원`;
 
 // KST 오늘 0시~24시 범위(UTC ISO)
@@ -72,9 +77,13 @@ export async function buildTodayReport(): Promise<string> {
   const { start, end, label } = todayKstRange();
   const rows = (await fetchOrders(sb, start, end)).filter((r) => !r.is_test_order);
 
-  const paid = rows.filter(isPaidRow);
+  const active = rows.filter((r) => !isCanceledRow(r)); // 취소 제외
+  const paid = active.filter(isPaidRow);
   const paidSum = paid.reduce((s, r) => s + rowAmount(r), 0);
-  const unpaidBank = rows.filter((r) => !isPaidRow(r) && String(r.payment_method || "") === "무통장입금");
+  const unpaidBank = active.filter((r) => !isPaidRow(r) && String(r.payment_method || "") === "무통장입금");
+  const unpaidCard = active.filter((r) => !isPaidRow(r) && String(r.payment_method || "") === "카드결제");
+  const unpaidBankSum = unpaidBank.reduce((s, r) => s + rowAmount(r), 0);
+  const unpaidCardSum = unpaidCard.reduce((s, r) => s + rowAmount(r), 0);
 
   // 오늘의 큰손(결제완료 기준, 전화번호로 합산)
   const byCust = new Map<string, { name: string; sum: number }>();
@@ -94,8 +103,9 @@ export async function buildTodayReport(): Promise<string> {
     `📊 <b>루루동이 오늘 결산</b> · ${label}`,
     ``,
     `🛒 오늘 주문: ${rows.length}건`,
-    `✅ 결제완료 매출: <b>${won(paidSum)}</b> (${paid.length}건)`,
-    `💸 무통장 미입금: ${unpaidBank.length}건`,
+    `✅ 결제완료 매출: <b>${won(paidSum)}</b> (${paid.length}건) · 무통장+카드`,
+    `💸 무통장 미입금: ${unpaidBank.length}건 (${won(unpaidBankSum)})`,
+    `💳 카드 미결제: ${unpaidCard.length}건 (${won(unpaidCardSum)})`,
   ];
   if (top && top.sum > 0) lines.push(`👑 오늘의 큰손: ${top.name} (${won(top.sum)})`);
   lines.push(``, `자세한 건 관리자 화면에서 확인하세요.`);

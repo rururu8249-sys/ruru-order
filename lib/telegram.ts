@@ -46,6 +46,25 @@ export async function saveTelegramConfig(input: {
   }
 }
 
+// "방송 종료 시 결산 자동 발송" 토글 — settings 테이블(키/값). 비밀 아님이라 여기 둠. 기본 켜짐.
+const SETTING_REPORT_ON_END = "telegram_report_on_end";
+export async function readReportOnEnd(): Promise<boolean> {
+  const sb = getServiceClient();
+  const { data } = await sb.from("settings").select("value").eq("key", SETTING_REPORT_ON_END).maybeSingle();
+  if (!data) return true;
+  return String((data as any).value ?? "").trim() !== "false";
+}
+export async function writeReportOnEnd(on: boolean): Promise<void> {
+  const sb = getServiceClient();
+  const value = on ? "true" : "false";
+  const { data: existing } = await sb.from("settings").select("key").eq("key", SETTING_REPORT_ON_END).limit(1);
+  if (Array.isArray(existing) && existing.length > 0) {
+    await sb.from("settings").update({ value }).eq("key", SETTING_REPORT_ON_END);
+  } else {
+    await sb.from("settings").insert({ key: SETTING_REPORT_ON_END, value });
+  }
+}
+
 export async function getTelegramStatus(): Promise<{ connected: boolean; enabled: boolean; chatIdSet: boolean }> {
   const cfg = await readTelegramConfig();
   return { connected: !!cfg.botToken && !!cfg.chatId, enabled: cfg.enabled, chatIdSet: !!cfg.chatId };
