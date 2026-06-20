@@ -10,6 +10,8 @@ import { useBulkPointGrant, type BulkGrantResult } from "./useBulkPointGrant";
 // 일괄지급 사유 프리셋(고객에게 보이는 문구). "직접입력" 선택 시 직접 작성.
 const BULK_POINT_REASON_PRESETS = ["방송 이벤트 당첨", "단골 감사", "리뷰 감사", "오지급 보정", "직접입력"];
 import { supabase } from "@/lib/supabase";
+import { showAdminToast } from "@/lib/adminToast";
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import type { LiveOrder } from "./types";
 import AdminLiveCustomerIssueRail from "./AdminLiveCustomerIssueRail";
 import AdminLivePhoneBlockPanel from "./AdminLivePhoneBlockPanel";
@@ -397,6 +399,7 @@ function CustomerDetailDrawer({
   onClose,
   onBlockAction,
   blockSaving,
+  onSaved,
 }: {
   customer: CustomerSummary | null;
   profile?: CustomerProfile | null;
@@ -405,10 +408,84 @@ function CustomerDetailDrawer({
   onClose: () => void;
   onBlockAction: (customer: CustomerSummary) => void | Promise<void>;
   blockSaving: boolean;
+  onSaved?: (patch: Partial<CustomerProfile>) => void;
 }) {
   const [avatarZoom, setAvatarZoom] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [fNick, setFNick] = useState("");
+  const [fName, setFName] = useState("");
+  const [fZip, setFZip] = useState("");
+  const [fAddr, setFAddr] = useState("");
+  const [fDetail, setFDetail] = useState("");
 
   if (!customer) return null;
+
+  const defaultShipping = Array.isArray(profile?.shipping_addresses)
+    ? (profile!.shipping_addresses.find((a: any) => a?.isDefault) ?? profile!.shipping_addresses[0] ?? null)
+    : null;
+
+  const openEdit = () => {
+    setFNick(clean(profile?.youtube_nickname) || (customer.nickname === "닉네임 미입력" ? "" : customer.nickname));
+    setFName(clean(profile?.customer_name) || (customer.name === "이름 없음" ? "" : customer.name));
+    setFZip(clean((defaultShipping as any)?.zipcode) || clean(profile?.zipcode));
+    setFAddr(clean((defaultShipping as any)?.address) || clean(profile?.address));
+    setFDetail(clean((defaultShipping as any)?.detailAddress) || clean(profile?.detail_address));
+    setEditOpen(true);
+  };
+
+  const saveEdit = async () => {
+    const phoneDigits = String(customer.phone || "").replace(/[^0-9]/g, "");
+    if (!phoneDigits) { showAdminToast("전화번호가 없어 수정할 수 없습니다.", "error"); return; }
+    if (!clean(fNick)) { showAdminToast("닉네임은 비울 수 없습니다(식별이 안 됩니다).", "warning"); return; }
+    const ok = await showAdminConfirm(
+      [
+        "이 회원의 정보를 수정할까요?",
+        "",
+        `닉네임: ${clean(fNick)}`,
+        `이름: ${clean(fName)}`,
+        `주소: ${[clean(fZip) ? `(${clean(fZip)})` : "", clean(fAddr), clean(fDetail)].filter(Boolean).join(" ") || "(변경 없음)"}`,
+        "",
+        "※ 닉네임/이름은 이 회원의 주문서 표시에도 반영됩니다.",
+        "※ 미입금 주문은 입금 자동매칭 기준(입금자명)도 새 닉네임으로 바뀝니다.",
+        "※ 전화번호는 안전을 위해 여기서 바꾸지 않습니다.",
+      ].join("\n")
+    );
+    if (!ok) return;
+    setEditSaving(true);
+    try {
+      const res = await fetch("/api/admin-live/customer-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: phoneDigits,
+          youtube_nickname: clean(fNick),
+          customer_name: clean(fName),
+          zipcode: clean(fZip),
+          address: clean(fAddr),
+          detail_address: clean(fDetail),
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!j?.ok) throw new Error(j?.message || "수정 실패");
+      showAdminToast(`회원 정보를 수정했습니다.${j.ordersUpdated ? ` (주문서 ${j.ordersUpdated}건 반영)` : ""} 다시 열면 새 값으로 보여요.`, "success");
+      setEditOpen(false);
+      onSaved?.({
+        youtube_nickname: clean(fNick),
+        customer_name: clean(fName),
+        zipcode: clean(fZip),
+        address: clean(fAddr),
+        detail_address: clean(fDetail),
+      });
+      // 드로어의 customer(CustomerSummary)는 별도 state라 즉시 갱신이 어려움 → 저장 후 닫아 stale 표시 방지.
+      //   목록은 onSaved의 reloadTick으로 새로고침되고, 다시 열면 새 값으로 보인다.
+      onClose();
+    } catch (e) {
+      showAdminToast("수정 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally {
+      setEditSaving(false);
+    }
+  };
 
   const totalPages = Math.max(1, Math.ceil(customer.orders.length / DETAIL_ORDER_PAGE_SIZE));
   const safePage = Math.min(Math.max(1, page), totalPages);
@@ -448,7 +525,8 @@ function CustomerDetailDrawer({
         {/* 헤더 */}
         <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid var(--color-line)", padding: "14px 18px" }}>
           <span style={{ fontSize: "15px", fontWeight: 800, color: "var(--color-ink)" }}>👤 회원 상세</span>
-          <button type="button" onClick={onClose} style={{ marginLeft: "auto", width: "27px", height: "27px", border: "none", background: "none", color: "var(--color-ink-mute)", fontSize: "18px", cursor: "pointer" }}>✕</button>
+          <button type="button" onClick={editOpen ? () => setEditOpen(false) : openEdit} style={{ marginLeft: "auto", marginRight: "8px", height: "30px", padding: "0 12px", borderRadius: "9px", border: "1px solid var(--color-rose-line)", background: editOpen ? "var(--color-surface-2)" : "var(--color-rose-deep)", color: editOpen ? "var(--color-ink-soft)" : "#fff", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}>{editOpen ? "취소" : "✎ 정보 수정"}</button>
+          <button type="button" onClick={onClose} style={{ width: "27px", height: "27px", border: "none", background: "none", color: "var(--color-ink-mute)", fontSize: "18px", cursor: "pointer" }}>✕</button>
         </div>
 
         <div style={{ padding: "16px 18px 18px" }}>
@@ -482,6 +560,33 @@ function CustomerDetailDrawer({
               </div>
             </div>
           </div>
+
+          {/* 정보 수정 폼 (닉네임/이름/주소 교정 — 전화번호는 안전상 제외) */}
+          {editOpen ? (
+            <div style={{ marginBottom: "14px", border: "1px solid var(--color-rose-line)", borderRadius: "12px", background: "var(--color-surface-2)", padding: "12px 13px" }}>
+              <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "9px" }}>✎ 회원 정보 수정</div>
+              {([
+                { label: "닉네임(유튜브 핸들명)", val: fNick, set: setFNick, ph: "예: @rur8249" },
+                { label: "이름", val: fName, set: setFName, ph: "주문자 이름" },
+                { label: "우편번호", val: fZip, set: setFZip, ph: "예: 06236" },
+                { label: "주소", val: fAddr, set: setFAddr, ph: "도로명/지번 주소" },
+                { label: "상세주소", val: fDetail, set: setFDetail, ph: "동/호수 등" },
+              ] as const).map((f) => (
+                <label key={f.label} style={{ display: "block", marginBottom: "8px" }}>
+                  <span style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", marginBottom: "3px" }}>{f.label}</span>
+                  <input value={f.val} onChange={(e) => f.set(e.target.value)} placeholder={f.ph}
+                    style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "0 11px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none" }} />
+                </label>
+              ))}
+              <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-warn-tx)", lineHeight: 1.6, margin: "4px 0 9px" }}>
+                ※ 닉네임/이름은 이 회원의 주문서 표시에도 반영됩니다.<br />※ 미입금 주문은 입금 자동매칭 기준(입금자명)도 새 닉네임으로 바뀝니다.<br />※ 전화번호는 안전을 위해 수정하지 않습니다.
+              </div>
+              <button type="button" onClick={saveEdit} disabled={editSaving}
+                style={{ width: "100%", height: "42px", borderRadius: "10px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "14px", fontWeight: 800, cursor: editSaving ? "not-allowed" : "pointer", opacity: editSaving ? 0.6 : 1 }}>
+                {editSaving ? "저장 중…" : "저장 (customers + 주문서 반영)"}
+              </button>
+            </div>
+          ) : null}
 
           {/* 등록 배송지 (고객이 등록한 customers.shipping_addresses 배열 — 읽기 전용) */}
           {Array.isArray(profile?.shipping_addresses) && profile.shipping_addresses.length > 0 ? (
@@ -634,6 +739,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
   const [buyersOnly, setBuyersOnly] = useState(false);
   // 일괄 포인트지급 — 선택(전화번호 숫자 기준) + 모달
   const [selectedPhones, setSelectedPhones] = useState<Set<string>>(new Set());
+  const [reloadTick, setReloadTick] = useState(0); // 회원정보 수정 후 목록 재조회 트리거
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkAmount, setBulkAmount] = useState("");
   const [bulkReasonPreset, setBulkReasonPreset] = useState(BULK_POINT_REASON_PRESETS[0]);
@@ -707,7 +813,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [reloadTick]);
 
   const customers = useMemo<CustomerSummary[]>(() => {
     const map = new Map<string, CustomerSummary>();
@@ -1667,6 +1773,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
         onClose={() => { setSelectedCustomer(null); setSelectedProfile(null); }}
         onBlockAction={handleCustomerBlockButton}
         blockSaving={blockSaving}
+        onSaved={(patch) => { setReloadTick((t) => t + 1); setSelectedProfile((p) => (p ? { ...p, ...patch } : p)); }}
       />
 
       <AdminLiveCustomerBlockReasonModal
