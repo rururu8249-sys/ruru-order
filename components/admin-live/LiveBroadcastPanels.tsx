@@ -3,7 +3,7 @@
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { CustomerRow } from "@/lib/admin-v2/types";
 import { resolveProductImageUrl } from "./quick-product/productImageUrl";
@@ -512,7 +512,27 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
   }, []);
 
   const videoId = useMemo(() => extractYoutubeVideoId(youtubeUrl), [youtubeUrl]);
-  const videoEmbedUrl = videoId ? `https://www.youtube.com/embed/${videoId}?playsinline=1&rel=0` : "";
+  const videoEmbedUrl = videoId ? `https://www.youtube.com/embed/${videoId}?playsinline=1&rel=0&enablejsapi=1` : "";
+  // 영상 음소거/볼륨 — 유튜브 자체 컨트롤이 cover로 잘려 안 보이므로 별도 제어(IFrame API postMessage)
+  const videoIframeRef = useRef<HTMLIFrameElement>(null);
+  const [videoMuted, setVideoMuted] = useState(true);
+  const [videoVolume, setVideoVolume] = useState(100);
+  const ytCmd = (func: string, args: (number | string)[] = []) =>
+    videoIframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args }), "*");
+  const toggleVideoMute = () => {
+    setVideoMuted((m) => {
+      const next = !m;
+      ytCmd(next ? "mute" : "unMute");
+      if (!next) ytCmd("setVolume", [videoVolume]);
+      return next;
+    });
+  };
+  const changeVideoVolume = (v: number) => {
+    setVideoVolume(v);
+    ytCmd("setVolume", [v]);
+    if (v > 0 && videoMuted) { setVideoMuted(false); ytCmd("unMute"); }
+    if (v === 0 && !videoMuted) { setVideoMuted(true); ytCmd("mute"); }
+  };
   const chatEmbedUrl = videoId && embedDomain ? `https://www.youtube.com/live_chat?v=${videoId}&embed_domain=${embedDomain}` : "";
 
   const filteredTasks = useMemo(() => {
@@ -836,14 +856,38 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
               <span className="rounded-md bg-surface-2 px-2 py-0.5 text-[11px] font-black text-ink-soft" title="좋아요 수">👍 {liveStats.likeCount.toLocaleString("ko-KR")}</span>
             ) : null}
           </div>
-          <div className="text-xs font-black text-ink-mute">
-            {videoRatio === "vertical" ? "9:16 세로" : videoRatio === "wide" ? "16:9 가로" : "자동"}
+          <div className="flex items-center gap-1.5">
+            {videoEmbedUrl ? (
+              <>
+                <button
+                  type="button"
+                  onClick={toggleVideoMute}
+                  title={videoMuted ? "소리 켜기" : "음소거"}
+                  className="rounded-md bg-surface-2 px-1.5 py-0.5 text-[13px] leading-none hover:bg-surface-3"
+                >
+                  {videoMuted ? "🔇" : "🔊"}
+                </button>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={videoVolume}
+                  onChange={(e) => changeVideoVolume(Number(e.target.value))}
+                  title={`볼륨 ${videoVolume}%`}
+                  className="h-1 w-16 cursor-pointer accent-rose-deep"
+                />
+              </>
+            ) : null}
+            <span className="text-xs font-black text-ink-mute">
+              {videoRatio === "vertical" ? "9:16 세로" : videoRatio === "wide" ? "16:9 가로" : "자동"}
+            </span>
           </div>
         </div>
 
         <div className="relative flex-1 min-h-0 w-full overflow-hidden rounded-2xl border border-line bg-slate-950">
           {videoEmbedUrl ? (
             <iframe
+              ref={videoIframeRef}
               title="YouTube live video"
               src={videoEmbedUrl}
               className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[128%] w-auto max-w-none aspect-[9/16]"
