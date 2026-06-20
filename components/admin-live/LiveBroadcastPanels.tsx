@@ -878,9 +878,6 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
                 />
               </>
             ) : null}
-            <span className="text-xs font-black text-ink-mute">
-              {videoRatio === "vertical" ? "9:16 세로" : videoRatio === "wide" ? "16:9 가로" : "자동"}
-            </span>
           </div>
         </div>
 
