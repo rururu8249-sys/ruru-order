@@ -51,6 +51,61 @@ export async function getTelegramStatus(): Promise<{ connected: boolean; enabled
   return { connected: !!cfg.botToken && !!cfg.chatId, enabled: cfg.enabled, chatIdSet: !!cfg.chatId };
 }
 
+// 봇에 /start(또는 아무 메시지) 보낸 기록(getUpdates)에서 실제 chat id를 읽어와 저장한다.
+//   → 수동으로 chat id 넣다가 틀리는 걸 없앰("chat not found" 방지). 추정 아님 — 텔레그램 실제 응답 기준.
+export async function detectChatIdFromUpdates(): Promise<{
+  ok: boolean;
+  chatId?: string;
+  name?: string;
+  candidates?: { id: string; name: string }[];
+  reason?: string;
+}> {
+  let cfg: TelegramConfig;
+  try {
+    cfg = await readTelegramConfig();
+  } catch (e: any) {
+    return { ok: false, reason: String(e?.message || e) };
+  }
+  if (!cfg.botToken) return { ok: false, reason: "봇 토큰을 먼저 저장하세요." };
+
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${cfg.botToken}/getUpdates`);
+    const j: any = await res.json().catch(() => ({}));
+    if (!res.ok || !j?.ok) {
+      const d = String(j?.description || `HTTP ${res.status}`);
+      // 웹훅이 걸려 있으면 getUpdates가 막힘 — 안내
+      return { ok: false, reason: d.includes("webhook") ? "봇에 웹훅이 설정돼 있어 자동탐지가 막혔어요(보통 없음)." : d };
+    }
+    const updates: any[] = Array.isArray(j.result) ? j.result : [];
+    const chats = new Map<string, string>();
+    for (const u of updates) {
+      const chat = u?.message?.chat || u?.edited_message?.chat || u?.my_chat_member?.chat || u?.channel_post?.chat;
+      if (chat && chat.id != null) {
+        const name =
+          [chat.first_name, chat.last_name].filter(Boolean).join(" ") ||
+          chat.username ||
+          chat.title ||
+          "";
+        chats.set(String(chat.id), name);
+      }
+    }
+    if (chats.size === 0) {
+      return { ok: false, reason: "봇에게 받은 메시지가 없어요. 그 봇 채팅을 열고 /start(또는 아무 메시지)를 먼저 보낸 뒤 다시 누르세요." };
+    }
+    const entries = [...chats.entries()];
+    const [lastId, lastName] = entries[entries.length - 1]; // 가장 최근에 말 건 사람
+    await saveTelegramConfig({ chatId: lastId });
+    return {
+      ok: true,
+      chatId: lastId,
+      name: lastName,
+      candidates: entries.map(([id, name]) => ({ id, name })),
+    };
+  } catch (e: any) {
+    return { ok: false, reason: String(e?.message || e) };
+  }
+}
+
 // 메시지 발송. 실패해도 throw 하지 않음({ok:false}). 설정 없거나 꺼져있으면 skip.
 export async function sendTelegram(
   text: string,

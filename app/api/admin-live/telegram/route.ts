@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
-import { getTelegramStatus, saveTelegramConfig, sendTelegram } from "@/lib/telegram";
+import { detectChatIdFromUpdates, getTelegramStatus, saveTelegramConfig, sendTelegram } from "@/lib/telegram";
 
 export const runtime = "nodejs";
 
@@ -31,6 +31,10 @@ export async function POST(request: NextRequest) {
         enabled: typeof (body as any)?.enabled === "boolean" ? (body as any).enabled : undefined,
       });
       return NextResponse.json({ ok: true });
+    }
+    if (action === "detect-chat") {
+      const r = await detectChatIdFromUpdates();
+      return NextResponse.json(r);
     }
     if (action === "test") {
       const msg = String((body as any)?.message || "").trim() || "🔔 루루동이 텔레그램 알림 테스트입니다. 잘 도착했어요!";

@@ -57,6 +57,30 @@ export default function TelegramNotifyCard() {
     }
   };
 
+  const [detecting, setDetecting] = useState(false);
+  const detectChat = async () => {
+    setDetecting(true);
+    setMsg("");
+    try {
+      const r = await fetch("/api/admin-live/telegram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "detect-chat" }),
+      });
+      const j = await r.json();
+      if (j.ok) {
+        setMsg(`✅ chat id 자동으로 찾아서 저장했어요: ${j.chatId}${j.name ? ` (${j.name})` : ""}. 이제 🔔 테스트 보내기를 눌러보세요.`);
+        loadStatus();
+      } else {
+        setMsg(`❌ ${j.reason || j.error || "자동 찾기 실패"}`);
+      }
+    } catch (e: any) {
+      setMsg("실패: " + (e?.message || e));
+    } finally {
+      setDetecting(false);
+    }
+  };
+
   const sendTest = async () => {
     setTesting(true);
     setMsg("");
@@ -117,9 +141,15 @@ export default function TelegramNotifyCard() {
         <button type="button" onClick={save} disabled={saving} className="h-10 rounded-xl bg-rose-deep px-4 text-sm font-black text-white disabled:opacity-50">
           {saving ? "저장 중…" : "저장"}
         </button>
+        <button type="button" onClick={detectChat} disabled={detecting} className="h-10 rounded-xl border border-line bg-surface-2 px-4 text-sm font-black text-ink-soft transition hover:bg-surface-3 disabled:opacity-50">
+          {detecting ? "찾는 중…" : "🔍 내 chat id 자동 찾기"}
+        </button>
         <button type="button" onClick={sendTest} disabled={testing} className="h-10 rounded-xl border border-line bg-surface-2 px-4 text-sm font-black text-ink-soft transition hover:bg-surface-3 disabled:opacity-50">
           {testing ? "보내는 중…" : "🔔 테스트 보내기"}
         </button>
+      </div>
+      <div className="rounded-xl border border-line bg-info-bg px-3 py-2 text-[11px] font-bold leading-5 text-info-tx">
+        💡 "chat not found"가 뜨면: 그 봇 채팅에서 <b>/start</b> 한 번 누른 뒤 → 위 <b>🔍 내 chat id 자동 찾기</b>를 누르세요. chat id를 직접 안 넣어도 자동으로 맞는 값이 채워집니다.
       </div>
       {msg ? <div className="text-xs font-bold text-ink-soft">{msg}</div> : null}
 
