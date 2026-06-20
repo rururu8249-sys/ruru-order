@@ -12,6 +12,19 @@ function getServiceClient(): SupabaseClient {
 
 export type TelegramConfig = { botToken: string; chatId: string; enabled: boolean };
 
+// chat_id 칸에 여러 명을 쉼표/줄바꿈/공백으로 넣을 수 있음 → 같은 메시지를 모두에게 발송.
+//   같이 운영하는 다른 관리자도 그 봇에 /start 하고, 그 사람 chat id 를 여기 추가하면 동일 알림 수신.
+export function parseChatIds(raw: string): string[] {
+  return Array.from(
+    new Set(
+      String(raw || "")
+        .split(/[\s,;]+/)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
 export async function readTelegramConfig(): Promise<TelegramConfig> {
   const sb = getServiceClient();
   const { data } = await sb
@@ -65,9 +78,10 @@ export async function writeReportOnEnd(on: boolean): Promise<void> {
   }
 }
 
-export async function getTelegramStatus(): Promise<{ connected: boolean; enabled: boolean; chatIdSet: boolean }> {
+export async function getTelegramStatus(): Promise<{ connected: boolean; enabled: boolean; chatIdSet: boolean; recipientCount: number }> {
   const cfg = await readTelegramConfig();
-  return { connected: !!cfg.botToken && !!cfg.chatId, enabled: cfg.enabled, chatIdSet: !!cfg.chatId };
+  const ids = parseChatIds(cfg.chatId);
+  return { connected: !!cfg.botToken && ids.length > 0, enabled: cfg.enabled, chatIdSet: ids.length > 0, recipientCount: ids.length };
 }
 
 // 봇에 /start(또는 아무 메시지) 보낸 기록(getUpdates)에서 실제 chat id를 읽어와 저장한다.
@@ -113,7 +127,9 @@ export async function detectChatIdFromUpdates(): Promise<{
     }
     const entries = [...chats.entries()];
     const [lastId, lastName] = entries[entries.length - 1]; // 가장 최근에 말 건 사람
-    await saveTelegramConfig({ chatId: lastId });
+    // 기존 수신자에 "덧붙이기"(덮어쓰기 X) — 여러 관리자가 각자 /start 후 추가되도록.
+    const merged = Array.from(new Set([...parseChatIds(cfg.chatId), lastId]));
+    await saveTelegramConfig({ chatId: merged.join(",") });
     return {
       ok: true,
       chatId: lastId,
@@ -136,24 +152,32 @@ export async function sendTelegram(
   } catch (e: any) {
     return { ok: false, reason: String(e?.message || e) };
   }
-  if (!cfg.botToken || !cfg.chatId) return { ok: false, skipped: true, reason: "봇 토큰/chat id 미설정" };
+  const ids = parseChatIds(cfg.chatId);
+  if (!cfg.botToken || ids.length === 0) return { ok: false, skipped: true, reason: "봇 토큰/chat id 미설정" };
   if (!cfg.enabled && !opts?.forceEvenIfDisabled) return { ok: false, skipped: true, reason: "알림 꺼짐" };
 
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${cfg.botToken}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: cfg.chatId,
-        text,
-        parse_mode: "HTML",
-        disable_web_page_preview: true,
-      }),
-    });
-    const j = await res.json().catch(() => ({}));
-    if (!res.ok || !(j as any)?.ok) return { ok: false, reason: (j as any)?.description || `HTTP ${res.status}` };
-    return { ok: true };
-  } catch (e: any) {
-    return { ok: false, reason: String(e?.message || e) };
+  // 등록된 모든 관리자(chat id)에게 같은 메시지 발송. 한 명이라도 성공하면 ok.
+  let anyOk = false;
+  const errs: string[] = [];
+  for (const id of ids) {
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${cfg.botToken}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: id,
+          text,
+          parse_mode: "HTML",
+          disable_web_page_preview: true,
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (res.ok && (j as any)?.ok) anyOk = true;
+      else errs.push(`${id}: ${(j as any)?.description || `HTTP ${res.status}`}`);
+    } catch (e: any) {
+      errs.push(`${id}: ${String(e?.message || e)}`);
+    }
   }
+  if (anyOk) return { ok: true, reason: errs.length ? `일부 실패: ${errs.join("; ")}` : undefined };
+  return { ok: false, reason: errs.join("; ") || "발송 실패" };
 }

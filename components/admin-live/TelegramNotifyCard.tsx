@@ -11,6 +11,7 @@ export default function TelegramNotifyCard() {
   const [reportOnEnd, setReportOnEnd] = useState(true);
   const [connected, setConnected] = useState(false);
   const [chatIdSet, setChatIdSet] = useState(false);
+  const [recipientCount, setRecipientCount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [msg, setMsg] = useState("");
@@ -23,6 +24,7 @@ export default function TelegramNotifyCard() {
         setConnected(!!j.connected);
         setEnabled(j.enabled !== false);
         setChatIdSet(!!j.chatIdSet);
+        setRecipientCount(Number(j.recipientCount || 0));
         setReportOnEnd(j.reportOnEnd !== false);
       }
     } catch {
@@ -71,7 +73,7 @@ export default function TelegramNotifyCard() {
       });
       const j = await r.json();
       if (j.ok) {
-        setMsg(`✅ chat id 자동으로 찾아서 저장했어요: ${j.chatId}${j.name ? ` (${j.name})` : ""}. 이제 🔔 테스트 보내기를 눌러보세요.`);
+        setMsg(`✅ chat id를 수신자 목록에 추가했어요: ${j.chatId}${j.name ? ` (${j.name})` : ""}. 이제 🔔 테스트 보내기를 눌러보세요.`);
         loadStatus();
       } else {
         setMsg(`❌ ${j.reason || j.error || "자동 찾기 실패"}`);
@@ -130,7 +132,7 @@ export default function TelegramNotifyCard() {
       </div>
 
       <div className={`rounded-xl border border-line px-3 py-2 text-xs font-black ${connected ? "bg-ok-bg text-ok-tx" : "bg-warn-bg text-warn-tx"}`}>
-        {connected ? "✅ 연결됨" : "⚠️ 아직 설정 안 됨 — 봇 토큰·chat id를 넣어주세요"}
+        {connected ? `✅ 연결됨 · 수신자 ${recipientCount}명` : "⚠️ 아직 설정 안 됨 — 봇 토큰·chat id를 넣어주세요"}
       </div>
 
       <label className="block">
@@ -144,13 +146,14 @@ export default function TelegramNotifyCard() {
         />
       </label>
       <label className="block">
-        <span className="text-xs font-black text-ink-soft">chat id (@userinfobot에서 받은 숫자)</span>
+        <span className="text-xs font-black text-ink-soft">chat id — 여러 명이면 쉼표로 (예: 111111111, 222222222)</span>
         <input
           value={chatId}
           onChange={(e) => setChatId(e.target.value)}
-          placeholder={chatIdSet ? "저장됨 — 바꿀 때만 입력" : "예: 123456789"}
+          placeholder={chatIdSet ? `저장됨(${recipientCount}명) — 바꿀 때만 입력` : "예: 123456789"}
           className="mt-1 h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-deep"
         />
+        <span className="mt-1 block text-[11px] font-bold text-ink-mute">같이 운영하는 관리자도 그 봇에 /start 하고, 그 사람 chat id를 쉼표로 추가하면 같은 알림을 받습니다.</span>
       </label>
 
       <label className="flex items-center gap-2 text-sm font-black text-ink">
@@ -167,7 +170,7 @@ export default function TelegramNotifyCard() {
           {saving ? "저장 중…" : "저장"}
         </button>
         <button type="button" onClick={detectChat} disabled={detecting} className="h-10 rounded-xl border border-line bg-surface-2 px-4 text-sm font-black text-ink-soft transition hover:bg-surface-3 disabled:opacity-50">
-          {detecting ? "찾는 중…" : "🔍 내 chat id 자동 찾기"}
+          {detecting ? "찾는 중…" : "🔍 chat id 자동 추가"}
         </button>
         <button type="button" onClick={sendTest} disabled={testing} className="h-10 rounded-xl border border-line bg-surface-2 px-4 text-sm font-black text-ink-soft transition hover:bg-surface-3 disabled:opacity-50">
           {testing ? "보내는 중…" : "🔔 테스트 보내기"}
