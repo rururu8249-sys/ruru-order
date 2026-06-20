@@ -922,7 +922,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
                   type="button"
                   onClick={() => { const u = nowProdImageOf(liveProduct); if (u) setLightbox(u); }}
                   title="사진 크게 보기"
-                  className="h-14 w-14 shrink-0 cursor-zoom-in overflow-hidden rounded-lg border border-line bg-surface-2"
+                  className="h-20 w-20 shrink-0 cursor-zoom-in overflow-hidden rounded-lg border border-line bg-surface-2"
                 >
                   {nowProdImageOf(liveProduct) ? (
                     <img src={nowProdImageOf(liveProduct)} alt="" className="h-full w-full object-cover" />
@@ -949,7 +949,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
                       key={String(p?.id ?? i)}
                       onClick={() => goToLiveIdx(i)}
                       title={p?.product_name || p?.name || ""}
-                      className={["relative h-10 w-10 shrink-0 overflow-hidden rounded-md border bg-surface-2 transition", i === safeIdx ? "border-rose-deep ring-1 ring-rose-deep" : "border-line hover:border-rose-line"].join(" ")}
+                      className={["relative h-12 w-12 shrink-0 overflow-hidden rounded-md border bg-surface-2 transition", i === safeIdx ? "border-rose-deep ring-1 ring-rose-deep" : "border-line hover:border-rose-line"].join(" ")}
                     >
                       {nowProdImageOf(p) ? (
                         <img src={nowProdImageOf(p)} alt="" className="h-full w-full object-cover" />
