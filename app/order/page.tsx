@@ -1059,6 +1059,14 @@ export default function OrderPage() {
   const [remoteAreaShippingFee, setRemoteAreaShippingFee] = useState(6000);
   const [pointEarnRateForDisplay, setPointEarnRateForDisplay] = useState(0);
   const [noticeText, setNoticeText] = useState("");
+  // 접속 팝업 공지(설정에서 문구/제목/글자크기/색상/ON·OFF 수정). 밴드 바로가기 + 24시간 안 보기 + 확인.
+  const [popupNoticeEnabled, setPopupNoticeEnabled] = useState(false);
+  const [popupNoticeTitle, setPopupNoticeTitle] = useState("📢 공지");
+  const [popupNoticeText, setPopupNoticeText] = useState("");
+  const [popupNoticeFontSize, setPopupNoticeFontSize] = useState("normal"); // normal | large | xlarge
+  const [popupNoticeColor, setPopupNoticeColor] = useState("#7B2D43"); // 제목·확인버튼 강조색
+  const [popupBandUrl, setPopupBandUrl] = useState("https://band.us/@ruru8249");
+  const [popupOpen, setPopupOpen] = useState(false);
   const [directInputEnabled, setDirectInputEnabled] = useState(true);
   const [combineShippingSettings, setCombineShippingSettings] =
     useState<CombineShippingSettings>(DEFAULT_COMBINE_SHIPPING_SETTINGS);
@@ -1640,6 +1648,12 @@ export default function OrderPage() {
         "point_earn_rate",
         "notice_text",
         "direct_input_enabled",
+        "popup_notice_enabled",
+        "popup_notice_title",
+        "popup_notice_text",
+        "popup_notice_fontsize",
+        "popup_notice_color",
+        "popup_band_url",
         ...COMBINE_SHIPPING_SETTING_KEYS,
       ]);
 
@@ -1677,6 +1691,28 @@ export default function OrderPage() {
     setDirectInputEnabled(
       String((data || []).find((i: any) => i.key === "direct_input_enabled")?.value || "true").trim() !== "false",
     );
+
+    // 접속 팝업 공지: 설정값 반영 + "24시간 안 보기"가 안 걸려 있으면 접속하자마자 표시
+    const pEnabled = String((data || []).find((i: any) => i.key === "popup_notice_enabled")?.value || "").trim() === "true";
+    const pText = String((data || []).find((i: any) => i.key === "popup_notice_text")?.value || "");
+    const pBand = String((data || []).find((i: any) => i.key === "popup_band_url")?.value || "").trim() || "https://band.us/@ruru8249";
+    const pTitle = String((data || []).find((i: any) => i.key === "popup_notice_title")?.value || "").trim() || "📢 공지";
+    const pFont = String((data || []).find((i: any) => i.key === "popup_notice_fontsize")?.value || "").trim() || "normal";
+    const pColor = String((data || []).find((i: any) => i.key === "popup_notice_color")?.value || "").trim() || "#7B2D43";
+    setPopupNoticeEnabled(pEnabled);
+    setPopupNoticeText(pText);
+    setPopupBandUrl(pBand);
+    setPopupNoticeTitle(pTitle);
+    setPopupNoticeFontSize(pFont);
+    setPopupNoticeColor(pColor);
+    let suppressed = false;
+    try {
+      const hideUntil = Number(localStorage.getItem("ruru_popup_notice_hide_until") || "0");
+      suppressed = Number.isFinite(hideUntil) && Date.now() < hideUntil;
+    } catch {
+      suppressed = false;
+    }
+    setPopupOpen(pEnabled && pText.trim().length > 0 && !suppressed);
   };
 
   const loadSavedCustomerInfo = () => {
@@ -4100,13 +4136,63 @@ export default function OrderPage() {
       <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}`}</style>
       {hasSavedInfo && <TopCustomerNav />}
 
+      {/* 접속 팝업 공지 — 카톡 로그인 후 주문서 첫 화면에 표시. 밴드 바로가기 + 24시간 안 보기 + 확인. 모든 모바일 대응. */}
+      {popupOpen && hasSavedInfo ? (
+        <div
+          onClick={() => setPopupOpen(false)}
+          style={{ position: "fixed", inset: 0, zIndex: 3000, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: "100%", maxWidth: "380px", maxHeight: "86vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "20px", boxShadow: "0 20px 60px rgba(0,0,0,0.28)", overflow: "hidden" }}
+          >
+            <div style={{ padding: "24px 22px 4px", overflowY: "auto" }}>
+              <div style={{ fontSize: "22px", fontWeight: 800, color: popupNoticeColor, textAlign: "center", marginBottom: "14px" }}>{popupNoticeTitle}</div>
+              <div style={{ fontSize: popupNoticeFontSize === "xlarge" ? "21px" : popupNoticeFontSize === "large" ? "19px" : "17px", fontWeight: 600, color: "#1A1A1A", lineHeight: 1.85, whiteSpace: "pre-wrap", textAlign: "center", wordBreak: "keep-all" }}>{popupNoticeText}</div>
+            </div>
+            <div style={{ padding: "18px 22px 22px", display: "flex", flexDirection: "column", gap: "10px" }}>
+              {popupBandUrl ? (
+                <a
+                  href={popupBandUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", height: "54px", borderRadius: "13px", background: "#03C75A", color: "#fff", fontSize: "16px", fontWeight: 800, textDecoration: "none" }}
+                >
+                  👉 루루동이 밴드 바로가기
+                </a>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setPopupOpen(false)}
+                style={{ height: "54px", borderRadius: "13px", background: popupNoticeColor, color: "#fff", border: "none", fontSize: "16px", fontWeight: 800, cursor: "pointer" }}
+              >
+                확인
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  try { localStorage.setItem("ruru_popup_notice_hide_until", String(Date.now() + 24 * 60 * 60 * 1000)); } catch {}
+                  setPopupOpen(false);
+                }}
+                style={{ height: "46px", borderRadius: "13px", background: "#F5F3F0", color: "#888", border: "none", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}
+              >
+                24시간 동안 열지 않기
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <CustomerPointGiftPopup />
 
       {/* P3. 방송 영상 — 방송 ON/OFF 상관없이 항상 표시 (좌:영상 / 우:라이브참여·공지) */}
       {hasSavedInfo ? (
         <section style={{ margin: "8px auto 0", width: "100%", maxWidth: "560px" }}>
           {!isBroadcastOn ? (
-            <div style={{ padding: "12px 14px", borderBottom: "0.5px solid #E5E1DC", fontSize: "13px", fontWeight: 700, color: "#888" }}>📺 현재 방송 중이 아닙니다</div>
+            <div style={{ padding: "14px 16px", borderBottom: "0.5px solid #E5E1DC" }}>
+              <div style={{ fontSize: "15px", fontWeight: 800, color: "#7B2D43", marginBottom: "4px" }}>📺 지금은 방송 중이 아니에요</div>
+              <div style={{ fontSize: "14px", fontWeight: 600, color: "#555", lineHeight: 1.6, wordBreak: "keep-all" }}>아래 상품은 방송이 없어도 언제든 주문할 수 있어요.</div>
+            </div>
           ) : (
           <>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderBottom: "0.5px solid #E5E1DC" }}>

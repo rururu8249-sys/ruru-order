@@ -17,7 +17,13 @@ type SettingKey =
   | "point_auto_earn_enabled"
   | "point_earn_rate"
   | "notice_text"
-  | "direct_input_enabled";
+  | "direct_input_enabled"
+  | "popup_notice_enabled"
+  | "popup_notice_title"
+  | "popup_notice_text"
+  | "popup_notice_fontsize"
+  | "popup_notice_color"
+  | "popup_band_url";
 
 type SettingRow = {
   key: string;
@@ -34,9 +40,25 @@ const SETTING_KEYS: SettingKey[] = [
   "point_earn_rate",
   "notice_text",
   "direct_input_enabled",
+  "popup_notice_enabled",
+  "popup_notice_title",
+  "popup_notice_text",
+  "popup_notice_fontsize",
+  "popup_notice_color",
+  "popup_band_url",
 ];
 
-type NumericSettingKey = Exclude<SettingKey, "notice_text" | "direct_input_enabled">;
+type NumericSettingKey = Exclude<
+  SettingKey,
+  | "notice_text"
+  | "direct_input_enabled"
+  | "popup_notice_enabled"
+  | "popup_notice_title"
+  | "popup_notice_text"
+  | "popup_notice_fontsize"
+  | "popup_notice_color"
+  | "popup_band_url"
+>;
 
 const DEFAULTS: Record<NumericSettingKey, number> = {
   customer_card_extra_rate: 10,
@@ -159,6 +181,13 @@ export default function AdminLiveSettingsPanel() {
   const [pointEarnRate, setPointEarnRate] = useState(String(DEFAULTS.point_earn_rate));
   const [noticeText, setNoticeText] = useState("");
   const [directInputEnabled, setDirectInputEnabled] = useState(true);
+  // 접속 팝업 공지
+  const [popupEnabled, setPopupEnabled] = useState(false);
+  const [popupTitle, setPopupTitle] = useState("📢 공지");
+  const [popupText, setPopupText] = useState("");
+  const [popupFont, setPopupFont] = useState("normal"); // normal | large | xlarge
+  const [popupColor, setPopupColor] = useState("#7B2D43");
+  const [popupBandUrl, setPopupBandUrl] = useState("https://band.us/@ruru8249");
 
   useEffect(() => {
     let alive = true;
@@ -187,6 +216,12 @@ export default function AdminLiveSettingsPanel() {
         setPointEarnRate(String(readNumber(rows, "point_earn_rate")));
         setNoticeText(String(rows.find((r) => r.key === "notice_text")?.value ?? ""));
         setDirectInputEnabled(clean(rows.find((r) => r.key === "direct_input_enabled")?.value || "true") !== "false");
+        setPopupEnabled(clean(rows.find((r) => r.key === "popup_notice_enabled")?.value) === "true");
+        setPopupTitle(String(rows.find((r) => r.key === "popup_notice_title")?.value ?? "").trim() || "📢 공지");
+        setPopupText(String(rows.find((r) => r.key === "popup_notice_text")?.value ?? ""));
+        setPopupFont(clean(rows.find((r) => r.key === "popup_notice_fontsize")?.value) || "normal");
+        setPopupColor(clean(rows.find((r) => r.key === "popup_notice_color")?.value) || "#7B2D43");
+        setPopupBandUrl(String(rows.find((r) => r.key === "popup_band_url")?.value ?? "").trim() || "https://band.us/@ruru8249");
       } finally {
         if (alive) setLoading(false);
       }
@@ -221,6 +256,12 @@ export default function AdminLiveSettingsPanel() {
           { key: "point_earn_rate", value: String(nextPointEarnRate) },
           { key: "notice_text", value: noticeText },
           { key: "direct_input_enabled", value: directInputEnabled ? "true" : "false" },
+          { key: "popup_notice_enabled", value: popupEnabled ? "true" : "false" },
+          { key: "popup_notice_title", value: popupTitle.trim() || "📢 공지" },
+          { key: "popup_notice_text", value: popupText },
+          { key: "popup_notice_fontsize", value: popupFont },
+          { key: "popup_notice_color", value: popupColor },
+          { key: "popup_band_url", value: popupBandUrl.trim() },
         ],
         { onConflict: "key" },
       );
@@ -396,6 +437,84 @@ export default function AdminLiveSettingsPanel() {
                 >
                   {directInputEnabled ? "직접입력 ON" : "직접입력 OFF"}
                 </button>
+              </div>
+
+              {/* 접속 팝업 공지 */}
+              <div className="mt-4 rounded-[20px] border border-line bg-surface-2 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-black text-ink">📢 접속 팝업 공지</div>
+                    <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">손님이 사이트에 들어오자마자 뜨는 팝업입니다. 밴드 바로가기 + 24시간 안 보기 + 확인 버튼 포함.</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPopupEnabled((v) => !v)}
+                    className={`shrink-0 rounded-full px-4 py-2 text-xs font-black transition ${popupEnabled ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}
+                  >
+                    {popupEnabled ? "팝업 ON" : "팝업 OFF"}
+                  </button>
+                </div>
+
+                <label className="mt-3 block">
+                  <span className="text-xs font-black text-ink-soft">제목</span>
+                  <input
+                    value={popupTitle}
+                    onChange={(e) => setPopupTitle(e.target.value)}
+                    placeholder="📢 공지"
+                    className="mt-1 h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-deep"
+                  />
+                </label>
+
+                <label className="mt-3 block">
+                  <span className="text-xs font-black text-ink-soft">팝업 문구 (줄바꿈 가능)</span>
+                  <textarea
+                    value={popupText}
+                    onChange={(e) => setPopupText(e.target.value)}
+                    placeholder="예) 루루동이 밴드에 가입하시면 방송 알림과 단독 혜택을 받으실 수 있어요!"
+                    rows={4}
+                    className="mt-1 w-full resize-none rounded-xl border border-line bg-surface p-3 text-sm font-bold leading-relaxed text-ink outline-none focus:border-rose-deep"
+                  />
+                </label>
+
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <label className="block">
+                    <span className="text-xs font-black text-ink-soft">글자 크기</span>
+                    <select
+                      value={popupFont}
+                      onChange={(e) => setPopupFont(e.target.value)}
+                      className="mt-1 h-10 w-full rounded-xl border border-line bg-surface px-2 text-sm font-bold text-ink outline-none focus:border-rose-deep"
+                    >
+                      <option value="normal">보통</option>
+                      <option value="large">크게</option>
+                      <option value="xlarge">아주 크게</option>
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-black text-ink-soft">강조 색상 (제목·확인 버튼)</span>
+                    <select
+                      value={popupColor}
+                      onChange={(e) => setPopupColor(e.target.value)}
+                      className="mt-1 h-10 w-full rounded-xl border border-line bg-surface px-2 text-sm font-bold text-ink outline-none focus:border-rose-deep"
+                    >
+                      <option value="#7B2D43">딥로즈</option>
+                      <option value="#0F6E56">초록</option>
+                      <option value="#185FA5">파랑</option>
+                      <option value="#1A1A1A">검정</option>
+                      <option value="#C0392B">빨강</option>
+                    </select>
+                  </label>
+                </div>
+
+                <label className="mt-3 block">
+                  <span className="text-xs font-black text-ink-soft">밴드 바로가기 주소</span>
+                  <input
+                    value={popupBandUrl}
+                    onChange={(e) => setPopupBandUrl(e.target.value)}
+                    placeholder="https://band.us/@ruru8249"
+                    className="mt-1 h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-deep"
+                  />
+                  <span className="mt-1 block text-[11px] font-bold text-ink-mute">비우면 밴드 버튼이 숨겨집니다.</span>
+                </label>
               </div>
             </div>
           )}
