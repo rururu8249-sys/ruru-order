@@ -1061,7 +1061,7 @@ export default function OrderPage() {
   const [noticeText, setNoticeText] = useState("");
   // 접속 팝업 공지(설정에서 문구/제목/글자크기/색상/ON·OFF 수정). 밴드 바로가기 + 24시간 안 보기 + 확인.
   const [popupNoticeEnabled, setPopupNoticeEnabled] = useState(false);
-  const [popupNoticeTitle, setPopupNoticeTitle] = useState("📢 공지");
+  const [popupNoticeTitle, setPopupNoticeTitle] = useState("");
   const [popupNoticeText, setPopupNoticeText] = useState("");
   const [popupNoticeFontSize, setPopupNoticeFontSize] = useState("normal"); // normal | large | xlarge
   const [popupNoticeColor, setPopupNoticeColor] = useState("#7B2D43"); // 제목·확인버튼 강조색
@@ -1696,7 +1696,7 @@ export default function OrderPage() {
     const pEnabled = String((data || []).find((i: any) => i.key === "popup_notice_enabled")?.value || "").trim() === "true";
     const pText = String((data || []).find((i: any) => i.key === "popup_notice_text")?.value || "");
     const pBand = String((data || []).find((i: any) => i.key === "popup_band_url")?.value || "").trim() || "https://band.us/@ruru8249";
-    const pTitle = String((data || []).find((i: any) => i.key === "popup_notice_title")?.value || "").trim() || "📢 공지";
+    const pTitle = String((data || []).find((i: any) => i.key === "popup_notice_title")?.value || "");
     const pFont = String((data || []).find((i: any) => i.key === "popup_notice_fontsize")?.value || "").trim() || "normal";
     const pColor = String((data || []).find((i: any) => i.key === "popup_notice_color")?.value || "").trim() || "#7B2D43";
     setPopupNoticeEnabled(pEnabled);
@@ -4144,11 +4144,31 @@ export default function OrderPage() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ width: "100%", maxWidth: "380px", maxHeight: "86vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "20px", boxShadow: "0 20px 60px rgba(0,0,0,0.28)", overflow: "hidden" }}
+            style={{ width: "100%", maxWidth: "380px", maxHeight: "88vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "22px", boxShadow: "0 24px 70px rgba(0,0,0,0.32)", overflow: "hidden", border: `2.5px solid ${popupNoticeColor}` }}
           >
-            <div style={{ padding: "24px 22px 4px", overflowY: "auto" }}>
-              <div style={{ fontSize: "22px", fontWeight: 800, color: popupNoticeColor, textAlign: "center", marginBottom: "14px" }}>{popupNoticeTitle}</div>
-              <div style={{ fontSize: popupNoticeFontSize === "xlarge" ? "21px" : popupNoticeFontSize === "large" ? "19px" : "17px", fontWeight: 600, color: "#1A1A1A", lineHeight: 1.85, whiteSpace: "pre-wrap", textAlign: "center", wordBreak: "keep-all" }}>{popupNoticeText}</div>
+            {/* 색상 헤더 바 (제목 비우면 안 뜸) */}
+            {popupNoticeTitle.trim() ? (
+              <div style={{ background: popupNoticeColor, color: "#fff", padding: "15px 18px", fontSize: "19px", fontWeight: 800, textAlign: "center", letterSpacing: "0.3px" }}>{popupNoticeTitle}</div>
+            ) : null}
+            <div style={{ padding: "20px 18px 6px", overflowY: "auto" }}>
+              {/* 점선 테두리 콘텐츠 박스 */}
+              <div
+                style={{
+                  background: `${popupNoticeColor}0D`,
+                  border: `1.5px dashed ${popupNoticeColor}66`,
+                  borderRadius: "16px",
+                  padding: "18px 16px",
+                  fontSize: popupNoticeFontSize === "xlarge" ? "21px" : popupNoticeFontSize === "large" ? "19px" : "17px",
+                  fontWeight: 600,
+                  color: "#1A1A1A",
+                  lineHeight: 1.85,
+                  whiteSpace: "pre-wrap",
+                  textAlign: "center",
+                  wordBreak: "keep-all",
+                }}
+              >
+                {popupNoticeText}
+              </div>
             </div>
             <div style={{ padding: "18px 22px 22px", display: "flex", flexDirection: "column", gap: "10px" }}>
               {popupBandUrl ? (

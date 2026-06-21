@@ -217,7 +217,7 @@ export default function AdminLiveSettingsPanel() {
         setNoticeText(String(rows.find((r) => r.key === "notice_text")?.value ?? ""));
         setDirectInputEnabled(clean(rows.find((r) => r.key === "direct_input_enabled")?.value || "true") !== "false");
         setPopupEnabled(clean(rows.find((r) => r.key === "popup_notice_enabled")?.value) === "true");
-        setPopupTitle(String(rows.find((r) => r.key === "popup_notice_title")?.value ?? "").trim() || "📢 공지");
+        setPopupTitle(String(rows.find((r) => r.key === "popup_notice_title")?.value ?? ""));
         setPopupText(String(rows.find((r) => r.key === "popup_notice_text")?.value ?? ""));
         setPopupFont(clean(rows.find((r) => r.key === "popup_notice_fontsize")?.value) || "normal");
         setPopupColor(clean(rows.find((r) => r.key === "popup_notice_color")?.value) || "#7B2D43");
@@ -257,7 +257,7 @@ export default function AdminLiveSettingsPanel() {
           { key: "notice_text", value: noticeText },
           { key: "direct_input_enabled", value: directInputEnabled ? "true" : "false" },
           { key: "popup_notice_enabled", value: popupEnabled ? "true" : "false" },
-          { key: "popup_notice_title", value: popupTitle.trim() || "📢 공지" },
+          { key: "popup_notice_title", value: popupTitle.trim() },
           { key: "popup_notice_text", value: popupText },
           { key: "popup_notice_fontsize", value: popupFont },
           { key: "popup_notice_color", value: popupColor },
@@ -456,17 +456,18 @@ export default function AdminLiveSettingsPanel() {
                 </div>
 
                 <label className="mt-3 block">
-                  <span className="text-xs font-black text-ink-soft">제목</span>
+                  <span className="text-xs font-black text-ink-soft">제목 (팝업 위 색상 띠 글씨)</span>
                   <input
                     value={popupTitle}
                     onChange={(e) => setPopupTitle(e.target.value)}
-                    placeholder="📢 공지"
+                    placeholder="예) 📢 중요 공지  ·  비우면 제목 띠 없이 본문만 표시"
                     className="mt-1 h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-deep"
                   />
+                  <span className="mt-1 block text-[11px] font-bold text-ink-mute">여기 제목을 넣으세요. 본문에 제목을 또 쓰면 두 번 나옵니다.</span>
                 </label>
 
                 <label className="mt-3 block">
-                  <span className="text-xs font-black text-ink-soft">팝업 문구 (줄바꿈 가능)</span>
+                  <span className="text-xs font-black text-ink-soft">팝업 문구 (본문 · 줄바꿈 가능)</span>
                   <textarea
                     value={popupText}
                     onChange={(e) => setPopupText(e.target.value)}
