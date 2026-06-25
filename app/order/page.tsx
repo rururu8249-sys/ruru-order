@@ -3235,8 +3235,8 @@ export default function OrderPage() {
       }
     }
 
-    if (paymentMethod === "카드결제" && productAmount < cardPaymentMinAmount) {
-      showCustomerNotice(`카드결제는 ${cardPaymentMinAmount.toLocaleString()}원 이상 구매 시 가능합니다.`);
+    if (paymentMethod === "카드결제" && (productAmount + shippingFee) < cardPaymentMinAmount) {
+      showCustomerNotice(`카드결제는 택배비 포함 ${cardPaymentMinAmount.toLocaleString()}원 이상 구매 시 가능합니다.`);
       return false;
     }
 
@@ -4547,7 +4547,7 @@ export default function OrderPage() {
 
               {paymentMethod === "카드결제" && (
                 <div style={{ marginTop: "12px", borderRadius: "16px", border: "1px solid #E5E1DC", background: "#F9EEF3", padding: "12px", fontSize: "13px", fontWeight: 800, lineHeight: 1.6, color: "#7A1E47" }}>
-                  ⓘ 카드결제는 {cardPaymentMinAmount.toLocaleString()}원 이상 구매 시 가능합니다.
+                  ⓘ 카드결제는 택배비 포함 {cardPaymentMinAmount.toLocaleString()}원 이상 구매 시 가능합니다.
                   <br />
                   주문서 제출 후 카톡채널로 문의 남겨주세요.
                 </div>
