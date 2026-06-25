@@ -114,6 +114,26 @@ export function useLiveOrderCancelRestore({
         showAdminToast("주문서복구 처리됐습니다.", "success");
       }
 
+      // 재고 정합: 취소=재고 복구 / 복구(취소해제)=재고 재차감.
+      // 별도 RPC(restore_order_inventory) — 돈/포인트/취소 RPC와 분리. 실패해도 주문 처리는 유지(비차단).
+      try {
+        const { error: invError } = await (supabase as any).rpc("restore_order_inventory", {
+          p_order_ids: rowIds,
+          p_mode: isCancel ? "restore" : "deduct",
+        });
+        if (invError) {
+          showAdminToast(
+            `재고 자동${isCancel ? "복구" : "재차감"} 실패 — 주문은 처리됨. 재고를 직접 확인하세요.\n${invError.message}`,
+            "warning",
+          );
+        }
+      } catch (invErr: any) {
+        showAdminToast(
+          `재고 처리 중 오류(주문은 처리됨): ${invErr?.message || invErr}`,
+          "warning",
+        );
+      }
+
       await onAfterStatusChange?.();
       onClose?.();
     } finally {
