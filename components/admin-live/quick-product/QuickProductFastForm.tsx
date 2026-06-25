@@ -194,6 +194,8 @@ function parseProductNote(row: ProductRow | null | undefined) {
       registered_order_enabled?: boolean;
       name_suggestion_enabled?: boolean;
       suggestion_keywords?: string[];
+      purchase_limit_enabled?: boolean;
+      purchase_limit_qty?: number;
     };
   } catch {
     return null;
@@ -521,6 +523,9 @@ export default function QuickProductFastForm({
   const [isPinned, setIsPinned] = useState(false);
   const [registeredOrderEnabled, setRegisteredOrderEnabled] = useState(true);
   const [nameSuggestionEnabled, setNameSuggestionEnabled] = useState(true);
+  // 개인당 구매제한(카톡 계정=전화번호 기준 누적, OFF할 때까지 방송 무관 계속 적용). 재고와 별개.
+  const [purchaseLimitEnabled, setPurchaseLimitEnabled] = useState(false);
+  const [purchaseLimitText, setPurchaseLimitText] = useState("1");
   const [suggestionKeywordsText, setSuggestionKeywordsText] = useState("");
 
   const [coverImages, setCoverImages] = useState<string[]>([]);
@@ -611,6 +616,8 @@ export default function QuickProductFastForm({
     const productNote = parseProductNote(initialProduct);
     const noteVariants = productNote?.stock_variants || [];
     setStockManagementEnabled(productNote?.stock_management_enabled !== false);
+    setPurchaseLimitEnabled(productNote?.purchase_limit_enabled === true);
+    setPurchaseLimitText(String(productNote?.purchase_limit_qty && productNote.purchase_limit_qty > 0 ? productNote.purchase_limit_qty : 1));
     setRegisteredOrderEnabled(productNote?.registered_order_enabled !== false);
     setNameSuggestionEnabled(productNote?.name_suggestion_enabled !== false);
     setSuggestionKeywordsText(Array.isArray(productNote?.suggestion_keywords) ? productNote.suggestion_keywords.join(", ") : "");
@@ -806,6 +813,8 @@ export default function QuickProductFastForm({
         stock_mode: stockMode,
         stock_variants: variantStockPayload,
         stock_management_enabled: stockManagementEnabled,
+        purchase_limit_enabled: purchaseLimitEnabled,
+        purchase_limit_qty: purchaseLimitEnabled ? Math.max(1, Number(purchaseLimitText) || 1) : 0,
         registered_order_enabled: registeredOrderEnabled,
         name_suggestion_enabled: nameSuggestionEnabled,
         suggestion_keywords: suggestionKeywordsText
@@ -1152,6 +1161,23 @@ export default function QuickProductFastForm({
               </div>
               <div onClick={() => setIsVisible((v) => !v)} style={tgStyle(isVisible)}><span style={tgKnob(isVisible)} /></div>
             </div>
+
+            {/* 개인당 구매제한 (카톡 계정=전화번호 기준, 끌 때까지 계속 적용) */}
+            <div style={toggleRow}>
+              <div>
+                <div style={{ fontSize: "13px", color: "var(--color-ink)" }}>개인당 구매제한</div>
+                <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "1px" }}>{purchaseLimitEnabled ? "한 사람(카톡 계정)이 이 상품을 정해진 개수까지만" : "(끄면 제한 없음)"}</div>
+              </div>
+              <div onClick={() => setPurchaseLimitEnabled((v) => !v)} style={tgStyle(purchaseLimitEnabled)}><span style={tgKnob(purchaseLimitEnabled)} /></div>
+            </div>
+
+            {purchaseLimitEnabled ? (
+              <div style={{ background: "#F7F5F3", borderRadius: "8px", padding: "10px", marginTop: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "12px", color: "var(--color-ink)", flex: 1 }}>1인당 최대</span>
+                <input style={{ fontSize: "12px", padding: "5px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "80px" }} type="number" min={1} value={purchaseLimitText} onChange={(e) => setPurchaseLimitText(e.target.value)} />
+                <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
+              </div>
+            ) : null}
           </div>
 
           {/* 구분선 */}

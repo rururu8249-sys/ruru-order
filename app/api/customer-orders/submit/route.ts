@@ -174,6 +174,85 @@ const normalizeOrderRowsForSubmitSettings = async (
   };
 };
 
+// 개인당 구매제한(상품관리 product_note.purchase_limit_enabled/qty) 서버 강제 검증.
+// - 카톡 계정 = 전화번호(숫자만)로 1:1 연결되므로 전화번호 누적으로 집계(방송 무관, 끌 때까지 적용).
+// - 등록상품(product_id 있음)만 대상. 직접입력(product_id 없음)은 제한 없음.
+// - 취소/테스트 주문은 누적에서 제외.
+// - 돈/재고/포인트 RPC는 일절 건드리지 않고, 주문 RPC 호출 전에 차단만 한다.
+// - 조회 실패 시(라이브 중 일시 오류) 정상 주문을 막지 않음(재고 초과는 RPC가 별도로 방어).
+async function assertPurchaseLimit(
+  supabase: any,
+  orderRows: AnyRow[],
+  phone: string,
+): Promise<void> {
+  const requestedByProduct = new Map<string, number>();
+  for (const row of orderRows) {
+    const pid = text(row?.product_id);
+    if (!pid || !/^[0-9]+$/.test(pid)) continue; // 직접입력 제외
+    const qty = toWon(row?.qty);
+    if (qty <= 0) continue;
+    requestedByProduct.set(pid, (requestedByProduct.get(pid) || 0) + qty);
+  }
+  if (requestedByProduct.size === 0) return;
+
+  const productIds = Array.from(requestedByProduct.keys()).map((id) => Number(id));
+  const { data: products, error: productError } = await supabase
+    .from("products")
+    .select("id, product_name, name, product_note")
+    .in("id", productIds);
+
+  if (productError || !Array.isArray(products)) {
+    console.warn("구매제한 검증: 상품 조회 실패(주문은 진행):", productError?.message);
+    return;
+  }
+
+  for (const product of products) {
+    const pid = text(product?.id);
+    let note: any = null;
+    try {
+      note = typeof product?.product_note === "string" ? JSON.parse(product.product_note) : product?.product_note;
+    } catch {
+      note = null;
+    }
+    if (!note || note.purchase_limit_enabled !== true) continue;
+
+    const limit = Math.floor(Number(note.purchase_limit_qty || 0));
+    if (!Number.isFinite(limit) || limit <= 0) continue;
+
+    const requested = requestedByProduct.get(pid) || 0;
+    if (requested <= 0) continue;
+
+    const { data: priorRows, error: priorError } = await supabase
+      .from("orders")
+      .select("qty, order_status, order_manage_status, is_test_order")
+      .eq("customer_phone", phone)
+      .eq("product_id", Number(pid));
+
+    if (priorError) {
+      console.warn("구매제한 검증: 기존주문 조회 실패(주문은 진행):", priorError.message);
+      continue;
+    }
+
+    let already = 0;
+    for (const r of priorRows || []) {
+      if (r?.is_test_order === true) continue;
+      const st = `${text(r?.order_status)} ${text(r?.order_manage_status)}`;
+      if (st.includes("취소")) continue; // 취소건은 누적 제외
+      already += toWon(r?.qty);
+    }
+
+    if (already + requested > limit) {
+      const pname = text(product?.product_name) || text(product?.name) || "이 상품";
+      const remain = Math.max(0, limit - already);
+      throw new Error(
+        already > 0
+          ? `${pname}은(는) 1인당 ${limit}개까지만 구매할 수 있어요. 이미 ${already}개 구매하셨고 ${remain}개 더 담을 수 있어요.`
+          : `${pname}은(는) 1인당 ${limit}개까지만 구매할 수 있어요. (현재 ${requested}개 담음)`,
+      );
+    }
+  }
+}
+
 
 export async function POST(request: NextRequest) {
   try {
@@ -209,6 +288,10 @@ export async function POST(request: NextRequest) {
     );
 
     const supabase = getSupabaseOrderSubmitClient();
+
+    // 개인당 구매제한 차단(돈/재고/포인트 RPC 무변경 — RPC 호출 전 검증만)
+    await assertPurchaseLimit(supabase, orderRows, phone);
+
     const normalizedSubmit = await normalizeOrderRowsForSubmitSettings(supabase, orderRows);
 
     const { data, error } = await supabase.rpc("submit_customer_order_with_points", {

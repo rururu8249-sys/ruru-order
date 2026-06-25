@@ -2879,17 +2879,32 @@ export default function OrderPage() {
           return matched ? Number(matched.stock) : 999;
         } catch { return 999; }
       })();
+      // 개인당 구매제한(상품관리 설정). 이 카트 안 수량만 캡(과거 누적은 서버가 최종 방어).
+      const limitQty = (() => {
+        try {
+          const note = typeof product.product_note === "string" ? JSON.parse(product.product_note) : product.product_note;
+          if ((note as any)?.purchase_limit_enabled !== true) return Infinity;
+          const n = Math.floor(Number((note as any)?.purchase_limit_qty || 0));
+          return Number.isFinite(n) && n > 0 ? n : Infinity;
+        } catch { return Infinity; }
+      })();
+      const effMax = Math.min(maxQty, limitQty);
+      // 더 작은 제약이 구매제한이면 구매제한 안내, 아니면 재고 안내
+      const limitMsg = (cap: number) =>
+        limitQty <= maxQty && Number.isFinite(limitQty)
+          ? "1인당 최대 " + limitQty + "개까지 구매할 수 있어요."
+          : "재고가 부족해요. 최대 " + cap + "개까지 담을 수 있어요.";
       const addQty = Number(nextItem.qty) || 1;
       const sameIndex = nextItem.product_id ? prev.findIndex((item) => item.product_id === nextItem.product_id && normColor(item.color) === normColor(nextItem.color) && normColor(item.size) === normColor(nextItem.size) && item.product_name.trim() !== "") : -1;
       if (sameIndex >= 0) {
         const existingQty = Number(prev[sameIndex].qty) || 1;
-        const newQty = Math.min(existingQty + addQty, maxQty);
-        if (newQty <= existingQty) { showCustomerNotice("재고가 부족해요. 최대 " + maxQty + "개까지 담을 수 있어요."); didAdd = false; return prev; }
-        clampedItem = { ...prev[sameIndex], qty: String(Math.min(addQty, maxQty)) };
+        const newQty = Math.min(existingQty + addQty, effMax);
+        if (newQty <= existingQty) { showCustomerNotice(limitMsg(effMax)); didAdd = false; return prev; }
+        clampedItem = { ...prev[sameIndex], qty: String(Math.min(addQty, effMax)) };
         return prev.map((item, index) => index === sameIndex ? { ...item, qty: String(newQty) } : item);
       }
-      const clampedQty = Math.min(addQty, maxQty);
-      if (clampedQty < addQty) showCustomerNotice("재고가 부족해요. " + clampedQty + "개로 조정했어요.");
+      const clampedQty = Math.min(addQty, effMax);
+      if (clampedQty < addQty) showCustomerNotice(limitMsg(clampedQty));
       clampedItem = clampedQty !== addQty ? { ...nextItem, qty: String(clampedQty) } : nextItem;
       const emptyIndex = prev.findIndex((item) => !item.product_name.trim());
       if (emptyIndex >= 0) return prev.map((item, index) => (index === emptyIndex ? clampedItem : item));
