@@ -1106,7 +1106,7 @@ export default function LiveOrderTable({
                       <div className="px-3 py-3 text-center text-[13px] font-black text-ink">
                         <div>{money(order.productAmount)}</div>
                         {Number(order.pointUsedAmount || 0) > 0 ? (
-                          <div className="text-[10px] text-ok-tx">-{money(Number(order.pointUsedAmount || 0))}</div>
+                          <div className="text-[10px] text-ok-tx">포인트 -{money(Number(order.pointUsedAmount || 0))}</div>
                         ) : null}
                       </div>
                       {/* 6. 택배비 */}
