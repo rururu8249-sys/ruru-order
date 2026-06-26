@@ -2912,7 +2912,8 @@ export default function OrderPage() {
     });
 
     setProductSearchOpenIndex(null);
-    setProductSearchText("");
+    // 검색어는 유지 — 담기 후 검색이 풀려 전체목록이 떠 "안 담긴 것처럼" 보이던 혼란 방지.
+    //   (담은 결과는 cart 카운트/토스트로 확인, 같은 검색으로 계속 담기 편함)
     // P6. 담기 완료 — confetti + "주문서에 담았어요!" 토스트(주문서 보기 / 계속 담기)
     if (didAdd) { setCartAddedItem(clampedItem); setCartAddedOpen(true); }
   };
