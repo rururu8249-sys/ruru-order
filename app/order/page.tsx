@@ -923,8 +923,11 @@ export default function OrderPage() {
         return;
       }
 
+      // 직접입력 추천 드롭다운만 닫는다. (메인 상품검색어는 비우지 않음)
+      //   기존엔 setProductSearchText("")까지 해서, 담기 버튼(검색영역 밖) 탭 시
+      //   pointerdown으로 검색이 지워지고 목록이 전체로 reflow→담기 클릭이 빗나가
+      //   "초기화면으로 튀고 안 담김" 버그가 있었음.
       setProductSearchOpenIndex(null);
-      setProductSearchText("");
     };
 
     document.addEventListener("pointerdown", handleProductSearchOutsidePointerDown);
