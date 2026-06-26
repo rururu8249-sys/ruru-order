@@ -2121,13 +2121,26 @@ export default function OrderPage() {
     const formattedPhone = formatOrderPhone(cleanPhone);
     const phoneValues = Array.from(new Set([cleanPhone, formattedPhone].filter(Boolean)));
 
-    const { data, error } = await supabase
+    // 합배 기준: 방송 ON이면 "같은 방송(broadcast_id)"으로 직접 묶는다.
+    //   기존엔 시간 window(사실상 한국시간 '그날')로만 조회해서, 방송을 여러 날 켜두거나
+    //   자정을 넘기면 다음날 주문에 배송비가 또 붙던 버그가 있었음(날짜·타임존·started_at 파싱에 흔들림).
+    //   broadcast_id 직접 매칭은 날짜와 무관하게 같은 방송이면 합배(같은 주소 한정)됨.
+    //   방송 OFF(쇼핑몰 모드)거나 broadcast 미로드면 기존 시간 window로 폴백.
+    const activeBroadcastIdForCombine = String(broadcast?.id || "").trim();
+    const combineByBroadcastId =
+      activeBroadcastIdForCombine.length > 0 &&
+      String(broadcast?.status || "").trim().toUpperCase() === "ON";
+
+    let combineQuery = supabase
       .from("orders")
-      .select("id, product_id, customer_phone, shipping_fee, adjusted_shipping_fee, order_manage_status, created_at, zipcode, address, detail_address")
-      .in("customer_phone", phoneValues)
-      .gte("created_at", settings.startAt)
-      .lte("created_at", settings.endAt)
-      .limit(100);
+      .select("id, product_id, customer_phone, shipping_fee, adjusted_shipping_fee, order_manage_status, created_at, zipcode, address, detail_address, broadcast_id")
+      .in("customer_phone", phoneValues);
+
+    combineQuery = combineByBroadcastId
+      ? combineQuery.eq("broadcast_id", activeBroadcastIdForCombine)
+      : combineQuery.gte("created_at", settings.startAt).lte("created_at", settings.endAt);
+
+    const { data, error } = await combineQuery.limit(100);
 
     if (error) {
       console.log("기존 배송비 확인 오류", error.message);
