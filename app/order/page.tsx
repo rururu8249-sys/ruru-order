@@ -4343,7 +4343,9 @@ export default function OrderPage() {
               }
               return true;
             });
-            const visibleItems = filtered.slice(0, visibleProductCount);
+            // 방송/쇼핑몰 상품 목록은 전부 표시(무한스크롤이 일부 기기에서 10개에서 멈추던 문제 해결).
+            //   상품 수(방송 담긴분/카탈로그 ≤ 80)라 한 번에 렌더해도 가벼움.
+            const visibleItems = filtered;
             // 카테고리 탭: 기본(의류/신발/잡화) + 상품에 실제로 쓰인 커스텀 카테고리(음식 등) 자동 노출
             const PRESET_CATS = ["의류", "신발", "잡화"];
             const presentCats = Array.from(
@@ -4442,9 +4444,6 @@ export default function OrderPage() {
                     })}
                   </div>
                 )}
-                {filtered.length > visibleProductCount ? (
-                  <div ref={sentinelRef} style={{ height: "1px", marginBottom: "8px" }} />
-                ) : null}
                 {directInputEnabled ? (
                   <button type="button" onClick={openDirectInputSheet} style={{ marginTop: "12px", width: "100%", border: "1px solid #D9C5CC", background: "#fff", borderRadius: "14px", padding: "13px", fontSize: "14px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+ 상품을 못 찾으셨나요? 직접 입력하기</button>
                 ) : null}
