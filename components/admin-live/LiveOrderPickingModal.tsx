@@ -17,7 +17,8 @@ import { exportLiveOrdersForPicking } from "./adminLiveOrderExcelExport";
 type Props = { orders: LiveOrder[]; filterLabel: string; onClose: () => void };
 
 type PickItem = { id: string; text: string; qty: number };
-type Panel = { key: string; nickname: string; name: string; search: string; paid: boolean; when: string; items: PickItem[]; totalQty: number };
+type Panel = { key: string; nickname: string; name: string; phone: string; search: string; paid: boolean; when: string; items: PickItem[]; totalQty: number };
+type BatchRow = { text: string; ids: string[]; totalQty: number; pickedQty: number };
 
 const PAID_STATUSES = ["paid", "auto_paid", "manual_paid", "card_paid"];
 const clean = (v: unknown) => String(v ?? "").trim();
@@ -56,6 +57,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   const [pickedIds, setPickedIds] = useState<Set<string>>(new Set());
   const [sortMode, setSortMode] = useState<"nickname" | "time">("nickname");
   const [paidOnly, setPaidOnly] = useState(true);
+  const [unpickedOnly, setUnpickedOnly] = useState(false);
+  const [viewMode, setViewMode] = useState<"order" | "batch">("order");
   const [search, setSearch] = useState("");
   const [resetting, setResetting] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -84,7 +87,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
               return { id: String(it.id), text: (clean(it.productName) || "상품") + (opt ? ` (${opt})` : ""), qty: Number(it.qty || 1) };
             });
       const totalQty = items.reduce((s, it) => s + (Number.isFinite(it.qty) ? it.qty : 1), 0);
-      list.push({ key: String(o.groupId || o.id), nickname, name, search: searchText, paid, when, items, totalQty });
+      const phone = clean(o.phone).replace(/[^0-9]/g, ""); // 같은 고객 판정용(숫자만)
+      list.push({ key: String(o.groupId || o.id), nickname, name, phone, search: searchText, paid, when, items, totalQty });
     }
     return list;
   }, [orders]);
@@ -117,6 +121,53 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
     if (!q) return scopedPanels;
     return scopedPanels.filter((p) => p.search.includes(q) || p.nickname.toLowerCase().includes(q) || p.items.some((it) => it.text.toLowerCase().includes(q)));
   }, [scopedPanels, search]);
+
+  // "안 챙긴 것만" 보기 — 켜면 다 챙긴 주문은 숨기고, 남은 주문은 안 챙긴 상품줄만 표시(막판 마무리용).
+  const displayPanels = useMemo(() => {
+    if (!unpickedOnly) return visiblePanels;
+    return visiblePanels
+      .map((p) => ({ ...p, items: p.items.filter((it) => !pickedIds.has(it.id)) }))
+      .filter((p) => p.items.length > 0);
+  }, [visiblePanels, unpickedOnly, pickedIds]);
+
+  // 같은 고객(전화번호) 묶음 — 여러 주문이 같은 사람이면 합배송 안내(중복배송·누락 방지).
+  const phoneCount = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const p of scopedPanels) if (p.phone) m.set(p.phone, (m.get(p.phone) || 0) + 1);
+    return m;
+  }, [scopedPanels]);
+
+  // 상품별 합계(배치 피킹) — 옵션까지 같은 상품을 전 주문에서 합산. 한 종류씩 한 번에 집기.
+  const batchRows = useMemo<BatchRow[]>(() => {
+    const m = new Map<string, BatchRow>();
+    const q = search.trim().toLowerCase();
+    for (const p of scopedPanels) {
+      for (const it of p.items) {
+        if (q && !it.text.toLowerCase().includes(q)) continue;
+        const row = m.get(it.text) || { text: it.text, ids: [], totalQty: 0, pickedQty: 0 };
+        row.ids.push(it.id);
+        row.totalQty += it.qty;
+        if (pickedIds.has(it.id)) row.pickedQty += it.qty;
+        m.set(it.text, row);
+      }
+    }
+    let rows = Array.from(m.values());
+    if (unpickedOnly) rows = rows.filter((r) => r.pickedQty < r.totalQty);
+    return rows.sort((a, b) => a.text.localeCompare(b.text, "ko"));
+  }, [scopedPanels, pickedIds, search, unpickedOnly]);
+
+  // 여러 항목 일괄 토글(전부 챙김이면 해제, 아니면 전부 챙김) — 상품별 뷰에서 한 줄 = 그 상품 전부.
+  const toggleIds = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    const allPicked = ids.every((id) => pickedIds.has(id));
+    const makePicked = !allPicked;
+    setPickedIds((prev) => { const n = new Set(prev); ids.forEach((id) => (makePicked ? n.add(id) : n.delete(id))); return n; });
+    try {
+      await writePicked(ids, makePicked);
+    } catch (e: any) {
+      showAdminToast("일괄 체크 실패\n\n" + (e?.message || e), "error");
+    }
+  };
 
   // 열 때 서버에서 picked_at 조회
   useEffect(() => {
@@ -213,13 +264,32 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2">
           <div className="text-[14px] font-black text-ink">
             챙김 <span className="text-ok-tx">{pickedQty}개</span> <span className="text-ink-mute">/</span> 전체 {totalQty}개
+            {totalQty > 0 && pickedQty < totalQty ? <span className="ml-1 text-[11px] font-black text-rose-deep">· {totalQty - pickedQty}개 남음</span> : null}
+            {totalQty > 0 && pickedQty >= totalQty ? <span className="ml-1 text-[11px] font-black text-ok-tx">· 다 챙김 🎉</span> : null}
           </div>
           <div className="flex items-center gap-1.5">
+            {/* 주문별 ↔ 상품별(배치 피킹) 전환 */}
+            <span className="inline-flex overflow-hidden rounded-lg border border-rose-deep">
+              <button type="button" onClick={() => setViewMode("order")} className={`px-2.5 py-1 text-[11px] font-black ${viewMode === "order" ? "bg-rose-deep text-white" : "bg-surface text-rose-deep"}`}>주문별</button>
+              <button type="button" onClick={() => setViewMode("batch")} className={`px-2.5 py-1 text-[11px] font-black ${viewMode === "batch" ? "bg-rose-deep text-white" : "bg-surface text-rose-deep"}`}>상품별</button>
+            </span>
             <button type="button" onClick={() => setPaidOnly((v) => !v)} className={`rounded-lg px-2.5 py-1 text-[11px] font-black ${paidOnly ? "bg-emerald-600 text-white" : "border border-amber-300 bg-warn-bg text-warn-tx"}`}>{paidOnly ? "결제완료만 ✓" : "미결제 포함"}</button>
-            <button type="button" onClick={() => setSortMode("nickname")} className={`rounded-lg px-2.5 py-1 text-[11px] font-black ${sortMode === "nickname" ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}>ㄱㄴㄷ순</button>
-            <button type="button" onClick={() => setSortMode("time")} className={`rounded-lg px-2.5 py-1 text-[11px] font-black ${sortMode === "time" ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}>시간순</button>
+            <button type="button" onClick={() => setUnpickedOnly((v) => !v)} className={`rounded-lg px-2.5 py-1 text-[11px] font-black ${unpickedOnly ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}>{unpickedOnly ? "안 챙긴 것만 ✓" : "안 챙긴 것만"}</button>
+            {viewMode === "order" ? (
+              <>
+                <button type="button" onClick={() => setSortMode("nickname")} className={`rounded-lg px-2.5 py-1 text-[11px] font-black ${sortMode === "nickname" ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}>ㄱㄴㄷ순</button>
+                <button type="button" onClick={() => setSortMode("time")} className={`rounded-lg px-2.5 py-1 text-[11px] font-black ${sortMode === "time" ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}>시간순</button>
+              </>
+            ) : null}
             <button type="button" onClick={resetAll} disabled={resetting} className="rounded-lg border border-danger-tx bg-danger-bg px-2.5 py-1 text-[11px] font-black text-[var(--color-danger-tx)] hover:bg-danger-bg disabled:opacity-50">{resetting ? "초기화중" : "전체 초기화"}</button>
             <button type="button" onClick={runExcel} disabled={exporting} className="rounded-lg bg-slate-950 px-2.5 py-1 text-[11px] font-black text-white hover:bg-rose-deep disabled:opacity-50">{exporting ? "내보내는중" : "엑셀"}</button>
+          </div>
+        </div>
+
+        {/* 진행 바 */}
+        <div className="shrink-0 px-4 pt-2">
+          <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2">
+            <div className="h-full rounded-full bg-emerald-500 transition-all duration-300" style={{ width: `${totalQty > 0 ? Math.round((pickedQty / totalQty) * 100) : 0}%` }} />
           </div>
         </div>
 
@@ -233,13 +303,37 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
           />
         </div>
 
-        {/* 패널 목록 (이 영역만 스크롤 — 모달 높이는 88vh 고정) */}
+        {/* 목록 (이 영역만 스크롤 — 모달 높이는 88vh 고정) */}
         <div className="flex-1 overflow-y-auto bg-surface-2 px-3 py-3">
-          {visiblePanels.length === 0 ? (
-            <div className="py-10 text-center text-sm font-bold text-ink-mute">챙길 주문이 없습니다.</div>
+          {viewMode === "batch" ? (
+            batchRows.length === 0 ? (
+              <div className="py-10 text-center text-sm font-bold text-ink-mute">{unpickedOnly ? "안 챙긴 상품이 없어요! 🎉" : "챙길 상품이 없습니다."}</div>
+            ) : (
+              <>
+                <div className="mb-2 px-1 text-[11px] font-bold text-ink-mute">상품 한 종류씩 한 번에 모아 집으세요. 한 줄 누르면 그 상품 전부 챙김 처리돼요.</div>
+                <div className="space-y-1.5">
+                  {batchRows.map((row) => {
+                    const done = row.ids.every((id) => pickedIds.has(id));
+                    const some = !done && row.ids.some((id) => pickedIds.has(id));
+                    return (
+                      <button key={row.text} type="button" onClick={() => toggleIds(row.ids)} className={`flex w-full items-center gap-3 rounded-xl border-2 px-3 py-2.5 text-left ${done ? "border-emerald-300 bg-ok-bg" : "border-line bg-surface hover:bg-surface-2"}`}>
+                        <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 text-[12px] font-black ${done ? "border-emerald-500 bg-emerald-500 text-white" : some ? "border-emerald-400 bg-emerald-100 text-emerald-600" : "border-line text-transparent"}`}>{some ? "–" : "✓"}</span>
+                        <span className={`min-w-0 flex-1 truncate text-[14px] font-black ${done ? "text-ink-mute line-through" : "text-ink"}`}>{row.text}</span>
+                        <span className="shrink-0 whitespace-nowrap text-right">
+                          <span className={`text-[16px] font-black ${done ? "text-ink-mute" : "text-rose-deep"}`}>×{row.totalQty}</span>
+                          <span className="ml-1 text-[11px] font-bold text-ink-mute">({row.pickedQty}/{row.totalQty})</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )
+          ) : displayPanels.length === 0 ? (
+            <div className="py-10 text-center text-sm font-bold text-ink-mute">{unpickedOnly ? "안 챙긴 게 없어요! 다 챙겼습니다 🎉" : "챙길 주문이 없습니다."}</div>
           ) : (
             <div className="space-y-2.5">
-              {visiblePanels.map((panel) => {
+              {displayPanels.map((panel) => {
                 const pickedInPanel = panel.items.filter((it) => pickedIds.has(it.id)).length;
                 const complete = panel.items.length > 0 && pickedInPanel === panel.items.length;
                 return (
@@ -252,6 +346,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                         {panel.name && panel.name !== panel.nickname ? <span className="shrink-0 text-[12px] font-bold text-ink-soft">· {panel.name}</span> : null}
                         {whenText(panel.when) ? <span className="shrink-0 text-[11px] font-semibold text-ink-mute">{whenText(panel.when)}</span> : null}
                       </span>
+                      {panel.phone && (phoneCount.get(panel.phone) || 0) > 1 ? (
+                        <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black text-violet-700" title="같은 고객의 다른 주문도 있어요 — 한 박스로 같이 포장하세요(합배송)">📦 같은고객 {phoneCount.get(panel.phone)}건</span>
+                      ) : null}
                       {panel.paid ? (
                         <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-ok-tx">결제완료</span>
                       ) : (
