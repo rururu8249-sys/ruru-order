@@ -1848,7 +1848,7 @@ export default function OrderPage() {
     const { data, error } = await supabase
       .from("products")
       .select("*, image_url, main_image_url, external_image_url, detail_image_urls, image_path")
-      .limit(80);
+      .limit(1000);
 
     if (error) {
       console.log("등록상품 빠른선택 불러오기 오류", error.message);
