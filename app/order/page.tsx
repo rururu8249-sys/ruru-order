@@ -77,6 +77,7 @@ import CustomerToastNotice from "@/components/customer/CustomerToastNotice";
 import CustomerManualAddressPanel from "@/components/customer/CustomerManualAddressPanel";
 import CustomerMissingDetailAddressPanel from "@/components/customer/CustomerMissingDetailAddressPanel";
 import GroupBuyQuickSelect, { type GroupBuyQuickSelectProduct } from "@/components/order/GroupBuyQuickSelect";
+import PWAInstallBanner from "@/components/PWAInstallBanner";
 
 
 type OrderItem = {
@@ -4260,6 +4261,7 @@ export default function OrderPage() {
     <OrderPageShell>
       <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}`}</style>
       {hasSavedInfo && <TopCustomerNav />}
+      <PWAInstallBanner />
 
       {/* 접속 팝업 공지 — 카톡 로그인 후 주문서 첫 화면에 표시. 밴드 바로가기 + 24시간 안 보기 + 확인. 모든 모바일 대응. */}
       {popupOpen && hasSavedInfo ? (
