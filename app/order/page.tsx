@@ -5249,7 +5249,8 @@ export default function OrderPage() {
 
         {alertSheetOpen ? (
           <div onClick={() => setAlertSheetOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 60, display: "flex", alignItems: "flex-end" }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: "#fff", borderRadius: "18px 18px 0 0", padding: "20px 18px 26px" }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: "#fff", borderTopLeftRadius: "24px", borderTopRightRadius: "24px", padding: "20px 18px 26px" }}>
+              <div style={{ width: "40px", height: "4px", borderRadius: "2px", background: "#E0DAD3", margin: "2px auto 12px" }} />
               <div style={{ fontSize: "17px", fontWeight: 800, color: "#7B2D43", marginBottom: "8px" }}>🔔 방송 시작 알림을 받으시겠어요?</div>
               <div style={{ fontSize: "13px", color: "#666", lineHeight: 1.6, marginBottom: "18px" }}>신청하면 라이브 시작 때 카카오 알림톡으로 알려드려요. 신청 시 알림 수신에 동의하며, 언제든 끌 수 있어요.</div>
               {liveAlertOptin ? (
@@ -5263,7 +5264,8 @@ export default function OrderPage() {
 
         {inquirySheetOpen ? (
           <div onClick={() => setInquirySheetOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 60, display: "flex", alignItems: "flex-end" }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: "#fff", borderRadius: "18px 18px 0 0", padding: "18px" }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: "#fff", borderTopLeftRadius: "24px", borderTopRightRadius: "24px", padding: "18px" }}>
+              <div style={{ width: "40px", height: "4px", borderRadius: "2px", background: "#E0DAD3", margin: "2px auto 12px" }} />
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
                 <span style={{ fontSize: "16px", fontWeight: 800, color: "#7B2D43" }}>문의하기</span>
                 <button type="button" onClick={() => setInquirySheetOpen(false)} aria-label="닫기" style={{ border: "none", background: "none", fontSize: "20px", color: "#999", cursor: "pointer" }}>✕</button>
@@ -5280,7 +5282,8 @@ export default function OrderPage() {
 
         {noticeSheetOpen ? (
           <div onClick={() => setNoticeSheetOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 60, display: "flex", alignItems: "flex-end" }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: "#fff", borderRadius: "18px 18px 0 0", padding: "18px", maxHeight: "70vh", overflowY: "auto" }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: "#fff", borderTopLeftRadius: "24px", borderTopRightRadius: "24px", padding: "18px", maxHeight: "70vh", overflowY: "auto" }}>
+              <div style={{ width: "40px", height: "4px", borderRadius: "2px", background: "#E0DAD3", margin: "2px auto 12px" }} />
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
                 <span style={{ fontSize: "16px", fontWeight: 800, color: "#7B2D43" }}>📢 공지사항</span>
                 <button type="button" onClick={() => setNoticeSheetOpen(false)} aria-label="닫기" style={{ border: "none", background: "none", fontSize: "20px", color: "#999", cursor: "pointer" }}>✕</button>

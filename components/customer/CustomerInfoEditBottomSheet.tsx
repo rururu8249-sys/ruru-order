@@ -166,12 +166,12 @@ export default function CustomerInfoEditBottomSheet({
     alignItems: "flex-end",
     justifyContent: "center",
     background: "rgba(15,23,42,0.45)",
-    padding: "0 12px",
   };
 
   const panelStyle: CSSProperties = {
     width: "100%",
-    maxWidth: "480px",
+    maxWidth: "560px",
+    margin: "0 auto",
     background: "#F7F4F1",
     borderRadius: "20px 20px 0 0",
     overflow: "hidden",

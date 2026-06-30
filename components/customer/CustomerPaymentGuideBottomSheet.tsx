@@ -96,7 +96,7 @@ export default function CustomerPaymentGuideBottomSheet({
   return (
     <div
       data-ruru-payment-guide-bottom-sheet="shell-v2"
-      style={{ position: "fixed", inset: 0, zIndex: 90, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(15,23,42,0.45)", padding: "0 12px" }}
+      style={{ position: "fixed", inset: 0, zIndex: 90, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(15,23,42,0.45)" }}
       role="dialog"
       aria-modal="true"
       aria-label={isOrderComplete ? "주문 접수 완료 및 입금 안내" : "입금 안내"}
@@ -107,7 +107,7 @@ export default function CustomerPaymentGuideBottomSheet({
     50% { transform: translateY(-50%) translateX(-8px); }
   }
 `}</style>
-      <div style={{ width: "100%", maxWidth: "430px", overflow: "hidden", borderTopLeftRadius: "28px", borderTopRightRadius: "28px", background: "#fff", boxShadow: "0 -22px 70px rgba(15,23,42,0.22)" }}>
+      <div style={{ width: "100%", maxWidth: "560px", margin: "0 auto", overflow: "hidden", borderTopLeftRadius: "28px", borderTopRightRadius: "28px", background: "#fff", boxShadow: "0 -22px 70px rgba(15,23,42,0.22)" }}>
         <div style={{ margin: "12px auto 0", height: "5px", width: "52px", borderRadius: "3px", background: "#E8E2DD" }} />
 
         <div style={{ maxHeight: "86dvh", overflowY: "auto", padding: "20px 16px calc(16px + env(safe-area-inset-bottom))" }}>
