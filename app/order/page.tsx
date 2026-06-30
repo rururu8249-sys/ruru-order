@@ -4313,10 +4313,13 @@ export default function OrderPage() {
         <section style={{ margin: "8px auto 0", width: "100%", maxWidth: "560px" }}>
           {!isBroadcastOn ? (
             <div style={{ display: "flex", gap: "8px", padding: "12px 16px 14px", borderBottom: "0.5px solid #E5E1DC" }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "13px", fontWeight: 800, color: "#7B2D43", background: "#F9EEF3", padding: "5px 11px", borderRadius: "99px", marginBottom: "10px" }}>🛍 쇼핑몰 모드</div>
-                <div style={{ fontSize: "15px", fontWeight: 800, color: "#7B2D43", marginBottom: "4px" }}>지금은 라이브 방송 중이 아니에요</div>
-                <div style={{ fontSize: "14px", fontWeight: 600, color: "#555", lineHeight: 1.6, wordBreak: "keep-all" }}>방송 중이 아니어도 구매 가능한 상품이 준비돼 있어요. 아래에서 언제든 주문하실 수 있어요 🛒</div>
+              <div style={{ flex: 1, position: "relative", aspectRatio: "9 / 16", background: "#F6E7ED", borderRadius: "12px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ textAlign: "center", padding: "0 16px" }}>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "11px", fontWeight: 700, color: "#a98792", background: "#fff", padding: "4px 11px", borderRadius: "99px", marginBottom: "18px" }}>🛍 쇼핑몰 모드</div>
+                  <div style={{ fontSize: "20px", fontWeight: 800, color: "#7B2D43", marginBottom: "10px", lineHeight: 1.35 }}>지금 바로<br />구매하실 수 있어요!</div>
+                  <div style={{ fontSize: "12px", fontWeight: 500, color: "#9a7e87", lineHeight: 1.55, marginBottom: "20px" }}>라이브 방송 중이 아니어도<br />언제든 주문 가능해요</div>
+                  <button type="button" onClick={() => { document.getElementById("ruru-shop-top")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "#7B2D43", color: "#fff", fontSize: "14px", fontWeight: 700, padding: "11px 20px", borderRadius: "99px", border: "none", cursor: "pointer" }}>🛒 상품 보러가기</button>
+                </div>
               </div>
               {liveSideRail}
             </div>
@@ -4429,7 +4432,7 @@ export default function OrderPage() {
             const extraCats = presentCats.filter((c) => !PRESET_CATS.includes(c)).sort();
             const categoryTabs = ["전체", ...PRESET_CATS, ...extraCats];
             return (
-              <section style={{ margin: "12px auto 0", width: "100%", maxWidth: "560px" }}>
+              <section id="ruru-shop-top" style={{ margin: "12px auto 0", width: "100%", maxWidth: "560px", scrollMarginTop: "70px" }}>
                 <input
                   value={productSearchText}
                   onChange={(e) => { setProductSearchText(e.target.value); setProductPage(1); setVisibleProductCount(10); }}
