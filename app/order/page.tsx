@@ -1048,6 +1048,10 @@ export default function OrderPage() {
     return Date.now() > hideUntil;
   });
   const [videoOpen, setVideoOpen] = useState(true);
+  const videoSlotRef = useRef<HTMLDivElement | null>(null);
+  const livePlayerRef = useRef<HTMLDivElement | null>(null);
+  const [videoClosed, setVideoClosed] = useState(false); // ✕로 완전 닫음
+  const [miniPos, setMiniPos] = useState<{ left: number; top: number } | null>(null);
   const [productPage, setProductPage] = useState(1);
   const [visibleProductCount, setVisibleProductCount] = useState(10);
   const [categoryFilter, setCategoryFilter] = useState<string>("전체");
@@ -1094,6 +1098,42 @@ export default function OrderPage() {
   const [showOptionDetail, setShowOptionDetail] = useState(false);
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
   const [duplicateWarningPendingAction, setDuplicateWarningPendingAction] = useState<(() => void) | null>(null);
+
+  // 라이브 미니플레이어: 풀 모드일 때 슬롯 위치를 rAF로 추적해 fixed 플레이어를 슬롯에 도킹
+  useEffect(() => {
+    if (!videoOpen || videoClosed) return;
+    let raf = 0;
+    const sync = () => {
+      const slot = videoSlotRef.current, p = livePlayerRef.current;
+      if (slot && p) {
+        const r = slot.getBoundingClientRect();
+        p.style.left = r.left + "px"; p.style.top = r.top + "px";
+        p.style.width = r.width + "px"; p.style.height = r.height + "px";
+        p.style.borderRadius = "10px";
+      }
+      raf = requestAnimationFrame(sync);
+    };
+    raf = requestAnimationFrame(sync);
+    return () => cancelAnimationFrame(raf);
+  }, [videoOpen, videoClosed]);
+
+  // 미니 모드: 드래그 위치 or 기본 우하단, 화면 경계 clamp (리사이즈/회전 시 재적용)
+  useEffect(() => {
+    if (videoOpen || videoClosed) return;
+    const p = livePlayerRef.current; if (!p) return;
+    const place = () => {
+      const w = 116, h = Math.round(w * 16 / 9), m = 12;
+      const left = miniPos ? miniPos.left : (window.innerWidth - w - m);
+      const top = miniPos ? miniPos.top : (window.innerHeight - h - 84);
+      p.style.width = w + "px"; p.style.height = h + "px";
+      p.style.left = Math.max(m, Math.min(left, window.innerWidth - w - m)) + "px";
+      p.style.top = Math.max(m, Math.min(top, window.innerHeight - h - m)) + "px";
+      p.style.borderRadius = "12px";
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [videoOpen, videoClosed, miniPos]);
 
   useEffect(() => {
     if (!directInputOpen || typeof window === "undefined") {
@@ -4315,9 +4355,10 @@ export default function OrderPage() {
             <div style={{ display: "flex", gap: "8px", padding: "12px 16px 14px", borderBottom: "0.5px solid #E5E1DC" }}>
               <div style={{ flex: 1, position: "relative", aspectRatio: "9 / 16", background: "#F6E7ED", borderRadius: "12px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <div style={{ textAlign: "center", padding: "0 16px" }}>
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "11px", fontWeight: 700, color: "#a98792", background: "#fff", padding: "4px 11px", borderRadius: "99px", marginBottom: "18px" }}>🛍 쇼핑몰 모드</div>
-                  <div style={{ fontSize: "20px", fontWeight: 800, color: "#7B2D43", marginBottom: "10px", lineHeight: 1.35 }}>지금 바로<br />구매하실 수 있어요!</div>
-                  <div style={{ fontSize: "12px", fontWeight: 500, color: "#9a7e87", lineHeight: 1.55, marginBottom: "20px" }}>라이브 방송 중이 아니어도<br />언제든 주문 가능해요</div>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "11px", fontWeight: 700, color: "#a98792", background: "#fff", padding: "4px 11px", borderRadius: "99px", marginBottom: "10px" }}>🛍 쇼핑몰 모드</div>
+                  <div style={{ fontSize: "11px", fontWeight: 600, color: "#b09aa1", marginBottom: "8px" }}>지금은 라이브 방송 중이 아니에요</div>
+                  <div style={{ fontSize: "20px", fontWeight: 800, color: "#7B2D43", marginBottom: "10px", lineHeight: 1.35 }}>그래도 지금 바로<br />구매하실 수 있어요!</div>
+                  <div style={{ fontSize: "12px", fontWeight: 500, color: "#9a7e87", lineHeight: 1.55, marginBottom: "20px" }}>마음에 드는 상품 언제든 주문 가능해요</div>
                   <button type="button" onClick={() => { document.getElementById("ruru-shop-top")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "#7B2D43", color: "#fff", fontSize: "14px", fontWeight: 700, padding: "11px 20px", borderRadius: "99px", border: "none", cursor: "pointer" }}>🛒 상품 보러가기</button>
                 </div>
               </div>
@@ -4329,20 +4370,18 @@ export default function OrderPage() {
             <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", fontWeight: 800, color: "#C0392B" }}>
               <span style={{ fontSize: "9px" }}>●</span> LIVE 방송 중
             </span>
-            <button type="button" onClick={() => setVideoOpen((v) => !v)} style={{ background: "none", border: "none", fontSize: "13px", fontWeight: 700, color: "#7A1E47", cursor: "pointer" }}>{videoOpen ? "접기 ▲" : "펼치기 ▼"}</button>
+            <button type="button" onClick={() => { if (videoClosed) { setVideoClosed(false); setVideoOpen(true); } else { setVideoOpen((v) => !v); } }} style={{ background: "none", border: "none", fontSize: "13px", fontWeight: 700, color: "#7A1E47", cursor: "pointer" }}>{videoClosed ? "영상 보기 ▼" : (videoOpen ? "접기 ▲" : "펼치기 ▼")}</button>
           </div>
-          {videoOpen ? (
+          {videoOpen && !videoClosed ? (
           <>
           <div style={{ display: "flex", gap: "8px", padding: "0 14px 12px", borderBottom: "0.5px solid #E5E1DC" }}>
-            <div style={{ flex: 1, position: "relative", aspectRatio: "9 / 16", background: "#141414", borderRadius: "10px", overflow: "hidden" }}>
-              {isBroadcastOn && videoEmbedSrc ? (
-                <iframe src={videoEmbedSrc} title="루루동이 라이브" style={{ width: "100%", height: "100%", border: "none", position: "absolute", inset: 0 }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
-              ) : (
+            <div ref={videoSlotRef} style={{ flex: 1, position: "relative", aspectRatio: "9 / 16", background: "#141414", borderRadius: "10px", overflow: "hidden" }}>
+              {!(isBroadcastOn && videoEmbedSrc) ? (
                 <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
                   <span style={{ fontSize: "28px", opacity: 0.3 }}>📺</span>
                   <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", textAlign: "center", lineHeight: 1.5, marginTop: "6px" }}>현재 방송 중이<br />아닙니다</span>
                 </div>
-              )}
+              ) : null}
             </div>
             {liveSideRail}
           </div>
@@ -4359,6 +4398,39 @@ export default function OrderPage() {
           )}
         </section>
       ) : null}
+
+      {hasSavedInfo && isBroadcastOn && videoEmbedSrc && !videoClosed && (
+        <div ref={livePlayerRef} style={{ position: "fixed", zIndex: 45, overflow: "hidden", background: "#141414", boxShadow: videoOpen ? "none" : "0 6px 20px rgba(0,0,0,0.28)" }}>
+          <iframe src={videoEmbedSrc} title="루루동이 라이브" style={{ width: "100%", height: "100%", border: "none", display: "block" }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
+          {!videoOpen && (
+            <>
+              <div
+                onPointerDown={(e) => {
+                  const p = livePlayerRef.current; if (!p) return;
+                  const rect = p.getBoundingClientRect();
+                  const offX = e.clientX - rect.left, offY = e.clientY - rect.top;
+                  (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+                  const move = (ev: PointerEvent) => {
+                    const w = rect.width, h = rect.height, m = 12;
+                    let nl = ev.clientX - offX, nt = ev.clientY - offY;
+                    nl = Math.max(m, Math.min(nl, window.innerWidth - w - m));
+                    nt = Math.max(m, Math.min(nt, window.innerHeight - h - m));
+                    setMiniPos({ left: nl, top: nt });
+                  };
+                  const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
+                  window.addEventListener("pointermove", move);
+                  window.addEventListener("pointerup", up);
+                }}
+                style={{ position: "absolute", top: 0, left: 0, right: 0, height: "26px", background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "4px", padding: "0 4px", cursor: "move", touchAction: "none" }}
+              >
+                <button type="button" aria-label="펼치기" onPointerDown={(e) => e.stopPropagation()} onClick={() => setVideoOpen(true)} style={{ width: "20px", height: "20px", borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.85)", color: "#222", fontSize: "11px", cursor: "pointer" }}>⤢</button>
+                <button type="button" aria-label="닫기" onPointerDown={(e) => e.stopPropagation()} onClick={() => { setVideoClosed(true); }} style={{ width: "20px", height: "20px", borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.85)", color: "#222", fontSize: "11px", cursor: "pointer" }}>✕</button>
+              </div>
+              <div style={{ position: "absolute", top: "6px", left: "6px", background: "#C0392B", color: "#fff", fontSize: "8px", fontWeight: 600, padding: "1px 5px", borderRadius: "99px", pointerEvents: "none" }}>● LIVE</div>
+            </>
+          )}
+        </div>
+      )}
 
       {!isAutoLoggedIn && (isEditingCustomerInfo || customerMode === "new") && (
         <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
