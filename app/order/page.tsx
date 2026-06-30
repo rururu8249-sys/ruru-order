@@ -4201,6 +4201,39 @@ export default function OrderPage() {
     );
   }
 
+  const liveSideRail = (
+    <div style={{ width: "52px", flexShrink: 0, display: "flex", flexDirection: "column", gap: "11px", paddingTop: "2px" }}>
+      <button type="button" disabled={!(isBroadcastOn && broadcastYoutubeUrl)} onClick={isBroadcastOn && broadcastYoutubeUrl ? () => window.open(broadcastYoutubeUrl, "_blank") : undefined} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: isBroadcastOn && broadcastYoutubeUrl ? "pointer" : "default", opacity: isBroadcastOn && broadcastYoutubeUrl ? 1 : 0.4 }}>
+        <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: "#F2ECEE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>🔴</span>
+        <span style={{ fontSize: "9px", color: "#C0392B", fontWeight: 600 }}>라이브참여</span>
+      </button>
+      <button type="button" onClick={() => setAlertSheetOpen(true)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
+        <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: liveAlertOptin ? "#7B2D43" : "#F2ECEE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>🔔</span>
+        <span style={{ fontSize: "9px", color: liveAlertOptin ? "#7B2D43" : "#555", fontWeight: 600 }}>{liveAlertOptin ? "알림 ON" : "방송알림"}</span>
+      </button>
+      <button type="button" onClick={() => setNoticeSheetOpen(true)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
+        <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: "#F2ECEE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>📢</span>
+        <span style={{ fontSize: "9px", color: "#555", fontWeight: 500 }}>공지</span>
+      </button>
+      <button type="button" onClick={() => openOrderLookupBottomSheet()} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
+        <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: "#F2ECEE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>📦</span>
+        <span style={{ fontSize: "9px", color: "#555", fontWeight: 500 }}>주문내역</span>
+      </button>
+      <button type="button" onClick={() => openCustomerInfoEditBottomSheet()} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
+        <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: "#F2ECEE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>👤</span>
+        <span style={{ fontSize: "9px", color: "#555", fontWeight: 500 }}>회원정보</span>
+      </button>
+      <button type="button" onClick={() => setInquirySheetOpen(true)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
+        <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: "#F2ECEE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>💬</span>
+        <span style={{ fontSize: "9px", color: "#555", fontWeight: 500 }}>문의</span>
+      </button>
+      <button type="button" onClick={() => window.location.reload()} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
+        <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: "#F2ECEE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>🔄</span>
+        <span style={{ fontSize: "9px", color: "#555", fontWeight: 500 }}>새로고침</span>
+      </button>
+    </div>
+  );
+
   return (
     <OrderPageShell>
       <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}`}</style>
@@ -4279,10 +4312,13 @@ export default function OrderPage() {
       {hasSavedInfo ? (
         <section style={{ margin: "8px auto 0", width: "100%", maxWidth: "560px" }}>
           {!isBroadcastOn ? (
-            <div style={{ padding: "12px 16px 14px", borderBottom: "0.5px solid #E5E1DC" }}>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "13px", fontWeight: 800, color: "#7B2D43", background: "#F9EEF3", padding: "5px 11px", borderRadius: "99px", marginBottom: "10px" }}>🛍 쇼핑몰 모드</div>
-              <div style={{ fontSize: "15px", fontWeight: 800, color: "#7B2D43", marginBottom: "4px" }}>지금은 라이브 방송 중이 아니에요</div>
-              <div style={{ fontSize: "14px", fontWeight: 600, color: "#555", lineHeight: 1.6, wordBreak: "keep-all" }}>방송 중이 아니어도 구매 가능한 상품이 준비돼 있어요. 아래에서 언제든 주문하실 수 있어요 🛒</div>
+            <div style={{ display: "flex", gap: "8px", padding: "12px 16px 14px", borderBottom: "0.5px solid #E5E1DC" }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "13px", fontWeight: 800, color: "#7B2D43", background: "#F9EEF3", padding: "5px 11px", borderRadius: "99px", marginBottom: "10px" }}>🛍 쇼핑몰 모드</div>
+                <div style={{ fontSize: "15px", fontWeight: 800, color: "#7B2D43", marginBottom: "4px" }}>지금은 라이브 방송 중이 아니에요</div>
+                <div style={{ fontSize: "14px", fontWeight: 600, color: "#555", lineHeight: 1.6, wordBreak: "keep-all" }}>방송 중이 아니어도 구매 가능한 상품이 준비돼 있어요. 아래에서 언제든 주문하실 수 있어요 🛒</div>
+              </div>
+              {liveSideRail}
             </div>
           ) : (
           <>
@@ -4305,32 +4341,7 @@ export default function OrderPage() {
                 </div>
               )}
             </div>
-            <div style={{ width: "52px", flexShrink: 0, display: "flex", flexDirection: "column", gap: "11px", paddingTop: "2px" }}>
-              <button type="button" disabled={!(isBroadcastOn && broadcastYoutubeUrl)} onClick={isBroadcastOn && broadcastYoutubeUrl ? () => window.open(broadcastYoutubeUrl, "_blank") : undefined} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: isBroadcastOn && broadcastYoutubeUrl ? "pointer" : "default", opacity: isBroadcastOn && broadcastYoutubeUrl ? 1 : 0.4 }}>
-                <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: "#E8340A", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>🔴</span>
-                <span style={{ fontSize: "9px", color: "#E8340A", fontWeight: 600 }}>라이브참여</span>
-              </button>
-              <button type="button" onClick={() => setAlertSheetOpen(true)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
-                <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: liveAlertOptin ? "#7B2D43" : "#F2ECEE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>🔔</span>
-                <span style={{ fontSize: "9px", color: liveAlertOptin ? "#7B2D43" : "#555", fontWeight: 600 }}>{liveAlertOptin ? "알림 ON" : "방송알림"}</span>
-              </button>
-              <button type="button" onClick={() => setNoticeSheetOpen(true)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
-                <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: "#F2ECEE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>📢</span>
-                <span style={{ fontSize: "9px", color: "#555", fontWeight: 500 }}>공지</span>
-              </button>
-              <button type="button" onClick={() => openOrderLookupBottomSheet()} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
-                <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: "#F2ECEE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>📦</span>
-                <span style={{ fontSize: "9px", color: "#555", fontWeight: 500 }}>주문내역</span>
-              </button>
-              <button type="button" onClick={() => openCustomerInfoEditBottomSheet()} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
-                <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: "#F2ECEE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>👤</span>
-                <span style={{ fontSize: "9px", color: "#555", fontWeight: 500 }}>회원정보</span>
-              </button>
-              <button type="button" onClick={() => setInquirySheetOpen(true)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
-                <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: "#F2ECEE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>💬</span>
-                <span style={{ fontSize: "9px", color: "#555", fontWeight: 500 }}>문의</span>
-              </button>
-            </div>
+            {liveSideRail}
           </div>
           <div style={{ padding: "9px 14px", borderBottom: "0.5px solid #E5E1DC", fontSize: "12px", fontWeight: 700, color: "#555" }}>
             {broadcast ? (
