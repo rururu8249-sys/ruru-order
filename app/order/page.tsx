@@ -4279,9 +4279,10 @@ export default function OrderPage() {
       {hasSavedInfo ? (
         <section style={{ margin: "8px auto 0", width: "100%", maxWidth: "560px" }}>
           {!isBroadcastOn ? (
-            <div style={{ padding: "14px 16px", borderBottom: "0.5px solid #E5E1DC" }}>
-              <div style={{ fontSize: "15px", fontWeight: 800, color: "#7B2D43", marginBottom: "4px" }}>📺 지금은 방송 중이 아니에요</div>
-              <div style={{ fontSize: "14px", fontWeight: 600, color: "#555", lineHeight: 1.6, wordBreak: "keep-all" }}>아래 상품은 방송이 없어도 언제든 주문할 수 있어요.</div>
+            <div style={{ padding: "12px 16px 14px", borderBottom: "0.5px solid #E5E1DC" }}>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "13px", fontWeight: 800, color: "#7B2D43", background: "#F9EEF3", padding: "5px 11px", borderRadius: "99px", marginBottom: "10px" }}>🛍 쇼핑몰 모드</div>
+              <div style={{ fontSize: "15px", fontWeight: 800, color: "#7B2D43", marginBottom: "4px" }}>지금은 라이브 방송 중이 아니에요</div>
+              <div style={{ fontSize: "14px", fontWeight: 600, color: "#555", lineHeight: 1.6, wordBreak: "keep-all" }}>방송 중이 아니어도 구매 가능한 상품이 준비돼 있어요. 아래에서 언제든 주문하실 수 있어요 🛒</div>
             </div>
           ) : (
           <>
