@@ -328,6 +328,12 @@ function ImagePicker({
     };
   }, [triggerRef]);
   const [uploading, setUploading] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const c = () => setIsMobile(typeof window !== "undefined" && window.innerWidth <= 640);
+    c(); window.addEventListener("resize", c);
+    return () => window.removeEventListener("resize", c);
+  }, []);
 
   const uploadFiles = async (files: FileList | File[]) => {
     const safeFiles = Array.from(files).filter((file) => file.type.startsWith("image/"));
@@ -467,7 +473,7 @@ function ImagePicker({
       />
 
       {/* 목업 .detail-photos : 5칸 그리드 */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "6px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${isMobile ? 3 : 5}, 1fr)`, gap: "6px" }}>
         {Array.from({ length: maxFiles }, (_, index) => {
           const image = value[index] || "";
           const isAddSlot = index === value.length;
@@ -520,6 +526,12 @@ export default function QuickProductFastForm({
 }: QuickProductFastFormProps) {
   const [category, setCategory] = useState("");
   const [badgeType, setBadgeType] = useState("none");
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const c = () => setIsMobile(typeof window !== "undefined" && window.innerWidth <= 640);
+    c(); window.addEventListener("resize", c);
+    return () => window.removeEventListener("resize", c);
+  }, []);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [addingCategory, setAddingCategory] = useState(false);
   const [newCategoryText, setNewCategoryText] = useState("");
@@ -973,7 +985,7 @@ export default function QuickProductFastForm({
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 18px" }}>
 
           {/* .top-row : 사진(120) + 필드 */}
-          <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: "14px", marginBottom: "14px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "120px 1fr", gap: "14px", marginBottom: "14px" }}>
             <div style={{ width: "120px" }}>
               <ImagePicker label="" value={coverImages} maxFiles={1} uploadKind="cover" mode="cover" onChange={setCoverImages} triggerRef={coverUploadRef} />
             </div>
