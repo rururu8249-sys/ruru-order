@@ -443,6 +443,10 @@ function ImagePicker({
             </button>
           ) : null}
         </div>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: "4px", marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#7B2D43", background: "#F9EEF3", border: "1px solid #E7C9D4", borderRadius: "8px", padding: "6px 10px", cursor: "pointer" }}>
+          📷 촬영하기
+          <input type="file" accept="image/*" capture="environment" hidden onChange={handleFileChange} />
+        </label>
       </div>
     );
   }
@@ -951,7 +955,6 @@ export default function QuickProductFastForm({
     <div
       className="ruru-product-sian"
       style={{ position: "fixed", inset: 0, zIndex: 90, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", padding: "16px" }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
     >
       {/* .modal */}
       <div style={{ width: "560px", maxWidth: "100%", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "12px", boxShadow: "0 0 0 2px #7B2D43, 0 8px 40px rgba(0,0,0,0.35)", overflow: "hidden", transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}>
