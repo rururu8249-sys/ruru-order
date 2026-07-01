@@ -148,6 +148,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   const [copied, setCopied] = useState(false);
   const [busyId, setBusyId] = useState("");
+  const [isNarrow, setIsNarrow] = useState(false);
   // 위젯 설정(일괄) 화면
   const [widgetSettingsOpen, setWidgetSettingsOpen] = useState(false);
   const [wsMode, setWsMode] = useState<"rotate" | "pin">("rotate");
@@ -238,6 +239,14 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
   // 방송/쇼핑몰 탭 상품명 검색 필터 (기존 search state 재사용, 표시 전용)
   const nameMatch = (p: ProductRow) => !search.trim() || productName(p).toLowerCase().includes(search.trim().toLowerCase());
+
+  // 모바일(≤640) 감지 — 방송상품 탭 2단→세로 스택
+  useEffect(() => {
+    const check = () => setIsNarrow(typeof window !== "undefined" && window.innerWidth <= 640);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   // 기록 탭(방송별 매출/주문)
   const [histLoaded, setHistLoaded] = useState(false);
@@ -1207,9 +1216,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             )}
           </div>
         ) : tab === "broadcast" ? (
-          <div style={{ flex: 1, minHeight: 0, display: "flex", gap: "12px", padding: "14px 18px 16px" }}>
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: isNarrow ? "column" : "row", gap: "12px", padding: "14px 18px 16px" }}>
             {/* 좌측: 방송 목록 */}
-            <div style={{ width: "260px", flexShrink: 0, display: "flex", flexDirection: "column", border: "1px solid var(--color-line)", borderRadius: "10px", overflow: "hidden" }}>
+            <div style={{ width: isNarrow ? "100%" : "260px", flexShrink: 0, ...(isNarrow ? { maxHeight: "210px" } : {}), display: "flex", flexDirection: "column", border: "1px solid var(--color-line)", borderRadius: "10px", overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 12px", borderBottom: "1px solid var(--color-line)" }}>
                 <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)" }}>📺 방송 목록</span>
                 <button type="button" disabled={bcBusy} onClick={() => { setNewBcTitle(""); setNewBcOpen(true); }} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "7px", padding: "4px 9px", cursor: bcBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>+ 새 방송</button>
@@ -1250,7 +1259,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               </div>
             </div>
             {/* 우측: 선택 방송의 진열 상품 (sort_order순, 읽기 전용) */}
-            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", border: "1px solid var(--color-line)", borderRadius: "10px", overflow: "hidden" }}>
+            <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", border: "1px solid var(--color-line)", borderRadius: "10px", overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 12px", borderBottom: "1px solid var(--color-line)" }}>
                 <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)" }}>진열 상품 {bcProducts.length}개</span>
                 <button type="button" disabled={!bcSelId || bcBusy} onClick={openBcPicker} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "7px", padding: "5px 11px", cursor: !bcSelId || bcBusy ? "not-allowed" : "pointer", opacity: !bcSelId || bcBusy ? 0.5 : 1 }}>+ 상품 담기</button>
