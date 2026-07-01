@@ -55,6 +55,8 @@ type CustomerProfile = {
   is_blocked?: boolean | null;
   block_reason?: string | null;
   customer_memo?: string | null;
+  live_alert_optin?: boolean | null;
+  live_alert_optin_at?: string | null;
   last_order_at?: string | null;
   created_at?: string | null;
   kakao_id?: string | null;
@@ -587,6 +589,12 @@ function CustomerDetailDrawer({
                 {customer.blocked ? (
                   <span style={{ fontSize: "10px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", borderRadius: "6px", padding: "2px 7px" }}>차단</span>
                 ) : null}
+                {profile?.live_alert_optin ? (
+                  <span
+                    title={profile.live_alert_optin_at ? `신청일 ${new Date(profile.live_alert_optin_at).toLocaleDateString("ko-KR")}` : "방송알림 신청"}
+                    style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: 9999, fontSize: 12, fontWeight: 600, background: "#F9EEF3", color: "#7A1E47", marginLeft: 6 }}
+                  >🔔 방송알림</span>
+                ) : null}
               </div>
               <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", lineHeight: 1.8 }}>
                 📞 {formatPhone(customer.phone) || "-"}<br />
@@ -843,7 +851,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
       const { data, error } = await supabase
         .from("customers")
         .select(
-          "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, shipping_addresses, is_blocked, block_reason, customer_memo, last_order_at, created_at, kakao_id, kakao_nickname, kakao_profile_image, first_login_at, last_login_at, customer_history"
+          "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, shipping_addresses, is_blocked, block_reason, customer_memo, last_order_at, created_at, kakao_id, kakao_nickname, kakao_profile_image, first_login_at, last_login_at, customer_history, live_alert_optin, live_alert_optin_at"
         )
         .order("created_at", { ascending: false })
         .limit(1000);
