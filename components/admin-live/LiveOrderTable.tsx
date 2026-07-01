@@ -1023,7 +1023,7 @@ export default function LiveOrderTable({
 
       <div className="h-[1180px] overflow-auto rounded-xl border border-line">
             {/* 헤더 행 */}
-            <div className="grid grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 border-b border-rose-line bg-rose-soft/40 text-[12px] font-black text-ink-soft">
+            <div className="grid min-w-[1000px] grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 border-b border-rose-line bg-rose-soft/40 text-[12px] font-black text-ink-soft">
               <span className="flex items-center justify-center py-2.5">
                 <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} className="h-4 w-4 cursor-pointer accent-[var(--color-rose-deep)]" />
               </span>
@@ -1054,7 +1054,7 @@ export default function LiveOrderTable({
                       onDragOver={isMatchableOrder(order) ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (dropHoverOrderId !== order.id) setDropHoverOrderId(order.id); } : undefined}
                       onDragLeave={isMatchableOrder(order) ? () => setDropHoverOrderId((cur) => (cur === order.id ? "" : cur)) : undefined}
                       onDrop={isMatchableOrder(order) ? (e) => { e.preventDefault(); handleDepositDropOnOrder(order, e.dataTransfer.getData("text/plain")); } : undefined}
-                      className={`grid grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 items-start text-[14px] transition ${dropHoverOrderId === order.id ? "bg-ok-bg ring-2 ring-inset ring-ok-tx" : selected ? "bg-rose-soft/70" : "hover:bg-surface-2"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}
+                      className={`grid min-w-[1000px] grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 items-start text-[14px] transition ${dropHoverOrderId === order.id ? "bg-ok-bg ring-2 ring-inset ring-ok-tx" : selected ? "bg-rose-soft/70" : "hover:bg-surface-2"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}
                     >
                       {/* 0. 선택 체크박스 */}
                       <div className="flex items-center justify-center py-3" onClick={(e) => e.stopPropagation()}>
