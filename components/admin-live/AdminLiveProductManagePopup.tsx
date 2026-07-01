@@ -209,6 +209,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   };
   const stopBcAutoScroll = () => { const s = bcAutoScrollRef.current; if (s.raf) cancelAnimationFrame(s.raf); s.raf = 0; s.dir = 0; };
 
+  // 방송/쇼핑몰 탭 상품명 검색 필터 (기존 search state 재사용, 표시 전용)
+  const nameMatch = (p: ProductRow) => !search.trim() || productName(p).toLowerCase().includes(search.trim().toLowerCase());
+
   // 기록 탭(방송별 매출/주문)
   const [histLoaded, setHistLoaded] = useState(false);
   const [histLoading, setHistLoading] = useState(false);
@@ -1225,6 +1228,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)" }}>진열 상품 {bcProducts.length}개</span>
                 <button type="button" disabled={!bcSelId || bcBusy} onClick={openBcPicker} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "7px", padding: "5px 11px", cursor: !bcSelId || bcBusy ? "not-allowed" : "pointer", opacity: !bcSelId || bcBusy ? 0.5 : 1 }}>+ 상품 담기</button>
               </div>
+              <div style={{ padding: "8px 12px 0" }}>
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 10px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid #e5dfe1", fontSize: "13px", boxSizing: "border-box" }} />
+              </div>
               <div
                 ref={bcScrollRef}
                 onDragOver={handleBcDragAutoScroll}
@@ -1239,13 +1245,13 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   <div style={{ textAlign: "center", padding: "30px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>진열된 상품이 없습니다.</div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
-                    {bcProducts.map((p, i) => {
+                    {bcProducts.filter(nameMatch).map((p, i) => {
                       const img = mainImage(p);
                       const pid = productId(p);
                       return (
                         <div
                           key={pid || i}
-                          draggable={!bcBusy}
+                          draggable={!bcBusy && !search.trim()}
                           onDragStart={() => { setBcDragFrom(i); setBcDragOver(i); }}
                           onDragOver={(e) => { e.preventDefault(); if (bcDragOver !== i) setBcDragOver(i); }}
                           onDrop={(e) => { e.preventDefault(); if (bcDragFrom !== null) void reorderBc(bcDragFrom, i); setBcDragFrom(null); setBcDragOver(null); }}
@@ -1282,18 +1288,19 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)" }}>🛍 쇼핑몰 진열 {shopRows.length}개</span>
               <button type="button" disabled={shopBusy} onClick={openShopPicker} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "7px", padding: "5px 11px", cursor: shopBusy ? "wait" : "pointer", opacity: shopBusy ? 0.5 : 1 }}>+ 쇼핑몰에 상품 추가</button>
             </div>
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 10px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid #e5dfe1", fontSize: "13px", boxSizing: "border-box" }} />
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
               {shopRows.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>진열된 상품이 없습니다.</div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
-                  {shopRows.map((p, i) => {
+                  {shopRows.filter(nameMatch).map((p, i) => {
                     const img = mainImage(p);
                     const pid = productId(p);
                     return (
                       <div
                         key={pid || i}
-                        draggable={!shopBusy}
+                        draggable={!shopBusy && !search.trim()}
                         onDragStart={() => { setShopDragFrom(i); setShopDragOver(i); }}
                         onDragOver={(e) => { e.preventDefault(); if (shopDragOver !== i) setShopDragOver(i); }}
                         onDrop={(e) => { e.preventDefault(); if (shopDragFrom !== null) void reorderShop(shopDragFrom, i); setShopDragFrom(null); setShopDragOver(null); }}
