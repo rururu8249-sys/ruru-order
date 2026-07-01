@@ -106,6 +106,37 @@ export default function LiveHeader({
           >
             ■ 방송종료
           </button>
+          {activeBroadcast && (
+            <button
+              type="button"
+              className="h-9 rounded-xl bg-indigo-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700 disabled:bg-line disabled:text-ink-mute"
+              onClick={async (e) => {
+                const btn = e.currentTarget;
+                btn.disabled = true;
+                try {
+                  const pre = await fetch("/api/admin-live/live-alert-send", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ broadcastId: activeBroadcast.id, dryRun: true }),
+                  }).then((r) => r.json()).catch(() => null);
+                  if (!pre?.ok) { window.alert("대상 조회 실패: " + (pre?.error || "권한/네트워크 확인")); return; }
+                  if (pre.alreadySent) { window.alert("이 방송은 이미 방송알림을 발송했습니다."); return; }
+                  if (!pre.targetCount) { window.alert("방송알림 신청자가 없습니다."); return; }
+                  if (!window.confirm(`방송알림 신청자 ${pre.targetCount}명에게 알림톡을 발송합니다.\n계속할까요?`)) return;
+                  const res = await fetch("/api/admin-live/live-alert-send", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ broadcastId: activeBroadcast.id }),
+                  }).then((r) => r.json()).catch(() => null);
+                  if (res?.alreadySent) { window.alert("이 방송은 이미 방송알림을 발송했습니다."); return; }
+                  if (res?.ok) window.alert(`방송알림 발송 완료\n성공 ${res.successCount} / 실패 ${res.failCount} (대상 ${res.targetCount}명)`);
+                  else window.alert("발송 실패: " + (res?.error || "알 수 없는 오류"));
+                } finally { btn.disabled = false; }
+              }}
+            >
+              📣 방송알림
+            </button>
+          )}
         </div>
       </div>
 
