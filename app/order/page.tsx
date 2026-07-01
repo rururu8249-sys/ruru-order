@@ -1930,7 +1930,7 @@ export default function OrderPage() {
   const loadBroadcastProducts = async (broadcastId: string | number) => {
     const { data, error } = await supabase
       .from("broadcast_products")
-      .select("product_id, products(*)")
+      .select("product_id, sort_order, products(*)")
       .eq("broadcast_id", broadcastId);
 
     if (error) {
@@ -1940,7 +1940,7 @@ export default function OrderPage() {
     }
 
     const nextProducts = (data || [])
-      .map((row: any) => row.products)
+      .map((row: any) => (row.products ? { ...row.products, __bpSort: row.sort_order } : null))
       .filter((product: any) => product)
       .map((product: any) => ({
         id: product.id,
@@ -1961,7 +1961,7 @@ export default function OrderPage() {
         is_pinned: Boolean(product.is_pinned) || Boolean(product.pinned),
         pinned: Boolean(product.pinned) || Boolean(product.is_pinned),
         pinned_at: String(product.pinned_at ?? ""),
-        sort_order: Number(product.sort_order ?? product.display_order ?? 999999),
+        sort_order: Number(product.__bpSort ?? product.sort_order ?? product.display_order ?? 999999),
         display_order: Number(product.display_order ?? product.sort_order ?? 999999),
         created_at: String(product.created_at ?? ""),
         updated_at: String(product.updated_at ?? ""),
