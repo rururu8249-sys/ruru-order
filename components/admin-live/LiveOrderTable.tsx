@@ -414,6 +414,12 @@ export default function LiveOrderTable({
   const [pageSize, setPageSize] = useState(10);
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [selectedDepositIds, setSelectedDepositIds] = useState<string[]>([]);
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const c = () => setIsMobile(typeof window !== "undefined" && window.innerWidth <= 640);
+    c(); window.addEventListener("resize", c);
+    return () => window.removeEventListener("resize", c);
+  }, []);
   const [matchSaving, setMatchSaving] = useState(false);
   const [matchSearch, setMatchSearch] = useState("");
   const [dropHoverOrderId, setDropHoverOrderId] = useState("");
@@ -1022,7 +1028,8 @@ export default function LiveOrderTable({
       </div>
 
       <div className="h-[1180px] overflow-auto rounded-xl border border-line">
-            {/* 헤더 행 */}
+            {/* 헤더 행 (모바일 카드형에선 숨김) */}
+            {!isMobile && (
             <div className="grid min-w-[1000px] grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 border-b border-rose-line bg-rose-soft/40 text-[12px] font-black text-ink-soft">
               <span className="flex items-center justify-center py-2.5">
                 <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} className="h-4 w-4 cursor-pointer accent-[var(--color-rose-deep)]" />
@@ -1038,6 +1045,7 @@ export default function LiveOrderTable({
               <span className="whitespace-nowrap px-3 py-2.5 text-center">입금</span>
               <span className="whitespace-nowrap px-3 py-2.5 text-center">출고</span>
             </div>
+            )}
 
             {/* 주문 행 목록 */}
             <div className="divide-y divide-line">
@@ -1048,6 +1056,51 @@ export default function LiveOrderTable({
               ) : (
                 visibleOrders.map((order) => {
                   const selected = order.id === selectedOrderId;
+                  if (isMobile) {
+                    return (
+                      <div key={order.id} onClick={() => onSelectOrder(order)}
+                        style={{ background: "#fff", border: "1px solid #eadfe3", borderLeft: order.paymentStatus === "manual_match_needed" ? "3px solid var(--color-rose-deep)" : "1px solid #eadfe3", borderRadius: "12px", padding: "11px 12px", marginBottom: "9px", cursor: "pointer" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                          <input type="checkbox" checked={selectedOrderIds.has(String(order.id))} onChange={() => toggleSelectOrder(String(order.id))} onClick={(e) => e.stopPropagation()} style={{ width: "16px", height: "16px", accentColor: "var(--color-rose-deep)" }} />
+                          <span style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{order.nickname}</span>
+                          <span style={{ fontSize: "11px", color: "#888" }}>{order.name || ""}</span>
+                          <span style={{ marginLeft: "auto", fontSize: "10px", color: "#aaa" }}>
+                            {(() => {
+                              const src = order.createdAt || order.submittedAt;
+                              if (!src) return "-";
+                              try {
+                                const d = new Date(src);
+                                if (isNaN(d.getTime())) return src;
+                                const yy = d.getFullYear();
+                                const mm = String(d.getMonth() + 1).padStart(2, "0");
+                                const dd = String(d.getDate()).padStart(2, "0");
+                                const wd = ["일", "월", "화", "수", "목", "금", "토"][d.getDay()];
+                                const hh = String(d.getHours()).padStart(2, "0");
+                                const mi = String(d.getMinutes()).padStart(2, "0");
+                                return `${yy}.${mm}.${dd} (${wd}) ${hh}:${mi}`;
+                              } catch { return src; }
+                            })()}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: "12px", color: "#444", marginBottom: "7px", lineHeight: 1.4 }}>{renderOrderSummary(order)} · {getTotalQty(order)}개</div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", flexWrap: "wrap" }}>
+                          <div style={{ display: "flex", gap: "5px", alignItems: "center", flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
+                            {statusBadge(order)}
+                            {(order as any).shippingStatus ? (
+                              <span className={`inline-flex items-center justify-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10px] font-black leading-none ${String((order as any).shippingStatus) === "출고완료" ? "bg-info-bg text-[var(--color-info-tx)]" : "bg-surface-2 text-ink-soft"}`}>{(order as any).shippingStatus}</span>
+                            ) : null}
+                            {order.paymentStatus === "manual_match_needed" ? (
+                              <button type="button" onClick={(e) => { e.stopPropagation(); onSelectForMatch?.(order); }} className="rounded-lg border border-orange-300 bg-warn-bg px-2 py-0.5 text-[10px] font-black text-warn-tx hover:bg-orange-100">🔗 입금매칭</button>
+                            ) : null}
+                            {order.paymentStatus === "card_unpaid" && onOpenCardPay ? (
+                              <button type="button" onClick={() => { openPaysterRightHalf(); onOpenCardPay(order); }} className="rounded-lg border border-info-tx bg-info-bg px-2 py-0.5 text-[10px] font-black text-info-tx hover:bg-info-bg">💳 카드결제</button>
+                            ) : null}
+                          </div>
+                          <span style={{ fontSize: "15px", fontWeight: 800, color: "#C0392B" }}>{money(Number(order.totalAmount || 0) || Number(order.finalAmount || 0))}</span>
+                        </div>
+                      </div>
+                    );
+                  }
                   return (
                     <Fragment key={order.id}>
                     <div
