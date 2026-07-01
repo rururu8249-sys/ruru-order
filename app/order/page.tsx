@@ -102,6 +102,7 @@ type BroadcastProduct = {
   shipping_type: string;
   combine_shipping: string;
   badge_type?: string;
+  badge_types?: string[];
   color_options?: unknown;
   size_options?: unknown;
   size_option_enabled?: unknown;
@@ -887,6 +888,12 @@ function normalizeOrderProductRow(product: any): BroadcastProduct {
     product_type: String(product?.product_type ?? ""),
     shipping_type: String(product?.shipping_type ?? product?.delivery_type ?? ""),
     badge_type: String(product?.badge_type ?? "none"),
+    badge_types:
+      Array.isArray((product as any)?.badge_types) && (product as any).badge_types.length
+        ? (product as any).badge_types.map((x: any) => String(x))
+        : product?.badge_type && product.badge_type !== "none"
+          ? [String(product.badge_type)]
+          : [],
     // 옵션/없음입력 토글 신호: 고객 옵션 판단(getRegisteredOptionMode)이 읽을 수 있게 그대로 통과시킨다.
     color_options: product?.color_options ?? null,
     size_options: product?.size_options ?? null,
@@ -1972,6 +1979,12 @@ export default function OrderPage() {
         shipping_type: product.shipping_type || "일반",
         combine_shipping: product.combine_shipping || "Y",
         badge_type: String(product.badge_type || "none"),
+        badge_types:
+          Array.isArray((product as any)?.badge_types) && (product as any).badge_types.length
+            ? (product as any).badge_types.map((x: any) => String(x))
+            : product.badge_type && product.badge_type !== "none"
+              ? [String(product.badge_type)]
+              : [],
         // 옵션/없음입력 토글 신호: 고객 옵션 판단(getRegisteredOptionMode)이 읽을 수 있게 그대로 통과시킨다.
         color_options: product.color_options ?? null,
         size_options: product.size_options ?? null,
@@ -4535,6 +4548,12 @@ export default function OrderPage() {
                         } catch { return false; }
                       })();
                       const badgeType = String((product as unknown as Record<string, unknown>)?.badge_type || "").trim().toLowerCase();
+                      const badges =
+                        Array.isArray((product as any).badge_types) && (product as any).badge_types.length
+                          ? (product as any).badge_types.map((x: any) => String(x).trim().toLowerCase())
+                          : badgeType && badgeType !== "none"
+                            ? [badgeType]
+                            : [];
                       return (
                         <div
                           key={String(product.id)}
@@ -4552,14 +4571,14 @@ export default function OrderPage() {
                             <div style={{ display: "flex", gap: "4px", marginBottom: "4px", flexWrap: "wrap" }}>
                               {isBroadcastOn && pinned ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#E8340A", borderRadius: "5px", padding: "2px 6px" }}>🔴 라이브</span> : null}
                               {!isBroadcastOn && pinned ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#7A1E47", borderRadius: "5px", padding: "2px 6px" }}>📌 추천</span> : null}
-                              {badgeType === "new" ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#0F6E56", background: "#E7F3EE", borderRadius: "5px", padding: "2px 6px" }}>NEW</span> : null}
-                              {badgeType === "hot" ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>HOT</span> : null}
-                              {badgeType === "limit" ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#854F0B", background: "#FBF1E0", borderRadius: "5px", padding: "2px 6px" }}>한정</span> : null}
-                              {badgeType === "pick" ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#FFF8E7", color: "#B8860B" }}>⭐ MD픽</span> : null}
-                              {badgeType === "direct" ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#E8F0FE", color: "#1D4ED8" }}>🛒 바로구매</span> : null}
+                              {badges.includes("new") ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#0F6E56", background: "#E7F3EE", borderRadius: "5px", padding: "2px 6px" }}>NEW</span> : null}
+                              {badges.includes("hot") ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>HOT</span> : null}
+                              {badges.includes("limit") ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#854F0B", background: "#FBF1E0", borderRadius: "5px", padding: "2px 6px" }}>한정</span> : null}
+                              {badges.includes("pick") ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#FFF8E7", color: "#B8860B" }}>⭐ MD픽</span> : null}
+                              {badges.includes("direct") ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#E8F0FE", color: "#1D4ED8" }}>🛒 바로구매</span> : null}
                             </div>
                             <div style={{ fontSize: "13px", fontWeight: 700, color: "#222", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.product_name}</div>
-                            {badgeType === "direct" ? (<div style={{ fontSize: 11, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>방송 접수 없이 지금 바로 구매 가능</div>) : null}
+                            {badges.includes("direct") ? (<div style={{ fontSize: 11, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>방송 접수 없이 지금 바로 구매 가능</div>) : null}
                             <div style={{ marginTop: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                               <span style={{ fontSize: "15px", fontWeight: 800, color: "#7A1E47" }}>{won(Number(product.price || 0))}</span>
                               <button

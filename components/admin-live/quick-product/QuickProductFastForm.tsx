@@ -525,7 +525,7 @@ export default function QuickProductFastForm({
   onClose,
 }: QuickProductFastFormProps) {
   const [category, setCategory] = useState("");
-  const [badgeType, setBadgeType] = useState("none");
+  const [badgeTypes, setBadgeTypes] = useState<string[]>([]);
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     const c = () => setIsMobile(typeof window !== "undefined" && window.innerWidth <= 640);
@@ -643,7 +643,10 @@ export default function QuickProductFastForm({
     setSuggestionKeywordsText(Array.isArray(productNote?.suggestion_keywords) ? productNote.suggestion_keywords.join(", ") : "");
 
     setCategory(String((productNote as { category?: unknown } | null)?.category || ""));
-    setBadgeType(String(pickString(initialProduct || {}, ["badge_type"], "none") || "none"));
+    const _bt = Array.isArray((initialProduct as any)?.badge_types)
+      ? (initialProduct as any).badge_types.filter(Boolean).map((x: any) => String(x))
+      : ((initialProduct as any)?.badge_type && (initialProduct as any).badge_type !== "none" ? [String((initialProduct as any).badge_type)] : []);
+    setBadgeTypes(_bt);
     setProductName(pickString(initialProduct, ["product_name", "name", "title"], ""));
     setPriceText(formatNumberWithComma(pickNumber(initialProduct, ["price", "sale_price", "selling_price"], 0)));
     setShippingType(pickString(initialProduct, ["shipping_type", "delivery_type"], "normal"));
@@ -850,7 +853,8 @@ export default function QuickProductFastForm({
         stock: totalStock,
         status: isVisible ? "판매중" : "숨김",
         product_type: resolvedProductType,
-        badge_type: badgeType === "none" ? null : badgeType,
+        badge_types: badgeTypes,
+        badge_type: badgeTypes[0] ?? null,
         shipping_type: shippingType,
         combine_shipping: shippingType === "vendor" ? "N" : "Y",
         sort_order: 0,
@@ -1066,11 +1070,15 @@ export default function QuickProductFastForm({
             <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}`}</style>
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
               {([["none", "없음"], ["new", "✨ NEW"], ["hot", "🔥 HOT"], ["limit", "⏰ 한정"], ["pick", "⭐ MD픽"], ["direct", "🛒 바로구매"]] as const).map(([v, l]) => {
-                const on = badgeType === v;
+                const on = v === "none" ? badgeTypes.length === 0 : badgeTypes.includes(v);
                 return (
                   <div
                     key={v}
-                    onClick={() => setBadgeType(v)}
+                    onClick={() =>
+                      v === "none"
+                        ? setBadgeTypes([])
+                        : setBadgeTypes((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]))
+                    }
                     style={{ padding: "6px 12px", borderRadius: "8px", border: "1px solid " + (on ? "#7A1E47" : "#E5E1DC"), fontSize: "12px", fontWeight: 600, cursor: "pointer", color: on ? "#fff" : "#6B6460", background: on ? "#7A1E47" : "#fff", animation: v === "hot" ? "shimmer 1.5s ease-in-out infinite" : undefined }}
                   >
                     {l}
