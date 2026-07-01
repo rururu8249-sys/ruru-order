@@ -181,6 +181,34 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [shopDragFrom, setShopDragFrom] = useState<number | null>(null);
   const [shopDragOver, setShopDragOver] = useState<number | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // 방송상품 드래그 중 가장자리 자동 스크롤 (sort_order/저장 로직 무관, UX만)
+  const bcScrollRef = useRef<HTMLDivElement>(null);
+  const bcAutoScrollRef = useRef<{ raf: number; dir: number; speed: number }>({ raf: 0, dir: 0, speed: 0 });
+  const handleBcDragAutoScroll = (e: React.DragEvent) => {
+    const el = bcScrollRef.current; if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const edge = 64;
+    const y = e.clientY;
+    let dir = 0, dist = 0;
+    if (y < rect.top + edge) { dir = -1; dist = rect.top + edge - y; }
+    else if (y > rect.bottom - edge) { dir = 1; dist = y - (rect.bottom - edge); }
+    const s = bcAutoScrollRef.current;
+    s.dir = dir; s.speed = Math.min(22, Math.max(4, dist / 3));
+    if (dir !== 0 && !s.raf) {
+      const step = () => {
+        const el2 = bcScrollRef.current;
+        if (el2 && bcAutoScrollRef.current.dir !== 0) {
+          el2.scrollTop += bcAutoScrollRef.current.dir * bcAutoScrollRef.current.speed;
+          bcAutoScrollRef.current.raf = requestAnimationFrame(step);
+        } else { bcAutoScrollRef.current.raf = 0; }
+      };
+      s.raf = requestAnimationFrame(step);
+    }
+    if (dir === 0 && s.raf) { cancelAnimationFrame(s.raf); s.raf = 0; }
+  };
+  const stopBcAutoScroll = () => { const s = bcAutoScrollRef.current; if (s.raf) cancelAnimationFrame(s.raf); s.raf = 0; s.dir = 0; };
+
   // 기록 탭(방송별 매출/주문)
   const [histLoaded, setHistLoaded] = useState(false);
   const [histLoading, setHistLoading] = useState(false);
@@ -1197,7 +1225,14 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)" }}>진열 상품 {bcProducts.length}개</span>
                 <button type="button" disabled={!bcSelId || bcBusy} onClick={openBcPicker} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "7px", padding: "5px 11px", cursor: !bcSelId || bcBusy ? "not-allowed" : "pointer", opacity: !bcSelId || bcBusy ? 0.5 : 1 }}>+ 상품 담기</button>
               </div>
-              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "10px 12px" }}>
+              <div
+                ref={bcScrollRef}
+                onDragOver={handleBcDragAutoScroll}
+                onDrop={stopBcAutoScroll}
+                onDragEnd={stopBcAutoScroll}
+                onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) stopBcAutoScroll(); }}
+                style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "10px 12px" }}
+              >
                 {!bcSelId ? (
                   <div style={{ textAlign: "center", padding: "30px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>방송을 선택하세요.</div>
                 ) : bcProducts.length === 0 ? (
