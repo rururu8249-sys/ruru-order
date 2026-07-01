@@ -7,6 +7,7 @@ import TrendPanel from "./TrendPanel";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import AdminAuthSettingsPanel from "./AdminAuthSettingsPanel";
+import CombineShippingAdminPage from "@/app/admin-v2/combine/page";
 
 type SettingKey =
   | "customer_card_extra_rate"
@@ -154,9 +155,10 @@ function decimalInput(value: string) {
 }
 
 // 설정 카테고리(좌측 네비) — 업계 표준: 카테고리별로 나눠 스크롤 최소화
-type SettingsTab = "payment" | "point" | "order" | "youtube" | "telegram" | "trend" | "security";
+type SettingsTab = "payment" | "combine" | "point" | "order" | "youtube" | "telegram" | "trend" | "security";
 const SETTINGS_TABS: { key: SettingsTab; label: string; icon: string; desc: string }[] = [
   { key: "payment", label: "결제·배송", icon: "💳", desc: "카드 수수료·배송비" },
+  { key: "combine", label: "합배송", icon: "🚚", desc: "날짜·시간 기준 수동설정" },
   { key: "point", label: "포인트 적립", icon: "🪙", desc: "자동적립·적립률" },
   { key: "order", label: "주문서 표시", icon: "📝", desc: "공지·직접입력" },
   { key: "youtube", label: "유튜브 알림", icon: "📺", desc: "라이브 채팅 자동알림" },
@@ -369,6 +371,9 @@ export default function AdminLiveSettingsPanel() {
               </div>
             </>
           )}
+
+          {/* ── 합배송(기존 수동 시간설정 페이지 그대로) ── */}
+          {activeTab === "combine" && <CombineShippingAdminPage />}
 
           {/* ── 포인트 적립 ── */}
           {activeTab === "point" && (
