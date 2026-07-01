@@ -209,6 +209,33 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   };
   const stopBcAutoScroll = () => { const s = bcAutoScrollRef.current; if (s.raf) cancelAnimationFrame(s.raf); s.raf = 0; s.dir = 0; };
 
+  // 쇼핑몰 진열 탭 드래그 중 가장자리 자동 스크롤 (mall_sort_order/저장 로직 무관, UX만)
+  const shopScrollRef = useRef<HTMLDivElement>(null);
+  const shopAutoScrollRef = useRef<{ raf: number; dir: number; speed: number }>({ raf: 0, dir: 0, speed: 0 });
+  const handleShopDragAutoScroll = (e: React.DragEvent) => {
+    const el = shopScrollRef.current; if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const edge = 64;
+    const y = e.clientY;
+    let dir = 0, dist = 0;
+    if (y < rect.top + edge) { dir = -1; dist = rect.top + edge - y; }
+    else if (y > rect.bottom - edge) { dir = 1; dist = y - (rect.bottom - edge); }
+    const s = shopAutoScrollRef.current;
+    s.dir = dir; s.speed = Math.min(22, Math.max(4, dist / 3));
+    if (dir !== 0 && !s.raf) {
+      const step = () => {
+        const el2 = shopScrollRef.current;
+        if (el2 && shopAutoScrollRef.current.dir !== 0) {
+          el2.scrollTop += shopAutoScrollRef.current.dir * shopAutoScrollRef.current.speed;
+          shopAutoScrollRef.current.raf = requestAnimationFrame(step);
+        } else { shopAutoScrollRef.current.raf = 0; }
+      };
+      s.raf = requestAnimationFrame(step);
+    }
+    if (dir === 0 && s.raf) { cancelAnimationFrame(s.raf); s.raf = 0; }
+  };
+  const stopShopAutoScroll = () => { const s = shopAutoScrollRef.current; if (s.raf) cancelAnimationFrame(s.raf); s.raf = 0; s.dir = 0; };
+
   // 방송/쇼핑몰 탭 상품명 검색 필터 (기존 search state 재사용, 표시 전용)
   const nameMatch = (p: ProductRow) => !search.trim() || productName(p).toLowerCase().includes(search.trim().toLowerCase());
 
@@ -1289,7 +1316,14 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               <button type="button" disabled={shopBusy} onClick={openShopPicker} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "7px", padding: "5px 11px", cursor: shopBusy ? "wait" : "pointer", opacity: shopBusy ? 0.5 : 1 }}>+ 쇼핑몰에 상품 추가</button>
             </div>
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 10px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid #e5dfe1", fontSize: "13px", boxSizing: "border-box" }} />
-            <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+            <div
+              ref={shopScrollRef}
+              onDragOver={handleShopDragAutoScroll}
+              onDrop={stopShopAutoScroll}
+              onDragEnd={stopShopAutoScroll}
+              onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) stopShopAutoScroll(); }}
+              style={{ flex: 1, minHeight: 0, overflowY: "auto" }}
+            >
               {shopRows.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>진열된 상품이 없습니다.</div>
               ) : (
