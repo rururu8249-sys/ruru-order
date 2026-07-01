@@ -504,6 +504,10 @@ function ImagePicker({
           );
         })}
       </div>
+      <label style={{ display: "inline-flex", alignItems: "center", gap: "4px", marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#7B2D43", background: "#F9EEF3", border: "1px solid #E7C9D4", borderRadius: "8px", padding: "6px 10px", cursor: "pointer" }}>
+        📷 촬영하기
+        <input type="file" accept="image/*" capture="environment" hidden onChange={handleFileChange} />
+      </label>
       <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", textAlign: "right", marginTop: "4px" }}>{value.length} / {maxFiles}</div>
     </div>
   );

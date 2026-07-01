@@ -1005,7 +1005,6 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   if (typeof document === "undefined") return null;
 
   const chipBase: React.CSSProperties = { padding: "5px 12px", borderRadius: "16px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid var(--color-rose-line)" };
-  const topBtn: React.CSSProperties = { height: "36px", borderRadius: "9px", padding: "0 12px", fontSize: "12px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" };
 
   return createPortal(
     <div
@@ -1017,7 +1016,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         {/* 헤더 */}
         <div style={{ display: "flex", alignItems: "center", padding: "14px 18px", borderBottom: "1px solid var(--color-line)" }}>
           <span style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-rose-deep)" }}>📦 상품 관리</span>
-          <button type="button" onClick={onClose} style={{ marginLeft: "auto", border: "none", background: "none", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>✕</button>
+          <button type="button" onClick={openCreate} style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "13px", fontWeight: 800, color: "#fff", background: "#7B2D43", border: "none", borderRadius: "8px", padding: "7px 13px", cursor: "pointer", marginLeft: "auto" }}>+ 상품 등록</button>
+          <button type="button" onClick={onClose} style={{ marginLeft: "8px", border: "none", background: "none", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>✕</button>
         </div>
 
         {/* 탭 2개 */}
@@ -1291,11 +1291,6 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
           </div>
         ) : (
           <>
-            {/* 상단 버튼 (전체 상품) */}
-            <div style={{ display: "flex", gap: "6px", padding: "12px 18px 8px" }}>
-              <button type="button" onClick={openCreate} style={{ ...topBtn, background: "var(--color-rose-deep)", color: "#fff", border: "none" }}>+ 상품 등록</button>
-            </div>
-
             {/* 검색 */}
             <div style={{ padding: "0 18px 8px" }}>
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid var(--color-line)", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none", color: "var(--color-ink)" }} />
