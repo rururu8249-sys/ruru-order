@@ -2064,6 +2064,17 @@ export default function OrderPage() {
   const currentShippingAddressSignature = getShippingAddressSignature(zipcode, address, detailAddress);
 
   const resolveCurrentCombineShippingSettings = (sourceSettings: CombineShippingSettings): CombineShippingSettings => {
+    // 관리자 수동 시간설정이 켜져있고 "지금 유효"하면 방송 ON이어도 시간범위를 우선한다.
+    //   (방송을 껐다 켜거나 쇼핑몰 모드여도, 이 범위 안이면 created_at 기준으로 합배송)
+    if (isCombineShippingActiveNow(sourceSettings)) {
+      return {
+        ...sourceSettings,
+        enabled: true,
+        startAt: sourceSettings.startAt,
+        endAt: sourceSettings.endAt,
+      };
+    }
+
     const activeBroadcastId = String(broadcast?.id || "").trim();
     const activeBroadcastStatus = String(broadcast?.status || "").trim().toUpperCase();
     const activeBroadcastStartAt = String(broadcast?.started_at || broadcast?.created_at || "").trim();
@@ -2166,8 +2177,11 @@ export default function OrderPage() {
     //   자정을 넘기면 다음날 주문에 배송비가 또 붙던 버그가 있었음(날짜·타임존·started_at 파싱에 흔들림).
     //   broadcast_id 직접 매칭은 날짜와 무관하게 같은 방송이면 합배(같은 주소 한정)됨.
     //   방송 OFF(쇼핑몰 모드)거나 broadcast 미로드면 기존 시간 window로 폴백.
+    //   단, 관리자 수동 시간설정이 지금 유효하면 방송 무관하게 시간 window(created_at) 기준을 우선한다.
+    const adminWindowActive = isCombineShippingActiveNow(loadedSettings);
     const activeBroadcastIdForCombine = String(broadcast?.id || "").trim();
     const combineByBroadcastId =
+      !adminWindowActive &&
       activeBroadcastIdForCombine.length > 0 &&
       String(broadcast?.status || "").trim().toUpperCase() === "ON";
 

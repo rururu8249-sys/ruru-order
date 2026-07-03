@@ -9,8 +9,20 @@ import {
   toDateTimeLocalValue,
   fromDateTimeLocalValue,
   DEFAULT_COMBINE_SHIPPING_SETTINGS,
-  isCombineShippingActiveNow,
 } from "@/lib/admin-v2/combineShipping";
+
+// 기본 프리필: 오늘 18:00 ~ 내일 05:00 (datetime-local 문자열)
+function tonightPresetLocal() {
+  const start = new Date();
+  start.setHours(18, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  end.setHours(5, 0, 0, 0);
+  return {
+    startLocal: toDateTimeLocalValue(start.toISOString()),
+    endLocal: toDateTimeLocalValue(end.toISOString()),
+  };
+}
 
 export default function CombineShippingSettingsTab() {
   const [loading, setLoading] = useState(true);
@@ -19,10 +31,6 @@ export default function CombineShippingSettingsTab() {
   const [enabled, setEnabled] = useState(DEFAULT_COMBINE_SHIPPING_SETTINGS.enabled);
   const [startLocal, setStartLocal] = useState("");
   const [endLocal, setEndLocal] = useState("");
-  // 저장된 값(뱃지 판정용) — 편집 중인 입력칸이 아니라 확정 저장값 기준
-  const [savedEnabled, setSavedEnabled] = useState(false);
-  const [savedStartAt, setSavedStartAt] = useState("");
-  const [savedEndAt, setSavedEndAt] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -44,11 +52,20 @@ export default function CombineShippingSettingsTab() {
 
         const parsed = parseCombineShippingSettings(data);
         setEnabled(parsed.enabled);
-        setStartLocal(toDateTimeLocalValue(parsed.startAt));
-        setEndLocal(toDateTimeLocalValue(parsed.endAt));
-        setSavedEnabled(parsed.enabled);
-        setSavedStartAt(parsed.startAt);
-        setSavedEndAt(parsed.endAt);
+
+        // 저장값이 유효(둘 다 있고 종료가 미래)하면 그대로, 아니면 오늘18:00~내일05:00 프리필
+        const endMs = parsed.endAt ? new Date(parsed.endAt).getTime() : NaN;
+        const hasValid =
+          !!parsed.startAt && !!parsed.endAt && Number.isFinite(endMs) && endMs > Date.now();
+
+        if (hasValid) {
+          setStartLocal(toDateTimeLocalValue(parsed.startAt));
+          setEndLocal(toDateTimeLocalValue(parsed.endAt));
+        } else {
+          const preset = tonightPresetLocal();
+          setStartLocal(preset.startLocal);
+          setEndLocal(preset.endLocal);
+        }
       } finally {
         if (alive) setLoading(false);
       }
@@ -66,19 +83,19 @@ export default function CombineShippingSettingsTab() {
     const endAt = fromDateTimeLocalValue(endLocal);
 
     if (enabled) {
-      // 3. 빈칸 차단
+      // 빈칸 차단
       if (!startAt || !endAt) {
         showAdminToast("합배송 시간을 사용하려면 시작·종료 시각을 모두 입력하세요.", "warning");
         return;
       }
       const startMs = new Date(startAt).getTime();
       const endMs = new Date(endAt).getTime();
-      // 기존: 시작 >= 종료 차단
+      // 시작 >= 종료 차단
       if (startMs >= endMs) {
         showAdminToast("종료 시각은 시작 시각보다 뒤여야 합니다.", "warning");
         return;
       }
-      // 1. 종료가 이미 과거(만료된 범위) 차단 — 잘못 저장하면 사실상 적용 안 됨
+      // 종료가 이미 과거(만료된 범위) 차단 — 잘못 저장하면 사실상 적용 안 됨
       if (endMs <= Date.now()) {
         showAdminToast(
           "종료 시간이 이미 지났습니다. 미래 시간으로 설정하세요(지금은 오늘 기준 적용됨).",
@@ -86,7 +103,7 @@ export default function CombineShippingSettingsTab() {
         );
         return;
       }
-      // 2. 범위가 7일 초과면 확인 — 그 기간 같은 번호 주문 전부 배송비 0원
+      // 범위가 7일 초과면 확인 — 그 기간 같은 번호 주문 전부 배송비 0원
       const rangeDays = (endMs - startMs) / (1000 * 60 * 60 * 24);
       if (rangeDays > 7) {
         const ok = window.confirm(
@@ -112,49 +129,14 @@ export default function CombineShippingSettingsTab() {
         return;
       }
 
-      setSavedEnabled(enabled);
-      setSavedStartAt(startAt);
-      setSavedEndAt(endAt);
       showAdminToast("합배송 설정을 저장했습니다.", "success");
     } finally {
       setSaving(false);
     }
   };
 
-  const activeNow = isCombineShippingActiveNow({
-    enabled: savedEnabled,
-    startAt: savedStartAt,
-    endAt: savedEndAt,
-  });
-
-  // 현재상태 3단계(저장 확정값 기준): 사용중 / 예정 / 꺼짐·만료
-  const savedStartMs = savedStartAt ? new Date(savedStartAt).getTime() : NaN;
-  const isUpcoming =
-    savedEnabled && Number.isFinite(savedStartMs) && Date.now() < savedStartMs && !activeNow;
-  const status = activeNow ? "active" : isUpcoming ? "upcoming" : "off";
-  const statusLabel = status === "active" ? "🟢 사용중" : status === "upcoming" ? "🟡 예정" : "⚪ 꺼짐·만료";
-  const statusClass =
-    status === "active"
-      ? "bg-ok-bg text-ok-tx"
-      : status === "upcoming"
-        ? "bg-warn-bg text-warn-tx"
-        : "bg-surface-2 text-ink-mute";
-
-  // 4. 빠른설정: 오늘 18:00 ~ 내일 05:00
-  const applyTonightPreset = () => {
-    const start = new Date();
-    start.setHours(18, 0, 0, 0);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 1);
-    end.setHours(5, 0, 0, 0);
-    setStartLocal(toDateTimeLocalValue(start.toISOString()));
-    setEndLocal(toDateTimeLocalValue(end.toISOString()));
-  };
-
-  const clearTimes = () => {
-    setStartLocal("");
-    setEndLocal("");
-  };
+  const statusLabel = enabled ? "🟢 켜짐" : "⚪ 꺼짐";
+  const statusClass = enabled ? "bg-ok-bg text-ok-tx" : "bg-surface-2 text-ink-mute";
 
   if (loading) {
     return <div className="rounded-2xl border border-line bg-surface px-4 py-6 text-sm font-bold text-ink-mute">불러오는 중…</div>;
@@ -163,7 +145,10 @@ export default function CombineShippingSettingsTab() {
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-line bg-warn-bg px-4 py-3 text-xs font-bold leading-5 text-warn-tx">
-        방송 OFF일 때 이 시간범위 안에서 같은 전화번호로 들어온 주문은 배송비 0원(합배송)으로 처리됩니다.
+        아래 시간범위 안에 같은 고객이 주문하면 배송비 0원(합배송)이에요.
+        <span className="mt-1 block text-[11px] font-bold text-ink-mute">
+          ※ 방송을 껐다 켜도(쇼핑몰모드 포함) 이 범위 안이면 합배송돼요.
+        </span>
       </div>
 
       <div className="rounded-2xl border border-line bg-surface p-4">
@@ -191,24 +176,7 @@ export default function CombineShippingSettingsTab() {
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={applyTonightPreset}
-            className="rounded-lg border border-line bg-surface-2 px-3 py-1.5 text-xs font-black text-ink-soft transition hover:border-rose-deep"
-          >
-            오늘 방송(18:00~내일05:00)
-          </button>
-          <button
-            type="button"
-            onClick={clearTimes}
-            className="rounded-lg border border-line bg-surface-2 px-3 py-1.5 text-xs font-black text-ink-mute transition hover:border-rose-deep"
-          >
-            지우기
-          </button>
-        </div>
-
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="block">
             <span className="mb-1 block text-xs font-black text-ink-soft">시작</span>
             <input
