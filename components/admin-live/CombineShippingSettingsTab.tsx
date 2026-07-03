@@ -66,13 +66,33 @@ export default function CombineShippingSettingsTab() {
     const endAt = fromDateTimeLocalValue(endLocal);
 
     if (enabled) {
+      // 3. 빈칸 차단
       if (!startAt || !endAt) {
         showAdminToast("합배송 시간을 사용하려면 시작·종료 시각을 모두 입력하세요.", "warning");
         return;
       }
-      if (new Date(startAt).getTime() >= new Date(endAt).getTime()) {
+      const startMs = new Date(startAt).getTime();
+      const endMs = new Date(endAt).getTime();
+      // 기존: 시작 >= 종료 차단
+      if (startMs >= endMs) {
         showAdminToast("종료 시각은 시작 시각보다 뒤여야 합니다.", "warning");
         return;
+      }
+      // 1. 종료가 이미 과거(만료된 범위) 차단 — 잘못 저장하면 사실상 적용 안 됨
+      if (endMs <= Date.now()) {
+        showAdminToast(
+          "종료 시간이 이미 지났습니다. 미래 시간으로 설정하세요(지금은 오늘 기준 적용됨).",
+          "warning",
+        );
+        return;
+      }
+      // 2. 범위가 7일 초과면 확인 — 그 기간 같은 번호 주문 전부 배송비 0원
+      const rangeDays = (endMs - startMs) / (1000 * 60 * 60 * 24);
+      if (rangeDays > 7) {
+        const ok = window.confirm(
+          `합배송 범위가 약 ${Math.round(rangeDays)}일입니다. 그 기간 같은 번호 주문이 전부 배송비 0원 됩니다. 계속?`,
+        );
+        if (!ok) return;
       }
     }
 
@@ -107,6 +127,35 @@ export default function CombineShippingSettingsTab() {
     endAt: savedEndAt,
   });
 
+  // 현재상태 3단계(저장 확정값 기준): 사용중 / 예정 / 꺼짐·만료
+  const savedStartMs = savedStartAt ? new Date(savedStartAt).getTime() : NaN;
+  const isUpcoming =
+    savedEnabled && Number.isFinite(savedStartMs) && Date.now() < savedStartMs && !activeNow;
+  const status = activeNow ? "active" : isUpcoming ? "upcoming" : "off";
+  const statusLabel = status === "active" ? "🟢 사용중" : status === "upcoming" ? "🟡 예정" : "⚪ 꺼짐·만료";
+  const statusClass =
+    status === "active"
+      ? "bg-ok-bg text-ok-tx"
+      : status === "upcoming"
+        ? "bg-warn-bg text-warn-tx"
+        : "bg-surface-2 text-ink-mute";
+
+  // 4. 빠른설정: 오늘 18:00 ~ 내일 05:00
+  const applyTonightPreset = () => {
+    const start = new Date();
+    start.setHours(18, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    end.setHours(5, 0, 0, 0);
+    setStartLocal(toDateTimeLocalValue(start.toISOString()));
+    setEndLocal(toDateTimeLocalValue(end.toISOString()));
+  };
+
+  const clearTimes = () => {
+    setStartLocal("");
+    setEndLocal("");
+  };
+
   if (loading) {
     return <div className="rounded-2xl border border-line bg-surface px-4 py-6 text-sm font-bold text-ink-mute">불러오는 중…</div>;
   }
@@ -126,12 +175,8 @@ export default function CombineShippingSettingsTab() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span
-              className={`rounded-full px-2.5 py-1 text-[11px] font-black ${
-                activeNow ? "bg-ok-bg text-ok-tx" : "bg-surface-2 text-ink-mute"
-              }`}
-            >
-              {activeNow ? "🟢 사용중" : "⚪ 꺼짐"}
+            <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${statusClass}`}>
+              {statusLabel}
             </span>
             <button
               type="button"
@@ -146,7 +191,24 @@ export default function CombineShippingSettingsTab() {
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={applyTonightPreset}
+            className="rounded-lg border border-line bg-surface-2 px-3 py-1.5 text-xs font-black text-ink-soft transition hover:border-rose-deep"
+          >
+            오늘 방송(18:00~내일05:00)
+          </button>
+          <button
+            type="button"
+            onClick={clearTimes}
+            className="rounded-lg border border-line bg-surface-2 px-3 py-1.5 text-xs font-black text-ink-mute transition hover:border-rose-deep"
+          >
+            지우기
+          </button>
+        </div>
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="block">
             <span className="mb-1 block text-xs font-black text-ink-soft">시작</span>
             <input
