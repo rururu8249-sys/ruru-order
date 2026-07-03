@@ -171,7 +171,7 @@ export default function CombineShippingSettingsTab() {
           <div>
             <div className="text-sm font-black text-ink">합배송 시간 사용</div>
             <div className="mt-0.5 text-[11px] font-bold text-ink-mute">
-              끄면 이 설정은 무시됩니다(기본 배송비 적용).
+              끄면 관리자 시간범위 대신 &apos;오늘 하루&apos; 기준으로 합배송합니다.
             </div>
           </div>
           <div className="flex items-center gap-2">
