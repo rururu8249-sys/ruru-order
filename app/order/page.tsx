@@ -4624,9 +4624,9 @@ export default function OrderPage() {
                                 // 옵션 상품: 임박 옵션만 옵션별 표시(합산 금지) / 단일 상품: N개 남음
                                 const lowOpts = lowStockOptionsOrderProduct(product);
                                 if (lowOpts.length > 0) {
-                                  const shown = lowOpts.slice(0, 2).map((o) => `${o.label} ${o.stock}개`).join(" · ");
-                                  const more = lowOpts.length > 2 ? ` 외 ${lowOpts.length - 2}` : "";
-                                  return <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px" }}>🔥 {shown}{more} 남음</span>;
+                                  // 가장 급한(재고 적은) 순으로 최대 2개만, "외 N" 같은 축약 표현은 헷갈려서 안 씀(사장님 지침)
+                                  const shown = [...lowOpts].sort((a, b) => a.stock - b.stock).slice(0, 2).map((o) => `${o.label} ${o.stock}개`).join(" · ");
+                                  return <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px" }}>🔥 {shown} 남음</span>;
                                 }
                                 const remain = lowStockRemainOrderProduct(product);
                                 return remain !== null ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px" }}>🔥 {remain}개 남음</span> : null;
