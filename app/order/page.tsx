@@ -787,6 +787,22 @@ function isSoldOutOrderProduct(product: any): boolean {
   return Number.isFinite(stock) && stock <= 0;
 }
 
+// 재고 임박 표시 전용(읽기만·주문/재고 로직 무관): 재고관리 중이고 남은 수량 1~5개일 때만 숫자 반환
+function lowStockRemainOrderProduct(product: any): number | null {
+  const note = readOrderNoteObject(product);
+  if (note?.stock_management_enabled !== true) return null;
+  const variants = Array.isArray(note?.stock_variants) ? note.stock_variants : [];
+  let remain: number;
+  if (variants.length > 0) {
+    remain = variants.reduce((sum: number, v: any) => sum + Math.max(0, Number(v.stock ?? 0) || 0), 0);
+  } else {
+    const stock = Number(product?.stock ?? product?.total_stock);
+    if (!Number.isFinite(stock)) return null;
+    remain = Math.max(0, stock);
+  }
+  return remain >= 1 && remain <= 5 ? remain : null;
+}
+
 
 
 function OrderInputClearButton({
@@ -4588,6 +4604,7 @@ export default function OrderPage() {
                               {badges.includes("new") ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#0F6E56", background: "#E7F3EE", borderRadius: "5px", padding: "2px 6px" }}>NEW</span> : null}
                               {badges.includes("hot") ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>HOT</span> : null}
                               {badges.includes("limit") ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#854F0B", background: "#FBF1E0", borderRadius: "5px", padding: "2px 6px" }}>한정</span> : null}
+                              {!sold ? (() => { const remain = lowStockRemainOrderProduct(product); return remain !== null ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px" }}>🔥 {remain}개 남음</span> : null; })() : null}
                               {badges.includes("pick") ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#FFF8E7", color: "#B8860B" }}>⭐ MD픽</span> : null}
                               {badges.includes("direct") ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#E8F0FE", color: "#1D4ED8" }}>🛒 바로구매</span> : null}
                             </div>
