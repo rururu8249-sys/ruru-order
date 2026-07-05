@@ -43,3 +43,7 @@ next-env.d.ts
 # local safety backups
 .backup_*/
 .env.vercel.production
+# 백업 파일은 커밋 금지 (2026-07-05 repo 청소 — 원본은 git 히스토리에 보존)
+*.bak
+*.bak_*
+*.bak.*
