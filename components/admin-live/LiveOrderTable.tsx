@@ -200,6 +200,17 @@ function statusBadge(order: LiveOrder) {
   return <span style={{ ...base, ...green }}>입금확인</span>;
 }
 
+function returnBadge(order: LiveOrder) {
+  // 반품/교환 기록 배지 (기록 전용 표시 — 정산/입금/상태 판정 무관)
+  const s = String(order.returnStatus || "").trim();
+  if (!s) return null;
+  return (
+    <span className="inline-flex shrink-0 items-center rounded-full border border-warn-tx bg-warn-bg px-2 py-0.5 text-[10px] font-black text-warn-tx" title={order.returnReason || undefined}>
+      ↩ {s}
+    </span>
+  );
+}
+
 function testOrderBadge(order: LiveOrder) {
   // 테스트 주문 배지는 화면에서 숨김(칸 차지 방지). isTestOrder 판정/필터/정산제외 로직은 그대로 유지됨.
   return null;
@@ -1138,10 +1149,11 @@ export default function LiveOrderTable({
                             {order.nickname}
                           </button>
                         </div>
-                        {(inventoryStatusBadge(order) || testOrderBadge(order)) && (
+                        {(inventoryStatusBadge(order) || testOrderBadge(order) || returnBadge(order)) && (
                           <div className="flex flex-wrap gap-1 mt-0.5">
                             {inventoryStatusBadge(order)}
                             {testOrderBadge(order)}
+                            {returnBadge(order)}
                           </div>
                         )}
                       </div>

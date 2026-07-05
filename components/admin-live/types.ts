@@ -97,5 +97,9 @@ export type LiveOrder = {
   excludeFromPaymentMatch?: boolean;
   excludeFromShipping?: boolean;
   excludeFromPicking?: boolean;
+  /** 반품/교환 기록 (기록 전용 — 정산/입금/재고 계산과 무관) */
+  returnStatus?: string | null;
+  returnReason?: string | null;
+  returnAmount?: number | null;
   items: LiveOrderItem[];
 };

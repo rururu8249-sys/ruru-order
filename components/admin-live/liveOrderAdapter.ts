@@ -363,6 +363,10 @@ export function toAdminLiveOrder(group: OrderGroup): LiveOrder {
     excludeFromPaymentMatch: groupHasTruthyFlag(group, "exclude_from_payment_match"),
     excludeFromShipping: groupHasTruthyFlag(group, "exclude_from_shipping"),
     excludeFromPicking: groupHasTruthyFlag(group, "exclude_from_picking"),
+    // 반품/교환 기록 (기록 전용·표시만)
+    returnStatus: (first as any).return_status || null,
+    returnReason: (first as any).return_reason || null,
+    returnAmount: Number((first as any).return_amount || 0) || 0,
     items,
   };
 }

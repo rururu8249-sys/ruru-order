@@ -131,6 +131,13 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const [localOrder, setLocalOrder] = useState(order);
   const [refreshingDetail, setRefreshingDetail] = useState(false);
 
+  // 반품/교환 기록 (기록 전용 — 정산/입금/재고/포인트 계산과 무관, return_* 컬럼만 update)
+  const [returnEditing, setReturnEditing] = useState(false);
+  const [returnSaving, setReturnSaving] = useState(false);
+  const [returnStatusDraft, setReturnStatusDraft] = useState("");
+  const [returnReasonDraft, setReturnReasonDraft] = useState("");
+  const [returnAmountDraft, setReturnAmountDraft] = useState("");
+
   useEffect(() => {
     setLocalOrder(order);
   }, [order]);
@@ -489,6 +496,46 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       await onAfterStatusChange?.();
     } finally {
       setSavingCustomer(false);
+    }
+  };
+
+  // 반품/교환 기록 저장: return_* 컬럼만 update (주문상태/입금/정산/재고/포인트 로직 완전 무관·기록 전용)
+  const startEditReturn = () => {
+    const row = order as any;
+    setReturnStatusDraft(String(row.returnStatus || ""));
+    setReturnReasonDraft(String(row.returnReason || ""));
+    setReturnAmountDraft(row.returnAmount ? String(row.returnAmount) : "");
+    setReturnEditing(true);
+  };
+
+  const handleSaveReturn = async () => {
+    if (returnSaving) return;
+    const rowIds = items.map((item) => Number(item.id)).filter((id) => Number.isFinite(id) && id > 0);
+    if (rowIds.length === 0) {
+      showAdminToast("저장할 주문 행을 찾지 못했습니다.", "warning");
+      return;
+    }
+    setReturnSaving(true);
+    try {
+      const amount = Math.max(0, Number(returnAmountDraft.replace(/[^0-9]/g, "") || "0") || 0);
+      const { error } = await supabase
+        .from("orders")
+        .update({
+          return_status: returnStatusDraft || null,
+          return_reason: returnReasonDraft.trim() || null,
+          return_amount: returnStatusDraft ? amount : null,
+          return_updated_at: returnStatusDraft ? new Date().toISOString() : null,
+        })
+        .in("id", rowIds);
+      if (error) {
+        showAdminToast("반품/교환 기록 저장 실패\n\n" + error.message, "error");
+        return;
+      }
+      showAdminToast(returnStatusDraft ? "반품/교환 기록이 저장됐습니다." : "반품/교환 기록을 지웠습니다.", "success");
+      setReturnEditing(false);
+      await onAfterStatusChange?.();
+    } finally {
+      setReturnSaving(false);
     }
   };
 
@@ -945,6 +992,64 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           <div className="min-h-[56px] rounded-lg bg-surface-2 p-3 text-[12px] font-bold leading-6 text-ink-soft">
             {customerDeliveryMemoText || "입력 없음"}
           </div>
+        </section>
+
+        {/* 반품/교환 기록 (기록 전용 — 정산·입금·재고 계산에 반영 안 됨) */}
+        <section className="mt-3">
+          <div className="mb-1 flex items-center gap-2">
+            <span className="text-[11px] font-black text-ink-mute">반품/교환 기록</span>
+            {!returnEditing ? (
+              <button type="button" onClick={startEditReturn} className="rounded-md border border-rose-line bg-rose-soft px-2 py-0.5 text-[10px] font-black text-rose-deep">
+                {(order as any).returnStatus ? "✎ 수정" : "+ 기록"}
+              </button>
+            ) : null}
+          </div>
+          {!returnEditing ? (
+            (order as any).returnStatus ? (
+              <div className="rounded-lg border border-warn-tx/40 bg-warn-bg p-3 text-[12px] font-bold leading-6 text-warn-tx">
+                <span className="mr-2 rounded-md bg-surface px-2 py-0.5 text-[11px] font-black">{String((order as any).returnStatus)}</span>
+                {Number((order as any).returnAmount || 0) > 0 ? <span className="mr-2">환불 예정/완료 {money(Number((order as any).returnAmount || 0))}</span> : null}
+                <div className="mt-1 whitespace-pre-wrap text-ink-soft">{String((order as any).returnReason || "사유 없음")}</div>
+                <div className="mt-1 text-[10px] text-ink-mute">※ 기록용입니다 — 정산·입금·재고 숫자는 바뀌지 않아요.</div>
+              </div>
+            ) : (
+              <div className="rounded-lg bg-surface-2 p-3 text-[12px] font-bold text-ink-mute">기록 없음</div>
+            )
+          ) : (
+            <div className="rounded-lg border border-line bg-surface-2 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <select value={returnStatusDraft} onChange={(e) => setReturnStatusDraft(e.target.value)} className="h-8 rounded-md border border-line bg-surface px-2 text-[12px] font-black text-ink">
+                  <option value="">기록 없음(지우기)</option>
+                  <option value="반품접수">반품접수</option>
+                  <option value="교환접수">교환접수</option>
+                  <option value="반품완료">반품완료</option>
+                  <option value="교환완료">교환완료</option>
+                </select>
+                <input
+                  value={returnAmountDraft}
+                  onChange={(e) => setReturnAmountDraft(e.target.value.replace(/[^0-9]/g, ""))}
+                  inputMode="numeric"
+                  placeholder="환불 금액(기록용)"
+                  onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }}
+                  className="h-8 w-[130px] rounded-md border border-line bg-surface px-2 text-right text-[12px] font-black text-ink"
+                />
+                <span className="text-[11px] font-bold text-ink-mute">원</span>
+              </div>
+              <textarea
+                value={returnReasonDraft}
+                onChange={(e) => setReturnReasonDraft(e.target.value)}
+                placeholder="사유·처리 메모 (예: 스몰 → 미디움 교환, 7/6 회수 예약)"
+                className="mt-2 h-16 w-full rounded-md border border-line bg-surface p-2 text-[12px] font-bold text-ink"
+              />
+              <div className="mt-2 flex gap-2">
+                <button type="button" disabled={returnSaving} onClick={() => void handleSaveReturn()} className="rounded-md bg-rose-deep px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-50">
+                  {returnSaving ? "저장중…" : "저장"}
+                </button>
+                <button type="button" onClick={() => setReturnEditing(false)} className="rounded-md border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ink-soft">취소</button>
+              </div>
+              <div className="mt-1 text-[10px] font-bold text-ink-mute">※ 기록 전용 — 주문상태·정산·입금·재고에는 아무 영향 없습니다.</div>
+            </div>
+          )}
         </section>
       </div>
     </aside>
