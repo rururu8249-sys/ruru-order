@@ -787,20 +787,36 @@ function isSoldOutOrderProduct(product: any): boolean {
   return Number.isFinite(stock) && stock <= 0;
 }
 
-// 재고 임박 표시 전용(읽기만·주문/재고 로직 무관): 재고관리 중이고 남은 수량 1~5개일 때만 숫자 반환
+// 재고 임박 표시 전용(읽기만·주문/재고 로직 무관)
+// ※2026-07-05 사장님 지침: 옵션 상품은 "합산(총재고)" 표시 안 함 — 임박한 옵션만 옵션별로 표시.
+// 옵션 없는(총재고) 상품 전용: 재고관리 중이고 남은 수량 1~5개일 때만 숫자 반환
 function lowStockRemainOrderProduct(product: any): number | null {
   const note = readOrderNoteObject(product);
   if (note?.stock_management_enabled !== true) return null;
   const variants = Array.isArray(note?.stock_variants) ? note.stock_variants : [];
-  let remain: number;
-  if (variants.length > 0) {
-    remain = variants.reduce((sum: number, v: any) => sum + Math.max(0, Number(v.stock ?? 0) || 0), 0);
-  } else {
-    const stock = Number(product?.stock ?? product?.total_stock);
-    if (!Number.isFinite(stock)) return null;
-    remain = Math.max(0, stock);
-  }
+  if (variants.length > 0) return null; // 옵션 상품은 합산 표시 금지 → lowStockOptionsOrderProduct가 담당
+  const stock = Number(product?.stock ?? product?.total_stock);
+  if (!Number.isFinite(stock)) return null;
+  const remain = Math.max(0, stock);
   return remain >= 1 && remain <= 5 ? remain : null;
+}
+
+// 옵션 상품 전용: 재고 1~5개인 "임박 옵션"만 [{label, stock}]로 반환 (재고관리 중일 때만)
+function lowStockOptionsOrderProduct(product: any): Array<{ label: string; stock: number }> {
+  const note = readOrderNoteObject(product);
+  if (note?.stock_management_enabled !== true) return [];
+  const variants = Array.isArray(note?.stock_variants) ? note.stock_variants : [];
+  if (variants.length === 0) return [];
+  const norm = (s: unknown) => {
+    const t = String(s ?? "").trim();
+    return t === "없음" ? "" : t;
+  };
+  return variants
+    .map((v: any) => ({
+      label: [norm(v.color), norm(v.size)].filter(Boolean).join("/") || "기본",
+      stock: Number(v.stock ?? 0),
+    }))
+    .filter((x: { stock: number }) => Number.isFinite(x.stock) && x.stock >= 1 && x.stock <= 5);
 }
 
 
@@ -4604,7 +4620,17 @@ export default function OrderPage() {
                               {badges.includes("new") ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#0F6E56", background: "#E7F3EE", borderRadius: "5px", padding: "2px 6px" }}>NEW</span> : null}
                               {badges.includes("hot") ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>HOT</span> : null}
                               {badges.includes("limit") ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#854F0B", background: "#FBF1E0", borderRadius: "5px", padding: "2px 6px" }}>한정</span> : null}
-                              {!sold ? (() => { const remain = lowStockRemainOrderProduct(product); return remain !== null ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px" }}>🔥 {remain}개 남음</span> : null; })() : null}
+                              {!sold ? (() => {
+                                // 옵션 상품: 임박 옵션만 옵션별 표시(합산 금지) / 단일 상품: N개 남음
+                                const lowOpts = lowStockOptionsOrderProduct(product);
+                                if (lowOpts.length > 0) {
+                                  const shown = lowOpts.slice(0, 2).map((o) => `${o.label} ${o.stock}개`).join(" · ");
+                                  const more = lowOpts.length > 2 ? ` 외 ${lowOpts.length - 2}` : "";
+                                  return <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px" }}>🔥 {shown}{more} 남음</span>;
+                                }
+                                const remain = lowStockRemainOrderProduct(product);
+                                return remain !== null ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px" }}>🔥 {remain}개 남음</span> : null;
+                              })() : null}
                               {badges.includes("pick") ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#FFF8E7", color: "#B8860B" }}>⭐ MD픽</span> : null}
                               {badges.includes("direct") ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#E8F0FE", color: "#1D4ED8" }}>🛒 바로구매</span> : null}
                             </div>

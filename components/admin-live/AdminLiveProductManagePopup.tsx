@@ -776,6 +776,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
   // 재고임박 필터 (전체 상품 탭): 재고관리 중 && 재고 3개 이하
   const [lowOnly, setLowOnly] = useState(false);
+  // 정렬 (전체 상품 탭): 기본(고정 우선)/최신 등록순/재고 적은순 — 표시 순서만, 데이터 무변경
+  const [sortKey, setSortKey] = useState<"default" | "latest" | "stock_low">("default");
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -789,14 +791,30 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       if (q && !productName(p).toLowerCase().includes(q)) return false;
       return true;
     });
-    // 고정(is_pinned) 상품을 배열 앞으로 (true → 0, false → 1)
+    // 정렬: 재고 적은순(재고관리 상품 우선, 미관리·재고없음은 뒤로)
+    if (sortKey === "stock_low") {
+      const val = (p: ProductRow) => {
+        const m = stockMetaOf(p);
+        return m.managed && m.stock !== null ? m.stock : Number.POSITIVE_INFINITY;
+      };
+      return list.sort((a, b) => val(a) - val(b));
+    }
+    // 정렬: 최신 등록순 (created_at 내림차순, 파싱 실패는 뒤로)
+    if (sortKey === "latest") {
+      const ts = (p: ProductRow) => {
+        const t = new Date(String((p as Record<string, unknown>).created_at || "")).getTime();
+        return Number.isFinite(t) ? t : 0;
+      };
+      return list.sort((a, b) => ts(b) - ts(a));
+    }
+    // 기본: 고정(is_pinned) 상품을 배열 앞으로 (true → 0, false → 1)
     return list.sort(
       (a, b) =>
         (pickBoolean(a, ["is_pinned", "pinned"], false) ? 0 : 1) -
         (pickBoolean(b, ["is_pinned", "pinned"], false) ? 0 : 1),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products, search, category, lowOnly]);
+  }, [products, search, category, lowOnly, sortKey]);
 
   const visible = filtered.slice(0, visibleCount);
 
@@ -1051,6 +1069,55 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       return Number.isFinite(n) ? n : null;
     } catch {
       return null;
+    }
+  };
+
+  // 재고 메타 (읽기 전용): 재고관리 여부 / 옵션 유무 / 현재 stock
+  const stockMetaOf = (p: ProductRow): { managed: boolean; hasVariants: boolean; stock: number | null } => {
+    try {
+      const raw = (p as Record<string, unknown>).product_note;
+      if (!raw) return { managed: false, hasVariants: false, stock: null };
+      const note = typeof raw === "string" ? JSON.parse(raw) : raw;
+      if (!note || typeof note !== "object") return { managed: false, hasVariants: false, stock: null };
+      const managed = (note as { stock_management_enabled?: boolean }).stock_management_enabled !== false;
+      const variants = (note as { stock_variants?: unknown }).stock_variants;
+      const hasVariants = Array.isArray(variants) && variants.length > 0;
+      const n = Number((p as Record<string, unknown>).stock);
+      return { managed, hasVariants, stock: Number.isFinite(n) ? n : null };
+    } catch {
+      return { managed: false, hasVariants: false, stock: null };
+    }
+  };
+
+  // 인라인 재고 수정 (전체 상품 탭 · "옵션 없는(총재고) 상품"만 허용)
+  // 옵션 상품은 products.stock이 product_note에서 파생(트리거 동기화)이라 직접 수정 시 desync → 수정 폼으로 유도.
+  // 트리거(ruru_products_inventory_variants_sync_trg)는 product_note 변경 시에만 동작하므로 이 update로는 안 돎(확인됨).
+  const [inlineStockId, setInlineStockId] = useState("");
+  const [inlineStockText, setInlineStockText] = useState("");
+  const [inlineStockSaving, setInlineStockSaving] = useState(false);
+
+  const saveInlineStock = async (p: ProductRow) => {
+    const id = productId(p);
+    if (!id || inlineStockSaving) return;
+    const m = stockMetaOf(p);
+    if (!m.managed || m.hasVariants) {
+      setInlineStockId("");
+      return; // 가드: 옵션 상품/재고관리 OFF는 인라인 수정 금지
+    }
+    const n = Math.max(0, Number(inlineStockText || "0") || 0);
+    setInlineStockSaving(true);
+    try {
+      // 폼 저장·트리거와 동일 세트(stock + is_soldout)로 일관성 유지
+      const { error } = await supabase.from("products").update({ stock: n, is_soldout: n <= 0 }).eq("id", id);
+      if (error) throw error;
+      setInlineStockId("");
+      await loadProducts();
+      window.dispatchEvent(new Event("ruru-live-product-updated"));
+      showAdminToast(`재고를 ${n}개로 변경했어요.`, "success");
+    } catch (e) {
+      showAdminToast("재고 변경 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally {
+      setInlineStockSaving(false);
     }
   };
 
@@ -1544,6 +1611,15 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               >
                 🔥 재고임박
               </button>
+              <select
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as "default" | "latest" | "stock_low")}
+                style={{ marginLeft: "auto", height: "28px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 800, padding: "0 8px", cursor: "pointer" }}
+              >
+                <option value="default">기본순 (고정 우선)</option>
+                <option value="latest">최신 등록순</option>
+                <option value="stock_low">재고 적은순</option>
+              </select>
             </div>
 
             {/* 상품 목록 (무한스크롤) */}
@@ -1590,6 +1666,43 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                               return <span style={{ fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: "var(--color-danger-bg)", color: "var(--color-danger-tx)" }}>{s <= 0 ? "⛔ 품절" : `🔥 재고 ${s}`}</span>;
                             })()}
                           </div>
+                          {/* 재고 표시 + 인라인 수정 (총재고 상품만 · 옵션 상품은 수정 폼 유도) */}
+                          {(() => {
+                            const m = stockMetaOf(p);
+                            if (!m.managed || m.stock === null) return null;
+                            if (m.hasVariants) {
+                              return (
+                                <div style={{ marginTop: "5px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>
+                                  재고 {m.stock.toLocaleString("ko-KR")}개
+                                  <button type="button" onClick={() => editProduct(p)} title="옵션별 재고는 수정 폼에서 변경" style={{ marginLeft: "5px", fontSize: "10px", fontWeight: 800, color: "var(--color-info-tx)", background: "var(--color-info-bg)", border: "none", borderRadius: "5px", padding: "2px 7px", cursor: "pointer" }}>옵션별 수정</button>
+                                </div>
+                              );
+                            }
+                            if (inlineStockId !== id) {
+                              return (
+                                <div style={{ marginTop: "5px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>
+                                  재고 {m.stock.toLocaleString("ko-KR")}개
+                                  <button type="button" onClick={() => { setInlineStockId(id); setInlineStockText(String(m.stock)); }} style={{ marginLeft: "5px", fontSize: "10px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "5px", padding: "2px 7px", cursor: "pointer" }}>✎ 수정</button>
+                                </div>
+                              );
+                            }
+                            return (
+                              <div style={{ marginTop: "5px", display: "flex", alignItems: "center", gap: "5px" }}>
+                                <input
+                                  value={inlineStockText}
+                                  onChange={(e) => setInlineStockText(e.target.value.replace(/[^0-9]/g, ""))}
+                                  inputMode="numeric"
+                                  autoFocus
+                                  onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }}
+                                  onKeyDown={(e) => { if (e.key === "Enter") void saveInlineStock(p); if (e.key === "Escape") setInlineStockId(""); }}
+                                  style={{ width: "64px", height: "26px", borderRadius: "6px", border: "1px solid var(--color-rose-line)", padding: "0 8px", fontSize: "12px", fontWeight: 800, textAlign: "right", color: "var(--color-ink)", background: "var(--color-surface)" }}
+                                />
+                                <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
+                                <button type="button" disabled={inlineStockSaving} onClick={() => void saveInlineStock(p)} style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "5px", padding: "4px 9px", cursor: inlineStockSaving ? "wait" : "pointer", opacity: inlineStockSaving ? 0.6 : 1 }}>{inlineStockSaving ? "저장중…" : "저장"}</button>
+                                <button type="button" onClick={() => setInlineStockId("")} style={{ fontSize: "10px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "5px", padding: "4px 9px", cursor: "pointer" }}>취소</button>
+                              </div>
+                            );
+                          })()}
                           {/* 원버튼 위젯 */}
                           <button
                             type="button"
