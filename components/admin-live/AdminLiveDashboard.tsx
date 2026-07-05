@@ -1410,6 +1410,14 @@ export default function AdminLiveDashboard() {
       ? "정산 빠른보기"
       : "";
 
+  // 사이드바 예외 배지 (읽기 전용 카운트): 정산제외(테스트) 제외, 매칭필요/카드미결제 — 필터와 무관하게 로드된 전체 주문 기준
+  // (취소 주문은 paymentStatus가 "canceled"라 아래 조건에 자연 제외됨)
+  const badgeBase = orders.filter((o) => o.excludeFromSettlement !== true);
+  const exceptionBadges = {
+    needMatch: badgeBase.filter((o) => o.paymentStatus === "manual_match_needed").length,
+    cardUnpaid: badgeBase.filter((o) => o.paymentMethod === "카드결제" && o.paymentStatus === "card_unpaid").length,
+  };
+
   return (
     <div className={`min-h-screen bg-canvas text-ink ${theme === "dark" ? "dark" : ""}`} data-ruru-controltower-shell="broadcast-quick-modal-sidebar-dock-v2">
       <div className="flex min-h-screen">
@@ -1419,6 +1427,7 @@ export default function AdminLiveDashboard() {
           onToggleTheme={toggleTheme}
           navOpen={navOpen}
           onCloseNav={() => setNavOpen(false)}
+          exceptionBadges={exceptionBadges}
           onMenuChange={(nextMenu) => {
             setActiveMenu(nextMenu);
             replacePanelInUrl(nextMenu);

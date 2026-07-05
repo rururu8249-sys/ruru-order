@@ -9,6 +9,8 @@ type Props = {
   onToggleTheme: () => void;
   navOpen?: boolean;
   onCloseNav?: () => void;
+  /** 예외 배지 (읽기 전용): 매칭필요/카드미결제 건수 — 주문·입금 메뉴에 표시 */
+  exceptionBadges?: { needMatch: number; cardUnpaid: number };
 };
 
 export default function AdminLiveSidebar({
@@ -18,6 +20,7 @@ export default function AdminLiveSidebar({
   onToggleTheme,
   navOpen = false,
   onCloseNav,
+  exceptionBadges,
 }: Props) {
   return (
     <>
@@ -81,6 +84,16 @@ export default function AdminLiveSidebar({
                   <span className="block text-[15px] font-black">{menu.label}</span>
                   <span className="block truncate text-[10px] font-bold opacity-60">{menu.desc}</span>
                 </span>
+                {menu.key === "broadcast" && exceptionBadges && (exceptionBadges.needMatch > 0 || exceptionBadges.cardUnpaid > 0) ? (
+                  <span className="ml-auto flex shrink-0 flex-col items-end gap-0.5">
+                    {exceptionBadges.needMatch > 0 ? (
+                      <span className="whitespace-nowrap rounded-full bg-danger-bg px-2 py-0.5 text-[10px] font-black text-danger-tx">매칭 {exceptionBadges.needMatch}</span>
+                    ) : null}
+                    {exceptionBadges.cardUnpaid > 0 ? (
+                      <span className="whitespace-nowrap rounded-full bg-danger-bg px-2 py-0.5 text-[10px] font-black text-danger-tx">카드 {exceptionBadges.cardUnpaid}</span>
+                    ) : null}
+                  </span>
+                ) : null}
               </button>
             );
           })}
