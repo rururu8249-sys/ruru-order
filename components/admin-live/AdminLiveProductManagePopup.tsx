@@ -774,11 +774,18 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     }
   };
 
+  // 재고임박 필터 (전체 상품 탭): 재고관리 중 && 재고 3개 이하
+  const [lowOnly, setLowOnly] = useState(false);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const list = products.filter((p) => {
       if (pickString(p, ["status", "product_status"], "") === "deleted") return false;
       if (category !== "전체" && productCategory(p) !== category) return false;
+      if (lowOnly) {
+        const s = lowStockOf(p);
+        if (s === null || s > 3) return false;
+      }
       if (q && !productName(p).toLowerCase().includes(q)) return false;
       return true;
     });
@@ -788,7 +795,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         (pickBoolean(a, ["is_pinned", "pinned"], false) ? 0 : 1) -
         (pickBoolean(b, ["is_pinned", "pinned"], false) ? 0 : 1),
     );
-  }, [products, search, category]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, search, category, lowOnly]);
 
   const visible = filtered.slice(0, visibleCount);
 
@@ -1010,6 +1018,40 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const editProduct = (p: ProductRow) => {
     window.dispatchEvent(new CustomEvent("ruru-edit-quick-product", { detail: p }));
     onClose();
+  };
+
+  // 복제: 기존 수정 이벤트 재사용하되 id 계열 제거 → 등록 폼이 "신규 모드 + 값 프리필"로 열림.
+  // 저장 버튼 누르기 전에는 아무것도 생성되지 않음(위험 0). 고정(is_pinned)은 복제 안 함.
+  const duplicateProduct = (p: ProductRow) => {
+    const copy = { ...(p as Record<string, unknown>) };
+    delete copy.id;
+    delete copy.product_id;
+    delete copy.uuid;
+    delete copy.created_at;
+    delete copy.updated_at;
+    copy.is_pinned = false;
+    copy.pinned = false;
+    const newName = `${productName(p)} 복사`;
+    copy.product_name = newName;
+    copy.name = newName;
+    copy.title = newName;
+    window.dispatchEvent(new CustomEvent("ruru-edit-quick-product", { detail: copy }));
+    onClose();
+  };
+
+  // 재고 임박 표시용 (읽기 전용): product_note가 있고 재고관리 중일 때만 products.stock 반환
+  const lowStockOf = (p: ProductRow): number | null => {
+    try {
+      const raw = (p as Record<string, unknown>).product_note;
+      if (!raw) return null;
+      const note = typeof raw === "string" ? JSON.parse(raw) : raw;
+      if (!note || typeof note !== "object") return null;
+      if ((note as { stock_management_enabled?: boolean }).stock_management_enabled === false) return null;
+      const n = Number((p as Record<string, unknown>).stock);
+      return Number.isFinite(n) ? n : null;
+    } catch {
+      return null;
+    }
   };
 
   const deleteProduct = async (p: ProductRow) => {
@@ -1494,6 +1536,14 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   {c}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => setLowOnly((v) => !v)}
+                title="재고관리 중이면서 재고 3개 이하인 상품만"
+                style={{ ...chipBase, background: lowOnly ? "var(--color-danger-bg)" : "var(--color-surface)", color: lowOnly ? "var(--color-danger-tx)" : "var(--color-ink-soft)", borderColor: lowOnly ? "var(--color-danger-tx)" : "var(--color-line)" }}
+              >
+                🔥 재고임박
+              </button>
             </div>
 
             {/* 상품 목록 (무한스크롤) */}
@@ -1534,6 +1584,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           <div style={{ marginTop: "5px", display: "flex", gap: "4px", flexWrap: "wrap" }}>
                             <span style={{ fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: "var(--color-info-bg)", color: "var(--color-info-tx)" }}>{shippingLabel(p)}</span>
                             {productCategory(p) ? <span style={{ fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: "var(--color-surface-3)", color: "var(--color-ink-soft)" }}>{productCategory(p)}</span> : null}
+                            {(() => {
+                              const s = lowStockOf(p);
+                              if (s === null || s > 3) return null;
+                              return <span style={{ fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: "var(--color-danger-bg)", color: "var(--color-danger-tx)" }}>{s <= 0 ? "⛔ 품절" : `🔥 재고 ${s}`}</span>;
+                            })()}
                           </div>
                           {/* 원버튼 위젯 */}
                           <button
@@ -1549,6 +1604,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         {/* 수정 / 삭제 — 오른쪽 끝 나란히 */}
                         <div style={{ display: "flex", flexDirection: "row", gap: "5px", flexShrink: 0, alignSelf: "flex-start" }}>
                           <button type="button" onClick={() => editProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-info-tx)", background: "var(--color-info-bg)", border: "none", borderRadius: "6px", padding: "6px 11px", cursor: "pointer" }}>수정</button>
+                          <button type="button" onClick={() => duplicateProduct(p)} title="이 상품 내용으로 새 상품 등록 폼 열기" style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "6px", padding: "6px 11px", cursor: "pointer" }}>복제</button>
                           <button type="button" onClick={() => void deleteProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", border: "none", borderRadius: "6px", padding: "6px 11px", cursor: "pointer" }}>삭제</button>
                         </div>
                       </div>
