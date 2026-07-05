@@ -1165,7 +1165,7 @@ export default function QuickProductFastForm({
                     {resolvedVariantRows.map((row) => (
                       <div key={row.key} style={{ display: "grid", gridTemplateColumns: "1fr 80px 24px", gap: "8px", alignItems: "center", padding: "5px 0", borderBottom: "1px solid #E8E2DD" }}>
                         <div style={{ fontSize: "12px", color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[row.color, row.size].filter(Boolean).join(" / ") || "기본"}</div>
-                        <input style={{ fontSize: "12px", padding: "5px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "100%" }} type="number" min={0} value={row.stock} onChange={(e) => updateVariantStock(row.key, Math.max(0, Number(e.target.value) || 0))} />
+                        <input style={{ fontSize: "12px", padding: "5px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "100%" }} type="number" min={0} inputMode="numeric" value={row.stock} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => updateVariantStock(row.key, Math.max(0, Number(e.target.value) || 0))} />
                         <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
                       </div>
                     ))}
@@ -1175,7 +1175,7 @@ export default function QuickProductFastForm({
               ) : (
                 <div style={{ background: "#F7F5F3", borderRadius: "8px", padding: "10px", marginTop: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
                   <span style={{ fontSize: "12px", color: "var(--color-ink)", flex: 1 }}>총 재고 수량</span>
-                  <input style={{ fontSize: "12px", padding: "5px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "80px" }} type="number" min={0} value={totalStockText} onChange={(e) => setTotalStockText(e.target.value)} />
+                  <input style={{ fontSize: "12px", padding: "5px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "80px" }} type="number" min={0} inputMode="numeric" value={totalStockText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setTotalStockText(e.target.value)} />
                   <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
                 </div>
               )
@@ -1201,7 +1201,7 @@ export default function QuickProductFastForm({
             {purchaseLimitEnabled ? (
               <div style={{ background: "#F7F5F3", borderRadius: "8px", padding: "10px", marginTop: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
                 <span style={{ fontSize: "12px", color: "var(--color-ink)", flex: 1 }}>1인당 최대</span>
-                <input style={{ fontSize: "12px", padding: "5px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "80px" }} type="number" min={1} value={purchaseLimitText} onChange={(e) => setPurchaseLimitText(e.target.value)} />
+                <input style={{ fontSize: "12px", padding: "5px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "80px" }} type="number" min={1} inputMode="numeric" value={purchaseLimitText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setPurchaseLimitText(e.target.value)} />
                 <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
               </div>
             ) : null}
