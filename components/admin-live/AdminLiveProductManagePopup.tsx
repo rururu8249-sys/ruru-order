@@ -166,10 +166,17 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   // 새 방송 만들기 모달
   const [newBcOpen, setNewBcOpen] = useState(false);
   const [newBcTitle, setNewBcTitle] = useState("");
+  // 선택 복사(지난 방송 상품 → 새 방송): product_id 순서 배열. null이면 일반 새 방송
+  const [bcCopyMode, setBcCopyMode] = useState(false);
+  const [bcCopySel, setBcCopySel] = useState<Set<string>>(new Set());
+  const [newBcCopyIds, setNewBcCopyIds] = useState<string[] | null>(null);
   // 상품 담기 피커
   const [bcPickerOpen, setBcPickerOpen] = useState(false);
   const [bcPickerSel, setBcPickerSel] = useState<Set<string>>(new Set());
   const [bcPickerSearch, setBcPickerSearch] = useState("");
+  // 피커 방송 필터: 특정 지난 방송에 담았던 상품만 보기 (""=전체 창고, ids null=전체)
+  const [bcPickerFromBcId, setBcPickerFromBcId] = useState("");
+  const [bcPickerFromIds, setBcPickerFromIds] = useState<Set<string> | null>(null);
   // 드래그 순서변경
   const [bcDragFrom, setBcDragFrom] = useState<number | null>(null);
   const [bcDragOver, setBcDragOver] = useState<number | null>(null);
@@ -348,12 +355,27 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     setBcBusy(true);
     try {
       const created = await createDraftBroadcast(title);
+      // 선택 복사: 지난 방송에서 체크한 상품들을 새 방송에 그대로 연결(broadcast_products insert만, 상품 데이터 복사 아님)
+      let copiedCount = 0;
+      if (newBcCopyIds && newBcCopyIds.length > 0) {
+        const toInsert = newBcCopyIds.map((pid, i) => ({ broadcast_id: String(created.id), product_id: pid, sort_order: i, is_visible: true }));
+        const { error: copyErr } = await supabase.from("broadcast_products").insert(toInsert);
+        if (copyErr) {
+          showAdminToast("방송은 생성됐지만 상품 복사에 실패했습니다.\n\n" + copyErr.message, "warning");
+        } else {
+          copiedCount = toInsert.length;
+        }
+      }
       await loadBroadcastList(String(created.id));
       // 방송 목록 전용 신호 — Dashboard가 broadcasts 배열을 다시 로드하도록(상품 패널용 ruru-live-product-updated와 분리)
       window.dispatchEvent(new Event("ruru-broadcast-list-updated"));
+      if (copiedCount > 0) window.dispatchEvent(new Event("ruru-live-product-updated"));
       setNewBcOpen(false);
       setNewBcTitle("");
-      showAdminToast("방송이 생성됐습니다. 상품을 담아주세요.", "success");
+      setNewBcCopyIds(null);
+      setBcCopyMode(false);
+      setBcCopySel(new Set());
+      showAdminToast(copiedCount > 0 ? `방송이 생성됐고 상품 ${copiedCount}개를 담았어요.` : "방송이 생성됐습니다. 상품을 담아주세요.", "success");
     } catch (e) {
       const err = e as { message?: string; code?: string };
       showAdminToast("새 방송 생성 실패\n\n" + (err?.message ?? err?.code ?? "알 수 없는 오류"), "error");
@@ -413,6 +435,34 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, bcSelId, products]);
 
+  // 방송 변경 시 선택 복사 상태 초기화
+  useEffect(() => {
+    setBcCopyMode(false);
+    setBcCopySel(new Set());
+  }, [bcSelId]);
+
+  // 선택 복사 토글
+  const toggleBcCopyPick = (pid: string) => {
+    setBcCopySel((prev) => {
+      const next = new Set(prev);
+      if (next.has(pid)) next.delete(pid);
+      else next.add(pid);
+      return next;
+    });
+  };
+
+  // 선택 복사 → 새 방송 모달 열기 (bcProducts 순서 유지)
+  const openNewBcWithCopy = () => {
+    const ids = bcProducts.map((p) => productId(p)).filter((pid) => pid && bcCopySel.has(pid));
+    if (ids.length === 0) {
+      showAdminToast("복사할 상품을 먼저 선택하세요.", "warning");
+      return;
+    }
+    setNewBcCopyIds(ids);
+    setNewBcTitle("");
+    setNewBcOpen(true);
+  };
+
   // 이미 담긴 product_id 세트 (피커 비활성용)
   const bcAddedIds = useMemo(() => new Set(bcProducts.map((p) => productId(p))), [bcProducts]);
 
@@ -444,7 +494,23 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     }
     setBcPickerSel(new Set());
     setBcPickerSearch("");
+    setBcPickerFromBcId("");
+    setBcPickerFromIds(null);
     setBcPickerOpen(true);
+  };
+
+  // 피커 방송 필터 변경: 그 방송의 broadcast_products product_id 로드 (읽기 전용)
+  const changeBcPickerFrom = async (bid: string) => {
+    setBcPickerFromBcId(bid);
+    if (!bid) {
+      setBcPickerFromIds(null);
+      return;
+    }
+    const { data } = await supabase
+      .from("broadcast_products")
+      .select("product_id")
+      .eq("broadcast_id", bid);
+    setBcPickerFromIds(new Set(((data as { product_id: unknown }[]) || []).map((r) => String(r.product_id))));
   };
 
   const toggleBcPick = (id: string) => {
@@ -1232,7 +1298,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>· {bcList.find((b) => b.id === bcSelId)?.title ?? "방송 선택"}</span>
                   ) : null}
                 </span>
-                <button type="button" disabled={bcBusy} onClick={() => { setNewBcTitle(""); setNewBcOpen(true); }} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "7px", padding: "4px 9px", cursor: bcBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>+ 새 방송</button>
+                <button type="button" disabled={bcBusy} onClick={() => { setNewBcTitle(""); setNewBcCopyIds(null); setNewBcOpen(true); }} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "7px", padding: "4px 9px", cursor: bcBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>+ 새 방송</button>
               </div>
               {(!isNarrow || bcListOpen) && (
               <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
@@ -1276,10 +1342,27 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 12px", borderBottom: "1px solid var(--color-line)" }}>
                 <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)" }}>진열 상품 {bcProducts.length}개</span>
                 <button type="button" disabled={!bcSelId || bcBusy} onClick={openBcPicker} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "7px", padding: "5px 11px", cursor: !bcSelId || bcBusy ? "not-allowed" : "pointer", opacity: !bcSelId || bcBusy ? 0.5 : 1 }}>+ 상품 담기</button>
+                {bcSelId && bcProducts.length > 0 ? (
+                  <button type="button" disabled={bcBusy} onClick={() => { setBcCopyMode((v) => !v); setBcCopySel(new Set()); }} style={{ fontSize: "11px", fontWeight: 800, color: bcCopyMode ? "var(--color-ink-soft)" : "var(--color-rose-deep)", background: bcCopyMode ? "var(--color-surface)" : "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "7px", padding: "5px 11px", cursor: bcBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>{bcCopyMode ? "✕ 선택 취소" : "☑ 선택 복사"}</button>
+                ) : null}
               </div>
               <div style={{ padding: "8px 12px 0" }}>
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 10px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid #e5dfe1", fontSize: "13px", boxSizing: "border-box" }} />
               </div>
+              {bcCopyMode ? (
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "0 12px 8px" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", cursor: "pointer", userSelect: "none" }}>
+                    <input
+                      type="checkbox"
+                      checked={bcProducts.length > 0 && bcCopySel.size === bcProducts.length}
+                      onChange={(e) => setBcCopySel(e.target.checked ? new Set(bcProducts.map((p) => productId(p)).filter(Boolean)) : new Set())}
+                      style={{ width: "15px", height: "15px", accentColor: "var(--color-rose-deep)", cursor: "pointer" }}
+                    />
+                    전체선택
+                  </label>
+                  <button type="button" disabled={bcCopySel.size === 0 || bcBusy} onClick={openNewBcWithCopy} style={{ marginLeft: "auto", fontSize: "12px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "7px", padding: "6px 12px", cursor: bcCopySel.size === 0 || bcBusy ? "not-allowed" : "pointer", opacity: bcCopySel.size === 0 || bcBusy ? 0.5 : 1 }}>선택 {bcCopySel.size}개 → 새 방송으로 복사</button>
+                </div>
+              ) : null}
               <div
                 ref={bcScrollRef}
                 onDragOver={handleBcDragAutoScroll}
@@ -1300,15 +1383,20 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       return (
                         <div
                           key={pid || i}
-                          draggable={!bcBusy && !search.trim()}
+                          draggable={!bcBusy && !search.trim() && !bcCopyMode}
+                          onClick={bcCopyMode && pid ? () => toggleBcCopyPick(pid) : undefined}
                           onDragStart={() => { setBcDragFrom(i); setBcDragOver(i); }}
                           onDragOver={(e) => { e.preventDefault(); if (bcDragOver !== i) setBcDragOver(i); }}
                           onDrop={(e) => { e.preventDefault(); if (bcDragFrom !== null) void reorderBc(bcDragFrom, i); setBcDragFrom(null); setBcDragOver(null); }}
                           onDragEnd={() => { setBcDragFrom(null); setBcDragOver(null); }}
-                          style={{ display: "flex", alignItems: "center", gap: "10px", border: "1px solid var(--color-line)", borderRadius: "9px", padding: "8px", background: bcDragFrom !== null && bcDragOver === i && bcDragFrom !== i ? "var(--color-warn-bg)" : "var(--color-surface)", opacity: bcDragFrom === i ? 0.4 : 1, boxShadow: bcDragFrom !== null && bcDragOver === i && bcDragFrom !== i ? "inset 0 2px 0 var(--color-rose-deep)" : undefined, cursor: bcBusy ? "default" : "grab" }}
+                          style={{ display: "flex", alignItems: "center", gap: "10px", border: bcCopyMode && bcCopySel.has(pid) ? "1px solid var(--color-rose-deep)" : "1px solid var(--color-line)", borderRadius: "9px", padding: "8px", background: bcCopyMode && bcCopySel.has(pid) ? "var(--color-rose-soft)" : bcDragFrom !== null && bcDragOver === i && bcDragFrom !== i ? "var(--color-warn-bg)" : "var(--color-surface)", opacity: bcDragFrom === i ? 0.4 : 1, boxShadow: bcDragFrom !== null && bcDragOver === i && bcDragFrom !== i ? "inset 0 2px 0 var(--color-rose-deep)" : undefined, cursor: bcCopyMode ? "pointer" : bcBusy ? "default" : "grab" }}
                         >
-                          {/* 드래그 핸들 */}
-                          <span style={{ flexShrink: 0, fontSize: "14px", color: "var(--color-ink-mute)", userSelect: "none" }} title="드래그로 순서 변경">⠿</span>
+                          {/* 선택 복사 모드: 체크박스 / 평소: 드래그 핸들 */}
+                          {bcCopyMode ? (
+                            <input type="checkbox" checked={bcCopySel.has(pid)} onChange={() => toggleBcCopyPick(pid)} onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, width: "16px", height: "16px", accentColor: "var(--color-rose-deep)", cursor: "pointer" }} />
+                          ) : (
+                            <span style={{ flexShrink: 0, fontSize: "14px", color: "var(--color-ink-mute)", userSelect: "none" }} title="드래그로 순서 변경">⠿</span>
+                          )}
                           <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", width: "20px", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
                           <span
                             onClick={(e) => { e.stopPropagation(); if (img) setLightbox(img); }}
@@ -1321,8 +1409,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             <div style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
                             <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)", marginTop: "2px" }}>{money(productPrice(p))}</div>
                           </div>
-                          <button type="button" onClick={() => editProduct(p)} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }}>수정</button>
-                          <button type="button" disabled={bcBusy} onClick={() => void removeBcProduct(pid)} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", border: "none", borderRadius: "6px", padding: "6px 10px", cursor: bcBusy ? "wait" : "pointer", opacity: bcBusy ? 0.6 : 1 }}>빼기</button>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); editProduct(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }}>수정</button>
+                          <button type="button" disabled={bcBusy} onClick={(e) => { e.stopPropagation(); void removeBcProduct(pid); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", border: "none", borderRadius: "6px", padding: "6px 10px", cursor: bcBusy ? "wait" : "pointer", opacity: bcBusy ? 0.6 : 1 }}>빼기</button>
                         </div>
                       );
                     })}
@@ -1589,8 +1677,20 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               <span style={{ fontSize: "15px", fontWeight: 800, color: "var(--color-rose-deep)" }}>방송에 상품 담기</span>
               <button type="button" onClick={() => setBcPickerOpen(false)} style={{ marginLeft: "auto", border: "none", background: "none", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>✕</button>
             </div>
-            {/* 검색 */}
-            <div style={{ padding: "12px 18px 8px" }}>
+            {/* 불러올 범위(전체 창고/지난 방송) + 검색 */}
+            <div style={{ padding: "12px 18px 8px", display: "flex", flexDirection: "column", gap: "8px" }}>
+              <select
+                value={bcPickerFromBcId}
+                onChange={(e) => void changeBcPickerFrom(e.target.value)}
+                style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid var(--color-line)", padding: "0 10px", fontSize: "13px", fontWeight: 700, outline: "none", color: "var(--color-ink)", background: "var(--color-surface)" }}
+              >
+                <option value="">📦 전체 창고에서 담기</option>
+                {bcList.filter((b) => b.id !== bcSelId).map((b) => {
+                  const d = new Date(b.started_at);
+                  const dateLabel = Number.isNaN(d.getTime()) ? "" : ` (${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")})`;
+                  return <option key={b.id} value={b.id}>📺 {b.title}{dateLabel} 방송에서 불러오기</option>;
+                })}
+              </select>
               <input value={bcPickerSearch} onChange={(e) => setBcPickerSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid var(--color-line)", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none", color: "var(--color-ink)" }} />
             </div>
             {/* 목록 */}
@@ -1599,14 +1699,19 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 const q = bcPickerSearch.trim().toLowerCase();
                 const pickList = products.filter((p) => {
                   if (pickString(p, ["status"], "") === "deleted") return false;
+                  if (bcPickerFromBcId && bcPickerFromIds && !bcPickerFromIds.has(productId(p))) return false;
                   if (q && !productName(p).toLowerCase().includes(q)) return false;
                   return true;
                 });
                 if (pickList.length === 0) {
-                  return <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>상품이 없습니다.</div>;
+                  return <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>{bcPickerFromBcId ? "그 방송에 담았던 상품이 없습니다." : "상품이 없습니다."}</div>;
                 }
+                const selectableIds = pickList.map((p) => productId(p)).filter((pid) => pid && !bcAddedIds.has(pid));
                 return (
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    {bcPickerFromBcId && selectableIds.length > 0 ? (
+                      <button type="button" onClick={() => setBcPickerSel((prev) => new Set([...prev, ...selectableIds]))} style={{ alignSelf: "flex-start", fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "7px", padding: "5px 10px", cursor: "pointer" }}>☑ 표시된 {selectableIds.length}개 모두 선택 (담긴 것 제외)</button>
+                    ) : null}
                     {pickList.map((p, i) => {
                       const pid = productId(p);
                       const already = bcAddedIds.has(pid);
@@ -1723,6 +1828,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 placeholder="예: 0617 저녁 라이브"
                 style={{ width: "100%", height: "40px", borderRadius: "9px", border: "1px solid var(--color-line)", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none", color: "var(--color-ink)" }}
               />
+              {newBcCopyIds && newBcCopyIds.length > 0 ? (
+                <div style={{ marginTop: "8px", fontSize: "11px", fontWeight: 700, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "7px", padding: "7px 10px" }}>☑ 선택한 상품 {newBcCopyIds.length}개가 새 방송에 그대로 담깁니다.</div>
+              ) : null}
             </div>
             <div style={{ display: "flex", gap: "8px", padding: "0 18px 16px" }}>
               <button type="button" onClick={() => setNewBcOpen(false)} style={{ flex: 1, height: "40px", borderRadius: "9px", fontSize: "13px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface)", border: "1px solid var(--color-line)", cursor: "pointer" }}>취소</button>
