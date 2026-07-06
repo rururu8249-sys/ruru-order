@@ -226,7 +226,7 @@ const ORDER_DRAFT_STORAGE_KEY = "ruru_order_draft_v1";
 
 type OrderDraftData = {
   items?: OrderItem[];
-  paymentMethod?: "무통장입금" | "카드결제";
+  paymentMethod?: "무통장입금" | "카드결제" | "";
   requestMemo?: string;
   pointUseInput?: string;
   savedAt?: number;
@@ -1002,7 +1002,8 @@ export default function OrderPage() {
   const [youtubeNicknameError, setYoutubeNicknameError] = useState("");
   const [isKakaoLoginReturn, setIsKakaoLoginReturn] = useState(false);
 
-  const [paymentMethod, setPaymentMethod] = useState<"무통장입금" | "카드결제">("무통장입금");
+  // [사장님 지침 2026-07-06] 결제수단 기본값 = 미선택("") — 고객이 직접 골라야 제출 가능(validate에서 차단)
+  const [paymentMethod, setPaymentMethod] = useState<"무통장입금" | "카드결제" | "">("");
   const [items, setItems] = useState<OrderItem[]>([{ ...emptyItem }]);
   const [submitting, setSubmitting] = useState(false);
   // 중복 제출 방지: state는 반영이 느려 연타를 못 막으므로 ref로 즉시 빗장을 건다.
@@ -1226,7 +1227,7 @@ export default function OrderPage() {
       draftItems.some((item) => isMeaningfulOrderItem(item)) ||
       requestMemo.trim() ||
       pointUseInput.trim() ||
-      paymentMethod !== "무통장입금";
+      paymentMethod !== "";
 
     if (!hasMeaningfulDraft) {
       clearOrderDraftData();
@@ -3415,6 +3416,11 @@ export default function OrderPage() {
       }
     }
 
+    if (!paymentMethod) {
+      showCustomerNotice("결제 방법을 선택해주세요. (무통장입금 또는 카드결제)");
+      return false;
+    }
+
     if (paymentMethod === "카드결제" && (productAmount + shippingFee) < cardPaymentMinAmount) {
       showCustomerNotice(`카드결제는 택배비 포함 ${cardPaymentMinAmount.toLocaleString()}원 이상 구매 시 가능합니다.`);
       return false;
@@ -3610,7 +3616,7 @@ export default function OrderPage() {
       setDone({
         nickname: youtubeNickname.trim(),
         name: customerName.trim(),
-        paymentMethod,
+        paymentMethod: paymentMethod === "카드결제" ? "카드결제" : "무통장입금",
         items: validItems,
         totalQty,
         productAmount,
@@ -3629,7 +3635,7 @@ export default function OrderPage() {
 
       setItems([{ ...emptyItem }]);
       setRequestMemo("");
-      setPaymentMethod("무통장입금");
+      setPaymentMethod("");
       setPointUseInput("");
       setPin("");
 
@@ -4883,7 +4889,7 @@ export default function OrderPage() {
                   shippingFee={shippingFee}
                   cardExtra={cardExtra}
                   totalAmount={totalAmount}
-                  paymentMethod={paymentMethod}
+                  paymentMethod={paymentMethod === "카드결제" ? "카드결제" : "무통장입금"}
                   customerPointBalance={customerPointBalance}
                   customerPointLoading={customerPointLoading}
                   pointUseInput={commaNumberText(pointUseInput)}
@@ -5509,7 +5515,7 @@ export default function OrderPage() {
           onCopyBankAccount={copyBankAccount}
           onClose={() => setPaymentGuideOpen(false)}
           isOrderComplete={Boolean(done)}
-          paymentMethod={done?.paymentMethod || paymentMethod}
+          paymentMethod={done?.paymentMethod || (paymentMethod === "카드결제" ? "카드결제" : "무통장입금")}
           items={done?.items || []}
           productAmount={done?.productAmount || 0}
           shippingFee={done?.shippingFee || 0}
