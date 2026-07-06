@@ -75,7 +75,15 @@ export default function MyOrderResultCard({
           ? label
           : "확인중";
 
-  const showBandTrackingNotice = deliveryStatus === "출고완료";
+  // [송장 표시] DB에 관리자가 입력한 송장(tracking_number)이 있으면 앱에서 바로 조회 — 밴드 안내는 송장 미등록 시 폴백
+  const trackingNumber = String(order.tracking_number || "").trim();
+  const trackingCompany = String(order.tracking_company || "").trim();
+  const trackingUrl = trackingNumber
+    ? (!trackingCompany || trackingCompany.includes("로젠")
+        ? `https://www.ilogen.com/web/personal/trace/${encodeURIComponent(trackingNumber)}`
+        : `https://search.naver.com/search.naver?query=${encodeURIComponent(`${trackingCompany} ${trackingNumber}`)}`)
+    : "";
+  const showBandTrackingNotice = deliveryStatus === "출고완료" && !trackingNumber;
 
   const pointUsedAmount = toMoneyNumber(order.point_used_amount ?? order.pointUsedAmount);
   const finalPaymentAmount = toMoneyNumber(
@@ -172,6 +180,21 @@ export default function MyOrderResultCard({
             <span>최종 결제금액</span>
             <span>{pointWon(finalPaymentAmount)}</span>
           </div>
+        </div>
+      ) : null}
+
+      {trackingNumber ? (
+        <div className="mt-2 rounded-[16px] bg-blue-50 p-3 ring-1 ring-blue-100">
+          <p className="text-[12px] font-bold tracking-[-0.04em] text-slate-600">🚚 {trackingCompany || "로젠택배"} 송장번호</p>
+          <p className="mt-0.5 text-[15px] font-black tracking-[-0.02em] text-slate-900" style={{ wordBreak: "break-all" }}>{trackingNumber}</p>
+          <a
+            href={trackingUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 flex min-h-[38px] items-center justify-center rounded-[14px] bg-blue-700 px-3 py-2 text-[12px] font-black tracking-[-0.04em] text-white transition active:scale-[0.98]"
+          >
+            배송 조회하기
+          </a>
         </div>
       ) : null}
 

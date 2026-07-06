@@ -28,6 +28,18 @@ export type CustomerOrderLookupGroup = {
   cardExtraText?: string;
   totalAmountText: string;
   products: CustomerOrderLookupGroupProduct[];
+  // [송장 표시] 관리자가 등록한 송장 — 있으면 카드에 배송조회 버튼 노출
+  trackingNumber?: string;
+  trackingCompany?: string;
+};
+
+const trackingUrlOf = (num?: string, company?: string) => {
+  const n = String(num || "").trim();
+  if (!n) return "";
+  const c = String(company || "").trim();
+  return !c || c.includes("로젠")
+    ? `https://www.ilogen.com/web/personal/trace/${encodeURIComponent(n)}`
+    : `https://search.naver.com/search.naver?query=${encodeURIComponent(`${c} ${n}`)}`;
 };
 
 type CustomerOrderLookupBottomSheetProps = {
@@ -176,6 +188,19 @@ export default function CustomerOrderLookupBottomSheet({
                           <span style={{ fontSize: "13px", fontWeight: 800, color: "#222" }}>결제금액</span>
                           <span style={{ fontSize: "18px", fontWeight: 800, letterSpacing: "-0.07em", color: "#7B2D43" }}>{group.totalAmountText}</span>
                         </div>
+                        {group.trackingNumber ? (
+                          <a
+                            href={trackingUrlOf(group.trackingNumber, group.trackingCompany)}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", borderRadius: "12px", background: "#EBF2FE", border: "1px solid #D3E2FC", padding: "9px 12px", textDecoration: "none" }}
+                          >
+                            <span style={{ minWidth: 0, fontSize: "12px", fontWeight: 800, color: "#1D4ED8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              🚚 {group.trackingCompany || "로젠택배"} {group.trackingNumber}
+                            </span>
+                            <span style={{ flexShrink: 0, fontSize: "12px", fontWeight: 800, color: "#1D4ED8" }}>배송조회 ›</span>
+                          </a>
+                        ) : null}
                       </div>
                     </article>
                   );

@@ -60,7 +60,6 @@ import {
 import OrderPageShell from "@/components/order/OrderPageShell";
 import OrderCustomerTopNav from "@/components/order/OrderCustomerTopNav";
 import OrderPriceSummaryBox from "@/components/order/OrderPriceSummaryBox";
-import OrderDepositConfirmModal from "@/components/order/OrderDepositConfirmModal";
 import OrderCustomerInfoIntro from "@/components/order/OrderCustomerInfoIntro";
 import OrderCustomerInfoFormCard from "@/components/order/OrderCustomerInfoFormCard";
 import CustomerPaymentGuideBottomSheet from "@/components/customer/CustomerPaymentGuideBottomSheet";
@@ -1056,7 +1055,6 @@ export default function OrderPage() {
   const [addressSearchOpen, setAddressSearchOpen] = useState(false);
   const addressPickedHandlerRef = useRef<((addr: string, zipcode: string) => void) | null>(null);
   const [missingDetailAddressConfirmOpen, setMissingDetailAddressConfirmOpen] = useState(false);
-  const [showDepositConfirmModal, setShowDepositConfirmModal] = useState(false);
   const PRIVACY_CONSENT_VERSION = "2026-05-24-v1";
   const PRIVACY_CONSENT_STORAGE_KEY = "ruru_privacy_consent_version";
   const [hasPrivacyConsent, setHasPrivacyConsent] = useState(false);
@@ -3422,6 +3420,12 @@ export default function OrderPage() {
       return false;
     }
 
+    // [검증 강화 2026-07-06] 01X 시작 10~11자리만 허용 — 잘못된 번호는 입금매칭·알림톡·배송 연락 전부 깨짐
+    if (!/^01[016789][0-9]{7,8}$/.test(cleanPhone)) {
+      showCustomerNotice("휴대폰 번호를 확인해주세요. 01로 시작하는 10~11자리만 가능합니다.");
+      return false;
+    }
+
 
     if (!address.trim()) {
       showCustomerNotice("주소를 입력해주세요.");
@@ -3515,8 +3519,7 @@ export default function OrderPage() {
       const blockCheck = await refreshCustomerBlockStatus(customerPhone);
 
       if (blockCheck.blocked) {
-        setShowDepositConfirmModal(false);
-        return;
+        return; // (입금확인 모달은 2026-07-06 제거된 죽은 코드 — 닫을 것 없음)
       }
 
       if (!validate(options)) return;
@@ -4035,6 +4038,9 @@ export default function OrderPage() {
         statusDisplayText: status.displayText,
         deliveryLabel: status.filterKey === "출고완료" ? "출고완료" : "확인중",
         paymentMethodLabel: ruruOrderLookupPaymentMethod(head),
+        // [송장 표시] 그룹 내 첫 송장 등록 행 기준 (읽기 전용)
+        trackingNumber: (() => { const r = rows.find((o: any) => String(o?.tracking_number || "").trim()); return r ? String((r as any).tracking_number).trim() : ""; })(),
+        trackingCompany: (() => { const r = rows.find((o: any) => String(o?.tracking_number || "").trim()); return r ? String((r as any).tracking_company || "").trim() : ""; })(),
         productAmountText: ruruOrderLookupWon(productSubtotal),
         shippingFeeText: shippingTotal > 0 ? ruruOrderLookupWon(shippingTotal) : "무료",
         cardExtraText: cardExtraTotal > 0 ? ruruOrderLookupWon(cardExtraTotal) : "",
@@ -4060,33 +4066,13 @@ export default function OrderPage() {
   const buttonBase = "transition-all duration-150 active:scale-[0.97]";
 
 
-  const DEPOSIT_CONFIRM_HIDE_UNTIL_KEY = "ruru_deposit_confirm_hide_until";
-
-  const shouldSkipDepositConfirm = () => {
-    if (typeof window === "undefined") return false;
-
-    const hideUntil = Number(localStorage.getItem(DEPOSIT_CONFIRM_HIDE_UNTIL_KEY) || 0);
-    return Number.isFinite(hideUntil) && hideUntil > Date.now();
-  };
-
+  // [정리 2026-07-06] 입금확인 모달(OrderDepositConfirmModal)은 "띄우지 않는" 죽은 코드였음 → 사용 코드 제거
   const handleSubmitOrderClick = () => {
     if (!validate()) return;
 
     // data-ruru-order-submit-direct-with-payment-sheet="v1"
     // 주문서 제출 전 기존 입금확인 모달은 띄우지 않습니다.
     // 무통장입금 주문은 저장 성공 후 공통 입금안내 바텀시트로 안내합니다.
-    submitOrder();
-  };
-
-  const handleDepositConfirmSubmit = (hideFor24Hours: boolean) => {
-    if (hideFor24Hours && typeof window !== "undefined") {
-      localStorage.setItem(
-        DEPOSIT_CONFIRM_HIDE_UNTIL_KEY,
-        String(Date.now() + 24 * 60 * 60 * 1000),
-      );
-    }
-
-    setShowDepositConfirmModal(false);
     submitOrder();
   };
 
@@ -5657,17 +5643,6 @@ export default function OrderPage() {
             setPaymentGuideOpen(true);
           }}
         />
-
-      <OrderDepositConfirmModal
-        open={showDepositConfirmModal}
-        nickname={youtubeNickname || customerName}
-        totalAmount={finalPaymentAmount}
-        originalTotalAmount={totalAmount}
-        pointUsedAmount={selectedPointUseAmount}
-        finalAmount={finalPaymentAmount}
-        onClose={() => setShowDepositConfirmModal(false)}
-        onConfirm={handleDepositConfirmSubmit}
-      />
 
       <footer className="py-8 text-center text-[11px] font-bold tracking-[-0.03em] text-slate-400">
         © 2024 RURUDONGI. All rights reserved.
