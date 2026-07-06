@@ -731,7 +731,10 @@ export default function LiveOrderTable({
   }, [broadcastOptions, filters]);
 
   const runExport = async (kind: "rozen" | "picking", orders: LiveOrder[], filterLabel: string) => {
-    if (orders.length === 0) return;
+    if (orders.length === 0) {
+      showAdminToast("내보낼 주문이 없습니다. 필터를 확인해주세요.", "warning");
+      return;
+    }
     setExporting(kind);
     try {
       if (kind === "rozen") {
