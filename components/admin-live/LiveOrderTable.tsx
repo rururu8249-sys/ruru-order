@@ -524,13 +524,17 @@ export default function LiveOrderTable({
 
   const baseOrders = useMemo(() => {
     if (!broadcastStartedAt) return orders;
+    // [버그수정 2026-07-06] 방송묶음 컷(방송 시작 이후만 표시)은 "현재 방송" 보기일 때만 적용.
+    // 기존엔 방송 ON이면 기간/범위를 전체로 바꿔도 무조건 잘라서, 과거 매칭필요·카드미결제 주문이
+    // 배지/매출바에는 잡히는데 표에는 안 보이는 불일치가 났음(사장님 제보). 표시 전용 — 돈 로직 무관.
+    if (filters.broadcast !== "current") return orders;
     const startMs = new Date(broadcastStartedAt).getTime();
     if (Number.isNaN(startMs)) return orders;
     return orders.filter((order) => {
       const created = order.createdAt ? new Date(order.createdAt).getTime() : NaN;
       return !Number.isNaN(created) && created >= startMs;
     });
-  }, [orders, broadcastStartedAt]);
+  }, [orders, broadcastStartedAt, filters.broadcast]);
 
   const counts = useMemo(() => {
     const paid = baseOrders.filter((order) =>
