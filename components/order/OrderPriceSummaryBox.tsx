@@ -73,7 +73,7 @@ export default function OrderPriceSummaryBox({
           <div style={{ marginTop: "16px", borderTop: "1px solid #D9C5CC", paddingTop: "16px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", fontSize: "15px", fontWeight: 800, color: "#7B2D43" }}>
               <span>보유 포인트</span>
-              <span>{won(safePointBalance)}</span>
+              <span>{safePointBalance.toLocaleString()}P</span>
             </div>
 
             <div style={{ marginTop: "12px", display: "grid", gap: "10px" }}>
@@ -103,7 +103,7 @@ export default function OrderPriceSummaryBox({
           </div>
         ) : hasSmallPoint ? (
           <div style={{ marginTop: "16px", borderTop: "1px solid #D9C5CC", paddingTop: "16px", fontSize: "13px", fontWeight: 700, color: "#666", lineHeight: 1.5 }}>
-            보유 포인트 {won(safePointBalance)}
+            보유 포인트 {safePointBalance.toLocaleString()}P
             <br />
             포인트는 1,000원 이상부터 사용할 수 있습니다.
           </div>
@@ -115,6 +115,12 @@ export default function OrderPriceSummaryBox({
             <span>-{won(safePointUsedAmount)}</span>
           </div>
         ) : null}
+
+        {/* [UI] 최종 금액 합계 행 — 표시 전용(계산은 부모에서 끝난 finalAmount만 받음) */}
+        <div style={{ marginTop: "14px", borderTop: "1.5px solid #C9AEB8", paddingTop: "14px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "17px", fontWeight: 900, color: "#7B2D43" }}>
+          <span>{paymentMethod === "카드결제" ? "총 결제금액" : "총 입금금액"}</span>
+          <span>{won(typeof finalAmount === "number" ? Math.max(0, finalAmount) : Math.max(0, totalAmount - safePointUsedAmount))}</span>
+        </div>
 
         {pointEarnRate > 0 ? (
           <div style={{ marginTop: "12px", borderTop: "1px dashed #D9C5CC", paddingTop: "12px", display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", fontWeight: 700, color: "#7B2D43" }}>

@@ -1716,6 +1716,18 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
                         {/* 수정 / 삭제 — 오른쪽 끝 나란히 */}
                         <div style={{ display: "flex", flexDirection: "row", gap: "5px", flexShrink: 0, alignSelf: "flex-start" }}>
+                          <button
+                            type="button"
+                            title="고객 주문 딥링크 복사 — 방송 채팅 고정메시지에 붙이면 고객이 링크 탭 → 이 상품이 바로 열림"
+                            onClick={() => {
+                              const link = `${window.location.origin}/order?p=${String(p.id)}`;
+                              navigator.clipboard?.writeText(link).then(
+                                () => showAdminToast(`주문링크 복사됨\n${link}`, "success"),
+                                () => showAdminToast("복사 실패 — 직접 복사해주세요\n" + link, "warning"),
+                              );
+                            }}
+                            style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ok-tx, #0F6E56)", background: "var(--color-ok-bg, #E7F3EE)", border: "none", borderRadius: "6px", padding: "6px 11px", cursor: "pointer" }}
+                          >🔗 링크</button>
                           <button type="button" onClick={() => editProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-info-tx)", background: "var(--color-info-bg)", border: "none", borderRadius: "6px", padding: "6px 11px", cursor: "pointer" }}>수정</button>
                           <button type="button" onClick={() => duplicateProduct(p)} title="이 상품 내용으로 새 상품 등록 폼 열기" style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "6px", padding: "6px 11px", cursor: "pointer" }}>복제</button>
                           <button type="button" onClick={() => void deleteProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", border: "none", borderRadius: "6px", padding: "6px 11px", cursor: "pointer" }}>삭제</button>

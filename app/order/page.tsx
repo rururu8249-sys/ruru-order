@@ -1098,6 +1098,12 @@ export default function OrderPage() {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [cartAddedOpen, setCartAddedOpen] = useState(false);
   const [cartAddedItem, setCartAddedItem] = useState<any | null>(null);
+  // [UI] 담김 토스트 자동 소멸 (2.4초) — 모달 대신 비차단 토스트라 확인 클릭 불필요
+  useEffect(() => {
+    if (!cartAddedOpen) return;
+    const t = setTimeout(() => setCartAddedOpen(false), 2400);
+    return () => clearTimeout(t);
+  }, [cartAddedOpen, cartAddedItem]);
   const [lightboxImage, setLightboxImage] = useState<string>("");
   const [orderLookupOrders, setOrderLookupOrders] = useState<any[]>([]);
   const [orderLookupFilter, setOrderLookupFilter] = useState<CustomerOrderLookupFilter>("전체");
@@ -3154,6 +3160,24 @@ export default function OrderPage() {
     addRegisteredProductToOrderItems(product);
   };
 
+  // [딥링크] /order?p=상품ID — 방송 채팅 고정메시지 링크로 들어온 고객에게 해당 상품을 자동으로 열어줌.
+  // 표시/담기 UI만 트리거(담기 버튼 클릭과 동일 경로). 주문 제출·돈 로직 무관. 1회만 실행.
+  const deepLinkHandledRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkHandledRef.current) return;
+    if (!hasSavedInfo) return; // 로그인/정보확인 끝난 화면에서만
+    if (quickGroupBuyProducts.length === 0) return;
+    let pid = "";
+    try { pid = new URLSearchParams(window.location.search).get("p") || ""; } catch { deepLinkHandledRef.current = true; return; }
+    if (!pid.trim()) { deepLinkHandledRef.current = true; return; }
+    deepLinkHandledRef.current = true;
+    const target = quickGroupBuyProducts.find((pr: any) => String(pr?.id ?? "") === pid.trim());
+    if (!target) return; // 목록에 없으면(내려간 상품 등) 조용히 무시
+    if (isSoldOutOrderProduct(target as any)) { showCustomerNotice("앗, 링크의 상품은 품절됐어요. 다른 상품을 둘러봐 주세요."); return; }
+    setTimeout(() => { try { selectQuickGroupBuyProduct(target as BroadcastProduct); } catch { /* 무시 */ } }, 350);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasSavedInfo, quickGroupBuyProducts]);
+
   const getItemOptionSuggestions = (item: OrderItem, field: "color" | "size") => {
     const product = findMatchedBroadcastProduct(item, broadcastProducts);
 
@@ -4283,34 +4307,57 @@ export default function OrderPage() {
     );
   }
 
+  // [UI] 사이드 레일 아이콘 — 3D 이모지 → 딥로즈 단색 라인 SVG (기능·핸들러 무변경, 에셋만 교체)
+  const railIconSvg = (name: string, stroke: string) => {
+    const common = { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none" as const, stroke, strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+    switch (name) {
+      case "live":
+        return (<svg {...common}><circle cx="12" cy="12" r="9" /><polygon points="10,8.5 16,12 10,15.5" fill={stroke} stroke="none" /></svg>);
+      case "bell":
+        return (<svg {...common}><path d="M18 8.5a6 6 0 0 0-12 0c0 6.3-2 7.5-2 7.5h16s-2-1.2-2-7.5" /><path d="M10.3 19.5a2 2 0 0 0 3.4 0" /></svg>);
+      case "notice":
+        return (<svg {...common}><path d="M3 10.5v3" /><path d="M6.5 9.2 18 4.5v15L6.5 14.8z" /><path d="M9.5 15.5v2.3a1.8 1.8 0 0 0 3.6 0v-1" /></svg>);
+      case "box":
+        return (<svg {...common}><path d="M21 8 12 3.5 3 8v8l9 4.5 9-4.5z" /><path d="M3 8l9 4.5L21 8" /><path d="M12 12.5V20" /></svg>);
+      case "user":
+        return (<svg {...common}><circle cx="12" cy="8" r="3.8" /><path d="M4.5 20.5c0-3.8 3.3-5.7 7.5-5.7s7.5 1.9 7.5 5.7" /></svg>);
+      case "chat":
+        return (<svg {...common}><path d="M21 11.6a8.4 8.4 0 0 1-8.6 8.2c-1.5 0-2.9-.35-4.1-1L3 20l1.2-4A8.2 8.2 0 1 1 21 11.6z" /></svg>);
+      case "refresh":
+        return (<svg {...common}><path d="M20 11.5a8 8 0 1 0-2.2 6" /><path d="M20 5.5v6h-6" /></svg>);
+      default:
+        return null;
+    }
+  };
+  const railCircle = (active: boolean): CSSProperties => ({ width: "44px", height: "44px", borderRadius: "50%", background: active ? "#7B2D43" : "#F2ECEE", display: "flex", alignItems: "center", justifyContent: "center" });
   const liveSideRail = (
     <div style={{ width: "52px", flexShrink: 0, display: "flex", flexDirection: "column", gap: "11px", paddingTop: "2px" }}>
       <button type="button" disabled={!(isBroadcastOn && broadcastYoutubeUrl)} onClick={isBroadcastOn && broadcastYoutubeUrl ? () => window.open(broadcastYoutubeUrl, "_blank") : undefined} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: isBroadcastOn && broadcastYoutubeUrl ? "pointer" : "default", opacity: isBroadcastOn && broadcastYoutubeUrl ? 1 : 0.4 }}>
-        <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: "#F2ECEE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>🔴</span>
+        <span style={railCircle(false)}>{railIconSvg("live", "#C0392B")}</span>
         <span style={{ fontSize: "9px", color: "#C0392B", fontWeight: 600 }}>라이브참여</span>
       </button>
       <button type="button" onClick={() => setAlertSheetOpen(true)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
-        <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: liveAlertOptin ? "#7B2D43" : "#F2ECEE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>🔔</span>
+        <span style={railCircle(liveAlertOptin)}>{railIconSvg("bell", liveAlertOptin ? "#fff" : "#7B2D43")}</span>
         <span style={{ fontSize: "9px", color: liveAlertOptin ? "#7B2D43" : "#555", fontWeight: 600 }}>{liveAlertOptin ? "알림 ON" : "방송알림"}</span>
       </button>
       <button type="button" onClick={() => setNoticeSheetOpen(true)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
-        <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: "#F2ECEE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>📢</span>
+        <span style={railCircle(false)}>{railIconSvg("notice", "#7B2D43")}</span>
         <span style={{ fontSize: "9px", color: "#555", fontWeight: 500 }}>공지</span>
       </button>
       <button type="button" onClick={() => openOrderLookupBottomSheet()} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
-        <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: "#F2ECEE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>📦</span>
+        <span style={railCircle(false)}>{railIconSvg("box", "#7B2D43")}</span>
         <span style={{ fontSize: "9px", color: "#555", fontWeight: 500 }}>주문내역</span>
       </button>
       <button type="button" onClick={() => openCustomerInfoEditBottomSheet()} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
-        <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: "#F2ECEE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>👤</span>
+        <span style={railCircle(false)}>{railIconSvg("user", "#7B2D43")}</span>
         <span style={{ fontSize: "9px", color: "#555", fontWeight: 500 }}>회원정보</span>
       </button>
       <button type="button" onClick={() => setInquirySheetOpen(true)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
-        <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: "#F2ECEE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>💬</span>
+        <span style={railCircle(false)}>{railIconSvg("chat", "#7B2D43")}</span>
         <span style={{ fontSize: "9px", color: "#555", fontWeight: 500 }}>문의</span>
       </button>
       <button type="button" onClick={() => window.location.reload()} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
-        <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: "#F2ECEE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>🔄</span>
+        <span style={railCircle(false)}>{railIconSvg("refresh", "#7B2D43")}</span>
         <span style={{ fontSize: "9px", color: "#555", fontWeight: 500 }}>새로고침</span>
       </button>
     </div>
@@ -4396,8 +4443,9 @@ export default function OrderPage() {
         <section style={{ margin: "8px auto 0", width: "100%", maxWidth: "560px" }}>
           {!isBroadcastOn ? (
             <div style={{ display: "flex", gap: "8px", padding: "12px 16px 14px", borderBottom: "0.5px solid #E5E1DC" }}>
-              <div style={{ flex: 1, position: "relative", aspectRatio: "9 / 16", background: "#F6E7ED", borderRadius: "12px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div style={{ textAlign: "center", padding: "0 16px" }}>
+              {/* [UI] 쇼핑몰 모드: 방송 자리 빈 박스를 컴팩트하게 — 첫 화면에 상품이 바로 보이게 (방송 ON 영상 영역은 무변경) */}
+              <div style={{ flex: 1, position: "relative", background: "#F6E7ED", borderRadius: "12px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ textAlign: "center", padding: "26px 16px" }}>
                   <div style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "11px", fontWeight: 700, color: "#a98792", background: "#fff", padding: "4px 11px", borderRadius: "99px", marginBottom: "10px" }}>🛍 쇼핑몰 모드</div>
                   <div style={{ fontSize: "11px", fontWeight: 600, color: "#b09aa1", marginBottom: "8px" }}>지금은 라이브 방송 중이 아니에요</div>
                   <div style={{ fontSize: "20px", fontWeight: 800, color: "#7B2D43", marginBottom: "10px", lineHeight: 1.35 }}>그래도 지금 바로<br />구매하실 수 있어요!</div>
@@ -4635,9 +4683,9 @@ export default function OrderPage() {
                               {badges.includes("direct") ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#E8F0FE", color: "#1D4ED8" }}>🛒 바로구매</span> : null}
                             </div>
                             <div style={{ fontSize: "13px", fontWeight: 700, color: "#222", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.product_name}</div>
-                            {badges.includes("direct") ? (<div style={{ fontSize: 11, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>방송 접수 없이 지금 바로 구매 가능</div>) : null}
+                            {/* [UI] "방송 접수 없이 바로 구매" 반복 서브텍스트 제거(배지로 충분) + 가격 위계 강화 15→17px */}
                             <div style={{ marginTop: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                              <span style={{ fontSize: "15px", fontWeight: 800, color: "#7A1E47" }}>{won(Number(product.price || 0))}</span>
+                              <span style={{ fontSize: "17px", fontWeight: 800, color: "#7A1E47" }}>{won(Number(product.price || 0))}</span>
                               <button
                                 type="button"
                                 disabled={sold}
@@ -4853,7 +4901,7 @@ export default function OrderPage() {
                   disabled={submitting || customerBlockStatus.blocked}
                   style={{ width: "100%", padding: "14px", background: submitting || customerBlockStatus.blocked ? "#cbd5e1" : "#7A1E47", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: submitting || customerBlockStatus.blocked ? "default" : "pointer" }}
                 >
-                  {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : "주문서 제출 →"}
+                  {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : `${won(finalPaymentAmount)} 주문서 제출 →`}
                 </button>
               </div>
             </div>
@@ -4911,29 +4959,13 @@ export default function OrderPage() {
             </div>
           ) : null}
 
-          {/* 담기 완료 — 심플 (확인 ✓ + 주문서 보기 / 계속 담기) */}
+          {/* [UI] 담기 완료 — 차단형 모달 → 비차단 자동소멸 토스트 (방송 중 연속 담기 안 끊기게. 하단바가 담은 개수 표시 담당) */}
           {cartAddedOpen && (
-            <div style={{ position: "fixed", inset: 0, zIndex: 140, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.35)" }} onClick={(e) => { if (e.target === e.currentTarget) setCartAddedOpen(false); }}>
-              <div style={{ width: "320px", maxWidth: "88%", background: "#fff", borderRadius: "20px", padding: "24px 22px", boxShadow: "0 18px 50px rgba(0,0,0,0.25)" }}>
-                <div style={{ fontSize: "18px", fontWeight: 800, color: "#7B2D43", textAlign: "center" }}>주문서에 담았어요 ✓</div>
-                {cartAddedItem ? (
-                  <div style={{ marginTop: "16px", background: "#FAF6F7", borderRadius: "14px", padding: "14px 16px" }}>
-                    <div style={{ fontSize: "15px", fontWeight: 800, color: "#222", lineHeight: 1.4 }}>{cartAddedItem.product_name}</div>
-                    {(() => {
-                      const norm = (s: any) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
-                      const opt = [norm(cartAddedItem.color), norm(cartAddedItem.size)].filter(Boolean).join(" / ");
-                      return opt ? <div style={{ marginTop: "4px", fontSize: "13px", fontWeight: 600, color: "#888" }}>{opt}</div> : null;
-                    })()}
-                    <div style={{ marginTop: "10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <span style={{ fontSize: "13px", fontWeight: 700, color: "#666" }}>수량 {cartAddedItem.qty}개</span>
-                      <span style={{ fontSize: "16px", fontWeight: 800, color: "#7B2D43" }}>{(() => { const total = (Number(cartAddedItem.product_price) || 0) * (Number(cartAddedItem.qty) || 1); return total > 0 ? won(total) : "가격 직접입력"; })()}</span>
-                    </div>
-                  </div>
-                ) : null}
-                <div style={{ marginTop: "18px" }}>
-                  <button type="button" onClick={() => setCartAddedOpen(false)} style={{ width: "100%", height: "50px", borderRadius: "14px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}>확인</button>
-                </div>
-              </div>
+            <div style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", bottom: "calc(92px + env(safe-area-inset-bottom))", zIndex: 140, maxWidth: "88%", background: "rgba(52,20,31,0.93)", color: "#fff", borderRadius: "14px", padding: "12px 18px", display: "flex", alignItems: "center", gap: "10px", boxShadow: "0 10px 30px rgba(0,0,0,0.3)", pointerEvents: "none" }}>
+              <span style={{ flexShrink: 0, width: "22px", height: "22px", borderRadius: "50%", background: "#0F6E56", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: 900 }}>✓</span>
+              <span style={{ minWidth: 0, fontSize: "13px", fontWeight: 800, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {cartAddedItem ? `${String(cartAddedItem.product_name || "상품")} ${Number(cartAddedItem.qty) || 1}개 담았어요` : "주문서에 담았어요"}
+              </span>
             </div>
           )}
 
@@ -5002,12 +5034,7 @@ export default function OrderPage() {
                     </div>
                   ) : null}
 
-                  {registeredOptionColorMode === "none" ? (
-                    <div style={{ marginBottom: "16px" }}>
-                      <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>색상</div>
-                      <div style={{ height: "46px", display: "flex", alignItems: "center", padding: "0 14px", borderRadius: "14px", border: "1.5px solid #E8E2DD", background: "#F7F4F1", fontSize: "15px", fontWeight: 700, color: "#ABA5A0" }}>없음</div>
-                    </div>
-                  ) : null}
+                  {/* [UI] 옵션 없는 상품의 "없음" 죽은 칸 제거 — 안내 문구가 이미 있음 */}
 
                   {registeredOptionColorMode === "input" ? (
                     <div style={{ marginBottom: "16px" }}>
@@ -5045,12 +5072,7 @@ export default function OrderPage() {
                     </div>
                   ) : null}
 
-                  {registeredOptionSizeMode === "none" ? (
-                    <div style={{ marginBottom: "16px" }}>
-                      <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>사이즈</div>
-                      <div style={{ height: "46px", display: "flex", alignItems: "center", padding: "0 14px", borderRadius: "14px", border: "1.5px solid #E8E2DD", background: "#F7F4F1", fontSize: "15px", fontWeight: 700, color: "#ABA5A0" }}>없음</div>
-                    </div>
-                  ) : null}
+                  {/* [UI] 옵션 없는 상품의 "없음" 죽은 칸 제거 — 안내 문구가 이미 있음 */}
 
                   {registeredOptionSizeMode === "input" ? (
                     <div style={{ marginBottom: "16px" }}>
@@ -5468,6 +5490,9 @@ export default function OrderPage() {
           totalAmount={done?.totalAmount || 0}
           pointUsedAmount={done?.pointUsedAmount || 0}
           finalAmount={done?.finalAmount}
+          liveAlertOptin={liveAlertOptin}
+          liveAlertSaving={liveAlertSaving}
+          onLiveAlertRequest={() => { void saveLiveAlertOptin(true); }}
         />
 
         <CustomerInfoEditBottomSheet

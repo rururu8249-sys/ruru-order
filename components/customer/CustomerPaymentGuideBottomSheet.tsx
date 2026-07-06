@@ -2,6 +2,7 @@
 // 목적: 공통으로 사용하는 입금안내 바텀시트
 // 주의: UI 전용. DB, API, 주문저장, 입금매칭, 정산, 배송 로직 없음. (시안 딥로즈 #7B2D43 인라인)
 
+import { useState } from "react";
 import type { CSSProperties } from "react";
 
 type CustomerPaymentGuideOrderItem = {
@@ -32,6 +33,11 @@ type CustomerPaymentGuideBottomSheetProps = {
   totalAmount?: number;
   pointUsedAmount?: number;
   finalAmount?: number;
+
+  // [추가] 주문완료 화면에서 다음 방송 알림 신청 + 앱 설치 유도 (표시 전용 — 저장 로직은 부모 콜백)
+  liveAlertOptin?: boolean;
+  liveAlertSaving?: boolean;
+  onLiveAlertRequest?: () => void;
 };
 
 const toNumber = (value: string | number | undefined) => {
@@ -67,8 +73,24 @@ export default function CustomerPaymentGuideBottomSheet({
   totalAmount = 0,
   pointUsedAmount = 0,
   finalAmount,
+  liveAlertOptin = false,
+  liveAlertSaving = false,
+  onLiveAlertRequest,
 }: CustomerPaymentGuideBottomSheetProps) {
+  const [installHint, setInstallHint] = useState(false);
+
   if (!open) return null;
+
+  const isStandaloneApp =
+    typeof window !== "undefined" &&
+    (window.matchMedia?.("(display-mode: standalone)")?.matches || (navigator as any).standalone === true);
+  const handleInstallClick = () => {
+    const p = typeof window !== "undefined" ? (window as any).__ruruPwaPrompt : null;
+    if (p && typeof p.prompt === "function") {
+      try { p.prompt(); return; } catch { /* 폴백으로 안내 표시 */ }
+    }
+    setInstallHint(true);
+  };
 
   const safeNickname = String(depositNickname || "").trim() || "주문서 닉네임";
   const safeBankName = String(bankName || "").trim();
@@ -220,6 +242,47 @@ export default function CustomerPaymentGuideBottomSheet({
                   <span style={{ color: "#7A1E47" }}>{won(safeFinalAmount)}</span>
                 </div>
               </div>
+            </section>
+          )}
+
+          {/* [추가] 주문완료 = 참여도 최고점 — 다음 방송 알림 신청 + 앱 추가 유도 (업계 표준: 전환 직후 설치/알림 제안) */}
+          {isOrderComplete && (
+            <section style={{ marginTop: "16px", borderRadius: "18px", background: "#F9EEF3", border: "1px solid #E3CDD6", padding: "16px" }}>
+              <div style={{ fontSize: "15px", fontWeight: 800, letterSpacing: "-0.04em", color: "#7B2D43" }}>다음 방송, 놓치지 마세요</div>
+              {onLiveAlertRequest ? (
+                liveAlertOptin ? (
+                  <div style={{ marginTop: "10px", borderRadius: "12px", background: "#E1F5EE", border: "1px solid #C7EBDD", padding: "11px 14px", fontSize: "13px", fontWeight: 800, color: "#0F6E56" }}>
+                    🔔 방송알림 신청됨 — 방송 시작하면 카톡으로 알려드려요
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={liveAlertSaving}
+                    onClick={onLiveAlertRequest}
+                    style={{ marginTop: "10px", display: "flex", minHeight: "46px", width: "100%", alignItems: "center", justifyContent: "center", borderRadius: "12px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "14px", fontWeight: 800, cursor: liveAlertSaving ? "wait" : "pointer", opacity: liveAlertSaving ? 0.6 : 1 }}
+                  >
+                    {liveAlertSaving ? "신청 중..." : "🔔 방송 시작 알림 신청하기"}
+                  </button>
+                )
+              ) : null}
+              {!isStandaloneApp && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleInstallClick}
+                    style={{ marginTop: "8px", display: "flex", minHeight: "46px", width: "100%", alignItems: "center", justifyContent: "center", borderRadius: "12px", border: "1px solid #D9C5CC", background: "#fff", color: "#7B2D43", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}
+                  >
+                    📲 홈 화면에 앱으로 추가하기
+                  </button>
+                  {installHint && (
+                    <div style={{ marginTop: "8px", fontSize: "12px", fontWeight: 700, lineHeight: 1.6, color: "#8a6b76" }}>
+                      아이폰: Safari 하단 <b>공유</b> 버튼 → <b>홈 화면에 추가</b>
+                      <br />
+                      안드로이드: 브라우저 메뉴(⋮) → <b>홈 화면에 추가</b>
+                    </div>
+                  )}
+                </>
+              )}
             </section>
           )}
 
