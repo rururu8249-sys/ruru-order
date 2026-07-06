@@ -11,6 +11,8 @@ type Props = {
   onCloseNav?: () => void;
   /** 예외 배지 (읽기 전용): 매칭필요/카드미결제 건수 — 주문·입금 메뉴에 표시 */
   exceptionBadges?: { needMatch: number; cardUnpaid: number };
+  /** 배지 클릭 시 해당 상태 필터로 바로 이동 (match=매칭필요, card=카드미결제) */
+  onExceptionBadgeClick?: (kind: "match" | "card") => void;
 };
 
 export default function AdminLiveSidebar({
@@ -21,6 +23,7 @@ export default function AdminLiveSidebar({
   navOpen = false,
   onCloseNav,
   exceptionBadges,
+  onExceptionBadgeClick,
 }: Props) {
   return (
     <>
@@ -87,10 +90,20 @@ export default function AdminLiveSidebar({
                 {menu.key === "broadcast" && exceptionBadges && (exceptionBadges.needMatch > 0 || exceptionBadges.cardUnpaid > 0) ? (
                   <span className="ml-auto flex shrink-0 flex-col items-end gap-0.5">
                     {exceptionBadges.needMatch > 0 ? (
-                      <span className="whitespace-nowrap rounded-full bg-danger-bg px-2 py-0.5 text-[10px] font-black text-danger-tx">매칭 {exceptionBadges.needMatch}</span>
+                      <span
+                        role="button"
+                        title={`입금자명·금액이 주문과 자동으로 안 맞아 수동 확인이 필요한 주문 ${exceptionBadges.needMatch}건 — 클릭하면 해당 주문만 보여요`}
+                        onClick={(e) => { e.stopPropagation(); onExceptionBadgeClick?.("match"); }}
+                        className="cursor-pointer whitespace-nowrap rounded-full bg-danger-bg px-2 py-0.5 text-[10px] font-black text-danger-tx hover:ring-2 hover:ring-danger-tx/30"
+                      >매칭 {exceptionBadges.needMatch} ›</span>
                     ) : null}
                     {exceptionBadges.cardUnpaid > 0 ? (
-                      <span className="whitespace-nowrap rounded-full bg-danger-bg px-2 py-0.5 text-[10px] font-black text-danger-tx">카드 {exceptionBadges.cardUnpaid}</span>
+                      <span
+                        role="button"
+                        title={`카드결제 선택 후 아직 결제완료 처리 전인 주문 ${exceptionBadges.cardUnpaid}건 — 클릭하면 해당 주문만 보여요`}
+                        onClick={(e) => { e.stopPropagation(); onExceptionBadgeClick?.("card"); }}
+                        className="cursor-pointer whitespace-nowrap rounded-full bg-danger-bg px-2 py-0.5 text-[10px] font-black text-danger-tx hover:ring-2 hover:ring-danger-tx/30"
+                      >카드 {exceptionBadges.cardUnpaid} ›</span>
                     ) : null}
                   </span>
                 ) : null}

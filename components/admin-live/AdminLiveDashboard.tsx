@@ -1428,6 +1428,19 @@ export default function AdminLiveDashboard() {
           navOpen={navOpen}
           onCloseNav={() => setNavOpen(false)}
           exceptionBadges={exceptionBadges}
+          onExceptionBadgeClick={(kind) => {
+            // [UX 2026-07-06] 배지 클릭 = 그 예외 주문만 바로 보기: 주문·입금 화면 + 기간/범위 전체 + 해당 상태 필터
+            setActiveMenu("broadcast");
+            replacePanelInUrl("broadcast");
+            setNavOpen(false);
+            setFilters((prev) => ({
+              ...prev,
+              broadcast: "all",
+              scope: "all",
+              date: "all",
+              status: kind === "match" ? "manual_match_needed" : "card_unpaid",
+            }));
+          }}
           onMenuChange={(nextMenu) => {
             setActiveMenu(nextMenu);
             replacePanelInUrl(nextMenu);
