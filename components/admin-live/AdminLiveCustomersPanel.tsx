@@ -1463,7 +1463,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
                           {customer.name ? <span className="shrink-0 text-xs text-ink-mute">· {customer.name}</span> : null}
                         </div>
                         <div className="mt-0.5 truncate text-[11px] text-ink-mute">
-                          누적 {customer.orderCount}건 · {money(customer.totalAmount)}원
+                          누적 {customer.orderCount}건 · {money(customer.totalAmount)}
                           {customer.phone ? ` · ${formatPhone(customer.phone)}` : ""}
                         </div>
                       </button>
