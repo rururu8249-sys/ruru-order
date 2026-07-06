@@ -524,17 +524,17 @@ export default function LiveOrderTable({
 
   const baseOrders = useMemo(() => {
     if (!broadcastStartedAt) return orders;
-    // [버그수정 2026-07-06] 방송묶음 컷(방송 시작 이후만 표시)은 "현재 방송" 보기일 때만 적용.
-    // 기존엔 방송 ON이면 기간/범위를 전체로 바꿔도 무조건 잘라서, 과거 매칭필요·카드미결제 주문이
-    // 배지/매출바에는 잡히는데 표에는 안 보이는 불일치가 났음(사장님 제보). 표시 전용 — 돈 로직 무관.
-    if (filters.broadcast !== "current") return orders;
+    // [버그수정 2026-07-06] 방송묶음 컷(방송 시작 이후만 표시)은 "현재 방송 + 기간 전체(기본 화면)"일 때만 적용.
+    // 기존엔 방송 ON이면 필터를 바꿔도 무조건 잘라서 과거 주문 확인이 불가능했음(사장님 제보).
+    // 방송/기간 필터 중 하나라도 바꾸면 컷 해제 → 방송 중에도 지난 주문 조회 가능. 표시 전용 — 돈 로직 무관.
+    if (filters.broadcast !== "current" || filters.date !== "all") return orders;
     const startMs = new Date(broadcastStartedAt).getTime();
     if (Number.isNaN(startMs)) return orders;
     return orders.filter((order) => {
       const created = order.createdAt ? new Date(order.createdAt).getTime() : NaN;
       return !Number.isNaN(created) && created >= startMs;
     });
-  }, [orders, broadcastStartedAt, filters.broadcast]);
+  }, [orders, broadcastStartedAt, filters.broadcast, filters.date]);
 
   const counts = useMemo(() => {
     const paid = baseOrders.filter((order) =>
@@ -803,6 +803,12 @@ export default function LiveOrderTable({
     <section className="rounded-2xl border border-line bg-surface p-4 shadow-sm flex flex-col">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h2 className="mr-2 text-lg font-black text-ink">실시간 주문서</h2>
+        {/* [안내 2026-07-06] 방송묶음 컷이 걸려 있을 때 뭘 보고 있는지 명시 — 지난 주문 찾다가 헤매는 것 방지 */}
+        {broadcastStartedAt && filters.broadcast === "current" && filters.date === "all" ? (
+          <span className="rounded-full bg-rose-soft px-2.5 py-1 text-[11px] font-black text-rose-deep" title="지난 주문을 보려면 기간이나 방송 필터를 바꿔주세요">
+            이번 방송 주문만 표시 중 · 지난 주문은 기간/방송 필터 변경
+          </span>
+        ) : null}
 
         {[
           ["전체", counts.total, "all", "rose"],
