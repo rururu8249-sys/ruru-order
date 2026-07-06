@@ -4707,7 +4707,8 @@ export default function OrderPage() {
                               {badges.includes("direct") ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#E8F0FE", color: "#1D4ED8" }}>🛒 바로구매</span> : null}
                             </div>
                             <div style={{ fontSize: "13px", fontWeight: 700, color: "#222", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.product_name}</div>
-                            {/* [UI] "방송 접수 없이 바로 구매" 반복 서브텍스트 제거(배지로 충분) + 가격 위계 강화 15→17px */}
+                            {/* 바로구매 부가설명 유지(사장님 지침: 배지만으론 신규 고객이 뜻을 모름) + 가격 위계 강화 15→17px */}
+                            {badges.includes("direct") ? (<div style={{ fontSize: 11, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>방송 접수 없이 지금 바로 구매 가능</div>) : null}
                             <div style={{ marginTop: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                               <span style={{ fontSize: "17px", fontWeight: 800, color: "#7A1E47" }}>{won(Number(product.price || 0))}</span>
                               <button
