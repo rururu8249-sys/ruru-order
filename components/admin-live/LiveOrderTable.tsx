@@ -259,14 +259,9 @@ function inventoryStatusBadge(order: LiveOrder) {
   });
 
   if (deductedItem) {
-    return (
-      <span
-        className="inline-flex shrink-0 items-center rounded-full border border-ok-tx bg-ok-bg px-2 py-1 text-[11px] font-black text-ok-tx"
-        title={deductedItem.inventoryDeductionMemo || deductedItem.inventoryDeductionStatus || "재고차감 완료"}
-      >
-        재고차감완료
-      </span>
-    );
+    // [UI 2026-07-06] 정상(차감완료)은 무표시 — 전 행에 초록 배지가 반복되면 정보가 아니라 소음.
+    // 예외(재고차감제외·복구됨 등)만 아래에서 배지로 표시해 눈에 띄게. 판정 로직은 무변경.
+    return null;
   }
 
   const skippedItem = items.find((item) => {

@@ -73,7 +73,8 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl border border-rose-line bg-surface px-4 py-2.5 text-[12px] font-black">
-      <span className="text-ink-soft">매출 <span className="text-ink text-[13px]">{money(paidAmount)}</span></span>
+      {/* [UI 2026-07-06] 기준 명시 — 정산 팝업(이번달 자동조회)과 숫자가 달라 헷갈리던 것 방지 */}
+      <span className="text-ink-soft">매출<span className="ml-1 text-[10px] font-bold text-ink-mute">(현재 조회범위)</span> <span className="text-ink text-[13px]">{money(paidAmount)}</span></span>
       <span className="text-line">|</span>
       <span className="text-ink-soft">무통장입금 <span className="text-ok-tx">{money(bankPaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
       <span className="text-ink-soft">카드결제 <span className="text-ok-tx">{money(cardPaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>

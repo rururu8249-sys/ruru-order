@@ -203,13 +203,13 @@ export default function PaymentMatchPanel(_props: Props) {
           </div>
 
           <div className="mt-2 text-[11px] font-black tracking-[0.22em] text-ink-mute">
-            SAEMAEUL GEUMGO BANK DEPOSIT SYNC
+            새마을금고 입금 자동연동
           </div>
 
           <h1 className="mt-3 text-3xl font-black tracking-tight text-ink">입금내역</h1>
 
           <p className="mt-2 text-sm font-bold text-ink-soft">
-            Saemaeul Geumgo deposit records synced through BANKDA. 연결/처리 정보는 상세 버튼에서만 표시합니다.
+            뱅크다로 자동 수집된 새마을금고 입금 기록입니다. 연결/처리 정보는 상세 버튼에서만 표시합니다.
           </p>
         </div>
 
@@ -247,7 +247,7 @@ export default function PaymentMatchPanel(_props: Props) {
       {loading ? (
         <section className="rounded-[32px] border border-line bg-surface p-12 text-center shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
           <div className="text-lg font-black text-ink">입금내역을 불러오는 중입니다.</div>
-          <div className="mt-2 text-sm font-bold text-ink-mute">뱅크다 저장 내역을 조회하고 있습니다.</div>
+          <div className="mt-2 text-sm font-bold text-ink-mute">전체 입금 기록을 불러오고 있어 건수가 많으면 시간이 걸릴 수 있어요. 잠시만요.</div>
         </section>
       ) : (
         <DepositLedgerTable
