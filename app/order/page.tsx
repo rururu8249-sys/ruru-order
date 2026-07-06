@@ -790,19 +790,20 @@ function isSoldOutOrderProduct(product: any): boolean {
 // 재고 임박 표시 전용(읽기만·주문/재고 로직 무관)
 // ※2026-07-05 사장님 지침: 옵션 상품은 "합산(총재고)" 표시 안 함 — 임박한 옵션만 옵션별로 표시.
 // 옵션 없는(총재고) 상품 전용: 재고관리 중이고 남은 수량 1~5개일 때만 숫자 반환
-function lowStockRemainOrderProduct(product: any): number | null {
+function lowStockRemainOrderProduct(product: any, reservedQty = 0): number | null {
   const note = readOrderNoteObject(product);
   if (note?.stock_management_enabled !== true) return null;
   const variants = Array.isArray(note?.stock_variants) ? note.stock_variants : [];
   if (variants.length > 0) return null; // 옵션 상품은 합산 표시 금지 → lowStockOptionsOrderProduct가 담당
   const stock = Number(product?.stock ?? product?.total_stock);
   if (!Number.isFinite(stock)) return null;
-  const remain = Math.max(0, stock);
+  // [재고 홀드] 다른 고객이 담아둔(예약) 수량 반영 — 표시 전용
+  const remain = Math.max(0, stock - Math.max(0, Number(reservedQty) || 0));
   return remain >= 1 && remain <= 5 ? remain : null;
 }
 
 // 옵션 상품 전용: 재고 1~5개인 "임박 옵션"만 [{label, stock}]로 반환 (재고관리 중일 때만)
-function lowStockOptionsOrderProduct(product: any): Array<{ label: string; stock: number }> {
+function lowStockOptionsOrderProduct(product: any, reservedOf?: (color: unknown, size: unknown) => number): Array<{ label: string; stock: number }> {
   const note = readOrderNoteObject(product);
   if (note?.stock_management_enabled !== true) return [];
   const variants = Array.isArray(note?.stock_variants) ? note.stock_variants : [];
@@ -814,7 +815,8 @@ function lowStockOptionsOrderProduct(product: any): Array<{ label: string; stock
   return variants
     .map((v: any) => ({
       label: [norm(v.color), norm(v.size)].filter(Boolean).join("/") || "기본",
-      stock: Number(v.stock ?? 0),
+      // [재고 홀드] 다른 고객 예약 수량 차감 — 표시 전용
+      stock: Number(v.stock ?? 0) - Math.max(0, Number(reservedOf ? reservedOf(v.color, v.size) : 0) || 0),
     }))
     .filter((x: { stock: number }) => Number.isFinite(x.stock) && x.stock >= 1 && x.stock <= 5);
 }
@@ -2888,6 +2890,76 @@ export default function OrderPage() {
     });
   }, [broadcastProducts, groupBuyQuickProductsFromCatalog, broadcast?.status]);
 
+  // ============ [재고 홀드] 담는 즉시 서버에 예약(15분) — 다른 고객 화면·품절 판정에 즉시 차감 반영 ============
+  // ⚠️ 진짜 재고 차감/복구는 기존 제출 RPC·취소 복구가 단일 소유(무변경). 이 예약은 표시용 선점 전용이라
+  //    API가 죽어도 담기/제출/입금/정산 전부 정상 동작(오버셀은 제출 RPC가 원래 막고 있음).
+  const [reservedByVariant, setReservedByVariant] = useState<Record<string, number>>({});
+  const [reservedByProduct, setReservedByProduct] = useState<Record<string, number>>({});
+  const cartSessionKeyRef = useRef<string>("");
+  const getCartSessionKey = () => {
+    if (cartSessionKeyRef.current) return cartSessionKeyRef.current;
+    try {
+      let k = localStorage.getItem("ruru_cart_session_key") || "";
+      if (!k) {
+        k = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `s${Date.now()}${Math.random().toString(36).slice(2, 10)}`;
+        localStorage.setItem("ruru_cart_session_key", k);
+      }
+      cartSessionKeyRef.current = k;
+      return k;
+    } catch {
+      return "";
+    }
+  };
+  const reservationVariantKey = (pid: string, color: unknown, size: unknown) => {
+    const norm = (s: unknown) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
+    return `${pid}|${norm(color)}|${norm(size)}`;
+  };
+  const fetchCartReservations = async () => {
+    try {
+      const ids = quickGroupBuyProducts.map((p: any) => String(p?.id ?? "")).filter(Boolean);
+      if (ids.length === 0) return;
+      const res = await fetch(`/api/cart-reservations?ids=${encodeURIComponent(ids.join(","))}&exclude=${encodeURIComponent(getCartSessionKey())}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json().catch(() => null);
+      if (data?.ok) {
+        setReservedByVariant(data.byVariant || {});
+        setReservedByProduct(data.byProduct || {});
+      }
+    } catch { /* 예약 조회 실패해도 화면·주문 정상 */ }
+  };
+  const syncCartReservations = async () => {
+    try {
+      const key = getCartSessionKey();
+      if (!key) return;
+      const payload = items
+        .filter((it) => it.product_id && String(it.product_name || "").trim())
+        .map((it) => ({ productId: String(it.product_id), color: String(it.color || ""), size: String(it.size || ""), qty: Math.max(0, Math.min(99, Number(it.qty) || 0)) }))
+        .filter((r) => r.qty > 0);
+      await fetch("/api/cart-reservations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "sync", sessionKey: key, phone: onlyNumber(customerPhone || ""), items: payload }),
+      });
+    } catch { /* 실패해도 주문 흐름 무영향 */ }
+  };
+  // 담긴 상품 변경 → 1.5초 디바운스 예약 동기화(주문서 비우면 예약 해제와 동일·제출 성공 시 items 리셋으로 자동 해제)
+  useEffect(() => {
+    if (!hasSavedInfo) return;
+    const t = setTimeout(() => { void syncCartReservations().then(() => fetchCartReservations()); }, 1500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, hasSavedInfo]);
+  // 45초마다: 내 예약 연장(하트비트) + 다른 고객 예약 반영 (탭 보일 때만)
+  useEffect(() => {
+    if (!hasSavedInfo) return;
+    const t = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      void syncCartReservations().then(() => fetchCartReservations());
+    }, 45000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasSavedInfo, quickGroupBuyProducts.length]);
+
   // P4 상품목록 무한스크롤: 센티넬이 보이면 10개씩 더 노출 (센티넬이 조건부로 (재)마운트되므로 재부착)
   useEffect(() => {
     const el = sentinelRef.current;
@@ -4292,8 +4364,14 @@ export default function OrderPage() {
   })();
   const isSoldOutColorSize = (color: string, size: string) => {
     const nc = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
+    // [재고 홀드] 다른 고객이 담아둔(예약) 수량까지 빼고 품절 판정 — 표시 전용(실차감은 제출 RPC)
+    const pid = String(registeredOptionSelectProduct?.id ?? "");
     return registeredOptionStockVariants.length > 0 &&
-      registeredOptionStockVariants.some((v) => nc(v.color) === nc(color) && nc(v.size) === nc(size) && Number(v.stock) <= 0);
+      registeredOptionStockVariants.some((v) => {
+        if (nc(v.color) !== nc(color) || nc(v.size) !== nc(size)) return false;
+        const reserved = pid ? Number(reservedByVariant[reservationVariantKey(pid, v.color, v.size)] || 0) : 0;
+        return Number(v.stock) - Math.max(0, reserved) <= 0;
+      });
   };
   const registeredOptionColorChoices = registeredOptionSelectProduct
     ? getSelectableRegisteredOptions(registeredOptionSelectProduct, "color")
@@ -4643,21 +4721,31 @@ export default function OrderPage() {
                       const pinned = isPinnedOrderProduct(product);
                       const sold = (() => {
                         if (isSoldOutOrderProduct(product)) return true;
-                        // 주문서에 담긴 수량 합산 후 재고 초과 체크
+                        // 주문서에 담긴 수량 + 다른 고객 홀드(예약) 합산 후 재고 초과 체크
                         const productIdStr = String(product.id ?? "");
                         if (!productIdStr) return false;
                         try {
                           const note = typeof product.product_note === "string" ? JSON.parse(product.product_note) : product.product_note;
                           if (note?.stock_management_enabled !== true) return false;
                           const variants = Array.isArray(note?.stock_variants) ? note.stock_variants : [];
-                          if (variants.length === 0) return false;
+                          const normC = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
+                          if (variants.length === 0) {
+                            // 총재고(옵션 없는) 상품: 다른 고객 홀드 + 내 주문서 수량 반영
+                            const totalStock = Number((product as any)?.stock ?? (product as any)?.total_stock);
+                            if (!Number.isFinite(totalStock)) return false;
+                            const inCartTotal = items
+                              .filter((item) => item.product_id === productIdStr)
+                              .reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+                            const reservedTotal = Number(reservedByProduct[productIdStr] || 0);
+                            return inCartTotal + reservedTotal >= totalStock;
+                          }
                           return variants.every((v: any) => {
                             const maxStock = Number(v.stock ?? 0);
-                            const normC = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
                             const inCart = items
                               .filter((item) => item.product_id === productIdStr && normC(item.color) === normC(String(v.color ?? "")) && normC(item.size) === normC(String(v.size ?? "")))
                               .reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
-                            return inCart >= maxStock;
+                            const reserved = Number(reservedByVariant[reservationVariantKey(productIdStr, v.color, v.size)] || 0);
+                            return inCart + reserved >= maxStock;
                           });
                         } catch { return false; }
                       })();
@@ -4699,14 +4787,15 @@ export default function OrderPage() {
                               {badges.includes("hot") ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>HOT</span> : null}
                               {badges.includes("limit") ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#854F0B", background: "#FBF1E0", borderRadius: "5px", padding: "2px 6px" }}>한정</span> : null}
                               {!sold ? (() => {
-                                // 옵션 상품: 임박 옵션만 옵션별 표시(합산 금지) / 단일 상품: N개 남음
-                                const lowOpts = lowStockOptionsOrderProduct(product);
+                                // 옵션 상품: 임박 옵션만 옵션별 표시(합산 금지) / 단일 상품: N개 남음 — 다른 고객 홀드 반영
+                                const pidForLow = String(product.id ?? "");
+                                const lowOpts = lowStockOptionsOrderProduct(product, (c, s) => Number(reservedByVariant[reservationVariantKey(pidForLow, c, s)] || 0));
                                 if (lowOpts.length > 0) {
                                   // 가장 급한(재고 적은) 순으로 최대 2개만, "외 N" 같은 축약 표현은 헷갈려서 안 씀(사장님 지침)
                                   const shown = [...lowOpts].sort((a, b) => a.stock - b.stock).slice(0, 2).map((o) => `${o.label} ${o.stock}개`).join(" · ");
                                   return <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px" }}>🔥 {shown} 남음</span>;
                                 }
-                                const remain = lowStockRemainOrderProduct(product);
+                                const remain = lowStockRemainOrderProduct(product, Number(reservedByProduct[pidForLow] || 0));
                                 return remain !== null ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px" }}>🔥 {remain}개 남음</span> : null;
                               })() : null}
                               {badges.includes("pick") ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#FFF8E7", color: "#B8860B" }}>⭐ MD픽</span> : null}
