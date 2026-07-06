@@ -13,6 +13,7 @@ type OrderGroupCandidate = {
   nickname: string;
   customerName: string;
   amount: number;
+  pointUsed: number;
 };
 
 type MatchCandidate = {
@@ -54,9 +55,15 @@ function text(value: unknown) {
 }
 
 function autoMatchName(value: unknown) {
-  // 안전 확장: 앞뒤 공백 제거 + 맨 앞 @ 접두어만 제거합니다.
-  // 중간 문자, 한글, 숫자, 대소문자는 임의로 바꾸지 않습니다.
-  return text(value).replace(/^@+/, "");
+  // 매칭 키 비교 전용 정규화(표시/저장값은 절대 변경하지 않음):
+  //  - 앞뒤 공백 제거 + 맨 앞 @ 접두어 제거
+  //  - 공백/하이픈/언더스코어/점/가운뎃점 제거 + 소문자화
+  // 예) "뮤즈-12" == "뮤즈12", "sunhye-e5z" == "sunhyee5z"
+  // 서로 다른 사람이 같은 키로 겹치면 아래 "주문 1건 && 입금 1건" 조건에서 blocked 되어 오매칭 없음.
+  return text(value)
+    .replace(/^@+/, "")
+    .replace(/[\s\-_.·・]/g, "")
+    .toLowerCase();
 }
 
 function num(value: unknown) {
@@ -85,6 +92,12 @@ function orderAmount(order: AnyRow) {
       order.order_amount ??
       order.amount
   );
+}
+
+function orderPointUsed(order: AnyRow) {
+  // 이 주문에서 사용한 포인트. 다중상품+포인트 주문은 final_amount 합이 포인트 차감 전
+  // 금액이라, 매칭 시 (합계 - 사용포인트) 금액도 후보로 허용하기 위해 사용한다.
+  return num(order.point_used_amount ?? order.pointUsedAmount ?? order.used_point_amount ?? 0);
 }
 
 function orderGroupId(order: AnyRow) {
@@ -235,6 +248,7 @@ function buildOrderGroups(orders: AnyRow[]) {
     const nickname = orderNickname(firstOrder);
     const customerName = orderCustomerName(firstOrder);
     const amount = groupOrders.reduce((sum, order) => sum + orderAmount(order), 0);
+    const pointUsed = groupOrders.reduce((sum, order) => sum + orderPointUsed(order), 0);
     const orderIds = groupOrders.map((item) => Number(item.id)).filter((id) => Number.isFinite(id) && id > 0);
 
     if (!nickname || !amount || orderIds.length === 0) continue;
@@ -246,6 +260,7 @@ function buildOrderGroups(orders: AnyRow[]) {
       nickname,
       customerName,
       amount,
+      pointUsed,
     });
   }
 
@@ -281,15 +296,25 @@ function buildCandidates(orders: AnyRow[], deposits: AnyRow[]) {
     }
 
     for (const match of matchNames) {
-      const key = makeKey(match.name, group.amount);
-      ordersByKey.set(key, [
-        ...(ordersByKey.get(key) || []),
-        {
-          group,
-          matchName: match.name,
-          matchBasis: match.basis,
-        },
-      ]);
+      const entry = {
+        group,
+        matchName: match.name,
+        matchBasis: match.basis,
+      };
+
+      // 기본: 주문 합계금액. 추가: 포인트 사용 주문은 (합계 - 사용포인트) 실결제금액도 후보로 허용.
+      //  (다중상품+포인트 주문의 final_amount 합이 포인트 차감 전이라 실입금과 어긋나는 문제 대응.
+      //   두 금액을 "추가"만 하므로 포인트 미사용/단일상품 주문 동작은 변하지 않음.)
+      const amountKeys = [group.amount];
+      const netAmount = group.amount - group.pointUsed;
+      if (group.pointUsed > 0 && netAmount > 0 && netAmount !== group.amount) {
+        amountKeys.push(netAmount);
+      }
+
+      for (const amt of amountKeys) {
+        const key = makeKey(match.name, amt);
+        ordersByKey.set(key, [...(ordersByKey.get(key) || []), entry]);
+      }
     }
   }
 
