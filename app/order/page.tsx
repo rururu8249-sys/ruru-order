@@ -1972,6 +1972,20 @@ export default function OrderPage() {
     await loadBroadcastProducts(data.id);
   };
 
+  // [라이브 동기화] 방송 ON 동안 45초마다 방송 상품(고정상품 포함) 재조회 — 관리자가 "지금 띄운 상품"을 바꾸면
+  // 고객 목록 맨 위 강조 카드가 자동 반영. 읽기 전용 폴링(탭이 보일 때만), 주문/돈 로직 무관.
+  useEffect(() => {
+    const on = String(broadcast?.status || "").toUpperCase() === "ON";
+    const bid = broadcast?.id;
+    if (!on || !bid) return;
+    const t = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      void loadBroadcastProducts(bid);
+    }, 45000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [broadcast?.status, broadcast?.id]);
+
   const loadBroadcastProducts = async (broadcastId: string | number) => {
     const { data, error } = await supabase
       .from("broadcast_products")
@@ -4651,8 +4665,18 @@ export default function OrderPage() {
                       return (
                         <div
                           key={String(product.id)}
-                          style={{ display: "flex", gap: "12px", alignItems: "center", padding: "13px 0", borderBottom: "0.5px solid #E5E1DC" }}
+                          style={isBroadcastOn && pinned
+                            ? { padding: "12px", margin: "8px 0 12px", borderRadius: "14px", border: "1.5px solid #7A1E47", background: "#FDF3F7", boxShadow: "0 4px 16px rgba(122,30,71,0.10)" }
+                            : { padding: "13px 0", borderBottom: "0.5px solid #E5E1DC" }}
                         >
+                          {/* [UI] 방송 ON + 고정상품 = "지금 소개 중" 강조 카드 — 채팅에서 말하는 상품과 사이트 첫 화면 동기화 */}
+                          {isBroadcastOn && pinned ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px", fontSize: "12px", fontWeight: 900, color: "#7A1E47" }}>
+                              <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#E8340A", animation: "shimmer 1.2s ease-in-out infinite" }} />
+                              지금 방송에서 소개 중
+                            </div>
+                          ) : null}
+                          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
                           <div onClick={() => { if (img) setLightboxImage(img); }} style={{ position: "relative", flexShrink: 0, width: "84px", height: "84px", borderRadius: "10px", background: "#F0EBE8", overflow: "hidden", cursor: img ? "zoom-in" : "default" }}>
                             {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
                             {sold ? (
@@ -4695,6 +4719,7 @@ export default function OrderPage() {
                                 {sold ? "품절" : "담기"}
                               </button>
                             </div>
+                          </div>
                           </div>
                         </div>
                       );
