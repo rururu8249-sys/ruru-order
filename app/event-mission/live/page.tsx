@@ -158,8 +158,9 @@ export default function MissionLiveWidget() {
                 textShadow: "0 2px 5px rgba(0,0,0,0.8), 0 0 2px rgba(0,0,0,0.6)",
               }}
             >
-              <span style={{ fontSize: "1.15em" }}>🛒</span>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>다 같이 구매할수록 바가 가득 차요!</span>
+              {/* [2026-07-06 사장님 지침] 기본멘트를 구매욕·선물욕 자극형으로 교체 (선물 금액은 장면B가 담당) */}
+              <span style={{ fontSize: "1.15em" }}>🔥</span>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>지금 내 주문 하나가 전원 선물을 앞당겨요!</span>
             </div>
             {/* 장면 B: 진행 바 + 보상 (바 안에 % 오버레이) */}
             <div

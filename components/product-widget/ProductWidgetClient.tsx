@@ -94,8 +94,9 @@ export default function ProductWidgetClient() {
   const [rotation, setRotation] = useState<AnyProduct[]>([]);
   const [rotIndex, setRotIndex] = useState(0);
   // 이벤트 토스트 — 여러 개 동시 도착 가능 → 큐로 순서대로 3초씩 표시
-  const [toastQueue, setToastQueue] = useState<string[]>([]);
-  const [currentToast, setCurrentToast] = useState("");
+  // [2026-07-06] 문자열 → 구조화(제목/닉네임/내용): 상품 카드를 살짝 덮는 축하 오버레이로 표시
+  const [toastQueue, setToastQueue] = useState<Array<{ icon: string; title: string; name: string; detail: string }>>([]);
+  const [currentToast, setCurrentToast] = useState<{ icon: string; title: string; name: string; detail: string } | null>(null);
   const seenRef = useRef<Set<string>>(new Set());
   // 입금확인 폭죽(표시 전용). key 증가로 애니메이션 재시작, on으로 1회 표시.
   const [confettiKey, setConfettiKey] = useState(0);
@@ -212,7 +213,7 @@ export default function ProductWidgetClient() {
     // 입금/카드 상태가 기록되는 실제 컬럼들
     const statusOf = (row: AnyProduct) => String(row?.admin_order_status_v2 || row?.order_manage_status || row?.deposit_status || "").trim();
     const groupKey = (row: AnyProduct) => String(row?.order_group_id || row?.id || "");
-    const push = (msg: string) => setToastQueue((q) => [...q, msg]);
+    const push = (item: { icon: string; title: string; name: string; detail: string }) => setToastQueue((q) => [...q, item]);
 
     const channel = supabase
       .channel("ruru-product-widget-events")
@@ -222,7 +223,7 @@ export default function ProductWidgetClient() {
         const key = `ins:${groupKey(row)}`;
         if (seenRef.current.has(key)) return; // 한 주문(여러 상품행) 중복 방지
         seenRef.current.add(key);
-        push(`🛒 ${nick(row)}님 주문! ${pname(row)} ${amount(row)}원`);
+        push({ icon: "🛒", title: "주문서 제출!", name: `${nick(row)}님`, detail: `${pname(row)} · ${amount(row)}원` });
       })
       // B·C. 입금 확인(자동/수동) / D. 카드 결제 완료
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, (payload) => {
@@ -236,7 +237,7 @@ export default function ProductWidgetClient() {
           const key = `dep:${groupKey(row)}`;
           if (!seenRef.current.has(key)) {
             seenRef.current.add(key);
-            push(`✅ ${nick(row)}님 입금 확인! ${amount(row)}원`);
+            push({ icon: "✅", title: "입금 확인!", name: `${nick(row)}님`, detail: `${amount(row)}원 입금 완료` });
           }
         }
 
@@ -245,7 +246,7 @@ export default function ProductWidgetClient() {
           const key = `card:${groupKey(row)}`;
           if (!seenRef.current.has(key)) {
             seenRef.current.add(key);
-            push(`💳 ${nick(row)}님 카드 결제 완료! ${amount(row)}원`);
+            push({ icon: "💳", title: "카드 결제 완료!", name: `${nick(row)}님`, detail: `${amount(row)}원 결제 완료` });
           }
         }
       })
@@ -269,7 +270,7 @@ export default function ProductWidgetClient() {
   // 큐 변경으로 재실행되며 타이머가 즉시 clear되던 버그 수정. 3초 후 사라지고 다음 큐로 넘어감)
   useEffect(() => {
     if (!currentToast) return;
-    const t = window.setTimeout(() => setCurrentToast(""), 3000);
+    const t = window.setTimeout(() => setCurrentToast(null), 3000);
     return () => window.clearTimeout(t);
   }, [currentToast]);
 
@@ -287,24 +288,36 @@ export default function ProductWidgetClient() {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "transparent", pointerEvents: "none", fontFamily: "Pretendard, Arial, sans-serif" }}>
+      {/* [2026-07-06] 주문/입금 축하 오버레이 — 상품 카드를 살짝 덮으며 닉네임·내용·금액 표시 (3초 후 자동 소멸, 표시 전용) */}
       {currentToast ? (
         <div
           style={{
             position: "absolute",
-            left: "24px",
-            bottom: "160px",
-            background: "rgba(123,45,67,0.95)",
+            left: pos ? `${pos.x - 6}px` : "18px",
+            top: pos ? `${pos.y - 8}px` : undefined,
+            bottom: pos ? undefined : "18px",
+            width: "348px",
+            zIndex: 5,
+            background: "rgba(123,45,67,0.94)",
+            backdropFilter: "blur(7px)",
+            WebkitBackdropFilter: "blur(7px)",
+            border: "1.5px solid rgba(255,217,224,0.6)",
             color: "#fff",
-            padding: "10px 16px",
-            borderRadius: "12px",
-            fontSize: "15px",
-            fontWeight: 800,
-            whiteSpace: "nowrap",
-            boxShadow: "0 0 18px rgba(123,45,67,0.65), 0 4px 14px rgba(0,0,0,0.3)",
+            padding: "14px 16px",
+            borderRadius: "14px",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            boxShadow: "0 0 26px rgba(123,45,67,0.7), 0 6px 18px rgba(0,0,0,0.35)",
             animation: "ruruToastPop 0.5s cubic-bezier(0.18,0.89,0.32,1.28)",
           }}
         >
-          {currentToast}
+          <span style={{ fontSize: "30px", flexShrink: 0 }}>{currentToast.icon}</span>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: "13px", fontWeight: 900, letterSpacing: "0.03em", color: "#FFD9E0" }}>{currentToast.title}</div>
+            <div style={{ marginTop: "2px", fontSize: "19px", fontWeight: 900, lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentToast.name}</div>
+            <div style={{ marginTop: "2px", fontSize: "14px", fontWeight: 800, color: "rgba(255,255,255,0.92)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentToast.detail}</div>
+          </div>
         </div>
       ) : null}
 
@@ -362,7 +375,7 @@ export default function ProductWidgetClient() {
 
       {/* 입금/주문 토스트 폭죽 — 좌하단 국소, 표시 전용, pointerEvents none */}
       {confettiOn ? (
-        <div key={confettiKey} style={{ position: "absolute", left: "78px", bottom: "150px", width: 0, height: 0, pointerEvents: "none" }}>
+        <div key={confettiKey} style={{ position: "absolute", left: pos ? `${pos.x + 170}px` : "190px", top: pos ? `${pos.y + 30}px` : undefined, bottom: pos ? undefined : "90px", width: 0, height: 0, pointerEvents: "none", zIndex: 6 }}>
           {CONFETTI_PIECES.map((p, i) => (
             <span
               key={i}
