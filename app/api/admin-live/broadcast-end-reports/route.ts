@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-
-const ADMIN_COOKIE_NAME = "ruru_admin_session";
+import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 const DEFAULT_VISITOR_NOTE = "방문 로그 설정 후 표시";
 
 type BroadcastEndReportRequestBody = {
@@ -107,20 +106,12 @@ function createAdminSupabase() {
   });
 }
 
-function assertAdminSession(request: NextRequest) {
-  const expectedToken = process.env.ADMIN_SESSION_TOKEN;
+// [버그수정 2026-07-06] 옛 인증(ADMIN_SESSION_TOKEN 원문 비교)을 쓰던 유일한 잔재 → 실제 admin-live 인증(서명쿠키)으로 교체
+// (6/18 /api/youtube/* 라우트와 동일한 불일치 — 정산 팝업 "방송종료 요약 리스트 불러오기 실패 401" 원인)
+async function assertAdminSession(request: NextRequest) {
+  const session = await verifyAdminSessionFromRequest(request);
 
-  if (!expectedToken) {
-    return {
-      ok: false,
-      status: 500,
-      message: "ADMIN_SESSION_TOKEN 환경변수가 없습니다.",
-    };
-  }
-
-  const cookieToken = request.cookies.get(ADMIN_COOKIE_NAME)?.value || "";
-
-  if (!cookieToken || cookieToken !== expectedToken) {
+  if (!session) {
     return {
       ok: false,
       status: 401,
@@ -132,7 +123,7 @@ function assertAdminSession(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const auth = assertAdminSession(request);
+  const auth = await assertAdminSession(request);
 
   if (!auth.ok) {
     return jsonError(auth.message, auth.status);
@@ -174,7 +165,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = assertAdminSession(request);
+  const auth = await assertAdminSession(request);
 
   if (!auth.ok) {
     return jsonError(auth.message, auth.status);

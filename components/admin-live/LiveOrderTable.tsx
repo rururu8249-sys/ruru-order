@@ -151,17 +151,17 @@ function getVisibleOrderSummaryParts(order: LiveOrder) {
 
 function renderOrderSummary(order: LiveOrder) {
   const { parts, hiddenCount } = getVisibleOrderSummaryParts(order);
+  // [UI 2026-07-06] 여러 상품을 한 칸에 다 구겨넣으면 각각 "룰..."로 뭉개져 아무것도 못 읽음
+  // → 첫 상품은 온전히 + "외 N개"로 표시. 전체 목록은 hover(title)와 주문상세에서 확인.
+  const firstPart = parts[0] || "-";
+  const restCount = hiddenCount + Math.max(0, parts.length - 1);
+  const fullText = [...parts].join(", ") + (hiddenCount > 0 ? ` 외 ${hiddenCount}개` : "");
 
   return (
-    <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
-      {parts.map((part, index) => (
-        <span key={`${part}-${index}`} className="inline-flex min-w-0 items-center gap-2">
-          {index > 0 && <span className="text-rose-deep mx-0.5 shrink-0">,</span>}
-          <span className="truncate">{part}</span>
-        </span>
-      ))}
-      {hiddenCount > 0 && (
-        <span className="shrink-0 font-black text-ink-soft">외 {hiddenCount}개</span>
+    <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap" title={fullText}>
+      <span className="truncate">{firstPart}</span>
+      {restCount > 0 && (
+        <span className="shrink-0 font-black text-ink-soft">외 {restCount}개</span>
       )}
     </span>
   );
