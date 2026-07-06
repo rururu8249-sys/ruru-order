@@ -1205,9 +1205,8 @@ export default function OrderPage() {
 
       setItems(draftItems);
 
-      if (draft.paymentMethod === "무통장입금" || draft.paymentMethod === "카드결제") {
-        setPaymentMethod(draft.paymentMethod);
-      }
+      // [사장님 지침 2026-07-06] 결제수단은 draft에서 복원하지 않음 — 매번 미선택으로 시작해 고객이 직접 선택
+      // (예전 세션의 "카드결제"가 복원돼 기본 선택처럼 보이던 문제 차단. 상품/메모/포인트 입력은 계속 복원)
 
       if (typeof draft.requestMemo === "string") {
         setRequestMemo(draft.requestMemo);
