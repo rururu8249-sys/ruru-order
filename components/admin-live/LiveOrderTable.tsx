@@ -12,6 +12,20 @@ import { openPaysterRightHalf } from "./AdminLiveCardPayPopup";
 import BroadcastCalendarPicker, { type BroadcastCalendarItem } from "./BroadcastCalendarPicker";
 import { useLiveOrderShipped } from "./useLiveOrderShipped";
 
+// 총금액 표시 전용: 포인트 사용 주문은 실결제금액(상품금액 + 택배비 - 사용포인트)으로 표시한다.
+// - 단일상품: final_amount에 포인트가 이미 반영돼 기존 값과 동일(변화 없음)
+// - 다중상품: final_amount 합이 포인트 차감 전이라 정가로 보이던 문제를 "표시 단계에서만" 바로잡음
+// order.totalAmount 자체는 바꾸지 않으므로 매출 합계·매칭 기대금액 등 다른 로직에는 영향 없음.
+// 카드결제는 기존 표시(카드금액/부가세 포함)를 유지.
+function displayPayableAmount(order: LiveOrder): number {
+  const base = Number(order.totalAmount || 0) || Number(order.finalAmount || 0);
+  const point = Number(order.pointUsedAmount || 0);
+  const isCard = String(order.paymentMethod || "").includes("카드");
+  if (point <= 0 || isCard) return base;
+  const gross = Number(order.productAmount || 0) + Number(order.shippingFee || 0);
+  return gross > 0 ? Math.max(0, gross - point) : base;
+}
+
 // 현재 페이지를 새로고침 사이에 보존하기 위한 sessionStorage 키(보기 상태 전용).
 const LIVE_ORDERS_PAGE_KEY = "ruru_live_orders_page";
 
@@ -1115,7 +1129,7 @@ export default function LiveOrderTable({
                               <button type="button" onClick={() => { openPaysterRightHalf(); onOpenCardPay(order); }} className="rounded-lg border border-info-tx bg-info-bg px-2 py-0.5 text-[10px] font-black text-info-tx hover:bg-info-bg">💳 카드결제</button>
                             ) : null}
                           </div>
-                          <span style={{ fontSize: "15px", fontWeight: 800, color: "#C0392B" }}>{money(Number(order.totalAmount || 0) || Number(order.finalAmount || 0))}</span>
+                          <span style={{ fontSize: "15px", fontWeight: 800, color: "#C0392B" }}>{money(displayPayableAmount(order))}</span>
                         </div>
                       </div>
                     );
@@ -1188,7 +1202,7 @@ export default function LiveOrderTable({
                       </div>
                       {/* 7. 총금액 */}
                       <div className="px-3 py-3 text-center text-[14px] font-black text-ink">
-                        {money(Number(order.totalAmount || 0) || Number(order.finalAmount || 0))}
+                        {money(displayPayableAmount(order))}
                         {String((order as any).paymentMethod || "").includes("카드") && Number((order as any).cardPaymentTotalAmount || 0) > 0 ? (
                           <div className="text-[10px] font-black text-purple-700">카드 {money(Number((order as any).cardPaymentTotalAmount || 0))}</div>
                         ) : null}
