@@ -30,6 +30,7 @@ import AdminLiveSidebar from "./AdminLiveSidebar";
 import LiveHeader from "./LiveHeader";
 import LiveStatsCards from "./LiveStatsCards";
 import LiveBroadcastPanels from "./LiveBroadcastPanels";
+import LiveStatsPanel from "./LiveStatsPanel";
 import LiveBroadcastEndSummaryModal, { type LiveBroadcastEndSummary } from "./LiveBroadcastEndSummaryModal";
 import LiveOrderTable, { type LiveOrderFilters } from "./LiveOrderTable";
 import LiveOrderDetailDrawer from "./LiveOrderDetailDrawer";
@@ -1554,8 +1555,9 @@ export default function AdminLiveDashboard() {
                 </div>
               </div>
 
-              {/* 오른쪽 컬럼: 영상·채팅·지금상품(세로). xl 이상에서 스티키. */}
-              <aside className="min-w-0 xl:self-stretch">
+              {/* 오른쪽 컬럼: 라이브현황(KPI)·영상·채팅·지금상품(세로). xl 이상에서 스티키. */}
+              <aside className="min-w-0 space-y-3 xl:self-stretch">
+                <LiveStatsPanel orders={orders} activeBroadcastId={activeBroadcast?.id || null} />
                 <LiveBroadcastPanels variant="column" videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} activeBroadcastId={activeBroadcast?.id || null} />
               </aside>
             </div>
