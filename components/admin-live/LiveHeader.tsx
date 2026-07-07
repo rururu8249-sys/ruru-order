@@ -53,6 +53,68 @@ export default function LiveHeader({
   const [urlAppliedAt, setUrlAppliedAt] = useState("");
   const [editOpen, setEditOpen] = useState(false);
 
+  // 방송알림: 대상(신청자/전체) 선택 + 이미 받은 사람 제외(증분) + 미리보기
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [alertMode, setAlertMode] = useState<"optin" | "all">("optin");
+  const [alertPreview, setAlertPreview] = useState<any>(null);
+  const [alertPreviewLoading, setAlertPreviewLoading] = useState(false);
+  const [alertSending, setAlertSending] = useState(false);
+  const [alertResult, setAlertResult] = useState("");
+
+  const loadAlertPreview = async (mode: "optin" | "all") => {
+    if (!activeBroadcast) return;
+    setAlertPreviewLoading(true);
+    setAlertPreview(null);
+    setAlertResult("");
+    try {
+      const r = await fetch("/api/admin-live/live-alert-send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ broadcastId: activeBroadcast.id, dryRun: true, mode }),
+      }).then((res) => res.json()).catch(() => null);
+      if (!r?.ok) { setAlertResult("대상 조회 실패: " + (r?.error || "권한/네트워크 확인")); return; }
+      setAlertPreview(r);
+    } finally {
+      setAlertPreviewLoading(false);
+    }
+  };
+
+  const openAlert = () => {
+    if (!activeBroadcast) return;
+    setAlertOpen(true);
+    setAlertMode("optin");
+    void loadAlertPreview("optin");
+  };
+
+  const changeAlertMode = (mode: "optin" | "all") => {
+    setAlertMode(mode);
+    void loadAlertPreview(mode);
+  };
+
+  const sendAlert = async () => {
+    if (!activeBroadcast || alertSending) return;
+    const count = Number(alertPreview?.targetCount || 0);
+    if (count === 0) return;
+    if (alertMode === "all") {
+      if (!window.confirm(`⚠️ 신청 안 한 회원까지 ${count}명에게 발송합니다.\n동의 미확인자 발송은 카카오 채널 제재 위험이 있습니다.\n정말 보낼까요?`)) return;
+    } else {
+      if (!window.confirm(`${count}명에게 방송알림을 발송합니다. 계속할까요?`)) return;
+    }
+    setAlertSending(true);
+    setAlertResult("");
+    try {
+      const r = await fetch("/api/admin-live/live-alert-send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ broadcastId: activeBroadcast.id, mode: alertMode }),
+      }).then((res) => res.json()).catch(() => null);
+      setAlertResult(r?.ok ? `✅ 발송 완료 · 성공 ${r.successCount} / 실패 ${r.failCount}` : "발송 실패: " + (r?.error || "알 수 없는 오류"));
+      await loadAlertPreview(alertMode); // 발송 후 인원 갱신(이미 받은 사람 반영)
+    } finally {
+      setAlertSending(false);
+    }
+  };
+
   const statusLabel = useMemo(() => {
     if (activeBroadcast) return "방송중";
     return "대기";
@@ -110,29 +172,7 @@ export default function LiveHeader({
             <button
               type="button"
               className="h-9 rounded-xl bg-indigo-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700 disabled:bg-line disabled:text-ink-mute"
-              onClick={async (e) => {
-                const btn = e.currentTarget;
-                btn.disabled = true;
-                try {
-                  const pre = await fetch("/api/admin-live/live-alert-send", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ broadcastId: activeBroadcast.id, dryRun: true }),
-                  }).then((r) => r.json()).catch(() => null);
-                  if (!pre?.ok) { window.alert("대상 조회 실패: " + (pre?.error || "권한/네트워크 확인")); return; }
-                  if (pre.alreadySent) { window.alert("이 방송은 이미 방송알림을 발송했습니다."); return; }
-                  if (!pre.targetCount) { window.alert("방송알림 신청자가 없습니다."); return; }
-                  if (!window.confirm(`방송알림 신청자 ${pre.targetCount}명에게 알림톡을 발송합니다.\n계속할까요?`)) return;
-                  const res = await fetch("/api/admin-live/live-alert-send", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ broadcastId: activeBroadcast.id }),
-                  }).then((r) => r.json()).catch(() => null);
-                  if (res?.alreadySent) { window.alert("이 방송은 이미 방송알림을 발송했습니다."); return; }
-                  if (res?.ok) window.alert(`방송알림 발송 완료\n성공 ${res.successCount} / 실패 ${res.failCount} (대상 ${res.targetCount}명)`);
-                  else window.alert("발송 실패: " + (res?.error || "알 수 없는 오류"));
-                } finally { btn.disabled = false; }
-              }}
+              onClick={openAlert}
             >
               📣 방송알림
             </button>
@@ -227,6 +267,115 @@ export default function LiveHeader({
           </div>
         </div>
       ) : null}
+
+      {/* 방송알림 발송 모달: 대상(신청자/전체) 선택 + 이미 받은 사람 제외(증분) + 미리보기 */}
+      {alertOpen && (
+        <div
+          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !alertSending && setAlertOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-surface p-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <div className="text-[15px] font-black text-ink">📣 방송알림 발송</div>
+              <button
+                type="button"
+                onClick={() => !alertSending && setAlertOpen(false)}
+                className="rounded-lg px-2 py-1 text-sm font-black text-ink-mute hover:bg-surface-2"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 대상 선택 */}
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => changeAlertMode("optin")}
+                className={[
+                  "h-10 rounded-xl text-sm font-black transition",
+                  alertMode === "optin" ? "bg-indigo-600 text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2",
+                ].join(" ")}
+              >
+                알림 신청자만
+              </button>
+              <button
+                type="button"
+                onClick={() => changeAlertMode("all")}
+                className={[
+                  "h-10 rounded-xl text-sm font-black transition",
+                  alertMode === "all" ? "bg-red-600 text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2",
+                ].join(" ")}
+              >
+                전체 회원 ⚠️
+              </button>
+            </div>
+
+            {alertMode === "all" && (
+              <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-bold text-red-700">
+                ⚠️ 신청 안 한 회원에게도 발송합니다. 동의 미확인자 발송은 카카오 알림톡 채널이 제재/차단될 수 있어요.
+              </div>
+            )}
+
+            {/* 미리보기 */}
+            <div className="mb-3 rounded-xl bg-surface-2 px-3 py-2.5 text-[13px] font-bold text-ink">
+              {alertPreviewLoading ? (
+                <div className="text-ink-mute">대상 계산 중…</div>
+              ) : alertPreview ? (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span>후보 <b className="text-ink">{alertPreview.candidateCount}</b>명</span>
+                  <span className="text-ink-mute">·</span>
+                  <span>이미 받음 <b className="text-ink">{alertPreview.receivedCount}</b>명</span>
+                  <span className="text-ink-mute">·</span>
+                  <span className="text-indigo-700">이번에 받을 <b>{alertPreview.targetCount}</b>명</span>
+                </div>
+              ) : (
+                <div className="text-ink-mute">{alertResult || "대상 없음"}</div>
+              )}
+            </div>
+
+            {/* 이번에 받을 사람 목록(샘플) */}
+            {alertPreview?.sample?.length ? (
+              <div className="mb-3 max-h-40 overflow-auto rounded-xl border border-line">
+                <div className="sticky top-0 bg-surface-2 px-3 py-1.5 text-[11px] font-black text-ink-soft">
+                  이번에 받을 사람 (최대 100명 표시)
+                </div>
+                <ul className="divide-y divide-line">
+                  {alertPreview.sample.map((s: any, i: number) => (
+                    <li key={i} className="flex items-center justify-between px-3 py-1.5 text-[12px] font-bold text-ink">
+                      <span>{s.name || "(이름없음)"}</span>
+                      <span className="text-ink-mute">{s.phone}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {alertResult && !alertPreviewLoading && (
+              <div className="mb-3 text-[13px] font-black text-ink">{alertResult}</div>
+            )}
+
+            {/* 발송 버튼 */}
+            <button
+              type="button"
+              disabled={alertSending || alertPreviewLoading || !alertPreview || Number(alertPreview?.targetCount || 0) === 0}
+              onClick={sendAlert}
+              className={[
+                "h-11 w-full rounded-xl text-sm font-black text-white transition disabled:bg-line disabled:text-ink-mute",
+                alertMode === "all" ? "bg-red-600 hover:bg-red-700" : "bg-indigo-600 hover:bg-indigo-700",
+              ].join(" ")}
+            >
+              {alertSending
+                ? "발송 중…"
+                : Number(alertPreview?.targetCount || 0) > 0
+                  ? `${alertPreview.targetCount}명에게 발송`
+                  : "받을 사람 없음"}
+            </button>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
