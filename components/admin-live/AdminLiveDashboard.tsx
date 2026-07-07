@@ -31,6 +31,7 @@ import LiveHeader from "./LiveHeader";
 import LiveStatsCards from "./LiveStatsCards";
 import LiveBroadcastPanels from "./LiveBroadcastPanels";
 import LiveStatsPanel from "./LiveStatsPanel";
+import LiveIssueRailPanel from "./LiveIssueRailPanel";
 import LiveBroadcastEndSummaryModal, { type LiveBroadcastEndSummary } from "./LiveBroadcastEndSummaryModal";
 import LiveOrderTable, { type LiveOrderFilters } from "./LiveOrderTable";
 import LiveOrderDetailDrawer from "./LiveOrderDetailDrawer";
@@ -543,6 +544,7 @@ async function saveLiveBroadcastEndReport({
 
 export default function AdminLiveDashboard() {
   const [activeMenu, setActiveMenu] = useState<AdminLiveMenuKey>(() => readMenuFromUrl());
+  const [customersInitialTab, setCustomersInitialTab] = useState<"members" | "issues">("members");
   // 라이트/다크 테마 토글 — 관리자 루트에만 .dark 부여(다른 페이지 영향 0). localStorage 기억.
   const [theme, setTheme] = useState<"light" | "dark">("light");
   useEffect(() => {
@@ -1555,10 +1557,11 @@ export default function AdminLiveDashboard() {
                 </div>
               </div>
 
-              {/* 오른쪽 컬럼: 라이브현황(KPI)·영상·채팅·지금상품(세로). xl 이상에서 스티키. */}
+              {/* 오른쪽 컬럼: 영상·채팅 + (구 '지금 띄운 상품' 자리) 라이브현황·고객이슈. xl 이상에서 스티키. */}
               <aside className="min-w-0 space-y-3 xl:self-stretch">
+                <LiveBroadcastPanels variant="column" hideProducts videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} activeBroadcastId={activeBroadcast?.id || null} />
                 <LiveStatsPanel orders={orders} activeBroadcastId={activeBroadcast?.id || null} />
-                <LiveBroadcastPanels variant="column" videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} activeBroadcastId={activeBroadcast?.id || null} />
+                <LiveIssueRailPanel onOpenAll={() => { setCustomersInitialTab("issues"); setActiveMenu("customers"); }} />
               </aside>
             </div>
 
@@ -1650,7 +1653,7 @@ export default function AdminLiveDashboard() {
 
           {/* 고객관리 (자체 모달) */}
           {activeMenu === "customers" && (
-            <AdminLiveCustomersPanel orders={orders} onClose={() => setActiveMenu("broadcast")} />
+            <AdminLiveCustomersPanel orders={orders} initialTab={customersInitialTab} onClose={() => { setActiveMenu("broadcast"); setCustomersInitialTab("members"); }} />
           )}
 
           {/* 정산통계 팝업 */}

@@ -40,6 +40,7 @@ type Props = {
   youtubeUrl?: string | null;
   activeBroadcastId?: string | number | null;
   variant?: "row" | "column"; // row=가로 띠(기존) / column=우측 세로 컬럼(시안 2단)
+  hideProducts?: boolean; // column에서 "지금 띄운 상품" 패널 숨김(그 자리에 고객이슈 패널을 대신 배치할 때)
 };
 
 type AdminIssueTask = {
@@ -324,7 +325,7 @@ function CustomerIssueSummaryRow({
   );
 }
 
-export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroadcastId, variant = "row" }: Props) {
+export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroadcastId, variant = "row", hideProducts = false }: Props) {
   const isCol = variant === "column";
   const [pinnedProduct, setPinnedProduct] = useState<any | null>(null);
   const [rotationProducts, setRotationProducts] = useState<any[]>([]);
@@ -932,7 +933,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
         </div>
       </div>
 
-      {isCol ? (
+      {isCol && !hideProducts ? (
         /* 컴팩트(우측 컬럼): 지금 띄운 상품. 영상·채팅 아래(스크롤) — 남은 세로공간을 채워 빈공간 방지 */
         <div className="min-w-0 w-full shrink-0 xl:flex-1 xl:min-h-0 rounded-2xl border border-line bg-surface p-3 shadow-sm">
           <div className="mb-2 flex items-center justify-between gap-2">

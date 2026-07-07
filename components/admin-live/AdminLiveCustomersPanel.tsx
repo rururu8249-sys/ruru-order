@@ -22,6 +22,7 @@ import { CUSTOMER_TERMS } from "./adminLiveCustomerTerms";
 type Props = {
   orders: LiveOrder[];
   onClose?: () => void;
+  initialTab?: "members" | "issues";
 };
 
 type LooseLiveOrder = LiveOrder & Record<string, any>;
@@ -771,8 +772,8 @@ function CustomerDetailDrawer({
   );
 }
 
-export default function AdminLiveCustomersPanel({ orders, onClose }: Props) {
-  const [custTab, setCustTab] = useState<"members" | "issues">("members");
+export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = "members" }: Props) {
+  const [custTab, setCustTab] = useState<"members" | "issues">(initialTab);
   const [phoneBlockOpen, setPhoneBlockOpen] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
