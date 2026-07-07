@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import { resolveProductImageUrl } from "./quick-product/productImageUrl";
 
 type ProductRow = Record<string, unknown>;
@@ -537,7 +538,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
     const workingPayload: Record<string, unknown> = { ...payload };
 
     for (let attempt = 0; attempt < 24; attempt += 1) {
-      const { data, error } = await supabase.from("products").insert(workingPayload).select("id").single();
+      const { data, error } = await adminCatalogWrite({ table: "products", op: "insert", values: workingPayload, select: "id", single: true });
 
       if (!error) {
         return String((data as { id?: string | number } | null)?.id || "");
@@ -617,10 +618,14 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
         const productId = await insertSimpleFastProductSchemaSafe(payload);
 
         if (props.activeBroadcastId && productId) {
-          const { error: linkError } = await supabase.from("broadcast_products").insert({
-            broadcast_id: props.activeBroadcastId,
-            product_id: productId,
-            sort_order: 0,
+          const { error: linkError } = await adminCatalogWrite({
+            table: "broadcast_products",
+            op: "insert",
+            values: {
+              broadcast_id: props.activeBroadcastId,
+              product_id: productId,
+              sort_order: 0,
+            },
           });
 
           if (linkError) {
@@ -662,14 +667,14 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
 
     if (!ok) return;
 
-    const { error: linkError } = await supabase.from("broadcast_products").delete().eq("product_id", productId);
+    const { error: linkError } = await adminCatalogWrite({ table: "broadcast_products", op: "delete", filters: [{ type: "eq", col: "product_id", val: productId }] });
 
     if (linkError) {
       alert("상품 연결 삭제 실패\n\n" + linkError.message);
       return;
     }
 
-    const { error } = await supabase.from("products").delete().eq("id", productId);
+    const { error } = await adminCatalogWrite({ table: "products", op: "delete", filters: [{ type: "eq", col: "id", val: productId }] });
 
     if (error) {
       alert("상품 삭제 실패\n\n" + error.message);

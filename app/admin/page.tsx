@@ -12,6 +12,7 @@ import AdminOrderMoneyEditPanel from "@/components/admin/orders/AdminOrderMoneyE
 import AdminOrderCustomerInfoPanel from "@/components/admin/orders/AdminOrderCustomerInfoPanel";
 import AdminOrderMemoPanel from "@/components/admin/orders/AdminOrderMemoPanel";
 import { supabase } from "@/lib/supabase";
+import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -1567,15 +1568,21 @@ const selectedCustomerDetail = useMemo(() => {
 
     try {
       if (editingId) {
-        const { error } = await supabase
-          .from("products")
-          .update(payload)
-          .eq("id", editingId);
+        const { error } = await adminCatalogWrite({
+          table: "products",
+          op: "update",
+          values: payload,
+          filters: [{ type: "eq", col: "id", val: editingId }],
+        });
 
         if (error) throw error;
         showAdminToast("상품 수정 완료", "success");
       } else {
-        const { error } = await supabase.from("products").insert(payload);
+        const { error } = await adminCatalogWrite({
+          table: "products",
+          op: "insert",
+          values: payload,
+        });
 
         if (error) throw error;
         showAdminToast("상품 등록 완료", "success");
@@ -1596,13 +1603,15 @@ const selectedCustomerDetail = useMemo(() => {
   ) => {
     if (!id) return;
 
-    const { error } = await supabase
-      .from("products")
-      .update({
+    const { error } = await adminCatalogWrite({
+      table: "products",
+      op: "update",
+      values: {
         ...patch,
         updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
+      },
+      filters: [{ type: "eq", col: "id", val: id }],
+    });
 
     if (error) {
       showAdminToast("변경 실패\n\n" + error.message, "error");
@@ -1645,13 +1654,15 @@ const selectedCustomerDetail = useMemo(() => {
         ? { combine_shipping: bulkCombineShipping }
         : { status: bulkStatus };
 
-    const { error } = await supabase
-      .from("products")
-      .update({
+    const { error } = await adminCatalogWrite({
+      table: "products",
+      op: "update",
+      values: {
         ...patch,
         updated_at: new Date().toISOString(),
-      })
-      .in("id", selectedIds);
+      },
+      filters: [{ type: "in", col: "id", val: selectedIds }],
+    });
 
     if (error) {
       showAdminToast("일괄 변경 실패\n\n" + error.message, "error");
@@ -1687,10 +1698,11 @@ const selectedCustomerDetail = useMemo(() => {
   };
 
   const saveBroadcastProducts = async (broadcastId: string | number) => {
-    const { error: deleteError } = await supabase
-      .from("broadcast_products")
-      .delete()
-      .eq("broadcast_id", broadcastId);
+    const { error: deleteError } = await adminCatalogWrite({
+      table: "broadcast_products",
+      op: "delete",
+      filters: [{ type: "eq", col: "broadcast_id", val: broadcastId }],
+    });
 
     if (deleteError) throw deleteError;
 
@@ -1701,9 +1713,11 @@ const selectedCustomerDetail = useMemo(() => {
       product_id: productId,
     }));
 
-    const { error: insertError } = await supabase
-      .from("broadcast_products")
-      .insert(rows);
+    const { error: insertError } = await adminCatalogWrite({
+      table: "broadcast_products",
+      op: "insert",
+      values: rows,
+    });
 
     if (insertError) throw insertError;
   };
@@ -1723,16 +1737,21 @@ const selectedCustomerDetail = useMemo(() => {
         .eq("status", "ON");
 
       if ((activeRows || []).length > 0) {
-        const { error } = await supabase
-          .from("broadcasts")
-          .update({
+        const { error } = await adminCatalogWrite({
+          table: "broadcasts",
+          op: "update",
+          values: {
             status: "OFF",
             ended_at: new Date().toISOString(),
-          })
-          .in(
-            "id",
-            (activeRows || []).map((row: any) => row.id)
-          );
+          },
+          filters: [
+            {
+              type: "in",
+              col: "id",
+              val: (activeRows || []).map((row: any) => row.id),
+            },
+          ],
+        });
 
         if (error) throw error;
       }
@@ -1748,11 +1767,13 @@ const selectedCustomerDetail = useMemo(() => {
         is_combine_shipping_target: isCombineShippingTarget,
       };
 
-      const { data, error } = await supabase
-        .from("broadcasts")
-        .insert(payload)
-        .select()
-        .single();
+      const { data, error } = await adminCatalogWrite({
+        table: "broadcasts",
+        op: "insert",
+        values: payload,
+        select: "*",
+        single: true,
+      });
 
       if (error) throw error;
 
@@ -1784,16 +1805,18 @@ const selectedCustomerDetail = useMemo(() => {
     setSavingBroadcast(true);
 
     try {
-      const { error } = await supabase
-        .from("broadcasts")
-        .update({
+      const { error } = await adminCatalogWrite({
+        table: "broadcasts",
+        op: "update",
+        values: {
           public_title: broadcastTitle.trim(),
           admin_subtitle: broadcastSubtitle.trim(),
           shipping_fee: Number(broadcastShippingFee || 4000),
           card_fee_rate: Number(broadcastCardFeeRate || 10),
           is_combine_shipping_target: isCombineShippingTarget,
-        })
-        .eq("id", activeBroadcast.id);
+        },
+        filters: [{ type: "eq", col: "id", val: activeBroadcast.id }],
+      });
 
       if (error) throw error;
 
@@ -1824,13 +1847,15 @@ const selectedCustomerDetail = useMemo(() => {
     setSavingBroadcast(true);
 
     try {
-      const { error } = await supabase
-        .from("broadcasts")
-        .update({
+      const { error } = await adminCatalogWrite({
+        table: "broadcasts",
+        op: "update",
+        values: {
           status: "OFF",
           ended_at: new Date().toISOString(),
-        })
-        .eq("id", activeBroadcast.id);
+        },
+        filters: [{ type: "eq", col: "id", val: activeBroadcast.id }],
+      });
 
       if (error) throw error;
 
@@ -1870,10 +1895,12 @@ const selectedCustomerDetail = useMemo(() => {
 
     if (!ok) return;
 
-    const { error } = await supabase
-      .from("broadcasts")
-      .update({ is_deleted: true })
-      .eq("id", broadcastId);
+    const { error } = await adminCatalogWrite({
+      table: "broadcasts",
+      op: "update",
+      values: { is_deleted: true },
+      filters: [{ type: "eq", col: "id", val: broadcastId }],
+    });
 
     if (error) {
       showAdminToast("방송기록 숨김 실패\n\n" + error.message, "error");

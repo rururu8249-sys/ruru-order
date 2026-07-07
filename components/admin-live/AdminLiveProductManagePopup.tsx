@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabase";
+import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import { resolveProductImageUrl } from "./quick-product/productImageUrl";
 import { showAdminToast } from "@/lib/adminToast";
 import { createDraftBroadcast } from "./liveBroadcastController";
@@ -359,7 +360,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       let copiedCount = 0;
       if (newBcCopyIds && newBcCopyIds.length > 0) {
         const toInsert = newBcCopyIds.map((pid, i) => ({ broadcast_id: String(created.id), product_id: pid, sort_order: i, is_visible: true }));
-        const { error: copyErr } = await supabase.from("broadcast_products").insert(toInsert);
+        const { error: copyErr } = await adminCatalogWrite({ table: "broadcast_products", op: "insert", values: toInsert });
         if (copyErr) {
           showAdminToast("방송은 생성됐지만 상품 복사에 실패했습니다.\n\n" + copyErr.message, "warning");
         } else {
@@ -394,7 +395,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     if (!window.confirm(`'${b.title}' 방송을 목록에서 숨길까요?\n\n데이터는 보존되며 복구 가능합니다.`)) return;
     setBcBusy(true);
     try {
-      const { error } = await supabase.from("broadcasts").update({ is_deleted: true }).eq("id", b.id);
+      const { error } = await adminCatalogWrite({ table: "broadcasts", op: "update", values: { is_deleted: true }, filters: [{ type: "eq", col: "id", val: b.id }] });
       if (error) throw error;
       if (bcSelId === b.id) setBcSelId("");
       await loadBroadcastList();
@@ -471,11 +472,14 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     if (!bcSelId || !pid || bcBusy) return;
     setBcBusy(true);
     try {
-      const { error } = await supabase
-        .from("broadcast_products")
-        .delete()
-        .eq("broadcast_id", bcSelId)
-        .eq("product_id", pid);
+      const { error } = await adminCatalogWrite({
+        table: "broadcast_products",
+        op: "delete",
+        filters: [
+          { type: "eq", col: "broadcast_id", val: bcSelId },
+          { type: "eq", col: "product_id", val: pid },
+        ],
+      });
       if (error) throw error;
       await reloadBcProducts(bcSelId);
       window.dispatchEvent(new Event("ruru-live-product-updated"));
@@ -542,7 +546,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         setBcPickerOpen(false);
         return;
       }
-      const { error } = await supabase.from("broadcast_products").insert(toInsert);
+      const { error } = await adminCatalogWrite({ table: "broadcast_products", op: "insert", values: toInsert });
       if (error) throw error;
       setBcPickerOpen(false);
       await reloadBcProducts(bcSelId);
@@ -568,11 +572,15 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       for (let i = 0; i < ordered.length; i++) {
         const pid = productId(ordered[i]);
         if (!pid) continue;
-        const { error } = await supabase
-          .from("broadcast_products")
-          .update({ sort_order: i })
-          .eq("broadcast_id", bcSelId)
-          .eq("product_id", pid);
+        const { error } = await adminCatalogWrite({
+          table: "broadcast_products",
+          op: "update",
+          values: { sort_order: i },
+          filters: [
+            { type: "eq", col: "broadcast_id", val: bcSelId },
+            { type: "eq", col: "product_id", val: pid },
+          ],
+        });
         if (error) throw error;
       }
       window.dispatchEvent(new Event("ruru-live-product-updated"));
@@ -862,7 +870,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     if (!pid || shopBusy) return;
     setShopBusy(true);
     try {
-      const { error } = await supabase.from("products").update({ in_shop: false }).eq("id", pid);
+      const { error } = await adminCatalogWrite({ table: "products", op: "update", values: { in_shop: false }, filters: [{ type: "eq", col: "id", val: pid }] });
       if (error) throw error;
       setShopRows((prev) => prev.filter((p) => productId(p) !== pid)); // 낙관적
       window.dispatchEvent(new Event("ruru-live-product-updated"));
@@ -901,10 +909,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       const ids = Array.from(shopPickerSel).filter((pid) => !shopAddedIds.has(pid));
       for (const pid of ids) {
         maxSort += 1;
-        const { error } = await supabase
-          .from("products")
-          .update({ in_shop: true, mall_sort_order: maxSort })
-          .eq("id", pid);
+        const { error } = await adminCatalogWrite({
+          table: "products",
+          op: "update",
+          values: { in_shop: true, mall_sort_order: maxSort },
+          filters: [{ type: "eq", col: "id", val: pid }],
+        });
         if (error) throw error;
       }
       setShopPickerOpen(false);
@@ -932,7 +942,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       for (let i = 0; i < ordered.length; i++) {
         const pid = productId(ordered[i]);
         if (!pid) continue;
-        const { error } = await supabase.from("products").update({ mall_sort_order: i }).eq("id", pid);
+        const { error } = await adminCatalogWrite({ table: "products", op: "update", values: { mall_sort_order: i }, filters: [{ type: "eq", col: "id", val: pid }] });
         if (error) throw error;
       }
       window.dispatchEvent(new Event("ruru-live-product-updated"));
@@ -962,16 +972,18 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     setBusyId(id);
     try {
       // 기존 addToRotation과 동일: 고정 해제 후 순환에 추가(중복 제외)
-      await supabase.from("products").update({ is_pinned: false }).eq("is_pinned", true);
+      await adminCatalogWrite({ table: "products", op: "update", values: { is_pinned: false }, filters: [{ type: "eq", col: "is_pinned", val: true }] });
       const { data: existing } = await supabase
         .from("broadcast_products")
         .select("product_id")
         .eq("broadcast_id", activeBroadcastId)
         .eq("product_id", id);
       if (!existing || existing.length === 0) {
-        const { error } = await supabase
-          .from("broadcast_products")
-          .insert({ broadcast_id: activeBroadcastId, product_id: id, sort_order: 0 });
+        const { error } = await adminCatalogWrite({
+          table: "broadcast_products",
+          op: "insert",
+          values: { broadcast_id: activeBroadcastId, product_id: id, sort_order: 0 },
+        });
         if (error) throw error;
       }
       window.dispatchEvent(new Event("ruru-live-product-updated"));
@@ -988,11 +1000,14 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     if (!id || !activeBroadcastId) return;
     setBusyId(id);
     try {
-      const { error } = await supabase
-        .from("broadcast_products")
-        .delete()
-        .eq("broadcast_id", activeBroadcastId)
-        .eq("product_id", id);
+      const { error } = await adminCatalogWrite({
+        table: "broadcast_products",
+        op: "delete",
+        filters: [
+          { type: "eq", col: "broadcast_id", val: activeBroadcastId },
+          { type: "eq", col: "product_id", val: id },
+        ],
+      });
       if (error) throw error;
       window.dispatchEvent(new Event("ruru-live-product-updated"));
       showAdminToast("순환에서 뺐어요.", "success");
@@ -1009,7 +1024,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     setBusyId(id);
     try {
       // 기존 pinSelected와 동일 테이블/컬럼: is_pinned 해제
-      const { error } = await supabase.from("products").update({ is_pinned: false }).eq("id", id);
+      const { error } = await adminCatalogWrite({ table: "products", op: "update", values: { is_pinned: false }, filters: [{ type: "eq", col: "id", val: id }] });
       if (error) throw error;
       window.dispatchEvent(new Event("ruru-live-product-updated"));
       showAdminToast("고정을 해제했어요.", "success");
@@ -1108,7 +1123,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     setInlineStockSaving(true);
     try {
       // 폼 저장·트리거와 동일 세트(stock + is_soldout)로 일관성 유지
-      const { error } = await supabase.from("products").update({ stock: n, is_soldout: n <= 0 }).eq("id", id);
+      const { error } = await adminCatalogWrite({ table: "products", op: "update", values: { stock: n, is_soldout: n <= 0 }, filters: [{ type: "eq", col: "id", val: id }] });
       if (error) throw error;
       setInlineStockId("");
       await loadProducts();
@@ -1129,10 +1144,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     //   관리자 목록(status==="deleted" 제외)·고객 목록(app/order: status!=="deleted") 양쪽 모두 이 마커로 숨김.
     //   과거엔 is_visible도 함께 update했는데, is_visible 컬럼이 없으면 update 전체가 실패(=숨김 실패 [object Object]).
     //   status 하나로 양쪽 다 숨겨지므로 status만 업데이트(불필요한 컬럼 제거로 실패 원인 차단).
-    const { error } = await supabase
-      .from("products")
-      .update({ status: "deleted" })
-      .eq("id", id);
+    const { error } = await adminCatalogWrite({
+      table: "products",
+      op: "update",
+      values: { status: "deleted" },
+      filters: [{ type: "eq", col: "id", val: id }],
+    });
     if (error) {
       showAdminToast("상품 숨김 처리 실패\n\n" + (error.message || JSON.stringify(error)), "error");
       return;
@@ -1199,7 +1216,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     }
     setWsSaving(true);
     try {
-      await supabase.from("products").update({ is_pinned: false }).eq("is_pinned", true);
+      await adminCatalogWrite({ table: "products", op: "update", values: { is_pinned: false }, filters: [{ type: "eq", col: "is_pinned", val: true }] });
       const { data: existing } = await supabase
         .from("broadcast_products")
         .select("product_id")
@@ -1209,7 +1226,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         .filter((id) => !existingSet.has(String(id)))
         .map((id) => ({ broadcast_id: activeBroadcastId, product_id: id, sort_order: 0 }));
       if (toInsert.length > 0) {
-        const { error } = await supabase.from("broadcast_products").insert(toInsert);
+        const { error } = await adminCatalogWrite({ table: "broadcast_products", op: "insert", values: toInsert });
         if (error) throw error;
       }
       window.dispatchEvent(new Event("ruru-live-product-updated"));
@@ -1230,8 +1247,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     if (ids.length === 0) return;
     setWsSaving(true);
     try {
-      await supabase.from("products").update({ is_pinned: false }).eq("is_pinned", true);
-      const { error } = await supabase.from("products").update({ is_pinned: true }).in("id", ids);
+      await adminCatalogWrite({ table: "products", op: "update", values: { is_pinned: false }, filters: [{ type: "eq", col: "is_pinned", val: true }] });
+      const { error } = await adminCatalogWrite({ table: "products", op: "update", values: { is_pinned: true }, filters: [{ type: "in", col: "id", val: ids }] });
       if (error) throw error;
       window.dispatchEvent(new Event("ruru-live-product-updated"));
       showAdminToast(`${ids.length}개 상품을 고정(지금 띄움)했어요.`, "success");

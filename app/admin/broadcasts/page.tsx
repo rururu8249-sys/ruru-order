@@ -11,6 +11,7 @@ import { showAdminToast } from "@/lib/adminToast";
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 
 const ADMIN_PASSWORD = "8249";
 
@@ -104,14 +105,16 @@ export default function AdminBroadcastsPage() {
       return;
     }
 
-    const { error } = await supabase
-      .from("broadcasts")
-      .update({
+    const { error } = await adminCatalogWrite({
+      table: "broadcasts",
+      op: "update",
+      values: {
         is_deleted: true,
         deleted_at: new Date().toISOString(),
         delete_memo: `관리자 방송 삭제 / 연결 주문 ${count}건`,
-      })
-      .eq("id", broadcast.id);
+      },
+      filters: [{ type: "eq", col: "id", val: broadcast.id }],
+    });
 
     if (error) {
       showAdminToast("방송 삭제 오류: " + error.message);

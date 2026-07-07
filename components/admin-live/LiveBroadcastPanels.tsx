@@ -5,6 +5,7 @@ import { showAdminToast } from "@/lib/adminToast";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import type { CustomerRow } from "@/lib/admin-v2/types";
 import { resolveProductImageUrl } from "./quick-product/productImageUrl";
 
@@ -396,8 +397,8 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
   const pinLiveProduct = async (productId: string) => {
     if (!productId) return;
     try {
-      await supabase.from("products").update({ is_pinned: false }).eq("is_pinned", true);
-      await supabase.from("products").update({ is_pinned: true }).eq("id", productId);
+      await adminCatalogWrite({ table: "products", op: "update", values: { is_pinned: false }, filters: [{ type: "eq", col: "is_pinned", val: true }] });
+      await adminCatalogWrite({ table: "products", op: "update", values: { is_pinned: true }, filters: [{ type: "eq", col: "id", val: productId }] });
       window.dispatchEvent(new Event("ruru-live-product-updated"));
     } catch {
       // 무시 (고정 실패해도 방송화면엔 영향 없음)
@@ -420,7 +421,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
     setCycleOn(next);
     if (next) {
       try {
-        await supabase.from("products").update({ is_pinned: false }).eq("is_pinned", true);
+        await adminCatalogWrite({ table: "products", op: "update", values: { is_pinned: false }, filters: [{ type: "eq", col: "is_pinned", val: true }] });
         window.dispatchEvent(new Event("ruru-live-product-updated"));
       } catch {
         // 무시

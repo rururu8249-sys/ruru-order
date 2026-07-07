@@ -2,6 +2,7 @@
 
 import { ChangeEvent, type CSSProperties, DragEvent, type MouseEvent as ReactMouseEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import { showAdminToast } from "@/lib/adminToast";
 import { resolveProductImageUrl } from "./productImageUrl";
 import { compressProductImage } from "./compressProductImage";
@@ -243,11 +244,13 @@ async function insertProductSchemaSafe(payload: Record<string, unknown>) {
   const removedColumns: string[] = [];
 
   for (let attempt = 0; attempt < 12; attempt += 1) {
-    const { data, error } = await supabase
-      .from("products")
-      .insert(workingPayload)
-      .select("id")
-      .single();
+    const { data, error } = await adminCatalogWrite({
+      table: "products",
+      op: "insert",
+      values: workingPayload,
+      select: "id",
+      single: true,
+    });
 
     if (!error) {
       return { data, removedColumns };
@@ -278,12 +281,14 @@ async function updateProductSchemaSafe(productId: string, payload: Record<string
   const removedColumns: string[] = [];
 
   for (let attempt = 0; attempt < 12; attempt += 1) {
-    const { data, error } = await supabase
-      .from("products")
-      .update(workingPayload)
-      .eq("id", productId)
-      .select("id")
-      .single();
+    const { data, error } = await adminCatalogWrite({
+      table: "products",
+      op: "update",
+      values: workingPayload,
+      filters: [{ type: "eq", col: "id", val: productId }],
+      select: "id",
+      single: true,
+    });
 
     if (!error) {
       return { data, removedColumns };
@@ -879,13 +884,15 @@ export default function QuickProductFastForm({
       const productId = result.data?.id;
 
       if (!isEditMode && resolvedProductType === "broadcast" && activeBroadcastId && productId) {
-        const { error: linkError } = await supabase
-          .from("broadcast_products")
-          .insert({
+        const { error: linkError } = await adminCatalogWrite({
+          table: "broadcast_products",
+          op: "insert",
+          values: {
             broadcast_id: activeBroadcastId,
             product_id: productId,
             sort_order: 0,
-          });
+          },
+        });
 
         if (linkError) {
           showAdminToast(

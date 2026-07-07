@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 
 export type AdminLiveBroadcast = {
   id: string;
@@ -65,13 +66,12 @@ export async function startAdminLiveBroadcast(input: StartBroadcastInput) {
 
   const nowIso = new Date().toISOString();
 
-  const { error: closeError } = await supabase
-    .from("broadcasts")
-    .update({
-      status: "OFF",
-      ended_at: nowIso,
-    })
-    .eq("status", "ON");
+  const { error: closeError } = await adminCatalogWrite({
+    table: "broadcasts",
+    op: "update",
+    values: { status: "OFF", ended_at: nowIso },
+    filters: [{ type: "eq", col: "status", val: "ON" }],
+  });
 
   if (closeError) throw closeError;
 
@@ -88,11 +88,13 @@ export async function startAdminLiveBroadcast(input: StartBroadcastInput) {
     is_deleted: false,
   };
 
-  const { data, error } = await supabase
-    .from("broadcasts")
-    .insert(payload)
-    .select("*")
-    .single();
+  const { data, error } = await adminCatalogWrite({
+    table: "broadcasts",
+    op: "insert",
+    values: payload,
+    select: "*",
+    single: true,
+  });
 
   if (error) throw error;
 
@@ -111,25 +113,23 @@ export async function activateBroadcast(broadcastId: string) {
 
   const nowIso = new Date().toISOString();
 
-  const { error: closeError } = await supabase
-    .from("broadcasts")
-    .update({
-      status: "OFF",
-      ended_at: nowIso,
-    })
-    .eq("status", "ON");
+  const { error: closeError } = await adminCatalogWrite({
+    table: "broadcasts",
+    op: "update",
+    values: { status: "OFF", ended_at: nowIso },
+    filters: [{ type: "eq", col: "status", val: "ON" }],
+  });
 
   if (closeError) throw closeError;
 
-  const { data, error } = await supabase
-    .from("broadcasts")
-    .update({
-      status: "ON",
-      started_at: nowIso,
-    })
-    .eq("id", broadcastId)
-    .select("*")
-    .single();
+  const { data, error } = await adminCatalogWrite({
+    table: "broadcasts",
+    op: "update",
+    values: { status: "ON", started_at: nowIso },
+    filters: [{ type: "eq", col: "id", val: broadcastId }],
+    select: "*",
+    single: true,
+  });
 
   if (error) throw error;
 
@@ -161,11 +161,13 @@ export async function createDraftBroadcast(title: string) {
     is_deleted: false,
   };
 
-  const { data, error } = await supabase
-    .from("broadcasts")
-    .insert(payload)
-    .select("*")
-    .single();
+  const { data, error } = await adminCatalogWrite({
+    table: "broadcasts",
+    op: "insert",
+    values: payload,
+    select: "*",
+    single: true,
+  });
 
   if (error) throw error;
 
@@ -184,16 +186,18 @@ export async function updateAdminLiveBroadcast(input: UpdateBroadcastInput) {
     throw new Error("방송 제목을 입력해주세요.");
   }
 
-  const { data, error } = await supabase
-    .from("broadcasts")
-    .update({
+  const { data, error } = await adminCatalogWrite({
+    table: "broadcasts",
+    op: "update",
+    values: {
       public_title: title,
       youtube_live_url: youtubeUrl,
       youtube_live_enabled: Boolean(youtubeUrl),
-    })
-    .eq("id", input.broadcastId)
-    .select("*")
-    .single();
+    },
+    filters: [{ type: "eq", col: "id", val: input.broadcastId }],
+    select: "*",
+    single: true,
+  });
 
   if (error) throw error;
 
@@ -209,16 +213,14 @@ export async function endAdminLiveBroadcast(broadcastId: string) {
 
   const nowIso = new Date().toISOString();
 
-  const { data, error } = await supabase
-    .from("broadcasts")
-    .update({
-      status: "OFF",
-      ended_at: nowIso,
-      order_form_enabled: false,
-    })
-    .eq("id", broadcastId)
-    .select("*")
-    .single();
+  const { data, error } = await adminCatalogWrite({
+    table: "broadcasts",
+    op: "update",
+    values: { status: "OFF", ended_at: nowIso, order_form_enabled: false },
+    filters: [{ type: "eq", col: "id", val: broadcastId }],
+    select: "*",
+    single: true,
+  });
 
   if (error) throw error;
 

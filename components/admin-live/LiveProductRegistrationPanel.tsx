@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import { showAdminToast } from "@/lib/adminToast";
 import LiveProductImageUploader, { type UploadedProductImage } from "./LiveProductImageUploader";
 import LiveProductStockEditor from "./LiveProductStockEditor";
@@ -266,11 +267,13 @@ export default function LiveProductRegistrationPanel({
         detail_image_urls: detailImages.map((image) => image.url),
       };
 
-      const { data: insertedProduct, error: productError } = await supabase
-        .from("products")
-        .insert(payload)
-        .select("id")
-        .single();
+      const { data: insertedProduct, error: productError } = await adminCatalogWrite({
+        table: "products",
+        op: "insert",
+        values: payload,
+        select: "id",
+        single: true,
+      });
 
       if (productError) {
         throw new Error(productError.message);
@@ -295,9 +298,13 @@ export default function LiveProductRegistrationPanel({
         }
 
         if (!existingLink || existingLink.length === 0) {
-          const { error: linkError } = await supabase.from("broadcast_products").insert({
-            broadcast_id: activeBroadcastId,
-            product_id: productId,
+          const { error: linkError } = await adminCatalogWrite({
+            table: "broadcast_products",
+            op: "insert",
+            values: {
+              broadcast_id: activeBroadcastId,
+              product_id: productId,
+            },
           });
 
           if (linkError) {
