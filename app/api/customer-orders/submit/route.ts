@@ -19,6 +19,7 @@ type OrderSubmitPayload = {
   customerName?: string;
   recipient_name?: string;
   recipient_phone?: string;
+  kakao_id?: string;
 };
 
 function jsonError(message: string, status = 400) {
@@ -318,6 +319,19 @@ export async function POST(request: NextRequest) {
         .eq("order_group_id", recipientGroupId);
       if (recipientError) {
         console.warn("받는사람 저장 실패(주문은 정상 저장됨):", recipientError.message);
+      }
+    }
+
+    // 카카오 정체성 스탬프 — 안 바뀌는 kakao_id를 주문에 찍어, 이후 전화/이름 수정돼도 고객 조회가 안 깨지게.
+    //   받는사람 저장과 동일하게 RPC 무변경 + order_group_id로만 보강. 입금/정산/포인트 무관. 실패해도 주문은 성공 유지.
+    const kakaoId = text(body.kakao_id);
+    if (recipientGroupId && kakaoId) {
+      const { error: kakaoError } = await supabase
+        .from("orders")
+        .update({ kakao_id: kakaoId })
+        .eq("order_group_id", recipientGroupId);
+      if (kakaoError) {
+        console.warn("kakao_id 저장 실패(주문은 정상 저장됨):", kakaoError.message);
       }
     }
 

@@ -150,6 +150,21 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminSupabase();
     const phoneVariants = makePhoneVariants(customerPhone);
 
+    // 기존 회원도 적용: 로그인 시 이 사람의 "kakao_id 없는 기존 주문"에 kakao_id를 소급 연결(전화번호 매칭).
+    //   - 신규 주문만이 아니라 옛 주문까지 안 바뀌는 정체성으로 묶어, 이후 전화/이름 수정돼도 조회 안 깨짐.
+    //   - kakao_id가 이미 있는 주문은 건드리지 않음(.is null). 다른 사람 주문 안 건드림(전화 일치만).
+    //   - 주문/입금/정산/포인트 로직과 무관(kakao_id 컬럼만). 실패해도 로그인은 정상 진행.
+    if (kakaoId && phoneVariants.length > 0) {
+      const { error: orderBackfillError } = await supabase
+        .from("orders")
+        .update({ kakao_id: kakaoId })
+        .is("kakao_id", null)
+        .in("customer_phone", phoneVariants);
+      if (orderBackfillError) {
+        console.warn("기존 주문 kakao_id 소급연결 실패(로그인은 정상):", orderBackfillError.message);
+      }
+    }
+
     const { data: existingRows, error: selectError } = await supabase
       .from("customers")
       .select(

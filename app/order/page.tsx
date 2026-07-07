@@ -3667,6 +3667,12 @@ export default function OrderPage() {
           customer_name: customerName.trim(),
           recipient_name: recipientName.trim() || customerName.trim(),
           recipient_phone: onlyNumber(recipientPhone) || cleanPhone,
+          // 안 바뀌는 카카오 정체성 — 주문에 찍어두면 전화/이름 수정돼도 고객 조회가 안 깨짐
+          // (주문 RPC 무관, 제출 직후 order_group_id로만 별도 UPDATE).
+          kakao_id:
+            typeof window !== "undefined"
+              ? (localStorage.getItem("ruru_kakao_id") || "").trim()
+              : "",
         }),
       });
 
