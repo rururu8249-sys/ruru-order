@@ -838,8 +838,8 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
   };
 
   return (
-    <section className={isCol ? "flex w-full flex-col gap-3 xl:h-full" : "mb-4 flex w-full items-stretch gap-3"}>
-      <div className={`min-w-0 rounded-2xl border border-line bg-surface p-3.5 shadow-sm flex flex-col ${isCol ? "h-[480px] w-full xl:h-[44vh] xl:min-h-[260px] xl:shrink-0" : "h-[420px]"}`} style={isCol ? undefined : { flex: "1 1 0%" }}>
+    <section className={isCol ? `flex w-full flex-col gap-3${hideProducts ? "" : " xl:h-full"}` : "mb-4 flex w-full items-stretch gap-3"}>
+      <div className={`min-w-0 rounded-2xl border border-line bg-surface p-3.5 shadow-sm flex flex-col ${isCol ? (videoEmbedUrl ? "h-[480px] w-full xl:h-[44vh] xl:min-h-[260px] xl:shrink-0" : "h-[140px] w-full xl:shrink-0") : "h-[420px]"}`} style={isCol ? undefined : { flex: "1 1 0%" }}>
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-black text-ink">
             방송화면
@@ -905,7 +905,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
         </div>
       </div>
 
-      <div className={`min-w-0 rounded-2xl border border-line bg-surface p-3.5 shadow-sm flex flex-col ${isCol ? "h-[560px] w-full xl:h-[calc(100vh-44vh-1.75rem)] xl:min-h-[260px] xl:shrink-0" : "h-[420px]"}`} style={isCol ? undefined : { flex: "3 1 0%" }}>
+      <div className={`min-w-0 rounded-2xl border border-line bg-surface p-3.5 shadow-sm flex flex-col ${isCol ? (chatEmbedUrl ? "h-[560px] w-full xl:h-[calc(100vh-44vh-1.75rem)] xl:min-h-[260px] xl:shrink-0" : "h-[140px] w-full xl:shrink-0") : "h-[420px]"}`} style={isCol ? undefined : { flex: "3 1 0%" }}>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-black text-ink">라이브 채팅</h2>
           <span className="text-xs font-bold text-ink-soft">{chatEmbedUrl ? "채팅 연결" : "URL 대기"}</span>
