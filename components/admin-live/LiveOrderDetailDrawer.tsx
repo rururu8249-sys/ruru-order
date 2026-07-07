@@ -136,6 +136,10 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const [returnSaving, setReturnSaving] = useState(false);
   const [returnStatusDraft, setReturnStatusDraft] = useState("");
   const [returnReasonDraft, setReturnReasonDraft] = useState("");
+  const [issueSaving, setIssueSaving] = useState(false);
+  const [issueEditing, setIssueEditing] = useState(false);
+  const [issueTypeDraft, setIssueTypeDraft] = useState("return");
+  const [issueMemoDraft, setIssueMemoDraft] = useState("");
   const [returnAmountDraft, setReturnAmountDraft] = useState("");
 
   useEffect(() => {
@@ -539,6 +543,70 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     }
   };
 
+  // 고객이슈로 등록: 지금 보고 있는 주문(닉네임·주문번호·상품)을 그대로 admin_tasks 고객이슈로 간편 등록.
+  //   기존 고객이슈 빠른등록과 동일한 서버 route(/api/admin-v2/admin-tasks, 관리자인증) 재사용.
+  //   등록되면 '고객·이슈' 패널의 "고객 이슈" 탭에 그대로 뜸(같은 admin_tasks).
+  //   ⚠️ 주문/입금/정산/재고/포인트 상태는 일절 변경 안 함 — 이슈 기록만 생성.
+  const openIssueForm = () => {
+    const st = String((order as any).returnStatus || "");
+    setIssueTypeDraft(st.includes("교환") ? "exchange" : st.includes("환불") ? "refund" : "return");
+    setIssueMemoDraft(String((order as any).returnReason || "").trim());
+    setReturnEditing(false);
+    setIssueEditing(true);
+  };
+
+  const submitCustomerIssue = async () => {
+    if (issueSaving) return;
+    const row = order as any;
+    const nick = String((orderForView as any).nickname || row.nickname || row.youtube_nickname || "").trim();
+    const nm = String((orderForView as any).name || row.customer_name || row.name || "").trim();
+    const ph = String((orderForView as any).phone || row.phone || row.customer_phone || "").trim();
+    const orderNo = String((orderForView as any).orderNo || row.order_lookup_code || "").trim();
+    const productSummary = items.map((it: any) => String(it?.productName || "")).filter(Boolean).slice(0, 3).join(", ");
+    const typeLabel = ISSUE_TYPE_OPTIONS.find((o) => o.value === issueTypeDraft)?.label || "기타";
+    const nowLabel = new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit", weekday: "long" });
+
+    const title = `[고객이슈] ${nick || nm || ph || "고객"} - ${typeLabel}`;
+    const bodyText = [
+      `자동날짜: ${nowLabel}`,
+      `이슈유형: ${typeLabel}`,
+      `닉네임: ${nick || "-"}`,
+      `이름: ${nm || "-"}`,
+      `전화번호: ${ph || "-"}`,
+      orderNo ? `주문번호: ${orderNo}` : "",
+      productSummary ? `상품명: ${productSummary}` : "",
+      "",
+      issueMemoDraft.trim() || typeLabel,
+    ].filter(Boolean).join("\n");
+
+    setIssueSaving(true);
+    try {
+      const res = await fetch("/api/admin-v2/admin-tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({
+          task_type: issueTypeDraft,
+          title,
+          body: bodyText,
+          customer_name: nm || null,
+          customer_nickname: nick || null,
+          related_product: productSummary || null,
+          source: "order_detail_customer_issue",
+        }),
+      }).then((r) => r.json()).catch(() => null);
+      if (res?.ok) {
+        showAdminToast("고객이슈로 등록됐어요. '고객·이슈 → 고객 이슈' 탭에서 확인·처리하세요.", "success");
+        setIssueEditing(false);
+        setIssueMemoDraft("");
+      } else {
+        showAdminToast("고객이슈 등록 실패\n\n" + (res?.message || "알 수 없는 오류"), "error");
+      }
+    } finally {
+      setIssueSaving(false);
+    }
+  };
+
   // 입금대기 → 수동 입금확인: 기존 입금확인 로직(/api/admin-v2/manual-payment-confirm-without-deposit) 재사용. 새 로직 없음.
   const handleManualConfirm = async () => {
     if (manualConfirmAction) return;
@@ -733,6 +801,116 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             </>
           ) : null}
         </div>
+
+        {/* 반품/교환 · 고객이슈 — 상단 배치(반품/교환 처리 동선 단축, 스크롤 최소화) */}
+        <section className="mt-3">
+          <div className="mb-1 flex items-center gap-2">
+            <span className="text-[11px] font-black text-ink-mute">반품/교환 기록</span>
+            {!returnEditing && !issueEditing ? (
+              <>
+                <button type="button" onClick={startEditReturn} className="rounded-md border border-rose-line bg-rose-soft px-2 py-0.5 text-[10px] font-black text-rose-deep">
+                  {(order as any).returnStatus ? "✎ 수정" : "+ 기록"}
+                </button>
+                <button
+                  type="button"
+                  onClick={openIssueForm}
+                  className="rounded-md border border-line bg-surface px-2 py-0.5 text-[10px] font-black text-ink-soft transition hover:bg-surface-2"
+                >
+                  🗂 고객이슈로 등록
+                </button>
+              </>
+            ) : null}
+          </div>
+          {!returnEditing ? (
+            (order as any).returnStatus ? (
+              <div className="rounded-lg border border-warn-tx/40 bg-warn-bg p-3 text-[12px] font-bold leading-6 text-warn-tx">
+                <span className="mr-2 rounded-md bg-surface px-2 py-0.5 text-[11px] font-black">{String((order as any).returnStatus)}</span>
+                {Number((order as any).returnAmount || 0) > 0 ? <span className="mr-2">환불 예정/완료 {money(Number((order as any).returnAmount || 0))}</span> : null}
+                <div className="mt-1 whitespace-pre-wrap text-ink-soft">{String((order as any).returnReason || "사유 없음")}</div>
+                <div className="mt-1 text-[10px] text-ink-mute">※ 기록용입니다 — 정산·입금·재고 숫자는 바뀌지 않아요.</div>
+              </div>
+            ) : (
+              <div className="rounded-lg bg-surface-2 p-3 text-[12px] font-bold text-ink-mute">기록 없음</div>
+            )
+          ) : (
+            <div className="rounded-lg border border-line bg-surface-2 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <select value={returnStatusDraft} onChange={(e) => setReturnStatusDraft(e.target.value)} className="h-8 rounded-md border border-line bg-surface px-2 text-[12px] font-black text-ink">
+                  <option value="">기록 없음(지우기)</option>
+                  <option value="반품접수">반품접수</option>
+                  <option value="교환접수">교환접수</option>
+                  <option value="반품완료">반품완료</option>
+                  <option value="교환완료">교환완료</option>
+                </select>
+                <input
+                  value={returnAmountDraft}
+                  onChange={(e) => setReturnAmountDraft(e.target.value.replace(/[^0-9]/g, ""))}
+                  inputMode="numeric"
+                  placeholder="환불 금액(기록용)"
+                  onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }}
+                  className="h-8 w-[130px] rounded-md border border-line bg-surface px-2 text-right text-[12px] font-black text-ink"
+                />
+                <span className="text-[11px] font-bold text-ink-mute">원</span>
+              </div>
+              <textarea
+                value={returnReasonDraft}
+                onChange={(e) => setReturnReasonDraft(e.target.value)}
+                placeholder="사유·처리 메모 (예: 스몰 → 미디움 교환, 7/6 회수 예약)"
+                className="mt-2 h-16 w-full rounded-md border border-line bg-surface p-2 text-[12px] font-bold text-ink"
+              />
+              <div className="mt-2 flex gap-2">
+                <button type="button" disabled={returnSaving} onClick={() => void handleSaveReturn()} className="rounded-md bg-rose-deep px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-50">
+                  {returnSaving ? "저장중…" : "저장"}
+                </button>
+                <button type="button" onClick={() => setReturnEditing(false)} className="rounded-md border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ink-soft">취소</button>
+              </div>
+              <div className="mt-1 text-[10px] font-bold text-ink-mute">※ 기록 전용 — 주문상태·정산·입금·재고에는 아무 영향 없습니다.</div>
+            </div>
+          )}
+        </section>
+
+        {/* 고객이슈로 등록 — 반품/교환 편집기와 동일한 인라인 폼(유형칩 + 사유). admin_tasks 등록만. */}
+        {issueEditing ? (
+          <section className="mt-3">
+            <div className="mb-1 text-[11px] font-black text-ink-mute">고객이슈로 등록</div>
+            <div className="rounded-lg border border-line bg-surface-2 p-3">
+              <div className="mb-2 rounded-md bg-surface px-2.5 py-1.5 text-[11px] font-bold leading-5 text-ink-soft">
+                <span className="font-black text-ink">{orderForView.nickname || "-"}</span>
+                {" · "}
+                {order.orderNo || "주문번호 없음"}
+                <div className="truncate text-ink-mute">{items.map((it) => it.productName).filter(Boolean).slice(0, 3).join(", ") || "상품 없음"}</div>
+              </div>
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {ISSUE_TYPE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setIssueTypeDraft(opt.value)}
+                    className={[
+                      "rounded-full px-2.5 py-1 text-[11px] font-black transition",
+                      issueTypeDraft === opt.value ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2",
+                    ].join(" ")}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                value={issueMemoDraft}
+                onChange={(e) => setIssueMemoDraft(e.target.value)}
+                placeholder="사유·처리 메모 (예: 사이즈 안 맞아 교환 요청, 7/8 회수 예약)"
+                className="h-16 w-full rounded-md border border-line bg-surface p-2 text-[12px] font-bold text-ink"
+              />
+              <div className="mt-2 flex gap-2">
+                <button type="button" disabled={issueSaving} onClick={() => void submitCustomerIssue()} className="rounded-md bg-rose-deep px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-50">
+                  {issueSaving ? "등록중…" : "고객이슈 등록"}
+                </button>
+                <button type="button" onClick={() => setIssueEditing(false)} className="rounded-md border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ink-soft">취소</button>
+              </div>
+              <div className="mt-1 text-[10px] font-bold text-ink-mute">※ 고객이슈에만 등록 — 주문/입금/정산/재고 무변경. 등록 후 '고객·이슈 → 고객 이슈' 탭에서 확인·처리.</div>
+            </div>
+          </section>
+        ) : null}
 
         {/* 상태 배지 + 안내 (기존 로직) */}
         <div className={`rounded-xl border px-3 py-2 text-xs font-black ${getPaymentStatusClass(orderForView)}`}>
@@ -994,67 +1172,18 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           </div>
         </section>
 
-        {/* 반품/교환 기록 (기록 전용 — 정산·입금·재고 계산에 반영 안 됨) */}
-        <section className="mt-3">
-          <div className="mb-1 flex items-center gap-2">
-            <span className="text-[11px] font-black text-ink-mute">반품/교환 기록</span>
-            {!returnEditing ? (
-              <button type="button" onClick={startEditReturn} className="rounded-md border border-rose-line bg-rose-soft px-2 py-0.5 text-[10px] font-black text-rose-deep">
-                {(order as any).returnStatus ? "✎ 수정" : "+ 기록"}
-              </button>
-            ) : null}
-          </div>
-          {!returnEditing ? (
-            (order as any).returnStatus ? (
-              <div className="rounded-lg border border-warn-tx/40 bg-warn-bg p-3 text-[12px] font-bold leading-6 text-warn-tx">
-                <span className="mr-2 rounded-md bg-surface px-2 py-0.5 text-[11px] font-black">{String((order as any).returnStatus)}</span>
-                {Number((order as any).returnAmount || 0) > 0 ? <span className="mr-2">환불 예정/완료 {money(Number((order as any).returnAmount || 0))}</span> : null}
-                <div className="mt-1 whitespace-pre-wrap text-ink-soft">{String((order as any).returnReason || "사유 없음")}</div>
-                <div className="mt-1 text-[10px] text-ink-mute">※ 기록용입니다 — 정산·입금·재고 숫자는 바뀌지 않아요.</div>
-              </div>
-            ) : (
-              <div className="rounded-lg bg-surface-2 p-3 text-[12px] font-bold text-ink-mute">기록 없음</div>
-            )
-          ) : (
-            <div className="rounded-lg border border-line bg-surface-2 p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <select value={returnStatusDraft} onChange={(e) => setReturnStatusDraft(e.target.value)} className="h-8 rounded-md border border-line bg-surface px-2 text-[12px] font-black text-ink">
-                  <option value="">기록 없음(지우기)</option>
-                  <option value="반품접수">반품접수</option>
-                  <option value="교환접수">교환접수</option>
-                  <option value="반품완료">반품완료</option>
-                  <option value="교환완료">교환완료</option>
-                </select>
-                <input
-                  value={returnAmountDraft}
-                  onChange={(e) => setReturnAmountDraft(e.target.value.replace(/[^0-9]/g, ""))}
-                  inputMode="numeric"
-                  placeholder="환불 금액(기록용)"
-                  onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }}
-                  className="h-8 w-[130px] rounded-md border border-line bg-surface px-2 text-right text-[12px] font-black text-ink"
-                />
-                <span className="text-[11px] font-bold text-ink-mute">원</span>
-              </div>
-              <textarea
-                value={returnReasonDraft}
-                onChange={(e) => setReturnReasonDraft(e.target.value)}
-                placeholder="사유·처리 메모 (예: 스몰 → 미디움 교환, 7/6 회수 예약)"
-                className="mt-2 h-16 w-full rounded-md border border-line bg-surface p-2 text-[12px] font-bold text-ink"
-              />
-              <div className="mt-2 flex gap-2">
-                <button type="button" disabled={returnSaving} onClick={() => void handleSaveReturn()} className="rounded-md bg-rose-deep px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-50">
-                  {returnSaving ? "저장중…" : "저장"}
-                </button>
-                <button type="button" onClick={() => setReturnEditing(false)} className="rounded-md border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ink-soft">취소</button>
-              </div>
-              <div className="mt-1 text-[10px] font-bold text-ink-mute">※ 기록 전용 — 주문상태·정산·입금·재고에는 아무 영향 없습니다.</div>
-            </div>
-          )}
-        </section>
       </div>
     </aside>
   );
 }
+
+const ISSUE_TYPE_OPTIONS = [
+  { label: "반품", value: "return" },
+  { label: "교환", value: "exchange" },
+  { label: "환불", value: "refund" },
+  { label: "진상", value: "complaint" },
+  { label: "기타", value: "general" },
+];
 
 function Info({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
