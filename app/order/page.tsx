@@ -65,6 +65,7 @@ import OrderCustomerInfoFormCard from "@/components/order/OrderCustomerInfoFormC
 import CustomerPaymentGuideBottomSheet from "@/components/customer/CustomerPaymentGuideBottomSheet";
 import CustomerPointGiftPopup from "@/components/customer/CustomerPointGiftPopup";
 import CustomerInfoEditBottomSheet from "@/components/customer/CustomerInfoEditBottomSheet";
+import SheetGrabber from "@/components/customer/SheetGrabber";
 import { KakaoPostcodeEmbed } from "react-daum-postcode";
 import CustomerOrderLookupBottomSheet, {
   type CustomerOrderLookupFilter,
@@ -5097,9 +5098,9 @@ export default function OrderPage() {
 
           {registeredOptionSelectProduct && (
             <div style={{ position: "fixed", inset: 0, zIndex: 128, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(0,0,0,0.45)" }} onClick={(e) => { if (e.target === e.currentTarget) closeRegisteredOptionSelectSheet(); }}>
-              <div style={{ width: "100%", maxWidth: "430px", maxHeight: "92dvh", display: "flex", flexDirection: "column", background: "#fff", borderTopLeftRadius: "26px", borderTopRightRadius: "26px", overflow: "hidden" }}>
+              <div data-sheet style={{ width: "100%", maxWidth: "430px", maxHeight: "92dvh", display: "flex", flexDirection: "column", background: "#fff", borderTopLeftRadius: "26px", borderTopRightRadius: "26px", overflow: "hidden" }}>
                 <div style={{ flexShrink: 0, borderBottom: "1px solid #F0EAE0", padding: "12px 16px 16px" }}>
-                  <div style={{ margin: "0 auto 12px", width: "52px", height: "5px", borderRadius: "3px", background: "#E8E2DD" }} />
+                  <SheetGrabber onClose={closeRegisteredOptionSelectSheet} style={{ margin: "0 auto 6px" }} />
                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                     <div onClick={() => { const u = pickOrderProductImageUrl(registeredOptionSelectProduct); if (u) setLightboxImage(u); }} style={{ width: "60px", height: "60px", flexShrink: 0, borderRadius: "12px", overflow: "hidden", background: "#F0EBE8", cursor: pickOrderProductImageUrl(registeredOptionSelectProduct) ? "zoom-in" : "default" }}>
                       {pickOrderProductImageUrl(registeredOptionSelectProduct) ? (
