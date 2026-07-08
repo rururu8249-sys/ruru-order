@@ -71,11 +71,10 @@ export default function LiveIssueRailPanel({ onOpenAll }: Props) {
   }, [load]);
 
   const open = tasks.filter((t) => !isResolved(t));
-  const recent = open.slice(0, 5);
 
   return (
-    <div className="min-w-0 w-full shrink-0 rounded-2xl border border-line bg-surface p-3 shadow-sm">
-      <div className="mb-2 flex items-center justify-between gap-2">
+    <div className="min-w-0 w-full rounded-2xl border border-line bg-surface p-3 shadow-sm flex flex-col xl:h-full">
+      <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
         <span className="text-xs font-black text-ink">📮 고객이슈</span>
         <div className="flex shrink-0 items-center gap-1.5">
           <span
@@ -97,31 +96,33 @@ export default function LiveIssueRailPanel({ onOpenAll }: Props) {
         </div>
       </div>
 
-      {open.length === 0 ? (
-        <div className="rounded-lg bg-surface-2 px-3 py-4 text-center text-[11px] font-bold text-ink-mute">
-          {loading ? "불러오는 중…" : "미해결 고객이슈 없음 👍"}
-        </div>
-      ) : (
-        <ul className="space-y-1">
-          {recent.map((t, i) => (
-            <li key={String(t.id ?? i)} className="flex items-center gap-2 rounded-lg bg-surface-2 px-2.5 py-1.5">
-              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[11px] font-black text-ink">{t.title || "제목 없음"}</div>
-                <div className="truncate text-[10px] font-bold text-ink-mute">
-                  {t.customer_nickname || ""}
-                  {t.created_at ? ` · ${timeLabel(t.created_at)}` : ""}
+      <div className="min-h-0 flex-1 overflow-auto">
+        {open.length === 0 ? (
+          <div className="flex h-full min-h-[64px] items-center justify-center rounded-lg bg-surface-2 px-3 py-4 text-center text-[11px] font-bold text-ink-mute">
+            {loading ? "불러오는 중…" : "미해결 고객이슈 없음 👍"}
+          </div>
+        ) : (
+          <ul className="space-y-1">
+            {open.map((t, i) => (
+              <li key={String(t.id ?? i)} className="flex items-center gap-2 rounded-lg bg-surface-2 px-2.5 py-1.5">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[11px] font-black text-ink">{t.title || "제목 없음"}</div>
+                  <div className="truncate text-[10px] font-bold text-ink-mute">
+                    {t.customer_nickname || ""}
+                    {t.created_at ? ` · ${timeLabel(t.created_at)}` : ""}
+                  </div>
                 </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <button
         type="button"
         onClick={onOpenAll}
-        className="mt-2 w-full rounded-lg border border-line bg-surface-2 py-1.5 text-[11px] font-black text-ink-soft transition hover:bg-surface-3"
+        className="mt-2 shrink-0 w-full rounded-lg border border-line bg-surface-2 py-1.5 text-[11px] font-black text-ink-soft transition hover:bg-surface-3"
       >
         고객이슈 전체 보기 · 처리 →
       </button>

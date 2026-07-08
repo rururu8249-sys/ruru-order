@@ -1558,10 +1558,16 @@ export default function AdminLiveDashboard() {
               </div>
 
               {/* 오른쪽 컬럼: 영상·채팅 + (구 '지금 띄운 상품' 자리) 라이브현황·고객이슈. xl 이상에서 스티키. */}
-              <aside className="min-w-0 space-y-3 xl:self-stretch">
-                <LiveBroadcastPanels variant="column" hideProducts videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} activeBroadcastId={activeBroadcast?.id || null} />
-                <LiveStatsPanel orders={orders} activeBroadcastId={activeBroadcast?.id || null} />
-                <LiveIssueRailPanel onOpenAll={() => { setCustomersInitialTab("issues"); setActiveMenu("customers"); }} />
+              <aside className="min-w-0 space-y-3 xl:flex xl:flex-col xl:gap-3 xl:space-y-0 xl:self-stretch xl:min-h-0">
+                <div className="xl:shrink-0">
+                  <LiveBroadcastPanels variant="column" hideProducts videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} activeBroadcastId={activeBroadcast?.id || null} />
+                </div>
+                <div className="xl:shrink-0">
+                  <LiveStatsPanel orders={orders} activeBroadcastId={activeBroadcast?.id || null} />
+                </div>
+                <div className="min-h-0 xl:flex-1">
+                  <LiveIssueRailPanel onOpenAll={() => { setCustomersInitialTab("issues"); setActiveMenu("customers"); }} />
+                </div>
               </aside>
             </div>
 
