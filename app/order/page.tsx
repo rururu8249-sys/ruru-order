@@ -1142,7 +1142,6 @@ export default function OrderPage() {
   const [registeredOptionColor, setRegisteredOptionColor] = useState("");
   const [registeredOptionSize, setRegisteredOptionSize] = useState("");
   const [registeredOptionQty, setRegisteredOptionQty] = useState(1);
-  const [showOptionDetail, setShowOptionDetail] = useState(false);
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
   const [duplicateWarningPendingAction, setDuplicateWarningPendingAction] = useState<(() => void) | null>(null);
 
@@ -3115,7 +3114,6 @@ export default function OrderPage() {
     setRegisteredOptionColor("");
     setRegisteredOptionSize("");
     setRegisteredOptionQty(1);
-    setShowOptionDetail(false);
   };
 
   const closeRegisteredOptionSelectSheet = () => {
@@ -3123,7 +3121,6 @@ export default function OrderPage() {
     setRegisteredOptionColor("");
     setRegisteredOptionSize("");
     setRegisteredOptionQty(1);
-    setShowOptionDetail(false);
   };
 
   // 동일 상품 + 동일 옵션(색상/사이즈)으로 이미 제출된 주문이 있는지 확인.
@@ -4342,6 +4339,10 @@ export default function OrderPage() {
   const registeredOptionDescription = registeredOptionSelectProduct
     ? String(registeredOptionSelectProduct.product_description || registeredOptionSelectProduct.detail_description || registeredOptionSelectProduct.description || "").trim()
     : "";
+  // [상세UI] 상단 썸네일 스트립용: 대표(커버) + 상세사진 통합(중복 제거). Baymard: 숨은 썸네일은 노출로 신호.
+  const registeredOptionAllImages = registeredOptionSelectProduct
+    ? Array.from(new Set([pickOrderProductImageUrl(registeredOptionSelectProduct), ...registeredOptionDetailImages].filter(Boolean)))
+    : [];
   const registeredOptionStockVariants: { color: string; size: string; stock: number }[] = (() => {
     if (!registeredOptionSelectProduct) return [];
     try {
@@ -5100,7 +5101,7 @@ export default function OrderPage() {
                 <div style={{ flexShrink: 0, borderBottom: "1px solid #F0EAE0", padding: "12px 16px 16px" }}>
                   <div style={{ margin: "0 auto 12px", width: "52px", height: "5px", borderRadius: "3px", background: "#E8E2DD" }} />
                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <div style={{ width: "60px", height: "60px", flexShrink: 0, borderRadius: "12px", overflow: "hidden", background: "#F0EBE8" }}>
+                    <div onClick={() => { const u = pickOrderProductImageUrl(registeredOptionSelectProduct); if (u) setLightboxImage(u); }} style={{ width: "60px", height: "60px", flexShrink: 0, borderRadius: "12px", overflow: "hidden", background: "#F0EBE8", cursor: pickOrderProductImageUrl(registeredOptionSelectProduct) ? "zoom-in" : "default" }}>
                       {pickOrderProductImageUrl(registeredOptionSelectProduct) ? (
                         <img src={pickOrderProductImageUrl(registeredOptionSelectProduct)} alt={registeredOptionSelectProduct.product_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       ) : null}
@@ -5110,6 +5111,13 @@ export default function OrderPage() {
                       <div style={{ marginTop: "3px", fontSize: "15px", fontWeight: 800, color: "#7A1E47" }}>{registeredOptionPrice > 0 ? won(registeredOptionPrice) : "가격 직접입력"}</div>
                     </div>
                   </div>
+                  {registeredOptionAllImages.length > 1 ? (
+                    <div style={{ display: "flex", gap: "6px", marginTop: "10px", overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: "2px" }}>
+                      {registeredOptionAllImages.map((img, i) => (
+                        <img key={`thumb-${i}`} src={img} alt="" onClick={() => setLightboxImage(img)} style={{ width: "46px", height: "46px", flexShrink: 0, borderRadius: "8px", objectFit: "cover", cursor: "zoom-in", border: "1px solid #EEE7E1", background: "#F0EBE8" }} />
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div style={{ minHeight: 0, flex: 1, overflowY: "auto", padding: "16px" }}>
@@ -5195,23 +5203,17 @@ export default function OrderPage() {
                   ) : null}
 
                   {registeredOptionDetailImages.length > 0 || registeredOptionDescription ? (
-                    <div style={{ marginTop: "4px" }}>
-                      <button type="button" onClick={() => setShowOptionDetail((v) => !v)} style={{ width: "100%", height: "44px", borderRadius: "12px", border: "1px solid #E8E2DD", background: "#FAF6F2", fontSize: "13px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>
-                        상품 상세 보기 {showOptionDetail ? "▲" : "▼"}
-                      </button>
-                      {showOptionDetail ? (
-                        <div style={{ marginTop: "12px" }}>
-                          {registeredOptionDetailImages.length > 0 ? (
-                            <div style={{ display: "grid", gap: "8px" }}>
-                              {registeredOptionDetailImages.map((img, i) => (
-                                <img key={i} src={img} alt="" onClick={() => setLightboxImage(img)} style={{ width: "100%", borderRadius: "10px", objectFit: "cover", cursor: "pointer", background: "#F0EBE8" }} />
-                              ))}
-                            </div>
-                          ) : null}
-                          {registeredOptionDescription ? (
-                            <div style={{ marginTop: "10px", fontSize: "13px", color: "#555", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{registeredOptionDescription}</div>
-                          ) : null}
+                    <div style={{ marginTop: "16px", borderTop: "1px solid #F0EAE0", paddingTop: "14px" }}>
+                      <div style={{ marginBottom: "10px", fontSize: "14px", fontWeight: 800, color: "#333" }}>상품 상세</div>
+                      {registeredOptionDetailImages.length > 0 ? (
+                        <div style={{ display: "grid", gap: "8px" }}>
+                          {registeredOptionDetailImages.map((img, i) => (
+                            <img key={i} src={img} alt="" onClick={() => setLightboxImage(img)} style={{ width: "100%", borderRadius: "10px", objectFit: "cover", cursor: "zoom-in", background: "#F0EBE8" }} />
+                          ))}
                         </div>
+                      ) : null}
+                      {registeredOptionDescription ? (
+                        <div style={{ marginTop: "10px", fontSize: "13px", color: "#555", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{registeredOptionDescription}</div>
                       ) : null}
                     </div>
                   ) : null}

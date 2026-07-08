@@ -47,3 +47,6 @@ next-env.d.ts
 *.bak
 *.bak_*
 *.bak.*
+
+# 엑셀 일괄등록 임시 데이터(이미지·데이터셋)
+_bulk_register/
