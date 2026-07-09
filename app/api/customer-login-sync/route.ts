@@ -247,8 +247,9 @@ export async function POST(request: NextRequest) {
       //   이 UPDATE 가 DB 트리거(trg_sync_identity_on_phone_change)를 깨워
       //   포인트 잔액·이력·차단이 새 번호로 함께 따라온다(고아 방지).
       //   단 다른 고객이 이미 그 번호를 쓰는 중이면(unique 충돌) 번호는 건드리지 않는다.
+      //   (번호가 비어 있는 고객 row 도 이때 채워진다 — 그래야 포인트·주문과 연결된다)
       const existingPhoneDigits = phoneDigits(existing.customer_phone || "");
-      if (customerPhoneDigits && existingPhoneDigits && existingPhoneDigits !== customerPhoneDigits) {
+      if (customerPhoneDigits && existingPhoneDigits !== customerPhoneDigits) {
         const { data: conflictRows } = await supabase
           .from("customers")
           .select("id")
@@ -274,10 +275,22 @@ export async function POST(request: NextRequest) {
       // last_login_at은 항상 갱신 (→ updateData가 비는 일이 없으므로 스킵 분기 미발생)
       updateData.last_login_at = nowIso;
 
-      const { error: updateError } = await supabase
+      let { error: updateError } = await supabase
         .from("customers")
         .update(updateData)
         .eq("id", existing.id);
+
+      // 번호 갱신이 unique 충돌(다른 고객이 그 사이 같은 번호를 차지)로 실패하면,
+      //   번호만 빼고 다시 저장한다. 로그인이 절대 실패하지 않도록 하는 안전망.
+      if (updateError && updateData.customer_phone) {
+        const conflictLike = /duplicate|unique|23505/i.test(updateError.message || "");
+        if (conflictLike) {
+          console.warn("전화번호 갱신 충돌 → 번호 제외하고 재저장:", updateError.message);
+          delete updateData.customer_phone;
+          const retry = await supabase.from("customers").update(updateData).eq("id", existing.id);
+          updateError = retry.error;
+        }
+      }
 
       if (updateError) {
         return NextResponse.json(
