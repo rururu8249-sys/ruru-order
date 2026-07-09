@@ -23,6 +23,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 (없음)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-07-09 **서바이벌(폭풍 생존게임) 이벤트 신설 — 이벤트 4번째 탭**(Cowork 세션, 목업 storm-survivor-square.jsx 기준): 방송 구매자 50~100명을 막대인간으로 뿌리고 라운드마다 재난(번개/파도/돌풍/우박/운석)으로 탈락 → **최종 생존자 K명**(설정) 확정 → 포인트 자동지급. ①**신규 `app/event-survival/live/page.tsx`**(OBS 투명배경 오버레이) — 탈락 엔진이 "서버가 정한 생존자 K명만 남기고 나머지 탈락" 방식이라 결과가 서버와 100% 일치. 공개 API 2.5초 폴링, 이벤트 없으면 완전 투명(방송에 빈 박스 안 뜸), `?preview=1&total=&winners=`로 단독 미리보기. SSR hydration 방지(mounted 가드 — Math.random 렌더). ②**신규 `app/api/event-survival/overlay/route.ts`** — 인형뽑기 공개 API와 동일 패턴(고정토큰 `survival_luludongi_live` 접두 매칭 → 최신 이벤트 1건), 읽기 전용. ③**서버 `resolveSurvivalEvent`**(event-roulette route에 신규 함수) — 고정 당첨자 우선 확정(원본 명단에서 찾아 중복제외 필터에 안 휘둘림) → 나머지는 **기존 검증된 `pickRouletteWinner` 가중치 추첨**으로 중복 없이 K명 채움 → 이벤트 update + `event_roulette_winners`에 **K행 insert**(이미 있으면 skip=재실행 중복 0). **기존 `spinEvent`(단일당첨) 무변경**. createEvent는 eventKind "survival" 분기만 추가(기존 claw/roulette 동작 보존). ④**관리자 탭**(AdminLiveEventRoulettePanel) — `⛈️ 서바이벌` 탭 추가, 참가자 3버튼(주문서 제출자 전체/입금완료만/수동)·중복당첨금지·가중치 토글·위젯주소·이벤트목록 **전부 기존 공용 재사용**. 신규: **생존자 수 K** −/+ 입력, **당첨 고정 다중선택**(최대 K명, 서바이벌만 배열 `fixedSurvivorNicknames`; 룰렛은 기존 단일 `fixedWinnerNickname` 그대로). ⑤**돈: 신규 `grantPointToSurvivors`** — 기존 `grantPointToWinner`는 dedup 키가 eventId라 "이벤트당 1명" 전제(그대로 쓰면 1명 지급 후 나머지 skip) → **돈 API(`/api/admin-live/customer-points` action:grant)·전화번호 3단계 조회(orders→customers→kakao_nickname)는 100% 동일**하게 쓰고 **dedup 키만 winnerId(당첨자 행) 단위**로 바꾼 별도 함수. 2중 가드(세션 ref + DB `is_reward_done`), 1명 실패해도 나머지 계속·실패자만 잠금해제(재시도 가능), 지급 성공 시 그 행만 mark_reward_done. **호출 게이트는 룰렛과 동일**(운영모드+선물=포인트+금액>0), 돌리기 전 `생존자 N명 × M P = 총 X P 실제 지급` confirm. **기존 grantPointToWinner/룰렛/인형뽑기 지급 로직 삭제·변경 0건**. 검수 tsc 0에러 + **생존자 선정 시뮬 13/13 PASS**(고정당첨 보장·중복0·K클램프(참가자-1)·가중치 97%·중복제외 회피·없는 고정닉 차단) + **지급 시뮬 14/14 PASS**(K명 1인1회·동일세션 재실행 0·새로고침 후 DB잠금 0·부분기지급 신규만·번호없음/실패 격리+재시도·테스트모드 0·금액0/직접입력 0·총액정확) + 돈/입금/정산/배송/Bankda 파일 변경 0건. ⚠️**Supabase에 `supabase/sql/event_survival_columns.sql` 실행 필요**(event_roulette_events에 `survivor_nicknames jsonb`·`winner_count int` ADD COLUMN only — **2026-07-09 사장님 실행 완료**). 미실행 시 서바이벌만 에러, 룰렛/인형뽑기/미션 정상(신규 컬럼은 서바이벌 전용 UPDATE에서만 사용). ⚠️맥 build+push. ※잔여 위험(룰렛과 동일): 지급됐는데 배지 마킹만 실패하면 새로고침 후 재실행 시 재지급 가능 → 배지 직접 클릭으로 지급완료 처리. ※생존자는 서버 확정 직후 지급(연출 종료 대기 안 함 → 연출 끊겨도 지급 누락 없음).
 - 2026-07-06 **방송 위젯 연출 2건**(표시 전용·돈/판정 무관, Cowork 세션): ①**상품위젯 축하 오버레이** — 주문 제출/입금확인/카드결제완료 토스트를 문자열 상단바 → **상품 카드를 살짝 덮는 딥로즈 오버레이**(아이콘+제목 "주문서 제출!"/"입금 확인!"+닉네임 크게+상품·금액, 3초 자동소멸·큐 순차 유지)로 교체. 폭죽 위치도 카드 위치(pos) 따라가게(드래그 이동 시 동행). toastQueue 구조화(문자열→객체), realtime 구독/중복가드/금액 컬럼(final_amount 우선) 무변경. ②**미션 위젯 기본멘트 교체**(사장님 지침) — 장면A "다 같이 구매할수록 바가 가득 차요!"→"🔥 지금 내 주문 하나가 전원 선물을 앞당겨요!"(구매욕·선물욕 자극형, 선물 금액 표시는 장면B 유지). tsc 0에러. ⚠️맥 build+push.
 - 2026-07-06 **[버그] 방송 ON 중 표가 항상 현재 방송만 보이던 문제 수정 + 컷 조건 확장·안내 배지**(사장님 제보 — 배지 매칭3·매출바 250,000원인데 표엔 2건만, "필터 걸어도 예전 주문 확인 불가"): LiveOrderTable baseOrders의 방송묶음 컷(broadcastStartedAt 이후만)이 필터 무관 무조건 적용이었음 → **컷은 "방송=현재 방송 AND 기간=전체(기본 화면)"일 때만** 적용, 방송/기간 필터 중 하나라도 바꾸면 해제(기간 오늘/7일/직접, 방송 전체보기/과거 방송 전부 과거 주문 표시 가능). 방송 중 기본 화면은 기존과 동일. + 컷 활성 시 헤더에 "이번 방송 주문만 표시 중 · 지난 주문은 기간/방송 필터 변경" 배지(뭘 보고 있는지 명시). 판정 시뮬 6/6 PASS. 표시 전용·돈 로직 무관. tsc 0에러. ⚠️맥 build+push.
 - 2026-07-06 **사이드바 예외 배지 클릭 이동 + 툴팁**(표시/필터 전용): 사장님 "매칭1·카드2가 뭔지 모르겠다" → 배지에 hover 툴팁(뜻 설명) + 클릭 시 주문·입금 화면으로 이동하며 기간/범위 전체 + 해당 상태 필터(manual_match_needed/card_unpaid) 자동 적용(과거 방송 건도 보이게 broadcast/date all — 전체 재조회는 기존 needsFullLoad 경로). AdminLiveSidebar 신규 prop onExceptionBadgeClick, Dashboard 핸들러. 배지 라벨에 "›" 붙여 클릭 가능함 표시. tsc 0에러. ⚠️맥 build+push.
@@ -212,10 +213,22 @@ git status
 - 맥 sed s///1은 줄마다 첫 매칭이라 여러 줄 다 바뀜 → 여러 줄 치환은 python 스크립트 사용
 - 긴 체인(sed+build+commit+push 한 줄)은 중간에 멎음 → 단계 분리
 
+## ★★ 고객 식별 원칙 (2026-07-09 사장님 확정 — 절대 어기지 말 것)
+- **고객의 정체성 = 카카오 계정이다.** (`customers.id` uuid PK / `customers.kakao_id`)
+- **전화번호·주소·이름·닉네임은 전부 "바뀔 수 있는 정보"다. 절대 식별 키로 쓰지 말 것.**
+- 고객이 번호를 바꾸든 주소를 바꾸든 **같은 사람**이다. 포인트·주문·이력이 전부 따라와야 한다.
+- ❌ 앞으로 어떤 세션에서도 "고객 식별은 customer_phone 기준" 이라고 말하거나 그렇게 설계하지 말 것.
+  (과거 진행상황 기록에 그런 문장이 남아 있으나 **폐기된 기준**이다.)
+- ⚠️ 현재 코드 실태(2026-07-09): `customer_point_balances` / `customer_point_ledger` 가
+  `customer_phone` 문자열로만 연결돼 있고 customers 와 **FK가 없다** → 번호 바꾸면 포인트가 고아가 된다.
+  실제 피해 확인됨(엘레강스 1,395P / 김민양 295P). **이전 대상: `customers.id` 기준으로 마이그레이션 진행 중.**
+- 신규 코드에서 포인트/회원 관련 조회·쓰기는 **customer_id 우선**, phone은 폴백/연락처로만.
+
 ## DB 규칙
 - 스키마 변경: ADD COLUMN only
 - canonical 테이블: orders (flat)
 - 입금 추적: deposits 테이블
+- 포인트 주인: `customers.id` (카카오 계정). `customer_phone`은 연락처일 뿐 식별자가 아님.
 
 ## DB 변경사항 — Supabase SQL Editor에서 직접 실행해야 적용됨 (커밋만으로는 미적용)
 포인트 관련 테이블: customer_point_balances(잔액), customer_point_ledger(이력, change_type grant/use/cancel/adjust/expire), customer_point_gifts는 ledger의 customer_visible+seen으로 표시.

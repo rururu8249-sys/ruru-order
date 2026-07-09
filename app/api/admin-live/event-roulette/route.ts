@@ -752,7 +752,10 @@ async function createEvent(body: Record<string, unknown>) {
   const sourceDate = normalizeDateText(body.sourceDate);
   const broadcastId = cleanBroadcastId(body.broadcastId);
   const title = cleanText(body.title) || DEFAULT_TITLE;
-  const eventKind = cleanText(body.eventKind) === "claw" ? "claw" : "roulette";
+  const rawEventKind = cleanText(body.eventKind);
+  // 기존 동작 보존: claw가 아니면 roulette. survival은 명시적으로 보낼 때만 분기.
+  const eventKind: "claw" | "survival" | "roulette" =
+    rawEventKind === "claw" ? "claw" : rawEventKind === "survival" ? "survival" : "roulette";
   const requestedCreateParticipants = normalizeManualParticipantsForEvent(body.participants);
   const rawParticipants = requestedCreateParticipants.length > 0
     ? requestedCreateParticipants
@@ -797,7 +800,11 @@ async function createEvent(body: Record<string, unknown>) {
   }
 
   const overlayBaseToken =
-    eventKind === "roulette" ? "roulette_luludongi_live" : "claw_luludongi_live";
+    eventKind === "roulette"
+      ? "roulette_luludongi_live"
+      : eventKind === "survival"
+        ? "survival_luludongi_live"
+        : "claw_luludongi_live";
   const overlayToken = `${overlayBaseToken}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const spinDurationMs = calculateRouletteSpinDurationMs(participants.length);
 
@@ -972,6 +979,181 @@ async function spinEvent(body: Record<string, unknown>) {
       total_weight: picked.totalWeight,
       random_value: picked.randomValue,
     },
+  });
+}
+
+// ── 서바이벌(생존게임) 전용 ────────────────────────────────────────────────
+// 서버가 최종 생존자 K명을 확정한다. 고정 당첨자 우선 → 나머지는 가중치 랜덤(중복 없이).
+//   * 룰렛/인형뽑기의 spinEvent(단일 당첨)와 완전히 분리된 별도 함수 — 기존 추첨/지급 로직 무변경.
+//   * 여기서 포인트 지급은 하지 않는다(생존자 명단 확정·기록까지). 지급은 기존 grant 흐름이 담당.
+async function resolveSurvivalEvent(body: Record<string, unknown>) {
+  const supabase = getSupabaseAdmin();
+  const eventId = cleanText(body.eventId);
+  const winnerNote = cleanText(body.winnerNote) || "서바이벌 생존";
+
+  if (!eventId) {
+    return json({ ok: false, message: "eventId가 없습니다." }, 400);
+  }
+
+  const { data: eventData, error: eventError } = await supabase
+    .from("event_roulette_events")
+    .select(
+      "id, title, overlay_token, mode, is_test, status, broadcast_id, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
+    )
+    .eq("id", eventId)
+    .single();
+
+  if (eventError || !eventData) {
+    return json({ ok: false, message: eventError?.message || "서바이벌 이벤트를 찾지 못했습니다." }, 404);
+  }
+
+  const event = eventData as RouletteEventRow;
+  const requestedParticipants = normalizeManualParticipantsForEvent(body.participants);
+  const participants = requestedParticipants.length > 0
+    ? requestedParticipants
+    : Array.isArray(event.participant_snapshot)
+      ? event.participant_snapshot
+      : [];
+
+  if (participants.length <= 0) {
+    return json({ ok: false, message: "서바이벌 참여자가 없습니다." }, 400);
+  }
+
+  // 생존자 수 K — 최소 1명, 참가자 수보다 적어야 함(전원 생존이면 게임이 성립 안 함)
+  const rawCount = Math.floor(safeNumber(body.winnerCount, 1)) || 1;
+  const winnerCount = Math.max(1, Math.min(rawCount, participants.length - 1));
+
+  const excludeDailyDup = body.excludeDailyDup !== false;
+  const deduped = excludeDailyDup
+    ? await applyNoDuplicateWinnerRule(supabase, participants, {
+        mode: event.mode,
+        isTest: event.is_test,
+        sourceDate: event.source_date,
+        broadcastId: cleanText(event.broadcast_id),
+        excludeEventId: event.id,
+      })
+    : { participants, excludedWinnerCount: 0 };
+  const eligible = deduped.participants;
+
+  const survivors: EventRouletteParticipant[] = [];
+  const takenKeys = new Set<string>();
+
+  // 1) 고정 당첨자(미리 지정) 먼저 확정. 관리자가 명시적으로 고른 것이라 중복제외 필터에 휘둘리지 않게 원본에서도 찾는다.
+  const fixedRaw = Array.isArray(body.fixedNicknames) ? body.fixedNicknames : [];
+  for (const item of fixedRaw) {
+    const nick = cleanText(item);
+    if (!nick) continue;
+    const key = normalizeWinnerNicknameForDedupe(nick);
+    if (takenKeys.has(key)) continue;
+
+    const found = findRequestedWinner(eligible, nick) || findRequestedWinner(participants, nick);
+    if (!found) {
+      return json({ ok: false, message: `고정한 당첨자 "${nick}" 가(이) 참여자 명단에 없습니다. 고정을 해제하거나 명단을 다시 확인해주세요.` }, 400);
+    }
+    if (survivors.length >= winnerCount) {
+      return json({ ok: false, message: `고정 당첨자가 생존자 수(${winnerCount}명)보다 많습니다.` }, 400);
+    }
+    survivors.push(found);
+    takenKeys.add(key);
+  }
+
+  // 2) 남은 자리는 가중치 랜덤으로 중복 없이 채운다(기존 pickRouletteWinner 재사용).
+  let pool = eligible.filter((p) => !takenKeys.has(normalizeWinnerNicknameForDedupe(p.nickname)));
+  while (survivors.length < winnerCount && pool.length > 0) {
+    const picked = pickRouletteWinner(pool);
+    const key = normalizeWinnerNicknameForDedupe(picked.winner.nickname);
+    survivors.push(picked.winner);
+    takenKeys.add(key);
+    pool = pool.filter((p) => normalizeWinnerNicknameForDedupe(p.nickname) !== key);
+  }
+
+  if (survivors.length < winnerCount) {
+    return json({ ok: false, message: `생존자 ${winnerCount}명을 뽑기에 참여자가 부족합니다. (뽑을 수 있는 인원 ${survivors.length}명)` }, 400);
+  }
+
+  const now = new Date().toISOString();
+  const spinDurationMs = calculateRouletteSpinDurationMs(participants.length);
+  const survivorNicknames = survivors.map((s) => s.nickname);
+
+  const { data: updatedEvent, error: updateError } = await supabase
+    .from("event_roulette_events")
+    .update({
+      status: "result",
+      winner_nickname: survivorNicknames[0] || null, // 기존 단일 필드 호환(첫 생존자)
+      winner_note: winnerNote,
+      winner_order_ids: survivors[0]?.orderIds || [],
+      survivor_nicknames: survivorNicknames, // 서바이벌 전용 신규 컬럼
+      winner_count: winnerCount,
+      spin_started_at: now,
+      spin_duration_ms: spinDurationMs,
+      result_at: now,
+      updated_at: now,
+      participant_snapshot: participants,
+    })
+    .eq("id", eventId)
+    .select(
+      "id, title, overlay_token, mode, is_test, status, broadcast_id, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
+    )
+    .single();
+
+  if (updateError || !updatedEvent) {
+    return json({
+      ok: false,
+      message:
+        (updateError?.message || "서바이벌 결과 저장 실패") +
+        " — survivor_nicknames 컬럼이 없다면 Supabase에서 supabase/sql/event_survival_columns.sql 을 먼저 실행하세요.",
+    }, 500);
+  }
+
+  // 생존자 K명을 당첨자 테이블에 각각 기록. 이미 있으면 건너뜀(재실행해도 중복 생성 안 됨).
+  const { data: existingRows } = await supabase
+    .from("event_roulette_winners")
+    .select("id, nickname")
+    .eq("event_id", eventId);
+
+  const existing = (Array.isArray(existingRows) ? existingRows : []) as { id?: unknown; nickname?: unknown }[];
+  const existingKeys = new Set(existing.map((r) => normalizeWinnerNicknameForDedupe(r.nickname)));
+  const toInsert = survivorNicknames.filter((n) => !existingKeys.has(normalizeWinnerNicknameForDedupe(n)));
+
+  let insertedRows: { id?: unknown; nickname?: unknown }[] = [];
+
+  if (toInsert.length > 0) {
+    const { data: inserted, error: insertError } = await supabase
+      .from("event_roulette_winners")
+      .insert(
+        toInsert.map((nickname) => ({
+          event_id: eventId,
+          nickname,
+          winner_note: winnerNote,
+          winner_at: now,
+          is_reward_done: false,
+          is_test: event.is_test,
+        }))
+      )
+      .select("id, nickname");
+
+    if (insertError) {
+      return json({ ok: false, message: insertError.message || "서바이벌 당첨자 저장 실패" }, 500);
+    }
+    insertedRows = (Array.isArray(inserted) ? inserted : []) as { id?: unknown; nickname?: unknown }[];
+  }
+
+  const allRows = [...existing, ...insertedRows];
+  // 클라가 재조회 없이 바로 지급/마킹할 수 있도록 당첨자 레코드 id를 닉네임과 짝지어 반환.
+  const winners = survivorNicknames.map((nickname) => {
+    const row = allRows.find(
+      (r) => normalizeWinnerNicknameForDedupe(r.nickname) === normalizeWinnerNicknameForDedupe(nickname)
+    );
+    return { nickname, winnerId: row ? String(row.id ?? "") : "" };
+  });
+
+  return json({
+    ok: true,
+    event: sanitizeEventForAdmin(updatedEvent as RouletteEventRow),
+    overlay_event: sanitizeEventForOverlayProbe(updatedEvent as RouletteEventRow),
+    winner_count: winnerCount,
+    survivors: survivorNicknames,
+    winners,
   });
 }
 
@@ -1194,6 +1376,7 @@ export async function POST(request: NextRequest) {
     if (action === "participants") return handleParticipantsPost(body);
     if (action === "create_event") return createEvent(body);
     if (action === "spin_event") return spinEvent(body);
+    if (action === "resolve_survival_event") return resolveSurvivalEvent(body);
     if (action === "mark_reward_done") return markRewardDone(body);
     if (action === "delete_winner") return deleteWinnerRecord(body);
     if (action === "delete_event") return deleteRouletteEvent(body);

@@ -9,6 +9,7 @@ type RouletteMode = "live" | "test" | "preview";
 
 const FIXED_OVERLAY_TOKEN = "roulette_luludongi_live";
 const FIXED_CLAW_OVERLAY_TOKEN = "claw_luludongi_live";
+const FIXED_SURVIVAL_OVERLAY_TOKEN = "survival_luludongi_live";
 
 type RouletteBroadcast = {
   id: string;
@@ -82,6 +83,16 @@ type EventPayload = {
   event?: RouletteEvent;
   saved?: boolean;
   winnerId?: string; // spin_event 응답: 방금 만든 당첨자 레코드 id(배지 마킹용, 재조회 없이 사용)
+};
+
+// resolve_survival_event 응답: 생존자 K명 + 각 당첨자 레코드 id(지급/마킹용)
+type SurvivalResolvePayload = {
+  ok: boolean;
+  message?: string;
+  event?: RouletteEvent;
+  winner_count?: number;
+  survivors?: string[];
+  winners?: { nickname: string; winnerId: string }[];
 };
 
 type EventsPayload = {
@@ -192,6 +203,12 @@ function buildClawOverlayUrl() {
   return `${window.location.origin}/event-claw/overlay?token=${encodeURIComponent(FIXED_CLAW_OVERLAY_TOKEN)}`;
 }
 
+function buildSurvivalOverlayUrl() {
+  if (typeof window === "undefined") return "";
+
+  return `${window.location.origin}/event-survival/live?token=${encodeURIComponent(FIXED_SURVIVAL_OVERLAY_TOKEN)}`;
+}
+
 async function copyText(value: string) {
   if (!value) {
     showAdminToast("복사할 위젯주소가 없습니다.", "warning");
@@ -237,7 +254,7 @@ export default function AdminLiveEventRoulettePanel({
   const [winners, setWinners] = useState<RouletteWinner[]>([]);
   const [loading, setLoading] = useState(false);
   const [spinning, setSpinning] = useState(false);
-  const [eventTab, setEventTab] = useState<"roulette" | "claw" | "mission">("claw");
+  const [eventTab, setEventTab] = useState<"roulette" | "claw" | "mission" | "survival">("claw");
   const [participantSource, setParticipantSource] = useState<"auto" | "paid" | "manual">("auto");
   const [manualParticipantText, setManualParticipantText] = useState("");
   const [fixedWinnerNickname, setFixedWinnerNickname] = useState("");
@@ -245,6 +262,9 @@ export default function AdminLiveEventRoulettePanel({
   const [showParticipantList, setShowParticipantList] = useState(false);
   const [giftType, setGiftType] = useState<"point" | "custom">("point");
   const [giftPointAmount, setGiftPointAmount] = useState("");
+  // 서바이벌(생존게임) 전용 상태 — 다른 탭 로직에는 영향 없음
+  const [survivorCount, setSurvivorCount] = useState(1); // 최종 생존자(당첨자) 수 K
+  const [fixedSurvivorNicknames, setFixedSurvivorNicknames] = useState<string[]>([]); // 미리 지정한 고정 당첨자(다중, 최대 K)
   // 시안 신규 UI 상태 (추첨 로직 무변경 — 표시/선택용)
   const [excludeDailyDup, setExcludeDailyDup] = useState(true);
   const [useWeight, setUseWeight] = useState(false);
@@ -254,6 +274,7 @@ export default function AdminLiveEventRoulettePanel({
 
   const overlayUrl = useMemo(() => buildOverlayUrl(currentEvent), [currentEvent]);
   const clawOverlayUrl = useMemo(() => buildClawOverlayUrl(), []);
+  const survivalOverlayUrl = useMemo(() => buildSurvivalOverlayUrl(), []);
 
   const manualParticipants = useMemo<RouletteParticipant[]>(() => {
     const seen = new Set<string>();
@@ -550,6 +571,123 @@ export default function AdminLiveEventRoulettePanel({
       if (evId) grantedEventIdsRef.current.delete(evId); // 실패 시 잠금 해제(재시도 허용)
       showAdminToast("포인트 자동지급 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
     }
+  };
+
+  // ── 서바이벌(생존게임) 전용 지급 ─────────────────────────────────────────
+  // 왜 별도 함수인가: 위 grantPointToWinner는 "이벤트당 당첨자 1명" 전제라 dedup 키가 eventId다.
+  //   서바이벌은 한 이벤트에 생존자 K명이라 그대로 쓰면 1명 지급 후 나머지가 전부 skip된다.
+  //   → 돈이 나가는 API·전화번호 조회는 100% 동일하게 쓰고, 중복 가드 키만 winnerId(당첨자 행) 단위로 바꿈.
+  //   ⚠ 기존 grantPointToWinner / 룰렛 / 인형뽑기 지급 로직은 무변경.
+  const grantedWinnerIdsRef = useRef<Set<string>>(new Set()); // 세션 중복지급 가드(당첨자 행 단위)
+
+  // 닉네임 → 전화번호 (grantPointToWinner와 동일한 3단계 조회, 읽기 전용)
+  const findWinnerPhone = async (nick: string) => {
+    const digitsOf = (v: unknown) => String(v || "").replace(/[^0-9]/g, "");
+    let phone = "";
+    {
+      const { data: oRow } = await supabase
+        .from("orders").select("customer_phone")
+        .eq("youtube_nickname", nick)
+        .order("created_at", { ascending: false }).limit(1).maybeSingle();
+      phone = digitsOf((oRow as { customer_phone?: unknown } | null)?.customer_phone);
+    }
+    if (!phone) {
+      const { data: cRows } = await supabase
+        .from("customers").select("customer_phone")
+        .eq("youtube_nickname", nick)
+        .order("last_order_at", { ascending: false }).limit(1);
+      phone = digitsOf((cRows as { customer_phone?: unknown }[] | null)?.[0]?.customer_phone);
+    }
+    if (!phone) {
+      const { data: kRows } = await supabase
+        .from("customers").select("customer_phone")
+        .eq("kakao_nickname", nick).limit(1);
+      phone = digitsOf((kRows as { customer_phone?: unknown }[] | null)?.[0]?.customer_phone);
+    }
+    return phone;
+  };
+
+  // 생존자 K명에게 각각 amount 포인트 지급. 한 명 실패해도 나머지는 계속 진행.
+  //   중복지급 방지 2중: ① 세션 ref(winnerId) ② DB의 is_reward_done(그 당첨자 행) 확인 후 지급, 성공 시 즉시 잠금.
+  const grantPointToSurvivors = async (
+    survivorWinners: { nickname: string; winnerId: string }[],
+    amount: number,
+    reason: string
+  ) => {
+    const paid: string[] = [];
+    const skipped: string[] = [];
+    const failed: string[] = [];
+
+    for (const w of survivorWinners) {
+      const nick = String(w.nickname || "").trim();
+      const winnerId = String(w.winnerId || "").trim();
+
+      if (!nick || !winnerId) {
+        failed.push(`${nick || "?"}(당첨 레코드 없음)`);
+        continue;
+      }
+      if (grantedWinnerIdsRef.current.has(winnerId)) {
+        skipped.push(nick);
+        continue;
+      }
+
+      // 영구 게이트: 이 당첨자 행이 이미 지급완료면 skip (재실행/새로고침/다른 탭 포함)
+      const { data: wRow } = await supabase
+        .from("event_roulette_winners").select("is_reward_done")
+        .eq("id", winnerId).maybeSingle();
+      if ((wRow as { is_reward_done?: boolean } | null)?.is_reward_done) {
+        grantedWinnerIdsRef.current.add(winnerId);
+        skipped.push(nick);
+        continue;
+      }
+
+      grantedWinnerIdsRef.current.add(winnerId); // 선점 잠금(실패 시 아래에서 해제)
+
+      try {
+        const phone = await findWinnerPhone(nick);
+        if (!phone) {
+          grantedWinnerIdsRef.current.delete(winnerId); // 지급 안 됐으니 해제
+          failed.push(`${nick}(전화번호 없음)`);
+          continue;
+        }
+
+        const payload = await requestJson<{ ok: boolean; message?: string }>("/api/admin-live/customer-points", {
+          method: "POST",
+          body: JSON.stringify({
+            phone,
+            action: "grant",
+            amount,
+            reason: reason || "서바이벌 생존",
+            youtube_nickname: nick,
+            customer_visible: true,
+          }),
+        });
+        if (!payload.ok) throw new Error(payload.message || "포인트 지급 실패");
+
+        // 지급 성공 → 그 당첨자 행만 지급완료로 잠금(영구 중복지급 게이트)
+        const markRes = await requestJson<{ ok: boolean; message?: string }>("/api/admin-live/event-roulette", {
+          method: "POST",
+          body: JSON.stringify({ action: "mark_reward_done", winnerId, isRewardDone: true }),
+        }).catch((e) => ({ ok: false, message: e instanceof Error ? e.message : String(e) }));
+
+        if (!markRes.ok) {
+          // 포인트는 이미 지급됨(재지급 X). 배지 표시만 실패 → 운영자가 직접 배지 클릭하도록 안내.
+          showAdminToast(`${nick} 포인트는 지급됐지만 '지급완료' 배지 표시에 실패했어요. 배지를 직접 눌러주세요.`, "warning");
+        }
+        paid.push(nick);
+      } catch (e) {
+        grantedWinnerIdsRef.current.delete(winnerId); // 실패 시 잠금 해제(재시도 허용)
+        failed.push(`${nick}(${e instanceof Error ? e.message : String(e)})`);
+      }
+    }
+
+    await loadEventsAndWinners();
+
+    const lines = [`⛈️ 서바이벌 포인트 지급 결과`];
+    if (paid.length) lines.push(`✅ 지급 ${paid.length}명: ${paid.join(", ")} (각 ${amount.toLocaleString("ko-KR")}P)`);
+    if (skipped.length) lines.push(`⏭️ 이미 지급됨 ${skipped.length}명: ${skipped.join(", ")}`);
+    if (failed.length) lines.push(`❌ 실패 ${failed.length}명: ${failed.join(", ")}\n→ 실패한 사람은 회원상세에서 수동 지급해주세요.`);
+    showAdminToast(lines.join("\n"), failed.length ? "warning" : "success");
   };
 
   const openEventPanel = () => {
@@ -917,6 +1055,101 @@ export default function AdminLiveEventRoulettePanel({
     }
   };
 
+  // 서바이벌(생존게임) 실행.
+  //   ① create_event(eventKind:"survival")로 이벤트 생성 → ② resolve_survival_event로 서버가 생존자 K명 확정
+  //   (고정 당첨자 우선 → 나머지 가중치 랜덤). 방송 위젯은 그 결과를 폴링해 연출을 재생한다.
+  //   포인트 지급은 여기서 하지 않는다(Phase 4에서 기존 grant 흐름 연결).
+  const startSurvivalEvent = async () => {
+    if (finalParticipants.length === 0) {
+      showAdminToast("참가자 명단이 없습니다. 자동 명단을 불러오거나 수동 참가자를 입력해주세요.", "warning");
+      return;
+    }
+    if (survivorCount < 1 || survivorCount >= finalParticipants.length) {
+      showAdminToast(`생존자 수는 1명 이상, 참가자 수(${finalParticipants.length}명)보다 적어야 합니다.`, "warning");
+      return;
+    }
+    if (fixedSurvivorNicknames.length > survivorCount) {
+      showAdminToast(`고정 당첨자(${fixedSurvivorNicknames.length}명)가 생존자 수(${survivorCount}명)보다 많습니다.`, "warning");
+      return;
+    }
+
+    // 실제 돈이 나가므로 총 지급액을 먼저 확인시킨다(운영모드 + 포인트 선물일 때만).
+    const gAmountPre = Number(String(giftPointAmount || "").replace(/[^0-9]/g, "")) || 0;
+    if (mode === "live" && giftType === "point" && gAmountPre > 0) {
+      const totalPre = gAmountPre * survivorCount;
+      if (!window.confirm(
+        `⛈️ 서바이벌을 시작합니다.\n\n생존자 ${survivorCount}명 × ${gAmountPre.toLocaleString("ko-KR")}P` +
+        `\n= 총 ${totalPre.toLocaleString("ko-KR")}P 가 실제로 지급됩니다.\n\n진행할까요?`
+      )) return;
+    }
+
+    setCurrentEvent(null); // 이전 결과 표시 제거 후 새 판
+    setSpinning(true);
+
+    try {
+      const createPayload = await requestJson<EventPayload>("/api/admin-live/event-roulette", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "create_event",
+          mode,
+          sourceDate,
+          broadcastId,
+          title,
+          participantSource,
+          participants: finalParticipants,
+          eventKind: "survival",
+          excludeDailyDup,
+        }),
+      });
+
+      if (!createPayload.ok || !createPayload.event) {
+        throw new Error(createPayload.message || "서바이벌 이벤트 생성 실패");
+      }
+
+      const eventId = createPayload.event.id;
+
+      const resolvePayload = await requestJson<SurvivalResolvePayload>("/api/admin-live/event-roulette", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "resolve_survival_event",
+          eventId,
+          winnerCount: survivorCount,
+          fixedNicknames: fixedSurvivorNicknames,
+          winnerNote,
+          participants: finalParticipants,
+          excludeDailyDup,
+        }),
+      });
+
+      if (!resolvePayload.ok) {
+        throw new Error(resolvePayload.message || "서바이벌 생존자 확정 실패");
+      }
+
+      setCurrentEvent(resolvePayload.event || null);
+      const survivors = resolvePayload.survivors || [];
+      showAdminToast(
+        `⛈️ 서바이벌 생존자 ${survivors.length}명 확정!\n${survivors.join(", ")}\n\n방송 위젯에서 연출이 시작됩니다.`,
+        "success"
+      );
+
+      // 포인트 자동지급 — 룰렛과 동일한 게이트: 운영(live) 모드 + 선물=포인트 + 금액>0 일 때만.
+      //   생존자는 서버가 이미 확정했으므로 연출 종료를 기다리지 않고 바로 지급한다(연출이 끊겨도 지급 누락 없음).
+      const gAmount = Number(String(giftPointAmount || "").replace(/[^0-9]/g, "")) || 0;
+      if (giftType === "point" && gAmount > 0 && mode === "live") {
+        await grantPointToSurvivors(resolvePayload.winners || [], gAmount, winnerNote || "서바이벌 생존");
+      } else {
+        if (giftType === "point" && gAmount > 0) {
+          showAdminToast("테스트 모드라 포인트 자동지급은 건너뜁니다.", "info");
+        }
+        void loadEventsAndWinners();
+      }
+    } catch (error) {
+      showAdminToast("서바이벌 실행 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
+    } finally {
+      setSpinning(false);
+    }
+  };
+
   const startRouletteOneClick = async () => {
     if (finalParticipants.length === 0) {
       showAdminToast("먼저 주문서 명단을 불러오거나 수동 참가자를 입력해주세요.", "warning");
@@ -1105,9 +1338,9 @@ export default function AdminLiveEventRoulettePanel({
     if (mode === "live" && giftType === "point" && amt <= 0) {
       if (!window.confirm("⚠️ 당첨자에게 줄 포인트 금액이 비어 있어요 (0P).\n이대로 돌리면 포인트 자동지급이 안 됩니다.\n\n‘당첨 내용(포인트)’에 금액을 먼저 입력하세요.\n\n그래도 그냥 돌릴까요?")) return;
     }
-    (eventTab === "roulette" ? startRouletteOneClick : startClawEvent)();
+    (eventTab === "roulette" ? startRouletteOneClick : eventTab === "survival" ? startSurvivalEvent : startClawEvent)();
   };
-  const widgetUrl = eventTab === "roulette" ? overlayUrl : clawOverlayUrl;
+  const widgetUrl = eventTab === "roulette" ? overlayUrl : eventTab === "survival" ? survivalOverlayUrl : clawOverlayUrl;
   const periodChips: { key: "today" | "week" | "month" | "date"; label: string }[] = [
     { key: "today", label: "오늘" },
     { key: "week", label: "이번주" },
@@ -1138,6 +1371,8 @@ export default function AdminLiveEventRoulettePanel({
                     onClick={() => { setEventTab("claw"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>인형뽑기</span>
                   <span className="badge" style={{ padding: "4px 14px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "mission" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "mission" ? "#fff" : "var(--mut)" }}
                     onClick={() => { setEventTab("mission"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>🎯 미션 게이지</span>
+                  <span className="badge" style={{ padding: "4px 14px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "survival" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "survival" ? "#fff" : "var(--mut)" }}
+                    onClick={() => { setEventTab("survival"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>⛈️ 서바이벌</span>
                   <span style={{ width: "1px", height: "18px", background: "var(--bd)", margin: "0 3px" }} />
                   <span className="badge" style={{ padding: "4px 10px", cursor: "pointer", border: "1px solid var(--bd)", background: mode === "test" ? "var(--amber-bg)" : "var(--color-surface)", color: mode === "test" ? "var(--amber)" : "var(--mut)" }} onClick={() => changeMode("test")}>테스트</span>
                   <span className="badge" style={{ padding: "4px 10px", cursor: "pointer", border: "1px solid var(--bd)", background: mode === "live" ? "var(--green-bg)" : "var(--color-surface)", color: mode === "live" ? "var(--green)" : "var(--mut)" }} onClick={() => changeMode("live")}>운영</span>
@@ -1160,6 +1395,12 @@ export default function AdminLiveEventRoulettePanel({
                       <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
                         <span style={{ fontSize: "12px", color: "var(--rose)", fontWeight: 600 }}>{finalParticipants.length}명</span>
                       </div>
+                    </div>
+                  ) : eventTab === "survival" ? (
+                    <div style={{ width: "150px", height: "150px", borderRadius: "16px", background: "var(--color-surface)", border: "1px solid var(--bd)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "5px" }}>
+                      <span style={{ fontSize: "44px", lineHeight: 1 }}>⛈️</span>
+                      <span style={{ fontSize: "12px", color: "var(--rose)", fontWeight: 600 }}>서바이벌 · {finalParticipants.length}명</span>
+                      <span style={{ fontSize: "11px", color: "var(--mut2)" }}>생존 {survivorCount}명</span>
                     </div>
                   ) : (
                     <div style={{ width: "150px", height: "150px", borderRadius: "16px", background: "var(--color-surface)", border: "1px solid var(--bd)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "6px" }}>
@@ -1202,20 +1443,45 @@ export default function AdminLiveEventRoulettePanel({
                     <span style={{ fontSize: "11px" }}>많이 산 사람 확률 ↑ <span style={{ color: "var(--mut2)" }}>(금액40%+당일60%)</span></span>
                     <span className={`tog ${useWeight ? "on" : "off"}`}><i /></span>
                   </div>
+                  {eventTab === "survival" ? (
+                    <div style={{ background: "var(--rose-bg)", border: "1px solid var(--rose-bd)", borderRadius: "7px", padding: "8px 11px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontSize: "11px", color: "var(--rose)", fontWeight: 600 }}>생존자(당첨자) 수</span>
+                      <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                        <button className="btn" style={{ height: "auto", padding: "2px 9px" }} onClick={() => setSurvivorCount((v) => Math.max(1, v - 1))}>−</button>
+                        <input className="ipt" style={{ width: "48px", textAlign: "center", padding: "4px" }} inputMode="numeric" value={survivorCount}
+                          onChange={(e) => { const d = Number(e.target.value.replace(/[^0-9]/g, "")) || 1; setSurvivorCount(Math.max(1, d)); }} />
+                        <button className="btn" style={{ height: "auto", padding: "2px 9px" }} onClick={() => setSurvivorCount((v) => v + 1)}>+</button>
+                        <span style={{ fontSize: "11px", color: "var(--mut2)" }}>명</span>
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
               {/* 당첨 고정 */}
               <div style={{ border: "1px solid var(--rose-bd)", background: "var(--rose-bg)", borderRadius: "8px", padding: "9px 11px", marginBottom: "11px" }}>
-                <div style={{ fontSize: "11px", color: "var(--rose)", fontWeight: 600, marginBottom: "7px" }}>🎯 당첨 고정 (명단에서 닉네임 클릭)</div>
+                <div style={{ fontSize: "11px", color: "var(--rose)", fontWeight: 600, marginBottom: "7px" }}>🎯 당첨 고정 (명단에서 닉네임 클릭){eventTab === "survival" ? ` · 최대 ${survivorCount}명` : ""}</div>
                 <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", maxHeight: "92px", overflowY: "auto" }}>
                   {finalParticipants.length === 0 ? (
                     <span className="note">참가자를 먼저 불러오세요.</span>
                   ) : (
                     finalParticipants.map((p, i) => {
-                      const on = fixedWinnerNickname === p.nickname;
+                      const on = eventTab === "survival" ? fixedSurvivorNicknames.includes(p.nickname) : fixedWinnerNickname === p.nickname;
+                      const toggleFixed = () => {
+                        if (eventTab === "survival") {
+                          setFixedSurvivorNicknames((prev) =>
+                            prev.includes(p.nickname)
+                              ? prev.filter((n) => n !== p.nickname)
+                              : prev.length >= survivorCount
+                                ? prev
+                                : [...prev, p.nickname]
+                          );
+                        } else {
+                          setFixedWinnerNickname(on ? "" : p.nickname);
+                        }
+                      };
                       return (
-                        <span key={`fix-${p.nickname}-${i}`} className={`nick ${on ? "win" : ""}`} onClick={() => setFixedWinnerNickname(on ? "" : p.nickname)}>{on ? "👑 " : ""}{p.nickname}</span>
+                        <span key={`fix-${p.nickname}-${i}`} className={`nick ${on ? "win" : ""}`} onClick={toggleFixed}>{on ? "👑 " : ""}{p.nickname}</span>
                       );
                     })
                   )}
@@ -1266,7 +1532,7 @@ export default function AdminLiveEventRoulettePanel({
                   filteredWinners.map((w) => (
                     <div key={`winner-${w.id}`} className="row">
                       <span className="note" style={{ width: "120px", flexShrink: 0 }}>{dateTimeFull(w.winner_at)}</span>
-                      <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.is_test ? "테스트" : "운영"} · {(() => { const ev = events.find((e) => e.id === w.event_id); const token = ev?.overlay_token || ""; return token.startsWith("roulette") ? "🎡룰렛" : token.startsWith("claw") ? "🪆인형뽑기" : "이벤트"; })()} · 당첨 <b>{w.nickname}</b> · {w.winner_note || "이벤트 당첨"}</span>
+                      <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.is_test ? "테스트" : "운영"} · {(() => { const ev = events.find((e) => e.id === w.event_id); const token = ev?.overlay_token || ""; return token.startsWith("roulette") ? "🎡룰렛" : token.startsWith("claw") ? "🪆인형뽑기" : token.startsWith("survival") ? "⛈️서바이벌" : "이벤트"; })()} · 당첨 <b>{w.nickname}</b> · {w.winner_note || "이벤트 당첨"}</span>
                       <span className={`badge ${w.is_reward_done ? "b-ok" : "b-card"}`} style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => markRewardDone(w, !w.is_reward_done)}>{w.is_reward_done ? "지급완료" : "지급대기"}</span>
                       <span className="note" style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => void deleteWinnerRecord(w)}>삭제</span>
                     </div>
