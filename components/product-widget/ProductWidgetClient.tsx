@@ -71,6 +71,32 @@ function stockLabel(p: AnyProduct | null): string {
   return `남은 ${Math.max(0, stock)}`;
 }
 
+// [2026-07-09] 품절 판정 — 고객 주문페이지 isSoldOutOrderProduct(app/order/page.tsx:775)와 동일 기준.
+//   * 재고관리 OFF면 품절 처리 안 함(레거시 상품 보호)
+//   * 옵션 상품 → 모든 옵션 재고가 0일 때만 품절
+//   * 옵션 없는 상품 → 총재고 0일 때 품절
+//   읽기 전용(주문/재고 로직 무관, 표시만).
+function isSoldOutWidgetProduct(p: AnyProduct | null): boolean {
+  if (!p) return false;
+  let note: any = p.product_note;
+  if (typeof note === "string") {
+    try {
+      note = JSON.parse(note);
+    } catch {
+      note = null;
+    }
+  }
+  if (note?.stock_management_enabled !== true) return false;
+
+  const variants = Array.isArray(note?.stock_variants) ? note.stock_variants : [];
+  if (variants.length > 0) {
+    return variants.every((v: any) => Number(v?.stock ?? 0) <= 0);
+  }
+
+  const stock = Number(p.stock ?? p.total_stock);
+  return Number.isFinite(stock) && stock <= 0;
+}
+
 // 입금확인 폭죽 파티클(표시 전용) — 좌하단에서 위/바깥으로 흩어짐. 브랜드 톤(버건디/핑크/골드).
 const CONFETTI_PIECES = [
   { tx: "-46px", ty: "-70px", r: "200deg", color: "#7B2D43", size: 8, round: false, dur: 1.2 },
@@ -101,6 +127,8 @@ export default function ProductWidgetClient() {
   // 입금확인 폭죽(표시 전용). key 증가로 애니메이션 재시작, on으로 1회 표시.
   const [confettiKey, setConfettiKey] = useState(0);
   const [confettiOn, setConfettiOn] = useState(false);
+  // 주문/취소 실시간 이벤트가 오면 상품(재고)을 즉시 다시 읽기 위한 핸들
+  const reloadProductsRef = useRef<null | (() => void)>(null);
 
   // 위젯 위치 — 운영자가 드래그해서 원하는 곳에 두면 기억(localStorage, 보기 상태 전용·돈 로직 무관).
   // 저장 전(null)에는 기본 좌하단(left:24/bottom:24) 유지.
@@ -186,10 +214,17 @@ export default function ProductWidgetClient() {
         /* 로드 실패해도 위젯은 빈 화면 유지 */
       }
     };
+    // [2026-07-09] 주문이 들어오면 실시간 구독 쪽에서 이 함수를 불러 재고를 즉시 다시 읽는다.
+    //   (평소 20초 폴링은 관리자 재고 수정 등 다른 변경 대비용으로 그대로 유지)
+    reloadProductsRef.current = () => {
+      void load();
+    };
+
     void load();
     const timer = window.setInterval(() => void load(), 20000);
     return () => {
       alive = false;
+      reloadProductsRef.current = null;
       window.clearInterval(timer);
     };
   }, []);
@@ -284,7 +319,8 @@ export default function ProductWidgetClient() {
   const current = pinned || rotation[rotIndex] || null;
   const img = imageOf(current);
   const colors = colorsOf(current); // 색상만 표시(사이즈는 제외)
-  const stock = stockLabel(current);
+  const soldOut = isSoldOutWidgetProduct(current);
+  const stock = soldOut ? "" : stockLabel(current); // 품절이면 "남은 0" 대신 SOLD OUT 오버레이로 알림
 
   // [2026-07-09] 시안 반영: 정사각형(1:1) 카드. 이미지가 카드를 채우고, 하단에 상품명[옵션]·금액.
   //   주문 제출/입금 확인 시 카드 위를 초록 "주문성공!" 오버레이가 덮는다(3초 자동 소멸).
@@ -338,6 +374,22 @@ export default function ProductWidgetClient() {
 
             {pinned ? (
               <span style={{ position: "absolute", top: "7px", right: "8px", zIndex: 3, fontSize: "15px" }}>📌</span>
+            ) : null}
+
+            {/* 품절 오버레이 — 고객페이지와 동일 기준. 주문/입금 배너(zIndex 5)는 이 위에 뜬다. */}
+            {soldOut ? (
+              <div
+                style={{
+                  position: "absolute", inset: 0, zIndex: 4,
+                  background: "rgba(0,0,0,0.55)",
+                  display: "flex", flexDirection: "column",
+                  alignItems: "center", justifyContent: "center", gap: "4px",
+                  pointerEvents: "none",
+                }}
+              >
+                <span style={{ fontSize: "13px", fontWeight: 900, letterSpacing: "0.12em", color: "#fff" }}>SOLD OUT</span>
+                <span style={{ fontSize: "11px", fontWeight: 800, color: "rgba(255,255,255,0.85)" }}>품절</span>
+              </div>
             ) : null}
 
             {/* 하단: 상품명[옵션] + 금액 */}
