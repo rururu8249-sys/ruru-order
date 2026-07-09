@@ -48,9 +48,34 @@ function sizesOf(p: AnyProduct | null): string {
   return p ? joinOptionValues(p.size_options ?? p.sizes ?? p.size ?? p.product_sizes) : "";
 }
 
+// [2026-07-09] "없음"류 값 제거 — 상품에 색상이 없으면 color_options에 문자 그대로 "없음"이 저장돼 있어
+//   위젯에 `[없음]`으로 찍히던 문제. 고객 주문페이지와 동일하게 이런 값은 옵션으로 안 친다.
+// 배경(그라데이션) 없이도 밝은 상품 사진 위에서 글씨가 읽히도록 하는 검정 아웃라인.
+//   다방향 text-shadow로 테두리를 만들고, 마지막에 약한 그림자로 입체감만 살짝.
+const OUTLINE_TEXT =
+  "-2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000," +
+  "-2px 0 0 #000, 2px 0 0 #000, 0 -2px 0 #000, 0 2px 0 #000, 0 3px 8px rgba(0,0,0,0.55)";
+const OUTLINE_TEXT_SM =
+  "-1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000," +
+  "0 2px 6px rgba(0,0,0,0.5)";
+
+const EMPTY_OPTION_WORDS = new Set(["없음", "없슴", "무", "-", "none", "n/a", "na"]);
+function cleanOptionText(raw: string): string {
+  return raw
+    .split(" · ")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0 && !EMPTY_OPTION_WORDS.has(s.toLowerCase()))
+    .join(" · ");
+}
+
 // 색상 옵션 — 기존엔 이 함수/렌더가 없어서 색상이 표시되지 않았음
 function colorsOf(p: AnyProduct | null): string {
-  return p ? joinOptionValues(p.color_options ?? p.colors ?? p.color ?? p.product_colors) : "";
+  return p ? cleanOptionText(joinOptionValues(p.color_options ?? p.colors ?? p.color ?? p.product_colors)) : "";
+}
+
+// 사이즈 옵션 — 방송에서 "사이즈 뭐 있어요?"를 줄이기 위해 위젯에도 표시
+function sizeTextOf(p: AnyProduct | null): string {
+  return p ? cleanOptionText(sizesOf(p)) : "";
 }
 
 // 재고 "표시" 의도가 있을 때만 노출 — stock_management_enabled 이고 숫자일 때 "남은 N"
@@ -335,7 +360,10 @@ export default function ProductWidgetClient() {
 
   const current = pinned || rotation[rotIndex] || null;
   const img = imageOf(current);
-  const colors = colorsOf(current); // 색상만 표시(사이즈는 제외)
+  const colors = colorsOf(current);
+  const sizeText = sizeTextOf(current);
+  // 색상 · 사이즈를 한 줄로. 둘 다 없으면 아예 안 그림("없음" 표시 금지)
+  const optionText = [colors, sizeText].filter(Boolean).join("  |  ");
   const soldOut = isSoldOutWidgetProduct(current);
   const stock = soldOut ? "" : stockLabel(current); // 품절이면 "남은 0" 대신 SOLD OUT 오버레이로 알림
 
@@ -386,8 +414,8 @@ export default function ProductWidgetClient() {
               <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "56px", opacity: 0.8 }}>👟</div>
             )}
 
-            {/* 하단 가독성 그라데이션 */}
-            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "58%", background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.88) 100%)" }} />
+            {/* [2026-07-09] 상품이 가려져서 하단 어두운 그라데이션 제거.
+                대신 글씨에 검정 아웃라인(다방향 text-shadow)을 둘러 배경 없이도 또렷하게 읽히게 함. */}
 
             {pinned ? (
               <span style={{ position: "absolute", top: "7px", right: "8px", zIndex: 3, fontSize: "15px" }}>📌</span>
@@ -409,25 +437,37 @@ export default function ProductWidgetClient() {
               </div>
             ) : null}
 
-            {/* 하단: 상품명[옵션] + 금액 */}
+            {/* 하단: 상품명 / 옵션(색상·사이즈) / 금액 — 배경 없이 아웃라인 글씨만 */}
             <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 2, padding: "10px 11px 11px" }}>
               <div
                 style={{
-                  fontSize: "14px", fontWeight: 800, lineHeight: 1.3,
-                  textShadow: "0 1px 6px rgba(0,0,0,0.8)",
+                  fontSize: "15px", fontWeight: 900, lineHeight: 1.3, color: "#fff",
+                  textShadow: OUTLINE_TEXT,
                   overflow: "hidden", textOverflow: "ellipsis",
                   display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", wordBreak: "break-all",
                 }}
               >
                 {nameOf(current)}
-                {colors ? <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.82)" }}>{` [${colors}]`}</span> : null}
               </div>
+
+              {optionText ? (
+                <div
+                  style={{
+                    marginTop: "2px", fontSize: "12px", fontWeight: 800, color: "#fff",
+                    textShadow: OUTLINE_TEXT_SM,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}
+                >
+                  {optionText}
+                </div>
+              ) : null}
+
               <div style={{ marginTop: "3px", display: "flex", alignItems: "baseline", gap: "7px" }}>
-                <span style={{ fontSize: "18px", fontWeight: 900, color: "#fff", textShadow: "0 1px 6px rgba(0,0,0,0.85)" }}>
+                <span style={{ fontSize: "20px", fontWeight: 900, color: "#fff", textShadow: OUTLINE_TEXT }}>
                   {priceOf(current).toLocaleString("ko-KR")}원
                 </span>
                 {stock ? (
-                  <span style={{ fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.75)" }}>{stock}</span>
+                  <span style={{ fontSize: "11px", fontWeight: 800, color: "#fff", textShadow: OUTLINE_TEXT_SM }}>{stock}</span>
                 ) : null}
               </div>
             </div>
