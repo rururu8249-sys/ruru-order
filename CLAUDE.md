@@ -233,8 +233,17 @@ git status
   트리거는 exception을 삼키고 warning만 남김 → customers 저장(주문 제출) 절대 안 막음(주소 트리거와 동일 방침).
   ③`trg_fill_point_customer_id_*` — 신규 포인트 행에 customer_id 자동 채움. **돈 계산·지급 RPC/API 무변경. 시뮬 17/17 PASS.**
   → **차단 우회도 함께 해결**(차단 행이 새 번호로 따라감).
-- 🔴 미해결(방송 없는 날 진행): ①1인당 구매제한 우회(`assertPurchaseLimit`이 orders.customer_phone 누적 → 번호 바꾸면 리셋)
-  ②주문취소 실패 위험(`order_point_cancel_restore_rpc.sql:145-153` 잔액 row 없으면 raise exception → 취소 트랜잭션 전체 실패)
+- ✅ 2026-07-09 **남은 2건도 해결**:
+  ①**1인당 구매제한 우회 차단** — `assertPurchaseLimit`(submit route)이 `kakao_id` 기준 누적으로 전환
+  (`kakao_id.eq.X` OR `and(kakao_id.is.null, customer_phone.eq.현재번호)`). kakao_id 없으면 기존 전화번호 폴백(회귀 0).
+  ②**주문취소 실패 위험 제거** — `cancel_order_and_restore_points` 3단 폴백으로 교체
+  (`supabase/sql/order_point_cancel_restore_fix_20260709.sql`): ①주문 번호로 잔액 찾기 → ②없으면 주문의 kakao_id로
+  고객 **현재 번호**를 찾아 재시도 → ③그래도 없으면 잔액 row를 생성해 복구. **`raise exception` 제거**(번호 자체가 없는 주문만 예외).
+  ledger/balance 모두 "실제 잔액이 있는 번호"에 기록 → 고아 재발 0. **복구 금액식·중복복구 차단·정산/입금 계산 무변경.**
+  ③트리거 `trg_sync_identity_on_phone_change`에 (d) 추가 — 번호 변경 시 **옛 주문에 kakao_id 스탬프**(주문의 번호·금액·상태는 불변).
+  검수 tsc 0 + **시뮬 16/16 PASS**(우회 차단·회귀 0·취소 항상 성공·중복복구 방지).
+  ⚠️ Supabase에 `order_point_cancel_restore_fix_20260709.sql` + 갱신된 `point_identity_sync_trigger.sql` 실행 필요.
+- ※ 입금 자동매칭은 `orders.youtube_nickname`(주문 시점 스냅샷)+금액 기준이라 **고객이 닉네임을 바꿔도 과거 주문 매칭은 안 깨진다**(2026-07-09 확인).
 
 ## DB 규칙
 - 스키마 변경: ADD COLUMN only

@@ -176,7 +176,10 @@ const normalizeOrderRowsForSubmitSettings = async (
 };
 
 // 개인당 구매제한(상품관리 product_note.purchase_limit_enabled/qty) 서버 강제 검증.
-// - 카톡 계정 = 전화번호(숫자만)로 1:1 연결되므로 전화번호 누적으로 집계(방송 무관, 끌 때까지 적용).
+// - ★ 고객 식별 = 카카오 계정(kakao_id). 전화번호는 폴백일 뿐이다.
+//   전화번호로만 누적하면 번호를 바꾸는 순간 제한이 리셋돼 우회가 가능했다(2026-07-09 수정).
+//   kakao_id 가 있으면 [kakao_id 일치] 또는 [kakao_id 없는 옛 주문 + 현재 전화번호] 를 누적한다.
+//   (번호 변경 시 DB 트리거가 옛 주문에 kakao_id 를 찍어주므로 과거 구매분도 계속 잡힌다.)
 // - 등록상품(product_id 있음)만 대상. 직접입력(product_id 없음)은 제한 없음.
 // - 취소/테스트 주문은 누적에서 제외.
 // - 돈/재고/포인트 RPC는 일절 건드리지 않고, 주문 RPC 호출 전에 차단만 한다.
@@ -185,6 +188,7 @@ async function assertPurchaseLimit(
   supabase: any,
   orderRows: AnyRow[],
   phone: string,
+  kakaoId = "",
 ): Promise<void> {
   const requestedByProduct = new Map<string, number>();
   for (const row of orderRows) {
@@ -223,11 +227,26 @@ async function assertPurchaseLimit(
     const requested = requestedByProduct.get(pid) || 0;
     if (requested <= 0) continue;
 
-    const { data: priorRows, error: priorError } = await supabase
+    // 누적 대상 조회: 카톡 계정 우선(번호 바꿔도 이어짐), 없으면 전화번호 폴백.
+    const safeKakaoId = String(kakaoId || "").replace(/[^0-9A-Za-z_-]/g, "");
+    const safePhone = String(phone || "").replace(/[^0-9]/g, "");
+    let priorQuery = supabase
       .from("orders")
       .select("qty, order_status, order_manage_status, is_test_order")
-      .eq("customer_phone", phone)
       .eq("product_id", Number(pid));
+
+    if (safeKakaoId && safePhone) {
+      // kakao_id 일치 OR (kakao_id 없는 옛 주문 + 현재 전화번호)
+      priorQuery = priorQuery.or(
+        `kakao_id.eq.${safeKakaoId},and(kakao_id.is.null,customer_phone.eq.${safePhone})`
+      );
+    } else if (safeKakaoId) {
+      priorQuery = priorQuery.eq("kakao_id", safeKakaoId);
+    } else {
+      priorQuery = priorQuery.eq("customer_phone", safePhone);
+    }
+
+    const { data: priorRows, error: priorError } = await priorQuery;
 
     if (priorError) {
       console.warn("구매제한 검증: 기존주문 조회 실패(주문은 진행):", priorError.message);
@@ -291,7 +310,8 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseOrderSubmitClient();
 
     // 개인당 구매제한 차단(돈/재고/포인트 RPC 무변경 — RPC 호출 전 검증만)
-    await assertPurchaseLimit(supabase, orderRows, phone);
+    //   카톡 계정(kakao_id) 기준 누적 → 전화번호 바꿔도 제한 우회 불가
+    await assertPurchaseLimit(supabase, orderRows, phone, text(body.kakao_id));
 
     const normalizedSubmit = await normalizeOrderRowsForSubmitSettings(supabase, orderRows);
 

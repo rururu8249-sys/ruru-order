@@ -114,6 +114,20 @@ begin
        select 1 from public.customer_phone_blocks where phone = v_new
      );
 
+  ---------------------------------------------------------------
+  -- (d) 옛 번호로 된 주문에 kakao_id 를 찍어둔다(정체성 스탬프).
+  --     * 주문의 전화번호·금액·상태는 절대 건드리지 않는다(정산/입금 이력 보존).
+  --     * kakao_id 가 비어있는 주문에만 채운다.
+  --     → 이 덕분에 ①1인당 구매제한이 번호 바꿔도 누적되고
+  --                ②주문취소 시 옛 주문에서 현재 고객을 찾아 포인트를 복구할 수 있다.
+  ---------------------------------------------------------------
+  if coalesce(nullif(trim(coalesce(new.kakao_id, '')), ''), '') <> '' then
+    update public.orders
+       set kakao_id = new.kakao_id
+     where kakao_id is null
+       and regexp_replace(coalesce(customer_phone, ''), '[^0-9]', '', 'g') = v_old;
+  end if;
+
   return new;
 
 exception when others then
