@@ -250,11 +250,24 @@ export default function ProductWidgetClient() {
     const groupKey = (row: AnyProduct) => String(row?.order_group_id || row?.id || "");
     const push = (item: { icon: string; title: string; name: string; detail: string }) => setToastQueue((q) => [...q, item]);
 
+    // [2026-07-09] 재고 즉시 반영 — 주문/취소가 들어오면 상품을 곧바로 다시 읽는다.
+    //   한 주문에 상품이 여러 개면 INSERT가 여러 번 오므로 0.4초 디바운스로 한 번만 재조회.
+    //   (주문 제출 RPC가 재고차감과 orders INSERT를 같은 트랜잭션에서 커밋하므로, 이 시점엔 새 재고가 보인다)
+    let reloadTimer: number | null = null;
+    const scheduleStockReload = () => {
+      if (reloadTimer) window.clearTimeout(reloadTimer);
+      reloadTimer = window.setTimeout(() => {
+        reloadTimer = null;
+        reloadProductsRef.current?.();
+      }, 400);
+    };
+
     const channel = supabase
       .channel("ruru-product-widget-events")
       // A. 주문서 작성 완료
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, (payload) => {
         const row = (payload.new || {}) as AnyProduct;
+        scheduleStockReload(); // 재고 즉시 갱신(중복 토스트 가드보다 먼저 — 상품행마다 재고가 줄기 때문)
         const key = `ins:${groupKey(row)}`;
         if (seenRef.current.has(key)) return; // 한 주문(여러 상품행) 중복 방지
         seenRef.current.add(key);
@@ -266,6 +279,9 @@ export default function ProductWidgetClient() {
         const oldRow = (payload.old || {}) as AnyProduct;
         const status = statusOf(row);
         const oldStatus = statusOf(oldRow);
+
+        // 주문취소 등으로 상태가 바뀌면 재고가 복구될 수 있으므로 재고도 다시 읽는다.
+        if (status !== oldStatus) scheduleStockReload();
 
         // B·C. 입금확인 (자동입금확인/수동입금확인/입금확인)
         if (/입금확인/.test(status) && !/입금확인/.test(oldStatus)) {
@@ -287,6 +303,7 @@ export default function ProductWidgetClient() {
       })
       .subscribe();
     return () => {
+      if (reloadTimer) window.clearTimeout(reloadTimer);
       supabase.removeChannel(channel);
     };
   }, []);
