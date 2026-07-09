@@ -286,114 +286,152 @@ export default function ProductWidgetClient() {
   const colors = colorsOf(current); // 색상만 표시(사이즈는 제외)
   const stock = stockLabel(current);
 
+  // [2026-07-09] 시안 반영: 정사각형(1:1) 카드. 이미지가 카드를 채우고, 하단에 상품명[옵션]·금액.
+  //   주문 제출/입금 확인 시 카드 위를 초록 "주문성공!" 오버레이가 덮는다(3초 자동 소멸).
+  //   ※ 표시 전용 — 실시간 구독/금액 컬럼/중복가드/드래그 저장 로직은 무변경.
+  const CARD = 240; // 카드 한 변(px). OBS에서 소스 크기로 더 키울 수 있음(벡터/이미지라 또렷).
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "transparent", pointerEvents: "none", fontFamily: "Pretendard, Arial, sans-serif" }}>
-      {/* [2026-07-06] 주문/입금 축하 오버레이 — 상품 카드를 살짝 덮으며 닉네임·내용·금액 표시 (3초 후 자동 소멸, 표시 전용) */}
-      {currentToast ? (
-        <div
-          style={{
-            position: "absolute",
-            left: pos ? `${pos.x - 6}px` : "18px",
-            top: pos ? `${pos.y - 8}px` : undefined,
-            bottom: pos ? undefined : "18px",
-            width: "348px",
-            zIndex: 5,
-            background: "rgba(123,45,67,0.94)",
-            backdropFilter: "blur(7px)",
-            WebkitBackdropFilter: "blur(7px)",
-            border: "1.5px solid rgba(255,217,224,0.6)",
-            color: "#fff",
-            padding: "14px 16px",
-            borderRadius: "14px",
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            boxShadow: "0 0 26px rgba(123,45,67,0.7), 0 6px 18px rgba(0,0,0,0.35)",
-            animation: "ruruToastPop 0.5s cubic-bezier(0.18,0.89,0.32,1.28)",
-          }}
-        >
-          <span style={{ fontSize: "30px", flexShrink: 0 }}>{currentToast.icon}</span>
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: "13px", fontWeight: 900, letterSpacing: "0.03em", color: "#FFD9E0" }}>{currentToast.title}</div>
-            <div style={{ marginTop: "2px", fontSize: "19px", fontWeight: 900, lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentToast.name}</div>
-            <div style={{ marginTop: "2px", fontSize: "14px", fontWeight: 800, color: "rgba(255,255,255,0.92)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentToast.detail}</div>
-          </div>
-        </div>
-      ) : null}
-
-      {current ? (
-        <div
-          key={String(current?.id ?? rotIndex)}
-          onMouseDown={startDragWidget}
-          title="드래그해서 위치 이동 (위치 자동 저장)"
-          style={{
-            position: "absolute",
-            left: pos ? `${pos.x}px` : "24px",
-            top: pos ? `${pos.y}px` : undefined,
-            bottom: pos ? undefined : "24px",
-            width: "336px",
-            cursor: "move",
-            pointerEvents: "auto",
-            display: "flex",
-            gap: "12px",
-            alignItems: "center",
-            background: "rgba(38,38,44,0.60)",
-            backdropFilter: "blur(9px)",
-            WebkitBackdropFilter: "blur(9px)",
-            border: "1px solid rgba(255,255,255,0.14)",
-            borderRadius: "12px",
-            padding: "12px",
-            color: "#fff",
-            animation: "ruruWidgetIn 0.5s ease",
-          }}
-        >
-          <div style={{ position: "relative", width: "86px", height: "86px", flexShrink: 0, borderRadius: "9px", overflow: "hidden", background: "rgba(255,255,255,0.1)" }}>
+      {/* 카드·오버레이·폭죽을 한 앵커에 묶어, 드래그로 옮기면 전부 같이 따라간다 */}
+      <div
+        style={{
+          position: "absolute",
+          left: pos ? `${pos.x}px` : "24px",
+          top: pos ? `${pos.y}px` : undefined,
+          bottom: pos ? undefined : "24px",
+          width: `${CARD}px`,
+          pointerEvents: "none",
+        }}
+      >
+        {current ? (
+          <div
+            key={String(current?.id ?? rotIndex)}
+            onMouseDown={startDragWidget}
+            title="드래그해서 위치 이동 (위치 자동 저장)"
+            style={{
+              position: "relative",
+              width: "100%",
+              aspectRatio: "1 / 1",
+              cursor: "move",
+              pointerEvents: "auto",
+              borderRadius: "14px",
+              overflow: "hidden",
+              background: "rgba(24,24,28,0.72)",
+              backdropFilter: "blur(9px)",
+              WebkitBackdropFilter: "blur(9px)",
+              border: "1px solid rgba(255,255,255,0.16)",
+              boxShadow: "0 10px 30px rgba(0,0,0,0.45)",
+              color: "#fff",
+              animation: "ruruWidgetIn 0.5s ease",
+            }}
+          >
+            {/* 상품 이미지 — 카드 전체를 채움 */}
             {img ? (
-              <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <img src={img} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
-              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px" }}>👟</div>
+              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "56px", opacity: 0.8 }}>👟</div>
             )}
+
+            {/* 하단 가독성 그라데이션 */}
+            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "58%", background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.88) 100%)" }} />
+
             {pinned ? (
-              <span style={{ position: "absolute", top: "4px", left: "4px", fontSize: "15px" }}>📌</span>
+              <span style={{ position: "absolute", top: "7px", right: "8px", zIndex: 3, fontSize: "15px" }}>📌</span>
+            ) : null}
+
+            {/* 하단: 상품명[옵션] + 금액 */}
+            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 2, padding: "10px 11px 11px" }}>
+              <div
+                style={{
+                  fontSize: "14px", fontWeight: 800, lineHeight: 1.3,
+                  textShadow: "0 1px 6px rgba(0,0,0,0.8)",
+                  overflow: "hidden", textOverflow: "ellipsis",
+                  display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", wordBreak: "break-all",
+                }}
+              >
+                {nameOf(current)}
+                {colors ? <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.82)" }}>{` [${colors}]`}</span> : null}
+              </div>
+              <div style={{ marginTop: "3px", display: "flex", alignItems: "baseline", gap: "7px" }}>
+                <span style={{ fontSize: "18px", fontWeight: 900, color: "#fff", textShadow: "0 1px 6px rgba(0,0,0,0.85)" }}>
+                  {priceOf(current).toLocaleString("ko-KR")}원
+                </span>
+                {stock ? (
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.75)" }}>{stock}</span>
+                ) : null}
+              </div>
+            </div>
+
+            {/* 주문/입금 오버레이 — 카드 위를 덮는 초록 배너 (3초 자동 소멸) */}
+            {currentToast ? (
+              <div
+                style={{
+                  position: "absolute", left: "8px", right: "8px", top: "32%", zIndex: 5,
+                  background: "linear-gradient(180deg, #22c55e 0%, #16a34a 100%)",
+                  border: "1.5px solid rgba(255,255,255,0.55)",
+                  borderRadius: "11px",
+                  padding: "9px 10px",
+                  color: "#fff",
+                  boxShadow: "0 0 24px rgba(34,197,94,0.55), 0 6px 16px rgba(0,0,0,0.4)",
+                  animation: "ruruToastPop 0.5s cubic-bezier(0.18,0.89,0.32,1.28)",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ fontSize: "16px", flexShrink: 0 }}>{currentToast.icon}</span>
+                  <span style={{ fontSize: "14px", fontWeight: 900, letterSpacing: "0.02em" }}>{currentToast.title}</span>
+                </div>
+                <div style={{ marginTop: "2px", fontSize: "16px", fontWeight: 900, lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {currentToast.name}
+                </div>
+                <div style={{ marginTop: "1px", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.95)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {currentToast.detail}
+                </div>
+              </div>
+            ) : null}
+
+            {/* 폭죽 — 카드 중앙에서 터짐 */}
+            {confettiOn ? (
+              <div key={confettiKey} style={{ position: "absolute", left: "50%", top: "42%", width: 0, height: 0, pointerEvents: "none", zIndex: 6 }}>
+                {CONFETTI_PIECES.map((p, i) => (
+                  <span
+                    key={i}
+                    style={{
+                      position: "absolute",
+                      width: `${p.size}px`,
+                      height: `${p.size}px`,
+                      borderRadius: p.round ? "50%" : "2px",
+                      background: p.color,
+                      ["--tx" as any]: p.tx,
+                      ["--ty" as any]: p.ty,
+                      ["--r" as any]: p.r,
+                      animation: `ruruConfetti ${p.dur}s ease-out forwards`,
+                    }}
+                  />
+                ))}
+              </div>
             ) : null}
           </div>
-
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: "17px", fontWeight: 800, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", wordBreak: "break-all" }}>
-              {nameOf(current)}
+        ) : currentToast ? (
+          // 띄운 상품이 없을 때도 주문/입금 알림은 보이게(카드 없이 배너만)
+          <div
+            style={{
+              background: "linear-gradient(180deg, #22c55e 0%, #16a34a 100%)",
+              border: "1.5px solid rgba(255,255,255,0.55)",
+              borderRadius: "11px", padding: "10px 12px", color: "#fff",
+              boxShadow: "0 0 24px rgba(34,197,94,0.55), 0 6px 16px rgba(0,0,0,0.4)",
+              animation: "ruruToastPop 0.5s cubic-bezier(0.18,0.89,0.32,1.28)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span style={{ fontSize: "16px" }}>{currentToast.icon}</span>
+              <span style={{ fontSize: "14px", fontWeight: 900 }}>{currentToast.title}</span>
             </div>
-            {colors ? (
-              <div style={{ marginTop: "4px", fontSize: "14px", color: "rgba(255,255,255,0.78)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{colors}</div>
-            ) : null}
-            <div style={{ marginTop: "5px", display: "flex", alignItems: "baseline", gap: "8px" }}>
-              <span style={{ fontSize: "19px", fontWeight: 800, color: "#FFD9E0" }}>{priceOf(current).toLocaleString("ko-KR")}원</span>
-              {stock ? <span style={{ fontSize: "13px", fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>{stock}</span> : null}
-            </div>
+            <div style={{ marginTop: "2px", fontSize: "16px", fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentToast.name}</div>
+            <div style={{ marginTop: "1px", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.95)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentToast.detail}</div>
           </div>
-        </div>
-      ) : null}
-
-      {/* 입금/주문 토스트 폭죽 — 좌하단 국소, 표시 전용, pointerEvents none */}
-      {confettiOn ? (
-        <div key={confettiKey} style={{ position: "absolute", left: pos ? `${pos.x + 170}px` : "190px", top: pos ? `${pos.y + 30}px` : undefined, bottom: pos ? undefined : "90px", width: 0, height: 0, pointerEvents: "none", zIndex: 6 }}>
-          {CONFETTI_PIECES.map((p, i) => (
-            <span
-              key={i}
-              style={{
-                position: "absolute",
-                width: `${p.size}px`,
-                height: `${p.size}px`,
-                borderRadius: p.round ? "50%" : "2px",
-                background: p.color,
-                ["--tx" as any]: p.tx,
-                ["--ty" as any]: p.ty,
-                ["--r" as any]: p.r,
-                animation: `ruruConfetti ${p.dur}s ease-out forwards`,
-              }}
-            />
-          ))}
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
       <style>{`
         @keyframes ruruWidgetIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
