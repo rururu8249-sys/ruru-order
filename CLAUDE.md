@@ -219,10 +219,16 @@ git status
 - 고객이 번호를 바꾸든 주소를 바꾸든 **같은 사람**이다. 포인트·주문·이력이 전부 따라와야 한다.
 - ❌ 앞으로 어떤 세션에서도 "고객 식별은 customer_phone 기준" 이라고 말하거나 그렇게 설계하지 말 것.
   (과거 진행상황 기록에 그런 문장이 남아 있으나 **폐기된 기준**이다.)
-- ⚠️ 현재 코드 실태(2026-07-09): `customer_point_balances` / `customer_point_ledger` 가
-  `customer_phone` 문자열로만 연결돼 있고 customers 와 **FK가 없다** → 번호 바꾸면 포인트가 고아가 된다.
-  실제 피해 확인됨(엘레강스 1,395P / 김민양 295P). **이전 대상: `customers.id` 기준으로 마이그레이션 진행 중.**
+- ⚠️ 코드 실태: `customer_point_balances` / `customer_point_ledger` 의 **읽기·쓰기가 아직 `customer_phone` 기준**이다.
+  (RPC·트리거·API 전부) → 번호를 바꾸면 여전히 새 고아 행이 생긴다. **STEP 3에서 전환 예정.**
+- ✅ 2026-07-09 완료: 고아 포인트 복구(문수 1,395P `01058794497`→`01089904497` / 김정임 295P `01034200786`→`01034300786`,
+  `supabase/sql/point_phone_migration_20260709.sql`) + **`customer_id` 컬럼 추가·백필 완료**
+  (`supabase/sql/point_customer_id_step1.sql` 실행됨 — 잔액 441/441, 이력 930/930 연결, 미연결 0).
+  단 **코드는 아직 customer_id를 읽지 않는다**(동작 변화 0). 기반만 마련된 상태.
 - 신규 코드에서 포인트/회원 관련 조회·쓰기는 **customer_id 우선**, phone은 폴백/연락처로만.
+- 🔴 미해결(방송 없는 날 진행): ①차단 우회(`customer_phone_blocks`가 phone unique → 번호 바꾸면 차단 풀림)
+  ②1인당 구매제한 우회(`assertPurchaseLimit`이 customer_phone 누적 → 번호 바꾸면 리셋)
+  ③주문취소 실패 위험(`order_point_cancel_restore_rpc.sql:145-153` 잔액 row 없으면 raise exception → 취소 트랜잭션 전체 실패)
 
 ## DB 규칙
 - 스키마 변경: ADD COLUMN only
