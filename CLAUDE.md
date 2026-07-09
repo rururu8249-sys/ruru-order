@@ -244,6 +244,10 @@ git status
   검수 tsc 0 + **시뮬 16/16 PASS**(우회 차단·회귀 0·취소 항상 성공·중복복구 방지).
   ⚠️ Supabase에 `order_point_cancel_restore_fix_20260709.sql` + 갱신된 `point_identity_sync_trigger.sql` 실행 필요.
 - ※ 입금 자동매칭은 `orders.youtube_nickname`(주문 시점 스냅샷)+금액 기준이라 **고객이 닉네임을 바꿔도 과거 주문 매칭은 안 깨진다**(2026-07-09 확인).
+- ✅ 2026-07-09 **로그인 안전망 + 중복 kakao_id 정리**: ①login-sync 번호 갱신이 unique 충돌하면 **번호만 빼고 재저장**
+  (로그인 500 실패 방지 — kakao-first 전환으로 새로 생긴 실패 경로를 막음). 빈 번호 row도 이때 채움.
+  ②같은 kakao_id 중복 고객 2쌍(750/752 최송아, 721/1129 송기영) 정리 — 포인트0·주문0·참조0 확인 후 삭제,
+  백업 `customers_backup_20260709_kakao_dedup`. 중복 kakao_id 현재 **0건**. (login은 created_at 최신 row를 선택 = 진짜 row)
 
 ## DB 규칙
 - 스키마 변경: ADD COLUMN only
