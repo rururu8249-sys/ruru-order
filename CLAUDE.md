@@ -226,9 +226,15 @@ git status
   (`supabase/sql/point_customer_id_step1.sql` 실행됨 — 잔액 441/441, 이력 930/930 연결, 미연결 0).
   단 **코드는 아직 customer_id를 읽지 않는다**(동작 변화 0). 기반만 마련된 상태.
 - 신규 코드에서 포인트/회원 관련 조회·쓰기는 **customer_id 우선**, phone은 폴백/연락처로만.
-- 🔴 미해결(방송 없는 날 진행): ①차단 우회(`customer_phone_blocks`가 phone unique → 번호 바꾸면 차단 풀림)
-  ②1인당 구매제한 우회(`assertPurchaseLimit`이 customer_phone 누적 → 번호 바꾸면 리셋)
-  ③주문취소 실패 위험(`order_point_cancel_restore_rpc.sql:145-153` 잔액 row 없으면 raise exception → 취소 트랜잭션 전체 실패)
+- ✅ 2026-07-09 **근본수정 완료**: ①`customer-login-sync`가 **kakao_id로 고객을 먼저 찾음**(전화번호는 폴백)
+  → 번호 바꿔도 같은 사람, 중복 고객 row 생성 안 함. 번호가 바뀌면 `customers.customer_phone`을 갱신(unique 충돌 시 스킵).
+  ②**DB 트리거 `trg_sync_identity_on_phone_change`**(`supabase/sql/point_identity_sync_trigger.sql`, 2026-07-09 실행 완료)
+  — 번호 변경 시 `customer_point_balances`(있으면 합산)·`customer_point_ledger`·`customer_phone_blocks`가 자동으로 따라감.
+  트리거는 exception을 삼키고 warning만 남김 → customers 저장(주문 제출) 절대 안 막음(주소 트리거와 동일 방침).
+  ③`trg_fill_point_customer_id_*` — 신규 포인트 행에 customer_id 자동 채움. **돈 계산·지급 RPC/API 무변경. 시뮬 17/17 PASS.**
+  → **차단 우회도 함께 해결**(차단 행이 새 번호로 따라감).
+- 🔴 미해결(방송 없는 날 진행): ①1인당 구매제한 우회(`assertPurchaseLimit`이 orders.customer_phone 누적 → 번호 바꾸면 리셋)
+  ②주문취소 실패 위험(`order_point_cancel_restore_rpc.sql:145-153` 잔액 row 없으면 raise exception → 취소 트랜잭션 전체 실패)
 
 ## DB 규칙
 - 스키마 변경: ADD COLUMN only

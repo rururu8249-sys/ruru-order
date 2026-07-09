@@ -165,26 +165,42 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { data: existingRows, error: selectError } = await supabase
-      .from("customers")
-      .select(
-        "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, customer_memo, is_blocked, last_order_at, created_at, kakao_id, kakao_nickname, kakao_profile_image, customer_history"
-      )
-      .in("customer_phone", phoneVariants)
-      .order("created_at", { ascending: false })
-      .limit(1);
+    const CUSTOMER_SELECT_COLUMNS =
+      "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, customer_memo, is_blocked, last_order_at, created_at, kakao_id, kakao_nickname, kakao_profile_image, customer_history";
 
-    if (selectError) {
-      return NextResponse.json(
-        {
-          ok: false,
-          message: selectError.message,
-        },
-        { status: 500 }
-      );
+    // ★ 고객 식별 원칙: 정체성은 카카오 계정(kakao_id)이다. 전화번호는 바뀔 수 있는 연락처일 뿐.
+    //   ① kakao_id 로 먼저 찾는다 → 번호를 바꿔도 "같은 사람"으로 인식(중복 고객 row 생성 방지).
+    //   ② 못 찾으면 전화번호로 폴백(카톡ID 없던 시절 옛 회원).
+    //   ③ 그래도 없으면 신규 등록.
+    let existing: CustomerRow | undefined;
+
+    if (kakaoId) {
+      const { data: byKakao, error: kakaoSelectError } = await supabase
+        .from("customers")
+        .select(CUSTOMER_SELECT_COLUMNS)
+        .eq("kakao_id", kakaoId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (kakaoSelectError) {
+        return NextResponse.json({ ok: false, message: kakaoSelectError.message }, { status: 500 });
+      }
+      existing = Array.isArray(byKakao) ? (byKakao[0] as CustomerRow | undefined) : undefined;
     }
 
-    const existing = Array.isArray(existingRows) ? (existingRows[0] as CustomerRow | undefined) : undefined;
+    if (!existing) {
+      const { data: byPhone, error: selectError } = await supabase
+        .from("customers")
+        .select(CUSTOMER_SELECT_COLUMNS)
+        .in("customer_phone", phoneVariants)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (selectError) {
+        return NextResponse.json({ ok: false, message: selectError.message }, { status: 500 });
+      }
+      existing = Array.isArray(byPhone) ? (byPhone[0] as CustomerRow | undefined) : undefined;
+    }
 
     if (existing?.id) {
       const updateData: Record<string, unknown> = {};
@@ -225,6 +241,29 @@ export async function POST(request: NextRequest) {
       // 프로필 이미지: 로그인마다 최신 값으로 갱신
       if (kakaoProfileImage) {
         updateData.kakao_profile_image = kakaoProfileImage;
+      }
+
+      // ★ 카카오 계정으로 찾았는데 전화번호가 바뀐 경우 → customers 의 번호를 새 번호로 갱신한다.
+      //   이 UPDATE 가 DB 트리거(trg_sync_identity_on_phone_change)를 깨워
+      //   포인트 잔액·이력·차단이 새 번호로 함께 따라온다(고아 방지).
+      //   단 다른 고객이 이미 그 번호를 쓰는 중이면(unique 충돌) 번호는 건드리지 않는다.
+      const existingPhoneDigits = phoneDigits(existing.customer_phone || "");
+      if (customerPhoneDigits && existingPhoneDigits && existingPhoneDigits !== customerPhoneDigits) {
+        const { data: conflictRows } = await supabase
+          .from("customers")
+          .select("id")
+          .eq("customer_phone", customerPhoneDigits)
+          .neq("id", existing.id)
+          .limit(1);
+
+        if (Array.isArray(conflictRows) && conflictRows.length > 0) {
+          console.warn(
+            `전화번호 변경 스킵(다른 고객이 사용 중): ${customerPhoneDigits}`
+          );
+        } else {
+          updateData.customer_phone = customerPhoneDigits;
+          recordChange("customer_phone", existing.customer_phone, customerPhoneDigits);
+        }
       }
 
       // 변경 이력이 생겼으면 저장
