@@ -1515,7 +1515,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 ) : null}
               </div>
               <div style={{ padding: "8px 12px 0" }}>
-                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 10px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid #e5dfe1", fontSize: "13px", boxSizing: "border-box" }} />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 10px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid #e5dfe1", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
               </div>
               {bcCopyMode ? (
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "0 12px 8px" }}>
@@ -1612,7 +1612,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)" }}>🛍 쇼핑몰 진열 {shopRows.length}개</span>
               <button type="button" disabled={shopBusy} onClick={openShopPicker} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "7px", padding: "5px 11px", cursor: shopBusy ? "wait" : "pointer", opacity: shopBusy ? 0.5 : 1 }}>+ 쇼핑몰에 상품 추가</button>
             </div>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 10px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid #e5dfe1", fontSize: "13px", boxSizing: "border-box" }} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 10px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid #e5dfe1", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
             <div
               ref={shopScrollRef}
               onDragOver={handleShopDragAutoScroll}
