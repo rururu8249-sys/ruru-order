@@ -3,7 +3,7 @@
 //   - 돈/포인트 로직 없음(1단계). 전원 지급은 별도(2단계).
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
-import { getMissionSupabase, computeMissionProgress, readMissionConfig, fetchMissionBuyers, fetchMissionPaidPhones, fetchMissionPayoutHistory } from "@/lib/mission";
+import { getMissionSupabase, computeMissionProgress, readMissionConfig, fetchMissionBuyers, fetchMissionPaidPhones, fetchMissionPayoutHistory, MISSION_BROADCAST_KEY, fetchActiveBroadcastForMission } from "@/lib/mission";
 
 export const dynamic = "force-dynamic";
 
@@ -83,7 +83,9 @@ export async function POST(request: NextRequest) {
       if (action === "payout_reset") return json({ ok: true });
 
       const { broadcastId, broadcastTitle, startedAt, buyers } = await fetchMissionBuyers(supabase);
-      if (!broadcastId) return json({ ok: false, message: "진행 중인 방송이 없습니다." }, 400);
+      // 방송이 꺼져 있어도 미션을 켤 때 저장한 방송(mission_broadcast_id)으로 명단/지급이 가능하다.
+      //   그 앵커조차 없을 때만 막는다(미션을 한 번도 켠 적 없음).
+      if (!broadcastId) return json({ ok: false, message: "이벤트를 켠 방송을 찾을 수 없습니다. (미션을 켠 적이 없거나 방송이 삭제됨)" }, 400);
       const cfg = await readMissionConfig(supabase);
       const reward = cfg.reward;
 
@@ -133,14 +135,23 @@ export async function POST(request: NextRequest) {
     let startedAt = (tmap.get("mission_started_at") || "").trim();
     let endedAt = (tmap.get("mission_ended_at") || "").trim();
     const nowIso = new Date().toISOString();
+    // [2026-07-10] 미션을 켤 때 "그 방송 id"를 앵커로 저장 → 방송을 껐어도 명단/지급 가능.
+    //   기존 값은 유지(종료·편집 저장에서 지우지 않음). 진행률/위젯 로직은 무변경.
+    const bcIdRow = (
+      await supabase.from("settings").select("value").eq("key", MISSION_BROADCAST_KEY).maybeSingle()
+    ).data as { value?: unknown } | null;
+    let missionBroadcastId = String(bcIdRow?.value ?? "").trim();
     if (newActive && !prev.active) {
       startedAt = nowIso; // 새 이벤트 시작
       endedAt = "";
+      const activeBc = await fetchActiveBroadcastForMission(supabase);
+      missionBroadcastId = String((activeBc as Record<string, unknown> | null)?.id ?? "").trim() || missionBroadcastId;
     } else if (!newActive && prev.active) {
-      endedAt = nowIso; // 이벤트 종료
+      endedAt = nowIso; // 이벤트 종료 (방송 id는 유지 → 방송 꺼도 명단 조회 가능)
     }
 
     const rows = [
+      { key: MISSION_BROADCAST_KEY, value: missionBroadcastId },
       { key: "mission_active", value: newActive ? "true" : "false" },
       { key: "mission_goal_type", value: goalType },
       { key: "mission_goal_value", value: String(num(b.goalValue)) },

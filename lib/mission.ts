@@ -116,6 +116,32 @@ async function fetchActiveBroadcast(supabase: Client) {
   return active || null;
 }
 
+// [2026-07-10] 미션을 켠 시점의 방송 id (settings). 방송을 껐어도 "그 이벤트의 방송"을 찾기 위한 앵커.
+export const MISSION_BROADCAST_KEY = "mission_broadcast_id";
+
+export async function fetchActiveBroadcastForMission(supabase: Client) {
+  return fetchActiveBroadcast(supabase);
+}
+
+// 명단/지급용 방송 확정: ①진행 중(ON) 방송 우선 → ②없으면 미션을 켤 때 저장해둔 방송 id로 조회.
+//   → 방송을 끈 뒤에도 "선물 줄 명단"을 보고 지급할 수 있다(사장님 지침 2026-07-10).
+//   진행률(computeMissionProgress)·위젯은 기존대로 ON 방송만 본다(변경 없음).
+async function fetchMissionBroadcast(supabase: Client) {
+  const active = await fetchActiveBroadcast(supabase);
+  if (active) return active;
+  const { data } = await supabase.from("settings").select("value").eq("key", MISSION_BROADCAST_KEY).maybeSingle();
+  const id = String((data as { value?: unknown } | null)?.value ?? "").trim();
+  if (!id) return null;
+  const { data: bc } = await supabase
+    .from("broadcasts")
+    .select("id,public_title,started_at,ended_at,status,is_deleted")
+    .eq("id", id)
+    .maybeSingle();
+  const row = (bc || null) as Record<string, unknown> | null;
+  if (!row || row.is_deleted === true) return null;
+  return row;
+}
+
 // 이벤트(미션) 시작/종료 시각 — 카운트·지급 대상 기준 구간.
 //   - mission_started_at: 미션을 켜는 순간 기록(= 새 이벤트 시작점). 없으면 방송 시작으로 fallback.
 //   - mission_ended_at: 이벤트 종료 시 기록(구간 끝 고정). 진행 중이면 지금까지.
@@ -253,7 +279,8 @@ export async function fetchMissionPayoutHistory(supabase: Client, fromIso: strin
 export async function fetchMissionBuyers(
   supabase: Client
 ): Promise<{ broadcastId: string; broadcastTitle: string; startedAt: string; broadcastStartedAt: string; buyers: MissionBuyer[] }> {
-  const bc = await fetchActiveBroadcast(supabase);
+  // 방송이 꺼져 있어도 "미션을 켤 때의 방송"으로 명단/지급이 가능하게(fetchMissionBroadcast).
+  const bc = await fetchMissionBroadcast(supabase);
   if (!bc || !bc.started_at) return { broadcastId: "", broadcastTitle: "", startedAt: "", broadcastStartedAt: "", buyers: [] };
   const cfg = await readMissionConfig(supabase);
   // 카운트/지급 구간 = 이벤트 시작~종료(진행 중이면 지금). 방송 시작 아님.
