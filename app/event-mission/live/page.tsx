@@ -135,7 +135,8 @@ export default function MissionLiveWidget() {
           borderRadius: 11,
           background: panelBg,
           border,
-          padding: "9px 18px",
+          // [2026-07-10] 글씨를 키우면서 좌우 여백을 줄여 470px 안에 다 들어가게
+          padding: "9px 12px",
           color: "#fff",
           backdropFilter: "blur(3px)",
           WebkitBackdropFilter: "blur(3px)",
@@ -204,12 +205,12 @@ export default function MissionLiveWidget() {
                 whiteSpace: "nowrap",
                 opacity: phase === 0 ? 1 : 0,
                 transition: "opacity .55s ease",
-                fontSize: "25px",
+                fontSize: "26px",
                 fontWeight: 900,
-                textShadow: "0 2px 6px rgba(0,0,0,0.85), 0 0 3px rgba(0,0,0,0.7)",
+                textShadow: "0 2px 6px rgba(0,0,0,0.9), 0 0 3px rgba(0,0,0,0.75)",
               }}
             >
-              {/* [2026-07-10 사장님 지침] "다 같이 참여" 뉘앙스 추가 + 글씨 크게 */}
+              {/* [2026-07-10 사장님 지침] 장면A = 글자만 나오는 화면 */}
               <span style={{ fontSize: "1.15em" }}>🎯</span>
               <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>100% 목표달성 선물 이벤트</span>
             </div>
@@ -220,7 +221,8 @@ export default function MissionLiveWidget() {
                 inset: 0,
                 display: "flex",
                 alignItems: "center",
-                gap: 11,
+                justifyContent: "center", // [2026-07-10] 왼쪽 치우침 → 가운데 정렬
+                gap: 10,
                 whiteSpace: "nowrap",
                 overflow: "hidden", // 포인트 금액이 길어도 위젯 박스 밖으로 안 나가게
                 opacity: phase === 1 ? 1 : 0,
@@ -233,11 +235,11 @@ export default function MissionLiveWidget() {
               <span
                 style={{
                   position: "relative",
-                  width: 120,
+                  width: 108,
                   flexShrink: 0,
-                  height: 26,
-                  background: "rgba(255,255,255,0.3)",
-                  borderRadius: 13,
+                  height: 30,
+                  background: "rgba(255,255,255,0.32)",
+                  borderRadius: 15,
                   overflow: "hidden",
                   display: "block",
                 }}
@@ -250,7 +252,7 @@ export default function MissionLiveWidget() {
                     width: `${pct}%`,
                     height: "100%",
                     background: fillBg,
-                    borderRadius: 13,
+                    borderRadius: 15,
                     transition: "width .6s ease",
                     display: "block",
                   }}
@@ -262,10 +264,10 @@ export default function MissionLiveWidget() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: "18px",
+                    fontSize: "19px",
                     fontWeight: 900,
                     color: "#fff",
-                    textShadow: "0 1px 3px rgba(0,0,0,0.85)",
+                    textShadow: "0 1px 3px rgba(0,0,0,0.9)",
                   }}
                 >
                   {pctRounded}%
@@ -273,7 +275,7 @@ export default function MissionLiveWidget() {
               </span>
               <span
                 style={{
-                  fontSize: "22px",
+                  fontSize: "24px",
                   fontWeight: 900,
                   flexShrink: 1,
                   minWidth: 0,
@@ -295,9 +297,9 @@ export default function MissionLiveWidget() {
                   </>
                 ) : (
                   <>
-                    100%{" "}
+                    100% 채우면{" "}
                     <span style={{ color: "#F5C451" }}>
-                      {reward > 0 ? `전원 ${won(reward)}P 선물 이벤트` : "선물 이벤트"}
+                      {reward > 0 ? `전원 ${won(reward)}P 선물!` : "전원 선물!"}
                     </span>
                   </>
                 )}
