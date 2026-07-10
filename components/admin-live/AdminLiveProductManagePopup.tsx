@@ -421,6 +421,18 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products]);
 
+  // [2026-07-10] 고정(📌)한 상품을 방송 상품 목록 맨 위로 올려 보여준다(표시 순서만).
+  //   ⚠ 실제 진열 순서(sort_order)는 안 바뀐다. 드래그 순서변경은 인덱스 기반이라
+  //     표시 순서가 뒤섞이면 엉키므로, 고정이 걸려 있는 동안엔 드래그를 잠근다(검색 중 잠금과 동일 정책).
+  const bcProductsView = useMemo(() => {
+    if (!pinnedId) return bcProducts;
+    const idx = bcProducts.findIndex((p) => productId(p) === pinnedId);
+    if (idx <= 0) return bcProducts; // 없거나 이미 맨 위
+    const copy = [...bcProducts];
+    const [top] = copy.splice(idx, 1);
+    return [top, ...copy];
+  }, [bcProducts, pinnedId]);
+
   // 선택 방송의 broadcast_products 목록 로드 (sort_order순, products와 매칭)
   const reloadBcProducts = async (selId: string) => {
     if (!selId) {
@@ -1533,19 +1545,20 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   <div style={{ textAlign: "center", padding: "30px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>진열된 상품이 없습니다.</div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
-                    {bcProducts.filter(nameMatch).map((p, i) => {
+                    {bcProductsView.filter(nameMatch).map((p, i) => {
                       const img = mainImage(p);
                       const pid = productId(p);
+                      const isPinnedRow = pinnedId === pid;
                       return (
                         <div
                           key={pid || i}
-                          draggable={!bcBusy && !search.trim() && !bcCopyMode}
+                          draggable={!bcBusy && !search.trim() && !bcCopyMode && !pinnedId}
                           onClick={bcCopyMode && pid ? () => toggleBcCopyPick(pid) : undefined}
                           onDragStart={() => { setBcDragFrom(i); setBcDragOver(i); }}
                           onDragOver={(e) => { e.preventDefault(); if (bcDragOver !== i) setBcDragOver(i); }}
                           onDrop={(e) => { e.preventDefault(); if (bcDragFrom !== null) void reorderBc(bcDragFrom, i); setBcDragFrom(null); setBcDragOver(null); }}
                           onDragEnd={() => { setBcDragFrom(null); setBcDragOver(null); }}
-                          style={{ display: "flex", alignItems: "center", gap: "10px", border: bcCopyMode && bcCopySel.has(pid) ? "1px solid var(--color-rose-deep)" : "1px solid var(--color-line)", borderRadius: "9px", padding: "8px", background: bcCopyMode && bcCopySel.has(pid) ? "var(--color-rose-soft)" : bcDragFrom !== null && bcDragOver === i && bcDragFrom !== i ? "var(--color-warn-bg)" : "var(--color-surface)", opacity: bcDragFrom === i ? 0.4 : 1, boxShadow: bcDragFrom !== null && bcDragOver === i && bcDragFrom !== i ? "inset 0 2px 0 var(--color-rose-deep)" : undefined, cursor: bcCopyMode ? "pointer" : bcBusy ? "default" : "grab" }}
+                          style={{ display: "flex", alignItems: "center", gap: "10px", border: isPinnedRow ? "2px solid var(--color-rose-deep)" : bcCopyMode && bcCopySel.has(pid) ? "1px solid var(--color-rose-deep)" : "1px solid var(--color-line)", borderRadius: "9px", padding: "8px", background: isPinnedRow ? "var(--color-rose-soft)" : bcCopyMode && bcCopySel.has(pid) ? "var(--color-rose-soft)" : bcDragFrom !== null && bcDragOver === i && bcDragFrom !== i ? "var(--color-warn-bg)" : "var(--color-surface)", opacity: bcDragFrom === i ? 0.4 : 1, boxShadow: bcDragFrom !== null && bcDragOver === i && bcDragFrom !== i ? "inset 0 2px 0 var(--color-rose-deep)" : undefined, cursor: bcCopyMode ? "pointer" : bcBusy ? "default" : "grab" }}
                         >
                           {/* 선택 복사 모드: 체크박스 / 평소: 드래그 핸들 */}
                           {bcCopyMode ? (
