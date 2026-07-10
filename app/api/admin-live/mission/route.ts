@@ -24,6 +24,29 @@ export async function GET(request: NextRequest) {
   if (auth) return auth;
   try {
     const supabase = getMissionSupabase();
+
+    // [2026-07-10] 앵커 자동 동기화 — 미션이 켜져 있고 활성(ON) 방송이 있는데
+    //   저장된 mission_broadcast_id가 비었거나 다르면 현재 방송으로 갱신한다.
+    //   → "미션 먼저 켜고 방송 시작" 순서로 해도 앵커가 올바르게 잡힌다.
+    //   미션이 꺼져 있거나 방송이 없으면 건드리지 않는다(종료 후 명단 조회용 앵커 보존).
+    try {
+      const cfg = await readMissionConfig(supabase);
+      if (cfg.active) {
+        const activeBc = (await fetchActiveBroadcastForMission(supabase)) as Record<string, unknown> | null;
+        const activeId = String(activeBc?.id ?? "").trim();
+        if (activeId) {
+          const cur = (
+            await supabase.from("settings").select("value").eq("key", MISSION_BROADCAST_KEY).maybeSingle()
+          ).data as { value?: unknown } | null;
+          if (String(cur?.value ?? "").trim() !== activeId) {
+            await supabase.from("settings").upsert([{ key: MISSION_BROADCAST_KEY, value: activeId }], { onConflict: "key" });
+          }
+        }
+      }
+    } catch {
+      /* 앵커 동기화 실패는 진행률 조회를 막지 않는다 */
+    }
+
     const p = await computeMissionProgress(supabase);
     return json({ ok: true, ...p });
   } catch (e) {
@@ -144,8 +167,10 @@ export async function POST(request: NextRequest) {
     if (newActive && !prev.active) {
       startedAt = nowIso; // 새 이벤트 시작
       endedAt = "";
+      // ⚠️ 활성 방송이 없으면 앵커를 **비운다**. (옛 방송 id를 그대로 두면 지난 방송 구매자가 명단에 뜬다)
+      //    방송을 나중에 켜면 아래 GET 동기화가 그때 앵커를 채운다.
       const activeBc = await fetchActiveBroadcastForMission(supabase);
-      missionBroadcastId = String((activeBc as Record<string, unknown> | null)?.id ?? "").trim() || missionBroadcastId;
+      missionBroadcastId = String((activeBc as Record<string, unknown> | null)?.id ?? "").trim();
     } else if (!newActive && prev.active) {
       endedAt = nowIso; // 이벤트 종료 (방송 id는 유지 → 방송 꺼도 명단 조회 가능)
     }
