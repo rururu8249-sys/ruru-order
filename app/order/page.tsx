@@ -772,6 +772,20 @@ function isPinnedOrderProduct(product: any): boolean {
   return ["true", "1", "y", "yes", "상단", "고정"].includes(String(value ?? "").trim().toLowerCase());
 }
 
+// [2026-07-09 사장님 지침] 사이즈는 항상 "36(S)" 형태로 보여준다.
+//   ⚠️ 표시 전용 — 저장되는 값(주문 옵션·재고 variant 키)은 원래 값 그대로다.
+//      (라벨만 바꾸므로 기존 주문/재고와 절대 안 어긋난다)
+const SIZE_NUM_TO_LETTER: Record<string, string> = { "36": "S", "38": "M", "40": "L", "42": "XL", "44": "XXL" };
+const SIZE_LETTER_TO_NUM: Record<string, string> = { S: "36", M: "38", L: "40", XL: "42", XXL: "44" };
+function sizeDisplayLabel(raw: unknown): string {
+  const v = String(raw ?? "").trim();
+  if (!v) return "";
+  if (SIZE_NUM_TO_LETTER[v]) return `${v}(${SIZE_NUM_TO_LETTER[v]})`;
+  const upper = v.toUpperCase();
+  if (SIZE_LETTER_TO_NUM[upper]) return `${SIZE_LETTER_TO_NUM[upper]}(${upper})`;
+  return v; // 매핑에 없는 사이즈(프리, 250 등)는 원래대로
+}
+
 function isSoldOutOrderProduct(product: any): boolean {
   const note = readOrderNoteObject(product);
   if (note?.stock_management_enabled !== true) return false; // 재고관리 OFF면 품절 처리 안 함(주문 막지 않음)
@@ -5174,7 +5188,7 @@ export default function OrderPage() {
                             const selected = registeredOptionSize === option;
                             const soldOut = isSoldOutColorSize(registeredOptionColor, option);
                             return (
-                              <button key={`s-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionSize((prev) => prev === option ? "" : option); }} style={{ height: "44px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
+                              <button key={`s-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionSize((prev) => prev === option ? "" : option); }} style={{ height: "44px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? sizeDisplayLabel(option) + " (품절)" : sizeDisplayLabel(option)}</button>
                             );
                           })}
                         </div>
@@ -5184,7 +5198,7 @@ export default function OrderPage() {
                             const selected = registeredOptionSize === option;
                             const soldOut = isSoldOutColorSize(registeredOptionColor, option);
                             return (
-                              <button key={`s-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionSize((prev) => prev === option ? "" : option); }} style={{ height: "34px", borderRadius: "999px", padding: "0 14px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "13px", fontWeight: 700, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
+                              <button key={`s-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionSize((prev) => prev === option ? "" : option); }} style={{ height: "34px", borderRadius: "999px", padding: "0 14px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "13px", fontWeight: 700, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? sizeDisplayLabel(option) + " (품절)" : sizeDisplayLabel(option)}</button>
                             );
                           })}
                         </div>

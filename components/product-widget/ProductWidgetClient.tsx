@@ -7,6 +7,7 @@
 // - 배경 투명(크로마키). 읽기 전용 — 돈/주문 로직 건드리지 않음.
 
 import { useEffect, useRef, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/lib/supabase";
 import { resolveProductImageUrl } from "@/components/admin-live/quick-product/productImageUrl";
 import { getActiveBroadcast, loadAdminLiveBroadcasts } from "@/components/admin-live/liveBroadcastController";
@@ -59,6 +60,12 @@ const OUTLINE_TEXT_SM =
   "-1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000," +
   "0 2px 6px rgba(0,0,0,0.5)";
 
+// 주문성공(초록) / 입금·카드완료(파랑) 알림 배너
+type ToastItem = { icon: string; title: string; name: string; detail: string; tone: "green" | "blue" };
+
+// 고객 주문서 주소 — QR로 그린다(파일 불필요, 항상 최신)
+const ORDER_URL = "https://ruru-order.vercel.app/order";
+
 const EMPTY_OPTION_WORDS = new Set(["없음", "없슴", "무", "-", "none", "n/a", "na"]);
 function cleanOptionText(raw: string): string {
   return raw
@@ -73,9 +80,24 @@ function colorsOf(p: AnyProduct | null): string {
   return p ? cleanOptionText(joinOptionValues(p.color_options ?? p.colors ?? p.color ?? p.product_colors)) : "";
 }
 
+// [2026-07-09 사장님 지침] 사이즈는 항상 "36(S)" 형태로 표시. 표시 전용 — 저장값은 안 건드림.
+const SIZE_NUM_TO_LETTER: Record<string, string> = { "36": "S", "38": "M", "40": "L", "42": "XL", "44": "XXL" };
+const SIZE_LETTER_TO_NUM: Record<string, string> = { S: "36", M: "38", L: "40", XL: "42", XXL: "44" };
+function sizeDisplayLabel(raw: unknown): string {
+  const v = String(raw ?? "").trim();
+  if (!v) return "";
+  if (SIZE_NUM_TO_LETTER[v]) return `${v}(${SIZE_NUM_TO_LETTER[v]})`;
+  const upper = v.toUpperCase();
+  if (SIZE_LETTER_TO_NUM[upper]) return `${SIZE_LETTER_TO_NUM[upper]}(${upper})`;
+  return v; // 매핑에 없는 사이즈(프리, 250 등)는 원래대로
+}
+
 // 사이즈 옵션 — 방송에서 "사이즈 뭐 있어요?"를 줄이기 위해 위젯에도 표시
 function sizeTextOf(p: AnyProduct | null): string {
-  return p ? cleanOptionText(sizesOf(p)) : "";
+  if (!p) return "";
+  const cleaned = cleanOptionText(sizesOf(p));
+  if (!cleaned) return "";
+  return cleaned.split(" · ").map(sizeDisplayLabel).filter(Boolean).join(" · ");
 }
 
 // 재고 "표시" 의도가 있을 때만 노출 — stock_management_enabled 이고 숫자일 때 "남은 N"
@@ -146,8 +168,8 @@ export default function ProductWidgetClient() {
   const [rotIndex, setRotIndex] = useState(0);
   // 이벤트 토스트 — 여러 개 동시 도착 가능 → 큐로 순서대로 3초씩 표시
   // [2026-07-06] 문자열 → 구조화(제목/닉네임/내용): 상품 카드를 살짝 덮는 축하 오버레이로 표시
-  const [toastQueue, setToastQueue] = useState<Array<{ icon: string; title: string; name: string; detail: string }>>([]);
-  const [currentToast, setCurrentToast] = useState<{ icon: string; title: string; name: string; detail: string } | null>(null);
+  const [toastQueue, setToastQueue] = useState<ToastItem[]>([]);
+  const [currentToast, setCurrentToast] = useState<ToastItem | null>(null);
   const seenRef = useRef<Set<string>>(new Set());
   // 입금확인 폭죽(표시 전용). key 증가로 애니메이션 재시작, on으로 1회 표시.
   const [confettiKey, setConfettiKey] = useState(0);
@@ -273,7 +295,7 @@ export default function ProductWidgetClient() {
     // 입금/카드 상태가 기록되는 실제 컬럼들
     const statusOf = (row: AnyProduct) => String(row?.admin_order_status_v2 || row?.order_manage_status || row?.deposit_status || "").trim();
     const groupKey = (row: AnyProduct) => String(row?.order_group_id || row?.id || "");
-    const push = (item: { icon: string; title: string; name: string; detail: string }) => setToastQueue((q) => [...q, item]);
+    const push = (item: ToastItem) => setToastQueue((q) => [...q, item]);
 
     // [2026-07-09] 재고 즉시 반영 — 주문/취소가 들어오면 상품을 곧바로 다시 읽는다.
     //   한 주문에 상품이 여러 개면 INSERT가 여러 번 오므로 0.4초 디바운스로 한 번만 재조회.
@@ -296,7 +318,8 @@ export default function ProductWidgetClient() {
         const key = `ins:${groupKey(row)}`;
         if (seenRef.current.has(key)) return; // 한 주문(여러 상품행) 중복 방지
         seenRef.current.add(key);
-        push({ icon: "🛒", title: "주문서 제출!", name: `${nick(row)}님`, detail: `${pname(row)} · ${amount(row)}원` });
+        // 주문성공: "무엇을" 샀는지가 핵심 → 상품명. (입금완료는 "얼마" → 금액)
+        push({ icon: "🎉", title: "주문성공!", name: `${nick(row)}님`, detail: pname(row), tone: "green" });
       })
       // B·C. 입금 확인(자동/수동) / D. 카드 결제 완료
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, (payload) => {
@@ -313,7 +336,7 @@ export default function ProductWidgetClient() {
           const key = `dep:${groupKey(row)}`;
           if (!seenRef.current.has(key)) {
             seenRef.current.add(key);
-            push({ icon: "✅", title: "입금 확인!", name: `${nick(row)}님`, detail: `${amount(row)}원 입금 완료` });
+            push({ icon: "💰", title: "입금완료!", name: `${nick(row)}님`, detail: `${amount(row)}원`, tone: "blue" });
           }
         }
 
@@ -322,7 +345,7 @@ export default function ProductWidgetClient() {
           const key = `card:${groupKey(row)}`;
           if (!seenRef.current.has(key)) {
             seenRef.current.add(key);
-            push({ icon: "💳", title: "카드 결제 완료!", name: `${nick(row)}님`, detail: `${amount(row)}원 결제 완료` });
+            push({ icon: "💳", title: "카드결제완료!", name: `${nick(row)}님`, detail: `${amount(row)}원`, tone: "blue" });
           }
         }
       })
@@ -367,14 +390,16 @@ export default function ProductWidgetClient() {
   const soldOut = isSoldOutWidgetProduct(current);
   const stock = soldOut ? "" : stockLabel(current); // 품절이면 "남은 0" 대신 SOLD OUT 오버레이로 알림
 
-  // [2026-07-09] 시안 반영: 정사각형(1:1) 카드. 이미지가 카드를 채우고, 하단에 상품명[옵션]·금액.
-  //   주문 제출/입금 확인 시 카드 위를 초록 "주문성공!" 오버레이가 덮는다(3초 자동 소멸).
+  // [2026-07-09 v2] 사장님 지침 반영:
+  //   ① 배경 바·그라데이션·그림자 전부 제거 → 글씨는 검정 아웃라인만으로 읽히게(상품 사진 안 가림)
+  //   ② 카드 비율 1:1 → 3:4 (옷 사진이 세로로 길어서, 정사각형이면 글씨가 옷을 덮음)
+  //   ③ 카드 위에 "📱 주문서 QR" 블록을 붙여 한 세트로 이동
   //   ※ 표시 전용 — 실시간 구독/금액 컬럼/중복가드/드래그 저장 로직은 무변경.
-  const CARD = 240; // 카드 한 변(px). OBS에서 소스 크기로 더 키울 수 있음(벡터/이미지라 또렷).
+  const CARD = 240; // 위젯 폭(px). OBS 소스 크기로 더 키울 수 있음.
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "transparent", pointerEvents: "none", fontFamily: "Pretendard, Arial, sans-serif" }}>
-      {/* 카드·오버레이·폭죽을 한 앵커에 묶어, 드래그로 옮기면 전부 같이 따라간다 */}
+      {/* QR·카드·오버레이·폭죽을 한 앵커에 묶어, 드래그로 옮기면 전부 같이 따라간다 */}
       <div
         style={{
           position: "absolute",
@@ -385,6 +410,24 @@ export default function ProductWidgetClient() {
           pointerEvents: "none",
         }}
       >
+        {/* 주문서 QR — 상품이 있든 없든 항상 표시(고객이 언제든 스캔) */}
+        <div
+          onMouseDown={startDragWidget}
+          title="드래그해서 위치 이동 (위치 자동 저장)"
+          style={{
+            marginBottom: "6px", borderRadius: "10px", overflow: "hidden",
+            cursor: "move", pointerEvents: "auto",
+            animation: "ruruWidgetIn 0.5s ease",
+          }}
+        >
+          <div style={{ padding: "5px 0", textAlign: "center", fontSize: "14px", fontWeight: 900, color: "#fff", background: "#7B2D43", lineHeight: 1.15 }}>
+            📱 주문서 QR
+          </div>
+          <div style={{ padding: "6px", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <QRCodeSVG value={ORDER_URL} size={CARD - 12} level="M" bgColor="#ffffff" fgColor="#111111" style={{ width: "100%", height: "auto", display: "block" }} />
+          </div>
+        </div>
+
         {current ? (
           <div
             key={String(current?.id ?? rotIndex)}
@@ -393,16 +436,12 @@ export default function ProductWidgetClient() {
             style={{
               position: "relative",
               width: "100%",
-              aspectRatio: "1 / 1",
+              aspectRatio: "3 / 4",
               cursor: "move",
               pointerEvents: "auto",
-              borderRadius: "14px",
+              borderRadius: "10px",
               overflow: "hidden",
-              background: "rgba(24,24,28,0.72)",
-              backdropFilter: "blur(9px)",
-              WebkitBackdropFilter: "blur(9px)",
-              border: "1px solid rgba(255,255,255,0.16)",
-              boxShadow: "0 10px 30px rgba(0,0,0,0.45)",
+              background: "rgba(24,24,28,0.55)",
               color: "#fff",
               animation: "ruruWidgetIn 0.5s ease",
             }}
@@ -437,14 +476,13 @@ export default function ProductWidgetClient() {
               </div>
             ) : null}
 
-            {/* 하단: 상품명 / 옵션(색상·사이즈) / 금액 — 배경 없이 아웃라인 글씨만 */}
-            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 2, padding: "10px 11px 11px" }}>
+            {/* 하단: 상품명 / 옵션(색상·사이즈) / 금액 — 배경·음영 없이 아웃라인 글씨만 */}
+            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 2, padding: "8px 9px 9px" }}>
               <div
                 style={{
-                  fontSize: "15px", fontWeight: 900, lineHeight: 1.3, color: "#fff",
+                  fontSize: "17px", fontWeight: 900, lineHeight: 1.15, color: "#fff",
                   textShadow: OUTLINE_TEXT,
-                  overflow: "hidden", textOverflow: "ellipsis",
-                  display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", wordBreak: "break-all",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                 }}
               >
                 {nameOf(current)}
@@ -453,48 +491,64 @@ export default function ProductWidgetClient() {
               {optionText ? (
                 <div
                   style={{
-                    marginTop: "2px", fontSize: "12px", fontWeight: 800, color: "#fff",
+                    marginTop: "1px", fontSize: "13px", fontWeight: 900, lineHeight: 1.25, color: "#fff",
                     textShadow: OUTLINE_TEXT_SM,
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    wordBreak: "keep-all", // 사이즈가 "36(S)·38(M)·4…"로 잘리지 않게 줄바꿈 허용
                   }}
                 >
                   {optionText}
                 </div>
               ) : null}
 
-              <div style={{ marginTop: "3px", display: "flex", alignItems: "baseline", gap: "7px" }}>
-                <span style={{ fontSize: "20px", fontWeight: 900, color: "#fff", textShadow: OUTLINE_TEXT }}>
-                  {priceOf(current).toLocaleString("ko-KR")}원
+              <div style={{ marginTop: "2px", display: "flex", alignItems: "baseline", gap: "6px" }}>
+                <span style={{ fontSize: "23px", fontWeight: 900, lineHeight: 1, color: "#fff", textShadow: OUTLINE_TEXT }}>
+                  {priceOf(current).toLocaleString("ko-KR")}
+                  <span style={{ fontSize: "14px", fontWeight: 800 }}>원</span>
                 </span>
                 {stock ? (
-                  <span style={{ fontSize: "11px", fontWeight: 800, color: "#fff", textShadow: OUTLINE_TEXT_SM }}>{stock}</span>
+                  <span style={{ fontSize: "11px", fontWeight: 900, color: "#fff", textShadow: OUTLINE_TEXT_SM }}>{stock}</span>
                 ) : null}
               </div>
             </div>
 
-            {/* 주문/입금 오버레이 — 카드 위를 덮는 초록 배너 (3초 자동 소멸) */}
+            {/* 주문성공(초록) / 입금·카드완료(파랑) 알림 — 3초 자동 소멸.
+                반투명 위에 흰 글씨를 얹으면 뭉개지므로 불투명 배경 + 흰 테두리 + 상세는 흰 알약으로. */}
             {currentToast ? (
               <div
                 style={{
-                  position: "absolute", left: "8px", right: "8px", top: "32%", zIndex: 5,
-                  background: "linear-gradient(180deg, #22c55e 0%, #16a34a 100%)",
-                  border: "1.5px solid rgba(255,255,255,0.55)",
-                  borderRadius: "11px",
-                  padding: "9px 10px",
-                  color: "#fff",
-                  boxShadow: "0 0 24px rgba(34,197,94,0.55), 0 6px 16px rgba(0,0,0,0.4)",
+                  position: "absolute", inset: 0, zIndex: 5,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  padding: "8px", background: "rgba(0,0,0,0.34)",
                   animation: "ruruToastPop 0.5s cubic-bezier(0.18,0.89,0.32,1.28)",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ fontSize: "16px", flexShrink: 0 }}>{currentToast.icon}</span>
-                  <span style={{ fontSize: "14px", fontWeight: 900, letterSpacing: "0.02em" }}>{currentToast.title}</span>
-                </div>
-                <div style={{ marginTop: "2px", fontSize: "16px", fontWeight: 900, lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {currentToast.name}
-                </div>
-                <div style={{ marginTop: "1px", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.95)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {currentToast.detail}
+                <div
+                  style={{
+                    width: "100%", borderRadius: "10px", padding: "9px 8px", textAlign: "center",
+                    background: currentToast.tone === "green" ? "#16a34a" : "#1d4ed8",
+                    border: "2px solid #fff",
+                    color: "#fff",
+                  }}
+                >
+                  <div style={{ fontSize: "14px", fontWeight: 900, lineHeight: 1.1 }}>
+                    {currentToast.icon} {currentToast.title}
+                  </div>
+                  <div style={{ marginTop: "2px", fontSize: "18px", fontWeight: 900, lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {currentToast.name}
+                  </div>
+                  {currentToast.detail ? (
+                    <div
+                      style={{
+                        marginTop: "4px", display: "inline-block", maxWidth: "100%",
+                        fontSize: "12px", fontWeight: 900,
+                        color: currentToast.tone === "green" ? "#0b3d1e" : "#0b2a5e",
+                        background: "#fff", borderRadius: "999px", padding: "3px 9px",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}
+                    >
+                      {currentToast.detail}
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ) : null}
@@ -525,19 +579,17 @@ export default function ProductWidgetClient() {
           // 띄운 상품이 없을 때도 주문/입금 알림은 보이게(카드 없이 배너만)
           <div
             style={{
-              background: "linear-gradient(180deg, #22c55e 0%, #16a34a 100%)",
-              border: "1.5px solid rgba(255,255,255,0.55)",
-              borderRadius: "11px", padding: "10px 12px", color: "#fff",
-              boxShadow: "0 0 24px rgba(34,197,94,0.55), 0 6px 16px rgba(0,0,0,0.4)",
+              background: currentToast.tone === "green" ? "#16a34a" : "#1d4ed8",
+              border: "2px solid #fff",
+              borderRadius: "10px", padding: "9px 10px", color: "#fff", textAlign: "center",
               animation: "ruruToastPop 0.5s cubic-bezier(0.18,0.89,0.32,1.28)",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span style={{ fontSize: "16px" }}>{currentToast.icon}</span>
-              <span style={{ fontSize: "14px", fontWeight: 900 }}>{currentToast.title}</span>
-            </div>
-            <div style={{ marginTop: "2px", fontSize: "16px", fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentToast.name}</div>
-            <div style={{ marginTop: "1px", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.95)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentToast.detail}</div>
+            <div style={{ fontSize: "14px", fontWeight: 900, lineHeight: 1.1 }}>{currentToast.icon} {currentToast.title}</div>
+            <div style={{ marginTop: "2px", fontSize: "18px", fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentToast.name}</div>
+            {currentToast.detail ? (
+              <div style={{ marginTop: "4px", display: "inline-block", maxWidth: "100%", fontSize: "12px", fontWeight: 900, color: currentToast.tone === "green" ? "#0b3d1e" : "#0b2a5e", background: "#fff", borderRadius: "999px", padding: "3px 9px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentToast.detail}</div>
+            ) : null}
           </div>
         ) : null}
       </div>
