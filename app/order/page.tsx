@@ -1104,6 +1104,8 @@ export default function OrderPage() {
   const [howToOpen, setHowToOpen] = useState(false);
   const [howToSteps, setHowToSteps] = useState(HOWTO_DEFAULT.steps);
   const [howToWarn, setHowToWarn] = useState(HOWTO_DEFAULT.warn);
+  // [2026-07-10] 상품 목록 정렬(표시 전용). 기본순 = 고정 상품 우선 + 방송 진열 순서(기존 동작)
+  const [productSort, setProductSort] = useState<"default" | "price_asc" | "price_desc" | "name">("default");
   const [videoOpen, setVideoOpen] = useState(true);
   const videoSlotRef = useRef<HTMLDivElement | null>(null);
   const livePlayerRef = useRef<HTMLDivElement | null>(null);
@@ -4705,9 +4707,23 @@ export default function OrderPage() {
               }
               return true;
             });
+            // [2026-07-10] 정렬 드롭다운 — "기본순"이면 기존 순서(고정 상품 우선 → 방송 진열 순서) 그대로.
+            //   그 외에는 표시 순서만 바꾼다(DB의 sort_order·is_pinned는 안 건드림).
+            const sorted =
+              productSort === "default"
+                ? filtered
+                : [...filtered].sort((a, b) => {
+                    // 가격 필드는 카드 표시(912행 helper)와 동일 기준
+                    const pa = Number((a as any).price ?? (a as any).sale_price ?? (a as any).selling_price ?? 0) || 0;
+                    const pb = Number((b as any).price ?? (b as any).sale_price ?? (b as any).selling_price ?? 0) || 0;
+                    if (productSort === "price_asc") return pa - pb;
+                    if (productSort === "price_desc") return pb - pa;
+                    // name: 코드 안의 숫자를 숫자로 비교(CH-2가 CH-10보다 앞)
+                    return String(a.product_name || "").localeCompare(String(b.product_name || ""), "ko", { numeric: true });
+                  });
             // 방송/쇼핑몰 상품 목록은 전부 표시(무한스크롤이 일부 기기에서 10개에서 멈추던 문제 해결).
             //   상품 수(방송 담긴분/카탈로그 ≤ 80)라 한 번에 렌더해도 가벼움.
-            const visibleItems = filtered;
+            const visibleItems = sorted;
             // 카테고리 탭: 기본(의류/신발/잡화) + 상품에 실제로 쓰인 커스텀 카테고리(음식 등) 자동 노출
             const PRESET_CATS = ["의류", "신발", "잡화"];
             const presentCats = Array.from(
@@ -4737,6 +4753,20 @@ export default function OrderPage() {
                       <button key={cat} type="button" onClick={() => { setCategoryFilter(cat); setVisibleProductCount(10); }} style={{ flex: 1, height: "36px", borderRadius: "999px", border: on ? "none" : "1px solid #D9C5CC", background: on ? "#7A1E47" : "#fff", color: on ? "#fff" : "#7A1E47", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>{cat}</button>
                     );
                   })}
+                </div>
+                {/* [2026-07-10] 정렬 드롭다운 — 표시 순서만 바꿈. 기본순이면 지금 방송 상품이 맨 위(고정) */}
+                <div style={{ marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                  <span style={{ fontSize: "12px", fontWeight: 700, color: "#8A8A8A" }}>총 {visibleItems.length}개</span>
+                  <select
+                    value={productSort}
+                    onChange={(e) => { setProductSort(e.target.value as typeof productSort); setVisibleProductCount(10); }}
+                    style={{ height: "34px", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 700, padding: "0 10px", cursor: "pointer", outline: "none" }}
+                  >
+                    <option value="default">기본순 (방송 순서)</option>
+                    <option value="price_asc">낮은 가격순</option>
+                    <option value="price_desc">높은 가격순</option>
+                    <option value="name">이름순</option>
+                  </select>
                 </div>
                 {visibleItems.length === 0 ? (
                   <div style={{ marginTop: "14px", padding: "26px", textAlign: "center", color: "#999", fontSize: "14px", fontWeight: 700 }}>찾는 상품이 없어요. 아래 직접 입력으로 담아주세요.</div>
