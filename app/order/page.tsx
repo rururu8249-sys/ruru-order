@@ -5577,11 +5577,27 @@ export default function OrderPage() {
                 <span style={{ fontSize: "16px", fontWeight: 800, color: "#7B2D43" }}>문의하기</span>
                 <button type="button" onClick={() => setInquirySheetOpen(false)} aria-label="닫기" style={{ border: "none", background: "none", fontSize: "20px", color: "#999", cursor: "pointer" }}>✕</button>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px" }}>
-                <a href="https://youtube.com/channel/UCBbrUWUnHvq5Ldpxgy5GdMw?si=2wsmT_wEinvKzzEF" target="_blank" rel="noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", padding: "12px 4px", borderRadius: "10px", background: "#F5F3F0", textDecoration: "none" }}><span style={{ fontSize: "18px" }}>▶️</span><span style={{ fontSize: "10px", color: "#6B6460", fontWeight: 500 }}>유튜브</span></a>
-                <a href="https://pf.kakao.com/_RMxaqX" target="_blank" rel="noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", padding: "12px 4px", borderRadius: "10px", background: "#F5F3F0", textDecoration: "none" }}><span style={{ fontSize: "18px" }}>💬</span><span style={{ fontSize: "10px", color: "#6B6460", fontWeight: 500 }}>카톡채널</span></a>
-                <a href="https://band.us/@ruru8249" target="_blank" rel="noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", padding: "12px 4px", borderRadius: "10px", background: "#F5F3F0", textDecoration: "none" }}><span style={{ fontSize: "18px" }}>🎵</span><span style={{ fontSize: "10px", color: "#6B6460", fontWeight: 500 }}>밴드</span></a>
-                <a href="https://www.instagram.com/ruru8249_?igsh=MXR3Z2xnYmI1cG0ybQ==" target="_blank" rel="noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", padding: "12px 4px", borderRadius: "10px", background: "#F5F3F0", textDecoration: "none" }}><span style={{ fontSize: "18px" }}>📷</span><span style={{ fontSize: "10px", color: "#6B6460", fontWeight: 500 }}>인스타</span></a>
+              {/* [2026-07-10 사장님 지침] 카톡채널 = 1:1 문의 주 채널 → 가로 한 줄 단독 배치.
+                  나머지(유튜브·밴드·인스타)는 아래 한 줄 3칸. 링크 주소는 전부 기존 그대로. */}
+              <a
+                href="https://pf.kakao.com/_RMxaqX"
+                target="_blank"
+                rel="noreferrer"
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", padding: "15px 12px", borderRadius: "12px", background: "#FEE500", textDecoration: "none", marginBottom: "8px" }}
+              >
+                {/* 카카오톡 말풍선 아이콘(노란 배경 + 갈색 말풍선 = 카카오 공식 조합) */}
+                <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden focusable="false">
+                  <path
+                    fill="#3C1E1E"
+                    d="M12 3C6.9 3 2.8 6.3 2.8 10.3c0 2.6 1.7 4.9 4.3 6.2-.2.7-.7 2.5-.8 2.9 0 0 0 .2.1.2h.2c.3-.1 2.7-1.8 3.4-2.3.6.1 1.3.2 2 .2 5.1 0 9.2-3.3 9.2-7.2S17.1 3 12 3z"
+                  />
+                </svg>
+                <span style={{ fontSize: "15px", color: "#3C1E1E", fontWeight: 800 }}>카톡채널로 문의하기</span>
+              </a>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+                <a href="https://youtube.com/channel/UCBbrUWUnHvq5Ldpxgy5GdMw?si=2wsmT_wEinvKzzEF" target="_blank" rel="noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", padding: "12px 4px", borderRadius: "10px", background: "#F5F3F0", textDecoration: "none" }}><span style={{ fontSize: "18px" }}>▶️</span><span style={{ fontSize: "11px", color: "#6B6460", fontWeight: 600 }}>유튜브</span></a>
+                <a href="https://band.us/@ruru8249" target="_blank" rel="noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", padding: "12px 4px", borderRadius: "10px", background: "#F5F3F0", textDecoration: "none" }}><span style={{ fontSize: "18px" }}>🎵</span><span style={{ fontSize: "11px", color: "#6B6460", fontWeight: 600 }}>밴드</span></a>
+                <a href="https://www.instagram.com/ruru8249_?igsh=MXR3Z2xnYmI1cG0ybQ==" target="_blank" rel="noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", padding: "12px 4px", borderRadius: "10px", background: "#F5F3F0", textDecoration: "none" }}><span style={{ fontSize: "18px" }}>📷</span><span style={{ fontSize: "11px", color: "#6B6460", fontWeight: 600 }}>인스타</span></a>
               </div>
             </div>
           </div>
