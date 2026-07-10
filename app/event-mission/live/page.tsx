@@ -211,7 +211,7 @@ export default function MissionLiveWidget() {
             >
               {/* [2026-07-10 사장님 지침] "다 같이 참여" 뉘앙스 추가 + 글씨 크게 */}
               <span style={{ fontSize: "1.15em" }}>🎯</span>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>다 같이 100% 목표달성 이벤트</span>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>100% 목표달성 선물 이벤트</span>
             </div>
             {/* 장면 B: 진행 바 + 보상 (바 안에 % 오버레이) */}
             <div
@@ -228,11 +228,12 @@ export default function MissionLiveWidget() {
               }}
             >
               <span style={{ fontSize: 26, flexShrink: 0, textShadow: "0 2px 5px rgba(0,0,0,0.8)" }}>🎁</span>
-              {/* [2026-07-10] 바가 가로를 다 먹어 글씨가 작아지던 것 → 바를 고정폭(150px)으로 줄이고 글씨를 키움 */}
+              {/* [2026-07-10] 바가 가로를 다 먹어 글씨가 작아지던 것 → 바를 고정폭으로 줄이고 글씨를 키움.
+                  방송 실화면에서 문구가 "전원 선…"으로 잘려 150 → 120px로 한 번 더 축소. */}
               <span
                 style={{
                   position: "relative",
-                  width: 150,
+                  width: 120,
                   flexShrink: 0,
                   height: 26,
                   background: "rgba(255,255,255,0.3)",
@@ -284,18 +285,19 @@ export default function MissionLiveWidget() {
                 {/* [2026-07-10] 문구 근거(업계 검색):
                       ① Goal-Gradient — 목표에 가까울수록 행동이 빨라짐 → 90%↑엔 "조금만 더!" 별도 문구
                       ② 행동형 카피 — "N 남음"보다 "N 채우면 ○○이 열려요"가 전환이 높음 → "되면"→"채우면", "오픈" */}
+                {/* 방송 실화면에서 잘려서 문구를 짧게(사장님 지침) */}
                 {near ? (
                   <>
                     조금만 더!{" "}
                     <span style={{ color: "#F5C451" }}>
-                      곧 {reward > 0 ? `전원 ${won(reward)}P` : "전원"} 선물 오픈!
+                      곧 전원 {reward > 0 ? `${won(reward)}P ` : ""}선물!
                     </span>
                   </>
                 ) : (
                   <>
-                    100% 채우면{" "}
+                    100%{" "}
                     <span style={{ color: "#F5C451" }}>
-                      {reward > 0 ? `전원 ${won(reward)}P 선물 오픈!` : "전원 선물 오픈!"}
+                      {reward > 0 ? `전원 ${won(reward)}P 선물 이벤트` : "선물 이벤트"}
                     </span>
                   </>
                 )}
