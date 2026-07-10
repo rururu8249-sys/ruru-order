@@ -144,23 +144,36 @@ function isSoldOutWidgetProduct(p: AnyProduct | null): boolean {
   return Number.isFinite(stock) && stock <= 0;
 }
 
-// 입금확인 폭죽 파티클(표시 전용) — 좌하단에서 위/바깥으로 흩어짐. 브랜드 톤(버건디/핑크/골드).
+// 주문성공/입금완료/카드결제완료 폭죽(표시 전용) — 카드 밖에서 사방으로 시원하게 퍼진다.
+//   [2026-07-09] 방송에서 잘 보이도록 입자 14 → 26개, 크기·비산거리 확대.
 const CONFETTI_PIECES = [
-  { tx: "-46px", ty: "-70px", r: "200deg", color: "#7B2D43", size: 8, round: false, dur: 1.2 },
-  { tx: "-18px", ty: "-96px", r: "-160deg", color: "#FFD9E0", size: 7, round: true, dur: 1.3 },
-  { tx: "16px", ty: "-104px", r: "140deg", color: "#F5C24B", size: 9, round: false, dur: 1.25 },
-  { tx: "48px", ty: "-88px", r: "-220deg", color: "#7B2D43", size: 7, round: true, dur: 1.15 },
-  { tx: "74px", ty: "-58px", r: "180deg", color: "#FFD9E0", size: 8, round: false, dur: 1.3 },
-  { tx: "-66px", ty: "-44px", r: "-120deg", color: "#F5C24B", size: 6, round: true, dur: 1.1 },
-  { tx: "90px", ty: "-30px", r: "240deg", color: "#FFD9E0", size: 9, round: false, dur: 1.35 },
-  { tx: "-30px", ty: "-80px", r: "160deg", color: "#F5C24B", size: 7, round: true, dur: 1.2 },
-  { tx: "34px", ty: "-72px", r: "-200deg", color: "#7B2D43", size: 8, round: false, dur: 1.25 },
-  { tx: "-86px", ty: "-58px", r: "120deg", color: "#FFD9E0", size: 6, round: true, dur: 1.15 },
-  { tx: "60px", ty: "-100px", r: "-140deg", color: "#F5C24B", size: 8, round: false, dur: 1.4 },
-  { tx: "4px", ty: "-118px", r: "260deg", color: "#7B2D43", size: 7, round: true, dur: 1.3 },
-  { tx: "-54px", ty: "-90px", r: "-180deg", color: "#FFD9E0", size: 9, round: false, dur: 1.35 },
-  { tx: "104px", ty: "-46px", r: "150deg", color: "#F5C24B", size: 6, round: true, dur: 1.2 },
-] as const;
+  { tx: "104px", ty: "-38px", r: "-232deg", color: "#7B2D43", size: 11, round: true, dur: 1.49 },
+  { tx: "71px", ty: "-34px", r: "-348deg", color: "#FFD9E0", size: 10, round: false, dur: 1.45 },
+  { tx: "115px", ty: "-69px", r: "-101deg", color: "#F5C24B", size: 8, round: false, dur: 1.15 },
+  { tx: "98px", ty: "-74px", r: "-397deg", color: "#22c55e", size: 9, round: true, dur: 1.15 },
+  { tx: "92px", ty: "-84px", r: "-419deg", color: "#ffffff", size: 12, round: false, dur: 1.17 },
+  { tx: "66px", ty: "-73px", r: "-414deg", color: "#6FC3E8", size: 12, round: false, dur: 1.45 },
+  { tx: "45px", ty: "-61px", r: "-88deg", color: "#7B2D43", size: 8, round: true, dur: 1.43 },
+  { tx: "45px", ty: "-75px", r: "53deg", color: "#FFD9E0", size: 11, round: false, dur: 1.19 },
+  { tx: "36px", ty: "-77px", r: "91deg", color: "#F5C24B", size: 12, round: false, dur: 1.59 },
+  { tx: "31px", ty: "-88px", r: "-329deg", color: "#22c55e", size: 12, round: true, dur: 1.44 },
+  { tx: "23px", ty: "-91px", r: "222deg", color: "#ffffff", size: 8, round: false, dur: 1.43 },
+  { tx: "11px", ty: "-77px", r: "-418deg", color: "#6FC3E8", size: 12, round: false, dur: 1.22 },
+  { tx: "7px", ty: "-138px", r: "335deg", color: "#7B2D43", size: 10, round: true, dur: 1.38 },
+  { tx: "-6px", ty: "-128px", r: "200deg", color: "#FFD9E0", size: 10, round: false, dur: 1.25 },
+  { tx: "-14px", ty: "-92px", r: "-41deg", color: "#F5C24B", size: 8, round: false, dur: 1.44 },
+  { tx: "-33px", ty: "-133px", r: "473deg", color: "#22c55e", size: 10, round: true, dur: 1.54 },
+  { tx: "-36px", ty: "-100px", r: "-391deg", color: "#ffffff", size: 8, round: false, dur: 1.41 },
+  { tx: "-39px", ty: "-82px", r: "160deg", color: "#6FC3E8", size: 9, round: false, dur: 1.66 },
+  { tx: "-63px", ty: "-106px", r: "-460deg", color: "#7B2D43", size: 13, round: true, dur: 1.15 },
+  { tx: "-84px", ty: "-113px", r: "102deg", color: "#FFD9E0", size: 10, round: false, dur: 1.52 },
+  { tx: "-98px", ty: "-108px", r: "477deg", color: "#F5C24B", size: 12, round: false, dur: 1.58 },
+  { tx: "-58px", ty: "-53px", r: "-349deg", color: "#22c55e", size: 10, round: true, dur: 1.38 },
+  { tx: "-62px", ty: "-47px", r: "-416deg", color: "#ffffff", size: 13, round: false, dur: 1.52 },
+  { tx: "-122px", ty: "-74px", r: "372deg", color: "#6FC3E8", size: 10, round: false, dur: 1.53 },
+  { tx: "-103px", ty: "-49px", r: "-494deg", color: "#7B2D43", size: 11, round: true, dur: 1.31 },
+  { tx: "-139px", ty: "-51px", r: "-301deg", color: "#FFD9E0", size: 11, round: false, dur: 1.14 },
+];
 
 export default function ProductWidgetClient() {
   const [pinned, setPinned] = useState<AnyProduct | null>(null);
@@ -471,8 +484,26 @@ export default function ProductWidgetClient() {
                   pointerEvents: "none",
                 }}
               >
-                <span style={{ fontSize: "13px", fontWeight: 900, letterSpacing: "0.12em", color: "#fff" }}>SOLD OUT</span>
-                <span style={{ fontSize: "11px", fontWeight: 800, color: "rgba(255,255,255,0.85)" }}>품절</span>
+                {/* letter-spacing은 마지막 글자 뒤에도 공백을 넣어 가운데 정렬이 왼쪽으로 치우친다.
+                    → textIndent로 그만큼 오른쪽으로 밀어 정확히 가운데 오게 보정. */}
+                <span
+                  style={{
+                    fontSize: "30px", fontWeight: 900, lineHeight: 1, color: "#fff",
+                    letterSpacing: "0.06em", textIndent: "0.06em",
+                    textShadow: OUTLINE_TEXT,
+                  }}
+                >
+                  SOLD OUT
+                </span>
+                <span
+                  style={{
+                    marginTop: "6px", fontSize: "17px", fontWeight: 900,
+                    letterSpacing: "0.22em", textIndent: "0.22em",
+                    color: "#fff", background: "#C0392B", borderRadius: "999px", padding: "3px 18px",
+                  }}
+                >
+                  품절
+                </span>
               </div>
             ) : null}
 
@@ -553,27 +584,6 @@ export default function ProductWidgetClient() {
               </div>
             ) : null}
 
-            {/* 폭죽 — 카드 중앙에서 터짐 */}
-            {confettiOn ? (
-              <div key={confettiKey} style={{ position: "absolute", left: "50%", top: "42%", width: 0, height: 0, pointerEvents: "none", zIndex: 6 }}>
-                {CONFETTI_PIECES.map((p, i) => (
-                  <span
-                    key={i}
-                    style={{
-                      position: "absolute",
-                      width: `${p.size}px`,
-                      height: `${p.size}px`,
-                      borderRadius: p.round ? "50%" : "2px",
-                      background: p.color,
-                      ["--tx" as any]: p.tx,
-                      ["--ty" as any]: p.ty,
-                      ["--r" as any]: p.r,
-                      animation: `ruruConfetti ${p.dur}s ease-out forwards`,
-                    }}
-                  />
-                ))}
-              </div>
-            ) : null}
           </div>
         ) : currentToast ? (
           // 띄운 상품이 없을 때도 주문/입금 알림은 보이게(카드 없이 배너만)
@@ -590,6 +600,29 @@ export default function ProductWidgetClient() {
             {currentToast.detail ? (
               <div style={{ marginTop: "4px", display: "inline-block", maxWidth: "100%", fontSize: "12px", fontWeight: 900, color: currentToast.tone === "green" ? "#0b3d1e" : "#0b2a5e", background: "#fff", borderRadius: "999px", padding: "3px 9px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentToast.detail}</div>
             ) : null}
+          </div>
+        ) : null}
+
+        {/* 폭죽 — 카드 밖(앵커)에서 터뜨려야 카드 overflow:hidden 에 안 잘리고 시원하게 퍼진다.
+            주문성공/입금완료/카드결제완료 어떤 알림이든 1회 재생(표시 전용). */}
+        {confettiOn ? (
+          <div key={confettiKey} style={{ position: "absolute", left: "50%", top: "62%", width: 0, height: 0, pointerEvents: "none", zIndex: 9 }}>
+            {CONFETTI_PIECES.map((p, i) => (
+              <span
+                key={i}
+                style={{
+                  position: "absolute",
+                  width: `${p.size}px`,
+                  height: `${p.size}px`,
+                  borderRadius: p.round ? "50%" : "2px",
+                  background: p.color,
+                  ["--tx" as any]: p.tx,
+                  ["--ty" as any]: p.ty,
+                  ["--r" as any]: p.r,
+                  animation: `ruruConfetti ${p.dur}s ease-out forwards`,
+                }}
+              />
+            ))}
           </div>
         ) : null}
       </div>
