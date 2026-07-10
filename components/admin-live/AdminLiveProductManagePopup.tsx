@@ -413,6 +413,14 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
+  // 현재 위젯에 고정된 상품 id ("" 이면 순환 중). products 로드 시 동기화 + 고정/해제 시 즉시 반영.
+  const [pinnedId, setPinnedId] = useState<string>("");
+  useEffect(() => {
+    const pinned = products.find((p) => pickBoolean(p, ["is_pinned", "pinned"], false));
+    setPinnedId(pinned ? productId(pinned) : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products]);
+
   // 선택 방송의 broadcast_products 목록 로드 (sort_order순, products와 매칭)
   const reloadBcProducts = async (selId: string) => {
     if (!selId) {
@@ -1026,10 +1034,32 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       // 기존 pinSelected와 동일 테이블/컬럼: is_pinned 해제
       const { error } = await adminCatalogWrite({ table: "products", op: "update", values: { is_pinned: false }, filters: [{ type: "eq", col: "id", val: id }] });
       if (error) throw error;
+      setPinnedId("");
       window.dispatchEvent(new Event("ruru-live-product-updated"));
-      showAdminToast("고정을 해제했어요.", "success");
+      showAdminToast("고정을 해제했어요. 위젯이 다시 순환합니다.", "success");
     } catch (e) {
       showAdminToast("고정 해제 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally {
+      setBusyId("");
+    }
+  };
+
+  // [2026-07-10] 방송 상품 탭에서 바로 "이 상품만 위젯 고정".
+  //   기존 pinSelected(일괄 고정)와 완전히 동일한 방식 — 전체 고정 해제 후 이 상품만 is_pinned=true.
+  //   위젯(ProductWidgetClient)은 is_pinned 상품이 있으면 그것만 띄우고, 없으면 순환한다.
+  const pinSingle = async (p: ProductRow) => {
+    const id = productId(p);
+    if (!id) return;
+    setBusyId(id);
+    try {
+      await adminCatalogWrite({ table: "products", op: "update", values: { is_pinned: false }, filters: [{ type: "eq", col: "is_pinned", val: true }] });
+      const { error } = await adminCatalogWrite({ table: "products", op: "update", values: { is_pinned: true }, filters: [{ type: "eq", col: "id", val: id }] });
+      if (error) throw error;
+      setPinnedId(id);
+      window.dispatchEvent(new Event("ruru-live-product-updated"));
+      showAdminToast("이 상품만 위젯에 고정했어요.", "success");
+    } catch (e) {
+      showAdminToast("상품 고정 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
     } finally {
       setBusyId("");
     }
@@ -1535,6 +1565,24 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             <div style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
                             <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)", marginTop: "2px" }}>{money(productPrice(p))}</div>
                           </div>
+                          {/* [2026-07-10] 방송 중 "이 상품만 위젯에 띄우기". 고정 중이면 눌러서 해제(=다시 순환). */}
+                          {!bcCopyMode ? (
+                            <button
+                              type="button"
+                              disabled={busyId === pid}
+                              onClick={(e) => { e.stopPropagation(); void (pinnedId === pid ? unpinSingle(p) : pinSingle(p)); }}
+                              title={pinnedId === pid ? "고정 해제 — 위젯이 다시 순환합니다" : "이 상품만 위젯에 고정합니다"}
+                              style={{
+                                flexShrink: 0, fontSize: "11px", fontWeight: 800, borderRadius: "6px", padding: "6px 10px",
+                                cursor: busyId === pid ? "wait" : "pointer", opacity: busyId === pid ? 0.6 : 1,
+                                color: pinnedId === pid ? "#fff" : "var(--color-ink-soft)",
+                                background: pinnedId === pid ? "var(--color-rose-deep)" : "var(--color-surface-2)",
+                                border: "1px solid " + (pinnedId === pid ? "var(--color-rose-deep)" : "var(--color-line)"),
+                              }}
+                            >
+                              {pinnedId === pid ? "📌 고정중" : "📌 고정"}
+                            </button>
+                          ) : null}
                           <button type="button" onClick={(e) => { e.stopPropagation(); editProduct(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }}>수정</button>
                           <button type="button" disabled={bcBusy} onClick={(e) => { e.stopPropagation(); void removeBcProduct(pid); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", border: "none", borderRadius: "6px", padding: "6px 10px", cursor: bcBusy ? "wait" : "pointer", opacity: bcBusy ? 0.6 : 1 }}>빼기</button>
                         </div>
