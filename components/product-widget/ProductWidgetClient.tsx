@@ -408,7 +408,11 @@ export default function ProductWidgetClient() {
   //   ② 카드 비율 1:1 → 3:4 (옷 사진이 세로로 길어서, 정사각형이면 글씨가 옷을 덮음)
   //   ③ 카드 위에 "📱 주문서 QR" 블록을 붙여 한 세트로 이동
   //   ※ 표시 전용 — 실시간 구독/금액 컬럼/중복가드/드래그 저장 로직은 무변경.
-  const CARD = 240; // 위젯 폭(px). OBS 소스 크기로 더 키울 수 있음.
+  // 위젯 전체 폭(px). QR·상품카드가 이 폭을 공유한다.
+  //   전체 높이 ≈ QR블록(폭+헤더 약 23px) + 간격 6px + 카드(폭×4/3)
+  //   예) 200 → 약 496px  /  240 → 약 590px
+  //   [2026-07-09] 방송화면에서 세로가 어깨 아래까지 내려와 240 → 200으로 축소.
+  const CARD = 200;
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "transparent", pointerEvents: "none", fontFamily: "Pretendard, Arial, sans-serif" }}>
@@ -433,11 +437,11 @@ export default function ProductWidgetClient() {
             animation: "ruruWidgetIn 0.5s ease",
           }}
         >
-          <div style={{ padding: "5px 0", textAlign: "center", fontSize: "14px", fontWeight: 900, color: "#fff", background: "#7B2D43", lineHeight: 1.15 }}>
+          <div style={{ padding: "4px 0", textAlign: "center", fontSize: "13px", fontWeight: 900, color: "#fff", background: "#7B2D43", lineHeight: 1.15 }}>
             📱 주문서 QR
           </div>
-          <div style={{ padding: "6px", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <QRCodeSVG value={ORDER_URL} size={CARD - 12} level="M" bgColor="#ffffff" fgColor="#111111" style={{ width: "100%", height: "auto", display: "block" }} />
+          <div style={{ padding: "5px", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <QRCodeSVG value={ORDER_URL} size={CARD - 10} level="M" bgColor="#ffffff" fgColor="#111111" style={{ width: "100%", height: "auto", display: "block" }} />
           </div>
         </div>
 
