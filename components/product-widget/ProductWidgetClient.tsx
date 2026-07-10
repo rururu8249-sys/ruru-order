@@ -413,6 +413,9 @@ export default function ProductWidgetClient() {
   //   예) 200 → 약 496px  /  240 → 약 590px
   //   [2026-07-09] 방송화면에서 세로가 어깨 아래까지 내려와 240 → 200으로 축소.
   const CARD = 200;
+  // QR 라벨 세로 띠 폭 / QR 실제 크기(정사각형 유지). 블록 높이 = QR_SIZE + 패딩(10).
+  const QR_LABEL_W = 30;
+  const QR_SIZE = CARD - QR_LABEL_W - 10;
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "transparent", pointerEvents: "none", fontFamily: "Pretendard, Arial, sans-serif" }}>
@@ -437,11 +440,39 @@ export default function ProductWidgetClient() {
             animation: "ruruWidgetIn 0.5s ease",
           }}
         >
-          <div style={{ padding: "4px 0", textAlign: "center", fontSize: "13px", fontWeight: 900, color: "#fff", background: "#7B2D43", lineHeight: 1.15 }}>
-            📱 주문서 QR
-          </div>
-          <div style={{ padding: "5px", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <QRCodeSVG value={ORDER_URL} size={CARD - 10} level="M" bgColor="#ffffff" fgColor="#111111" style={{ width: "100%", height: "auto", display: "block" }} />
+          {/* [2026-07-09 사장님 선택 B안] "주문서 QR" 라벨을 상단 가로 헤더 → 왼쪽 세로 띠로.
+              QR은 정사각형이라 헤더를 위에 두면 그만큼 QR을 줄여야 했음(스캔 불리).
+              세로 띠로 옮기면 같은 높이에서 QR을 더 크게 쓸 수 있다.
+              블록 높이 ≈ QR(160) + 상하 패딩 10 = 약 170px. */}
+          <div style={{ display: "flex", background: "#fff" }}>
+            <div
+              style={{
+                width: `${QR_LABEL_W}px`,
+                background: "#7B2D43",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <span
+                style={{
+                  writingMode: "vertical-rl",
+                  textOrientation: "upright",
+                  color: "#fff",
+                  fontSize: "15px",
+                  fontWeight: 900,
+                  letterSpacing: "0.06em",
+                  whiteSpace: "nowrap",
+                  lineHeight: 1,
+                }}
+              >
+                주문서 QR
+              </span>
+            </div>
+            <div style={{ flex: 1, padding: "5px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <QRCodeSVG value={ORDER_URL} size={QR_SIZE} level="M" bgColor="#ffffff" fgColor="#111111" style={{ display: "block" }} />
+            </div>
           </div>
         </div>
 
