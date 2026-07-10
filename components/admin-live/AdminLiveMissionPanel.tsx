@@ -5,6 +5,7 @@
 //   - "구매자 전원 지급"(돈)은 2단계라 여기엔 없음(읽기/설정 전용).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useBulkPointGrant } from "./useBulkPointGrant";
+import { useLiveOrderGiftAdd } from "./useLiveOrderGiftAdd";
 import { MISSION_PAYOUT_MEMO } from "@/lib/mission";
 
 type GoalType = "count" | "amount";
@@ -153,7 +154,7 @@ export default function AdminLiveMissionPanel() {
 
   // ── 2단계: 구매자 전원 지급 ──
   const { running: paying, grant } = useBulkPointGrant();
-  const [payout, setPayout] = useState<{ count: number; reward: number; total: number; alreadyPaidCount: number; broadcastTitle: string; allowDup: boolean; buyers: Buyer[] } | null>(null);
+  const [payout, setPayout] = useState<{ count: number; reward: number; total: number; alreadyPaidCount: number; totalBuyers: number; broadcastTitle: string; allowDup: boolean; buyers: Buyer[] } | null>(null);
   const [allowDup, setAllowDup] = useState(false); // 중복 지급 허용(이미 받은 사람도 다시)
   const [payMsg, setPayMsg] = useState("");
   const [executing, setExecuting] = useState(false);
@@ -163,13 +164,41 @@ export default function AdminLiveMissionPanel() {
   const [histPeriod, setHistPeriod] = useState<"today" | "week" | "month" | "date">("today");
   const [histDate, setHistDate] = useState(""); // 날짜선택 yyyy-mm-dd(KST)
 
+  // ── 포인트가 아닌 선물(사은품 등)을 주문서에 0원 행으로 넣기 ──
+  const { running: giftRunning, addGiftToBuyers } = useLiveOrderGiftAdd();
+  const [giftName, setGiftName] = useState("");
+  const [giftAllowDup, setGiftAllowDup] = useState(false); // 같은 주문서에 같은 선물 또 넣기
+  const [giftMsg, setGiftMsg] = useState("");
+
+  const doAddGift = async () => {
+    if (!payout || giftRunning) return;
+    const name = giftName.trim();
+    if (!name) {
+      setGiftMsg("선물 이름을 입력하세요.");
+      return;
+    }
+    const ok = window.confirm(
+      `아래 ${payout.count}명의 가장 최근 주문서에\n"🎁 ${name}" 을(를) 0원으로 추가할까요?\n\n` +
+        `· 주문 총금액·입금매칭·재고는 바뀌지 않습니다\n` +
+        `· 송장·물건챙기기 목록에 선물이 함께 나옵니다\n` +
+        (giftAllowDup ? `· ⚠️ 중복 허용 — 같은 주문서에 이미 있어도 또 추가됩니다` : `· 같은 주문서에 이미 있으면 건너뜁니다`)
+    );
+    if (!ok) return;
+    setGiftMsg("");
+    const r = await addGiftToBuyers(payout.buyers.map((b) => ({ phone: b.phone, nickname: b.nickname })), name, giftAllowDup);
+    const parts = [`선물 추가 ${r.success.length}명`];
+    if (r.skipped.length) parts.push(`건너뜀 ${r.skipped.length}명`);
+    if (r.failed.length) parts.push(`실패 ${r.failed.length}명(${r.failed[0]?.reason ?? ""})`);
+    setGiftMsg(parts.join(" · "));
+  };
+
   const openPayout = async () => {
     setPayMsg("");
     try {
       const res = await fetch("/api/admin-live/mission", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "payout_preview", allowDup }) });
       const j = await res.json();
       if (!j.ok) { setPayMsg(j.message || "조회 실패"); return; }
-      setPayout({ count: j.count, reward: j.reward, total: j.total, alreadyPaidCount: j.alreadyPaidCount || 0, broadcastTitle: j.broadcastTitle || "", allowDup: !!j.allowDup, buyers: Array.isArray(j.buyers) ? j.buyers : [] });
+      setPayout({ count: j.count, reward: j.reward, total: j.total, alreadyPaidCount: j.alreadyPaidCount || 0, totalBuyers: j.totalBuyers || 0, broadcastTitle: j.broadcastTitle || "", allowDup: !!j.allowDup, buyers: Array.isArray(j.buyers) ? j.buyers : [] });
     } catch (e) {
       setPayMsg("조회 실패: " + (e instanceof Error ? e.message : String(e)));
     }
@@ -205,10 +234,10 @@ export default function AdminLiveMissionPanel() {
     }
   };
 
-  // 이벤트 종료: 미션 끄기(active=false 저장 → 위젯 숨김) + 지급 버튼 열림
+  // 이벤트 종료: 미션 끄기(active=false 저장 → 위젯 숨김) + 지급 버튼 열림 + 선물 줄 명단 자동 표시
   const endEvent = async () => {
     if (ending) return;
-    if (!window.confirm("이벤트를 종료할까요?\n\n· 방송 위젯이 꺼집니다(숨김)\n· '구매자 전원 지급' 버튼이 열립니다\n(지급은 방송이 켜져 있는 동안 해주세요)")) return;
+    if (!window.confirm("이벤트를 종료할까요?\n\n· 방송 위젯이 꺼집니다(숨김)\n· 선물 줘야 할 명단이 바로 표시됩니다\n· '구매자 전원 지급' 버튼이 열립니다\n(지급은 방송이 켜져 있는 동안 해주세요)")) return;
     setEnding(true);
     setMsg("");
     try {
@@ -223,6 +252,9 @@ export default function AdminLiveMissionPanel() {
         setSavedSnap(snapOf(false, goalType, goalValue, rewardAmount, title));
         setMsg("이벤트 종료됨 — 위젯 숨김, 지급 버튼이 열렸어요.");
         load();
+        // [2026-07-10 사장님 지침] 종료하고 선물 주는 걸 깜빡하는 사고 방지 →
+        //   종료 즉시 "선물 줘야 할 명단"을 자동으로 띄운다. (읽기 전용 조회 — 지급 아님)
+        await openPayout();
       } else {
         setMsg("종료 실패: " + (j.message || ""));
       }
@@ -462,19 +494,43 @@ export default function AdminLiveMissionPanel() {
       {payout ? (
         <div style={{ position: "fixed", inset: 0, zIndex: 140, background: "rgba(2,6,23,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={(e) => { if (e.target === e.currentTarget) setPayout(null); }}>
           <div style={{ width: "min(500px,94vw)", maxHeight: "88vh", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: 16, padding: 20 }}>
-            <div style={{ fontSize: 16, fontWeight: 800, color: "var(--color-rose-deep)", flexShrink: 0 }}>구매자 전원 포인트 지급 — 최종 확인</div>
+            {/* [2026-07-10] 포인트 이벤트가 아닐 수도 있음(사은품 등) → 제목·안내를 reward 유무로 분기 */}
+            <div style={{ fontSize: 16, fontWeight: 800, color: "var(--color-rose-deep)", flexShrink: 0 }}>
+              {payout.reward > 0 ? "구매자 전원 포인트 지급 — 최종 확인" : "🎁 선물 줘야 할 구매자 명단"}
+            </div>
             {payout.count === 0 ? (
-              <div style={{ marginTop: 12, fontSize: 14, color: "var(--color-danger-tx)", fontWeight: 700, lineHeight: 1.6 }}>이미 이 방송 구매자 전원에게 지급됐어요.<br />같은 사람은 중복 지급되지 않습니다{payout.alreadyPaidCount > 0 ? ` (이미 ${payout.alreadyPaidCount}명 지급됨)` : ""}.</div>
+              payout.totalBuyers === 0 ? (
+                <div style={{ marginTop: 12, fontSize: 14, color: "var(--color-ink-soft)", fontWeight: 700, lineHeight: 1.6 }}>
+                  이 이벤트 구간에 결제완료 구매자가 없어요.<br />선물 줄 대상이 없습니다.
+                </div>
+              ) : (
+                <div style={{ marginTop: 12, fontSize: 14, color: "var(--color-danger-tx)", fontWeight: 700, lineHeight: 1.6 }}>이미 이 방송 구매자 전원에게 지급됐어요.<br />같은 사람은 중복 지급되지 않습니다{payout.alreadyPaidCount > 0 ? ` (이미 ${payout.alreadyPaidCount}명 지급됨)` : ""}.</div>
+              )
             ) : (
               <>
                 <div style={{ marginTop: 8, fontSize: 13, color: "var(--color-ink-soft)", flexShrink: 0 }}>
-                  {payout.broadcastTitle ? `${payout.broadcastTitle} · ` : ""}아래 <b style={{ color: "var(--color-rose-deep)" }}>{payout.count}명</b>{payout.allowDup ? "(전원)" : "(신규)"}에게 1인당 <b style={{ color: "var(--color-rose-deep)" }}>{won(payout.reward)}P</b> 지급
-                  {payout.alreadyPaidCount > 0 ? (
-                    payout.allowDup
-                      ? <span style={{ color: "var(--color-danger-tx)", fontWeight: 700 }}> · ⚠️ 이미 받은 {payout.alreadyPaidCount}명도 또 지급(중복)</span>
-                      : <span style={{ color: "var(--color-ink-mute)" }}> · 이미 {payout.alreadyPaidCount}명은 지급됨(제외)</span>
-                  ) : null}
+                  {payout.broadcastTitle ? `${payout.broadcastTitle} · ` : ""}
+                  {payout.reward > 0 ? (
+                    <>
+                      아래 <b style={{ color: "var(--color-rose-deep)" }}>{payout.count}명</b>{payout.allowDup ? "(전원)" : "(신규)"}에게 1인당 <b style={{ color: "var(--color-rose-deep)" }}>{won(payout.reward)}P</b> 지급
+                      {payout.alreadyPaidCount > 0 ? (
+                        payout.allowDup
+                          ? <span style={{ color: "var(--color-danger-tx)", fontWeight: 700 }}> · ⚠️ 이미 받은 {payout.alreadyPaidCount}명도 또 지급(중복)</span>
+                          : <span style={{ color: "var(--color-ink-mute)" }}> · 이미 {payout.alreadyPaidCount}명은 지급됨(제외)</span>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      이 이벤트 결제완료 구매자 <b style={{ color: "var(--color-rose-deep)" }}>{payout.count}명</b>
+                    </>
+                  )}
                 </div>
+                {payout.reward <= 0 ? (
+                  <div style={{ marginTop: 8, padding: "9px 11px", borderRadius: 9, background: "var(--color-surface-2)", border: "1px solid var(--color-rose-line)", fontSize: 12.5, color: "var(--color-ink-soft)", lineHeight: 1.6, flexShrink: 0 }}>
+                    <b style={{ color: "var(--color-rose-deep)" }}>포인트가 설정되지 않았어요.</b> 사은품·무료배송 등 <b>포인트가 아닌 선물</b>이면 이 명단을 보고 직접 챙겨주세요.
+                    <br />포인트로 주시려면 창을 닫고 <b>구매자 1인당 포인트</b>를 입력·저장한 뒤 다시 종료/지급하세요.
+                  </div>
+                ) : null}
                 <div style={{ marginTop: 10, flex: 1, minHeight: 0, overflowY: "auto", border: "1px solid var(--color-surface-3)", borderRadius: 10 }}>
                   {payout.buyers.length === 0 ? (
                     <div style={{ padding: "16px", textAlign: "center", color: "var(--color-ink-mute)", fontSize: 13 }}>지급 대상(결제완료 구매자)이 없어요.</div>
@@ -490,12 +546,61 @@ export default function AdminLiveMissionPanel() {
                   )}
                 </div>
                 <div style={{ marginTop: 10, fontSize: 15, fontWeight: 800, color: "var(--color-rose-deep)", flexShrink: 0 }}>
-                  총 {payout.count}명 · 총 지급 <span style={{ color: "var(--color-ok-tx)" }}>{won(payout.total)}P</span>
+                  총 {payout.count}명
+                  {payout.reward > 0 ? (
+                    <> · 총 지급 <span style={{ color: "var(--color-ok-tx)" }}>{won(payout.total)}P</span></>
+                  ) : null}
+                </div>
+
+                {/* [2026-07-10 사장님 지침] 포인트가 아닌 선물(사은품 등)을 주문서에 0원 행으로 얹기.
+                    → 송장·물건챙기기에 함께 나와 선물을 빠뜨리지 않음. 총금액/재고/입금매칭 불변. */}
+                <div style={{ marginTop: 12, padding: "11px 12px", borderRadius: 10, border: "1.5px solid var(--color-rose-line)", background: "var(--color-surface-2)", flexShrink: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: "var(--color-rose-deep)" }}>🎁 선물을 주문서에 넣기 (포인트 아님)</div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: "var(--color-ink-mute)", lineHeight: 1.5 }}>
+                    위 {payout.count}명의 <b>가장 최근 주문서</b>에 0원으로 추가됩니다. 총금액·재고·입금매칭은 그대로예요.
+                  </div>
+                  <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                    <input
+                      value={giftName}
+                      onChange={(e) => setGiftName(e.target.value)}
+                      placeholder="선물 이름 (예: 수면양말)"
+                      style={{ flex: 1, minWidth: 0, padding: "9px 10px", borderRadius: 8, border: "1.5px solid var(--color-rose-line)", background: "var(--color-surface)", color: "var(--color-ink)", fontSize: 13 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={doAddGift}
+                      disabled={giftRunning || !giftName.trim()}
+                      style={{ flexShrink: 0, padding: "9px 14px", borderRadius: 8, border: "none", background: "var(--color-rose-deep)", color: "#fff", fontWeight: 800, fontSize: 13, cursor: giftRunning || !giftName.trim() ? "not-allowed" : "pointer", opacity: giftRunning || !giftName.trim() ? 0.5 : 1 }}
+                    >
+                      {giftRunning ? "넣는 중…" : "주문서에 넣기"}
+                    </button>
+                  </div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12, color: "var(--color-ink-soft)", cursor: "pointer" }}>
+                    <input type="checkbox" checked={giftAllowDup} onChange={(e) => setGiftAllowDup(e.target.checked)} />
+                    중복 허용 — 같은 주문서에 같은 선물이 있어도 또 추가 (꺼짐 = 건너뜀)
+                  </label>
+                  {giftMsg ? <div style={{ marginTop: 7, fontSize: 12.5, fontWeight: 700, color: "var(--color-ok-tx)" }}>{giftMsg}</div> : null}
                 </div>
               </>
             )}
             <div style={{ display: "flex", gap: 8, marginTop: 16, flexShrink: 0 }}>
-              <button type="button" onClick={() => setPayout(null)} style={{ flex: 1, padding: "11px", borderRadius: 10, border: "1.5px solid var(--color-rose-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontWeight: 700, cursor: "pointer" }}>취소</button>
+              <button type="button" onClick={() => setPayout(null)} style={{ flex: 1, padding: "11px", borderRadius: 10, border: "1.5px solid var(--color-rose-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontWeight: 700, cursor: "pointer" }}>{payout.reward > 0 ? "취소" : "닫기"}</button>
+              {/* 사은품 등 직접 챙길 때 쓰라고 명단 복사 (읽기 전용) */}
+              {payout.count > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const text = payout.buyers.map((b, i) => `${i + 1}. ${b.nickname} (${won(b.amount)}원)`).join("\n");
+                    navigator.clipboard?.writeText(text).then(
+                      () => setPayMsg("명단을 복사했어요."),
+                      () => setPayMsg("복사 실패 — 직접 선택해 복사하세요.")
+                    );
+                  }}
+                  style={{ flex: 1, padding: "11px", borderRadius: 10, border: "1.5px solid var(--color-rose-line)", background: "var(--color-surface)", color: "var(--color-rose-deep)", fontWeight: 800, cursor: "pointer" }}
+                >
+                  📋 명단 복사
+                </button>
+              ) : null}
               {payout.count > 0 && payout.reward > 0 ? (
                 <button type="button" onClick={doPayout} disabled={paying || executing} style={{ flex: 1, padding: "11px", borderRadius: 10, border: "none", background: "var(--color-ok-tx)", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: paying || executing ? 0.6 : 1 }}>{paying || executing ? "지급 중…" : `${won(payout.total)}P 지급 실행`}</button>
               ) : null}
