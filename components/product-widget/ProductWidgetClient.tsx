@@ -81,15 +81,14 @@ function colorsOf(p: AnyProduct | null): string {
 }
 
 // [2026-07-09 사장님 지침] 사이즈는 항상 "36(S)" 형태로 표시. 표시 전용 — 저장값은 안 건드림.
-const SIZE_NUM_TO_LETTER: Record<string, string> = { "36": "S", "38": "M", "40": "L", "42": "XL", "44": "XXL" };
-const SIZE_LETTER_TO_NUM: Record<string, string> = { S: "36", M: "38", L: "40", XL: "42", XXL: "44" };
+// [2026-07-10 사장님 지침] 36/38/40 세 개만 괄호로 알파벳 병기(app/order/page.tsx와 동일 규칙).
+//   4·6·8·10·12, S/M/L/XL/2XL, 250 등은 원문 그대로. (문자 S를 "36(S)"로 되돌리던 오표기 제거)
+const SIZE_NUM_TO_LETTER: Record<string, string> = { "36": "S", "38": "M", "40": "L" };
 function sizeDisplayLabel(raw: unknown): string {
   const v = String(raw ?? "").trim();
   if (!v) return "";
   if (SIZE_NUM_TO_LETTER[v]) return `${v}(${SIZE_NUM_TO_LETTER[v]})`;
-  const upper = v.toUpperCase();
-  if (SIZE_LETTER_TO_NUM[upper]) return `${SIZE_LETTER_TO_NUM[upper]}(${upper})`;
-  return v; // 매핑에 없는 사이즈(프리, 250 등)는 원래대로
+  return v; // 그 외 사이즈는 저장된 그대로
 }
 
 // 사이즈 옵션 — 방송에서 "사이즈 뭐 있어요?"를 줄이기 위해 위젯에도 표시
