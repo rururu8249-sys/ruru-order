@@ -24,6 +24,8 @@ const won = (n: number) => n.toLocaleString("ko-KR");
 export default function MissionLiveWidget() {
   const [data, setData] = useState<MissionData | null>(null);
   const [preview, setPreview] = useState(false);
+  // 바 폭(px). 기본 560 — 주문서 QR(200px) 왼쪽에 들어가는 크기. ?w=480 처럼 조절 가능.
+  const [barWidth, setBarWidth] = useState(560);
   const [phase, setPhase] = useState(0); // 0=설명 문구, 1=진행 바 (4초마다 전환)
   const [celebrate, setCelebrate] = useState(false); // 달성 순간 1회 반짝
   const wasDoneRef = useRef(false);
@@ -31,7 +33,10 @@ export default function MissionLiveWidget() {
   useEffect(() => {
     document.documentElement.style.background = "transparent";
     document.body.style.background = "transparent";
-    setPreview(new URLSearchParams(window.location.search).get("preview") === "1");
+    const q = new URLSearchParams(window.location.search);
+    setPreview(q.get("preview") === "1");
+    const w = Number(q.get("w"));
+    if (Number.isFinite(w) && w >= 240 && w <= 1200) setBarWidth(w);
     let alive = true;
     const load = async () => {
       try {
@@ -92,16 +97,20 @@ export default function MissionLiveWidget() {
       style={{
         fontFamily: "'Noto Sans KR', system-ui, sans-serif",
         display: "flex",
-        justifyContent: "center",
-        padding: "6px 10px",
+        // [2026-07-09] 주문서 QR 왼쪽에 붙일 수 있게 가운데 정렬 → 왼쪽 정렬로 변경.
+        //   OBS에서 소스를 QR 왼쪽으로 끌어다 놓으면 딱 맞는다.
+        justifyContent: "flex-start",
+        padding: "4px 6px",
         background: "transparent",
       }}
     >
       <style>{`@keyframes ruruPulse{0%,100%{opacity:1}50%{opacity:.55}}@keyframes ruruCelebrate{0%,100%{box-shadow:0 0 0 0 rgba(245,196,81,0),0 4px 14px rgba(0,0,0,0.18);transform:scale(1)}50%{box-shadow:0 0 18px 6px rgba(245,196,81,0.85),0 4px 14px rgba(0,0,0,0.28);transform:scale(1.015)}}`}</style>
       <div
         style={{
-          width: "min(96vw, 1080px)",
-          borderRadius: 13,
+          // [2026-07-09] 화면 전체를 가로지르던 바(1080px)를 QR 옆에 들어가는 크기로 축소.
+          //   ?w=560 처럼 쿼리로 폭을 조절할 수 있다(기본 560px).
+          width: `min(96vw, ${barWidth}px)`,
+          borderRadius: 11,
           background: panelBg,
           border,
           padding: "9px 18px",
@@ -126,16 +135,17 @@ export default function MissionLiveWidget() {
               justifyContent: "center",
               gap: 9,
               whiteSpace: "nowrap",
-              fontSize: "clamp(15px, 3.6vw, 22px)",
+              fontSize: "20px",
               fontWeight: 800,
               textShadow: "0 2px 5px rgba(0,0,0,0.8), 0 0 2px rgba(0,0,0,0.6)",
             }}
           >
-            <span style={{ fontSize: "1.15em" }}>🏆</span>
+            {/* [2026-07-09 사장님 지침] 달성 시 "선물이 펑펑펑" 안내 */}
+            <span style={{ fontSize: "1.15em" }}>🎉</span>
             <span>
-              목표 달성!{" "}
+              100% 목표달성! <span style={{ color: "#F5C451" }}>선물이 펑펑펑</span>
               {reward > 0 ? (
-                <span style={{ color: "#F5C451" }}>구매자 전원 {won(reward)}P 선물!</span>
+                <span style={{ color: "#F5C451" }}> — 전원 {won(reward)}P!</span>
               ) : null}
             </span>
           </div>
@@ -153,14 +163,14 @@ export default function MissionLiveWidget() {
                 whiteSpace: "nowrap",
                 opacity: phase === 0 ? 1 : 0,
                 transition: "opacity .55s ease",
-                fontSize: "clamp(15px, 3.6vw, 22px)",
+                fontSize: "20px",
                 fontWeight: 800,
                 textShadow: "0 2px 5px rgba(0,0,0,0.8), 0 0 2px rgba(0,0,0,0.6)",
               }}
             >
-              {/* [2026-07-06 사장님 지침] 기본멘트를 구매욕·선물욕 자극형으로 교체 (선물 금액은 장면B가 담당) */}
-              <span style={{ fontSize: "1.15em" }}>🔥</span>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>지금 내 주문 하나가 전원 선물을 앞당겨요!</span>
+              {/* [2026-07-09 사장님 지침] 장면A 문구를 "100% 목표달성 이벤트"로 (선물 금액은 장면B가 담당) */}
+              <span style={{ fontSize: "1.15em" }}>🎯</span>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>100% 목표달성 이벤트</span>
             </div>
             {/* 장면 B: 진행 바 + 보상 (바 안에 % 오버레이) */}
             <div
@@ -208,7 +218,7 @@ export default function MissionLiveWidget() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: "clamp(12px, 2.4vw, 15px)",
+                    fontSize: "14px",
                     fontWeight: 800,
                     color: "#fff",
                     textShadow: "0 1px 3px rgba(0,0,0,0.85)",
@@ -219,7 +229,7 @@ export default function MissionLiveWidget() {
               </span>
               <span
                 style={{
-                  fontSize: "clamp(14px, 3vw, 18px)",
+                  fontSize: "16px",
                   fontWeight: 800,
                   flexShrink: 0,
                   textShadow: "0 2px 5px rgba(0,0,0,0.8), 0 0 2px rgba(0,0,0,0.6)",
