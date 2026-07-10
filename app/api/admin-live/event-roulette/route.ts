@@ -1185,6 +1185,33 @@ async function markRewardDone(body: Record<string, unknown>) {
   return json({ ok: true, winner: data });
 }
 
+// [2026-07-10] 배지 마킹 폴백 — winnerId를 클라가 못 구했을 때 eventId(+닉네임)로 서버가 직접 찾아 마킹.
+//   기존 markRewardDone(winnerId 기준)은 무변경. 실패 경로만 보완한다.
+//   원인: 마킹 전 당첨자 행 조회를 브라우저 supabase로 하던 구조 → RLS/레이스로 실패하면
+//         "돈은 나갔는데 is_reward_done=false" → 재실행 시 중복지급(2026-07-05 쥬쥬엉니 2,000P 실제 발생).
+async function markRewardDoneByEvent(body: Record<string, unknown>) {
+  const supabase = getSupabaseAdmin();
+  const eventId = cleanText(body.eventId);
+  const nickname = cleanText(body.nickname);
+  const now = new Date().toISOString();
+
+  if (!eventId) return json({ ok: false, message: "eventId가 없습니다." }, 400);
+
+  let q = supabase.from("event_roulette_winners").select("id").eq("event_id", eventId);
+  if (nickname) q = q.eq("nickname", nickname);
+  const { data: rows, error: findError } = await q.order("created_at", { ascending: false }).limit(1);
+  if (findError) return json({ ok: false, message: findError.message }, 500);
+  const winnerId = String((rows as { id?: unknown }[] | null)?.[0]?.id ?? "");
+  if (!winnerId) return json({ ok: false, message: "당첨자 레코드를 찾지 못했습니다." }, 404);
+
+  const { error } = await supabase
+    .from("event_roulette_winners")
+    .update({ is_reward_done: true, reward_done_at: now, updated_at: now })
+    .eq("id", winnerId);
+  if (error) return json({ ok: false, message: error.message }, 500);
+  return json({ ok: true, winnerId });
+}
+
 async function deleteRouletteEvent(body: Record<string, unknown>) {
   const eventId = cleanText(body.eventId);
   const allowLiveDelete = body.allowLiveDelete === true;
@@ -1378,6 +1405,7 @@ export async function POST(request: NextRequest) {
     if (action === "spin_event") return spinEvent(body);
     if (action === "resolve_survival_event") return resolveSurvivalEvent(body);
     if (action === "mark_reward_done") return markRewardDone(body);
+    if (action === "mark_reward_done_by_event") return markRewardDoneByEvent(body);
     if (action === "delete_winner") return deleteWinnerRecord(body);
     if (action === "delete_event") return deleteRouletteEvent(body);
     if (action === "delete_test_records") return deleteTestRecords();

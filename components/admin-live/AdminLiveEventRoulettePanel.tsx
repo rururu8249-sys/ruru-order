@@ -541,30 +541,28 @@ export default function AdminLiveEventRoulettePanel({
       // 지급 성공 → 해당 당첨자 레코드 is_reward_done=true (영구 중복지급 게이트). 기존 mark_reward_done API 재사용.
       //   winnerId는 spin 응답이 직접 줌(winnerIdByEventRef) → 재조회(race/RLS) 불필요. 없을 때만 event_id로 재조회(최대 3회).
       if (evId) {
-        let winnerId: string | undefined = winnerIdByEventRef.current.get(evId) || undefined;
-        for (let i = 0; i < 3 && !winnerId; i++) {
-          const { data: wRow } = await supabase
-            .from("event_roulette_winners")
-            .select("id")
-            .eq("event_id", evId)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          winnerId = (wRow as { id?: string } | null)?.id;
-          if (!winnerId) await new Promise((r) => setTimeout(r, 600));
-        }
-        if (winnerId) {
+        // [2026-07-10 버그수정] 마킹이 실패하면 "돈은 나갔는데 잠금이 안 걸린" 상태가 되어 재실행 시 중복지급된다.
+        //   (2026-07-05 쥬쥬엉니 2,000P 실제 발생) → 마킹을 3회 재시도하고, winnerId를 못 구하면
+        //   서버가 eventId로 직접 찾아 마킹하는 폴백(mark_reward_done_by_event)을 쓴다. 돈 API는 무변경.
+        const winnerId: string | undefined = winnerIdByEventRef.current.get(evId) || undefined;
+        let marked = false;
+        for (let i = 0; i < 3 && !marked; i++) {
+          const body = winnerId
+            ? { action: "mark_reward_done", winnerId, isRewardDone: true }
+            : { action: "mark_reward_done_by_event", eventId: evId, nickname };
           const markRes = await requestJson<{ ok: boolean; message?: string }>("/api/admin-live/event-roulette", {
             method: "POST",
-            body: JSON.stringify({ action: "mark_reward_done", winnerId, isRewardDone: true }),
+            body: JSON.stringify(body),
           }).catch((e) => ({ ok: false, message: e instanceof Error ? e.message : String(e) }));
-          if (!markRes.ok) {
-            // 포인트는 이미 지급됨(재지급 X). 배지 마킹만 실패 → 운영자가 알도록 알리고 수동 처리 유도.
-            showAdminToast(`${nickname} 포인트는 지급됐지만 '지급완료' 배지 표시에 실패했어요. 당첨자 배지를 직접 눌러 지급완료로 바꿔주세요.`, "warning");
-          }
+          marked = !!markRes.ok;
+          if (!marked) await new Promise((r) => setTimeout(r, 700));
+        }
+        if (marked) {
           await loadEventsAndWinners();
         } else {
-          showAdminToast(`${nickname} 포인트는 지급됐지만 당첨 레코드를 못 찾아 배지 표시를 못 했어요. 새로고침 후 배지를 직접 눌러주세요.`, "warning");
+          // 포인트는 이미 지급됨(재지급 X). 배지 마킹만 실패 → 세션 잠금은 유지하고 운영자에게 알린다.
+          showAdminToast(`⚠️ ${nickname} 포인트는 지급됐지만 '지급완료' 배지 표시에 실패했어요. 중복지급 방지를 위해 배지를 직접 눌러 지급완료로 바꿔주세요.`, "warning");
+          await loadEventsAndWinners();
         }
       }
     } catch (e) {
@@ -665,14 +663,19 @@ export default function AdminLiveEventRoulettePanel({
         if (!payload.ok) throw new Error(payload.message || "포인트 지급 실패");
 
         // 지급 성공 → 그 당첨자 행만 지급완료로 잠금(영구 중복지급 게이트)
-        const markRes = await requestJson<{ ok: boolean; message?: string }>("/api/admin-live/event-roulette", {
-          method: "POST",
-          body: JSON.stringify({ action: "mark_reward_done", winnerId, isRewardDone: true }),
-        }).catch((e) => ({ ok: false, message: e instanceof Error ? e.message : String(e) }));
-
-        if (!markRes.ok) {
+        //   [2026-07-10] 마킹 실패 = 중복지급 위험 → 3회 재시도(룰렛과 동일 정책)
+        let marked = false;
+        for (let i = 0; i < 3 && !marked; i++) {
+          const markRes = await requestJson<{ ok: boolean; message?: string }>("/api/admin-live/event-roulette", {
+            method: "POST",
+            body: JSON.stringify({ action: "mark_reward_done", winnerId, isRewardDone: true }),
+          }).catch((e) => ({ ok: false, message: e instanceof Error ? e.message : String(e) }));
+          marked = !!markRes.ok;
+          if (!marked) await new Promise((r) => setTimeout(r, 700));
+        }
+        if (!marked) {
           // 포인트는 이미 지급됨(재지급 X). 배지 표시만 실패 → 운영자가 직접 배지 클릭하도록 안내.
-          showAdminToast(`${nick} 포인트는 지급됐지만 '지급완료' 배지 표시에 실패했어요. 배지를 직접 눌러주세요.`, "warning");
+          showAdminToast(`⚠️ ${nick} 포인트는 지급됐지만 '지급완료' 배지 표시에 실패했어요. 중복지급 방지를 위해 배지를 직접 눌러주세요.`, "warning");
         }
         paid.push(nick);
       } catch (e) {
