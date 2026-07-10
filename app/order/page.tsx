@@ -38,6 +38,7 @@ const normalizeEmptyProductOptionValue = (value: unknown) => {
 
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { HOWTO_DEFAULT, parseHowtoSteps } from "@/lib/howto";
 import { supabase } from "@/lib/supabase";
 import { isRemoteAreaAddress } from "@/lib/order/shippingAddress";
 import { formatOrderPhone, normalizeOrderPhone } from "@/lib/order/phone";
@@ -1098,11 +1099,11 @@ export default function OrderPage() {
   const [alertSheetOpen, setAlertSheetOpen] = useState(false);
   const [inquirySheetOpen, setInquirySheetOpen] = useState(false);
   const [noticeSheetOpen, setNoticeSheetOpen] = useState(false);
-  const [howToOpen, setHowToOpen] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const hideUntil = Number(localStorage.getItem("ruru_howto_hide_until") || 0);
-    return Date.now() > hideUntil;
-  });
+  // [2026-07-10] 주문 방법 팝업 — 관리자 설정(howto_enabled)이 켜져 있을 때만 뜬다.
+  //   설정을 읽기 전엔 안 띄운다(꺼둔 상태로 깜빡이는 것 방지). loadOrderSettings에서 연다.
+  const [howToOpen, setHowToOpen] = useState(false);
+  const [howToSteps, setHowToSteps] = useState(HOWTO_DEFAULT.steps);
+  const [howToWarn, setHowToWarn] = useState(HOWTO_DEFAULT.warn);
   const [videoOpen, setVideoOpen] = useState(true);
   const videoSlotRef = useRef<HTMLDivElement | null>(null);
   const livePlayerRef = useRef<HTMLDivElement | null>(null);
@@ -1737,6 +1738,8 @@ export default function OrderPage() {
         "point_earn_rate",
         "notice_text",
         "direct_input_enabled",
+        "howto_enabled",
+        "howto_steps",
         "popup_notice_enabled",
         "popup_notice_title",
         "popup_notice_text",
@@ -1780,6 +1783,22 @@ export default function OrderPage() {
     setDirectInputEnabled(
       String((data || []).find((i: any) => i.key === "direct_input_enabled")?.value || "true").trim() !== "false",
     );
+
+    // 주문 방법 팝업: 관리자 설정 ON + "오늘 하루 열지 않기"가 안 걸려 있으면 표시
+    const howtoOn = String((data || []).find((i: any) => i.key === "howto_enabled")?.value || "true").trim() !== "false";
+    const howtoCfg = parseHowtoSteps((data || []).find((i: any) => i.key === "howto_steps")?.value);
+    setHowToSteps(howtoCfg.steps);
+    setHowToWarn(howtoCfg.warn);
+    if (howtoOn) {
+      let hidden = false;
+      try {
+        const hideUntil = Number(localStorage.getItem("ruru_howto_hide_until") || "0");
+        hidden = Number.isFinite(hideUntil) && Date.now() < hideUntil;
+      } catch {
+        hidden = false;
+      }
+      if (!hidden) setHowToOpen(true);
+    }
 
     // 접속 팝업 공지: 설정값 반영 + "24시간 안 보기"가 안 걸려 있으면 접속하자마자 표시
     const pEnabled = String((data || []).find((i: any) => i.key === "popup_notice_enabled")?.value || "").trim() === "true";
@@ -5505,30 +5524,23 @@ export default function OrderPage() {
               <div style={{ width: "40px", height: "4px", borderRadius: "2px", background: "#E5E1DC", margin: "12px auto 18px" }} />
               <div style={{ fontSize: "18px", fontWeight: 800, color: "#1A1A1A", padding: "0 20px", marginBottom: "18px" }}>📌 주문 방법</div>
 
+              {/* [2026-07-10] 3단계 내용은 관리자 설정(howto_steps)에서 수정. 설정이 없으면 기본 문구. */}
               <div style={{ padding: "0 20px" }}>
-                <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", padding: "13px 0", borderBottom: "0.5px solid #E5E1DC" }}>
-                  <span style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#7A1E47", color: "#fff", fontSize: "14px", fontWeight: 800, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>1</span>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#1A1A1A" }}>방송에서 루루언니에게 접수 확인</div>
-                    <div style={{ fontSize: "12px", color: "#6B6460", marginTop: "3px" }}>채팅창에 상품명 · 옵션 · 수량 입력 후 루루언니 접수 완료 확인</div>
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", padding: "13px 0", borderBottom: "0.5px solid #E5E1DC" }}>
-                  <span style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#7A1E47", color: "#fff", fontSize: "14px", fontWeight: 800, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>2</span>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#1A1A1A" }}>여기서 상품 담고 주문서 제출</div>
-                    <div style={{ fontSize: "12px", color: "#6B6460", marginTop: "3px" }}>목록에서 상품 찾아 담기 → 주문서 제출</div>
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", padding: "13px 0" }}>
-                  <span style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#7A1E47", color: "#fff", fontSize: "14px", fontWeight: 800, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>3</span>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#1A1A1A" }}>안내 계좌로 입금</div>
-                    <span style={{ fontSize: "11px", color: "#C0392B", background: "#FFF0F0", borderRadius: "6px", padding: "4px 8px", display: "inline-block", marginTop: "4px", lineHeight: 1.6 }}>입금자명은 닉네임으로, 금액은 주문서 결제금액과 정확히 일치해야 자동 확인됩니다</span>
-                  </div>
-                </div>
+                {howToSteps.map((step, i) => {
+                  const last = i === howToSteps.length - 1;
+                  return (
+                    <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "14px", padding: "13px 0", borderBottom: last ? "none" : "0.5px solid #E5E1DC" }}>
+                      <span style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#7A1E47", color: "#fff", fontSize: "14px", fontWeight: 800, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{i + 1}</span>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: "14px", fontWeight: 700, color: "#1A1A1A" }}>{step.title}</div>
+                        {step.desc ? <div style={{ fontSize: "12px", color: "#6B6460", marginTop: "3px" }}>{step.desc}</div> : null}
+                        {last && howToWarn.trim() ? (
+                          <span style={{ fontSize: "11px", color: "#C0392B", background: "#FFF0F0", borderRadius: "6px", padding: "4px 8px", display: "inline-block", marginTop: "4px", lineHeight: 1.6 }}>{howToWarn}</span>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "0 20px", marginTop: "16px" }}>

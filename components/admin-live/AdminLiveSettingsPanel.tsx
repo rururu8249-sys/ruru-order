@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import AdminAuthSettingsPanel from "./AdminAuthSettingsPanel";
 import CombineShippingSettingsTab from "./CombineShippingSettingsTab";
+import { HOWTO_DEFAULT, parseHowtoSteps } from "@/lib/howto";
 
 type SettingKey =
   | "customer_card_extra_rate"
@@ -24,7 +25,9 @@ type SettingKey =
   | "popup_notice_text"
   | "popup_notice_fontsize"
   | "popup_notice_color"
-  | "popup_band_url";
+  | "popup_band_url"
+  | "howto_enabled"
+  | "howto_steps";
 
 type SettingRow = {
   key: string;
@@ -47,6 +50,8 @@ const SETTING_KEYS: SettingKey[] = [
   "popup_notice_fontsize",
   "popup_notice_color",
   "popup_band_url",
+  "howto_enabled",
+  "howto_steps",
 ];
 
 type NumericSettingKey = Exclude<
@@ -59,6 +64,8 @@ type NumericSettingKey = Exclude<
   | "popup_notice_fontsize"
   | "popup_notice_color"
   | "popup_band_url"
+  | "howto_enabled"
+  | "howto_steps"
 >;
 
 const DEFAULTS: Record<NumericSettingKey, number> = {
@@ -190,6 +197,10 @@ export default function AdminLiveSettingsPanel() {
   const [popupFont, setPopupFont] = useState("normal"); // normal | large | xlarge
   const [popupColor, setPopupColor] = useState("#7B2D43");
   const [popupBandUrl, setPopupBandUrl] = useState("https://band.us/@ruru8249");
+  // [2026-07-10] 주문 방법 팝업 — 켜고/끄기 + 내용 수정
+  const [howtoEnabled, setHowtoEnabled] = useState(true);
+  const [howtoSteps, setHowtoSteps] = useState(HOWTO_DEFAULT.steps);
+  const [howtoWarn, setHowtoWarn] = useState(HOWTO_DEFAULT.warn);
 
   useEffect(() => {
     let alive = true;
@@ -218,6 +229,12 @@ export default function AdminLiveSettingsPanel() {
         setPointEarnRate(String(readNumber(rows, "point_earn_rate")));
         setNoticeText(String(rows.find((r) => r.key === "notice_text")?.value ?? ""));
         setDirectInputEnabled(clean(rows.find((r) => r.key === "direct_input_enabled")?.value || "true") !== "false");
+        setHowtoEnabled(clean(rows.find((r) => r.key === "howto_enabled")?.value || "true") !== "false");
+        {
+          const cfg = parseHowtoSteps(rows.find((r) => r.key === "howto_steps")?.value);
+          setHowtoSteps(cfg.steps);
+          setHowtoWarn(cfg.warn);
+        }
         setPopupEnabled(clean(rows.find((r) => r.key === "popup_notice_enabled")?.value) === "true");
         setPopupTitle(String(rows.find((r) => r.key === "popup_notice_title")?.value ?? ""));
         setPopupText(String(rows.find((r) => r.key === "popup_notice_text")?.value ?? ""));
@@ -258,6 +275,8 @@ export default function AdminLiveSettingsPanel() {
           { key: "point_earn_rate", value: String(nextPointEarnRate) },
           { key: "notice_text", value: noticeText },
           { key: "direct_input_enabled", value: directInputEnabled ? "true" : "false" },
+          { key: "howto_enabled", value: howtoEnabled ? "true" : "false" },
+          { key: "howto_steps", value: JSON.stringify({ steps: howtoSteps, warn: howtoWarn }) },
           { key: "popup_notice_enabled", value: popupEnabled ? "true" : "false" },
           { key: "popup_notice_title", value: popupTitle.trim() },
           { key: "popup_notice_text", value: popupText },
@@ -414,6 +433,70 @@ export default function AdminLiveSettingsPanel() {
           {activeTab === "order" && (
             <div className={cardClass}>
               {sectionTitle("주문서 공지 / 직접입력", "손님 주문서 상단 공지 문구와 “직접 입력하기” 버튼 노출 여부를 관리합니다.")}
+
+              {/* [2026-07-10] 주문 방법 팝업 — 접속하자마자 뜨는 안내. 켜고/끄기 + 내용 수정 */}
+              <div className="mb-3 rounded-[20px] border border-line bg-surface-2 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-black text-ink">📌 주문 방법 팝업</div>
+                    <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
+                      손님이 주문서에 접속하면 바로 뜹니다. 끄면 아예 안 뜹니다.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setHowtoEnabled((v) => !v)}
+                    className={`shrink-0 rounded-full px-4 py-2 text-xs font-black transition ${
+                      howtoEnabled ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-mute"
+                    }`}
+                  >
+                    {howtoEnabled ? "켜짐" : "꺼짐"}
+                  </button>
+                </div>
+
+                {howtoEnabled ? (
+                  <div className="mt-3 space-y-3">
+                    {howtoSteps.map((step, i) => (
+                      <div key={i} className="rounded-2xl border border-line bg-surface p-3">
+                        <div className="text-xs font-black text-rose-deep">{i + 1}단계</div>
+                        <input
+                          value={step.title}
+                          onChange={(e) => {
+                            const next = [...howtoSteps];
+                            next[i] = { ...next[i], title: e.target.value };
+                            setHowtoSteps(next);
+                          }}
+                          placeholder="제목"
+                          className="mt-2 w-full rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm font-bold text-ink outline-none transition focus:border-rose-deep"
+                        />
+                        <input
+                          value={step.desc}
+                          onChange={(e) => {
+                            const next = [...howtoSteps];
+                            next[i] = { ...next[i], desc: e.target.value };
+                            setHowtoSteps(next);
+                          }}
+                          placeholder="설명 (비우면 안 보임)"
+                          className="mt-2 w-full rounded-xl border border-line bg-surface-2 px-3 py-2 text-xs font-bold text-ink-soft outline-none transition focus:border-rose-deep"
+                        />
+                      </div>
+                    ))}
+                    <div className="rounded-2xl border border-line bg-surface p-3">
+                      <div className="text-xs font-black text-danger-tx">빨간 경고 문구 (3단계 아래)</div>
+                      <textarea
+                        value={howtoWarn}
+                        onChange={(e) => setHowtoWarn(e.target.value)}
+                        rows={2}
+                        placeholder="비우면 경고 문구가 안 보입니다."
+                        className="mt-2 w-full resize-none rounded-xl border border-line bg-surface-2 px-3 py-2 text-xs font-bold text-ink outline-none transition focus:border-rose-deep"
+                      />
+                    </div>
+                    <div className="text-[11px] font-bold text-ink-mute">
+                      ※ 아래 <b>저장</b>을 눌러야 손님 화면에 반영됩니다. 손님이 “오늘 하루 열지 않기”를 누르면 그 사람에겐 24시간 안 뜹니다.
+                    </div>
+                  </div>
+                ) : null}
+              </div>
 
               <div className="rounded-[20px] border border-line bg-surface-2 p-4">
                 <div className="text-sm font-black text-ink">주문서 공지 문구</div>
