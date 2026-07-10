@@ -407,7 +407,9 @@ export default function AdminLiveMissionPanel() {
             opacity: paying ? 0.6 : 1,
           }}
         >
-          🎁 구매자 전원에게 지급하기
+          {/* [2026-07-10] 포인트를 안 걸었으면 "지급"이라는 말이 겁나서 못 누름 → 명단 보기로 라벨 변경.
+              둘 다 openPayout(읽기 전용 조회)만 호출한다. 실제 지급은 모달 안 버튼에서만. */}
+          {(prog?.reward ?? 0) > 0 ? "🎁 구매자 전원에게 지급하기" : "🎁 선물 줄 명단 보기"}
         </button>
         {!payoutUnlocked ? (
           <div style={{ fontSize: 12, color: "var(--color-ink-mute)", marginTop: 6 }}>※ 위 “🛑 이벤트 종료”를 누르면 지급 버튼이 열려요.</div>
