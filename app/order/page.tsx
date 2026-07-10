@@ -4757,6 +4757,9 @@ export default function OrderPage() {
                 {/* [2026-07-10] 정렬 드롭다운 — 표시 순서만 바꿈. 기본순이면 지금 방송 상품이 맨 위(고정) */}
                 <div style={{ marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                   <span style={{ fontSize: "12px", fontWeight: 700, color: "#8A8A8A" }}>총 {visibleItems.length}개</span>
+                  {/* 손님이 무슨 칸인지 알 수 있게 "정렬" 라벨을 붙임 */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 700, color: "#8A8A8A", whiteSpace: "nowrap" }}>⇅ 정렬</span>
                   <select
                     value={productSort}
                     onChange={(e) => { setProductSort(e.target.value as typeof productSort); setVisibleProductCount(10); }}
@@ -4767,6 +4770,7 @@ export default function OrderPage() {
                     <option value="price_desc">높은 가격순</option>
                     <option value="name">이름순</option>
                   </select>
+                  </div>
                 </div>
                 {visibleItems.length === 0 ? (
                   <div style={{ marginTop: "14px", padding: "26px", textAlign: "center", color: "#999", fontSize: "14px", fontWeight: 700 }}>찾는 상품이 없어요. 아래 직접 입력으로 담아주세요.</div>
