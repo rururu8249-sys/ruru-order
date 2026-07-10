@@ -545,7 +545,8 @@ export default function ProductWidgetClient() {
             <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 2, padding: "8px 9px 9px" }}>
               <div
                 style={{
-                  fontSize: "17px", fontWeight: 900, lineHeight: 1.15, color: "#fff",
+                  // [2026-07-11 사장님 요청] 상품명 폰트 17 → 20px
+                  fontSize: "20px", fontWeight: 900, lineHeight: 1.15, color: "#fff",
                   textShadow: OUTLINE_TEXT,
                   overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                 }}
