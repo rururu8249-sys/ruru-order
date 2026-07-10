@@ -4826,6 +4826,8 @@ export default function OrderPage() {
                               })() : null}
                               {badges.includes("pick") ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#FFF8E7", color: "#B8860B" }}>⭐ MD픽</span> : null}
                               {badges.includes("direct") ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#E8F0FE", color: "#1D4ED8" }}>🛒 바로구매</span> : null}
+                              {/* [2026-07-10] 해외배송 배지 — 표시 전용(배송비 계산과 무관) */}
+                              {badges.includes("overseas") ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#EEF6F3", color: "#0F6E56" }}>✈️ 해외배송</span> : null}
                             </div>
                             <div style={{ fontSize: "13px", fontWeight: 700, color: "#222", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.product_name}</div>
                             {/* 바로구매 부가설명 유지(사장님 지침: 배지만으론 신규 고객이 뜻을 모름) + 가격 위계 강화 15→17px */}

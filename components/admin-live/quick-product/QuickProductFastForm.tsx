@@ -1076,7 +1076,8 @@ export default function QuickProductFastForm({
             <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginBottom: "6px" }}>손님 상품 목록에 표시되는 뱃지</div>
             <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}`}</style>
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-              {([["none", "없음"], ["new", "✨ NEW"], ["hot", "🔥 HOT"], ["limit", "⏰ 한정"], ["pick", "⭐ MD픽"], ["direct", "🛒 바로구매"]] as const).map(([v, l]) => {
+              {/* [2026-07-10] 해외배송 배지 추가 (표시 전용 — 배송비/배송 로직과 무관) */}
+              {([["none", "없음"], ["new", "✨ NEW"], ["hot", "🔥 HOT"], ["limit", "⏰ 한정"], ["pick", "⭐ MD픽"], ["direct", "🛒 바로구매"], ["overseas", "✈️ 해외배송"]] as const).map(([v, l]) => {
                 const on = v === "none" ? badgeTypes.length === 0 : badgeTypes.includes(v);
                 return (
                   <div
