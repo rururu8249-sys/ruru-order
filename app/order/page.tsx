@@ -4874,7 +4874,7 @@ export default function OrderPage() {
                                 onClick={() => selectQuickGroupBuyProduct(product as BroadcastProduct)}
                                 style={{ flexShrink: 0, height: "32px", padding: "0 16px", borderRadius: "8px", border: "none", background: sold ? "#ccc" : "#7A1E47", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: sold ? "default" : "pointer" }}
                               >
-                                {sold ? "품절" : "담기"}
+                                {sold ? "품절" : "장바구니 담기"}
                               </button>
                             </div>
                           </div>
@@ -5084,7 +5084,7 @@ export default function OrderPage() {
                   disabled={submitting || customerBlockStatus.blocked}
                   style={{ width: "100%", padding: "14px", background: submitting || customerBlockStatus.blocked ? "#cbd5e1" : "#7A1E47", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: submitting || customerBlockStatus.blocked ? "default" : "pointer" }}
                 >
-                  {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : `${won(finalPaymentAmount)} 주문서 제출 →`}
+                  {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : `${won(finalPaymentAmount)} 주문서 제출 및 결제 →`}
                 </button>
               </div>
             </div>
@@ -5541,7 +5541,7 @@ export default function OrderPage() {
                     disabled={isEmpty}
                     style={{ flex: 1, height: "54px", borderRadius: "14px", border: "none", background: isEmpty ? "#E5E1DC" : "#7A1E47", color: isEmpty ? "#9A9590" : "#fff", fontSize: "15px", fontWeight: 800, cursor: isEmpty ? "default" : "pointer" }}
                   >
-                    {isEmpty ? "담은 상품이 없어요" : `🛒 담은 상품 ${cartCount}개 · 확인하기 →`}
+                    {isEmpty ? "담은 상품이 없어요" : `🛒 장바구니 담은상품 ${cartCount}개 확인하기 →`}
                   </button>
                 );
               })()}
