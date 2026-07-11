@@ -873,7 +873,7 @@ export default function AdminLiveEventRoulettePanel({
           broadcastId: nextBroadcastId || undefined,
           paidOnly: paidOnly || undefined,
           excludeDailyDup,
-          orderGroupIds: filteredIdsRef.current ?? undefined,
+          orderGroupIds: paidOnly ? undefined : (filteredIdsRef.current ?? undefined),
         }),
       });
 
@@ -1436,7 +1436,7 @@ export default function AdminLiveEventRoulettePanel({
                   {!canLoadParticipants && participantSource !== "manual" ? (
                     <div className="note" style={{ color: "var(--amber)" }}>⚠ 불러올 주문 없음 — 방송 시작 또는 주문서에 주문이 보이면 명단을 불러올 수 있어요.</div>
                   ) : participantSource !== "manual" ? (
-                    <div className="note" style={{ color: "var(--mut2)" }}>※ 주문서 화면 필터(기간/방송/상태)에 보이는 주문 기준으로 잡힙니다.</div>
+                    <div className="note" style={{ color: "var(--mut2)" }}>※ 주문서 제출자 전체=화면 필터(기간·방송·상태) 기준. 입금완료한 사람만=방송 전체 결제완료(무통장·카드) 포함.</div>
                   ) : null}
                   <div style={{ background: "var(--color-surface-2)", borderRadius: "7px", padding: "8px 11px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => setExcludeDailyDup((v) => !v)}>
                     <span style={{ fontSize: "11px" }}>당일 중복당첨 금지</span>
