@@ -7,7 +7,6 @@
 // - 배경 투명(크로마키). 읽기 전용 — 돈/주문 로직 건드리지 않음.
 
 import { useEffect, useRef, useState } from "react";
-import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/lib/supabase";
 import { resolveProductImageUrl } from "@/components/admin-live/quick-product/productImageUrl";
 import { getActiveBroadcast, loadAdminLiveBroadcasts } from "@/components/admin-live/liveBroadcastController";
@@ -64,7 +63,6 @@ const OUTLINE_TEXT_SM =
 type ToastItem = { icon: string; title: string; name: string; detail: string; tone: "green" | "blue" };
 
 // 고객 주문서 주소 — QR로 그린다(파일 불필요, 항상 최신)
-const ORDER_URL = "https://ruru-order.vercel.app/order";
 
 const EMPTY_OPTION_WORDS = new Set(["없음", "없슴", "무", "-", "none", "n/a", "na"]);
 function cleanOptionText(raw: string): string {
@@ -405,20 +403,17 @@ export default function ProductWidgetClient() {
   // [2026-07-09 v2] 사장님 지침 반영:
   //   ① 배경 바·그라데이션·그림자 전부 제거 → 글씨는 검정 아웃라인만으로 읽히게(상품 사진 안 가림)
   //   ② 카드 비율 1:1 → 3:4 (옷 사진이 세로로 길어서, 정사각형이면 글씨가 옷을 덮음)
-  //   ③ 카드 위에 "📱 주문서 QR" 블록을 붙여 한 세트로 이동
   //   ※ 표시 전용 — 실시간 구독/금액 컬럼/중복가드/드래그 저장 로직은 무변경.
-  // 위젯 전체 폭(px). QR·상품카드가 이 폭을 공유한다.
+  //   [2026-07-11] 주문서 QR 블록 제거됨 — 아래 높이 서술은 히스토리.
+  // 위젯 전체 폭(px). 상품카드가 이 폭을 쓴다.
   //   전체 높이 ≈ QR블록(폭+헤더 약 23px) + 간격 6px + 카드(폭×4/3)
   //   예) 200 → 약 496px  /  240 → 약 590px
   //   [2026-07-09] 방송화면에서 세로가 어깨 아래까지 내려와 240 → 200으로 축소.
   const CARD = 200;
-  // QR 라벨 세로 띠 폭 / QR 실제 크기(정사각형 유지). 블록 높이 = QR_SIZE + 패딩(10).
-  const QR_LABEL_W = 30;
-  const QR_SIZE = CARD - QR_LABEL_W - 10;
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "transparent", pointerEvents: "none", fontFamily: "Pretendard, Arial, sans-serif" }}>
-      {/* QR·카드·오버레이·폭죽을 한 앵커에 묶어, 드래그로 옮기면 전부 같이 따라간다 */}
+      {/* 카드·오버레이·폭죽을 한 앵커에 묶어, 드래그로 옮기면 전부 같이 따라간다 */}
       <div
         style={{
           position: "absolute",
@@ -429,51 +424,6 @@ export default function ProductWidgetClient() {
           pointerEvents: "none",
         }}
       >
-        {/* 주문서 QR — 상품이 있든 없든 항상 표시(고객이 언제든 스캔) */}
-        <div
-          onMouseDown={startDragWidget}
-          title="드래그해서 위치 이동 (위치 자동 저장)"
-          style={{
-            marginBottom: "6px", borderRadius: "10px", overflow: "hidden",
-            cursor: "move", pointerEvents: "auto",
-            animation: "ruruWidgetIn 0.5s ease",
-          }}
-        >
-          {/* [2026-07-09 사장님 선택 B안] "주문서 QR" 라벨을 상단 가로 헤더 → 왼쪽 세로 띠로.
-              QR은 정사각형이라 헤더를 위에 두면 그만큼 QR을 줄여야 했음(스캔 불리).
-              세로 띠로 옮기면 같은 높이에서 QR을 더 크게 쓸 수 있다.
-              블록 높이 ≈ QR(160) + 상하 패딩 10 = 약 170px. */}
-          <div style={{ display: "flex", background: "#fff" }}>
-            <div
-              style={{
-                width: `${QR_LABEL_W}px`,
-                background: "#7B2D43",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              <span
-                style={{
-                  writingMode: "vertical-rl",
-                  textOrientation: "upright",
-                  color: "#fff",
-                  fontSize: "15px",
-                  fontWeight: 900,
-                  letterSpacing: "0.06em",
-                  whiteSpace: "nowrap",
-                  lineHeight: 1,
-                }}
-              >
-                주문서 QR
-              </span>
-            </div>
-            <div style={{ flex: 1, padding: "5px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <QRCodeSVG value={ORDER_URL} size={QR_SIZE} level="M" bgColor="#ffffff" fgColor="#111111" style={{ display: "block" }} />
-            </div>
-          </div>
-        </div>
 
         {current ? (
           <div
