@@ -18,6 +18,9 @@ type Props = {
   // 닫힘/재오픈 사이 탭 위치 보존(수정 후 보던 탭 유지)
   initialTab?: ProductManageTab;
   onTabChange?: (tab: ProductManageTab) => void;
+  // 닫힘/재오픈 사이 검색어 보존(수정 후 보던 검색 유지)
+  initialSearch?: string;
+  onSearchChange?: (search: string) => void;
 };
 
 const PAGE_STEP = 10;
@@ -137,12 +140,12 @@ function productCategory(p: ProductRow) {
 
 const productId = (p: ProductRow) => pickString(p, ["id", "product_id"], "");
 
-export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose, initialTab, onTabChange }: Props) {
+export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose, initialTab, onTabChange, initialSearch, onSearchChange }: Props) {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [rotationIds, setRotationIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<ProductManageTab>(initialTab ?? "broadcast");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch ?? "");
   const [category, setCategory] = useState("전체");
   const [visibleCount, setVisibleCount] = useState(PAGE_STEP);
   const [lightbox, setLightbox] = useState("");
@@ -320,6 +323,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     onTabChange?.(tab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
+
+  // 현재 검색어를 부모(Dashboard)에 보고 → 닫힘/재오픈 사이 검색어 보존
+  useEffect(() => {
+    onSearchChange?.(search);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
 
   // 방송 상품 탭: 방송 목록 로드 (읽기 전용)
   const loadBroadcastList = async (preferId?: string) => {

@@ -573,6 +573,7 @@ export default function AdminLiveDashboard() {
   const [broadcastProductCount, setBroadcastProductCount] = useState<number | null>(null);
   const [shopOpen, setShopOpenState] = useState(true);
   const [lastProductTab, setLastProductTab] = useState<ProductManageTab>("broadcast");
+  const [lastProductSearch, setLastProductSearch] = useState("");
   const [savingBroadcast, setSavingBroadcast] = useState(false);
   const [broadcastTitle, setBroadcastTitle] = useState("루루동이LIVE");
   const [broadcastYoutubeUrl, setBroadcastYoutubeUrl] = useState("");
@@ -1636,6 +1637,8 @@ export default function AdminLiveDashboard() {
               onClose={() => setActiveMenu("broadcast")}
               initialTab={lastProductTab}
               onTabChange={setLastProductTab}
+              initialSearch={lastProductSearch}
+              onSearchChange={setLastProductSearch}
             />
           )}
 
