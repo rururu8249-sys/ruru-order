@@ -1452,8 +1452,8 @@ export default function AdminLiveEventRoulettePanel({
                       <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                         <button className="btn" style={{ height: "auto", padding: "2px 9px" }} onClick={() => setSurvivorCount((v) => Math.max(1, v - 1))}>−</button>
                         <input className="ipt" style={{ width: "48px", textAlign: "center", padding: "4px" }} inputMode="numeric" value={survivorCount}
-                          onChange={(e) => { const d = Number(e.target.value.replace(/[^0-9]/g, "")) || 1; setSurvivorCount(Math.max(1, d)); }} />
-                        <button className="btn" style={{ height: "auto", padding: "2px 9px" }} onClick={() => setSurvivorCount((v) => v + 1)}>+</button>
+                          onChange={(e) => { const d = Number(e.target.value.replace(/[^0-9]/g, "")) || 1; setSurvivorCount(Math.min(Math.max(1, d), Math.max(1, finalParticipants.length - 1))); }} />
+                        <button className="btn" style={{ height: "auto", padding: "2px 9px" }} onClick={() => setSurvivorCount((v) => Math.min(v + 1, Math.max(1, finalParticipants.length - 1)))}>+</button>
                         <span style={{ fontSize: "11px", color: "var(--mut2)" }}>명</span>
                       </span>
                     </div>
