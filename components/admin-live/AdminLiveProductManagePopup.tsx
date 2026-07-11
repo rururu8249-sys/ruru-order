@@ -276,8 +276,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [histDetailLoading, setHistDetailLoading] = useState("");
 
   // 상품 fetch (기존 loadProducts 재사용)
-  const loadProducts = async () => {
-    setLoading(true);
+  const loadProducts = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const { data, error } = await supabase.from("products").select("*");
       if (error) throw error;
@@ -285,7 +285,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     } catch (e) {
       showAdminToast("상품 불러오기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -306,7 +306,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     void loadProducts();
     void loadRotationIds();
     const onUpdated = () => {
-      void loadProducts();
+      void loadProducts(true);
       void loadRotationIds();
     };
     window.addEventListener("ruru-live-product-updated", onUpdated);
@@ -1050,15 +1050,18 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const unpinSingle = async (p: ProductRow) => {
     const id = productId(p);
     if (!id) return;
+    // 즉시 반영(optimistic): 화면부터 고정 해제. DB쓰기는 그대로, 실패 시 서버상태로 재동기화.
+    setProducts((prev) => prev.map((row) => (productId(row) === id ? { ...row, is_pinned: false, pinned: false } : row)));
+    setPinnedId("");
     setBusyId(id);
     try {
       // 기존 pinSelected와 동일 테이블/컬럼: is_pinned 해제
       const { error } = await adminCatalogWrite({ table: "products", op: "update", values: { is_pinned: false }, filters: [{ type: "eq", col: "id", val: id }] });
       if (error) throw error;
-      setPinnedId("");
       window.dispatchEvent(new Event("ruru-live-product-updated"));
       showAdminToast("고정을 해제했어요. 위젯이 다시 순환합니다.", "success");
     } catch (e) {
+      window.dispatchEvent(new Event("ruru-live-product-updated"));
       showAdminToast("고정 해제 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
     } finally {
       setBusyId("");
@@ -1071,15 +1074,18 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const pinSingle = async (p: ProductRow) => {
     const id = productId(p);
     if (!id) return;
+    // 즉시 반영(optimistic): 느린 회선에서도 화면부터 고정 표시. DB쓰기는 그대로, 실패 시 서버상태로 재동기화.
+    setProducts((prev) => prev.map((row) => { const rid = productId(row); return { ...row, is_pinned: rid === id, pinned: rid === id }; }));
+    setPinnedId(id);
     setBusyId(id);
     try {
       await adminCatalogWrite({ table: "products", op: "update", values: { is_pinned: false }, filters: [{ type: "eq", col: "is_pinned", val: true }] });
       const { error } = await adminCatalogWrite({ table: "products", op: "update", values: { is_pinned: true }, filters: [{ type: "eq", col: "id", val: id }] });
       if (error) throw error;
-      setPinnedId(id);
       window.dispatchEvent(new Event("ruru-live-product-updated"));
       showAdminToast("이 상품만 위젯에 고정했어요.", "success");
     } catch (e) {
+      window.dispatchEvent(new Event("ruru-live-product-updated"));
       showAdminToast("상품 고정 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
     } finally {
       setBusyId("");
