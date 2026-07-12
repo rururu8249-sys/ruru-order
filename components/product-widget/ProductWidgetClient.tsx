@@ -375,6 +375,12 @@ export default function ProductWidgetClient() {
           }
         }
       })
+      // [2026-07-12 사장님 지침] 즉각 반영 — 20초 폴링을 기다리지 않고 실시간으로 다시 읽는다.
+      //   E. 상품 변경(고정/해제·재고·이미지) F. 방송 진열 변경(담기/빼기/순서) G. 방송 변경(위젯 토글·시작/종료).
+      //   공용 0.4초 디바운스(scheduleStockReload) 재사용. 실시간이 안 와도 기존 20초 폴링이 백업으로 그대로 동작.
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "products" }, () => scheduleStockReload())
+      .on("postgres_changes", { event: "*", schema: "public", table: "broadcast_products" }, () => scheduleStockReload())
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "broadcasts" }, () => scheduleStockReload())
       .subscribe();
     return () => {
       if (reloadTimer) window.clearTimeout(reloadTimer);
@@ -409,6 +415,17 @@ export default function ProductWidgetClient() {
 
   const current = pinned || rotation[rotIndex] || null;
   const img = imageOf(current);
+
+  // [2026-07-12 사장님 지침] 간헐적 이미지 미표시 해결 — 불안정 회선(중국 현장 등)에서 저장소 이미지
+  //   로드가 한 번 실패하면 재시도 없이 빈 카드로 남던 문제. 실패 시 1.5초 간격 자동 재시도(최대 6회),
+  //   재시도마다 캐시 우회 쿼리(wr=n)로 강제 재요청. 상품이 바뀌면 카운터 리셋. 표시 전용.
+  const [imgRetry, setImgRetry] = useState(0);
+  const currentKey = String(current?.id ?? current?.product_id ?? "");
+  useEffect(() => {
+    setImgRetry(0);
+  }, [currentKey]);
+  const imgSrc = imgRetry > 0 && img ? `${img}${img.includes("?") ? "&" : "?"}wr=${imgRetry}` : img;
+
   const colors = colorsOf(current);
   const sizeText = sizeTextOf(current);
   // 색상 · 사이즈를 한 줄로. 둘 다 없으면 아예 안 그림("없음" 표시 금지)
@@ -463,7 +480,14 @@ export default function ProductWidgetClient() {
           >
             {/* 상품 이미지 — 카드 전체를 채움 */}
             {img ? (
-              <img src={img} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+              <img
+                src={imgSrc}
+                alt=""
+                onError={() => {
+                  if (imgRetry < 6) window.setTimeout(() => setImgRetry((v) => v + 1), 1500);
+                }}
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+              />
             ) : (
               <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "56px", opacity: 0.8 }}>👟</div>
             )}
