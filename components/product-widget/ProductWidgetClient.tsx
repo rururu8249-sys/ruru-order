@@ -413,6 +413,20 @@ export default function ProductWidgetClient() {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "transparent", pointerEvents: "none", fontFamily: "Pretendard, Arial, sans-serif" }}>
+      {/* [2026-07-12 사장님 지침] 주문방법 배너 — 위젯과 한 묶음. 브라우저 소스 하나로 배너+상품카드 동시 표시.
+          항상 표시(상품카드 토글과 무관하게 유지 예정). 표시 전용 — 돈/주문/드래그 로직 무접촉. */}
+      <img
+        src="/order-banner.png"
+        alt="주문방법 안내"
+        style={{
+          position: "absolute",
+          top: "16px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: "min(94vw, 1400px)",
+          pointerEvents: "none",
+        }}
+      />
       {/* 카드·오버레이·폭죽을 한 앵커에 묶어, 드래그로 옮기면 전부 같이 따라간다 */}
       <div
         style={{
