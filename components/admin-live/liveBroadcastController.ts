@@ -12,6 +12,8 @@ export type AdminLiveBroadcast = {
   youtube_live_url?: string | null;
   youtube_live_enabled?: boolean | null;
   is_deleted?: boolean | null;
+  // [2026-07-12] 위젯 상품카드 표시 여부 (null/undefined면 true 취급 — 기존 방송 호환)
+  widget_card_enabled?: boolean | null;
 };
 
 export type StartBroadcastInput = {
@@ -202,6 +204,27 @@ export async function updateAdminLiveBroadcast(input: UpdateBroadcastInput) {
   if (error) throw error;
 
   await safeUpsertSetting("current_broadcast_name", title);
+
+  return data as AdminLiveBroadcast;
+}
+
+// [2026-07-12 사장님 지침] 위젯 상품카드 ON/OFF — 방송 중 위젯의 상품카드만 숨기고 싶을 때.
+//   broadcasts.widget_card_enabled 한 컬럼만 갱신. 방송 상태·정산/주문/돈 로직 무접촉.
+export async function setBroadcastWidgetCard(broadcastId: string, enabled: boolean) {
+  if (!broadcastId) {
+    throw new Error("방송 ID가 없습니다.");
+  }
+
+  const { data, error } = await adminCatalogWrite({
+    table: "broadcasts",
+    op: "update",
+    values: { widget_card_enabled: enabled },
+    filters: [{ type: "eq", col: "id", val: broadcastId }],
+    select: "*",
+    single: true,
+  });
+
+  if (error) throw error;
 
   return data as AdminLiveBroadcast;
 }

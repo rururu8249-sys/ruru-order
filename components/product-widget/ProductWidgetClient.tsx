@@ -252,6 +252,15 @@ export default function ProductWidgetClient() {
 
         const broadcasts = await loadAdminLiveBroadcasts();
         const active = getActiveBroadcast(broadcasts);
+        // [2026-07-12 사장님 지침] 관리자 "위젯 상품 ON/OFF" 토글 — OFF면 상품카드 숨김(위젯 완전 투명).
+        //   widget_card_enabled가 null/undefined(컬럼 없던 옛 방송)면 ON 취급. 폴링(20초)마다 반영.
+        if (active && (active as AnyProduct).widget_card_enabled === false) {
+          if (alive) {
+            setPinned(null);
+            setRotation([]);
+          }
+          return;
+        }
         // [2026-07-12 사장님 지침] 현재 방송에 안 담긴 상품은 위젯에 안 띄운다.
         //   고정(is_pinned)이 전역 플래그라 지난 방송에서 고정한 상품이 새 방송에도 떠서
         //   "안 담았는데 왜 공개되냐" 사고가 남 → 고정 상품도 활성 방송 진열 목록에 있을 때만 표시.
@@ -420,30 +429,15 @@ export default function ProductWidgetClient() {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "transparent", pointerEvents: "none", fontFamily: "Pretendard, Arial, sans-serif" }}>
-      {/* [2026-07-12 사장님 지침] 주문방법 배너 — 위젯과 한 묶음. 브라우저 소스 하나로 배너+상품카드 동시 표시.
-          항상 표시(상품카드 토글과 무관하게 유지 예정). 표시 전용 — 돈/주문/드래그 로직 무접촉. */}
-      <img
-        src="/order-banner.png"
-        alt="주문방법 안내"
-        style={{
-          position: "absolute",
-          top: "16px",
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: "min(94vw, 1400px)",
-          pointerEvents: "none",
-        }}
-      />
+      {/* [2026-07-12 사장님 확정] 내장 배너 제거 — 위젯은 상품카드만. 주문방법 배너는
+          PRISM에 PNG 이미지 소스로 직접 올려서 운영(두 겹 표시 방지). 기본 위치도 원래 좌하단 복원. */}
       {/* 카드·오버레이·폭죽을 한 앵커에 묶어, 드래그로 옮기면 전부 같이 따라간다 */}
-      {/* [2026-07-12 사장님 지침] 기본 위치 좌하단 24px → 배너 바로 아래 오른쪽(참고 배열).
-          PRISM에서 드래그가 어려워 기본값만으로 배너+카드 배열이 나오게 함.
-          배너 높이 = 배너폭 × 700/2000(=0.35). 드래그 저장 위치(pos)가 있으면 기존대로 그게 우선. */}
       <div
         style={{
           position: "absolute",
-          left: pos ? `${pos.x}px` : undefined,
-          right: pos ? undefined : "24px",
-          top: pos ? `${pos.y}px` : "calc(16px + min(94vw, 1400px) * 0.35 + 16px)",
+          left: pos ? `${pos.x}px` : "24px",
+          top: pos ? `${pos.y}px` : undefined,
+          bottom: pos ? undefined : "24px",
           width: `${CARD}px`,
           pointerEvents: "none",
         }}

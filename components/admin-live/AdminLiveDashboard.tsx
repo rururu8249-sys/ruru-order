@@ -43,6 +43,7 @@ import {
   getShopOpen,
   isOrderInsideBroadcastTime,
   loadAdminLiveBroadcasts,
+  setBroadcastWidgetCard,
   setShopOpen,
   startAdminLiveBroadcast,
   updateAdminLiveBroadcast,
@@ -1000,6 +1001,21 @@ export default function AdminLiveDashboard() {
     }
   };
 
+  // [2026-07-12 사장님 지침] 위젯 상품카드 ON/OFF — 쇼핑몰 토글과 동일 패턴(낙관적 + 실패 롤백).
+  //   broadcasts.widget_card_enabled 한 컬럼만 갱신. null/undefined = ON(기존 방송 호환).
+  const widgetCardOn = activeBroadcast ? activeBroadcast.widget_card_enabled !== false : true;
+  const handleToggleWidgetCard = async () => {
+    if (!activeBroadcast?.id) return;
+    const next = !widgetCardOn;
+    setBroadcasts((prev) => prev.map((b) => (b.id === activeBroadcast.id ? { ...b, widget_card_enabled: next } : b)));
+    try {
+      await setBroadcastWidgetCard(activeBroadcast.id, next);
+    } catch {
+      setBroadcasts((prev) => prev.map((b) => (b.id === activeBroadcast.id ? { ...b, widget_card_enabled: !next } : b)));
+      showAdminToast("위젯 상품카드 상태 저장에 실패했어요.", "error");
+    }
+  };
+
   // 컨트롤타워 "상품 N개" — 활성 방송의 broadcast_products 연결 개수(읽기 전용 count)
   const loadBroadcastProductCount = async () => {
     if (!activeBroadcast?.id) {
@@ -1483,6 +1499,8 @@ export default function AdminLiveDashboard() {
                     productCount={broadcastProductCount ?? undefined}
                     shopOpen={shopOpen}
                     onToggleShopOpen={handleToggleShopOpen}
+                    widgetCardOn={widgetCardOn}
+                    onToggleWidgetCard={handleToggleWidgetCard}
                   />
                 </div>
                 {loadError ? (

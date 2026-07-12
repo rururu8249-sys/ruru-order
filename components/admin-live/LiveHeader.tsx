@@ -22,6 +22,9 @@ type Props = {
   productCount?: number;
   shopOpen?: boolean;
   onToggleShopOpen?: () => void;
+  // [2026-07-12] 위젯 상품카드 ON/OFF (방송 중에만 의미. 배너는 PRISM 소스라 무관)
+  widgetCardOn?: boolean;
+  onToggleWidgetCard?: () => void;
 };
 
 function todayLabel() {
@@ -48,6 +51,8 @@ export default function LiveHeader({
   productCount,
   shopOpen = true,
   onToggleShopOpen,
+  widgetCardOn = true,
+  onToggleWidgetCard,
 }: Props) {
   const [titleSavedAt, setTitleSavedAt] = useState("");
   const [urlAppliedAt, setUrlAppliedAt] = useState("");
@@ -191,6 +196,19 @@ export default function LiveHeader({
         <span className="hidden text-ink-mute md:inline">· 주문묶음=방송 시작~종료 기준</span>
 
         <div className="ml-auto flex items-center gap-2">
+          {/* [2026-07-12] 위젯 상품카드 ON/OFF — 방송 중에만 활성. 카드만 숨김(위젯 투명), 배너는 PRISM 소스라 무관 */}
+          <button
+            type="button"
+            disabled={!activeBroadcast}
+            onClick={() => onToggleWidgetCard?.()}
+            className={[
+              "h-7 rounded-lg px-2.5 text-[11px] font-black transition disabled:cursor-not-allowed disabled:opacity-40",
+              widgetCardOn ? "bg-ok-bg text-ok-tx" : "bg-surface-3 text-ink-soft",
+            ].join(" ")}
+            title={activeBroadcast ? "방송 위젯의 상품카드를 켜고 끕니다 (위젯 반영 최대 20초)" : "방송 중에만 사용할 수 있습니다"}
+          >
+            🖼 위젯 상품 {widgetCardOn ? "ON" : "OFF"}
+          </button>
           {/* 쇼핑몰 열기/닫기 — settings.shop_open 영속. 방송 ON 중엔 의미 없어 비활성. */}
           <button
             type="button"
