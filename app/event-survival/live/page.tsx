@@ -124,6 +124,8 @@ export default function SurvivalLiveWidget() {
   useEffect(() => { survivorIdsRef.current = survivorIds; }, [survivorIds]);
   const running = useRef(false);
   const lastEventKeyRef = useRef(""); // 같은 판을 두 번 연출하지 않도록 하는 키(result_at|updated_at)
+  const firstLoadRef = useRef(true); // 위젯 로드 후 첫 폴링 — 켠 시점에 이미 끝난 옛 결과 자동재생 방지
+  const rosterKeyRef = useRef(""); // 현재 대기(명단)화면 참가자 키 — 매 폴링 재배치(깜빡임) 방지
   const stageRef = useRef<HTMLDivElement | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const addT = (t: ReturnType<typeof setTimeout>) => timers.current.push(t);
@@ -273,7 +275,29 @@ export default function SurvivalLiveWidget() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick]);
 
-  // 실제 모드(OBS): 공개 오버레이 API를 폴링해 새 결과가 확정되면 연출 시작.
+  // 명단만 대기 표시(연출 시작 안 함): 위젯을 켜거나 아직 안 돌렸을 때 참가자 로스터만 보여준다.
+  const showRosterReady = useCallback((participantNames: string[], k: number) => {
+    running.current = false;
+    clearT();
+    const scene = makeScene(participantNames, participantNames.length);
+    playersRef.current = scene;
+    survivorIdsRef.current = new Set();
+    setTotal(scene.length);
+    setWinnerCount(Math.max(1, k || 1));
+    setNames(participantNames);
+    setPlayers(scene);
+    setSurvivorIds(new Set());
+    setWinners([]);
+    setMessage(null);
+    setFx(null);
+    setBursts([]);
+    setHasEvent(true);
+    setPhase("ready");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 실제 모드(OBS): 공개 오버레이 API 폴링. 결과 전이면 명단만 대기 표시,
+  //   위젯이 켜져 있는 동안 '새로' 확정된 결과에만 연출. 껐다 켜도(remount) 켠 시점의 옛 결과는 재생 안 함.
   useEffect(() => {
     if (!mounted || preview) return;
     let alive = true;
@@ -293,18 +317,39 @@ export default function SurvivalLiveWidget() {
           updated_at?: string | null;
         };
 
-        if (ev.status !== "result") return;
-
-        const survivorNames = Array.isArray(ev.survivors) ? ev.survivors : [];
         const participantNames = Array.isArray(ev.participants)
           ? ev.participants.map((p) => String(p?.nickname || "").trim()).filter(Boolean)
           : [];
-        if (survivorNames.length <= 0 || participantNames.length <= 0) return;
+        const survivorNames = Array.isArray(ev.survivors) ? ev.survivors : [];
+
+        // 아직 결과 전(idle/spinning): 참가자 명단만 대기 표시(연출 시작 안 함).
+        if (ev.status !== "result") {
+          firstLoadRef.current = false;
+          if (!running.current) {
+            const rkey = "roster:" + participantNames.join("|");
+            if (participantNames.length > 0) {
+              if (rkey !== rosterKeyRef.current) { rosterKeyRef.current = rkey; showRosterReady(participantNames, Number(ev.winner_count || 1)); }
+            } else if (rosterKeyRef.current !== "") { rosterKeyRef.current = ""; setHasEvent(false); }
+          }
+          return;
+        }
 
         const key = `${ev.result_at || ""}|${ev.updated_at || ""}`;
-        if (!key || key === lastEventKeyRef.current) return; // 같은 판이면 다시 안 돌림
-        lastEventKeyRef.current = key;
+        if (!key || key === lastEventKeyRef.current) return; // 같은 판이면 아무것도 안 함
 
+        // 위젯을 켠 '시점에 이미' 확정돼 있던 옛 결과 → 재생하지 않고 명단만 대기 표시.
+        if (firstLoadRef.current) {
+          lastEventKeyRef.current = key;
+          firstLoadRef.current = false;
+          if (participantNames.length > 0) { rosterKeyRef.current = "roster:" + participantNames.join("|"); showRosterReady(participantNames, Number(ev.winner_count || survivorNames.length || 1)); }
+          else setHasEvent(false);
+          return;
+        }
+
+        // 위젯이 켜져 있는 동안 '새로' 확정된 결과 → 연출 시작.
+        if (survivorNames.length <= 0 || participantNames.length <= 0) return;
+        lastEventKeyRef.current = key;
+        rosterKeyRef.current = "";
         startFromServer(participantNames, survivorNames, Number(ev.winner_count || survivorNames.length));
       } catch {
         /* 무시 — 다음 폴링에서 재시도 */
@@ -317,7 +362,7 @@ export default function SurvivalLiveWidget() {
       alive = false;
       clearInterval(t);
     };
-  }, [mounted, preview, startFromServer]);
+  }, [mounted, preview, startFromServer, showRosterReady]);
 
   useEffect(() => () => { running.current = false; clearT(); }, []);
 
