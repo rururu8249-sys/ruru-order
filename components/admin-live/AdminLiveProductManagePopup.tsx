@@ -442,6 +442,15 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     return [top, ...copy];
   }, [bcProducts, pinnedId]);
 
+  // [2026-07-12 사장님 지침] 드래그 잠금은 고정 상품이 "현재 보는 방송 목록에 있을 때만".
+  //   고정(is_pinned)이 전역 플래그라, 다른 방송에서 고정해둔 상품 때문에 이 방송의
+  //   순서변경까지 잠기던 문제 해결. 목록에 없으면 bcProductsView === bcProducts(위 439라인)라
+  //   인덱스가 그대로 일치 → 드래그 풀어도 순서 안 엉킴. sort_order 저장 로직 무변경.
+  const pinnedInBcList = useMemo(
+    () => Boolean(pinnedId) && bcProducts.some((p) => productId(p) === pinnedId),
+    [bcProducts, pinnedId],
+  );
+
   // 선택 방송의 broadcast_products 목록 로드 (sort_order순, products와 매칭)
   const reloadBcProducts = async (selId: string) => {
     if (!selId) {
@@ -1567,7 +1576,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       return (
                         <div
                           key={pid || i}
-                          draggable={!bcBusy && !search.trim() && !bcCopyMode && !pinnedId}
+                          draggable={!bcBusy && !search.trim() && !bcCopyMode && !pinnedInBcList}
                           onClick={bcCopyMode && pid ? () => toggleBcCopyPick(pid) : undefined}
                           onDragStart={() => { setBcDragFrom(i); setBcDragOver(i); }}
                           onDragOver={(e) => { e.preventDefault(); if (bcDragOver !== i) setBcDragOver(i); }}

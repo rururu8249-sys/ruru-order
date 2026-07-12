@@ -249,24 +249,31 @@ export default function ProductWidgetClient() {
       try {
         const { data: products } = await supabase.from("products").select("*");
         const list = (products || []) as AnyProduct[];
-        const p = list.find((x) => x?.is_pinned === true || x?.pinned === true) || null;
-        if (alive) setPinned(p);
 
         const broadcasts = await loadAdminLiveBroadcasts();
         const active = getActiveBroadcast(broadcasts);
+        // [2026-07-12 사장님 지침] 현재 방송에 안 담긴 상품은 위젯에 안 띄운다.
+        //   고정(is_pinned)이 전역 플래그라 지난 방송에서 고정한 상품이 새 방송에도 떠서
+        //   "안 담았는데 왜 공개되냐" 사고가 남 → 고정 상품도 활성 방송 진열 목록에 있을 때만 표시.
+        //   활성 방송이 없거나 진열 0개면 카드 없음(배너는 별개로 항상 표시). 표시 전용 — 고정 저장/DB 무변경.
+        let ids: string[] = [];
         if (active?.id) {
           const { data: links } = await supabase
             .from("broadcast_products")
             .select("product_id, sort_order")
             .eq("broadcast_id", active.id)
             .order("sort_order", { ascending: true });
-          const ids = ((links as { product_id: unknown }[]) || []).map((r) => String(r.product_id));
+          ids = ((links as { product_id: unknown }[]) || []).map((r) => String(r.product_id));
           const byId = new Map(list.map((x) => [String(x?.id ?? x?.product_id), x]));
           const rot = ids.map((id) => byId.get(id)).filter(Boolean) as AnyProduct[];
           if (alive) setRotation(rot);
         } else if (alive) {
           setRotation([]);
         }
+
+        const p = list.find((x) => x?.is_pinned === true || x?.pinned === true) || null;
+        const pinnedInActive = p && ids.includes(String(p?.id ?? p?.product_id)) ? p : null;
+        if (alive) setPinned(pinnedInActive);
       } catch {
         /* 로드 실패해도 위젯은 빈 화면 유지 */
       }
@@ -428,12 +435,15 @@ export default function ProductWidgetClient() {
         }}
       />
       {/* 카드·오버레이·폭죽을 한 앵커에 묶어, 드래그로 옮기면 전부 같이 따라간다 */}
+      {/* [2026-07-12 사장님 지침] 기본 위치 좌하단 24px → 배너 바로 아래 오른쪽(참고 배열).
+          PRISM에서 드래그가 어려워 기본값만으로 배너+카드 배열이 나오게 함.
+          배너 높이 = 배너폭 × 700/2000(=0.35). 드래그 저장 위치(pos)가 있으면 기존대로 그게 우선. */}
       <div
         style={{
           position: "absolute",
-          left: pos ? `${pos.x}px` : "24px",
-          top: pos ? `${pos.y}px` : undefined,
-          bottom: pos ? undefined : "24px",
+          left: pos ? `${pos.x}px` : undefined,
+          right: pos ? undefined : "24px",
+          top: pos ? `${pos.y}px` : "calc(16px + min(94vw, 1400px) * 0.35 + 16px)",
           width: `${CARD}px`,
           pointerEvents: "none",
         }}
