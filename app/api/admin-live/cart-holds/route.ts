@@ -65,11 +65,13 @@ export async function GET(request: NextRequest) {
 
     const holds = rows.map((r) => {
       const ph = String(r.customer_phone ?? "");
+      // [2026-07-16] 예약에 저장된 닉네임/이름 우선(담는 시점 입력값 — 첫 구매 고객도 표시됨),
+      //   없으면(컬럼 추가 전 옛 예약) 주문 이력 매칭 폴백.
       return {
         sessionKey: String(r.session_key ?? ""),
         phone: ph,
-        nickname: who[ph]?.nickname || "",
-        name: who[ph]?.name || "",
+        nickname: String(r.nickname ?? "").trim() || who[ph]?.nickname || "",
+        name: String(r.customer_name ?? "").trim() || who[ph]?.name || "",
         productId: String(r.product_id ?? ""),
         productName: names[String(r.product_id ?? "")] || "상품",
         color: String(r.color ?? ""),

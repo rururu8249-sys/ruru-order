@@ -2970,7 +2970,16 @@ export default function OrderPage() {
       await fetch("/api/cart-reservations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "sync", sessionKey: key, phone: onlyNumber(customerPhone || ""), items: payload }),
+        // [2026-07-16 사장님 지침] 담김현황에 누가 담았는지 바로 보이게 닉네임/이름도 함께 저장(표시 전용).
+        //   고객은 카톡 로그인+닉네임 입력을 거쳐야 담을 수 있어서 이 시점에 값이 항상 있음. 주문 제출 로직 무관.
+        body: JSON.stringify({
+          action: "sync",
+          sessionKey: key,
+          phone: onlyNumber(customerPhone || ""),
+          nickname: String(youtubeNickname || "").trim().slice(0, 40),
+          customerName: String(customerName || "").trim().slice(0, 40),
+          items: payload,
+        }),
       });
     } catch { /* 실패해도 주문 흐름 무영향 */ }
   };

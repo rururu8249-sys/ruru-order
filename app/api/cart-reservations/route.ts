@@ -105,6 +105,10 @@ export async function POST(request: NextRequest) {
     if (action !== "sync") return NextResponse.json({ ok: false, error: "알 수 없는 action" }, { status: 400 });
 
     const phone = String(body?.phone ?? "").replace(/[^0-9]/g, "").slice(0, 20) || null;
+    // [2026-07-16 사장님 지침] 담김현황 표시용 닉네임/이름 저장 (⚠️ 배포 전 cart_reservations에
+    //   nickname/customer_name 컬럼 ADD COLUMN 필요 — 없으면 insert가 실패해 선점 표시가 멈춤)
+    const nickname = String(body?.nickname ?? "").trim().slice(0, 40) || null;
+    const customerName = String(body?.customerName ?? "").trim().slice(0, 40) || null;
     const rawItems = Array.isArray(body?.items) ? body.items.slice(0, MAX_ITEMS) : [];
     const holdMinutes = await getHoldMinutes(supabase);
     const expiresAt = new Date(Date.now() + holdMinutes * 60 * 1000).toISOString();
@@ -112,6 +116,8 @@ export async function POST(request: NextRequest) {
       .map((it: any) => ({
         session_key: sessionKey,
         customer_phone: phone,
+        nickname,
+        customer_name: customerName,
         product_id: String(it?.productId ?? "").trim().slice(0, 80),
         color: normOpt(it?.color).slice(0, 60),
         size: normOpt(it?.size).slice(0, 60),
