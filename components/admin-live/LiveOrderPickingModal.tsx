@@ -239,7 +239,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
     setExporting(true);
     try {
       const exportOrders = paidOnly ? orders.filter((o) => PAID_STATUSES.includes(clean(o.paymentStatus))) : orders;
-      await exportLiveOrdersForPicking(exportOrders, { filterLabel });
+      // [2026-07-16] 챙김 여부 컬럼용 — 화면과 동일한 체크 집합(pickedIds) 전달
+      await exportLiveOrdersForPicking(exportOrders, { filterLabel }, pickedIds);
     } finally {
       setExporting(false);
     }

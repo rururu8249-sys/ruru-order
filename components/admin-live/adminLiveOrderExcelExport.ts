@@ -400,7 +400,7 @@ export async function exportLiveOrdersForRosen(orders: LiveOrder[], meta: Export
   await writeWorkbook(workbook, `rozen_${safeFileDate()}.xlsx`);
 }
 
-export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: ExportMeta) {
+export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: ExportMeta, pickedIds?: Set<string>) {
   const exportOrders = orders.filter((order) => !isPickingExportExcluded(order));
 
   if (!exportOrders.length) {
@@ -408,9 +408,14 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
     return;
   }
 
-  // [2026-07-13 사장님 지침] 물건챙기기 엑셀은 딱 5컬럼만: 닉네임·상품명·옵션·수량·상품금액.
+  // [2026-07-16 사장님 지침] 물건챙기기 엑셀에 "챙김" 컬럼 추가 — 팝업에서 체크한 건 "챙김", 안 한 건 "안챙김".
+  //   챙김 판정은 팝업과 동일한 picked id 집합(orders.picked_at 기반). pickedIds 없으면(옛 호출) 컬럼 생략.
   //   상품금액은 주문에 저장된 값(item.amount, 상품행 없으면 order.productAmount) 표시 전용 — 재계산 안 함.
-  const headers = ["닉네임", "상품명", "옵션", "수량", "상품금액"];
+  const withPick = pickedIds instanceof Set;
+  const headers = withPick
+    ? ["닉네임", "상품명", "옵션", "수량", "상품금액", "챙김"]
+    : ["닉네임", "상품명", "옵션", "수량", "상품금액"];
+  const pickLabel = (id: string) => (pickedIds?.has(id) ? "챙김" : "안챙김");
 
   const itemRows: WorkbookRow[] = [];
 
@@ -418,24 +423,28 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
     const items = order.items || [];
 
     if (!items.length) {
-      itemRows.push([
+      const row: WorkbookRow = [
         labelName(order),
         clean(order.orderSummary) || "상품명없음",
         "",
         1,
         Number(order.productAmount || 0),
-      ]);
+      ];
+      if (withPick) row.push(pickLabel(String(order.id)));
+      itemRows.push(row);
       return;
     }
 
     items.forEach((item) => {
-      itemRows.push([
+      const row: WorkbookRow = [
         labelName(order),
         itemName(item),
         itemOption(item),
         itemQty(item),
         Number(item.amount || 0),
-      ]);
+      ];
+      if (withPick) row.push(pickLabel(String(item.id)));
+      itemRows.push(row);
     });
   });
 
