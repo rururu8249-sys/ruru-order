@@ -408,19 +408,9 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
     return;
   }
 
-  const headers = [
-    "방송명",
-    "주문시간",
-    "닉네임",
-    "이름",
-    "전화번호",
-    "상품명",
-    "옵션",
-    "수량",
-    "결제상태",
-    "주문번호",
-    "배송메모",
-  ];
+  // [2026-07-13 사장님 지침] 물건챙기기 엑셀은 딱 5컬럼만: 닉네임·상품명·옵션·수량·상품금액.
+  //   상품금액은 주문에 저장된 값(item.amount, 상품행 없으면 order.productAmount) 표시 전용 — 재계산 안 함.
+  const headers = ["닉네임", "상품명", "옵션", "수량", "상품금액"];
 
   const itemRows: WorkbookRow[] = [];
 
@@ -429,34 +419,22 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
 
     if (!items.length) {
       itemRows.push([
-        clean(order.broadcastName),
-        clean(order.submittedAt),
         labelName(order),
-        clean(order.name),
-        phoneText(order),
         clean(order.orderSummary) || "상품명없음",
         "",
         1,
-        paymentLabel(order),
-        clean(order.orderNo || order.groupId || order.id),
-        deliveryMemoText(order),
+        Number(order.productAmount || 0),
       ]);
       return;
     }
 
     items.forEach((item) => {
       itemRows.push([
-        clean(order.broadcastName),
-        clean(order.submittedAt),
         labelName(order),
-        clean(order.name),
-        phoneText(order),
         itemName(item),
         itemOption(item),
         itemQty(item),
-        paymentLabel(order),
-        clean(order.orderNo || order.groupId || order.id),
-        deliveryMemoText(order),
+        Number(item.amount || 0),
       ]);
     });
   });

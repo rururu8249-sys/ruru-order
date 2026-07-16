@@ -16,7 +16,8 @@ import { exportLiveOrdersForPicking } from "./adminLiveOrderExcelExport";
 
 type Props = { orders: LiveOrder[]; filterLabel: string; onClose: () => void };
 
-type PickItem = { id: string; text: string; qty: number };
+// [2026-07-13 사장님 지침] amount = 주문에 저장된 상품금액(표시 전용, 재계산 안 함)
+type PickItem = { id: string; text: string; qty: number; amount: number };
 type Panel = { key: string; nickname: string; name: string; phone: string; search: string; paid: boolean; when: string; items: PickItem[]; totalQty: number };
 type BatchRow = { text: string; ids: string[]; totalQty: number; pickedQty: number };
 
@@ -81,10 +82,10 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
       const rawItems = Array.isArray(o.items) ? (o.items as LiveOrderItem[]) : [];
       const items: PickItem[] =
         rawItems.length === 0
-          ? [{ id: String(o.id), text: clean(o.orderSummary) || "상품", qty: 1 }]
+          ? [{ id: String(o.id), text: clean(o.orderSummary) || "상품", qty: 1, amount: Number(o.productAmount || 0) }]
           : rawItems.map((it) => {
               const opt = [clean(it.color), clean(it.size)].filter(Boolean).join("/");
-              return { id: String(it.id), text: (clean(it.productName) || "상품") + (opt ? ` (${opt})` : ""), qty: Number(it.qty || 1) };
+              return { id: String(it.id), text: (clean(it.productName) || "상품") + (opt ? ` (${opt})` : ""), qty: Number(it.qty || 1), amount: Number(it.amount || 0) };
             });
       const totalQty = items.reduce((s, it) => s + (Number.isFinite(it.qty) ? it.qty : 1), 0);
       const phone = clean(o.phone).replace(/[^0-9]/g, ""); // 같은 고객 판정용(숫자만)
@@ -365,6 +366,10 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                           <button key={it.id} type="button" onClick={() => togglePick(it.id)} className={`flex w-full items-center gap-3 py-2.5 pl-6 pr-3 text-left ${picked ? "bg-ok-bg" : "bg-surface hover:bg-surface-2"}`}>
                             <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 text-[11px] font-black ${picked ? "border-emerald-500 bg-emerald-500 text-white" : "border-line text-transparent"}`}>✓</span>
                             <span className={`min-w-0 flex-1 truncate text-[13px] font-bold ${picked ? "text-ink-mute line-through" : "text-ink"}`}>{it.text}</span>
+                            {/* [2026-07-13] 상품금액 표시 — 주문에 저장된 값 그대로(표시 전용) */}
+                            {it.amount > 0 ? (
+                              <span className={`shrink-0 text-[12px] font-black ${picked ? "text-ink-mute" : "text-rose-deep"}`}>{it.amount.toLocaleString("ko-KR")}원</span>
+                            ) : null}
                             <span className={`shrink-0 text-[13px] font-black ${picked ? "text-ink-mute" : "text-ink"}`}>{it.qty}개</span>
                           </button>
                         );
