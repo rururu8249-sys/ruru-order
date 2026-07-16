@@ -14,6 +14,8 @@ type Props = { onClose: () => void };
 type Hold = {
   sessionKey: string;
   phone: string;
+  nickname: string;
+  name: string;
   productName: string;
   color: string;
   size: string;
@@ -22,7 +24,7 @@ type Hold = {
   createdAt: string;
 };
 
-type Group = { sessionKey: string; phone: string; items: Hold[]; totalQty: number; minExpires: number };
+type Group = { sessionKey: string; phone: string; nickname: string; name: string; items: Hold[]; totalQty: number; minExpires: number };
 
 const phoneFmt = (p: string) => {
   const d = String(p || "").replace(/[^0-9]/g, "");
@@ -72,11 +74,13 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
     for (const h of holds) {
       const exp = new Date(h.expiresAt).getTime();
       if (!Number.isFinite(exp) || exp <= now) continue; // 화면에서도 만료분 제외
-      const g = map.get(h.sessionKey) || { sessionKey: h.sessionKey, phone: h.phone, items: [], totalQty: 0, minExpires: Infinity };
+      const g = map.get(h.sessionKey) || { sessionKey: h.sessionKey, phone: h.phone, nickname: h.nickname, name: h.name, items: [], totalQty: 0, minExpires: Infinity };
       g.items.push(h);
       g.totalQty += h.qty;
       g.minExpires = Math.min(g.minExpires, exp);
       if (!g.phone && h.phone) g.phone = h.phone;
+      if (!g.nickname && h.nickname) g.nickname = h.nickname;
+      if (!g.name && h.name) g.name = h.name;
       map.set(h.sessionKey, g);
     }
     return Array.from(map.values()).sort((a, b) => a.minExpires - b.minExpires);
@@ -84,8 +88,14 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
 
   const totalQty = groups.reduce((s, g) => s + g.totalQty, 0);
 
+  // 헤더 표기: 닉네임(이름)이 있으면 크게, 전화번호는 보조. 주문 이력 없으면 전화번호만.
+  const groupLabel = (g: Group) => {
+    const nick = [g.nickname, g.name && g.nickname !== g.name ? `(${g.name})` : ""].filter(Boolean).join(" ");
+    return nick || (g.phone ? phoneFmt(g.phone) : "번호 미입력 고객");
+  };
+
   const clearSession = async (g: Group) => {
-    const who = g.phone ? phoneFmt(g.phone) : "번호 미입력 고객";
+    const who = groupLabel(g);
     if (!(await showAdminConfirm(`${who}의 담김 ${g.totalQty}개 선점을 해제할까요?\n\n다른 고객 화면의 남은 수량이 즉시 복구됩니다. (실제 재고·주문에는 영향 없음)`))) return;
     setClearing(g.sessionKey);
     try {
@@ -135,7 +145,16 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
                 <div key={g.sessionKey} className="overflow-hidden rounded-2xl border border-line">
                   <div className="flex items-center gap-2 bg-surface-2 px-3 py-2">
                     <span className="min-w-0 flex-1 truncate text-[13px] font-black text-ink">
-                      {g.phone ? `📱 ${phoneFmt(g.phone)}` : "번호 미입력 고객"}
+                      {g.nickname || g.name ? (
+                        <>
+                          👤 {groupLabel(g)}
+                          {g.phone ? <span className="ml-1.5 text-[11px] font-bold text-ink-mute">📱 {phoneFmt(g.phone)}</span> : null}
+                        </>
+                      ) : g.phone ? (
+                        `📱 ${phoneFmt(g.phone)}`
+                      ) : (
+                        "번호 미입력 고객"
+                      )}
                     </span>
                     <span className="shrink-0 text-[11px] font-black text-rose-deep">{remainText(g.minExpires, now)}</span>
                     <button
