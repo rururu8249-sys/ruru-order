@@ -61,6 +61,27 @@ export async function GET(request: NextRequest) {
         const prev = who[ph] || { nickname: "", name: "" };
         who[ph] = { nickname: prev.nickname || nickname, name: prev.name || name };
       }
+
+      // [2026-07-16] 2차 폴백: customers(카톡 가입 정보) — 주문 이력 없는 신규 고객도
+      //   가입/닉네임 입력 시점 값이 있음. customer_phone이 하이픈 유무 섞여 저장돼 있어
+      //   두 형식 모두로 조회(주문페이지와 동일 패턴), 매칭 키는 숫자만으로 정규화.
+      const hyph = (d: string) =>
+        d.length === 11 ? `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}` : d.length === 10 ? `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}` : d;
+      const phoneVariants = Array.from(new Set(phones.flatMap((p) => [p, hyph(p)])));
+      const { data: custs } = await supabase
+        .from("customers")
+        .select("customer_phone, youtube_nickname, customer_name")
+        .in("customer_phone", phoneVariants)
+        .limit(500);
+      for (const c of (custs || []) as Record<string, unknown>[]) {
+        const ph = String(c.customer_phone ?? "").replace(/[^0-9]/g, "");
+        if (!ph) continue;
+        const prev = who[ph] || { nickname: "", name: "" };
+        who[ph] = {
+          nickname: prev.nickname || String(c.youtube_nickname ?? "").trim(),
+          name: prev.name || String(c.customer_name ?? "").trim(),
+        };
+      }
     }
 
     const holds = rows.map((r) => {
