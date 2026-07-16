@@ -18,6 +18,7 @@ type SettingKey =
   | "remote_area_shipping_fee"
   | "point_auto_earn_enabled"
   | "point_earn_rate"
+  | "cart_hold_minutes"
   | "notice_text"
   | "direct_input_enabled"
   | "popup_notice_enabled"
@@ -42,6 +43,7 @@ const SETTING_KEYS: SettingKey[] = [
   "remote_area_shipping_fee",
   "point_auto_earn_enabled",
   "point_earn_rate",
+  "cart_hold_minutes",
   "notice_text",
   "direct_input_enabled",
   "popup_notice_enabled",
@@ -76,7 +78,18 @@ const DEFAULTS: Record<NumericSettingKey, number> = {
   remote_area_shipping_fee: 6000,
   point_auto_earn_enabled: 0,
   point_earn_rate: 0,
+  cart_hold_minutes: 15,
 };
+
+// [2026-07-13] 장바구니 선점 유지시간 — 분값을 사람이 읽기 좋은 단위로 분해/조립
+type HoldUnit = "minute" | "hour" | "day";
+const HOLD_UNIT_MULT: Record<HoldUnit, number> = { minute: 1, hour: 60, day: 1440 };
+function decomposeHoldMinutes(m: number): { amount: string; unit: HoldUnit } {
+  const v = Math.max(1, Math.round(m));
+  if (v % 1440 === 0) return { amount: String(v / 1440), unit: "day" };
+  if (v % 60 === 0) return { amount: String(v / 60), unit: "hour" };
+  return { amount: String(v), unit: "minute" };
+}
 
 function clean(value: unknown) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
@@ -188,6 +201,9 @@ export default function AdminLiveSettingsPanel() {
   const [remoteShippingFee, setRemoteShippingFee] = useState(formatMoneyInput(DEFAULTS.remote_area_shipping_fee));
   const [pointAutoEarn, setPointAutoEarn] = useState(false);
   const [pointEarnRate, setPointEarnRate] = useState(String(DEFAULTS.point_earn_rate));
+  // [2026-07-13] 장바구니 선점 유지시간 (분으로 저장, 화면은 분/시간/일 선택)
+  const [holdAmount, setHoldAmount] = useState(String(DEFAULTS.cart_hold_minutes));
+  const [holdUnit, setHoldUnit] = useState<HoldUnit>("minute");
   const [noticeText, setNoticeText] = useState("");
   const [directInputEnabled, setDirectInputEnabled] = useState(true);
   // 접속 팝업 공지
@@ -227,6 +243,11 @@ export default function AdminLiveSettingsPanel() {
         setRemoteShippingFee(formatMoneyInput(readNumber(rows, "remote_area_shipping_fee")));
         setPointAutoEarn(clean(rows.find((r) => r.key === "point_auto_earn_enabled")?.value) === "true");
         setPointEarnRate(String(readNumber(rows, "point_earn_rate")));
+        {
+          const hold = decomposeHoldMinutes(readNumber(rows, "cart_hold_minutes"));
+          setHoldAmount(hold.amount);
+          setHoldUnit(hold.unit);
+        }
         setNoticeText(String(rows.find((r) => r.key === "notice_text")?.value ?? ""));
         setDirectInputEnabled(clean(rows.find((r) => r.key === "direct_input_enabled")?.value || "true") !== "false");
         setHowtoEnabled(clean(rows.find((r) => r.key === "howto_enabled")?.value || "true") !== "false");
@@ -260,6 +281,8 @@ export default function AdminLiveSettingsPanel() {
     const nextDefaultShippingFee = Math.max(0, Math.round(toNumber(defaultShippingFee)));
     const nextRemoteShippingFee = Math.max(nextDefaultShippingFee, Math.round(toNumber(remoteShippingFee)));
     const nextPointEarnRate = Math.min(100, Math.max(0, toNumber(pointEarnRate)));
+    // 장바구니 선점 유지시간: 분으로 환산, 10분~30일(43200분) 클램프 — API 쪽 클램프와 동일 기준
+    const nextHoldMinutes = Math.min(43200, Math.max(10, Math.round(toNumber(holdAmount) * HOLD_UNIT_MULT[holdUnit])));
 
     setSaving(true);
 
@@ -273,6 +296,7 @@ export default function AdminLiveSettingsPanel() {
           { key: "remote_area_shipping_fee", value: String(nextRemoteShippingFee) },
           { key: "point_auto_earn_enabled", value: pointAutoEarn ? "true" : "false" },
           { key: "point_earn_rate", value: String(nextPointEarnRate) },
+          { key: "cart_hold_minutes", value: String(nextHoldMinutes) },
           { key: "notice_text", value: noticeText },
           { key: "direct_input_enabled", value: directInputEnabled ? "true" : "false" },
           { key: "howto_enabled", value: howtoEnabled ? "true" : "false" },
@@ -297,6 +321,11 @@ export default function AdminLiveSettingsPanel() {
       setCardMinAmount(formatMoneyInput(nextCardMinAmount));
       setDefaultShippingFee(formatMoneyInput(nextDefaultShippingFee));
       setRemoteShippingFee(formatMoneyInput(nextRemoteShippingFee));
+      {
+        const holdNorm = decomposeHoldMinutes(nextHoldMinutes);
+        setHoldAmount(holdNorm.amount);
+        setHoldUnit(holdNorm.unit);
+      }
 
       showAdminToast("운영 설정을 저장했습니다.", "success");
     } finally {
@@ -433,6 +462,34 @@ export default function AdminLiveSettingsPanel() {
           {activeTab === "order" && (
             <div className={cardClass}>
               {sectionTitle("주문서 공지 / 직접입력", "손님 주문서 상단 공지 문구와 “직접 입력하기” 버튼 노출 여부를 관리합니다.")}
+
+              {/* [2026-07-13 사장님 지침] 장바구니 선점 유지시간 — 담는 순간 다른 고객 화면 남은 수량에서
+                  빠져 보이는 시간. 지나면 자동 해제(표시용 예약만 — 진짜 재고/주문/차감 로직 무관). */}
+              <div className="mb-3 rounded-[20px] border border-line bg-surface-2 p-4">
+                <div className="text-sm font-black text-ink">🛒 장바구니 선점 유지시간</div>
+                <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
+                  고객이 장바구니에 담으면 이 시간 동안 다른 고객에게 남은 수량에서 빠져 보입니다. 시간이 지나면 자동
+                  해제됩니다. 실제 재고 차감은 기존대로 주문서 제출 때만 일어납니다. (최소 10분 ~ 최대 30일)
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  <input
+                    value={holdAmount}
+                    onChange={(e) => setHoldAmount(e.target.value.replace(/[^0-9]/g, ""))}
+                    inputMode="numeric"
+                    className="w-24 rounded-xl border border-line bg-surface px-3 py-2 text-sm font-black text-ink outline-none transition focus:border-rose-deep"
+                  />
+                  <select
+                    value={holdUnit}
+                    onChange={(e) => setHoldUnit(e.target.value as HoldUnit)}
+                    className="rounded-xl border border-line bg-surface px-3 py-2 text-sm font-black text-ink outline-none transition focus:border-rose-deep"
+                  >
+                    <option value="minute">분</option>
+                    <option value="hour">시간</option>
+                    <option value="day">일</option>
+                  </select>
+                  <span className="text-xs font-bold text-ink-mute">동안 선점 유지 (저장 후 새 담기부터 적용)</span>
+                </div>
+              </div>
 
               {/* [2026-07-10] 주문 방법 팝업 — 접속하자마자 뜨는 안내. 켜고/끄기 + 내용 수정 */}
               <div className="mb-3 rounded-[20px] border border-line bg-surface-2 p-4">

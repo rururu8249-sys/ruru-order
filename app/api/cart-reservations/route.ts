@@ -10,9 +10,25 @@ import { createClient } from "@supabase/supabase-js";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const HOLD_MINUTES = 15; // 홀드 유지 시간(하트비트로 연장됨)
+// [2026-07-13 사장님 지침] 홀드 유지시간을 설정(settings.cart_hold_minutes)에서 읽는다.
+//   관리자 설정 > 주문서 탭에서 분/시간/일 단위로 자유 조정. 하한 10분(하트비트 주기보다 짧아져
+//   담자마자 풀리는 사고 방지), 상한 30일. 읽기 실패/미설정 시 기본 15분 — 주문 흐름 영향 없음.
+const HOLD_MINUTES_DEFAULT = 15;
+const HOLD_MINUTES_MIN = 10;
+const HOLD_MINUTES_MAX = 43200; // 30일
 const MAX_ITEMS = 40; // 한 주문서 최대 예약 줄수(남용 방지)
 const MAX_QTY = 99;
+
+async function getHoldMinutes(supabase: ReturnType<typeof getSupabaseAdmin>): Promise<number> {
+  try {
+    const { data } = await supabase.from("settings").select("value").eq("key", "cart_hold_minutes").maybeSingle();
+    const n = Math.round(Number((data as any)?.value));
+    if (!Number.isFinite(n) || n <= 0) return HOLD_MINUTES_DEFAULT;
+    return Math.min(HOLD_MINUTES_MAX, Math.max(HOLD_MINUTES_MIN, n));
+  } catch {
+    return HOLD_MINUTES_DEFAULT;
+  }
+}
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -90,7 +106,8 @@ export async function POST(request: NextRequest) {
 
     const phone = String(body?.phone ?? "").replace(/[^0-9]/g, "").slice(0, 20) || null;
     const rawItems = Array.isArray(body?.items) ? body.items.slice(0, MAX_ITEMS) : [];
-    const expiresAt = new Date(Date.now() + HOLD_MINUTES * 60 * 1000).toISOString();
+    const holdMinutes = await getHoldMinutes(supabase);
+    const expiresAt = new Date(Date.now() + holdMinutes * 60 * 1000).toISOString();
     const rows = rawItems
       .map((it: any) => ({
         session_key: sessionKey,
@@ -108,7 +125,7 @@ export async function POST(request: NextRequest) {
     const { error: insError } = await supabase.from("cart_reservations").insert(rows);
     if (insError) return NextResponse.json({ ok: false, error: insError.message }, { status: 500 });
 
-    return NextResponse.json({ ok: true, reserved: rows.length, holdMinutes: HOLD_MINUTES });
+    return NextResponse.json({ ok: true, reserved: rows.length, holdMinutes });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 });
   }

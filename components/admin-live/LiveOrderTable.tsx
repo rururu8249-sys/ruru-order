@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { LiveOrder } from "./types";
 import { exportLiveOrdersForPicking, exportLiveOrdersForRosen } from "./adminLiveOrderExcelExport";
 import LiveOrderPickingModal from "./LiveOrderPickingModal";
+import LiveCartHoldsModal from "./LiveCartHoldsModal";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import LiveOrderCancelViewFilter, { type LiveOrderCancelViewFilterValue } from "./LiveOrderCancelViewFilter";
@@ -517,6 +518,8 @@ export default function LiveOrderTable({
   const [exporting, setExporting] = useState<"" | "rozen" | "picking">("");
   const [exportConfirm, setExportConfirm] = useState<"" | "rozen" | "picking">("");
   const [pickingOpen, setPickingOpen] = useState(false);
+  // [2026-07-13] 담김 현황(장바구니 선점) 팝업 — 표시 전용, 주문/돈 로직 무관
+  const [cartHoldsOpen, setCartHoldsOpen] = useState(false);
   const [cancelViewFilter, setCancelViewFilter] = useState<LiveOrderCancelViewFilterValue>("all");
 
   // 필터/정렬 변경 시 1페이지로. 단, 첫 마운트(새로고침으로 복원된 페이지)에는 리셋하지 않음.
@@ -767,6 +770,7 @@ export default function LiveOrderTable({
 
   return (
     <>
+    {cartHoldsOpen ? <LiveCartHoldsModal onClose={() => setCartHoldsOpen(false)} /> : null}
     {pickingOpen ? (
       <LiveOrderPickingModal orders={exportableOrders} filterLabel={currentFilterLabel} onClose={() => setPickingOpen(false)} />
     ) : null}
@@ -923,6 +927,15 @@ export default function LiveOrderTable({
             title="물건챙기기 체크리스트 팝업을 엽니다"
           >
             🛍 물건챙기기
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setCartHoldsOpen(true)}
+            className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2"
+            title="장바구니에 담기만 하고 아직 주문서 제출 안 한 고객 목록을 봅니다"
+          >
+            🛒 담김 현황
           </button>
 
             
