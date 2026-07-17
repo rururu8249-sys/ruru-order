@@ -26,12 +26,35 @@ export async function GET(request: NextRequest) {
   }
   try {
     const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase
+
+    // [2026-07-17 사장님 지침] 기본은 "현재 방송 시작 이후" 담김만 표시.
+    //   선점 유지시간이 길어지면(설정으로 수 시간~수 일) 지난 방송/쇼핑몰 모드 때 담긴 것까지
+    //   섞여 나와 헷갈리는 문제. ?scope=all 이면 기존대로 전부 표시(팝업 토글).
+    //   활성 방송 탐지는 대시보드/미션과 동일 패턴(status 대소문자 무시 + 삭제 제외). 읽기 전용.
+    const scopeAll = new URL(request.url).searchParams.get("scope") === "all";
+    let broadcastTitle = "";
+    let broadcastStartedAt = "";
+    if (!scopeAll) {
+      const { data: bcs } = await supabase
+        .from("broadcasts")
+        .select("id,public_title,started_at,status,is_deleted")
+        .order("started_at", { ascending: false })
+        .limit(20);
+      const active = ((bcs || []) as Record<string, unknown>[]).find(
+        (b) => b.is_deleted !== true && String(b.status || "").toUpperCase() === "ON"
+      );
+      if (active && active.started_at) {
+        broadcastTitle = String(active.public_title ?? "").trim();
+        broadcastStartedAt = String(active.started_at);
+      }
+    }
+
+    let query = supabase
       .from("cart_reservations")
       .select("*")
-      .gt("expires_at", new Date().toISOString())
-      .order("expires_at", { ascending: true })
-      .limit(2000);
+      .gt("expires_at", new Date().toISOString());
+    if (broadcastStartedAt) query = query.gte("created_at", broadcastStartedAt);
+    const { data, error } = await query.order("expires_at", { ascending: true }).limit(2000);
     if (error) return NextResponse.json({ ok: false, error: { message: error.message } }, { status: 500 });
 
     const rows = (data || []) as Record<string, unknown>[];
@@ -103,7 +126,12 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json({ ok: true, holds });
+    return NextResponse.json({
+      ok: true,
+      holds,
+      scope: broadcastStartedAt ? "broadcast" : "all",
+      broadcastTitle,
+    });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: { message: String(e?.message ?? e) } }, { status: 500 });
   }

@@ -45,17 +45,21 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState("");
   const [now, setNow] = useState(() => Date.now());
+  // [2026-07-17 사장님 지침] 기본 = 현재 방송 시작 이후 담김만. 토글로 지난 것까지 전체 보기.
+  const [scopeAll, setScopeAll] = useState(false);
+  const [scopeInfo, setScopeInfo] = useState<{ scope: string; broadcastTitle: string }>({ scope: "all", broadcastTitle: "" });
 
   const load = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin-live/cart-holds", { cache: "no-store" });
+      const res = await fetch(`/api/admin-live/cart-holds${scopeAll ? "?scope=all" : ""}`, { cache: "no-store" });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.ok) {
         showAdminToast("담김 현황 불러오기 실패\n\n" + (json?.error?.message || `요청 실패(${res.status})`), "error");
         return;
       }
       setHolds(Array.isArray(json.holds) ? json.holds : []);
+      setScopeInfo({ scope: String(json.scope || "all"), broadcastTitle: String(json.broadcastTitle || "") });
       setNow(Date.now());
     } finally {
       setLoading(false);
@@ -63,10 +67,13 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
   };
 
   useEffect(() => {
-    void load();
+    void load(); // 최초 + 범위 토글 변경 시 재조회
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeAll]);
+
+  useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 30000); // 남은 시간 표시만 갱신
     return () => window.clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const groups = useMemo<Group[]>(() => {
@@ -131,7 +138,22 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
         </div>
 
         <div className="border-b border-line bg-surface-2 px-5 py-2 text-xs font-black text-ink-soft">
-          장바구니 {groups.length}개 · 담긴 수량 {totalQty}개 — 시간이 지나면 자동 해제되고, 여기서 바로 해제할 수도 있습니다.
+          <div>장바구니 {groups.length}개 · 담긴 수량 {totalQty}개 — 시간이 지나면 자동 해제되고, 여기서 바로 해제할 수도 있습니다.</div>
+          {scopeAll ? (
+            <div className="mt-1 flex items-center gap-2 text-ink-mute">
+              <span>지난 담김(이전 방송·쇼핑몰 모드)까지 전체 표시 중</span>
+              <button type="button" onClick={() => setScopeAll(false)} className="rounded-lg border border-line bg-surface px-2 py-0.5 text-[11px] font-black text-ink-soft hover:bg-surface-2">
+                현재 방송만 보기
+              </button>
+            </div>
+          ) : scopeInfo.scope === "broadcast" ? (
+            <div className="mt-1 flex items-center gap-2 text-ink-mute">
+              <span>📺 현재 방송{scopeInfo.broadcastTitle ? `(${scopeInfo.broadcastTitle})` : ""} 시작 이후 담김만 표시 중</span>
+              <button type="button" onClick={() => setScopeAll(true)} className="rounded-lg border border-line bg-surface px-2 py-0.5 text-[11px] font-black text-ink-soft hover:bg-surface-2">
+                지난 것까지 보기
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
