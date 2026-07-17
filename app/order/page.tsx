@@ -52,7 +52,6 @@ import {
 import {
   COMBINE_SHIPPING_SETTING_KEYS,
   DEFAULT_COMBINE_SHIPPING_SETTINGS,
-  hasPaidShippingFee,
   isCombineShippingActiveNow,
   parseCombineShippingSettings,
   resolveCombineShippingLookupWindow,
@@ -2294,9 +2293,12 @@ export default function OrderPage() {
       (order: any) => !isCanceledOrderForCombineShipping(order),
     );
 
+    // [2026-07-17 사장님 정책 확정] 합배송 기준 주문 = "배송비를 낸 주문"이 아니라
+    //   "합배송 범위(시간창/같은방송) 안의 같은 주소 유효 주문 전부"(배송비 0원짜리 포함).
+    //   기존 hasPaidShippingFee(배송비>0) 게이트 때문에 무료배송 상품만 먼저 산 고객의
+    //   다음 주문에 배송비가 붙던 것(스마일 사례, id 2612/2647→2675)을 제거.
+    //   취소/환불 제외는 위 activeCombineShippingOrders 필터가 담당(정규식), 주소 동일 조건 유지.
     const paidShippingOrders = activeCombineShippingOrders.filter((order: any) => {
-      if (!hasPaidShippingFee(order)) return false;
-
       const orderAddressSignature = getShippingAddressSignature(
         order.zipcode,
         order.address,
