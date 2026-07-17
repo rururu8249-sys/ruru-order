@@ -26,6 +26,8 @@ export type CustomerOrderLookupGroup = {
   productAmountText?: string;
   shippingFeeText?: string;
   cardExtraText?: string;
+  // [2026-07-18] 포인트 사용액 표시 (예: "-2,000원") — 상품금액과 결제금액 차이 설명용
+  pointUsedText?: string;
   totalAmountText: string;
   products: CustomerOrderLookupGroupProduct[];
   // [송장 표시] 관리자가 등록한 송장 — 있으면 카드에 배송조회 버튼 노출
@@ -182,6 +184,12 @@ export default function CustomerOrderLookupBottomSheet({
                           <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#666", marginBottom: "6px" }}>
                             <span>카드수수료</span>
                             <span style={{ fontWeight: 700, color: "#444" }}>{group.cardExtraText}</span>
+                          </div>
+                        ) : null}
+                        {group.pointUsedText ? (
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#666", marginBottom: "6px" }}>
+                            <span>포인트 사용</span>
+                            <span style={{ fontWeight: 700, color: "#0F6E56" }}>{group.pointUsedText}</span>
                           </div>
                         ) : null}
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid #F0EBE6", paddingTop: "6px" }}>

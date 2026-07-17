@@ -4066,6 +4066,8 @@ export default function OrderPage() {
       // 실배송비 / 카드수수료 / 결제금액(전부 포함)
       const rowShippingFee = (o: any) => Number(o?.adjusted_shipping_fee ?? o?.shipping_fee ?? 0);
       const rowCardExtra = (o: any) => Number(o?.vat_amount ?? 0);
+      // [2026-07-18 표시 추가] 포인트 사용액 — 상품금액과 결제금액이 왜 다른지 고객에게 보여주기 위함(읽기 전용)
+      const rowPointUsed = (o: any) => Number(o?.point_used_amount ?? 0);
       const rowTotalAmount = (o: any) =>
         Number(o?.final_amount ?? o?.adjusted_total_price ?? o?.total_price ?? o?.product_price ?? 0);
 
@@ -4078,6 +4080,7 @@ export default function OrderPage() {
       const productSubtotal = sumBy(rowProductAmount);
       const shippingTotal = sumBy(rowShippingFee);
       const cardExtraTotal = sumBy(rowCardExtra);
+      const pointUsedTotal = sumBy(rowPointUsed);
       const total = sumBy(rowTotalAmount);
 
       return {
@@ -4094,6 +4097,7 @@ export default function OrderPage() {
         productAmountText: ruruOrderLookupWon(productSubtotal),
         shippingFeeText: shippingTotal > 0 ? ruruOrderLookupWon(shippingTotal) : "무료",
         cardExtraText: cardExtraTotal > 0 ? ruruOrderLookupWon(cardExtraTotal) : "",
+        pointUsedText: pointUsedTotal > 0 ? `-${ruruOrderLookupWon(pointUsedTotal)}` : "",
         totalAmountText: ruruOrderLookupWon(total),
         products: rows.map((o) => ({
           name: ruruOrderLookupProductName(o),
