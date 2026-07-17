@@ -4426,7 +4426,13 @@ export default function OrderPage() {
   const registeredOptionTotalPrice = Math.max(1, registeredOptionQty) * (Number.isFinite(registeredOptionPrice) ? registeredOptionPrice : 0);
   const allOptionsSoldOut = registeredOptionSelectProduct ? isSoldOutOrderProduct(registeredOptionSelectProduct) : false;
 
-  if (isKakaoLoginReturn && !isAutoLoggedIn) {
+  // [2026-07-16 사장님 지침] 유튜브 닉네임 미입력이면 주문서/담기 진입 자체를 막고 닉네임 입력 모달을 강제한다.
+  //   기존엔 isKakaoLoginReturn(카톡복귀)일 때만 모달을 띄워, 재로그인으로 이름/주소만 복원돼 hasSavedInfo=true가
+  //   된 케이스(닉네임만 빈)에서 관문을 건너뛰고 담기가 됐다(중복계정·미입력 사고의 A 원인).
+  //   → 로그인 정보가 저장된 상태(hasSavedInfo)인데 닉네임만 비면 무조건 이 모달로 보낸다.
+  //   정상 고객(닉네임 있음)은 isAutoLoggedIn=true라 여기 안 걸림. 로그인/제출/돈 로직 무변경(렌더 게이트만).
+  const mustEnterYoutubeNickname = hasSavedInfo && !youtubeNickname.trim();
+  if ((isKakaoLoginReturn || mustEnterYoutubeNickname) && !isAutoLoggedIn) {
     return (
       <OrderPageShell>
         <section className="rounded-[32px] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
