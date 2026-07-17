@@ -87,7 +87,7 @@ function buildDescription(brand: string, item: string, deal: string, hashtags: s
     "✅ 구매 전 방송 안내사항을 꼭 확인해 주세요",
     "",
     "📌 주문 방법",
-    "방송 중 안내되는 주문 방법을 확인해 주세요.",
+    "🛒 주문은 여기서 → https://ruru-order.vercel.app/order",
     "유튜브 닉네임과 사이트 닉네임은 동일하게 맞춰주세요.",
     "",
     "💬 카톡채널 문의 https://pf.kakao.com/_RMxaqX",
@@ -196,15 +196,37 @@ export default function YoutubeSeoPage() {
   }, []);
 
   const fetchSuggestions = useCallback(async () => {
-    const q = suggestQuery.trim() || [brand, item].filter(Boolean).join(" ");
-    if (!q) return;
+    // 직접 입력이 있으면 그것만, 없으면 브랜드·아이템을 쉼표로 나눠 "각각" 조회 후 합침
+    // (통짜 문자열로 물어보면 맨 앞 브랜드 연관어만 나오는 문제 방지)
+    const queries = suggestQuery.trim()
+      ? [suggestQuery.trim()]
+      : [...splitTerms(brand), ...splitTerms(item)].slice(0, 6);
+    if (queries.length === 0) return;
+
     setSuggestLoading(true);
     try {
-      const res = await fetch(
-        `/api/admin-live/youtube-seo?q=${encodeURIComponent(q)}`
+      const results = await Promise.all(
+        queries.map(async (q) => {
+          try {
+            const res = await fetch(
+              `/api/admin-live/youtube-seo?q=${encodeURIComponent(q)}`
+            );
+            const data = (await res.json()) as { suggestions?: string[] };
+            return Array.isArray(data.suggestions) ? data.suggestions.slice(0, 6) : [];
+          } catch {
+            return [];
+          }
+        })
       );
-      const data = (await res.json()) as { suggestions?: string[] };
-      setSuggestions(Array.isArray(data.suggestions) ? data.suggestions : []);
+      // 브랜드별 결과를 번갈아 섞어서(라운드로빈) 상위 18개 — 특정 브랜드 쏠림 방지
+      const merged: string[] = [];
+      const maxLen = Math.max(...results.map((r) => r.length), 0);
+      for (let i = 0; i < maxLen; i++) {
+        for (const r of results) {
+          if (r[i]) merged.push(r[i]);
+        }
+      }
+      setSuggestions(Array.from(new Set(merged)).slice(0, 18));
     } catch {
       setSuggestions([]);
     } finally {
