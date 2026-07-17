@@ -27,13 +27,15 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = getSupabaseAdmin();
 
-    // [2026-07-17 사장님 지침] 기본은 "현재 방송 시작 이후" 담김만 표시.
-    //   선점 유지시간이 길어지면(설정으로 수 시간~수 일) 지난 방송/쇼핑몰 모드 때 담긴 것까지
-    //   섞여 나와 헷갈리는 문제. ?scope=all 이면 기존대로 전부 표시(팝업 토글).
+    // [2026-07-17 사장님 지침 v2] 기본은 "현재 방송에 진열된 상품"의 담김만 표시.
+    //   ※ 처음엔 방송 시작 시각(created_at) 기준으로 걸렀으나 실패 — 고객 장바구니에 남아 있던
+    //     옛 상품도 재접속 시 예약이 통째로 갱신되며 created_at이 새로 찍혀 시간으로는 못 거름.
+    //   → 활성 방송의 broadcast_products에 연결된 product_id 집합으로 필터(상품 기준).
+    //   ?scope=all 이면 기존대로 전부 표시(팝업 토글). 방송 OFF면 전체 표시(쇼핑몰 모드).
     //   활성 방송 탐지는 대시보드/미션과 동일 패턴(status 대소문자 무시 + 삭제 제외). 읽기 전용.
     const scopeAll = new URL(request.url).searchParams.get("scope") === "all";
     let broadcastTitle = "";
-    let broadcastStartedAt = "";
+    let allowedProductIds: Set<string> | null = null;
     if (!scopeAll) {
       const { data: bcs } = await supabase
         .from("broadcasts")
@@ -43,21 +45,34 @@ export async function GET(request: NextRequest) {
       const active = ((bcs || []) as Record<string, unknown>[]).find(
         (b) => b.is_deleted !== true && String(b.status || "").toUpperCase() === "ON"
       );
-      if (active && active.started_at) {
+      if (active && active.id) {
         broadcastTitle = String(active.public_title ?? "").trim();
-        broadcastStartedAt = String(active.started_at);
+        const { data: bps } = await supabase
+          .from("broadcast_products")
+          .select("product_id, is_visible")
+          .eq("broadcast_id", active.id)
+          .limit(500);
+        allowedProductIds = new Set(
+          ((bps || []) as Record<string, unknown>[])
+            .filter((b) => b.is_visible !== false)
+            .map((b) => String(b.product_id ?? ""))
+            .filter(Boolean)
+        );
       }
     }
 
-    let query = supabase
+    const { data, error } = await supabase
       .from("cart_reservations")
       .select("*")
-      .gt("expires_at", new Date().toISOString());
-    if (broadcastStartedAt) query = query.gte("created_at", broadcastStartedAt);
-    const { data, error } = await query.order("expires_at", { ascending: true }).limit(2000);
+      .gt("expires_at", new Date().toISOString())
+      .order("expires_at", { ascending: true })
+      .limit(2000);
     if (error) return NextResponse.json({ ok: false, error: { message: error.message } }, { status: 500 });
 
-    const rows = (data || []) as Record<string, unknown>[];
+    let rows = (data || []) as Record<string, unknown>[];
+    if (allowedProductIds) {
+      rows = rows.filter((r) => allowedProductIds!.has(String(r.product_id ?? "")));
+    }
     // [2026-07-16 버그수정] products에 name 컬럼이 없어 select가 통째로 에러 → 전부 "상품"으로 나오던 문제.
     //   실제 존재하는 컬럼(id, product_name)만 조회하고, 에러도 삼키지 않고 응답에 실어 보낸다.
     const ids = Array.from(new Set(rows.map((r) => String(r.product_id ?? "")).filter(Boolean)));
@@ -129,7 +144,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       holds,
-      scope: broadcastStartedAt ? "broadcast" : "all",
+      scope: allowedProductIds ? "broadcast" : "all",
       broadcastTitle,
     });
   } catch (e: any) {

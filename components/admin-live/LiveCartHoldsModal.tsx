@@ -148,7 +148,7 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
             </div>
           ) : scopeInfo.scope === "broadcast" ? (
             <div className="mt-1 flex items-center gap-2 text-ink-mute">
-              <span>📺 현재 방송{scopeInfo.broadcastTitle ? `(${scopeInfo.broadcastTitle})` : ""} 시작 이후 담김만 표시 중</span>
+              <span>📺 현재 방송{scopeInfo.broadcastTitle ? `(${scopeInfo.broadcastTitle})` : ""}에 진열된 상품 담김만 표시 중</span>
               <button type="button" onClick={() => setScopeAll(true)} className="rounded-lg border border-line bg-surface px-2 py-0.5 text-[11px] font-black text-ink-soft hover:bg-surface-2">
                 지난 것까지 보기
               </button>
