@@ -24,13 +24,26 @@ type Hold = {
   createdAt: string;
 };
 
-type Group = { sessionKey: string; phone: string; nickname: string; name: string; items: Hold[]; totalQty: number; minExpires: number };
+type Group = { sessionKey: string; phone: string; nickname: string; name: string; items: Hold[]; totalQty: number; minExpires: number; maxCreated: number };
 
 const phoneFmt = (p: string) => {
   const d = String(p || "").replace(/[^0-9]/g, "");
   if (d.length === 11) return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
   if (d.length === 10) return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
   return d;
+};
+
+// 담은 시각(=마지막 장바구니 갱신 시각) 표시 — 재접속하면 예약이 갱신되며 시간이 새로 찍힘.
+const createdText = (ms: number) => {
+  if (!Number.isFinite(ms) || ms <= 0) return "";
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(ms));
 };
 
 const remainText = (expiresMs: number, nowMs: number) => {
@@ -81,10 +94,12 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
     for (const h of holds) {
       const exp = new Date(h.expiresAt).getTime();
       if (!Number.isFinite(exp) || exp <= now) continue; // 화면에서도 만료분 제외
-      const g = map.get(h.sessionKey) || { sessionKey: h.sessionKey, phone: h.phone, nickname: h.nickname, name: h.name, items: [], totalQty: 0, minExpires: Infinity };
+      const g = map.get(h.sessionKey) || { sessionKey: h.sessionKey, phone: h.phone, nickname: h.nickname, name: h.name, items: [], totalQty: 0, minExpires: Infinity, maxCreated: 0 };
       g.items.push(h);
       g.totalQty += h.qty;
       g.minExpires = Math.min(g.minExpires, exp);
+      const created = new Date(h.createdAt).getTime();
+      if (Number.isFinite(created)) g.maxCreated = Math.max(g.maxCreated, created);
       if (!g.phone && h.phone) g.phone = h.phone;
       if (!g.nickname && h.nickname) g.nickname = h.nickname;
       if (!g.name && h.name) g.name = h.name;
@@ -178,6 +193,9 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
                         "번호 미입력 고객"
                       )}
                     </span>
+                    {g.maxCreated > 0 ? (
+                      <span className="shrink-0 text-[11px] font-bold text-ink-mute">🕒 {createdText(g.maxCreated)} 담음</span>
+                    ) : null}
                     <span className="shrink-0 text-[11px] font-black text-rose-deep">{remainText(g.minExpires, now)}</span>
                     <button
                       type="button"

@@ -23,6 +23,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 (없음)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-07-17 **담김 현황: 담은 시각 표시 추가**(LiveCartHoldsModal 1파일 20+/2-, 표시 전용): 그룹 헤더에 `🕒 M. D. 오후 h:mm 담음`(KST, Intl) — 남은 시간 옆. 값은 예약 created_at 최신값 = **마지막 장바구니 갱신 시각**(재접속 시 sync로 갱신되는 한계 주석 명시). 검수 tsc 0에러. DB변경 없음.
 - 2026-07-17 **담김 현황 v2: 시간 기준 → "현재 방송 진열 상품" 기준으로 교체**(cart-holds route+모달 문구, 읽기 전용): 직전 5c4a314의 `created_at >= started_at` 필터가 **실패** — 고객 장바구니에 남은 옛 상품도 재접속 시 예약 전체교체(sync)로 created_at이 새로 찍혀 시간으론 못 거름(사장님 실화면 확인). → 활성 방송의 `broadcast_products`(is_visible!==false) product_id 집합으로 필터. 안내문구 "진열된 상품 담김만 표시 중". scope=all 토글·방송 OFF 전체 표시는 유지. 쓰기는 여전히 clear의 cart_reservations.delete뿐. 검수 tsc 0에러.
 - 2026-07-17 **담김 현황: 기본을 "현재 방송 시작 이후"로 제한 + 전체 보기 토글**(cart-holds route+LiveCartHoldsModal 2파일, 읽기 전용·선점해제/재고/돈 무접촉): 선점 유지시간을 설정으로 늘린 뒤(수 시간~) 지난 방송·쇼핑몰 모드 때 담긴 것까지 섞여 나와 "등록 안 한 상품이 왜 나오냐" 혼란. → GET에 활성 방송 탐지(대시보드/미션과 동일 패턴: status 대소문자 무시+삭제 제외) 후 `created_at >= started_at` 필터, `?scope=all`이면 기존대로 전부. 응답에 scope/broadcastTitle 실어 팝업 안내줄("📺 현재 방송(제목) 시작 이후 담김만 표시 중")+[지난 것까지 보기]/[현재 방송만 보기] 토글. 방송 OFF면 기존대로 전체 표시(쇼핑몰 모드). 검수 tsc 0에러 + 2파일(59+/9-). DB변경 없음.
 - 2026-07-17 **유튜브 SEO 생성기: 설명문에 주문 사이트 링크 추가**(youtube-seo/page.tsx 1줄 교체): 설명문 템플릿 "주문 방법" 섹션에 `🛒 주문은 여기서 → https://ruru-order.vercel.app/order` 삽입("방송 중 안내" 문구 자리 교체). 검수 tsc 0에러. DB변경 없음.
