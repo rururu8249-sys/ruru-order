@@ -214,6 +214,17 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
     setUnitPrice(String(productPrice(p) || ""));
   };
 
+  // [조합형 옵션 · 2026-07-22] 세부상품(종류) 상품은 옵션 선택 시 단가 기본값 = 기본가 + 추가금.
+  //   운영자가 이후 단가 칸을 직접 고치는 건 그대로 가능(기본값만 자동 세팅). 조합형 아니면 동작 없음.
+  useEffect(() => {
+    if (!selected) return;
+    if ((note as Record<string, unknown>)["combo_mode"] !== true) return;
+    const pricing = (note as Record<string, unknown>)["option_pricing"];
+    if (!pricing || typeof pricing !== "object" || Array.isArray(pricing)) return;
+    const plus = Math.max(0, Math.floor(Number((pricing as Record<string, unknown>)[color.trim()]) || 0));
+    setUnitPrice(String((productPrice(selected) || 0) + plus));
+  }, [color, selected, note]);
+
   const handleAdd = async () => {
     if (!selected) {
       showAdminToast("상품을 선택해주세요.", "warning");

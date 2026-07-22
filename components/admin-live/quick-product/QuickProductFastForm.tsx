@@ -22,6 +22,14 @@ type VariantStockRow = {
   stock: number;
 };
 
+// [조합형 옵션] 세부상품 편집 행 — 저장 시 color 자리에 name, 추가금은 product_note.option_pricing
+type ComboOptionRow = {
+  name: string;
+  plusText: string;
+  stockText: string;
+  hidden: boolean;
+};
+
 type ImagePickerProps = {
   label: string;
   value: string[];
@@ -197,6 +205,11 @@ function parseProductNote(row: ProductRow | null | undefined) {
       suggestion_keywords?: string[];
       purchase_limit_enabled?: boolean;
       purchase_limit_qty?: number;
+      // [조합형 옵션 · 2026-07-22] 세부상품(종류) 모드 — 세부상품명은 stock_variants의 color 자리에 저장(재고 RPC 무변경 재사용)
+      combo_mode?: boolean;
+      option_label?: string;
+      option_pricing?: Record<string, number>; // { 세부상품명: 추가금(원, 0 이상) }
+      combo_hidden?: string[]; // 등록만 하고 고객 노출 막은 세부상품명(가격 미정 등)
     };
   } catch {
     return null;
@@ -563,6 +576,10 @@ export default function QuickProductFastForm({
   const [totalStockText, setTotalStockText] = useState("0");
   const [variantRows, setVariantRows] = useState<VariantStockRow[]>([]);
 
+  // [조합형 옵션] 옵션 편집 방식 — 기본은 기존(색상/사이즈) 그대로, 켜면 세부상품(이름+추가금+재고) 표
+  const [optionEditMode, setOptionEditMode] = useState<"legacy" | "combo">("legacy");
+  const [comboRows, setComboRows] = useState<ComboOptionRow[]>([]);
+
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [sizePresetOpen, setSizePresetOpen] = useState(false);
@@ -678,6 +695,33 @@ export default function QuickProductFastForm({
       setStockMode("total");
       setTotalStockText(String(pickNumber(initialProduct, ["stock", "total_stock"], 0) || 0));
       setVariantRows([]);
+    }
+
+    // [조합형 옵션] 수정 모드 복원 — 세부상품명/추가금/재고/노출을 표로 복원
+    if (productNote?.combo_mode === true) {
+      const pricing = (productNote.option_pricing && typeof productNote.option_pricing === "object") ? productNote.option_pricing : {};
+      const hiddenList = Array.isArray(productNote.combo_hidden) ? productNote.combo_hidden.map((x) => String(x ?? "").trim()) : [];
+      const stockByName = new Map<string, number>();
+      for (const row of noteVariants) {
+        const nm = String(row.color ?? "").trim();
+        if (nm) stockByName.set(nm, Number(row.stock || 0));
+      }
+      // 노출 순서 = color_options 우선, 숨김(변형에만 있는) 항목은 뒤에
+      const exposed = pickArray(initialProduct, ["color_options", "colors"]).filter((n) => stockByName.has(n));
+      const rest = [...stockByName.keys()].filter((n) => !exposed.includes(n));
+      const ordered = [...exposed, ...rest];
+      setOptionEditMode("combo");
+      setComboRows(
+        ordered.map((name) => ({
+          name,
+          plusText: String(Math.max(0, Math.floor(Number((pricing as Record<string, unknown>)[name]) || 0))),
+          stockText: String(stockByName.get(name) ?? 0),
+          hidden: hiddenList.includes(name),
+        })),
+      );
+    } else {
+      setOptionEditMode("legacy");
+      setComboRows([]);
     }
   }, [initialProduct]);
 
@@ -828,34 +872,80 @@ export default function QuickProductFastForm({
       return;
     }
 
+    // [조합형 옵션] 세부상품 행 정리·검증 — 이름 필수·중복 금지, 추가금·재고는 0 이상 정수
+    const comboActive = optionEditMode === "combo";
+    const comboClean = comboActive
+      ? comboRows
+          .map((row) => ({
+            name: row.name.trim(),
+            plus: Math.max(0, Math.floor(Number(String(row.plusText).replace(/[^0-9]/g, "")) || 0)),
+            stock: Math.max(0, Math.floor(Number(String(row.stockText).replace(/[^0-9]/g, "")) || 0)),
+            hidden: row.hidden,
+          }))
+          .filter((row) => row.name)
+      : [];
+
+    if (comboActive) {
+      if (comboClean.length === 0) {
+        showAdminToast("세부상품을 1개 이상 입력해주세요.", "error");
+        return;
+      }
+      const seen = new Set<string>();
+      for (const row of comboClean) {
+        if (seen.has(row.name)) {
+          showAdminToast(`세부상품명이 중복됐습니다: ${row.name}`, "error");
+          return;
+        }
+        seen.add(row.name);
+      }
+      if (comboClean.every((row) => row.hidden)) {
+        showAdminToast("모든 세부상품이 노출 꺼짐 상태예요. 최소 1개는 노출을 켜주세요.\n(상품 자체를 숨기려면 아래 '고객 노출'을 꺼주세요)", "error");
+        return;
+      }
+    }
+
     setSaving(true);
 
     try {
-      const variantStockPayload = resolvedVariantRows.map((row) => ({
-        color: row.color,
-        size: row.size,
-        stock: Number(row.stock || 0),
-      }));
+      // [조합형] 세부상품명을 color 자리에 저장(size는 빈값) → 재고차감 RPC·선점·품절 기존 경로 그대로 동작
+      const variantStockPayload = comboActive
+        ? comboClean.map((row) => ({ color: row.name, size: "", stock: row.stock }))
+        : resolvedVariantRows.map((row) => ({
+            color: row.color,
+            size: row.size,
+            stock: Number(row.stock || 0),
+          }));
+
+      const comboTotalStock = comboClean.reduce((sum, row) => sum + row.stock, 0);
 
       const productNote = JSON.stringify({
-        stock_mode: stockMode,
+        stock_mode: comboActive ? "option" : stockMode,
         stock_variants: variantStockPayload,
         stock_management_enabled: stockManagementEnabled,
         purchase_limit_enabled: purchaseLimitEnabled,
         purchase_limit_qty: purchaseLimitEnabled ? Math.max(1, Number(purchaseLimitText) || 1) : 0,
         registered_order_enabled: registeredOrderEnabled,
-        name_suggestion_enabled: nameSuggestionEnabled,
+        // [조합형] 직접입력 추천에서 제외 — 추천으로 담으면 추가금 없이 기본가로 잘못 담길 수 있어 차단
+        name_suggestion_enabled: comboActive ? false : nameSuggestionEnabled,
         suggestion_keywords: suggestionKeywordsText
           .split(",")
           .map((keyword) => keyword.trim())
           .filter(Boolean),
         category: category.trim(),
+        ...(comboActive
+          ? {
+              combo_mode: true,
+              option_label: "종류",
+              option_pricing: Object.fromEntries(comboClean.map((row) => [row.name, row.plus])),
+              combo_hidden: comboClean.filter((row) => row.hidden).map((row) => row.name),
+            }
+          : {}),
       });
 
       const payload: Record<string, unknown> = {
         product_name: name,
         price,
-        stock: totalStock,
+        stock: comboActive ? comboTotalStock : totalStock,
         status: isVisible ? "판매중" : "숨김",
         product_type: resolvedProductType,
         badge_types: badgeTypes,
@@ -866,10 +956,11 @@ export default function QuickProductFastForm({
         is_pinned: isPinned,
         pinned_at: nextPinnedAt,
         image_url: coverImages[0] || null,
-        color_options: colors,
-        size_options: sizes,
-        color_option_enabled: colors.length > 0,
-        size_option_enabled: sizes.length > 0,
+        // [조합형] color_options = 노출 세부상품명(숨김 제외) — 고객 시트 "종류 선택" 목록의 원천
+        color_options: comboActive ? comboClean.filter((row) => !row.hidden).map((row) => row.name) : colors,
+        size_options: comboActive ? [] : sizes,
+        color_option_enabled: comboActive ? true : colors.length > 0,
+        size_option_enabled: comboActive ? false : sizes.length > 0,
         product_description: normalizeTextareaText(description).trim() || null,
         detail_image_urls: detailImages,
         is_visible: isVisible,
@@ -1101,6 +1192,41 @@ export default function QuickProductFastForm({
             <div style={{ border: "1px solid #E8E2DD", borderRadius: "8px", padding: "12px", background: "#F7F5F3" }}>
               <div style={{ fontSize: "12px", color: "var(--color-ink-mute)", marginBottom: "10px" }}>옵션 (각각 켜고 / 직접입력·선택)</div>
 
+              {/* [조합형 옵션] 옵션 방식 선택 — 기본값 "색상·사이즈"(기존 그대로), 조합형은 켠 상품만 */}
+              <div style={{ display: "flex", background: "var(--color-surface)", border: "1px solid #E8E2DD", borderRadius: "8px", overflow: "hidden", marginBottom: "12px" }}>
+                <button type="button" onClick={() => setOptionEditMode("legacy")} style={{ flex: 1, padding: "8px 4px", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 800, background: optionEditMode === "legacy" ? "#7B2D43" : "transparent", color: optionEditMode === "legacy" ? "#fff" : "var(--color-ink-mute)" }}>색상·사이즈 (기존)</button>
+                <button type="button" onClick={() => { setOptionEditMode("combo"); setComboRows((prev) => (prev.length ? prev : [{ name: "", plusText: "0", stockText: "0", hidden: false }])); }} style={{ flex: 1, padding: "8px 4px", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 800, background: optionEditMode === "combo" ? "#7B2D43" : "transparent", color: optionEditMode === "combo" ? "#fff" : "var(--color-ink-mute)" }}>세부상품 조합형</button>
+              </div>
+
+              {optionEditMode === "combo" ? (
+                <div>
+                  <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginBottom: "8px", lineHeight: 1.6 }}>
+                    한 상품 안에서 여러 세부상품을 드롭다운으로 고르게 합니다 (예: 디올 향수 → 소바쥬/어딕트…).<br />
+                    위 가격 = <b>기본가(제일 싼 금액)</b> · 세부상품 판매가 = 기본가 + 추가금 · 재고 0 = 품절 표시
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 74px 58px 40px 22px", gap: "6px", padding: "0 2px 4px", fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>
+                    <span>세부상품명</span><span style={{ textAlign: "right" }}>추가금</span><span style={{ textAlign: "right" }}>재고</span><span style={{ textAlign: "center" }}>노출</span><span />
+                  </div>
+                  <div style={{ maxHeight: "240px", overflowY: "auto" }}>
+                    {comboRows.map((row, idx) => (
+                      <div key={`combo-row-${idx}`} style={{ display: "grid", gridTemplateColumns: "1fr 74px 58px 40px 22px", gap: "6px", alignItems: "center", padding: "3px 0" }}>
+                        <input style={{ fontSize: "12px", padding: "6px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", opacity: row.hidden ? 0.55 : 1 }} type="text" placeholder="예: 디올 소바쥬" value={row.name} onChange={(e) => setComboRows((prev) => prev.map((r, i) => (i === idx ? { ...r, name: e.target.value } : r)))} />
+                        <input style={{ fontSize: "12px", padding: "6px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", opacity: row.hidden ? 0.55 : 1 }} type="text" inputMode="numeric" value={row.plusText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setComboRows((prev) => prev.map((r, i) => (i === idx ? { ...r, plusText: e.target.value.replace(/[^0-9]/g, "") } : r)))} />
+                        <input style={{ fontSize: "12px", padding: "6px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", opacity: row.hidden ? 0.55 : 1 }} type="text" inputMode="numeric" value={row.stockText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setComboRows((prev) => prev.map((r, i) => (i === idx ? { ...r, stockText: e.target.value.replace(/[^0-9]/g, "") } : r)))} />
+                        <button type="button" title={row.hidden ? "고객에게 숨김(가격 미정 등) — 누르면 노출" : "노출 중 — 누르면 숨김"} onClick={() => setComboRows((prev) => prev.map((r, i) => (i === idx ? { ...r, hidden: !r.hidden } : r)))} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: "14px", textAlign: "center", padding: 0 }}>{row.hidden ? "🚫" : "👁"}</button>
+                        <button type="button" onClick={() => setComboRows((prev) => prev.filter((_, i) => i !== idx))} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: "12px", color: "#C0392B", padding: 0 }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "8px" }}>
+                    <button type="button" onClick={() => setComboRows((prev) => [...prev, { name: "", plusText: "0", stockText: "0", hidden: false }])} style={{ border: "1.5px dashed #7B2D43", background: "var(--color-surface)", color: "#7B2D43", fontSize: "12px", fontWeight: 800, borderRadius: "8px", padding: "6px 12px", cursor: "pointer" }}>+ 세부상품 추가</button>
+                    <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>
+                      {comboRows.filter((r) => r.name.trim()).length}종 · 총 재고 {comboRows.reduce((s, r) => s + (Math.max(0, Math.floor(Number(String(r.stockText).replace(/[^0-9]/g, "")) || 0))), 0).toLocaleString("ko-KR")}개
+                    </span>
+                  </div>
+                </div>
+              ) : (
+              <>
               {/* 색상 — togglePill 제거, 프리셋 드롭다운(사이즈와 동일 구조) */}
               <div style={optRow}>
                 <span style={optLabel}>색상</span>
@@ -1152,6 +1278,8 @@ export default function QuickProductFastForm({
                 <span style={optLabel}>금액</span>
                 <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>{priceText.trim() ? "위 가격 사용" : "비우면 손님 직접입력"}</span>
               </div>
+              </>
+              )}
             </div>
           </div>
 
@@ -1166,7 +1294,11 @@ export default function QuickProductFastForm({
             </div>
 
             {stockManagementEnabled ? (
-              colors.length > 0 || sizes.length > 0 ? (
+              optionEditMode === "combo" ? (
+                <div style={{ background: "#F7F5F3", borderRadius: "8px", padding: "10px", marginTop: "8px", fontSize: "12px", color: "var(--color-ink-mute)" }}>
+                  세부상품 조합형은 위 옵션 표의 <b>재고 칸</b>이 옵션별 재고예요. (재고 0 = 그 세부상품만 품절 표시)
+                </div>
+              ) : colors.length > 0 || sizes.length > 0 ? (
                 <div style={{ background: "#F7F5F3", borderRadius: "8px", padding: "10px", marginTop: "8px" }}>
                   <div style={{ fontSize: "12px", color: "var(--color-ink-mute)", marginBottom: "8px" }}>옵션별 재고 수량</div>
                   <div style={{ maxHeight: "200px", overflowY: "auto" }}>

@@ -604,6 +604,8 @@ function registeredProductNoneOptionEnabled(product: BroadcastProduct): boolean 
 // - "none":   해당 field가 토글 ON(size/color_option_enabled=true) 또는 "없음" 명시 → 자동 "없음", 입력 불필요.
 // - "input":  실옵션도 없고 토글도 OFF → 고객이 직접 입력해야 함.
 function getRegisteredOptionMode(product: BroadcastProduct, field: "color" | "size"): "select" | "none" | "input" {
+  // [조합형 옵션] 세부상품 상품은 color=종류 선택 강제 / size 사용 안 함(레거시 "없음" 센티널 경로 안 탐)
+  if (readComboInfoOrderProduct(product)) return field === "color" ? "select" : "none";
   if (getSelectableRegisteredOptions(product, field).length > 0) return "select";
   // field별 독립 판단: color는 color_option_enabled, size는 size_option_enabled
   const record = product as unknown as Record<string, unknown>;
@@ -833,6 +835,62 @@ function lowStockOptionsOrderProduct(product: any, reservedOf?: (color: unknown,
       stock: Number(v.stock ?? 0) - Math.max(0, Number(reservedOf ? reservedOf(v.color, v.size) : 0) || 0),
     }))
     .filter((x: { stock: number }) => Number.isFinite(x.stock) && x.stock >= 1 && x.stock <= 5);
+}
+
+// ─────────────────────────────────────────────────────────────
+// [조합형 옵션 · 2026-07-22] 세부상품(종류) 상품 헬퍼 — 표시/담기 단가 계산 전용.
+//   구조: 세부상품명을 기존 color 옵션 자리에 그대로 사용 → 재고차감 RPC(product_inventory_variants
+//   (product_id, color, size) 키)·선점·품절·중복체크는 기존 검증된 경로 100% 재사용(무변경).
+//   추가금만 product_note.option_pricing({세부상품명: 추가금})에서 읽어 담기 시 단가에 더한다.
+//   조합형이 아닌 상품(combo_mode !== true)은 전부 null/0 반환 → 기존 동작 완전 동일.
+// ─────────────────────────────────────────────────────────────
+function readComboInfoOrderProduct(product: unknown): { names: string[]; pricing: Record<string, number>; maxPlus: number } | null {
+  const note = readOrderNoteObject(product);
+  if ((note as any)?.combo_mode !== true) return null;
+  const pricingRaw = (note as any)?.option_pricing;
+  const pricing: Record<string, number> = {};
+  if (pricingRaw && typeof pricingRaw === "object" && !Array.isArray(pricingRaw)) {
+    for (const key of Object.keys(pricingRaw)) {
+      const v = Math.max(0, Math.floor(Number((pricingRaw as any)[key]) || 0));
+      pricing[String(key).trim()] = v;
+    }
+  }
+  // 노출 세부상품 = color_options (숨김 처리된 세부상품은 stock_variants에만 존재)
+  const rawList = (product as any)?.color_options;
+  let names: string[] = [];
+  if (Array.isArray(rawList)) {
+    names = rawList.map((x: any) => String(x ?? "").trim()).filter(Boolean);
+  } else if (typeof rawList === "string" && rawList.trim()) {
+    try {
+      const parsed = JSON.parse(rawList);
+      if (Array.isArray(parsed)) names = parsed.map((x: any) => String(x ?? "").trim()).filter(Boolean);
+    } catch { /* 무시 — 아래 stock_variants 폴백 */ }
+  }
+  if (names.length === 0) {
+    const variants = Array.isArray((note as any)?.stock_variants) ? (note as any).stock_variants : [];
+    const hidden = Array.isArray((note as any)?.combo_hidden) ? (note as any).combo_hidden.map((x: any) => String(x ?? "").trim()) : [];
+    names = variants
+      .map((v: any) => String(v?.color ?? "").trim())
+      .filter((n: string) => n && !hidden.includes(n));
+  }
+  const maxPlus = names.reduce((m, n) => Math.max(m, Number(pricing[n] || 0)), 0);
+  return { names, pricing, maxPlus };
+}
+
+// 담기/시트 단가용: 선택된 세부상품의 추가금(조합형 아니면 항상 0 → 기존 상품 경로 무영향)
+function comboPlusOfOrderProduct(product: unknown, color?: string): number {
+  const info = readComboInfoOrderProduct(product);
+  if (!info) return 0;
+  return Math.max(0, Math.floor(Number(info.pricing[String(color ?? "").trim()] || 0)));
+}
+
+// 상품 검색이 세부상품명(예: "탐다오")으로도 잡히게 — 표시(필터) 전용
+function comboNamesMatchOrderProduct(product: unknown, query: string): boolean {
+  const info = readComboInfoOrderProduct(product);
+  if (!info) return false;
+  const q = normalizeSuggestionText(query);
+  if (!q) return false;
+  return info.names.some((n) => normalizeSuggestionText(n).includes(q));
 }
 
 
@@ -1159,6 +1217,8 @@ export default function OrderPage() {
   const [registeredOptionColor, setRegisteredOptionColor] = useState("");
   const [registeredOptionSize, setRegisteredOptionSize] = useState("");
   const [registeredOptionQty, setRegisteredOptionQty] = useState(1);
+  // [조합형 옵션] 세부상품이 많을 때(예: 미니어처 143종) 옵션 시트 안 검색어 — 표시 전용
+  const [registeredOptionComboSearch, setRegisteredOptionComboSearch] = useState("");
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
   const [duplicateWarningPendingAction, setDuplicateWarningPendingAction] = useState<(() => void) | null>(null);
 
@@ -3069,7 +3129,9 @@ export default function OrderPage() {
     product: BroadcastProduct,
     options?: { color?: string; size?: string; qty?: number }
   ) => {
-    const productPrice = Number(product.price || 0);
+    // [조합형 옵션] 단가 = 기본가 + 선택한 세부상품 추가금. 조합형 아니면 comboPlus=0 → 기존과 완전 동일.
+    const comboPlus = comboPlusOfOrderProduct(product, options?.color);
+    const productPrice = Number(product.price || 0) + comboPlus;
     const nextProductPrice = Number.isFinite(productPrice) && productPrice > 0 ? String(Math.round(productPrice)) : "";
 
     const fallbackColor = pickRegisteredProductOptionText(product, [
@@ -3161,6 +3223,7 @@ export default function OrderPage() {
     setRegisteredOptionColor("");
     setRegisteredOptionSize("");
     setRegisteredOptionQty(1);
+    setRegisteredOptionComboSearch("");
   };
 
   const closeRegisteredOptionSelectSheet = () => {
@@ -3168,6 +3231,7 @@ export default function OrderPage() {
     setRegisteredOptionColor("");
     setRegisteredOptionSize("");
     setRegisteredOptionQty(1);
+    setRegisteredOptionComboSearch("");
   };
 
   // 동일 상품 + 동일 옵션(색상/사이즈)으로 이미 제출된 주문이 있는지 확인.
@@ -3227,9 +3291,11 @@ export default function OrderPage() {
     // none(없음입력 토글 ON)은 입력/선택 불필요. select는 선택 강제, input은 직접입력 강제.
     if (colorMode !== "none" && !normalizeEmptyProductOptionValue(registeredOptionColor)) {
       showCustomerNotice(
-        colorMode === "input"
-          ? "색상을 입력해주세요."
-          : "색상을 선택해주세요."
+        readComboInfoOrderProduct(product)
+          ? "종류를 선택해주세요."
+          : colorMode === "input"
+            ? "색상을 입력해주세요."
+            : "색상을 선택해주세요."
       );
       return;
     }
@@ -4429,7 +4495,11 @@ export default function OrderPage() {
     ? getRegisteredOptionMode(registeredOptionSelectProduct, "size")
     : "none";
   const registeredOptionPrice = registeredOptionSelectProduct ? Number(registeredOptionSelectProduct.price || 0) : 0;
-  const registeredOptionTotalPrice = Math.max(1, registeredOptionQty) * (Number.isFinite(registeredOptionPrice) ? registeredOptionPrice : 0);
+  // [조합형 옵션] 시트 표시/선택금액 — 선택한 세부상품 추가금 반영(조합형 아니면 plus=0 → 기존 동일)
+  const registeredOptionComboInfo = registeredOptionSelectProduct ? readComboInfoOrderProduct(registeredOptionSelectProduct) : null;
+  const registeredOptionComboPlus = registeredOptionComboInfo ? comboPlusOfOrderProduct(registeredOptionSelectProduct, registeredOptionColor) : 0;
+  const registeredOptionUnitPrice = registeredOptionPrice + registeredOptionComboPlus;
+  const registeredOptionTotalPrice = Math.max(1, registeredOptionQty) * (Number.isFinite(registeredOptionUnitPrice) ? registeredOptionUnitPrice : 0);
   const allOptionsSoldOut = registeredOptionSelectProduct ? isSoldOutOrderProduct(registeredOptionSelectProduct) : false;
 
   // [2026-07-16 사장님 지침] 유튜브 닉네임 미입력이면 주문서/담기 진입 자체를 막고 닉네임 입력 모달을 강제한다.
@@ -4720,7 +4790,8 @@ export default function OrderPage() {
             }
             const q = productSearchText.trim();
             const filtered = quickGroupBuyProducts.filter((p) => {
-              if (q && !productMatchesSuggestion(p as BroadcastProduct, q)) return false;
+              // [조합형 옵션] 세부상품명(예: "탐다오")으로도 대표상품이 검색되게 — 표시 전용
+              if (q && !productMatchesSuggestion(p as BroadcastProduct, q) && !comboNamesMatchOrderProduct(p, q)) return false;
               if (categoryFilter !== "전체") {
                 const note = parseProductSuggestionNote((p as any).product_note);
                 const cat = String((note as any)?.category ?? (p as any).category ?? (p as any).product_category ?? "").trim();
@@ -4887,8 +4958,10 @@ export default function OrderPage() {
                             <div style={{ fontSize: "13px", fontWeight: 700, color: "#222", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.product_name}</div>
                             {/* 바로구매 부가설명 유지(사장님 지침: 배지만으론 신규 고객이 뜻을 모름) + 가격 위계 강화 15→17px */}
                             {badges.includes("direct") ? (<div style={{ fontSize: 11, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>방송 접수 없이 지금 바로 구매 가능</div>) : null}
+                            {/* [조합형 옵션] 세부상품 개수 안내 — 표시 전용 */}
+                            {(() => { const ci = readComboInfoOrderProduct(product); return ci && ci.names.length > 1 ? (<div style={{ fontSize: 11, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>종류 {ci.names.length}가지 · 눌러서 선택</div>) : null; })()}
                             <div style={{ marginTop: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                              <span style={{ fontSize: "17px", fontWeight: 800, color: "#7A1E47" }}>{won(Number(product.price || 0))}</span>
+                              <span style={{ fontSize: "17px", fontWeight: 800, color: "#7A1E47" }}>{(() => { const ci = readComboInfoOrderProduct(product); return ci && ci.maxPlus > 0 ? won(Number(product.price || 0)) + "~" : won(Number(product.price || 0)); })()}</span>
                               <button
                                 type="button"
                                 disabled={sold}
@@ -5199,7 +5272,16 @@ export default function OrderPage() {
                     </div>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontSize: "16px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{registeredOptionSelectProduct.product_name}</div>
-                      <div style={{ marginTop: "3px", fontSize: "15px", fontWeight: 800, color: "#7A1E47" }}>{registeredOptionPrice > 0 ? won(registeredOptionPrice) : "가격 직접입력"}</div>
+                      <div style={{ marginTop: "3px", fontSize: "15px", fontWeight: 800, color: "#7A1E47" }}>
+                        {/* [조합형 옵션] 선택 전엔 "기본가~", 선택하면 그 세부상품 단가 표시 */}
+                        {registeredOptionComboInfo
+                          ? registeredOptionColor.trim()
+                            ? won(registeredOptionUnitPrice)
+                            : registeredOptionComboInfo.maxPlus > 0
+                              ? won(registeredOptionPrice) + "~"
+                              : won(registeredOptionPrice)
+                          : registeredOptionPrice > 0 ? won(registeredOptionPrice) : "가격 직접입력"}
+                      </div>
                     </div>
                   </div>
                   {registeredOptionAllImages.length > 1 ? (
@@ -5217,7 +5299,69 @@ export default function OrderPage() {
                       이 상품은 옵션이 없습니다. 수량만 선택해 주세요.
                     </div>
                   ) : null}
-                  {registeredOptionColorChoices.length > 0 ? (
+
+                  {/* [조합형 옵션] 종류 선택 — 검색(8종 초과 시) + 세부상품 목록(추가금·품절·N개 남음 표시) */}
+                  {registeredOptionComboInfo ? (
+                    <div style={{ marginBottom: "16px" }}>
+                      <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>
+                        종류 선택 <span style={{ fontSize: "12px", fontWeight: 700, color: "#ABA5A0" }}>({registeredOptionComboInfo.names.length}가지)</span>
+                      </div>
+                      {registeredOptionComboInfo.names.length > 8 ? (
+                        <div style={{ position: "relative", marginBottom: "8px" }}>
+                          <input
+                            value={registeredOptionComboSearch}
+                            onChange={(e) => setRegisteredOptionComboSearch(e.target.value)}
+                            placeholder="이름으로 검색 (예: 탐다오)"
+                            style={{ height: "44px", width: "100%", boxSizing: "border-box", borderRadius: "12px", border: "1.5px solid #E8E2DD", background: "#fff", padding: "0 14px", fontSize: "14px", fontWeight: 700, color: "#222", outline: "none" }}
+                          />
+                        </div>
+                      ) : null}
+                      {(() => {
+                        const info = registeredOptionComboInfo;
+                        const pid = String(registeredOptionSelectProduct?.id ?? "");
+                        const query = normalizeSuggestionText(registeredOptionComboSearch);
+                        const list = info.names.filter((n) => !query || normalizeSuggestionText(n).includes(query));
+                        const stockOf = (name: string): number | null => {
+                          const v = registeredOptionStockVariants.find((row: any) => String(row?.color ?? "").trim() === name && !String(row?.size ?? "").trim());
+                          if (!v) return null; // 재고관리 OFF 등 — 품절/임박 표시 없음
+                          const reserved = pid ? Number(reservedByVariant[reservationVariantKey(pid, name, "")] || 0) : 0;
+                          return Math.max(0, Number(v.stock ?? 0) - Math.max(0, reserved));
+                        };
+                        if (list.length === 0) {
+                          return <div style={{ padding: "14px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "#ABA5A0", border: "1px solid #F0EAE0", borderRadius: "12px" }}>검색 결과가 없어요</div>;
+                        }
+                        return (
+                          <div style={{ border: "1px solid #F0EAE0", borderRadius: "12px", maxHeight: "236px", overflowY: "auto", background: "#FFFDFB" }}>
+                            {list.map((name) => {
+                              const selected = registeredOptionColor === name;
+                              const remain = stockOf(name);
+                              const soldOut = remain !== null && remain <= 0;
+                              const plus = Math.max(0, Math.floor(Number(info.pricing[name] || 0)));
+                              return (
+                                <button
+                                  key={`combo-${name}`}
+                                  type="button"
+                                  onClick={() => { if (soldOut) return; setRegisteredOptionColor((prev) => (prev === name ? "" : name)); }}
+                                  style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", textAlign: "left", padding: "12px 14px", border: "none", borderBottom: "1px solid #F6EFE9", background: selected ? "#7A1E47" : "transparent", cursor: soldOut ? "default" : "pointer", opacity: soldOut ? 0.45 : 1 }}
+                                >
+                                  <span style={{ minWidth: 0, flex: 1, fontSize: "14px", fontWeight: 700, color: selected ? "#fff" : "#333", textDecoration: soldOut ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+                                  {soldOut ? (
+                                    <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "#fff", background: "#B5A1A8", borderRadius: "5px", padding: "2px 6px" }}>품절</span>
+                                  ) : remain !== null && remain <= 5 ? (
+                                    <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "#C0392B", background: selected ? "#fff" : "#FBEAE7", borderRadius: "5px", padding: "2px 6px" }}>{remain}개 남음</span>
+                                  ) : null}
+                                  <span style={{ flexShrink: 0, fontSize: "13px", fontWeight: 800, color: selected ? "#F5D9E5" : plus > 0 ? "#7A1E47" : "#B5AAA4" }}>{plus > 0 ? `+${won(plus)}` : "+0원"}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
+                      {!registeredOptionColor.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>종류를 선택해주세요</div> : null}
+                    </div>
+                  ) : null}
+
+                  {!registeredOptionComboInfo && registeredOptionColorChoices.length > 0 ? (
                     <div style={{ marginBottom: "16px" }}>
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>색상</div>
                       {registeredOptionColorChoices.length <= 4 ? (
