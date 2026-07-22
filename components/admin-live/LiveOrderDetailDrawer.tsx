@@ -123,6 +123,9 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
+  // [받는분 수정 · 2026-07-22 사장님 지시] 받는분(배송) 이름/연락처도 편집 폼에서 함께 수정 — recipient_* 는 배송/송장 전용 컬럼(입금·정산·포인트 무관)
+  const [editRecipientName, setEditRecipientName] = useState("");
+  const [editRecipientPhone, setEditRecipientPhone] = useState("");
   const [editZipcode, setEditZipcode] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [editDetailAddress, setEditDetailAddress] = useState("");
@@ -600,6 +603,9 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     setEditAddress(clean(row.address) || clean(row.customerAddress) || clean(row.shippingAddress));
     setEditDetailAddress(clean(row.detailAddress) || clean(row.detail_address));
     setEditMemo(clean(row.requestMemo) || clean(row.request_memo) || clean(row.deliveryMemo));
+    // 받는분: 저장된 recipient 값 우선, 없으면 주문자 값으로 프리필
+    setEditRecipientName(clean(orderForView.recipientName) || clean(row.recipient_name) || clean(row.name) || clean(row.customer_name));
+    setEditRecipientPhone(clean(orderForView.recipientPhone) || clean(row.recipient_phone) || clean(orderForView.phone) || clean(row.customer_phone));
     setEditingCustomer(true);
   };
 
@@ -624,6 +630,9 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           address: editAddress.trim(),
           detail_address: editDetailAddress.trim(),
           request_memo: editMemo.trim(),
+          // [받는분 수정] 배송/송장 전용 컬럼 — 입금확인·정산·포인트 매칭은 customer_* 기준이라 무관
+          recipient_name: editRecipientName.trim(),
+          recipient_phone: editRecipientPhone.replace(/[^0-9]/g, ""),
         })
         .in("id", rowIds);
       if (error) {
@@ -979,6 +988,17 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                   <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} inputMode="numeric" className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
                 </label>
               </div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="grid gap-1 text-[10px] font-black text-ink-mute">받는분 이름
+                  <input value={editRecipientName} onChange={(e) => setEditRecipientName(e.target.value)} className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
+                </label>
+                <label className="grid gap-1 text-[10px] font-black text-ink-mute">받는분 연락처
+                  <input value={editRecipientPhone} onChange={(e) => setEditRecipientPhone(e.target.value)} inputMode="numeric" className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
+                </label>
+              </div>
+              <button type="button" onClick={() => { setEditRecipientName(editName.trim()); setEditRecipientPhone(editPhone.replace(/[^0-9]/g, "")); }} className="h-8 w-full rounded-lg border border-dashed border-line bg-surface text-[11px] font-black text-ink-soft hover:border-rose-deep hover:text-rose-deep">
+                ↕ 받는분을 주문자와 동일하게
+              </button>
               <div className="grid gap-1 text-[10px] font-black text-ink-mute">우편번호 · 주소
                 <div className="flex gap-2">
                   <input value={editZipcode} onChange={(e) => setEditZipcode(e.target.value)} placeholder="우편번호" className="h-9 w-[96px] rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
