@@ -21,6 +21,8 @@ type LoginSyncBody = {
   customer_zipcode?: unknown;
   customer_address?: unknown;
   customer_detail_address?: unknown;
+  // [2026-07-22 사장님 지시] 유튜브 닉네임 — 관문 통과 즉시 DB 반영용(기존엔 주문 제출 때만 저장돼 "닉네임 미입력" 회원이 남던 문제)
+  youtube_nickname?: unknown;
 };
 
 type CustomerRow = {
@@ -134,6 +136,7 @@ export async function POST(request: NextRequest) {
   const kakaoId = cleanText(body.kakao_id);
   const kakaoNickname = cleanText(body.kakao_nickname);
   const kakaoProfileImage = cleanText(body.kakao_profile_image);
+  const youtubeNickname = cleanText(body.youtube_nickname).slice(0, 80);
   const nowIso = new Date().toISOString();
 
   if (customerPhoneDigits.length < 10) {
@@ -231,6 +234,13 @@ export async function POST(request: NextRequest) {
         recordChange("detail_address", existing.detail_address, detailAddress);
       }
 
+      // [유튜브 닉네임] 관문/재방문 시 즉시 반영 — 비어 있으면 채우고, 달라졌으면 갱신 + 변경이력 기록
+      //   (닉네임 중복 검사는 고객 관문에서 이미 통과한 값만 들어옴. 주문/입금/포인트 로직 무관 — customers 표시/검색 필드)
+      if (youtubeNickname && cleanText(existing.youtube_nickname) !== youtubeNickname) {
+        updateData.youtube_nickname = youtubeNickname;
+        recordChange("youtube_nickname", existing.youtube_nickname, youtubeNickname);
+      }
+
       // 카카오 식별자: kakao_id는 비어있을 때만 보완, nickname은 있으면 갱신
       if (shouldFill(existing.kakao_id, kakaoId)) {
         updateData.kakao_id = kakaoId;
@@ -311,7 +321,7 @@ export async function POST(request: NextRequest) {
     }
 
     const insertData: Record<string, unknown> = {
-      youtube_nickname: "",
+      youtube_nickname: youtubeNickname || "",
       customer_name: customerName,
       customer_phone: customerPhoneDigits, // DB customer_phone 키는 숫자만(2026-06-16 정규화 + 주문 RPC 정합)
       zipcode,

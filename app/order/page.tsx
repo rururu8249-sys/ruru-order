@@ -2585,6 +2585,34 @@ export default function OrderPage() {
     ].join("\n");
   };
 
+  // [닉네임 DB 즉시저장 · 2026-07-22 사장님 지시] 닉네임 관문 통과/재방문 시 customers에 바로 반영.
+  //   기존엔 localStorage에만 저장돼 "주문서 제출 전 회원"이 전부 닉네임 미입력으로 남던 문제 해결.
+  //   fire-and-forget: 실패해도 로그인/주문 흐름을 절대 막지 않음. 같은 (번호,닉네임)은 세션당 1회만 전송.
+  //   돈/주문/입금 로직 무관 — customer-login-sync(고객 자동등록 API)에 youtube_nickname만 추가로 실어 보냄.
+  const syncYoutubeNicknameToServer = async (nickname: string) => {
+    try {
+      const cleanNick = String(nickname || "").trim();
+      const phone = normalizePhone(customerPhone);
+      if (!cleanNick || phone.length < 10) return;
+      const dedupeKey = `ruru_nick_synced_${phone}_${cleanNick}`;
+      if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(dedupeKey)) return;
+      await fetch("/api/customer-login-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer_phone: phone,
+          youtube_nickname: cleanNick,
+          kakao_id: typeof localStorage !== "undefined" ? localStorage.getItem("ruru_kakao_id") || "" : "",
+          kakao_nickname: typeof localStorage !== "undefined" ? localStorage.getItem("ruru_kakao_nickname") || "" : "",
+          customer_name: customerName.trim(),
+        }),
+      });
+      if (typeof sessionStorage !== "undefined") sessionStorage.setItem(dedupeKey, "1");
+    } catch {
+      // 조용히 무시 — 다음 방문/제출 때 다시 채워짐
+    }
+  };
+
   const confirmKakaoYoutubeNickname = async () => {
     const cleanNickname = youtubeNickname.trim();
 
@@ -2605,6 +2633,9 @@ export default function OrderPage() {
     markYoutubeNicknameConfirmVersionCurrent();
     setYoutubeNickname(cleanNickname);
     setIsKakaoLoginReturn(false);
+
+    // [닉네임 DB 즉시저장] 관문 통과 순간 회원 DB에도 반영 (전화번호가 아직 없으면 아래 재방문 효과가 나중에 처리)
+    void syncYoutubeNicknameToServer(cleanNickname);
 
     const hasRequiredCustomerInfo = Boolean(
       customerName.trim() &&
@@ -3231,6 +3262,16 @@ export default function OrderPage() {
     // P6. 담기 완료 — confetti + "주문서에 담았어요!" 토스트(주문서 보기 / 계속 담기)
     if (didAdd) { setCartAddedItem(clampedItem); setCartAddedOpen(true); }
   };
+
+  // [닉네임 자가치유] 이미 폰(localStorage)에만 닉네임이 있는 기존 고객 — 주문 페이지 열기만 하면
+  //   회원 DB에 자동 반영(세션당 1회, 비어있거나 다를 때만 서버가 갱신). 표시/검색 필드만 — 돈 로직 무관.
+  useEffect(() => {
+    const nick = youtubeNickname.trim();
+    const phone = normalizePhone(customerPhone);
+    if (!nick || phone.length < 10 || !hasSavedInfo) return;
+    void syncYoutubeNicknameToServer(nick);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [youtubeNickname, customerPhone, hasSavedInfo]);
 
   const openRegisteredOptionSelectSheet = (product: BroadcastProduct) => {
     setRegisteredOptionSelectProduct(product);
