@@ -742,6 +742,77 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     }
   };
 
+  // [고객용 복사 · 2026-07-22 사장님 지시] 배송정보+주문내역+금액을 고객에게 붙여넣기 좋은 텍스트로 클립보드 복사.
+  //   읽기 전용(어떤 데이터도 변경 없음). 금액 표기는 이 서랍 화면의 계산값(상품금액/배송비/카드추가금/포인트) 그대로.
+  const copyCustomerOrderSummary = async () => {
+    const fmtPhone = (value?: string | null) => {
+      const digits = String(value || "").replace(/[^0-9]/g, "");
+      if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+      if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+      return String(value || "").trim();
+    };
+    const o = orderForView;
+    const orderPhoneDigits = String(o.phone || "").replace(/[^0-9]/g, "");
+    const recipientName = String(o.recipientName || "").trim();
+    const recipientPhone = String(o.recipientPhone || "").trim();
+    const recipientDiffers =
+      (recipientName && recipientName !== String(o.name || "").trim()) ||
+      (recipientPhone && recipientPhone.replace(/[^0-9]/g, "") !== orderPhoneDigits);
+    const addressText = getCustomerAddress(o);
+    const zip = String(o.zipcode || "").trim();
+
+    const lines: string[] = [];
+    lines.push(`[루루동이 주문내역] ${String(o.orderNo || "").trim()}`.trim());
+    lines.push(`주문일: ${formatFullDateTime(o.createdAt, o.submittedAt)}`);
+    lines.push("");
+    if (String(o.nickname || "").trim()) lines.push(`닉네임: ${String(o.nickname).trim()}`);
+    lines.push(`주문자: ${String(o.name || "").trim()}${o.phone ? ` (${fmtPhone(o.phone)})` : ""}`);
+    if (recipientDiffers) {
+      lines.push(`받는분: ${recipientName || String(o.name || "").trim()}${recipientPhone ? ` (${fmtPhone(recipientPhone)})` : ""}`);
+    }
+    if (addressText) lines.push(`주소: ${zip ? `(${zip}) ` : ""}${addressText}`);
+    lines.push("");
+    lines.push("[주문상품]");
+    for (const item of items) {
+      const opt = [String(item.color || "").trim(), String(item.size || "").trim()]
+        .filter((value) => value && value !== "없음")
+        .join("/");
+      lines.push(`- ${item.productName}${opt ? ` (${opt})` : ""} ${Number(item.qty) || 1}개 · ${money(Number(item.amount) || 0)}`);
+    }
+    lines.push("");
+    lines.push(`상품금액 ${money(productAmount)}`);
+    lines.push(`배송비 ${money(shippingFee)}`);
+    if (isCardPaymentDisplay && cardPaymentExtraAmount > 0) lines.push(`카드수수료 ${money(cardPaymentExtraAmount)}`);
+    if (pointUsedAmount > 0) lines.push(`포인트 사용 -${money(pointUsedAmount)}`);
+    const payableTotal = isCardPaymentDisplay
+      ? cardPaymentExpectedTotal
+      : Math.max(0, totalAmount - (pointUsedAmount > 0 ? pointUsedAmount : 0));
+    lines.push(`총 결제금액 ${money(payableTotal)} · ${String(o.paymentMethod || "").trim() || "무통장입금"}`);
+    if (String(o.deliveryMemo || "").trim()) {
+      lines.push("");
+      lines.push(`배송메모: ${String(o.deliveryMemo).trim()}`);
+    }
+
+    const text = lines.join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      showAdminToast("고객용 주문내역이 복사됐어요. 카톡 등에 그대로 붙여넣으세요.", "success");
+    } catch {
+      // 클립보드 권한 실패 시 폴백(구형 방식)
+      try {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+        showAdminToast("고객용 주문내역이 복사됐어요. 카톡 등에 그대로 붙여넣으세요.", "success");
+      } catch {
+        showAdminToast("복사에 실패했습니다. 다시 시도해주세요.", "error");
+      }
+    }
+  };
+
   // 입금대기 → 수동 입금확인: 기존 입금확인 로직(/api/admin-v2/manual-payment-confirm-without-deposit) 재사용. 새 로직 없음.
   const handleManualConfirm = async () => {
     if (manualConfirmAction) return;
@@ -854,8 +925,16 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   return (
     <aside className="flex h-full min-h-0 w-full flex-col bg-surface">
       {/* 목업 B panel-header */}
-      <header className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
+      <header className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-3">
         <span className="text-[15px] font-black text-ink">주문 상세</span>
+        {/* [고객용 복사 · 2026-07-22 사장님 지시] 닉네임/이름/주소/연락처/주문내역/금액을 카톡에 바로 붙여넣을 텍스트로 복사 — 읽기 전용 */}
+        <button
+          type="button"
+          onClick={() => void copyCustomerOrderSummary()}
+          className="ml-auto rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft transition hover:border-rose-deep hover:text-rose-deep"
+        >
+          📋 고객용 복사
+        </button>
         <button
           type="button"
           onClick={(event) => {
