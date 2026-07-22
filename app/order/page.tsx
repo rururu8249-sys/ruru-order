@@ -884,6 +884,17 @@ function comboPlusOfOrderProduct(product: unknown, color?: string): number {
   return Math.max(0, Math.floor(Number(info.pricing[String(color ?? "").trim()] || 0)));
 }
 
+// ─────────────────────────────────────────────────────────────
+// [무료나눔 · 2026-07-22] 0원 상품(선물) — note.free_product===true && price===0 인 "등록상품"만
+//   0원 담기/제출을 허용한다. 직접입력·일반상품의 "1원 미만 제출 금지" 정책(20행)은 그대로 유지.
+//   가격 비움(손님 직접입력 상품)과는 별개 플래그라 기존 직접입력형 상품 동작 무변경.
+// ─────────────────────────────────────────────────────────────
+function isFreeOrderProduct(product: unknown): boolean {
+  const note = readOrderNoteObject(product);
+  if ((note as any)?.free_product !== true) return false;
+  return Number((product as any)?.price || 0) === 0;
+}
+
 // 상품 검색이 세부상품명(예: "탐다오")으로도 잡히게 — 표시(필터) 전용
 function comboNamesMatchOrderProduct(product: unknown, query: string): boolean {
   const info = readComboInfoOrderProduct(product);
@@ -3132,7 +3143,10 @@ export default function OrderPage() {
     // [조합형 옵션] 단가 = 기본가 + 선택한 세부상품 추가금. 조합형 아니면 comboPlus=0 → 기존과 완전 동일.
     const comboPlus = comboPlusOfOrderProduct(product, options?.color);
     const productPrice = Number(product.price || 0) + comboPlus;
-    const nextProductPrice = Number.isFinite(productPrice) && productPrice > 0 ? String(Math.round(productPrice)) : "";
+    // [무료나눔] 0원 상품은 "0"으로 담는다(빈값=손님 직접입력 취급 방지). 그 외 0/음수는 기존대로 빈값.
+    const nextProductPrice = Number.isFinite(productPrice) && productPrice > 0
+      ? String(Math.round(productPrice))
+      : isFreeOrderProduct(product) ? "0" : "";
 
     const fallbackColor = pickRegisteredProductOptionText(product, [
       "color",
@@ -3572,6 +3586,14 @@ export default function OrderPage() {
         showCustomerNotice("수량을 입력해주세요.");
         return false;
       }
+
+      // [무료나눔] 등록된 0원 선물 상품만 예외 — 직접입력/일반상품은 아래 1원 미만 금지 그대로
+      const freeMatched = item.product_id
+        ? [...broadcastProducts, ...groupBuyQuickProductsFromCatalog].find(
+            (p) => String((p as any)?.id ?? "") === String(item.product_id) && isFreeOrderProduct(p),
+          )
+        : null;
+      if (freeMatched && String(item.product_price).trim() === "0") continue;
 
       if (!toNumber(item.product_price)) {
         showCustomerNotice("금액을 입력해주세요.");
@@ -4954,6 +4976,8 @@ export default function OrderPage() {
                               {badges.includes("direct") ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#E8F0FE", color: "#1D4ED8" }}>🛒 바로구매</span> : null}
                               {/* [2026-07-10] 해외배송 배지 — 표시 전용(배송비 계산과 무관) */}
                               {badges.includes("overseas") ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#EEF6F3", color: "#0F6E56" }}>✈️ 해외배송</span> : null}
+                              {/* [무료나눔] 0원 선물 상품 배지 — 표시 전용 */}
+                              {isFreeOrderProduct(product) ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 800, padding: "2px 6px", background: "#E7F3EE", color: "#0F6E56" }}>🎁 무료나눔</span> : null}
                             </div>
                             <div style={{ fontSize: "13px", fontWeight: 700, color: "#222", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.product_name}</div>
                             {/* 바로구매 부가설명 유지(사장님 지침: 배지만으론 신규 고객이 뜻을 모름) + 가격 위계 강화 15→17px */}
@@ -5273,14 +5297,18 @@ export default function OrderPage() {
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontSize: "16px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{registeredOptionSelectProduct.product_name}</div>
                       <div style={{ marginTop: "3px", fontSize: "15px", fontWeight: 800, color: "#7A1E47" }}>
-                        {/* [조합형 옵션] 선택 전엔 "기본가~", 선택하면 그 세부상품 단가 표시 */}
+                        {/* [조합형 옵션] 선택 전엔 "기본가~", 선택하면 그 세부상품 단가 표시 / [무료나눔] 0원 표기 */}
                         {registeredOptionComboInfo
                           ? registeredOptionColor.trim()
                             ? won(registeredOptionUnitPrice)
                             : registeredOptionComboInfo.maxPlus > 0
                               ? won(registeredOptionPrice) + "~"
                               : won(registeredOptionPrice)
-                          : registeredOptionPrice > 0 ? won(registeredOptionPrice) : "가격 직접입력"}
+                          : registeredOptionPrice > 0
+                            ? won(registeredOptionPrice)
+                            : registeredOptionSelectProduct && isFreeOrderProduct(registeredOptionSelectProduct)
+                              ? "0원 · 🎁 무료나눔"
+                              : "가격 직접입력"}
                       </div>
                     </div>
                   </div>

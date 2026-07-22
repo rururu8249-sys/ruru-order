@@ -210,6 +210,8 @@ function parseProductNote(row: ProductRow | null | undefined) {
       option_label?: string;
       option_pricing?: Record<string, number>; // { 세부상품명: 추가금(원, 0 이상) }
       combo_hidden?: string[]; // 등록만 하고 고객 노출 막은 세부상품명(가격 미정 등)
+      // [무료나눔 · 2026-07-22] true면 0원 상품(선물). 가격 비움(손님 직접입력)과 구분되는 명시 플래그
+      free_product?: boolean;
     };
   } catch {
     return null;
@@ -580,6 +582,9 @@ export default function QuickProductFastForm({
   const [optionEditMode, setOptionEditMode] = useState<"legacy" | "combo">("legacy");
   const [comboRows, setComboRows] = useState<ComboOptionRow[]>([]);
 
+  // [무료나눔 · 2026-07-22] 0원 상품 플래그 — note.free_product (가격 비움=직접입력과 구분)
+  const [freeProductEnabled, setFreeProductEnabled] = useState(false);
+
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [sizePresetOpen, setSizePresetOpen] = useState(false);
@@ -696,6 +701,9 @@ export default function QuickProductFastForm({
       setTotalStockText(String(pickNumber(initialProduct, ["stock", "total_stock"], 0) || 0));
       setVariantRows([]);
     }
+
+    // [무료나눔] 플래그 복원
+    setFreeProductEnabled(productNote?.free_product === true);
 
     // [조합형 옵션] 수정 모드 복원 — 세부상품명/추가금/재고/노출을 표로 복원
     if (productNote?.combo_mode === true) {
@@ -836,6 +844,9 @@ export default function QuickProductFastForm({
     setTotalStockText("0");
     setVariantRows([]);
     setDescription("");
+    setFreeProductEnabled(false);
+    setOptionEditMode("legacy");
+    setComboRows([]);
   };
 
   const saveProduct = async () => {
@@ -848,7 +859,8 @@ export default function QuickProductFastForm({
       : null;
 
     const name = productName.trim();
-    const price = moneyNumber(priceText);
+    // [무료나눔] 켜져 있으면 가격 0 고정(입력값 무시) — 0원 제출 허용은 note.free_product 플래그로 판별
+    const price = freeProductEnabled ? 0 : moneyNumber(priceText);
     // product_type: 수정은 기존 값 보존(기존 group_buy 17개 덮어쓰기 금지).
     // 신규는 방송 중이면 "broadcast"(방송상품), 방송 OFF면 "group_buy"(상시판매)로 등록 → 방송 안 해도 상품 등록 가능.
     const resolvedProductType = isEditMode
@@ -925,13 +937,14 @@ export default function QuickProductFastForm({
         purchase_limit_enabled: purchaseLimitEnabled,
         purchase_limit_qty: purchaseLimitEnabled ? Math.max(1, Number(purchaseLimitText) || 1) : 0,
         registered_order_enabled: registeredOrderEnabled,
-        // [조합형] 직접입력 추천에서 제외 — 추천으로 담으면 추가금 없이 기본가로 잘못 담길 수 있어 차단
-        name_suggestion_enabled: comboActive ? false : nameSuggestionEnabled,
+        // [조합형] 직접입력 추천 제외(추가금 누락 방지) / [무료나눔] 추천 제외(직접입력 경로는 0원 금지 정책이라 혼선 방지)
+        name_suggestion_enabled: comboActive || freeProductEnabled ? false : nameSuggestionEnabled,
         suggestion_keywords: suggestionKeywordsText
           .split(",")
           .map((keyword) => keyword.trim())
           .filter(Boolean),
         category: category.trim(),
+        free_product: freeProductEnabled,
         ...(comboActive
           ? {
               combo_mode: true,
@@ -1106,9 +1119,15 @@ export default function QuickProductFastForm({
               <div>
                 <label style={fieldLabel}>가격 <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(비우면 손님 직접입력)</span></label>
                 <div style={{ position: "relative" }}>
-                  <input style={{ ...fieldInput, paddingRight: "30px" }} type="text" inputMode="numeric" placeholder="59,000" value={priceText} onChange={(e) => setPriceText(formatNumberWithComma(e.target.value))} />
+                  <input style={{ ...fieldInput, paddingRight: "30px", opacity: freeProductEnabled ? 0.45 : 1 }} type="text" inputMode="numeric" placeholder="59,000" value={freeProductEnabled ? "0" : priceText} disabled={freeProductEnabled} onChange={(e) => setPriceText(formatNumberWithComma(e.target.value))} />
                   <span style={{ position: "absolute", right: "11px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", color: "var(--color-ink-mute)", pointerEvents: "none" }}>원</span>
                 </div>
+                {/* [무료나눔 · 2026-07-22] 0원 상품 — "가격 비움(손님 직접입력)"과 구분되는 별도 플래그.
+                    켜면 가격 0 고정 + note.free_product=true → 고객 주문서에서 이 상품만 0원 제출 허용 */}
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "6px", fontSize: "12px", fontWeight: 700, color: freeProductEnabled ? "#0F6E56" : "var(--color-ink-mute)", cursor: "pointer" }}>
+                  <input type="checkbox" checked={freeProductEnabled} onChange={(e) => setFreeProductEnabled(e.target.checked)} style={{ accentColor: "#0F6E56" }} />
+                  🎁 무료나눔 상품 (0원 — 손님에게 선물)
+                </label>
               </div>
               <div>
                 <label style={fieldLabel}>배송</label>

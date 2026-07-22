@@ -298,6 +298,141 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     return true;
   };
 
+  // ─────────────────────────────────────────────────────────────
+  // [배송비 수정 · 2026-07-22 사장님 지시] 제출된 주문의 배송비를 주문상세에서 자유롭게(0원~) 수정.
+  //   - 상품수정(useLiveOrderItemEdit)과 동일 패턴: orders UPDATE + item_change_history 이력 누적.
+  //   - 배송비를 실은 행(현재 배송비>0인 첫 행, 없으면 첫 행)에 새 배송비를 싣고,
+  //     배송비가 나뉘어 실린 다른 행은 0으로 정리(그룹 배송비 = 행 합계라 합계가 정확히 새 값이 됨).
+  //   - 각 수정 행의 adjusted_total_price/total_price = 상품금액+새배송비+카드추가금 재계산.
+  //     final_amount(입금매칭 기대금액)는 기존값이 있을 때만 = 재계산 총액 - 그 행 포인트사용액.
+  //   - 취소 행은 건드리지 않음. Bankda/정산 로직 무변경(그들이 읽는 컬럼 값만 정확히 갱신).
+  // ─────────────────────────────────────────────────────────────
+  const [shipEditOpen, setShipEditOpen] = useState(false);
+  const [shipEditText, setShipEditText] = useState("");
+  const [savingShipping, setSavingShipping] = useState(false);
+
+  const CANCELED_ROW_RE = /주문서취소|주문취소|취소|환불|cancel|refund/i;
+
+  const handleSaveShippingFee = async () => {
+    if (savingShipping) return;
+    const newFee = Math.max(0, Math.floor(Number(String(shipEditText).replace(/[^0-9]/g, "")) || 0));
+    const rowIds = (Array.isArray(localOrder.items) ? localOrder.items : [])
+      .map((item) => Number(item.id))
+      .filter((id) => Number.isFinite(id) && id > 0);
+    if (rowIds.length === 0) {
+      showAdminToast("수정할 주문 행을 찾지 못했습니다.", "warning");
+      return;
+    }
+
+    const currentFee = Number(localOrder.shippingFee || 0);
+    const paidLikeStatuses = ["manual_paid", "auto_paid", "paid", "card_paid"];
+    const paidWarning = paidLikeStatuses.includes(String((localOrder as { paymentStatus?: string }).paymentStatus || ""))
+      ? "\n\n⚠️ 이미 입금/결제 확인된 주문입니다. 배송비를 바꾸면 확인된 입금액과 총액이 달라질 수 있으니 금액 차이를 꼭 확인하세요."
+      : "";
+
+    const ok = await showAdminConfirm(
+      [
+        "배송비를 수정할까요?",
+        "",
+        `현재 배송비: ${currentFee.toLocaleString("ko-KR")}원 → 새 배송비: ${newFee.toLocaleString("ko-KR")}원`,
+        "총 결제예정금액과 입금매칭 기대금액이 새 배송비 기준으로 다시 계산됩니다.",
+        "변경 전 값은 수정이력에 누적됩니다.",
+      ].join("\n") + paidWarning,
+    );
+    if (!ok) return;
+
+    setSavingShipping(true);
+    try {
+      const { data: rows, error: loadError } = await supabase
+        .from("orders")
+        .select(
+          "id, qty, product_price, adjusted_product_price, shipping_fee, adjusted_shipping_fee, vat_amount, total_price, adjusted_total_price, final_amount, point_used_amount, item_change_history, order_manage_status, admin_order_status_v2",
+        )
+        .in("id", rowIds);
+
+      if (loadError || !Array.isArray(rows) || rows.length === 0) {
+        showAdminToast("현재 주문값을 불러오지 못했습니다.\n\n" + (loadError?.message || ""), "error");
+        return;
+      }
+
+      const activeRows = rows.filter(
+        (row) => !CANCELED_ROW_RE.test(`${row.order_manage_status ?? ""} ${row.admin_order_status_v2 ?? ""}`),
+      );
+      if (activeRows.length === 0) {
+        showAdminToast("취소되지 않은 주문 행이 없어 배송비를 수정할 수 없습니다.", "warning");
+        return;
+      }
+
+      const feeOf = (row: { adjusted_shipping_fee?: unknown; shipping_fee?: unknown }) =>
+        Number(row.adjusted_shipping_fee ?? row.shipping_fee ?? 0) || 0;
+      const sortedActive = [...activeRows].sort((a, b) => Number(a.id) - Number(b.id));
+      const carriers = sortedActive.filter((row) => feeOf(row) > 0);
+      const target = carriers[0] ?? sortedActive[0];
+
+      for (const row of sortedActive) {
+        const nextRowFee = Number(row.id) === Number(target.id) ? newFee : carriers.some((c) => Number(c.id) === Number(row.id)) ? 0 : null;
+        if (nextRowFee === null || nextRowFee === feeOf(row)) continue;
+
+        const qty = Number(row.qty || 1) || 1;
+        const rowProductAmount =
+          row.adjusted_product_price !== null && row.adjusted_product_price !== undefined
+            ? Number(row.adjusted_product_price) || 0
+            : (Number(row.product_price) || 0) * qty;
+        const cardExtra = Number(row.vat_amount ?? 0) || 0;
+        const pointUsed = Number(row.point_used_amount ?? 0) || 0;
+        const nextTotal = rowProductAmount + nextRowFee + cardExtra;
+
+        const previousHistory = Array.isArray(row.item_change_history) ? row.item_change_history : [];
+        const historyEntry = {
+          changed_at: new Date().toISOString(),
+          source: "admin-live-shipping-edit",
+          row_id: Number(row.id),
+          product_changed: false,
+          amount_changed: true,
+          before: {
+            shipping_fee: Number(row.shipping_fee ?? 0) || 0,
+            adjusted_shipping_fee: row.adjusted_shipping_fee ?? null,
+            adjusted_total_price: Number(row.adjusted_total_price ?? row.total_price ?? 0) || 0,
+            final_amount: row.final_amount ?? null,
+          },
+          after: {
+            adjusted_shipping_fee: nextRowFee,
+            adjusted_total_price: nextTotal,
+            final_amount:
+              row.final_amount !== null && row.final_amount !== undefined ? Math.max(0, nextTotal - pointUsed) : null,
+          },
+        };
+
+        const patch: Record<string, unknown> = {
+          adjusted_shipping_fee: nextRowFee,
+          adjusted_total_price: nextTotal,
+          total_price: nextTotal,
+          item_change_history: [...previousHistory, historyEntry],
+        };
+        if (row.final_amount !== null && row.final_amount !== undefined) {
+          patch.final_amount = Math.max(0, nextTotal - pointUsed);
+        }
+
+        const { error: updateError } = await supabase.from("orders").update(patch).eq("id", row.id);
+        if (updateError) {
+          showAdminToast("배송비 수정 실패\n\n" + updateError.message, "error");
+          return;
+        }
+      }
+
+      setLocalOrder((previousOrder) => {
+        const previousItems = Array.isArray(previousOrder.items) ? previousOrder.items : [];
+        const nextProductAmount = previousItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+        return { ...previousOrder, shippingFee: newFee, totalAmount: nextProductAmount + newFee };
+      });
+      setShipEditOpen(false);
+      showAdminToast(`배송비가 ${newFee.toLocaleString("ko-KR")}원으로 수정됐습니다.`, "success");
+      await onAfterStatusChange?.();
+    } finally {
+      setSavingShipping(false);
+    }
+  };
+
   const orderForView = localOrder;
   const items = Array.isArray(orderForView.items) ? orderForView.items : [];
   const isCanceled = isLiveOrderCanceled(orderForView);
@@ -1045,7 +1180,37 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         {/* 금액 요약 (목업 B) */}
         <div className="mt-3 border-t border-line pt-2">
           <div className="flex items-center justify-between py-1 text-[12px]"><span className="text-ink-soft">상품금액</span><span className="font-black text-ink">{money(productAmount)}</span></div>
-          <div className="flex items-center justify-between py-1 text-[12px]"><span className="text-ink-soft">배송비</span><span className="font-black text-ink">{money(shippingFee)}</span></div>
+          <div className="flex items-center justify-between py-1 text-[12px]">
+            <span className="text-ink-soft">배송비</span>
+            <span className="flex items-center gap-1.5">
+              <span className="font-black text-ink">{money(shippingFee)}</span>
+              {/* [배송비 수정] 취소 주문은 숨김 — 0원 포함 자유 입력 */}
+              {!isCanceled ? (
+                <button
+                  type="button"
+                  onClick={() => { setShipEditText(String(shippingFee)); setShipEditOpen((v) => !v); }}
+                  className="rounded-md border border-line bg-surface px-1.5 py-0.5 text-[10px] font-black text-ink-soft hover:border-rose-deep hover:text-rose-deep"
+                >
+                  ✎ 수정
+                </button>
+              ) : null}
+            </span>
+          </div>
+          {shipEditOpen && !isCanceled ? (
+            <div className="mb-1 flex items-center gap-1.5 rounded-lg bg-surface-2 px-2 py-1.5">
+              <span className="text-[11px] font-bold text-ink-soft">새 배송비</span>
+              <input
+                value={shipEditText === "" ? "" : Number(String(shipEditText).replace(/[^0-9]/g, "") || 0).toLocaleString("ko-KR")}
+                inputMode="numeric"
+                onChange={(event) => setShipEditText(event.target.value.replace(/[^0-9]/g, ""))}
+                className="w-24 rounded-md border border-line px-2 py-1 text-right text-[12px] font-black outline-none focus:border-rose-deep"
+                placeholder="0"
+              />
+              <span className="text-[11px] text-ink-soft">원 (0원 가능)</span>
+              <button type="button" disabled={savingShipping} onClick={() => void handleSaveShippingFee()} className="ml-auto rounded-md bg-rose-deep px-2.5 py-1 text-[11px] font-black text-white disabled:opacity-50">{savingShipping ? "저장중…" : "저장"}</button>
+              <button type="button" disabled={savingShipping} onClick={() => setShipEditOpen(false)} className="rounded-md border border-line bg-surface px-2 py-1 text-[11px] font-bold text-ink-soft">취소</button>
+            </div>
+          ) : null}
           {isCardPaymentDisplay && cardPaymentExtraAmount > 0 ? (
             <div className="flex items-center justify-between py-1 text-[12px]"><span className="text-ink-soft">카드추가금</span><span className="font-black text-ink">{money(cardPaymentExtraAmount)}</span></div>
           ) : null}
