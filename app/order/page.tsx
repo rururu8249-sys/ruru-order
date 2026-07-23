@@ -723,7 +723,9 @@ function readOrderProductImageValue(value: unknown): string {
     return "";
   }
 
-  if (trimmed.startsWith("http") || trimmed.startsWith("/")) {
+  // [2026-07-23] data:image URL 허용 — 촬영하기/자동생성 썸네일이 dataURL로 저장되는데
+  //   기존엔 http·/ 만 인정해 고객 카드에서 안 보였음(표시 전용 수정)
+  if (trimmed.startsWith("http") || trimmed.startsWith("/") || trimmed.startsWith("data:image/")) {
     return trimmed;
   }
 
@@ -5019,6 +5021,8 @@ export default function OrderPage() {
                               {badges.includes("overseas") ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#EEF6F3", color: "#0F6E56" }}>✈️ 해외배송</span> : null}
                               {/* [무료나눔] 0원 선물 상품 배지 — 표시 전용 */}
                               {isFreeOrderProduct(product) ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 800, padding: "2px 6px", background: "#E7F3EE", color: "#0F6E56" }}>🎁 무료나눔</span> : null}
+                              {/* [2026-07-23 사장님 지시] 업체배송 상품 카드 배지 — 표시 전용(배송비 계산과 무관) */}
+                              {productDeliveryLabel(product) === "업체배송" ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#EEF2FA", color: "#3B5BA5" }}>🚚 업체배송</span> : null}
                             </div>
                             <div style={{ fontSize: "13px", fontWeight: 700, color: "#222", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.product_name}</div>
                             {/* 바로구매 부가설명 유지(사장님 지침: 배지만으론 신규 고객이 뜻을 모름) + 가격 위계 강화 15→17px */}
