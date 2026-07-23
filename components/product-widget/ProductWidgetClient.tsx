@@ -97,6 +97,44 @@ function sizeTextOf(p: AnyProduct | null): string {
   return cleaned.split(" · ").map(sizeDisplayLabel).filter(Boolean).join(" · ");
 }
 
+// [2026-07-23 사장님 지침] 조합형(combo_mode) 상품 전용 표시 정보.
+//   평소(단일 옵션·일반) 상품은 combo_mode가 없어 null 반환 → 기존 표시 로직 그대로(무변경).
+//   조합형일 때만: 세부상품명 전체 나열 대신 "종류 N가지" 요약 + 추가금 있으면 가격 뒤 "~".
+//   표시 전용 — 재고/금액/주문 로직 무관.
+type ComboWidgetInfo = { label: string; count: number; maxPlus: number };
+function comboInfoOf(p: AnyProduct | null): ComboWidgetInfo | null {
+  if (!p) return null;
+  let note: any = p.product_note;
+  if (typeof note === "string") {
+    try {
+      note = JSON.parse(note);
+    } catch {
+      note = null;
+    }
+  }
+  if (note?.combo_mode !== true) return null;
+  const label = String(note?.option_label || "종류").trim() || "종류";
+  let names: string[] = [];
+  const raw = p.color_options;
+  if (Array.isArray(raw)) {
+    names = raw.map((s: unknown) => String(s).trim()).filter(Boolean);
+  } else if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) names = parsed.map((s: unknown) => String(s).trim()).filter(Boolean);
+    } catch {
+      /* 문자열 파싱 실패 → 개수 0으로 두고 요약 미표시 */
+    }
+  }
+  const pricing = note?.option_pricing && typeof note.option_pricing === "object" ? (note.option_pricing as Record<string, unknown>) : {};
+  let maxPlus = 0;
+  for (const name of names) {
+    const plus = Number(pricing[name] ?? 0);
+    if (Number.isFinite(plus) && plus > maxPlus) maxPlus = plus;
+  }
+  return { label, count: names.length, maxPlus };
+}
+
 // 재고 "표시" 의도가 있을 때만 노출 — stock_management_enabled 이고 숫자일 때 "남은 N"
 function stockLabel(p: AnyProduct | null): string {
   if (!p) return "";
@@ -428,8 +466,12 @@ export default function ProductWidgetClient() {
 
   const colors = colorsOf(current);
   const sizeText = sizeTextOf(current);
-  // 색상 · 사이즈를 한 줄로. 둘 다 없으면 아예 안 그림("없음" 표시 금지)
-  const optionText = [colors, sizeText].filter(Boolean).join("  |  ");
+  // [2026-07-23] 조합형(combo_mode)만 "종류 N가지" 요약 — 세부상품명 수십 개가 카드에 쏟아지던 문제.
+  //   평소 상품(comboInfo=null)은 기존과 동일: 색상 · 사이즈를 한 줄로. 둘 다 없으면 아예 안 그림.
+  const comboInfo = comboInfoOf(current);
+  const optionText = comboInfo
+    ? (comboInfo.count > 0 ? `${comboInfo.label} ${comboInfo.count}가지` : "")
+    : [colors, sizeText].filter(Boolean).join("  |  ");
   const soldOut = isSoldOutWidgetProduct(current);
   const stock = soldOut ? "" : stockLabel(current); // 품절이면 "남은 0" 대신 SOLD OUT 오버레이로 알림
 
@@ -561,7 +603,8 @@ export default function ProductWidgetClient() {
               <div style={{ marginTop: "2px", display: "flex", alignItems: "baseline", gap: "6px" }}>
                 <span style={{ fontSize: "23px", fontWeight: 900, lineHeight: 1, color: "#fff", textShadow: OUTLINE_TEXT }}>
                   {priceOf(current).toLocaleString("ko-KR")}
-                  <span style={{ fontSize: "14px", fontWeight: 800 }}>원</span>
+                  {/* [2026-07-23] 조합형 + 추가금 옵션 존재 시 "원~" — 고객 주문페이지 카드와 동일 규칙. 평소 상품은 "원" 그대로. */}
+                  <span style={{ fontSize: "14px", fontWeight: 800 }}>{comboInfo && comboInfo.maxPlus > 0 ? "원~" : "원"}</span>
                 </span>
                 {stock ? (
                   <span style={{ fontSize: "11px", fontWeight: 900, color: "#fff", textShadow: OUTLINE_TEXT_SM }}>{stock}</span>
