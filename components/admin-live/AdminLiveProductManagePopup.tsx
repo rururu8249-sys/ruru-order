@@ -85,6 +85,20 @@ function pickArray(row: ProductRow, keys: string[]) {
   return [];
 }
 
+// [2026-07-23 사장님 지침] 조합형 상품은 세부상품명(예: "로스트 체리")으로도 검색되게 —
+//   고객 주문페이지 comboNamesMatchOrderProduct와 동일 기준(공백 제거·소문자).
+//   평소 상품(combo_mode 없음)은 false 반환 → 기존 상품명 검색 결과 무변경. 표시(필터) 전용.
+function normalizeSearchText(value: string) {
+  return value.replace(/\s+/g, "").toLowerCase();
+}
+function comboNamesMatch(p: ProductRow, rawQuery: string): boolean {
+  const q = normalizeSearchText(rawQuery);
+  if (!q) return false;
+  const note = parseProductNote(p);
+  if (note.combo_mode !== true) return false;
+  return pickArray(p, ["color_options"]).some((n) => normalizeSearchText(n).includes(q));
+}
+
 function parseProductNote(p: ProductRow): Record<string, unknown> {
   const raw = (p as { product_note?: unknown }).product_note;
   if (raw && typeof raw === "object") return raw as Record<string, unknown>;
@@ -251,7 +265,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const stopShopAutoScroll = () => { const s = shopAutoScrollRef.current; if (s.raf) cancelAnimationFrame(s.raf); s.raf = 0; s.dir = 0; };
 
   // 방송/쇼핑몰 탭 상품명 검색 필터 (기존 search state 재사용, 표시 전용)
-  const nameMatch = (p: ProductRow) => !search.trim() || productName(p).toLowerCase().includes(search.trim().toLowerCase());
+  // [2026-07-23] 조합형이면 세부상품명 매칭도 허용(comboNamesMatch — 평소 상품은 항상 false)
+  const nameMatch = (p: ProductRow) =>
+    !search.trim() ||
+    productName(p).toLowerCase().includes(search.trim().toLowerCase()) ||
+    comboNamesMatch(p, search);
 
   // 모바일(≤640) 감지 — 방송상품 탭 2단→세로 스택
   useEffect(() => {
@@ -834,7 +852,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         const s = lowStockOf(p);
         if (s === null || s > 3) return false;
       }
-      if (q && !productName(p).toLowerCase().includes(q)) return false;
+      // [2026-07-23] 조합형이면 세부상품명 매칭도 허용(평소 상품은 comboNamesMatch가 항상 false → 기존과 동일)
+      if (q && !productName(p).toLowerCase().includes(q) && !comboNamesMatch(p, search)) return false;
       return true;
     });
     // 정렬: 재고 적은순(재고관리 상품 우선, 미관리·재고없음은 뒤로)
@@ -1983,7 +2002,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 const pickList = products.filter((p) => {
                   if (pickString(p, ["status"], "") === "deleted") return false;
                   if (bcPickerFromBcId && bcPickerFromIds && !bcPickerFromIds.has(productId(p))) return false;
-                  if (q && !productName(p).toLowerCase().includes(q)) return false;
+                  // [2026-07-23] 조합형 세부상품명 검색 허용(평소 상품 무변경)
+                  if (q && !productName(p).toLowerCase().includes(q) && !comboNamesMatch(p, bcPickerSearch)) return false;
                   return true;
                 });
                 if (pickList.length === 0) {
@@ -2048,7 +2068,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 const q = shopPickerSearch.trim().toLowerCase();
                 const pickList = products.filter((p) => {
                   if (pickString(p, ["status"], "") === "deleted") return false;
-                  if (q && !productName(p).toLowerCase().includes(q)) return false;
+                  // [2026-07-23] 조합형 세부상품명 검색 허용(평소 상품 무변경)
+                  if (q && !productName(p).toLowerCase().includes(q) && !comboNamesMatch(p, shopPickerSearch)) return false;
                   return true;
                 });
                 if (pickList.length === 0) {
