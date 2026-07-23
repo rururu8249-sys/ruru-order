@@ -64,8 +64,11 @@ begin
   if v_new_qty <= 0 then
     raise exception '수량은 1개 이상이어야 합니다.';
   end if;
-  if v_new_unit_price <= 0 then
-    raise exception '판매단가는 1원 이상이어야 합니다.';
+  -- [2026-07-23 사장님 지침] 선물(0원) 처리 허용 — 음수만 차단.
+  --   (v_new_unit_price는 위에서 greatest(0,...) 클램프라 이 가드는 방어용.
+  --    금액 재계산·final_amount·재고 복구/재차감 로직은 0원에서도 동일하게 안전: total = 0×qty + 배송비 + 카드수수료)
+  if v_new_unit_price < 0 then
+    raise exception '판매단가는 0원 이상이어야 합니다.';
   end if;
   if v_new_color in ('없음', '선택안함', '-', 'none', 'NONE', 'None') then
     v_new_color := '';

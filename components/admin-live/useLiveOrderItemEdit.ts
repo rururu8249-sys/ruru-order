@@ -131,8 +131,9 @@ export function useLiveOrderItemEdit(onAfterSave?: (result: LiveOrderItemEditSav
       return false;
     }
 
-    if (unitPrice <= 0) {
-      showAdminToast("금액은 1원 이상이어야 합니다.", "warning");
+    // [2026-07-23 사장님 지침] 선물(0원) 처리 허용 — 음수만 차단. 0원 저장 시 아래 확인창에 경고 명시.
+    if (unitPrice < 0) {
+      showAdminToast("금액은 0원 이상이어야 합니다.", "warning");
       return false;
     }
 
@@ -143,9 +144,14 @@ export function useLiveOrderItemEdit(onAfterSave?: (result: LiveOrderItemEditSav
 
     const inventoryLinkedEdit = isInventoryLinkedEditableItem(item);
 
+    // [2026-07-23] 0원 저장은 선물/무료 처리 — 실수 방지를 위해 확인창에 명시 경고
+    const zeroPriceWarning =
+      unitPrice === 0 ? ["", "⚠️ 판매단가 0원 — 선물/무료 처리로 저장됩니다.", "0원 주문은 자동입금매칭 대상이 아니므로 입금확인은 수동 처리하세요."] : [];
+
     const confirmMessage = inventoryLinkedEdit
       ? [
           "재고연동 상품수정을 진행할까요?",
+          ...zeroPriceWarning,
           "",
           "기존 재고를 먼저 복구하고, 새 옵션/수량 기준으로 재고를 다시 차감합니다.",
           "재고가 부족하면 저장되지 않습니다.",
@@ -154,6 +160,7 @@ export function useLiveOrderItemEdit(onAfterSave?: (result: LiveOrderItemEditSav
         ].join("\n")
       : [
           "상품/옵션/수량/금액을 수정할까요?",
+          ...zeroPriceWarning,
           "",
           "변경 전 값은 item_change_history에 누적됩니다.",
           "상품금액과 총 결제예정금액은 수정값 기준으로 다시 계산됩니다.",
