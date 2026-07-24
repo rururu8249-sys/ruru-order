@@ -13,9 +13,11 @@ const PAID = new Set(["paid", "auto_paid", "manual_paid", "card_paid"]);
 type Props = {
   orders: LiveOrder[];
   activeBroadcastId: string | null;
+  /** [2026-07-24] 방송 판매 리포트 팝업 열기(더보기 버튼) — 표시 전용 */
+  onOpenReport?: () => void;
 };
 
-export default function LiveStatsPanel({ orders, activeBroadcastId }: Props) {
+export default function LiveStatsPanel({ orders, activeBroadcastId, onOpenReport }: Props) {
   const stats = useMemo(() => {
     // 이번 방송 주문(취소 제외). 방송 없으면 빈 상태.
     const rows = (orders || []).filter(
@@ -48,7 +50,18 @@ export default function LiveStatsPanel({ orders, activeBroadcastId }: Props) {
     <div className="rounded-2xl border border-line bg-surface p-3 shadow-sm">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-black text-ink">📊 라이브 현황</span>
-        <span className="text-[10px] font-bold text-ink-mute">이번 방송 · 실시간</span>
+        <span className="flex items-center gap-1.5">
+          <span className="text-[10px] font-bold text-ink-mute">이번 방송 · 실시간</span>
+          {onOpenReport ? (
+            <button
+              type="button"
+              onClick={onOpenReport}
+              className="rounded-full border border-rose-line bg-rose-soft px-2 py-0.5 text-[10px] font-black text-rose-deep"
+            >
+              더보기 →
+            </button>
+          ) : null}
+        </span>
       </div>
 
       {!activeBroadcastId ? (

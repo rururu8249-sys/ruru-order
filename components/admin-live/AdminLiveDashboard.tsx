@@ -31,6 +31,7 @@ import LiveHeader from "./LiveHeader";
 import LiveStatsCards from "./LiveStatsCards";
 import LiveBroadcastPanels from "./LiveBroadcastPanels";
 import LiveStatsPanel from "./LiveStatsPanel";
+import BroadcastReportPopup from "./BroadcastReportPopup";
 import LiveIssueRailPanel from "./LiveIssueRailPanel";
 import LiveBroadcastEndSummaryModal, { type LiveBroadcastEndSummary } from "./LiveBroadcastEndSummaryModal";
 import LiveOrderTable, { type LiveOrderFilters } from "./LiveOrderTable";
@@ -546,6 +547,8 @@ async function saveLiveBroadcastEndReport({
 export default function AdminLiveDashboard() {
   const [activeMenu, setActiveMenu] = useState<AdminLiveMenuKey>(() => readMenuFromUrl());
   const [customersInitialTab, setCustomersInitialTab] = useState<"members" | "issues">("members");
+  // [2026-07-24] 방송 판매 리포트 팝업(라이브 현황 "더보기") — 읽기 전용 표시
+  const [reportOpen, setReportOpen] = useState(false);
   // 라이트/다크 테마 토글 — 관리자 루트에만 .dark 부여(다른 페이지 영향 0). localStorage 기억.
   const [theme, setTheme] = useState<"light" | "dark">("light");
   useEffect(() => {
@@ -1582,7 +1585,7 @@ export default function AdminLiveDashboard() {
                   <LiveBroadcastPanels variant="column" hideProducts videoRatio={videoRatio} youtubeUrl={activeBroadcast?.youtube_live_url || ""} activeBroadcastId={activeBroadcast?.id || null} />
                 </div>
                 <div className="xl:shrink-0">
-                  <LiveStatsPanel orders={orders} activeBroadcastId={activeBroadcast?.id || null} />
+                  <LiveStatsPanel orders={orders} activeBroadcastId={activeBroadcast?.id || null} onOpenReport={() => setReportOpen(true)} />
                 </div>
                 <div className="min-h-0 xl:flex-1">
                   <LiveIssueRailPanel onOpenAll={() => { setCustomersInitialTab("issues"); setActiveMenu("customers"); }} />
@@ -1728,6 +1731,9 @@ export default function AdminLiveDashboard() {
           />
 
           {/* 입금매칭은 위 2-col 우측 사이드 패널로 이동(목업 C). */}
+
+          {/* [2026-07-24] 방송 판매 리포트 — 라이브 현황 "더보기" (읽기 전용) */}
+          <BroadcastReportPopup open={reportOpen} onClose={() => setReportOpen(false)} initialBroadcastId={activeBroadcast?.id || null} />
 
           {broadcastEndSummary ? (
             <LiveBroadcastEndSummaryModal
