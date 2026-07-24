@@ -28,8 +28,11 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
   const [broadcasts, setBroadcasts] = useState<BroadcastEntry[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
   const [orders, setOrders] = useState<LiveOrder[]>([]);
+  // [2026-07-24 사장님] 카테고리별 집계용 — 주문행 id → 상품 카테고리(products.note.category). 읽기 전용.
+  const [categoryOfRowId, setCategoryOfRowId] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(false);
   const [bestSort, setBestSort] = useState<"qty" | "sales">("qty");
+  const [catExpand, setCatExpand] = useState<string>(""); // 펼친 대분류(카테고리 카드 클릭)
   const [buyerSearch, setBuyerSearch] = useState("");
   const [buyerExpand, setBuyerExpand] = useState<string>("");
 
@@ -82,6 +85,43 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
       }
       if (!alive) return;
       setOrders(buildAdminLiveOrderGroups(all).map(toAdminLiveOrder));
+
+      // 카테고리 매핑: 주문행 product_id → products.product_note.category (직접입력 등 매핑 불가는 "기타")
+      try {
+        const rowProduct = new Map<string, string>();
+        for (const r of all) {
+          const pid = String((r as Record<string, unknown>).product_id || "");
+          if (pid && pid !== "null") rowProduct.set(String(r.id), pid);
+        }
+        const pids = Array.from(new Set(Array.from(rowProduct.values())));
+        const catByPid = new Map<string, string>();
+        for (let i = 0; i < pids.length; i += 300) {
+          const { data: prows } = await supabase
+            .from("products")
+            .select("id, product_note")
+            .in("id", pids.slice(i, i + 300));
+          ((prows as Array<Record<string, unknown>>) || []).forEach((p) => {
+            let note: unknown = p.product_note;
+            if (typeof note === "string") {
+              try {
+                note = JSON.parse(note);
+              } catch {
+                note = null;
+              }
+            }
+            const cat = String((note as { category?: unknown } | null)?.category || "").trim();
+            if (cat) catByPid.set(String(p.id), cat);
+          });
+        }
+        const catOfRow = new Map<string, string>();
+        rowProduct.forEach((pid, rowId) => {
+          const c = catByPid.get(pid);
+          if (c) catOfRow.set(rowId, c);
+        });
+        if (alive) setCategoryOfRowId(catOfRow);
+      } catch {
+        if (alive) setCategoryOfRowId(new Map()); // 매핑 실패해도 리포트 본체는 정상 표시("기타"로 묶임)
+      }
       setLoading(false);
     })();
     return () => {
@@ -124,6 +164,33 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
     }
     const bestAll = Array.from(itemMap.values());
 
+    // 카테고리별 판매 (대분류: 향수/화장품/미니어처/세트향수… — 상품 미매핑은 "기타")
+    //   [2026-07-24 사장님: 대분류+세부 둘 다] 카드를 누르면 카테고리 안 상품별 세부(립 N개, 크림 N개…)가 펼쳐짐.
+    const catMap = new Map<string, { qty: number; sales: number; products: Map<string, { qty: number; sales: number }> }>();
+    for (const o of paid) {
+      for (const it of o.items || []) {
+        const cat = categoryOfRowId.get(String(it.id)) || "기타";
+        const cur = catMap.get(cat) || { qty: 0, sales: 0, products: new Map<string, { qty: number; sales: number }>() };
+        cur.qty += Number(it.qty || 0);
+        cur.sales += Number(it.amount || 0);
+        const pv = cur.products.get(it.productName) || { qty: 0, sales: 0 };
+        pv.qty += Number(it.qty || 0);
+        pv.sales += Number(it.amount || 0);
+        cur.products.set(it.productName, pv);
+        catMap.set(cat, cur);
+      }
+    }
+    const categories = Array.from(catMap.entries())
+      .map(([name, v]) => ({
+        name,
+        qty: v.qty,
+        sales: v.sales,
+        products: Array.from(v.products.entries())
+          .map(([pname, pv]) => ({ name: pname, ...pv }))
+          .sort((a, b) => b.qty - a.qty),
+      }))
+      .sort((a, b) => b.qty - a.qty);
+
     // 구매자별: 전화번호(없으면 닉네임+이름) 기준 묶음, 금액 큰 순
     const buyerMap = new Map<
       string,
@@ -156,9 +223,10 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
       cardCount,
       avg: paid.length > 0 ? Math.round(sales / paid.length) : 0,
       bestAll,
+      categories,
       buyers,
     };
-  }, [orders]);
+  }, [orders, categoryOfRowId]);
 
   const best = useMemo(() => {
     const sorted = [...report.bestAll].sort((a, b) => (bestSort === "qty" ? b.qty - a.qty : b.sales - a.sales));
@@ -188,6 +256,13 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
     lines.push(`총 매출: ${won(report.sales)}`);
     lines.push(`구매자: ${report.buyers.length}명 · 주문 ${report.paidCount}건 · 판매 ${report.qtyTotal}개`);
     lines.push(`객단가: ${won(report.avg)} · 무통장 ${report.bankCount} · 카드 ${report.cardCount}`);
+    if (report.categories.length > 0) {
+      lines.push("");
+      lines.push(`📦 카테고리별`);
+      report.categories.forEach((c) => {
+        lines.push(`- ${c.name}: ${c.qty}개 · ${won(c.sales)}`);
+      });
+    }
     lines.push("");
     lines.push(`🏆 베스트 TOP${Math.min(5, best.length)} (${bestSort === "qty" ? "수량순" : "매출순"})`);
     best.slice(0, 5).forEach((b, i) => {
@@ -233,6 +308,7 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
             onChange={(e) => {
               setSelectedId(e.target.value);
               setBuyerExpand("");
+              setCatExpand("");
             }}
             style={{ flex: 1, minWidth: 0, height: "36px", borderRadius: "9px", border: "1px solid var(--color-line)", padding: "0 10px", fontSize: "13px", fontWeight: 700, background: "var(--color-surface)", color: "var(--color-ink)", cursor: "pointer" }}
           >
@@ -290,6 +366,57 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
                   </div>
                 ))}
               </div>
+
+              {/* 📦 카테고리별 판매 — "향수 총 몇 개" 한눈에 */}
+              {report.categories.length > 0 ? (
+                <>
+                  <div style={{ fontSize: "13px", fontWeight: 900, color: "var(--color-ink)", marginBottom: "7px" }}>
+                    📦 카테고리별 판매 <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-ink-mute)" }}>· 카드를 누르면 상품별 세부</span>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(118px, 1fr))", gap: "6px", marginBottom: catExpand ? "6px" : "14px" }}>
+                    {report.categories.map((c, i) => {
+                      const on = catExpand === c.name;
+                      return (
+                        <div
+                          key={c.name}
+                          onClick={() => setCatExpand(on ? "" : c.name)}
+                          style={{ borderRadius: "11px", padding: "9px 10px", cursor: "pointer", background: on || i === 0 ? "var(--color-rose-soft)" : "var(--color-surface-2)", border: "1px solid " + (on ? "var(--color-rose-deep)" : i === 0 ? "var(--color-rose-line)" : "var(--color-line)") }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px" }}>
+                            <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
+                            <span style={{ flexShrink: 0, fontSize: "9px", color: "var(--color-ink-mute)" }}>{on ? "▴" : "▾"}</span>
+                          </div>
+                          <div style={{ marginTop: "2px", fontSize: "16px", fontWeight: 900, color: on || i === 0 ? "var(--color-rose-deep)" : "var(--color-ink)" }}>
+                            {c.qty.toLocaleString("ko-KR")}<span style={{ fontSize: "11px", fontWeight: 800 }}>개</span>
+                          </div>
+                          <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-ink-soft)" }}>{won(c.sales)}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {catExpand
+                    ? (() => {
+                        const cat = report.categories.find((c) => c.name === catExpand);
+                        if (!cat) return null;
+                        return (
+                          <div style={{ border: "1px solid var(--color-rose-line)", borderRadius: "11px", padding: "8px 12px", marginBottom: "14px", background: "var(--color-surface)" }}>
+                            <div style={{ fontSize: "11px", fontWeight: 900, color: "var(--color-rose-deep)", marginBottom: "4px" }}>
+                              {cat.name} 상품별 · {cat.qty.toLocaleString("ko-KR")}개 · {won(cat.sales)}
+                            </div>
+                            {cat.products.map((p, j) => (
+                              <div key={p.name} style={{ display: "flex", alignItems: "baseline", gap: "8px", padding: "5px 0", borderBottom: j < cat.products.length - 1 ? "1px dashed var(--color-line)" : "none" }}>
+                                <span style={{ width: "20px", flexShrink: 0, textAlign: "center", fontSize: "10px", fontWeight: 900, color: j < 3 ? "var(--color-rose-deep)" : "var(--color-ink-mute)" }}>{j + 1}</span>
+                                <span style={{ flex: 1, minWidth: 0, fontSize: "12px", fontWeight: 700, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+                                <span style={{ flexShrink: 0, fontSize: "12px", fontWeight: 900, color: "var(--color-rose-deep)" }}>{p.qty.toLocaleString("ko-KR")}개</span>
+                                <span style={{ flexShrink: 0, fontSize: "10px", fontWeight: 700, color: "var(--color-ink-soft)" }}>{won(p.sales)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()
+                    : null}
+                </>
+              ) : null}
 
               {/* 🏆 베스트 품목 */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "7px" }}>
