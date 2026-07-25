@@ -219,7 +219,7 @@ export function useLiveOrderItemEdit(onAfterSave?: (result: LiveOrderItemEditSav
       const { data: current, error: loadError } = await supabase
         .from("orders")
         .select(
-          "id, product_name, color, size, qty, product_price, adjusted_product_price, shipping_fee, adjusted_shipping_fee, vat_amount, total_price, adjusted_total_price, final_amount, memo, item_change_history"
+          "id, product_name, color, size, qty, product_price, adjusted_product_price, shipping_fee, adjusted_shipping_fee, vat_amount, total_price, adjusted_total_price, final_amount, point_used_amount, memo, item_change_history"
         )
         .eq("id", rowId)
         .single();
@@ -233,6 +233,10 @@ export function useLiveOrderItemEdit(onAfterSave?: (result: LiveOrderItemEditSav
       const cardExtra = Number(current.vat_amount ?? 0) || 0;
       const productTotal = unitPrice * qty;
       const nextTotal = productTotal + shippingFee + cardExtra;
+      // [2026-07-25 전체점검 발견] 최종금액은 사용 포인트를 뺀 실결제액 — 재고연동 RPC [수정3]·배송비수정과 동일 기준.
+      //   기존엔 nextTotal 그대로 덮어서 포인트 사용 주문 수정 시 입금 기대금액이 부풀던 버그(과거 5건 흔적 확인).
+      const pointUsed = Number((current as { point_used_amount?: unknown }).point_used_amount ?? 0) || 0;
+      const nextFinal = Math.max(0, nextTotal - pointUsed);
 
       const productChanged =
         valuesChanged(current.product_name, productName) ||
@@ -276,7 +280,7 @@ export function useLiveOrderItemEdit(onAfterSave?: (result: LiveOrderItemEditSav
           product_price: unitPrice,
           adjusted_product_price: productTotal,
           adjusted_total_price: nextTotal,
-          final_amount: current.final_amount !== null && current.final_amount !== undefined ? nextTotal : null,
+          final_amount: current.final_amount !== null && current.final_amount !== undefined ? nextFinal : null,
         },
       };
 
@@ -294,7 +298,7 @@ export function useLiveOrderItemEdit(onAfterSave?: (result: LiveOrderItemEditSav
       };
 
       if (current.final_amount !== null && current.final_amount !== undefined) {
-        patch.final_amount = nextTotal;
+        patch.final_amount = nextFinal;
       }
 
       const { error: updateError } = await supabase

@@ -55,6 +55,24 @@ begin
   v_status := coalesce(v_order.inventory_deduction_status, '');
   v_qty := greatest(0, coalesce(v_order.qty, 0));
 
+  -- [2026-07-25 수정1] 'deducted'(총칭) 허용 + [수정2] 상품 옵션설정으로 경로 확정.
+  --   배포 제출 함수가 총칭으로 저장 → 기존 게이트에서 스킵되어 "항목 삭제해도 재고 미복구"였음
+  --   (restore_order_inventory·상품수정 RPC와 동일 버그·동일 수정).
+  if v_status = 'deducted' then
+    declare
+      v_note jsonb;
+    begin
+      select public.ruru_try_parse_jsonb(product_note) into v_note
+      from public.products where id = v_order.product_id;
+      if lower(coalesce(nullif(v_note->>'stock_mode', ''), 'total')) = 'option'
+         or (jsonb_typeof(v_note->'stock_variants') = 'array' and jsonb_array_length(v_note->'stock_variants') > 0) then
+        v_status := 'deducted_option';
+      else
+        v_status := 'deducted_total';
+      end if;
+    end;
+  end if;
+
   -- 등록상품 + 차감완료 + 미복구이면 재고 복구
   if v_order.product_id is not null
      and v_status in ('deducted_total', 'deducted_option')

@@ -41,6 +41,9 @@ declare
   v_id bigint;
   v_order public.orders%rowtype;
   v_status text;
+  v_product_note jsonb;
+  v_stock_mode text;
+  v_has_option_variants boolean;
   v_qty integer;
   v_color text;
   v_size text;
@@ -72,11 +75,30 @@ begin
     v_qty := greatest(0, coalesce(v_order.qty, 0));
 
     -- 등록상품 + 차감완료 + 수량>0 만 대상
+    -- [2026-07-25 수정1] 'deducted'(총칭) 허용 — 배포 주문제출 함수가 총칭으로 저장 중이라
+    --   기존 게이트에서 전부 스킵되어 "취소해도 재고 미복구"가 재발하던 원인(상품수정 RPC와 동일 버그).
     if v_order.product_id is null
-       or v_status not in ('deducted_total', 'deducted_option')
+       or v_status not in ('deducted_total', 'deducted_option', 'deducted')
        or v_qty <= 0 then
       v_skipped_count := v_skipped_count + 1;
       continue;
+    end if;
+
+    -- [2026-07-25 수정2] 'deducted'(총칭)면 상품 옵션설정 기준으로 복구경로(옵션/총재고) 확정.
+    --   제출 차감 로직·상품수정 RPC [수정2]와 동일 기준(stock_mode='option' 또는 옵션변형 존재 → 옵션).
+    if v_status = 'deducted' then
+      select public.ruru_try_parse_jsonb(product_note)
+        into v_product_note
+      from public.products
+      where id = v_order.product_id;
+      v_stock_mode := lower(coalesce(nullif(v_product_note->>'stock_mode', ''), 'total'));
+      v_has_option_variants := jsonb_typeof(v_product_note->'stock_variants') = 'array'
+        and jsonb_array_length(v_product_note->'stock_variants') > 0;
+      if v_stock_mode = 'option' or v_has_option_variants then
+        v_status := 'deducted_option';
+      else
+        v_status := 'deducted_total';
+      end if;
     end if;
 
     v_color := trim(coalesce(v_order.color, ''));
