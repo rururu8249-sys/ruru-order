@@ -32,6 +32,7 @@ import LiveStatsCards from "./LiveStatsCards";
 import LiveBroadcastPanels from "./LiveBroadcastPanels";
 import LiveStatsPanel from "./LiveStatsPanel";
 import BroadcastReportPopup from "./BroadcastReportPopup";
+import SystemAuditCard from "./SystemAuditCard";
 import LiveIssueRailPanel from "./LiveIssueRailPanel";
 import LiveBroadcastEndSummaryModal, { type LiveBroadcastEndSummary } from "./LiveBroadcastEndSummaryModal";
 import LiveOrderTable, { type LiveOrderFilters } from "./LiveOrderTable";
@@ -1587,6 +1588,10 @@ export default function AdminLiveDashboard() {
                 <div className="xl:shrink-0">
                   <LiveStatsPanel orders={orders} activeBroadcastId={activeBroadcast?.id || null} onOpenReport={() => setReportOpen(true)} />
                 </div>
+                <div className="xl:shrink-0">
+                  {/* [2026-07-25 사장님] 상시 시스템 점검 카드 — 이상 없어도 초록 표시 */}
+                  <SystemAuditCard onOpenDetail={() => void runIntegrityCheck()} />
+                </div>
                 <div className="min-h-0 xl:flex-1">
                   <LiveIssueRailPanel onOpenAll={() => { setCustomersInitialTab("issues"); setActiveMenu("customers"); }} />
                 </div>
@@ -2700,15 +2705,23 @@ export default function AdminLiveDashboard() {
                     { title: "자동입금확인인데 입금없음", count: integrityResult.summary?.check1_auto_paid_no_deposit ?? 0, items: integrityResult.check1?.items ?? [], kind: "check1" },
                     { title: "주문그룹 중복입금", count: integrityResult.summary?.check2_group_multi_deposit ?? 0, items: integrityResult.check2?.items ?? [], kind: "check2" },
                     { title: "중복 입금내역", count: integrityResult.summary?.check3_duplicate_deposit ?? 0, items: integrityResult.check3?.items ?? [], kind: "check3" },
+                    // [2026-07-25 전체점검] 점검4~8 — API가 만들어주는 label 문자열을 그대로 표시
+                    { title: "취소인데 재고 미복구", count: integrityResult.summary?.check4_cancel_not_restored ?? 0, items: integrityResult.check4?.items ?? [], kind: "check4" },
+                    { title: "재고 장부 불일치", count: integrityResult.summary?.check5_stock_ledger_mismatch ?? 0, items: integrityResult.check5?.items ?? [], kind: "check5" },
+                    { title: "금액 공식 불일치", count: integrityResult.summary?.check6_amount_formula ?? 0, items: integrityResult.check6?.items ?? [], kind: "check6" },
+                    { title: "포인트 잔액≠이력", count: integrityResult.summary?.check7_point_mismatch ?? 0, items: integrityResult.check7?.items ?? [], kind: "check7" },
+                    { title: "입금확인 시각 누락", count: integrityResult.summary?.check8_paid_no_timestamp ?? 0, items: integrityResult.check8?.items ?? [], kind: "check8" },
                   ].map((card) => {
                     const now = Date.now();
                     const SEVEN = 7 * 24 * 60 * 60 * 1000;
                     const itemsWithDate = card.items.map((item: any) => {
                       const dateRaw = card.kind === "check1" ? item.created_at
                         : card.kind === "check2" ? item.latest_deposited_time
-                        : item.deposited_time;
+                        : card.kind === "check3" ? item.deposited_time
+                        : item.created_at;
                       const t = dateRaw ? new Date(dateRaw).getTime() : NaN;
-                      const isRecent = Number.isFinite(t) ? (now - t) <= SEVEN : false;
+                      // 날짜 없는 항목(재고 장부·포인트)은 "최근 7일만" 필터에서도 항상 표시
+                      const isRecent = dateRaw ? (Number.isFinite(t) ? (now - t) <= SEVEN : false) : true;
                       return { item, dateRaw, isRecent };
                     });
                     const shownItems = integrityRecentOnly ? itemsWithDate.filter((x: any) => x.isRecent) : itemsWithDate;
@@ -2740,7 +2753,9 @@ export default function AdminLiveDashboard() {
                                     ? `· ${item.nickname || "-"} / ${Number(item.amount || 0).toLocaleString("ko-KR")}원${item.order_lookup_code ? ` / ${item.order_lookup_code}` : ""} · ${dateStr}`
                                     : card.kind === "check2"
                                       ? `· 입금 ${item.deposit_ids?.length || 0}건 / ${Number(item.total_deposit_amount || 0).toLocaleString("ko-KR")}원 · ${dateStr}`
-                                      : `· ${item.depositor_name || "-"} / ${Number(item.amount || 0).toLocaleString("ko-KR")}원 / ${item.deposit_ids?.length || 0}줄 · ${dateStr}`}
+                                      : card.kind === "check3"
+                                        ? `· ${item.depositor_name || "-"} / ${Number(item.amount || 0).toLocaleString("ko-KR")}원 / ${item.deposit_ids?.length || 0}줄 · ${dateStr}`
+                                        : `· ${item.label || "-"}${x.dateRaw ? ` · ${dateStr}` : ""}`}
                                 </div>
                               );
                             })}
