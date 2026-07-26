@@ -55,13 +55,14 @@ function makeScene(names: string[] | null, n: number): Player[] {
     }
   }
   const total = list.length;
-  const cols = 10;
+  // [2026-07-26 사장님] 위젯을 가로로 키우면서 격자도 12열로 넓게 사용
+  const cols = 12;
   const rows = Math.max(1, Math.ceil(total / cols));
   return list.map((name, i) => {
     const col = i % cols;
     const row = Math.floor(i / cols);
-    const x = 7 + (col + 0.5) * (86 / cols) + (Math.random() * 5 - 2.5);
-    const y = 30 + (row + 0.5) * (64 / rows) + (Math.random() * 4 - 2);
+    const x = 4.5 + (col + 0.5) * (91 / cols) + (Math.random() * 4 - 2);
+    const y = 27 + (row + 0.5) * (66 / rows) + (Math.random() * 4 - 2);
     return { id: i, name, x, y, dead: false, hit: false, dtype: null };
   });
 }
@@ -90,14 +91,32 @@ function deathTransform(t: string | null) {
     default: return "translate(-50%,-50%) translateY(45px) rotate(95deg)";
   }
 }
+// [2026-07-26] 진짜 낙뢰 느낌: 마디 많은 지그재그 본줄기 + 중간에서 갈라지는 가지 2~3개
 function streakPoints(x: number, y: number, fromX: number) {
+  const seg = 7;
   const pts: number[][] = [[fromX, 0]];
-  for (let i = 1; i < 4; i++) pts.push([fromX + (x - fromX) * (i / 4) + (Math.random() * 6 - 3), (y * i) / 4]);
+  for (let i = 1; i < seg; i++) pts.push([fromX + (x - fromX) * (i / seg) + (Math.random() * 8 - 4), (y * i) / seg + (Math.random() * 3 - 1.5)]);
   pts.push([x, y]);
-  return pts.map((p) => p.join(",")).join(" ");
+  const main = pts.map((p) => p.join(",")).join(" ");
+  const branches: string[] = [];
+  const branchCount = 2 + Math.floor(Math.random() * 2);
+  for (let b = 0; b < branchCount; b++) {
+    const start = pts[1 + Math.floor(Math.random() * (pts.length - 3))];
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    const bp: number[][] = [start];
+    let bx = start[0];
+    let by = start[1];
+    for (let j = 0; j < 3; j++) {
+      bx += dir * (3 + Math.random() * 5);
+      by += 4 + Math.random() * 6;
+      bp.push([bx, by]);
+    }
+    branches.push(bp.map((p) => p.join(",")).join(" "));
+  }
+  return { main, branches };
 }
 
-type FxState = { type: string; key: number; streaks: { id: number; pts: string }[]; accent: string } | null;
+type FxState = { type: string; key: number; streaks: { id: number; pts: string; br: string[] }[]; accent: string } | null;
 type Burst = { id: string; x: number; y: number; emoji: string; accent: string; dtype: string };
 type MsgState = { label: string; dead: string[] } | null;
 
@@ -143,6 +162,7 @@ export default function SurvivalLiveWidget() {
     const q = new URLSearchParams(window.location.search);
     const isPreview = q.get("preview") === "1";
     setPreview(isPreview);
+    soundOnRef.current = q.get("sound") !== "0"; // [2026-07-26] ?sound=0 이면 효과음 끔
 
     if (isPreview) {
       const t = Math.max(2, Math.min(200, Number(q.get("total")) || 100));
@@ -182,11 +202,103 @@ export default function SurvivalLiveWidget() {
   const shake = (strong: boolean) => {
     const el = stageRef.current;
     if (!el || !el.animate) return;
-    const m = strong ? 8 : 5;
-    el.animate([{ transform: "translate(0,0)" }, { transform: `translate(-${m}px,${m / 2}px)` },
-      { transform: `translate(${m}px,-${m / 3}px)` }, { transform: `translate(-${m / 2}px,0)` },
-      { transform: "translate(0,0)" }], { duration: 360, easing: "ease-out" });
+    // [2026-07-26] 번개/운석은 훨씬 강하게 — 진짜 낙뢰 맞은 느낌의 진동
+    const m = strong ? 16 : 6;
+    el.animate([{ transform: "translate(0,0) rotate(0deg)" }, { transform: `translate(-${m}px,${m / 2}px) rotate(-0.6deg)` },
+      { transform: `translate(${m}px,-${m / 2}px) rotate(0.5deg)` }, { transform: `translate(-${m * 0.7}px,${m / 3}px) rotate(-0.35deg)` },
+      { transform: `translate(${m / 2}px,0) rotate(0.2deg)` }, { transform: "translate(0,0) rotate(0deg)" }],
+      { duration: strong ? 550 : 360, easing: "ease-out" });
   };
+
+  // ── [2026-07-26 사장님] 효과음 — 파일 없이 코드로 합성(WebAudio). ?sound=0 으로 끔.
+  //   OBS 브라우저 소스에서 "오디오를 통해 재생"을 켜면 방송으로 송출됨. 실패해도 연출은 정상 진행.
+  const soundOnRef = useRef(true);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const ensureAudio = () => {
+    if (!soundOnRef.current) return null;
+    try {
+      const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AC) return null;
+      if (!audioCtxRef.current) audioCtxRef.current = new AC();
+      if (audioCtxRef.current.state === "suspended") void audioCtxRef.current.resume();
+      return audioCtxRef.current;
+    } catch { return null; }
+  };
+  const playSfx = useCallback((kind: string) => {
+    const ctx = ensureAudio();
+    if (!ctx) return;
+    try {
+      const t0 = ctx.currentTime;
+      const out = ctx.createGain();
+      out.gain.value = 0.5;
+      out.connect(ctx.destination);
+      const noise = (dur: number) => {
+        const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        return src;
+      };
+      const env = (g: GainNode, start: number, peak: number, end: number, dur: number) => {
+        g.gain.setValueAtTime(start, t0);
+        g.gain.linearRampToValueAtTime(peak, t0 + 0.02);
+        g.gain.exponentialRampToValueAtTime(Math.max(0.001, end), t0 + dur);
+      };
+      if (kind === "lightning") {
+        // ① 찢어지는 크랙(고역 노이즈) ② 감전 지지직(사각파 트레몰로) ③ 낮은 천둥 우르릉
+        const crack = noise(0.18); const cf = ctx.createBiquadFilter(); cf.type = "highpass"; cf.frequency.value = 1500;
+        const cg = ctx.createGain(); env(cg, 0.0001, 0.9, 0.001, 0.18);
+        crack.connect(cf).connect(cg).connect(out); crack.start(t0);
+        const zap = ctx.createOscillator(); zap.type = "square"; zap.frequency.setValueAtTime(320, t0);
+        zap.frequency.exponentialRampToValueAtTime(70, t0 + 0.35);
+        const zg = ctx.createGain(); zg.gain.setValueAtTime(0.25, t0);
+        for (let i = 0; i < 8; i++) zg.gain.setValueAtTime(i % 2 ? 0.02 : 0.22, t0 + 0.03 * i); // 지지직 떨림
+        zg.gain.exponentialRampToValueAtTime(0.001, t0 + 0.4);
+        zap.connect(zg).connect(out); zap.start(t0 + 0.02); zap.stop(t0 + 0.45);
+        const rumble = noise(1.6); const rf = ctx.createBiquadFilter(); rf.type = "lowpass"; rf.frequency.value = 130;
+        const rg = ctx.createGain(); env(rg, 0.0001, 0.8, 0.001, 1.6);
+        rumble.connect(rf).connect(rg).connect(out); rumble.start(t0 + 0.05);
+      } else if (kind === "wave") {
+        const w = noise(1.3); const wf = ctx.createBiquadFilter(); wf.type = "lowpass";
+        wf.frequency.setValueAtTime(250, t0); wf.frequency.linearRampToValueAtTime(1100, t0 + 0.45);
+        wf.frequency.linearRampToValueAtTime(180, t0 + 1.25);
+        const wg = ctx.createGain(); wg.gain.setValueAtTime(0.001, t0);
+        wg.gain.linearRampToValueAtTime(0.85, t0 + 0.4); wg.gain.exponentialRampToValueAtTime(0.001, t0 + 1.3);
+        w.connect(wf).connect(wg).connect(out); w.start(t0);
+      } else if (kind === "wind") {
+        const w = noise(0.9); const wf = ctx.createBiquadFilter(); wf.type = "bandpass"; wf.Q.value = 1.2;
+        wf.frequency.setValueAtTime(350, t0); wf.frequency.linearRampToValueAtTime(1400, t0 + 0.5);
+        wf.frequency.linearRampToValueAtTime(500, t0 + 0.9);
+        const wg = ctx.createGain(); env(wg, 0.0001, 0.6, 0.001, 0.9);
+        w.connect(wf).connect(wg).connect(out); w.start(t0);
+      } else if (kind === "hail") {
+        for (let i = 0; i < 7; i++) {
+          const o = ctx.createOscillator(); o.type = "triangle"; o.frequency.value = 1500 + Math.random() * 900;
+          const g = ctx.createGain(); const ts = t0 + i * 0.055;
+          g.gain.setValueAtTime(0.25, ts); g.gain.exponentialRampToValueAtTime(0.001, ts + 0.07);
+          o.connect(g).connect(out); o.start(ts); o.stop(ts + 0.08);
+        }
+      } else if (kind === "meteor") {
+        const o = ctx.createOscillator(); o.type = "sawtooth";
+        o.frequency.setValueAtTime(950, t0); o.frequency.exponentialRampToValueAtTime(70, t0 + 0.5);
+        const g = ctx.createGain(); env(g, 0.0001, 0.35, 0.001, 0.5);
+        o.connect(g).connect(out); o.start(t0); o.stop(t0 + 0.55);
+        const boom = noise(0.9); const bf = ctx.createBiquadFilter(); bf.type = "lowpass"; bf.frequency.value = 160;
+        const bg = ctx.createGain(); env(bg, 0.0001, 0.9, 0.001, 0.9);
+        boom.connect(bf).connect(bg).connect(out); boom.start(t0 + 0.4);
+      } else if (kind === "win") {
+        [523, 659, 784, 1047, 1319].forEach((f, i) => {
+          const o = ctx.createOscillator(); o.type = "sine"; o.frequency.value = f;
+          const g = ctx.createGain(); const ts = t0 + i * 0.13;
+          g.gain.setValueAtTime(0.0001, ts); g.gain.linearRampToValueAtTime(0.35, ts + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.001, ts + 0.5);
+          o.connect(g).connect(out); o.start(ts); o.stop(ts + 0.55);
+        });
+      }
+    } catch { /* 소리 실패는 무시 — 연출은 계속 */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const tick = useCallback(() => {
     if (!running.current) return;
@@ -200,6 +312,7 @@ export default function SurvivalLiveWidget() {
       running.current = false;
       setWinners(alive);
       setPhase("done"); setFx(null); setBursts([]);
+      playSfx("win"); // [2026-07-26] 우승 팡파레
       return;
     }
     // 이번 라운드 탈락 인원(남은 탈락후보 규모에 따라 가변)
@@ -218,12 +331,13 @@ export default function SurvivalLiveWidget() {
     const dis = DISASTERS[Math.floor(Math.random() * DISASTERS.length)];
     const next = cur.map((p) =>
       vids.has(p.id) ? { ...p, dead: true, hit: true, dtype: dis.id } : (p.hit ? { ...p, hit: false } : p));
-    let streaks: { id: number; pts: string }[] = [];
-    if (dis.id === "lightning") streaks = victims.map((v) => ({ id: v.id, pts: streakPoints(v.x, v.y, v.x) }));
-    if (dis.id === "meteor") streaks = victims.map((v) => ({ id: v.id, pts: streakPoints(v.x, v.y, v.x - 25) }));
+    let streaks: { id: number; pts: string; br: string[] }[] = [];
+    if (dis.id === "lightning") streaks = victims.map((v) => { const s = streakPoints(v.x, v.y, v.x); return { id: v.id, pts: s.main, br: s.branches }; });
+    if (dis.id === "meteor") streaks = victims.map((v) => { const s = streakPoints(v.x, v.y, v.x - 25); return { id: v.id, pts: s.main, br: [] }; });
     setFx({ type: dis.id, key: Date.now(), streaks, accent: dis.accent });
     setBursts(victims.map((v) => ({ id: v.id + "-" + Date.now(), x: v.x, y: v.y, emoji: dis.emoji, accent: dis.accent, dtype: dis.id })));
     shake(dis.id === "meteor" || dis.id === "lightning");
+    playSfx(dis.id); // [2026-07-26] 재난 효과음
     addT(setTimeout(() => setFx(null), 850));
     addT(setTimeout(() => setBursts([]), dis.id === "lightning" ? 800 : 650));
     setMessage({ label: dis.label, dead: victims.map((v) => v.name) });
@@ -238,6 +352,7 @@ export default function SurvivalLiveWidget() {
 
   const start = useCallback(() => {
     if (running.current) return;
+    ensureAudio(); // [2026-07-26] 클릭(사용자 제스처) 시점에 오디오 활성화 — 미리보기 브라우저 자동재생 정책 대응
     running.current = true; setPhase("running");
     addT(setTimeout(tick, 700));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -376,7 +491,8 @@ export default function SurvivalLiveWidget() {
   return (
     <div style={{ fontFamily: "'Pretendard','Apple SD Gothic Neo',sans-serif",
       minHeight: "100vh", position: "relative", overflow: "hidden",
-      display: "flex", alignItems: "center", justifyContent: "center", background: "transparent" }}>
+      display: "flex", alignItems: "flex-start", justifyContent: "center", background: "transparent",
+      paddingTop: "1.5vh" }}>
       <style>{`
         @keyframes rainfall{to{transform:translateY(120vh)}}
         @keyframes flick{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
@@ -387,6 +503,13 @@ export default function SurvivalLiveWidget() {
         @keyframes windSweep{0%{transform:translateX(-130%) rotate(-9deg);opacity:0}25%{opacity:.9}100%{transform:translateX(130%) rotate(-9deg);opacity:0}}
         @keyframes hailFall{0%{transform:translateY(-15%);opacity:0}20%{opacity:1}100%{transform:translateY(130%);opacity:.2}}
         @keyframes flashOut{0%{opacity:1}100%{opacity:0}}
+        @keyframes stormFlash{0%{opacity:1}12%{opacity:.15}25%{opacity:.95}40%{opacity:.05}55%{opacity:.6}75%{opacity:.1}100%{opacity:0}}
+        @keyframes stormDark{0%{opacity:0}20%{opacity:.55}100%{opacity:0}}
+        @keyframes boltFade{0%{opacity:0}8%{opacity:1}55%{opacity:1}75%{opacity:.3}85%{opacity:.9}100%{opacity:0}}
+        @keyframes tsunamiSweep{0%{transform:translateX(-118%) skewX(-6deg)}100%{transform:translateX(130%) skewX(-6deg)}}
+        @keyframes tsunamiSweep2{0%{transform:translateX(-135%) skewX(-10deg) scaleY(.92)}100%{transform:translateX(125%) skewX(-10deg) scaleY(1)}}
+        @keyframes foamBob{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-9px) scale(1.25)}}
+        @keyframes winnerPanelIn{0%{transform:translateY(24px);opacity:0}100%{transform:translateY(0);opacity:1}}
         @keyframes ringExpand{0%{width:8px;height:8px;opacity:.9}100%{width:64px;height:64px;opacity:0}}
         @keyframes burstPop{0%{transform:scale(.3);opacity:0}35%{transform:scale(1.5);opacity:1}100%{transform:scale(1);opacity:0}}
         @keyframes confetti{0%{transform:translateY(-12%) rotate(0);opacity:1}100%{transform:translateY(420px) rotate(540deg);opacity:.9}}
@@ -397,8 +520,9 @@ export default function SurvivalLiveWidget() {
         @keyframes sparkFlick{0%,100%{opacity:1}33%{opacity:.15}66%{opacity:.9}}
       `}</style>
 
-      {/* ── 정사각(1:1) 게임 위젯 : OBS 소스로 얹힘(투명 배경) ── */}
-      <div ref={stageRef} style={{ position: "relative", width: "min(96vw, 96vh)", aspectRatio: "1 / 1",
+      {/* ── [2026-07-26 사장님] 채팅 안전 레이아웃: 화면 위쪽 2/3만 사용, 하단 1/3은 투명으로 비움
+             (9:16 세로 방송에서 시청자 유튜브 채팅이 하단에 겹치므로 가리지 않게) ── */}
+      <div ref={stageRef} style={{ position: "relative", width: "96vw", height: "63vh",
         borderRadius: 20, overflow: "hidden",
         background: "linear-gradient(180deg,rgba(20,12,30,.62),rgba(45,26,44,.62))",
         border: "1px solid rgba(255,255,255,.14)", boxShadow: "0 12px 40px rgba(0,0,0,.4)" }}>
@@ -501,6 +625,26 @@ export default function SurvivalLiveWidget() {
           </div>
         ))}
 
+        {/* [2026-07-26 사장님] 다중 당첨자 명단 패널 — 여러 명일 때 하단에 크게, 잘 보이게 */}
+        {done && multi && (
+          <div style={{ position: "absolute", left: "50%", bottom: preview ? 66 : 18, transform: "translateX(-50%)",
+            zIndex: 45, maxWidth: "92%", padding: "12px 18px 13px", borderRadius: 16,
+            background: "rgba(18,10,16,.88)", border: `2px solid ${GOLD}`,
+            boxShadow: "0 8px 32px rgba(0,0,0,.55), 0 0 24px rgba(240,196,90,.35)",
+            animation: "winnerPanelIn .5s ease", textAlign: "center" }}>
+            <div style={{ fontSize: 17, fontWeight: 900, color: GOLD, marginBottom: 8, textShadow: "0 1px 6px #000" }}>
+              🏆 당첨자 {winners.length}명 🏆
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 7 }}>
+              {winners.map((w) => (
+                <span key={w.id} style={{ fontSize: 16, fontWeight: 900, color: "#231018",
+                  background: GOLD, padding: "4px 13px", borderRadius: 999, lineHeight: 1.4,
+                  boxShadow: "0 3px 10px rgba(240,196,90,.45)" }}>{w.name}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* 진행자 컨트롤 — 미리보기(?preview=1)에서만. 실제 방송은 관리자 ▶돌리기가 서버로 트리거한다. */}
         {preview ? (
         <div style={{ position: "absolute", bottom: 16, left: 0, right: 0, display: "flex",
@@ -527,25 +671,65 @@ export default function SurvivalLiveWidget() {
 function DisasterFX({ fx }: { fx: NonNullable<FxState> }) {
   const { type, accent, streaks } = fx;
   if (type === "lightning" || type === "meteor") {
-    const flash = type === "meteor" ? "rgba(255,140,80,.45)" : "rgba(255,255,255,.6)";
+    const flash = type === "meteor" ? "rgba(255,140,80,.45)" : "rgba(255,255,255,.75)";
     return (<>
+      {/* [2026-07-26] 폭풍우 낙뢰: 하늘 어두워짐 → 2~3연속 섬광 → 가지 치는 본줄기+흰 심지 */}
+      {type === "lightning" && (
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 14,
+          background: "radial-gradient(ellipse at 50% 0%, rgba(10,6,20,.0), rgba(5,3,12,.85))",
+          animation: "stormDark .9s ease-out forwards" }} />
+      )}
       <div style={{ position: "absolute", inset: 0, background: flash, pointerEvents: "none",
-        zIndex: 15, animation: "flashOut .3s ease-out forwards" }} />
+        zIndex: 15, animation: `${type === "lightning" ? "stormFlash .55s" : "flashOut .3s"} ease-out forwards` }} />
       <svg viewBox="0 0 100 100" preserveAspectRatio="none"
-        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 16 }}>
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none",
+          zIndex: 16, animation: type === "lightning" ? "boltFade .8s ease-out forwards" : "none" }}>
         {streaks.map((s) => (
-          <polyline key={s.id} points={s.pts} fill="none" stroke={accent} strokeWidth="3.5"
-            vectorEffect="non-scaling-stroke" strokeLinejoin="round"
-            style={{ filter: `drop-shadow(0 0 7px ${accent})` }} />
+          <g key={s.id}>
+            {/* 가지 번개 */}
+            {(s.br || []).map((bp, i) => (
+              <polyline key={i} points={bp} fill="none" stroke={accent} strokeWidth="1.6"
+                vectorEffect="non-scaling-stroke" strokeLinejoin="round"
+                style={{ filter: `drop-shadow(0 0 5px ${accent})`, opacity: 0.85 }} />
+            ))}
+            {/* 본줄기: 바깥 광채 + 흰 심지 이중 스트로크 */}
+            <polyline points={s.pts} fill="none" stroke={accent} strokeWidth="5"
+              vectorEffect="non-scaling-stroke" strokeLinejoin="round"
+              style={{ filter: `drop-shadow(0 0 12px ${accent}) drop-shadow(0 0 24px ${accent})`, opacity: 0.9 }} />
+            <polyline points={s.pts} fill="none" stroke="#fff" strokeWidth="1.8"
+              vectorEffect="non-scaling-stroke" strokeLinejoin="round"
+              style={{ filter: "drop-shadow(0 0 4px #fff)" }} />
+          </g>
         ))}
       </svg>
     </>);
   }
   if (type === "wave") return (
+    /* [2026-07-26] 쓰나미: 화면 전체 높이 3겹 물벽 + 물마루 포말 + 물보라 */
     <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 20 }}>
-      <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: "70%",
-        background: "linear-gradient(90deg,transparent,rgba(70,160,220,.55) 60%,rgba(190,230,255,.75))",
-        borderRadius: "0 60% 60% 0 / 0 50% 50% 0", animation: "waveSweep .9s ease-in-out" }} />
+      {/* 뒷물결(느리고 어두움) */}
+      <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: "88%",
+        background: "linear-gradient(90deg,transparent,rgba(20,80,140,.5) 55%,rgba(60,140,200,.65))",
+        borderRadius: "0 45% 45% 0 / 0 60% 40% 0", animation: "tsunamiSweep2 1.15s ease-in-out" }} />
+      {/* 본물결(크고 밝음) */}
+      <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: "80%",
+        background: "linear-gradient(90deg,transparent 5%,rgba(50,130,200,.6) 45%,rgba(140,210,250,.85) 88%,rgba(240,252,255,.95))",
+        borderRadius: "0 38% 62% 0 / 0 55% 45% 0", animation: "tsunamiSweep 1s ease-in-out",
+        boxShadow: "8px 0 30px rgba(120,200,255,.5)" }}>
+        {/* 물마루 포말 방울 */}
+        {Array.from({ length: 9 }).map((_, i) => (
+          <div key={i} style={{ position: "absolute", right: -6, top: `${4 + i * 11}%`,
+            width: 10 + (i % 3) * 5, height: 10 + (i % 3) * 5, borderRadius: "50%",
+            background: "rgba(255,255,255,.9)", filter: "blur(1px)",
+            animation: `foamBob ${0.4 + (i % 3) * 0.15}s ease-in-out infinite` }} />
+        ))}
+      </div>
+      {/* 앞쪽 물보라 스프레이 */}
+      {Array.from({ length: 12 }).map((_, i) => (
+        <div key={"s" + i} style={{ position: "absolute", top: `${Math.random() * 90}%`, left: 0, width: "100%", height: 2,
+          background: "linear-gradient(90deg,transparent,rgba(220,245,255,.8),transparent)",
+          animation: `windSweep ${0.6 + Math.random() * 0.4}s ease-in ${Math.random() * 0.25}s` }} />
+      ))}
     </div>);
   if (type === "wind") return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 20 }}>
