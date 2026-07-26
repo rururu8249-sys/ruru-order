@@ -24,15 +24,16 @@ type Runner = {
   y: number;         // 세로 위치(%) — 무리(crowd) 흩뿌림. 레인 없음(마라톤 방식).
   color: string;
   finishTime: number; // 초 — 결승선 통과 예정 시각(당첨자 우선). 연출 순서 결정.
-  wobbleA: number;    // 초반 흔들림 진폭
-  wobbleF: number;    // 흔들림 주기
-  pace: number;       // 커브 지수
-  x: number;          // 현재 진행 0~100
+  mix: number;        // 직선 성분 비율(0~1) — 낮을수록 후반 가속(뒤에서 치고 나옴)
+  pace: number;       // 후반 가속 지수
+  x: number;          // 현재 진행 0~100 (100=결승선). 단조 증가(절대 뒤로 안 감).
   rank: number | null;
 };
 
 const TRACK_TOP = 24;    // % — HUD 아래
 const TRACK_BOTTOM = 94; // %
+const FINISH_PCT = 88;   // 결승선 화면 위치(%). x=100이 여기에 매핑됨.
+const START_PCT = 4;
 
 // 참가자 이름 → 러너 배열. names 없으면 데모용 가짜 n명.
 function makeRunners(names: string[] | null, n: number, winnerOrder: string[]): Runner[] {
@@ -64,13 +65,16 @@ function makeRunners(names: string[] | null, n: number, winnerOrder: string[]): 
     const wi = winIdx.has(name) ? (winIdx.get(name) as number) : -1;
     let finishTime: number;
     let pace: number;
+    let mix: number;
     if (wi >= 0) {
       const frac = K > 1 ? wi / (K - 1) : 0;
       finishTime = RACE_LEAD + frac * WIN_WINDOW + (Math.random() * 0.16 - 0.08); // 순서대로, 근소차(포토피니시)
-      pace = 1.5 + Math.random() * 0.35; // 당첨자: 초반 뒤처졌다 막판 스퍼트로 역전(뒤에서 치고 나옴)
+      pace = 2.0 + Math.random() * 0.6;   // 당첨자: 후반 가속 크게 → 뒤에서 치고 나와 역전
+      mix = 0.15 + Math.random() * 0.2;   // 직선 성분 적음(초반 느림)
     } else {
-      finishTime = lastWinT + 1.4 + Math.random() * 2.8; // 일반: 당첨자보다 한참 뒤 → 경주 종료 시점에 아직 트랙 위(결승선 못 넘김, 뭉침 방지)
-      pace = 1.0 + Math.random() * 0.18; // 초반 앞서다 따라잡힘
+      finishTime = lastWinT + 1.4 + Math.random() * 2.8; // 일반: 당첨자보다 한참 뒤(결승선 못 넘김, 뭉침 방지)
+      pace = 1.15 + Math.random() * 0.35; // 일반: 완만한 가속(초반 앞서다 후반 따라잡힘)
+      mix = 0.5 + Math.random() * 0.4;    // 직선 성분 많음(꾸준)
     }
     // 무리 흩뿌림: 세로 위치를 트랙 전체에 랜덤 배치(레인 없음). 당첨자는 약간 가운데로 모아 눈에 띄게.
     const spread = TRACK_BOTTOM - TRACK_TOP;
@@ -83,8 +87,7 @@ function makeRunners(names: string[] | null, n: number, winnerOrder: string[]): 
       y,
       color: LANE_COLORS[i % LANE_COLORS.length],
       finishTime,
-      wobbleA: 6 + Math.random() * 7,   // 엎치락뒤치락 폭
-      wobbleF: 0.5 + Math.random() * 0.9,
+      mix,
       pace,
       x: 0,
       rank: null,
@@ -92,17 +95,16 @@ function makeRunners(names: string[] | null, n: number, winnerOrder: string[]): 
   });
 }
 
-const FINISH_X = 88;   // 결승선 위치(%)
 const RACE_LEAD = 8.0; // 첫 당첨자 결승 통과 시각(초) — 게임 길이 기준(카운트다운 별도)
 
-// 러너 진행: 결승선(FINISH_X)에 finishTime에 정확히 도달. 초반~중반 엎치락뒤치락(jockey),
-//   pace가 높은 당첨자는 뒤처졌다 막판 스퍼트로 역전. 통과 순서는 finishTime로 보존(포토피니시 안전).
+// 러너 진행 0~100(=결승선). ★단조 증가 — 절대 뒤로 안 감(출렁임 제거).
+//   f = mix·u + (1-mix)·u^pace : 두 증가함수의 블렌드라 항상 전진.
+//   러너마다 mix/pace가 달라 '가속 시점'이 갈려 자연스러운 추월(엎치락뒤치락) 발생.
+//   당첨자는 mix 낮고 pace 높음 → 초반 뒤처졌다 후반 가속으로 앞질러 결승선 통과.
 function progressAt(elapsed: number, r: Runner): number {
-  const tt = elapsed / r.finishTime;
-  const base = FINISH_X * Math.pow(Math.min(tt, 1.3), r.pace); // tt=1 → x=FINISH_X(통과)
-  const win = Math.pow(Math.sin(Math.PI * Math.min(tt, 1)), 1.8); // 흔들림: 중반 최대, 양끝 0(통과순서 보존)
-  const jockey = Math.sin(elapsed * r.wobbleF * 2 * Math.PI + r.id * 1.7) * r.wobbleA * win;
-  return Math.max(0, Math.min(108, base + jockey));
+  const u = Math.min(1, elapsed / r.finishTime);
+  const f = r.mix * u + (1 - r.mix) * Math.pow(u, r.pace);
+  return f * 100; // u=1 → 100(결승선)
 }
 
 // 달리는 졸라맨 — 앞으로 기운 몸통 + 팔다리가 크게 교차하는 러닝 사이클(관절 회전).
@@ -290,7 +292,7 @@ export default function RaceLiveWidget() {
     const next = cur.map((r) => {
       if (r.rank !== null) return r;
       const x = progressAt(elapsed, r);
-      if (x >= FINISH_X && r.rank === null) {
+      if (x >= 100 && r.rank === null) { // 결승선 도달(x=100). 부드럽게 도달 — 순간이동 없음.
         rankCounterRef.current += 1;
         const rank = rankCounterRef.current;
         const isWin = winnerSetRef.current.has(r.name);
@@ -298,7 +300,7 @@ export default function RaceLiveWidget() {
           setFinishedRanks((prev) => [...prev, { name: r.name, rank, color: r.color }]);
           playSfx("finish");
         }
-        return { ...r, x: 100, rank };
+        return { ...r, x: 100, rank }; // 결승선(100)에 고정
       }
       return { ...r, x };
     });
@@ -477,11 +479,11 @@ export default function RaceLiveWidget() {
         </div>
 
         {/* 결승선 줄 하나(체커보드) + 깃발 */}
-        <div style={{ position: "absolute", left: `${FINISH_X}%`, top: `${TRACK_TOP - 3}%`, bottom: `${100 - TRACK_BOTTOM - 1}%`,
+        <div style={{ position: "absolute", left: `${FINISH_PCT}%`, top: `${TRACK_TOP - 3}%`, bottom: `${100 - TRACK_BOTTOM - 1}%`,
           width: 10, transform: "translateX(-50%)", zIndex: 20,
           backgroundImage: "repeating-conic-gradient(#fff 0% 25%, #111 0% 50%)", backgroundSize: "10px 10px",
           borderRadius: 2, boxShadow: "0 0 10px rgba(255,255,255,.35)" }} />
-        <div style={{ position: "absolute", left: `${FINISH_X}%`, top: `${TRACK_TOP - 8}%`, transform: "translateX(-50%)",
+        <div style={{ position: "absolute", left: `${FINISH_PCT}%`, top: `${TRACK_TOP - 8}%`, transform: "translateX(-50%)",
           zIndex: 21, fontSize: 18 }}>🏁</div>
         {/* 출발선(왼쪽 옅은 줄) */}
         <div style={{ position: "absolute", left: "3.5%", top: `${TRACK_TOP - 1}%`, bottom: `${100 - TRACK_BOTTOM}%`,
@@ -491,7 +493,7 @@ export default function RaceLiveWidget() {
         {runners.map((r) => {
           const isWin = winnerNames.has(r.name);
           const nameOn = isWin || leaderIds.has(r.id) || r.rank !== null;
-          const left = 4 + (r.x / 100) * (FINISH_X - 4);
+          const left = START_PCT + (r.x / 100) * (FINISH_PCT - START_PCT);
           const z = (r.rank !== null || isWin) ? 30 : 10 + Math.round(r.x / 3); // 앞설수록 위
           return (
             <div key={r.id} style={{ position: "absolute", left: `${left}%`, top: `${r.y}%`,
