@@ -753,9 +753,11 @@ async function createEvent(body: Record<string, unknown>) {
   const broadcastId = cleanBroadcastId(body.broadcastId);
   const title = cleanText(body.title) || DEFAULT_TITLE;
   const rawEventKind = cleanText(body.eventKind);
-  // 기존 동작 보존: claw가 아니면 roulette. survival은 명시적으로 보낼 때만 분기.
-  const eventKind: "claw" | "survival" | "roulette" =
-    rawEventKind === "claw" ? "claw" : rawEventKind === "survival" ? "survival" : "roulette";
+  // 기존 동작 보존: claw가 아니면 roulette. survival/race는 명시적으로 보낼 때만 분기.
+  // [2026-07-26] race(달리기)는 survival과 동일 엔진(K명 당첨) — overlay_token만 다름.
+  const eventKind: "claw" | "survival" | "race" | "roulette" =
+    rawEventKind === "claw" ? "claw" : rawEventKind === "survival" ? "survival"
+      : rawEventKind === "race" ? "race" : "roulette";
   const requestedCreateParticipants = normalizeManualParticipantsForEvent(body.participants);
   const rawParticipants = requestedCreateParticipants.length > 0
     ? requestedCreateParticipants
@@ -804,7 +806,9 @@ async function createEvent(body: Record<string, unknown>) {
       ? "roulette_luludongi_live"
       : eventKind === "survival"
         ? "survival_luludongi_live"
-        : "claw_luludongi_live";
+        : eventKind === "race"
+          ? "race_luludongi_live"
+          : "claw_luludongi_live";
   const overlayToken = `${overlayBaseToken}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const spinDurationMs = calculateRouletteSpinDurationMs(participants.length);
 

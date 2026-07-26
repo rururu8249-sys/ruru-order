@@ -10,6 +10,7 @@ type RouletteMode = "live" | "test" | "preview";
 const FIXED_OVERLAY_TOKEN = "roulette_luludongi_live";
 const FIXED_CLAW_OVERLAY_TOKEN = "claw_luludongi_live";
 const FIXED_SURVIVAL_OVERLAY_TOKEN = "survival_luludongi_live";
+const FIXED_RACE_OVERLAY_TOKEN = "race_luludongi_live"; // [2026-07-26] 달리기 대회
 
 type RouletteBroadcast = {
   id: string;
@@ -209,6 +210,12 @@ function buildSurvivalOverlayUrl() {
   return `${window.location.origin}/event-survival/live?token=${encodeURIComponent(FIXED_SURVIVAL_OVERLAY_TOKEN)}`;
 }
 
+function buildRaceOverlayUrl() {
+  if (typeof window === "undefined") return "";
+
+  return `${window.location.origin}/event-race/live?token=${encodeURIComponent(FIXED_RACE_OVERLAY_TOKEN)}`;
+}
+
 async function copyText(value: string) {
   if (!value) {
     showAdminToast("복사할 위젯주소가 없습니다.", "warning");
@@ -254,7 +261,7 @@ export default function AdminLiveEventRoulettePanel({
   const [winners, setWinners] = useState<RouletteWinner[]>([]);
   const [loading, setLoading] = useState(false);
   const [spinning, setSpinning] = useState(false);
-  const [eventTab, setEventTab] = useState<"roulette" | "claw" | "mission" | "survival">("claw");
+  const [eventTab, setEventTab] = useState<"roulette" | "claw" | "mission" | "survival" | "race">("claw");
   const [participantSource, setParticipantSource] = useState<"auto" | "paid" | "manual">("auto");
   const [manualParticipantText, setManualParticipantText] = useState("");
   const [fixedWinnerNickname, setFixedWinnerNickname] = useState("");
@@ -275,6 +282,7 @@ export default function AdminLiveEventRoulettePanel({
   const overlayUrl = useMemo(() => buildOverlayUrl(currentEvent), [currentEvent]);
   const clawOverlayUrl = useMemo(() => buildClawOverlayUrl(), []);
   const survivalOverlayUrl = useMemo(() => buildSurvivalOverlayUrl(), []);
+  const raceOverlayUrl = useMemo(() => buildRaceOverlayUrl(), []); // [2026-07-26] 달리기
 
   const manualParticipants = useMemo<RouletteParticipant[]>(() => {
     const seen = new Set<string>();
@@ -1076,12 +1084,17 @@ export default function AdminLiveEventRoulettePanel({
       return;
     }
 
+    // [2026-07-26] 달리기(race)는 서바이벌과 동일 엔진 — 탭에 따라 eventKind/문구만 다름.
+    const isRace = eventTab === "race";
+    const kindLabel = isRace ? "🏁 달리기 대회" : "⛈️ 서바이벌";
+    const winnerWord = isRace ? "당첨자" : "생존자";
+
     // 실제 돈이 나가므로 총 지급액을 먼저 확인시킨다(운영모드 + 포인트 선물일 때만).
     const gAmountPre = Number(String(giftPointAmount || "").replace(/[^0-9]/g, "")) || 0;
     if (mode === "live" && giftType === "point" && gAmountPre > 0) {
       const totalPre = gAmountPre * survivorCount;
       if (!window.confirm(
-        `⛈️ 서바이벌을 시작합니다.\n\n생존자 ${survivorCount}명 × ${gAmountPre.toLocaleString("ko-KR")}P` +
+        `${kindLabel}을 시작합니다.\n\n${winnerWord} ${survivorCount}명 × ${gAmountPre.toLocaleString("ko-KR")}P` +
         `\n= 총 ${totalPre.toLocaleString("ko-KR")}P 가 실제로 지급됩니다.\n\n진행할까요?`
       )) return;
     }
@@ -1100,13 +1113,13 @@ export default function AdminLiveEventRoulettePanel({
           title,
           participantSource,
           participants: finalParticipants,
-          eventKind: "survival",
+          eventKind: isRace ? "race" : "survival",
           excludeDailyDup,
         }),
       });
 
       if (!createPayload.ok || !createPayload.event) {
-        throw new Error(createPayload.message || "서바이벌 이벤트 생성 실패");
+        throw new Error(createPayload.message || `${kindLabel} 이벤트 생성 실패`);
       }
 
       const eventId = createPayload.event.id;
@@ -1131,7 +1144,7 @@ export default function AdminLiveEventRoulettePanel({
       setCurrentEvent(resolvePayload.event || null);
       const survivors = resolvePayload.survivors || [];
       showAdminToast(
-        `⛈️ 서바이벌 생존자 ${survivors.length}명 확정!\n${survivors.join(", ")}\n\n방송 위젯에서 연출이 시작됩니다.`,
+        `${kindLabel} ${winnerWord} ${survivors.length}명 확정!\n${survivors.join(", ")}\n\n방송 위젯에서 연출이 시작됩니다.`,
         "success"
       );
 
@@ -1139,7 +1152,7 @@ export default function AdminLiveEventRoulettePanel({
       //   생존자는 서버가 이미 확정했으므로 연출 종료를 기다리지 않고 바로 지급한다(연출이 끊겨도 지급 누락 없음).
       const gAmount = Number(String(giftPointAmount || "").replace(/[^0-9]/g, "")) || 0;
       if (giftType === "point" && gAmount > 0 && mode === "live") {
-        await grantPointToSurvivors(resolvePayload.winners || [], gAmount, winnerNote || "서바이벌 생존");
+        await grantPointToSurvivors(resolvePayload.winners || [], gAmount, winnerNote || (isRace ? "달리기 당첨" : "서바이벌 생존"));
       } else {
         if (giftType === "point" && gAmount > 0) {
           showAdminToast("테스트 모드라 포인트 자동지급은 건너뜁니다.", "info");
@@ -1341,9 +1354,12 @@ export default function AdminLiveEventRoulettePanel({
     if (mode === "live" && giftType === "point" && amt <= 0) {
       if (!window.confirm("⚠️ 당첨자에게 줄 포인트 금액이 비어 있어요 (0P).\n이대로 돌리면 포인트 자동지급이 안 됩니다.\n\n‘당첨 내용(포인트)’에 금액을 먼저 입력하세요.\n\n그래도 그냥 돌릴까요?")) return;
     }
-    (eventTab === "roulette" ? startRouletteOneClick : eventTab === "survival" ? startSurvivalEvent : startClawEvent)();
+    // [2026-07-26] 달리기(race)는 서바이벌과 동일 실행 함수 사용(startSurvivalEvent가 탭 감지).
+    (eventTab === "roulette" ? startRouletteOneClick : (eventTab === "survival" || eventTab === "race") ? startSurvivalEvent : startClawEvent)();
   };
-  const widgetUrl = eventTab === "roulette" ? overlayUrl : eventTab === "survival" ? survivalOverlayUrl : clawOverlayUrl;
+  // [2026-07-26] K명 당첨 방식(서바이벌·달리기 공용) 판정 — UI 게이팅에 사용.
+  const isKWinnerTab = eventTab === "survival" || eventTab === "race";
+  const widgetUrl = eventTab === "roulette" ? overlayUrl : eventTab === "survival" ? survivalOverlayUrl : eventTab === "race" ? raceOverlayUrl : clawOverlayUrl;
   const periodChips: { key: "today" | "week" | "month" | "date"; label: string }[] = [
     { key: "today", label: "오늘" },
     { key: "week", label: "이번주" },
@@ -1376,6 +1392,8 @@ export default function AdminLiveEventRoulettePanel({
                     onClick={() => { setEventTab("mission"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>🎯 미션 게이지</span>
                   <span className="badge" style={{ padding: "4px 14px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "survival" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "survival" ? "#fff" : "var(--mut)" }}
                     onClick={() => { setEventTab("survival"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>⛈️ 서바이벌</span>
+                  <span className="badge" style={{ padding: "4px 14px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "race" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "race" ? "#fff" : "var(--mut)" }}
+                    onClick={() => { setEventTab("race"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>🏁 달리기</span>
                   <span style={{ width: "1px", height: "18px", background: "var(--bd)", margin: "0 3px" }} />
                   <span className="badge" style={{ padding: "4px 10px", cursor: "pointer", border: "1px solid var(--bd)", background: mode === "test" ? "var(--amber-bg)" : "var(--color-surface)", color: mode === "test" ? "var(--amber)" : "var(--mut)" }} onClick={() => changeMode("test")}>테스트</span>
                   <span className="badge" style={{ padding: "4px 10px", cursor: "pointer", border: "1px solid var(--bd)", background: mode === "live" ? "var(--green-bg)" : "var(--color-surface)", color: mode === "live" ? "var(--green)" : "var(--mut)" }} onClick={() => changeMode("live")}>운영</span>
@@ -1399,11 +1417,11 @@ export default function AdminLiveEventRoulettePanel({
                         <span style={{ fontSize: "12px", color: "var(--rose)", fontWeight: 600 }}>{finalParticipants.length}명</span>
                       </div>
                     </div>
-                  ) : eventTab === "survival" ? (
+                  ) : isKWinnerTab ? (
                     <div style={{ width: "150px", height: "150px", borderRadius: "16px", background: "var(--color-surface)", border: "1px solid var(--bd)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "5px" }}>
-                      <span style={{ fontSize: "44px", lineHeight: 1 }}>⛈️</span>
-                      <span style={{ fontSize: "12px", color: "var(--rose)", fontWeight: 600 }}>서바이벌 · {finalParticipants.length}명</span>
-                      <span style={{ fontSize: "11px", color: "var(--mut2)" }}>생존 {survivorCount}명</span>
+                      <span style={{ fontSize: "44px", lineHeight: 1 }}>{eventTab === "race" ? "🏁" : "⛈️"}</span>
+                      <span style={{ fontSize: "12px", color: "var(--rose)", fontWeight: 600 }}>{eventTab === "race" ? "달리기" : "서바이벌"} · {finalParticipants.length}명</span>
+                      <span style={{ fontSize: "11px", color: "var(--mut2)" }}>{eventTab === "race" ? "당첨" : "생존"} {survivorCount}명</span>
                     </div>
                   ) : (
                     <div style={{ width: "150px", height: "150px", borderRadius: "16px", background: "var(--color-surface)", border: "1px solid var(--bd)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "6px" }}>
@@ -1446,9 +1464,9 @@ export default function AdminLiveEventRoulettePanel({
                     <span style={{ fontSize: "11px" }}>많이 산 사람 확률 ↑ <span style={{ color: "var(--mut2)" }}>(금액40%+당일60%)</span></span>
                     <span className={`tog ${useWeight ? "on" : "off"}`}><i /></span>
                   </div>
-                  {eventTab === "survival" ? (
+                  {isKWinnerTab ? (
                     <div style={{ background: "var(--rose-bg)", border: "1px solid var(--rose-bd)", borderRadius: "7px", padding: "8px 11px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
-                      <span style={{ fontSize: "11px", color: "var(--rose)", fontWeight: 600 }}>생존자(당첨자) 수</span>
+                      <span style={{ fontSize: "11px", color: "var(--rose)", fontWeight: 600 }}>{eventTab === "race" ? "당첨자(등수) 수" : "생존자(당첨자) 수"}</span>
                       <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                         <button className="btn" style={{ height: "auto", padding: "2px 9px" }} onClick={() => setSurvivorCount((v) => Math.max(1, v - 1))}>−</button>
                         <input className="ipt" style={{ width: "48px", textAlign: "center", padding: "4px" }} inputMode="numeric" value={survivorCount}
@@ -1463,15 +1481,15 @@ export default function AdminLiveEventRoulettePanel({
 
               {/* 당첨 고정 */}
               <div style={{ border: "1px solid var(--rose-bd)", background: "var(--rose-bg)", borderRadius: "8px", padding: "9px 11px", marginBottom: "11px" }}>
-                <div style={{ fontSize: "11px", color: "var(--rose)", fontWeight: 600, marginBottom: "7px" }}>🎯 당첨 고정 (명단에서 닉네임 클릭){eventTab === "survival" ? ` · 최대 ${survivorCount}명` : ""}</div>
+                <div style={{ fontSize: "11px", color: "var(--rose)", fontWeight: 600, marginBottom: "7px" }}>🎯 당첨 고정 (명단에서 닉네임 클릭){isKWinnerTab ? ` · 최대 ${survivorCount}명` : ""}</div>
                 <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", maxHeight: "92px", overflowY: "auto" }}>
                   {finalParticipants.length === 0 ? (
                     <span className="note">참가자를 먼저 불러오세요.</span>
                   ) : (
                     finalParticipants.map((p, i) => {
-                      const on = eventTab === "survival" ? fixedSurvivorNicknames.includes(p.nickname) : fixedWinnerNickname === p.nickname;
+                      const on = isKWinnerTab ? fixedSurvivorNicknames.includes(p.nickname) : fixedWinnerNickname === p.nickname;
                       const toggleFixed = () => {
-                        if (eventTab === "survival") {
+                        if (isKWinnerTab) {
                           setFixedSurvivorNicknames((prev) =>
                             prev.includes(p.nickname)
                               ? prev.filter((n) => n !== p.nickname)
@@ -1535,7 +1553,7 @@ export default function AdminLiveEventRoulettePanel({
                   filteredWinners.map((w) => (
                     <div key={`winner-${w.id}`} className="row">
                       <span className="note" style={{ width: "120px", flexShrink: 0 }}>{dateTimeFull(w.winner_at)}</span>
-                      <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.is_test ? "테스트" : "운영"} · {(() => { const ev = events.find((e) => e.id === w.event_id); const token = ev?.overlay_token || ""; return token.startsWith("roulette") ? "🎡룰렛" : token.startsWith("claw") ? "🪆인형뽑기" : token.startsWith("survival") ? "⛈️서바이벌" : "이벤트"; })()} · 당첨 <b>{w.nickname}</b> · {w.winner_note || "이벤트 당첨"}</span>
+                      <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.is_test ? "테스트" : "운영"} · {(() => { const ev = events.find((e) => e.id === w.event_id); const token = ev?.overlay_token || ""; return token.startsWith("roulette") ? "🎡룰렛" : token.startsWith("claw") ? "🪆인형뽑기" : token.startsWith("survival") ? "⛈️서바이벌" : token.startsWith("race") ? "🏁달리기" : "이벤트"; })()} · 당첨 <b>{w.nickname}</b> · {w.winner_note || "이벤트 당첨"}</span>
                       <span className={`badge ${w.is_reward_done ? "b-ok" : "b-card"}`} style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => markRewardDone(w, !w.is_reward_done)}>{w.is_reward_done ? "지급완료" : "지급대기"}</span>
                       <span className="note" style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => void deleteWinnerRecord(w)}>삭제</span>
                     </div>
