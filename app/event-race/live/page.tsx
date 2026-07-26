@@ -27,12 +27,17 @@ const BACK = ["맘", "님", "언니", "여사", "공주", "이", "네", "댁", "
 type Runner = {
   id: number;
   name: string;
-  y: number;         // 세로 위치(%) — 무리(crowd) 흩뿌림. 레인 없음(마라톤 방식).
+  y: number;          // 세로 위치(%) — 무리(crowd) 흩뿌림. 레인 없음(마라톤 방식).
   color: string;
-  finishTime: number; // 초 — 결승선 통과 예정 시각(당첨자 우선). 연출 순서 결정.
-  mix: number;        // 직선 성분 비율(0~1) — 낮을수록 후반 가속(뒤에서 치고 나옴)
-  pace: number;       // 후반 가속 지수
-  x: number;          // 현재 진행 0~100 (100=결승선).
+  role: "win" | "lose"; // 당첨자(결승 통과)/일반(통과 못 함)
+  crossTime: number;  // 초 — 당첨자 결승 런지 돌입 시각(순서대로 → 통과 순서 보존). 일반=Infinity.
+  spd: number;        // 기본 전진 속도(%/s)
+  amp: number;        // 속도 진동 진폭(0~1) — 러너끼리 앞서거니 뒤서거니(엎치락뒤치락). 속도만 흔들어 절대 뒤로 안 감.
+  w: number;          // 속도 진동 각속도
+  phase: number;      // 속도 진동 위상(러너마다 달라 leapfrog)
+  bx: number;         // 적분된 기본 위치(아이템 전) — 매 프레임 전진 누적.
+  x: number;          // 화면 표시 위치 0~100 (아이템 반영, 100=결승선).
+  lunge: { x0: number; t0: number } | null; // 결승 런지 상태(당첨자만)
   rank: number | null;
   hit: boolean;       // 아이템 맞아 뱅글뱅글(카트라이더) 상태
   fallen: boolean;    // 넘어짐 상태
@@ -40,16 +45,21 @@ type Runner = {
 
 // 렌더용 이펙트 조각(매 프레임 refs에서 재구성). kind에 따라 표현 다름.
 //   fly=날아가는 발사체(미사일), ground=바닥 아이템(바나나), puff=충돌/부스터 순간 이펙트
-type ItemFx = { id: string; emoji: string; x: number; y: number; kind: "fly" | "ground" | "puff" };
+type ItemFx = { id: string; emoji: string; x: number; y: number; kind: "fly" | "ground" | "puff" | "boom" };
 // 소스 오브젝트(refs 보관)
-type Shot = { id: string; emoji: string; fromX: number; fromY: number; toX: number; toY: number; targetId: number; born: number; dur: number; resolved: boolean };
+type Shot = { id: string; emoji: string; fromX: number; fromY: number; toX: number; toY: number; targetId: number; born: number; dur: number; resolved: boolean; clutch?: boolean };
 type Banana = { id: string; x: number; y: number; born: number; consumed: boolean };
-type Puff = { id: string; emoji: string; x: number; y: number; born: number };
+type Puff = { id: string; emoji: string; x: number; y: number; born: number; big?: boolean };
 
 const TRACK_TOP = 24;    // % — HUD 아래
 const TRACK_BOTTOM = 94; // %
 const FINISH_PCT = 88;   // 결승선 화면 위치(%). x=100이 여기에 매핑됨.
 const START_PCT = 4;
+const RACE_LEAD = 8.0;   // 첫 당첨자 결승 런지 돌입 시각(초) — 게임 길이 기준(카운트다운 별도)
+const LUNGE = 0.5;       // 결승 런지 시간(초) — 앞 무리를 제치고 결승선을 끊는 마지막 대시
+const LOSE_CAP = 88;     // 일반 러너 진행 상한(%) — 결승선(100) 못 넘음. 선두 무리는 여기 언저리서 엎치락.
+const WIN_CAP = 90;      // 당첨자 런지 전 상한(%)
+const MAXBACK = 3.0;     // 한 프레임 최대 뒤로 이동(%) — 아이템 넉백이 순간이동식으로 튀지 않게(부드러운 스텀블)
 
 // 참가자 이름 → 러너 배열. names 없으면 데모용 가짜 n명.
 function makeRunners(names: string[] | null, n: number, winnerOrder: string[]): Runner[] {
@@ -72,57 +82,40 @@ function makeRunners(names: string[] | null, n: number, winnerOrder: string[]): 
   const winIdx = new Map<string, number>();
   winnerOrder.forEach((nm, i) => winIdx.set(String(nm || "").trim(), i));
 
-  // [2026-07-26 긴장감 설계] 첫 당첨자는 RACE_LEAD(8초)에 통과 → 게임시간 확보(너무 빠르지 않게).
-  //   당첨자들은 좁은 포토피니시 창(WIN_WINDOW) 안에서 아슬아슬 순서대로 통과, 일반 러너는 그 뒤.
+  // [2026-07-26 재설계] 엎치락뒤치락 + 결승선 역전 연출.
+  //   ▸ 위치는 매 프레임 "속도"를 적분해 전진(animate). 속도만 진동(amp/w/phase)시켜 서로 앞서거니 뒤서거니 →
+  //     leapfrog(엎치락뒤치락). 속도는 항상 ≥0이라 절대 뒤로 안 감(옛 출렁임 버그 원인=위치에 sine 더한 것과 다름).
+  //   ▸ 일반 러너: 빨리 치고 나가 선두 무리 형성(트랙 전체로 펼침), 상한 LOSE_CAP(<100)에서 결승선 못 넘음.
+  //   ▸ 당첨자: 중상위권에 섞여 달리다, 지정 순서(crossTime) 되면 결승 런지로 앞 무리 제치고 통과 → 역전.
+  //     crossTime이 gap 간격으로 순서대로라 통과 순서=서버 지정 순서 보존(런지 시간 동일 → 추월 불가).
   const K = winnerOrder.length;
-  const WIN_WINDOW = Math.min(2.2, Math.max(0.5, K * 0.42)); // 당첨자 통과 총폭(포토피니시)
-  const lastWinT = RACE_LEAD + WIN_WINDOW;
+  const WIN_WINDOW = Math.min(2.0, Math.max(0.6, K * 0.4)); // 당첨자 결승 돌입 총폭
+  const gap = Math.min(0.5, WIN_WINDOW / Math.max(1, K));   // 당첨자 간 결승 돌입 간격(포토피니시 리듬)
+  const spread = TRACK_BOTTOM - TRACK_TOP;
   return list.map((name, i) => {
     const wi = winIdx.has(name) ? (winIdx.get(name) as number) : -1;
-    let finishTime: number;
-    let pace: number;
-    let mix: number;
+    const amp = 0.5 + Math.random() * 0.35;      // 속도 진동 진폭 — 클수록 확확 치고 나감(<1이라 항상 전진)
+    const w = 2.0 + Math.random() * 2.2;         // 진동 각속도
+    const phase = Math.random() * Math.PI * 2;   // 위상(러너마다 달라 leapfrog)
     if (wi >= 0) {
-      const frac = K > 1 ? wi / (K - 1) : 0;
-      finishTime = RACE_LEAD + frac * WIN_WINDOW + (Math.random() * 0.16 - 0.08); // 순서대로, 근소차(포토피니시)
-      pace = 2.0 + Math.random() * 0.6;   // 당첨자: 후반 가속 크게 → 뒤에서 치고 나와 역전
-      mix = 0.15 + Math.random() * 0.2;   // 직선 성분 적음(초반 느림)
-    } else {
-      finishTime = lastWinT + 1.4 + Math.random() * 2.8; // 일반: 당첨자보다 한참 뒤(결승선 못 넘김, 뭉침 방지)
-      pace = 1.15 + Math.random() * 0.35; // 일반: 완만한 가속(초반 앞서다 후반 따라잡힘)
-      mix = 0.5 + Math.random() * 0.4;    // 직선 성분 많음(꾸준)
+      return {
+        id: i, name, role: "win" as const,
+        crossTime: RACE_LEAD + wi * gap,          // 순서대로 결승 런지 돌입
+        spd: 8.5 + Math.random() * 2.0,           // 당첨자: 중상위권 속도
+        amp, w, phase, color: runnerColor(i),
+        y: TRACK_TOP + spread * (0.16 + Math.random() * 0.68),
+        bx: 0, x: 0, lunge: null, rank: null, hit: false, fallen: false,
+      };
     }
-    // 무리 흩뿌림: 세로 위치를 트랙 전체에 랜덤 배치(레인 없음). 당첨자는 약간 가운데로 모아 눈에 띄게.
-    const spread = TRACK_BOTTOM - TRACK_TOP;
-    const y = wi >= 0
-      ? TRACK_TOP + spread * (0.22 + Math.random() * 0.56)   // 당첨자: 중앙대
-      : TRACK_TOP + spread * Math.random();                  // 일반: 전체 흩뿌림
     return {
-      id: i,
-      name,
-      y,
-      color: runnerColor(i),
-      finishTime,
-      mix,
-      pace,
-      x: 0,
-      rank: null,
-      hit: false,
-      fallen: false,
+      id: i, name, role: "lose" as const,
+      crossTime: Infinity,
+      spd: 7.0 + Math.random() * 5.0,             // 일반: 빠른 러너는 선두 형성, 느린 러너는 후미(펼침)
+      amp, w, phase, color: runnerColor(i),
+      y: TRACK_TOP + spread * Math.random(),
+      bx: 0, x: 0, lunge: null, rank: null, hit: false, fallen: false,
     };
   });
-}
-
-const RACE_LEAD = 8.0; // 첫 당첨자 결승 통과 시각(초) — 게임 길이 기준(카운트다운 별도)
-
-// 러너 진행 0~100(=결승선). ★단조 증가 — 절대 뒤로 안 감(출렁임 제거).
-//   f = mix·u + (1-mix)·u^pace : 두 증가함수의 블렌드라 항상 전진.
-//   러너마다 mix/pace가 달라 '가속 시점'이 갈려 자연스러운 추월(엎치락뒤치락) 발생.
-//   당첨자는 mix 낮고 pace 높음 → 초반 뒤처졌다 후반 가속으로 앞질러 결승선 통과.
-function progressAt(elapsed: number, r: Runner): number {
-  const u = Math.min(1, elapsed / r.finishTime);
-  const f = r.mix * u + (1 - r.mix) * Math.pow(u, r.pace);
-  return f * 100; // u=1 → 100(결승선)
 }
 
 // 달리는 졸라맨 — 앞으로 기운 몸통 + 팔다리가 크게 교차하는 러닝 사이클(관절 회전).
@@ -130,11 +123,14 @@ function progressAt(elapsed: number, r: Runner): number {
 function RunnerStick({ color, running, size, finished, hit, fallen }: { color: string; running: boolean; size: number; finished: boolean; hit: boolean; fallen: boolean }) {
   const jointArm = { transformBox: "fill-box" as const, transformOrigin: "left center" };
   const jointLeg = { transformBox: "fill-box" as const, transformOrigin: "left top" };
-  const bodyAnim = fallen ? "fallSpin .7s ease-out" : hit ? "hitSpin .6s linear" : running ? "runBob .24s ease-in-out infinite" : "none";
+  // 넘어짐: 뒤로 벌러덩 자빠져 드러눕고 그대로 유지(forwards). 맞음: 계속 뱅글뱅글.
+  const bodyAnim = fallen ? "wipeout .45s ease-out forwards" : hit ? "hitSpin .4s linear infinite" : running ? "runBob .24s ease-in-out infinite" : "none";
   const limbsRun = running && !hit && !fallen; // 맞거나 넘어지면 팔다리 러닝 멈춤
+  const emph = fallen || hit ? 1.35 : 1; // 사고 난 러너는 크게 → 눈에 확 띔
   return (
-    <svg width={size} height={size * 1.25} viewBox="0 0 30 34" style={{ overflow: "visible" }}>
-      {(hit || fallen) && <text x="17" y="-4" textAnchor="middle" fontSize="13">💫</text>}
+    <svg width={size * emph} height={size * 1.25 * emph} viewBox="0 0 30 34" style={{ overflow: "visible" }}>
+      {fallen && <text x="17" y="-3" textAnchor="middle" fontSize="17" style={{ animation: "starSpin .5s linear infinite" }}>💫</text>}
+      {hit && !fallen && <text x="17" y="-4" textAnchor="middle" fontSize="15" style={{ animation: "starSpin .4s linear infinite" }}>😵‍💫</text>}
       <g style={{ animation: bodyAnim, transformBox: "fill-box", transformOrigin: "center bottom" }}>
         {/* 머리 */}
         <circle cx="17" cy="6" r="4.6" fill={color} />
@@ -175,7 +171,11 @@ export default function RaceLiveWidget() {
   const [leader, setLeader] = useState("");        // 실시간 선두 닉네임(긴장감)
   const [finalSprint, setFinalSprint] = useState(false); // 마지막 스퍼트 구간
   const [items, setItems] = useState<ItemFx[]>([]); // 아이템 이펙트(바나나/부스터…)
+  const [shaking, setShaking] = useState(false);    // 큰 충돌 시 화면 흔들림
+  const shakingRef = useRef(false);
   const sprintFiredRef = useRef(false);
+  const clutchFiredRef = useRef(false); // 결승 직전 선두(비당첨)에게 미사일(1등 뺏김 연출) 1회
+  const lastElapsedRef = useRef(0);     // 직전 프레임 경과시간 — 속도 적분용 dt
   const endGuardRef = useRef(14); // 안전 종료 타임아웃(초) — beginRace에서 인원/당첨수에 맞춰 설정
   const lastRenderRef = useRef(0); // 렌더 스로틀(≈30fps) — 100명도 버벅임 없이
   // 카트라이더식 아이템: 러너별 순간 가감속(bump)·피격(hit)·넘어짐(fall) 시각. 순서 보존 위해 base와 분리.
@@ -314,23 +314,44 @@ export default function RaceLiveWidget() {
     setTotal(scene.length); setWinnerCount(Math.max(1, k || 1)); setTitle(ttl || "🏁 루루동이 달리기 대회");
     setNames(participantNames); setWinnerOrder([]); setRunners(scene);
     setFinishedRanks([]); setPhase("ready"); setHasEvent(true); setCountText("");
-    setLeader(""); setFinalSprint(false); sprintFiredRef.current = false;
+    setLeader(""); setFinalSprint(false); sprintFiredRef.current = false; clutchFiredRef.current = false; lastElapsedRef.current = 0;
+    setShaking(false); shakingRef.current = false;
     setItems([]); bumpRef.current = {}; offRef.current = {}; hitUntilRef.current = {}; fallUntilRef.current = {};
     shotsRef.current = []; bananasRef.current = []; puffsRef.current = [];
     nextShotRef.current = 0; nextBananaRef.current = 0; nextBoostRef.current = 0;
   }, []);
 
   const nid = () => `fx${idSeqRef.current++}`;
+  // 큰 충돌 시 화면 흔들림(중복 방지). 결승 clutch·선두 와이프아웃에만.
+  const triggerShake = () => {
+    if (shakingRef.current) return;
+    shakingRef.current = true; setShaking(true);
+    addT(setTimeout(() => { shakingRef.current = false; setShaking(false); }, 320));
+  };
+  const BOOMS = ["꽝!", "펑!", "쿵!", "퍽!"];
 
   // 🚀 미사일 발사 — 뒷사람이 앞사람(선두권)에게 발사. 날아가서 맞으면 뱅글/넘어짐 + 감속.
   const spawnShot = useCallback((now: number) => {
-    const alive = runnersRef.current.filter((r) => r.rank === null);
+    const alive = runnersRef.current.filter((r) => r.rank === null && !r.lunge);
     if (alive.length < 5) return;
-    const attacker = alive[Math.floor(Math.random() * alive.length)];
-    const ahead = alive.filter((r) => r.x > attacker.x + 4 && r.id !== attacker.id);
-    const target = (ahead.length ? ahead[Math.floor(Math.random() * ahead.length)] : alive[Math.floor(Math.random() * alive.length)]);
-    if (target.id === attacker.id) return;
-    shotsRef.current.push({ id: nid(), emoji: "☄️", fromX: attacker.x, fromY: attacker.y, toX: target.x, toY: target.y, targetId: target.id, born: now, dur: 380, resolved: false });
+    // 표적은 '선두 무리'(상위 6명) — 시청자 눈이 보는 곳에서 사고가 나야 극적임.
+    const leaders = [...alive].sort((a, b) => b.x - a.x).slice(0, Math.min(6, alive.length));
+    const target = leaders[Math.floor(Math.random() * leaders.length)];
+    const behind = alive.filter((r) => r.x < target.x - 3 && r.id !== target.id);
+    const attacker = behind.length ? behind[Math.floor(Math.random() * behind.length)] : alive[Math.floor(Math.random() * alive.length)];
+    if (!attacker || attacker.id === target.id) return;
+    shotsRef.current.push({ id: nid(), emoji: "☄️", fromX: attacker.x, fromY: attacker.y, toX: target.x, toY: target.y, targetId: target.id, born: now, dur: 340, resolved: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 🎯 지정 대상 미사일(결승 clutch용) — 대상 뒤 러너가 발사. 선두(비당첨)에게 꽂아 1등 뺏김 연출.
+  const spawnShotAt = useCallback((now: number, target: Runner, dur: number) => {
+    const alive = runnersRef.current.filter((r) => r.rank === null && !r.lunge && r.id !== target.id);
+    const behind = alive.filter((r) => r.x < target.x);
+    const attacker = behind.length ? behind[Math.floor(Math.random() * behind.length)] : (alive.length ? alive[Math.floor(Math.random() * alive.length)] : null);
+    const fromX = attacker ? attacker.x : Math.max(2, target.x - 18);
+    const fromY = attacker ? attacker.y : target.y;
+    shotsRef.current.push({ id: nid(), emoji: "☄️", fromX, fromY, toX: target.x, toY: target.y, targetId: target.id, born: now, dur, resolved: false, clutch: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -354,79 +375,119 @@ export default function RaceLiveWidget() {
   const animate = useCallback(() => {
     const now = performance.now();
     const elapsed = (now - startTimeRef.current) / 1000;
-    const cur = runnersRef.current;
+    const dt = Math.min(0.05, Math.max(0, elapsed - lastElapsedRef.current)); // 탭 비활성 등 큰 점프 방지
+    lastElapsedRef.current = elapsed;
 
-    // 아이템 스케줄(막판 스퍼트 전까지만 → 결말 보존)
-    const itemWindow = elapsed > 1.0 && elapsed < RACE_LEAD - 1.8;
+    // 아이템 스케줄(결승 런지 직전까지만 발생 → 결말 보존). 자주 터져 시끌시끌.
+    const itemWindow = elapsed > 0.8 && elapsed < RACE_LEAD - 0.5;
     if (itemWindow) {
-      if (elapsed > nextShotRef.current) { spawnShot(now); nextShotRef.current = elapsed + 0.55 + Math.random() * 0.7; }
-      if (elapsed > nextBananaRef.current) { spawnBanana(now); nextBananaRef.current = elapsed + 1.1 + Math.random() * 1.1; }
-      if (elapsed > nextBoostRef.current) { spawnBoost(now); nextBoostRef.current = elapsed + 1.3 + Math.random() * 1.3; }
+      if (elapsed > nextShotRef.current) { spawnShot(now); nextShotRef.current = elapsed + 0.45 + Math.random() * 0.5; }
+      if (elapsed > nextBananaRef.current) { spawnBanana(now); nextBananaRef.current = elapsed + 0.8 + Math.random() * 0.8; }
+      if (elapsed > nextBoostRef.current) { spawnBoost(now); nextBoostRef.current = elapsed + 1.0 + Math.random() * 1.0; }
     }
 
-    // 미사일 도착 처리: 명중 → 대상 뱅글/넘어짐 + 감속 + 💥
+    // 🎯 결승 직전 clutch: 현재 선두(비당첨) 1~2명에게 미사일 꽂음 → 눈앞에서 1등 뺏김(반전). 1회.
+    if (!clutchFiredRef.current && elapsed > RACE_LEAD - 1.15) {
+      clutchFiredRef.current = true;
+      const losers = runnersRef.current
+        .filter((r) => r.role === "lose" && r.rank === null && !r.lunge)
+        .sort((a, b) => b.x - a.x);
+      if (losers[0]) spawnShotAt(now, losers[0], 280);
+      if (losers[1]) spawnShotAt(now, losers[1], 360);
+    }
+
+    // 미사일 도착 처리: 명중 → 대상 뱅글/넘어짐 + 감속 + 💥 (clutch는 더 세게)
     for (const s of shotsRef.current) {
       if (!s.resolved && now >= s.born + s.dur) {
         s.resolved = true;
-        const tgt = runnersRef.current.find((r) => r.id === s.targetId && r.rank === null);
+        const tgt = runnersRef.current.find((r) => r.id === s.targetId && r.rank === null && !r.lunge);
         if (tgt) {
-          bumpRef.current[tgt.id] = (bumpRef.current[tgt.id] || 0) - (5 + Math.random() * 5);
-          const fall = Math.random() < 0.4;
-          if (fall) fallUntilRef.current[tgt.id] = now + 750; else hitUntilRef.current[tgt.id] = now + 620;
-          puffsRef.current.push({ id: nid(), emoji: "💥", x: s.toX, y: s.toY, born: now });
+          const mag = s.clutch ? (10 + Math.random() * 6) : (5 + Math.random() * 5);
+          bumpRef.current[tgt.id] = (bumpRef.current[tgt.id] || 0) - mag;
+          const fall = s.clutch ? true : Math.random() < 0.55; // clutch는 무조건 자빠짐(1등 뺏김)
+          if (fall) {
+            fallUntilRef.current[tgt.id] = now + 850;         // 넘어져 드러눕고 그동안 정지 → 제쳐짐
+            puffsRef.current.push({ id: nid(), emoji: "💥", x: s.toX, y: s.toY, born: now });
+            puffsRef.current.push({ id: nid(), emoji: BOOMS[Math.floor(Math.random() * BOOMS.length)], x: s.toX, y: s.toY, born: now, big: true });
+            triggerShake();
+          } else {
+            hitUntilRef.current[tgt.id] = now + 620;
+            puffsRef.current.push({ id: nid(), emoji: "💥", x: s.toX, y: s.toY, born: now });
+          }
         }
       }
     }
     // 오래된 것 정리
     shotsRef.current = shotsRef.current.filter((s) => now - s.born < s.dur + 120);
-    bananasRef.current = bananasRef.current.filter((b) => !b.consumed && now - b.born < 5000);
+    bananasRef.current = bananasRef.current.filter((b) => !b.consumed && now - b.born < 6000);
     puffsRef.current = puffsRef.current.filter((p) => now - p.born < 750);
 
-    const next = cur.map((r) => {
-      if (r.rank !== null) return r;
-      const u = Math.min(1, elapsed / r.finishTime);
-      const base = progressAt(elapsed, r);
-      if (base >= 100) { // 결승선 도달(정해진 finishTime 기준 → 순서 보존). 부드럽게 도달.
-        rankCounterRef.current += 1;
-        const rank = rankCounterRef.current;
-        if (winnerSetRef.current.has(r.name)) {
-          setFinishedRanks((prev) => [...prev, { name: r.name, rank, color: GOLD }]);
-          playSfx("finish");
+    // ── 러너 갱신(refs 직접 갱신 — 속도 적분 상태 유지). React 렌더는 아래 스로틀에서 복제 반영.
+    for (const r of runnersRef.current) {
+      if (r.rank !== null) continue;
+      // (1) 결승 런지: 지정 시각(crossTime) 되면 현재 위치에서 결승선(100)까지 대시. p=1이면 통과=등수 확정.
+      //     crossTime이 순서대로 + 런지 시간 동일 → 통과 순서=서버 지정 순서 보존(추월 불가).
+      if (r.role === "win" && !r.lunge && elapsed >= r.crossTime) r.lunge = { x0: r.x, t0: elapsed };
+      if (r.lunge) {
+        const p = Math.min(1, (elapsed - r.lunge.t0) / LUNGE);
+        r.x = r.lunge.x0 + (100 - r.lunge.x0) * Math.pow(p, 1.5); // 가속 대시(앞 무리 제침)
+        r.hit = false; r.fallen = false;
+        if (p >= 1) {
+          r.x = 100;
+          rankCounterRef.current += 1;
+          const rank = rankCounterRef.current;
+          r.rank = rank;
+          if (winnerSetRef.current.has(r.name)) {
+            setFinishedRanks((prev) => [...prev, { name: r.name, rank, color: GOLD }]);
+            playSfx("finish");
+          }
         }
-        return { ...r, x: 100, rank, hit: false, fallen: false };
+        continue;
       }
-      // 아이템 가감속: bump=목표값(감쇠 회복). off=화면표시 오프셋이 bump을 부드럽게 추격(EASE)
-      //   → 피격/부스터가 순간이동식으로 튀지 않고 자연스러운 스텀블/가속으로 보임.
-      //   결승 근처(u→1)엔 (1-u)^1.3 로 효과 0 → 정해진 순서 그대로 보존.
+      // (2) 속도 적분(항상 전진). 속도만 진동 → 서로 앞서거니 뒤서거니(엎치락뒤치락). 절대 뒤로 안 감.
+      //     ★맞으면 실제로 멈춤/느려짐 → 제쳐짐(손해가 눈에 보임). 당첨자는 crossTime 런지로 통과라 순서 무관.
+      let v = r.spd * (1 + r.amp * Math.sin(r.w * elapsed + r.phase));
+      if (v < 0) v = 0;
+      const isDown = now < (fallUntilRef.current[r.id] || 0);
+      const isHit = !isDown && now < (hitUntilRef.current[r.id] || 0);
+      if (isDown) v = 0;          // 쓰러진 동안 완전 정지(드러누움)
+      else if (isHit) v *= 0.3;   // 맞고 비틀 — 크게 느려짐
+      r.bx += v * dt;
+      const cap = r.role === "win" ? WIN_CAP : LOSE_CAP;
+      if (r.bx > cap) r.bx = cap;
+      // (3) 아이템 오프셋(부드럽게 추격 → 순간이동 방지) + 한 프레임 최대 뒤로 제한
       let bump = bumpRef.current[r.id] || 0;
       bump *= 0.93;
       if (Math.abs(bump) < 0.15) bump = 0;
       bumpRef.current[r.id] = bump;
       let off = offRef.current[r.id] || 0;
-      off += (bump - off) * 0.22; // 부드럽게 따라감
+      off += (bump - off) * 0.25;
       if (Math.abs(off) < 0.05) off = 0;
       offRef.current[r.id] = off;
-      const vis = Math.max(0, Math.min(97, base + off * Math.pow(1 - u, 1.3)));
-      // 바나나 충돌: 밟으면 미끄러짐(소비)
-      if (itemWindow) {
-        for (const b of bananasRef.current) {
-          if (!b.consumed && Math.abs(vis - b.x) < 1.6 && Math.abs(r.y - b.y) < 4.5) {
-            b.consumed = true;
-            bumpRef.current[r.id] = (bumpRef.current[r.id] || 0) - (4 + Math.random() * 4);
-            hitUntilRef.current[r.id] = now + 600;
-            puffsRef.current.push({ id: nid(), emoji: "💫", x: b.x, y: b.y, born: now });
-          }
+      let vis = r.bx + off;
+      if (vis > cap) vis = cap;
+      if (vis < 0) vis = 0;
+      if (vis < r.x - MAXBACK) vis = r.x - MAXBACK; // 넉백은 스텀블로(순간이동 금지)
+      // (4) 바나나 스윕 충돌: 두 프레임 사이에 지나쳤으면 반드시 밟힘(빠르게 지나가도 안 놓침)
+      for (const b of bananasRef.current) {
+        if (b.consumed) continue;
+        const crossed = (r.x <= b.x && vis >= b.x) || Math.abs(vis - b.x) < 2.6;
+        if (crossed && Math.abs(r.y - b.y) < 7) {
+          b.consumed = true;
+          bumpRef.current[r.id] = (bumpRef.current[r.id] || 0) - (4 + Math.random() * 4);
+          hitUntilRef.current[r.id] = now + 550;
+          puffsRef.current.push({ id: nid(), emoji: "💫", x: b.x, y: b.y, born: now });
         }
       }
-      const fallen = now < (fallUntilRef.current[r.id] || 0);
-      const hit = !fallen && now < (hitUntilRef.current[r.id] || 0);
-      return { ...r, x: vis, hit, fallen };
-    });
-    runnersRef.current = next;
-    // 렌더는 ≈30fps로 스로틀(100명도 부드럽게). CSS 트랜지션이 사이를 매끄럽게 이음.
+      r.x = vis;
+      r.fallen = now < (fallUntilRef.current[r.id] || 0);
+      r.hit = !r.fallen && now < (hitUntilRef.current[r.id] || 0);
+    }
+    const next = runnersRef.current;
+    // 렌더는 ≈30fps로 스로틀(100명도 부드럽게). 복제 배열로 setState → React 리렌더.
     if (now - lastRenderRef.current > 32) {
       lastRenderRef.current = now;
-      setRunners(next);
+      setRunners(next.map((r) => ({ ...r })));
       // 이펙트 조각 재구성: 날아가는 미사일(보간 위치)·바닥 바나나·순간 이펙트
       const fx: ItemFx[] = [];
       for (const s of shotsRef.current) {
@@ -434,7 +495,7 @@ export default function RaceLiveWidget() {
         fx.push({ id: s.id, emoji: s.emoji, x: s.fromX + (s.toX - s.fromX) * p, y: s.fromY + (s.toY - s.fromY) * p, kind: "fly" });
       }
       for (const b of bananasRef.current) if (!b.consumed) fx.push({ id: b.id, emoji: "🍌", x: b.x, y: b.y, kind: "ground" });
-      for (const p of puffsRef.current) fx.push({ id: p.id, emoji: p.emoji, x: p.x, y: p.y, kind: "puff" });
+      for (const p of puffsRef.current) fx.push({ id: p.id, emoji: p.emoji, x: p.x, y: p.y, kind: p.big ? "boom" : "puff" });
       setItems(fx);
     }
 
@@ -463,7 +524,7 @@ export default function RaceLiveWidget() {
     }
     rafRef.current = requestAnimationFrame(animate);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playSfx, spawnShot, spawnBanana, spawnBoost]);
+  }, [playSfx, spawnShot, spawnShotAt, spawnBanana, spawnBoost]);
 
   const beginRace = useCallback((participantNames: string[], winners: string[], k: number, ttl: string) => {
     clearAll();
@@ -472,13 +533,14 @@ export default function RaceLiveWidget() {
     runnersRef.current = scene;
     winnerSetRef.current = new Set(winners.map((n) => String(n || "").trim()));
     rankCounterRef.current = 0;
-    // 안전 종료: 마지막 당첨자 예상 통과 + 여유. (WIN_WINDOW = min(2.2, max(.5, K*.42)))
+    // 안전 종료: 마지막 당첨자 결승 런지 완료 + 여유. (WIN_WINDOW = min(2.0, max(.6, K*.4)))
     const K = winners.length;
-    endGuardRef.current = RACE_LEAD + Math.min(2.2, Math.max(0.5, K * 0.42)) + 2.5;
+    endGuardRef.current = RACE_LEAD + Math.min(2.0, Math.max(0.6, K * 0.4)) + LUNGE + 2.0;
     setTotal(scene.length); setWinnerCount(Math.max(1, k || winners.length)); setTitle(ttl || "🏁 루루동이 달리기 대회");
     setNames(participantNames); setWinnerOrder(winners); setRunners(scene);
     setFinishedRanks([]); setHasEvent(true);
-    setLeader(""); setFinalSprint(false); sprintFiredRef.current = false;
+    setLeader(""); setFinalSprint(false); sprintFiredRef.current = false; clutchFiredRef.current = false; lastElapsedRef.current = 0;
+    setShaking(false); shakingRef.current = false;
     setItems([]); bumpRef.current = {}; offRef.current = {}; hitUntilRef.current = {}; fallUntilRef.current = {};
     shotsRef.current = []; bananasRef.current = []; puffsRef.current = [];
     nextShotRef.current = 0; nextBananaRef.current = 0; nextBoostRef.current = 0;
@@ -563,9 +625,14 @@ export default function RaceLiveWidget() {
   if (!mounted) return null;
   if (!preview && !hasEvent) return null;
 
-  // 레인 없음(마라톤 무리). 인원 많을수록 졸라맨 작게. 이름은 선두 소수 + 당첨자만.
-  const figSize = total <= 16 ? 32 : total <= 35 ? 24 : total <= 60 ? 18 : total <= 90 ? 15 : 13;
+  // 레인 없음(마라톤 무리). 인원 많을수록 졸라맨 작게. 이름은 선두 소수 + 통과 당첨자만(글씨벽 방지).
+  const figSize = total <= 16 ? 38 : total <= 35 ? 30 : total <= 60 ? 22 : total <= 90 ? 17 : 15;
   const running = phase === "running";
+  // [2026-07-26 사장님] 닉네임 겹침 해소: 달리는 중엔 "현재 선두 상위 N명"만 이름표. 통과한 당첨자는 항상.
+  const NAME_TOP = 8;
+  const leadNameSet = new Set(
+    [...runners].filter((r) => r.rank === null).sort((a, b) => b.x - a.x).slice(0, NAME_TOP).map((r) => r.id)
+  );
   // [2026-07-26 사장님] 스포일러 방지: 경주 중엔 이름표·금색 없음(누가 이길지 모르게).
   //   결승선을 통과(rank 배정)한 러너만 그 순간 금색 이름표+등수 표시 → 통과=당첨이 자연스럽게 공개.
   //   현재 선두는 상단 HUD "현재 1위 OOO"로만 안내.
@@ -589,6 +656,10 @@ export default function RaceLiveWidget() {
         @keyframes flash{0%,100%{opacity:1}50%{opacity:.4}}
         @keyframes hitSpin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
         @keyframes fallSpin{0%{transform:rotate(0)}60%{transform:rotate(88deg) translateY(4px)}100%{transform:rotate(82deg) translateY(4px)}}
+        @keyframes wipeout{0%{transform:rotate(0) translateY(0)}25%{transform:rotate(-45deg) translateY(-6px)}55%{transform:rotate(-115deg) translateY(-1px)}80%{transform:rotate(-96deg) translateY(7px)}100%{transform:rotate(-90deg) translateY(7px)}}
+        @keyframes starSpin{0%{transform:rotate(0) scale(1)}50%{transform:rotate(180deg) scale(1.2)}100%{transform:rotate(360deg) scale(1)}}
+        @keyframes shake{0%,100%{transform:translate(0,0)}20%{transform:translate(-4px,2px)}40%{transform:translate(4px,-2px)}60%{transform:translate(-3px,-2px)}80%{transform:translate(3px,2px)}}
+        @keyframes boomPop{0%{transform:translate(-50%,-50%) scale(.3) rotate(-8deg);opacity:0}30%{transform:translate(-50%,-50%) scale(1.35) rotate(4deg);opacity:1}70%{transform:translate(-50%,-70%) scale(1.1) rotate(-2deg);opacity:1}100%{transform:translate(-50%,-120%) scale(.9);opacity:0}}
         @keyframes itemFloat{0%{transform:translate(-50%,-50%) scale(.4);opacity:0}25%{transform:translate(-50%,-115%) scale(1.3);opacity:1}100%{transform:translate(-50%,-210%) scale(1);opacity:0}}
       `}</style>
 
@@ -596,7 +667,8 @@ export default function RaceLiveWidget() {
       <div ref={stageRef} style={{ position: "relative", width: "min(96vw, 105vh)", height: "63vh",
         borderRadius: 20, overflow: "hidden",
         background: "linear-gradient(180deg,rgba(18,20,32,.62),rgba(30,34,52,.62))",
-        border: "1px solid rgba(255,255,255,.14)", boxShadow: "0 12px 40px rgba(0,0,0,.4)" }}>
+        border: "1px solid rgba(255,255,255,.14)", boxShadow: "0 12px 40px rgba(0,0,0,.4)",
+        animation: shaking ? "shake .32s ease-in-out" : "none" }}>
 
         {/* HUD */}
         <div style={{ position: "absolute", top: 8, left: 0, right: 0, textAlign: "center", zIndex: 40, pointerEvents: "none", padding: "0 8px" }}>
@@ -628,21 +700,24 @@ export default function RaceLiveWidget() {
           const finished = r.rank !== null;           // 결승선 통과 = 당첨 확정(그때만 금색+등수)
           const left = START_PCT + (r.x / 100) * (FINISH_PCT - START_PCT);
           const z = finished ? 30 : 10 + Math.round(r.x / 3); // 앞설수록 위
-          // 닉네임은 항상 표시(경주 중엔 중립색). 인원 많으면 작게.
-          const nameFs = finished ? 11 : total <= 30 ? 9 : 8;
+          // 이름표: 통과 당첨자(금색) + 현재 선두 상위 N명만 → 60명도 글씨벽 안 생김.
+          const showName = finished || leadNameSet.has(r.id);
+          const nameFs = finished ? 11 : total <= 30 ? 10 : 9;
           return (
             <div key={r.id} style={{ position: "absolute", left: `${left}%`, top: `${r.y}%`,
               transform: "translate(-50%,-50%)", zIndex: z,
               display: "flex", flexDirection: "column", alignItems: "center", gap: 0,
-              transition: "left .1s linear, top .1s linear" }}>
-              <span style={{ fontSize: nameFs, fontWeight: 900, whiteSpace: "nowrap", lineHeight: 1.2,
-                color: finished ? "#231018" : "#fff",
-                background: finished ? GOLD : "rgba(0,0,0,.5)",
-                padding: finished ? "1px 7px" : "0px 4px", borderRadius: 6, marginBottom: 1,
-                boxShadow: finished ? "0 2px 8px rgba(240,196,90,.5)" : "none",
-                animation: finished ? "medalPop .35s ease" : "none" }}>
-                {finished ? `${r.rank}등 ` : ""}{r.name}
-              </span>
+              transition: "left .09s linear, top .12s linear" }}>
+              {showName && (
+                <span style={{ fontSize: nameFs, fontWeight: 900, whiteSpace: "nowrap", lineHeight: 1.2,
+                  color: finished ? "#231018" : "#fff",
+                  background: finished ? GOLD : "rgba(0,0,0,.55)",
+                  padding: finished ? "1px 7px" : "0px 5px", borderRadius: 6, marginBottom: 1,
+                  boxShadow: finished ? "0 2px 8px rgba(240,196,90,.5)" : "none",
+                  animation: finished ? "medalPop .35s ease" : "none" }}>
+                  {finished ? `${r.rank}등 ` : ""}{r.name}
+                </span>
+              )}
               <RunnerStick color={finished ? GOLD : r.color} running={running && !finished} size={figSize}
                 finished={finished} hit={r.hit} fallen={r.fallen} />
             </div>
@@ -655,21 +730,35 @@ export default function RaceLiveWidget() {
           if (it.kind === "ground") {
             return (
               <div key={it.id} style={{ position: "absolute", left: `${left}%`, top: `${it.y}%`, zIndex: 30,
-                fontSize: 17, pointerEvents: "none", transform: "translate(-50%,-50%)",
-                filter: "drop-shadow(0 2px 2px rgba(0,0,0,.4))" }}>{it.emoji}</div>
+                fontSize: 19, pointerEvents: "none", transform: "translate(-50%,-50%)",
+                filter: "drop-shadow(0 2px 2px rgba(0,0,0,.45))" }}>{it.emoji}</div>
             );
           }
           if (it.kind === "fly") {
+            // 미사일: 큰 이모지 + 뒤로 끌리는 불꼬리(속도감).
             return (
               <div key={it.id} style={{ position: "absolute", left: `${left}%`, top: `${it.y}%`, zIndex: 34,
-                fontSize: 19, pointerEvents: "none", transform: "translate(-50%,-50%)",
-                filter: "drop-shadow(0 0 5px rgba(255,180,60,.9))" }}>{it.emoji}</div>
+                pointerEvents: "none", transform: "translate(-50%,-50%)" }}>
+                <div style={{ position: "absolute", right: "48%", top: "50%", transform: "translateY(-50%)",
+                  width: 44, height: 6, borderRadius: 4, filter: "blur(1.2px)",
+                  background: "linear-gradient(90deg, rgba(255,150,30,0) 0%, rgba(255,120,40,.55) 55%, rgba(255,220,120,.95) 100%)" }} />
+                <div style={{ fontSize: 25, filter: "drop-shadow(0 0 8px rgba(255,160,40,1))" }}>{it.emoji}</div>
+              </div>
             );
           }
-          // puff: 충돌/부스터 순간 이펙트 — 떴다 사라짐
+          if (it.kind === "boom") {
+            // 큰 충돌 온오마토페("꽝!") — 노란 굵은 글씨가 팡 튀어오름
+            return (
+              <div key={it.id} style={{ position: "absolute", left: `${left}%`, top: `${it.y}%`, zIndex: 38,
+                fontSize: 30, fontWeight: 900, color: "#FFD21E", pointerEvents: "none", letterSpacing: "-1px",
+                textShadow: "1.5px 1.5px 0 #7a1f00,-1.5px 1.5px 0 #7a1f00,1.5px -1.5px 0 #7a1f00,-1.5px -1.5px 0 #7a1f00,0 3px 8px rgba(0,0,0,.6)",
+                animation: "boomPop .7s ease-out forwards" }}>{it.emoji}</div>
+            );
+          }
+          // puff: 충돌/부스터 순간 이펙트 — 크게 떴다 사라짐
           return (
             <div key={it.id} style={{ position: "absolute", left: `${left}%`, top: `${it.y}%`, zIndex: 35,
-              fontSize: 21, pointerEvents: "none", animation: "itemFloat .75s ease-out forwards" }}>{it.emoji}</div>
+              fontSize: 26, pointerEvents: "none", animation: "itemFloat .75s ease-out forwards" }}>{it.emoji}</div>
           );
         })}
 
