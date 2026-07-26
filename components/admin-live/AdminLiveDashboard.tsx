@@ -2715,9 +2715,10 @@ export default function AdminLiveDashboard() {
                     const now = Date.now();
                     const SEVEN = 7 * 24 * 60 * 60 * 1000;
                     const itemsWithDate = card.items.map((item: any) => {
+                      // [2026-07-26] 입금 관련 날짜는 created_at 사용 — deposited_time은 "시각만" 저장이라 날짜없음 오표시됐었음
                       const dateRaw = card.kind === "check1" ? item.created_at
-                        : card.kind === "check2" ? item.latest_deposited_time
-                        : card.kind === "check3" ? item.deposited_time
+                        : card.kind === "check2" ? (item.latest_created_at ?? item.latest_deposited_time)
+                        : card.kind === "check3" ? (item.created_at ?? item.deposited_time)
                         : item.created_at;
                       const t = dateRaw ? new Date(dateRaw).getTime() : NaN;
                       // 날짜 없는 항목(재고 장부·포인트)은 "최근 7일만" 필터에서도 항상 표시

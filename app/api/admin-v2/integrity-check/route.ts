@@ -182,11 +182,15 @@ export async function GET() {
           .map((d) => d.deposited_time)
           .filter(Boolean)
           .sort();
+        // [2026-07-26] deposited_time은 "시각만"(HH:MM:SS) 저장되는 컬럼이라 날짜 판정 불가 →
+        //   날짜는 created_at(기록일)에서 읽는다("날짜없음" 오표시 수정).
+        const dates = deps.map((d) => d.created_at).filter(Boolean).sort();
         return {
           order_group_id: gid,
           deposit_ids: deps.map((d) => d.id),
           total_deposit_amount: deps.reduce((sum, d) => sum + depositAmountNum(d), 0),
           latest_deposited_time: times.length ? times[times.length - 1] : null,
+          latest_created_at: dates.length ? dates[dates.length - 1] : null,
         };
       });
 
@@ -209,6 +213,8 @@ export async function GET() {
         depositor_name: deps[0].depositor_name ?? null,
         amount: depositAmountNum(deps[0]),
         deposited_time: deps[0].deposited_time ?? null,
+        // [2026-07-26] 날짜는 created_at에서 (deposited_time은 시각만 저장)
+        created_at: deps.map((d) => d.created_at).filter(Boolean).sort().slice(-1)[0] ?? null,
         deposit_ids: deps.map((d) => d.id),
       }));
 
@@ -321,6 +327,25 @@ export async function GET() {
         created_at: o.created_at ?? null,
       }));
 
+    // [2026-07-26 사장님] 상시 카드용 "최근 7일" 건수 — 옛 기록(5~6월 데이터 초기)과 새 문제를 구분.
+    //   날짜 없는 항목은 옛 기록으로 간주(카드 미집계), 단 현재 상태 점검(재고 장부·포인트)은 날짜 개념이 없으므로 전부 집계.
+    const SEVEN_MS = 7 * 24 * 60 * 60 * 1000;
+    const isRecentDate = (raw: unknown) => {
+      if (!raw) return false;
+      const t = new Date(String(raw)).getTime();
+      return Number.isFinite(t) && nowMs - t <= SEVEN_MS;
+    };
+    const recentSummary = {
+      check1_auto_paid_no_deposit: check1Items.filter((i) => isRecentDate(i.created_at)).length,
+      check2_group_multi_deposit: check2Items.filter((i) => isRecentDate(i.latest_created_at)).length,
+      check3_duplicate_deposit: check3Items.filter((i) => isRecentDate(i.created_at)).length,
+      check4_cancel_not_restored: check4Items.filter((i) => isRecentDate(i.created_at)).length,
+      check5_stock_ledger_mismatch: check5Items.length, // 현재 상태 점검 — 전부 집계
+      check6_amount_formula: check6Items.filter((i) => isRecentDate(i.created_at)).length,
+      check7_point_mismatch: check7Items.length, // 현재 상태 점검 — 전부 집계
+      check8_paid_no_timestamp: check8Items.filter((i) => isRecentDate(i.created_at)).length,
+    };
+
     return NextResponse.json({
       ok: true,
       generated_at: new Date().toISOString(),
@@ -334,6 +359,7 @@ export async function GET() {
         check7_point_mismatch: check7Items.length,
         check8_paid_no_timestamp: check8Items.length,
       },
+      recent_summary: recentSummary,
       check1: { count: check1Items.length, items: check1Items },
       check2: { count: check2Items.length, items: check2Items },
       check3: { count: check3Items.length, items: check3Items },

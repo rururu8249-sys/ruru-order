@@ -37,7 +37,9 @@ export default function SystemAuditCard({ onOpenDetail }: { onOpenDetail?: () =>
     void load();
   }, [load]);
 
-  const summary = result?.summary || {};
+  // [2026-07-26] 카드는 "최근 7일 + 현재 상태" 기준(recent_summary) — 5~6월 옛 기록으로
+  //   상시 빨간불이 켜지지 않게. 과거 전체는 [자세히 보기] 팝업의 "전체 보기"에서 확인.
+  const summary = result?.recent_summary || result?.summary || {};
   const bad = CHECK_LABELS
     .map(([key, label]) => ({ key, label, count: Number(summary[key] || 0) }))
     .filter((c) => c.count > 0);
@@ -74,7 +76,7 @@ export default function SystemAuditCard({ onOpenDetail }: { onOpenDetail?: () =>
       ) : allOk ? (
         <div className="rounded-xl bg-emerald-50 px-3 py-2">
           <div className="text-[13px] font-black text-emerald-700">✅ 이상 없음</div>
-          <div className="mt-0.5 text-[10px] font-bold text-emerald-700/70">재고·금액·포인트·입금 {CHECK_LABELS.length}개 항목 전부 통과</div>
+          <div className="mt-0.5 text-[10px] font-bold text-emerald-700/70">재고·금액·포인트·입금 {CHECK_LABELS.length}개 항목 통과 · 최근 7일 기준</div>
         </div>
       ) : result ? (
         <div className="rounded-xl bg-red-50 px-3 py-2">
