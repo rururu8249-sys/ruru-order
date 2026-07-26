@@ -175,7 +175,6 @@ export default function RaceLiveWidget() {
   const stageRef = useRef<HTMLDivElement | null>(null);
 
   const done = phase === "done";
-  const winnerNames = new Set(winnerOrder.map((n) => String(n || "").trim()));
 
   // ── 효과음: /sfx/race-{start|run|finish}.mp3 있으면 사용, 없으면 WebAudio 합성. ?sound=0 끔.
   const soundOnRef = useRef(true);
@@ -433,11 +432,9 @@ export default function RaceLiveWidget() {
   // 레인 없음(마라톤 무리). 인원 많을수록 졸라맨 작게. 이름은 선두 소수 + 당첨자만.
   const figSize = total <= 16 ? 32 : total <= 35 ? 24 : total <= 60 ? 18 : total <= 90 ? 15 : 13;
   const running = phase === "running";
-  // 현재 선두 몇 명만 이름표(무리 속 겹침 방지). 인원 적으면 넉넉히.
-  const nameTopN = total <= 12 ? total : total <= 30 ? 6 : 4;
-  const orderByX = [...runners].filter((r) => r.rank === null).sort((a, b) => b.x - a.x);
-  const leaderIds = new Set(orderByX.slice(0, nameTopN).map((r) => r.id));
-  // 무리 그림: z-index는 앞선 러너일수록 위로(자연스러운 겹침). 당첨자·완주자는 항상 위.
+  // [2026-07-26 사장님] 스포일러 방지: 경주 중엔 이름표·금색 없음(누가 이길지 모르게).
+  //   결승선을 통과(rank 배정)한 러너만 그 순간 금색 이름표+등수 표시 → 통과=당첨이 자연스럽게 공개.
+  //   현재 선두는 상단 HUD "현재 1위 OOO"로만 안내.
 
   return (
     <div style={{ fontFamily: "'Pretendard','Apple SD Gothic Neo',sans-serif", minHeight: "100vh",
@@ -491,24 +488,22 @@ export default function RaceLiveWidget() {
 
         {/* 러너 무리(마라톤) — 레인 없음. x=진행, y=고정 흩뿌림. 앞선 러너가 위로 겹침. */}
         {runners.map((r) => {
-          const isWin = winnerNames.has(r.name);
-          const nameOn = isWin || leaderIds.has(r.id) || r.rank !== null;
+          const finished = r.rank !== null;           // 결승선 통과 = 당첨 확정(경주 중엔 없음)
           const left = START_PCT + (r.x / 100) * (FINISH_PCT - START_PCT);
-          const z = (r.rank !== null || isWin) ? 30 : 10 + Math.round(r.x / 3); // 앞설수록 위
+          const z = finished ? 30 : 10 + Math.round(r.x / 3); // 앞설수록 위
           return (
             <div key={r.id} style={{ position: "absolute", left: `${left}%`, top: `${r.y}%`,
               transform: "translate(-50%,-50%)", zIndex: z,
               display: "flex", flexDirection: "column", alignItems: "center", gap: 0,
               transition: "left .1s linear, top .1s linear" }}>
-              {nameOn && (
-                <span style={{ fontSize: isWin ? 11 : 9, fontWeight: 900, whiteSpace: "nowrap", lineHeight: 1.2,
-                  color: isWin ? "#231018" : "#fff", background: isWin ? GOLD : "rgba(0,0,0,.55)",
-                  padding: isWin ? "1px 7px" : "0px 4px", borderRadius: 6, marginBottom: 1,
-                  boxShadow: isWin ? "0 2px 8px rgba(240,196,90,.5)" : "none" }}>
-                  {r.rank !== null && isWin ? `${r.rank}등 ` : ""}{r.name}
+              {finished && (
+                <span style={{ fontSize: 11, fontWeight: 900, whiteSpace: "nowrap", lineHeight: 1.2,
+                  color: "#231018", background: GOLD, padding: "1px 7px", borderRadius: 6, marginBottom: 1,
+                  boxShadow: "0 2px 8px rgba(240,196,90,.5)", animation: "medalPop .35s ease" }}>
+                  {r.rank}등 {r.name}
                 </span>
               )}
-              <RunnerStick color={isWin ? GOLD : r.color} running={running && r.rank === null} size={figSize} finished={r.rank !== null && isWin} />
+              <RunnerStick color={finished ? GOLD : r.color} running={running && !finished} size={figSize} finished={finished} />
             </div>
           );
         })}
