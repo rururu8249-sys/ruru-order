@@ -628,11 +628,12 @@ export default function RaceLiveWidget() {
   // 레인 없음(마라톤 무리). 인원 많을수록 졸라맨 작게. 이름은 선두 소수 + 통과 당첨자만(글씨벽 방지).
   const figSize = total <= 16 ? 38 : total <= 35 ? 30 : total <= 60 ? 22 : total <= 90 ? 17 : 15;
   const running = phase === "running";
-  // [2026-07-26 사장님] 닉네임 겹침 해소: 달리는 중엔 "현재 선두 상위 N명"만 이름표. 통과한 당첨자는 항상.
+  // [2026-07-26 사장님] 닉네임 겹침 해소 + 대기 중 노출 방지: "달리는 중" 현재 선두 상위 N명만 이름표.
+  //   출발 전(ready/countdown)엔 다들 출발선(x=0)이라 이름 안 뜸(대기 화면 스포일러/글씨벽 방지). 통과 당첨자는 항상.
   const NAME_TOP = 8;
-  const leadNameSet = new Set(
-    [...runners].filter((r) => r.rank === null).sort((a, b) => b.x - a.x).slice(0, NAME_TOP).map((r) => r.id)
-  );
+  const leadNameSet = running
+    ? new Set([...runners].filter((r) => r.rank === null).sort((a, b) => b.x - a.x).slice(0, NAME_TOP).map((r) => r.id))
+    : new Set<number>();
   // [2026-07-26 사장님] 스포일러 방지: 경주 중엔 이름표·금색 없음(누가 이길지 모르게).
   //   결승선을 통과(rank 배정)한 러너만 그 순간 금색 이름표+등수 표시 → 통과=당첨이 자연스럽게 공개.
   //   현재 선두는 상단 HUD "현재 1위 OOO"로만 안내.
