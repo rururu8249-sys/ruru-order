@@ -11,7 +11,13 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 const ROSE = "#7B2D43";
 const GOLD = "#F0C45A";
 const TOKEN = "race_luludongi_live"; // 공개 오버레이 API 고정 토큰
-const LANE_COLORS = ["#FF8A5A", "#6FC3E8", "#B8E8C4", "#F0C45A", "#E88FB8", "#9D8DF1", "#7ED8C3", "#F5A3C7"];
+// [2026-07-26 사장님] 색상 다양화 — 황금각(137.5°)으로 색상환을 고르게 분배해 60명+도 전부 다른 색.
+function runnerColor(i: number): string {
+  const hue = (i * 137.508) % 360;
+  const sat = 68 + (i % 3) * 8;   // 68/76/84
+  const light = 56 + (i % 4) * 5; // 56~71
+  return `hsl(${hue.toFixed(0)}, ${sat}%, ${light}%)`;
+}
 
 const FRONT = ["꽃님", "봄날", "행복", "예쁜", "루루", "하늘", "달콤", "사랑", "미소", "햇살",
   "바다", "노을", "향기", "구름", "달빛", "새록", "포근", "설렘", "단비", "온유",
@@ -26,9 +32,19 @@ type Runner = {
   finishTime: number; // 초 — 결승선 통과 예정 시각(당첨자 우선). 연출 순서 결정.
   mix: number;        // 직선 성분 비율(0~1) — 낮을수록 후반 가속(뒤에서 치고 나옴)
   pace: number;       // 후반 가속 지수
-  x: number;          // 현재 진행 0~100 (100=결승선). 단조 증가(절대 뒤로 안 감).
+  x: number;          // 현재 진행 0~100 (100=결승선).
   rank: number | null;
+  hit: boolean;       // 아이템 맞아 뱅글뱅글(카트라이더) 상태
+  fallen: boolean;    // 넘어짐 상태
 };
+
+// 렌더용 이펙트 조각(매 프레임 refs에서 재구성). kind에 따라 표현 다름.
+//   fly=날아가는 발사체(미사일), ground=바닥 아이템(바나나), puff=충돌/부스터 순간 이펙트
+type ItemFx = { id: string; emoji: string; x: number; y: number; kind: "fly" | "ground" | "puff" };
+// 소스 오브젝트(refs 보관)
+type Shot = { id: string; emoji: string; fromX: number; fromY: number; toX: number; toY: number; targetId: number; born: number; dur: number; resolved: boolean };
+type Banana = { id: string; x: number; y: number; born: number; consumed: boolean };
+type Puff = { id: string; emoji: string; x: number; y: number; born: number };
 
 const TRACK_TOP = 24;    // % — HUD 아래
 const TRACK_BOTTOM = 94; // %
@@ -85,12 +101,14 @@ function makeRunners(names: string[] | null, n: number, winnerOrder: string[]): 
       id: i,
       name,
       y,
-      color: LANE_COLORS[i % LANE_COLORS.length],
+      color: runnerColor(i),
       finishTime,
       mix,
       pace,
       x: 0,
       rank: null,
+      hit: false,
+      fallen: false,
     };
   });
 }
@@ -108,29 +126,32 @@ function progressAt(elapsed: number, r: Runner): number {
 }
 
 // 달리는 졸라맨 — 앞으로 기운 몸통 + 팔다리가 크게 교차하는 러닝 사이클(관절 회전).
-//   transform-box:fill-box 로 각 팔다리를 관절에서 회전시켜 실제로 뛰는 것처럼 보이게.
-function RunnerStick({ color, running, size, finished }: { color: string; running: boolean; size: number; finished: boolean }) {
+//   hit=아이템 맞아 뱅글뱅글 / fallen=넘어져 나뒹굼(카트라이더 반칙 연출).
+function RunnerStick({ color, running, size, finished, hit, fallen }: { color: string; running: boolean; size: number; finished: boolean; hit: boolean; fallen: boolean }) {
   const jointArm = { transformBox: "fill-box" as const, transformOrigin: "left center" };
   const jointLeg = { transformBox: "fill-box" as const, transformOrigin: "left top" };
+  const bodyAnim = fallen ? "fallSpin .7s ease-out" : hit ? "hitSpin .6s linear" : running ? "runBob .24s ease-in-out infinite" : "none";
+  const limbsRun = running && !hit && !fallen; // 맞거나 넘어지면 팔다리 러닝 멈춤
   return (
     <svg width={size} height={size * 1.25} viewBox="0 0 30 34" style={{ overflow: "visible" }}>
-      <g style={{ animation: running ? "runBob .24s ease-in-out infinite" : "none", transformBox: "fill-box", transformOrigin: "center bottom" }}>
+      {(hit || fallen) && <text x="17" y="-4" textAnchor="middle" fontSize="13">💫</text>}
+      <g style={{ animation: bodyAnim, transformBox: "fill-box", transformOrigin: "center bottom" }}>
         {/* 머리 */}
         <circle cx="17" cy="6" r="4.6" fill={color} />
         {/* 몸통(앞으로 기움) */}
         <line x1="17" y1="10" x2="14" y2="21" stroke={color} strokeWidth="3.2" strokeLinecap="round" />
         {/* 뒤팔 */}
         <line x1="15" y1="13" x2="7" y2="16" stroke={color} strokeWidth="2.8" strokeLinecap="round"
-          style={{ ...jointArm, animation: running ? "armB .24s ease-in-out infinite" : "none" }} />
+          style={{ ...jointArm, animation: limbsRun ? "armB .24s ease-in-out infinite" : "none" }} />
         {/* 앞팔 */}
         <line x1="15" y1="13" x2="24" y2="11" stroke={color} strokeWidth="2.8" strokeLinecap="round"
-          style={{ ...jointArm, animation: running ? "armF .24s ease-in-out infinite" : "none" }} />
+          style={{ ...jointArm, animation: limbsRun ? "armF .24s ease-in-out infinite" : "none" }} />
         {/* 뒷다리(밀어내기) */}
         <line x1="14" y1="21" x2="7" y2="31" stroke={color} strokeWidth="3" strokeLinecap="round"
-          style={{ ...jointLeg, animation: running ? "legB .24s ease-in-out infinite" : "none" }} />
+          style={{ ...jointLeg, animation: limbsRun ? "legB .24s ease-in-out infinite" : "none" }} />
         {/* 앞다리(내딛기) */}
         <line x1="14" y1="21" x2="22" y2="30" stroke={color} strokeWidth="3" strokeLinecap="round"
-          style={{ ...jointLeg, animation: running ? "legF .24s ease-in-out infinite" : "none" }} />
+          style={{ ...jointLeg, animation: limbsRun ? "legF .24s ease-in-out infinite" : "none" }} />
       </g>
       {finished && <text x="17" y="-3" textAnchor="middle" fontSize="13">🎉</text>}
     </svg>
@@ -153,9 +174,22 @@ export default function RaceLiveWidget() {
   const [finishedRanks, setFinishedRanks] = useState<{ name: string; rank: number; color: string }[]>([]);
   const [leader, setLeader] = useState("");        // 실시간 선두 닉네임(긴장감)
   const [finalSprint, setFinalSprint] = useState(false); // 마지막 스퍼트 구간
+  const [items, setItems] = useState<ItemFx[]>([]); // 아이템 이펙트(바나나/부스터…)
   const sprintFiredRef = useRef(false);
   const endGuardRef = useRef(14); // 안전 종료 타임아웃(초) — beginRace에서 인원/당첨수에 맞춰 설정
   const lastRenderRef = useRef(0); // 렌더 스로틀(≈30fps) — 100명도 버벅임 없이
+  // 카트라이더식 아이템: 러너별 순간 가감속(bump)·피격(hit)·넘어짐(fall) 시각. 순서 보존 위해 base와 분리.
+  const bumpRef = useRef<Record<number, number>>({}); // 목표 가감속(피격/부스터로 즉시 변함, 감쇠 회복)
+  const offRef = useRef<Record<number, number>>({});  // 화면표시 오프셋 — bump을 부드럽게 추격(순간이동식 튐 방지)
+  const hitUntilRef = useRef<Record<number, number>>({});
+  const fallUntilRef = useRef<Record<number, number>>({});
+  const shotsRef = useRef<Shot[]>([]);     // 날아가는 미사일들
+  const bananasRef = useRef<Banana[]>([]); // 바닥 바나나들
+  const puffsRef = useRef<Puff[]>([]);     // 충돌/부스터 순간 이펙트
+  const nextShotRef = useRef(0);
+  const nextBananaRef = useRef(0);
+  const nextBoostRef = useRef(0);
+  const idSeqRef = useRef(0);
 
   const runnersRef = useRef(runners);
   useEffect(() => { runnersRef.current = runners; }, [runners]);
@@ -281,6 +315,39 @@ export default function RaceLiveWidget() {
     setNames(participantNames); setWinnerOrder([]); setRunners(scene);
     setFinishedRanks([]); setPhase("ready"); setHasEvent(true); setCountText("");
     setLeader(""); setFinalSprint(false); sprintFiredRef.current = false;
+    setItems([]); bumpRef.current = {}; offRef.current = {}; hitUntilRef.current = {}; fallUntilRef.current = {};
+    shotsRef.current = []; bananasRef.current = []; puffsRef.current = [];
+    nextShotRef.current = 0; nextBananaRef.current = 0; nextBoostRef.current = 0;
+  }, []);
+
+  const nid = () => `fx${idSeqRef.current++}`;
+
+  // 🚀 미사일 발사 — 뒷사람이 앞사람(선두권)에게 발사. 날아가서 맞으면 뱅글/넘어짐 + 감속.
+  const spawnShot = useCallback((now: number) => {
+    const alive = runnersRef.current.filter((r) => r.rank === null);
+    if (alive.length < 5) return;
+    const attacker = alive[Math.floor(Math.random() * alive.length)];
+    const ahead = alive.filter((r) => r.x > attacker.x + 4 && r.id !== attacker.id);
+    const target = (ahead.length ? ahead[Math.floor(Math.random() * ahead.length)] : alive[Math.floor(Math.random() * alive.length)]);
+    if (target.id === attacker.id) return;
+    shotsRef.current.push({ id: nid(), emoji: "☄️", fromX: attacker.x, fromY: attacker.y, toX: target.x, toY: target.y, targetId: target.id, born: now, dur: 380, resolved: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 🍌 바닥 바나나 — 앞쪽 트랙 임의 위치에 깔림. 러너가 밟으면 미끄러짐.
+  const spawnBanana = useCallback((now: number) => {
+    const x = 20 + Math.random() * 55; // 트랙 중앙대
+    const y = TRACK_TOP + 4 + Math.random() * (TRACK_BOTTOM - TRACK_TOP - 8);
+    bananasRef.current.push({ id: nid(), x, y, born: now, consumed: false });
+  }, []);
+
+  // 💨 부스터 — 러너 하나가 가속.
+  const spawnBoost = useCallback((now: number) => {
+    const alive = runnersRef.current.filter((r) => r.rank === null);
+    if (alive.length < 3) return;
+    const b = alive[Math.floor(Math.random() * alive.length)];
+    bumpRef.current[b.id] = (bumpRef.current[b.id] || 0) + (6 + Math.random() * 7);
+    puffsRef.current.push({ id: nid(), emoji: "💨", x: Math.max(2, b.x - 5), y: b.y, born: now });
   }, []);
 
   // 애니메이션 루프
@@ -288,24 +355,88 @@ export default function RaceLiveWidget() {
     const now = performance.now();
     const elapsed = (now - startTimeRef.current) / 1000;
     const cur = runnersRef.current;
+
+    // 아이템 스케줄(막판 스퍼트 전까지만 → 결말 보존)
+    const itemWindow = elapsed > 1.0 && elapsed < RACE_LEAD - 1.8;
+    if (itemWindow) {
+      if (elapsed > nextShotRef.current) { spawnShot(now); nextShotRef.current = elapsed + 0.55 + Math.random() * 0.7; }
+      if (elapsed > nextBananaRef.current) { spawnBanana(now); nextBananaRef.current = elapsed + 1.1 + Math.random() * 1.1; }
+      if (elapsed > nextBoostRef.current) { spawnBoost(now); nextBoostRef.current = elapsed + 1.3 + Math.random() * 1.3; }
+    }
+
+    // 미사일 도착 처리: 명중 → 대상 뱅글/넘어짐 + 감속 + 💥
+    for (const s of shotsRef.current) {
+      if (!s.resolved && now >= s.born + s.dur) {
+        s.resolved = true;
+        const tgt = runnersRef.current.find((r) => r.id === s.targetId && r.rank === null);
+        if (tgt) {
+          bumpRef.current[tgt.id] = (bumpRef.current[tgt.id] || 0) - (5 + Math.random() * 5);
+          const fall = Math.random() < 0.4;
+          if (fall) fallUntilRef.current[tgt.id] = now + 750; else hitUntilRef.current[tgt.id] = now + 620;
+          puffsRef.current.push({ id: nid(), emoji: "💥", x: s.toX, y: s.toY, born: now });
+        }
+      }
+    }
+    // 오래된 것 정리
+    shotsRef.current = shotsRef.current.filter((s) => now - s.born < s.dur + 120);
+    bananasRef.current = bananasRef.current.filter((b) => !b.consumed && now - b.born < 5000);
+    puffsRef.current = puffsRef.current.filter((p) => now - p.born < 750);
+
     const next = cur.map((r) => {
       if (r.rank !== null) return r;
-      const x = progressAt(elapsed, r);
-      if (x >= 100 && r.rank === null) { // 결승선 도달(x=100). 부드럽게 도달 — 순간이동 없음.
+      const u = Math.min(1, elapsed / r.finishTime);
+      const base = progressAt(elapsed, r);
+      if (base >= 100) { // 결승선 도달(정해진 finishTime 기준 → 순서 보존). 부드럽게 도달.
         rankCounterRef.current += 1;
         const rank = rankCounterRef.current;
-        const isWin = winnerSetRef.current.has(r.name);
-        if (isWin) {
-          setFinishedRanks((prev) => [...prev, { name: r.name, rank, color: r.color }]);
+        if (winnerSetRef.current.has(r.name)) {
+          setFinishedRanks((prev) => [...prev, { name: r.name, rank, color: GOLD }]);
           playSfx("finish");
         }
-        return { ...r, x: 100, rank }; // 결승선(100)에 고정
+        return { ...r, x: 100, rank, hit: false, fallen: false };
       }
-      return { ...r, x };
+      // 아이템 가감속: bump=목표값(감쇠 회복). off=화면표시 오프셋이 bump을 부드럽게 추격(EASE)
+      //   → 피격/부스터가 순간이동식으로 튀지 않고 자연스러운 스텀블/가속으로 보임.
+      //   결승 근처(u→1)엔 (1-u)^1.3 로 효과 0 → 정해진 순서 그대로 보존.
+      let bump = bumpRef.current[r.id] || 0;
+      bump *= 0.93;
+      if (Math.abs(bump) < 0.15) bump = 0;
+      bumpRef.current[r.id] = bump;
+      let off = offRef.current[r.id] || 0;
+      off += (bump - off) * 0.22; // 부드럽게 따라감
+      if (Math.abs(off) < 0.05) off = 0;
+      offRef.current[r.id] = off;
+      const vis = Math.max(0, Math.min(97, base + off * Math.pow(1 - u, 1.3)));
+      // 바나나 충돌: 밟으면 미끄러짐(소비)
+      if (itemWindow) {
+        for (const b of bananasRef.current) {
+          if (!b.consumed && Math.abs(vis - b.x) < 1.6 && Math.abs(r.y - b.y) < 4.5) {
+            b.consumed = true;
+            bumpRef.current[r.id] = (bumpRef.current[r.id] || 0) - (4 + Math.random() * 4);
+            hitUntilRef.current[r.id] = now + 600;
+            puffsRef.current.push({ id: nid(), emoji: "💫", x: b.x, y: b.y, born: now });
+          }
+        }
+      }
+      const fallen = now < (fallUntilRef.current[r.id] || 0);
+      const hit = !fallen && now < (hitUntilRef.current[r.id] || 0);
+      return { ...r, x: vis, hit, fallen };
     });
     runnersRef.current = next;
     // 렌더는 ≈30fps로 스로틀(100명도 부드럽게). CSS 트랜지션이 사이를 매끄럽게 이음.
-    if (now - lastRenderRef.current > 32) { lastRenderRef.current = now; setRunners(next); }
+    if (now - lastRenderRef.current > 32) {
+      lastRenderRef.current = now;
+      setRunners(next);
+      // 이펙트 조각 재구성: 날아가는 미사일(보간 위치)·바닥 바나나·순간 이펙트
+      const fx: ItemFx[] = [];
+      for (const s of shotsRef.current) {
+        const p = Math.min(1, (now - s.born) / s.dur);
+        fx.push({ id: s.id, emoji: s.emoji, x: s.fromX + (s.toX - s.fromX) * p, y: s.fromY + (s.toY - s.fromY) * p, kind: "fly" });
+      }
+      for (const b of bananasRef.current) if (!b.consumed) fx.push({ id: b.id, emoji: "🍌", x: b.x, y: b.y, kind: "ground" });
+      for (const p of puffsRef.current) fx.push({ id: p.id, emoji: p.emoji, x: p.x, y: p.y, kind: "puff" });
+      setItems(fx);
+    }
 
     // 실시간 선두(결승 전 러너 중 가장 앞) — 같은 값이면 React가 리렌더 생략
     let lead = ""; let leadX = -1;
@@ -332,7 +463,7 @@ export default function RaceLiveWidget() {
     }
     rafRef.current = requestAnimationFrame(animate);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playSfx]);
+  }, [playSfx, spawnShot, spawnBanana, spawnBoost]);
 
   const beginRace = useCallback((participantNames: string[], winners: string[], k: number, ttl: string) => {
     clearAll();
@@ -348,6 +479,9 @@ export default function RaceLiveWidget() {
     setNames(participantNames); setWinnerOrder(winners); setRunners(scene);
     setFinishedRanks([]); setHasEvent(true);
     setLeader(""); setFinalSprint(false); sprintFiredRef.current = false;
+    setItems([]); bumpRef.current = {}; offRef.current = {}; hitUntilRef.current = {}; fallUntilRef.current = {};
+    shotsRef.current = []; bananasRef.current = []; puffsRef.current = [];
+    nextShotRef.current = 0; nextBananaRef.current = 0; nextBoostRef.current = 0;
     // 카운트다운 3·2·1·출발!
     setPhase("countdown");
     setCountText("3");
@@ -453,6 +587,9 @@ export default function RaceLiveWidget() {
         @keyframes winnerPanelIn{0%{transform:translateY(24px);opacity:0}100%{transform:translateY(0);opacity:1}}
         @keyframes dashFlow{to{background-position:0 -16px}}
         @keyframes flash{0%,100%{opacity:1}50%{opacity:.4}}
+        @keyframes hitSpin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+        @keyframes fallSpin{0%{transform:rotate(0)}60%{transform:rotate(88deg) translateY(4px)}100%{transform:rotate(82deg) translateY(4px)}}
+        @keyframes itemFloat{0%{transform:translate(-50%,-50%) scale(.4);opacity:0}25%{transform:translate(-50%,-115%) scale(1.3);opacity:1}100%{transform:translate(-50%,-210%) scale(1);opacity:0}}
       `}</style>
 
       {/* 위젯 크기·배치: 서바이벌과 동일(상단 63vh, 하단 채팅 자리 투명). PC 가로상한. */}
@@ -488,23 +625,51 @@ export default function RaceLiveWidget() {
 
         {/* 러너 무리(마라톤) — 레인 없음. x=진행, y=고정 흩뿌림. 앞선 러너가 위로 겹침. */}
         {runners.map((r) => {
-          const finished = r.rank !== null;           // 결승선 통과 = 당첨 확정(경주 중엔 없음)
+          const finished = r.rank !== null;           // 결승선 통과 = 당첨 확정(그때만 금색+등수)
           const left = START_PCT + (r.x / 100) * (FINISH_PCT - START_PCT);
           const z = finished ? 30 : 10 + Math.round(r.x / 3); // 앞설수록 위
+          // 닉네임은 항상 표시(경주 중엔 중립색). 인원 많으면 작게.
+          const nameFs = finished ? 11 : total <= 30 ? 9 : 8;
           return (
             <div key={r.id} style={{ position: "absolute", left: `${left}%`, top: `${r.y}%`,
               transform: "translate(-50%,-50%)", zIndex: z,
               display: "flex", flexDirection: "column", alignItems: "center", gap: 0,
               transition: "left .1s linear, top .1s linear" }}>
-              {finished && (
-                <span style={{ fontSize: 11, fontWeight: 900, whiteSpace: "nowrap", lineHeight: 1.2,
-                  color: "#231018", background: GOLD, padding: "1px 7px", borderRadius: 6, marginBottom: 1,
-                  boxShadow: "0 2px 8px rgba(240,196,90,.5)", animation: "medalPop .35s ease" }}>
-                  {r.rank}등 {r.name}
-                </span>
-              )}
-              <RunnerStick color={finished ? GOLD : r.color} running={running && !finished} size={figSize} finished={finished} />
+              <span style={{ fontSize: nameFs, fontWeight: 900, whiteSpace: "nowrap", lineHeight: 1.2,
+                color: finished ? "#231018" : "#fff",
+                background: finished ? GOLD : "rgba(0,0,0,.5)",
+                padding: finished ? "1px 7px" : "0px 4px", borderRadius: 6, marginBottom: 1,
+                boxShadow: finished ? "0 2px 8px rgba(240,196,90,.5)" : "none",
+                animation: finished ? "medalPop .35s ease" : "none" }}>
+                {finished ? `${r.rank}등 ` : ""}{r.name}
+              </span>
+              <RunnerStick color={finished ? GOLD : r.color} running={running && !finished} size={figSize}
+                finished={finished} hit={r.hit} fallen={r.fallen} />
             </div>
+          );
+        })}
+
+        {/* 🎮 아이템 이펙트 — fly:날아가는 미사일 / ground:바닥 바나나 / puff:충돌·부스터 순간 */}
+        {items.map((it) => {
+          const left = START_PCT + (it.x / 100) * (FINISH_PCT - START_PCT);
+          if (it.kind === "ground") {
+            return (
+              <div key={it.id} style={{ position: "absolute", left: `${left}%`, top: `${it.y}%`, zIndex: 30,
+                fontSize: 17, pointerEvents: "none", transform: "translate(-50%,-50%)",
+                filter: "drop-shadow(0 2px 2px rgba(0,0,0,.4))" }}>{it.emoji}</div>
+            );
+          }
+          if (it.kind === "fly") {
+            return (
+              <div key={it.id} style={{ position: "absolute", left: `${left}%`, top: `${it.y}%`, zIndex: 34,
+                fontSize: 19, pointerEvents: "none", transform: "translate(-50%,-50%)",
+                filter: "drop-shadow(0 0 5px rgba(255,180,60,.9))" }}>{it.emoji}</div>
+            );
+          }
+          // puff: 충돌/부스터 순간 이펙트 — 떴다 사라짐
+          return (
+            <div key={it.id} style={{ position: "absolute", left: `${left}%`, top: `${it.y}%`, zIndex: 35,
+              fontSize: 21, pointerEvents: "none", animation: "itemFloat .75s ease-out forwards" }}>{it.emoji}</div>
           );
         })}
 
