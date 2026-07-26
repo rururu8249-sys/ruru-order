@@ -21,15 +21,18 @@ const BACK = ["맘", "님", "언니", "여사", "공주", "이", "네", "댁", "
 type Runner = {
   id: number;
   name: string;
-  lane: number;      // 0..N-1
+  y: number;         // 세로 위치(%) — 무리(crowd) 흩뿌림. 레인 없음(마라톤 방식).
   color: string;
   finishTime: number; // 초 — 결승선 통과 예정 시각(당첨자 우선). 연출 순서 결정.
   wobbleA: number;    // 초반 흔들림 진폭
   wobbleF: number;    // 흔들림 주기
-  pace: number;       // 커브 지수(0.85~1.15)
+  pace: number;       // 커브 지수
   x: number;          // 현재 진행 0~100
   rank: number | null;
 };
+
+const TRACK_TOP = 24;    // % — HUD 아래
+const TRACK_BOTTOM = 94; // %
 
 // 참가자 이름 → 러너 배열. names 없으면 데모용 가짜 n명.
 function makeRunners(names: string[] | null, n: number, winnerOrder: string[]): Runner[] {
@@ -52,58 +55,82 @@ function makeRunners(names: string[] | null, n: number, winnerOrder: string[]): 
   const winIdx = new Map<string, number>();
   winnerOrder.forEach((nm, i) => winIdx.set(String(nm || "").trim(), i));
 
-  // 당첨자는 4.6초부터 0.5초 간격으로 먼저 통과, 일반 러너는 그 뒤에 흩어져 통과.
+  // [2026-07-26 긴장감 설계] 첫 당첨자는 RACE_LEAD(8초)에 통과 → 게임시간 확보(너무 빠르지 않게).
+  //   당첨자들은 좁은 포토피니시 창(WIN_WINDOW) 안에서 아슬아슬 순서대로 통과, 일반 러너는 그 뒤.
   const K = winnerOrder.length;
-  const lastWinT = 4.6 + Math.max(0, K - 1) * 0.5;
+  const WIN_WINDOW = Math.min(2.2, Math.max(0.5, K * 0.42)); // 당첨자 통과 총폭(포토피니시)
+  const lastWinT = RACE_LEAD + WIN_WINDOW;
   return list.map((name, i) => {
     const wi = winIdx.has(name) ? (winIdx.get(name) as number) : -1;
     let finishTime: number;
+    let pace: number;
     if (wi >= 0) {
-      finishTime = 4.6 + wi * 0.5 + (Math.random() * 0.12 - 0.06); // 당첨자: 순서대로, 근소차
+      const frac = K > 1 ? wi / (K - 1) : 0;
+      finishTime = RACE_LEAD + frac * WIN_WINDOW + (Math.random() * 0.16 - 0.08); // 순서대로, 근소차(포토피니시)
+      pace = 1.5 + Math.random() * 0.35; // 당첨자: 초반 뒤처졌다 막판 스퍼트로 역전(뒤에서 치고 나옴)
     } else {
-      finishTime = lastWinT + 0.55 + Math.random() * 3.2; // 일반: 당첨자 이후 흩뿌림
+      finishTime = lastWinT + 1.4 + Math.random() * 2.8; // 일반: 당첨자보다 한참 뒤 → 경주 종료 시점에 아직 트랙 위(결승선 못 넘김, 뭉침 방지)
+      pace = 1.0 + Math.random() * 0.18; // 초반 앞서다 따라잡힘
     }
+    // 무리 흩뿌림: 세로 위치를 트랙 전체에 랜덤 배치(레인 없음). 당첨자는 약간 가운데로 모아 눈에 띄게.
+    const spread = TRACK_BOTTOM - TRACK_TOP;
+    const y = wi >= 0
+      ? TRACK_TOP + spread * (0.22 + Math.random() * 0.56)   // 당첨자: 중앙대
+      : TRACK_TOP + spread * Math.random();                  // 일반: 전체 흩뿌림
     return {
       id: i,
       name,
-      lane: i,
+      y,
       color: LANE_COLORS[i % LANE_COLORS.length],
       finishTime,
-      wobbleA: 3 + Math.random() * 6,
-      wobbleF: 0.6 + Math.random() * 1.1,
-      pace: 0.86 + Math.random() * 0.28,
+      wobbleA: 6 + Math.random() * 7,   // 엎치락뒤치락 폭
+      wobbleF: 0.5 + Math.random() * 0.9,
+      pace,
       x: 0,
       rank: null,
     };
   });
 }
 
-// 러너 진행 곡선: 0~1 정규화 시간 t에서 진행률(%) — 초반 엎치락뒤치락, 결승선(finishTime)에서 100%.
+const FINISH_X = 88;   // 결승선 위치(%)
+const RACE_LEAD = 8.0; // 첫 당첨자 결승 통과 시각(초) — 게임 길이 기준(카운트다운 별도)
+
+// 러너 진행: 결승선(FINISH_X)에 finishTime에 정확히 도달. 초반~중반 엎치락뒤치락(jockey),
+//   pace가 높은 당첨자는 뒤처졌다 막판 스퍼트로 역전. 통과 순서는 finishTime로 보존(포토피니시 안전).
 function progressAt(elapsed: number, r: Runner): number {
-  const t = Math.min(1, elapsed / r.finishTime);
-  const base = Math.pow(t, r.pace) * 100;
-  const wob = Math.sin(elapsed * r.wobbleF * 2 * Math.PI + r.id) * r.wobbleA * (1 - t); // 초반만 흔들림
-  return Math.max(0, Math.min(100, base + wob));
+  const tt = elapsed / r.finishTime;
+  const base = FINISH_X * Math.pow(Math.min(tt, 1.3), r.pace); // tt=1 → x=FINISH_X(통과)
+  const win = Math.pow(Math.sin(Math.PI * Math.min(tt, 1)), 1.8); // 흔들림: 중반 최대, 양끝 0(통과순서 보존)
+  const jockey = Math.sin(elapsed * r.wobbleF * 2 * Math.PI + r.id * 1.7) * r.wobbleA * win;
+  return Math.max(0, Math.min(108, base + jockey));
 }
 
-const FINISH_X = 88; // 결승선 위치(%)
-
+// 달리는 졸라맨 — 앞으로 기운 몸통 + 팔다리가 크게 교차하는 러닝 사이클(관절 회전).
+//   transform-box:fill-box 로 각 팔다리를 관절에서 회전시켜 실제로 뛰는 것처럼 보이게.
 function RunnerStick({ color, running, size, finished }: { color: string; running: boolean; size: number; finished: boolean }) {
-  // 달리는 졸라맨: 다리 2개가 번갈아 움직이는 프레임 애니메이션
+  const jointArm = { transformBox: "fill-box" as const, transformOrigin: "left center" };
+  const jointLeg = { transformBox: "fill-box" as const, transformOrigin: "left top" };
   return (
-    <svg width={size} height={size * 1.15} viewBox="0 0 26 30" style={{ overflow: "visible" }}>
-      <g style={{ animation: running ? "runBob .28s steps(2) infinite" : "none", transformOrigin: "13px 26px" }}>
-        <circle cx="14" cy="5" r="4.4" fill="none" stroke={color} strokeWidth="2.6" />
-        {/* 앞으로 살짝 기운 몸통 */}
-        <line x1="14" y1="9" x2="12" y2="19" stroke={color} strokeWidth="2.6" strokeLinecap="round" />
-        {/* 팔(앞뒤로 흔듦) */}
-        <line x1="13" y1="12" x2={running ? 20 : 18} y2={running ? 9 : 15} stroke={color} strokeWidth="2.6" strokeLinecap="round" style={{ animation: running ? "armL .28s ease-in-out infinite alternate" : "none", transformOrigin: "13px 12px" }} />
-        <line x1="13" y1="12" x2={running ? 5 : 8} y2={running ? 15 : 15} stroke={color} strokeWidth="2.6" strokeLinecap="round" style={{ animation: running ? "armR .28s ease-in-out infinite alternate" : "none", transformOrigin: "13px 12px" }} />
-        {/* 다리(달리는 스텝) */}
-        <line x1="12" y1="19" x2={running ? 19 : 8} y2="28" stroke={color} strokeWidth="2.6" strokeLinecap="round" style={{ animation: running ? "legA .28s ease-in-out infinite alternate" : "none", transformOrigin: "12px 19px" }} />
-        <line x1="12" y1="19" x2={running ? 6 : 17} y2="28" stroke={color} strokeWidth="2.6" strokeLinecap="round" style={{ animation: running ? "legB .28s ease-in-out infinite alternate" : "none", transformOrigin: "12px 19px" }} />
+    <svg width={size} height={size * 1.25} viewBox="0 0 30 34" style={{ overflow: "visible" }}>
+      <g style={{ animation: running ? "runBob .24s ease-in-out infinite" : "none", transformBox: "fill-box", transformOrigin: "center bottom" }}>
+        {/* 머리 */}
+        <circle cx="17" cy="6" r="4.6" fill={color} />
+        {/* 몸통(앞으로 기움) */}
+        <line x1="17" y1="10" x2="14" y2="21" stroke={color} strokeWidth="3.2" strokeLinecap="round" />
+        {/* 뒤팔 */}
+        <line x1="15" y1="13" x2="7" y2="16" stroke={color} strokeWidth="2.8" strokeLinecap="round"
+          style={{ ...jointArm, animation: running ? "armB .24s ease-in-out infinite" : "none" }} />
+        {/* 앞팔 */}
+        <line x1="15" y1="13" x2="24" y2="11" stroke={color} strokeWidth="2.8" strokeLinecap="round"
+          style={{ ...jointArm, animation: running ? "armF .24s ease-in-out infinite" : "none" }} />
+        {/* 뒷다리(밀어내기) */}
+        <line x1="14" y1="21" x2="7" y2="31" stroke={color} strokeWidth="3" strokeLinecap="round"
+          style={{ ...jointLeg, animation: running ? "legB .24s ease-in-out infinite" : "none" }} />
+        {/* 앞다리(내딛기) */}
+        <line x1="14" y1="21" x2="22" y2="30" stroke={color} strokeWidth="3" strokeLinecap="round"
+          style={{ ...jointLeg, animation: running ? "legF .24s ease-in-out infinite" : "none" }} />
       </g>
-      {finished && <text x="13" y="-4" textAnchor="middle" fontSize="12">💨</text>}
+      {finished && <text x="17" y="-3" textAnchor="middle" fontSize="13">🎉</text>}
     </svg>
   );
 }
@@ -122,6 +149,11 @@ export default function RaceLiveWidget() {
   const [phase, setPhase] = useState<"ready" | "countdown" | "running" | "done">("ready");
   const [countText, setCountText] = useState("");
   const [finishedRanks, setFinishedRanks] = useState<{ name: string; rank: number; color: string }[]>([]);
+  const [leader, setLeader] = useState("");        // 실시간 선두 닉네임(긴장감)
+  const [finalSprint, setFinalSprint] = useState(false); // 마지막 스퍼트 구간
+  const sprintFiredRef = useRef(false);
+  const endGuardRef = useRef(14); // 안전 종료 타임아웃(초) — beginRace에서 인원/당첨수에 맞춰 설정
+  const lastRenderRef = useRef(0); // 렌더 스로틀(≈30fps) — 100명도 버벅임 없이
 
   const runnersRef = useRef(runners);
   useEffect(() => { runnersRef.current = runners; }, [runners]);
@@ -196,6 +228,23 @@ export default function RaceLiveWidget() {
           g.gain.exponentialRampToValueAtTime(0.001, ts + 0.6);
           o.connect(g).connect(out); o.start(ts); o.stop(ts + 0.65);
         });
+      } else if (kind === "drumroll") {
+        // 두구두구 드럼롤 — 점점 빨라지고 커짐(마지막 스퍼트 긴장감). 약 1.8초.
+        let ts = t0; let gap = 0.075; const end = t0 + 1.8;
+        while (ts < end) {
+          const hit = ctx.createBufferSource();
+          const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.05), ctx.sampleRate);
+          const d = buf.getChannelData(0);
+          for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2);
+          hit.buffer = buf;
+          const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 260;
+          const g = ctx.createGain();
+          const vol = 0.12 + 0.28 * ((ts - t0) / 1.8); // 점점 커짐
+          g.gain.setValueAtTime(vol, ts); g.gain.exponentialRampToValueAtTime(0.001, ts + 0.06);
+          hit.connect(lp).connect(g).connect(out); hit.start(ts);
+          gap = Math.max(0.028, gap * 0.93); // 점점 빨라짐
+          ts += gap;
+        }
       }
     } catch { /* 무시 */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -230,6 +279,7 @@ export default function RaceLiveWidget() {
     setTotal(scene.length); setWinnerCount(Math.max(1, k || 1)); setTitle(ttl || "🏁 루루동이 달리기 대회");
     setNames(participantNames); setWinnerOrder([]); setRunners(scene);
     setFinishedRanks([]); setPhase("ready"); setHasEvent(true); setCountText("");
+    setLeader(""); setFinalSprint(false); sprintFiredRef.current = false;
   }, []);
 
   // 애니메이션 루프
@@ -237,7 +287,6 @@ export default function RaceLiveWidget() {
     const now = performance.now();
     const elapsed = (now - startTimeRef.current) / 1000;
     const cur = runnersRef.current;
-    let allWinnersDone = true;
     const next = cur.map((r) => {
       if (r.rank !== null) return r;
       const x = progressAt(elapsed, r);
@@ -251,24 +300,35 @@ export default function RaceLiveWidget() {
         }
         return { ...r, x: 100, rank };
       }
-      if (winnerSetRef.current.has(r.name)) allWinnersDone = false;
       return { ...r, x };
     });
     runnersRef.current = next;
-    setRunners(next);
+    // 렌더는 ≈30fps로 스로틀(100명도 부드럽게). CSS 트랜지션이 사이를 매끄럽게 이음.
+    if (now - lastRenderRef.current > 32) { lastRenderRef.current = now; setRunners(next); }
+
+    // 실시간 선두(결승 전 러너 중 가장 앞) — 같은 값이면 React가 리렌더 생략
+    let lead = ""; let leadX = -1;
+    for (const r of next) { if (r.rank === null && r.x > leadX) { leadX = r.x; lead = r.name; } }
+    if (lead) setLeader(lead);
+
+    // 마지막 스퍼트: 첫 당첨자 통과 ~1.6초 전부터 드럼롤 + HUD (1회)
+    if (!sprintFiredRef.current && elapsed > RACE_LEAD - 1.6) {
+      sprintFiredRef.current = true;
+      setFinalSprint(true);
+      playSfx("drumroll");
+    }
 
     const finishedWinners = next.filter((r) => r.rank !== null && winnerSetRef.current.has(r.name)).length;
     if (finishedWinners >= winnerSetRef.current.size && winnerSetRef.current.size > 0) {
-      // 당첨자 전원 통과 → 0.8초 후 종료 연출
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
-      addT(setTimeout(() => setPhase("done"), 800));
+      setRunners(next); // 스로틀로 놓친 마지막 프레임 확정 반영
+      addT(setTimeout(() => setPhase("done"), 400)); // 마지막 당첨자 통과 직후 종료(일반 러너 뭉침 방지)
       return;
     }
-    if (elapsed > 14) { // 안전 타임아웃
+    if (elapsed > endGuardRef.current) { // 안전 타임아웃(당첨수에 맞춰 동적)
       setPhase("done"); if (rafRef.current) cancelAnimationFrame(rafRef.current); rafRef.current = null; return;
     }
-    void allWinnersDone;
     rafRef.current = requestAnimationFrame(animate);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playSfx]);
@@ -280,9 +340,13 @@ export default function RaceLiveWidget() {
     runnersRef.current = scene;
     winnerSetRef.current = new Set(winners.map((n) => String(n || "").trim()));
     rankCounterRef.current = 0;
+    // 안전 종료: 마지막 당첨자 예상 통과 + 여유. (WIN_WINDOW = min(2.2, max(.5, K*.42)))
+    const K = winners.length;
+    endGuardRef.current = RACE_LEAD + Math.min(2.2, Math.max(0.5, K * 0.42)) + 2.5;
     setTotal(scene.length); setWinnerCount(Math.max(1, k || winners.length)); setTitle(ttl || "🏁 루루동이 달리기 대회");
     setNames(participantNames); setWinnerOrder(winners); setRunners(scene);
     setFinishedRanks([]); setHasEvent(true);
+    setLeader(""); setFinalSprint(false); sprintFiredRef.current = false;
     // 카운트다운 3·2·1·출발!
     setPhase("countdown");
     setCountText("3");
@@ -364,34 +428,32 @@ export default function RaceLiveWidget() {
   if (!mounted) return null;
   if (!preview && !hasEvent) return null;
 
-  // 러너가 많을수록 레인 얇게 + 졸라맨 작게. 이름은 리더/당첨자만.
-  const laneCount = Math.max(1, total);
-  const trackTop = 22;      // % — HUD 아래
-  const trackBottom = 96;   // %
-  const laneH = (trackBottom - trackTop) / laneCount;
-  const figSize = Math.max(10, Math.min(26, (laneH / 100) * 630 * 0.8));
+  // 레인 없음(마라톤 무리). 인원 많을수록 졸라맨 작게. 이름은 선두 소수 + 당첨자만.
+  const figSize = total <= 16 ? 32 : total <= 35 ? 24 : total <= 60 ? 18 : total <= 90 ? 15 : 13;
   const running = phase === "running";
-  // 현재 선두 순위(진행률 기준) — 이름 표시할 리더 판정용
+  // 현재 선두 몇 명만 이름표(무리 속 겹침 방지). 인원 적으면 넉넉히.
+  const nameTopN = total <= 12 ? total : total <= 30 ? 6 : 4;
   const orderByX = [...runners].filter((r) => r.rank === null).sort((a, b) => b.x - a.x);
-  const leaderIds = new Set(orderByX.slice(0, 8).map((r) => r.id));
-  const showAllNames = total <= 14;
+  const leaderIds = new Set(orderByX.slice(0, nameTopN).map((r) => r.id));
+  // 무리 그림: z-index는 앞선 러너일수록 위로(자연스러운 겹침). 당첨자·완주자는 항상 위.
 
   return (
     <div style={{ fontFamily: "'Pretendard','Apple SD Gothic Neo',sans-serif", minHeight: "100vh",
       position: "relative", overflow: "hidden", display: "flex", alignItems: "flex-start",
       justifyContent: "center", background: "transparent", paddingTop: "1.5vh" }}>
       <style>{`
-        @keyframes runBob{0%{transform:translateY(0)}100%{transform:translateY(-2px)}}
-        @keyframes legA{from{transform:rotate(28deg)}to{transform:rotate(-30deg)}}
-        @keyframes legB{from{transform:rotate(-30deg)}to{transform:rotate(28deg)}}
-        @keyframes armL{from{transform:rotate(-25deg)}to{transform:rotate(25deg)}}
-        @keyframes armR{from{transform:rotate(25deg)}to{transform:rotate(-25deg)}}
+        @keyframes runBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+        @keyframes legF{0%{transform:rotate(38deg)}50%{transform:rotate(-32deg)}100%{transform:rotate(38deg)}}
+        @keyframes legB{0%{transform:rotate(-32deg)}50%{transform:rotate(38deg)}100%{transform:rotate(-32deg)}}
+        @keyframes armF{0%{transform:rotate(-34deg)}50%{transform:rotate(30deg)}100%{transform:rotate(-34deg)}}
+        @keyframes armB{0%{transform:rotate(30deg)}50%{transform:rotate(-34deg)}100%{transform:rotate(30deg)}}
         @keyframes countPop{0%{transform:scale(.3);opacity:0}40%{transform:scale(1.2);opacity:1}100%{transform:scale(1);opacity:1}}
         @keyframes tapeBreak{0%{opacity:1;transform:scaleY(1)}100%{opacity:0;transform:scaleY(1.4)}}
         @keyframes medalPop{0%{transform:scale(0);opacity:0}60%{transform:scale(1.3)}100%{transform:scale(1);opacity:1}}
         @keyframes confetti{0%{transform:translateY(-12%) rotate(0);opacity:1}100%{transform:translateY(340px) rotate(540deg);opacity:.9}}
         @keyframes winnerPanelIn{0%{transform:translateY(24px);opacity:0}100%{transform:translateY(0);opacity:1}}
         @keyframes dashFlow{to{background-position:0 -16px}}
+        @keyframes flash{0%,100%{opacity:1}50%{opacity:.4}}
       `}</style>
 
       {/* 위젯 크기·배치: 서바이벌과 동일(상단 63vh, 하단 채팅 자리 투명). PC 가로상한. */}
@@ -405,48 +467,57 @@ export default function RaceLiveWidget() {
           <div style={{ fontSize: 18, fontWeight: 900, color: "#fff", textShadow: "0 2px 10px rgba(0,0,0,.8)" }}>{title}</div>
           <div style={{ minHeight: 22, marginTop: 2 }}>
             {phase === "ready" && <span style={{ fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,.9)" }}>출발하면 {winnerCount}등까지 당첨! 🏅</span>}
-            {phase === "running" && <span style={{ fontSize: 14, fontWeight: 900, color: GOLD, textShadow: "0 1px 8px #000" }}>🏃 결승선까지 전력질주!</span>}
+            {phase === "running" && (
+              finalSprint
+                ? <span style={{ fontSize: 15, fontWeight: 900, color: "#FF6B6B", textShadow: "0 1px 8px #000", animation: "flash .4s infinite" }}>🔥 마지막 스퍼트!! 🔥</span>
+                : <span style={{ fontSize: 14, fontWeight: 900, color: GOLD, textShadow: "0 1px 8px #000" }}>🏃 현재 1위 <b style={{ color: "#fff" }}>{leader || "…"}</b></span>
+            )}
             {done && <span style={{ fontSize: 15, fontWeight: 900, color: GOLD, textShadow: "0 2px 10px #000" }}>🎉 {winnerCount > 1 ? `${winnerCount}명 ` : ""}당첨 확정! 🎉</span>}
           </div>
         </div>
 
-        {/* 결승선(체커보드) */}
-        <div style={{ position: "absolute", left: `${FINISH_X}%`, top: `${trackTop - 2}%`, bottom: `${100 - trackBottom}%`,
-          width: 12, transform: "translateX(-50%)", zIndex: 20,
-          backgroundImage: "repeating-conic-gradient(#fff 0% 25%, #111 0% 50%)", backgroundSize: "12px 12px",
+        {/* 결승선 줄 하나(체커보드) + 깃발 */}
+        <div style={{ position: "absolute", left: `${FINISH_X}%`, top: `${TRACK_TOP - 3}%`, bottom: `${100 - TRACK_BOTTOM - 1}%`,
+          width: 10, transform: "translateX(-50%)", zIndex: 20,
+          backgroundImage: "repeating-conic-gradient(#fff 0% 25%, #111 0% 50%)", backgroundSize: "10px 10px",
           borderRadius: 2, boxShadow: "0 0 10px rgba(255,255,255,.35)" }} />
-        <div style={{ position: "absolute", left: `${FINISH_X}%`, top: `${trackTop - 6}%`, transform: "translateX(-50%)",
-          zIndex: 21, fontSize: 16 }}>🏁</div>
+        <div style={{ position: "absolute", left: `${FINISH_X}%`, top: `${TRACK_TOP - 8}%`, transform: "translateX(-50%)",
+          zIndex: 21, fontSize: 18 }}>🏁</div>
+        {/* 출발선(왼쪽 옅은 줄) */}
+        <div style={{ position: "absolute", left: "3.5%", top: `${TRACK_TOP - 1}%`, bottom: `${100 - TRACK_BOTTOM}%`,
+          width: 2, background: "rgba(255,255,255,.25)", zIndex: 5 }} />
 
-        {/* 레인 + 러너 */}
+        {/* 러너 무리(마라톤) — 레인 없음. x=진행, y=고정 흩뿌림. 앞선 러너가 위로 겹침. */}
         {runners.map((r) => {
-          const y = trackTop + (r.lane + 0.5) * laneH;
           const isWin = winnerNames.has(r.name);
-          const nameOn = isWin || showAllNames || leaderIds.has(r.id) || r.rank !== null;
+          const nameOn = isWin || leaderIds.has(r.id) || r.rank !== null;
+          const left = 4 + (r.x / 100) * (FINISH_X - 4);
+          const z = (r.rank !== null || isWin) ? 30 : 10 + Math.round(r.x / 3); // 앞설수록 위
           return (
-            <div key={r.id}>
-              {/* 레인 바닥선 */}
-              {laneH > 3.2 && (
-                <div style={{ position: "absolute", left: "2%", right: "4%", top: `${y + laneH * 0.42}%`, height: 1,
-                  background: "rgba(255,255,255,.08)" }} />
+            <div key={r.id} style={{ position: "absolute", left: `${left}%`, top: `${r.y}%`,
+              transform: "translate(-50%,-50%)", zIndex: z,
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 0,
+              transition: "left .1s linear, top .1s linear" }}>
+              {nameOn && (
+                <span style={{ fontSize: isWin ? 11 : 9, fontWeight: 900, whiteSpace: "nowrap", lineHeight: 1.2,
+                  color: isWin ? "#231018" : "#fff", background: isWin ? GOLD : "rgba(0,0,0,.55)",
+                  padding: isWin ? "1px 7px" : "0px 4px", borderRadius: 6, marginBottom: 1,
+                  boxShadow: isWin ? "0 2px 8px rgba(240,196,90,.5)" : "none" }}>
+                  {r.rank !== null && isWin ? `${r.rank}등 ` : ""}{r.name}
+                </span>
               )}
-              <div style={{ position: "absolute", left: `${2 + (r.x / 100) * (FINISH_X - 2)}%`, top: `${y}%`,
-                transform: "translate(-50%,-50%)", zIndex: r.rank !== null ? 30 : 12,
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 0,
-                transition: running ? "none" : "left .3s linear" }}>
-                {nameOn && (
-                  <span style={{ fontSize: isWin ? 11 : 9, fontWeight: 900, whiteSpace: "nowrap", lineHeight: 1.2,
-                    color: isWin ? "#231018" : "#fff", background: isWin ? GOLD : "rgba(0,0,0,.5)",
-                    padding: isWin ? "1px 7px" : "0px 4px", borderRadius: 6,
-                    boxShadow: isWin ? "0 2px 8px rgba(240,196,90,.5)" : "none" }}>
-                    {r.rank !== null && isWin ? `${r.rank}등 ` : ""}{r.name}
-                  </span>
-                )}
-                <RunnerStick color={isWin ? GOLD : r.color} running={running && r.rank === null} size={figSize} finished={r.rank !== null && isWin} />
-              </div>
+              <RunnerStick color={isWin ? GOLD : r.color} running={running && r.rank === null} size={figSize} finished={r.rank !== null && isWin} />
             </div>
           );
         })}
+
+        {/* 참가 인원 표시(무리 규모) */}
+        {(phase === "ready" || running) && (
+          <div style={{ position: "absolute", right: "5%", bottom: "3%", zIndex: 41, pointerEvents: "none",
+            fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,.75)", textShadow: "0 1px 6px #000" }}>
+            🏃 {total}명 참가
+          </div>
+        )}
 
         {/* 카운트다운 */}
         {phase === "countdown" && countText && (
