@@ -30,14 +30,17 @@ type Runner = {
   y: number;          // 세로 위치(%) — 무리(crowd) 흩뿌림. 레인 없음(마라톤 방식).
   color: string;
   role: "win" | "lose"; // 당첨자(결승 통과)/일반(통과 못 함)
-  crossTime: number;  // 초 — 당첨자 결승 런지 돌입 시각(순서대로 → 통과 순서 보존). 일반=Infinity.
+  crossTime: number;  // 초 — 당첨자가 결승선을 '끊는' 시각(순서대로 → 통과 순서 보존). 일반=Infinity.
+  lungeDur: number;   // 결승 런지 길이(초) — 러너마다 달라 통과 방식 제각각(멀리서 길게/코앞서 툭).
+  lungePow: number;   // 런지 가속 지수(러너마다 달라)
+  sprintB: number;    // 마지막 스퍼트 가속 배율(러너마다 달라 — 어떤 당첨자는 확 치고 나옴)
   spd: number;        // 기본 전진 속도(%/s)
   amp: number;        // 속도 진동 진폭(0~1) — 러너끼리 앞서거니 뒤서거니(엎치락뒤치락). 속도만 흔들어 절대 뒤로 안 감.
   w: number;          // 속도 진동 각속도
   phase: number;      // 속도 진동 위상(러너마다 달라 leapfrog)
   bx: number;         // 적분된 기본 위치(아이템 전) — 매 프레임 전진 누적.
   x: number;          // 화면 표시 위치 0~100 (아이템 반영, 100=결승선).
-  lunge: { x0: number; t0: number } | null; // 결승 런지 상태(당첨자만)
+  lunge: { x0: number; t0: number; dur: number; pow: number } | null; // 결승 런지 상태(당첨자만)
   rank: number | null;
   hit: boolean;       // 아이템 맞아 뱅글뱅글(카트라이더) 상태
   fallen: boolean;    // 넘어짐 상태
@@ -55,10 +58,10 @@ const TRACK_TOP = 24;    // % — HUD 아래
 const TRACK_BOTTOM = 94; // %
 const FINISH_PCT = 88;   // 결승선 화면 위치(%). x=100이 여기에 매핑됨.
 const START_PCT = 4;
-const RACE_LEAD = 8.0;   // 첫 당첨자 결승 런지 돌입 시각(초) — 게임 길이 기준(카운트다운 별도)
-const LUNGE = 0.5;       // 결승 런지 시간(초) — 앞 무리를 제치고 결승선을 끊는 마지막 대시
-const LOSE_CAP = 88;     // 일반 러너 진행 상한(%) — 결승선(100) 못 넘음. 선두 무리는 여기 언저리서 엎치락.
-const WIN_CAP = 90;      // 당첨자 런지 전 상한(%)
+const RACE_LEAD = 8.0;   // 첫 당첨자 결승선 통과 시각(초) — 게임 길이 기준(카운트다운 별도)
+const SPRINT = 5.8;      // 마지막 스퍼트 시작(초) — 선두 무리가 결승선 코앞까지 몰려가 난투극
+const LOSE_CAP = 95;     // 일반 러너 진행 상한(%) — 결승선(100) 코앞까지 갔다가 못 넘음(덴탈 대상).
+const WIN_CAP = 92;      // 당첨자 런지 전 상한(%) — 결승선 바로 앞에 붙음 → 런지 짧아져 '후다닥' 안 됨
 const MAXBACK = 3.0;     // 한 프레임 최대 뒤로 이동(%) — 아이템 넉백이 순간이동식으로 튀지 않게(부드러운 스텀블)
 
 // 참가자 이름 → 러너 배열. names 없으면 데모용 가짜 n명.
@@ -89,8 +92,8 @@ function makeRunners(names: string[] | null, n: number, winnerOrder: string[]): 
   //   ▸ 당첨자: 중상위권에 섞여 달리다, 지정 순서(crossTime) 되면 결승 런지로 앞 무리 제치고 통과 → 역전.
   //     crossTime이 gap 간격으로 순서대로라 통과 순서=서버 지정 순서 보존(런지 시간 동일 → 추월 불가).
   const K = winnerOrder.length;
-  const WIN_WINDOW = Math.min(2.0, Math.max(0.6, K * 0.4)); // 당첨자 결승 돌입 총폭
-  const gap = Math.min(0.5, WIN_WINDOW / Math.max(1, K));   // 당첨자 간 결승 돌입 간격(포토피니시 리듬)
+  const WIN_WINDOW = Math.min(2.6, Math.max(0.9, K * 0.45)); // 당첨자 통과 총폭(포토피니시)
+  const gap = Math.min(0.6, WIN_WINDOW / Math.max(1, K));    // 당첨자 간 통과 간격
   const spread = TRACK_BOTTOM - TRACK_TOP;
   return list.map((name, i) => {
     const wi = winIdx.has(name) ? (winIdx.get(name) as number) : -1;
@@ -100,8 +103,11 @@ function makeRunners(names: string[] | null, n: number, winnerOrder: string[]): 
     if (wi >= 0) {
       return {
         id: i, name, role: "win" as const,
-        crossTime: RACE_LEAD + wi * gap,          // 순서대로 결승 런지 돌입
-        spd: 8.5 + Math.random() * 2.0,           // 당첨자: 중상위권 속도
+        crossTime: RACE_LEAD + wi * gap + Math.random() * 0.12, // 결승선 끊는 시각(순서 보존 + 약간 랜덤)
+        lungeDur: 0.45 + Math.random() * 0.5,     // 통과 방식 제각각: 멀리서 길게(큰값)/코앞서 툭(작은값)
+        lungePow: 1.2 + Math.random() * 0.7,      // 가속 지수도 제각각
+        sprintB: 1.8 + Math.random() * 1.6,       // 스퍼트 가속 제각각(어떤 당첨자는 확 치고 나옴)
+        spd: 8.0 + Math.random() * 2.0,           // 당첨자: 중상위권 속도
         amp, w, phase, color: runnerColor(i),
         y: TRACK_TOP + spread * (0.16 + Math.random() * 0.68),
         bx: 0, x: 0, lunge: null, rank: null, hit: false, fallen: false,
@@ -109,8 +115,9 @@ function makeRunners(names: string[] | null, n: number, winnerOrder: string[]): 
     }
     return {
       id: i, name, role: "lose" as const,
-      crossTime: Infinity,
-      spd: 7.0 + Math.random() * 5.0,             // 일반: 빠른 러너는 선두 형성, 느린 러너는 후미(펼침)
+      crossTime: Infinity, lungeDur: 0, lungePow: 1,
+      sprintB: 1.4 + Math.random() * 0.7,         // 일반도 스퍼트엔 결승선으로 몰림(선두 무리 형성)
+      spd: 6.5 + Math.random() * 5.0,             // 빠른 러너는 선두, 느린 러너는 후미(펼침)
       amp, w, phase, color: runnerColor(i),
       y: TRACK_TOP + spread * Math.random(),
       bx: 0, x: 0, lunge: null, rank: null, hit: false, fallen: false,
@@ -174,7 +181,8 @@ export default function RaceLiveWidget() {
   const [shaking, setShaking] = useState(false);    // 큰 충돌 시 화면 흔들림
   const shakingRef = useRef(false);
   const sprintFiredRef = useRef(false);
-  const clutchFiredRef = useRef(false); // 결승 직전 선두(비당첨)에게 미사일(1등 뺏김 연출) 1회
+  const nextClutchRef = useRef(0);      // 결승선 덴탈(선두 비당첨자 미사일) 다음 발사 시각
+  const lastCrossRef = useRef(RACE_LEAD); // 마지막 당첨자 통과 예정 시각(덴탈/종료 창)
   const lastElapsedRef = useRef(0);     // 직전 프레임 경과시간 — 속도 적분용 dt
   const endGuardRef = useRef(14); // 안전 종료 타임아웃(초) — beginRace에서 인원/당첨수에 맞춰 설정
   const lastRenderRef = useRef(0); // 렌더 스로틀(≈30fps) — 100명도 버벅임 없이
@@ -314,7 +322,7 @@ export default function RaceLiveWidget() {
     setTotal(scene.length); setWinnerCount(Math.max(1, k || 1)); setTitle(ttl || "🏁 루루동이 달리기 대회");
     setNames(participantNames); setWinnerOrder([]); setRunners(scene);
     setFinishedRanks([]); setPhase("ready"); setHasEvent(true); setCountText("");
-    setLeader(""); setFinalSprint(false); sprintFiredRef.current = false; clutchFiredRef.current = false; lastElapsedRef.current = 0;
+    setLeader(""); setFinalSprint(false); sprintFiredRef.current = false; nextClutchRef.current = 0; lastElapsedRef.current = 0;
     setShaking(false); shakingRef.current = false;
     setItems([]); bumpRef.current = {}; offRef.current = {}; hitUntilRef.current = {}; fallUntilRef.current = {};
     shotsRef.current = []; bananasRef.current = []; puffsRef.current = [];
@@ -378,22 +386,22 @@ export default function RaceLiveWidget() {
     const dt = Math.min(0.05, Math.max(0, elapsed - lastElapsedRef.current)); // 탭 비활성 등 큰 점프 방지
     lastElapsedRef.current = elapsed;
 
-    // 아이템 스케줄(결승 런지 직전까지만 발생 → 결말 보존). 자주 터져 시끌시끌.
-    const itemWindow = elapsed > 0.8 && elapsed < RACE_LEAD - 0.5;
+    // 아이템 스케줄(마지막 스퍼트 전까지 — 스퍼트 구간은 결승선 덴탈이 담당). 자주 터져 시끌시끌.
+    const itemWindow = elapsed > 0.8 && elapsed < SPRINT;
     if (itemWindow) {
       if (elapsed > nextShotRef.current) { spawnShot(now); nextShotRef.current = elapsed + 0.45 + Math.random() * 0.5; }
       if (elapsed > nextBananaRef.current) { spawnBanana(now); nextBananaRef.current = elapsed + 0.8 + Math.random() * 0.8; }
       if (elapsed > nextBoostRef.current) { spawnBoost(now); nextBoostRef.current = elapsed + 1.0 + Math.random() * 1.0; }
     }
 
-    // 🎯 결승 직전 clutch: 현재 선두(비당첨) 1~2명에게 미사일 꽂음 → 눈앞에서 1등 뺏김(반전). 1회.
-    if (!clutchFiredRef.current && elapsed > RACE_LEAD - 1.15) {
-      clutchFiredRef.current = true;
-      const losers = runnersRef.current
-        .filter((r) => r.role === "lose" && r.rank === null && !r.lunge)
-        .sort((a, b) => b.x - a.x);
-      if (losers[0]) spawnShotAt(now, losers[0], 280);
-      if (losers[1]) spawnShotAt(now, losers[1], 360);
+    // 🎯 결승선 덴탈: 스퍼트 동안 결승선 코앞(x>78) 선두 비당첨자에게 미사일 반복 발사 →
+    //    "1등 눈앞에서 자빠지고 뒤에서 당첨자가 통과"가 결승선에서 계속 벌어짐(반전의 반전).
+    if (elapsed > SPRINT + 0.3 && elapsed < lastCrossRef.current + 0.1 && elapsed > nextClutchRef.current) {
+      const lead = runnersRef.current
+        .filter((r) => r.role === "lose" && r.rank === null && !r.lunge && r.x > 78)
+        .sort((a, b) => b.x - a.x)[0];
+      if (lead) spawnShotAt(now, lead, 200);
+      nextClutchRef.current = elapsed + 0.34 + Math.random() * 0.15;
     }
 
     // 미사일 도착 처리: 명중 → 대상 뱅글/넘어짐 + 감속 + 💥 (clutch는 더 세게)
@@ -425,12 +433,14 @@ export default function RaceLiveWidget() {
     // ── 러너 갱신(refs 직접 갱신 — 속도 적분 상태 유지). React 렌더는 아래 스로틀에서 복제 반영.
     for (const r of runnersRef.current) {
       if (r.rank !== null) continue;
-      // (1) 결승 런지: 지정 시각(crossTime) 되면 현재 위치에서 결승선(100)까지 대시. p=1이면 통과=등수 확정.
-      //     crossTime이 순서대로 + 런지 시간 동일 → 통과 순서=서버 지정 순서 보존(추월 불가).
-      if (r.role === "win" && !r.lunge && elapsed >= r.crossTime) r.lunge = { x0: r.x, t0: elapsed };
+      // (1) 결승 런지: crossTime-lungeDur에 돌입해 crossTime에 결승선(100) 통과. 통과 '시각'이 순서대로라
+      //     런지 길이/가속이 러너마다 달라도(멀리서 길게/코앞서 툭) 통과 순서=서버 지정 순서 100% 보존.
+      if (r.role === "win" && !r.lunge && elapsed >= r.crossTime - r.lungeDur) {
+        r.lunge = { x0: r.x, t0: elapsed, dur: Math.max(0.15, r.crossTime - elapsed), pow: r.lungePow };
+      }
       if (r.lunge) {
-        const p = Math.min(1, (elapsed - r.lunge.t0) / LUNGE);
-        r.x = r.lunge.x0 + (100 - r.lunge.x0) * Math.pow(p, 1.5); // 가속 대시(앞 무리 제침)
+        const p = Math.min(1, (elapsed - r.lunge.t0) / r.lunge.dur);
+        r.x = r.lunge.x0 + (100 - r.lunge.x0) * Math.pow(p, r.lunge.pow); // 러너별 제각각 대시
         r.hit = false; r.fallen = false;
         if (p >= 1) {
           r.x = 100;
@@ -448,6 +458,7 @@ export default function RaceLiveWidget() {
       //     ★맞으면 실제로 멈춤/느려짐 → 제쳐짐(손해가 눈에 보임). 당첨자는 crossTime 런지로 통과라 순서 무관.
       let v = r.spd * (1 + r.amp * Math.sin(r.w * elapsed + r.phase));
       if (v < 0) v = 0;
+      if (elapsed > SPRINT) v *= r.sprintB; // 마지막 스퍼트: 선두 무리가 결승선 코앞까지 몰림(런지 짧아짐)
       const isDown = now < (fallUntilRef.current[r.id] || 0);
       const isHit = !isDown && now < (hitUntilRef.current[r.id] || 0);
       if (isDown) v = 0;          // 쓰러진 동안 완전 정지(드러누움)
@@ -505,7 +516,7 @@ export default function RaceLiveWidget() {
     if (lead) setLeader(lead);
 
     // 마지막 스퍼트: 첫 당첨자 통과 ~1.6초 전부터 드럼롤 + HUD (1회)
-    if (!sprintFiredRef.current && elapsed > RACE_LEAD - 1.6) {
+    if (!sprintFiredRef.current && elapsed > SPRINT) {
       sprintFiredRef.current = true;
       setFinalSprint(true);
       playSfx("drumroll");
@@ -533,13 +544,16 @@ export default function RaceLiveWidget() {
     runnersRef.current = scene;
     winnerSetRef.current = new Set(winners.map((n) => String(n || "").trim()));
     rankCounterRef.current = 0;
-    // 안전 종료: 마지막 당첨자 결승 런지 완료 + 여유. (WIN_WINDOW = min(2.0, max(.6, K*.4)))
+    // 마지막 당첨자 통과 예정 시각(WIN_WINDOW = min(2.6, max(.9, K*.45)), gap 동일) + 안전 종료 여유.
     const K = winners.length;
-    endGuardRef.current = RACE_LEAD + Math.min(2.0, Math.max(0.6, K * 0.4)) + LUNGE + 2.0;
+    const WIN_WINDOW = Math.min(2.6, Math.max(0.9, K * 0.45));
+    const gap = Math.min(0.6, WIN_WINDOW / Math.max(1, K));
+    lastCrossRef.current = RACE_LEAD + (K - 1) * gap + 0.12;
+    endGuardRef.current = lastCrossRef.current + 2.0;
     setTotal(scene.length); setWinnerCount(Math.max(1, k || winners.length)); setTitle(ttl || "🏁 루루동이 달리기 대회");
     setNames(participantNames); setWinnerOrder(winners); setRunners(scene);
     setFinishedRanks([]); setHasEvent(true);
-    setLeader(""); setFinalSprint(false); sprintFiredRef.current = false; clutchFiredRef.current = false; lastElapsedRef.current = 0;
+    setLeader(""); setFinalSprint(false); sprintFiredRef.current = false; nextClutchRef.current = 0; lastElapsedRef.current = 0;
     setShaking(false); shakingRef.current = false;
     setItems([]); bumpRef.current = {}; offRef.current = {}; hitUntilRef.current = {}; fallUntilRef.current = {};
     shotsRef.current = []; bananasRef.current = []; puffsRef.current = [];
