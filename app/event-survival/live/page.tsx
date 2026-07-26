@@ -210,90 +210,157 @@ export default function SurvivalLiveWidget() {
       { duration: strong ? 550 : 360, easing: "ease-out" });
   };
 
-  // ── [2026-07-26 사장님] 효과음 — 파일 없이 코드로 합성(WebAudio). ?sound=0 으로 끔.
-  //   OBS 브라우저 소스에서 "오디오를 통해 재생"을 켜면 방송으로 송출됨. 실패해도 연출은 정상 진행.
+  // ── [2026-07-26 사장님] 효과음 v2 — ①/sfx/survival-*.mp3 파일이 있으면 그걸 사용(진짜 음원)
+  //   ②없으면 리버브·왜곡·저음 노이즈를 겹친 합성음(v1 "뿅뿅" 소리 개선). ?sound=0 으로 끔.
+  //   OBS 브라우저 소스 "오디오를 통해 재생"을 켜면 방송 송출. 실패해도 연출은 정상 진행.
   const soundOnRef = useRef(true);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const reverbRef = useRef<ConvolverNode | null>(null);
+  const sfxFilesRef = useRef<Record<string, string>>({}); // kind → 재생 가능한 파일 URL
+
+  // 실제 음원 파일 자동 인식: public/sfx/survival-번개.mp3 식으로 넣어두면 합성음 대신 사용
+  useEffect(() => {
+    if (!mounted) return;
+    const kinds = ["lightning", "wave", "wind", "hail", "meteor", "win"];
+    kinds.forEach((k) => {
+      const url = `/sfx/survival-${k}.mp3`;
+      const a = new Audio();
+      a.preload = "auto";
+      a.oncanplaythrough = () => { sfxFilesRef.current[k] = url; };
+      a.onerror = () => { /* 파일 없음 → 합성음 사용 */ };
+      a.src = url;
+    });
+  }, [mounted]);
+
   const ensureAudio = () => {
     if (!soundOnRef.current) return null;
     try {
       const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!AC) return null;
       if (!audioCtxRef.current) audioCtxRef.current = new AC();
-      if (audioCtxRef.current.state === "suspended") void audioCtxRef.current.resume();
-      return audioCtxRef.current;
+      const ctx = audioCtxRef.current;
+      if (ctx.state === "suspended") void ctx.resume();
+      // 공용 리버브(잔향): 1.8초 감쇠 노이즈 임펄스 — 소리에 공간감·울림을 준다
+      if (!reverbRef.current) {
+        const len = Math.ceil(ctx.sampleRate * 1.8);
+        const ir = ctx.createBuffer(2, len, ctx.sampleRate);
+        for (let ch = 0; ch < 2; ch++) {
+          const d = ir.getChannelData(ch);
+          for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6);
+        }
+        const conv = ctx.createConvolver();
+        conv.buffer = ir;
+        reverbRef.current = conv;
+      }
+      return ctx;
     } catch { return null; }
   };
+
   const playSfx = useCallback((kind: string) => {
+    if (!soundOnRef.current) return;
+    // ① 실제 음원 파일이 있으면 우선 사용
+    const fileUrl = sfxFilesRef.current[kind];
+    if (fileUrl) {
+      try { const a = new Audio(fileUrl); a.volume = 0.85; void a.play(); return; } catch { /* 합성음으로 진행 */ }
+    }
+    // ② 합성음 v2: 노이즈 층 + 왜곡 + 리버브
     const ctx = ensureAudio();
     if (!ctx) return;
     try {
       const t0 = ctx.currentTime;
-      const out = ctx.createGain();
-      out.gain.value = 0.5;
-      out.connect(ctx.destination);
-      const noise = (dur: number) => {
+      const out = ctx.createGain(); out.gain.value = 0.55; out.connect(ctx.destination);
+      const rev = reverbRef.current;
+      const revSend = ctx.createGain(); revSend.gain.value = 0.5;
+      if (rev) { revSend.connect(rev); rev.connect(out); } else { revSend.connect(out); }
+      const toOut = (n: AudioNode, wet = 0.5) => { n.connect(out); const g = ctx.createGain(); g.gain.value = wet; n.connect(g); g.connect(revSend); };
+      // 브라운 노이즈(우르릉·물소리용 — 흰 노이즈보다 훨씬 묵직)
+      const brown = (dur: number) => {
+        const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        let last = 0;
+        for (let i = 0; i < d.length; i++) { const w = Math.random() * 2 - 1; last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; }
+        const s = ctx.createBufferSource(); s.buffer = buf; return s;
+      };
+      const white = (dur: number) => {
         const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate);
         const d = buf.getChannelData(0);
         for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-        const src = ctx.createBufferSource();
-        src.buffer = buf;
-        return src;
+        const s = ctx.createBufferSource(); s.buffer = buf; return s;
       };
-      const env = (g: GainNode, start: number, peak: number, end: number, dur: number) => {
-        g.gain.setValueAtTime(start, t0);
-        g.gain.linearRampToValueAtTime(peak, t0 + 0.02);
-        g.gain.exponentialRampToValueAtTime(Math.max(0.001, end), t0 + dur);
+      const dist = () => { // 크랙용 왜곡
+        const ws = ctx.createWaveShaper();
+        const curve = new Float32Array(256);
+        for (let i = 0; i < 256; i++) { const x = (i / 128) - 1; curve[i] = Math.tanh(3.5 * x); }
+        ws.curve = curve; return ws;
       };
       if (kind === "lightning") {
-        // ① 찢어지는 크랙(고역 노이즈) ② 감전 지지직(사각파 트레몰로) ③ 낮은 천둥 우르릉
-        const crack = noise(0.18); const cf = ctx.createBiquadFilter(); cf.type = "highpass"; cf.frequency.value = 1500;
-        const cg = ctx.createGain(); env(cg, 0.0001, 0.9, 0.001, 0.18);
-        crack.connect(cf).connect(cg).connect(out); crack.start(t0);
-        const zap = ctx.createOscillator(); zap.type = "square"; zap.frequency.setValueAtTime(320, t0);
-        zap.frequency.exponentialRampToValueAtTime(70, t0 + 0.35);
-        const zg = ctx.createGain(); zg.gain.setValueAtTime(0.25, t0);
-        for (let i = 0; i < 8; i++) zg.gain.setValueAtTime(i % 2 ? 0.02 : 0.22, t0 + 0.03 * i); // 지지직 떨림
-        zg.gain.exponentialRampToValueAtTime(0.001, t0 + 0.4);
-        zap.connect(zg).connect(out); zap.start(t0 + 0.02); zap.stop(t0 + 0.45);
-        const rumble = noise(1.6); const rf = ctx.createBiquadFilter(); rf.type = "lowpass"; rf.frequency.value = 130;
-        const rg = ctx.createGain(); env(rg, 0.0001, 0.8, 0.001, 1.6);
-        rumble.connect(rf).connect(rg).connect(out); rumble.start(t0 + 0.05);
+        // ①쩌억 크랙(왜곡 화이트노이즈) ②콰르릉 본체(브라운노이즈 5초, 필터 스윕+맥동) ③초저음 쿵
+        const crack = white(0.14); const cf = ctx.createBiquadFilter(); cf.type = "highpass"; cf.frequency.value = 900;
+        const cg = ctx.createGain(); cg.gain.setValueAtTime(1.0, t0); cg.gain.exponentialRampToValueAtTime(0.001, t0 + 0.16);
+        crack.connect(cf).connect(dist()).connect(cg); toOut(cg, 0.7); crack.start(t0);
+        const body = brown(5); const bf = ctx.createBiquadFilter(); bf.type = "lowpass";
+        bf.frequency.setValueAtTime(420, t0 + 0.06); bf.frequency.exponentialRampToValueAtTime(70, t0 + 4.5);
+        const bg = ctx.createGain();
+        bg.gain.setValueAtTime(0.001, t0 + 0.05); bg.gain.linearRampToValueAtTime(1.15, t0 + 0.16);
+        bg.gain.setValueAtTime(1.15, t0 + 0.5); bg.gain.linearRampToValueAtTime(0.55, t0 + 1.1);
+        bg.gain.linearRampToValueAtTime(0.85, t0 + 1.7); bg.gain.exponentialRampToValueAtTime(0.001, t0 + 4.8); // 우르릉 맥동
+        body.connect(bf).connect(bg); toOut(bg, 0.6); body.start(t0 + 0.05);
+        const sub = ctx.createOscillator(); sub.type = "sine";
+        sub.frequency.setValueAtTime(52, t0); sub.frequency.exponentialRampToValueAtTime(30, t0 + 1.2);
+        const sg = ctx.createGain(); sg.gain.setValueAtTime(0.9, t0); sg.gain.exponentialRampToValueAtTime(0.001, t0 + 1.3);
+        sub.connect(sg); toOut(sg, 0.2); sub.start(t0); sub.stop(t0 + 1.4);
       } else if (kind === "wave") {
-        const w = noise(1.3); const wf = ctx.createBiquadFilter(); wf.type = "lowpass";
-        wf.frequency.setValueAtTime(250, t0); wf.frequency.linearRampToValueAtTime(1100, t0 + 0.45);
-        wf.frequency.linearRampToValueAtTime(180, t0 + 1.25);
-        const wg = ctx.createGain(); wg.gain.setValueAtTime(0.001, t0);
-        wg.gain.linearRampToValueAtTime(0.85, t0 + 0.4); wg.gain.exponentialRampToValueAtTime(0.001, t0 + 1.3);
-        w.connect(wf).connect(wg).connect(out); w.start(t0);
+        // 멀리서 밀려와 덮치는 파도: 브라운노이즈 스웰 + 부서질 때 화이트 스플래시
+        const swell = brown(2.6); const sf = ctx.createBiquadFilter(); sf.type = "lowpass";
+        sf.frequency.setValueAtTime(220, t0); sf.frequency.linearRampToValueAtTime(950, t0 + 0.8);
+        sf.frequency.linearRampToValueAtTime(160, t0 + 2.5);
+        const sg = ctx.createGain(); sg.gain.setValueAtTime(0.001, t0);
+        sg.gain.linearRampToValueAtTime(1.1, t0 + 0.75); sg.gain.exponentialRampToValueAtTime(0.001, t0 + 2.6);
+        swell.connect(sf).connect(sg); toOut(sg, 0.55); swell.start(t0);
+        const splash = white(1.1); const pf = ctx.createBiquadFilter(); pf.type = "bandpass"; pf.frequency.value = 2400; pf.Q.value = 0.6;
+        const pg = ctx.createGain(); pg.gain.setValueAtTime(0.001, t0 + 0.6);
+        pg.gain.linearRampToValueAtTime(0.5, t0 + 0.8); pg.gain.exponentialRampToValueAtTime(0.001, t0 + 1.7);
+        splash.connect(pf).connect(pg); toOut(pg, 0.6); splash.start(t0 + 0.6);
       } else if (kind === "wind") {
-        const w = noise(0.9); const wf = ctx.createBiquadFilter(); wf.type = "bandpass"; wf.Q.value = 1.2;
-        wf.frequency.setValueAtTime(350, t0); wf.frequency.linearRampToValueAtTime(1400, t0 + 0.5);
-        wf.frequency.linearRampToValueAtTime(500, t0 + 0.9);
-        const wg = ctx.createGain(); env(wg, 0.0001, 0.6, 0.001, 0.9);
-        w.connect(wf).connect(wg).connect(out); w.start(t0);
+        const w = brown(1.6); const wf = ctx.createBiquadFilter(); wf.type = "bandpass"; wf.Q.value = 0.9;
+        wf.frequency.setValueAtTime(300, t0); wf.frequency.linearRampToValueAtTime(1500, t0 + 0.7);
+        wf.frequency.linearRampToValueAtTime(400, t0 + 1.5);
+        const wg = ctx.createGain(); wg.gain.setValueAtTime(0.001, t0);
+        wg.gain.linearRampToValueAtTime(0.9, t0 + 0.35); wg.gain.exponentialRampToValueAtTime(0.001, t0 + 1.6);
+        w.connect(wf).connect(wg); toOut(wg, 0.45); w.start(t0);
       } else if (kind === "hail") {
-        for (let i = 0; i < 7; i++) {
-          const o = ctx.createOscillator(); o.type = "triangle"; o.frequency.value = 1500 + Math.random() * 900;
-          const g = ctx.createGain(); const ts = t0 + i * 0.055;
-          g.gain.setValueAtTime(0.25, ts); g.gain.exponentialRampToValueAtTime(0.001, ts + 0.07);
-          o.connect(g).connect(out); o.start(ts); o.stop(ts + 0.08);
+        // 얼음 알갱이: 노이즈 틱(발진음 대신) — 유리알 떨어지는 느낌
+        for (let i = 0; i < 9; i++) {
+          const tk = white(0.045); const tf = ctx.createBiquadFilter(); tf.type = "bandpass";
+          tf.frequency.value = 2600 + Math.random() * 2200; tf.Q.value = 7;
+          const tg = ctx.createGain(); const ts = t0 + i * 0.05 + Math.random() * 0.02;
+          tg.gain.setValueAtTime(0.65, ts); tg.gain.exponentialRampToValueAtTime(0.001, ts + 0.06);
+          tk.connect(tf).connect(tg); toOut(tg, 0.5); tk.start(ts);
         }
       } else if (kind === "meteor") {
-        const o = ctx.createOscillator(); o.type = "sawtooth";
-        o.frequency.setValueAtTime(950, t0); o.frequency.exponentialRampToValueAtTime(70, t0 + 0.5);
-        const g = ctx.createGain(); env(g, 0.0001, 0.35, 0.001, 0.5);
-        o.connect(g).connect(out); o.start(t0); o.stop(t0 + 0.55);
-        const boom = noise(0.9); const bf = ctx.createBiquadFilter(); bf.type = "lowpass"; bf.frequency.value = 160;
-        const bg = ctx.createGain(); env(bg, 0.0001, 0.9, 0.001, 0.9);
-        boom.connect(bf).connect(bg).connect(out); boom.start(t0 + 0.4);
+        const fall = brown(0.8); const ff = ctx.createBiquadFilter(); ff.type = "bandpass"; ff.Q.value = 1.5;
+        ff.frequency.setValueAtTime(1800, t0); ff.frequency.exponentialRampToValueAtTime(120, t0 + 0.55);
+        const fg = ctx.createGain(); fg.gain.setValueAtTime(0.001, t0);
+        fg.gain.linearRampToValueAtTime(0.7, t0 + 0.3); fg.gain.exponentialRampToValueAtTime(0.001, t0 + 0.6);
+        fall.connect(ff).connect(fg); toOut(fg, 0.4); fall.start(t0);
+        const boom = brown(2.2); const bf2 = ctx.createBiquadFilter(); bf2.type = "lowpass"; bf2.frequency.value = 140;
+        const bg2 = ctx.createGain(); bg2.gain.setValueAtTime(1.2, t0 + 0.5); bg2.gain.exponentialRampToValueAtTime(0.001, t0 + 2.4);
+        boom.connect(bf2).connect(bg2); toOut(bg2, 0.6); boom.start(t0 + 0.5);
+        const sub2 = ctx.createOscillator(); sub2.type = "sine"; sub2.frequency.setValueAtTime(48, t0 + 0.5);
+        sub2.frequency.exponentialRampToValueAtTime(28, t0 + 1.4);
+        const sg2 = ctx.createGain(); sg2.gain.setValueAtTime(0.8, t0 + 0.5); sg2.gain.exponentialRampToValueAtTime(0.001, t0 + 1.5);
+        sub2.connect(sg2); toOut(sg2, 0.2); sub2.start(t0 + 0.5); sub2.stop(t0 + 1.6);
       } else if (kind === "win") {
-        [523, 659, 784, 1047, 1319].forEach((f, i) => {
-          const o = ctx.createOscillator(); o.type = "sine"; o.frequency.value = f;
-          const g = ctx.createGain(); const ts = t0 + i * 0.13;
-          g.gain.setValueAtTime(0.0001, ts); g.gain.linearRampToValueAtTime(0.35, ts + 0.02);
-          g.gain.exponentialRampToValueAtTime(0.001, ts + 0.5);
-          o.connect(g).connect(out); o.start(ts); o.stop(ts + 0.55);
+        // 팡파레: 디튠 2겹 + 리버브 → 게임기 소리 대신 풍성한 차임
+        [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => {
+          const ts = t0 + i * 0.14;
+          [0, 4].forEach((cents) => {
+            const o = ctx.createOscillator(); o.type = "triangle";
+            o.frequency.value = f * Math.pow(2, cents / 1200);
+            const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, ts);
+            g.gain.linearRampToValueAtTime(0.28, ts + 0.02); g.gain.exponentialRampToValueAtTime(0.001, ts + 0.9);
+            o.connect(g); toOut(g, 0.75); o.start(ts); o.stop(ts + 1.0);
+          });
         });
       }
     } catch { /* 소리 실패는 무시 — 연출은 계속 */ }
@@ -522,7 +589,9 @@ export default function SurvivalLiveWidget() {
 
       {/* ── [2026-07-26 사장님] 채팅 안전 레이아웃: 화면 위쪽 2/3만 사용, 하단 1/3은 투명으로 비움
              (9:16 세로 방송에서 시청자 유튜브 채팅이 하단에 겹치므로 가리지 않게) ── */}
-      <div ref={stageRef} style={{ position: "relative", width: "96vw", height: "63vh",
+      {/* 가로 상한(105vh): PC 같은 와이드 화면에서 납작한 띠가 되지 않게 비율 제한.
+          OBS 세로(9:16) 화면에서는 96vw가 더 작아서 그대로 세로형 꽉 참. */}
+      <div ref={stageRef} style={{ position: "relative", width: "min(96vw, 105vh)", height: "63vh",
         borderRadius: 20, overflow: "hidden",
         background: "linear-gradient(180deg,rgba(20,12,30,.62),rgba(45,26,44,.62))",
         border: "1px solid rgba(255,255,255,.14)", boxShadow: "0 12px 40px rgba(0,0,0,.4)" }}>
