@@ -41,6 +41,7 @@ type CustomerRow = {
   kakao_nickname?: string | null;
   kakao_profile_image?: string | null;
   customer_history?: unknown;
+  live_alert_optin?: boolean | null;
 };
 
 const cleanText = (value: unknown) => String(value ?? "").trim();
@@ -169,7 +170,7 @@ export async function POST(request: NextRequest) {
     }
 
     const CUSTOMER_SELECT_COLUMNS =
-      "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, customer_memo, is_blocked, last_order_at, created_at, kakao_id, kakao_nickname, kakao_profile_image, customer_history";
+      "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, customer_memo, is_blocked, last_order_at, created_at, kakao_id, kakao_nickname, kakao_profile_image, customer_history, live_alert_optin";
 
     // ★ 고객 식별 원칙: 정체성은 카카오 계정(kakao_id)이다. 전화번호는 바뀔 수 있는 연락처일 뿐.
     //   ① kakao_id 로 먼저 찾는다 → 번호를 바꿔도 "같은 사람"으로 인식(중복 고객 row 생성 방지).
@@ -282,6 +283,17 @@ export async function POST(request: NextRequest) {
         updateData.customer_history = history;
       }
 
+      // [2026-07-29 사장님 지시] 방송알림 기본 ON
+      //   - 한 번도 설정한 적 없는 회원(null)만 ON으로 채운다.
+      //   - 본인이 직접 끈 회원(false)은 절대 다시 켜지 않는다(수신거부 존중).
+      //   - 이미 true면 그대로 둔다(신청일 live_alert_optin_at 보존).
+      //   - 알림 발송 대상(live_alert_optin) 외 다른 로직(주문/입금/정산/포인트) 무관.
+      if (existing.live_alert_optin === null || existing.live_alert_optin === undefined) {
+        updateData.live_alert_optin = true;
+        updateData.live_alert_optin_at = nowIso;
+        updateData.live_alert_optin_source = "kakao_login_default";
+      }
+
       // last_login_at은 항상 갱신 (→ updateData가 비는 일이 없으므로 스킵 분기 미발생)
       updateData.last_login_at = nowIso;
 
@@ -332,6 +344,10 @@ export async function POST(request: NextRequest) {
       kakao_profile_image: kakaoProfileImage || null,
       first_login_at: nowIso,
       last_login_at: nowIso,
+      // [2026-07-29 사장님 지시] 신규 가입(카톡 간편로그인)은 방송알림 기본 ON
+      live_alert_optin: true,
+      live_alert_optin_at: nowIso,
+      live_alert_optin_source: "kakao_signup_default",
     };
 
     const { data: insertedRows, error: insertError } = await supabase
