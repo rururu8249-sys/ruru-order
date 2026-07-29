@@ -4682,7 +4682,24 @@ export default function OrderPage() {
                   wordBreak: "keep-all",
                 }}
               >
-                {popupNoticeText}
+                {/* [2026-07-29] 문구 안에 --- 만 있는 줄 → 그 자리에 가로 구분선.
+                    구분선이 없으면 통짜 문구 1개라 기존과 동일하게 보임(회귀 0). */}
+                {popupNoticeText
+                  .split(/^[ \t]*[-─—]{3,}[ \t]*$/m)
+                  .map((segment, index) => (
+                    <div key={index}>
+                      {index > 0 ? (
+                        <div
+                          style={{
+                            height: "1px",
+                            background: `${popupNoticeColor}40`,
+                            margin: "14px -4px",
+                          }}
+                        />
+                      ) : null}
+                      <div>{segment.replace(/^\n+|\n+$/g, "")}</div>
+                    </div>
+                  ))}
               </div>
             </div>
             <div style={{ padding: "18px 22px 22px", display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -5842,10 +5859,15 @@ export default function OrderPage() {
             <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: "#fff", borderTopLeftRadius: "24px", borderTopRightRadius: "24px", padding: "20px 18px 26px" }}>
               <div style={{ width: "40px", height: "4px", borderRadius: "2px", background: "#E0DAD3", margin: "2px auto 12px" }} />
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px", marginBottom: "8px" }}>
-                <span style={{ fontSize: "17px", fontWeight: 800, color: "#7B2D43" }}>🔔 방송 시작 알림을 받으시겠어요?</span>
+                <span style={{ fontSize: "17px", fontWeight: 800, color: "#7B2D43" }}>{liveAlertOptin ? "🔔 방송 시작 알림을 받고 있어요" : "🔔 방송 시작 알림을 받으시겠어요?"}</span>
                 <button type="button" onClick={() => setAlertSheetOpen(false)} aria-label="닫기" style={{ border: "none", background: "none", fontSize: "20px", color: "#999", cursor: "pointer", flexShrink: 0, lineHeight: 1 }}>✕</button>
               </div>
-              <div style={{ fontSize: "13px", color: "#666", lineHeight: 1.6, marginBottom: "18px" }}>신청하면 라이브 시작 때 카카오 알림톡으로 알려드려요. 신청 시 알림 수신에 동의하며, 언제든 끌 수 있어요.</div>
+              {/* [2026-07-29] 카톡 로그인 시 알림이 기본 ON이므로, 켜져 있는 손님에겐 "자동으로 켜졌고 여기서 끌 수 있다"고 알려준다(카카오 채널 정책 대비 고지). */}
+              <div style={{ fontSize: "13px", color: "#666", lineHeight: 1.6, marginBottom: "18px" }}>
+                {liveAlertOptin
+                  ? "카카오 로그인을 하시면 방송 시작 알림이 자동으로 켜집니다. 라이브가 시작되면 카카오 알림톡으로 알려드려요. 원하지 않으시면 바로 아래 [알림 끄기] 버튼을 눌러주세요."
+                  : "신청하면 라이브 시작 때 카카오 알림톡으로 알려드려요. 신청 시 알림 수신에 동의하며, 언제든 끌 수 있어요."}
+              </div>
               {liveAlertOptin ? (
                 <button type="button" disabled={liveAlertSaving} onClick={() => saveLiveAlertOptin(false)} style={{ width: "100%", padding: "13px", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", fontSize: "15px", fontWeight: 700, cursor: "pointer" }}>알림 끄기</button>
               ) : (

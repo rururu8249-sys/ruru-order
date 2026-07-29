@@ -608,16 +608,31 @@ export default function AdminLiveSettingsPanel() {
                   <span className="mt-1 block text-[11px] font-bold text-ink-mute">여기 제목을 넣으세요. 본문에 제목을 또 쓰면 두 번 나옵니다.</span>
                 </label>
 
-                <label className="mt-3 block">
-                  <span className="text-xs font-black text-ink-soft">팝업 문구 (본문 · 줄바꿈 가능)</span>
+                <div className="mt-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-black text-ink-soft">팝업 문구 (본문 · 줄바꿈 가능)</span>
+                    {/* [2026-07-29] 공지 여러 건을 항목별로 나눠 보이게 하는 구분선 */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPopupText((prev) => (prev.endsWith("\n") || prev === "" ? prev : prev + "\n") + "---\n")
+                      }
+                      className="shrink-0 rounded-full border border-line bg-surface px-3 py-1 text-[11px] font-black text-ink-soft"
+                    >
+                      ─ 구분선 넣기
+                    </button>
+                  </div>
                   <textarea
                     value={popupText}
                     onChange={(e) => setPopupText(e.target.value)}
-                    placeholder="예) 루루동이 밴드에 가입하시면 방송 알림과 단독 혜택을 받으실 수 있어요!"
-                    rows={4}
+                    placeholder={"예) 👜 롱샴 7/27(월) 출고완료\n---\n💄 향수&화장품 7/27(월)~ 업체 순차출고"}
+                    rows={6}
                     className="mt-1 w-full resize-none rounded-xl border border-line bg-surface p-3 text-sm font-bold leading-relaxed text-ink outline-none focus:border-rose-deep"
                   />
-                </label>
+                  <span className="mt-1 block text-[11px] font-bold leading-5 text-ink-mute">
+                    한 줄에 <b className="text-ink-soft">---</b> 만 쓰면 손님 팝업에서 그 자리에 가로 구분선이 그어집니다. (공지 여러 건을 항목별로 나눌 때)
+                  </span>
+                </div>
 
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <label className="block">
