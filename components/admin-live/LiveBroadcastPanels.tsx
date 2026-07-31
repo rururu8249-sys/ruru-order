@@ -536,20 +536,9 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
     if (v === 0 && !videoMuted) { setVideoMuted(true); ytCmd("mute"); }
   };
   const chatEmbedUrl = videoId && embedDomain ? `https://www.youtube.com/live_chat?v=${videoId}&embed_domain=${embedDomain}` : "";
-  // 채팅 배경 — 유튜브 채팅 iframe은 배경이 투명이고 글자색만 브라우저 테마를 따름(라이트=검정/다크=흰색).
-  // 흰 배경에 흰 글씨가 되면 채팅이 안 보이므로, 배경을 브라우저 테마에 자동으로 맞추고 수동 토글도 제공(방송 중 즉시 대응).
+  // 채팅 테마 — 유튜브 채팅 iframe은 배경색이 아니라 "iframe 요소의 color-scheme"을 보고 라이트/다크를 정함(사장님 크롬에서 실측 확인).
+  // color-scheme 미지정 시 크롬 테마 설정이 그대로 전파돼 흰 배경+흰 글씨 사고 → 기본 라이트로 강제, 수동 토글(방송 중 즉시 대응)만 유지.
   const [chatBgDark, setChatBgDark] = useState(false);
-  useEffect(() => {
-    try {
-      const mq = window.matchMedia("(prefers-color-scheme: dark)");
-      setChatBgDark(mq.matches);
-      const onChange = (e: MediaQueryListEvent) => setChatBgDark(e.matches);
-      mq.addEventListener("change", onChange);
-      return () => mq.removeEventListener("change", onChange);
-    } catch {
-      return undefined;
-    }
-  }, []);
   const chatBg = chatBgDark ? "#0f0f0f" : "#ffffff";
 
   const filteredTasks = useMemo(() => {
@@ -941,10 +930,11 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
         <div className="flex-1 min-h-0 overflow-hidden rounded-2xl border border-line bg-surface-2" style={chatEmbedUrl ? { background: chatBg } : undefined}>
           {chatEmbedUrl ? (
             <iframe
+              key={chatBgDark ? "chat-dark" : "chat-light"}
               title="YouTube live chat"
               src={chatEmbedUrl}
               className="h-full w-full"
-              style={{ background: chatBg }}
+              style={{ background: chatBg, colorScheme: chatBgDark ? "dark" : "light" }}
             />
           ) : (
             <div className="flex h-full items-center justify-center p-6 text-center">
