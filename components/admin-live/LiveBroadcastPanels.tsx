@@ -536,6 +536,21 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
     if (v === 0 && !videoMuted) { setVideoMuted(true); ytCmd("mute"); }
   };
   const chatEmbedUrl = videoId && embedDomain ? `https://www.youtube.com/live_chat?v=${videoId}&embed_domain=${embedDomain}` : "";
+  // 채팅 배경 — 유튜브 채팅 iframe은 배경이 투명이고 글자색만 브라우저 테마를 따름(라이트=검정/다크=흰색).
+  // 흰 배경에 흰 글씨가 되면 채팅이 안 보이므로, 배경을 브라우저 테마에 자동으로 맞추고 수동 토글도 제공(방송 중 즉시 대응).
+  const [chatBgDark, setChatBgDark] = useState(false);
+  useEffect(() => {
+    try {
+      const mq = window.matchMedia("(prefers-color-scheme: dark)");
+      setChatBgDark(mq.matches);
+      const onChange = (e: MediaQueryListEvent) => setChatBgDark(e.matches);
+      mq.addEventListener("change", onChange);
+      return () => mq.removeEventListener("change", onChange);
+    } catch {
+      return undefined;
+    }
+  }, []);
+  const chatBg = chatBgDark ? "#0f0f0f" : "#ffffff";
 
   const filteredTasks = useMemo(() => {
     return tasks
@@ -908,15 +923,28 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
       <div className={`min-w-0 rounded-2xl border border-line bg-surface p-3.5 shadow-sm flex flex-col ${isCol ? "h-[560px] w-full xl:h-[calc(100vh-44vh-1.75rem)] xl:min-h-[260px] xl:shrink-0" : "h-[420px]"}`} style={isCol ? undefined : { flex: "3 1 0%" }}>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-black text-ink">라이브 채팅</h2>
-          <span className="text-xs font-bold text-ink-soft">{chatEmbedUrl ? "채팅 연결" : "URL 대기"}</span>
+          <div className="flex items-center gap-1.5">
+            {chatEmbedUrl ? (
+              <button
+                type="button"
+                onClick={() => setChatBgDark((v) => !v)}
+                title="채팅 배경 전환 — 채팅 글씨가 안 보이면 눌러 주세요"
+                className="rounded-lg border border-line bg-surface-2 px-2 py-0.5 text-[11px] font-black text-ink-soft transition hover:bg-surface-3"
+              >
+                {chatBgDark ? "🌙 어두운 배경" : "☀️ 밝은 배경"}
+              </button>
+            ) : null}
+            <span className="text-xs font-bold text-ink-soft">{chatEmbedUrl ? "채팅 연결" : "URL 대기"}</span>
+          </div>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-hidden rounded-2xl border border-line bg-surface-2">
+        <div className="flex-1 min-h-0 overflow-hidden rounded-2xl border border-line bg-surface-2" style={chatEmbedUrl ? { background: chatBg } : undefined}>
           {chatEmbedUrl ? (
             <iframe
               title="YouTube live chat"
               src={chatEmbedUrl}
-              className="h-full w-full bg-surface"
+              className="h-full w-full"
+              style={{ background: chatBg }}
             />
           ) : (
             <div className="flex h-full items-center justify-center p-6 text-center">
