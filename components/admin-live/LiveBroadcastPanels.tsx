@@ -536,10 +536,8 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
     if (v === 0 && !videoMuted) { setVideoMuted(true); ytCmd("mute"); }
   };
   const chatEmbedUrl = videoId && embedDomain ? `https://www.youtube.com/live_chat?v=${videoId}&embed_domain=${embedDomain}` : "";
-  // 채팅 테마 — 유튜브 채팅 iframe은 배경색이 아니라 "iframe 요소의 color-scheme"을 보고 라이트/다크를 정함(사장님 크롬에서 실측 확인).
-  // color-scheme 미지정 시 크롬 테마 설정이 그대로 전파돼 흰 배경+흰 글씨 사고 → 기본 라이트로 강제, 수동 토글(방송 중 즉시 대응)만 유지.
-  const [chatBgDark, setChatBgDark] = useState(false);
-  const chatBg = chatBgDark ? "#0f0f0f" : "#ffffff";
+  // 채팅 테마 — 유튜브 채팅 iframe은 iframe 요소의 color-scheme으로 라이트/다크를 정함(실측).
+  // ⚠️다크 임베드는 크롬이 캔버스를 불투명 흰색으로 처리해 흰 글씨 사고가 남(실측·우회 불가) → 항상 라이트 고정, 다크 토글 금지.
 
   const filteredTasks = useMemo(() => {
     return tasks
@@ -912,29 +910,16 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
       <div className={`min-w-0 rounded-2xl border border-line bg-surface p-3.5 shadow-sm flex flex-col ${isCol ? "h-[560px] w-full xl:h-[calc(100vh-44vh-1.75rem)] xl:min-h-[260px] xl:shrink-0" : "h-[420px]"}`} style={isCol ? undefined : { flex: "3 1 0%" }}>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-black text-ink">라이브 채팅</h2>
-          <div className="flex items-center gap-1.5">
-            {chatEmbedUrl ? (
-              <button
-                type="button"
-                onClick={() => setChatBgDark((v) => !v)}
-                title="채팅 배경 전환 — 채팅 글씨가 안 보이면 눌러 주세요"
-                className="rounded-lg border border-line bg-surface-2 px-2 py-0.5 text-[11px] font-black text-ink-soft transition hover:bg-surface-3"
-              >
-                {chatBgDark ? "🌙 어두운 배경" : "☀️ 밝은 배경"}
-              </button>
-            ) : null}
-            <span className="text-xs font-bold text-ink-soft">{chatEmbedUrl ? "채팅 연결" : "URL 대기"}</span>
-          </div>
+          <span className="text-xs font-bold text-ink-soft">{chatEmbedUrl ? "채팅 연결" : "URL 대기"}</span>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-hidden rounded-2xl border border-line bg-surface-2" style={chatEmbedUrl ? { background: chatBg } : undefined}>
+        <div className="flex-1 min-h-0 overflow-hidden rounded-2xl border border-line bg-surface-2" style={chatEmbedUrl ? { background: "#ffffff" } : undefined}>
           {chatEmbedUrl ? (
             <iframe
-              key={chatBgDark ? "chat-dark" : "chat-light"}
               title="YouTube live chat"
               src={chatEmbedUrl}
               className="h-full w-full"
-              style={{ background: chatBg, colorScheme: chatBgDark ? "dark" : "light" }}
+              style={{ background: "#ffffff", colorScheme: "light" }}
             />
           ) : (
             <div className="flex h-full items-center justify-center p-6 text-center">
