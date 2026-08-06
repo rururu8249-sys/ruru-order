@@ -139,6 +139,105 @@ async function selectDeposits(supabase: any) {
   return { data: all, error: null };
 }
 
+function chunkList(list: string[], size: number) {
+  const out: string[][] = [];
+  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
+  return out;
+}
+
+// [2026-08-06 부하개선] orders 전체 스캔 폴백(예전 동작 그대로 — 타깃 조회가 실패할 때만 사용)
+async function selectAllOrdersFallback(supabase: any) {
+  const pageSize = 1000;
+  let from = 0;
+  const all: any[] = [];
+  while (true) {
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .range(from, from + pageSize - 1);
+    if (error) return { data: null, error };
+    const rows = data || [];
+    all.push(...rows);
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+  return { data: all, error: null };
+}
+
+// [2026-08-06 부하개선] 기존에는 orders 전체를 1000행씩 끝까지 select("*") 했지만,
+// buildOrderMaps/attachLinkedOrders 는 "deposits 가 실제로 들고 있는 키"만 조회에 쓴다.
+// 따라서 그 키(order_group_id / order_lookup_code / id)에 해당하는 행만 가져와도
+// linked_orders 결과는 완전히 동일하고, 전체 테이블 스캔만 사라진다.
+// 참조 키가 하나도 없으면(=매칭된 입금 0건) orders 조회 자체를 생략한다.
+async function selectOrdersForDeposits(supabase: any, deposits: AnyRow[]) {
+  const groupKeys = new Set<string>();
+  const orderIdKeys = new Set<string>();
+
+  for (const deposit of deposits) {
+    const { groupKeys: gKeys, orderKeys: oKeys } = depositLinkedKeys(deposit);
+    for (const key of gKeys) groupKeys.add(key);
+    for (const key of oKeys) orderIdKeys.add(key);
+  }
+
+  if (groupKeys.size === 0 && orderIdKeys.size === 0) {
+    return { data: [] as AnyRow[], error: null };
+  }
+
+  const collected: AnyRow[] = [];
+  const CHUNK = 150;
+
+  const runIn = async (column: string, values: string[] | number[]) => {
+    for (const part of chunkList(values as string[], CHUNK)) {
+      const { data, error } = await supabase.from("orders").select("*").in(column, part);
+      // 없는 컬럼(42703) 등은 조용히 건너뛴다 — 기존 first() 방어 로직과 동일한 취지
+      if (error) {
+        if (String((error as any)?.code || "") === "42703") return true;
+        throw error;
+      }
+      collected.push(...((data as AnyRow[]) || []));
+    }
+    return true;
+  };
+
+  try {
+    const groupList = Array.from(groupKeys);
+
+    if (groupList.length > 0) {
+      await runIn("order_group_id", groupList);
+      await runIn("order_lookup_code", groupList);
+      // buildOrderMaps 의 first() 가 보던 대체 컬럼도 동일하게 시도한다.
+      // 실제 스키마에 없으면 42703 으로 조용히 건너뛰므로 기존 동작과 어긋나지 않는다.
+      await runIn("group_id", groupList);
+      await runIn("lookup_code", groupList);
+    }
+
+    const numericIds = Array.from(orderIdKeys)
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value));
+
+    if (numericIds.length > 0) {
+      await runIn("id", numericIds as unknown as string[]);
+      await runIn("order_id", numericIds as unknown as string[]);
+    }
+  } catch (error) {
+    // 타깃 조회가 실패하면 예전 전체조회로 폴백해서 화면이 비지 않게 한다.
+    return await selectAllOrdersFallback(supabase);
+  }
+
+  // 여러 키로 중복 수집될 수 있어 id 기준 1회만 남긴다(uniqueRows 와 동일 기준).
+  const seen = new Set<string>();
+  const deduped: AnyRow[] = [];
+
+  for (const row of collected) {
+    const key = cleanText(first(row, ["id", "order_id"])) || JSON.stringify(row);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(row);
+  }
+
+  return { data: deduped, error: null };
+}
+
 export async function GET() {
   if (!supabaseUrl || !supabaseServiceKey) {
     return NextResponse.json(
@@ -174,23 +273,7 @@ export async function GET() {
 
     const deposits: AnyRow[] = Array.isArray(depositsResult.data) ? (depositsResult.data as AnyRow[]) : [];
 
-    const ordersResult = await (async () => {
-      const pageSize = 1000;
-      let from = 0;
-      const all: any[] = [];
-      while (true) {
-        const { data, error } = await supabase
-          .from("orders")
-          .select("*")
-          .range(from, from + pageSize - 1);
-        if (error) return { data: null, error };
-        const rows = data || [];
-        all.push(...rows);
-        if (rows.length < pageSize) break;
-        from += pageSize;
-      }
-      return { data: all, error: null };
-    })();
+    const ordersResult = await selectOrdersForDeposits(supabase, deposits);
 
     if (ordersResult.error) {
       return NextResponse.json({

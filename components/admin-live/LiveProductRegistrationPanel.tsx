@@ -151,7 +151,9 @@ export default function LiveProductRegistrationPanel({
     const { data, error } = await supabase
       .from("products")
       .select(
-        "id,name,price,stock,product_type,status,shipping_type,sort_order,is_pinned,image_url,color_options,size_options,size_option_enabled,delivery_group_key,product_description,detail_image_urls",
+        // [2026-08-06] products 에는 name 컬럼이 없다(product_name). 존재하지 않는 컬럼을 넣으면
+        // 쿼리가 통째로 실패하므로 실제 컬럼명으로 정정. (이 패널은 현재 어디에서도 import 되지 않는 미사용 파일)
+        "id,name:product_name,price,stock,product_type,status,shipping_type,sort_order,is_pinned,image_url,color_options,size_options,size_option_enabled,delivery_group_key,product_description,detail_image_urls",
       )
       .order("is_pinned", { ascending: false })
       .order("sort_order", { ascending: true })
