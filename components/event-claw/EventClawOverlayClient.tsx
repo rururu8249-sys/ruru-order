@@ -230,6 +230,8 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
 
   useEffect(() => {
     let cancelled = false;
+    // [2026-08-06 부하개선] 표시할 이벤트가 없을 땐 폴링을 늦추기 위한 플래그.
+    let hasEvent = false;
 
     async function loadOverlay() {
       try {
@@ -242,26 +244,38 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
         if (cancelled) return;
 
         if (!payload.ok || !payload.event) {
+          hasEvent = false;
           setEvent(null);
           setMessage(payload.message || "표시할 인형뽑기 이벤트가 없습니다.");
           return;
         }
 
+        hasEvent = true;
         setEvent(payload.event);
         setMessage("");
       } catch (error) {
         if (cancelled) return;
+        hasEvent = false;
         setEvent(null);
         setMessage(error instanceof Error ? error.message : String(error));
       }
     }
 
-    void loadOverlay();
-    const timer = window.setInterval(loadOverlay, 900);
+    // [2026-08-06 부하개선] 기존 setInterval(loadOverlay, 900) → 적응형 폴링.
+    // 이벤트가 떠 있는 동안엔 기존과 동일한 0.9초, 없을 땐 5초.
+    let timer: number | null = null;
+
+    const tick = async () => {
+      await loadOverlay();
+      if (cancelled) return;
+      timer = window.setTimeout(tick, hasEvent ? 900 : 5000);
+    };
+
+    void tick();
 
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      if (timer !== null) window.clearTimeout(timer);
     };
   }, [token]);
 

@@ -358,6 +358,8 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
 
   useEffect(() => {
     let cancelled = false;
+    // [2026-08-06 부하개선] 표시할 이벤트가 없을 땐 폴링을 늦추기 위한 플래그.
+    let hasEvent = false;
 
     const load = async () => {
       try {
@@ -370,6 +372,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
         if (cancelled) return;
 
         if (!payload.ok || !payload.event) {
+          hasEvent = false;
           setEvent(null);
           setMessage(payload.message || "표시할 룰렛 이벤트가 없습니다.");
           setPhase("idle");
@@ -377,21 +380,33 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           return;
         }
 
+        hasEvent = true;
         setEvent(payload.event);
         setMessage("");
       } catch (error) {
         if (cancelled) return;
+        hasEvent = false;
         setEvent(null);
         setMessage(error instanceof Error ? error.message : "룰렛 정보를 불러오지 못했습니다.");
       }
     };
 
-    load();
-    const interval = window.setInterval(load, 900);
+    // [2026-08-06 부하개선] 기존 setInterval(load, 900) → 적응형 폴링.
+    // 이벤트가 떠 있는 동안엔 기존과 동일한 0.9초(돌리기 반응속도 무변경),
+    // 표시할 이벤트가 없을 땐 5초로 낮춘다(OBS 소스만 켜둔 대기 상태의 상시 부하 제거).
+    let timer: number | null = null;
+
+    const tick = async () => {
+      await load();
+      if (cancelled) return;
+      timer = window.setTimeout(tick, hasEvent ? 900 : 5000);
+    };
+
+    void tick();
 
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
+      if (timer !== null) window.clearTimeout(timer);
     };
   }, [initialToken]);
 
