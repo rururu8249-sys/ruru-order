@@ -142,6 +142,39 @@ export async function GET() {
       (order) => order.is_deleted !== true && order.is_test_order !== true,
     );
 
+    const DAY_MS = 24 * 60 * 60 * 1000;
+
+    // ── 주문그룹 요약 맵 (닉네임·주문일 등) — 점검2 상세/점검9 판정에 사용 (읽기 전용) ──
+    //   그룹 안 여러 행 중 "가장 이른 created_at"을 주문 생성일로 본다.
+    const orderGroupInfo = new Map<
+      string,
+      {
+        nickname: string | null;
+        customer_name: string | null;
+        order_lookup_code: string | null;
+        order_created_at: string | null;
+        order_created_ms: number;
+      }
+    >();
+    for (const o of orders) {
+      const gid = cleanText(o.order_group_id);
+      if (!gid) continue;
+      const t = o.created_at ? new Date(o.created_at).getTime() : NaN;
+      const prev = orderGroupInfo.get(gid);
+      if (!prev) {
+        orderGroupInfo.set(gid, {
+          nickname: o.youtube_nickname ?? null,
+          customer_name: o.customer_name ?? null,
+          order_lookup_code: o.order_lookup_code ?? null,
+          order_created_at: o.created_at ?? null,
+          order_created_ms: Number.isFinite(t) ? t : Infinity,
+        });
+      } else if (Number.isFinite(t) && t < prev.order_created_ms) {
+        prev.order_created_at = o.created_at ?? prev.order_created_at;
+        prev.order_created_ms = t;
+      }
+    }
+
     // ── 점검1) 자동입금확인인데 연결 입금 없음 ──────────────────────────────
     // 자동입금확인 주문의 order_group_id를, match_order_group_id로 가진 deposit이 하나도 없는 경우.
     const matchedGroupIds = new Set<string>();
@@ -185,12 +218,35 @@ export async function GET() {
         // [2026-07-26] deposited_time은 "시각만"(HH:MM:SS) 저장되는 컬럼이라 날짜 판정 불가 →
         //   날짜는 created_at(기록일)에서 읽는다("날짜없음" 오표시 수정).
         const dates = deps.map((d) => d.created_at).filter(Boolean).sort();
+        // [2026-08-06] 자세히 보기 강화: 입금자·각 입금 상세 + 연결 주문 + 날짜역전(오매칭) 의심 표시.
+        const gi = orderGroupInfo.get(gid) || null;
+        const orderMs = gi?.order_created_ms ?? Infinity;
+        const depositDetails = deps.map((d) => {
+          const dMs = d.created_at ? new Date(d.created_at).getTime() : NaN;
+          const inverted =
+            Number.isFinite(dMs) && orderMs !== Infinity && orderMs - dMs > DAY_MS;
+          return {
+            deposit_id: d.id,
+            depositor_name: d.depositor_name ?? null,
+            amount: depositAmountNum(d),
+            deposited_time: d.deposited_time ?? null,
+            created_at: d.created_at ?? null,
+            date_inverted: inverted,
+          };
+        });
         return {
           order_group_id: gid,
           deposit_ids: deps.map((d) => d.id),
           total_deposit_amount: deps.reduce((sum, d) => sum + depositAmountNum(d), 0),
           latest_deposited_time: times.length ? times[times.length - 1] : null,
           latest_created_at: dates.length ? dates[dates.length - 1] : null,
+          // 신규 상세
+          nickname: gi?.nickname ?? null,
+          customer_name: gi?.customer_name ?? null,
+          order_lookup_code: gi?.order_lookup_code ?? null,
+          order_created_at: gi?.order_created_at ?? null,
+          deposits: depositDetails,
+          date_inverted: depositDetails.some((x) => x.date_inverted),
         };
       });
 
@@ -327,6 +383,35 @@ export async function GET() {
         created_at: o.created_at ?? null,
       }));
 
+    // ── 점검9) 날짜 역전 매칭 (입금일 < 주문 생성일 = 오매칭 의심) ────────────
+    //   [2026-08-06 사장님] "시스템이 알아서 걸러라" — 7/31 현장입금이 8/6 주문에 자동으로
+    //   잘못 물린 사고 유형을 자동 감지. 입금이 주문보다 먼저일 수 없으므로, 매칭된 입금의
+    //   기록일이 주문 생성일보다 "하루 이상" 이르면 오매칭으로 의심(같은 날 시각차는 제외).
+    //   읽기 전용 — 자동매칭(autoPaymentMatch) 로직은 건드리지 않고 감지·표시만 한다.
+    const check9Items: AnyRow[] = [];
+    for (const deposit of allDeposits) {
+      const gid = cleanText(deposit.match_order_group_id);
+      if (!gid) continue;
+      const gi = orderGroupInfo.get(gid);
+      if (!gi || gi.order_created_ms === Infinity) continue;
+      const dMs = deposit.created_at ? new Date(deposit.created_at).getTime() : NaN;
+      if (!Number.isFinite(dMs)) continue;
+      if (gi.order_created_ms - dMs > DAY_MS) {
+        check9Items.push({
+          deposit_id: deposit.id,
+          depositor_name: deposit.depositor_name ?? null,
+          amount: depositAmountNum(deposit),
+          deposit_created_at: deposit.created_at ?? null,
+          order_group_id: gid,
+          nickname: gi.nickname,
+          customer_name: gi.customer_name,
+          order_lookup_code: gi.order_lookup_code,
+          order_created_at: gi.order_created_at,
+          days_early: Math.floor((gi.order_created_ms - dMs) / DAY_MS),
+        });
+      }
+    }
+
     // [2026-07-26 사장님] 상시 카드용 "최근 7일" 건수 — 옛 기록(5~6월 데이터 초기)과 새 문제를 구분.
     //   날짜 없는 항목은 옛 기록으로 간주(카드 미집계), 단 현재 상태 점검(재고 장부·포인트)은 날짜 개념이 없으므로 전부 집계.
     const SEVEN_MS = 7 * 24 * 60 * 60 * 1000;
@@ -344,6 +429,7 @@ export async function GET() {
       check6_amount_formula: check6Items.filter((i) => isRecentDate(i.created_at)).length,
       check7_point_mismatch: check7Items.length, // 현재 상태 점검 — 전부 집계
       check8_paid_no_timestamp: check8Items.filter((i) => isRecentDate(i.created_at)).length,
+      check9_date_inverted_match: check9Items.length, // 오매칭 의심 — 오래돼도 살아있는 위험이라 전부 집계
     };
 
     return NextResponse.json({
@@ -358,6 +444,7 @@ export async function GET() {
         check6_amount_formula: check6Items.length,
         check7_point_mismatch: check7Items.length,
         check8_paid_no_timestamp: check8Items.length,
+        check9_date_inverted_match: check9Items.length,
       },
       recent_summary: recentSummary,
       check1: { count: check1Items.length, items: check1Items },
@@ -368,6 +455,7 @@ export async function GET() {
       check6: { count: check6Items.length, items: check6Items },
       check7: { count: check7Items.length, items: check7Items },
       check8: { count: check8Items.length, items: check8Items },
+      check9: { count: check9Items.length, items: check9Items },
     });
   } catch (error) {
     return NextResponse.json(

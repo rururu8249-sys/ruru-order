@@ -15,6 +15,7 @@ const CHECK_LABELS: Array<[string, string]> = [
   ["check6_amount_formula", "금액 공식 불일치"],
   ["check7_point_mismatch", "포인트 잔액≠이력"],
   ["check8_paid_no_timestamp", "입금확인 시각 누락"],
+  ["check9_date_inverted_match", "날짜 역전 매칭(오매칭 의심)"],
 ];
 
 export default function SystemAuditCard({ onOpenDetail }: { onOpenDetail?: () => void }) {
