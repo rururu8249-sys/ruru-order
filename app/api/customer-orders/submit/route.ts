@@ -178,6 +178,47 @@ const normalizeOrderRowsForSubmitSettings = async (
   };
 };
 
+// [2026-08-11] "직접입력" 서버 강제 검증.
+//   설정(settings.direct_input_enabled)이 false 인데 등록상품이 아닌 항목(product_id 없음)이 오면 거부한다.
+//   왜 필요한가: 이 설정은 그동안 손님 화면의 버튼을 숨기는 "표시 전용"이라, 아래 경로로는 그대로 접수됐다.
+//     ① DB가 느려 손님 화면이 설정을 못 읽으면 기본 ON 으로 동작 (8/10 23:25 장애 때 실제 발생)
+//     ② 임시주문서(localStorage)에 직접입력 항목이 담긴 채 나중에 제출
+//     ③ 설정을 끄기 전에 열어둔 탭은 계속 예전(ON) 상태
+//   ⚠️ 설정 조회가 실패하면 반드시 "허용"으로 통과시킨다 — DB 일시 오류로 주문 전체가 막히는 사고 방지.
+//   ⚠️ 돈/재고/포인트 RPC는 일절 건드리지 않고, 주문 RPC 호출 전에 차단만 한다.
+async function assertDirectInputAllowed(supabase: any, orderRows: AnyRow[]): Promise<void> {
+  // 등록상품이 아닌(=직접입력) 항목이 하나라도 있는지 먼저 본다. 없으면 설정 조회조차 안 한다.
+  const directRows = orderRows.filter((row) => {
+    const pid = text(row?.product_id);
+    return !pid || !/^[0-9]+$/.test(pid);
+  });
+  if (directRows.length === 0) return;
+
+  const { data, error } = await supabase
+    .from("settings")
+    .select("key, value")
+    .eq("key", "direct_input_enabled")
+    .maybeSingle();
+
+  if (error) {
+    console.warn("직접입력 검증: 설정 조회 실패(주문은 진행):", error?.message);
+    return; // 조회 실패 → 허용(주문을 막지 않는다)
+  }
+
+  const raw = String((data as AnyRow | null)?.value ?? "").trim().toLowerCase();
+  if (raw !== "false") return; // 설정이 없거나 true → 기존과 동일하게 허용
+
+  const names = directRows
+    .map((row) => text(row?.product_name))
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(", ");
+
+  throw new Error(
+    `지금은 상품을 직접 입력해서 주문할 수 없어요.${names ? `\n(${names})` : ""}\n상품 목록에서 선택해 주세요.`,
+  );
+}
+
 // 개인당 구매제한(상품관리 product_note.purchase_limit_enabled/qty) 서버 강제 검증.
 // - ★ 고객 식별 = 카카오 계정(kakao_id). 전화번호는 폴백일 뿐이다.
 //   전화번호로만 누적하면 번호를 바꾸는 순간 제한이 리셋돼 우회가 가능했다(2026-07-09 수정).
@@ -314,6 +355,7 @@ export async function POST(request: NextRequest) {
 
     // 개인당 구매제한 차단(돈/재고/포인트 RPC 무변경 — RPC 호출 전 검증만)
     //   카톡 계정(kakao_id) 기준 누적 → 전화번호 바꿔도 제한 우회 불가
+    await assertDirectInputAllowed(supabase, orderRows);
     await assertPurchaseLimit(supabase, orderRows, phone, text(body.kakao_id));
 
     const normalizedSubmit = await normalizeOrderRowsForSubmitSettings(supabase, orderRows);

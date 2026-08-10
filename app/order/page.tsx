@@ -1274,7 +1274,11 @@ export default function OrderPage() {
   const [popupNoticeColor, setPopupNoticeColor] = useState("#7B2D43"); // 제목·확인버튼 강조색
   const [popupBandUrl, setPopupBandUrl] = useState("https://band.us/@ruru8249");
   const [popupOpen, setPopupOpen] = useState(false);
-  const [directInputEnabled, setDirectInputEnabled] = useState(true);
+  // [2026-08-11 사고분석] 기본값을 false 로 둔다.
+  //   예전엔 true 라서, DB가 느려 설정 조회가 실패하면(1889행 return) 관리자가 OFF 해둬도
+  //   손님 화면엔 "직접 입력하기" 버튼이 떠버렸다(8/10 23:25 장애 때 실제로 발생 — 없는 상품 "반바지" 주문 접수).
+  //   → 설정을 성공적으로 읽어 ON 으로 확인된 경우에만 켠다. 못 읽으면 숨김(안전한 실패).
+  const [directInputEnabled, setDirectInputEnabled] = useState(false);
   const [combineShippingSettings, setCombineShippingSettings] =
     useState<CombineShippingSettings>(DEFAULT_COMBINE_SHIPPING_SETTINGS);
   const [alreadyPaidShipping, setAlreadyPaidShipping] = useState(false);
@@ -1861,6 +1865,7 @@ export default function OrderPage() {
   ]);
 
 
+  const settingsRetriedRef = useRef(false);
   const loadOrderSettings = async () => {
     const { data, error } = await supabase
       .from("settings")
@@ -1888,6 +1893,11 @@ export default function OrderPage() {
 
     if (error) {
       console.log("설정 불러오기 오류", error.message);
+      // 일시적 지연이면 한 번만 다시 시도(직접입력 버튼이 계속 숨겨진 채로 남지 않게).
+      if (!settingsRetriedRef.current) {
+        settingsRetriedRef.current = true;
+        setTimeout(() => { void loadOrderSettings(); }, 2500);
+      }
       return;
     }
 
