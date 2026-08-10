@@ -913,6 +913,21 @@ function readComboInfoOrderProduct(product: unknown): { names: string[]; pricing
   return { names, pricing, maxPlus };
 }
 
+// [2026-08-11] 세부상품별 대표사진 { 세부상품명: URL } — 관리자에서 넣은 옵션별 이미지.
+//   없으면 빈 객체 → 기존 상품은 아무 변화 없음.
+function readComboPhotosOrderProduct(product: unknown): Record<string, string> {
+  const note = readOrderNoteObject(product);
+  const raw = (note as any)?.detail_photos;
+  const out: Record<string, string> = {};
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    for (const key of Object.keys(raw)) {
+      const url = String((raw as any)[key] ?? "").trim();
+      if (url) out[String(key).trim()] = url;
+    }
+  }
+  return out;
+}
+
 // 담기/시트 단가용: 선택된 세부상품의 추가금(조합형 아니면 항상 0 → 기존 상품 경로 무영향)
 function comboPlusOfOrderProduct(product: unknown, color?: string): number {
   const info = readComboInfoOrderProduct(product);
@@ -4603,8 +4618,15 @@ export default function OrderPage() {
     ? String(registeredOptionSelectProduct.product_description || registeredOptionSelectProduct.detail_description || registeredOptionSelectProduct.description || "").trim()
     : "";
   // [상세UI] 상단 썸네일 스트립용: 대표(커버) + 상세사진 통합(중복 제거). Baymard: 숨은 썸네일은 노출로 신호.
+  // [2026-08-11] 세부상품별 사진 — 고른 세부상품의 사진이 있으면 맨 앞(대표)으로 올린다.
+  const registeredOptionComboPhotos = registeredOptionSelectProduct ? readComboPhotosOrderProduct(registeredOptionSelectProduct) : {};
   const registeredOptionAllImages = registeredOptionSelectProduct
-    ? Array.from(new Set([pickOrderProductImageUrl(registeredOptionSelectProduct), ...registeredOptionDetailImages].filter(Boolean)))
+    ? Array.from(new Set([
+        registeredOptionComboPhotos[String(registeredOptionDetail || registeredOptionColor).trim()] || "",
+        pickOrderProductImageUrl(registeredOptionSelectProduct),
+        ...Object.values(registeredOptionComboPhotos),
+        ...registeredOptionDetailImages,
+      ].filter(Boolean)))
     : [];
   const registeredOptionStockVariants: { color: string; size: string; stock: number }[] = (() => {
     if (!registeredOptionSelectProduct) return [];
@@ -5550,6 +5572,13 @@ export default function OrderPage() {
                                   }}
                                   style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", textAlign: "left", padding: "12px 14px", border: "none", borderBottom: "1px solid #F6EFE9", background: selected ? "#7A1E47" : "transparent", cursor: soldOut ? "default" : "pointer", opacity: soldOut ? 0.45 : 1 }}
                                 >
+                                  {registeredOptionComboPhotos[name] ? (
+                                    <img
+                                      src={registeredOptionComboPhotos[name]}
+                                      alt=""
+                                      style={{ width: "40px", height: "40px", borderRadius: "8px", objectFit: "cover", flexShrink: 0, background: "#F0EBE8", opacity: soldOut ? 0.5 : 1 }}
+                                    />
+                                  ) : null}
                                   <span style={{ minWidth: 0, flex: 1, fontSize: "14px", fontWeight: 700, color: selected ? "#fff" : "#333", textDecoration: soldOut ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
                                   {soldOut ? (
                                     <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "#fff", background: "#B5A1A8", borderRadius: "5px", padding: "2px 6px" }}>품절</span>

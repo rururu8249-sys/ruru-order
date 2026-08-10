@@ -214,6 +214,8 @@ function parseProductNote(row: ProductRow | null | undefined) {
       // [2026-08-10 옵션 통합] 축 정의 — 고객 화면이 몇 단으로 보여줄지 판단하는 원천
       option_axes?: Array<{ key: "detail" | "color" | "size"; label: string; values: string[] }>;
       combo_detail_values?: string[]; // 1번 축(세부상품) 노출 값 — 3단일 때 color_options는 색상이 차지하므로 별도 보관
+      // [2026-08-11] 세부상품별 대표사진 { 세부상품명: 이미지URL } — 스마트스토어/쿠팡의 옵션별 이미지와 같은 개념
+      detail_photos?: Record<string, string>;
       // [무료나눔 · 2026-07-22] true면 0원 상품(선물). 가격 비움(손님 직접입력)과 구분되는 명시 플래그
       free_product?: boolean;
     };
@@ -612,6 +614,11 @@ export default function QuickProductFastForm({
   const [detailLabel, setDetailLabel] = useState(DETAIL_LABEL_FIXED);
   const [detailPlus, setDetailPlus] = useState<Record<string, string>>({}); // 세부상품명 → 추가금(문자)
   const [detailHidden, setDetailHidden] = useState<string[]>([]);           // 고객에게 숨길 세부상품명
+  // [2026-08-11] 세부상품별 대표사진 — 손님이 종류를 고를 때 사진으로 구분할 수 있게(업계 표준: 옵션별 이미지)
+  const [detailPhotos, setDetailPhotos] = useState<Record<string, string>>({});
+  const [detailPhotoUploading, setDetailPhotoUploading] = useState("");
+  const detailPhotoInputRef = useRef<HTMLInputElement | null>(null);
+  const detailPhotoTargetRef = useRef("");
 
   // [무료나눔 · 2026-07-22] 0원 상품 플래그 — note.free_product (가격 비움=직접입력과 구분)
   const [freeProductEnabled, setFreeProductEnabled] = useState(false);
@@ -631,6 +638,9 @@ export default function QuickProductFastForm({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
   const [nameError, setNameError] = useState(false);
+  // [2026-08-11] 방송 중 속도 — 거의 안 건드리는 카테고리·뱃지가 옵션/재고를 화면 밖으로 밀어내던 문제.
+  //   기본 접힘 → 사진·이름·가격 다음에 바로 옵션·재고가 오게 한다. (값은 전부 기본값이 있어 안 펴도 등록 가능)
+  const [extraOpen, setExtraOpen] = useState(false);
   const coverUploadRef = useRef<(() => void) | null>(null);
 
   // 팝업 드래그(헤더 잡고 이동)
@@ -788,6 +798,14 @@ export default function QuickProductFastForm({
     }
     setDetailPlus(nextPlus);
     setDetailHidden(hiddenList.filter((n) => restoredDetails.includes(n)));
+    const photosRaw = (productNote?.detail_photos && typeof productNote.detail_photos === "object")
+      ? (productNote.detail_photos as Record<string, unknown>) : {};
+    const nextPhotos: Record<string, string> = {};
+    for (const name of restoredDetails) {
+      const url = String(photosRaw[name] ?? "").trim();
+      if (url) nextPhotos[name] = url;
+    }
+    setDetailPhotos(nextPhotos);
   }, [initialProduct]);
 
   const details = useMemo(() => unique(splitOptions(detailText)), [detailText]);
@@ -920,6 +938,45 @@ export default function QuickProductFastForm({
     setVariantRows(buildVariantRows(details, colors, sizes, variantRows).map((row) => ({ ...row, stock: n })));
   };
 
+  // [2026-08-11] 세부상품 사진 업로드 — 기존 상품사진과 동일한 압축·업로드 API 재사용
+  const pickDetailPhoto = (name: string) => {
+    detailPhotoTargetRef.current = name;
+    detailPhotoInputRef.current?.click();
+  };
+
+  const handleDetailPhotoChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    const name = detailPhotoTargetRef.current;
+    if (!file || !name) return;
+
+    setDetailPhotoUploading(name);
+    try {
+      const optimizedFile = await compressProductImage(file, "cover");
+      const formData = new FormData();
+      formData.append("file", optimizedFile);
+      formData.append("kind", "cover");
+      const response = await fetch("/api/admin-live/product-images/upload", { method: "POST", body: formData });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || payload?.ok === false) throw new Error(payload?.message || "이미지 업로드 실패");
+      const url = String(payload?.url || payload?.publicUrl || payload?.path || "").trim();
+      if (!url) throw new Error("이미지 주소를 받지 못했어요");
+      setDetailPhotos((prev) => ({ ...prev, [name]: url }));
+    } catch (error) {
+      showAdminToast("세부상품 사진 업로드 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
+    } finally {
+      setDetailPhotoUploading("");
+    }
+  };
+
+  const removeDetailPhoto = (name: string) => {
+    setDetailPhotos((prev) => {
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
+  };
+
   const toggleDetailHidden = (name: string) => {
     setDetailHidden((prev) => (prev.includes(name) ? prev.filter((x) => x !== name) : [...prev, name]));
   };
@@ -951,6 +1008,7 @@ export default function QuickProductFastForm({
     setDetailLabel(DETAIL_LABEL_FIXED);
     setDetailPlus({});
     setDetailHidden([]);
+    setDetailPhotos({});
     setBulkStockText("10");
   };
 
@@ -1064,6 +1122,10 @@ export default function QuickProductFastForm({
                 details.map((name) => [name, Math.max(0, Math.floor(Number(String(detailPlus[name] ?? "0").replace(/[^0-9]/g, "")) || 0))]),
               ),
               combo_hidden: details.filter((name) => detailHidden.includes(name)),
+              // [2026-08-11] 세부상품별 대표사진 — 실제로 사진을 넣은 것만 저장(없으면 키 자체를 안 만듦)
+              ...(details.some((name) => detailPhotos[name])
+                ? { detail_photos: Object.fromEntries(details.filter((name) => detailPhotos[name]).map((name) => [name, detailPhotos[name]])) }
+                : {}),
             }
           : {}),
         ...(optionAxesPayload ? { option_axes: optionAxesPayload, combo_detail_values: exposedDetails } : {}),
@@ -1254,6 +1316,21 @@ export default function QuickProductFastForm({
             </div>
           </div>
 
+          {/* [2026-08-11] 카테고리·뱃지는 기본 접힘 — 방송 중엔 옵션·재고가 먼저 보이게 */}
+          {!extraOpen ? (
+            <div style={{ marginBottom: "12px" }}>
+              <button
+                type="button"
+                onClick={() => setExtraOpen(true)}
+                style={{ width: "100%", padding: "9px", border: "1px dashed #D9C5CC", background: "var(--color-surface)", color: "#7B2D43", fontSize: "12px", fontWeight: 800, borderRadius: "8px", cursor: "pointer" }}
+              >
+                ＋ 카테고리 · 상품 뱃지 {category.trim() || badgeTypes.length > 0 ? `(${[category.trim(), badgeTypes.length ? `뱃지 ${badgeTypes.length}` : ""].filter(Boolean).join(" · ")})` : "(선택)"}
+              </button>
+            </div>
+          ) : null}
+
+          {extraOpen ? (
+          <>
           {/* 카테고리 */}
           <div style={{ marginBottom: "14px" }}>
             <div style={sectionLabel}>카테고리</div>
@@ -1319,6 +1396,8 @@ export default function QuickProductFastForm({
               })}
             </div>
           </div>
+          </>
+          ) : null}
 
           {/* ── 옵션 박스 [2026-08-10 통합] 탭 제거 · 슬롯 3개(세부상품/색상/사이즈) 중 쓰는 것만 축이 된다 ── */}
           <div style={{ marginBottom: "14px" }}>
@@ -1482,11 +1561,16 @@ export default function QuickProductFastForm({
               {usedAxisCount > 0 ? (
                 <div style={{ background: "#F5E6EB", border: "1px solid #D9C5CC", color: "#7B2D43", fontSize: "11px", borderRadius: "8px", padding: "8px 10px", marginTop: "9px", lineHeight: 1.7 }}>
                   {details.length > 0 && colors.length > 0
-                    ? <>3단 — 손님은 <b>{detailLabel} → 색상 → 사이즈</b> 순으로 고릅니다. 재고는 <b>&quot;{detailLabel} / 색상&quot; + 사이즈</b>로 관리돼요.</>
+                    ? <>3단 — 손님은 <b>세부상품 → 색상 → 사이즈</b> 순으로 고릅니다. 재고는 <b>&quot;세부상품 / 색상&quot; + 사이즈</b>로 관리돼요.</>
                     : details.length > 0
-                      ? <>손님은 <b>{detailLabel}</b>만 고릅니다. (예전 &quot;세부상품 조합형&quot;과 <b>완전히 같은 방식</b>)</>
+                      ? <>손님은 <b>세부상품</b>만 고릅니다. (예전 &quot;세부상품 조합형&quot;과 <b>완전히 같은 방식</b>)</>
                       : <>손님은 <b>{[colors.length ? "색상" : "", sizes.length ? "사이즈" : ""].filter(Boolean).join(" → ")}</b>을(를) 고릅니다. (예전 &quot;색상·사이즈&quot;와 <b>완전히 같은 방식</b>)</>}
-                  {details.length > 0 ? <><br />추가금은 <b>{detailLabel}</b>별로 넣습니다 · 👁 를 누르면 그 {detailLabel}만 손님에게 숨겨져요.</> : null}
+                  {details.length > 0 ? (
+                    <>
+                      <br />추가금은 <b>세부상품</b>별로 넣습니다 · 👁 를 누르면 그 세부상품만 손님에게 숨겨져요.
+                      <br /><b>＋ 네모칸</b>을 누르면 <b>세부상품마다 사진</b>을 넣을 수 있어요 (손님이 사진 보고 고름) · 사진 위 <b>우클릭</b>하면 삭제.
+                    </>
+                  ) : null}
                 </div>
               ) : null}
             </div>
