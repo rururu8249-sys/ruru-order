@@ -63,6 +63,9 @@ function text(value: unknown): string {
   return String(value ?? "").trim();
 }
 
+// [3단 옵션] 재고 키에 "세부상품 / 색상"으로 합쳐 저장한다(app/order/page.tsx ORDER_AXIS_JOIN 과 반드시 동일).
+const SUBMIT_AXIS_JOIN = " / ";
+
 function firstOrderValue(orderRows: AnyRow[], key: string): unknown {
   return orderRows[0]?.[key];
 }
@@ -219,6 +222,112 @@ async function assertDirectInputAllowed(supabase: any, orderRows: AnyRow[]): Pro
   );
 }
 
+// [2026-08-11] 등록상품 "금액 후려치기" 서버 강제 검증.
+//   왜 필요한가: 주문 저장 RPC(inventory_auto_deduct_rpc.sql 443~448행)는 금액을 손님이 보낸 값 그대로 쓴다.
+//   products.price 를 조회하지 않으므로, 55,000원 상품을 1,000원으로 제출해도 그대로 접수되고 재고는 정상 차감된다.
+//   게다가 final_amount 가 1,000원이 되어 Bankda 자동입금확인이 1,000원 입금을 "정상"으로 매칭해 출고까지 간다.
+//   ⚠️ 설계 원칙 — "정상 주문을 잘못 막는 것"이 더 큰 사고다. 그래서:
+//     ① 카탈로그 가격의 절반(MIN_PRICE_RATIO) 미만만 거부. 높은 금액은 통과.
+//        왜 "절반"인가: 실제 운영 주문 2,255건을 이 규칙으로 되돌려본 결과, 카탈로그보다 낮은 주문은
+//        전부 사장님이 관리자에서 금액을 고친 건(0원 선물·특가·랜덤박스)이었고 최저 비율은 50.8%였다.
+//        "카탈로그보다 1원이라도 낮으면 차단"으로 하면 방송 중 가격을 올리는 순간 이미 담아둔 손님이
+//        전부 막혀 더 큰 사고가 난다. 절반 기준이면 정상 운영은 절대 안 막히고 1원·1,000원 후려치기만 잡힌다.
+//     ② 기대가격이 0이면 검증하지 않음 → 「가격 비움=손님 직접입력」 상품·무료나눔 기존 동작 유지.
+//     ③ 조회 실패 시 무조건 통과 → DB 일시 오류로 주문 전체가 막히는 사고 방지.
+//     ④ 직접입력(product_id 없음)은 대상 아님 → 기존 정책 유지(차단은 assertDirectInputAllowed 담당).
+//     ⑤ 삭제된 상품도 products 행은 남으므로 통과 → 임시주문서에 옛 상품이 남은 손님 보호.
+//   ⚠️ 돈/재고/포인트 RPC는 일절 건드리지 않고, 주문 RPC 호출 전에 차단만 한다.
+function readSubmitNoteObject(value: unknown): AnyRow | null {
+  if (!value) return null;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" ? (parsed as AnyRow) : null;
+    } catch {
+      return null;
+    }
+  }
+  return typeof value === "object" ? (value as AnyRow) : null;
+}
+
+// 조합형 추가금. 손님 화면 comboPlusOfOrderProduct(app/order/page.tsx 932행)와 동일 규칙:
+//   ① color 값과 정확히 일치하는 키 우선  ② [3단] "세부상품 / 색상" 이면 앞부분(세부상품)으로 조회
+// 못 찾으면 0 → 기대가격이 낮아져 "통과" 방향으로만 틀린다(정상 주문을 막지 않음).
+function submitComboSurcharge(productNote: unknown, color: string): number {
+  const note = readSubmitNoteObject(productNote);
+  if (!note || note.combo_mode !== true) return 0;
+  const pricingRaw = note.option_pricing;
+  if (!pricingRaw || typeof pricingRaw !== "object" || Array.isArray(pricingRaw)) return 0;
+  const pricing: Record<string, number> = {};
+  for (const key of Object.keys(pricingRaw as AnyRow)) {
+    pricing[String(key).trim()] = Math.max(0, Math.floor(Number((pricingRaw as AnyRow)[key]) || 0));
+  }
+  const key = String(color ?? "").trim();
+  if (Object.prototype.hasOwnProperty.call(pricing, key)) return pricing[key];
+  const at = key.indexOf(SUBMIT_AXIS_JOIN);
+  if (at >= 0) {
+    const detailKey = key.slice(0, at).trim();
+    return Math.max(0, Math.floor(Number(pricing[detailKey] || 0)));
+  }
+  return 0;
+}
+
+const MIN_PRICE_RATIO = 0.5; // 카탈로그 가격 대비 허용 하한(0.5 = 절반). 실측 근거는 위 주석 참고.
+
+async function assertRegisteredProductPrices(supabase: any, orderRows: AnyRow[]): Promise<void> {
+  const targets = orderRows
+    .map((row) => ({ row, pid: text(row?.product_id) }))
+    .filter((t) => t.pid && /^[0-9]+$/.test(t.pid));
+  if (targets.length === 0) return;
+
+  const ids = Array.from(new Set(targets.map((t) => Number(t.pid))));
+
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, product_name, price, product_note")
+    .in("id", ids);
+
+  if (error) {
+    console.warn("상품 금액 검증: 조회 실패(주문은 진행):", error?.message);
+    return; // 조회 실패 → 허용(주문을 막지 않는다)
+  }
+
+  const catalog = new Map<string, AnyRow>();
+  for (const item of (data || []) as AnyRow[]) catalog.set(String(item?.id), item);
+
+  for (const t of targets) {
+    const product = catalog.get(t.pid);
+
+    // 상품 행 자체가 없다 = 목록에 없는 번호를 직접 만들어 보낸 요청(정상 손님은 절대 발생 안 함)
+    if (!product) {
+      throw new Error(
+        `주문하신 상품을 찾을 수 없어요.${text(t.row?.product_name) ? `\n(${text(t.row?.product_name)})` : ""}\n페이지를 새로고침한 뒤 상품 목록에서 다시 담아주세요.`,
+      );
+    }
+
+    const basePrice = Math.max(0, Math.floor(Number(product?.price) || 0));
+    const surcharge = submitComboSurcharge(product?.product_note, text(t.row?.color));
+    const expected = basePrice + surcharge;
+
+    // 기대가격 0 = 「가격 비움(손님 직접입력)」 상품 · 무료나눔 → 검증하지 않음(기존 동작 유지)
+    if (expected <= 0) continue;
+
+    const rawUnit = t.row?.adjusted_product_price ?? t.row?.product_price;
+    const unitPrice = Math.floor(Number(rawUnit) || 0);
+
+    const minAllowed = Math.floor(expected * MIN_PRICE_RATIO);
+    if (unitPrice < minAllowed) {
+      const pname = text(product?.product_name) || text(t.row?.product_name) || "상품";
+      console.warn(
+        `상품 금액 검증 차단: product_id=${t.pid} ${pname} 낸금액=${unitPrice} 카탈로그=${expected} 하한=${minAllowed}`,
+      );
+      throw new Error(
+        `${pname} 금액이 맞지 않아요.\n상품 가격이 바뀌었을 수 있어요. 페이지를 새로고침한 뒤 다시 담아주세요.`,
+      );
+    }
+  }
+}
+
 // 개인당 구매제한(상품관리 product_note.purchase_limit_enabled/qty) 서버 강제 검증.
 // - ★ 고객 식별 = 카카오 계정(kakao_id). 전화번호는 폴백일 뿐이다.
 //   전화번호로만 누적하면 번호를 바꾸는 순간 제한이 리셋돼 우회가 가능했다(2026-07-09 수정).
@@ -356,6 +465,7 @@ export async function POST(request: NextRequest) {
     // 개인당 구매제한 차단(돈/재고/포인트 RPC 무변경 — RPC 호출 전 검증만)
     //   카톡 계정(kakao_id) 기준 누적 → 전화번호 바꿔도 제한 우회 불가
     await assertDirectInputAllowed(supabase, orderRows);
+    await assertRegisteredProductPrices(supabase, orderRows);
     await assertPurchaseLimit(supabase, orderRows, phone, text(body.kakao_id));
 
     const normalizedSubmit = await normalizeOrderRowsForSubmitSettings(supabase, orderRows);
