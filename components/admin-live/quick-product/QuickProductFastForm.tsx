@@ -1506,7 +1506,17 @@ export default function QuickProductFastForm({
                       {variantGroups.map((group) => (
                         <div key={`grp-${group.detail || "__none__"}`} style={{ marginBottom: "4px" }}>
                           {group.detail ? (
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 82px 34px", gap: "6px", alignItems: "center", background: "#F5E6EB", borderRadius: "6px", padding: "5px 8px", marginBottom: "3px" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "36px 1fr 82px 34px", gap: "6px", alignItems: "center", background: "#F5E6EB", borderRadius: "6px", padding: "5px 8px", marginBottom: "3px" }}>
+                              {/* [2026-08-11] 세부상품별 대표사진 — 손님이 종류 고를 때 사진으로 구분 (스마트스토어·쿠팡의 옵션별 이미지와 동일 개념) */}
+                              <button
+                                type="button"
+                                onClick={() => pickDetailPhoto(group.detail)}
+                                title={detailPhotos[group.detail] ? "사진 바꾸기 (우클릭하면 삭제)" : "이 세부상품 사진 넣기"}
+                                onContextMenu={(e) => { e.preventDefault(); if (detailPhotos[group.detail]) removeDetailPhoto(group.detail); }}
+                                style={{ width: "36px", height: "36px", borderRadius: "7px", border: detailPhotos[group.detail] ? "none" : "1.5px dashed #C9A8B4", background: detailPhotos[group.detail] ? `center/cover no-repeat url(${JSON.stringify(resolveProductImageUrl(detailPhotos[group.detail]))})` : "var(--color-surface)", cursor: "pointer", padding: 0, fontSize: "14px", fontWeight: 800, color: "#B08A99", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}
+                              >
+                                {detailPhotoUploading === group.detail ? "…" : detailPhotos[group.detail] ? "" : "＋"}
+                              </button>
                               <span style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", opacity: detailHidden.includes(group.detail) ? 0.5 : 1 }}>
                                 {group.detail}
                               </span>
@@ -1556,6 +1566,9 @@ export default function QuickProductFastForm({
                   </div>
                 )
               ) : null}
+
+              {/* 세부상품 사진 업로드용 숨은 input (그룹 헤더 사진칸이 이걸 부름) */}
+              <input ref={detailPhotoInputRef} type="file" accept="image/*" onChange={handleDetailPhotoChange} style={{ display: "none" }} />
 
               {/* 저장 형태 안내 — 사장님이 "지금과 같은지" 바로 확인할 수 있게 */}
               {usedAxisCount > 0 ? (
