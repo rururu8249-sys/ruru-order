@@ -901,6 +901,17 @@ export default function QuickProductFastForm({
 
   // [2026-08-11] 프리셋 버튼/항목 공용 스타일 — 세부상품 슬롯과 톤 통일 + 다중선택임을 눈에 보이게
   // [2026-08-11 사장님 지침] 프리셋 드롭다운을 맥 기본 메뉴 느낌으로 — 어두운 라운드 패널 + 왼쪽 ✓
+  // [2026-08-11] 색상/사이즈 칸 상태 안내 — 비우면 "손님 직접입력"(필수), "없음"이면 옵션 자체를 안 씀.
+  //   page.tsx getRegisteredOptionMode(610~637행) 기준: 값 있으면 select / "없음"이면 none / 비면 input.
+  const optionStateHint = (text: string) => {
+    const v = text.trim();
+    if (!v) return { text: "✏️ 손님 직접입력", color: "var(--color-info-tx)" };
+    if (splitOptions(v).length > 0 && splitOptions(v).every((x) => x === "없음")) {
+      return { text: "🚫 사용 안 함", color: "var(--color-ink-mute)" };
+    }
+    return null;
+  };
+
   const presetBtn = (count: number): CSSProperties => ({
     padding: "6px 11px", borderRadius: "7px", fontSize: "11px", fontWeight: 800,
     background: count > 0 ? "#7B2D43" : "#FBF1E0",
@@ -1331,6 +1342,15 @@ export default function QuickProductFastForm({
 
           {extraOpen ? (
           <>
+          <div style={{ marginBottom: "8px", textAlign: "right" }}>
+            <button
+              type="button"
+              onClick={() => setExtraOpen(false)}
+              style={{ padding: "5px 12px", border: "1px solid #D9C5CC", background: "var(--color-surface)", color: "#7B2D43", fontSize: "11px", fontWeight: 800, borderRadius: "7px", cursor: "pointer" }}
+            >
+              − 접기
+            </button>
+          </div>
           {/* 카테고리 */}
           <div style={{ marginBottom: "14px" }}>
             <div style={sectionLabel}>카테고리</div>
@@ -1406,14 +1426,14 @@ export default function QuickProductFastForm({
                 <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>
                   옵션 <span style={{ color: "#7B2D43", fontWeight: 800 }}>{usedAxisCount > 0 ? `${usedAxisCount}단` : "없음"}</span>
                 </span>
-                <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>비우면 그 옵션은 사용 안 함</span>
+                <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>값 넣으면 고르기 · 비우면 손님 직접입력</span>
               </div>
 
               {/* 슬롯 1 — 세부상품(라벨 변경 가능). A-1 / A-2 / A-3 처럼 한 상품 안의 여러 상품 */}
               <div style={optRow}>
                 <span style={optLabel}>세부상품</span>
                 <input style={optInput} type="text" placeholder="A-1, A-2, A-3 (쉼표로 구분)" value={detailText} onChange={(e) => setDetailText(e.target.value)} />
-                {!detailText.trim() ? <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>사용 안 함</span> : null}
+                {!detailText.trim() ? <span style={{ fontSize: "11.5px", fontWeight: 700, color: "var(--color-ink-mute)", whiteSpace: "nowrap" }}>🚫 사용 안 함</span> : null}
               </div>
 
               {/* 슬롯 2 — 색상 */}
@@ -1431,14 +1451,14 @@ export default function QuickProductFastForm({
                         const on = splitOptions(colorText).includes(preset);
                         return (
                           <div key={preset} onClick={() => applyColorPreset(preset)} style={presetItem(on)}>
-                            <span style={{ width: "13px", flexShrink: 0, fontWeight: 900 }}>{on ? "✓" : ""}</span>{preset}
+                            <span style={{ width: "13px", flexShrink: 0, fontWeight: 900 }}>{on ? "✓" : ""}</span>{preset === "없음" ? "🚫 사용 안 함" : preset}
                           </div>
                         );
                       })}
                     </div>
                   ) : null}
                 </div>
-                {!colorText.trim() ? <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>사용 안 함</span> : null}
+                {optionStateHint(colorText) ? <span style={{ fontSize: "11.5px", fontWeight: 700, color: optionStateHint(colorText)!.color, whiteSpace: "nowrap" }}>{optionStateHint(colorText)!.text}</span> : null}
               </div>
 
               {/* 슬롯 3 — 사이즈 */}
@@ -1456,14 +1476,14 @@ export default function QuickProductFastForm({
                         const on = normalizePresetOptions(preset).some((o) => splitOptions(sizeText).includes(o));
                         return (
                           <div key={preset} onClick={() => applySizePreset(preset)} style={presetItem(on)}>
-                            <span style={{ width: "13px", flexShrink: 0, fontWeight: 900 }}>{on ? "✓" : ""}</span>{preset}
+                            <span style={{ width: "13px", flexShrink: 0, fontWeight: 900 }}>{on ? "✓" : ""}</span>{preset === "없음" ? "🚫 사용 안 함" : preset}
                           </div>
                         );
                       })}
                     </div>
                   ) : null}
                 </div>
-                {!sizeText.trim() ? <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>사용 안 함</span> : null}
+                {optionStateHint(sizeText) ? <span style={{ fontSize: "11.5px", fontWeight: 700, color: optionStateHint(sizeText)!.color, whiteSpace: "nowrap" }}>{optionStateHint(sizeText)!.text}</span> : null}
               </div>
 
               {usedAxisCount === 0 ? (
