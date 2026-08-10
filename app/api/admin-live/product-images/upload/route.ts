@@ -24,11 +24,15 @@ function getSupabaseAdmin() {
   });
 }
 
+// [2026-08-11 버그수정] 파일명에 한글이 있으면 Supabase Storage가 "Invalid key"로 업로드를 거부한다
+//   (스토리지 키는 ASCII만 허용). 기존엔 `가-힣`을 허용 문자에 넣어둬서, 한글 이름 사진은 전부 업로드 실패했다.
+//   → 영문/숫자/_/- 만 남기고 나머지는 "-"로 치환. 전부 치환되면 기본 이름 사용.
 function safeFileName(name: string) {
   const base = name
     .replace(/\.[^.]+$/, "")
-    .replace(/[^a-zA-Z0-9가-힣_-]+/g, "-")
+    .replace(/[^a-zA-Z0-9_-]+/g, "-")
     .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
     .slice(0, 50);
 
   return base || "product-image";
