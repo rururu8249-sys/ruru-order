@@ -19,6 +19,9 @@ type OrderSubmitPayload = {
   customerName?: string;
   recipient_name?: string;
   recipient_phone?: string;
+  // [2026-08-11 담기 선착순] 본인 선점 식별용 세션키 (없으면 전화번호 기준 — 구버전 호환)
+  cart_session_key?: string;
+  cartSessionKey?: string;
   kakao_id?: string;
 };
 
@@ -315,12 +318,19 @@ export async function POST(request: NextRequest) {
 
     const normalizedSubmit = await normalizeOrderRowsForSubmitSettings(supabase, orderRows);
 
+    // [2026-08-11 담기 선착순] 세션키 전달 — RPC가 "남의 선점 못 뺏기" 검증 + 제출 성공 시 본인 선점 해제
+    const cartSessionKey = (() => {
+      const t = String(body.cart_session_key ?? body.cartSessionKey ?? "").trim();
+      return t.length >= 6 && t.length <= 80 ? t : null;
+    })();
+
     const { data, error } = await supabase.rpc("submit_customer_order_with_points", {
       p_order_rows: normalizedSubmit.orderRows,
       p_point_use_amount: pointUseAmount,
       p_customer_phone: phone,
       p_youtube_nickname: youtubeNickname,
       p_customer_name: customerName,
+      p_session_key: cartSessionKey,
     });
 
     if (error) {

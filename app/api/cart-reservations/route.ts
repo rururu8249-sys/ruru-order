@@ -97,41 +97,48 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseAdmin();
 
-    // 세션 기존 예약 제거(교체 방식 — 멱등)
-    const { error: delError } = await supabase.from("cart_reservations").delete().eq("session_key", sessionKey);
-    if (delError) return NextResponse.json({ ok: false, error: delError.message }, { status: 500 });
-
-    if (action === "clear") return NextResponse.json({ ok: true, cleared: true });
+    if (action === "clear") {
+      // 해제는 기존 방식 유지(검증 불필요)
+      const { error: delError } = await supabase.from("cart_reservations").delete().eq("session_key", sessionKey);
+      if (delError) return NextResponse.json({ ok: false, error: delError.message }, { status: 500 });
+      return NextResponse.json({ ok: true, cleared: true });
+    }
     if (action !== "sync") return NextResponse.json({ ok: false, error: "알 수 없는 action" }, { status: 400 });
 
+    // [2026-08-11 담기 선착순] 무조건 기록 → 서버 원자 검증(claim_cart_hold RPC)으로 교체.
+    //   같은 상품 동시 담기는 DB 행잠금이 도착 순서대로 직렬화 → 먼저 도착한 담기가 임자.
+    //   부족하면 그 옵션만 거부(results에 ok:false + available). 재고 숫자는 불변(실차감=제출 RPC).
     const phone = String(body?.phone ?? "").replace(/[^0-9]/g, "").slice(0, 20) || null;
-    // [2026-07-16 사장님 지침] 담김현황 표시용 닉네임/이름 저장 (⚠️ 배포 전 cart_reservations에
-    //   nickname/customer_name 컬럼 ADD COLUMN 필요 — 없으면 insert가 실패해 선점 표시가 멈춤)
     const nickname = String(body?.nickname ?? "").trim().slice(0, 40) || null;
     const customerName = String(body?.customerName ?? "").trim().slice(0, 40) || null;
     const rawItems = Array.isArray(body?.items) ? body.items.slice(0, MAX_ITEMS) : [];
-    const holdMinutes = await getHoldMinutes(supabase);
-    const expiresAt = new Date(Date.now() + holdMinutes * 60 * 1000).toISOString();
-    const rows = rawItems
+    const items = rawItems
       .map((it: any) => ({
-        session_key: sessionKey,
-        customer_phone: phone,
-        nickname,
-        customer_name: customerName,
-        product_id: String(it?.productId ?? "").trim().slice(0, 80),
+        productId: String(it?.productId ?? "").trim().slice(0, 80),
         color: normOpt(it?.color).slice(0, 60),
         size: normOpt(it?.size).slice(0, 60),
         qty: Math.max(0, Math.min(MAX_QTY, Number(it?.qty) || 0)),
-        expires_at: expiresAt,
       }))
-      .filter((r: any) => r.product_id && r.qty > 0);
+      .filter((r: any) => r.productId && r.qty > 0);
+    const holdMinutes = await getHoldMinutes(supabase);
 
-    if (rows.length === 0) return NextResponse.json({ ok: true, reserved: 0 });
+    const { data, error } = await supabase.rpc("claim_cart_hold", {
+      p_session_key: sessionKey,
+      p_phone: phone,
+      p_nickname: nickname,
+      p_customer_name: customerName,
+      p_items: items,
+      p_hold_minutes: holdMinutes,
+    });
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
-    const { error: insError } = await supabase.from("cart_reservations").insert(rows);
-    if (insError) return NextResponse.json({ ok: false, error: insError.message }, { status: 500 });
-
-    return NextResponse.json({ ok: true, reserved: rows.length, holdMinutes });
+    return NextResponse.json({
+      ok: true,
+      reserved: items.length,
+      holdMinutes,
+      allOk: (data as any)?.allOk !== false,
+      results: (data as any)?.results ?? [],
+    });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 });
   }

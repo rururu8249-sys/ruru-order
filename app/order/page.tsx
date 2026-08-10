@@ -3073,7 +3073,7 @@ export default function OrderPage() {
         .filter((it) => it.product_id && String(it.product_name || "").trim())
         .map((it) => ({ productId: String(it.product_id), color: String(it.color || ""), size: String(it.size || ""), qty: Math.max(0, Math.min(99, Number(it.qty) || 0)) }))
         .filter((r) => r.qty > 0);
-      await fetch("/api/cart-reservations", {
+      const res = await fetch("/api/cart-reservations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // [2026-07-16 사장님 지침] 담김현황에 누가 담았는지 바로 보이게 닉네임/이름도 함께 저장(표시 전용).
@@ -3087,12 +3087,33 @@ export default function OrderPage() {
           items: payload,
         }),
       });
+      // [2026-08-11 담기 선착순] 서버 원자 검증 결과 반영 — 먼저 담은 손님이 임자.
+      //   거부된 옵션은 남은 수량으로 자동 조정(0이면 제거) + "방금 품절" 안내. 돈/제출 로직 무관.
+      const claim = await res.json().catch(() => null);
+      if (claim?.ok && claim.allOk === false && Array.isArray(claim.results)) {
+        const rejected = claim.results.filter((r: any) => r && r.ok === false);
+        if (rejected.length > 0) {
+          const normR = (s: unknown) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
+          setItems((prev) => prev
+            .map((it) => {
+              const hit = rejected.find((r: any) =>
+                String(r.productId) === String(it.product_id) &&
+                normR(r.color) === normR(it.color) &&
+                normR(r.size) === normR(it.size));
+              if (!hit) return it;
+              const avail = Math.max(0, Number(hit.available) || 0);
+              return avail > 0 ? { ...it, qty: String(avail) } : { ...it, __removeBySoldout: true } as any;
+            })
+            .filter((it: any) => !it.__removeBySoldout));
+          showCustomerNotice("앗, 방금 다른 손님이 먼저 담아서 일부 상품이 품절됐어요. 주문서 수량을 확인해주세요!");
+        }
+      }
     } catch { /* 실패해도 주문 흐름 무영향 */ }
   };
   // 담긴 상품 변경 → 1.5초 디바운스 예약 동기화(주문서 비우면 예약 해제와 동일·제출 성공 시 items 리셋으로 자동 해제)
   useEffect(() => {
     if (!hasSavedInfo) return;
-    const t = setTimeout(() => { void syncCartReservations().then(() => fetchCartReservations()); }, 1500);
+    const t = setTimeout(() => { void syncCartReservations().then(() => fetchCartReservations()); }, 200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, hasSavedInfo]);
@@ -3840,6 +3861,8 @@ export default function OrderPage() {
           customer_phone: cleanPhone,
           youtube_nickname: youtubeNickname.trim(),
           customer_name: customerName.trim(),
+          // [2026-08-11 담기 선착순] 본인 선점 식별용 — 서버가 "남의 선점 못 뺏기" 검증·제출 후 선점 해제에 사용
+          cart_session_key: getCartSessionKey(),
           recipient_name: recipientName.trim() || customerName.trim(),
           recipient_phone: onlyNumber(recipientPhone) || cleanPhone,
           // 안 바뀌는 카카오 정체성 — 주문에 찍어두면 전화/이름 수정돼도 고객 조회가 안 깨짐
