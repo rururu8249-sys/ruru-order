@@ -605,7 +605,8 @@ function registeredProductNoneOptionEnabled(product: BroadcastProduct): boolean 
 // - "input":  실옵션도 없고 토글도 OFF → 고객이 직접 입력해야 함.
 function getRegisteredOptionMode(product: BroadcastProduct, field: "color" | "size"): "select" | "none" | "input" {
   // [조합형 옵션] 세부상품 상품은 color=종류 선택 강제 / size 사용 안 함(레거시 "없음" 센티널 경로 안 탐)
-  if (readComboInfoOrderProduct(product)) return field === "color" ? "select" : "none";
+  //   단 [2026-08-10 3단]은 세부상품이 별도 축이라 color/size 는 아래 일반 로직으로 정상 판정한다.
+  if (readComboInfoOrderProduct(product) && !readOrderAxes3(product)) return field === "color" ? "select" : "none";
   if (getSelectableRegisteredOptions(product, field).length > 0) return "select";
   // field별 독립 판단: color는 color_option_enabled, size는 size_option_enabled
   const record = product as unknown as Record<string, unknown>;
@@ -846,6 +847,25 @@ function lowStockOptionsOrderProduct(product: any, reservedOf?: (color: unknown,
 //   추가금만 product_note.option_pricing({세부상품명: 추가금})에서 읽어 담기 시 단가에 더한다.
 //   조합형이 아닌 상품(combo_mode !== true)은 전부 null/0 반환 → 기존 동작 완전 동일.
 // ─────────────────────────────────────────────────────────────
+// [2026-08-10 3단 옵션] 관리자에서 "세부상품 + 색상/사이즈"를 함께 쓴 상품만 여기서 정보를 돌려준다.
+//   재고 키는 여전히 (color, size) 2칸이며, 3단일 때 color 칸에 "세부상품 / 색상"이 합쳐져 저장돼 있다.
+//   option_axes 가 없는 기존 상품(세부상품만 / 색상+사이즈)은 항상 null → 기존 동작 100% 동일.
+const ORDER_AXIS_JOIN = " / ";
+function readOrderAxes3(product: unknown): { detailLabel: string; detailNames: string[] } | null {
+  const note = readOrderNoteObject(product);
+  const axes = (note as any)?.option_axes;
+  if (!Array.isArray(axes) || axes.length === 0) return null;
+  const detailAxis = axes.find((a: any) => a?.key === "detail");
+  const hasColorOrSize = axes.some((a: any) => a?.key === "color" || a?.key === "size");
+  if (!detailAxis || !hasColorOrSize) return null;
+  const rawNames = Array.isArray((note as any)?.combo_detail_values) && (note as any).combo_detail_values.length > 0
+    ? (note as any).combo_detail_values
+    : (Array.isArray(detailAxis.values) ? detailAxis.values : []);
+  const detailNames = rawNames.map((x: any) => String(x ?? "").trim()).filter(Boolean);
+  if (detailNames.length === 0) return null;
+  return { detailLabel: String(detailAxis.label || "세부상품").trim() || "세부상품", detailNames };
+}
+
 function readComboInfoOrderProduct(product: unknown): { names: string[]; pricing: Record<string, number>; maxPlus: number } | null {
   const note = readOrderNoteObject(product);
   if ((note as any)?.combo_mode !== true) return null;
@@ -856,6 +876,12 @@ function readComboInfoOrderProduct(product: unknown): { names: string[]; pricing
       const v = Math.max(0, Math.floor(Number((pricingRaw as any)[key]) || 0));
       pricing[String(key).trim()] = v;
     }
+  }
+  // [3단] color_options 자리는 "색상"이 차지하므로 세부상품 목록은 combo_detail_values 에서 읽는다.
+  const axes3 = readOrderAxes3(product);
+  if (axes3) {
+    const maxPlus3 = axes3.detailNames.reduce((m, n) => Math.max(m, Number(pricing[n] || 0)), 0);
+    return { names: axes3.detailNames, pricing, maxPlus: maxPlus3 };
   }
   // 노출 세부상품 = color_options (숨김 처리된 세부상품은 stock_variants에만 존재)
   const rawList = (product as any)?.color_options;
@@ -883,7 +909,19 @@ function readComboInfoOrderProduct(product: unknown): { names: string[]; pricing
 function comboPlusOfOrderProduct(product: unknown, color?: string): number {
   const info = readComboInfoOrderProduct(product);
   if (!info) return 0;
-  return Math.max(0, Math.floor(Number(info.pricing[String(color ?? "").trim()] || 0)));
+  const key = String(color ?? "").trim();
+  // 1) 정확히 일치하는 키가 있으면 그대로 (= 기존 상품·기존 동작 100% 동일)
+  if (Object.prototype.hasOwnProperty.call(info.pricing, key)) {
+    return Math.max(0, Math.floor(Number(info.pricing[key] || 0)));
+  }
+  // 2) [2026-08-10 3단] color 칸이 "세부상품 / 색상"으로 합쳐진 경우 앞부분(세부상품)으로 추가금을 찾는다.
+  //    이걸 안 하면 3단 상품이 추가금 0원으로 담기는 돈 사고가 난다.
+  const at = key.indexOf(ORDER_AXIS_JOIN);
+  if (at >= 0) {
+    const detailKey = key.slice(0, at).trim();
+    return Math.max(0, Math.floor(Number(info.pricing[detailKey] || 0)));
+  }
+  return 0;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1232,6 +1270,8 @@ export default function OrderPage() {
   const [registeredOptionQty, setRegisteredOptionQty] = useState(1);
   // [조합형 옵션] 세부상품이 많을 때(예: 미니어처 143종) 옵션 시트 안 검색어 — 표시 전용
   const [registeredOptionComboSearch, setRegisteredOptionComboSearch] = useState("");
+  // [2026-08-10 3단] 세부상품(1번 축) 선택값. 3단이 아닌 상품에서는 사용하지 않음(기존 동작 무변경).
+  const [registeredOptionDetail, setRegisteredOptionDetail] = useState("");
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
   const [duplicateWarningPendingAction, setDuplicateWarningPendingAction] = useState<(() => void) | null>(null);
 
@@ -3300,6 +3340,7 @@ export default function OrderPage() {
     setRegisteredOptionSelectProduct(product);
     setRegisteredOptionColor("");
     setRegisteredOptionSize("");
+    setRegisteredOptionDetail("");
     setRegisteredOptionQty(1);
     setRegisteredOptionComboSearch("");
   };
@@ -3308,6 +3349,7 @@ export default function OrderPage() {
     setRegisteredOptionSelectProduct(null);
     setRegisteredOptionColor("");
     setRegisteredOptionSize("");
+    setRegisteredOptionDetail("");
     setRegisteredOptionQty(1);
     setRegisteredOptionComboSearch("");
   };
@@ -3366,6 +3408,13 @@ export default function OrderPage() {
     const colorMode = getRegisteredOptionMode(product, "color");
     const sizeMode = getRegisteredOptionMode(product, "size");
 
+    // [2026-08-10 3단] 세부상품(1번 축)을 먼저 골라야 한다.
+    const axes3ForAdd = readOrderAxes3(product);
+    if (axes3ForAdd && !registeredOptionDetail.trim()) {
+      showCustomerNotice(`${axes3ForAdd.detailLabel}을(를) 선택해주세요.`);
+      return;
+    }
+
     // none(없음입력 토글 ON)은 입력/선택 불필요. select는 선택 강제, input은 직접입력 강제.
     if (colorMode !== "none" && !normalizeEmptyProductOptionValue(registeredOptionColor)) {
       showCustomerNotice(
@@ -3392,16 +3441,17 @@ export default function OrderPage() {
     const stockMgmtEnabled = (() => { try { const n = typeof product.product_note === "string" ? JSON.parse(product.product_note) : product.product_note; return (n as any)?.stock_management_enabled === true || (product as any).stock_management_enabled === true; } catch { return false; } })();
     if (variants.length > 0 && stockMgmtEnabled) {
       const nm = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
-      const matched = variants.find((v: any) => nm(v.color) === nm(registeredOptionColor) && nm(v.size) === nm(registeredOptionSize));
+      const matched = variants.find((v: any) => nm(v.color) === nm(registeredOptionStorageColor) && nm(v.size) === nm(registeredOptionSize));
       if (matched && Number(matched.stock) <= 0) {
-        showCustomerNotice("선택한 옵션(" + [registeredOptionColor, registeredOptionSize].filter(Boolean).join("/") + ")의 재고가 없습니다.");
+        showCustomerNotice("선택한 옵션(" + [registeredOptionStorageColor, registeredOptionSize].filter(Boolean).join("/") + ")의 재고가 없습니다.");
         return;
       }
     }
 
     const doAdd = () => {
       addRegisteredProductToOrderItems(product, {
-        color: registeredOptionColor,
+        // [3단] 재고 키와 동일하게 "세부상품 / 색상"으로 담는다(주문서·송장에도 그대로 표시)
+        color: registeredOptionStorageColor,
         size: registeredOptionSize,
         qty: registeredOptionQty,
       });
@@ -3411,7 +3461,7 @@ export default function OrderPage() {
     const isDuplicate = await checkDuplicateOrder({
       productId: String(product.id ?? ""),
       productName: product.product_name,
-      color: registeredOptionColor,
+      color: registeredOptionStorageColor,
       size: registeredOptionSize,
     });
     if (isDuplicate) {
@@ -4559,8 +4609,18 @@ export default function OrderPage() {
       return Array.isArray((note as any)?.stock_variants) ? (note as any).stock_variants : [];
     } catch { return []; }
   })();
+  // [2026-08-10 3단] 이 상품이 3단인지 + 재고 조회에 쓸 실제 color 키("세부상품 / 색상")
+  const registeredOptionAxes3 = registeredOptionSelectProduct ? readOrderAxes3(registeredOptionSelectProduct) : null;
+  const joinAxisColor = (colorValue: string) =>
+    registeredOptionAxes3
+      ? [registeredOptionDetail, colorValue].map((v) => String(v ?? "").trim()).filter(Boolean).join(ORDER_AXIS_JOIN)
+      : colorValue;
+  // 담기·재고매칭·중복확인에 쓰는 최종 color 값 (3단이 아니면 기존 그대로)
+  const registeredOptionStorageColor = joinAxisColor(registeredOptionColor);
+
   const isSoldOutColorSize = (color: string, size: string) => {
     const nc = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
+    color = joinAxisColor(color);
     // [재고 홀드] 다른 고객이 담아둔(예약) 수량까지 빼고 품절 판정 — 표시 전용(실차감은 제출 RPC)
     const pid = String(registeredOptionSelectProduct?.id ?? "");
     return registeredOptionStockVariants.length > 0 &&
@@ -4585,7 +4645,9 @@ export default function OrderPage() {
   const registeredOptionPrice = registeredOptionSelectProduct ? Number(registeredOptionSelectProduct.price || 0) : 0;
   // [조합형 옵션] 시트 표시/선택금액 — 선택한 세부상품 추가금 반영(조합형 아니면 plus=0 → 기존 동일)
   const registeredOptionComboInfo = registeredOptionSelectProduct ? readComboInfoOrderProduct(registeredOptionSelectProduct) : null;
-  const registeredOptionComboPlus = registeredOptionComboInfo ? comboPlusOfOrderProduct(registeredOptionSelectProduct, registeredOptionColor) : 0;
+  const registeredOptionComboPlus = registeredOptionComboInfo
+    ? comboPlusOfOrderProduct(registeredOptionSelectProduct, registeredOptionAxes3 ? registeredOptionDetail : registeredOptionColor)
+    : 0;
   const registeredOptionUnitPrice = registeredOptionPrice + registeredOptionComboPlus;
   const registeredOptionTotalPrice = Math.max(1, registeredOptionQty) * (Number.isFinite(registeredOptionUnitPrice) ? registeredOptionUnitPrice : 0);
   const allOptionsSoldOut = registeredOptionSelectProduct ? isSoldOutOrderProduct(registeredOptionSelectProduct) : false;
@@ -5417,7 +5479,7 @@ export default function OrderPage() {
                   {registeredOptionComboInfo ? (
                     <div style={{ marginBottom: "16px" }}>
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>
-                        종류 선택 <span style={{ fontSize: "12px", fontWeight: 700, color: "#ABA5A0" }}>({registeredOptionComboInfo.names.length}가지)</span>
+                        {registeredOptionAxes3 ? registeredOptionAxes3.detailLabel : "종류"} 선택 <span style={{ fontSize: "12px", fontWeight: 700, color: "#ABA5A0" }}>({registeredOptionComboInfo.names.length}가지)</span>
                       </div>
                       {registeredOptionComboInfo.names.length > 8 ? (
                         <div style={{ position: "relative", marginBottom: "8px" }}>
@@ -5435,6 +5497,19 @@ export default function OrderPage() {
                         const query = normalizeSuggestionText(registeredOptionComboSearch);
                         const list = info.names.filter((n) => !query || normalizeSuggestionText(n).includes(query));
                         const stockOf = (name: string): number | null => {
+                          if (registeredOptionAxes3) {
+                            // [3단] 그 세부상품에 속한 모든 (색상×사이즈) 재고 합 — 하나라도 남아 있으면 고를 수 있어야 한다
+                            const prefix = name + ORDER_AXIS_JOIN;
+                            const rows = registeredOptionStockVariants.filter((row: any) => {
+                              const c = String(row?.color ?? "").trim();
+                              return c === name || c.startsWith(prefix);
+                            });
+                            if (rows.length === 0) return null;
+                            return rows.reduce((sum: number, row: any) => {
+                              const rsv = pid ? Number(reservedByVariant[reservationVariantKey(pid, row.color, row.size)] || 0) : 0;
+                              return sum + Math.max(0, Number(row.stock ?? 0) - Math.max(0, rsv));
+                            }, 0);
+                          }
                           const v = registeredOptionStockVariants.find((row: any) => String(row?.color ?? "").trim() === name && !String(row?.size ?? "").trim());
                           if (!v) return null; // 재고관리 OFF 등 — 품절/임박 표시 없음
                           const reserved = pid ? Number(reservedByVariant[reservationVariantKey(pid, name, "")] || 0) : 0;
@@ -5446,7 +5521,7 @@ export default function OrderPage() {
                         return (
                           <div style={{ border: "1px solid #F0EAE0", borderRadius: "12px", maxHeight: "236px", overflowY: "auto", background: "#FFFDFB" }}>
                             {list.map((name) => {
-                              const selected = registeredOptionColor === name;
+                              const selected = (registeredOptionAxes3 ? registeredOptionDetail : registeredOptionColor) === name;
                               const remain = stockOf(name);
                               const soldOut = remain !== null && remain <= 0;
                               const plus = Math.max(0, Math.floor(Number(info.pricing[name] || 0)));
@@ -5454,7 +5529,17 @@ export default function OrderPage() {
                                 <button
                                   key={`combo-${name}`}
                                   type="button"
-                                  onClick={() => { if (soldOut) return; setRegisteredOptionColor((prev) => (prev === name ? "" : name)); }}
+                                  onClick={() => {
+                                    if (soldOut) return;
+                                    if (registeredOptionAxes3) {
+                                      // 세부상품을 바꾸면 그 아래 색상/사이즈 선택은 초기화(다른 재고 조합이라)
+                                      setRegisteredOptionDetail((prev) => (prev === name ? "" : name));
+                                      setRegisteredOptionColor("");
+                                      setRegisteredOptionSize("");
+                                      return;
+                                    }
+                                    setRegisteredOptionColor((prev) => (prev === name ? "" : name));
+                                  }}
                                   style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", textAlign: "left", padding: "12px 14px", border: "none", borderBottom: "1px solid #F6EFE9", background: selected ? "#7A1E47" : "transparent", cursor: soldOut ? "default" : "pointer", opacity: soldOut ? 0.45 : 1 }}
                                 >
                                   <span style={{ minWidth: 0, flex: 1, fontSize: "14px", fontWeight: 700, color: selected ? "#fff" : "#333", textDecoration: soldOut ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
@@ -5470,13 +5555,20 @@ export default function OrderPage() {
                           </div>
                         );
                       })()}
-                      {!registeredOptionColor.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>종류를 선택해주세요</div> : null}
+                      {!(registeredOptionAxes3 ? registeredOptionDetail : registeredOptionColor).trim()
+                        ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>{registeredOptionAxes3 ? registeredOptionAxes3.detailLabel : "종류"}를 선택해주세요</div>
+                        : null}
                     </div>
                   ) : null}
 
-                  {!registeredOptionComboInfo && registeredOptionColorChoices.length > 0 ? (
-                    <div style={{ marginBottom: "16px" }}>
-                      <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>색상</div>
+                  {(!registeredOptionComboInfo || registeredOptionAxes3) && registeredOptionColorChoices.length > 0 ? (
+                    <div style={{ marginBottom: "16px", opacity: registeredOptionAxes3 && !registeredOptionDetail.trim() ? 0.45 : 1, pointerEvents: registeredOptionAxes3 && !registeredOptionDetail.trim() ? "none" : "auto" }}>
+                      <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>
+                        색상
+                        {registeredOptionAxes3 && !registeredOptionDetail.trim()
+                          ? <span style={{ marginLeft: "6px", fontSize: "12px", fontWeight: 700, color: "#ABA5A0" }}>— {registeredOptionAxes3.detailLabel}부터 선택</span>
+                          : null}
+                      </div>
                       {registeredOptionColorChoices.length <= 4 ? (
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                           {registeredOptionColorChoices.map((option) => {
@@ -5513,8 +5605,13 @@ export default function OrderPage() {
                   ) : null}
 
                   {registeredOptionSizeChoices.length > 0 ? (
-                    <div style={{ marginBottom: "16px" }}>
-                      <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>사이즈</div>
+                    <div style={{ marginBottom: "16px", opacity: registeredOptionAxes3 && !registeredOptionDetail.trim() ? 0.45 : 1, pointerEvents: registeredOptionAxes3 && !registeredOptionDetail.trim() ? "none" : "auto" }}>
+                      <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>
+                        사이즈
+                        {registeredOptionAxes3 && !registeredOptionDetail.trim()
+                          ? <span style={{ marginLeft: "6px", fontSize: "12px", fontWeight: 700, color: "#ABA5A0" }}>— {registeredOptionAxes3.detailLabel}부터 선택</span>
+                          : null}
+                      </div>
                       {registeredOptionSizeChoices.length <= 4 ? (
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                           {registeredOptionSizeChoices.map((option) => {

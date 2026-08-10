@@ -221,7 +221,15 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
     if ((note as Record<string, unknown>)["combo_mode"] !== true) return;
     const pricing = (note as Record<string, unknown>)["option_pricing"];
     if (!pricing || typeof pricing !== "object" || Array.isArray(pricing)) return;
-    const plus = Math.max(0, Math.floor(Number((pricing as Record<string, unknown>)[color.trim()]) || 0));
+    // [2026-08-10 3단] color 가 "세부상품 / 색상"이면 앞부분(세부상품)으로 추가금을 찾는다.
+    //   정확히 일치하는 키를 먼저 보므로 기존 조합형 상품은 동작 무변경.
+    const pricingMap = pricing as Record<string, unknown>;
+    const colorKey = color.trim();
+    const sepAt = colorKey.indexOf(" / ");
+    const lookupKey = Object.prototype.hasOwnProperty.call(pricingMap, colorKey)
+      ? colorKey
+      : sepAt >= 0 ? colorKey.slice(0, sepAt).trim() : colorKey;
+    const plus = Math.max(0, Math.floor(Number(pricingMap[lookupKey]) || 0));
     setUnitPrice(String((productPrice(selected) || 0) + plus));
   }, [color, selected, note]);
 

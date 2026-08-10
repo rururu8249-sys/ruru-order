@@ -17,18 +17,18 @@ type QuickProductFastFormProps = {
 
 type VariantStockRow = {
   key: string;
-  color: string;
+  color: string;   // 저장 키 (3단이면 "세부상품 / 색상"으로 합쳐진 값)
   size: string;
   stock: number;
+  detail: string;  // 표시용 — 1번 축(세부상품) 값
+  colorOnly: string; // 표시용 — 2번 축(색상) 값
 };
 
-// [조합형 옵션] 세부상품 편집 행 — 저장 시 color 자리에 name, 추가금은 product_note.option_pricing
-type ComboOptionRow = {
-  name: string;
-  plusText: string;
-  stockText: string;
-  hidden: boolean;
-};
+// [2026-08-10 옵션 통합] 세부상품 축 라벨 후보 — note.option_label 에 저장(고객 화면 제목으로 사용)
+const DETAIL_LABEL_PRESETS = ["세부상품", "종류", "맛", "용량", "브랜드"];
+// 옵션 값 구분자 — 3단일 때 "세부상품 / 색상"을 stock_variants.color 한 칸에 합쳐 넣는다.
+//   (재고 키가 (color,size) 2칸뿐이라 DB·재고차감 RPC를 안 건드리고 3단을 지원하기 위한 방식)
+const AXIS_JOIN = " / ";
 
 type ImagePickerProps = {
   label: string;
@@ -210,6 +210,9 @@ function parseProductNote(row: ProductRow | null | undefined) {
       option_label?: string;
       option_pricing?: Record<string, number>; // { 세부상품명: 추가금(원, 0 이상) }
       combo_hidden?: string[]; // 등록만 하고 고객 노출 막은 세부상품명(가격 미정 등)
+      // [2026-08-10 옵션 통합] 축 정의 — 고객 화면이 몇 단으로 보여줄지 판단하는 원천
+      option_axes?: Array<{ key: "detail" | "color" | "size"; label: string; values: string[] }>;
+      combo_detail_values?: string[]; // 1번 축(세부상품) 노출 값 — 3단일 때 color_options는 색상이 차지하므로 별도 보관
       // [무료나눔 · 2026-07-22] true면 0원 상품(선물). 가격 비움(손님 직접입력)과 구분되는 명시 플래그
       free_product?: boolean;
     };
@@ -218,23 +221,30 @@ function parseProductNote(row: ProductRow | null | undefined) {
   }
 }
 
-function buildVariantRows(colors: string[], sizes: string[], previous: VariantStockRow[]) {
+// [2026-08-10 옵션 통합] 1~3축 조합 생성.
+//   저장 키는 기존과 동일하게 (color, size) 2칸 — 세부상품이 있으면 color 칸에 "세부상품 / 색상"으로 합친다.
+//   · 세부상품만        → color="A-1",        size=""      (= 기존 조합형과 100% 동일)
+//   · 색상만            → color="블랙",       size=""      (= 기존과 100% 동일)
+//   · 색상+사이즈       → color="블랙",       size="M"     (= 기존과 100% 동일)
+//   · 세부+색상+사이즈  → color="A-1 / 블랙", size="M"     (신규)
+function buildVariantRows(details: string[], colors: string[], sizes: string[], previous: VariantStockRow[]) {
+  const safeDetails = details.length ? details : [""];
   const safeColors = colors.length ? colors : [""];
   const safeSizes = sizes.length ? sizes : [""];
   const previousMap = new Map(previous.map((row) => [row.key, row.stock]));
+  const rows: VariantStockRow[] = [];
 
-  return safeColors.flatMap((color) =>
-    safeSizes.map((size) => {
-      const key = `${color || "__EMPTY_COLOR__"}__${size || "__EMPTY_SIZE__"}`;
+  for (const detail of safeDetails) {
+    for (const colorOnly of safeColors) {
+      for (const size of safeSizes) {
+        const color = [detail, colorOnly].filter(Boolean).join(AXIS_JOIN);
+        const key = `${color || "__EMPTY_COLOR__"}__${size || "__EMPTY_SIZE__"}`;
+        rows.push({ key, color, size, stock: previousMap.get(key) ?? 0, detail, colorOnly });
+      }
+    }
+  }
 
-      return {
-        key,
-        color,
-        size,
-        stock: previousMap.get(key) ?? 0,
-      };
-    }),
-  );
+  return rows;
 }
 
 function getMissingColumn(errorMessage: string) {
@@ -557,7 +567,9 @@ export default function QuickProductFastForm({
   const [newCategoryText, setNewCategoryText] = useState("");
   const [productName, setProductName] = useState("");
   const [priceText, setPriceText] = useState("");
-  const [stockManagementEnabled, setStockManagementEnabled] = useState(false);
+  // [2026-08-10 0단계] 기본 ON — 방송 상품은 거의 전부 재고관리가 필요한데 기본이 꺼져 있어
+  //   재고를 입력하고도 무제한으로 저장되는 사고가 있었다(8/10 오버셀과 같은 경로).
+  const [stockManagementEnabled, setStockManagementEnabled] = useState(true);
   const [shippingType, setShippingType] = useState("normal");
   const [isVisible, setIsVisible] = useState(true);
   const [isPinned, setIsPinned] = useState(false);
@@ -578,9 +590,12 @@ export default function QuickProductFastForm({
   const [totalStockText, setTotalStockText] = useState("0");
   const [variantRows, setVariantRows] = useState<VariantStockRow[]>([]);
 
-  // [조합형 옵션] 옵션 편집 방식 — 기본은 기존(색상/사이즈) 그대로, 켜면 세부상품(이름+추가금+재고) 표
-  const [optionEditMode, setOptionEditMode] = useState<"legacy" | "combo">("legacy");
-  const [comboRows, setComboRows] = useState<ComboOptionRow[]>([]);
+  // [2026-08-10 옵션 통합] 탭 제거 — 옵션 슬롯 3개(세부상품/색상/사이즈) 중 값을 넣은 것만 축으로 사용.
+  //   세부상품만 = 기존 "조합형"과 저장 결과 동일 / 색상+사이즈 = 기존과 동일 / 셋 다 = 신규 3단
+  const [detailText, setDetailText] = useState("");
+  const [detailLabel, setDetailLabel] = useState("세부상품");
+  const [detailPlus, setDetailPlus] = useState<Record<string, string>>({}); // 세부상품명 → 추가금(문자)
+  const [detailHidden, setDetailHidden] = useState<string[]>([]);           // 고객에게 숨길 세부상품명
 
   // [무료나눔 · 2026-07-22] 0원 상품 플래그 — note.free_product (가격 비움=직접입력과 구분)
   const [freeProductEnabled, setFreeProductEnabled] = useState(false);
@@ -689,12 +704,19 @@ export default function QuickProductFastForm({
     if (noteVariants.length > 0) {
       setStockMode("option");
       setVariantRows(
-        noteVariants.map((row) => ({
-          key: `${row.color || "__EMPTY_COLOR__"}__${row.size || "__EMPTY_SIZE__"}`,
-          color: row.color || "",
-          size: row.size || "",
-          stock: Number(row.stock || 0),
-        })),
+        noteVariants.map((row) => {
+          const savedColor = row.color || "";
+          // 3단으로 저장된 경우 color 칸이 "세부상품 / 색상" 형태 → 표시용으로만 분해(저장 키는 그대로)
+          const sepAt = savedColor.indexOf(AXIS_JOIN);
+          return {
+            key: `${savedColor || "__EMPTY_COLOR__"}__${row.size || "__EMPTY_SIZE__"}`,
+            color: savedColor,
+            size: row.size || "",
+            stock: Number(row.stock || 0),
+            detail: sepAt >= 0 ? savedColor.slice(0, sepAt) : savedColor,
+            colorOnly: sepAt >= 0 ? savedColor.slice(sepAt + AXIS_JOIN.length) : "",
+          };
+        }),
       );
     } else {
       setStockMode("total");
@@ -705,36 +727,58 @@ export default function QuickProductFastForm({
     // [무료나눔] 플래그 복원
     setFreeProductEnabled(productNote?.free_product === true);
 
-    // [조합형 옵션] 수정 모드 복원 — 세부상품명/추가금/재고/노출을 표로 복원
-    if (productNote?.combo_mode === true) {
-      const pricing = (productNote.option_pricing && typeof productNote.option_pricing === "object") ? productNote.option_pricing : {};
-      const hiddenList = Array.isArray(productNote.combo_hidden) ? productNote.combo_hidden.map((x) => String(x ?? "").trim()) : [];
-      const stockByName = new Map<string, number>();
+    // [2026-08-10 옵션 통합] 수정 모드 복원 — 축(세부상품/색상/사이즈) 되살리기
+    const pricing = (productNote?.option_pricing && typeof productNote.option_pricing === "object")
+      ? (productNote.option_pricing as Record<string, unknown>) : {};
+    const hiddenList = Array.isArray(productNote?.combo_hidden)
+      ? productNote.combo_hidden.map((x) => String(x ?? "").trim()) : [];
+    const axes = Array.isArray(productNote?.option_axes) ? productNote.option_axes : null;
+
+    let restoredDetails: string[] = [];
+    if (axes && axes.length > 0) {
+      // 신규 형식 — 축 정의를 그대로 복원
+      const find = (k: string) => axes.find((a) => a?.key === k);
+      const dv = find("detail");
+      const cv = find("color");
+      const sv = find("size");
+      restoredDetails = Array.isArray(dv?.values) ? dv!.values.map((x) => String(x ?? "").trim()).filter(Boolean) : [];
+      setDetailText(restoredDetails.join(", "));
+      setDetailLabel(String(dv?.label || "세부상품"));
+      setColorText(Array.isArray(cv?.values) ? cv!.values.join(", ") : "");
+      setSizeText(Array.isArray(sv?.values) ? sv!.values.join(", ") : "");
+    } else if (productNote?.combo_mode === true) {
+      // 옛 조합형 — 세부상품명이 color_options / stock_variants.color 에 들어있다
+      const stockNames: string[] = [];
       for (const row of noteVariants) {
         const nm = String(row.color ?? "").trim();
-        if (nm) stockByName.set(nm, Number(row.stock || 0));
+        if (nm && !stockNames.includes(nm)) stockNames.push(nm);
       }
-      // 노출 순서 = color_options 우선, 숨김(변형에만 있는) 항목은 뒤에
-      const exposed = pickArray(initialProduct, ["color_options", "colors"]).filter((n) => stockByName.has(n));
-      const rest = [...stockByName.keys()].filter((n) => !exposed.includes(n));
-      const ordered = [...exposed, ...rest];
-      setOptionEditMode("combo");
-      setComboRows(
-        ordered.map((name) => ({
-          name,
-          plusText: String(Math.max(0, Math.floor(Number((pricing as Record<string, unknown>)[name]) || 0))),
-          stockText: String(stockByName.get(name) ?? 0),
-          hidden: hiddenList.includes(name),
-        })),
-      );
+      const exposed = pickArray(initialProduct, ["color_options", "colors"]).filter((n) => stockNames.includes(n));
+      const rest = stockNames.filter((n) => !exposed.includes(n));
+      restoredDetails = [...exposed, ...rest];
+      setDetailText(restoredDetails.join(", "));
+      setDetailLabel(String(productNote?.option_label || "세부상품"));
+      setColorText("");
+      setSizeText("");
     } else {
-      setOptionEditMode("legacy");
-      setComboRows([]);
+      // 옛 색상·사이즈 — 위(685~686행)에서 이미 colorText/sizeText 를 채웠으므로 세부상품만 비운다
+      setDetailText("");
+      setDetailLabel("세부상품");
     }
+
+    const nextPlus: Record<string, string> = {};
+    for (const name of restoredDetails) {
+      nextPlus[name] = String(Math.max(0, Math.floor(Number(pricing[name]) || 0)));
+    }
+    setDetailPlus(nextPlus);
+    setDetailHidden(hiddenList.filter((n) => restoredDetails.includes(n)));
   }, [initialProduct]);
 
+  const details = useMemo(() => unique(splitOptions(detailText)), [detailText]);
   const colors = useMemo(() => unique(splitOptions(colorText)), [colorText]);
   const sizes = useMemo(() => unique(splitOptions(sizeText)), [sizeText]);
+  // 사용 중인 축 개수(1~3). 0이면 옵션 없는 단일 상품.
+  const usedAxisCount = (details.length ? 1 : 0) + (colors.length ? 1 : 0) + (sizes.length ? 1 : 0);
 
   const noneOptionAutofillEnabled = colorText.trim() === "없음" && sizeText.trim() === "없음";
 
@@ -751,8 +795,8 @@ export default function QuickProductFastForm({
 
   const resolvedVariantRows = useMemo(() => {
     if (stockMode !== "option") return [];
-    return buildVariantRows(colors, sizes, variantRows);
-  }, [colors, sizes, stockMode, variantRows]);
+    return buildVariantRows(details, colors, sizes, variantRows);
+  }, [details, colors, sizes, stockMode, variantRows]);
 
   const totalStock = useMemo(() => {
     if (stockMode === "option") {
@@ -762,10 +806,10 @@ export default function QuickProductFastForm({
     return moneyNumber(totalStockText);
   }, [resolvedVariantRows, stockMode, totalStockText]);
 
-  // 색상/사이즈 옵션이 있으면 옵션별(option) 재고, 없으면 단순 총(total) 재고로 자동 전환.
+  // 옵션(세부상품/색상/사이즈)이 하나라도 있으면 옵션별(option) 재고, 없으면 단순 총(total) 재고로 자동 전환.
   useEffect(() => {
-    setStockMode(colors.length > 0 || sizes.length > 0 ? "option" : "total");
-  }, [colors.length, sizes.length]);
+    setStockMode(details.length > 0 || colors.length > 0 || sizes.length > 0 ? "option" : "total");
+  }, [details.length, colors.length, sizes.length]);
 
   const applyColorPreset = (preset: string) => {
     setColorText((current) => {
@@ -822,12 +866,29 @@ export default function QuickProductFastForm({
   };
 
   const updateVariantStock = (targetKey: string, stock: number) => {
-    const nextRows = buildVariantRows(colors, sizes, variantRows).map((row) =>
+    const nextRows = buildVariantRows(details, colors, sizes, variantRows).map((row) =>
       row.key === targetKey ? { ...row, stock } : row,
     );
 
     setVariantRows(nextRows);
   };
+
+  // [2026-08-10] 조합이 많아지면(3단은 최대 수십 줄) 한 칸씩 못 채우므로 일괄 적용을 둔다.
+  const [bulkStockText, setBulkStockText] = useState("10");
+  const applyBulkStock = () => {
+    const n = Math.max(0, Math.floor(Number(String(bulkStockText).replace(/[^0-9]/g, "")) || 0));
+    setVariantRows(buildVariantRows(details, colors, sizes, variantRows).map((row) => ({ ...row, stock: n })));
+  };
+
+  const toggleDetailHidden = (name: string) => {
+    setDetailHidden((prev) => (prev.includes(name) ? prev.filter((x) => x !== name) : [...prev, name]));
+  };
+
+  // 세부상품별로 조합 행을 묶어서 보여주기 위한 그룹 (세부상품 미사용이면 단일 그룹)
+  const variantGroups = useMemo(() => {
+    if (details.length === 0) return [{ detail: "", rows: resolvedVariantRows }];
+    return details.map((detail) => ({ detail, rows: resolvedVariantRows.filter((row) => row.detail === detail) }));
+  }, [details, resolvedVariantRows]);
 
   const resetForm = () => {
     setCategory("");
@@ -845,8 +906,12 @@ export default function QuickProductFastForm({
     setVariantRows([]);
     setDescription("");
     setFreeProductEnabled(false);
-    setOptionEditMode("legacy");
-    setComboRows([]);
+    setStockManagementEnabled(true);
+    setDetailText("");
+    setDetailLabel("세부상품");
+    setDetailPlus({});
+    setDetailHidden([]);
+    setBulkStockText("10");
   };
 
   const saveProduct = async () => {
@@ -884,34 +949,32 @@ export default function QuickProductFastForm({
       return;
     }
 
-    // [조합형 옵션] 세부상품 행 정리·검증 — 이름 필수·중복 금지, 추가금·재고는 0 이상 정수
-    const comboActive = optionEditMode === "combo";
-    const comboClean = comboActive
-      ? comboRows
-          .map((row) => ({
-            name: row.name.trim(),
-            plus: Math.max(0, Math.floor(Number(String(row.plusText).replace(/[^0-9]/g, "")) || 0)),
-            stock: Math.max(0, Math.floor(Number(String(row.stockText).replace(/[^0-9]/g, "")) || 0)),
-            hidden: row.hidden,
-          }))
-          .filter((row) => row.name)
-      : [];
+    // [2026-08-10 옵션 통합] 축 검증
+    const detailActive = details.length > 0;
+    const exposedDetails = details.filter((name) => !detailHidden.includes(name));
 
-    if (comboActive) {
-      if (comboClean.length === 0) {
-        showAdminToast("세부상품을 1개 이상 입력해주세요.", "error");
+    if (detailActive && exposedDetails.length === 0) {
+      showAdminToast(`모든 ${detailLabel}이(가) 숨김 상태예요. 최소 1개는 노출을 켜주세요.\n(상품 자체를 숨기려면 아래 '고객 노출'을 꺼주세요)`, "error");
+      return;
+    }
+
+    // 3단(세부상품+색상)일 때는 두 값을 " / "로 합쳐 재고 키를 만든다 → 값 안에 "/"가 있으면 키가 깨진다.
+    if (detailActive && colors.length > 0) {
+      const bad = [...details, ...colors].find((v) => v.includes("/"));
+      if (bad) {
+        showAdminToast(`옵션 값에 "/" 를 쓸 수 없어요: ${bad}\n(세부상품과 색상을 함께 쓰면 "세부상품 / 색상"으로 재고를 관리해서 충돌합니다)`, "error");
         return;
       }
-      const seen = new Set<string>();
-      for (const row of comboClean) {
-        if (seen.has(row.name)) {
-          showAdminToast(`세부상품명이 중복됐습니다: ${row.name}`, "error");
-          return;
-        }
-        seen.add(row.name);
-      }
-      if (comboClean.every((row) => row.hidden)) {
-        showAdminToast("모든 세부상품이 노출 꺼짐 상태예요. 최소 1개는 노출을 켜주세요.\n(상품 자체를 숨기려면 아래 '고객 노출'을 꺼주세요)", "error");
+    }
+
+    // [2026-08-10 0단계 · 사고 방지] 재고를 입력해 놓고 재고관리가 꺼져 있으면 무제한 판매로 저장된다.
+    //   지금까지 경고가 없어 오버셀 사고 경로가 됐다 → 저장 자체를 막는다.
+    if (!stockManagementEnabled) {
+      const enteredStock = stockMode === "option"
+        ? resolvedVariantRows.reduce((sum, row) => sum + Number(row.stock || 0), 0)
+        : moneyNumber(totalStockText);
+      if (enteredStock > 0) {
+        showAdminToast("재고를 입력했는데 '재고관리'가 꺼져 있어요.\n이대로 등록하면 재고와 상관없이 무제한으로 팔립니다.\n\n재고관리를 켜거나, 재고를 0으로 비워주세요.", "error");
         return;
       }
     }
@@ -919,46 +982,57 @@ export default function QuickProductFastForm({
     setSaving(true);
 
     try {
-      // [조합형] 세부상품명을 color 자리에 저장(size는 빈값) → 재고차감 RPC·선점·품절 기존 경로 그대로 동작
-      const variantStockPayload = comboActive
-        ? comboClean.map((row) => ({ color: row.name, size: "", stock: row.stock }))
-        : resolvedVariantRows.map((row) => ({
-            color: row.color,
-            size: row.size,
-            stock: Number(row.stock || 0),
-          }));
+      // [2026-08-10 옵션 통합] 저장 키는 항상 (color, size) 2칸 — 3단이면 color 칸에 "세부상품 / 색상"이 이미 합쳐져 있다.
+      //   축1(세부상품만)·축2(색상+사이즈)는 기존과 완전히 동일한 형태로 저장된다(회귀 0).
+      const variantStockPayload = resolvedVariantRows.map((row) => ({
+        color: row.color,
+        size: row.size,
+        stock: Number(row.stock || 0),
+      }));
 
-      const comboTotalStock = comboClean.reduce((sum, row) => sum + row.stock, 0);
+      // 축 정의는 "세부상품 + (색상 또는 사이즈)" 3단 이상일 때만 기록 →
+      //   기존 축1·축2 상품의 note 키 구성이 지금과 100% 동일하게 유지된다.
+      const needAxes = detailActive && (colors.length > 0 || sizes.length > 0);
+      const optionAxesPayload = needAxes
+        ? [
+            { key: "detail" as const, label: detailLabel, values: details },
+            ...(colors.length > 0 ? [{ key: "color" as const, label: "색상", values: colors }] : []),
+            ...(sizes.length > 0 ? [{ key: "size" as const, label: "사이즈", values: sizes }] : []),
+          ]
+        : null;
 
       const productNote = JSON.stringify({
-        stock_mode: comboActive ? "option" : stockMode,
+        stock_mode: stockMode,
         stock_variants: variantStockPayload,
         stock_management_enabled: stockManagementEnabled,
         purchase_limit_enabled: purchaseLimitEnabled,
         purchase_limit_qty: purchaseLimitEnabled ? Math.max(1, Number(purchaseLimitText) || 1) : 0,
         registered_order_enabled: registeredOrderEnabled,
         // [조합형] 직접입력 추천 제외(추가금 누락 방지) / [무료나눔] 추천 제외(직접입력 경로는 0원 금지 정책이라 혼선 방지)
-        name_suggestion_enabled: comboActive || freeProductEnabled ? false : nameSuggestionEnabled,
+        name_suggestion_enabled: detailActive || freeProductEnabled ? false : nameSuggestionEnabled,
         suggestion_keywords: suggestionKeywordsText
           .split(",")
           .map((keyword) => keyword.trim())
           .filter(Boolean),
         category: category.trim(),
         free_product: freeProductEnabled,
-        ...(comboActive
+        ...(detailActive
           ? {
               combo_mode: true,
-              option_label: "종류",
-              option_pricing: Object.fromEntries(comboClean.map((row) => [row.name, row.plus])),
-              combo_hidden: comboClean.filter((row) => row.hidden).map((row) => row.name),
+              option_label: detailLabel,
+              option_pricing: Object.fromEntries(
+                details.map((name) => [name, Math.max(0, Math.floor(Number(String(detailPlus[name] ?? "0").replace(/[^0-9]/g, "")) || 0))]),
+              ),
+              combo_hidden: details.filter((name) => detailHidden.includes(name)),
             }
           : {}),
+        ...(optionAxesPayload ? { option_axes: optionAxesPayload, combo_detail_values: exposedDetails } : {}),
       });
 
       const payload: Record<string, unknown> = {
         product_name: name,
         price,
-        stock: comboActive ? comboTotalStock : totalStock,
+        stock: totalStock,
         status: isVisible ? "판매중" : "숨김",
         product_type: resolvedProductType,
         badge_types: badgeTypes,
@@ -969,11 +1043,11 @@ export default function QuickProductFastForm({
         is_pinned: isPinned,
         pinned_at: nextPinnedAt,
         image_url: coverImages[0] || null,
-        // [조합형] color_options = 노출 세부상품명(숨김 제외) — 고객 시트 "종류 선택" 목록의 원천
-        color_options: comboActive ? comboClean.filter((row) => !row.hidden).map((row) => row.name) : colors,
-        size_options: comboActive ? [] : sizes,
-        color_option_enabled: comboActive ? true : colors.length > 0,
-        size_option_enabled: comboActive ? false : sizes.length > 0,
+        // color_options: 3단이면 "색상" 목록, 세부상품만 쓰면 노출 세부상품명(= 기존 조합형과 동일)
+        color_options: detailActive && colors.length === 0 ? exposedDetails : colors,
+        size_options: sizes,
+        color_option_enabled: detailActive ? true : colors.length > 0,
+        size_option_enabled: sizes.length > 0,
         product_description: normalizeTextareaText(description).trim() || null,
         detail_image_urls: detailImages,
         is_visible: isVisible,
@@ -1206,47 +1280,30 @@ export default function QuickProductFastForm({
             </div>
           </div>
 
-          {/* 옵션 박스 */}
+          {/* ── 옵션 박스 [2026-08-10 통합] 탭 제거 · 슬롯 3개(세부상품/색상/사이즈) 중 쓰는 것만 축이 된다 ── */}
           <div style={{ marginBottom: "14px" }}>
             <div style={{ border: "1px solid #E8E2DD", borderRadius: "8px", padding: "12px", background: "#F7F5F3" }}>
-              <div style={{ fontSize: "12px", color: "var(--color-ink-mute)", marginBottom: "10px" }}>옵션 (각각 켜고 / 직접입력·선택)</div>
-
-              {/* [조합형 옵션] 옵션 방식 선택 — 기본값 "색상·사이즈"(기존 그대로), 조합형은 켠 상품만 */}
-              <div style={{ display: "flex", background: "var(--color-surface)", border: "1px solid #E8E2DD", borderRadius: "8px", overflow: "hidden", marginBottom: "12px" }}>
-                <button type="button" onClick={() => setOptionEditMode("legacy")} style={{ flex: 1, padding: "8px 4px", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 800, background: optionEditMode === "legacy" ? "#7B2D43" : "transparent", color: optionEditMode === "legacy" ? "#fff" : "var(--color-ink-mute)" }}>색상·사이즈 (기존)</button>
-                <button type="button" onClick={() => { setOptionEditMode("combo"); setComboRows((prev) => (prev.length ? prev : [{ name: "", plusText: "0", stockText: "0", hidden: false }])); }} style={{ flex: 1, padding: "8px 4px", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 800, background: optionEditMode === "combo" ? "#7B2D43" : "transparent", color: optionEditMode === "combo" ? "#fff" : "var(--color-ink-mute)" }}>세부상품 조합형</button>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>
+                  옵션 <span style={{ color: "#7B2D43", fontWeight: 800 }}>{usedAxisCount > 0 ? `${usedAxisCount}단` : "없음"}</span>
+                </span>
+                <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>비우면 그 옵션은 사용 안 함</span>
               </div>
 
-              {optionEditMode === "combo" ? (
-                <div>
-                  <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginBottom: "8px", lineHeight: 1.6 }}>
-                    한 상품 안에서 여러 세부상품을 드롭다운으로 고르게 합니다 (예: 디올 향수 → 소바쥬/어딕트…).<br />
-                    위 가격 = <b>기본가(제일 싼 금액)</b> · 세부상품 판매가 = 기본가 + 추가금 · 재고 0 = 품절 표시
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 74px 58px 40px 22px", gap: "6px", padding: "0 2px 4px", fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>
-                    <span>세부상품명</span><span style={{ textAlign: "right" }}>추가금</span><span style={{ textAlign: "right" }}>재고</span><span style={{ textAlign: "center" }}>노출</span><span />
-                  </div>
-                  <div style={{ maxHeight: "240px", overflowY: "auto" }}>
-                    {comboRows.map((row, idx) => (
-                      <div key={`combo-row-${idx}`} style={{ display: "grid", gridTemplateColumns: "1fr 74px 58px 40px 22px", gap: "6px", alignItems: "center", padding: "3px 0" }}>
-                        <input style={{ fontSize: "12px", padding: "6px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", opacity: row.hidden ? 0.55 : 1 }} type="text" placeholder="예: 디올 소바쥬" value={row.name} onChange={(e) => setComboRows((prev) => prev.map((r, i) => (i === idx ? { ...r, name: e.target.value } : r)))} />
-                        <input style={{ fontSize: "12px", padding: "6px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", opacity: row.hidden ? 0.55 : 1 }} type="text" inputMode="numeric" value={row.plusText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setComboRows((prev) => prev.map((r, i) => (i === idx ? { ...r, plusText: e.target.value.replace(/[^0-9]/g, "") } : r)))} />
-                        <input style={{ fontSize: "12px", padding: "6px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", opacity: row.hidden ? 0.55 : 1 }} type="text" inputMode="numeric" value={row.stockText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setComboRows((prev) => prev.map((r, i) => (i === idx ? { ...r, stockText: e.target.value.replace(/[^0-9]/g, "") } : r)))} />
-                        <button type="button" title={row.hidden ? "고객에게 숨김(가격 미정 등) — 누르면 노출" : "노출 중 — 누르면 숨김"} onClick={() => setComboRows((prev) => prev.map((r, i) => (i === idx ? { ...r, hidden: !r.hidden } : r)))} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: "14px", textAlign: "center", padding: 0 }}>{row.hidden ? "🚫" : "👁"}</button>
-                        <button type="button" onClick={() => setComboRows((prev) => prev.filter((_, i) => i !== idx))} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: "12px", color: "#C0392B", padding: 0 }}>✕</button>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "8px" }}>
-                    <button type="button" onClick={() => setComboRows((prev) => [...prev, { name: "", plusText: "0", stockText: "0", hidden: false }])} style={{ border: "1.5px dashed #7B2D43", background: "var(--color-surface)", color: "#7B2D43", fontSize: "12px", fontWeight: 800, borderRadius: "8px", padding: "6px 12px", cursor: "pointer" }}>+ 세부상품 추가</button>
-                    <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>
-                      {comboRows.filter((r) => r.name.trim()).length}종 · 총 재고 {comboRows.reduce((s, r) => s + (Math.max(0, Math.floor(Number(String(r.stockText).replace(/[^0-9]/g, "")) || 0))), 0).toLocaleString("ko-KR")}개
-                    </span>
-                  </div>
-                </div>
-              ) : (
-              <>
-              {/* 색상 — togglePill 제거, 프리셋 드롭다운(사이즈와 동일 구조) */}
+              {/* 슬롯 1 — 세부상품(라벨 변경 가능). A-1 / A-2 / A-3 처럼 한 상품 안의 여러 상품 */}
+              <div style={optRow}>
+                <select
+                  value={detailLabel}
+                  onChange={(e) => setDetailLabel(e.target.value)}
+                  style={{ width: "76px", flexShrink: 0, fontSize: "11px", fontWeight: 800, padding: "6px 2px", border: "1px solid #E8E2DD", borderRadius: "6px", background: "#FBF1E0", color: "var(--color-warn-tx)", cursor: "pointer" }}
+                >
+                  {DETAIL_LABEL_PRESETS.map((l) => <option key={l} value={l}>{l}</option>)}
+                </select>
+                <input style={optInput} type="text" placeholder="A-1, A-2, A-3 (쉼표로 구분)" value={detailText} onChange={(e) => setDetailText(e.target.value)} />
+                {!detailText.trim() ? <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>사용 안 함</span> : null}
+              </div>
+
+              {/* 슬롯 2 — 색상 */}
               <div style={optRow}>
                 <span style={optLabel}>색상</span>
                 <input style={optInput} type="text" placeholder="화이트, 블랙, 베이지" value={colorText} onChange={(e) => setColorText(e.target.value)} />
@@ -1263,10 +1320,10 @@ export default function QuickProductFastForm({
                     </div>
                   ) : null}
                 </div>
-                {!colorText.trim() ? <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>고객 직접입력</span> : null}
+                {!colorText.trim() ? <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>사용 안 함</span> : null}
               </div>
 
-              {/* 사이즈 — togglePill 제거, 프리셋 드롭다운 */}
+              {/* 슬롯 3 — 사이즈 */}
               <div style={optRow}>
                 <span style={optLabel}>사이즈</span>
                 <input style={optInput} type="text" placeholder="220, 230, 240" value={sizeText} onChange={(e) => setSizeText(e.target.value)} />
@@ -1283,63 +1340,116 @@ export default function QuickProductFastForm({
                     </div>
                   ) : null}
                 </div>
-                {!sizeText.trim() ? <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>고객 직접입력</span> : null}
+                {!sizeText.trim() ? <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>사용 안 함</span> : null}
               </div>
 
-              {/* 수량 — togglePill 제거, 안내텍스트만 */}
-              <div style={optRow}>
-                <span style={optLabel}>수량</span>
-                <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>손님이 숫자 입력</span>
+              {usedAxisCount === 0 ? (
+                <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", padding: "2px 2px 0" }}>옵션 없는 단일 상품으로 등록됩니다. 손님은 수량만 고릅니다.</div>
+              ) : null}
+
+              {/* ── 재고관리 (옵션 박스 안으로 이동 — 재고 표 바로 위) ── */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #E8E2DD", marginTop: "10px", paddingTop: "10px" }}>
+                <div>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--color-ink)" }}>재고관리</div>
+                  <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "1px" }}>{stockManagementEnabled ? "재고 수량 관리 중" : "(끄면 무제한 — 재고를 세지 않음)"}</div>
+                </div>
+                <div onClick={() => setStockManagementEnabled((v) => !v)} style={tgStyle(stockManagementEnabled)}><span style={tgKnob(stockManagementEnabled)} /></div>
               </div>
 
-              {/* 금액 — togglePill 제거, 안내텍스트만 */}
-              <div style={{ ...optRow, marginBottom: 0 }}>
-                <span style={optLabel}>금액</span>
-                <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>{priceText.trim() ? "위 가격 사용" : "비우면 손님 직접입력"}</span>
-              </div>
-              </>
-              )}
+              {/* 🔴 사고 방지 — 재고를 넣었는데 재고관리가 꺼져 있으면 무제한으로 저장된다 */}
+              {!stockManagementEnabled && totalStock > 0 ? (
+                <div style={{ background: "var(--color-danger-bg)", border: "1px solid #F0C8C1", color: "var(--color-danger-tx)", fontSize: "12px", fontWeight: 700, borderRadius: "8px", padding: "9px 11px", marginTop: "8px", lineHeight: 1.6 }}>
+                  🔴 재고를 입력했는데 <b>재고관리가 꺼져 있어요.</b>
+                  <div style={{ fontWeight: 400, marginTop: "2px" }}>이대로 등록하면 <b>무제한으로 팔립니다.</b></div>
+                  <button type="button" onClick={() => setStockManagementEnabled(true)} style={{ marginTop: "6px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "11px", fontWeight: 800, borderRadius: "7px", padding: "5px 11px", cursor: "pointer" }}>재고관리 켜기</button>
+                </div>
+              ) : null}
+
+              {/* ── 재고 입력 ── */}
+              {stockManagementEnabled ? (
+                stockMode === "option" ? (
+                  <div style={{ marginTop: "9px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "5px" }}>
+                      <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>조합 {resolvedVariantRows.length}개</span>
+                      <span style={{ fontSize: "11px", color: "var(--color-ink-mute)", display: "flex", alignItems: "center", gap: "4px" }}>
+                        전체
+                        <input style={{ fontSize: "11px", padding: "3px 6px", border: "1px solid #E8E2DD", borderRadius: "5px", textAlign: "right", width: "46px" }} type="text" inputMode="numeric" value={bulkStockText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setBulkStockText(e.target.value.replace(/[^0-9]/g, ""))} />
+                        개
+                        <button type="button" onClick={applyBulkStock} style={{ border: "1.5px dashed #7B2D43", background: "var(--color-surface)", color: "#7B2D43", fontSize: "11px", fontWeight: 800, borderRadius: "7px", padding: "3px 9px", cursor: "pointer" }}>일괄적용</button>
+                      </span>
+                    </div>
+
+                    <div style={{ background: "#F7F5F3", borderRadius: "8px", padding: "8px", maxHeight: "260px", overflowY: "auto", border: "1px solid #E8E2DD" }}>
+                      {variantGroups.map((group) => (
+                        <div key={`grp-${group.detail || "__none__"}`} style={{ marginBottom: "4px" }}>
+                          {group.detail ? (
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 82px 34px", gap: "6px", alignItems: "center", background: "#F5E6EB", borderRadius: "6px", padding: "5px 8px", marginBottom: "3px" }}>
+                              <span style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", opacity: detailHidden.includes(group.detail) ? 0.5 : 1 }}>
+                                {group.detail}
+                              </span>
+                              <span style={{ display: "flex", alignItems: "center", gap: "3px" }}>
+                                <span style={{ fontSize: "10px", color: "#7B2D43", fontWeight: 700 }}>+</span>
+                                <input
+                                  style={{ fontSize: "11px", padding: "4px 6px", border: "1px solid #D9C5CC", borderRadius: "5px", textAlign: "right", width: "100%", background: "#fff" }}
+                                  type="text" inputMode="numeric" placeholder="추가금"
+                                  value={detailPlus[group.detail] ?? "0"}
+                                  onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }}
+                                  onChange={(e) => setDetailPlus((prev) => ({ ...prev, [group.detail]: e.target.value.replace(/[^0-9]/g, "") }))}
+                                />
+                              </span>
+                              <button type="button" title={detailHidden.includes(group.detail) ? "숨김 — 누르면 노출" : "노출 중 — 누르면 숨김"} onClick={() => toggleDetailHidden(group.detail)} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: "14px", padding: 0 }}>
+                                {detailHidden.includes(group.detail) ? "🚫" : "👁"}
+                              </button>
+                            </div>
+                          ) : null}
+
+                          {group.rows.map((row) => {
+                            const label = [row.colorOnly, row.size].filter(Boolean).join(" / ");
+                            const soldOut = Number(row.stock || 0) <= 0;
+                            return (
+                              <div key={row.key} style={{ display: "grid", gridTemplateColumns: "1fr 74px 20px", gap: "6px", alignItems: "center", padding: "3px 0 3px " + (group.detail ? "12px" : "2px") }}>
+                                <span style={{ fontSize: "12px", color: soldOut ? "var(--color-danger-tx)" : "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {label || (group.detail ? "재고" : "기본")}
+                                </span>
+                                <input style={{ fontSize: "12px", padding: "5px 7px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "100%" }} type="number" min={0} inputMode="numeric" value={row.stock} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => updateVariantStock(row.key, Math.max(0, Number(e.target.value) || 0))} />
+                                <span style={{ fontSize: "10px", fontWeight: 800, color: soldOut ? "var(--color-danger-tx)" : "var(--color-ink-mute)" }}>{soldOut ? "품절" : "개"}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--color-ink-mute)", display: "flex", justifyContent: "space-between" }}>
+                      <span>총 재고 {totalStock.toLocaleString("ko-KR")}개</span>
+                      <span>{resolvedVariantRows.filter((row) => Number(row.stock || 0) <= 0).length > 0 ? `품절 ${resolvedVariantRows.filter((row) => Number(row.stock || 0) <= 0).length}개` : ""}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ background: "#F7F5F3", borderRadius: "8px", padding: "10px", marginTop: "9px", display: "flex", alignItems: "center", gap: "8px", border: "1px solid #E8E2DD" }}>
+                    <span style={{ fontSize: "12px", color: "var(--color-ink)", flex: 1 }}>총 재고 수량</span>
+                    <input style={{ fontSize: "12px", padding: "5px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "80px" }} type="number" min={0} inputMode="numeric" value={totalStockText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setTotalStockText(e.target.value)} />
+                    <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
+                  </div>
+                )
+              ) : null}
+
+              {/* 저장 형태 안내 — 사장님이 "지금과 같은지" 바로 확인할 수 있게 */}
+              {usedAxisCount > 0 ? (
+                <div style={{ background: "#F5E6EB", border: "1px solid #D9C5CC", color: "#7B2D43", fontSize: "11px", borderRadius: "8px", padding: "8px 10px", marginTop: "9px", lineHeight: 1.7 }}>
+                  {details.length > 0 && colors.length > 0
+                    ? <>3단 — 손님은 <b>{detailLabel} → 색상 → 사이즈</b> 순으로 고릅니다. 재고는 <b>&quot;{detailLabel} / 색상&quot; + 사이즈</b>로 관리돼요.</>
+                    : details.length > 0
+                      ? <>손님은 <b>{detailLabel}</b>만 고릅니다. (예전 &quot;세부상품 조합형&quot;과 <b>완전히 같은 방식</b>)</>
+                      : <>손님은 <b>{[colors.length ? "색상" : "", sizes.length ? "사이즈" : ""].filter(Boolean).join(" → ")}</b>을(를) 고릅니다. (예전 &quot;색상·사이즈&quot;와 <b>완전히 같은 방식</b>)</>}
+                  {details.length > 0 ? <><br />추가금은 <b>{detailLabel}</b>별로 넣습니다 · 👁 를 누르면 그 {detailLabel}만 손님에게 숨겨져요.</> : null}
+                </div>
+              ) : null}
             </div>
           </div>
 
-          {/* 재고관리 / 고객노출 */}
+          {/* 고객노출 / 구매제한 */}
           <div style={{ marginBottom: "14px" }}>
-            <div style={toggleRow}>
-              <div>
-                <div style={{ fontSize: "13px", color: "var(--color-ink)" }}>재고관리</div>
-                <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "1px" }}>{stockManagementEnabled ? "재고 수량 관리 중" : "(끄면 무제한)"}</div>
-              </div>
-              <div onClick={() => setStockManagementEnabled((v) => !v)} style={tgStyle(stockManagementEnabled)}><span style={tgKnob(stockManagementEnabled)} /></div>
-            </div>
-
-            {stockManagementEnabled ? (
-              optionEditMode === "combo" ? (
-                <div style={{ background: "#F7F5F3", borderRadius: "8px", padding: "10px", marginTop: "8px", fontSize: "12px", color: "var(--color-ink-mute)" }}>
-                  세부상품 조합형은 위 옵션 표의 <b>재고 칸</b>이 옵션별 재고예요. (재고 0 = 그 세부상품만 품절 표시)
-                </div>
-              ) : colors.length > 0 || sizes.length > 0 ? (
-                <div style={{ background: "#F7F5F3", borderRadius: "8px", padding: "10px", marginTop: "8px" }}>
-                  <div style={{ fontSize: "12px", color: "var(--color-ink-mute)", marginBottom: "8px" }}>옵션별 재고 수량</div>
-                  <div style={{ maxHeight: "200px", overflowY: "auto" }}>
-                    {resolvedVariantRows.map((row) => (
-                      <div key={row.key} style={{ display: "grid", gridTemplateColumns: "1fr 80px 24px", gap: "8px", alignItems: "center", padding: "5px 0", borderBottom: "1px solid #E8E2DD" }}>
-                        <div style={{ fontSize: "12px", color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[row.color, row.size].filter(Boolean).join(" / ") || "기본"}</div>
-                        <input style={{ fontSize: "12px", padding: "5px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "100%" }} type="number" min={0} inputMode="numeric" value={row.stock} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => updateVariantStock(row.key, Math.max(0, Number(e.target.value) || 0))} />
-                        <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ marginTop: "7px", fontSize: "11px", color: "var(--color-ink-mute)", textAlign: "right" }}>총 재고 {totalStock.toLocaleString("ko-KR")}개</div>
-                </div>
-              ) : (
-                <div style={{ background: "#F7F5F3", borderRadius: "8px", padding: "10px", marginTop: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span style={{ fontSize: "12px", color: "var(--color-ink)", flex: 1 }}>총 재고 수량</span>
-                  <input style={{ fontSize: "12px", padding: "5px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "80px" }} type="number" min={0} inputMode="numeric" value={totalStockText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setTotalStockText(e.target.value)} />
-                  <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
-                </div>
-              )
-            ) : null}
-
             <div style={toggleRow}>
               <div>
                 <div style={{ fontSize: "13px", color: "var(--color-ink)" }}>고객 노출</div>
