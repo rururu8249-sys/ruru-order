@@ -2703,6 +2703,8 @@ export default function AdminLiveDashboard() {
                       style={{ fontSize: "12px", fontWeight: 700, padding: "5px 12px", borderRadius: "8px", border: "1px solid #E5C7CE", cursor: "pointer", background: !integrityRecentOnly ? "#7A1E47" : "#fff", color: !integrityRecentOnly ? "#fff" : "#7A1E47" }}>전체 보기</button>
                   </div>
                   {[
+                    // [2026-08-11] 재고 안전장치 생존 감시 — 제출RPC 거부로직·경비원·담기선점이 하나라도 죽으면 표시 (0건=안전)
+                    { title: "재고 안전장치 이상", count: integrityResult.summary?.check10_inventory_guard ?? 0, items: integrityResult.check10?.items ?? [], kind: "check10" },
                     { title: "자동입금확인인데 입금없음", count: integrityResult.summary?.check1_auto_paid_no_deposit ?? 0, items: integrityResult.check1?.items ?? [], kind: "check1" },
                     { title: "주문그룹 중복입금", count: integrityResult.summary?.check2_group_multi_deposit ?? 0, items: integrityResult.check2?.items ?? [], kind: "check2" },
                     { title: "날짜 역전 매칭(오매칭 의심)", count: integrityResult.summary?.check9_date_inverted_match ?? 0, items: integrityResult.check9?.items ?? [], kind: "check9" },

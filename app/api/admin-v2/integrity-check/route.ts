@@ -412,6 +412,23 @@ export async function GET() {
       }
     }
 
+    // ── 점검10) 재고 안전장치 생존 확인 (읽기 전용 RPC — 제출RPC 거부로직·경비원·담기선점) ──
+    //   7월 "조용한 덮어쓰기→오버셀" 사고 재발 감시. 정상이면 0건, 하나라도 죽으면 빨간 카드.
+    const check10Items: Array<{ label: string; created_at: null }> = [];
+    try {
+      const { data: guardData, error: guardError } = await supabase.rpc("check_inventory_guard");
+      if (guardError) {
+        check10Items.push({ label: `점검 RPC 호출 실패(check_inventory_guard 미설치?) — ${guardError.message}`, created_at: null });
+      } else {
+        const g = (guardData ?? {}) as AnyRow;
+        if (g.submit_reject_ok !== true) check10Items.push({ label: "🚨 제출 RPC에 재고부족 거부 로직 없음 — 오버셀 무방비 상태! 즉시 submit_rpc_v2 재적용 필요", created_at: null });
+        if (g.guard_trigger_ok !== true) check10Items.push({ label: "⚠️ 경비원(덮어쓰기 차단 트리거) 없음/비활성 — guard_submit_rpc_downgrade.sql 재적용 필요", created_at: null });
+        if (g.claim_fn_ok !== true) check10Items.push({ label: "⚠️ 담기 선점 RPC(claim_cart_hold) 없음 — 담기 선착순 미작동, claim_cart_hold_rpc.sql 재적용 필요", created_at: null });
+      }
+    } catch (e) {
+      check10Items.push({ label: `재고 안전장치 점검 실패 — ${e instanceof Error ? e.message : String(e)}`, created_at: null });
+    }
+
     // [2026-07-26 사장님] 상시 카드용 "최근 7일" 건수 — 옛 기록(5~6월 데이터 초기)과 새 문제를 구분.
     //   날짜 없는 항목은 옛 기록으로 간주(카드 미집계), 단 현재 상태 점검(재고 장부·포인트)은 날짜 개념이 없으므로 전부 집계.
     const SEVEN_MS = 7 * 24 * 60 * 60 * 1000;
@@ -430,6 +447,7 @@ export async function GET() {
       check7_point_mismatch: check7Items.length, // 현재 상태 점검 — 전부 집계
       check8_paid_no_timestamp: check8Items.filter((i) => isRecentDate(i.created_at)).length,
       check9_date_inverted_match: check9Items.length, // 오매칭 의심 — 오래돼도 살아있는 위험이라 전부 집계
+      check10_inventory_guard: check10Items.length, // 현재 상태 점검 — 전부 집계
     };
 
     return NextResponse.json({
@@ -445,6 +463,7 @@ export async function GET() {
         check7_point_mismatch: check7Items.length,
         check8_paid_no_timestamp: check8Items.length,
         check9_date_inverted_match: check9Items.length,
+        check10_inventory_guard: check10Items.length,
       },
       recent_summary: recentSummary,
       check1: { count: check1Items.length, items: check1Items },
@@ -456,6 +475,7 @@ export async function GET() {
       check7: { count: check7Items.length, items: check7Items },
       check8: { count: check8Items.length, items: check8Items },
       check9: { count: check9Items.length, items: check9Items },
+      check10: { count: check10Items.length, items: check10Items },
     });
   } catch (error) {
     return NextResponse.json(
