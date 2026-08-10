@@ -510,7 +510,10 @@ function splitProductOptionValue(value: unknown): string[] {
   }
 
   return value
-    .split(/[,.\/|·\n]+/g)
+    // [2026-08-11 버그수정] 마침표(.)를 구분자에서 뺀다.
+    //   신발 US 표기(225(US5.5), US6.5 …)가 "225(US5" / "5)" 로 쪼개져 옵션이 엉망이 되던 원인.
+    //   쉼표(,) · 슬래시(/) · 가운뎃점(·) · 줄바꿈만 구분자로 인정한다.
+    .split(/[,\/|·\n]+/g)
     .map((item) => item.trim())
     .filter(Boolean);
 }
@@ -526,8 +529,13 @@ function getProductOptionSuggestions(product: BroadcastProduct, field: "color" |
   const record = product as unknown as Record<string, unknown>;
   const values: string[] = [];
 
+  // [2026-08-11 3단] 3단 상품은 stock_variants.color 가 "세부상품 / 색상"으로 합쳐져 있다.
+  //   그대로 후보에 넣으면 색상 칩이 "A-1 / 블랙"처럼 뜨므로, 3단이면 color 는 variants 에서 뽑지 않는다.
+  //   (3단의 정확한 색상 목록은 아래 color_options 에 따로 저장돼 있음) — 3단이 아닌 상품은 기존과 동일.
+  const isAxes3Product = readOrderAxes3(product) !== null;
   if (Array.isArray(note?.stock_variants)) {
     for (const variant of note.stock_variants) {
+      if (isAxes3Product && field === "color") continue;
       const value = field === "color" ? variant.color : variant.size;
 
       if (typeof value === "string" && value.trim()) {

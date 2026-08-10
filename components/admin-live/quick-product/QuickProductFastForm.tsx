@@ -24,8 +24,9 @@ type VariantStockRow = {
   colorOnly: string; // 표시용 — 2번 축(색상) 값
 };
 
-// [2026-08-10 옵션 통합] 세부상품 축 라벨 후보 — note.option_label 에 저장(고객 화면 제목으로 사용)
-const DETAIL_LABEL_PRESETS = ["세부상품", "종류", "맛", "용량", "브랜드"];
+// [2026-08-11 사장님 지침] 라벨 드롭다운(맛/용량/브랜드) 제거 — 실제로 쓸 일이 없고 방송 중 고를 게 하나 더 늘 뿐.
+//   관리자 화면은 "세부상품" 고정 표기, 손님 화면 제목은 "종류 선택"으로 통일(기존 조합형 상품과 동일 문구).
+const DETAIL_LABEL_FIXED = "종류";
 // 옵션 값 구분자 — 3단일 때 "세부상품 / 색상"을 stock_variants.color 한 칸에 합쳐 넣는다.
 //   (재고 키가 (color,size) 2칸뿐이라 DB·재고차감 RPC를 안 건드리고 3단을 지원하기 위한 방식)
 const AXIS_JOIN = " / ";
@@ -227,11 +228,24 @@ function parseProductNote(row: ProductRow | null | undefined) {
 //   · 색상만            → color="블랙",       size=""      (= 기존과 100% 동일)
 //   · 색상+사이즈       → color="블랙",       size="M"     (= 기존과 100% 동일)
 //   · 세부+색상+사이즈  → color="A-1 / 블랙", size="M"     (신규)
+// [2026-08-11 재고 보존] 옵션 글자를 살짝 고쳐도(예: 225(US55) → 225(US5.5)) 재고가 0으로 리셋되지 않게
+//   마침표·공백·대소문자를 무시한 "느슨한 키"로 한 번 더 찾는다. 정확히 일치하는 키가 항상 우선이라 오배정 위험 없음.
+function looseVariantKey(key: string) {
+  return String(key || "").replace(/[.\s]/g, "").toLowerCase();
+}
+
 function buildVariantRows(details: string[], colors: string[], sizes: string[], previous: VariantStockRow[]) {
   const safeDetails = details.length ? details : [""];
   const safeColors = colors.length ? colors : [""];
   const safeSizes = sizes.length ? sizes : [""];
   const previousMap = new Map(previous.map((row) => [row.key, row.stock]));
+  // 느슨한 키 → 재고. 같은 느슨한 키가 여러 개면 첫 번째만(모호하면 안 쓰도록 중복은 무시)
+  const looseMap = new Map<string, number | null>();
+  for (const row of previous) {
+    const lk = looseVariantKey(row.key);
+    if (looseMap.has(lk)) looseMap.set(lk, null); // 중복 → 모호하므로 폴백 포기
+    else looseMap.set(lk, row.stock);
+  }
   const rows: VariantStockRow[] = [];
 
   for (const detail of safeDetails) {
@@ -239,7 +253,9 @@ function buildVariantRows(details: string[], colors: string[], sizes: string[], 
       for (const size of safeSizes) {
         const color = [detail, colorOnly].filter(Boolean).join(AXIS_JOIN);
         const key = `${color || "__EMPTY_COLOR__"}__${size || "__EMPTY_SIZE__"}`;
-        rows.push({ key, color, size, stock: previousMap.get(key) ?? 0, detail, colorOnly });
+        const exact = previousMap.get(key);
+        const loose = exact === undefined ? looseMap.get(looseVariantKey(key)) : undefined;
+        rows.push({ key, color, size, stock: exact ?? loose ?? 0, detail, colorOnly });
       }
     }
   }
@@ -593,7 +609,7 @@ export default function QuickProductFastForm({
   // [2026-08-10 옵션 통합] 탭 제거 — 옵션 슬롯 3개(세부상품/색상/사이즈) 중 값을 넣은 것만 축으로 사용.
   //   세부상품만 = 기존 "조합형"과 저장 결과 동일 / 색상+사이즈 = 기존과 동일 / 셋 다 = 신규 3단
   const [detailText, setDetailText] = useState("");
-  const [detailLabel, setDetailLabel] = useState("세부상품");
+  const [detailLabel, setDetailLabel] = useState(DETAIL_LABEL_FIXED);
   const [detailPlus, setDetailPlus] = useState<Record<string, string>>({}); // 세부상품명 → 추가금(문자)
   const [detailHidden, setDetailHidden] = useState<string[]>([]);           // 고객에게 숨길 세부상품명
 
@@ -743,7 +759,7 @@ export default function QuickProductFastForm({
       const sv = find("size");
       restoredDetails = Array.isArray(dv?.values) ? dv!.values.map((x) => String(x ?? "").trim()).filter(Boolean) : [];
       setDetailText(restoredDetails.join(", "));
-      setDetailLabel(String(dv?.label || "세부상품"));
+      setDetailLabel(String(dv?.label || DETAIL_LABEL_FIXED));
       setColorText(Array.isArray(cv?.values) ? cv!.values.join(", ") : "");
       setSizeText(Array.isArray(sv?.values) ? sv!.values.join(", ") : "");
     } else if (productNote?.combo_mode === true) {
@@ -757,13 +773,13 @@ export default function QuickProductFastForm({
       const rest = stockNames.filter((n) => !exposed.includes(n));
       restoredDetails = [...exposed, ...rest];
       setDetailText(restoredDetails.join(", "));
-      setDetailLabel(String(productNote?.option_label || "세부상품"));
+      setDetailLabel(String(productNote?.option_label || DETAIL_LABEL_FIXED));
       setColorText("");
       setSizeText("");
     } else {
       // 옛 색상·사이즈 — 위(685~686행)에서 이미 colorText/sizeText 를 채웠으므로 세부상품만 비운다
       setDetailText("");
-      setDetailLabel("세부상품");
+      setDetailLabel(DETAIL_LABEL_FIXED);
     }
 
     const nextPlus: Record<string, string> = {};
@@ -865,6 +881,30 @@ export default function QuickProductFastForm({
     }
   };
 
+  // [2026-08-11] 프리셋 버튼/항목 공용 스타일 — 세부상품 슬롯과 톤 통일 + 다중선택임을 눈에 보이게
+  // [2026-08-11 사장님 지침] 프리셋 드롭다운을 맥 기본 메뉴 느낌으로 — 어두운 라운드 패널 + 왼쪽 ✓
+  const presetBtn = (count: number): CSSProperties => ({
+    padding: "6px 11px", borderRadius: "7px", fontSize: "11px", fontWeight: 800,
+    background: count > 0 ? "#7B2D43" : "#FBF1E0",
+    color: count > 0 ? "#fff" : "var(--color-warn-tx)",
+    border: "none", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0, minWidth: "62px", textAlign: "center",
+  });
+  const presetMenu: CSSProperties = {
+    position: "absolute", top: "100%", right: 0, marginTop: "6px", zIndex: 10,
+    background: "rgba(58,54,52,0.97)", backdropFilter: "blur(12px)",
+    borderRadius: "12px", border: "1px solid rgba(255,255,255,0.14)",
+    boxShadow: "0 10px 28px rgba(0,0,0,0.32)", padding: "5px", minWidth: "178px", overflow: "hidden",
+  };
+  const presetHint: CSSProperties = {
+    padding: "6px 11px 8px", fontSize: "10.5px", fontWeight: 700,
+    color: "rgba(255,255,255,0.55)", borderBottom: "1px solid rgba(255,255,255,0.12)", marginBottom: "4px",
+  };
+  const presetItem = (on: boolean): CSSProperties => ({
+    display: "flex", alignItems: "center", gap: "7px", padding: "8px 11px", fontSize: "13px",
+    fontWeight: on ? 800 : 500, cursor: "pointer", borderRadius: "7px",
+    color: "#fff", background: on ? "rgba(255,255,255,0.16)" : "transparent",
+  });
+
   const updateVariantStock = (targetKey: string, stock: number) => {
     const nextRows = buildVariantRows(details, colors, sizes, variantRows).map((row) =>
       row.key === targetKey ? { ...row, stock } : row,
@@ -908,7 +948,7 @@ export default function QuickProductFastForm({
     setFreeProductEnabled(false);
     setStockManagementEnabled(true);
     setDetailText("");
-    setDetailLabel("세부상품");
+    setDetailLabel(DETAIL_LABEL_FIXED);
     setDetailPlus({});
     setDetailHidden([]);
     setBulkStockText("10");
@@ -954,7 +994,7 @@ export default function QuickProductFastForm({
     const exposedDetails = details.filter((name) => !detailHidden.includes(name));
 
     if (detailActive && exposedDetails.length === 0) {
-      showAdminToast(`모든 ${detailLabel}이(가) 숨김 상태예요. 최소 1개는 노출을 켜주세요.\n(상품 자체를 숨기려면 아래 '고객 노출'을 꺼주세요)`, "error");
+      showAdminToast("모든 세부상품이 숨김 상태예요. 최소 1개는 노출을 켜주세요.\n(상품 자체를 숨기려면 아래 '고객 노출'을 꺼주세요)", "error");
       return;
     }
 
@@ -1292,13 +1332,7 @@ export default function QuickProductFastForm({
 
               {/* 슬롯 1 — 세부상품(라벨 변경 가능). A-1 / A-2 / A-3 처럼 한 상품 안의 여러 상품 */}
               <div style={optRow}>
-                <select
-                  value={detailLabel}
-                  onChange={(e) => setDetailLabel(e.target.value)}
-                  style={{ width: "76px", flexShrink: 0, fontSize: "11px", fontWeight: 800, padding: "6px 2px", border: "1px solid #E8E2DD", borderRadius: "6px", background: "#FBF1E0", color: "var(--color-warn-tx)", cursor: "pointer" }}
-                >
-                  {DETAIL_LABEL_PRESETS.map((l) => <option key={l} value={l}>{l}</option>)}
-                </select>
+                <span style={optLabel}>세부상품</span>
                 <input style={optInput} type="text" placeholder="A-1, A-2, A-3 (쉼표로 구분)" value={detailText} onChange={(e) => setDetailText(e.target.value)} />
                 {!detailText.trim() ? <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>사용 안 함</span> : null}
               </div>
@@ -1308,13 +1342,18 @@ export default function QuickProductFastForm({
                 <span style={optLabel}>색상</span>
                 <input style={optInput} type="text" placeholder="화이트, 블랙, 베이지" value={colorText} onChange={(e) => setColorText(e.target.value)} />
                 <div ref={colorPresetRef} style={{ position: "relative", display: "inline-block" }}>
-                  <button type="button" onClick={() => setColorPresetOpen((v) => !v)} style={{ padding: "5px 10px", borderRadius: "6px", fontSize: "11px", background: "#FBF1E0", color: "var(--color-warn-tx)", cursor: "pointer", border: "none", display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>프리셋 ▾</button>
+                  <button type="button" onClick={() => setColorPresetOpen((v) => !v)} style={presetBtn(colors.length)}>
+                    프리셋{colors.length > 0 ? ` ${colors.length}` : ""} ▾
+                  </button>
                   {colorPresetOpen ? (
-                    <div style={{ position: "absolute", top: "100%", right: 0, background: "var(--color-surface)", border: "1px solid #E8E2DD", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, minWidth: "160px", marginTop: "4px", overflow: "hidden" }}>
+                    <div style={presetMenu}>
+                      <div style={presetHint}>여러 개 고를 수 있어요</div>
                       {COLOR_PRESETS.map((preset) => {
                         const on = splitOptions(colorText).includes(preset);
                         return (
-                          <div key={preset} onClick={() => applyColorPreset(preset)} style={{ padding: "8px 14px", fontSize: "12px", cursor: "pointer", color: on ? "#7B2D43" : "#1a1a1a", background: on ? "#F5E6EB" : "#fff" }}>{on ? "✓ " : ""}{preset}</div>
+                          <div key={preset} onClick={() => applyColorPreset(preset)} style={presetItem(on)}>
+                            <span style={{ width: "13px", flexShrink: 0, fontWeight: 900 }}>{on ? "✓" : ""}</span>{preset}
+                          </div>
                         );
                       })}
                     </div>
@@ -1328,13 +1367,18 @@ export default function QuickProductFastForm({
                 <span style={optLabel}>사이즈</span>
                 <input style={optInput} type="text" placeholder="220, 230, 240" value={sizeText} onChange={(e) => setSizeText(e.target.value)} />
                 <div ref={sizePresetRef} style={{ position: "relative", display: "inline-block" }}>
-                  <button type="button" onClick={() => setSizePresetOpen((v) => !v)} style={{ padding: "5px 10px", borderRadius: "6px", fontSize: "11px", background: "#FBF1E0", color: "var(--color-warn-tx)", cursor: "pointer", border: "none", display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>프리셋 ▾</button>
+                  <button type="button" onClick={() => setSizePresetOpen((v) => !v)} style={presetBtn(sizes.length)}>
+                    프리셋{sizes.length > 0 ? ` ${sizes.length}` : ""} ▾
+                  </button>
                   {sizePresetOpen ? (
-                    <div style={{ position: "absolute", top: "100%", right: 0, background: "var(--color-surface)", border: "1px solid #E8E2DD", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, minWidth: "160px", marginTop: "4px", overflow: "hidden" }}>
+                    <div style={presetMenu}>
+                      <div style={presetHint}>여러 개 고를 수 있어요</div>
                       {SIZE_PRESETS.map((preset) => {
                         const on = normalizePresetOptions(preset).some((o) => splitOptions(sizeText).includes(o));
                         return (
-                          <div key={preset} onClick={() => applySizePreset(preset)} style={{ padding: "8px 14px", fontSize: "12px", cursor: "pointer", color: on ? "#7B2D43" : "#1a1a1a", background: on ? "#F5E6EB" : "#fff" }}>{on ? "✓ " : ""}{preset}</div>
+                          <div key={preset} onClick={() => applySizePreset(preset)} style={presetItem(on)}>
+                            <span style={{ width: "13px", flexShrink: 0, fontWeight: 900 }}>{on ? "✓" : ""}</span>{preset}
+                          </div>
                         );
                       })}
                     </div>
@@ -1392,9 +1436,9 @@ export default function QuickProductFastForm({
                                 <input
                                   style={{ fontSize: "11px", padding: "4px 6px", border: "1px solid #D9C5CC", borderRadius: "5px", textAlign: "right", width: "100%", background: "#fff" }}
                                   type="text" inputMode="numeric" placeholder="추가금"
-                                  value={detailPlus[group.detail] ?? "0"}
+                                  value={formatNumberWithComma(detailPlus[group.detail] ?? "0") || "0"}
                                   onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }}
-                                  onChange={(e) => setDetailPlus((prev) => ({ ...prev, [group.detail]: e.target.value.replace(/[^0-9]/g, "") }))}
+                                  onChange={(e) => setDetailPlus((prev) => ({ ...prev, [group.detail]: onlyNumber(e.target.value) }))}
                                 />
                               </span>
                               <button type="button" title={detailHidden.includes(group.detail) ? "숨김 — 누르면 노출" : "노출 중 — 누르면 숨김"} onClick={() => toggleDetailHidden(group.detail)} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: "14px", padding: 0 }}>

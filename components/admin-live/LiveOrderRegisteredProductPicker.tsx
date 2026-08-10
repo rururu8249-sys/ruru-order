@@ -59,7 +59,8 @@ function splitOptionValue(value: unknown): string[] {
   if (Array.isArray(value)) return value.flatMap((i) => splitOptionValue(i));
   if (typeof value !== "string") return [];
   return value
-    .split(/[,./|·\n]+/g)
+    // [2026-08-11] 마침표(.) 구분자 제거 — US5.5 같은 사이즈가 쪼개지지 않게 (고객 페이지와 동일 기준)
+    .split(/[,/|·\n]+/g)
     .map((i) => i.trim())
     .filter(Boolean);
 }
