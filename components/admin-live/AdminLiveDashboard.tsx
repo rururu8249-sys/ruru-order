@@ -728,8 +728,11 @@ export default function AdminLiveDashboard() {
     });
   };
 
-  const loadOrders = async () => {
-    setLoading(true);
+  // [2026-08-12 사장님] silent=true면 "불러오는 중" 화면 없이 조용히 데이터만 교체 —
+  //   자동 갱신(Bankda 매칭·실시간 폴백·매칭 후 재조회)의 눈에 보이는 깜빡임 제거. 조회 로직 자체는 동일.
+  const loadOrders = async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
+    if (!silent) setLoading(true);
     setLoadError("");
 
     // 전체보기 / 지난달·기간선택(과거 범위) / 키워드 검색 시 .range로 전체 로드.
@@ -773,8 +776,11 @@ export default function AdminLiveDashboard() {
     }
 
     if (error) {
-      setOrders([]);
-      setOrderGroups([]);
+      // silent 갱신 실패 시엔 보이던 목록을 지우지 않는다(일시 오류로 화면이 비는 사고 방지)
+      if (!silent) {
+        setOrders([]);
+        setOrderGroups([]);
+      }
       setLoadError(error.message);
       setLoading(false);
       return;
@@ -792,7 +798,7 @@ export default function AdminLiveDashboard() {
         .from("orders")
         .select("*")
         .in("id", ids);
-      if (error) { void loadOrders(); return; }
+      if (error) { void loadOrders({ silent: true }); return; }
       const fetched = (data || []) as OrderRow[];
       const fetchedById = new Map(fetched.map((r: any) => [String(r.id), r]));
       const requested = new Set(ids.map(String));
@@ -816,7 +822,7 @@ export default function AdminLiveDashboard() {
       }
       applyRawOrderRows(next);
     } catch {
-      void loadOrders();
+      void loadOrders({ silent: true });
     }
   };
 
@@ -849,7 +855,7 @@ export default function AdminLiveDashboard() {
       // 매 폴링마다 무조건 loadOrders 하던 것이 "원치 않는 자동 새로고침"의 원인이었음.
       // 새 고객 주문은 아래 supabase realtime 구독이 즉시 반영한다.
       if (detail && detail.successCount > 0) {
-        await loadOrders();
+        await loadOrders({ silent: true });
       }
     },
   });
@@ -920,7 +926,7 @@ export default function AdminLiveDashboard() {
       pendingIds.clear();
       const full = needFullReload || ids.length === 0 || ids.length > 50;
       needFullReload = false;
-      if (full) { void loadOrders(); return; }
+      if (full) { void loadOrders({ silent: true }); return; }
       void applyRealtimeOrderChanges(ids);
     };
     const scheduleReload = (payload?: any) => {
@@ -1231,7 +1237,7 @@ export default function AdminLiveDashboard() {
   };
 
   const refreshAfterManualMatch = async () => {
-    await loadOrders();
+    await loadOrders({ silent: true });
     await loadDepositsFromServer();
   };
 
@@ -1684,7 +1690,7 @@ export default function AdminLiveDashboard() {
                       order={selectedOrder}
                       onOpenManualMatch={openManualMatchForOrder}
                       onClose={closeOrderDetail}
-                      onAfterStatusChange={loadOrders}
+                      onAfterStatusChange={() => loadOrders({ silent: true })}
                     />
                   ) : null}
                 </div>
