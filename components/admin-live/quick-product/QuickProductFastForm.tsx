@@ -257,7 +257,18 @@ function buildVariantRows(details: string[], colors: string[], sizes: string[], 
         const key = `${color || "__EMPTY_COLOR__"}__${size || "__EMPTY_SIZE__"}`;
         const exact = previousMap.get(key);
         const loose = exact === undefined ? looseMap.get(looseVariantKey(key)) : undefined;
-        rows.push({ key, color, size, stock: exact ?? loose ?? 0, detail, colorOnly });
+        // [2026-08-12 재고 보존 ②] 색상/사이즈를 "🚫 사용 안 함"(값 "없음")으로 바꾸면 축이 하나 늘어나
+        //   열쇠가 "A / 없음__없음" 이 되어, 저장돼 있던 "A____EMPTY_SIZE__" 과 안 맞아 재고가 전부 0으로
+        //   리셋되던 문제(향수·화장품 같은 조합형 상품에서 발생). 어제 넣은 느슨한 키는 마침표·공백·대소문자만
+        //   무시해서 축 개수가 달라지는 이 경우를 못 잡았다.
+        //   → "없음"을 빈 값으로 본 열쇠로 한 번 더 찾는다. 정확일치·느슨일치가 항상 우선이라 기존 동작 무변경.
+        const noneAsEmpty = (v: string) => { const t = String(v ?? "").trim(); return t === "없음" ? "" : t; };
+        const altColor = [noneAsEmpty(detail), noneAsEmpty(colorOnly)].filter(Boolean).join(AXIS_JOIN);
+        const altKey = `${altColor || "__EMPTY_COLOR__"}__${noneAsEmpty(size) || "__EMPTY_SIZE__"}`;
+        const alt = exact === undefined && (loose === undefined || loose === null) && altKey !== key
+          ? previousMap.get(altKey)
+          : undefined;
+        rows.push({ key, color, size, stock: exact ?? loose ?? alt ?? 0, detail, colorOnly });
       }
     }
   }
