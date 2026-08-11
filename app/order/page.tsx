@@ -373,6 +373,81 @@ function normalizeSuggestionText(value: string) {
   return value.replace(/\s+/g, "").toLowerCase();
 }
 
+// ─────────────────────────────────────────────────────────────
+// [2026-08-12 조합형 목록 개선] 세부상품이 많은 그룹(미니어처 143 · 립 66 · 팩트 48 …)에서
+//   손님이 원하는 걸 빨리 찾도록 돕는 "표시 전용" 헬퍼들.
+//   ⚠️ 담기·재고·금액·배송 로직과 무관. 저장되는 세부상품명(color 값)은 절대 바꾸지 않는다.
+// ─────────────────────────────────────────────────────────────
+// 브랜드 사전 — 8/12 방송 상품 740개 전수 대조로 인식 실패 0건 확인.
+//   긴 이름이 앞에 와야 "메종 프란시스커정"이 "메종"으로 잘리지 않는다(정렬 유지 필수).
+const ORDER_BRAND_LIST = [
+  "메종 프란시스커정", "메종프란시스커정", "메종 마르지엘라", "헬레나루빈스타인", "아쿠아디파르마",
+  "퍼퓸 드 말리", "퍼퓸 드말리", "퍼퓸드말리", "엑스 니 힐로", "마크제이콥스", "돌체앤가바나",
+  "산타마리아", "프레데릭 말", "세르주르텐", "아베크롬비", "펜할리곤스", "에스티로더", "루이비통",
+  "안나수이", "바이레도", "발렌티노", "입생로랑", "베르사체", "나르시소", "마르지엘라", "클라란스",
+  "빅토리아", "프레데릭", "라프레리", "까르띠에", "아르마니", "에르메스", "몽블랑", "라티잔",
+  "보테가", "셀린느", "티파니", "버버리", "불가리", "르라보", "조말론", "딥티크", "킬리안",
+  "크리드", "톰포드", "헬레나", "지방시", "시슬리", "라메르", "끌로에", "프라다", "로에베",
+  "돌체", "샤넬", "디올", "구찌", "겔랑", "랑콤", "이솝", "메모", "입생", "메종", "SK2", "맥",
+];
+// 같은 브랜드인데 표기가 갈리는 것들 → 칩을 하나로 합친다(엑셀 표기는 그대로 둔 채 화면에서만).
+const ORDER_BRAND_ALIAS: Record<string, string> = {
+  "입생": "입생로랑", "헬레나": "헬레나루빈스타인", "메종": "메종 프란시스커정",
+  "메종프란시스커정": "메종 프란시스커정", "퍼퓸 드말리": "퍼퓸 드 말리", "퍼퓸드말리": "퍼퓸 드 말리",
+  "프레데릭": "프레데릭 말", "마르지엘라": "메종 마르지엘라", "돌체": "돌체앤가바나",
+};
+// 상품명 맨 앞에 붙는 분류 접두어 — 화면에서 지워 이름을 짧게 보이게 한다(저장값은 그대로).
+const ORDER_CATEGORY_PREFIX = [
+  "핸드크림세트", "브러쉬세트", "브러쉬단품", "종이방향제", "헤어미스트", "바디로션", "바디크림",
+  "아이크림", "핸드크림", "클렌징폼", "미니어처", "립세트", "썬크림", "선크림", "파우더",
+  "차량", "캔들", "색조", "크림", "팩트", "립", "set",
+];
+
+// 브랜드 판정 — 앞쪽 3토큰 안에서만 찾는다.
+//   ("킬리안 세이크리드우드"가 뒷글자 때문에 크리드로 잘못 잡히던 문제를 막는다)
+function orderBrandOfDetailName(name: string): string | null {
+  let head = String(name ?? "").trim();
+  for (const p of ORDER_CATEGORY_PREFIX) {
+    if (head.startsWith(p)) { head = head.slice(p.length).trim(); break; }
+  }
+  head = head.split(/\s+/).slice(0, 3).join(" ");
+  for (const b of ORDER_BRAND_LIST) {
+    if (head.startsWith(b)) return ORDER_BRAND_ALIAS[b] ?? b;
+  }
+  for (const b of ORDER_BRAND_LIST) {
+    if (head.includes(b)) return ORDER_BRAND_ALIAS[b] ?? b;
+  }
+  return null;
+}
+
+// 화면에 보일 이름 — 그룹명과 겹치는 앞부분을 지운다.
+//   「립」 그룹 안의 "립 구찌 골디레드25호" → "구찌 골디레드25호"
+//   지우고 나서 빈 문자열이 되면 원래 이름을 그대로 쓴다(안전).
+function orderDetailDisplayName(groupName: string, detailName: string): string {
+  const raw = String(detailName ?? "").trim();
+  const g = String(groupName ?? "").trim().replace(/\s*향수$/, "").trim();
+  if (!g) return raw;
+  if (raw.length > g.length && raw.startsWith(g)) {
+    const cut = raw.slice(g.length).trim();
+    if (cut) return cut;
+  }
+  return raw;
+}
+
+// 브랜드 칩 목록 — 2개 이상 브랜드가 섞인 그룹에서만 쓴다(겔랑 향수처럼 한 브랜드면 빈 배열).
+function orderBrandChips(names: string[]): { brand: string; count: number }[] {
+  const map = new Map<string, number>();
+  for (const n of names) {
+    const b = orderBrandOfDetailName(n);
+    if (!b) continue;
+    map.set(b, (map.get(b) ?? 0) + 1);
+  }
+  if (map.size < 2) return [];
+  return Array.from(map.entries())
+    .map(([brand, count]) => ({ brand, count }))
+    .sort((a, b) => b.count - a.count || a.brand.localeCompare(b.brand));
+}
+
 function productSuggestionEnabled(product: BroadcastProduct) {
   const note = parseProductSuggestionNote(product.product_note);
 
@@ -5518,24 +5593,78 @@ export default function OrderPage() {
                   {/* [조합형 옵션] 종류 선택 — 검색(8종 초과 시) + 세부상품 목록(추가금·품절·N개 남음 표시) */}
                   {registeredOptionComboInfo ? (
                     <div style={{ marginBottom: "16px" }}>
-                      <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>
-                        {registeredOptionAxes3 ? registeredOptionAxes3.detailLabel : "종류"} 선택 <span style={{ fontSize: "12px", fontWeight: 700, color: "#ABA5A0" }}>({registeredOptionComboInfo.names.length}가지)</span>
-                      </div>
+                      {/* [2026-08-12] 제목에 살 수 있는 개수를 먼저 보여준다 — 143가지 중 뭘 살 수 있는지 바로 알게 */}
+                      {(() => {
+                        const total = registeredOptionComboInfo.names.length;
+                        const soldCount = registeredOptionComboInfo.names.filter((n) => {
+                          const v = registeredOptionStockVariants.find((row: any) => String(row?.color ?? "").trim() === n && !String(row?.size ?? "").trim());
+                          return v ? Number(v.stock ?? 0) <= 0 : false;
+                        }).length;
+                        return (
+                          <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>
+                            {registeredOptionAxes3 ? registeredOptionAxes3.detailLabel : "종류"} 선택{" "}
+                            <span style={{ fontSize: "12px", fontWeight: 700, color: "#ABA5A0" }}>
+                              {soldCount > 0 ? `(판매중 ${total - soldCount}가지 · 품절 ${soldCount}가지)` : `(${total}가지)`}
+                            </span>
+                          </div>
+                        );
+                      })()}
                       {registeredOptionComboInfo.names.length > 8 ? (
                         <div style={{ position: "relative", marginBottom: "8px" }}>
                           <input
                             value={registeredOptionComboSearch}
                             onChange={(e) => setRegisteredOptionComboSearch(e.target.value)}
-                            placeholder="이름으로 검색 (예: 탐다오)"
+                            placeholder="브랜드·이름으로 검색 (예: 샤넬, 탐다오)"
                             style={{ height: "44px", width: "100%", boxSizing: "border-box", borderRadius: "12px", border: "1.5px solid #E8E2DD", background: "#fff", padding: "0 14px", fontSize: "14px", fontWeight: 700, color: "#222", outline: "none" }}
                           />
+                          {registeredOptionComboSearch.trim() ? (
+                            <button
+                              type="button"
+                              onClick={() => setRegisteredOptionComboSearch("")}
+                              aria-label="검색어 지우기"
+                              style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", width: "28px", height: "28px", borderRadius: "50%", border: "none", background: "#F1ECEE", color: "#8A8A8A", fontSize: "15px", fontWeight: 800, cursor: "pointer", lineHeight: 1 }}
+                            >×</button>
+                          ) : null}
                         </div>
                       ) : null}
+                      {/* [2026-08-12] 브랜드 칩 — 한 그룹에 브랜드가 2개 이상 섞였을 때만 뜬다.
+                          「겔랑 향수」처럼 브랜드가 하나뿐인 그룹에서는 orderBrandChips 가 빈 배열이라 아무것도 안 나온다. */}
+                      {registeredOptionComboInfo.names.length > 8 ? (() => {
+                        const chips = orderBrandChips(registeredOptionComboInfo.names);
+                        if (chips.length < 2) return null;
+                        const cur = registeredOptionComboSearch.trim();
+                        return (
+                          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "8px" }}>
+                            <button
+                              type="button"
+                              onClick={() => setRegisteredOptionComboSearch("")}
+                              style={{ fontSize: "12px", fontWeight: 700, padding: "6px 11px", borderRadius: "999px", border: `1.5px solid ${!cur ? "#7A1E47" : "#E8E2DD"}`, background: !cur ? "#7A1E47" : "#fff", color: !cur ? "#fff" : "#555", cursor: "pointer" }}
+                            >전체 {registeredOptionComboInfo.names.length}</button>
+                            {chips.map(({ brand, count }) => {
+                              const on = normalizeSuggestionText(cur) === normalizeSuggestionText(brand);
+                              return (
+                                <button
+                                  key={`brand-${brand}`}
+                                  type="button"
+                                  onClick={() => setRegisteredOptionComboSearch((prev) => (normalizeSuggestionText(prev) === normalizeSuggestionText(brand) ? "" : brand))}
+                                  style={{ fontSize: "12px", fontWeight: 700, padding: "6px 11px", borderRadius: "999px", border: `1.5px solid ${on ? "#7A1E47" : "#E8E2DD"}`, background: on ? "#7A1E47" : "#fff", color: on ? "#fff" : "#555", cursor: "pointer" }}
+                                >{brand} {count}</button>
+                              );
+                            })}
+                          </div>
+                        );
+                      })() : null}
                       {(() => {
                         const info = registeredOptionComboInfo;
                         const pid = String(registeredOptionSelectProduct?.id ?? "");
                         const query = normalizeSuggestionText(registeredOptionComboSearch);
-                        const list = info.names.filter((n) => !query || normalizeSuggestionText(n).includes(query));
+                        // 이름에 없어도 브랜드가 맞으면 걸리게 한다(예: "입생" 검색 → "입생로랑" 상품도 포함)
+                        const list = info.names.filter((n) => {
+                          if (!query) return true;
+                          if (normalizeSuggestionText(n).includes(query)) return true;
+                          const b = orderBrandOfDetailName(n);
+                          return !!b && normalizeSuggestionText(b).includes(query);
+                        });
                         const stockOf = (name: string): number | null => {
                           if (registeredOptionAxes3) {
                             // [3단] 그 세부상품에 속한 모든 (색상×사이즈) 재고 합 — 하나라도 남아 있으면 고를 수 있어야 한다
@@ -5556,11 +5685,21 @@ export default function OrderPage() {
                           return Math.max(0, Number(v.stock ?? 0) - Math.max(0, reserved));
                         };
                         if (list.length === 0) {
-                          return <div style={{ padding: "14px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "#ABA5A0", border: "1px solid #F0EAE0", borderRadius: "12px" }}>검색 결과가 없어요</div>;
+                          return (
+                            <div style={{ padding: "18px 14px", textAlign: "center", border: "1px solid #F0EAE0", borderRadius: "12px" }}>
+                              <div style={{ fontSize: "13px", fontWeight: 700, color: "#ABA5A0" }}>검색 결과가 없어요</div>
+                              <button type="button" onClick={() => setRegisteredOptionComboSearch("")} style={{ marginTop: "10px", height: "36px", padding: "0 16px", borderRadius: "10px", border: "1.5px solid #E8E2DD", background: "#fff", fontSize: "13px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>전체 보기</button>
+                            </div>
+                          );
                         }
                         return (
-                          <div style={{ border: "1px solid #F0EAE0", borderRadius: "12px", maxHeight: "236px", overflowY: "auto", background: "#FFFDFB" }}>
-                            {list.map((name) => {
+                          <div style={{ border: "1px solid #F0EAE0", borderRadius: "12px", maxHeight: list.length > 8 ? "min(52vh, 460px)" : "300px", overflowY: "auto", background: "#FFFDFB" }}>
+                            {/* [2026-08-12] 품절은 맨 아래로 — 살 수 있는 것부터 보이게(원래 순서는 그 안에서 유지) */}
+                            {[...list]
+                              .map((n, i) => ({ n, i, out: (() => { const r = stockOf(n); return r !== null && r <= 0; })() }))
+                              .sort((a, b) => (a.out === b.out ? a.i - b.i : a.out ? 1 : -1))
+                              .map(({ n }) => n)
+                              .map((name) => {
                               const selected = (registeredOptionAxes3 ? registeredOptionDetail : registeredOptionColor) === name;
                               const remain = stockOf(name);
                               const soldOut = remain !== null && remain <= 0;
@@ -5589,7 +5728,7 @@ export default function OrderPage() {
                                       style={{ width: "40px", height: "40px", borderRadius: "8px", objectFit: "cover", flexShrink: 0, background: "#F0EBE8", opacity: soldOut ? 0.5 : 1 }}
                                     />
                                   ) : null}
-                                  <span style={{ minWidth: 0, flex: 1, fontSize: "14px", fontWeight: 700, color: selected ? "#fff" : "#333", textDecoration: soldOut ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+                                  <span style={{ minWidth: 0, flex: 1, fontSize: "14px", fontWeight: 700, color: selected ? "#fff" : "#333", textDecoration: soldOut ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name ?? ""), name)}</span>
                                   {soldOut ? (
                                     <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "#fff", background: "#B5A1A8", borderRadius: "5px", padding: "2px 6px" }}>품절</span>
                                   ) : remain !== null && remain <= 5 ? (
