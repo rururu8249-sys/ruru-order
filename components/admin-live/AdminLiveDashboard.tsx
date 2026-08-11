@@ -647,8 +647,9 @@ export default function AdminLiveDashboard() {
   const [quickPointSaving, setQuickPointSaving] = useState<"add" | "subtract" | null>(null);
   const [quickPointMessage, setQuickPointMessage] = useState("");
 
-  const loadDepositsFromServer = async () => {
-    const response = await fetch("/api/admin-v2/deposits", {
+  // [2026-08-11 부하개선] 기본은 최근 90일만(서버 스캔량 감소). 옛 입금 확인은 allPeriod=true(전체 기간 버튼).
+  const loadDepositsFromServer = async (allPeriod?: boolean) => {
+    const response = await fetch(allPeriod ? "/api/admin-v2/deposits?days=all" : "/api/admin-v2/deposits", {
       method: "GET",
       cache: "no-store",
     });
@@ -710,6 +711,23 @@ export default function AdminLiveDashboard() {
     }
   };
 
+  // [2026-08-11 부하개선] 실시간 증분 갱신용 — 마지막 조회의 원본 행을 들고 있다가,
+  //   주문 1건이 바뀌면 그 행만 DB에서 가져와 교체하고 화면을 다시 조립한다(전체 재조회 제거).
+  const rawOrderRowsRef = useRef<OrderRow[]>([]);
+
+  // 원본 행 → 그룹/목록/선택 상태 반영 (loadOrders 꼬리와 동일 로직을 공용화 — 표시 결과 무변경)
+  const applyRawOrderRows = (rows: OrderRow[]) => {
+    rawOrderRowsRef.current = rows;
+    const groups = sortLiveOrdersByCreatedDesc(buildAdminLiveOrderGroups(rows));
+    const liveOrders = groups.map(toAdminLiveOrder);
+    setOrderGroups(groups);
+    setOrders(liveOrders);
+    setSelectedOrderId((current) => {
+      if (current && liveOrders.some((order) => order.id === current)) return current;
+      return liveOrders.find((order) => order.paymentStatus === "manual_match_needed")?.id || liveOrders[0]?.id || "";
+    });
+  };
+
   const loadOrders = async () => {
     setLoading(true);
     setLoadError("");
@@ -762,18 +780,44 @@ export default function AdminLiveDashboard() {
       return;
     }
 
-    const groups = sortLiveOrdersByCreatedDesc(
-      buildAdminLiveOrderGroups((data || []) as OrderRow[])
-    );
-    const liveOrders = groups.map(toAdminLiveOrder);
-
-    setOrderGroups(groups);
-    setOrders(liveOrders);
-    setSelectedOrderId((current) => {
-      if (current && liveOrders.some((order) => order.id === current)) return current;
-      return liveOrders.find((order) => order.paymentStatus === "manual_match_needed")?.id || liveOrders[0]?.id || "";
-    });
+    applyRawOrderRows((data || []) as OrderRow[]);
     setLoading(false);
+  };
+
+  // [2026-08-11 부하개선] 변경된 주문 id만 조회해 원본 행에 병합 — 방송 피크 풀로드 폭풍 제거.
+  //   실패·이상 상황은 전부 기존 loadOrders(전체 재조회)로 폴백 → 표시 누락 위험 0.
+  const applyRealtimeOrderChanges = async (ids: string[]) => {
+    try {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .in("id", ids);
+      if (error) { void loadOrders(); return; }
+      const fetched = (data || []) as OrderRow[];
+      const fetchedById = new Map(fetched.map((r: any) => [String(r.id), r]));
+      const requested = new Set(ids.map(String));
+      const next: OrderRow[] = [];
+      for (const row of rawOrderRowsRef.current) {
+        const rid = String((row as any).id);
+        if (requested.has(rid)) {
+          const nr: any = fetchedById.get(rid);
+          requested.delete(rid);
+          // 행이 사라졌거나(영구삭제) 삭제 플래그면 목록에서 제거
+          if (!nr || nr.is_deleted === true) continue;
+          next.push(nr);
+        } else {
+          next.push(row);
+        }
+      }
+      // 새 주문(기존 목록에 없던 id)은 맨 앞에 추가 (created_at 정렬은 applyRawOrderRows가 담당)
+      for (const rid of requested) {
+        const nr: any = fetchedById.get(rid);
+        if (nr && nr.is_deleted !== true) next.unshift(nr);
+      }
+      applyRawOrderRows(next);
+    } catch {
+      void loadOrders();
+    }
   };
 
   // [읽기 전용] 금액 단독 추천을 dry_run(confirm 없음)으로 가져온다. DB 쓰기·자동확정 없음.
@@ -867,11 +911,24 @@ export default function AdminLiveDashboard() {
   // 새 고객 주문/상태변경이 수동 새로고침 없이 즉시 화면에 뜨도록 한다. (BANKDA setInterval과 무관)
   useEffect(() => {
     let debounce: ReturnType<typeof setTimeout> | null = null;
-    const scheduleReload = () => {
+    // [2026-08-11 부하개선] 이벤트마다 전체 재조회 → 바뀐 id만 모아 한 번에 증분 반영.
+    //   id를 못 받는 이벤트가 하나라도 있으면(구버전 페이로드 등) 기존처럼 전체 재조회.
+    const pendingIds = new Set<string>();
+    let needFullReload = false;
+    const flushChanges = () => {
+      const ids = Array.from(pendingIds);
+      pendingIds.clear();
+      const full = needFullReload || ids.length === 0 || ids.length > 50;
+      needFullReload = false;
+      if (full) { void loadOrders(); return; }
+      void applyRealtimeOrderChanges(ids);
+    };
+    const scheduleReload = (payload?: any) => {
+      const id = payload?.new?.id ?? payload?.old?.id;
+      if (id === undefined || id === null || id === "") needFullReload = true;
+      else pendingIds.add(String(id));
       if (debounce) clearTimeout(debounce);
-      debounce = setTimeout(() => {
-        void loadOrders();
-      }, 600);
+      debounce = setTimeout(flushChanges, 600);
     };
     const playNewOrderTone = () => {
       try {
@@ -884,11 +941,11 @@ export default function AdminLiveDashboard() {
     };
     const channel = supabase
       .channel("ruru-admin-live-orders-realtime")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, () => {
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, (payload: any) => {
         playNewOrderTone();
-        scheduleReload();
+        scheduleReload(payload);
       })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, scheduleReload)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, (payload: any) => scheduleReload(payload))
       .subscribe();
     return () => {
       if (debounce) clearTimeout(debounce);
@@ -2411,7 +2468,10 @@ export default function AdminLiveDashboard() {
                                   ) : null}
 
                                   {quickModal === "payments" ? (
-                                    <button type="button" onClick={loadDepositsFromServer} className="rounded-xl bg-rose-deep px-4 py-2 text-xs font-black text-white">입금내역 조회</button>
+                                    <>
+                                      <button type="button" onClick={() => void loadDepositsFromServer()} className="rounded-xl bg-rose-deep px-4 py-2 text-xs font-black text-white">입금내역 조회</button>
+                                      <button type="button" onClick={() => void loadDepositsFromServer(true)} title="90일보다 오래된 입금까지 전부 불러옵니다" className="rounded-xl border border-rose-deep px-4 py-2 text-xs font-black" style={{ color: "#7A1E47", background: "#fff" }}>전체 기간</button>
+                                    </>
                                   ) : null}
 
                                   {quickModal === "customers" ? (

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
@@ -104,25 +104,31 @@ function attachLinkedOrders(deposit: AnyRow, maps: ReturnType<typeof buildOrderM
   };
 }
 
-async function selectDeposits(supabase: any) {
+// [2026-08-11 부하개선] sinceIso가 있으면 그 이후 입금만 조회(기본 90일).
+//   sinceIso=null(전체 기간 버튼)일 때만 예전처럼 전량 — 기존 화면·매칭 표시는 동일, 스캔량만 감소.
+async function selectDeposits(supabase: any, sinceIso: string | null) {
   const pageSize = 1000;
   let from = 0;
   const all: any[] = [];
   while (true) {
-    const { data, error } = await supabase
+    let q = supabase
       .from("deposits")
       .select("*")
       .order("created_at", { ascending: false })
       .range(from, from + pageSize - 1);
+    if (sinceIso) q = q.gte("created_at", sinceIso);
+    const { data, error } = await q;
     if (error) {
       // 정렬 조회 실패 시: 정렬 없이 전체 페이지네이션 fallback
       const fb: any[] = [];
       let ffrom = 0;
       while (true) {
-        const { data: fdata, error: ferror } = await supabase
+        let fq = supabase
           .from("deposits")
           .select("*")
           .range(ffrom, ffrom + pageSize - 1);
+        if (sinceIso) fq = fq.gte("created_at", sinceIso);
+        const { data: fdata, error: ferror } = await fq;
         if (ferror) return { data: null, error: ferror };
         const frows = fdata || [];
         fb.push(...frows);
@@ -238,7 +244,7 @@ async function selectOrdersForDeposits(supabase: any, deposits: AnyRow[]) {
   return { data: deduped, error: null };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   if (!supabaseUrl || !supabaseServiceKey) {
     return NextResponse.json(
       {
@@ -258,7 +264,15 @@ export async function GET() {
   });
 
   try {
-    const depositsResult = await selectDeposits(supabase);
+    // [2026-08-11 부하개선] ?days=N(기본 90) 이후 입금만. ?days=all 이면 예전처럼 전체.
+    const daysRaw = request.nextUrl.searchParams.get("days");
+    const sinceIso = (() => {
+      if (daysRaw === "all") return null;
+      const n = Math.floor(Number(daysRaw));
+      const days = Number.isFinite(n) && n > 0 ? Math.min(n, 3650) : 90;
+      return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    })();
+    const depositsResult = await selectDeposits(supabase, sinceIso);
 
     if (depositsResult.error) {
       return NextResponse.json(
