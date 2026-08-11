@@ -274,25 +274,29 @@ function submitComboSurcharge(productNote: unknown, color: string): number {
 
 const MIN_PRICE_RATIO = 0.5; // 카탈로그 가격 대비 허용 하한(0.5 = 절반). 실측 근거는 위 주석 참고.
 
-async function assertRegisteredProductPrices(supabase: any, orderRows: AnyRow[]): Promise<void> {
+async function assertRegisteredProductPrices(
+  supabase: any,
+  orderRows: AnyRow[],
+): Promise<Map<string, AnyRow>> {
+  const catalog = new Map<string, AnyRow>();
+
   const targets = orderRows
     .map((row) => ({ row, pid: text(row?.product_id) }))
     .filter((t) => t.pid && /^[0-9]+$/.test(t.pid));
-  if (targets.length === 0) return;
+  if (targets.length === 0) return catalog;
 
   const ids = Array.from(new Set(targets.map((t) => Number(t.pid))));
 
   const { data, error } = await supabase
     .from("products")
-    .select("id, product_name, price, product_note")
+    .select("id, product_name, price, product_note, shipping_type, combine_shipping")
     .in("id", ids);
 
   if (error) {
     console.warn("상품 금액 검증: 조회 실패(주문은 진행):", error?.message);
-    return; // 조회 실패 → 허용(주문을 막지 않는다)
+    return catalog; // 조회 실패 → 허용(주문을 막지 않는다). 빈 카탈로그 = 배송그룹도 행 값으로 폴백.
   }
 
-  const catalog = new Map<string, AnyRow>();
   for (const item of (data || []) as AnyRow[]) catalog.set(String(item?.id), item);
 
   for (const t of targets) {
@@ -326,6 +330,148 @@ async function assertRegisteredProductPrices(supabase: any, orderRows: AnyRow[])
       );
     }
   }
+
+  return catalog; // 배송비 검증에서 배송그룹(일반/업체) 판정에 그대로 재사용 → 추가 조회 0회
+}
+
+// [2026-08-11] 배송비 안 내고 주문 넣는 것 차단.
+//   주문 저장 RPC는 shipping_fee 도 손님이 보낸 값을 그대로 쓴다 → 0원으로 보내면 배송비를 안 낸다.
+//   업체배송(vendor)과 일반배송(normal)은 그룹이 달라 각각 배송비가 붙는다 → 그룹 수만큼 받아야 한다.
+//   ⚠️ 합배송(같은 주소로 이미 주문한 손님은 배송비 0원)이 정상이라 "0원 = 무조건 차단"으로 하면
+//      재구매 손님이 전부 막히는 더 큰 사고가 난다. 그래서 합배송이 성립할 수 없는 경우만 막는다:
+//      "같은 전화번호 + 같은 주소로 된 최근 90일 유효 주문이 하나도 없는데 배송비를 안 냈다" → 거부.
+//   ⚠️ 합배송 판정(방송 단위/관리자 시간창/업체배송 그룹)은 서버에서 재현하지 않는다.
+//      재현하다 틀리면 정상 주문이 막힌다. 대신 "이전 주문이 있으면 무조건 통과"로 관대하게 간다.
+//      (실제 합배송 창은 그날·방송 단위라 90일은 매우 넉넉한 상한이다.)
+//   ⚠️ 돈/재고/포인트 RPC는 일절 건드리지 않고, 주문 RPC 호출 전에 차단만 한다.
+
+// 주소 비교 규칙 — 손님 화면 normalizeShippingAddressPart(app/order/page.tsx 2254행)와 동일.
+function normalizeSubmitAddressPart(value: unknown, removeParentheses = false): string {
+  let next = String(value || "");
+  if (removeParentheses) next = next.replace(/\([^)]*\)/g, " ");
+  return next.replace(/\s+/g, " ").replace(/[-‐-‒–—―]/g, "-").trim();
+}
+
+function submitAddressSignature(zipcode: unknown, address: unknown, detail: unknown): string {
+  return [
+    normalizeSubmitAddressPart(zipcode),
+    normalizeSubmitAddressPart(address, true),
+    normalizeSubmitAddressPart(detail),
+  ]
+    .filter(Boolean)
+    .join("|");
+}
+
+// 취소/환불 판정 — 손님 화면 isCanceledOrderForCombineShipping(1426행)과 동일 정규식.
+function isCanceledForSubmitShipping(status: unknown): boolean {
+  return /주문서취소|주문취소|취소|환불|cancel|refund/.test(String(status || "").trim().toLowerCase());
+}
+
+// 배송그룹 판정 — 손님 화면 resolveShippingGroupFromValue(app/order/page.tsx 173행)와 동일 규칙.
+//   상품 정보(products)가 있으면 그걸 기준으로 본다. 손님이 보낸 shipping_type 을 위조해
+//   "업체배송 아님"으로 속여 배송비 한 그룹분을 빼는 걸 막기 위함.
+function resolveSubmitShippingGroup(value: unknown): "normal" | "vendor" {
+  const record = (value || {}) as AnyRow;
+  const shippingType = String(record.shipping_type ?? record.delivery_type ?? "").trim().toLowerCase();
+  const combineShipping = String(record.combine_shipping ?? "").trim().toUpperCase();
+  if (shippingType.includes("vendor") || shippingType.includes("업체") || combineShipping === "N") {
+    return "vendor";
+  }
+  return "normal";
+}
+
+async function assertShippingFeeNotSkipped(
+  supabase: any,
+  orderRows: AnyRow[],
+  phone: string,
+  catalog: Map<string, AnyRow>,
+): Promise<void> {
+  // 배송비를 물릴 대상이 있는지 — 손님 화면 getChargeableShippingItems(1420행)와 동일 기준
+  const chargeable = orderRows.filter(
+    (row) =>
+      text(row?.product_name) &&
+      submitNumberValue(row?.qty, 0) > 0 &&
+      submitNumberValue(row?.product_price, 0) > 0,
+  );
+  if (chargeable.length === 0) return; // 무료나눔·0원만 담긴 주문 → 원래 배송비 0원
+
+  const baseShippingFee = Math.max(
+    0,
+    await readSubmitSettingNumber(supabase, "default_shipping_fee", 4000),
+  );
+  if (baseShippingFee <= 0) return; // 사장님이 무료배송 운영 중 → 검증 안 함
+
+  const paidShipping = orderRows.reduce((sum, row) => {
+    const fee = submitNumberValue(row?.adjusted_shipping_fee ?? row?.shipping_fee, 0);
+    return sum + Math.max(0, fee);
+  }, 0);
+
+  // 배송그룹(일반/업체)은 각각 배송비가 붙는다. 상품 정보 우선, 없으면(직접입력) 행 값으로 폴백.
+  const groups = new Set<string>();
+  for (const row of chargeable) {
+    const pid = text(row?.product_id);
+    const product = pid ? catalog.get(pid) : undefined;
+    groups.add(resolveSubmitShippingGroup(product ?? row));
+  }
+  const expectedShipping = baseShippingFee * Math.max(1, groups.size);
+
+  // 합배송이면 한 그룹분이 빠질 수 있으므로, 여기서는 "전액 냈으면 바로 통과"만 본다.
+  //   (정상 주문 대부분이 여기서 끝 → 이전 주문 조회 0회 = 방송 중 DB 부하 증가 없음)
+  if (paidShipping >= expectedShipping) return;
+
+  // 여기까지 왔다 = 배송비를 안 냈거나 모자람. 합배송이 성립할 수 있는지만 본다.
+  const signature = submitAddressSignature(
+    firstOrderValue(orderRows, "zipcode"),
+    firstOrderValue(orderRows, "address"),
+    firstOrderValue(orderRows, "detail_address"),
+  );
+
+  // ⚠️ 기간 제한을 두지 않는다.
+  //   처음엔 90일로 잡았다가 허점을 찾음: 관리자 합배송 시간설정(combine_shipping_start_at/end_at)은
+  //   상한이 없어서 사장님이 90일보다 긴 구간으로 잡을 수 있다(lib/admin-v2/combineShipping.ts).
+  //   그러면 손님 화면은 합배송으로 0원을 보내는데 서버는 이전 주문을 못 찾아 "정상 주문을 막는" 사고가 난다.
+  //   기간을 아예 안 보면 그 사고가 원천적으로 사라지고, 그래도 막아야 할 것은 그대로 막힌다:
+  //   "이 주소로 주문이 처음인 손님"은 손님 화면이 배송비를 100% 부과하므로(1448~1450행) 0원일 수가 없다.
+  // orders.customer_phone 은 하이픈 있는 값과 없는 값이 섞여 저장돼 있어 둘 다로 조회한다
+  //   (손님 화면 checkAlreadyPaidShippingGroups 2404행과 동일).
+  const digits = phone.replace(/[^0-9]/g, "").slice(0, 11);
+  const hyphenated =
+    digits.length > 7
+      ? `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}`
+      : digits;
+  const phoneValues = Array.from(new Set([phone, digits, hyphenated].filter(Boolean)));
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select("id, order_manage_status, zipcode, address, detail_address")
+    .in("customer_phone", phoneValues)
+    .order("created_at", { ascending: false })
+    .limit(300);
+
+  if (error) {
+    console.warn("배송비 검증: 이전 주문 조회 실패(주문은 진행):", error?.message);
+    return; // 조회 실패 → 허용(주문을 막지 않는다)
+  }
+
+  const hasSameAddressOrder = (data || []).some((row: AnyRow) => {
+    if (isCanceledForSubmitShipping(row?.order_manage_status)) return false;
+    const sig = submitAddressSignature(row?.zipcode, row?.address, row?.detail_address);
+    return Boolean(sig) && sig === signature;
+  });
+
+  // 이전 주문이 하나라도 있으면 합배송으로 한 그룹분이 빠졌을 수 있다 → 무조건 통과(재구매 손님 보호).
+  //   합배송 판정(관리자 시간설정 > 방송 단위 > 업체배송 그룹)은 손님 화면이 그대로 담당하고
+  //   여기서는 재현하지 않는다. 재현하다 틀리면 정상 주문이 막히는 더 큰 사고가 난다.
+  if (hasSameAddressOrder) return;
+
+  // 여기까지 = 같은 주소 이전 주문이 아예 없다 = 합배송이 성립할 수 없다
+  //   → 배송그룹 수만큼 전액을 냈어야 한다. 그런데 안 냈다.
+  console.warn(
+    `배송비 검증 차단: phone=${digits.slice(-4)} 낸배송비=${paidShipping} 필요=${expectedShipping}(${baseShippingFee}×${groups.size}그룹) 같은주소_이전주문=없음`,
+  );
+  throw new Error(
+    "배송비가 빠져 있어요.\n페이지를 새로고침한 뒤 다시 주문해 주세요.",
+  );
 }
 
 // 개인당 구매제한(상품관리 product_note.purchase_limit_enabled/qty) 서버 강제 검증.
@@ -465,7 +611,8 @@ export async function POST(request: NextRequest) {
     // 개인당 구매제한 차단(돈/재고/포인트 RPC 무변경 — RPC 호출 전 검증만)
     //   카톡 계정(kakao_id) 기준 누적 → 전화번호 바꿔도 제한 우회 불가
     await assertDirectInputAllowed(supabase, orderRows);
-    await assertRegisteredProductPrices(supabase, orderRows);
+    const productCatalog = await assertRegisteredProductPrices(supabase, orderRows);
+    await assertShippingFeeNotSkipped(supabase, orderRows, phone, productCatalog);
     await assertPurchaseLimit(supabase, orderRows, phone, text(body.kakao_id));
 
     const normalizedSubmit = await normalizeOrderRowsForSubmitSettings(supabase, orderRows);
