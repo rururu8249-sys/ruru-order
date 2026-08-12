@@ -849,23 +849,40 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
     let alive = true;
 
     const loadCustomerProfiles = async () => {
-      const { data, error } = await supabase
-        .from("customers")
-        .select(
-          "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, shipping_addresses, is_blocked, block_reason, customer_memo, last_order_at, created_at, kakao_id, kakao_nickname, kakao_profile_image, first_login_at, last_login_at, customer_history, live_alert_optin, live_alert_optin_at"
-        )
-        .order("created_at", { ascending: false })
-        .limit(1000);
+      // [2026-08-12] 회원이 1,000명을 넘으면 옛 회원이 목록·검색에서 통째로 누락되던 문제 수정.
+      //   Supabase는 한 번에 최대 1,000행만 돌려주므로 1,000명씩 나눠 전부 받아온다.
+      //   표시 전용(SELECT만) — 주문/입금/정산/배송/포인트 로직과 무관.
+      const PAGE_SIZE = 1000;
+      const collected: CustomerProfile[] = [];
+
+      for (let from = 0; from < 50000; from += PAGE_SIZE) {
+        const { data, error } = await supabase
+          .from("customers")
+          .select(
+            "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, shipping_addresses, is_blocked, block_reason, customer_memo, last_order_at, created_at, kakao_id, kakao_nickname, kakao_profile_image, first_login_at, last_login_at, customer_history, live_alert_optin, live_alert_optin_at"
+          )
+          .order("created_at", { ascending: false })
+          .range(from, from + PAGE_SIZE - 1);
+
+        if (!alive) return;
+
+        if (error) {
+          console.warn("[admin-live] customers 테이블 불러오기 실패", error.message);
+          if (collected.length === 0) {
+            setCustomerProfiles([]);
+            return;
+          }
+          break; // 일부라도 받아온 건 그대로 보여준다(빈 목록으로 날리지 않음)
+        }
+
+        const chunk = (data || []) as CustomerProfile[];
+        collected.push(...chunk);
+        if (chunk.length < PAGE_SIZE) break;
+      }
 
       if (!alive) return;
 
-      if (error) {
-        console.warn("[admin-live] customers 테이블 불러오기 실패", error.message);
-        setCustomerProfiles([]);
-        return;
-      }
-
-      setCustomerProfiles(((data || []) as CustomerProfile[]).filter((profile) => digitsOnly(profile.customer_phone) || clean(profile.customer_name) || clean(profile.youtube_nickname)));
+      setCustomerProfiles(collected.filter((profile) => digitsOnly(profile.customer_phone) || clean(profile.customer_name) || clean(profile.youtube_nickname)));
     };
 
     void loadCustomerProfiles();
