@@ -1312,6 +1312,15 @@ export default function OrderPage() {
   const [howToWarn, setHowToWarn] = useState(HOWTO_DEFAULT.warn);
   // [2026-07-10] 상품 목록 정렬(표시 전용). 기본순 = 고정 상품 우선 + 방송 진열 순서(기존 동작)
   const [productSort, setProductSort] = useState<"default" | "price_asc" | "price_desc" | "name">("default");
+  // [2026-08-12 리뉴얼 4단계] 상품 보기 방식 — 기본 ☰목록, ⊞격자는 선택. 기기에 기억(UI 취향값만 저장).
+  const [listView, setListView] = useState<"list" | "grid">("list");
+  useEffect(() => {
+    try { const v = localStorage.getItem("ruru_order_list_view"); if (v === "grid" || v === "list") setListView(v); } catch {}
+  }, []);
+  const changeListView = (v: "list" | "grid") => {
+    setListView(v);
+    try { localStorage.setItem("ruru_order_list_view", v); } catch {}
+  };
   const [productPage, setProductPage] = useState(1);
   const [visibleProductCount, setVisibleProductCount] = useState(10);
   const [categoryFilter, setCategoryFilter] = useState<string>("전체");
@@ -5081,6 +5090,13 @@ export default function OrderPage() {
                   <span style={{ fontSize: "12px", fontWeight: 700, color: "#8A8A8A" }}>총 {visibleItems.length}개</span>
                   {/* 손님이 무슨 칸인지 알 수 있게 "정렬" 라벨을 붙임 */}
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    {/* [2026-08-12 리뉴얼 4단계] 보기 전환 — 표시 배치만 바뀜(담기·금액·재고 무관) */}
+                    <div style={{ display: "flex", flexShrink: 0, border: "1px solid #D9C5CC", borderRadius: "9px", overflow: "hidden", background: "#fff" }}>
+                      <button type="button" aria-label="목록형 보기" title="목록형" onClick={() => changeListView("list")}
+                        style={{ width: "32px", height: "34px", border: "none", background: listView === "list" ? "#7A1E47" : "#fff", color: listView === "list" ? "#fff" : "#7A1E47", fontSize: "14px", fontWeight: 800, cursor: "pointer", lineHeight: 1 }}>☰</button>
+                      <button type="button" aria-label="격자형 보기" title="격자형(2열)" onClick={() => changeListView("grid")}
+                        style={{ width: "32px", height: "34px", border: "none", borderLeft: "1px solid #EADCE2", background: listView === "grid" ? "#7A1E47" : "#fff", color: listView === "grid" ? "#fff" : "#7A1E47", fontSize: "14px", fontWeight: 800, cursor: "pointer", lineHeight: 1 }}>⊞</button>
+                    </div>
                     <span style={{ fontSize: "12px", fontWeight: 700, color: "#8A8A8A", whiteSpace: "nowrap" }}>⇅ 정렬</span>
                   <select
                     value={productSort}
@@ -5097,7 +5113,9 @@ export default function OrderPage() {
                 {visibleItems.length === 0 ? (
                   <div style={{ marginTop: "14px", padding: "26px", textAlign: "center", color: "#999", fontSize: "14px", fontWeight: 700 }}>찾는 상품이 없어요. 아래 직접 입력으로 담아주세요.</div>
                 ) : (
-                  <div style={{ marginTop: "8px", display: "flex", flexDirection: "column" }}>
+                  <div style={listView === "grid"
+                    ? { marginTop: "10px", display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px", alignItems: "stretch" }
+                    : { marginTop: "8px", display: "flex", flexDirection: "column" }}>
                     {visibleItems.map((product) => {
                       const img = pickOrderProductImageUrl(product);
                       const pinned = isPinnedOrderProduct(product);
@@ -5141,7 +5159,9 @@ export default function OrderPage() {
                       return (
                         <div
                           key={String(product.id)}
-                          style={isBroadcastOn && pinned
+                          style={listView === "grid"
+                            ? { display: "flex", flexDirection: "column", padding: "10px", borderRadius: "14px", background: "#fff", border: isBroadcastOn && pinned ? "1.5px solid #7A1E47" : "1px solid #EFE6DE", boxShadow: isBroadcastOn && pinned ? "0 4px 16px rgba(122,30,71,0.10)" : "none" }
+                            : isBroadcastOn && pinned
                             ? { padding: "12px", margin: "8px 0 12px", borderRadius: "14px", border: "1.5px solid #7A1E47", background: "#FDF3F7", boxShadow: "0 4px 16px rgba(122,30,71,0.10)" }
                             : { padding: "13px 0", borderBottom: "0.5px solid #E5E1DC" }}
                         >
@@ -5152,8 +5172,12 @@ export default function OrderPage() {
                               지금 방송에서 소개 중
                             </div>
                           ) : null}
-                          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-                          <div onClick={() => { if (img) setLightboxImage(img); }} style={{ position: "relative", flexShrink: 0, width: "84px", height: "84px", borderRadius: "10px", background: "#F0EBE8", overflow: "hidden", cursor: img ? "zoom-in" : "default" }}>
+                          <div style={listView === "grid"
+                            ? { display: "flex", flexDirection: "column", gap: "8px", alignItems: "stretch", flex: 1, minWidth: 0 }
+                            : { display: "flex", gap: "12px", alignItems: "center" }}>
+                          <div onClick={() => { if (img) setLightboxImage(img); }} style={listView === "grid"
+                            ? { position: "relative", width: "100%", aspectRatio: "1 / 1", borderRadius: "10px", background: "#F0EBE8", overflow: "hidden", cursor: img ? "zoom-in" : "default" }
+                            : { position: "relative", flexShrink: 0, width: "84px", height: "84px", borderRadius: "10px", background: "#F0EBE8", overflow: "hidden", cursor: img ? "zoom-in" : "default" }}>
                             {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
                             {sold ? (
                               <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", borderRadius: "inherit", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
@@ -5161,7 +5185,7 @@ export default function OrderPage() {
                               </div>
                             ) : null}
                           </div>
-                          <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={listView === "grid" ? { minWidth: 0, flex: 1, display: "flex", flexDirection: "column" } : { minWidth: 0, flex: 1 }}>
                             <div style={{ display: "flex", gap: "4px", marginBottom: "4px", flexWrap: "wrap" }}>
                               {isBroadcastOn && pinned ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#E8340A", borderRadius: "5px", padding: "2px 6px" }}>🔴 라이브</span> : null}
                               {!isBroadcastOn && pinned ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#7A1E47", borderRadius: "5px", padding: "2px 6px" }}>📌 추천</span> : null}
@@ -5189,18 +5213,24 @@ export default function OrderPage() {
                               {/* [2026-07-23 사장님 지시] 업체배송 상품 카드 배지 — 표시 전용(배송비 계산과 무관) */}
                               {productDeliveryLabel(product) === "업체배송" ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#EEF2FA", color: "#3B5BA5" }}>🚚 업체배송</span> : null}
                             </div>
-                            <div style={{ fontSize: "13px", fontWeight: 700, color: "#222", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.product_name}</div>
+                            <div style={listView === "grid"
+                              ? { fontSize: "13px", fontWeight: 700, color: "#222", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "break-all" }
+                              : { fontSize: "13px", fontWeight: 700, color: "#222", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.product_name}</div>
                             {/* 바로구매 부가설명 유지(사장님 지침: 배지만으론 신규 고객이 뜻을 모름) + 가격 위계 강화 15→17px */}
                             {badges.includes("direct") ? (<div style={{ fontSize: 11, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>방송 접수 없이 지금 바로 구매 가능</div>) : null}
                             {/* [조합형 옵션] 세부상품 개수 안내 — 표시 전용 */}
                             {(() => { const ci = readComboInfoOrderProduct(product); return ci && ci.names.length > 1 ? (<div style={{ fontSize: 11, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>종류 {ci.names.length}가지 · 눌러서 선택</div>) : null; })()}
-                            <div style={{ marginTop: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                            <div style={listView === "grid"
+                              ? { marginTop: "auto", paddingTop: "6px", display: "flex", flexDirection: "column", alignItems: "stretch", gap: "6px" }
+                              : { marginTop: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                               <span style={{ fontSize: "17px", fontWeight: 800, color: "#7A1E47" }}>{(() => { const ci = readComboInfoOrderProduct(product); return ci && ci.maxPlus > 0 ? won(Number(product.price || 0)) + "~" : won(Number(product.price || 0)); })()}</span>
                               <button
                                 type="button"
                                 disabled={sold}
                                 onClick={() => selectQuickGroupBuyProduct(product as BroadcastProduct)}
-                                style={{ flexShrink: 0, height: "32px", padding: "0 16px", borderRadius: "8px", border: "none", background: sold ? "#ccc" : "#7A1E47", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: sold ? "default" : "pointer" }}
+                                style={listView === "grid"
+                                  ? { width: "100%", height: "34px", padding: "0 10px", borderRadius: "8px", border: "none", background: sold ? "#ccc" : "#7A1E47", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: sold ? "default" : "pointer" }
+                                  : { flexShrink: 0, height: "32px", padding: "0 16px", borderRadius: "8px", border: "none", background: sold ? "#ccc" : "#7A1E47", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: sold ? "default" : "pointer" }}
                               >
                                 {sold ? "품절" : "장바구니 담기"}
                               </button>
