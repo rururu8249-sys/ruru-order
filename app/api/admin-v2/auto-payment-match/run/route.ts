@@ -411,6 +411,22 @@ function buildCandidates(orders: AnyRow[], deposits: AnyRow[]) {
   };
 }
 
+// [2026-08-12] 포인트 전액 사용으로 실결제 0원이 된 주문 처리.
+//   붙일 입금내역이 애초에 없어서 영원히 "매칭필요"로 남던 건들이다.
+//   규칙(돈 사고 방지):
+//   - 자격 판정은 buildOrderGroups 재사용 → 취소/환불/이미 입금확인/출고완료/테스트 주문은 이미 제외됨.
+//   - 포인트 사용 > 0 이고 (주문그룹 합계 - 사용포인트)가 정확히 0 일 때만.
+//     음수(포인트가 주문금액보다 큼)는 데이터 이상이므로 자동처리하지 않고 사람이 보게 남긴다.
+//   - 이름+금액으로 이미 자동매칭 후보가 잡힌 주문그룹은 제외(이중 처리 방지).
+//   - deposits 테이블은 일절 건드리지 않는다(연결할 입금내역이 없음).
+function buildZeroPaymentGroups(orders: AnyRow[], excludeGroupIds: Set<string>) {
+  return buildOrderGroups(orders).filter((group) => {
+    if (excludeGroupIds.has(group.orderGroupId)) return false;
+    if (!(group.pointUsed > 0)) return false;
+    return group.amount - group.pointUsed === 0;
+  });
+}
+
 // [읽기 전용] "금액 단독" 추천 계산. DB를 절대 쓰지 않으며 자동확정도 하지 않는다.
 // 기존 buildCandidates(이름+금액 1:1 자동확정)는 건드리지 않고, 별도 추천 목록만 만든다.
 // 규칙(돈 사고 방지):
@@ -544,6 +560,8 @@ export async function POST(request: NextRequest) {
     const deposits = depositsResult.data || [];
 
     const preview = buildCandidates(orders, deposits);
+    const candidateGroupIds = new Set(preview.candidates.map((c) => c.order_group_id));
+    const zeroPaymentGroups = buildZeroPaymentGroups(orders, candidateGroupIds);
 
     if (!confirm) {
       // [읽기 전용] 금액 단독 추천. DB 쓰기/자동확정 없음. 미리보기 응답에만 포함.
@@ -564,10 +582,19 @@ export async function POST(request: NextRequest) {
           blocked_count: preview.blocked.length,
           amount_only_green: amountOnly.greenCount,
           amount_only_yellow: amountOnly.yellowCount,
+          zero_payment_groups: zeroPaymentGroups.length,
         },
         candidates: preview.candidates,
         blocked: preview.blocked,
         amount_only_suggestions: amountOnly.suggestions,
+        zero_payment_candidates: zeroPaymentGroups.map((group) => ({
+          order_group_id: group.orderGroupId,
+          order_ids: group.orderIds,
+          nickname: group.nickname,
+          customer_name: group.customerName,
+          amount: group.amount,
+          point_used: group.pointUsed,
+        })),
       });
     }
 
@@ -624,6 +651,45 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // [2026-08-12] 포인트 전액 사용 0원 주문 — 입금내역 없이 입금확인 처리.
+    //   orders 만 갱신하고 deposits 는 건드리지 않는다(연결할 입금이 없음).
+    let zeroPaymentSuccessCount = 0;
+    let zeroPaymentFailedCount = 0;
+
+    for (const group of zeroPaymentGroups) {
+      const zeroUpdate = await supabase
+        .from("orders")
+        .update({
+          admin_order_status_v2: "자동입금확인",
+          order_manage_status: "자동입금확인",
+          deposit_confirmed_at: nowIso,
+        })
+        .in("id", group.orderIds);
+
+      if (zeroUpdate.error) {
+        zeroPaymentFailedCount += 1;
+        results.push({
+          ok: false,
+          step: "zero_payment_orders_update",
+          order_group_id: group.orderGroupId,
+          error: zeroUpdate.error.message,
+        });
+        continue;
+      }
+
+      zeroPaymentSuccessCount += 1;
+      results.push({
+        ok: true,
+        kind: "zero_payment",
+        order_group_id: group.orderGroupId,
+        order_ids: group.orderIds,
+        nickname: group.nickname,
+        amount: group.amount,
+        point_used: group.pointUsed,
+        reason: "포인트 전액 사용으로 실결제 0원 — 입금내역 없이 입금확인",
+      });
+    }
+
     return NextResponse.json({
       ok: true,
       mode: "executed_db_write",
@@ -635,6 +701,8 @@ export async function POST(request: NextRequest) {
         success_count: successCount,
         failed_count: failedCount,
         blocked_count: preview.blocked.length,
+        zero_payment_success_count: zeroPaymentSuccessCount,
+        zero_payment_failed_count: zeroPaymentFailedCount,
       },
       results,
       blocked: preview.blocked,
