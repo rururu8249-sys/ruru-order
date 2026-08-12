@@ -94,6 +94,12 @@ function orderAmount(order: AnyRow) {
   );
 }
 
+// 포인트 차감 "전" 주문금액. orderAmount()는 final_amount(차감 후)를 먼저 보기 때문에
+//   포인트 전액사용 주문에서는 0이 되어 쓸 수 없다. 0원 주문 판정 전용.
+function orderGrossAmount(order: AnyRow) {
+  return num(order.adjusted_total_price ?? order.total_price ?? order.final_amount ?? 0);
+}
+
 function orderPointUsed(order: AnyRow) {
   // 이 주문에서 사용한 포인트. 다중상품+포인트 주문은 final_amount 합이 포인트 차감 전
   // 금액이라, 매칭 시 (합계 - 사용포인트) 금액도 후보로 허용하기 위해 사용한다.
@@ -146,7 +152,7 @@ function isBankPaymentMethod(value: unknown) {
   );
 }
 
-function isEligibleOrder(order: AnyRow) {
+function isEligibleOrder(order: AnyRow, options?: { allowZeroAmount?: boolean }) {
   const nickname = orderNickname(order);
   const amount = orderAmount(order);
   const status = orderStatusText(order);
@@ -155,7 +161,10 @@ function isEligibleOrder(order: AnyRow) {
   if (!order.id) return { ok: false, reason: "주문 ID 없음" };
   if (!orderGroupId(order)) return { ok: false, reason: "주문 그룹 ID 없음" };
   if (!nickname) return { ok: false, reason: "유튜브 닉네임 없음" };
-  if (!amount || amount <= 0) return { ok: false, reason: "입금예정금액 없음" };
+  // allowZeroAmount: 포인트 전액사용 0원 주문 판정에서만 true. 기본(자동매칭)은 기존 그대로 0원 제외.
+  if (!options?.allowZeroAmount && (!amount || amount <= 0)) {
+    return { ok: false, reason: "입금예정금액 없음" };
+  }
 
   // [2026-08-12] 이미 입금이 끝난 옛 주문이 후보로 남아 "같은 닉네임 + 같은 금액" 2건이 되면
   //   아래 1:1 규칙(주문 1건 && 입금 1건)에 걸려 새 주문의 자동입금확인이 통째로 멈추던 문제 수정.
@@ -414,17 +423,59 @@ function buildCandidates(orders: AnyRow[], deposits: AnyRow[]) {
 // [2026-08-12] 포인트 전액 사용으로 실결제 0원이 된 주문 처리.
 //   붙일 입금내역이 애초에 없어서 영원히 "매칭필요"로 남던 건들이다.
 //   규칙(돈 사고 방지):
-//   - 자격 판정은 buildOrderGroups 재사용 → 취소/환불/이미 입금확인/출고완료/테스트 주문은 이미 제외됨.
-//   - 포인트 사용 > 0 이고 (주문그룹 합계 - 사용포인트)가 정확히 0 일 때만.
+//   - buildOrderGroups 는 재사용하지 않는다. 거기서는 금액 0원이면 "입금예정금액 없음"으로 이미 걸러지기 때문.
+//     대신 isEligibleOrder(allowZeroAmount) 로 금액 조건만 예외 처리하고
+//     취소/환불/이미 입금확인/출고완료/무통장 여부/테스트 주문 제외는 전부 동일하게 적용한다.
+//   - 포인트 사용 > 0 이고 (포인트 차감 전 합계 - 사용포인트)가 정확히 0, 저장된 final_amount 합도 0 일 때만.
 //     음수(포인트가 주문금액보다 큼)는 데이터 이상이므로 자동처리하지 않고 사람이 보게 남긴다.
 //   - 이름+금액으로 이미 자동매칭 후보가 잡힌 주문그룹은 제외(이중 처리 방지).
 //   - deposits 테이블은 일절 건드리지 않는다(연결할 입금내역이 없음).
 function buildZeroPaymentGroups(orders: AnyRow[], excludeGroupIds: Set<string>) {
-  return buildOrderGroups(orders).filter((group) => {
-    if (excludeGroupIds.has(group.orderGroupId)) return false;
-    if (!(group.pointUsed > 0)) return false;
-    return group.amount - group.pointUsed === 0;
-  });
+  const map = new Map<
+    string,
+    { orderIds: number[]; nickname: string; customerName: string; gross: number; point: number; final: number }
+  >();
+
+  for (const order of orders) {
+    // 금액 조건만 예외로 두고, 취소/환불/이미 입금확인/출고완료/무통장 여부 등 안전조건은 전부 동일하게 적용.
+    if (!isEligibleOrder(order, { allowZeroAmount: true }).ok) continue;
+
+    const groupId = orderGroupId(order);
+    const id = Number(order.id);
+    if (!groupId || !Number.isFinite(id) || id <= 0) continue;
+
+    const current =
+      map.get(groupId) ||
+      { orderIds: [], nickname: orderNickname(order), customerName: orderCustomerName(order), gross: 0, point: 0, final: 0 };
+
+    current.orderIds.push(id);
+    current.gross += orderGrossAmount(order);
+    current.point += orderPointUsed(order);
+    current.final += num(order.final_amount ?? 0);
+
+    map.set(groupId, current);
+  }
+
+  const groups = [];
+
+  for (const [groupId, g] of map.entries()) {
+    if (excludeGroupIds.has(groupId)) continue;
+    if (g.orderIds.length === 0 || !g.nickname) continue;
+    if (!(g.point > 0)) continue;           // 포인트를 쓴 주문만
+    if (g.gross - g.point !== 0) continue;  // 정확히 0원일 때만(음수=데이터 이상 → 사람이 확인)
+    if (g.final !== 0) continue;            // 저장된 실결제금액도 0이어야 함(이중 확인)
+
+    groups.push({
+      orderGroupId: groupId,
+      orderIds: g.orderIds,
+      nickname: g.nickname,
+      customerName: g.customerName,
+      amount: g.gross,
+      pointUsed: g.point,
+    });
+  }
+
+  return groups;
 }
 
 // [읽기 전용] "금액 단독" 추천 계산. DB를 절대 쓰지 않으며 자동확정도 하지 않는다.
