@@ -4,6 +4,7 @@ import { showAdminToast } from "@/lib/adminToast";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
 import AdminLiveMissionPanel from "./AdminLiveMissionPanel";
+import AdminLiveEventSoundboard from "./AdminLiveEventSoundboard"; // [2026-08-12] 효과음 재생 버튼(표시·재생 전용)
 
 type RouletteMode = "live" | "test" | "preview";
 
@@ -1531,6 +1532,9 @@ export default function AdminLiveEventRoulettePanel({
                 <span className="note" style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{widgetUrl || "준비중"}</span>
                 <button className="btn rose" style={{ height: "auto", padding: "5px 12px" }} onClick={() => void copyText(widgetUrl)} disabled={!widgetUrl}>복사</button>
               </div>
+
+              {/* [2026-08-12] 효과음 사운드보드 — 서바이벌/달리기 탭에서만. 재생 전용(추첨·지급 무관) */}
+              {isKWinnerTab && <AdminLiveEventSoundboard kind={eventTab === "race" ? "race" : "survival"} />}
 
               {/* 이벤트 목록 */}
               <div style={{ borderTop: "1px solid var(--bd)", paddingTop: "11px" }}>
