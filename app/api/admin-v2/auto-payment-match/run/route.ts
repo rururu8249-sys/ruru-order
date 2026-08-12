@@ -157,6 +157,22 @@ function isEligibleOrder(order: AnyRow) {
   if (!nickname) return { ok: false, reason: "유튜브 닉네임 없음" };
   if (!amount || amount <= 0) return { ok: false, reason: "입금예정금액 없음" };
 
+  // [2026-08-12] 이미 입금이 끝난 옛 주문이 후보로 남아 "같은 닉네임 + 같은 금액" 2건이 되면
+  //   아래 1:1 규칙(주문 1건 && 입금 1건)에 걸려 새 주문의 자동입금확인이 통째로 멈추던 문제 수정.
+  //   ① deposit_confirmed_at(입금확인 시각)이 찍혀 있으면 = 입금 끝난 주문 → 후보에서 제외.
+  //      입금확인 취소 시 이 값이 null 로 되돌아가므로(payment-confirm-cancel) 다시 후보가 된다.
+  //   ② 이미 발송된 주문(출고완료/택배출고)도 제외. 옛 주문은 입금확인 후 상태가 "출고완료"로
+  //      덮여서 아래 상태 키워드 검사에 안 걸린다(그래서 미입금 주문처럼 보였다).
+  //      아직 안 나간 "출고대기"는 제외하지 않는다 — 미입금 상태일 수 있어 자동확인 대상으로 남긴다.
+  //   ⚠️ 후보를 "줄이기만" 하는 조건이라 없던 매칭이 새로 생기지 않는다. 금액 판정/입금 로직 무변경.
+  if (order.deposit_confirmed_at) {
+    return { ok: false, reason: "이미 입금확인된 주문(deposit_confirmed_at 있음)" };
+  }
+
+  if (hasAny(status, ["출고완료", "택배출고"])) {
+    return { ok: false, reason: `이미 발송된 주문 상태: ${status}` };
+  }
+
   if (!isBankPaymentMethod(method)) {
     return { ok: false, reason: `무통장 주문 아님: ${method}` };
   }
