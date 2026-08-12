@@ -37,7 +37,7 @@ const normalizeEmptyProductOptionValue = (value: unknown) => {
 
 
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { HOWTO_DEFAULT, parseHowtoSteps } from "@/lib/howto";
 import { supabase } from "@/lib/supabase";
 import { isRemoteAreaAddress } from "@/lib/order/shippingAddress";
@@ -1312,11 +1312,6 @@ export default function OrderPage() {
   const [howToWarn, setHowToWarn] = useState(HOWTO_DEFAULT.warn);
   // [2026-07-10] 상품 목록 정렬(표시 전용). 기본순 = 고정 상품 우선 + 방송 진열 순서(기존 동작)
   const [productSort, setProductSort] = useState<"default" | "price_asc" | "price_desc" | "name">("default");
-  const [videoOpen, setVideoOpen] = useState(true);
-  const videoSlotRef = useRef<HTMLDivElement | null>(null);
-  const livePlayerRef = useRef<HTMLDivElement | null>(null);
-  const [videoClosed, setVideoClosed] = useState(false); // ✕로 완전 닫음
-  const [miniPos, setMiniPos] = useState<{ left: number; top: number } | null>(null);
   const [productPage, setProductPage] = useState(1);
   const [visibleProductCount, setVisibleProductCount] = useState(10);
   const [categoryFilter, setCategoryFilter] = useState<string>("전체");
@@ -1372,28 +1367,12 @@ export default function OrderPage() {
   const [registeredOptionQty, setRegisteredOptionQty] = useState(1);
   // [조합형 옵션] 세부상품이 많을 때(예: 미니어처 143종) 옵션 시트 안 검색어 — 표시 전용
   const [registeredOptionComboSearch, setRegisteredOptionComboSearch] = useState("");
+  // [2026-08-12 리뉴얼 2단계] 다음 방송 일시 — settings.next_live_text 를 그대로 보여준다(없으면 안 뜸).
+  const [nextLiveText, setNextLiveText] = useState("");
   // [2026-08-10 3단] 세부상품(1번 축) 선택값. 3단이 아닌 상품에서는 사용하지 않음(기존 동작 무변경).
   const [registeredOptionDetail, setRegisteredOptionDetail] = useState("");
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
   const [duplicateWarningPendingAction, setDuplicateWarningPendingAction] = useState<(() => void) | null>(null);
-
-  // 미니 모드: 드래그 위치 or 기본 우하단, 화면 경계 clamp (리사이즈/회전 시 재적용)
-  useLayoutEffect(() => {
-    if (videoOpen || videoClosed) return;
-    const p = livePlayerRef.current; if (!p) return;
-    const place = () => {
-      const w = 116, h = Math.round(w * 16 / 9), m = 12;
-      const left = miniPos ? miniPos.left : (window.innerWidth - w - m);
-      const top = miniPos ? miniPos.top : (window.innerHeight - h - 84);
-      p.style.width = w + "px"; p.style.height = h + "px";
-      p.style.left = Math.max(m, Math.min(left, window.innerWidth - w - m)) + "px";
-      p.style.top = Math.max(m, Math.min(top, window.innerHeight - h - m)) + "px";
-      p.style.borderRadius = "12px";
-    };
-    place();
-    window.addEventListener("resize", place);
-    return () => window.removeEventListener("resize", place);
-  }, [videoOpen, videoClosed, miniPos]);
 
   useEffect(() => {
     if (!directInputOpen || typeof window === "undefined") {
@@ -2201,6 +2180,14 @@ export default function OrderPage() {
       .eq("key", "shop_open")
       .maybeSingle();
     setShopOpen(String(shopSetting?.value ?? "").trim().toLowerCase() !== "false");
+
+    // [리뉴얼] 다음 방송 일시(표시 전용) — 없거나 실패하면 배너에서 그 줄만 안 나온다.
+    const { data: nextLiveSetting } = await supabase
+      .from("settings")
+      .select("value")
+      .eq("key", "next_live_text")
+      .maybeSingle();
+    setNextLiveText(String(nextLiveSetting?.value ?? "").trim());
 
     const { data, error } = await supabase
       .from("broadcasts")
@@ -4621,6 +4608,37 @@ export default function OrderPage() {
     doFinalize();
   };
 
+  // [2026-08-12 리뉴얼 2단계] 유튜브는 브라우저 새 탭이 아니라 "앱"으로 연다.
+  //   iOS = youtube:// 스킴 / 안드로이드 = intent:// 스킴 → 앱이 없으면 0.8초 뒤 https 로 자동 폴백.
+  //   ⚠️ 표시/이동 전용. 주문·돈 로직과 무관.
+  const openYoutubeApp = (rawUrl: string) => {
+    const url = String(rawUrl || "").trim();
+    if (!url) return;
+    if (typeof window === "undefined") return;
+    const ua = String(window.navigator.userAgent || "");
+    const isIOS = /iPad|iPhone|iPod/.test(ua);
+    const isAndroid = /Android/i.test(ua);
+    const httpsUrl = url.startsWith("http") ? url : `https://${url}`;
+    let deep = "";
+    try {
+      const u = new URL(httpsUrl);
+      const rest = `${u.host}${u.pathname}${u.search}`;
+      if (isIOS) deep = `youtube://${rest}`;
+      else if (isAndroid) deep = `intent://${rest}#Intent;scheme=https;package=com.google.android.youtube;S.browser_fallback_url=${encodeURIComponent(httpsUrl)};end`;
+    } catch { deep = ""; }
+    if (!deep) { window.open(httpsUrl, "_blank", "noopener,noreferrer"); return; }
+    const started = Date.now();
+    const fallback = window.setTimeout(() => {
+      // 앱이 떠서 화면이 가려졌으면(문서가 숨겨짐) 폴백하지 않는다.
+      if (document.visibilityState === "hidden") return;
+      if (Date.now() - started < 700) return;
+      window.open(httpsUrl, "_blank", "noopener,noreferrer");
+    }, 800);
+    const onHide = () => { window.clearTimeout(fallback); document.removeEventListener("visibilitychange", onHide); };
+    document.addEventListener("visibilitychange", onHide);
+    window.location.href = deep;
+  };
+
   const TopCustomerNav = () => {
     const safeGreetingName = youtubeNickname || customerName || "고객";
     const safePointText = `${Math.max(0, Number(customerPointBalance || 0)).toLocaleString()}원`;
@@ -4650,10 +4668,23 @@ export default function OrderPage() {
       <header style={{ position: "sticky", top: 0, zIndex: 30, background: "#fff", borderBottom: "1px solid #E8E2DD", padding: "10px 12px" }}>
         <div style={{ margin: "0 auto", width: "100%", maxWidth: "560px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
-            <Link href="/order" style={{ flexShrink: 0, fontSize: "19px", fontWeight: 800, letterSpacing: "-0.04em", color: "#7A1E47", textDecoration: "none" }}>루루동이</Link>
-            {broadcast ? (
-              <span style={{ flexShrink: 0, fontSize: "10px", fontWeight: 800, color: "#fff", background: "#C0392B", borderRadius: "4px", padding: "2px 6px", letterSpacing: "0.02em" }}>LIVE</span>
-            ) : null}
+            {/* [2026-08-12 리뉴얼 1단계] 로고 — 집(대문) 아이콘 + 「루루동이 / 집구석 LIVE」 워드마크.
+                방송 중이면 LIVE 배지가 빨갛게, 아니면 차분한 로즈. 클릭 동작(/order)은 기존과 동일. */}
+            <Link href="/order" style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "3px", textDecoration: "none" }}>
+              <svg width="30" height="28" viewBox="5 9 30 27.4" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden>
+                <path d="M6.4 21 L18.4 10.6 a2.4 2.4 0 0 1 3.2 0 L33.6 21" stroke="#5E1837" strokeWidth="2.7" fill="none" />
+                <path d="M9.8 19.6 V31.6 a3.2 3.2 0 0 0 3.2 3.2 H27 a3.2 3.2 0 0 0 3.2 -3.2 V19.6" stroke="#5E1837" strokeWidth="2.7" fill="#F6DBE7" fillOpacity="0.6" />
+                <path d="M16 34.8 V28.9 a4 4 0 0 1 8 0 V34.8" stroke="#5E1837" strokeWidth="2.4" fill="#FFFFFF" />
+                <circle cx="21" cy="31.6" r="0.95" fill="#5E1837" />
+              </svg>
+              <span style={{ lineHeight: 1.05 }}>
+                <span style={{ display: "block", fontSize: "15.5px", fontWeight: 900, letterSpacing: "-0.02em", color: "#7A1E47" }}>루루동이</span>
+                <span style={{ display: "flex", alignItems: "center", gap: "3px", marginTop: "2px", fontSize: "10px", fontWeight: 800, color: "#A8807F" }}>
+                  집구석
+                  <span style={{ fontSize: "8.5px", fontWeight: 900, color: "#fff", background: broadcast ? "#E8340A" : "#B98A9C", borderRadius: "4px", padding: "1px 4px", letterSpacing: "0.05em" }}>LIVE</span>
+                </span>
+              </span>
+            </Link>
             <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "14px", fontWeight: 800, color: "#7A1E47" }}>👋 {safeGreetingName}님!</span>
           </div>
 
@@ -4678,22 +4709,6 @@ export default function OrderPage() {
   // P3. 방송 영상 — 방송 ON + 유튜브 URL 있을 때만
   const isBroadcastOn = String(broadcast?.status || "").toUpperCase() === "ON";
   const broadcastYoutubeUrl = String(broadcast?.youtube_live_url || broadcast?.youtube_url || "").trim();
-  const videoEmbedSrc = useMemo(() => {
-    if (!broadcastYoutubeUrl) return "";
-    try {
-      const u = new URL(broadcastYoutubeUrl);
-      let id = "";
-      if (u.hostname.includes("youtu.be")) id = u.pathname.replace("/", "").trim();
-      else if (u.searchParams.get("v")) id = u.searchParams.get("v") || "";
-      else {
-        const m = u.pathname.match(/\/(?:live|embed)\/([^/?]+)/);
-        if (m?.[1]) id = m[1];
-      }
-      return id ? `https://www.youtube.com/embed/${id}?playsinline=1&rel=0` : "";
-    } catch {
-      return "";
-    }
-  }, [broadcastYoutubeUrl]);
 
   const directInputItem = items[directInputTargetIndex] || null;
   const registeredOptionDetailImages = registeredOptionSelectProduct
@@ -4811,43 +4826,10 @@ export default function OrderPage() {
         return null;
     }
   };
-  const railCircle = (active: boolean): CSSProperties => ({ width: "44px", height: "44px", borderRadius: "50%", background: active ? "#7B2D43" : "#F2ECEE", display: "flex", alignItems: "center", justifyContent: "center" });
-  const liveSideRail = (
-    <div style={{ width: "52px", flexShrink: 0, display: "flex", flexDirection: "column", gap: "11px", paddingTop: "2px" }}>
-      <button type="button" disabled={!(isBroadcastOn && broadcastYoutubeUrl)} onClick={isBroadcastOn && broadcastYoutubeUrl ? () => window.open(broadcastYoutubeUrl, "_blank") : undefined} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: isBroadcastOn && broadcastYoutubeUrl ? "pointer" : "default", opacity: isBroadcastOn && broadcastYoutubeUrl ? 1 : 0.4 }}>
-        <span style={railCircle(false)}>{railIconSvg("live", "#C0392B")}</span>
-        <span style={{ fontSize: "9px", color: "#C0392B", fontWeight: 600 }}>라이브참여</span>
-      </button>
-      <button type="button" onClick={() => setAlertSheetOpen(true)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
-        <span style={railCircle(liveAlertOptin)}>{railIconSvg("bell", liveAlertOptin ? "#fff" : "#7B2D43")}</span>
-        <span style={{ fontSize: "9px", color: liveAlertOptin ? "#7B2D43" : "#555", fontWeight: 600 }}>{liveAlertOptin ? "알림 ON" : "방송알림"}</span>
-      </button>
-      <button type="button" onClick={() => setNoticeSheetOpen(true)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
-        <span style={railCircle(false)}>{railIconSvg("notice", "#7B2D43")}</span>
-        <span style={{ fontSize: "9px", color: "#555", fontWeight: 500 }}>공지</span>
-      </button>
-      <button type="button" onClick={() => openOrderLookupBottomSheet()} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
-        <span style={railCircle(false)}>{railIconSvg("box", "#7B2D43")}</span>
-        <span style={{ fontSize: "9px", color: "#555", fontWeight: 500 }}>주문내역</span>
-      </button>
-      <button type="button" onClick={() => openCustomerInfoEditBottomSheet()} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
-        <span style={railCircle(false)}>{railIconSvg("user", "#7B2D43")}</span>
-        <span style={{ fontSize: "9px", color: "#555", fontWeight: 500 }}>회원정보</span>
-      </button>
-      <button type="button" onClick={() => setInquirySheetOpen(true)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
-        <span style={railCircle(false)}>{railIconSvg("chat", "#7B2D43")}</span>
-        <span style={{ fontSize: "9px", color: "#555", fontWeight: 500 }}>문의</span>
-      </button>
-      <button type="button" onClick={() => window.location.reload()} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", border: "none", background: "none", padding: 0, cursor: "pointer" }}>
-        <span style={railCircle(false)}>{railIconSvg("refresh", "#7B2D43")}</span>
-        <span style={{ fontSize: "9px", color: "#555", fontWeight: 500 }}>새로고침</span>
-      </button>
-    </div>
-  );
 
   return (
     <OrderPageShell>
-      <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}`}</style>
+      <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}.ruru-cat-scroll::-webkit-scrollbar{display:none}`}</style>
       {hasSavedInfo && <TopCustomerNav />}
       <PWAInstallBanner />
 
@@ -4937,91 +4919,45 @@ export default function OrderPage() {
 
       <CustomerPointGiftPopup />
 
-      {/* P3. 방송 영상 — 방송 ON/OFF 상관없이 항상 표시 (좌:영상 / 우:라이브참여·공지) */}
+      {/* [2026-08-12 리뉴얼 2단계] P3. 방송 영역 — 영상 임베드 삭제.
+          손님이 유튜브 앱에서 방송을 보다 이 페이지로 오면 폰이 알아서 미니플레이어(PIP)를 띄운다.
+          우리 페이지는 주문에만 집중: 방송 OFF=예고 배너 / 방송 ON=검은 스트립 2줄. */}
       {hasSavedInfo ? (
-        <section style={{ margin: "8px auto 0", width: "100%", maxWidth: "560px" }}>
+        <section style={{ margin: "8px auto 0", width: "100%", maxWidth: "560px", padding: "0 14px 12px" }}>
           {!isBroadcastOn ? (
-            <div style={{ display: "flex", gap: "8px", padding: "12px 16px 14px", borderBottom: "0.5px solid #E5E1DC" }}>
-              {/* [UI] 쇼핑몰 모드: 방송 자리 빈 박스를 컴팩트하게 — 첫 화면에 상품이 바로 보이게 (방송 ON 영상 영역은 무변경) */}
-              <div style={{ flex: 1, position: "relative", background: "#F6E7ED", borderRadius: "12px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div style={{ textAlign: "center", padding: "26px 16px" }}>
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "11px", fontWeight: 700, color: "#a98792", background: "#fff", padding: "4px 11px", borderRadius: "99px", marginBottom: "10px" }}>🛍 쇼핑몰 모드</div>
-                  <div style={{ fontSize: "11px", fontWeight: 600, color: "#b09aa1", marginBottom: "8px" }}>지금은 라이브 방송 중이 아니에요</div>
-                  <div style={{ fontSize: "20px", fontWeight: 800, color: "#7B2D43", marginBottom: "10px", lineHeight: 1.35 }}>그래도 지금 바로<br />구매하실 수 있어요!</div>
-                  <div style={{ fontSize: "12px", fontWeight: 500, color: "#9a7e87", lineHeight: 1.55, marginBottom: "20px" }}>마음에 드는 상품 언제든 주문 가능해요</div>
-                  <button type="button" onClick={() => { document.getElementById("ruru-shop-top")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "#7B2D43", color: "#fff", fontSize: "14px", fontWeight: 700, padding: "11px 20px", borderRadius: "99px", border: "none", cursor: "pointer" }}>🛒 상품 보러가기</button>
-                </div>
+            <div style={{ position: "relative", overflow: "hidden", background: "linear-gradient(135deg,#7A1E47,#9A3560)", borderRadius: "18px", padding: "16px", color: "#fff" }}>
+              <span style={{ position: "absolute", right: "-6px", bottom: "-14px", fontSize: "74px", opacity: 0.18, pointerEvents: "none" }}>🛍️</span>
+              <div style={{ fontSize: "11px", fontWeight: 800, opacity: 0.85 }}>🛍 쇼핑몰 모드</div>
+              <div style={{ fontSize: "17px", fontWeight: 900, margin: "5px 0 4px" }}>지금은 방송 전이에요</div>
+              <div style={{ fontSize: "12.5px", fontWeight: 700, opacity: 0.92, lineHeight: 1.5 }}>
+                {nextLiveText ? <>다음 라이브 · {nextLiveText}<br /></> : null}
+                아래 상품 {quickGroupBuyProducts.length}개는 <b>지금 바로 주문</b>하실 수 있어요 👇
               </div>
-              {liveSideRail}
+              <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
+                <button type="button" onClick={() => setAlertSheetOpen(true)} style={{ flex: 1.2, height: "40px", border: "none", borderRadius: "12px", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}>
+                  {liveAlertOptin ? "🔔 알림 받는 중 ✓" : "🔔 방송 알림 받기"}
+                </button>
+                {broadcastYoutubeUrl ? (
+                  <button type="button" onClick={() => openYoutubeApp(broadcastYoutubeUrl)} style={{ flex: 0.8, height: "40px", border: "1.5px solid rgba(255,255,255,0.55)", borderRadius: "12px", background: "transparent", color: "#fff", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}>▶ 유튜브 채널</button>
+                ) : null}
+              </div>
             </div>
           ) : (
-          <>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderBottom: "0.5px solid #E5E1DC" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", fontWeight: 800, color: "#C0392B" }}>
-              <span style={{ fontSize: "9px" }}>●</span> LIVE 방송 중
-            </span>
-            <button type="button" onClick={() => { if (videoClosed) { setVideoClosed(false); setVideoOpen(true); } else { setVideoOpen((v) => !v); } }} style={{ background: "none", border: "none", fontSize: "13px", fontWeight: 700, color: "#7A1E47", cursor: "pointer" }}>{videoClosed ? "영상 보기 ▼" : (videoOpen ? "접기 ▲" : "펼치기 ▼")}</button>
-          </div>
-          {isBroadcastOn && !videoClosed ? (
-          <>
-          <div style={videoOpen ? { display: "flex", gap: "8px", padding: "0 14px 12px", borderBottom: "0.5px solid #E5E1DC" } : { height: 0, padding: 0, overflow: "hidden", border: "none" }}>
-            <div ref={videoSlotRef} style={{ flex: 1, position: "relative", aspectRatio: "9 / 16", background: "#141414", borderRadius: "10px", overflow: "hidden" }}>
-              {videoEmbedSrc ? (
-                <div
-                  ref={livePlayerRef}
-                  style={videoOpen
-                    ? { position: "absolute", inset: 0, width: "100%", height: "100%", borderRadius: "10px", zIndex: 0, overflow: "hidden", background: "#141414" }
-                    : { position: "fixed", zIndex: 45, width: "116px", height: "206px", overflow: "hidden", background: "#141414", borderRadius: "12px", boxShadow: "0 6px 20px rgba(0,0,0,0.28)" }}
-                >
-                  <iframe src={videoEmbedSrc} title="루루동이 라이브" style={{ width: "100%", height: "100%", border: "none", display: "block" }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
-                  {!videoOpen && (
-                    <>
-                      <div
-                        onPointerDown={(e) => {
-                          const p = livePlayerRef.current; if (!p) return;
-                          const rect = p.getBoundingClientRect();
-                          const offX = e.clientX - rect.left, offY = e.clientY - rect.top;
-                          (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-                          const move = (ev: PointerEvent) => {
-                            const w = rect.width, h = rect.height, m = 12;
-                            let nl = ev.clientX - offX, nt = ev.clientY - offY;
-                            nl = Math.max(m, Math.min(nl, window.innerWidth - w - m));
-                            nt = Math.max(m, Math.min(nt, window.innerHeight - h - m));
-                            setMiniPos({ left: nl, top: nt });
-                          };
-                          const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
-                          window.addEventListener("pointermove", move);
-                          window.addEventListener("pointerup", up);
-                        }}
-                        style={{ position: "absolute", inset: 0, cursor: "move", touchAction: "none", zIndex: 1 }}
-                      />
-                      <button type="button" aria-label="펼치기" onPointerDown={(e) => e.stopPropagation()} onClick={() => setVideoOpen(true)} style={{ position: "absolute", top: "6px", left: "6px", zIndex: 2, width: "28px", height: "28px", borderRadius: "50%", border: "none", background: "rgba(0,0,0,0.55)", color: "#fff", fontSize: "13px", cursor: "pointer" }}>⤢</button>
-                      <button type="button" aria-label="닫기" onPointerDown={(e) => e.stopPropagation()} onClick={() => { setVideoClosed(true); }} style={{ position: "absolute", top: "6px", right: "6px", zIndex: 2, width: "28px", height: "28px", borderRadius: "50%", border: "none", background: "rgba(0,0,0,0.55)", color: "#fff", fontSize: "13px", cursor: "pointer" }}>✕</button>
-                      <div style={{ position: "absolute", bottom: "6px", left: "6px", zIndex: 2, background: "#C0392B", color: "#fff", fontSize: "8px", fontWeight: 600, padding: "1px 5px", borderRadius: "99px", pointerEvents: "none" }}>● LIVE</div>
-                    </>
-                  )}
-                </div>
-              ) : (
-                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                  <span style={{ fontSize: "28px", opacity: 0.3 }}>📺</span>
-                  <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", textAlign: "center", lineHeight: 1.5, marginTop: "6px" }}>현재 방송 중이<br />아닙니다</span>
-                </div>
-              )}
+            <div style={{ background: "#1D1418", borderRadius: "16px", padding: "13px 14px", color: "#fff" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+                <span style={{ width: "9px", height: "9px", borderRadius: "50%", background: "#E8340A", flexShrink: 0, animation: "shimmer 1.2s ease-in-out infinite" }} />
+                <span style={{ fontSize: "14px", fontWeight: 900 }}>라이브 방송 중!</span>
+                <span style={{ marginLeft: "auto", fontSize: "11.5px", fontWeight: 700, opacity: 0.75 }}>
+                  {String(broadcast?.broadcast_public_title || broadcast?.public_title || "").trim() || "루루동이 라이브"}
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button type="button" onClick={() => setAlertSheetOpen(true)} style={{ flex: 1, height: "40px", border: "1.5px solid rgba(255,255,255,0.5)", borderRadius: "11px", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: "12.5px", fontWeight: 800, cursor: "pointer" }}>
+                  {liveAlertOptin ? "🔔 알림 받는 중 ✓" : "🔔 다음방송 알림받기"}
+                </button>
+                <button type="button" disabled={!broadcastYoutubeUrl} onClick={() => openYoutubeApp(broadcastYoutubeUrl)} style={{ flex: 1, height: "40px", border: "none", borderRadius: "11px", background: broadcastYoutubeUrl ? "#FF0033" : "#5A4048", color: "#fff", fontSize: "12.5px", fontWeight: 900, cursor: broadcastYoutubeUrl ? "pointer" : "default", opacity: broadcastYoutubeUrl ? 1 : 0.6 }}>▶ 방송 보러가기</button>
+              </div>
             </div>
-            {videoOpen ? liveSideRail : null}
-          </div>
-          {videoOpen ? (
-          <div style={{ padding: "9px 14px", borderBottom: "0.5px solid #E5E1DC", fontSize: "12px", fontWeight: 700, color: "#555" }}>
-            {broadcast ? (
-              <span>{ruruOrderLookupDateText(broadcast.started_at)} · {String(broadcast.broadcast_public_title || broadcast.public_title || "").trim() || "라이브 방송"}</span>
-            ) : (
-              <span>다음 방송을 기다려주세요 🙏</span>
-            )}
-          </div>
-          ) : null}
-          </>
-          ) : null}
-          </>
           )}
         </section>
       ) : null}
@@ -5113,21 +5049,33 @@ export default function OrderPage() {
             const extraCats = presentCats.filter((c) => !PRESET_CATS.includes(c)).sort();
             const categoryTabs = ["전체", ...PRESET_CATS, ...extraCats];
             return (
-              <section id="ruru-shop-top" style={{ margin: "12px auto 0", width: "100%", maxWidth: "560px", scrollMarginTop: "70px" }}>
+              <section id="ruru-shop-top" style={{ margin: "12px auto 0", width: "100%", maxWidth: "560px", scrollMarginTop: "70px", paddingBottom: "calc(150px + env(safe-area-inset-bottom))" }}>
                 <input
                   value={productSearchText}
                   onChange={(e) => { setProductSearchText(e.target.value); setProductPage(1); setVisibleProductCount(10); }}
                   placeholder="🔍 상품 이름 검색"
                   style={{ width: "100%", height: "48px", boxSizing: "border-box", border: "1px solid #D9C5CC", borderRadius: "14px", padding: "0 16px", fontSize: "15px", fontWeight: 700, color: "#333", outline: "none" }}
                 />
-                <div style={{ marginTop: "8px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                  {categoryTabs.map((cat) => {
-                    const on = categoryFilter === cat;
-                    return (
-                      <button key={cat} type="button" onClick={() => { setCategoryFilter(cat); setVisibleProductCount(10); }} style={{ flex: 1, height: "36px", borderRadius: "999px", border: on ? "none" : "1px solid #D9C5CC", background: on ? "#7A1E47" : "#fff", color: on ? "#fff" : "#7A1E47", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>{cat}</button>
-                    );
-                  })}
-                </div>
+                {/* [2026-08-12 리뉴얼 4단계] 카테고리 칩
+                    · 실제 등록된 카테고리만 나옴(기존 로직 유지)
+                    · 「전체」 빼고 종류가 1개뿐이면 줄 자체를 숨김 — 향수만 파는 날엔 안 보임
+                    · 줄바꿈 없이 한 줄 가로 스크롤. 오른쪽 끝 그라데이션으로 "더 있음"을 알림 */}
+                {categoryTabs.length > 2 ? (
+                  <div style={{ position: "relative", marginTop: "8px" }}>
+                    <div
+                      style={{ display: "flex", gap: "6px", overflowX: "auto", paddingRight: "26px", scrollbarWidth: "none", msOverflowStyle: "none" }}
+                      className="ruru-cat-scroll"
+                    >
+                      {categoryTabs.map((cat) => {
+                        const on = categoryFilter === cat;
+                        return (
+                          <button key={cat} type="button" onClick={() => { setCategoryFilter(cat); setVisibleProductCount(10); }} style={{ flexShrink: 0, height: "36px", padding: "0 16px", borderRadius: "999px", border: on ? "none" : "1px solid #D9C5CC", background: on ? "#7A1E47" : "#fff", color: on ? "#fff" : "#7A1E47", fontSize: "13px", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>{cat}</button>
+                        );
+                      })}
+                    </div>
+                    <span style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "26px", background: "linear-gradient(90deg,rgba(253,247,249,0),#FDF7F9)", pointerEvents: "none" }} />
+                  </div>
+                ) : null}
                 {/* [2026-07-10] 정렬 드롭다운 — 표시 순서만 바꿈. 기본순이면 지금 방송 상품이 맨 위(고정) */}
                 <div style={{ marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                   <span style={{ fontSize: "12px", fontWeight: 700, color: "#8A8A8A" }}>총 {visibleItems.length}개</span>
@@ -6089,25 +6037,60 @@ export default function OrderPage() {
             </div>
           )}
 
+          {/* [2026-08-12 리뉴얼 3단계] 하단 = 제출 바 + 탭 5개.
+              · 제출 바: 담은 게 없으면 반투명 얇은 바, 담기면 불투명 보라 바(개수·금액·제출).
+                onClick·disabled 조건은 기존과 100% 동일(setOrderSheetOpen → 주문서 시트).
+              · 탭: 오른쪽 아이콘 레일에 있던 핸들러를 그대로 옮겨 담음. 화면에 떠다니는 버튼 0개. */}
           {!orderSheetOpen && (
-          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 pb-[max(16px,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:px-4">
-            <div className="mx-auto max-w-[560px]" style={{ display: "flex" }}>
-              {(() => {
-                const cartCount = items.filter((it) => it.product_name.trim()).length;
-                const isEmpty = cartCount === 0;
+          <>
+            {(() => {
+              const cartCount = items.filter((it) => it.product_name.trim()).length;
+              const isEmpty = cartCount === 0;
+              const cartTotal = items.reduce((sum, it) => {
+                const qty = Math.max(0, Math.floor(Number(String(it.qty || "").replace(/[^0-9]/g, "")) || 0));
+                const price = Math.max(0, Math.floor(Number(String(it.product_price || "").replace(/[^0-9]/g, "")) || 0));
+                return sum + qty * price;
+              }, 0);
+              if (isEmpty) {
                 return (
-                  <button
-                    type="button"
-                    onClick={() => { if (isEmpty) return; setOrderSheetOpen(true); window.setTimeout(() => document.getElementById("orderSheetSection")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}
-                    disabled={isEmpty}
-                    style={{ flex: 1, height: "54px", borderRadius: "14px", border: "none", background: isEmpty ? "#E5E1DC" : "#7A1E47", color: isEmpty ? "#9A9590" : "#fff", fontSize: "15px", fontWeight: 800, cursor: isEmpty ? "default" : "pointer" }}
-                  >
-                    {isEmpty ? "담은 상품이 없어요" : `🛒 장바구니 담은상품 ${cartCount}개 확인하기 →`}
-                  </button>
+                  <div style={{ position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, background: "rgba(255,255,255,0.32)", backdropFilter: "blur(2.5px)", WebkitBackdropFilter: "blur(2.5px)", border: "1px solid rgba(255,255,255,0.55)", borderRadius: "12px", padding: "9px 14px", textAlign: "center", fontSize: "12px", fontWeight: 700, color: "#7E756F", pointerEvents: "none" }}>
+                    🛒 담은 상품이 없어요
+                  </div>
                 );
-              })()}
-            </div>
-          </div>
+              }
+              return (
+                <button
+                  type="button"
+                  onClick={() => { setOrderSheetOpen(true); window.setTimeout(() => document.getElementById("orderSheetSection")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}
+                  style={{ position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, display: "flex", alignItems: "center", gap: "10px", background: "#7A1E47", border: "none", borderRadius: "15px", padding: "11px 14px", boxShadow: "0 8px 22px rgba(122,30,71,0.35)", cursor: "pointer" }}
+                >
+                  <span style={{ fontSize: "12px", fontWeight: 800, color: "#F5D9E5", whiteSpace: "nowrap" }}>🛒 담은 상품 {cartCount}개</span>
+                  <span style={{ flex: 1, textAlign: "left", fontSize: "14px", fontWeight: 900, color: "#fff" }}>{cartTotal > 0 ? `${cartTotal.toLocaleString()}원` : ""}</span>
+                  <span style={{ flexShrink: 0, fontSize: "13.5px", fontWeight: 900, color: "#7A1E47", background: "#fff", borderRadius: "10px", padding: "9px 14px" }}>주문서 제출하기 →</span>
+                </button>
+              );
+            })()}
+
+            <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 40, height: "calc(68px + env(safe-area-inset-bottom))", paddingBottom: "env(safe-area-inset-bottom)", background: "#fff", borderTop: "1px solid #EFE6DE", display: "grid", gridTemplateColumns: "repeat(5,1fr)" }}>
+              {[
+                { key: "home", label: "홈", icon: "🏠", onClick: () => window.scrollTo({ top: 0, behavior: "smooth" }) },
+                { key: "notice", label: "공지", icon: "📢", onClick: () => setNoticeSheetOpen(true) },
+                { key: "orders", label: "주문내역", icon: "📦", onClick: () => openOrderLookupBottomSheet() },
+                { key: "inquiry", label: "문의", icon: "💬", onClick: () => setInquirySheetOpen(true) },
+                { key: "me", label: "내정보", icon: "👤", onClick: () => openCustomerInfoEditBottomSheet() },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={tab.onClick}
+                  style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "3px", border: "none", background: "none", padding: 0, cursor: "pointer", fontSize: "10px", fontWeight: 800, color: "#B0A6A0" }}
+                >
+                  <span style={{ fontSize: "19px", lineHeight: 1 }}>{tab.icon}</span>
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+          </>
           )}
         </>
       )}

@@ -243,11 +243,16 @@ function buildVariantRows(details: string[], colors: string[], sizes: string[], 
   const previousMap = new Map(previous.map((row) => [row.key, row.stock]));
   // 느슨한 키 → 재고. 같은 느슨한 키가 여러 개면 첫 번째만(모호하면 안 쓰도록 중복은 무시)
   const looseMap = new Map<string, number | null>();
+  // [2026-08-12 재고 보존 ③] 느슨일치로 가져온 게 "이전 어느 행"이었는지도 기억한다(중복이면 null).
+  const looseOwner = new Map<string, string | null>();
   for (const row of previous) {
     const lk = looseVariantKey(row.key);
-    if (looseMap.has(lk)) looseMap.set(lk, null); // 중복 → 모호하므로 폴백 포기
-    else looseMap.set(lk, row.stock);
+    if (looseMap.has(lk)) { looseMap.set(lk, null); looseOwner.set(lk, null); } // 중복 → 모호하므로 폴백 포기
+    else { looseMap.set(lk, row.stock); looseOwner.set(lk, row.key); }
   }
+  // [2026-08-12 재고 보존 ③] 이미 소비한 이전 행 / 아직 못 찾은 새 행 추적
+  const usedPrevKeys = new Set<string>();
+  const matchedFlags: boolean[] = [];
   const rows: VariantStockRow[] = [];
 
   for (const detail of safeDetails) {
@@ -268,8 +273,32 @@ function buildVariantRows(details: string[], colors: string[], sizes: string[], 
         const alt = exact === undefined && (loose === undefined || loose === null) && altKey !== key
           ? previousMap.get(altKey)
           : undefined;
-        rows.push({ key, color, size, stock: exact ?? loose ?? alt ?? 0, detail, colorOnly });
+        const resolved = exact ?? loose ?? alt;
+        // [2026-08-12 재고 보존 ③] 어떤 이전 행을 써버렸는지 기록 — 자리 승계에서 중복 사용 방지
+        if (exact !== undefined) usedPrevKeys.add(key);
+        else if (loose !== undefined && loose !== null) {
+          const owner = looseOwner.get(looseVariantKey(key));
+          if (owner) usedPrevKeys.add(owner);
+        } else if (alt !== undefined) usedPrevKeys.add(altKey);
+        rows.push({ key, color, size, stock: resolved ?? 0, detail, colorOnly });
+        matchedFlags.push(resolved !== undefined && resolved !== null);
       }
+    }
+  }
+
+  // ── [2026-08-12 재고 보존 ③] 4순위: 자리 승계 ────────────────────────
+  //   옵션 "글자"만 고친 경우(차지블베이지 → 차지블베이 → …)를 살린다.
+  //   못 찾은 새 행 수 == 아직 안 쓰인 이전 행 수 일 때만, 순서대로 1:1 로 재고를 옮긴다.
+  //   (이 조건은 곧 "조합 개수가 그대로"라는 뜻 — 옵션을 추가/삭제하면 승계하지 않는다.)
+  const unmatchedIdx: number[] = [];
+  for (let i = 0; i < rows.length; i += 1) if (!matchedFlags[i]) unmatchedIdx.push(i);
+  if (unmatchedIdx.length > 0) {
+    const leftovers = previous.filter((row) => !usedPrevKeys.has(row.key));
+    if (leftovers.length === unmatchedIdx.length) {
+      unmatchedIdx.forEach((rowIdx, k) => {
+        const carried = Number(leftovers[k]?.stock ?? 0);
+        if (Number.isFinite(carried) && carried > 0) rows[rowIdx] = { ...rows[rowIdx], stock: carried };
+      });
     }
   }
 
