@@ -6083,7 +6083,10 @@ export default function OrderPage() {
               }, 0);
               if (isEmpty) {
                 return (
-                  <div style={{ position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, background: "rgba(255,255,255,0.32)", backdropFilter: "blur(2.5px)", WebkitBackdropFilter: "blur(2.5px)", border: "1px solid rgba(255,255,255,0.55)", borderRadius: "12px", padding: "9px 14px", textAlign: "center", fontSize: "12px", fontWeight: 700, color: "#7E756F", pointerEvents: "none" }}>
+                  // [2026-08-13 사장님 선택 B안] 빈 장바구니 바 — 흰색 반투명은 배경(크림 #FDF5F1) 위에서
+                  //   판도 글씨도 묻혀 안 읽혔다. 판은 오히려 더 연하게(로즈 10%), 글씨는 더 진하게(로즈).
+                  //   담겼을 때 뜨는 진한 로즈 불투명 바와 확실히 구분되도록 농도를 낮게 유지한다. 표시 전용.
+                  <div style={{ position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, background: "rgba(122,30,71,0.10)", backdropFilter: "blur(2.5px)", WebkitBackdropFilter: "blur(2.5px)", border: "1px solid rgba(122,30,71,0.22)", borderRadius: "12px", padding: "9px 14px", textAlign: "center", fontSize: "12px", fontWeight: 800, color: "#7A1E47", pointerEvents: "none" }}>
                     🛒 담은 상품이 없어요
                   </div>
                 );
