@@ -5614,11 +5614,12 @@ export default function OrderPage() {
                         if (chips.length < 2) return null;
                         const cur = registeredOptionComboSearch.trim();
                         return (
-                          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "8px" }}>
+                          <div style={{ position: "relative", marginBottom: "8px" }}>
+                            <div style={{ display: "flex", gap: "6px", overflowX: "auto", paddingRight: "26px", scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}>
                             <button
                               type="button"
                               onClick={() => setRegisteredOptionComboSearch("")}
-                              style={{ fontSize: "12px", fontWeight: 700, padding: "6px 11px", borderRadius: "999px", border: `1.5px solid ${!cur ? "#7A1E47" : "#E8E2DD"}`, background: !cur ? "#7A1E47" : "#fff", color: !cur ? "#fff" : "#555", cursor: "pointer" }}
+                              style={{ flexShrink: 0, whiteSpace: "nowrap", fontSize: "12px", fontWeight: 700, padding: "6px 11px", borderRadius: "999px", border: `1.5px solid ${!cur ? "#7A1E47" : "#E8E2DD"}`, background: !cur ? "#7A1E47" : "#fff", color: !cur ? "#fff" : "#555", cursor: "pointer" }}
                             >전체 {registeredOptionComboInfo.names.length}</button>
                             {chips.map(({ brand, count }) => {
                               const on = normalizeSuggestionText(cur) === normalizeSuggestionText(brand);
@@ -5627,10 +5628,12 @@ export default function OrderPage() {
                                   key={`brand-${brand}`}
                                   type="button"
                                   onClick={() => setRegisteredOptionComboSearch((prev) => (normalizeSuggestionText(prev) === normalizeSuggestionText(brand) ? "" : brand))}
-                                  style={{ fontSize: "12px", fontWeight: 700, padding: "6px 11px", borderRadius: "999px", border: `1.5px solid ${on ? "#7A1E47" : "#E8E2DD"}`, background: on ? "#7A1E47" : "#fff", color: on ? "#fff" : "#555", cursor: "pointer" }}
+                                  style={{ flexShrink: 0, whiteSpace: "nowrap", fontSize: "12px", fontWeight: 700, padding: "6px 11px", borderRadius: "999px", border: `1.5px solid ${on ? "#7A1E47" : "#E8E2DD"}`, background: on ? "#7A1E47" : "#fff", color: on ? "#fff" : "#555", cursor: "pointer" }}
                                 >{brand} {count}</button>
                               );
                             })}
+                            </div>
+                            <span style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "26px", background: "linear-gradient(90deg,rgba(255,255,255,0),#fff)", pointerEvents: "none" }} />
                           </div>
                         );
                       })() : null}
