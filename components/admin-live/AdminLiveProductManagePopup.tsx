@@ -154,6 +154,28 @@ function productCategory(p: ProductRow) {
 
 const productId = (p: ProductRow) => pickString(p, ["id", "product_id"], "");
 
+// [2026-08-13] 목록 정렬 — 화면 표시 순서만 바꾼다. 저장(sort_order/mall_sort_order)은 안 건드림.
+type ProductSortKey = "manual" | "name" | "price_asc" | "price_desc" | "recent";
+const PRODUCT_SORT_OPTIONS: Array<{ key: ProductSortKey; label: string }> = [
+  { key: "manual", label: "진열 순서 (드래그)" },
+  { key: "name", label: "이름 ㄱㄴㄷ순" },
+  { key: "price_asc", label: "낮은 가격순" },
+  { key: "price_desc", label: "높은 가격순" },
+  { key: "recent", label: "최신 등록순" },
+];
+function productCreatedAt(p: ProductRow) {
+  const t = new Date(String((p as Record<string, unknown>).created_at || "")).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
+function sortProductRows(rows: ProductRow[], key: ProductSortKey) {
+  if (key === "manual") return rows;
+  const copy = [...rows];
+  if (key === "name") return copy.sort((a, b) => productName(a).localeCompare(productName(b), "ko"));
+  if (key === "price_asc") return copy.sort((a, b) => productPrice(a) - productPrice(b));
+  if (key === "price_desc") return copy.sort((a, b) => productPrice(b) - productPrice(a));
+  return copy.sort((a, b) => productCreatedAt(b) - productCreatedAt(a)); // recent
+}
+
 export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose, initialTab, onTabChange, initialSearch, onSearchChange }: Props) {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [rotationIds, setRotationIds] = useState<Set<string>>(new Set());
@@ -196,7 +218,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [bcPickerFromBcId, setBcPickerFromBcId] = useState("");
   const [bcPickerFromIds, setBcPickerFromIds] = useState<Set<string> | null>(null);
   // 드래그 순서변경
-  const [bcDragFrom, setBcDragFrom] = useState<number | null>(null);
+  const [bcDragPid, setBcDragPid] = useState<string | null>(null);
   const [bcDragOver, setBcDragOver] = useState<number | null>(null);
 
   // 쇼핑몰 진열 탭(shop) — products.in_shop / mall_sort_order 사용
@@ -206,7 +228,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [shopPickerSel, setShopPickerSel] = useState<Set<string>>(new Set());
   const [shopPickerSearch, setShopPickerSearch] = useState("");
   // 드래그 순서변경
-  const [shopDragFrom, setShopDragFrom] = useState<number | null>(null);
+  const [shopDragPid, setShopDragPid] = useState<string | null>(null);
   const [shopDragOver, setShopDragOver] = useState<number | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -448,26 +470,28 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products]);
 
+  // [2026-08-13 사장님 요청] 목록 정렬 드롭다운 — 화면 표시 순서만 바꾼다(저장 데이터 무변경).
+  //   「진열 순서」일 때만 드래그로 순서를 바꿀 수 있고, 다른 정렬에서는 잠근다.
+  //   (가격순으로 보고 있을 때 끌어놓으면 무엇을 의도한 건지 알 수 없어 엉키기 때문)
+  const [bcSort, setBcSort] = useState<ProductSortKey>("manual");
+
   // [2026-07-10] 고정(📌)한 상품을 방송 상품 목록 맨 위로 올려 보여준다(표시 순서만).
-  //   ⚠ 실제 진열 순서(sort_order)는 안 바뀐다. 드래그 순서변경은 인덱스 기반이라
-  //     표시 순서가 뒤섞이면 엉키므로, 고정이 걸려 있는 동안엔 드래그를 잠근다(검색 중 잠금과 동일 정책).
+  //   ⚠ 실제 진열 순서(sort_order)는 안 바뀐다.
+  //   [2026-08-13] 드래그를 순번(i)이 아니라 **상품 ID** 기준으로 바꿔서(reorderBcByPid),
+  //     고정으로 목록이 재배치돼 있어도 순서 변경이 정확하다 → 고정 중 드래그 잠금 해제.
   const bcProductsView = useMemo(() => {
+    if (bcSort !== "manual") return sortProductRows(bcProducts, bcSort);
     if (!pinnedId) return bcProducts;
     const idx = bcProducts.findIndex((p) => productId(p) === pinnedId);
     if (idx <= 0) return bcProducts; // 없거나 이미 맨 위
     const copy = [...bcProducts];
     const [top] = copy.splice(idx, 1);
     return [top, ...copy];
-  }, [bcProducts, pinnedId]);
+  }, [bcProducts, pinnedId, bcSort]);
 
-  // [2026-07-12 사장님 지침] 드래그 잠금은 고정 상품이 "현재 보는 방송 목록에 있을 때만".
-  //   고정(is_pinned)이 전역 플래그라, 다른 방송에서 고정해둔 상품 때문에 이 방송의
-  //   순서변경까지 잠기던 문제 해결. 목록에 없으면 bcProductsView === bcProducts(위 439라인)라
-  //   인덱스가 그대로 일치 → 드래그 풀어도 순서 안 엉킴. sort_order 저장 로직 무변경.
-  const pinnedInBcList = useMemo(
-    () => Boolean(pinnedId) && bcProducts.some((p) => productId(p) === pinnedId),
-    [bcProducts, pinnedId],
-  );
+  // [2026-08-13] 드래그 허용 조건 — 「진열 순서」 + 검색 안 함 + 복사모드 아님 + 저장 중 아님.
+  //   (고정 여부는 더 이상 조건이 아니다 — ID 기준 순서변경이라 안 엉킴)
+  const bcDragEnabled = !bcBusy && !search.trim() && !bcCopyMode && bcSort === "manual";
 
   // 선택 방송의 broadcast_products 목록 로드 (sort_order순, products와 매칭)
   const reloadBcProducts = async (selId: string) => {
@@ -647,6 +671,17 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     } finally {
       setBcBusy(false);
     }
+  };
+
+  // [2026-08-13] 순번(i)이 아니라 **상품 ID**로 순서 변경.
+  //   화면이 고정(📌)·검색으로 재배치돼 있어도 실제 목록(bcProducts)에서 두 상품의
+  //   진짜 위치를 찾아 옮기므로 어긋나지 않는다. 저장 로직(reorderBc)은 그대로 재사용.
+  const reorderBcByPid = (fromPid: string, toPid: string) => {
+    if (!fromPid || !toPid || fromPid === toPid) return;
+    const from = bcProducts.findIndex((p) => productId(p) === fromPid);
+    const to = bcProducts.findIndex((p) => productId(p) === toPid);
+    if (from < 0 || to < 0) return;
+    void reorderBc(from, to);
   };
 
   // 기록 탭: 방송 목록 + 방송별 매출/주문수 집계 (broadcasts + orders)
@@ -897,6 +932,18 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   }, [tab, filtered.length, visibleCount]);
 
   const categories = BASE_CATEGORIES;
+
+  // [2026-08-13] 쇼핑몰 진열 탭 정렬 (표시 전용)
+  const [shopSort, setShopSort] = useState<ProductSortKey>("manual");
+  const shopRowsView = useMemo(() => sortProductRows(shopRows, shopSort), [shopRows, shopSort]);
+  const shopDragEnabled = !shopBusy && !search.trim() && shopSort === "manual";
+  const reorderShopByPid = (fromPid: string, toPid: string) => {
+    if (!fromPid || !toPid || fromPid === toPid) return;
+    const from = shopRows.findIndex((p) => productId(p) === fromPid);
+    const to = shopRows.findIndex((p) => productId(p) === toPid);
+    if (from < 0 || to < 0) return;
+    void reorderShop(from, to);
+  };
 
   // 쇼핑몰 진열 목록: in_shop=true & 삭제 아님 & is_visible, mall_sort_order 오름차순
   const reloadShop = () => {
@@ -1554,11 +1601,26 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)" }}>진열 상품 {bcProducts.length}개</span>
                 <button type="button" disabled={!bcSelId || bcBusy} onClick={openBcPicker} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "7px", padding: "5px 11px", cursor: !bcSelId || bcBusy ? "not-allowed" : "pointer", opacity: !bcSelId || bcBusy ? 0.5 : 1 }}>+ 상품 담기</button>
                 {bcSelId && bcProducts.length > 0 ? (
+                  <select
+                    value={bcSort}
+                    onChange={(e) => setBcSort(e.target.value as ProductSortKey)}
+                    title="화면에 보이는 순서만 바꿉니다. 저장된 진열 순서는 그대로예요."
+                    style={{ height: "26px", borderRadius: "7px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 800, padding: "0 6px", cursor: "pointer" }}
+                  >
+                    {PRODUCT_SORT_OPTIONS.map((o) => (<option key={o.key} value={o.key}>{o.label}</option>))}
+                  </select>
+                ) : null}
+                {bcSelId && bcProducts.length > 0 ? (
                   <button type="button" disabled={bcBusy} onClick={() => { setBcCopyMode((v) => !v); setBcCopySel(new Set()); }} style={{ fontSize: "11px", fontWeight: 800, color: bcCopyMode ? "var(--color-ink-soft)" : "var(--color-rose-deep)", background: bcCopyMode ? "var(--color-surface)" : "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "7px", padding: "5px 11px", cursor: bcBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>{bcCopyMode ? "✕ 선택 취소" : "☑ 선택 복사"}</button>
                 ) : null}
               </div>
               <div style={{ padding: "8px 12px 0" }}>
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 10px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid #e5dfe1", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
+                {bcSelId && bcProducts.length > 0 && !bcDragEnabled && !bcCopyMode ? (
+                  <div style={{ margin: "0 0 8px", padding: "6px 9px", borderRadius: "7px", background: "var(--color-warn-bg)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 700, lineHeight: 1.4 }}>
+                    {search.trim() ? "🔍 검색 중에는 순서를 바꿀 수 없어요. 검색어를 지워주세요." : "↕ 순서를 바꾸려면 정렬을 「진열 순서 (드래그)」로 두세요. (지금은 보기만 바뀐 상태 — 저장된 순서는 그대로)"}
+                  </div>
+                ) : null}
               </div>
               {bcCopyMode ? (
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "0 12px 8px" }}>
@@ -1595,19 +1657,19 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       return (
                         <div
                           key={pid || i}
-                          draggable={!bcBusy && !search.trim() && !bcCopyMode && !pinnedInBcList}
+                          draggable={bcDragEnabled}
                           onClick={bcCopyMode && pid ? () => toggleBcCopyPick(pid) : undefined}
-                          onDragStart={() => { setBcDragFrom(i); setBcDragOver(i); }}
+                          onDragStart={() => { setBcDragPid(pid); setBcDragOver(i); }}
                           onDragOver={(e) => { e.preventDefault(); if (bcDragOver !== i) setBcDragOver(i); }}
-                          onDrop={(e) => { e.preventDefault(); if (bcDragFrom !== null) void reorderBc(bcDragFrom, i); setBcDragFrom(null); setBcDragOver(null); }}
-                          onDragEnd={() => { setBcDragFrom(null); setBcDragOver(null); }}
-                          style={{ display: "flex", alignItems: "center", gap: "10px", border: isPinnedRow ? "2px solid var(--color-rose-deep)" : bcCopyMode && bcCopySel.has(pid) ? "1px solid var(--color-rose-deep)" : "1px solid var(--color-line)", borderRadius: "9px", padding: "8px", background: isPinnedRow ? "var(--color-rose-soft)" : bcCopyMode && bcCopySel.has(pid) ? "var(--color-rose-soft)" : bcDragFrom !== null && bcDragOver === i && bcDragFrom !== i ? "var(--color-warn-bg)" : "var(--color-surface)", opacity: bcDragFrom === i ? 0.4 : 1, boxShadow: bcDragFrom !== null && bcDragOver === i && bcDragFrom !== i ? "inset 0 2px 0 var(--color-rose-deep)" : undefined, cursor: bcCopyMode ? "pointer" : bcBusy ? "default" : "grab" }}
+                          onDrop={(e) => { e.preventDefault(); if (bcDragPid) reorderBcByPid(bcDragPid, pid); setBcDragPid(null); setBcDragOver(null); }}
+                          onDragEnd={() => { setBcDragPid(null); setBcDragOver(null); }}
+                          style={{ display: "flex", alignItems: "center", gap: "10px", border: isPinnedRow ? "2px solid var(--color-rose-deep)" : bcCopyMode && bcCopySel.has(pid) ? "1px solid var(--color-rose-deep)" : "1px solid var(--color-line)", borderRadius: "9px", padding: "8px", background: isPinnedRow ? "var(--color-rose-soft)" : bcCopyMode && bcCopySel.has(pid) ? "var(--color-rose-soft)" : bcDragPid !== null && bcDragOver === i && bcDragPid !== pid ? "var(--color-warn-bg)" : "var(--color-surface)", opacity: bcDragPid === pid ? 0.4 : 1, boxShadow: bcDragPid !== null && bcDragOver === i && bcDragPid !== pid ? "inset 0 2px 0 var(--color-rose-deep)" : undefined, cursor: bcCopyMode ? "pointer" : !bcDragEnabled ? "default" : "grab" }}
                         >
                           {/* 선택 복사 모드: 체크박스 / 평소: 드래그 핸들 */}
                           {bcCopyMode ? (
                             <input type="checkbox" checked={bcCopySel.has(pid)} onChange={() => toggleBcCopyPick(pid)} onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, width: "16px", height: "16px", accentColor: "var(--color-rose-deep)", cursor: "pointer" }} />
                           ) : (
-                            <span style={{ flexShrink: 0, fontSize: "14px", color: "var(--color-ink-mute)", userSelect: "none" }} title="드래그로 순서 변경">⠿</span>
+                            <span style={{ flexShrink: 0, fontSize: "14px", color: bcDragEnabled ? "var(--color-ink-mute)" : "var(--color-line)", userSelect: "none" }} title={bcDragEnabled ? "드래그로 순서 변경" : "「진열 순서」로 두면 순서를 바꿀 수 있어요"}>⠿</span>
                           )}
                           <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", width: "20px", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
                           <span
@@ -1653,7 +1715,17 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
           <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "14px 18px 16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", flexWrap: "wrap" }}>
               <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)" }}>🛍 쇼핑몰 진열 {shopRows.length}개</span>
-              <button type="button" disabled={shopBusy} onClick={openShopPicker} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "7px", padding: "5px 11px", cursor: shopBusy ? "wait" : "pointer", opacity: shopBusy ? 0.5 : 1 }}>+ 쇼핑몰에 상품 추가</button>
+              {shopRows.length > 0 ? (
+                <select
+                  value={shopSort}
+                  onChange={(e) => setShopSort(e.target.value as ProductSortKey)}
+                  title="화면에 보이는 순서만 바꿉니다. 저장된 진열 순서는 그대로예요."
+                  style={{ marginLeft: "auto", height: "26px", borderRadius: "7px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 800, padding: "0 6px", cursor: "pointer" }}
+                >
+                  {PRODUCT_SORT_OPTIONS.map((o) => (<option key={o.key} value={o.key}>{o.label}</option>))}
+                </select>
+              ) : null}
+              <button type="button" disabled={shopBusy} onClick={openShopPicker} style={{ marginLeft: shopRows.length > 0 ? undefined : "auto", fontSize: "11px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "7px", padding: "5px 11px", cursor: shopBusy ? "wait" : "pointer", opacity: shopBusy ? 0.5 : 1 }}>+ 쇼핑몰에 상품 추가</button>
             </div>
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 10px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid #e5dfe1", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
             <div
@@ -1668,18 +1740,18 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>진열된 상품이 없습니다.</div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
-                  {shopRows.filter(nameMatch).map((p, i) => {
+                  {shopRowsView.filter(nameMatch).map((p, i) => {
                     const img = mainImage(p);
                     const pid = productId(p);
                     return (
                       <div
                         key={pid || i}
-                        draggable={!shopBusy && !search.trim()}
-                        onDragStart={() => { setShopDragFrom(i); setShopDragOver(i); }}
+                        draggable={shopDragEnabled}
+                        onDragStart={() => { setShopDragPid(pid); setShopDragOver(i); }}
                         onDragOver={(e) => { e.preventDefault(); if (shopDragOver !== i) setShopDragOver(i); }}
-                        onDrop={(e) => { e.preventDefault(); if (shopDragFrom !== null) void reorderShop(shopDragFrom, i); setShopDragFrom(null); setShopDragOver(null); }}
-                        onDragEnd={() => { setShopDragFrom(null); setShopDragOver(null); }}
-                        style={{ display: "flex", alignItems: "center", gap: "10px", border: "1px solid var(--color-line)", borderRadius: "10px", padding: "9px", background: shopDragFrom !== null && shopDragOver === i && shopDragFrom !== i ? "var(--color-warn-bg)" : "var(--color-surface)", opacity: shopDragFrom === i ? 0.4 : 1, boxShadow: shopDragFrom !== null && shopDragOver === i && shopDragFrom !== i ? "inset 0 2px 0 var(--color-rose-deep)" : undefined, cursor: shopBusy ? "default" : "grab" }}
+                        onDrop={(e) => { e.preventDefault(); if (shopDragPid) reorderShopByPid(shopDragPid, pid); setShopDragPid(null); setShopDragOver(null); }}
+                        onDragEnd={() => { setShopDragPid(null); setShopDragOver(null); }}
+                        style={{ display: "flex", alignItems: "center", gap: "10px", border: "1px solid var(--color-line)", borderRadius: "10px", padding: "9px", background: shopDragPid !== null && shopDragOver === i && shopDragPid !== pid ? "var(--color-warn-bg)" : "var(--color-surface)", opacity: shopDragPid === pid ? 0.4 : 1, boxShadow: shopDragPid !== null && shopDragOver === i && shopDragPid !== pid ? "inset 0 2px 0 var(--color-rose-deep)" : undefined, cursor: !shopDragEnabled ? "default" : "grab" }}
                       >
                         {/* 드래그 핸들 */}
                         <span style={{ flexShrink: 0, fontSize: "14px", color: "var(--color-ink-mute)", userSelect: "none" }} title="드래그로 순서 변경">⠿</span>
