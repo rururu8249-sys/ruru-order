@@ -5307,8 +5307,10 @@ export default function OrderPage() {
                       </div>
 
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: "13px", fontWeight: 600, color: "#1A1A1A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.product_name || "상품명 없음"}</div>
-                        <div style={{ fontSize: "11px", color: "#ABA5A0", marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{itemHasNoOptions ? "옵션 없음" : `${optionColorText} / ${optionSizeText}`} · 단가 {won(toNumber(item.product_price))}</div>
+                        {/* [2026-08-13] 주문서 확인에서도 상품명·옵션명이 잘리면 손님이 제출 전에
+                            뭘 담았는지 확인을 못 한다(옵션명 = 조합형 세부상품명이라 특히 김) → 2줄 줄바꿈 */}
+                        <div style={{ fontSize: "13px", fontWeight: 600, color: "#1A1A1A", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{item.product_name || "상품명 없음"}</div>
+                        <div style={{ fontSize: "11px", color: "#ABA5A0", marginTop: "2px", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{itemHasNoOptions ? "옵션 없음" : `${optionColorText} / ${optionSizeText}`} · 단가 {won(toNumber(item.product_price))}</div>
 
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "6px", gap: "8px" }}>
                           <span style={{ fontSize: "12px", fontWeight: 700, color: toNumber(item.qty) > 0 ? "#6B6460" : "#e74c3c" }}>수량 {toNumber(item.qty)}개</span>
@@ -5706,7 +5708,10 @@ export default function OrderPage() {
                                       style={{ width: "40px", height: "40px", borderRadius: "8px", objectFit: "cover", flexShrink: 0, background: "#F0EBE8", opacity: soldOut ? 0.5 : 1 }}
                                     />
                                   ) : null}
-                                  <span style={{ minWidth: 0, flex: 1, fontSize: "14px", fontWeight: 700, color: selected ? "#fff" : "#333", textDecoration: soldOut ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name ?? ""), name)}</span>
+                                  {/* [2026-08-13 사장님 지적] 이름이 길면 「차량 아쿠아디파르마 무광…」처럼 잘려서
+                                      뒷부분(구분 정보)이 안 보였다. Baymard 리스트 원칙대로 말줄임 대신 2줄 줄바꿈
+                                      (line-clamp 2 — 2줄 넘는 극단적 이름만 말줄임). 표시 전용. */}
+                                  <span style={{ minWidth: 0, flex: 1, fontSize: "14px", fontWeight: 700, lineHeight: 1.35, color: selected ? "#fff" : "#333", textDecoration: soldOut ? "line-through" : "none", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name ?? ""), name)}</span>
                                   {soldOut ? (
                                     <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "#fff", background: "#B5A1A8", borderRadius: "5px", padding: "2px 6px" }}>품절</span>
                                   ) : remain !== null && remain <= 5 ? (
