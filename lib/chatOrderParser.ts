@@ -316,6 +316,30 @@ export function parseChatOrder(
     const chatWords = text.split(/[^a-z0-9가-힣]+/).map((w) => squash(w)).filter((w) => w.length >= 2);
     // 손님이 말한 앞머리(브랜드/카테고리)와 다른 세부상품은 후보에서 제외한다.
     const chatHeads = chatHeadsOf(text, collectHeads(products));
+
+    // 종류 지정어: 세부상품명에는 한 번도 안 나오고 상품명에만 나오는 단어.
+    //   손님이 "미니"라고 하면 그건 향 이름이 아니라 [미니어처 향수] 를 가리키는 말이다.
+    //   → 그 상품의 세부상품만 후보로 남긴다. ("미니 구찌 블롬" 이 일반 구찌로 새지 않게)
+    const onlyProductIds = new Set<string>();
+    {
+      const variantWords = new Set<string>();
+      for (const p of products) {
+        for (const v of p.variants || []) {
+          for (const x of String(v).split(/[^a-z0-9가-힣]+/i)) {
+            const sx = squash(x);
+            if (sx) variantWords.add(sx);
+          }
+        }
+      }
+      for (const w of chatWords) {
+        if (variantWords.has(w)) continue;   // 브랜드·향 이름이면 종류 지정어가 아니다
+        const hit = products.filter((p) =>
+          nameBody(p.name).split(/\s+/).map((x) => squash(x)).filter(Boolean)
+            .some((x) => x === w || x.startsWith(w) || looseEqual(w, x))
+        );
+        if (hit.length === 1) onlyProductIds.add(hit[0].id);   // 딱 한 상품만 가리킬 때만
+      }
+    }
     type VariantHit = { p: ParseProduct; variant: string; score: number };
     let bestScore = 0;
     let hits: VariantHit[] = [];
@@ -325,6 +349,7 @@ export function parseChatOrder(
     for (const p of products) {
       for (const v of p.variants || []) {
         if (EMPTY_OPTION_WORDS.has(String(v).trim().toLowerCase())) continue;
+        if (onlyProductIds.size > 0 && !onlyProductIds.has(p.id)) continue;
         if (chatHeads.size > 0 && !chatHeads.has(variantHead(v))) continue;
         const sv = squash(v);
         const vWords = String(v).split(/[^a-z0-9가-힣]+/i).map((x) => squash(x)).filter(Boolean);
