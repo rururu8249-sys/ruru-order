@@ -305,7 +305,7 @@ export async function fetchYoutubeLiveStats(): Promise<{ concurrentViewers: numb
   }
 }
 
-export async function postLiveChatMessage(messageText: string, opts?: { forceEvenIfDisabled?: boolean }): Promise<PostResult> {
+export async function postLiveChatMessage(messageText: string, opts?: { forceEvenIfDisabled?: boolean; liveChatId?: string }): Promise<PostResult> {
   try {
     const text = String(messageText || "").trim().slice(0, 200);
     if (!text) return { ok: false, reason: "빈 메시지" };
@@ -321,7 +321,9 @@ export async function postLiveChatMessage(messageText: string, opts?: { forceEve
     if (!refreshToken) return { ok: false, skipped: true, reason: "유튜브 미연결" };
 
     const accessToken = await getAccessToken(refreshToken);
-    let liveChatId = await resolveLiveChatId(sb, accessToken);
+    // [2026-08-14] 호출측이 chatId를 이미 알고 있으면 그대로 쓴다(채팅봇 테스트 URL 모드).
+    //   없을 때만 기존 3순위 해석 — 기존 알림 동작 무변경.
+    let liveChatId = String(opts?.liveChatId || "").trim() || (await resolveLiveChatId(sb, accessToken));
     if (!liveChatId) return { ok: false, skipped: true, reason: "활성 라이브 채팅을 찾지 못함(라이브 URL 확인)" };
 
     const postOnce = async (chatId: string) => {

@@ -200,6 +200,8 @@ export async function parsePendingChatOrders(
     let botSent = 0;
     try {
       if ((await readSetting(sb, SETTING_BOT_REPLY_ENABLED)) === "true" && botTargets.length > 0) {
+        // 읽기 루프가 찾아둔 채팅방 ID를 그대로 쓴다 — 테스트 URL 모드에서도 봇이 글을 쓸 수 있다.
+        const botChatId = await readSetting(sb, "chat_order_chat_id");
         const day = new Date().toISOString().slice(0, 10);
         const { data: u } = await sb.from("youtube_api_usage")
           .select("calls").eq("day", day).eq("method", "liveChatMessages.insert").limit(1).maybeSingle();
@@ -216,7 +218,7 @@ export async function parsePendingChatOrders(
           const msg = t.kind === "ambiguous" && t.cands.length > 0
             ? `🤖 ${nick}${t.cands.slice(0, 3).join(" / ")} 중 어느 상품인지 종류와 함께 다시 적어주세요!`
             : `🤖 ${nick}상품명(또는 앞번호)과 함께 적어주시면 바로 접수돼요! 예) 3번 주세요`;
-          const res = await postLiveChatMessage(msg, { forceEvenIfDisabled: true });
+          const res = await postLiveChatMessage(msg, { forceEvenIfDisabled: true, liveChatId: botChatId });
           if (res.ok) {
             botSent += 1; sentToday += 1; lastMs = Date.now();
             await writeSetting(sb, SETTING_BOT_LAST_MS, String(lastMs));

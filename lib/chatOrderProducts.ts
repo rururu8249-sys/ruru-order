@@ -6,6 +6,8 @@
 //   ⚠️ select만 한다. 재고·금액·주문 로직 무접촉.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ParseProduct } from "@/lib/chatOrderParser";
+import { readSetting } from "@/lib/youtube";
+import { SETTING_TEST_LIVE_URL } from "@/lib/youtubeChatRead";
 
 // "없음/무/-" 같은 빈 옵션 표기는 세부상품명이 아니다. 채팅에서 잘못 잡히면 안 되므로 제외.
 //   (기준은 위젯 cleanOptionText 의 EMPTY_OPTION_WORDS 와 동일)
@@ -83,6 +85,17 @@ export async function loadParseProducts(sb: SupabaseClient): Promise<LoadedProdu
   if (live) {
     const broadcastId = String(live.id);
     return { products: await loadBroadcastProducts(sb, broadcastId), broadcastId, source: "live" };
+  }
+
+  // [테스트 모드] 테스트 라이브 URL이 걸려 있으면 방송 리허설이다 —
+  //   쇼핑몰 진열이 아니라 "가장 최근 방송에 담긴 상품"으로 인식한다.
+  const testUrl = await readSetting(sb, SETTING_TEST_LIVE_URL);
+  if (testUrl) {
+    const recent0 = list[0] || null;
+    if (recent0) {
+      const bid = String(recent0.id);
+      return { products: await loadBroadcastProducts(sb, bid), broadcastId: bid, source: "recent" };
+    }
   }
 
   // 쇼핑몰 모드: 진열 상품만

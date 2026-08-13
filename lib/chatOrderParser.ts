@@ -101,9 +101,12 @@ function extractQty(text: string): { qty: number; consumed: string[] } {
     const m = text.match(re);
     if (m) { consumed.push(m[0]); return { qty: n, consumed }; }
   }
-  // 3) "하나요" 처럼 단위 없이 쓰는 경우
-  const m3 = text.match(/(하나|둘|셋|넷)\s*요?/);
-  if (m3) { consumed.push(m3[0]); return { qty: KO_NUM[m3[1]] || 1, consumed }; }
+  // 3) "하나요" 처럼 단위 없이 쓰는 경우 — 반드시 독립된 단어일 때만.
+  //    ("셋업"의 "셋", "하나로"의 "하나" 같은 단어 조각을 수량으로 오인하면 안 된다)
+  for (const w of text.split(/[^가-힣]+/)) {
+    const m3 = w.match(/^(하나|둘|셋|넷|다섯)(요|개요)?$/);
+    if (m3) { consumed.push(w); return { qty: KO_NUM[m3[1]] || 1, consumed }; }
+  }
   return { qty: 1, consumed };
 }
 
@@ -254,8 +257,11 @@ function exactProductByName(text: string, products: ParseProduct[]): ParseProduc
     if (body.length > bestLen) { bestLen = body.length; best = [p]; }
     else if (body.length === bestLen && !best.some((x) => x.id === p.id)) best.push(p);
   }
-  // 더 긴 상품명이 이긴다("아이크림" > "크림"). 같은 길이로 겹치면 포기.
-  return best.length === 1 ? best[0] : null;
+  if (best.length === 0) return null;
+  // 더 긴 상품명이 이긴다("아이크림" > "크림").
+  // 같은 길이로 여럿이어도 "이름이 전부 같은 상품"(과거 방송 중복 등록)이면 모호가 아니다 — 하나를 쓴다.
+  const bodies = new Set(best.map((x) => squash(nameBody(x.name))));
+  return bodies.size === 1 ? best[0] : null;
 }
 
 // ── 본체 ──────────────────────────────────────────────
@@ -463,6 +469,9 @@ export function parseChatOrder(
         let sum = 0;
         for (const piece of String(n).split(/[\s()[\]{}·・,./\-_~]+/).filter((x) => x.length >= 2)) {
           const sp = squash(piece);
+          // 색상·사이즈 단어는 상품명 증거로 안 친다 — 손님의 "화이트"는 옵션 선택이지
+          //   [알로 화이트 셋업]을 가리키는 말이 아니다. (이름 전체 일치는 위에서 이미 처리)
+          if (COLOR_WORDS.includes(sp) || SIZE_WORDS.includes(sp)) continue;
           if (sp.length >= 2 && squashed.includes(sp)) { sum += sp.length; continue; }
           for (const w of chatWords) {
             const sw = squash(w);
