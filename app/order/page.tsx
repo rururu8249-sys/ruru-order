@@ -1645,6 +1645,33 @@ export default function OrderPage() {
     }
   };
 
+  // [2026-08-13 사장님 요청] 관리자(운영자 테스트 계정)도 진짜 주문을 넣어야 할 때가 있다.
+  //   - operator_test_accounts 에 등록된 번호일 때만 주문서에 테스트/실주문 선택 UI를 띄운다.
+  //   - 일반 손님은 operatorTestAccount 가 항상 null → 화면에도 안 보이고 동작에도 영향 없음.
+  //   - 기본값은 "테스트 주문 ON"(기존 동작 그대로). 체크를 풀어야만 실제 주문으로 접수된다.
+  const [operatorTestAccount, setOperatorTestAccount] = useState<OperatorTestOrderFlags | null>(null);
+  const [adminTestOrderMode, setAdminTestOrderMode] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const clean = normalizePhone(customerPhone || "");
+
+    if (clean.length < 10 || clean.length > 11) {
+      setOperatorTestAccount(null);
+      return;
+    }
+
+    (async () => {
+      const flags = await getOperatorTestOrderFlags(clean);
+      if (!cancelled) setOperatorTestAccount(flags.isTestOrder ? flags : null);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerPhone]);
+
   const refreshCustomerBlockStatus = async (phoneValue: string) => {
     const cleanPhone = normalizePhone(phoneValue);
 
@@ -3880,7 +3907,13 @@ export default function OrderPage() {
       }
 
       const cleanPhone = normalizePhone(customerPhone);
-      const operatorTestOrderFlags = await getOperatorTestOrderFlags(cleanPhone);
+      // 운영자 테스트 계정이라도 "테스트 주문" 체크를 풀었으면 실제 주문으로 접수한다.
+      //   (일반 손님은 rawOperatorTestOrderFlags.isTestOrder 가 항상 false → 아래 분기와 무관)
+      const rawOperatorTestOrderFlags = await getOperatorTestOrderFlags(cleanPhone);
+      const operatorTestOrderFlags =
+        rawOperatorTestOrderFlags.isTestOrder && !adminTestOrderMode
+          ? EMPTY_OPERATOR_TEST_ORDER_FLAGS
+          : rawOperatorTestOrderFlags;
       const paidShippingGroupsBeforeSubmit = await checkAlreadyPaidShippingGroups(cleanPhone);
       const paidShippingBeforeSubmit = paidShippingGroupsBeforeSubmit.normal || paidShippingGroupsBeforeSubmit.vendor;
       const validItems = items.filter(
@@ -5438,6 +5471,43 @@ export default function OrderPage() {
               </div>
 
               <div style={{ flexShrink: 0, padding: "12px 18px calc(12px + env(safe-area-inset-bottom))", borderTop: "0.5px solid #E5E1DC", background: "#fff" }}>
+                {operatorTestAccount ? (
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "10px",
+                      marginBottom: "10px",
+                      padding: "10px 12px",
+                      borderRadius: "12px",
+                      border: adminTestOrderMode ? "1.5px solid #C7B8D8" : "1.5px solid #E24A4A",
+                      background: adminTestOrderMode ? "#F6F2FA" : "#FFF2F2",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={adminTestOrderMode}
+                      onChange={(event) => setAdminTestOrderMode(event.target.checked)}
+                      style={{ marginTop: "2px", width: "18px", height: "18px", flexShrink: 0, accentColor: "#7A1E47" }}
+                    />
+                    <span style={{ fontSize: "12.5px", fontWeight: 800, lineHeight: 1.5, color: adminTestOrderMode ? "#5B3E72" : "#B3261E" }}>
+                      {adminTestOrderMode ? (
+                        <>
+                          🧪 테스트 주문으로 제출
+                          <br />
+                          <span style={{ fontWeight: 700, color: "#7A6A80" }}>정산·입금확인·송장·피킹에서 제외됩니다. 실제 주문이면 체크를 해제하세요.</span>
+                        </>
+                      ) : (
+                        <>
+                          ⚠️ 실제 주문으로 접수됩니다
+                          <br />
+                          <span style={{ fontWeight: 700 }}>정산·입금확인·송장에 그대로 포함됩니다.</span>
+                        </>
+                      )}
+                    </span>
+                  </label>
+                ) : null}
                 <button
                   type="button"
                   onClick={handleSubmitOrderClick}
