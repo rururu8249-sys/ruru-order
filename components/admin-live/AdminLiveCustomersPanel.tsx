@@ -39,6 +39,10 @@ type CustomerSummary = {
   unpaidCount: number;
   manualNeededCount: number;
   latestOrderAt: string;
+  // [2026-08-13] 정렬 세분화용 — 가입일(customers.created_at) / 최근 접속(customers.last_login_at).
+  //   주문에서만 만들어진 행은 빈 문자열이고, 회원 프로필 병합 단계에서 채워진다.
+  joinedAt: string;
+  lastLoginAt: string;
   blocked: boolean;
   blockReason: string;
   orders: LooseLiveOrder[];
@@ -68,7 +72,7 @@ type CustomerProfile = {
   customer_history?: Array<{ field: string; old_value: string; new_value: string; changed_at: string }> | null;
 };
 
-type SortMode = "latest" | "amount" | "orders" | "nickname";
+type SortMode = "latest" | "amount" | "orders" | "nickname" | "joinedDesc" | "joinedAsc" | "lastLogin";
 type StatusFilter = "all" | "normal" | "blocked" | "attention";
 
 type BlockOverride = {
@@ -922,6 +926,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
           unpaidCount: isUnpaid(order) ? 1 : 0,
           manualNeededCount: isManualNeeded(order) ? 1 : 0,
           latestOrderAt,
+          joinedAt: "",
+          lastLoginAt: "",
           blocked: orderBlocked,
           blockReason: orderBlockReason,
           orders: [order],
@@ -987,6 +993,9 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
           current.latestOrderAt = profileLatestAt;
         }
 
+        current.joinedAt = clean(profile.created_at) || current.joinedAt;
+        current.lastLoginAt = clean(profile.last_login_at) || current.lastLoginAt;
+
         return;
       }
 
@@ -1002,6 +1011,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
         unpaidCount: 0,
         manualNeededCount: 0,
         latestOrderAt: profileLatestAt,
+        joinedAt: clean(profile.created_at),
+        lastLoginAt: clean(profile.last_login_at),
         blocked: profileBlocked,
         blockReason: profileBlockReason,
         orders: [],
@@ -1040,6 +1051,22 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
         if (sortMode === "amount") return b.totalAmount - a.totalAmount;
         if (sortMode === "orders") return b.orderCount - a.orderCount;
         if (sortMode === "nickname") return a.nickname.localeCompare(b.nickname, "ko");
+        // 가입일/최근접속: 값이 없는 회원(옛 데이터)은 항상 뒤로 보낸다.
+        if (sortMode === "joinedDesc") {
+          if (!a.joinedAt) return 1;
+          if (!b.joinedAt) return -1;
+          return b.joinedAt.localeCompare(a.joinedAt);
+        }
+        if (sortMode === "joinedAsc") {
+          if (!a.joinedAt) return 1;
+          if (!b.joinedAt) return -1;
+          return a.joinedAt.localeCompare(b.joinedAt);
+        }
+        if (sortMode === "lastLogin") {
+          if (!a.lastLoginAt) return 1;
+          if (!b.lastLoginAt) return -1;
+          return b.lastLoginAt.localeCompare(a.lastLoginAt);
+        }
         return b.latestOrderAt.localeCompare(a.latestOrderAt);
       });
   }, [customers, keyword, sortMode, statusFilter, buyersOnly]);
@@ -1380,6 +1407,9 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
               className="h-11 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink"
             >
               <option value="latest">최근주문순</option>
+              <option value="lastLogin">최근접속순</option>
+              <option value="joinedDesc">최근가입순</option>
+              <option value="joinedAsc">과거가입순</option>
               <option value="amount">누적구매금액순</option>
               <option value="orders">주문수순</option>
               <option value="nickname">닉네임순</option>
@@ -1778,6 +1808,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                               unpaidCount: 0,
                               manualNeededCount: 0,
                               latestOrderAt: "",
+                              joinedAt: "",
+                              lastLoginAt: "",
                               blocked: true,
                               blockReason: block.reason,
                               orders: [],
