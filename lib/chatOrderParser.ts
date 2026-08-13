@@ -122,6 +122,85 @@ function extractOptionTokens(text: string, consumed: string[]): string[] {
   return Array.from(new Set(out));
 }
 
+// ── 표기 흔들림(딥티크/딥디크) 허용 ─────────────────────
+//   한글 자모로 쪼개 한 글자 차이까지만 같은 말로 본다.
+//   ⚠️ 안전장치 3개: (1) 한글만 (숫자·용량·호수는 절대 흔들면 안 됨)
+//                   (2) 첫 글자가 같아야 함 (마스크↔머스크 차단)
+//                   (3) 자모 6개 이상인 긴 단어만
+const CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
+const JUNG = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ";
+const JONG = "_ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ";
+const HANGUL_ONLY = /^[가-힣]+$/;
+
+function toJamo(v: string): string {
+  let out = "";
+  for (const c of v) {
+    const k = c.charCodeAt(0) - 0xac00;
+    if (k >= 0 && k < 11172) {
+      out += CHO[Math.floor(k / 588)] + JUNG[Math.floor((k % 588) / 28)];
+      const t = k % 28;
+      if (t) out += JONG[t];
+    } else out += c;
+  }
+  return out;
+}
+
+function isEditDistanceOne(a: string, b: string): boolean {
+  const m = a.length, n = b.length;
+  if (Math.abs(m - n) > 1) return false;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i += 1) {
+    const cur = [i];
+    for (let k = 1; k <= n; k += 1) {
+      cur[k] = Math.min(prev[k] + 1, cur[k - 1] + 1, prev[k - 1] + (a[i - 1] === b[k - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[n] === 1;
+}
+
+function looseEqual(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (!HANGUL_ONLY.test(a) || !HANGUL_ONLY.test(b)) return false;
+  if (a[0] !== b[0]) return false;
+  const ja = toJamo(a), jb = toJamo(b);
+  if (ja.length < 6 || jb.length < 6) return false;
+  return isEditDistanceOne(ja, jb);
+}
+
+// ── 앞머리(브랜드/카테고리) ─────────────────────────────
+//   세부상품명은 [앞머리 + 세부] 로 등록돼 있다. (예: "샤넬 블루드 10ml", "크림 라메르크림 100ml")
+//   손님이 앞머리를 말했으면, 다른 앞머리의 세부상품은 애초에 후보가 아니다.
+//   → "미니 샤넬 블루드" 가 [불가리 블루] 로 가는 일이 원천 차단된다.
+function variantHead(v: string): string {
+  return squash(String(v).trim().split(/\s+/)[0] || "");
+}
+
+function collectHeads(products: ParseProduct[]): Set<string> {
+  const out = new Set<string>();
+  for (const p of products) {
+    for (const v of p.variants || []) {
+      const h = variantHead(v);
+      if (h.length >= 2) out.add(h);
+    }
+    const first = squash(nameBody(p.name).split(/\s+/)[0] || "");
+    if (first.length >= 2) out.add(first);
+  }
+  return out;
+}
+
+// 채팅에 등장한 앞머리들. 표기 흔들림도 받아준다("딥디크" → "딥티크").
+function chatHeadsOf(text: string, heads: Set<string>): Set<string> {
+  const out = new Set<string>();
+  for (const w of text.split(/[^a-z0-9가-힣]+/).filter(Boolean)) {
+    const sw = squash(w);
+    if (sw.length < 2) continue;
+    if (heads.has(sw)) { out.add(sw); continue; }
+    for (const h of heads) if (looseEqual(sw, h)) { out.add(h); break; }
+  }
+  return out;
+}
+
 // 상품이 정해진 뒤, 그 상품의 세부상품 중 채팅 단어로 좁혀 정확히 하나면 그걸 돌려준다.
 //   상품이 이미 특정된 상태라 오탐 위험이 낮다. 하나로 안 좁혀지면 null(옵션 미확정).
 function narrowVariant(text: string, p: ParseProduct): string | null {
@@ -132,10 +211,14 @@ function narrowVariant(text: string, p: ParseProduct): string | null {
   for (const v of p.variants || []) {
     if (EMPTY_OPTION_WORDS.has(String(v).trim().toLowerCase())) continue;
     const sv = squash(v);
+    const vWords = String(v).split(/[^a-z0-9가-힣]+/i).map((x) => squash(x)).filter(Boolean);
     let sc = 0;
     for (const w of words) {
       const sw = squash(w);
-      if (sw.length >= 2 && sv.includes(sw)) sc += sw.length;
+      if (sw.length < 2) continue;
+      if (sv.includes(sw)) { sc += sw.length; continue; }
+      // 표기 흔들림("딥디크" → "딥티크")
+      if (vWords.some((x) => looseEqual(sw, x))) sc += sw.length;
     }
     if (sc === 0) continue;
     if (sc > bestScore) { bestScore = sc; best = [v]; }
@@ -161,7 +244,7 @@ function exactProductByName(text: string, products: ParseProduct[]): ParseProduc
   for (const p of products) {
     const body = squash(nameBody(p.name));
     if (body.length < 2) continue;
-    if (!grams.includes(body)) continue;
+    if (!grams.includes(body) && !grams.some((g) => looseEqual(g, body))) continue;
     if (body.length > bestLen) { bestLen = body.length; best = [p]; }
     else if (body.length === bestLen && !best.some((x) => x.id === p.id)) best.push(p);
   }
@@ -235,12 +318,15 @@ export function parseChatOrder(
         for (let k = i; k < ws.length && k < i + 6; k += 1) { acc += squash(ws[k]); chatGrams.add(acc); }
       }
     }
+    // 손님이 말한 앞머리(브랜드/카테고리)와 다른 세부상품은 후보에서 제외한다.
+    const chatHeads = chatHeadsOf(text, collectHeads(products));
     type VariantHit = { p: ParseProduct; variant: string; score: number };
     let bestScore = 0;
     let hits: VariantHit[] = [];
     for (const p of products) {
       for (const v of p.variants || []) {
         if (EMPTY_OPTION_WORDS.has(String(v).trim().toLowerCase())) continue;
+        if (chatHeads.size > 0 && !chatHeads.has(variantHead(v))) continue;
         const cands = [squash(v)];
         const tail = squash(String(v).split(/\s+/).slice(1).join(" "));
         if (tail.length >= 2) cands.push(tail);
@@ -342,7 +428,9 @@ export function parseChatOrder(
           // 손님은 줄여서 말한다: "미니" → "미니어처". 채팅 단어가 상품명 조각의 앞부분이면 인정.
           for (const w of chatWords) {
             const sw = squash(w);
-            if (sw.length >= 2 && sp.startsWith(sw)) best = Math.max(best, sw.length);
+            if (sw.length < 2) continue;
+            if (sp.startsWith(sw)) { best = Math.max(best, sw.length); continue; }
+            if (looseEqual(sw, sp)) best = Math.max(best, sp.length);   // "딥디크" → "딥티크"
           }
         }
       }

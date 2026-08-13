@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       const sb = sbAdmin();
       const loaded = await loadParseProducts(sb);
       const cur = await getCurrentProductAt(sb, new Date().toISOString());
-      const lines = (body.preview as unknown[]).slice(0, 50).map((v) => String(v ?? ""));
+      const lines = (body.preview as unknown[]).slice(0, 800).map((v) => String(v ?? ""));
       const rows = lines.map((line) => {
         const r = parseChatOrder(line, loaded.products, cur?.productId ?? null);
         return {
