@@ -162,7 +162,6 @@ function isEditDistanceOne(a: string, b: string): boolean {
 function looseEqual(a: string, b: string): boolean {
   if (a === b) return true;
   if (!HANGUL_ONLY.test(a) || !HANGUL_ONLY.test(b)) return false;
-  if (a[0] !== b[0]) return false;
   const ja = toJamo(a), jb = toJamo(b);
   if (ja.length < 6 || jb.length < 6) return false;
   return isEditDistanceOne(ja, jb);
@@ -195,8 +194,12 @@ function chatHeadsOf(text: string, heads: Set<string>): Set<string> {
   for (const w of text.split(/[^a-z0-9가-힣]+/).filter(Boolean)) {
     const sw = squash(w);
     if (sw.length < 2) continue;
+    // 정확히 맞는 앞머리가 있으면 그걸 쓴다. (마스크/머스크처럼 둘 다 실재하는 말을 지켜준다)
     if (heads.has(sw)) { out.add(sw); continue; }
-    for (const h of heads) if (looseEqual(sw, h)) { out.add(h); break; }
+    // 정확한 게 없을 때만 표기 흔들림을 본다. 후보가 둘 이상이면 어느 쪽인지 모르므로 포기.
+    const near: string[] = [];
+    for (const h of heads) if (looseEqual(sw, h)) near.push(h);
+    if (near.length === 1) out.add(near[0]);
   }
   return out;
 }
