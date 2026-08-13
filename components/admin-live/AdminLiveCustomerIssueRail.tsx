@@ -342,6 +342,9 @@ function IssueCard({
   const done = isResolved(task);
   const rows = issueRows(task);
   const issueTypes = getIssueTypes(task);
+  // [2026-08-13 사장님 요청] 카드 클릭 시 등록 원문 전체 펼침 — 기존엔 요약 첫 줄만 보여 답답했음. 표시 전용.
+  const [expanded, setExpanded] = useState(false);
+  const fullText = cleanMultiline(task.body) || getIssueText(task);
 
   return (
     <article
@@ -410,10 +413,22 @@ function IssueCard({
         </div>
       </div>
 
-      <div className="mt-3 rounded-2xl bg-surface/70 px-3 py-2 ring-1 ring-white">
-        {rows.map(([label, value]) => (
-          <IssueRow key={label} label={label} value={value} strong={label === "메모"} />
-        ))}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setExpanded((v) => !v)}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded((v) => !v); } }}
+        className="mt-3 cursor-pointer rounded-2xl bg-surface/70 px-3 py-2 ring-1 ring-line transition hover:ring-rose-line"
+        title={expanded ? "접기" : "클릭하면 전체 내용을 볼 수 있어요"}
+      >
+        {expanded ? (
+          <div className="whitespace-pre-wrap break-words py-1 text-[12px] font-bold leading-6 text-ink">{fullText}</div>
+        ) : (
+          rows.map(([label, value]) => (
+            <IssueRow key={label} label={label} value={value} strong={label === "메모"} />
+          ))
+        )}
+        <div className="mt-1 text-right text-[10px] font-black text-ink-mute">{expanded ? "▲ 접기" : "▼ 전체 보기"}</div>
       </div>
     </article>
   );

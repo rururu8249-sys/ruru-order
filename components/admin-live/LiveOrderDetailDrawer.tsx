@@ -137,13 +137,15 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   // 반품/교환 기록 (기록 전용 — 정산/입금/재고/포인트 계산과 무관, return_* 컬럼만 update)
   const [returnEditing, setReturnEditing] = useState(false);
   const [returnSaving, setReturnSaving] = useState(false);
-  const [returnStatusDraft, setReturnStatusDraft] = useState("");
+  // [2026-08-13 사장님 요청] 반품 기록 = 유형(환불/교환) 선택 + 상품 체크 + 세부사항(선택).
+  //   저장 시 서버(/api/admin-live/order-return)가 기록 + 고객이슈 자동등록 + (환불) 적립 포인트 회수까지 처리.
+  const [returnModeDraft, setReturnModeDraft] = useState<"refund" | "exchange">("refund");
+  const [returnSelectedIds, setReturnSelectedIds] = useState<string[]>([]);
   const [returnReasonDraft, setReturnReasonDraft] = useState("");
   const [issueSaving, setIssueSaving] = useState(false);
   const [issueEditing, setIssueEditing] = useState(false);
   const [issueTypeDraft, setIssueTypeDraft] = useState("return");
   const [issueMemoDraft, setIssueMemoDraft] = useState("");
-  const [returnAmountDraft, setReturnAmountDraft] = useState("");
 
   useEffect(() => {
     setLocalOrder(order);
@@ -649,37 +651,80 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 
   // 반품/교환 기록 저장: return_* 컬럼만 update (주문상태/입금/정산/재고/포인트 로직 완전 무관·기록 전용)
   const startEditReturn = () => {
-    const row = order as any;
-    setReturnStatusDraft(String(row.returnStatus || ""));
-    setReturnReasonDraft(String(row.returnReason || ""));
-    setReturnAmountDraft(row.returnAmount ? String(row.returnAmount) : "");
+    const st = String((order as any).returnStatus || "");
+    setReturnModeDraft(st.includes("교환") ? "exchange" : "refund");
+    setReturnSelectedIds(items.map((item) => String(item.id)).filter(Boolean));
+    setReturnReasonDraft("");
     setReturnEditing(true);
+  };
+
+  const toggleReturnItem = (id: string) => {
+    setReturnSelectedIds((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
   };
 
   const handleSaveReturn = async () => {
     if (returnSaving) return;
-    const rowIds = items.map((item) => Number(item.id)).filter((id) => Number.isFinite(id) && id > 0);
+    const refRowId = Number(items[0]?.id);
+    const rowIds = returnSelectedIds.map((v) => Number(v)).filter((v) => Number.isFinite(v) && v > 0);
+    if (!Number.isFinite(refRowId) || refRowId <= 0) {
+      showAdminToast("기준 주문 행을 찾지 못했습니다.", "warning");
+      return;
+    }
     if (rowIds.length === 0) {
-      showAdminToast("저장할 주문 행을 찾지 못했습니다.", "warning");
+      showAdminToast("반품할 상품을 1개 이상 선택해주세요.", "warning");
       return;
     }
     setReturnSaving(true);
     try {
-      const amount = Math.max(0, Number(returnAmountDraft.replace(/[^0-9]/g, "") || "0") || 0);
-      const { error } = await supabase
-        .from("orders")
-        .update({
-          return_status: returnStatusDraft || null,
-          return_reason: returnReasonDraft.trim() || null,
-          return_amount: returnStatusDraft ? amount : null,
-          return_updated_at: returnStatusDraft ? new Date().toISOString() : null,
-        })
-        .in("id", rowIds);
-      if (error) {
-        showAdminToast("반품/교환 기록 저장 실패\n\n" + error.message, "error");
+      const res = await fetch("/api/admin-live/order-return", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ mode: returnModeDraft, refRowId, rowIds, detail: returnReasonDraft.trim() }),
+      }).then((r) => r.json()).catch(() => null);
+
+      if (!res?.ok) {
+        showAdminToast("반품/교환 접수 실패\n\n" + (res?.message || "알 수 없는 오류"), "error");
         return;
       }
-      showAdminToast(returnStatusDraft ? "반품/교환 기록이 저장됐습니다." : "반품/교환 기록을 지웠습니다.", "success");
+
+      const lines = [`${res.modeLabel || "반품"} 접수 기록 완료`];
+      if (res.issueRegistered) lines.push("🗂 고객이슈 자동 등록됨");
+      if (Number(res.reclaimed) > 0) {
+        const after = Number(res.balanceAfter);
+        lines.push(
+          `적립 포인트 ${Number(res.reclaimed).toLocaleString("ko-KR")}원 회수` +
+            (Number.isFinite(after) ? ` → 잔액 ${after.toLocaleString("ko-KR")}원${after < 0 ? " (마이너스)" : ""}` : "")
+        );
+      } else if (res.reclaimNote) {
+        lines.push(String(res.reclaimNote));
+      }
+      if (res.partial && res.message) lines.push(String(res.message));
+      showAdminToast(lines.join("\n"), res.partial ? "warning" : "success");
+      setReturnEditing(false);
+      await onAfterStatusChange?.();
+    } finally {
+      setReturnSaving(false);
+    }
+  };
+
+  // 기록 지우기 — 기존 동작 유지(return_* 컬럼만 null). 포인트/이슈는 건드리지 않는다.
+  const handleClearReturn = async () => {
+    if (returnSaving) return;
+    if (!(await showAdminConfirm("반품/교환 기록을 지울까요?\n\n(이미 회수된 포인트나 등록된 고객이슈는 되돌리지 않습니다)"))) return;
+    const rowIds = items.map((item) => Number(item.id)).filter((id) => Number.isFinite(id) && id > 0);
+    if (rowIds.length === 0) return;
+    setReturnSaving(true);
+    try {
+      const { error } = await supabase
+        .from("orders")
+        .update({ return_status: null, return_reason: null, return_amount: null, return_updated_at: null })
+        .in("id", rowIds);
+      if (error) {
+        showAdminToast("기록 지우기 실패\n\n" + error.message, "error");
+        return;
+      }
+      showAdminToast("반품/교환 기록을 지웠습니다.", "success");
       setReturnEditing(false);
       await onAfterStatusChange?.();
     } finally {
@@ -1069,36 +1114,71 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           ) : (
             <div className="rounded-lg border border-line bg-surface-2 p-3">
               <div className="flex flex-wrap items-center gap-2">
-                <select value={returnStatusDraft} onChange={(e) => setReturnStatusDraft(e.target.value)} className="h-8 rounded-md border border-line bg-surface px-2 text-[12px] font-black text-ink">
-                  <option value="">기록 없음(지우기)</option>
-                  <option value="반품접수">반품접수</option>
-                  <option value="교환접수">교환접수</option>
-                  <option value="반품완료">반품완료</option>
-                  <option value="교환완료">교환완료</option>
-                </select>
-                <input
-                  value={returnAmountDraft}
-                  onChange={(e) => setReturnAmountDraft(e.target.value.replace(/[^0-9]/g, ""))}
-                  inputMode="numeric"
-                  placeholder="환불 금액(기록용)"
-                  onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }}
-                  className="h-8 w-[130px] rounded-md border border-line bg-surface px-2 text-right text-[12px] font-black text-ink"
-                />
-                <span className="text-[11px] font-bold text-ink-mute">원</span>
+                <button
+                  type="button"
+                  onClick={() => setReturnModeDraft("refund")}
+                  className={[
+                    "rounded-lg px-3 py-1.5 text-[12px] font-black transition",
+                    returnModeDraft === "refund" ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2",
+                  ].join(" ")}
+                >
+                  반품(환불)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReturnModeDraft("exchange")}
+                  className={[
+                    "rounded-lg px-3 py-1.5 text-[12px] font-black transition",
+                    returnModeDraft === "exchange" ? "bg-slate-800 text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2",
+                  ].join(" ")}
+                >
+                  반품(교환)
+                </button>
               </div>
+
+              <div className="mt-2 space-y-1 rounded-md border border-line bg-surface p-2">
+                <div className="text-[10px] font-black text-ink-mute">대상 상품 선택 ({returnSelectedIds.length}/{items.length})</div>
+                {items.map((item) => {
+                  const id = String(item.id);
+                  const checked = returnSelectedIds.includes(id);
+                  const opt = [String(item.color || "").trim(), String(item.size || "").trim()]
+                    .filter((v) => v && v !== "없음")
+                    .join("/");
+                  return (
+                    <label key={id} className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 hover:bg-surface-2">
+                      <input type="checkbox" checked={checked} onChange={() => toggleReturnItem(id)} className="h-4 w-4 shrink-0 accent-rose-deep" />
+                      <span className="min-w-0 flex-1 truncate text-[12px] font-bold text-ink">
+                        {item.productName}
+                        {opt ? <span className="text-ink-mute"> ({opt})</span> : null}
+                        <span className="ml-1 text-ink-mute">× {Number(item.qty) || 1}</span>
+                      </span>
+                      <span className="shrink-0 text-[11px] font-black text-ink-soft">{money(Number(item.amount) || 0)}</span>
+                    </label>
+                  );
+                })}
+              </div>
+
               <textarea
                 value={returnReasonDraft}
                 onChange={(e) => setReturnReasonDraft(e.target.value)}
-                placeholder="사유·처리 메모 (예: 스몰 → 미디움 교환, 7/6 회수 예약)"
-                className="mt-2 h-16 w-full rounded-md border border-line bg-surface p-2 text-[12px] font-bold text-ink"
+                placeholder="세부사항 (선택 — 예: 사이즈 안 맞음, 7/6 회수 예약)"
+                className="mt-2 h-14 w-full rounded-md border border-line bg-surface p-2 text-[12px] font-bold text-ink"
               />
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex flex-wrap gap-2">
                 <button type="button" disabled={returnSaving} onClick={() => void handleSaveReturn()} className="rounded-md bg-rose-deep px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-50">
-                  {returnSaving ? "저장중…" : "저장"}
+                  {returnSaving ? "접수중…" : returnModeDraft === "refund" ? "환불 접수 (포인트 회수 포함)" : "교환 접수"}
                 </button>
                 <button type="button" onClick={() => setReturnEditing(false)} className="rounded-md border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ink-soft">취소</button>
+                {(order as any).returnStatus ? (
+                  <button type="button" disabled={returnSaving} onClick={() => void handleClearReturn()} className="ml-auto rounded-md border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ink-mute hover:text-danger-tx">
+                    기록 지우기
+                  </button>
+                ) : null}
               </div>
-              <div className="mt-1 text-[10px] font-bold text-ink-mute">※ 기록 전용 — 주문상태·정산·입금·재고에는 아무 영향 없습니다.</div>
+              <div className="mt-1 text-[10px] font-bold leading-4 text-ink-mute">
+                ※ 접수하면 고객이슈에 자동 등록됩니다. 환불은 이 주문에서 자동 적립된 포인트를 선택 상품 비율만큼 회수합니다(잔액 부족 시 마이너스).
+                <br />※ 주문상태·입금·정산·재고 숫자는 바뀌지 않습니다.
+              </div>
             </div>
           )}
         </section>
