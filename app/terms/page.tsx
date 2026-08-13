@@ -23,8 +23,8 @@ export const metadata: Metadata = {
 const SHOP_INFO = {
   serviceName: "루루동이 집구석LIVE",
   siteUrl: "https://ruru-order.vercel.app",
-  companyName: "더블에이치",
-  ownerName: "유혜원",
+  companyName: "",
+  ownerName: "",
   email: "rururu8249@gmail.com",
   effectiveDate: "2026년 8월 14일",
 };

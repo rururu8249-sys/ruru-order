@@ -6391,7 +6391,7 @@ export default function OrderPage() {
           }}
         />
 
-      <footer className="py-8 text-center text-[11px] font-bold tracking-[-0.03em] text-slate-400">
+      <footer className="pt-8 pb-56 text-center text-[11px] font-bold tracking-[-0.03em] text-slate-400">
         <div className="mb-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
           <a href="/privacy" className="underline underline-offset-2">개인정보처리방침</a>
           <span aria-hidden="true">·</span>
