@@ -328,18 +328,28 @@ export function parseChatOrder(
         if (chatHeads.size > 0 && !chatHeads.has(variantHead(v))) continue;
         const sv = squash(v);
         const vWords = String(v).split(/[^a-z0-9가-힣]+/i).map((x) => squash(x)).filter(Boolean);
-        let score = 0;
+        let raw = 0;       // 가중 점수
+        let chars = 0;     // 맞은 글자수 (근거 세기 판정용)
         let matched = 0;
         for (const w of chatWords) {
-          // 채팅 단어가 세부상품명 안에 있으면 인정. (반대 방향이라 "블루"가 "블루드"를 삼키지 않는다)
-          if (sv.includes(w)) { score += w.length; matched += 1; continue; }
-          // 표기 흔들림 — 단어 대 단어로만 본다.
-          if (vWords.some((x) => looseEqual(w, x))) { score += w.length; matched += 1; }
+          // ① 단어가 통째로 같으면 강하게 인정 ("블룸" = "블룸")
+          if (vWords.includes(w) || vWords.some((x) => looseEqual(w, x))) {
+            raw += w.length * 3; chars += w.length; matched += 1; continue;
+          }
+          // ② 단어 안에 묻혀 있으면 약하게만 인정 ("블룸" ⊂ "블룸그린")
+          //    반대 방향이라 "블루"가 "블루드"를 삼키는 일은 없다.
+          if (sv.includes(w)) { raw += w.length; chars += w.length; matched += 1; }
         }
+        if (matched === 0) continue;
+        // 세부상품명 쪽 단어 중 손님이 실제로 말한 비율. 안 말한 단어가 많으면 그만큼 깎는다.
+        //   "랑콤 미라클" 은 2/2, "랑콤 미라클(오렌지) 5ml" 은 2/4 → 앞의 것이 이긴다.
+        const covered = vWords.filter(
+          (x) => chatWords.some((w) => w === x || looseEqual(w, x) || x.includes(w))
+        ).length;
+        const score = Math.round((raw * 100 * covered) / Math.max(1, vWords.length));
         // 근거가 약하면 후보로 올리지 않는다.
         //   단어 하나만 맞았다면 그 단어가 4글자 이상은 돼야 한다("엑스트라도즈" O, "샤넬" X).
-        if (matched === 0) continue;
-        if (matched < 2 && score < 4) { weak.push({ p, variant: v, score }); continue; }
+        if (matched < 2 && chars < 4) { weak.push({ p, variant: v, score }); continue; }
         if (score > bestScore) { bestScore = score; hits = [{ p, variant: v, score }]; }
         else if (score === bestScore) hits.push({ p, variant: v, score });
       }
