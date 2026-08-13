@@ -8,7 +8,11 @@
 export type ParseProduct = {
   id: string;
   name: string;          // 등록 상품명. 앞 번호 포함 가능 ("3. 룰루레몬 차지필로우")
-  aliases?: string[];    // 세부상품명 등 추가 명칭
+  // 조합형(combo_mode) 상품의 세부상품명. products.color_options 배열을 그대로 넣는다.
+  //   예: ["킬리안 엔젤스쉐어 온더락", "킬리안 굿걸", "킬리안 돈비샤이", ...]
+  //   여기가 맞으면 옵션 1단 축까지 확정된다.
+  variants?: string[];
+  aliases?: string[];    // 그 밖의 추가 명칭
 };
 
 export type ParseStatus =
@@ -21,7 +25,8 @@ export type ParseResult = {
   status: ParseStatus;
   productId: string | null;
   productName: string | null;
-  matchedBy: "number" | "name" | "current" | null;
+  matchedBy: "number" | "name" | "variant" | "current" | null;
+  variantName: string | null;   // 조합형 세부상품이 특정됐으면 그 이름
   qty: number;
   optionTokens: string[];
   candidates: string[];
@@ -121,7 +126,7 @@ export function parseChatOrder(
 ): ParseResult {
   const text = norm(rawText);
   const base: ParseResult = {
-    status: "not_order", productId: null, productName: null, matchedBy: null,
+    status: "not_order", productId: null, productName: null, matchedBy: null, variantName: null,
     qty: 1, optionTokens: [], candidates: [], reason: "",
   };
   if (!text) return { ...base, reason: "빈 메시지" };
@@ -151,16 +156,45 @@ export function parseChatOrder(
   const { qty, consumed } = extractQty(text);
   const optionTokens = extractOptionTokens(text, consumed);
 
+  // 0순위: 조합형 세부상품명 (가장 구체적 — 맞으면 옵션 1단 축까지 확정)
+  //   "킬리안 굿걸" 전체도, 브랜드 뗀 "굿걸"도 잡는다.
+  {
+    const sq = squash(text);
+    let best: { p: ParseProduct; variant: string; score: number } | null = null;
+    let tie = false;
+    for (const p of products) {
+      for (const v of p.variants || []) {
+        const cands = [squash(v)];
+        const tail = squash(String(v).split(/\s+/).slice(1).join(" "));
+        if (tail.length >= 2) cands.push(tail);
+        for (const c of cands) {
+          if (c.length >= 2 && sq.includes(c)) {
+            const score = c.length;
+            if (!best || score > best.score) { best = { p, variant: v, score }; tie = false; }
+            else if (best && score === best.score && best.variant !== v) tie = true;
+          }
+        }
+      }
+    }
+    if (best && !tie) {
+      return {
+        status: "parsed", productId: best.p.id, productName: best.p.name,
+        matchedBy: "variant", variantName: best.variant,
+        qty, optionTokens, candidates: [], reason: "세부상품 일치 → 옵션 확정",
+      };
+    }
+  }
+
   // 1순위: 상품 앞 번호
   const numMatch = text.match(/(\d{1,3})\s*번/);
   if (numMatch) {
     const want = Number(numMatch[1]);
     const hit = products.filter((p) => productLeadingNumber(p.name) === want);
     if (hit.length === 1) {
-      return { status: "parsed", productId: hit[0].id, productName: hit[0].name, matchedBy: "number", qty, optionTokens, candidates: [], reason: `${want}번 상품` };
+      return { status: "parsed", productId: hit[0].id, productName: hit[0].name, matchedBy: "number", variantName: null, qty, optionTokens, candidates: [], reason: `${want}번 상품` };
     }
     if (hit.length > 1) {
-      return { status: "ambiguous", productId: null, productName: null, matchedBy: null, qty, optionTokens, candidates: hit.map((p) => p.name), reason: `${want}번 상품이 여러 개` };
+      return { status: "ambiguous", productId: null, productName: null, matchedBy: null, qty, optionTokens, variantName: null, candidates: hit.map((p) => p.name), reason: `${want}번 상품이 여러 개` };
     }
     // 번호는 말했는데 그 번호 상품이 없음 → 이름 매칭으로 계속 진행
   }
@@ -186,17 +220,17 @@ export function parseChatOrder(
 
   if (scored.length === 1 || (scored.length > 1 && scored[0].score > scored[1].score)) {
     const p = scored[0].p;
-    return { status: "parsed", productId: p.id, productName: p.name, matchedBy: "name", qty, optionTokens, candidates: [], reason: "상품명 일치" };
+    return { status: "parsed", productId: p.id, productName: p.name, matchedBy: "name", variantName: null, qty, optionTokens, candidates: [], reason: "상품명 일치" };
   }
   if (scored.length > 1) {
-    return { status: "ambiguous", productId: null, productName: null, matchedBy: null, qty, optionTokens, candidates: scored.slice(0, 5).map((x) => x.p.name), reason: "상품 후보가 여러 개" };
+    return { status: "ambiguous", productId: null, productName: null, matchedBy: null, qty, optionTokens, variantName: null, candidates: scored.slice(0, 5).map((x) => x.p.name), reason: "상품 후보가 여러 개" };
   }
 
   // 3순위: 「지금 이거」
   if (currentProductId) {
     const p = products.find((x) => x.id === currentProductId);
     if (p) {
-      return { status: "parsed", productId: p.id, productName: p.name, matchedBy: "current", qty, optionTokens, candidates: [], reason: "「지금 이거」로 적용" };
+      return { status: "parsed", productId: p.id, productName: p.name, matchedBy: "current", variantName: null, qty, optionTokens, candidates: [], reason: "「지금 이거」로 적용" };
     }
   }
 
