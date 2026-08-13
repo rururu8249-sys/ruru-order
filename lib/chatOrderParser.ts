@@ -379,7 +379,7 @@ export function parseChatOrder(
         for (const w of chatWords) {
           if (sv.includes(w) || vWords.some((x) => looseEqual(w, x))) continue;
           if (pNameWords.some((x) => x === w || x.startsWith(w) || looseEqual(w, x))) {
-            nameBonus += w.length * 100;
+            nameBonus += w.length * 300;   // 세부상품 단어를 통째로 맞힌 것과 같은 무게
           }
         }
         const score = Math.round((raw * 100 * covered) / Math.max(1, vWords.length)) + nameBonus;
