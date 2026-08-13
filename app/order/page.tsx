@@ -6392,6 +6392,18 @@ export default function OrderPage() {
         />
 
       <footer className="py-8 text-center text-[11px] font-bold tracking-[-0.03em] text-slate-400">
+        <div className="mb-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+          <a href="/privacy" className="underline underline-offset-2">개인정보처리방침</a>
+          <span aria-hidden="true">·</span>
+          <a href="/terms" className="underline underline-offset-2">이용약관</a>
+        </div>
+        <p className="mb-2 font-normal leading-relaxed">
+          본 서비스는 YouTube API Services를 이용합니다. 이용 시{" "}
+          <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">YouTube 서비스 약관</a>{" "}
+          및{" "}
+          <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">Google 개인정보처리방침</a>
+          이 함께 적용됩니다.
+        </p>
         © 2024 RURUDONGI. All rights reserved.
       </footer>
     </OrderPageShell>
