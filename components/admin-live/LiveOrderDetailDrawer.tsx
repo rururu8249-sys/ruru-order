@@ -142,10 +142,6 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const [returnModeDraft, setReturnModeDraft] = useState<"refund" | "exchange">("refund");
   const [returnSelectedIds, setReturnSelectedIds] = useState<string[]>([]);
   const [returnReasonDraft, setReturnReasonDraft] = useState("");
-  const [issueSaving, setIssueSaving] = useState(false);
-  const [issueEditing, setIssueEditing] = useState(false);
-  const [issueTypeDraft, setIssueTypeDraft] = useState("return");
-  const [issueMemoDraft, setIssueMemoDraft] = useState("");
 
   useEffect(() => {
     setLocalOrder(order);
@@ -650,9 +646,10 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   };
 
   // 반품/교환 기록 저장: return_* 컬럼만 update (주문상태/입금/정산/재고/포인트 로직 완전 무관·기록 전용)
-  const startEditReturn = () => {
-    const st = String((order as any).returnStatus || "");
-    setReturnModeDraft(st.includes("교환") ? "exchange" : "refund");
+  // [2026-08-13 사장님 지시] 진입 버튼 = [반품(환불)] [반품(교환)] 두 개만 상시 노출.
+  //   버튼이 곧 유형 선택이므로 편집기 안의 유형 버튼은 없앴고, 접수하면 고객이슈 자동 등록(별도 등록 버튼 삭제).
+  const startEditReturn = (mode: "refund" | "exchange") => {
+    setReturnModeDraft(mode);
     setReturnSelectedIds(items.map((item) => String(item.id)).filter(Boolean));
     setReturnReasonDraft("");
     setReturnEditing(true);
@@ -729,70 +726,6 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       await onAfterStatusChange?.();
     } finally {
       setReturnSaving(false);
-    }
-  };
-
-  // 고객이슈로 등록: 지금 보고 있는 주문(닉네임·주문번호·상품)을 그대로 admin_tasks 고객이슈로 간편 등록.
-  //   기존 고객이슈 빠른등록과 동일한 서버 route(/api/admin-v2/admin-tasks, 관리자인증) 재사용.
-  //   등록되면 '고객·이슈' 패널의 "고객 이슈" 탭에 그대로 뜸(같은 admin_tasks).
-  //   ⚠️ 주문/입금/정산/재고/포인트 상태는 일절 변경 안 함 — 이슈 기록만 생성.
-  const openIssueForm = () => {
-    const st = String((order as any).returnStatus || "");
-    setIssueTypeDraft(st.includes("교환") ? "exchange" : st.includes("환불") ? "refund" : "return");
-    setIssueMemoDraft(String((order as any).returnReason || "").trim());
-    setReturnEditing(false);
-    setIssueEditing(true);
-  };
-
-  const submitCustomerIssue = async () => {
-    if (issueSaving) return;
-    const row = order as any;
-    const nick = String((orderForView as any).nickname || row.nickname || row.youtube_nickname || "").trim();
-    const nm = String((orderForView as any).name || row.customer_name || row.name || "").trim();
-    const ph = String((orderForView as any).phone || row.phone || row.customer_phone || "").trim();
-    const orderNo = String((orderForView as any).orderNo || row.order_lookup_code || "").trim();
-    const productSummary = items.map((it: any) => String(it?.productName || "")).filter(Boolean).slice(0, 3).join(", ");
-    const typeLabel = ISSUE_TYPE_OPTIONS.find((o) => o.value === issueTypeDraft)?.label || "기타";
-    const nowLabel = new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit", weekday: "long" });
-
-    const title = `[고객이슈] ${nick || nm || ph || "고객"} - ${typeLabel}`;
-    const bodyText = [
-      `자동날짜: ${nowLabel}`,
-      `이슈유형: ${typeLabel}`,
-      `닉네임: ${nick || "-"}`,
-      `이름: ${nm || "-"}`,
-      `전화번호: ${ph || "-"}`,
-      orderNo ? `주문번호: ${orderNo}` : "",
-      productSummary ? `상품명: ${productSummary}` : "",
-      "",
-      issueMemoDraft.trim() || typeLabel,
-    ].filter(Boolean).join("\n");
-
-    setIssueSaving(true);
-    try {
-      const res = await fetch("/api/admin-v2/admin-tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-        body: JSON.stringify({
-          task_type: issueTypeDraft,
-          title,
-          body: bodyText,
-          customer_name: nm || null,
-          customer_nickname: nick || null,
-          related_product: productSummary || null,
-          source: "order_detail_customer_issue",
-        }),
-      }).then((r) => r.json()).catch(() => null);
-      if (res?.ok) {
-        showAdminToast("고객이슈로 등록됐어요. '고객·이슈 → 고객 이슈' 탭에서 확인·처리하세요.", "success");
-        setIssueEditing(false);
-        setIssueMemoDraft("");
-      } else {
-        showAdminToast("고객이슈 등록 실패\n\n" + (res?.message || "알 수 없는 오류"), "error");
-      }
-    } finally {
-      setIssueSaving(false);
     }
   };
 
@@ -1084,18 +1017,22 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         {/* 반품/교환 · 고객이슈 — 상단 배치(반품/교환 처리 동선 단축, 스크롤 최소화) */}
         <section className="mt-3">
           <div className="mb-1 flex items-center gap-2">
-            <span className="text-[11px] font-black text-ink-mute">반품/교환 기록</span>
-            {!returnEditing && !issueEditing ? (
+            <span className="text-[11px] font-black text-ink-mute">반품/교환</span>
+            {!returnEditing ? (
               <>
-                <button type="button" onClick={startEditReturn} className="rounded-md border border-rose-line bg-rose-soft px-2 py-0.5 text-[10px] font-black text-rose-deep">
-                  {(order as any).returnStatus ? "✎ 수정" : "+ 기록"}
+                <button
+                  type="button"
+                  onClick={() => startEditReturn("refund")}
+                  className="rounded-md border border-rose-line bg-rose-soft px-2.5 py-1 text-[11px] font-black text-rose-deep transition hover:bg-rose-line/40"
+                >
+                  ↩ 반품(환불)
                 </button>
                 <button
                   type="button"
-                  onClick={openIssueForm}
-                  className="rounded-md border border-line bg-surface px-2 py-0.5 text-[10px] font-black text-ink-soft transition hover:bg-surface-2"
+                  onClick={() => startEditReturn("exchange")}
+                  className="rounded-md border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft transition hover:bg-surface-2"
                 >
-                  🗂 고객이슈로 등록
+                  ⇄ 반품(교환)
                 </button>
               </>
             ) : null}
@@ -1113,26 +1050,19 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             )
           ) : (
             <div className="rounded-lg border border-line bg-surface-2 p-3">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2">
+                <span className={[
+                  "rounded-lg px-3 py-1.5 text-[12px] font-black text-white",
+                  returnModeDraft === "refund" ? "bg-rose-deep" : "bg-slate-800",
+                ].join(" ")}>
+                  {returnModeDraft === "refund" ? "↩ 반품(환불) 접수" : "⇄ 반품(교환) 접수"}
+                </span>
                 <button
                   type="button"
-                  onClick={() => setReturnModeDraft("refund")}
-                  className={[
-                    "rounded-lg px-3 py-1.5 text-[12px] font-black transition",
-                    returnModeDraft === "refund" ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2",
-                  ].join(" ")}
+                  onClick={() => setReturnModeDraft(returnModeDraft === "refund" ? "exchange" : "refund")}
+                  className="rounded-md border border-line bg-surface px-2 py-1 text-[10px] font-black text-ink-mute hover:bg-surface-2"
                 >
-                  반품(환불)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setReturnModeDraft("exchange")}
-                  className={[
-                    "rounded-lg px-3 py-1.5 text-[12px] font-black transition",
-                    returnModeDraft === "exchange" ? "bg-slate-800 text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2",
-                  ].join(" ")}
-                >
-                  반품(교환)
+                  {returnModeDraft === "refund" ? "교환으로 전환" : "환불로 전환"}
                 </button>
               </div>
 
@@ -1182,49 +1112,6 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             </div>
           )}
         </section>
-
-        {/* 고객이슈로 등록 — 반품/교환 편집기와 동일한 인라인 폼(유형칩 + 사유). admin_tasks 등록만. */}
-        {issueEditing ? (
-          <section className="mt-3">
-            <div className="mb-1 text-[11px] font-black text-ink-mute">고객이슈로 등록</div>
-            <div className="rounded-lg border border-line bg-surface-2 p-3">
-              <div className="mb-2 rounded-md bg-surface px-2.5 py-1.5 text-[11px] font-bold leading-5 text-ink-soft">
-                <span className="font-black text-ink">{orderForView.nickname || "-"}</span>
-                {" · "}
-                {order.orderNo || "주문번호 없음"}
-                <div className="truncate text-ink-mute">{items.map((it) => it.productName).filter(Boolean).slice(0, 3).join(", ") || "상품 없음"}</div>
-              </div>
-              <div className="mb-2 flex flex-wrap gap-1.5">
-                {ISSUE_TYPE_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setIssueTypeDraft(opt.value)}
-                    className={[
-                      "rounded-full px-2.5 py-1 text-[11px] font-black transition",
-                      issueTypeDraft === opt.value ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2",
-                    ].join(" ")}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-              <textarea
-                value={issueMemoDraft}
-                onChange={(e) => setIssueMemoDraft(e.target.value)}
-                placeholder="사유·처리 메모 (예: 사이즈 안 맞아 교환 요청, 7/8 회수 예약)"
-                className="h-16 w-full rounded-md border border-line bg-surface p-2 text-[12px] font-bold text-ink"
-              />
-              <div className="mt-2 flex gap-2">
-                <button type="button" disabled={issueSaving} onClick={() => void submitCustomerIssue()} className="rounded-md bg-rose-deep px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-50">
-                  {issueSaving ? "등록중…" : "고객이슈 등록"}
-                </button>
-                <button type="button" onClick={() => setIssueEditing(false)} className="rounded-md border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ink-soft">취소</button>
-              </div>
-              <div className="mt-1 text-[10px] font-bold text-ink-mute">※ 고객이슈에만 등록 — 주문/입금/정산/재고 무변경. 등록 후 '고객·이슈 → 고객 이슈' 탭에서 확인·처리.</div>
-            </div>
-          </section>
-        ) : null}
 
         {/* 상태 배지 + 안내 (기존 로직) */}
         <div className={`rounded-xl border px-3 py-2 text-xs font-black ${getPaymentStatusClass(orderForView)}`}>
@@ -1521,13 +1408,6 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   );
 }
 
-const ISSUE_TYPE_OPTIONS = [
-  { label: "반품", value: "return" },
-  { label: "교환", value: "exchange" },
-  { label: "환불", value: "refund" },
-  { label: "진상", value: "complaint" },
-  { label: "기타", value: "general" },
-];
 
 function Info({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
