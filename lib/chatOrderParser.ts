@@ -122,6 +122,22 @@ function extractOptionTokens(text: string, consumed: string[]): string[] {
   return Array.from(new Set(out));
 }
 
+// 상품이 정해진 뒤, 그 상품의 세부상품 중 채팅 단어로 좁혀 정확히 하나면 그걸 돌려준다.
+//   상품이 이미 특정된 상태라 오탐 위험이 낮다. 하나로 안 좁혀지면 null(옵션 미확정).
+function narrowVariant(text: string, p: ParseProduct): string | null {
+  const words = text.split(/[^a-z0-9가-힣]+/).filter((w) => w.length >= 2);
+  if (words.length === 0) return null;
+  const hit = (p.variants || []).filter((v) => {
+    if (EMPTY_OPTION_WORDS.has(String(v).trim().toLowerCase())) return false;
+    const sv = squash(v);
+    return words.some((w) => {
+      const sw = squash(w);
+      return sw.length >= 2 && sv.includes(sw);
+    });
+  });
+  return hit.length === 1 ? hit[0] : null;
+}
+
 // ── 본체 ──────────────────────────────────────────────
 export function parseChatOrder(
   rawText: string,
@@ -188,19 +204,49 @@ export function parseChatOrder(
     );
 
     let pick: VariantHit | null = uniq.length === 1 ? uniq[0] : null;
-    // 동점 후보가 여러 상품에 걸쳐 있으면 「지금 이거」로 지정된 상품을 우선한다.
+    let tieReason = "";
+
+    // 동점 해소 ①: 손님이 상품 쪽 구분 단어를 말했으면 그걸로 가린다.
+    //   세부상품명이 완전히 같은 경우가 있다.
+    //   예) "펜할리곤스 더치스로즈" 는 [펜할리곤스 향수] 와 [미니어처 향수] 양쪽에 똑같이 있고,
+    //       구분 단어("미니")는 세부상품명이 아니라 상품명에만 들어 있다.
+    //   → 채팅에 "미니"가 있으면 [미니어처 향수] 로 확정한다.
+    if (!pick && uniq.length > 1) {
+      const chatTokens = text.split(/[^a-z0-9가-힣]+/).filter((w) => w.length >= 2);
+      // 후보 세부상품명에 "공통으로" 든 단어(=브랜드·향 이름)는 구분 단어가 아니다.
+      //   "미니 펜할리곤스 더치스로즈" 에서 구분 단어는 "미니" 하나뿐이다.
+      //   "펜할리곤스"를 구분에 쓰면 [펜할리곤스 향수] 쪽으로 잘못 끌려간다.
+      const strong = chatTokens.filter(
+        (w) => !uniq.every((h) => squash(h.variant).includes(squash(w)))
+      );
+      // 구분 단어 우선 → 없으면 전체 단어로 한 번 더 시도
+      for (const tokens of [strong, chatTokens]) {
+        if (tokens.length === 0) continue;
+        const byName = uniq.filter((h) => {
+          const body = squash(nameBody(h.p.name));
+          return tokens.some((w) => {
+            const sw = squash(w);
+            return sw.length >= 2 && body.includes(sw);
+          });
+        });
+        if (byName.length === 1) { pick = byName[0]; tieReason = "상품 구분 단어로 확정"; break; }
+      }
+    }
+
+    // 동점 해소 ②: 그래도 못 가리면 「지금 이거」로 지정된 상품을 우선한다.
     //   방송 중 셀러가 직접 지정한 값이므로 채팅 문자열보다 강한 신호다.
-    //   (예: "딥티크 로즈"가 두 상품에 다 있을 때, 지금 파는 쪽으로 확정)
+    //   (예: "딥티크 로즈"가 캔들·차량용 양쪽에 있을 때, 지금 파는 쪽으로 확정)
     if (!pick && uniq.length > 1 && currentProductId) {
       const onCurrent = uniq.filter((h) => h.p.id === currentProductId);
-      if (onCurrent.length === 1) pick = onCurrent[0];
+      if (onCurrent.length === 1) { pick = onCurrent[0]; tieReason = "「지금 이거」로 확정"; }
     }
+    // 둘 다 실패하면 담지 않는다 — 손님이 어느 쪽인지 말해야 접수된다.
     if (pick) {
       return {
         status: "parsed", productId: pick.p.id, productName: pick.p.name,
         matchedBy: "variant", variantName: pick.variant,
         qty, optionTokens, candidates: [],
-        reason: uniq.length > 1 ? "세부상품 동점 → 「지금 이거」로 확정" : "세부상품 일치 → 옵션 확정",
+        reason: tieReason ? `세부상품 동점 → ${tieReason}` : "세부상품 일치 → 옵션 확정",
       };
     }
     // 동점인데 「지금 이거」로도 못 가리면 아래 번호/상품명 매칭으로 계속 진행한다(기존 동작 유지).
@@ -230,8 +276,15 @@ export function parseChatOrder(
         const s = squash(n);
         if (s.length >= 2 && squashed.includes(s)) { best = Math.max(best, s.length * 10); continue; }
         // 상품명을 단어로 쪼개 2글자 이상 조각이 메시지에 있으면 부분 점수
+        const chatWords = text.split(/[^a-z0-9가-힣]+/).filter((x) => x.length >= 2);
         for (const piece of String(n).split(/[\s()[\]{}·・,./\-_~]+/).filter((x) => x.length >= 2)) {
-          if (squashed.includes(squash(piece))) best = Math.max(best, squash(piece).length);
+          const sp = squash(piece);
+          if (squashed.includes(sp)) { best = Math.max(best, sp.length); continue; }
+          // 손님은 줄여서 말한다: "미니" → "미니어처". 채팅 단어가 상품명 조각의 앞부분이면 인정.
+          for (const w of chatWords) {
+            const sw = squash(w);
+            if (sw.length >= 2 && sp.startsWith(sw)) best = Math.max(best, sw.length);
+          }
         }
       }
       return { p, score: best };
@@ -241,15 +294,51 @@ export function parseChatOrder(
 
   if (scored.length === 1 || (scored.length > 1 && scored[0].score > scored[1].score)) {
     const p = scored[0].p;
-    return { status: "parsed", productId: p.id, productName: p.name, matchedBy: "name", variantName: null, qty, optionTokens, candidates: [], reason: "상품명 일치" };
+    // 상품이 정해졌으면 그 상품의 세부상품 안에서 한 번 더 좁힌다.
+    //   예) "미니 샤넬 저요" → 상품=[미니어처 향수] 확정 → 그 안에서 "샤넬"이 든 세부상품 1개면 확정.
+    const v = narrowVariant(text, p);
+    return {
+      status: "parsed", productId: p.id, productName: p.name, matchedBy: "name",
+      variantName: v, qty, optionTokens, candidates: [],
+      reason: v ? "상품명 일치 → 세부상품까지 확정" : "상품명 일치",
+    };
   }
   if (scored.length > 1) {
-    // 상품명 동점도 「지금 이거」로 가린다.
+    const top = scored.filter((x) => x.score === scored[0].score);
+
+    // 동점 해소 ①: "카테고리 지정어"로 가린다.
+    //   어떤 세부상품명에도 안 나오는 단어(= 브랜드·향 이름이 아닌 단어)는 손님이 종류를 지정한 것이다.
+    //   예) "미니 샤넬 저요" — "샤넬"은 세부상품명에 나오니 브랜드, "미니"는 안 나오니 종류 지정어.
+    //       → 상품명에 "미니"가 든 [미니어처 향수] 로 확정.
+    {
+      const chatWords = text.split(/[^a-z0-9가-힣]+/).filter((w) => w.length >= 2);
+      const allVariants = products.flatMap((x) => (x.variants || []).map((v) => squash(v)));
+      const categoryWords = chatWords.filter((w) => {
+        const sw = squash(w);
+        return sw.length >= 2 && !allVariants.some((v) => v.includes(sw));
+      });
+      if (categoryWords.length > 0) {
+        const byCategory = top.filter((x) => {
+          const body = squash(nameBody(x.p.name));
+          return categoryWords.some((w) => body.includes(squash(w)));
+        });
+        if (byCategory.length === 1) {
+          const p2 = byCategory[0].p;
+          const v2 = narrowVariant(text, p2);
+          return {
+            status: "parsed", productId: p2.id, productName: p2.name, matchedBy: "name",
+            variantName: v2, qty, optionTokens, candidates: [],
+            reason: v2 ? "종류 지정어로 확정 → 세부상품까지 확정" : "종류 지정어로 확정",
+          };
+        }
+      }
+    }
+
+    // 동점 해소 ②: 「지금 이거」로 가린다.
     if (currentProductId) {
-      const top = scored.filter((x) => x.score === scored[0].score);
       const onCurrent = top.find((x) => x.p.id === currentProductId);
       if (onCurrent) {
-        return { status: "parsed", productId: onCurrent.p.id, productName: onCurrent.p.name, matchedBy: "name", variantName: null, qty, optionTokens, candidates: [], reason: "상품명 동점 → 「지금 이거」로 확정" };
+        return { status: "parsed", productId: onCurrent.p.id, productName: onCurrent.p.name, matchedBy: "name", variantName: narrowVariant(text, onCurrent.p), qty, optionTokens, candidates: [], reason: "상품명 동점 → 「지금 이거」로 확정" };
       }
     }
     return { status: "ambiguous", productId: null, productName: null, matchedBy: null, qty, optionTokens, variantName: null, candidates: scored.slice(0, 5).map((x) => x.p.name), reason: "상품 후보가 여러 개" };
