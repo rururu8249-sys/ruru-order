@@ -334,6 +334,10 @@ export function parseChatOrder(
         if (EMPTY_OPTION_WORDS.has(String(v).trim().toLowerCase())) continue;
         const sv = squash(v);
         const vWords = String(v).split(/[^a-zA-Z0-9가-힣]+/).map((x) => squash(x)).filter(Boolean);
+        // 등록명이 "로스트 체리"처럼 띄어 있고 손님이 "로스트채리"(붙임+오타)로 칠 때를 위해
+        //   이웃 단어를 붙인 형태도 오타 비교 대상에 넣는다.
+        const vWordsJoined = vWords.slice();
+        for (let i = 0; i + 1 < vWords.length; i += 1) vWordsJoined.push(vWords[i] + vWords[i + 1]);
         let score = 0;
         let matched = 0;      // 세부상품명 단어를 맞힌 개수
         let matchedChars = 0; // 맞힌 글자수 (근거 세기)
@@ -342,7 +346,7 @@ export function parseChatOrder(
           //     맞으면 소폭 가점, 없으면 소폭 감점 — 이것만으로 후보가 되지는 않는다.
           if (isMeasure(w)) { score += sv.includes(w) ? w.length : -w.length; continue; }
           // (1) 세부상품명 단어와 일치 — 통째(오타 허용) 또는 4글자 이상의 붙여쓰기 포함
-          if (vWords.some((x) => x === w || looseEqual(w, x)) || (w.length >= 4 && sv.includes(w))) {
+          if (vWordsJoined.some((x) => x === w || looseEqual(w, x)) || (w.length >= 4 && sv.includes(w))) {
             score += w.length * 3; matched += 1; matchedChars += w.length; continue;
           }
           // (2) 짧은 단어가 세부상품명 안에 묻힘 ("블룸" ⊂ "블룸그린") — 약한 근거
