@@ -7,6 +7,8 @@ import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { parsePendingChatOrders } from "@/lib/chatOrderPipeline";
 import { loadParseProducts } from "@/lib/chatOrderProducts";
+import { parseChatOrder } from "@/lib/chatOrderParser";
+import { getCurrentProductAt } from "@/lib/chatCurrentProduct";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,6 +38,30 @@ export async function POST(request: NextRequest) {
   if (!session) return NextResponse.json({ ok: false, error: { message: "관리자 인증이 필요합니다." } }, { status: 401 });
   try {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+
+    // 미리보기: 문장을 그대로 판정만 해본다. DB에 쓰지 않는다(읽기 전용).
+    //   방송 전에 "이렇게 치면 잡히나?" 를 확인하는 용도.
+    if (Array.isArray(body.preview)) {
+      const sb = sbAdmin();
+      const loaded = await loadParseProducts(sb);
+      const cur = await getCurrentProductAt(sb, new Date().toISOString());
+      const lines = (body.preview as unknown[]).slice(0, 50).map((v) => String(v ?? ""));
+      const rows = lines.map((line) => {
+        const r = parseChatOrder(line, loaded.products, cur?.productId ?? null);
+        return {
+          text: line, status: r.status, product: r.productName, variant: r.variantName,
+          qty: r.qty, matchedBy: r.matchedBy, options: r.optionTokens,
+          candidates: r.candidates, reason: r.reason,
+        };
+      });
+      return NextResponse.json({
+        ok: true, preview: true, rows,
+        productCount: loaded.products.length,
+        source: loaded.source,
+        current: cur?.productName ?? null,
+      });
+    }
+
     const result = await parsePendingChatOrders(sbAdmin(), {
       reparseAll: body.reparseAll === true,
       limit: Number(body.limit ?? 200) || 200,

@@ -27,6 +27,10 @@ type QueueRow = {
 };
 
 type UsageRow = { method: string; calls: number };
+type PreviewRow = {
+  text: string; status: string; product: string | null; variant: string | null;
+  qty: number; matchedBy: string | null; reason: string; candidates: string[];
+};
 type ProductRow = { id: string; name: string; variants?: string[] };
 type CurrentProduct = { productId: string; productName: string; setAt: string } | null;
 
@@ -66,6 +70,8 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
   const [autoRead, setAutoRead] = useState(false);
   const [onlyOrders, setOnlyOrders] = useState(true);
   const [lastRead, setLastRead] = useState("");
+  const [testText, setTestText] = useState("");
+  const [testRows, setTestRows] = useState<PreviewRow[]>([]);
   const autoRef = useRef(false);
   autoRef.current = autoRead;
 
@@ -171,6 +177,22 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
       if (!json?.ok) { showAdminToast("파싱 실패 — " + (json?.reason || ""), "error"); return; }
       showAdminToast(`전체 재파싱 ${json.updated}건 (상품 ${json.productCount}개 기준)`);
       await loadQueue();
+    } finally { setBusy(""); }
+  };
+
+  // 문장 판정 테스트 — DB에 쓰지 않는다. 지금 등록된 상품 목록 그대로 판정만 해본다.
+  const runPreview = async () => {
+    const lines = testText.split("\n").map((v) => v.trim()).filter(Boolean).slice(0, 50);
+    if (lines.length === 0) { showAdminToast("테스트할 문장을 한 줄에 하나씩 넣어주세요."); return; }
+    setBusy("preview");
+    try {
+      const res = await fetch("/api/chat-orders/parse", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preview: lines }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!json?.ok) { showAdminToast("판정 실패 — " + (json?.error?.message || ""), "error"); return; }
+      setTestRows((json.rows || []) as PreviewRow[]);
     } finally { setBusy(""); }
   };
 
@@ -289,6 +311,50 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
               );
             })}
           </div>
+        </div>
+
+        {/* 문장 판정 테스트 — 방송 전에 "이렇게 치면 잡히나?" 확인 */}
+        <div className="border-b border-line px-5 py-3">
+          <div className="mb-2 flex items-center gap-2 text-[11px] font-black text-ink-soft">
+            <span>🧪 문장 판정 테스트</span>
+            <span className="text-ink-mute">한 줄에 하나씩 — 실제 등록 상품으로 판정만 합니다(주문 안 됨)</span>
+            <button type="button" onClick={() => void runPreview()} disabled={busy === "preview"}
+              className="ml-auto rounded-lg bg-slate-700 px-3 py-1 font-black text-white disabled:opacity-50">
+              {busy === "preview" ? "판정중…" : "판정해보기"}
+            </button>
+            {testRows.length > 0 ? (
+              <button type="button" onClick={() => setTestRows([])}
+                className="rounded-lg border border-line bg-surface px-2 py-1 text-ink-soft hover:bg-surface-2">지우기</button>
+            ) : null}
+          </div>
+          <textarea
+            value={testText} onChange={(e) => setTestText(e.target.value)} rows={3}
+            placeholder={"크림 라메르 주세요\n아이크림 라메르 2개\n미니 샤넬 블루드 저요"}
+            className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[12px] font-bold text-ink"
+          />
+          {testRows.length > 0 ? (
+            <div className="mt-2 max-h-56 overflow-auto rounded-lg border border-line">
+              <table className="w-full text-[12px]">
+                <tbody>
+                  {testRows.map((r, i) => {
+                    const st = STATUS_META[r.status] || STATUS_META.raw;
+                    return (
+                      <tr key={i} className="border-b border-line last:border-0">
+                        <td className="px-3 py-1.5 text-ink">{r.text}</td>
+                        <td className="whitespace-nowrap px-3 py-1.5">
+                          <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-black ${st.cls}`}>{st.label}</span>
+                        </td>
+                        <td className="px-3 py-1.5 font-bold text-ink">{r.product || "-"}</td>
+                        <td className="px-3 py-1.5 text-ink">{r.variant || "-"}</td>
+                        <td className="whitespace-nowrap px-3 py-1.5 text-right font-black text-ink">{r.status === "parsed" ? r.qty : ""}</td>
+                        <td className="px-3 py-1.5 text-[11px] text-ink-mute">{r.reason}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
         </div>
 
         {/* 대기열 */}
