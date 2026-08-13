@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { parsePendingChatOrders } from "@/lib/chatOrderPipeline";
-import { loadParseProducts } from "@/lib/chatOrderProducts";
+import { loadParseProducts, loadAllParseProducts } from "@/lib/chatOrderProducts";
 import { parseChatOrder } from "@/lib/chatOrderParser";
 import { getCurrentProductAt } from "@/lib/chatCurrentProduct";
 
@@ -43,7 +43,8 @@ export async function POST(request: NextRequest) {
     //   방송 전에 "이렇게 치면 잡히나?" 를 확인하는 용도.
     if (Array.isArray(body.preview)) {
       const sb = sbAdmin();
-      const loaded = await loadParseProducts(sb);
+      // scope:"all" 이면 전체 상품(의류·잡화 포함)으로 판정 — 시뮬레이션 전용, DB 무변경
+      const loaded = body.scope === "all" ? await loadAllParseProducts(sb) : await loadParseProducts(sb);
       const cur = await getCurrentProductAt(sb, new Date().toISOString());
       const lines = (body.preview as unknown[]).slice(0, 800).map((v) => String(v ?? ""));
       const rows = lines.map((line) => {

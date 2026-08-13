@@ -42,6 +42,29 @@ export type LoadedProducts = {
   source: "live" | "recent" | "none";
 };
 
+// [시뮬레이션 전용] 방송 여부와 무관하게 "전체 상품"을 파서 형식으로 읽는다.
+//   의류·신발·잡화(비조합형)도 포함 — 이름 매칭·번호 매칭 검증 대상.
+//   읽기 전용(select만). 운영 파싱은 아래 loadParseProducts(방송 상품)를 그대로 쓴다.
+export async function loadAllParseProducts(sb: SupabaseClient): Promise<LoadedProducts> {
+  const { data } = await sb
+    .from("products")
+    .select("id,product_name,product_note,color_options")
+    .limit(3000);
+  const products: ParseProduct[] = [];
+  for (const p of (data || []) as Record<string, unknown>[]) {
+    const id = String(p.id ?? "").trim();
+    const name = String(p.product_name ?? "").trim();
+    if (!id || !name) continue;
+    const note = parseNote(p.product_note);
+    const variants = note?.combo_mode === true
+      ? toStringArray(p.color_options).filter(isMeaningfulVariant)
+      : [];
+    const aliases = toStringArray(note?.chat_aliases);
+    products.push({ id, name, variants, aliases });
+  }
+  return { products, broadcastId: null, source: "none" };
+}
+
 export async function loadParseProducts(sb: SupabaseClient): Promise<LoadedProducts> {
   // 1) 방송 선택 — ON 우선, 없으면 최근
   const { data: bcRows } = await sb

@@ -307,139 +307,91 @@ export function parseChatOrder(
     }
   }
 
-  // 0순위: 조합형 세부상품명 (가장 구체적 — 맞으면 옵션 1단 축까지 확정)
-  //   "킬리안 굿걸" 전체도, 브랜드 뗀 "굿걸"도 잡는다.
+  // 0순위: 세부상품명 매칭 — 원칙 하나로 통일한 점수 모델.
+  //   후보(상품×세부상품)가 손님의 말을 얼마나 "설명"하는지 본다.
+  //   ① 설명되는 단어(세부상품명/상품명에 있는 말)는 가점
+  //   ② 설명 안 되는 단어는 감점 — "미니 구찌 블롬"의 "미니"를
+  //      일반 [구찌 향수]는 설명 못 하고 [미니어처 향수]는 설명한다 → 자동으로 갈린다
+  //   ③ 손님이 안 말한 세부상품 쪽 단어(5ml 등)는 소폭 감점 — 정확히 말한 쪽이 이긴다
   {
-    // 손님은 등록명을 통째로 치지 않는다. 용량을 빼먹고("겔랑 라쁘띠 edp"),
-    //   브랜드를 생략하고("더치스 로즈"), 오타도 낸다("딥디크").
-    //   → 문자열 통째 비교가 아니라 "단어 몇 개가 맞았나" 점수로 본다.
     const chatWords = text.split(/[^a-z0-9가-힣]+/).map((w) => squash(w)).filter((w) => w.length >= 2);
-    // 손님이 말한 앞머리(브랜드/카테고리)와 다른 세부상품은 후보에서 제외한다.
-    const chatHeads = chatHeadsOf(text, collectHeads(products));
-
-    // 종류 지정어: 세부상품명에는 한 번도 안 나오고 상품명에만 나오는 단어.
-    //   손님이 "미니"라고 하면 그건 향 이름이 아니라 [미니어처 향수] 를 가리키는 말이다.
-    //   → 그 상품의 세부상품만 후보로 남긴다. ("미니 구찌 블롬" 이 일반 구찌로 새지 않게)
-    const onlyProductIds = new Set<string>();
-    {
-      const variantWords = new Set<string>();
-      for (const p of products) {
-        for (const v of p.variants || []) {
-          for (const x of String(v).split(/[^a-z0-9가-힣]+/i)) {
-            const sx = squash(x);
-            if (sx) variantWords.add(sx);
-          }
-        }
-      }
-      for (const w of chatWords) {
-        if (variantWords.has(w)) continue;   // 브랜드·향 이름이면 종류 지정어가 아니다
-        const hit = products.filter((p) =>
-          nameBody(p.name).split(/\s+/).map((x) => squash(x)).filter(Boolean)
-            .some((x) => x === w || x.startsWith(w) || looseEqual(w, x))
-        );
-        if (hit.length === 1) onlyProductIds.add(hit[0].id);   // 딱 한 상품만 가리킬 때만
-      }
-    }
     type VariantHit = { p: ParseProduct; variant: string; score: number };
-    let bestScore = 0;
+    let bestScore = -Infinity;
     let hits: VariantHit[] = [];
-    // 근거가 약한 후보(짧은 향 이름 하나만 맞은 것). 강한 후보가 전혀 없고
-    //   이 약한 후보가 "딱 하나"일 때만 쓴다. → "굿걸 하나요" 는 살리고, "샤넬"·"블루" 는 안 담는다.
     const weak: VariantHit[] = [];
     for (const p of products) {
-      const pNameWords = nameBody(p.name).split(/\s+/).map((x) => squash(x)).filter(Boolean);
+      const pNameWords = nameBody(p.name).split(/[^a-zA-Z0-9가-힣]+/).map((x) => squash(x)).filter(Boolean);
       for (const v of p.variants || []) {
         if (EMPTY_OPTION_WORDS.has(String(v).trim().toLowerCase())) continue;
-        if (onlyProductIds.size > 0 && !onlyProductIds.has(p.id)) continue;
-        if (chatHeads.size > 0 && !chatHeads.has(variantHead(v))) continue;
         const sv = squash(v);
-        const vWords = String(v).split(/[^a-z0-9가-힣]+/i).map((x) => squash(x)).filter(Boolean);
-        let raw = 0;       // 가중 점수
-        let chars = 0;     // 맞은 글자수 (근거 세기 판정용)
-        let matched = 0;
+        const vWords = String(v).split(/[^a-zA-Z0-9가-힣]+/).map((x) => squash(x)).filter(Boolean);
+        let score = 0;
+        let matched = 0;      // 세부상품명 단어를 맞힌 개수
+        let matchedChars = 0; // 맞힌 글자수 (근거 세기)
         for (const w of chatWords) {
-          // ① 단어가 통째로 같으면 강하게 인정 ("블룸" = "블룸")
-          if (vWords.includes(w) || vWords.some((x) => looseEqual(w, x))) {
-            raw += w.length * 3; chars += w.length; matched += 1; continue;
+          // (1) 세부상품명 단어와 일치 — 통째(오타 허용) 또는 4글자 이상의 붙여쓰기 포함
+          if (vWords.some((x) => x === w || looseEqual(w, x)) || (w.length >= 4 && sv.includes(w))) {
+            score += w.length * 3; matched += 1; matchedChars += w.length; continue;
           }
-          // ② 단어 안에 묻혀 있으면 약하게만 인정 ("블룸" ⊂ "블룸그린")
-          //    반대 방향이라 "블루"가 "블루드"를 삼키는 일은 없다.
-          if (sv.includes(w)) { raw += w.length; chars += w.length; matched += 1; }
+          // (2) 짧은 단어가 세부상품명 안에 묻힘 ("블룸" ⊂ "블룸그린") — 약한 근거
+          if (sv.includes(w)) { score += w.length; matched += 1; matchedChars += w.length; continue; }
+          // (3) 상품명 쪽 단어와 일치 ("미니" → [미니어처 향수]) — 종류를 콕 집은 것
+          if (pNameWords.some((x) => x === w || x.startsWith(w) || looseEqual(w, x))) {
+            score += w.length * 3; continue;
+          }
+          // (4) 이 후보로는 설명이 안 되는 말 — 감점
+          score -= w.length * 2;
         }
         if (matched === 0) continue;
-        // 세부상품명 쪽 단어 중 손님이 실제로 말한 비율. 안 말한 단어가 많으면 그만큼 깎는다.
-        //   "랑콤 미라클" 은 2/2, "랑콤 미라클(오렌지) 5ml" 은 2/4 → 앞의 것이 이긴다.
-        const covered = vWords.filter(
-          (x) => chatWords.some((w) => w === x || looseEqual(w, x) || x.includes(w))
-        ).length;
-        // 세부상품명에는 없는데 상품명에는 있는 단어 = 손님이 "종류"를 콕 집어 말한 것.
-        //   "미니 구찌 블롬" 의 "미니" 는 향 이름이 아니라 [미니어처 향수] 를 가리킨다.
-        //   ("미니" 가 다른 세부상품명(set 아르마니 미니 14종)에 있어도 이 상품 기준으로 판단한다)
-        let nameBonus = 0;
-        for (const w of chatWords) {
-          if (sv.includes(w) || vWords.some((x) => looseEqual(w, x))) continue;
-          if (pNameWords.some((x) => x === w || x.startsWith(w) || looseEqual(w, x))) {
-            nameBonus += w.length * 300;   // 세부상품 단어를 통째로 맞힌 것과 같은 무게
-          }
+        // 손님이 언급 안 한 세부상품 쪽 단어는 소폭 감점 ("5ml" 안 말했으면 일반이 이긴다)
+        for (const x of vWords) {
+          const spoken = chatWords.some((w) => w === x || w.includes(x) || x.includes(w) || looseEqual(w, x));
+          if (!spoken) score -= x.length;
         }
-        const score = Math.round((raw * 100 * covered) / Math.max(1, vWords.length)) + nameBonus;
-        // 근거가 약하면 후보로 올리지 않는다.
-        //   단어 하나만 맞았다면 그 단어가 4글자 이상은 돼야 한다("엑스트라도즈" O, "샤넬" X).
-        if (matched < 2 && chars < 4) { weak.push({ p, variant: v, score }); continue; }
-        if (score > bestScore) { bestScore = score; hits = [{ p, variant: v, score }]; }
-        else if (score === bestScore) hits.push({ p, variant: v, score });
+        const hit: VariantHit = { p, variant: v, score };
+        // 근거가 약한 후보(2~3글자 단어 하나) — 유일할 때만 쓴다 ("굿걸"은 되고 "샤넬"은 안 된다)
+        if (matched < 2 && matchedChars < 4) { weak.push(hit); continue; }
+        if (score > bestScore) { bestScore = score; hits = [hit]; }
+        else if (score === bestScore) hits.push(hit);
       }
     }
-    // 강한 후보가 하나도 없으면, 약한 후보가 유일할 때만 인정한다.
     if (hits.length === 0) {
-      const uw = weak.filter(
-        (h, i) => weak.findIndex((x) => x.p.id === h.p.id && x.variant === h.variant) === i
-      );
+      const uw = weak.filter((h, i) => weak.findIndex((x) => x.p.id === h.p.id && x.variant === h.variant) === i);
       if (uw.length === 1) hits = uw;
     }
-    // 같은 상품에 같은 세부상품이 중복 등록된 경우는 하나로 본다.
-    const uniq = hits.filter(
-      (h, i) => hits.findIndex((x) => x.p.id === h.p.id && x.variant === h.variant) === i
-    );
+    const uniq = hits.filter((h, i) => hits.findIndex((x) => x.p.id === h.p.id && x.variant === h.variant) === i);
 
     let pick: VariantHit | null = uniq.length === 1 ? uniq[0] : null;
     let tieReason = "";
 
-    // 동점 해소 ①: 손님이 상품 쪽 구분 단어를 말했으면 그걸로 가린다.
-    //   세부상품명이 완전히 같은 경우가 있다.
-    //   예) "펜할리곤스 더치스로즈" 는 [펜할리곤스 향수] 와 [미니어처 향수] 양쪽에 똑같이 있고,
-    //       구분 단어("미니")는 세부상품명이 아니라 상품명에만 들어 있다.
-    //   → 채팅에 "미니"가 있으면 [미니어처 향수] 로 확정한다.
+    // 동점인데 전부 같은 상품이면: 상품은 확정, 세부상품만 미확정으로 접수
+    if (!pick && uniq.length > 1 && uniq.every((h) => h.p.id === uniq[0].p.id)) {
+      return {
+        status: "parsed", productId: uniq[0].p.id, productName: uniq[0].p.name,
+        matchedBy: "variant", variantName: null, qty, optionTokens,
+        candidates: uniq.map((h) => h.variant).slice(0, 5),
+        reason: "상품 확정 · 세부상품 후보 여러 개(미확정)",
+      };
+    }
+
+    // 동점 해소 ①: 상품명 쪽 구분 단어 (등록 표기 차이로 갈린 동점)
     if (!pick && uniq.length > 1) {
-      const chatTokens = text.split(/[^a-z0-9가-힣]+/).filter((w) => w.length >= 2);
-      // 후보 세부상품명에 "공통으로" 든 단어(=브랜드·향 이름)는 구분 단어가 아니다.
-      //   "미니 펜할리곤스 더치스로즈" 에서 구분 단어는 "미니" 하나뿐이다.
-      //   "펜할리곤스"를 구분에 쓰면 [펜할리곤스 향수] 쪽으로 잘못 끌려간다.
-      const strong = chatTokens.filter(
-        (w) => !uniq.every((h) => squash(h.variant).includes(squash(w)))
-      );
-      // 구분 단어 우선 → 없으면 전체 단어로 한 번 더 시도
-      for (const tokens of [strong, chatTokens]) {
+      const strongTokens = chatWords.filter((w) => !uniq.every((h) => squash(h.variant).includes(w)));
+      for (const tokens of [strongTokens, chatWords]) {
         if (tokens.length === 0) continue;
         const byName = uniq.filter((h) => {
           const body = squash(nameBody(h.p.name));
-          return tokens.some((w) => {
-            const sw = squash(w);
-            return sw.length >= 2 && body.includes(sw);
-          });
+          return tokens.some((w) => body.includes(w));
         });
         if (byName.length === 1) { pick = byName[0]; tieReason = "상품 구분 단어로 확정"; break; }
       }
     }
 
-    // 동점 해소 ②: 그래도 못 가리면 「지금 이거」로 지정된 상품을 우선한다.
-    //   방송 중 셀러가 직접 지정한 값이므로 채팅 문자열보다 강한 신호다.
-    //   (예: "딥티크 로즈"가 캔들·차량용 양쪽에 있을 때, 지금 파는 쪽으로 확정)
+    // 동점 해소 ②: 「지금 이거」
     if (!pick && uniq.length > 1 && currentProductId) {
       const onCurrent = uniq.filter((h) => h.p.id === currentProductId);
       if (onCurrent.length === 1) { pick = onCurrent[0]; tieReason = "「지금 이거」로 확정"; }
     }
-    // 둘 다 실패하면 담지 않는다 — 손님이 어느 쪽인지 말해야 접수된다.
     if (pick) {
       return {
         status: "parsed", productId: pick.p.id, productName: pick.p.name,
@@ -448,7 +400,7 @@ export function parseChatOrder(
         reason: tieReason ? `세부상품 동점 → ${tieReason}` : "세부상품 일치 → 옵션 확정",
       };
     }
-    // 동점인데 「지금 이거」로도 못 가리면 아래 번호/상품명 매칭으로 계속 진행한다(기존 동작 유지).
+    // 동점 못 가리면 담지 않고 아래 번호/상품명 매칭으로 넘어간다.
   }
 
   // 1순위: 상품 앞 번호
