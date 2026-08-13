@@ -347,6 +347,7 @@ export function parseChatOrder(
     //   이 약한 후보가 "딱 하나"일 때만 쓴다. → "굿걸 하나요" 는 살리고, "샤넬"·"블루" 는 안 담는다.
     const weak: VariantHit[] = [];
     for (const p of products) {
+      const pNameWords = nameBody(p.name).split(/\s+/).map((x) => squash(x)).filter(Boolean);
       for (const v of p.variants || []) {
         if (EMPTY_OPTION_WORDS.has(String(v).trim().toLowerCase())) continue;
         if (onlyProductIds.size > 0 && !onlyProductIds.has(p.id)) continue;
@@ -371,7 +372,17 @@ export function parseChatOrder(
         const covered = vWords.filter(
           (x) => chatWords.some((w) => w === x || looseEqual(w, x) || x.includes(w))
         ).length;
-        const score = Math.round((raw * 100 * covered) / Math.max(1, vWords.length));
+        // 세부상품명에는 없는데 상품명에는 있는 단어 = 손님이 "종류"를 콕 집어 말한 것.
+        //   "미니 구찌 블롬" 의 "미니" 는 향 이름이 아니라 [미니어처 향수] 를 가리킨다.
+        //   ("미니" 가 다른 세부상품명(set 아르마니 미니 14종)에 있어도 이 상품 기준으로 판단한다)
+        let nameBonus = 0;
+        for (const w of chatWords) {
+          if (sv.includes(w) || vWords.some((x) => looseEqual(w, x))) continue;
+          if (pNameWords.some((x) => x === w || x.startsWith(w) || looseEqual(w, x))) {
+            nameBonus += w.length * 100;
+          }
+        }
+        const score = Math.round((raw * 100 * covered) / Math.max(1, vWords.length)) + nameBonus;
         // 근거가 약하면 후보로 올리지 않는다.
         //   단어 하나만 맞았다면 그 단어가 4글자 이상은 돼야 한다("엑스트라도즈" O, "샤넬" X).
         if (matched < 2 && chars < 4) { weak.push({ p, variant: v, score }); continue; }
