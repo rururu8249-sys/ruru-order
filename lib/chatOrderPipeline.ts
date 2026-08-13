@@ -155,6 +155,13 @@ export async function parsePendingChatOrders(
       const currentId = resolveCurrentAt(history, Number.isFinite(atMs) ? atMs : Date.now());
       let r = parseChatOrder(raw, products, currentId);
 
+      // 봇이 쓴 안내 메시지(🤖 시작)는 주문이 아니다 — 봇이 자기 글에 다시 안내를 다는
+      //   무한루프를 원천 차단한다. (안내문에 "주세요"가 들어가므로 필수)
+      if (raw.trim().startsWith("🤖")) {
+        r = { ...r, status: "not_order", productId: null, productName: null, matchedBy: null,
+              variantName: null, candidates: [], reason: "봇 안내 메시지" };
+      }
+
       // 자가진단이 찾아낸 "이름 겹침" 문장 패턴은 확신하지 않고 자동 보류한다.
       //   방송 중 새 상품이 기존 상품과 겹쳐도 사람이 안 봐도 안전.
       if (r.status === "parsed" && conflictPhrases.length > 0) {
