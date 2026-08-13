@@ -27,7 +27,7 @@ export function getYoutubeClientSecret(): string {
   return String(process.env.YOUTUBE_CLIENT_SECRET || "").trim();
 }
 
-function getServiceClient(): SupabaseClient {
+export function getServiceClient(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error("Supabase service role 환경변수가 없습니다.");
@@ -35,11 +35,11 @@ function getServiceClient(): SupabaseClient {
 }
 
 // ---- 설정(settings) 읽기/쓰기 (서비스롤) ----
-async function readSetting(sb: SupabaseClient, key: string): Promise<string> {
+export async function readSetting(sb: SupabaseClient, key: string): Promise<string> {
   const { data } = await sb.from("settings").select("value").eq("key", key).limit(1).maybeSingle();
   return data ? String((data as any).value ?? "").trim() : "";
 }
-async function writeSetting(sb: SupabaseClient, key: string, value: string): Promise<void> {
+export async function writeSetting(sb: SupabaseClient, key: string, value: string): Promise<void> {
   const { data: existing } = await sb.from("settings").select("key").eq("key", key).limit(1);
   if (Array.isArray(existing) && existing.length > 0) {
     await sb.from("settings").update({ value }).eq("key", key);
@@ -58,14 +58,14 @@ export async function saveRefreshToken(refreshToken: string): Promise<void> {
     await sb.from("youtube_integration").insert({ id: 1, refresh_token: refreshToken });
   }
 }
-async function readRefreshToken(sb: SupabaseClient): Promise<string> {
+export async function readRefreshToken(sb: SupabaseClient): Promise<string> {
   const { data } = await sb.from("youtube_integration").select("refresh_token").eq("id", 1).limit(1).maybeSingle();
   return data ? String((data as any).refresh_token ?? "").trim() : "";
 }
 
 // 메인 컨트롤타워에서 저장한 "현재 방송(status=ON)"의 유튜브 라이브 URL을 그대로 사용한다.
 // (설정에서 또 입력할 필요 없음 — 한 곳에서만 관리)
-async function readActiveBroadcastLiveUrl(sb: SupabaseClient): Promise<string> {
+export async function readActiveBroadcastLiveUrl(sb: SupabaseClient): Promise<string> {
   const { data } = await sb
     .from("broadcasts")
     .select("youtube_live_url")
@@ -160,7 +160,7 @@ export async function saveNotifySettings(opts: { notifyEnabled?: boolean; messag
 }
 
 // ---- access token 발급 ----
-async function getAccessToken(refreshToken: string): Promise<string> {
+export async function getAccessToken(refreshToken: string): Promise<string> {
   const body = new URLSearchParams({
     client_id: getYoutubeClientId(),
     client_secret: getYoutubeClientSecret(),
@@ -221,7 +221,7 @@ export function extractVideoId(input: string): string {
 }
 
 // ---- 활성 라이브 채팅 ID 조회 ----
-async function resolveLiveChatId(sb: SupabaseClient, accessToken: string): Promise<string> {
+export async function resolveLiveChatId(sb: SupabaseClient, accessToken: string): Promise<string> {
   // 현재 방송(메인 컨트롤타워)의 라이브 URL → videoId
   const liveUrl = await readActiveBroadcastLiveUrl(sb);
   const videoId = extractVideoId(liveUrl);
