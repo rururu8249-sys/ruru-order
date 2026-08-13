@@ -65,6 +65,7 @@ import AdminLiveProductListPanel from "./AdminLiveProductListPanel";
 import AdminLiveProductManagePopup, { type ProductManageTab } from "./AdminLiveProductManagePopup";
 import AdminLiveCardPayPopup from "./AdminLiveCardPayPopup";
 import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
+import ChatOrderQueuePopup from "./ChatOrderQueuePopup";
 import {
   buildAlwaysOrderOptions,
   getAlwaysOrderDateFromFilter,
@@ -283,6 +284,7 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
 const MENU_KEYS_FOR_URL: AdminLiveMenuKey[] = [
   "broadcast",
   "products",
+  "chatorder",
   "event",
   "point",
   "orders",
@@ -1785,8 +1787,13 @@ export default function AdminLiveDashboard() {
             </div>
           )}
 
+          {/* 채팅주문 대기열 팝업 — 판정 결과 확인 전용(담기 없음) */}
+          {activeMenu === "chatorder" && (
+            <ChatOrderQueuePopup onClose={() => setActiveMenu("broadcast")} />
+          )}
+
           {/* 알 수 없는 메뉴 */}
-          {activeMenu !== "broadcast" && activeMenu !== "products" && activeMenu !== "event" && activeMenu !== "orders" && activeMenu !== "payments" && activeMenu !== "customers" && activeMenu !== "settlement" && activeMenu !== "settings" && (
+          {activeMenu !== "broadcast" && activeMenu !== "products" && activeMenu !== "chatorder" && activeMenu !== "event" && activeMenu !== "orders" && activeMenu !== "payments" && activeMenu !== "customers" && activeMenu !== "settlement" && activeMenu !== "settings" && (
             <AdminLiveMenuPlaceholder menuKey={activeMenu} />
           )}
 

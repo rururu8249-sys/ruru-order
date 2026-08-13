@@ -1,6 +1,7 @@
 export type AdminLiveMenuKey =
   | "broadcast"
   | "products"
+  | "chatorder"
   | "orders"
   | "payments"
   | "customers"
@@ -40,6 +41,16 @@ export const ADMIN_LIVE_MENUS: AdminLiveMenuItem[] = [
     readyTitle: "상품 관리",
     readyDescription: "방송상품, 공구·상시판매, 전체 창고를 보고 선택해 방송 순환에 담거나 새 상품을 등록합니다.",
     checkpoints: ["방송상품", "공구·상시판매", "전체 창고", "새 상품 등록", "순환 담기"],
+  },
+  {
+    key: "chatorder",
+    label: "채팅주문",
+    icon: "💬",
+    desc: "유튜브 채팅 접수",
+    sidebarNotice: "유튜브 라이브 채팅을 읽어 주문으로 인식한 결과를 확인합니다. 아직 자동으로 담지 않습니다.",
+    readyTitle: "채팅 주문 대기열",
+    readyDescription: "라이브 채팅을 읽어 상품·수량을 판정한 결과를 눈으로 검증합니다.",
+    checkpoints: ["채팅 읽기", "「지금 이거」 지정", "판정 결과", "쿼터 사용량"],
   },
   {
     key: "settlement",

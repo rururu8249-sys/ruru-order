@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Number(new URL(request.url).searchParams.get("limit") || 100) || 100, 500);
     const day = new Date().toISOString().slice(0, 10);
     const rowsRes = await sb.from("chat_orders")
-      .select("id,display_name,raw_message,published_at,parse_status")
+      .select("id,display_name,raw_message,published_at,parse_status,parsed_product_id,parsed_product_name,parsed_variant,parsed_qty,parsed_matched_by,parsed_options,parsed_candidates,parsed_reason")
       .order("id", { ascending: false }).limit(limit);
     const usageRes = await sb.from("youtube_api_usage").select("method,calls").eq("day", day);
     const setRes = await sb.from("settings").select("value").eq("key", SETTING_CHAT_READ_ENABLED).limit(1).maybeSingle();
