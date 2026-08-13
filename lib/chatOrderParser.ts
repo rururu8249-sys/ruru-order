@@ -127,15 +127,46 @@ function extractOptionTokens(text: string, consumed: string[]): string[] {
 function narrowVariant(text: string, p: ParseProduct): string | null {
   const words = text.split(/[^a-z0-9가-힣]+/).filter((w) => w.length >= 2);
   if (words.length === 0) return null;
-  const hit = (p.variants || []).filter((v) => {
-    if (EMPTY_OPTION_WORDS.has(String(v).trim().toLowerCase())) return false;
+  let bestScore = 0;
+  let best: string[] = [];
+  for (const v of p.variants || []) {
+    if (EMPTY_OPTION_WORDS.has(String(v).trim().toLowerCase())) continue;
     const sv = squash(v);
-    return words.some((w) => {
+    let sc = 0;
+    for (const w of words) {
       const sw = squash(w);
-      return sw.length >= 2 && sv.includes(sw);
-    });
-  });
-  return hit.length === 1 ? hit[0] : null;
+      if (sw.length >= 2 && sv.includes(sw)) sc += sw.length;
+    }
+    if (sc === 0) continue;
+    if (sc > bestScore) { bestScore = sc; best = [v]; }
+    else if (sc === bestScore) best.push(v);
+  }
+  // 최고점이 하나일 때만 확정. 동점이면 옵션 미확정으로 남긴다(손님에게 되물어야 하는 상황).
+  return best.length === 1 ? best[0] : null;
+}
+
+// 손님이 말한 단어가 등록된 상품명과 "정확히" 같으면 그 상품이다.
+//   사장님 등록 규칙이 [세부상품명 = 상품명 + 세부] 이므로 이게 가장 강한 신호다.
+//   예) "크림 라메르 주세요" → 상품 [크림]  ("아이크림"에 크림이 들어있다고 끌려가면 안 된다)
+//   붙여 쓴 두 단어까지 본다("바디 크림" → "바디크림").
+function exactProductByName(text: string, products: ParseProduct[]): ParseProduct | null {
+  const words = text.split(/[^a-z0-9가-힣]+/).filter(Boolean);
+  const grams: string[] = [];
+  for (let i = 0; i < words.length; i += 1) {
+    grams.push(squash(words[i]));
+    if (i + 1 < words.length) grams.push(squash(words[i] + words[i + 1]));
+  }
+  let bestLen = 0;
+  let best: ParseProduct[] = [];
+  for (const p of products) {
+    const body = squash(nameBody(p.name));
+    if (body.length < 2) continue;
+    if (!grams.includes(body)) continue;
+    if (body.length > bestLen) { bestLen = body.length; best = [p]; }
+    else if (body.length === bestLen && !best.some((x) => x.id === p.id)) best.push(p);
+  }
+  // 더 긴 상품명이 이긴다("아이크림" > "크림"). 같은 길이로 겹치면 포기.
+  return best.length === 1 ? best[0] : null;
 }
 
 // ── 본체 ──────────────────────────────────────────────
@@ -175,6 +206,20 @@ export function parseChatOrder(
 
   const { qty, consumed } = extractQty(text);
   const optionTokens = extractOptionTokens(text, consumed);
+
+  // 최우선: 손님이 등록 상품명을 그대로 말했으면 그 상품으로 확정한다.
+  //   세부상품명이 [상품명 + 세부] 로 등록돼 있어, 부분일치보다 이게 훨씬 정확하다.
+  {
+    const exact = exactProductByName(text, products);
+    if (exact) {
+      const v = narrowVariant(text, exact);
+      return {
+        status: "parsed", productId: exact.id, productName: exact.name,
+        matchedBy: "name", variantName: v, qty, optionTokens, candidates: [],
+        reason: v ? "상품명 그대로 말함 → 세부상품까지 확정" : "상품명 그대로 말함 (세부상품 미확정)",
+      };
+    }
+  }
 
   // 0순위: 조합형 세부상품명 (가장 구체적 — 맞으면 옵션 1단 축까지 확정)
   //   "킬리안 굿걸" 전체도, 브랜드 뗀 "굿걸"도 잡는다.
@@ -312,10 +357,12 @@ export function parseChatOrder(
     //       → 상품명에 "미니"가 든 [미니어처 향수] 로 확정.
     {
       const chatWords = text.split(/[^a-z0-9가-힣]+/).filter((w) => w.length >= 2);
-      const allVariants = products.flatMap((x) => (x.variants || []).map((v) => squash(v)));
+      // 비교 대상은 "전체 상품"이 아니라 "지금 동점인 후보들"의 세부상품명이다.
+      //   전체로 보면 무관한 상품(예: 립 루이비통 미니사이즈) 때문에 "미니"가 지정어에서 빠진다.
+      const topVariants = top.flatMap((x) => (x.p.variants || []).map((v) => squash(v)));
       const categoryWords = chatWords.filter((w) => {
         const sw = squash(w);
-        return sw.length >= 2 && !allVariants.some((v) => v.includes(sw));
+        return sw.length >= 2 && !topVariants.some((v) => v.includes(sw));
       });
       if (categoryWords.length > 0) {
         const byCategory = top.filter((x) => {
