@@ -150,8 +150,8 @@ export default function PrivacyPage() {
                 <th style={S.th}>수집 항목</th>
               </tr>
               <tr>
-                <td style={S.td}>카카오 간편 로그인</td>
-                <td style={S.td}>카카오 회원번호, 카카오 닉네임, 프로필 이미지</td>
+                <td style={S.td}>카카오톡 간편 로그인</td>
+                <td style={S.td}>카카오톡 회원번호, 카카오톡 닉네임, 프로필 이미지</td>
               </tr>
               <tr>
                 <td style={S.td}>주문·배송</td>
@@ -172,7 +172,7 @@ export default function PrivacyPage() {
             </tbody>
           </table>
           <p style={{ ...S.p, marginTop: 12 }}>
-            회사는 이용자가 서비스 화면에서 직접 입력하거나, 카카오 간편 로그인을 통해
+            회사는 이용자가 서비스 화면에서 직접 입력하거나, 카카오톡 간편 로그인을 통해
             동의한 정보를 수집합니다. 주민등록번호는 수집하지 않습니다.
           </p>
         </section>
@@ -277,7 +277,7 @@ export default function PrivacyPage() {
                 <td style={S.td}>웹 서비스 호스팅</td>
               </tr>
               <tr>
-                <td style={S.td}>카카오</td>
+                <td style={S.td}>카카오톡</td>
                 <td style={S.td}>간편 로그인 인증</td>
               </tr>
               <tr>
