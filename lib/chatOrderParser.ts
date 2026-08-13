@@ -225,6 +225,16 @@ export function parseChatOrder(
   //   "킬리안 굿걸" 전체도, 브랜드 뗀 "굿걸"도 잡는다.
   {
     const sq = squash(text);
+    // 손님이 말한 "단어 덩어리"들. 단어 경계를 지켜야 오탐이 없다.
+    //   "미니 샤넬 블루드 저요" 에서 "블루"(불가리 블루)가 걸리면 안 된다 — 블루드의 일부일 뿐이다.
+    const chatGrams = new Set<string>();
+    {
+      const ws = text.split(/[^a-z0-9가-힣]+/).filter(Boolean);
+      for (let i = 0; i < ws.length; i += 1) {
+        let acc = "";
+        for (let k = i; k < ws.length && k < i + 6; k += 1) { acc += squash(ws[k]); chatGrams.add(acc); }
+      }
+    }
     type VariantHit = { p: ParseProduct; variant: string; score: number };
     let bestScore = 0;
     let hits: VariantHit[] = [];
@@ -236,7 +246,11 @@ export function parseChatOrder(
         if (tail.length >= 2) cands.push(tail);
         let hit = 0;
         for (const c of cands) {
-          if (c.length >= 2 && sq.includes(c)) hit = Math.max(hit, c.length);
+          if (c.length < 2) continue;
+          // 1차: 단어 경계가 딱 맞는 경우 (짧아도 안전 — "굿걸")
+          if (chatGrams.has(c)) { hit = Math.max(hit, c.length); continue; }
+          // 2차: 조사·오타로 붙여 쓴 경우("킬리안굿걸요"). 짧으면 오탐이라 4글자 이상만.
+          if (c.length >= 4 && sq.includes(c)) hit = Math.max(hit, c.length);
         }
         if (hit === 0) continue;
         if (hit > bestScore) { bestScore = hit; hits = [{ p, variant: v, score: hit }]; }
