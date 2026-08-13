@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { SETTING_CHAT_READ_ENABLED, SETTING_TEST_LIVE_URL } from "@/lib/youtubeChatRead";
-import { SETTING_SELF_CHECK } from "@/lib/chatOrderPipeline";
+import { SETTING_SELF_CHECK, SETTING_BOT_REPLY_ENABLED } from "@/lib/chatOrderPipeline";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
     const usageRes = await sb.from("youtube_api_usage").select("method,calls").eq("day", day);
     const setRes = await sb.from("settings").select("value").eq("key", SETTING_CHAT_READ_ENABLED).limit(1).maybeSingle();
     const scRes = await sb.from("settings").select("value").eq("key", SETTING_SELF_CHECK).limit(1).maybeSingle();
+    const botRes = await sb.from("settings").select("value").eq("key", SETTING_BOT_REPLY_ENABLED).limit(1).maybeSingle();
     let selfCheck: unknown = null;
     try { selfCheck = JSON.parse(String((scRes.data as any)?.value || "")); } catch { /* 없으면 null */ }
     return NextResponse.json({
@@ -38,6 +39,7 @@ export async function GET(request: NextRequest) {
       usage: usageRes.data || [],
       rows: rowsRes.data || [],
       selfCheck,
+      botEnabled: String((botRes.data as any)?.value ?? "") === "true",
     });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: { message: String(e?.message || e) } }, { status: 500 });
@@ -64,6 +66,11 @@ export async function POST(request: NextRequest) {
     if (typeof body.enabled === "boolean") {
       await put(SETTING_CHAT_READ_ENABLED, body.enabled ? "true" : "false");
       out.enabled = body.enabled;
+    }
+    // 봇 안내: 상품을 못 정한 주문 채팅에 다시 적어달라고 자동 안내 (하루 40건 상한)
+    if (typeof body.botReply === "boolean") {
+      await put(SETTING_BOT_REPLY_ENABLED, body.botReply ? "true" : "false");
+      out.botReply = body.botReply;
     }
     // 테스트 라이브 URL: 값이 있으면 「방송시작」 없이 그 URL의 채팅만 읽는다(손님 화면 무변화).
     // 빈 문자열을 보내면 해제되고 다시 방송 ON 기준으로 돌아간다.

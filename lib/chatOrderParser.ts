@@ -415,7 +415,17 @@ export function parseChatOrder(
         reason: tieReason ? `세부상품 동점 → ${tieReason}` : "세부상품 일치 → 옵션 확정",
       };
     }
-    // 동점 못 가리면 담지 않고 아래 번호/상품명 매칭으로 넘어간다.
+    // 동점을 못 가렸으면 여기서 멈춘다 — 아래 이름 매칭으로 흘려보내면
+    //   "딥티크 로즈"(캔들/차량용 동점)가 [딥티크 향수]로 잘못 확정될 수 있다.
+    if (uniq.length > 1) {
+      const names = Array.from(new Set(uniq.map((h) => h.p.name)));
+      return {
+        status: "ambiguous", productId: null, productName: null, matchedBy: null,
+        variantName: null, qty, optionTokens,
+        candidates: names.slice(0, 4),
+        reason: "여러 상품에 같은 이름 — 종류를 같이 적어야 접수",
+      };
+    }
   }
 
   // 1순위: 상품 앞 번호

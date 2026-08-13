@@ -67,6 +67,7 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
   const [rows, setRows] = useState<QueueRow[]>([]);
   const [usage, setUsage] = useState<UsageRow[]>([]);
   const [enabled, setEnabled] = useState(false);
+  const [botEnabled, setBotEnabled] = useState(false);
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [broadcastSource, setBroadcastSource] = useState<string>("none");
   const [current, setCurrent] = useState<CurrentProduct>(null);
@@ -91,6 +92,7 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
       setEnabled(Boolean(json.enabled));
       // 자동 자가진단 결과 — 겹침이 있을 때만 조용히 배너 표시 (없으면 아무것도 안 뜸)
       if (json.selfCheck && Number(json.selfCheck.wrong) > 0) setSelfCheck(json.selfCheck as SelfCheckResult);
+      setBotEnabled(Boolean(json.botEnabled));
     } catch { /* 조회 실패는 화면만 비움 */ }
   }, []);
 
@@ -136,6 +138,18 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
     const t = setInterval(() => { if (autoRef.current) void readOnce(); }, 5000);
     return () => clearInterval(t);
   }, [autoRead, readOnce]);
+
+  const toggleBot = async () => {
+    setBusy("bot");
+    try {
+      await fetch("/api/chat-orders", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ botReply: !botEnabled }),
+      });
+      setBotEnabled((v) => !v);
+      showAdminToast(!botEnabled ? "봇 안내 ON — 상품을 못 정한 주문 채팅에 자동으로 안내합니다 (하루 40건 상한)" : "봇 안내 OFF");
+    } finally { setBusy(""); }
+  };
 
   const toggleEnabled = async () => {
     setBusy("enable");
@@ -270,6 +284,12 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
               <input type="checkbox" checked={autoRead} onChange={(e) => setAutoRead(e.target.checked)} />
               자동읽기 5초 <span className="text-ink-mute">(쿼터 소모)</span>
             </label>
+            <button
+              type="button" onClick={() => void toggleBot()} disabled={busy === "bot"}
+              className={`rounded-lg px-3 py-1.5 font-black text-white disabled:opacity-50 ${botEnabled ? "bg-sky-600" : "bg-slate-400"}`}
+              title="상품을 못 정한 주문 채팅에 봇이 '다시 적어달라'고 자동 안내합니다. 글 1개당 쿼터 50, 하루 40건 상한.">
+              🤖 봇 안내 {botEnabled ? "ON" : "OFF"}
+            </button>
             <button
               type="button" onClick={() => void reparse()} disabled={busy === "parse"}
               className="rounded-lg border border-line bg-surface px-3 py-1.5 text-ink-soft hover:bg-surface-2 disabled:opacity-50"

@@ -6,7 +6,18 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseChatOrder, type ParseProduct } from "@/lib/chatOrderParser";
 import { loadParseProducts } from "@/lib/chatOrderProducts";
-import { readSetting, writeSetting } from "@/lib/youtube";
+import { readSetting, writeSetting, postLiveChatMessage } from "@/lib/youtube";
+
+// ── 봇 안내(자동) ───────────────────────────────────────
+//   상품을 못 정한 주문 채팅(보류/상품모름)에 봇이 채팅으로 다시 적어달라고 안내한다.
+//   ⚠️ 쿼터 보호: 글 1개 = 50 units. 하루 40건 상한 + 발송 간격 20초 + 회당 2건.
+//   ⚠️ 같은 채팅에 두 번 안내하지 않는다(raw → 판정완료로 상태가 바뀌므로 자동 보장).
+export const SETTING_BOT_REPLY_ENABLED = "chat_order_bot_reply_enabled";
+const SETTING_BOT_LAST_MS = "chat_order_bot_last_ms";
+const BOT_DAILY_CAP = 40;
+const BOT_GAP_MS = 20000;
+const BOT_MAX_PER_PASS = 2;
+const BOT_FRESH_MS = 3 * 60 * 1000;   // 3분 지난 채팅엔 뒷북 안내 금지
 
 // ── 자가진단(자동) ──────────────────────────────────────
 //   상품 목록이 바뀌는 순간(방송 중 새 상품 등록 포함) 스스로 돌고,
@@ -60,6 +71,7 @@ export type ParsePassResult = {
   byStatus: Record<string, number>;
   productCount: number;
   broadcastSource: "live" | "shop" | "recent" | "none";
+  botSent?: number;
   reason?: string;
 };
 
@@ -88,7 +100,7 @@ export async function parsePendingChatOrders(
   try {
     let q = sb
       .from("chat_orders")
-      .select("id,raw_message,published_at,parse_status")
+      .select("id,raw_message,published_at,parse_status,display_name,channel_id")
       .order("id", { ascending: true })
       .limit(limit);
     if (!opts?.reparseAll) q = q.eq("parse_status", "raw");
@@ -135,6 +147,8 @@ export async function parsePendingChatOrders(
       .filter((r) => Number.isFinite(r.setMs)) as CurrentRow[];
 
     let updated = 0;
+    // 봇 안내 대상: (닉네임, 사유) — 판정 후 모아서 상한 안에서 발송
+    const botTargets: { name: string; channel: string; kind: "ambiguous" | "need_product"; cands: string[]; atMs: number }[] = [];
     for (const row of pending) {
       const raw = String(row.raw_message ?? "");
       const atMs = new Date(String(row.published_at ?? "")).getTime();
@@ -156,6 +170,14 @@ export async function parsePendingChatOrders(
 
       byStatus[r.status] = (byStatus[r.status] || 0) + 1;
 
+      if ((r.status === "ambiguous" || r.status === "need_product") && Number.isFinite(atMs)) {
+        botTargets.push({
+          name: String(row.display_name ?? "").trim(),
+          channel: String(row.channel_id ?? ""),
+          kind: r.status, cands: r.candidates, atMs,
+        });
+      }
+
       const { error: upErr } = await sb
         .from("chat_orders")
         .update({
@@ -174,6 +196,37 @@ export async function parsePendingChatOrders(
       if (!upErr) updated += 1;
     }
 
+    // ── 봇 안내 발송 (설정 ON일 때만, 상한 준수) ──
+    let botSent = 0;
+    try {
+      if ((await readSetting(sb, SETTING_BOT_REPLY_ENABLED)) === "true" && botTargets.length > 0) {
+        const day = new Date().toISOString().slice(0, 10);
+        const { data: u } = await sb.from("youtube_api_usage")
+          .select("calls").eq("day", day).eq("method", "liveChatMessages.insert").limit(1).maybeSingle();
+        let sentToday = Number((u as Record<string, unknown> | null)?.calls || 0);
+        let lastMs = Number(await readSetting(sb, SETTING_BOT_LAST_MS)) || 0;
+        const seenChannel = new Set<string>();
+        for (const t of botTargets) {
+          if (botSent >= BOT_MAX_PER_PASS || sentToday >= BOT_DAILY_CAP) break;
+          if (Date.now() - t.atMs > BOT_FRESH_MS) continue;          // 뒷북 금지
+          if (Date.now() - lastMs < BOT_GAP_MS) break;               // 발송 간격
+          if (t.channel && seenChannel.has(t.channel)) continue;     // 같은 손님 1회
+          seenChannel.add(t.channel);
+          const nick = t.name ? `${t.name}님, ` : "";
+          const msg = t.kind === "ambiguous" && t.cands.length > 0
+            ? `🤖 ${nick}${t.cands.slice(0, 3).join(" / ")} 중 어느 상품인지 종류와 함께 다시 적어주세요!`
+            : `🤖 ${nick}상품명(또는 앞번호)과 함께 적어주시면 바로 접수돼요! 예) 3번 주세요`;
+          const res = await postLiveChatMessage(msg, { forceEvenIfDisabled: true });
+          if (res.ok) {
+            botSent += 1; sentToday += 1; lastMs = Date.now();
+            await writeSetting(sb, SETTING_BOT_LAST_MS, String(lastMs));
+            if (u) await sb.from("youtube_api_usage").update({ calls: sentToday }).eq("day", day).eq("method", "liveChatMessages.insert");
+            else await sb.from("youtube_api_usage").insert({ day, method: "liveChatMessages.insert", calls: 1 });
+          } else break; // 실패하면 이번 회차는 중단 (다음 주기에 재시도할 다른 채팅이 온다)
+        }
+      }
+    } catch { /* 봇 안내 실패는 파싱 결과를 막지 않는다 */ }
+
     return {
       ok: true,
       scanned: pending.length,
@@ -181,6 +234,7 @@ export async function parsePendingChatOrders(
       byStatus,
       productCount: products.length,
       broadcastSource: loaded.source,
+      botSent,
     };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
