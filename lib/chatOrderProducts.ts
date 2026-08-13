@@ -88,13 +88,22 @@ export async function loadParseProducts(sb: SupabaseClient): Promise<LoadedProdu
   }
 
   // [테스트 모드] 테스트 라이브 URL이 걸려 있으면 방송 리허설이다 —
-  //   쇼핑몰 진열이 아니라 "가장 최근 방송에 담긴 상품"으로 인식한다.
+  //   "가장 최근 방송 상품 + 쇼핑몰 진열"을 합쳐서 인식한다. (리허설 중엔 둘 다 시연 대상)
   const testUrl = await readSetting(sb, SETTING_TEST_LIVE_URL);
   if (testUrl) {
+    const merged: ParseProduct[] = [];
     const recent0 = list[0] || null;
-    if (recent0) {
-      const bid = String(recent0.id);
-      return { products: await loadBroadcastProducts(sb, bid), broadcastId: bid, source: "recent" };
+    if (recent0) merged.push(...(await loadBroadcastProducts(sb, String(recent0.id))));
+    const { data: shopRows2 } = await sb
+      .from("products")
+      .select("id,product_name,product_note,color_options")
+      .eq("in_shop", true)
+      .limit(500);
+    for (const p of rowsToParseProducts((shopRows2 || []) as Record<string, unknown>[])) {
+      if (!merged.some((x) => x.id === p.id)) merged.push(p);
+    }
+    if (merged.length > 0) {
+      return { products: merged, broadcastId: recent0 ? String(recent0.id) : null, source: "recent" };
     }
   }
 
