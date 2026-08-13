@@ -180,10 +180,10 @@ function collectHeads(products: ParseProduct[]): Set<string> {
   for (const p of products) {
     for (const v of p.variants || []) {
       const h = variantHead(v);
-      if (h.length >= 2) out.add(h);
+      if (h.length >= 1) out.add(h);   // "립" 처럼 한 글자 앞머리도 실재한다
     }
     const first = squash(nameBody(p.name).split(/\s+/)[0] || "");
-    if (first.length >= 2) out.add(first);
+    if (first.length >= 1) out.add(first);
   }
   return out;
 }
@@ -193,7 +193,7 @@ function chatHeadsOf(text: string, heads: Set<string>): Set<string> {
   const out = new Set<string>();
   for (const w of text.split(/[^a-z0-9가-힣]+/).filter(Boolean)) {
     const sw = squash(w);
-    if (sw.length < 2) continue;
+    if (sw.length < 1) continue;
     // 정확히 맞는 앞머리가 있으면 그걸 쓴다. (마스크/머스크처럼 둘 다 실재하는 말을 지켜준다)
     if (heads.has(sw)) { out.add(sw); continue; }
     // 정확한 게 없을 때만 표기 흔들림을 본다. 후보가 둘 이상이면 어느 쪽인지 모르므로 포기.
@@ -246,7 +246,7 @@ function exactProductByName(text: string, products: ParseProduct[]): ParseProduc
   let best: ParseProduct[] = [];
   for (const p of products) {
     const body = squash(nameBody(p.name));
-    if (body.length < 2) continue;
+    if (body.length < 1) continue;   // "립" 같은 한 글자 상품명도 실재한다
     if (!grams.includes(body) && !grams.some((g) => looseEqual(g, body))) continue;
     if (body.length > bestLen) { bestLen = body.length; best = [p]; }
     else if (body.length === bestLen && !best.some((x) => x.id === p.id)) best.push(p);
@@ -310,41 +310,46 @@ export function parseChatOrder(
   // 0순위: 조합형 세부상품명 (가장 구체적 — 맞으면 옵션 1단 축까지 확정)
   //   "킬리안 굿걸" 전체도, 브랜드 뗀 "굿걸"도 잡는다.
   {
-    const sq = squash(text);
-    // 손님이 말한 "단어 덩어리"들. 단어 경계를 지켜야 오탐이 없다.
-    //   "미니 샤넬 블루드 저요" 에서 "블루"(불가리 블루)가 걸리면 안 된다 — 블루드의 일부일 뿐이다.
-    const chatGrams = new Set<string>();
-    {
-      const ws = text.split(/[^a-z0-9가-힣]+/).filter(Boolean);
-      for (let i = 0; i < ws.length; i += 1) {
-        let acc = "";
-        for (let k = i; k < ws.length && k < i + 6; k += 1) { acc += squash(ws[k]); chatGrams.add(acc); }
-      }
-    }
+    // 손님은 등록명을 통째로 치지 않는다. 용량을 빼먹고("겔랑 라쁘띠 edp"),
+    //   브랜드를 생략하고("더치스 로즈"), 오타도 낸다("딥디크").
+    //   → 문자열 통째 비교가 아니라 "단어 몇 개가 맞았나" 점수로 본다.
+    const chatWords = text.split(/[^a-z0-9가-힣]+/).map((w) => squash(w)).filter((w) => w.length >= 2);
     // 손님이 말한 앞머리(브랜드/카테고리)와 다른 세부상품은 후보에서 제외한다.
     const chatHeads = chatHeadsOf(text, collectHeads(products));
     type VariantHit = { p: ParseProduct; variant: string; score: number };
     let bestScore = 0;
     let hits: VariantHit[] = [];
+    // 근거가 약한 후보(짧은 향 이름 하나만 맞은 것). 강한 후보가 전혀 없고
+    //   이 약한 후보가 "딱 하나"일 때만 쓴다. → "굿걸 하나요" 는 살리고, "샤넬"·"블루" 는 안 담는다.
+    const weak: VariantHit[] = [];
     for (const p of products) {
       for (const v of p.variants || []) {
         if (EMPTY_OPTION_WORDS.has(String(v).trim().toLowerCase())) continue;
         if (chatHeads.size > 0 && !chatHeads.has(variantHead(v))) continue;
-        const cands = [squash(v)];
-        const tail = squash(String(v).split(/\s+/).slice(1).join(" "));
-        if (tail.length >= 2) cands.push(tail);
-        let hit = 0;
-        for (const c of cands) {
-          if (c.length < 2) continue;
-          // 1차: 단어 경계가 딱 맞는 경우 (짧아도 안전 — "굿걸")
-          if (chatGrams.has(c)) { hit = Math.max(hit, c.length); continue; }
-          // 2차: 조사·오타로 붙여 쓴 경우("킬리안굿걸요"). 짧으면 오탐이라 4글자 이상만.
-          if (c.length >= 4 && sq.includes(c)) hit = Math.max(hit, c.length);
+        const sv = squash(v);
+        const vWords = String(v).split(/[^a-z0-9가-힣]+/i).map((x) => squash(x)).filter(Boolean);
+        let score = 0;
+        let matched = 0;
+        for (const w of chatWords) {
+          // 채팅 단어가 세부상품명 안에 있으면 인정. (반대 방향이라 "블루"가 "블루드"를 삼키지 않는다)
+          if (sv.includes(w)) { score += w.length; matched += 1; continue; }
+          // 표기 흔들림 — 단어 대 단어로만 본다.
+          if (vWords.some((x) => looseEqual(w, x))) { score += w.length; matched += 1; }
         }
-        if (hit === 0) continue;
-        if (hit > bestScore) { bestScore = hit; hits = [{ p, variant: v, score: hit }]; }
-        else if (hit === bestScore) hits.push({ p, variant: v, score: hit });
+        // 근거가 약하면 후보로 올리지 않는다.
+        //   단어 하나만 맞았다면 그 단어가 4글자 이상은 돼야 한다("엑스트라도즈" O, "샤넬" X).
+        if (matched === 0) continue;
+        if (matched < 2 && score < 4) { weak.push({ p, variant: v, score }); continue; }
+        if (score > bestScore) { bestScore = score; hits = [{ p, variant: v, score }]; }
+        else if (score === bestScore) hits.push({ p, variant: v, score });
       }
+    }
+    // 강한 후보가 하나도 없으면, 약한 후보가 유일할 때만 인정한다.
+    if (hits.length === 0) {
+      const uw = weak.filter(
+        (h, i) => weak.findIndex((x) => x.p.id === h.p.id && x.variant === h.variant) === i
+      );
+      if (uw.length === 1) hits = uw;
     }
     // 같은 상품에 같은 세부상품이 중복 등록된 경우는 하나로 본다.
     const uniq = hits.filter(
