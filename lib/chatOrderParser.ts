@@ -62,6 +62,10 @@ const SIZE_WORDS = [
   "프리", "free", "원사이즈",
 ];
 
+// "없음/무/-" 같은 빈 옵션 표기는 세부상품명이 아니다. 로더에서도 거르지만
+//   파서는 순수 함수라 어디서 호출돼도 안전하도록 여기서도 막는다.
+const EMPTY_OPTION_WORDS = new Set(["없음", "없슴", "무", "-", "none", "n/a", "na"]);
+
 // ── 유틸 ──────────────────────────────────────────────
 const norm = (v: unknown) =>
   String(v ?? "").toLowerCase().replace(/\s+/g, " ").trim();
@@ -160,29 +164,46 @@ export function parseChatOrder(
   //   "킬리안 굿걸" 전체도, 브랜드 뗀 "굿걸"도 잡는다.
   {
     const sq = squash(text);
-    let best: { p: ParseProduct; variant: string; score: number } | null = null;
-    let tie = false;
+    type VariantHit = { p: ParseProduct; variant: string; score: number };
+    let bestScore = 0;
+    let hits: VariantHit[] = [];
     for (const p of products) {
       for (const v of p.variants || []) {
+        if (EMPTY_OPTION_WORDS.has(String(v).trim().toLowerCase())) continue;
         const cands = [squash(v)];
         const tail = squash(String(v).split(/\s+/).slice(1).join(" "));
         if (tail.length >= 2) cands.push(tail);
+        let hit = 0;
         for (const c of cands) {
-          if (c.length >= 2 && sq.includes(c)) {
-            const score = c.length;
-            if (!best || score > best.score) { best = { p, variant: v, score }; tie = false; }
-            else if (best && score === best.score && best.variant !== v) tie = true;
-          }
+          if (c.length >= 2 && sq.includes(c)) hit = Math.max(hit, c.length);
         }
+        if (hit === 0) continue;
+        if (hit > bestScore) { bestScore = hit; hits = [{ p, variant: v, score: hit }]; }
+        else if (hit === bestScore) hits.push({ p, variant: v, score: hit });
       }
     }
-    if (best && !tie) {
+    // 같은 상품에 같은 세부상품이 중복 등록된 경우는 하나로 본다.
+    const uniq = hits.filter(
+      (h, i) => hits.findIndex((x) => x.p.id === h.p.id && x.variant === h.variant) === i
+    );
+
+    let pick: VariantHit | null = uniq.length === 1 ? uniq[0] : null;
+    // 동점 후보가 여러 상품에 걸쳐 있으면 「지금 이거」로 지정된 상품을 우선한다.
+    //   방송 중 셀러가 직접 지정한 값이므로 채팅 문자열보다 강한 신호다.
+    //   (예: "딥티크 로즈"가 두 상품에 다 있을 때, 지금 파는 쪽으로 확정)
+    if (!pick && uniq.length > 1 && currentProductId) {
+      const onCurrent = uniq.filter((h) => h.p.id === currentProductId);
+      if (onCurrent.length === 1) pick = onCurrent[0];
+    }
+    if (pick) {
       return {
-        status: "parsed", productId: best.p.id, productName: best.p.name,
-        matchedBy: "variant", variantName: best.variant,
-        qty, optionTokens, candidates: [], reason: "세부상품 일치 → 옵션 확정",
+        status: "parsed", productId: pick.p.id, productName: pick.p.name,
+        matchedBy: "variant", variantName: pick.variant,
+        qty, optionTokens, candidates: [],
+        reason: uniq.length > 1 ? "세부상품 동점 → 「지금 이거」로 확정" : "세부상품 일치 → 옵션 확정",
       };
     }
+    // 동점인데 「지금 이거」로도 못 가리면 아래 번호/상품명 매칭으로 계속 진행한다(기존 동작 유지).
   }
 
   // 1순위: 상품 앞 번호
@@ -223,6 +244,14 @@ export function parseChatOrder(
     return { status: "parsed", productId: p.id, productName: p.name, matchedBy: "name", variantName: null, qty, optionTokens, candidates: [], reason: "상품명 일치" };
   }
   if (scored.length > 1) {
+    // 상품명 동점도 「지금 이거」로 가린다.
+    if (currentProductId) {
+      const top = scored.filter((x) => x.score === scored[0].score);
+      const onCurrent = top.find((x) => x.p.id === currentProductId);
+      if (onCurrent) {
+        return { status: "parsed", productId: onCurrent.p.id, productName: onCurrent.p.name, matchedBy: "name", variantName: null, qty, optionTokens, candidates: [], reason: "상품명 동점 → 「지금 이거」로 확정" };
+      }
+    }
     return { status: "ambiguous", productId: null, productName: null, matchedBy: null, qty, optionTokens, variantName: null, candidates: scored.slice(0, 5).map((x) => x.p.name), reason: "상품 후보가 여러 개" };
   }
 

@@ -7,6 +7,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ParseProduct } from "@/lib/chatOrderParser";
 
+// "없음/무/-" 같은 빈 옵션 표기는 세부상품명이 아니다. 채팅에서 잘못 잡히면 안 되므로 제외.
+//   (기준은 위젯 cleanOptionText 의 EMPTY_OPTION_WORDS 와 동일)
+const EMPTY_OPTION_WORDS = new Set(["없음", "없슴", "무", "-", "none", "n/a", "na"]);
+function isMeaningfulVariant(v: string): boolean {
+  const t = v.trim();
+  if (t.length < 2) return false;
+  return !EMPTY_OPTION_WORDS.has(t.toLowerCase());
+}
+
 // products.color_options 는 배열일 수도, JSON 문자열일 수도 있다(위젯 comboInfoOf와 동일 처리).
 function toStringArray(raw: unknown): string[] {
   if (Array.isArray(raw)) return raw.map((s) => String(s).trim()).filter(Boolean);
@@ -65,7 +74,9 @@ export async function loadParseProducts(sb: SupabaseClient): Promise<LoadedProdu
     const note = parseNote(p.product_note);
     // 조합형일 때만 세부상품명을 variants로 넘긴다. 일반 상품의 색상옵션(검정/흰색)은
     // 상품을 특정하지 못하므로 variants로 쓰면 안 된다.
-    const variants = note?.combo_mode === true ? toStringArray(p.color_options) : [];
+    const variants = note?.combo_mode === true
+      ? toStringArray(p.color_options).filter(isMeaningfulVariant)
+      : [];
     // 별칭은 관리자가 product_note.chat_aliases 에 넣어두면 추가로 인식된다(선택).
     const aliases = toStringArray(note?.chat_aliases);
 
