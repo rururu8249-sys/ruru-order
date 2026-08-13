@@ -39,6 +39,42 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
 
+    // 자가진단: 상품 목록에서 "손님이 칠 법한 문장"을 자동 생성해 전부 판정한다.
+    //   새 상품 등록 후 이름 충돌이 없는지 버튼 한 번으로 확인하는 용도. DB 무변경.
+    if (body.selfCheck === true) {
+      const sb = sbAdmin();
+      const loaded = body.scope === "all" ? await loadAllParseProducts(sb) : await loadParseProducts(sb);
+      const sqz = (v: string) => v.toLowerCase().replace(/[^a-z0-9가-힣]/g, "");
+      type Case = { text: string; expectName: string; expectVariant: string | null };
+      const cases: Case[] = [];
+      for (const p of loaded.products) {
+        cases.push({ text: `${p.name} 주세요`, expectName: p.name, expectVariant: null });
+        for (const v of p.variants || []) cases.push({ text: `${v} 주세요`, expectName: p.name, expectVariant: v });
+      }
+      let full = 0, prod = 0, wrong = 0, safe = 0;
+      const bad: { text: string; expected: string; got: string }[] = [];
+      for (const c of cases.slice(0, 2000)) {
+        const r = parseChatOrder(c.text, loaded.products, null);
+        const nameOK = r.productName && sqz(r.productName) === sqz(c.expectName);
+        const varOK = c.expectVariant && r.variantName && sqz(r.variantName) === sqz(c.expectVariant);
+        if (r.status !== "parsed") safe += 1;
+        else if (varOK || (nameOK && !c.expectVariant)) full += 1;
+        else if (nameOK) prod += 1;
+        else {
+          wrong += 1;
+          if (bad.length < 50) bad.push({
+            text: c.text, expected: c.expectName + (c.expectVariant ? ` / ${c.expectVariant}` : ""),
+            got: (r.productName || "-") + (r.variantName ? ` / ${r.variantName}` : ""),
+          });
+        }
+      }
+      return NextResponse.json({
+        ok: true, selfCheck: true,
+        total: Math.min(cases.length, 2000), full, prod, wrong, safe, bad,
+        productCount: loaded.products.length, source: loaded.source,
+      });
+    }
+
     // 미리보기: 문장을 그대로 판정만 해본다. DB에 쓰지 않는다(읽기 전용).
     //   방송 전에 "이렇게 치면 잡히나?" 를 확인하는 용도.
     if (Array.isArray(body.preview)) {

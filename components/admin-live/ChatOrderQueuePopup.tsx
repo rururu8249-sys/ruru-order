@@ -27,6 +27,11 @@ type QueueRow = {
 };
 
 type UsageRow = { method: string; calls: number };
+type SelfCheckResult = {
+  total: number; full: number; prod: number; wrong: number; safe: number;
+  productCount: number;
+  bad: { text: string; expected: string; got: string }[];
+};
 type PreviewRow = {
   text: string; status: string; product: string | null; variant: string | null;
   qty: number; matchedBy: string | null; reason: string; candidates: string[];
@@ -72,6 +77,7 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
   const [lastRead, setLastRead] = useState("");
   const [testText, setTestText] = useState("");
   const [testRows, setTestRows] = useState<PreviewRow[]>([]);
+  const [selfCheck, setSelfCheck] = useState<SelfCheckResult | null>(null);
   const autoRef = useRef(false);
   autoRef.current = autoRead;
 
@@ -177,6 +183,20 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
       if (!json?.ok) { showAdminToast("파싱 실패 — " + (json?.reason || ""), "error"); return; }
       showAdminToast(`전체 재파싱 ${json.updated}건 (상품 ${json.productCount}개 기준)`);
       await loadQueue();
+    } finally { setBusy(""); }
+  };
+
+  // 자가진단 — 방송상품으로 문장을 자동 생성해 전부 판정. 새 상품 추가 후 버튼 한 번이면 끝.
+  const runSelfCheck = async () => {
+    setBusy("selfcheck");
+    try {
+      const res = await fetch("/api/chat-orders/parse", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ selfCheck: true }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!json?.ok) { showAdminToast("자가진단 실패 — " + (json?.error?.message || ""), "error"); return; }
+      setSelfCheck(json as SelfCheckResult);
     } finally { setBusy(""); }
   };
 
@@ -318,8 +338,13 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
           <div className="mb-2 flex items-center gap-2 text-[11px] font-black text-ink-soft">
             <span>🧪 문장 판정 테스트</span>
             <span className="text-ink-mute">한 줄에 하나씩 — 실제 등록 상품으로 판정만 합니다(주문 안 됨)</span>
+            <button type="button" onClick={() => void runSelfCheck()} disabled={busy === "selfcheck"}
+              className="ml-auto rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1 font-black text-emerald-800 disabled:opacity-50"
+              title="방송상품 전체로 손님 문장을 자동 생성해 판정합니다. 새 상품 추가 후 한 번 눌러 충돌만 확인하세요.">
+              {busy === "selfcheck" ? "진단중…" : "🩺 자가진단"}
+            </button>
             <button type="button" onClick={() => void runPreview()} disabled={busy === "preview"}
-              className="ml-auto rounded-lg bg-slate-700 px-3 py-1 font-black text-white disabled:opacity-50">
+              className="rounded-lg bg-slate-700 px-3 py-1 font-black text-white disabled:opacity-50">
               {busy === "preview" ? "판정중…" : "판정해보기"}
             </button>
             {testRows.length > 0 ? (
@@ -327,6 +352,28 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
                 className="rounded-lg border border-line bg-surface px-2 py-1 text-ink-soft hover:bg-surface-2">지우기</button>
             ) : null}
           </div>
+          {selfCheck ? (
+            <div className="mb-2 rounded-lg border border-line bg-surface-2 px-3 py-2 text-[11px] font-black">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-ink">진단 {selfCheck.total}문장 (상품 {selfCheck.productCount}개)</span>
+                <span className="text-emerald-700">정확 {selfCheck.full + selfCheck.prod}</span>
+                <span className={selfCheck.wrong > 0 ? "text-red-600" : "text-ink-mute"}>엉뚱한 상품 {selfCheck.wrong}</span>
+                <span className="text-ink-mute">판정 보류 {selfCheck.safe}</span>
+                <button type="button" onClick={() => setSelfCheck(null)} className="ml-auto rounded-lg border border-line bg-surface px-2 py-0.5 text-ink-soft">닫기</button>
+              </div>
+              {selfCheck.wrong > 0 ? (
+                <div className="mt-1.5 max-h-40 overflow-auto">
+                  {selfCheck.bad.map((b, i) => (
+                    <div key={i} className="border-t border-line py-1 font-bold text-ink-soft">
+                      "{b.text}" → <span className="text-red-600">{b.got}</span> <span className="text-ink-mute">(정답: {b.expected})</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-1 text-emerald-700">엉뚱한 상품으로 가는 문장이 없습니다. 방송 진행에 문제 없어요.</div>
+              )}
+            </div>
+          ) : null}
           <textarea
             value={testText} onChange={(e) => setTestText(e.target.value)} rows={3}
             placeholder={"크림 라메르 주세요\n아이크림 라메르 2개\n미니 샤넬 블루드 저요"}
