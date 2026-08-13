@@ -7,12 +7,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   getServiceClient, readSetting, writeSetting,
-  readRefreshToken, getAccessToken, resolveLiveChatId,
+  readRefreshToken, getAccessToken, resolveLiveChatId, extractVideoId,
 } from "@/lib/youtube";
 
 export const SETTING_CHAT_READ_ENABLED = "chat_order_read_enabled";
 const SETTING_CHAT_ID = "chat_order_chat_id";
 const SETTING_PAGE_TOKEN = "chat_order_page_token";
+// [테스트용] 값이 있으면 broadcasts.status=ON 검사를 건너뛰고 이 URL의 채팅만 읽는다.
+//   → 관리자 「방송시작」을 누르지 않으므로 손님 화면에 방송 배너가 뜨지 않는다.
+export const SETTING_TEST_LIVE_URL = "chat_order_test_live_url";
 
 export type ChatReadResult = {
   ok: boolean; skipped?: boolean; reason?: string;
@@ -44,13 +47,29 @@ async function isBroadcastOn(sb: SupabaseClient): Promise<boolean> {
     .some((r) => String(r.status ?? "").toUpperCase() === "ON");
 }
 
+async function resolveChatIdFromUrl(accessToken: string, liveUrl: string): Promise<string> {
+  const videoId = extractVideoId(liveUrl);
+  if (!videoId) return "";
+  try {
+    const res = await fetch(
+      "https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=" + encodeURIComponent(videoId),
+      { headers: { Authorization: "Bearer " + accessToken } }
+    );
+    const json: any = await res.json().catch(() => ({}));
+    return String(json?.items?.[0]?.liveStreamingDetails?.activeLiveChatId || "").trim();
+  } catch {
+    return "";
+  }
+}
+
 export async function readLiveChatOnce(): Promise<ChatReadResult> {
   const calls: Record<string, number> = {};
   try {
     const sb = getServiceClient();
     if ((await readSetting(sb, SETTING_CHAT_READ_ENABLED)) !== "true")
       return { ok: true, skipped: true, reason: "채팅읽기 OFF" };
-    if (!(await isBroadcastOn(sb)))
+    const testLiveUrl = await readSetting(sb, SETTING_TEST_LIVE_URL);
+    if (!testLiveUrl && !(await isBroadcastOn(sb)))
       return { ok: true, skipped: true, reason: "방송 OFF" };
 
     const refreshToken = await readRefreshToken(sb);
@@ -59,7 +78,9 @@ export async function readLiveChatOnce(): Promise<ChatReadResult> {
 
     let chatId = await readSetting(sb, SETTING_CHAT_ID);
     if (!chatId) {
-      chatId = await resolveLiveChatId(sb, accessToken);
+      chatId = testLiveUrl
+        ? await resolveChatIdFromUrl(accessToken, testLiveUrl)
+        : await resolveLiveChatId(sb, accessToken);
       calls["videos.list"] = 1;
       await bumpUsage(sb, "videos.list");
       if (!chatId) return { ok: false, skipped: true, reason: "활성 라이브 채팅 없음", calls };

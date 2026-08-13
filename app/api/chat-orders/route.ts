@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
-import { SETTING_CHAT_READ_ENABLED } from "@/lib/youtubeChatRead";
+import { SETTING_CHAT_READ_ENABLED, SETTING_TEST_LIVE_URL } from "@/lib/youtubeChatRead";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,17 +43,32 @@ export async function POST(request: NextRequest) {
   const session = await verifyAdminSessionFromRequest(request);
   if (!session) return NextResponse.json({ ok: false, error: { message: "관리자 인증이 필요합니다." } }, { status: 401 });
   try {
-    const body = await request.json().catch(() => ({}));
-    const enabled = (body as any)?.enabled === true;
-    const value = enabled ? "true" : "false";
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const sb = sbAdmin();
-    const { data: exist } = await sb.from("settings").select("key").eq("key", SETTING_CHAT_READ_ENABLED).limit(1);
-    if (Array.isArray(exist) && exist.length > 0) {
-      await sb.from("settings").update({ value }).eq("key", SETTING_CHAT_READ_ENABLED);
-    } else {
-      await sb.from("settings").insert({ key: SETTING_CHAT_READ_ENABLED, value });
+
+    const put = async (key: string, value: string) => {
+      const { data: exist } = await sb.from("settings").select("key").eq("key", key).limit(1);
+      if (Array.isArray(exist) && exist.length > 0) {
+        await sb.from("settings").update({ value }).eq("key", key);
+      } else {
+        await sb.from("settings").insert({ key, value });
+      }
+    };
+
+    const out: Record<string, unknown> = { ok: true };
+    if (typeof body.enabled === "boolean") {
+      await put(SETTING_CHAT_READ_ENABLED, body.enabled ? "true" : "false");
+      out.enabled = body.enabled;
     }
-    return NextResponse.json({ ok: true, enabled });
+    // 테스트 라이브 URL: 값이 있으면 「방송시작」 없이 그 URL의 채팅만 읽는다(손님 화면 무변화).
+    // 빈 문자열을 보내면 해제되고 다시 방송 ON 기준으로 돌아간다.
+    if (typeof body.testLiveUrl === "string") {
+      await put(SETTING_TEST_LIVE_URL, String(body.testLiveUrl).trim());
+      await put("chat_order_chat_id", "");
+      await put("chat_order_page_token", "");
+      out.testLiveUrl = String(body.testLiveUrl).trim();
+    }
+    return NextResponse.json(out);
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: { message: String(e?.message || e) } }, { status: 500 });
   }
