@@ -182,9 +182,11 @@ begin
       into v_variant_id, v_before_stock
     from public.product_inventory_variants
     where product_id = v_old_product_id
-      and color = v_old_color
-      and size = v_old_size
-    for update;
+      and public.ruru_norm_option(color) = public.ruru_norm_option(v_old_color)
+      and public.ruru_norm_option(size) = public.ruru_norm_option(v_old_size)
+    order by (color = v_old_color and size = v_old_size) desc, id asc
+    limit 1
+    for update;  -- [2026-08-13] 옵션 정규화 매칭
     if not found then
       raise exception '기존 옵션 재고를 찾을 수 없습니다. 상품번호 %, 옵션 % / %',
         v_old_product_id, v_old_color, v_old_size;
@@ -299,7 +301,7 @@ begin
     )
     select
       v_old_product_id,
-      trim(coalesce(variant_row.value->>'color', '')),
+      regexp_replace(trim(coalesce(variant_row.value->>'color', '')), '\s*/\s*없음\s*$', ''),  -- [2026-08-13] 3단 합성형 꼬리 제거
       trim(coalesce(variant_row.value->>'size', '')),
       greatest(
         0,
@@ -321,9 +323,11 @@ begin
       into v_variant_id, v_before_stock
     from public.product_inventory_variants
     where product_id = v_old_product_id
-      and color = v_new_color
-      and size = v_new_size
-    for update;
+      and public.ruru_norm_option(color) = public.ruru_norm_option(v_new_color)
+      and public.ruru_norm_option(size) = public.ruru_norm_option(v_new_size)
+    order by (color = v_new_color and size = v_new_size) desc, id asc
+    limit 1
+    for update;  -- [2026-08-13] 옵션 정규화 매칭
     if not found then
       raise exception '새 옵션 재고를 찾을 수 없습니다. 상품번호 %, 옵션 % / %',
         v_old_product_id, v_new_color, v_new_size;

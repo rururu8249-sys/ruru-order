@@ -54,7 +54,7 @@ begin
   end if;
   if v_name = '' then raise exception '상품명을 입력해주세요.'; end if;
   if v_qty <= 0 then raise exception '수량은 1개 이상이어야 합니다.'; end if;
-  if v_unit <= 0 then raise exception '단가는 1원 이상이어야 합니다.'; end if;
+  if v_unit < 0 then raise exception '단가는 0원 이상이어야 합니다.'; end if;  -- [2026-08-13] 선물 0원 허용
   if v_color in ('없음','선택안함','-','none','NONE','None') then v_color := ''; end if;
   if v_size in ('없음','선택안함','-','none','NONE','None') then v_size := ''; end if;
 
@@ -84,7 +84,7 @@ begin
       if v_stock_mode = 'option' or v_has_variants then
         insert into public.product_inventory_variants (product_id, color, size, stock)
         select p_product_id,
-               trim(coalesce(vr.value->>'color','')),
+               regexp_replace(trim(coalesce(vr.value->>'color','')), '\s*/\s*없음\s*$', ''),  -- [2026-08-13] 3단 합성형 " / 없음" 꼬리 제거
                trim(coalesce(vr.value->>'size','')),
                greatest(0, case when coalesce(vr.value->>'stock','') ~ '^[0-9]+$' then (vr.value->>'stock')::int else 0 end)
         from jsonb_array_elements(
@@ -94,7 +94,12 @@ begin
 
         select id, stock into v_variant_id, v_before
           from public.product_inventory_variants
-          where product_id=p_product_id and color=v_color and size=v_size for update;
+          where product_id = p_product_id
+            and public.ruru_norm_option(color) = public.ruru_norm_option(v_color)
+            and public.ruru_norm_option(size) = public.ruru_norm_option(v_size)
+          order by (color = v_color and size = v_size) desc, id asc
+          limit 1
+          for update;  -- [2026-08-13] 옵션 정규화 매칭(ruru_norm_option)
         if not found then
           raise exception '옵션 재고를 찾을 수 없습니다. 상품 %, 옵션 % / %', p_product_id, v_color, v_size;
         end if;

@@ -124,8 +124,9 @@ export function useLiveOrderItemAdd(onAfter?: (result: LiveOrderItemAddResult) =
       showAdminToast("수량은 1개 이상이어야 합니다.", "warning");
       return false;
     }
-    if (unitPrice <= 0) {
-      showAdminToast("금액은 1원 이상이어야 합니다.", "warning");
+    // [2026-08-13 사장님 요청] 선물/사은품은 0원으로 넣을 수 있어야 한다. 음수만 차단.
+    if (unitPrice < 0) {
+      showAdminToast("금액은 0원 이상이어야 합니다.", "warning");
       return false;
     }
 
@@ -254,8 +255,9 @@ export function useLiveOrderItemAdd(onAfter?: (result: LiveOrderItemAddResult) =
       showAdminToast("수량은 1개 이상이어야 합니다.", "warning");
       return false;
     }
-    if (unitPrice <= 0) {
-      showAdminToast("단가는 1원 이상이어야 합니다.", "warning");
+    // [2026-08-13 사장님 요청] 선물(0원)도 등록상품으로 추가 가능해야 한다(재고는 정상 차감). 음수만 차단.
+    if (unitPrice < 0) {
+      showAdminToast("단가는 0원 이상이어야 합니다.", "warning");
       return false;
     }
 
