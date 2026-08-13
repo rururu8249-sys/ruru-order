@@ -72,7 +72,7 @@ const norm = (v: unknown) =>
 
 // 매칭용: 공백·괄호·기호 제거
 const squash = (v: unknown) =>
-  String(v ?? "").toLowerCase().replace(/[\s()[\]{}·・,./\-_~]/g, "");
+  String(v ?? "").toLowerCase().replace(/[^a-z0-9가-힣]/g, "");
 
 // 상품명 앞의 번호 접두 추출 ("3. 몽글니트" / "3.몽글니트" / "3 몽글니트" → 3)
 export function productLeadingNumber(name: string): number | null {
@@ -239,8 +239,11 @@ function exactProductByName(text: string, products: ParseProduct[]): ParseProduc
   const words = text.split(/[^a-z0-9가-힣]+/).filter(Boolean);
   const grams: string[] = [];
   for (let i = 0; i < words.length; i += 1) {
-    grams.push(squash(words[i]));
-    if (i + 1 < words.length) grams.push(squash(words[i] + words[i + 1]));
+    let acc = "";
+    for (let k = i; k < words.length && k < i + 5; k += 1) {
+      acc += squash(words[k]);
+      grams.push(acc);
+    }
   }
   let bestLen = 0;
   let best: ParseProduct[] = [];
@@ -314,7 +317,13 @@ export function parseChatOrder(
   //      일반 [구찌 향수]는 설명 못 하고 [미니어처 향수]는 설명한다 → 자동으로 갈린다
   //   ③ 손님이 안 말한 세부상품 쪽 단어(5ml 등)는 소폭 감점 — 정확히 말한 쪽이 이긴다
   {
-    const chatWords = text.split(/[^a-z0-9가-힣]+/).map((w) => squash(w)).filter((w) => w.length >= 2);
+    // 주문어("주세요")·수량어("2개","하나요")는 상품 판단에서 제외한다.
+    const stop = new Set<string>();
+    for (const w of ORDER_WORDS) stop.add(squash(w));
+    for (const c of consumed) for (const x of c.split(/\s+/)) stop.add(squash(x));
+    const isMeasure = (w: string) => /^\d+(\.\d+)?(ml|g|kg|호|종|개입|cm|mm)?$/.test(w);
+    const chatWords = text.split(/[^a-z0-9가-힣]+/).map((w) => squash(w))
+      .filter((w) => w.length >= 2 && !stop.has(w));
     type VariantHit = { p: ParseProduct; variant: string; score: number };
     let bestScore = -Infinity;
     let hits: VariantHit[] = [];
@@ -329,6 +338,9 @@ export function parseChatOrder(
         let matched = 0;      // 세부상품명 단어를 맞힌 개수
         let matchedChars = 0; // 맞힌 글자수 (근거 세기)
         for (const w of chatWords) {
+          // (0) 용량·호수·수치("100ml","144호")는 상품을 정하는 근거가 아니라 참고 신호.
+          //     맞으면 소폭 가점, 없으면 소폭 감점 — 이것만으로 후보가 되지는 않는다.
+          if (isMeasure(w)) { score += sv.includes(w) ? w.length : -w.length; continue; }
           // (1) 세부상품명 단어와 일치 — 통째(오타 허용) 또는 4글자 이상의 붙여쓰기 포함
           if (vWords.some((x) => x === w || looseEqual(w, x)) || (w.length >= 4 && sv.includes(w))) {
             score += w.length * 3; matched += 1; matchedChars += w.length; continue;
@@ -340,6 +352,7 @@ export function parseChatOrder(
             score += w.length * 3; continue;
           }
           // (4) 이 후보로는 설명이 안 되는 말 — 감점
+          //     "룰루레몬 반바지 아이보리"가 향수(발렌티노돈나 아이보리)로 새지 않는 핵심 장치.
           score -= w.length * 2;
         }
         if (matched === 0) continue;
@@ -348,6 +361,8 @@ export function parseChatOrder(
           const spoken = chatWords.some((w) => w === x || w.includes(x) || x.includes(w) || looseEqual(w, x));
           if (!spoken) score -= x.length;
         }
+        // 설명 못 한 말이 더 많으면(총점 0 이하) 후보 자격이 없다.
+        if (score <= 0) continue;
         const hit: VariantHit = { p, variant: v, score };
         // 근거가 약한 후보(2~3글자 단어 하나) — 유일할 때만 쓴다 ("굿걸"은 되고 "샤넬"은 안 된다)
         if (matched < 2 && matchedChars < 4) { weak.push(hit); continue; }
@@ -425,20 +440,24 @@ export function parseChatOrder(
       let best = 0;
       for (const n of names) {
         const s = squash(n);
-        if (s.length >= 2 && squashed.includes(s)) { best = Math.max(best, s.length * 10); continue; }
-        // 상품명을 단어로 쪼개 2글자 이상 조각이 메시지에 있으면 부분 점수
+        // 이름 전체가 통째로 들어있으면: 맞은 글자수 = 이름 길이 (배수 없음 —
+        //   "밴딩바지"(4)가 "이중허리밴딩바지"(8) 조각보다 커지는 왜곡 방지)
+        if (s.length >= 2 && squashed.includes(s)) { best = Math.max(best, s.length); continue; }
+        // 상품명을 단어로 쪼개, 맞은 조각들의 "글자수 합"으로 점수를 낸다.
+        //   "알로 블랙 셔츠스트라이프 셋업"은 조각 3개 합이 커서 일반 "셔츠"를 이긴다.
         const chatWords = text.split(/[^a-z0-9가-힣]+/).filter((x) => x.length >= 2);
+        let sum = 0;
         for (const piece of String(n).split(/[\s()[\]{}·・,./\-_~]+/).filter((x) => x.length >= 2)) {
           const sp = squash(piece);
-          if (squashed.includes(sp)) { best = Math.max(best, sp.length); continue; }
-          // 손님은 줄여서 말한다: "미니" → "미니어처". 채팅 단어가 상품명 조각의 앞부분이면 인정.
+          if (sp.length >= 2 && squashed.includes(sp)) { sum += sp.length; continue; }
           for (const w of chatWords) {
             const sw = squash(w);
             if (sw.length < 2) continue;
-            if (sp.startsWith(sw)) { best = Math.max(best, sw.length); continue; }
-            if (looseEqual(sw, sp)) best = Math.max(best, sp.length);   // "딥디크" → "딥티크"
+            if (sp.startsWith(sw)) { sum += sw.length; break; }
+            if (looseEqual(sw, sp)) { sum += sp.length; break; }   // "딥디크" → "딥티크"
           }
         }
+        best = Math.max(best, sum);
       }
       return { p, score: best };
     })
