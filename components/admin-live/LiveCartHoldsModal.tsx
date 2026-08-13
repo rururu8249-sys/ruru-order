@@ -26,6 +26,18 @@ type Hold = {
 
 type Group = { sessionKey: string; phone: string; nickname: string; name: string; items: Hold[]; totalQty: number; minExpires: number; maxCreated: number };
 
+// [2026-08-13 사장님 요청] 담김 현황 정렬 선택.
+//   기본값은 기존 동작 그대로 "남은 시간 짧은순"(곧 풀릴 선점부터 보이게).
+//   표시 순서만 바꾸는 화면 전용 기능 — 재고/선점/주문/돈 로직 무관.
+type SortKey = "expires" | "recent" | "qty" | "name";
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "expires", label: "남은 시간 짧은순" },
+  { value: "recent", label: "최신 담김순" },
+  { value: "qty", label: "담긴 수량 많은순" },
+  { value: "name", label: "닉네임순" },
+];
+
 const phoneFmt = (p: string) => {
   const d = String(p || "").replace(/[^0-9]/g, "");
   if (d.length === 11) return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
@@ -60,6 +72,7 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
   const [now, setNow] = useState(() => Date.now());
   // [2026-07-17 사장님 지침] 기본 = 현재 방송 시작 이후 담김만. 토글로 지난 것까지 전체 보기.
   const [scopeAll, setScopeAll] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>("expires");
   const [scopeInfo, setScopeInfo] = useState<{ scope: string; broadcastTitle: string }>({ scope: "all", broadcastTitle: "" });
 
   const load = async () => {
@@ -105,8 +118,16 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
       if (!g.name && h.name) g.name = h.name;
       map.set(h.sessionKey, g);
     }
-    return Array.from(map.values()).sort((a, b) => a.minExpires - b.minExpires);
-  }, [holds, now]);
+    const list = Array.from(map.values());
+    const nameOf = (g: Group) => (g.nickname || g.name || g.phone || "").toString();
+
+    return list.sort((a, b) => {
+      if (sortKey === "recent") return b.maxCreated - a.maxCreated;
+      if (sortKey === "qty") return b.totalQty - a.totalQty || a.minExpires - b.minExpires;
+      if (sortKey === "name") return nameOf(a).localeCompare(nameOf(b), "ko");
+      return a.minExpires - b.minExpires;
+    });
+  }, [holds, now, sortKey]);
 
   const totalQty = groups.reduce((s, g) => s + g.totalQty, 0);
 
@@ -153,7 +174,19 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
         </div>
 
         <div className="border-b border-line bg-surface-2 px-5 py-2 text-xs font-black text-ink-soft">
-          <div>장바구니 {groups.length}개 · 담긴 수량 {totalQty}개 — 시간이 지나면 자동 해제되고, 여기서 바로 해제할 수도 있습니다.</div>
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">장바구니 {groups.length}개 · 담긴 수량 {totalQty}개 — 시간이 지나면 자동 해제되고, 여기서 바로 해제할 수도 있습니다.</div>
+            <select
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value as SortKey)}
+              className="shrink-0 rounded-lg border border-line bg-surface px-2 py-1 text-[11px] font-black text-ink-soft"
+              aria-label="담김 목록 정렬"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
           {scopeAll ? (
             <div className="mt-1 flex items-center gap-2 text-ink-mute">
               <span>지난 담김(이전 방송·쇼핑몰 모드)까지 전체 표시 중</span>
