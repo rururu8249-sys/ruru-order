@@ -24,14 +24,14 @@ export const metadata: Metadata = {
 const SHOP_INFO = {
   serviceName: "루루동이 집구석LIVE",
   siteUrl: "https://ruru-order.vercel.app",
-  companyName: "",         // 상호(사업자등록증상)      ← 채우면 표시됨
-  ownerName: "",           // 대표자명                  ← 채우면 표시됨
-  bizNumber: "",           // 사업자등록번호            ← 채우면 표시됨
-  mailOrderNumber: "",     // 통신판매업 신고번호       ← 채우면 표시됨
-  address: "",             // 사업장 주소               ← 채우면 표시됨
-  privacyOfficer: "",      // 개인정보 보호책임자       ← 채우면 표시됨
+  companyName: "더블에이치",
+  ownerName: "유혜원",
+  bizNumber: "473-02-03285",
+  mailOrderNumber: "",     // 통신판매업 신고번호 ← 확인되면 여기 채우면 자동 표시됨
+  address: "경기도 부천시 오정구 수주로25, 가동 B02호",
+  privacyOfficer: "유혜원",
   email: "rururu8249@gmail.com",
-  phone: "",               // 연락처                    ← 채우면 표시됨
+  phone: "010-9999-2420",
   effectiveDate: "2026년 8월 14일",
 };
 
