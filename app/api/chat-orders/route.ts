@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { SETTING_CHAT_READ_ENABLED, SETTING_TEST_LIVE_URL } from "@/lib/youtubeChatRead";
+import { SETTING_SELF_CHECK } from "@/lib/chatOrderPipeline";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,11 +29,15 @@ export async function GET(request: NextRequest) {
       .order("id", { ascending: false }).limit(limit);
     const usageRes = await sb.from("youtube_api_usage").select("method,calls").eq("day", day);
     const setRes = await sb.from("settings").select("value").eq("key", SETTING_CHAT_READ_ENABLED).limit(1).maybeSingle();
+    const scRes = await sb.from("settings").select("value").eq("key", SETTING_SELF_CHECK).limit(1).maybeSingle();
+    let selfCheck: unknown = null;
+    try { selfCheck = JSON.parse(String((scRes.data as any)?.value || "")); } catch { /* 없으면 null */ }
     return NextResponse.json({
       ok: true,
       enabled: String((setRes.data as any)?.value ?? "") === "true",
       usage: usageRes.data || [],
       rows: rowsRes.data || [],
+      selfCheck,
     });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: { message: String(e?.message || e) } }, { status: 500 });

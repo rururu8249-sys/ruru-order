@@ -89,6 +89,8 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
       setRows((json.rows || []) as QueueRow[]);
       setUsage((json.usage || []) as UsageRow[]);
       setEnabled(Boolean(json.enabled));
+      // 자동 자가진단 결과 — 겹침이 있을 때만 조용히 배너 표시 (없으면 아무것도 안 뜸)
+      if (json.selfCheck && Number(json.selfCheck.wrong) > 0) setSelfCheck(json.selfCheck as SelfCheckResult);
     } catch { /* 조회 실패는 화면만 비움 */ }
   }, []);
 
@@ -312,7 +314,7 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
                 className="rounded-lg border border-line bg-surface px-2 py-0.5 text-ink-soft hover:bg-surface-2 disabled:opacity-50">해제</button>
             ) : null}
             <span className="ml-auto text-ink-mute">
-              파싱 기준 상품 {products.length}개 ({broadcastSource === "live" ? "방송중" : broadcastSource === "recent" ? "최근 방송" : "없음"})
+              파싱 기준 상품 {products.length}개 ({broadcastSource === "live" ? "방송중" : broadcastSource === "shop" ? "쇼핑몰 진열" : broadcastSource === "recent" ? "최근 방송" : "없음"})
             </span>
           </div>
           <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto">
@@ -361,6 +363,7 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
                 <span className="text-ink-mute">판정 보류 {selfCheck.safe}</span>
                 <button type="button" onClick={() => setSelfCheck(null)} className="ml-auto rounded-lg border border-line bg-surface px-2 py-0.5 text-ink-soft">닫기</button>
               </div>
+              <div className="mt-0.5 text-ink-mute">겹침 문장은 자동으로 「보류」 처리되어 잘못 담기지 않습니다.</div>
               {selfCheck.wrong > 0 ? (
                 <div className="mt-1.5 max-h-40 overflow-auto">
                   {selfCheck.bad.map((b, i) => (

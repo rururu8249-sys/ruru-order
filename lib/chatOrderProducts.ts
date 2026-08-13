@@ -39,7 +39,8 @@ function parseNote(raw: unknown): Record<string, unknown> | null {
 export type LoadedProducts = {
   products: ParseProduct[];
   broadcastId: string | null;
-  source: "live" | "recent" | "none";
+  // live=방송중(방송에 담긴 상품만) / shop=쇼핑몰 모드(in_shop 진열분만) / recent=최근 방송(테스트 폴백)
+  source: "live" | "shop" | "recent" | "none";
 };
 
 // [시뮬레이션 전용] 방송 여부와 무관하게 "전체 상품"을 파서 형식으로 읽는다.
@@ -66,7 +67,10 @@ export async function loadAllParseProducts(sb: SupabaseClient): Promise<LoadedPr
 }
 
 export async function loadParseProducts(sb: SupabaseClient): Promise<LoadedProducts> {
-  // 1) 방송 선택 — ON 우선, 없으면 최근
+  // [사장님 규칙] 인식 범위는 손님 주문 화면과 동일하게 맞춘다.
+  //   방송 모드(ON): 그 방송에 담긴 상품만.
+  //   쇼핑몰 모드(OFF): in_shop=true 진열 상품만.
+  //   (진열 0개면 테스트 편의상 가장 최근 방송으로 폴백)
   const { data: bcRows } = await sb
     .from("broadcasts")
     .select("id,status,is_deleted,started_at")
@@ -75,25 +79,46 @@ export async function loadParseProducts(sb: SupabaseClient): Promise<LoadedProdu
     .limit(20);
   const list = (bcRows || []) as Record<string, unknown>[];
   const live = list.find((r) => String(r.status ?? "").toUpperCase() === "ON") || null;
-  const picked = live || list[0] || null;
-  if (!picked) return { products: [], broadcastId: null, source: "none" };
 
-  const broadcastId = String(picked.id);
+  if (live) {
+    const broadcastId = String(live.id);
+    return { products: await loadBroadcastProducts(sb, broadcastId), broadcastId, source: "live" };
+  }
 
-  // 2) 그 방송에 담긴 상품
+  // 쇼핑몰 모드: 진열 상품만
+  const { data: shopRows } = await sb
+    .from("products")
+    .select("id,product_name,product_note,color_options")
+    .eq("in_shop", true)
+    .limit(500);
+  const shop = rowsToParseProducts((shopRows || []) as Record<string, unknown>[]);
+  if (shop.length > 0) return { products: shop, broadcastId: null, source: "shop" };
+
+  // 폴백: 가장 최근 방송 (테스트용)
+  const recent = list[0] || null;
+  if (!recent) return { products: [], broadcastId: null, source: "none" };
+  const broadcastId = String(recent.id);
+  return { products: await loadBroadcastProducts(sb, broadcastId), broadcastId, source: "recent" };
+}
+
+async function loadBroadcastProducts(sb: SupabaseClient, broadcastId: string): Promise<ParseProduct[]> {
   const { data: bpRows } = await sb
     .from("broadcast_products")
     .select("product_id, sort_order, products(id,product_name,product_note,color_options)")
     .eq("broadcast_id", broadcastId);
-
-  const products: ParseProduct[] = [];
+  const rows: Record<string, unknown>[] = [];
   for (const row of (bpRows || []) as Record<string, unknown>[]) {
-    const p = row.products as Record<string, unknown> | null;
-    if (!p) continue;
+    if (row.products) rows.push(row.products as Record<string, unknown>);
+  }
+  return rowsToParseProducts(rows);
+}
+
+function rowsToParseProducts(rows: Record<string, unknown>[]): ParseProduct[] {
+  const products: ParseProduct[] = [];
+  for (const p of rows) {
     const id = String(p.id ?? "").trim();
     const name = String(p.product_name ?? "").trim();
     if (!id || !name) continue;
-
     const note = parseNote(p.product_note);
     // 조합형일 때만 세부상품명을 variants로 넘긴다. 일반 상품의 색상옵션(검정/흰색)은
     // 상품을 특정하지 못하므로 variants로 쓰면 안 된다.
@@ -102,9 +127,7 @@ export async function loadParseProducts(sb: SupabaseClient): Promise<LoadedProdu
       : [];
     // 별칭은 관리자가 product_note.chat_aliases 에 넣어두면 추가로 인식된다(선택).
     const aliases = toStringArray(note?.chat_aliases);
-
     products.push({ id, name, variants, aliases });
   }
-
-  return { products, broadcastId, source: live ? "live" : "recent" };
+  return products;
 }
