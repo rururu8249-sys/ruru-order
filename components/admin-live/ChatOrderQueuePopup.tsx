@@ -73,14 +73,12 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
   const [current, setCurrent] = useState<CurrentProduct>(null);
   const [testUrl, setTestUrl] = useState("");
   const [busy, setBusy] = useState("");
-  const [autoRead, setAutoRead] = useState(false);
   const [onlyOrders, setOnlyOrders] = useState(true);
   const [lastRead, setLastRead] = useState("");
   const [testText, setTestText] = useState("");
   const [testRows, setTestRows] = useState<PreviewRow[]>([]);
   const [selfCheck, setSelfCheck] = useState<SelfCheckResult | null>(null);
-  const autoRef = useRef(false);
-  autoRef.current = autoRead;
+  const [advanced, setAdvanced] = useState(false);
 
   const loadQueue = useCallback(async () => {
     try {
@@ -131,13 +129,6 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
       await loadQueue();
     } finally { setBusy(""); }
   }, [loadQueue]);
-
-  // 자동읽기 — 5초. 유튜브 쿼터를 쓰므로 명시적으로 켤 때만 돈다.
-  useEffect(() => {
-    if (!autoRead) return;
-    const t = setInterval(() => { if (autoRef.current) void readOnce(); }, 5000);
-    return () => clearInterval(t);
-  }, [autoRead, readOnce]);
 
   const toggleBot = async () => {
     setBusy("bot");
@@ -265,59 +256,61 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
           </div>
         </div>
 
-        {/* 조작 바 */}
+        {/* 조작 바 — 방송 중엔 이 두 개만 보면 됩니다 */}
         <div className="border-b border-line bg-surface-2 px-5 py-3">
-          <div className="flex flex-wrap items-center gap-2 text-[11px] font-black">
-            <button
-              type="button" onClick={() => void toggleEnabled()} disabled={busy === "enable"}
-              className={`rounded-lg px-3 py-1.5 font-black text-white disabled:opacity-50 ${enabled ? "bg-emerald-600" : "bg-slate-400"}`}
-            >
-              채팅읽기 {enabled ? "ON" : "OFF"}
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => void toggleEnabled()} disabled={busy === "enable"}
+              className={`rounded-xl px-4 py-2 text-[13px] font-black text-white disabled:opacity-50 ${enabled ? "bg-emerald-600" : "bg-slate-400"}`}>
+              {enabled ? "✅ 채팅주문 받는 중" : "▶ 채팅주문 켜기"}
             </button>
-            <button
-              type="button" onClick={() => void readOnce()} disabled={busy === "read"}
-              className="rounded-lg bg-rose-deep px-3 py-1.5 font-black text-white disabled:opacity-50"
-            >
-              {busy === "read" ? "읽는중…" : "지금 1회 읽기 + 파싱"}
+            <button type="button" onClick={() => void toggleBot()} disabled={busy === "bot"}
+              className={`rounded-xl px-4 py-2 text-[13px] font-black text-white disabled:opacity-50 ${botEnabled ? "bg-sky-600" : "bg-slate-400"}`}
+              title="상품을 못 알아들은 주문 채팅에 봇이 '다시 적어달라'고 자동으로 안내합니다.">
+              🤖 봇 안내 {botEnabled ? "켜짐" : "꺼짐"}
             </button>
-            <label className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-ink-soft">
-              <input type="checkbox" checked={autoRead} onChange={(e) => setAutoRead(e.target.checked)} />
-              자동읽기 5초 <span className="text-ink-mute">(쿼터 소모)</span>
-            </label>
-            <button
-              type="button" onClick={() => void toggleBot()} disabled={busy === "bot"}
-              className={`rounded-lg px-3 py-1.5 font-black text-white disabled:opacity-50 ${botEnabled ? "bg-sky-600" : "bg-slate-400"}`}
-              title="상품을 못 정한 주문 채팅에 봇이 '다시 적어달라'고 자동 안내합니다. 글 1개당 쿼터 50, 하루 40건 상한.">
-              🤖 봇 안내 {botEnabled ? "ON" : "OFF"}
-            </button>
-            <button
-              type="button" onClick={() => void reparse()} disabled={busy === "parse"}
-              className="rounded-lg border border-line bg-surface px-3 py-1.5 text-ink-soft hover:bg-surface-2 disabled:opacity-50"
-            >
-              전체 재파싱
-            </button>
-            <label className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-ink-soft">
-              <input type="checkbox" checked={onlyOrders} onChange={(e) => setOnlyOrders(e.target.checked)} />
-              주문만 보기
-            </label>
-            <span className="ml-auto text-ink-mute">
-              오늘 API 호출 {todayCalls}회 · 접수후보 {counts.parsed || 0} · 상품모름 {counts.need_product || 0} · 후보여럿 {counts.ambiguous || 0}
+            <span className="ml-auto text-[12px] font-black text-ink-soft">
+              접수후보 <b className="text-emerald-700">{counts.parsed || 0}</b> · 확인필요 {(counts.need_product || 0) + (counts.ambiguous || 0)}
             </span>
-          </div>
-
-          {lastRead ? <div className="mt-1.5 text-[11px] font-black text-ink-mute">최근 읽기: {lastRead}</div> : null}
-
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <input
-              value={testUrl} onChange={(e) => setTestUrl(e.target.value)}
-              placeholder="테스트 라이브 URL (비우면 해제 — 관리자 「방송시작」 없이 그 방송만 읽음)"
-              className="min-w-[320px] flex-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-bold text-ink"
-            />
-            <button type="button" onClick={() => void saveTestUrl()} disabled={busy === "url"}
-              className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50">
-              저장
+            <button type="button" onClick={() => setAdvanced((v) => !v)}
+              className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft hover:bg-surface-2">
+              ⚙ 고급{advanced ? " 닫기" : ""}
             </button>
           </div>
+          <div className="mt-1.5 text-[11px] font-bold text-ink-mute">
+            방송 컨트롤타워가 열려 있으면 채팅은 자동으로 읽혀요 — 여기선 켜고 끄기만 하면 됩니다.
+          </div>
+
+          {advanced ? (
+            <div className="mt-2 rounded-xl border border-line bg-surface p-3">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] font-black">
+                <button type="button" onClick={() => void readOnce()} disabled={busy === "read"}
+                  className="rounded-lg bg-rose-deep px-3 py-1.5 font-black text-white disabled:opacity-50">
+                  {busy === "read" ? "읽는중…" : "지금 1회 읽기 + 파싱"}
+                </button>
+                <button type="button" onClick={() => void reparse()} disabled={busy === "parse"}
+                  className="rounded-lg border border-line bg-surface px-3 py-1.5 text-ink-soft hover:bg-surface-2 disabled:opacity-50">
+                  전체 재파싱
+                </button>
+                <label className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-ink-soft">
+                  <input type="checkbox" checked={onlyOrders} onChange={(e) => setOnlyOrders(e.target.checked)} />
+                  주문만 보기
+                </label>
+                <span className="ml-auto text-ink-mute">오늘 API 호출 {todayCalls}회</span>
+              </div>
+              {lastRead ? <div className="mt-1.5 text-[11px] font-black text-ink-mute">최근 읽기: {lastRead}</div> : null}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <input
+                  value={testUrl} onChange={(e) => setTestUrl(e.target.value)}
+                  placeholder="테스트 라이브 URL (비우면 해제 — 「방송시작」 없이 그 방송만 읽음)"
+                  className="min-w-[280px] flex-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-bold text-ink"
+                />
+                <button type="button" onClick={() => void saveTestUrl()} disabled={busy === "url"}
+                  className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50">
+                  저장
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {/* 「지금 이거」 */}
@@ -355,77 +348,75 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
           </div>
         </div>
 
-        {/* 문장 판정 테스트 — 방송 전에 "이렇게 치면 잡히나?" 확인 */}
-        <div className="border-b border-line px-5 py-3">
-          <div className="mb-2 flex items-center gap-2 text-[11px] font-black text-ink-soft">
-            <span>🧪 문장 판정 테스트</span>
-            <span className="text-ink-mute">한 줄에 하나씩 — 실제 등록 상품으로 판정만 합니다(주문 안 됨)</span>
-            <button type="button" onClick={() => void runSelfCheck()} disabled={busy === "selfcheck"}
-              className="ml-auto rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1 font-black text-emerald-800 disabled:opacity-50"
-              title="방송상품 전체로 손님 문장을 자동 생성해 판정합니다. 새 상품 추가 후 한 번 눌러 충돌만 확인하세요.">
-              {busy === "selfcheck" ? "진단중…" : "🩺 자가진단"}
-            </button>
-            <button type="button" onClick={() => void runPreview()} disabled={busy === "preview"}
-              className="rounded-lg bg-slate-700 px-3 py-1 font-black text-white disabled:opacity-50">
-              {busy === "preview" ? "판정중…" : "판정해보기"}
-            </button>
+        {/* 자동 자가진단 경고 — 문제 있을 때만 나타납니다 */}
+        {selfCheck ? (
+          <div className="border-b border-line px-5 py-2">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-black">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-amber-900">⚠️ 이름이 겹치는 상품이 있어요</span>
+                <span className="text-amber-800">겹침 문장 {selfCheck.wrong}건은 자동으로 「보류」 처리돼 잘못 담기지 않습니다</span>
+                <button type="button" onClick={() => setSelfCheck(null)} className="ml-auto rounded-lg border border-amber-200 bg-white px-2 py-0.5 text-amber-800">닫기</button>
+              </div>
+              <div className="mt-1.5 max-h-32 overflow-auto">
+                {selfCheck.bad.slice(0, 10).map((b, i) => (
+                  <div key={i} className="border-t border-amber-100 py-1 font-bold text-amber-800">
+                    "{b.text}" → <span className="text-red-600">{b.got}</span> <span className="opacity-70">(정답: {b.expected})</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* 문장 판정 테스트 (고급) */}
+        {advanced ? (
+          <div className="border-b border-line px-5 py-3">
+            <div className="mb-2 flex items-center gap-2 text-[11px] font-black text-ink-soft">
+              <span>🧪 문장 판정 테스트</span>
+              <span className="text-ink-mute">한 줄에 하나씩 — 판정만 합니다(주문 안 됨)</span>
+              <button type="button" onClick={() => void runSelfCheck()} disabled={busy === "selfcheck"}
+                className="ml-auto rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1 font-black text-emerald-800 disabled:opacity-50">
+                {busy === "selfcheck" ? "진단중…" : "🩺 자가진단"}
+              </button>
+              <button type="button" onClick={() => void runPreview()} disabled={busy === "preview"}
+                className="rounded-lg bg-slate-700 px-3 py-1 font-black text-white disabled:opacity-50">
+                {busy === "preview" ? "판정중…" : "판정해보기"}
+              </button>
+              {testRows.length > 0 ? (
+                <button type="button" onClick={() => setTestRows([])}
+                  className="rounded-lg border border-line bg-surface px-2 py-1 text-ink-soft hover:bg-surface-2">지우기</button>
+              ) : null}
+            </div>
+            <textarea
+              value={testText} onChange={(e) => setTestText(e.target.value)} rows={3}
+              placeholder={"크림 라메르 주세요\n아이크림 라메르 2개\n미니 샤넬 블루드 저요"}
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[12px] font-bold text-ink"
+            />
             {testRows.length > 0 ? (
-              <button type="button" onClick={() => setTestRows([])}
-                className="rounded-lg border border-line bg-surface px-2 py-1 text-ink-soft hover:bg-surface-2">지우기</button>
+              <div className="mt-2 max-h-56 overflow-auto rounded-lg border border-line">
+                <table className="w-full text-[12px]">
+                  <tbody>
+                    {testRows.map((r, i) => {
+                      const st = STATUS_META[r.status] || STATUS_META.raw;
+                      return (
+                        <tr key={i} className="border-b border-line last:border-0">
+                          <td className="px-3 py-1.5 text-ink">{r.text}</td>
+                          <td className="whitespace-nowrap px-3 py-1.5">
+                            <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-black ${st.cls}`}>{st.label}</span>
+                          </td>
+                          <td className="px-3 py-1.5 font-bold text-ink">{r.product || "-"}</td>
+                          <td className="px-3 py-1.5 text-ink">{r.variant || "-"}</td>
+                          <td className="whitespace-nowrap px-3 py-1.5 text-right font-black text-ink">{r.status === "parsed" ? r.qty : ""}</td>
+                          <td className="px-3 py-1.5 text-[11px] text-ink-mute">{r.reason}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             ) : null}
           </div>
-          {selfCheck ? (
-            <div className="mb-2 rounded-lg border border-line bg-surface-2 px-3 py-2 text-[11px] font-black">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="text-ink">진단 {selfCheck.total}문장 (상품 {selfCheck.productCount}개)</span>
-                <span className="text-emerald-700">정확 {selfCheck.full + selfCheck.prod}</span>
-                <span className={selfCheck.wrong > 0 ? "text-red-600" : "text-ink-mute"}>엉뚱한 상품 {selfCheck.wrong}</span>
-                <span className="text-ink-mute">판정 보류 {selfCheck.safe}</span>
-                <button type="button" onClick={() => setSelfCheck(null)} className="ml-auto rounded-lg border border-line bg-surface px-2 py-0.5 text-ink-soft">닫기</button>
-              </div>
-              <div className="mt-0.5 text-ink-mute">겹침 문장은 자동으로 「보류」 처리되어 잘못 담기지 않습니다.</div>
-              {selfCheck.wrong > 0 ? (
-                <div className="mt-1.5 max-h-40 overflow-auto">
-                  {selfCheck.bad.map((b, i) => (
-                    <div key={i} className="border-t border-line py-1 font-bold text-ink-soft">
-                      "{b.text}" → <span className="text-red-600">{b.got}</span> <span className="text-ink-mute">(정답: {b.expected})</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="mt-1 text-emerald-700">엉뚱한 상품으로 가는 문장이 없습니다. 방송 진행에 문제 없어요.</div>
-              )}
-            </div>
-          ) : null}
-          <textarea
-            value={testText} onChange={(e) => setTestText(e.target.value)} rows={3}
-            placeholder={"크림 라메르 주세요\n아이크림 라메르 2개\n미니 샤넬 블루드 저요"}
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[12px] font-bold text-ink"
-          />
-          {testRows.length > 0 ? (
-            <div className="mt-2 max-h-56 overflow-auto rounded-lg border border-line">
-              <table className="w-full text-[12px]">
-                <tbody>
-                  {testRows.map((r, i) => {
-                    const st = STATUS_META[r.status] || STATUS_META.raw;
-                    return (
-                      <tr key={i} className="border-b border-line last:border-0">
-                        <td className="px-3 py-1.5 text-ink">{r.text}</td>
-                        <td className="whitespace-nowrap px-3 py-1.5">
-                          <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-black ${st.cls}`}>{st.label}</span>
-                        </td>
-                        <td className="px-3 py-1.5 font-bold text-ink">{r.product || "-"}</td>
-                        <td className="px-3 py-1.5 text-ink">{r.variant || "-"}</td>
-                        <td className="whitespace-nowrap px-3 py-1.5 text-right font-black text-ink">{r.status === "parsed" ? r.qty : ""}</td>
-                        <td className="px-3 py-1.5 text-[11px] text-ink-mute">{r.reason}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
-        </div>
+        ) : null}
 
         {/* 대기열 */}
         <div className="min-h-0 flex-1 overflow-auto">

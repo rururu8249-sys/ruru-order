@@ -157,7 +157,7 @@ export async function parsePendingChatOrders(
 
       // 봇이 쓴 안내 메시지(🤖 시작)는 주문이 아니다 — 봇이 자기 글에 다시 안내를 다는
       //   무한루프를 원천 차단한다. (안내문에 "주세요"가 들어가므로 필수)
-      if (raw.trim().startsWith("🤖")) {
+      if (/^[🤖🛍📢🎁]/u.test(raw.trim())) {
         r = { ...r, status: "not_order", productId: null, productName: null, matchedBy: null,
               variantName: null, candidates: [], reason: "봇 안내 메시지" };
       }
