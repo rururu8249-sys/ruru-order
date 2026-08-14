@@ -148,6 +148,11 @@ export async function parsePendingChatOrders(
       }))
       .filter((r) => Number.isFinite(r.setMs)) as CurrentRow[];
 
+    // 봇/시스템 계정 목록 — 이 계정들의 채팅은 절대 주문으로 인식하지 않는다.
+    //   ① 우리 봇 계정(발송 시 저장된 채널 ID)  ② Nightbot 등 관리봇(이름 기준)
+    const botChannelId = (await readSetting(sb, "chat_order_bot_channel_id")).trim();
+    const BOT_NAMES = new Set(["nightbot", "streamlabs", "streamelements"]);
+
     let updated = 0;
     // 봇 안내 대상: (닉네임, 사유) — 판정 후 모아서 상한 안에서 발송
     const botTargets: { name: string; channel: string; kind: "ambiguous" | "need_product"; cands: string[]; atMs: number }[] = [];
@@ -159,9 +164,15 @@ export async function parsePendingChatOrders(
       const currentId = resolveCurrentAt(history, Number.isFinite(atMs) ? atMs : Date.now());
       let r = parseChatOrder(raw, products, currentId);
 
-      // 봇이 쓴 안내 메시지(🤖 시작)는 주문이 아니다 — 봇이 자기 글에 다시 안내를 다는
-      //   무한루프를 원천 차단한다. (안내문에 "주세요"가 들어가므로 필수)
-      if (/^[🤖🛍📢🎁🧾]/u.test(raw.trim())) {
+      // 봇·시스템 계정의 글은 주문이 아니다 — 작성자 기준(확실) + 이모지 접두(백업) 이중 차단.
+      //   봇이 자기 글에 다시 반응하는 무한루프를 원천 차단한다.
+      const authorCh = String(row.channel_id ?? "").trim();
+      const authorName = String(row.display_name ?? "").trim().toLowerCase().replace(/^@/, "");
+      if (
+        (botChannelId && authorCh === botChannelId) ||
+        BOT_NAMES.has(authorName) ||
+        /^[🤖🛍📢🎁🧾]/u.test(raw.trim())
+      ) {
         r = { ...r, status: "not_order", productId: null, productName: null, matchedBy: null,
               variantName: null, candidates: [], reason: "봇 안내 메시지" };
       }
