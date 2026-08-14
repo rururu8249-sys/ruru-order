@@ -3461,7 +3461,7 @@ export default function OrderPage() {
 
   // ── [채팅주문 4단계] 내 채팅 가주문 배너 — 표시 전용 ─────────────────────────
   //   설정(chat_order_customer_ui_enabled) OFF면 서버가 빈 결과를 주고, 배너는 렌더되지 않는다.
-  //   자동으로 담지 않는다(사장님 확정) — 손님이 눌러야 아래 addChatClaimRow가 기존 담기 함수로 담는다.
+  //   [2026-08-14 변경] 가져온 채팅 주문은 아래 자동담기 effect가 주문서에 바로 담아둔다(사장님 지시).
   useEffect(() => {
     const on = String(broadcast?.status || "").toUpperCase() === "ON";
     const nick = youtubeNickname.trim();
@@ -3494,31 +3494,42 @@ export default function OrderPage() {
     }));
   };
 
-  const chatClaimOptionText = (row: any): string =>
-    chatClaimItemsOf(row)
-      .map((i) => { const os = [i.color, i.size].filter(Boolean).join("/"); return `${os ? `${os} ` : ""}${i.qty}개`; })
-      .join(" · ");
-
-  const addChatClaimRow = (row: any) => {
-    // 담기는 기존 함수 재사용 → 재고캡·1인 구매제한·조합가 검증을 똑같이 통과한다. 제출·입금·정산 로직 무접촉.
-    const product = [...broadcastProducts, ...groupBuyQuickProductsFromCatalog].find(
-      (p) => String((p as any)?.id ?? "") === String(row?.product_id ?? "")
-    );
-    if (!product) { showCustomerNotice("지금 판매 목록에 없는 상품이에요. 아래 목록에서 직접 담아주세요."); return; }
-    for (const it of chatClaimItemsOf(row)) {
-      addRegisteredProductToOrderItems(product as BroadcastProduct, {
-        color: it.color || undefined, size: it.size || undefined, qty: it.qty,
-      });
+  // [2026-08-14 사장님 지시 변경] 중간 배너 없이 — 채팅 주문을 주문서에 "자동으로 담아둔다".
+  //   손님은 주문서에서 확인하고 수정/삭제하거나 맞으면 바로 제출. 담기는 기존 함수 재사용이라
+  //   재고캡·1인 구매제한·조합가 검증 동일 통과. 진짜 재고차감·돈 처리는 제출 RPC 그대로(무접촉).
+  //   같은 행 중복 담김 방지: 세션 내 ref + 서버 claimed_at(담음 표시, 대기열 소진 아님) 이중.
+  const chatClaimDoneRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!hasSavedInfo || chatClaimRows.length === 0) return;
+    const pool = [...broadcastProducts, ...groupBuyQuickProductsFromCatalog];
+    if (pool.length === 0) return; // 상품 목록 로딩 전 — 다음 폴링/의존성 변경 때 재시도
+    const claimedIds: number[] = [];
+    for (const row of chatClaimRows) {
+      const key = String(row?.id ?? "");
+      if (!key || chatClaimDoneRef.current.has(key)) continue;
+      const product = pool.find((p) => String((p as any)?.id ?? "") === String(row?.product_id ?? ""));
+      if (!product) continue; // 지금 판매 목록에 없는 상품 — 담지 않고 보류(강제 담기 금지)
+      chatClaimDoneRef.current.add(key);
+      for (const it of chatClaimItemsOf(row)) {
+        addRegisteredProductToOrderItems(product as BroadcastProduct, {
+          color: it.color || undefined, size: it.size || undefined, qty: it.qty,
+        });
+      }
+      claimedIds.push(Number(row.id));
     }
-    setChatClaimRows((prev) => prev.filter((r) => r.id !== row.id));
+    if (claimedIds.length === 0) return;
+    setChatClaimRows((prev) => prev.filter((r) => !claimedIds.includes(Number(r.id))));
+    setCartAddedOpen(false); // 개별 담김 팝업 대신 아래 요약 안내 한 번만
+    showCustomerNotice(`💬 채팅으로 주문하신 ${claimedIds.length}건을 주문서에 담아뒀어요 — 확인하고 제출해주세요!`, "success");
     // "담음" 표시(대기열 소진 아님 — 관리자 확인용). 실패해도 무시.
     try {
       void fetch("/api/chat-orders/mine", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: [row.id], nick: youtubeNickname.trim() }),
+        body: JSON.stringify({ ids: claimedIds, nick: youtubeNickname.trim() }),
       });
     } catch { /* best-effort */ }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatClaimRows, broadcastProducts, groupBuyQuickProductsFromCatalog, hasSavedInfo]);
 
   // [닉네임 자가치유] 이미 폰(localStorage)에만 닉네임이 있는 기존 고객 — 주문 페이지 열기만 하면
   //   회원 DB에 자동 반영(세션당 1회, 비어있거나 다를 때만 서버가 갱신). 표시/검색 필드만 — 돈 로직 무관.
@@ -5068,36 +5079,6 @@ export default function OrderPage() {
               </div>
             </div>
           )}
-        </section>
-      ) : null}
-
-      {/* [채팅주문 4단계] 「채팅으로 주문하셨죠?」 확인 배너 — 방송 ON + 관리자 토글 ON + 내 닉 채팅주문 있을 때만.
-          자동으로 담지 않는다(사장님 확정): 손님이 눌러야 담긴다. 조건 미충족 시 렌더 0 = 기존 화면 무변화. */}
-      {hasSavedInfo && isBroadcastOn && chatClaimRows.length > 0 ? (
-        <section style={{ margin: "0 auto", width: "100%", maxWidth: "560px", padding: "0 14px 4px" }}>
-          <div style={{ background: "#FFF6FA", border: "1.5px solid #E8A3C0", borderRadius: "16px", padding: "13px 14px" }}>
-            <div style={{ fontSize: "14px", fontWeight: 900, color: "#7A1E47", marginBottom: "8px" }}>
-              💬 채팅으로 주문하셨죠? <span style={{ fontWeight: 700, fontSize: "12px", color: "#A96E86" }}>눌러서 주문서에 담아주세요</span>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
-              {chatClaimRows.slice(0, 5).map((row) => (
-                <div key={String(row.id)} style={{ display: "flex", alignItems: "center", gap: "8px", background: "#fff", border: "1px solid #F0D9E4", borderRadius: "12px", padding: "9px 11px" }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "13.5px", fontWeight: 800, color: "#3A2F34", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {String(row.product_name || "")}
-                    </div>
-                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#A96E86" }}>{chatClaimOptionText(row)}</div>
-                  </div>
-                  <button type="button" onClick={() => addChatClaimRow(row)} style={{ flexShrink: 0, height: "36px", padding: "0 14px", border: "none", borderRadius: "10px", background: "#7A1E47", color: "#fff", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}>
-                    🛒 담기
-                  </button>
-                </div>
-              ))}
-            </div>
-            <button type="button" onClick={() => setChatClaimRows([])} style={{ marginTop: "8px", width: "100%", height: "34px", border: "none", borderRadius: "10px", background: "transparent", color: "#B08FA0", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
-              제가 주문한 게 아니에요 · 숨기기
-            </button>
-          </div>
         </section>
       ) : null}
 

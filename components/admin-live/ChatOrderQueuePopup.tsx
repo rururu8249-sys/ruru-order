@@ -153,7 +153,7 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
         body: JSON.stringify({ customerUi: !customerUi }),
       });
       setCustomerUi((v) => !v);
-      showAdminToast(!customerUi ? "손님 배너 ON — 채팅으로 주문한 손님 주문서 상단에 「눌러서 담기」 배너가 뜹니다" : "손님 배너 OFF");
+      showAdminToast(!customerUi ? "채팅주문 자동담기 ON — 채팅으로 주문한 손님이 사이트에 오면 주문서에 자동으로 담아둡니다 (제출은 손님이 직접)" : "채팅주문 자동담기 OFF");
     } finally { setBusy(""); }
   };
 
@@ -285,8 +285,8 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
             </button>
             <button type="button" onClick={() => void toggleCustomerUi()} disabled={busy === "cui"}
               className={`rounded-xl px-4 py-2 text-[13px] font-black text-white disabled:opacity-50 ${customerUi ? "bg-fuchsia-600" : "bg-slate-400"}`}
-              title="채팅으로 주문한 손님이 사이트에 오면 주문서 상단에 「채팅으로 주문하셨죠? 눌러서 담기」 배너를 보여줍니다. 자동으로 담지는 않습니다.">
-              🛒 손님 배너 {customerUi ? "켜짐" : "꺼짐"}
+              title="채팅으로 주문한 손님이 사이트에 오면 채팅 주문을 주문서에 자동으로 담아둡니다. 손님이 확인·수정 후 직접 제출합니다.">
+              🛒 채팅 자동담기 {customerUi ? "켜짐" : "꺼짐"}
             </button>
             <span className="ml-auto text-[12px] font-black text-ink-soft">
               접수후보 <b className="text-emerald-700">{counts.parsed || 0}</b> · 확인필요 {(counts.need_product || 0) + (counts.ambiguous || 0)}
