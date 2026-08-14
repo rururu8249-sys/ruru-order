@@ -14,7 +14,9 @@ import { readSetting, writeSetting, postLiveChatMessage } from "@/lib/youtube";
 //   ⚠️ 같은 채팅에 두 번 안내하지 않는다(raw → 판정완료로 상태가 바뀌므로 자동 보장).
 export const SETTING_BOT_REPLY_ENABLED = "chat_order_bot_reply_enabled";
 const SETTING_BOT_LAST_MS = "chat_order_bot_last_ms";
-const BOT_DAILY_CAP = 40;
+const BOT_DAILY_CAP = 60;          // 안내+접수확인 합산 일일 상한 (글 1개 = 쿼터 50)
+const SETTING_BOT_CONFIRM_LAST_MS = "chat_order_bot_confirm_last_ms";
+const BOT_CONFIRM_GAP_MS = 60000;  // 접수확인은 1분에 1번, 그 사이 접수분을 묶어서 발송
 const BOT_GAP_MS = 20000;
 const BOT_MAX_PER_PASS = 2;
 const BOT_FRESH_MS = 3 * 60 * 1000;   // 3분 지난 채팅엔 뒷북 안내 금지
@@ -149,6 +151,8 @@ export async function parsePendingChatOrders(
     let updated = 0;
     // 봇 안내 대상: (닉네임, 사유) — 판정 후 모아서 상한 안에서 발송
     const botTargets: { name: string; channel: string; kind: "ambiguous" | "need_product"; cands: string[]; atMs: number }[] = [];
+    // 접수 확인 대상: 알아들은 주문 — 묶어서 한 줄로 확인해준다
+    const confirmTargets: { name: string; product: string; variant: string | null; qty: number; atMs: number }[] = [];
     for (const row of pending) {
       const raw = String(row.raw_message ?? "");
       const atMs = new Date(String(row.published_at ?? "")).getTime();
@@ -177,6 +181,12 @@ export async function parsePendingChatOrders(
 
       byStatus[r.status] = (byStatus[r.status] || 0) + 1;
 
+      if (r.status === "parsed" && Number.isFinite(atMs)) {
+        confirmTargets.push({
+          name: String(row.display_name ?? "").trim().replace(/^@/, ""),
+          product: String(r.productName || ""), variant: r.variantName, qty: r.qty, atMs,
+        });
+      }
       if ((r.status === "ambiguous" || r.status === "need_product") && Number.isFinite(atMs)) {
         botTargets.push({
           name: String(row.display_name ?? "").trim(),
@@ -235,6 +245,37 @@ export async function parsePendingChatOrders(
         }
       }
     } catch { /* 봇 안내 실패는 파싱 결과를 막지 않는다 */ }
+
+    // ── 접수 확인 발송 (묶음 — 1분에 1번, 여러 건을 한 줄로) ──
+    try {
+      if ((await readSetting(sb, SETTING_BOT_REPLY_ENABLED)) === "true") {
+        const fresh = confirmTargets.filter((t) => Date.now() - t.atMs <= BOT_FRESH_MS);
+        if (fresh.length > 0) {
+          const day = new Date().toISOString().slice(0, 10);
+          const { data: u } = await sb.from("youtube_api_usage")
+            .select("calls").eq("day", day).eq("method", "liveChatMessages.insert").limit(1).maybeSingle();
+          const sentToday = Number((u as Record<string, unknown> | null)?.calls || 0);
+          const lastMs = Number(await readSetting(sb, SETTING_BOT_CONFIRM_LAST_MS)) || 0;
+          if (sentToday < BOT_DAILY_CAP && Date.now() - lastMs >= BOT_CONFIRM_GAP_MS) {
+            const item = (t: (typeof fresh)[number]) => {
+              const what = (t.variant || t.product).replace(/\(.*?\)/g, "").trim().slice(0, 14);
+              return `${t.name}님 ${what}${t.qty > 1 ? ` ${t.qty}개` : ""}`;
+            };
+            const shown = fresh.slice(0, 3).map(item).join(" · ");
+            const more = fresh.length > 3 ? ` 외 ${fresh.length - 3}건` : "";
+            const msg = `🧾 접수! ${shown}${more} — 사이트 주문서에서 확정해주세요 🛒`;
+            const botChatId2 = await readSetting(sb, "chat_order_chat_id");
+            const res = await postLiveChatMessage(msg, { forceEvenIfDisabled: true, liveChatId: botChatId2 });
+            if (res.ok) {
+              botSent += 1;
+              await writeSetting(sb, SETTING_BOT_CONFIRM_LAST_MS, String(Date.now()));
+              if (u) await sb.from("youtube_api_usage").update({ calls: sentToday + 1 }).eq("day", day).eq("method", "liveChatMessages.insert");
+              else await sb.from("youtube_api_usage").insert({ day, method: "liveChatMessages.insert", calls: 1 });
+            }
+          }
+        }
+      }
+    } catch { /* 접수확인 실패는 파싱 결과를 막지 않는다 */ }
 
     return {
       ok: true,
