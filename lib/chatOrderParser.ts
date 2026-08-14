@@ -48,6 +48,25 @@ const KO_NUM: Record<string, number> = {
   다섯: 5, 여섯: 6, 일곱: 7, 여덟: 8, 아홉: 9, 열: 10,
 };
 
+// [2026-08-14 사장님 지시] 종류(카테고리) 유사어 — 손님의 상식 단어("가방")를 상품명 단어("토트백")와
+//   같은 증거로 친다. 같은 그룹 안에서만, 그리고 상품명 조각이 그 단어로 끝날 때("단톤모자"←"모자")도 인정.
+const CATEGORY_SYNONYMS: string[][] = [
+  ["가방", "토트백", "백팩", "크로스백", "숄더백", "에코백", "클러치", "파우치"],
+  ["모자", "캡", "볼캡", "비니", "버킷햇", "벙거지", "스냅백"],
+  ["신발", "운동화", "스니커즈", "슈즈", "샌들", "슬리퍼", "로퍼", "부츠"],
+  ["바지", "팬츠", "슬랙스"],
+  ["반팔", "반팔티", "반팔티셔츠"],
+  ["긴팔", "긴팔티", "긴팔티셔츠"],
+  ["향수", "퍼퓸"],
+];
+function categoryHit(sw: string, sp: string): boolean {
+  for (const g of CATEGORY_SYNONYMS) {
+    if (!g.includes(sw)) continue;
+    for (const syn of g) if (sp === syn || (sp.length > syn.length && sp.endsWith(syn))) return true;
+  }
+  return false;
+}
+
 const COLOR_WORDS = [
   "블랙", "검정", "검은", "깜장", "black",
   "화이트", "흰색", "하양", "white",
@@ -551,6 +570,7 @@ function parseChatOrderCore(
             if (sw.length < 2) continue;
             if (sp.startsWith(sw)) { sum += sw.length; break; }
             if (looseEqual(sw, sp)) { sum += sp.length; break; }   // "딥디크" → "딥티크"
+            if (categoryHit(sw, sp)) { sum += sw.length; break; }  // "가방" → "토트백", "모자" → "단톤모자"
           }
         }
         best = Math.max(best, sum);

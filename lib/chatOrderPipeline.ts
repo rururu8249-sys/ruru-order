@@ -299,7 +299,7 @@ export async function parsePendingChatOrders(
           const nick = t.name ? `${t.name}님, ` : "";
           // 조합형 종류 미지정(상품은 정해짐): "뉴에라캡은 종류가 여러 가지예요! 예) 1번 피츠버그…"
           const msg = t.kind === "ambiguous" && t.productName
-            ? `🤖 ${nick}${t.productName.replace(/\(.*?\)/g, "").trim().slice(0, 14)}은(는) 종류가 여러 가지예요! 예) ${String(t.cands[0] || "").slice(0, 20)} — 이름이나 번호까지 적어주세요`
+            ? `🤖 ${nick}${t.productName.replace(/\(.*?\)/g, "").trim().slice(0, 20)}은(는) 종류가 여러 가지예요! 예) ${String(t.cands[0] || "").slice(0, 20)} — 이름이나 번호까지 적어주세요`
             : t.kind === "ambiguous" && t.cands.length > 0
             ? `🤖 ${nick}${t.cands.slice(0, 3).join(" / ")} 중 어느 상품인지 종류와 함께 다시 적어주세요!`
             : `🤖 ${nick}상품명(또는 앞번호)과 함께 적어주시면 바로 접수돼요! 예) 3번 주세요`;
@@ -326,7 +326,7 @@ export async function parsePendingChatOrders(
           const lastMs = Number(await readSetting(sb, SETTING_BOT_CONFIRM_LAST_MS)) || 0;
           if (sentToday < BOT_DAILY_CAP && Date.now() - lastMs >= BOT_CONFIRM_GAP_MS) {
             const item = (t: (typeof fresh)[number]) => {
-              const what = (t.variant || t.product).replace(/\(.*?\)/g, "").trim().slice(0, 14);
+              const what = (t.variant || t.product).replace(/\(.*?\)/g, "").trim().slice(0, 30); // 상품명 잘려서 30자로 (2026-08-14 사장님 지적)
               // 수량은 1개여도 항상 붙인다 — "차지필로우 검정/230 1개", 멀티면 "블랙/M 1개·화이트/M 1개" (2026-08-14 사장님 지시)
               const opts = (t.items || [])
                 .map((i) => {
