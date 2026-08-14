@@ -3472,7 +3472,11 @@ export default function OrderPage() {
         const phone = normalizePhone(customerPhone);
         const res = await fetch(`/api/chat-orders/mine?nick=${encodeURIComponent(nick)}&phone=${encodeURIComponent(phone)}`, { cache: "no-store" });
         const json = await res.json().catch(() => null);
-        if (!stopped) setChatClaimRows(json?.ok && Array.isArray(json.rows) ? json.rows : []);
+        if (!stopped) {
+          setChatClaimRows(json?.ok && Array.isArray(json.rows) ? json.rows : []);
+          const nc = String(json?.nameChanged || "").trim();
+          if (nc && !chatNameChangeDismissedRef.current) setChatNameChanged(nc);
+        }
       } catch { /* 표시 전용 — 실패해도 주문 흐름 무관 */ }
     };
     void load();
@@ -3500,6 +3504,22 @@ export default function OrderPage() {
   //   재고캡·1인 구매제한·조합가 검증 동일 통과. 진짜 재고차감·돈 처리는 제출 RPC 그대로(무접촉).
   //   같은 행 중복 담김 방지: 세션 내 ref + 서버 claimed_at(담음 표시, 대기열 소진 아님) 이중.
   const chatClaimDoneRef = useRef<Set<string>>(new Set());
+  // [2026-08-14 사장님 승인] 유튜브 이름 변경 감지 → "사이트 닉네임도 똑같이 바꿀까요?" 팝업 (강제 변경 아님 — 손님 확인 1탭)
+  //   닉네임은 자동입금매칭 키라서: 가입 때와 동일한 중복 검사를 통과할 때만 변경, 실패 시 정보수정 안내.
+  const [chatNameChanged, setChatNameChanged] = useState<string | null>(null);
+  const chatNameChangeDismissedRef = useRef(false);
+  const applyChatNameChange = async () => {
+    const newNick = String(chatNameChanged || "").trim().replace(/^@/, "");
+    setChatNameChanged(null);
+    chatNameChangeDismissedRef.current = true;
+    if (!newNick) return;
+    const dupMsg = await getDuplicateYoutubeNicknameMessage(newNick, customerPhone);
+    if (dupMsg) { showCustomerNotice("이미 사용 중인 닉네임이라 자동으로 바꿀 수 없어요. 상단 [정보수정]에서 직접 바꿔주세요."); return; }
+    setYoutubeNickname(newNick);
+    try { localStorage.setItem("ruru_youtube_nickname", newNick); } catch { /* 표시용 */ }
+    void syncYoutubeNicknameToServer(newNick);
+    showCustomerNotice(`닉네임을 '${newNick}'(으)로 바꿨어요! 입금하실 때도 이 이름으로 해주세요.`, "success");
+  };
   useEffect(() => {
     if (!hasSavedInfo || chatClaimRows.length === 0) return;
     const pool = [...broadcastProducts, ...groupBuyQuickProductsFromCatalog];
@@ -5660,6 +5680,21 @@ export default function OrderPage() {
               </span>
             </div>
           )}
+
+          {chatNameChanged ? (
+            <div style={{ position: "fixed", inset: 0, zIndex: 150, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", padding: "0 24px" }}>
+              <div style={{ width: "330px", maxWidth: "100%", background: "#fff", borderRadius: "20px", padding: "24px 22px", boxShadow: "0 18px 50px rgba(0,0,0,0.25)" }}>
+                <div style={{ fontSize: "18px", fontWeight: 800, color: "#7A1E47", textAlign: "center" }}>📺 유튜브 이름이 바뀌셨네요!</div>
+                <div style={{ marginTop: "10px", fontSize: "14px", fontWeight: 600, color: "#555", textAlign: "center", lineHeight: 1.65 }}>
+                  유튜브 이름이 <b style={{ color: "#7A1E47" }}>{chatNameChanged}</b>(으)로 확인됐어요.<br />사이트 닉네임도 똑같이 바꿀까요?<br /><span style={{ fontSize: "12.5px", color: "#999" }}>똑같아야 주문 확인과 입금 확인이 정확해요.</span>
+                </div>
+                <div style={{ marginTop: "20px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <button type="button" onClick={() => { setChatNameChanged(null); chatNameChangeDismissedRef.current = true; }} style={{ height: "50px", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", fontSize: "15px", fontWeight: 800, color: "#666", cursor: "pointer" }}>나중에</button>
+                  <button type="button" onClick={() => { void applyChatNameChange(); }} style={{ height: "50px", borderRadius: "14px", border: "none", background: "#7A1E47", fontSize: "15px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>똑같이 바꾸기</button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {duplicateWarningOpen && (
             <div style={{ position: "fixed", inset: 0, zIndex: 150, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", padding: "0 24px" }} onClick={(e) => { if (e.target === e.currentTarget) { setDuplicateWarningOpen(false); setDuplicateWarningPendingAction(null); } }}>

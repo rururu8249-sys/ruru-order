@@ -53,11 +53,13 @@ export async function GET(request: NextRequest) {
       .order("id", { ascending: false })
       .limit(200);
     const rows: Record<string, unknown>[] = [];
+    let changedName = ""; // 채널ID로는 본인인데 채팅 이름 ≠ 사이트 닉네임 → 유튜브 이름을 바꾼 것
     for (const r of (data || []) as Record<string, unknown>[]) {
       if (r.claimed_at) continue;                              // 이미 담아간 것(표시용)은 숨김
       const byChannel = verifiedChannel && String(r.channel_id ?? "") === verifiedChannel; // 인증 고객: 채널ID 확정
       const byNick = nick.length >= 2 && sqz(r.display_name) === nick;                     // 미인증: 닉 정규화 정확일치
       if (!byChannel && !byNick) continue;
+      if (byChannel && !byNick && !changedName) changedName = String(r.display_name ?? "").trim();
       if (!r.parsed_product_id) continue;
       let items: unknown[] = [];
       try { const p = r.parsed_items ? JSON.parse(String(r.parsed_items)) : []; if (Array.isArray(p)) items = p; } catch { /* 없으면 빈 배열 */ }
@@ -71,7 +73,7 @@ export async function GET(request: NextRequest) {
       });
       if (rows.length >= 5) break;                             // 배너는 최대 5건
     }
-    return NextResponse.json({ ok: true, enabled: true, rows });
+    return NextResponse.json({ ok: true, enabled: true, rows, nameChanged: changedName || null });
   } catch {
     // 표시 전용 — 실패는 조용히 빈 결과(주문 흐름 무영향)
     return NextResponse.json({ ok: true, enabled: false, rows: [] });
