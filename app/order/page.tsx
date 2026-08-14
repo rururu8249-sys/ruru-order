@@ -5594,10 +5594,10 @@ export default function OrderPage() {
               <div style={{ padding: "2px 18px 10px" }}>
                 {chatFindOpen ? (
                   <div style={{ background: "#FFF6FA", border: "1.5px solid #E8A3C0", borderRadius: "12px", padding: "10px 12px" }}>
-                    <div style={{ fontSize: "14px", fontWeight: 900, color: "#7A1E47" }}>💬 채팅 주문 찾기</div>
-                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#A96E86", margin: "4px 0 9px", lineHeight: 1.6 }}>채팅으로 주문했는데 주문서에 없다면 — 유튜브 채팅에서 쓰시는 이름을 적어주세요. 그 이름으로 주문을 찾아 <b>바로 주문서에 담아드려요.</b></div>
+                    <div style={{ fontSize: "14px", fontWeight: 900, color: "#7A1E47" }}>💬 채팅으로 주문하셨나요?</div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#A96E86", margin: "4px 0 9px", lineHeight: 1.6 }}>채팅 닉네임 <b>두 글자</b>만 치면 이름이 떠요 — 고르면 <b>주문이 바로 담깁니다.</b></div>
                     <div style={{ display: "flex", gap: "7px" }}>
-                      <input value={chatFindName} onChange={(e) => onChatFindNameChange(e.target.value)} placeholder="유튜브 채팅 이름 (예: 홍길동_23)"
+                      <input value={chatFindName} onChange={(e) => onChatFindNameChange(e.target.value)} placeholder="채팅 닉네임 입력"
                         style={{ flex: 1, minWidth: 0, height: "38px", borderRadius: "10px", border: "1px solid #E8D5DD", padding: "0 12px", fontSize: "14px", fontWeight: 700 }} />
                       <button type="button" onClick={() => void findMyChatOrders()} style={{ flexShrink: 0, height: "38px", padding: "0 15px", border: "none", borderRadius: "10px", background: "#7A1E47", color: "#fff", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}>찾기</button>
                       <button type="button" onClick={() => setChatFindOpen(false)} style={{ flexShrink: 0, height: "38px", padding: "0 9px", border: "none", borderRadius: "10px", background: "transparent", color: "#B08FA0", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>닫기</button>
