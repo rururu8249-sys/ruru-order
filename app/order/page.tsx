@@ -3576,6 +3576,7 @@ export default function OrderPage() {
       if (json?.ok && Array.isArray(json.rows) && json.rows.length > 0) {
         chatAltNickRef.current = alt;
         setChatFindOpen(false);
+        showCustomerNotice(`💬 '${alt}'님의 채팅 주문 ${json.rows.length}건을 찾았어요 — 주문서에 담아드릴게요!`, "success");
         setChatClaimRows(json.rows); // 자동담기 effect가 담고, 담는 순간 채널ID 연결
       } else {
         showCustomerNotice(json?.enabled === false ? "지금은 채팅주문 담기가 꺼져 있어요." : `'${alt}' 이름의 최근 채팅 주문을 못 찾았어요. 채팅에 쓴 이름 그대로 적어주세요.`);
@@ -5560,9 +5561,10 @@ export default function OrderPage() {
               <div style={{ padding: "2px 18px 10px" }}>
                 {chatFindOpen ? (
                   <div style={{ background: "#FFF6FA", border: "1.5px solid #E8A3C0", borderRadius: "12px", padding: "10px 12px" }}>
-                    <div style={{ fontSize: "12px", fontWeight: 800, color: "#7A1E47", marginBottom: "7px" }}>채팅에서 쓰는 이름을 그대로 적어주세요 (예: Borahae_Ju)</div>
+                    <div style={{ fontSize: "14px", fontWeight: 900, color: "#7A1E47" }}>💬 채팅 주문 찾기</div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#A96E86", margin: "4px 0 9px", lineHeight: 1.6 }}>채팅으로 주문했는데 주문서에 없다면 — 유튜브 채팅에서 쓰시는 이름을 적어주세요. 그 이름으로 주문을 찾아 <b>바로 주문서에 담아드려요.</b></div>
                     <div style={{ display: "flex", gap: "7px" }}>
-                      <input value={chatFindName} onChange={(e) => setChatFindName(e.target.value)} placeholder="유튜브 채팅 이름"
+                      <input value={chatFindName} onChange={(e) => setChatFindName(e.target.value)} placeholder="유튜브 채팅 이름 (예: 홍길동_23)"
                         style={{ flex: 1, minWidth: 0, height: "38px", borderRadius: "10px", border: "1px solid #E8D5DD", padding: "0 12px", fontSize: "14px", fontWeight: 700 }} />
                       <button type="button" onClick={() => void findMyChatOrders()} style={{ flexShrink: 0, height: "38px", padding: "0 15px", border: "none", borderRadius: "10px", background: "#7A1E47", color: "#fff", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}>찾기</button>
                       <button type="button" onClick={() => setChatFindOpen(false)} style={{ flexShrink: 0, height: "38px", padding: "0 9px", border: "none", borderRadius: "10px", background: "transparent", color: "#B08FA0", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>닫기</button>
