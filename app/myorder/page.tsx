@@ -409,7 +409,7 @@ export default function MyOrderPage() {
               href="/"
               className="mt-4 flex min-h-[54px] w-full items-center justify-center rounded-[20px] bg-coral-600 px-4 py-3 text-[16px] font-black text-white shadow-[0_12px_26px_rgba(216,90,48,0.22)] transition active:scale-[0.98]"
             >
-              카카오로 간편 주문 시작
+              카카오톡으로 간편 주문 시작
             </Link>
           </section>
         )}

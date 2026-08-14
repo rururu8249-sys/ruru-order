@@ -38,7 +38,7 @@ export default function KakaoCallbackPage() {
           "알 수 없는 오류";
 
         setStatus("error");
-        setMessage(`카카오 로그인 실패: ${detailMessage}`);
+        setMessage(`카카오톡 로그인 실패: ${detailMessage}`);
         return;
       }
 
