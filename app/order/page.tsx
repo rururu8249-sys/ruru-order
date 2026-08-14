@@ -3441,10 +3441,12 @@ export default function OrderPage() {
       })();
       const effMax = Math.min(maxQty, limitQty);
       // 더 작은 제약이 구매제한이면 구매제한 안내, 아니면 재고 안내
+      // [2026-08-14 사장님 지시] 어떤 상품이 걸렸는지 상품명을 붙여서 안내
+      const pnm = String(product.product_name || "상품").replace(/\(.*?\)/g, "").trim().slice(0, 20);
       const limitMsg = (cap: number) =>
         limitQty <= maxQty && Number.isFinite(limitQty)
-          ? "1인당 최대 " + limitQty + "개까지 구매할 수 있어요."
-          : "재고가 부족해요. 최대 " + cap + "개까지 담을 수 있어요.";
+          ? "[" + pnm + "] 1인당 최대 " + limitQty + "개까지 구매할 수 있어요."
+          : "[" + pnm + "] 재고가 부족해요. 최대 " + cap + "개까지 담을 수 있어요.";
       const addQty = Number(nextItem.qty) || 1;
       const sameIndex = nextItem.product_id ? prev.findIndex((item) => item.product_id === nextItem.product_id && normColor(item.color) === normColor(nextItem.color) && normColor(item.size) === normColor(nextItem.size) && item.product_name.trim() !== "") : -1;
       if (sameIndex >= 0) {
@@ -3562,7 +3564,7 @@ export default function OrderPage() {
             }
           } catch { /* 캡 조회 실패 → 999 (서버가 제출 때 최종 방어) */ }
         }
-        if (next > maxQty) { next = Math.max(1, maxQty); showCustomerNotice(`최대 ${next}개까지 담을 수 있어요.`); }
+        if (next > maxQty) { next = Math.max(1, maxQty); showCustomerNotice(`[${String(it.product_name || "상품").replace(/\(.*?\)/g, "").trim().slice(0, 20)}] 최대 ${next}개까지 담을 수 있어요.`); }
       }
       return { ...it, qty: String(next) };
     }));
