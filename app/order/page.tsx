@@ -5343,7 +5343,7 @@ export default function OrderPage() {
                                   ? { width: "100%", height: "34px", padding: "0 10px", borderRadius: "8px", border: "none", background: sold ? "#ccc" : "#7A1E47", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: sold ? "default" : "pointer" }
                                   : { flexShrink: 0, height: "32px", padding: "0 16px", borderRadius: "8px", border: "none", background: sold ? "#ccc" : "#7A1E47", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: sold ? "default" : "pointer" }}
                               >
-                                {sold ? "품절" : "장바구니 담기"}
+                                {sold ? "품절" : "🛒 담기"}
                               </button>
                             </div>
                           </div>
@@ -6255,7 +6255,7 @@ export default function OrderPage() {
                 >
                   <span style={{ fontSize: "12px", fontWeight: 800, color: "#F5D9E5", whiteSpace: "nowrap" }}>🛒 담은 상품 {cartCount}개</span>
                   <span style={{ flex: 1, textAlign: "left", fontSize: "14px", fontWeight: 900, color: "#fff" }}>{cartTotal > 0 ? `${cartTotal.toLocaleString()}원` : ""}</span>
-                  <span style={{ flexShrink: 0, fontSize: "13.5px", fontWeight: 900, color: "#7A1E47", background: "#fff", borderRadius: "10px", padding: "9px 14px" }}>주문서 제출하기 →</span>
+                  <span style={{ flexShrink: 0, fontSize: "13.5px", fontWeight: 900, color: "#7A1E47", background: "#fff", borderRadius: "10px", padding: "9px 14px" }}>주문서 확인 →</span>
                 </button>
               );
             })()}

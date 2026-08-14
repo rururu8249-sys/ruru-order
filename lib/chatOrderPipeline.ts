@@ -307,7 +307,7 @@ export async function parsePendingChatOrders(
             };
             const shown = fresh.slice(0, 3).map(item).join(" · ");
             const more = fresh.length > 3 ? ` 외 ${fresh.length - 3}건` : "";
-            const msg = `🧾 접수! ${shown}${more} — 사이트 주문서에서 확정해주세요 🛒`;
+            const msg = `🧾 접수! ${shown}${more} — 주문서에서 확인 후 제출해주세요 🛒`;
             const botChatId2 = await readSetting(sb, "chat_order_chat_id");
             const res = await postLiveChatMessage(msg, { forceEvenIfDisabled: true, liveChatId: botChatId2 });
             if (res.ok) {
