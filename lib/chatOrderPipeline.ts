@@ -341,7 +341,7 @@ export async function parsePendingChatOrders(
               const tail = many > 4 ? ` 외${many - 4}` : "";
               return `${t.name}님 ${what} ${opts || `${Math.max(1, t.qty)}개`}${tail}`.trim();
             };
-            const shown = fresh.slice(0, 3).map(item).join(" · ");
+            const shown = fresh.slice(0, 3).map((t) => `✅${item(t)}`).join(" ");
             const more = fresh.length > 3 ? ` 외 ${fresh.length - 3}건` : "";
             const msg = `🧾 접수! ${shown}${more} — 주문서에서 확인 후 제출해주세요 🛒`;
             const botChatId2 = await readSetting(sb, "chat_order_chat_id");
