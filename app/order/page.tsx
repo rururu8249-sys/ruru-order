@@ -5186,27 +5186,6 @@ export default function OrderPage() {
         </section>
       ) : null}
 
-      {/* [셀프 연결] 방송 중 + 담긴 채팅주문이 없을 때만 — 눈에 거슬리지 않게 한 줄 */}
-      {hasSavedInfo && isBroadcastOn && chatClaimRows.length === 0 ? (
-        <section style={{ margin: "0 auto", width: "100%", maxWidth: "560px", padding: "0 14px 4px" }}>
-          {chatFindOpen ? (
-            <div style={{ background: "#FFF6FA", border: "1.5px solid #E8A3C0", borderRadius: "14px", padding: "11px 12px" }}>
-              <div style={{ fontSize: "12.5px", fontWeight: 800, color: "#7A1E47", marginBottom: "7px" }}>채팅에서 쓰는 이름을 그대로 적어주세요 (예: Borahae_Ju)</div>
-              <div style={{ display: "flex", gap: "7px" }}>
-                <input value={chatFindName} onChange={(e) => setChatFindName(e.target.value)} placeholder="유튜브 채팅 이름"
-                  style={{ flex: 1, minWidth: 0, height: "40px", borderRadius: "10px", border: "1px solid #E8D5DD", padding: "0 12px", fontSize: "14px", fontWeight: 700 }} />
-                <button type="button" onClick={() => void findMyChatOrders()} style={{ flexShrink: 0, height: "40px", padding: "0 16px", border: "none", borderRadius: "10px", background: "#7A1E47", color: "#fff", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}>찾기</button>
-                <button type="button" onClick={() => setChatFindOpen(false)} style={{ flexShrink: 0, height: "40px", padding: "0 10px", border: "none", borderRadius: "10px", background: "transparent", color: "#B08FA0", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>닫기</button>
-              </div>
-            </div>
-          ) : (
-            <button type="button" onClick={() => setChatFindOpen(true)} style={{ width: "100%", height: "36px", border: "1px dashed #E8A3C0", borderRadius: "12px", background: "#FFF9FC", color: "#A96E86", fontSize: "12.5px", fontWeight: 800, cursor: "pointer" }}>
-              💬 채팅으로 주문했는데 안 담겼나요? — 눌러서 찾기
-            </button>
-          )}
-        </section>
-      ) : null}
-
       {!isAutoLoggedIn && (isEditingCustomerInfo || customerMode === "new") && (
         <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
           <OrderCustomerInfoIntro mode={isEditingCustomerInfo ? "edit" : "check"} />
@@ -5575,6 +5554,28 @@ export default function OrderPage() {
                 })}
               </div>
             )}
+
+            {/* [셀프 연결 · 사장님 확정 위치] 주문서 확인 안 — 채팅주문 손님만 여길 보니까 남들에겐 안 거슬림 */}
+            {isBroadcastOn ? (
+              <div style={{ padding: "2px 18px 10px" }}>
+                {chatFindOpen ? (
+                  <div style={{ background: "#FFF6FA", border: "1.5px solid #E8A3C0", borderRadius: "12px", padding: "10px 12px" }}>
+                    <div style={{ fontSize: "12px", fontWeight: 800, color: "#7A1E47", marginBottom: "7px" }}>채팅에서 쓰는 이름을 그대로 적어주세요 (예: Borahae_Ju)</div>
+                    <div style={{ display: "flex", gap: "7px" }}>
+                      <input value={chatFindName} onChange={(e) => setChatFindName(e.target.value)} placeholder="유튜브 채팅 이름"
+                        style={{ flex: 1, minWidth: 0, height: "38px", borderRadius: "10px", border: "1px solid #E8D5DD", padding: "0 12px", fontSize: "14px", fontWeight: 700 }} />
+                      <button type="button" onClick={() => void findMyChatOrders()} style={{ flexShrink: 0, height: "38px", padding: "0 15px", border: "none", borderRadius: "10px", background: "#7A1E47", color: "#fff", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}>찾기</button>
+                      <button type="button" onClick={() => setChatFindOpen(false)} style={{ flexShrink: 0, height: "38px", padding: "0 9px", border: "none", borderRadius: "10px", background: "transparent", color: "#B08FA0", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>닫기</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setChatFindOpen(true)}
+                    style={{ width: "100%", padding: "7px 0", border: "none", background: "transparent", color: "#B08FA0", fontSize: "12px", fontWeight: 700, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px" }}>
+                    💬 채팅으로 주문했는데 주문서에 안 보이나요?
+                  </button>
+                )}
+              </div>
+            ) : null}
 
             <section style={{ padding: "16px 18px", borderTop: "0.5px solid #E5E1DC" }}>
               <div style={{ fontSize: "14px", fontWeight: 800, color: "#1A1A1A", marginBottom: "12px" }}>결제 방법을 선택해 주세요.</div>
