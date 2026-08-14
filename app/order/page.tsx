@@ -3579,13 +3579,21 @@ export default function OrderPage() {
     if (!alt) { showCustomerNotice("채팅에 쓰는 이름을 적어주세요."); return; }
     try {
       const phone = normalizePhone(customerPhone);
-      const res = await fetch(`/api/chat-orders/mine?nick=${encodeURIComponent(alt)}&phone=${encodeURIComponent(phone)}`, { cache: "no-store" });
+      const res = await fetch(`/api/chat-orders/mine?nick=${encodeURIComponent(alt)}&phone=${encodeURIComponent(phone)}&all=1`, { cache: "no-store" });
       const json = await res.json().catch(() => null);
       if (json?.ok && Array.isArray(json.rows) && json.rows.length > 0) {
+        // 이미 주문서에 있는 같은 상품·옵션은 제외 — 찾기를 여러 번 눌러도 수량이 이중으로 안 는다
+        const nrmF = (v: unknown) => { const t = String(v ?? "").trim(); return t === "없음" ? "" : t; };
+        const fresh = (json.rows as any[]).filter((row) => {
+          const its = chatClaimItemsOf(row);
+          return !its.every((i) => items.some((it) => String(it.product_id) === String(row.product_id) && nrmF(it.color) === nrmF(i.color) && nrmF(it.size) === nrmF(i.size)));
+        });
+        if (fresh.length === 0) { setChatFindOpen(false); showCustomerNotice("찾은 채팅 주문이 이미 주문서에 담겨 있어요!", "success"); return; }
+        for (const row of fresh) chatClaimDoneRef.current.delete(String(row.id)); // 회수/삭제 후 재담기 허용
         chatAltNickRef.current = alt;
         setChatFindOpen(false);
-        showCustomerNotice(`💬 '${alt}'님의 채팅 주문 ${json.rows.length}건을 찾았어요 — 주문서에 담아드릴게요!`, "success");
-        setChatClaimRows(json.rows); // 자동담기 effect가 담고, 담는 순간 채널ID 연결
+        showCustomerNotice(`💬 '${alt}'님의 채팅 주문 ${fresh.length}건을 찾았어요 — 주문서에 담아드릴게요!`, "success");
+        setChatClaimRows(fresh); // 자동담기 effect가 담고, 담는 순간 채널ID 연결
       } else {
         showCustomerNotice(json?.enabled === false ? "지금은 채팅주문 담기가 꺼져 있어요." : `'${alt}' 이름의 최근 채팅 주문을 못 찾았어요. 채팅에 쓴 이름 그대로 적어주세요.`);
       }

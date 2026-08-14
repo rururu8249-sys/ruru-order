@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
   try {
     const nick = sqz(request.nextUrl.searchParams.get("nick") || "");
     const phone = String(request.nextUrl.searchParams.get("phone") || "").replace(/\D/g, "");
+    const showAll = request.nextUrl.searchParams.get("all") === "1"; // 손님이 직접 「찾기」 — 담음 처리된 것도 포함(방송 전체 복구)
     if ((!nick || nick.length < 2) && phone.length < 10) return NextResponse.json({ ok: true, enabled: false, rows: [] });
     const sb = sbAdmin();
     const { data: st } = await sb.from("settings").select("value").eq("key", SETTING_CUSTOMER_UI_ENABLED).limit(1).maybeSingle();
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
     const rows: Record<string, unknown>[] = [];
     let changedName = ""; // 채널ID로는 본인인데 채팅 이름 ≠ 사이트 닉네임 → 유튜브 이름을 바꾼 것
     for (const r of (data || []) as Record<string, unknown>[]) {
-      if (r.claimed_at) continue;                              // 이미 담아간 것(표시용)은 숨김
+      if (!showAll && r.claimed_at) continue;                  // 자동담김은 새 주문만 / 직접 찾기는 전부
       const byChannel = verifiedChannel && String(r.channel_id ?? "") === verifiedChannel; // 인증 고객: 채널ID 확정
       const byNick = nick.length >= 2 && sqz(r.display_name) === nick;                     // 미인증: 닉 정규화 정확일치
       if (!byChannel && !byNick) continue;
@@ -72,7 +73,7 @@ export async function GET(request: NextRequest) {
         qty: Math.max(1, Number(r.parsed_qty || 1)),
         items,
       });
-      if (rows.length >= 5) break;                             // 배너는 최대 5건
+      if (rows.length >= (showAll ? 12 : 5)) break;            // 직접 찾기는 넉넉히
     }
     // [가로채기 방지] 이미 "다른 회원"에 연결된 채널의 채팅은 닉네임 입력으로 못 가져간다.
     //   연결된 단골의 주문은 본인(채널 일치)에게만 보인다. 돈은 어차피 각자 결제라 무관 — 이건 표시 보호.
