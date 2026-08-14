@@ -571,6 +571,9 @@ function parseChatOrderCore(
             if (sp.startsWith(sw)) { sum += sw.length; break; }
             if (looseEqual(sw, sp)) { sum += sp.length; break; }   // "딥디크" → "딥티크"
             if (categoryHit(sw, sp)) { sum += sw.length; break; }  // "가방" → "토트백", "모자" → "단톤모자"
+            // 붙여쓰기 대응("룰루가방 주문") — 단어 끝에 붙은 종류 단어도 인정 (2026-08-14 실채팅)
+            const catTail = CATEGORY_SYNONYMS.flat().find((g) => sw.length > g.length && sw.endsWith(g));
+            if (catTail && categoryHit(catTail, sp)) { sum += catTail.length; break; }
           }
         }
         best = Math.max(best, sum);
