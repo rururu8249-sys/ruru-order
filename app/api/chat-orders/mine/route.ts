@@ -54,7 +54,8 @@ export async function GET(request: NextRequest) {
     }
     const nick = sqz(request.nextUrl.searchParams.get("nick") || "");
     const phone = String(request.nextUrl.searchParams.get("phone") || "").replace(/\D/g, "");
-    const showAll = request.nextUrl.searchParams.get("all") === "1"; // 손님이 직접 「찾기」 — 담음 처리된 것도 포함(방송 전체 복구)
+    const showAll = request.nextUrl.searchParams.get("all") === "1";
+    const selfMode = request.nextUrl.searchParams.get("self") === "1"; // 연결 손님 전용 「내 주문 다시 담기」 // 손님이 직접 「찾기」 — 담음 처리된 것도 포함(방송 전체 복구)
     if ((!nick || nick.length < 2) && phone.length < 10) return NextResponse.json({ ok: true, enabled: false, rows: [] });
     const sb = sbAdmin();
     const { data: st } = await sb.from("settings").select("value").eq("key", SETTING_CUSTOMER_UI_ENABLED).limit(1).maybeSingle();
@@ -88,8 +89,8 @@ export async function GET(request: NextRequest) {
         continue;
       }
       // 직접 찾기(all=1)는 "고른 이름의 주문만" — 채널 매칭은 자동담김 전용 (본인 옛 주문이 딸려오는 혼동 방지)
-      const byChannel = !showAll && verifiedChannel && String(r.channel_id ?? "") === verifiedChannel;
-      const byNick = nick.length >= 2 && sqz(r.display_name) === nick;                     // 미인증: 닉 정규화 정확일치
+      const byChannel = (!showAll || selfMode) && verifiedChannel && String(r.channel_id ?? "") === verifiedChannel;
+      const byNick = !selfMode && nick.length >= 2 && sqz(r.display_name) === nick; // self 모드는 채널만                     // 미인증: 닉 정규화 정확일치
       if (!byChannel && !byNick) continue;
       if (byChannel && !byNick && !changedName) changedName = String(r.display_name ?? "").trim();
       if (!r.parsed_product_id) continue;
@@ -124,7 +125,8 @@ export async function GET(request: NextRequest) {
     }
     // 찾기 노출: 미연결 손님 = 항상 / 연결 손님 = 되찾을 기록 있을 때만 (사장님 확정 2026-08-14)
     const showFind = !verifiedChannel || claimedMine > 0;
-    return NextResponse.json({ ok: true, enabled: true, rows, nameChanged: changedName || null, showFind });
+    const linked = Boolean(verifiedChannel);
+    return NextResponse.json({ ok: true, enabled: true, rows, nameChanged: changedName || null, showFind, linked });
   } catch {
     // 표시 전용 — 실패는 조용히 빈 결과(주문 흐름 무영향)
     return NextResponse.json({ ok: true, enabled: false, rows: [] });

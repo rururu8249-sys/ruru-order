@@ -3487,6 +3487,7 @@ export default function OrderPage() {
         if (!stopped) {
           setChatUiEnabled(Boolean(json?.enabled));
           if (typeof json?.showFind === "boolean") setChatShowFind(json.showFind);
+          if (typeof json?.linked === "boolean") setChatLinked(json.linked);
           setChatClaimRows(json?.ok && Array.isArray(json.rows) ? json.rows : []);
           const nc = String(json?.nameChanged || "").trim();
           if (nc && !chatNameChangeDismissedRef.current) setChatNameChanged(nc);
@@ -3575,6 +3576,7 @@ export default function OrderPage() {
   //   담는 순간 서버가 채널ID를 연결(mine POST) → 다음부터는 평생 자동. 관리자 손 안 감.
   const [chatUiEnabled, setChatUiEnabled] = useState(false); // 관리자 「채팅 자동담기」 토글 상태 — OFF면 힌트/찾기 전부 숨김
   const [chatShowFind, setChatShowFind] = useState(true); // 연결된 손님은 되찾을 기록 있을 때만 찾기 노출
+  const [chatLinked, setChatLinked] = useState(false); // 연결된 손님 = 이름 검색 대신 「내 주문 다시 담기」
   const chatAltNickRef = useRef("");
   const [chatFindOpen, setChatFindOpen] = useState(false);
   const [chatFindName, setChatFindName] = useState("");
@@ -3593,12 +3595,12 @@ export default function OrderPage() {
       } catch { setChatFindSug([]); }
     }, 350);
   };
-  const findMyChatOrders = async (nameArg?: string) => {
-    const alt = String(nameArg ?? chatFindName).trim();
-    if (!alt) { showCustomerNotice("채팅에 쓰는 이름을 적어주세요."); return; }
+  const findMyChatOrders = async (nameArg?: string, selfMode?: boolean) => {
+    const alt = selfMode ? youtubeNickname.trim() : String(nameArg ?? chatFindName).trim();
+    if (!selfMode && !alt) { showCustomerNotice("채팅에 쓰는 이름을 적어주세요."); return; }
     try {
       const phone = normalizePhone(customerPhone);
-      const res = await fetch(`/api/chat-orders/mine?nick=${encodeURIComponent(alt)}&phone=${encodeURIComponent(phone)}&all=1`, { cache: "no-store" });
+      const res = await fetch(`/api/chat-orders/mine?nick=${encodeURIComponent(alt)}&phone=${encodeURIComponent(phone)}&all=1${selfMode ? "&self=1" : ""}`, { cache: "no-store" });
       const json = await res.json().catch(() => null);
       if (json?.ok && Array.isArray(json.rows) && json.rows.length > 0) {
         // 이미 주문서에 있는 같은 상품·옵션은 제외 — 찾기를 여러 번 눌러도 수량이 이중으로 안 는다
@@ -3609,7 +3611,7 @@ export default function OrderPage() {
         });
         if (fresh.length === 0) { setChatFindOpen(false); showCustomerNotice("찾은 채팅 주문이 이미 주문서에 담겨 있어요!", "success"); return; }
         for (const row of fresh) chatClaimDoneRef.current.delete(String(row.id)); // 회수/삭제 후 재담기 허용
-        chatAltNickRef.current = alt;
+        if (!selfMode) chatAltNickRef.current = alt;
         setChatFindOpen(false);
         showCustomerNotice(`💬 '${alt}'님의 채팅 주문 ${fresh.length}건을 찾았어요 — 주문서에 담아드릴게요!`, "success");
         setChatClaimRows(fresh); // 자동담기 effect가 담고, 담는 순간 채널ID 연결
@@ -5594,7 +5596,16 @@ export default function OrderPage() {
             {/* [셀프 연결 · 사장님 확정 위치] 주문서 확인 안 — 채팅주문 손님만 여길 보니까 남들에겐 안 거슬림 */}
             {isBroadcastOn && chatUiEnabled && chatShowFind ? (
               <div style={{ padding: "2px 18px 10px" }}>
-                {chatFindOpen ? (
+                {chatFindOpen ? ( chatLinked ? (
+                  <div style={{ background: "#FFF6FA", border: "1.5px solid #E8A3C0", borderRadius: "12px", padding: "12px" }}>
+                    <div style={{ fontSize: "14px", fontWeight: 900, color: "#7A1E47" }}>🔄 채팅 주문 다시 불러오기</div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#A96E86", margin: "4px 0 9px", lineHeight: 1.6 }}>회수되었거나 지워진 <b>내 채팅 주문</b>을 다시 담아드려요.</div>
+                    <div style={{ display: "flex", gap: "7px" }}>
+                      <button type="button" onClick={() => void findMyChatOrders(undefined, true)} style={{ flex: 1, height: "40px", border: "none", borderRadius: "10px", background: "#7A1E47", color: "#fff", fontSize: "13.5px", fontWeight: 900, cursor: "pointer" }}>내 주문 다시 담기</button>
+                      <button type="button" onClick={() => setChatFindOpen(false)} style={{ flexShrink: 0, height: "40px", padding: "0 12px", border: "none", borderRadius: "10px", background: "transparent", color: "#B08FA0", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>닫기</button>
+                    </div>
+                  </div>
+                ) : (
                   <div style={{ background: "#FFF6FA", border: "1.5px solid #E8A3C0", borderRadius: "12px", padding: "10px 12px" }}>
                     <div style={{ fontSize: "14px", fontWeight: 900, color: "#7A1E47" }}>💬 채팅으로 주문하셨나요?</div>
                     <div style={{ fontSize: "12px", fontWeight: 700, color: "#A96E86", margin: "4px 0 9px", lineHeight: 1.6 }}>채팅 닉네임 <b>한 글자</b>만 쳐도 이름이 떠요 — 고르면 <b>주문이 바로 담깁니다.</b></div>
@@ -5616,7 +5627,7 @@ export default function OrderPage() {
                       </div>
                     ) : null}
                   </div>
-                ) : (
+                ) ) : (
                   <button type="button" onClick={() => setChatFindOpen(true)}
                     style={{ width: "100%", padding: "7px 0", border: "none", background: "transparent", color: "#B08FA0", fontSize: "12px", fontWeight: 700, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px" }}>
                     💬 채팅으로 주문했는데 주문서에 안 보이나요?
