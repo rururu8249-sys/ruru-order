@@ -16,7 +16,7 @@ export const SETTING_BOT_REPLY_ENABLED = "chat_order_bot_reply_enabled";
 const SETTING_BOT_LAST_MS = "chat_order_bot_last_ms";
 const BOT_DAILY_CAP = 60;          // 안내+접수확인 합산 일일 상한 (글 1개 = 쿼터 50)
 const SETTING_BOT_CONFIRM_LAST_MS = "chat_order_bot_confirm_last_ms";
-const BOT_CONFIRM_GAP_MS = 60000;  // 접수확인은 1분에 1번, 그 사이 접수분을 묶어서 발송
+const BOT_CONFIRM_GAP_MS = 20000;  // 접수확인은 20초에 1번(즉답 체감), 그 사이 접수분을 묶어서 발송
 const BOT_GAP_MS = 20000;
 const BOT_MAX_PER_PASS = 2;
 const BOT_FRESH_MS = 3 * 60 * 1000;   // 3분 지난 채팅엔 뒷북 안내 금지

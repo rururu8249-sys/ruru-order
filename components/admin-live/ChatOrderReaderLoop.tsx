@@ -17,7 +17,9 @@ export default function ChatOrderReaderLoop() {
       } catch { /* 네트워크 오류는 다음 주기에 재시도 */ }
       finally { busy = false; }
     };
-    const t = setInterval(() => { void tick(); }, 7000);
+    // 20초: 유튜브 일일 쿼터(10,000) 안에서 최장 방송(7.7h)까지 버티는 간격.
+    //   쿼터 증설(50,000) 승인되면 5초로 올린다.
+    const t = setInterval(() => { void tick(); }, 20000);
     return () => clearInterval(t);
   }, []);
   return null;
