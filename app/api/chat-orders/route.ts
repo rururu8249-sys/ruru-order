@@ -101,6 +101,28 @@ export async function POST(request: NextRequest) {
       await put(SETTING_BOT_REPLY_ENABLED, body.botReply ? "true" : "false");
       out.botReply = body.botReply;
     }
+    // [수동 연결] 유튜브 이름(영문 등)과 사이트 닉네임이 달라 자동매칭 불가한 손님 —
+    //   관리자가 1회 연결하면 채널ID가 저장돼 이후 평생 자동. youtube_nickname은 읽기만(무접촉).
+    if (body.linkChat && typeof body.linkChat === "object") {
+      const lc = body.linkChat as Record<string, unknown>;
+      const sq = (v: unknown) => String(v ?? "").toLowerCase().replace(/^@/, "").replace(/[^a-z0-9가-힣]/g, "");
+      const chatName = sq(lc.chatName);
+      const siteNick = String(lc.siteNick ?? "").trim();
+      if (!chatName || !siteNick) return NextResponse.json({ ok: false, error: { message: "채팅 이름과 사이트 닉네임을 모두 입력해주세요." } }, { status: 400 });
+      const { data: rows } = await sb.from("chat_orders")
+        .select("display_name, channel_id").order("id", { ascending: false }).limit(300);
+      const hit = ((rows || []) as Record<string, unknown>[]).find((r) => sq(r.display_name) === chatName && String(r.channel_id ?? "").trim());
+      if (!hit) return NextResponse.json({ ok: false, error: { message: "최근 채팅에서 그 이름을 못 찾았어요. 채팅 원문의 닉네임 그대로 입력해주세요." } }, { status: 404 });
+      const ch = String(hit.channel_id).trim();
+      const { data: cust } = await sb.from("customers")
+        .select("customer_phone").eq("youtube_nickname", siteNick).limit(1).maybeSingle();
+      if (!cust) return NextResponse.json({ ok: false, error: { message: `사이트 닉네임 '${siteNick}' 회원을 못 찾았어요.` } }, { status: 404 });
+      const phone = String((cust as Record<string, unknown>).customer_phone ?? "");
+      await sb.from("customers").update({ youtube_channel_id: null }).eq("youtube_channel_id", ch).neq("customer_phone", phone);
+      await sb.from("customers").update({ youtube_channel_id: ch, youtube_handle: String(lc.chatName ?? "").trim().replace(/^@/, ""), handle_verified_at: new Date().toISOString() }).eq("customer_phone", phone);
+      out.linked = { channel: ch, siteNick };
+      return NextResponse.json(out);
+    }
     // 손님 배너: 채팅으로 주문한 손님 주문서 상단 「눌러서 담기」 배너 (4단계, 기본 OFF)
     if (typeof body.customerUi === "boolean") {
       await put("chat_order_customer_ui_enabled", body.customerUi ? "true" : "false");

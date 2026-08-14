@@ -82,6 +82,18 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
   const [testRows, setTestRows] = useState<PreviewRow[]>([]);
   const [selfCheck, setSelfCheck] = useState<SelfCheckResult | null>(null);
   const [advanced, setAdvanced] = useState(false);
+  const [linkChatName, setLinkChatName] = useState("");
+  const [linkSiteNick, setLinkSiteNick] = useState("");
+  const doLinkChat = async () => {
+    setBusy("link");
+    try {
+      const res = await fetch("/api/chat-orders", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ linkChat: { chatName: linkChatName.trim(), siteNick: linkSiteNick.trim() } }) });
+      const json = await res.json().catch(() => null);
+      if (json?.ok) { showAdminToast(`🔗 연결 완료 — 이제 ${linkChatName.trim()}님 채팅주문이 ${linkSiteNick.trim()}님에게 자동으로 담깁니다`); setLinkChatName(""); setLinkSiteNick(""); }
+      else showAdminToast(String(json?.error?.message || "연결 실패"));
+    } finally { setBusy(""); }
+  };
 
   const loadQueue = useCallback(async () => {
     try {
@@ -318,6 +330,19 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
 
           {advanced ? (
             <div className="mt-2 rounded-xl border border-line bg-surface p-3">
+              {/* [수동 연결] 유튜브 이름 ≠ 사이트 닉네임 (예: Borahae_Ju = 보라해쥬) — 1회 연결하면 평생 자동 */}
+              <div className="mb-2 rounded-lg border border-sky-200 bg-sky-50 p-2">
+                <div className="text-[11.5px] font-black text-sky-800">🔗 회원 수동 연결 — 유튜브 이름과 사이트 닉네임이 다른 손님 (1회만 하면 평생 자동)</div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <input value={linkChatName} onChange={(e) => setLinkChatName(e.target.value)} placeholder="채팅 이름 (예: Borahae_Ju)"
+                    className="w-44 rounded-lg border border-line bg-white px-2 py-1.5 text-[12px] font-bold" />
+                  <span className="text-[12px] font-black text-sky-700">=</span>
+                  <input value={linkSiteNick} onChange={(e) => setLinkSiteNick(e.target.value)} placeholder="사이트 닉네임 (예: 보라해쥬)"
+                    className="w-44 rounded-lg border border-line bg-white px-2 py-1.5 text-[12px] font-bold" />
+                  <button type="button" disabled={busy === "link" || !linkChatName.trim() || !linkSiteNick.trim()} onClick={() => void doLinkChat()}
+                    className="rounded-lg bg-sky-600 px-3 py-1.5 text-[12px] font-black text-white disabled:opacity-50">연결</button>
+                </div>
+              </div>
               <div className="flex flex-wrap items-center gap-2 text-[11px] font-black">
                 <button type="button" onClick={() => void readOnce()} disabled={busy === "read"}
                   className="rounded-lg bg-rose-deep px-3 py-1.5 font-black text-white disabled:opacity-50">
