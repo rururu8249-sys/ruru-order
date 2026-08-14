@@ -4829,8 +4829,12 @@ export default function OrderPage() {
   //   된 케이스(닉네임만 빈)에서 관문을 건너뛰고 담기가 됐다(중복계정·미입력 사고의 A 원인).
   //   → 로그인 정보가 저장된 상태(hasSavedInfo)인데 닉네임만 비면 무조건 이 모달로 보낸다.
   //   정상 고객(닉네임 있음)은 isAutoLoggedIn=true라 여기 안 걸림. 로그인/제출/돈 로직 무변경(렌더 게이트만).
+  // [2026-08-14] 정보수정 시트가 열려 있는 동안은 관문으로 전환하지 않는다.
+  //   시트에서 닉네임을 지우고 다시 입력하는 순간 빈 값이 감지되어 페이지 전체가 관문으로
+  //   교체되면서(시트 언마운트) 한글 조합이 끊기고 입력이 불가능해지던 버그 수정.
+  //   시트를 닫을 때는 기존 스냅샷 복원/저장 검증이 그대로 동작한다(관문 조건 무변경).
   const mustEnterYoutubeNickname = hasSavedInfo && !youtubeNickname.trim();
-  if ((isKakaoLoginReturn || mustEnterYoutubeNickname) && !isAutoLoggedIn) {
+  if ((isKakaoLoginReturn || mustEnterYoutubeNickname) && !isAutoLoggedIn && !customerInfoEditSheetOpen && !isEditingCustomerInfo) {
     return (
       <OrderPageShell>
         <section className="rounded-[32px] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
