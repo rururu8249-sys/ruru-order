@@ -69,6 +69,7 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
   const [usage, setUsage] = useState<UsageRow[]>([]);
   const [enabled, setEnabled] = useState(false);
   const [botEnabled, setBotEnabled] = useState(false);
+  const [customerUi, setCustomerUi] = useState(false);
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [broadcastSource, setBroadcastSource] = useState<string>("none");
   const [current, setCurrent] = useState<CurrentProduct>(null);
@@ -92,6 +93,7 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
       // 자동 자가진단 결과 — 겹침이 있을 때만 조용히 배너 표시 (없으면 아무것도 안 뜸)
       if (json.selfCheck && Number(json.selfCheck.wrong) > 0) setSelfCheck(json.selfCheck as SelfCheckResult);
       setBotEnabled(Boolean(json.botEnabled));
+      setCustomerUi(Boolean(json.customerUi));
     } catch { /* 조회 실패는 화면만 비움 */ }
   }, []);
 
@@ -140,6 +142,18 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
       });
       setBotEnabled((v) => !v);
       showAdminToast(!botEnabled ? "봇 안내 ON — 상품을 못 정한 주문 채팅에 자동으로 안내합니다 (하루 40건 상한)" : "봇 안내 OFF");
+    } finally { setBusy(""); }
+  };
+
+  const toggleCustomerUi = async () => {
+    setBusy("cui");
+    try {
+      await fetch("/api/chat-orders", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerUi: !customerUi }),
+      });
+      setCustomerUi((v) => !v);
+      showAdminToast(!customerUi ? "손님 배너 ON — 채팅으로 주문한 손님 주문서 상단에 「눌러서 담기」 배너가 뜹니다" : "손님 배너 OFF");
     } finally { setBusy(""); }
   };
 
@@ -268,6 +282,11 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
               className={`rounded-xl px-4 py-2 text-[13px] font-black text-white disabled:opacity-50 ${botEnabled ? "bg-sky-600" : "bg-slate-400"}`}
               title="상품을 못 알아들은 주문 채팅에 봇이 '다시 적어달라'고 자동으로 안내합니다.">
               🤖 봇 안내 {botEnabled ? "켜짐" : "꺼짐"}
+            </button>
+            <button type="button" onClick={() => void toggleCustomerUi()} disabled={busy === "cui"}
+              className={`rounded-xl px-4 py-2 text-[13px] font-black text-white disabled:opacity-50 ${customerUi ? "bg-fuchsia-600" : "bg-slate-400"}`}
+              title="채팅으로 주문한 손님이 사이트에 오면 주문서 상단에 「채팅으로 주문하셨죠? 눌러서 담기」 배너를 보여줍니다. 자동으로 담지는 않습니다.">
+              🛒 손님 배너 {customerUi ? "켜짐" : "꺼짐"}
             </button>
             <span className="ml-auto text-[12px] font-black text-ink-soft">
               접수후보 <b className="text-emerald-700">{counts.parsed || 0}</b> · 확인필요 {(counts.need_product || 0) + (counts.ambiguous || 0)}

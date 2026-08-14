@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
     const setRes = await sb.from("settings").select("value").eq("key", SETTING_CHAT_READ_ENABLED).limit(1).maybeSingle();
     const scRes = await sb.from("settings").select("value").eq("key", SETTING_SELF_CHECK).limit(1).maybeSingle();
     const botRes = await sb.from("settings").select("value").eq("key", SETTING_BOT_REPLY_ENABLED).limit(1).maybeSingle();
+    const cuRes = await sb.from("settings").select("value").eq("key", "chat_order_customer_ui_enabled").limit(1).maybeSingle();
     let selfCheck: unknown = null;
     try { selfCheck = JSON.parse(String((scRes.data as any)?.value || "")); } catch { /* 없으면 null */ }
     return NextResponse.json({
@@ -40,6 +41,7 @@ export async function GET(request: NextRequest) {
       rows: rowsRes.data || [],
       selfCheck,
       botEnabled: String((botRes.data as any)?.value ?? "") === "true",
+      customerUi: String((cuRes.data as any)?.value ?? "") === "true",
     });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: { message: String(e?.message || e) } }, { status: 500 });
@@ -71,6 +73,11 @@ export async function POST(request: NextRequest) {
     if (typeof body.botReply === "boolean") {
       await put(SETTING_BOT_REPLY_ENABLED, body.botReply ? "true" : "false");
       out.botReply = body.botReply;
+    }
+    // 손님 배너: 채팅으로 주문한 손님 주문서 상단 「눌러서 담기」 배너 (4단계, 기본 OFF)
+    if (typeof body.customerUi === "boolean") {
+      await put("chat_order_customer_ui_enabled", body.customerUi ? "true" : "false");
+      out.customerUi = body.customerUi;
     }
     // 테스트 라이브 URL: 값이 있으면 「방송시작」 없이 그 URL의 채팅만 읽는다(손님 화면 무변화).
     // 빈 문자열을 보내면 해제되고 다시 방송 ON 기준으로 돌아간다.
