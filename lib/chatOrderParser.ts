@@ -13,6 +13,8 @@ export type ParseProduct = {
   //   여기가 맞으면 옵션 1단 축까지 확정된다.
   variants?: string[];
   aliases?: string[];    // 그 밖의 추가 명칭
+  colors?: string[];     // 비조합형 상품의 등록 색상 목록 ("깔 저요" = 전 색상 주문에 필요)
+  sizes?: string[];      // 비조합형 상품의 등록 사이즈 목록
 };
 
 export type ParseStatus =
@@ -29,6 +31,9 @@ export type ParseResult = {
   variantName: string | null;   // 조합형 세부상품이 특정됐으면 그 이름
   qty: number;
   optionTokens: string[];
+  // 한 채팅에 여러 건: "블랙, 화이트 저요"=2건 / "블랙 미듐, 엑라"=2건 / "깔 저요"=전 색상.
+  //   항상 1개 이상. 단건이면 [{color,size,qty}] 하나.
+  items: { color: string | null; size: string | null; qty: number }[];
   candidates: string[];
   reason: string;
 };
@@ -59,12 +64,78 @@ const COLOR_WORDS = [
 const SIZE_WORDS = [
   "xs", "s", "m", "l", "xl", "xxl", "2xl", "3xl",
   "엠", "에스", "엘", "라지", "스몰", "미듐", "미디움", "미디엄", "라아지",
+  "엑라", "엑스라지", "투엑라", "쓰리엑라",
   "프리", "free", "원사이즈",
 ];
 
 // "없음/무/-" 같은 빈 옵션 표기는 세부상품명이 아니다. 로더에서도 거르지만
 //   파서는 순수 함수라 어디서 호출돼도 안전하도록 여기서도 막는다.
 const EMPTY_OPTION_WORDS = new Set(["없음", "없슴", "무", "-", "none", "n/a", "na"]);
+
+// 색상 동의어 그룹 — 손님이 "검정"이라 쳐도 등록명이 "블랙"이면 그걸로 매핑
+const COLOR_SYNONYM_GROUPS: string[][] = [
+  ["블랙", "검정", "검은", "깜장", "black"],
+  ["화이트", "흰색", "하양", "white"],
+  ["그레이", "회색", "gray", "grey", "챠콜", "차콜"],
+  ["네이비", "곤색", "navy"],
+  ["베이지", "beige"], ["아이보리", "ivory"], ["크림", "cream"],
+  ["브라운", "갈색", "brown"], ["카키", "khaki"],
+  ["레드", "빨강", "red"], ["블루", "파랑", "파란", "blue"],
+  ["그린", "초록", "green"], ["핑크", "분홍", "pink"],
+  ["옐로", "노랑", "yellow"], ["퍼플", "보라", "purple"],
+  ["실버", "은색"], ["골드", "금색"],
+];
+function sameColorWord(a: string, b: string): boolean {
+  const x = a.toLowerCase(), y = b.toLowerCase();
+  if (x === y) return true;
+  return COLOR_SYNONYM_GROUPS.some((g) => g.includes(x) && g.includes(y));
+}
+// 손님 색상 토큰 → 그 상품의 등록 색상명 (동의어·오타 허용). 못 찾으면 원문 유지.
+function mapToRegisteredColor(token: string, registered: string[]): string {
+  for (const r of registered) {
+    const rr = String(r).trim();
+    if (!rr) continue;
+    if (sameColorWord(token, rr) || squash(token) === squash(rr) || looseEqual(squash(token), squash(rr))) return rr;
+  }
+  return token;
+}
+
+// "깔 저요" = 전 색상 주문 신호
+const ALL_COLORS_WORDS = new Set(["깔", "깔별", "깔별로", "색깔별", "색깔별로", "컬러별", "컬러별로", "전색상", "전컬러", "색상별", "색상별로"]);
+
+// [2026-08-14 사장님 지침] 한 채팅에 여러 건 확장:
+//   "화이트 블랙 그레이 저요" → 색상별 1건씩 / "블랙 미듐, 엑라" → 사이즈별 1건씩(색상 공유)
+//   "깔 저요" → 등록 색상 전부 1건씩. 수량을 말했으면 각 건에 동일 적용.
+function expandItems(
+  text: string,
+  optionTokens: string[],
+  qty: number,
+  p: ParseProduct | null
+): { color: string | null; size: string | null; qty: number }[] {
+  const registeredColors = (p?.colors || []).map((x) => String(x).trim()).filter((x) => x && !EMPTY_OPTION_WORDS.has(x.toLowerCase()));
+  const words = text.split(/[^a-z0-9가-힣]+/).filter(Boolean);
+  const wantAllColors = words.some((w) => ALL_COLORS_WORDS.has(w));
+
+  const colorTokens: string[] = [];
+  const sizeTokens: string[] = [];
+  for (const t of optionTokens) {
+    const isColor = COLOR_WORDS.includes(t) || registeredColors.some((r) => sameColorWord(t, r) || squash(r) === squash(t));
+    if (isColor) { if (!colorTokens.some((x) => sameColorWord(x, t))) colorTokens.push(t); continue; }
+    sizeTokens.push(t);
+  }
+  const mappedColors = colorTokens.map((t) => mapToRegisteredColor(t, registeredColors));
+
+  if (wantAllColors && registeredColors.length > 0) {
+    return registeredColors.map((c) => ({ color: c, size: sizeTokens[0] ?? null, qty }));
+  }
+  if (mappedColors.length > 1) {
+    return mappedColors.map((c) => ({ color: c, size: sizeTokens[0] ?? null, qty }));
+  }
+  if (sizeTokens.length > 1) {
+    return sizeTokens.map((sz) => ({ color: mappedColors[0] ?? null, size: sz, qty }));
+  }
+  return [{ color: mappedColors[0] ?? null, size: sizeTokens[0] ?? null, qty }];
+}
 
 // ── 유틸 ──────────────────────────────────────────────
 const norm = (v: unknown) =>
@@ -265,13 +336,15 @@ function exactProductByName(text: string, products: ParseProduct[]): ParseProduc
 }
 
 // ── 본체 ──────────────────────────────────────────────
-export function parseChatOrder(
+type ParseResultCore = Omit<ParseResult, "items">;
+
+function parseChatOrderCore(
   rawText: string,
   products: ParseProduct[],
   currentProductId?: string | null
-): ParseResult {
+): ParseResultCore {
   const text = norm(rawText);
-  const base: ParseResult = {
+  const base: ParseResultCore = {
     status: "not_order", productId: null, productName: null, matchedBy: null, variantName: null,
     qty: 1, optionTokens: [], candidates: [], reason: "",
   };
@@ -550,4 +623,24 @@ export function parseChatOrder(
   }
 
   return { ...base, status: "need_product", qty, optionTokens, reason: "상품을 말하지 않았고 「지금 이거」도 없음" };
+}
+
+// 공개 진입점 — 판정 후 "한 채팅 = 여러 건" 확장까지 계산해 돌려준다.
+//   조합형(세부상품 확정)은 세부상품 1건. 일반 상품은 색상/사이즈 토큰·"깔"로 확장.
+export function parseChatOrder(
+  rawText: string,
+  products: ParseProduct[],
+  currentProductId?: string | null
+): ParseResult {
+  const core = parseChatOrderCore(rawText, products, currentProductId);
+  let items: ParseResult["items"] = [];
+  if (core.status === "parsed") {
+    if (core.variantName) {
+      items = [{ color: core.variantName, size: null, qty: core.qty }];
+    } else {
+      const p = core.productId ? products.find((x) => x.id === core.productId) || null : null;
+      items = expandItems(norm(rawText), core.optionTokens, core.qty, p);
+    }
+  }
+  return { ...core, items };
 }

@@ -12,3 +12,6 @@ alter table chat_orders add column if not exists parsed_at           timestamptz
 
 -- parse_status 값: raw(미파싱) / parsed / need_product / ambiguous / not_order
 create index if not exists idx_chat_orders_parse_status on chat_orders (parse_status);
+
+-- [2026-08-14 추가] 한 채팅 = 여러 건 (멀티옵션) — ADD COLUMN only, 실행 완료
+alter table chat_orders add column if not exists parsed_items text;

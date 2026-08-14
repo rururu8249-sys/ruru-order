@@ -159,7 +159,7 @@ export async function parsePendingChatOrders(
     // 봇 안내 대상: (닉네임, 사유) — 판정 후 모아서 상한 안에서 발송
     const botTargets: { name: string; channel: string; kind: "ambiguous" | "need_product"; cands: string[]; atMs: number }[] = [];
     // 접수 확인 대상: 알아들은 주문 — 묶어서 한 줄로 확인해준다
-    const confirmTargets: { name: string; product: string; variant: string | null; qty: number; atMs: number }[] = [];
+    const confirmTargets: { name: string; product: string; variant: string | null; qty: number; atMs: number; items: { color: string | null; size: string | null; qty: number }[] }[] = [];
     for (const row of pending) {
       const raw = String(row.raw_message ?? "");
       const atMs = new Date(String(row.published_at ?? "")).getTime();
@@ -199,6 +199,7 @@ export async function parsePendingChatOrders(
         confirmTargets.push({
           name: String(row.display_name ?? "").trim().replace(/^@/, ""),
           product: String(r.productName || ""), variant: r.variantName, qty: r.qty, atMs,
+          items: r.items,
         });
       }
       if ((r.status === "ambiguous" || r.status === "need_product") && Number.isFinite(atMs)) {
@@ -219,6 +220,7 @@ export async function parsePendingChatOrders(
           parsed_qty: r.qty,
           parsed_matched_by: r.matchedBy,
           parsed_options: r.optionTokens.join(","),
+          parsed_items: r.items.length > 0 ? JSON.stringify(r.items) : null,
           parsed_candidates: r.candidates.join(" | "),
           parsed_reason: r.reason,
           parsed_at: new Date().toISOString(),
@@ -273,7 +275,18 @@ export async function parsePendingChatOrders(
           if (sentToday < BOT_DAILY_CAP && Date.now() - lastMs >= BOT_CONFIRM_GAP_MS) {
             const item = (t: (typeof fresh)[number]) => {
               const what = (t.variant || t.product).replace(/\(.*?\)/g, "").trim().slice(0, 14);
-              return `${t.name}님 ${what}${t.qty > 1 ? ` ${t.qty}개` : ""}`;
+              // 색상/사이즈/수량까지 언급 — "차지필로우 검정/235 1개", 멀티면 "블랙/M·화이트/M 각1개"
+              const opts = (t.items || [])
+                .map((i) => {
+                  const os = [i.color, i.size].filter(Boolean).join("/");
+                  return os ? `${os}${i.qty > 1 ? ` ${i.qty}개` : ""}` : (i.qty > 1 ? `${i.qty}개` : "");
+                })
+                .filter(Boolean)
+                .slice(0, 4)
+                .join("·");
+              const many = (t.items || []).length;
+              const tail = many > 4 ? ` 외${many - 4}` : "";
+              return `${t.name}님 ${what}${opts ? ` ${opts}${tail}` : ""}`.trim();
             };
             const shown = fresh.slice(0, 3).map(item).join(" · ");
             const more = fresh.length > 3 ? ` 외 ${fresh.length - 3}건` : "";

@@ -24,6 +24,7 @@ type QueueRow = {
   parsed_options: string | null;
   parsed_candidates: string | null;
   parsed_reason: string | null;
+  parsed_items: string | null;
 };
 
 type UsageRow = { method: string; calls: number };
@@ -450,7 +451,16 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
                     <td className="px-3 py-2 font-bold text-ink">{r.parsed_product_name || ""}</td>
                     <td className="px-3 py-2 text-ink">{r.parsed_variant || ""}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-right font-black text-ink">{r.parse_status === "parsed" ? (r.parsed_qty ?? 1) : ""}</td>
-                    <td className="px-3 py-2 text-ink-soft">{r.parsed_options || ""}</td>
+                    <td className="px-3 py-2 text-ink-soft">{(() => {
+                      // 멀티옵션이면 건별로 보여준다: "블랙/M ×1 · 화이트/M ×1"
+                      try {
+                        const arr = JSON.parse(r.parsed_items || "[]") as { color: string | null; size: string | null; qty: number }[];
+                        if (Array.isArray(arr) && arr.length > 1) {
+                          return arr.map((i) => [i.color, i.size].filter(Boolean).join("/") + " ×" + i.qty).join(" · ");
+                        }
+                      } catch { /* 구형 데이터 */ }
+                      return r.parsed_options || "";
+                    })()}</td>
                     <td className="px-3 py-2 text-[11px] text-ink-mute">
                       {r.parsed_matched_by ? <b className="text-ink-soft">{MATCHED_LABEL[r.parsed_matched_by] || r.parsed_matched_by}</b> : null}
                       {r.parsed_matched_by && r.parsed_reason ? " · " : ""}

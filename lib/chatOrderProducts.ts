@@ -51,7 +51,7 @@ export type LoadedProducts = {
 export async function loadAllParseProducts(sb: SupabaseClient): Promise<LoadedProducts> {
   const { data } = await sb
     .from("products")
-    .select("id,product_name,product_note,color_options")
+    .select("id,product_name,product_note,color_options,size_options")
     .limit(3000);
   const products: ParseProduct[] = [];
   for (const p of (data || []) as Record<string, unknown>[]) {
@@ -59,11 +59,12 @@ export async function loadAllParseProducts(sb: SupabaseClient): Promise<LoadedPr
     const name = String(p.product_name ?? "").trim();
     if (!id || !name) continue;
     const note = parseNote(p.product_note);
-    const variants = note?.combo_mode === true
-      ? toStringArray(p.color_options).filter(isMeaningfulVariant)
-      : [];
+    const combo = note?.combo_mode === true;
+    const variants = combo ? toStringArray(p.color_options).filter(isMeaningfulVariant) : [];
+    const colors = combo ? [] : toStringArray(p.color_options).filter(isMeaningfulVariant);
+    const sizes = combo ? [] : toStringArray((p as Record<string, unknown>).size_options).filter(isMeaningfulVariant);
     const aliases = toStringArray(note?.chat_aliases);
-    products.push({ id, name, variants, aliases });
+    products.push({ id, name, variants, aliases, colors, sizes });
   }
   return { products, broadcastId: null, source: "none" };
 }
@@ -96,7 +97,7 @@ export async function loadParseProducts(sb: SupabaseClient): Promise<LoadedProdu
     if (recent0) merged.push(...(await loadBroadcastProducts(sb, String(recent0.id))));
     const { data: shopRows2 } = await sb
       .from("products")
-      .select("id,product_name,product_note,color_options")
+      .select("id,product_name,product_note,color_options,size_options")
       .eq("in_shop", true)
       .limit(500);
     for (const p of rowsToParseProducts((shopRows2 || []) as Record<string, unknown>[])) {
@@ -110,7 +111,7 @@ export async function loadParseProducts(sb: SupabaseClient): Promise<LoadedProdu
   // 쇼핑몰 모드: 진열 상품만
   const { data: shopRows } = await sb
     .from("products")
-    .select("id,product_name,product_note,color_options")
+    .select("id,product_name,product_note,color_options,size_options")
     .eq("in_shop", true)
     .limit(500);
   const shop = rowsToParseProducts((shopRows || []) as Record<string, unknown>[]);
@@ -126,7 +127,7 @@ export async function loadParseProducts(sb: SupabaseClient): Promise<LoadedProdu
 async function loadBroadcastProducts(sb: SupabaseClient, broadcastId: string): Promise<ParseProduct[]> {
   const { data: bpRows } = await sb
     .from("broadcast_products")
-    .select("product_id, sort_order, products(id,product_name,product_note,color_options)")
+    .select("product_id, sort_order, products(id,product_name,product_note,color_options,size_options)")
     .eq("broadcast_id", broadcastId);
   const rows: Record<string, unknown>[] = [];
   for (const row of (bpRows || []) as Record<string, unknown>[]) {
@@ -144,12 +145,14 @@ function rowsToParseProducts(rows: Record<string, unknown>[]): ParseProduct[] {
     const note = parseNote(p.product_note);
     // 조합형일 때만 세부상품명을 variants로 넘긴다. 일반 상품의 색상옵션(검정/흰색)은
     // 상품을 특정하지 못하므로 variants로 쓰면 안 된다.
-    const variants = note?.combo_mode === true
-      ? toStringArray(p.color_options).filter(isMeaningfulVariant)
-      : [];
+    const combo = note?.combo_mode === true;
+    const variants = combo ? toStringArray(p.color_options).filter(isMeaningfulVariant) : [];
+    // 비조합 상품의 등록 색상/사이즈 — "깔 저요"(전 색상) 확장과 색상 동의어 매핑에 쓴다.
+    const colors = combo ? [] : toStringArray(p.color_options).filter(isMeaningfulVariant);
+    const sizes = combo ? [] : toStringArray((p as Record<string, unknown>).size_options).filter(isMeaningfulVariant);
     // 별칭은 관리자가 product_note.chat_aliases 에 넣어두면 추가로 인식된다(선택).
     const aliases = toStringArray(note?.chat_aliases);
-    products.push({ id, name, variants, aliases });
+    products.push({ id, name, variants, aliases, colors, sizes });
   }
   return products;
 }
