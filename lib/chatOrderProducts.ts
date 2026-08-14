@@ -152,7 +152,22 @@ function rowsToParseProducts(rows: Record<string, unknown>[]): ParseProduct[] {
     const sizes = combo ? [] : toStringArray((p as Record<string, unknown>).size_options).filter(isMeaningfulVariant);
     // 별칭은 관리자가 product_note.chat_aliases 에 넣어두면 추가로 인식된다(선택).
     const aliases = toStringArray(note?.chat_aliases);
-    products.push({ id, name, variants, aliases, colors, sizes });
+    // [2026-08-14 버그수정] 3단 옵션 상품(뉴에라캡 아동용 등)은 combo_mode가 아니어도 세부상품이 있다 —
+    //   stock_variants 색상이 "세부상품 / 색상" 합성형(정식 형식)이면 앞부분을 variants로 추출.
+    //   이게 없어서 "뉴에라 모자도 주세요"가 종류 질문 없이 그냥 접수됐었다.
+    let variantsFinal = variants;
+    if (!combo && variants.length === 0) {
+      const sv = Array.isArray((note as Record<string, unknown>)?.stock_variants) ? ((note as Record<string, unknown>).stock_variants as unknown[]) : [];
+      const heads = new Set<string>();
+      for (const v of sv) {
+        const c = String((v as Record<string, unknown>)?.color ?? "");
+        if (!c.includes(" / ")) continue;
+        const head = c.split(" / ")[0].trim();
+        if (head && isMeaningfulVariant(head)) heads.add(head);
+      }
+      if (heads.size >= 2) variantsFinal = Array.from(heads);
+    }
+    products.push({ id, name, variants: variantsFinal, aliases, colors, sizes });
   }
   return products;
 }
