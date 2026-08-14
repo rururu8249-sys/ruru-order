@@ -6418,7 +6418,7 @@ export default function OrderPage() {
                   isBroadcastOn ? (
                     <button type="button"
                       onClick={() => { setChatFindOpen(true); setOrderSheetOpen(true); window.setTimeout(() => document.getElementById("orderSheetSection")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}
-                      style={{ position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, background: "rgba(122,30,71,0.10)", backdropFilter: "blur(2.5px)", WebkitBackdropFilter: "blur(2.5px)", border: "1px solid rgba(122,30,71,0.22)", borderRadius: "12px", padding: "9px 14px", textAlign: "center", fontSize: "12px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>
+                      style={{ position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, background: "rgba(255,255,255,0.94)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)", border: "1.5px solid rgba(122,30,71,0.5)", borderRadius: "13px", padding: "12px 14px", textAlign: "center", fontSize: "14.5px", fontWeight: 900, color: "#7A1E47", letterSpacing: "-0.3px", cursor: "pointer", boxShadow: "0 4px 14px rgba(122,30,71,0.15)" }}>
                       🛒 담은 상품이 없어요 · 💬 채팅주문 하셨나요?
                     </button>
                   ) : (
