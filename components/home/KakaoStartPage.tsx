@@ -69,62 +69,54 @@ export default function KakaoStartPage() {
   };
 
   if (!ready) {
-    return <main className="min-h-screen bg-[#f5f8ff] px-2 py-4 text-[#151923]" />;
+    return <main className="min-h-screen bg-[#FBF8F9] px-2 py-4 text-[#151923]" />;
   }
 
+  // [2026-08-14 사장님 지시] 파란색 임시 테마 → 루루동이 브랜드 시안(버건디 #7B2D43 + 핑크,
+  //   OrderEntryGateV2 진입 시안과 동일 계열)으로 표시만 변경. 카카오 로그인 로직·문구·버튼 동작 무변경.
   return (
     <main
-      className="min-h-screen bg-[#f5f8ff] px-2 py-4 text-[#151923] select-none sm:px-4"
+      className="min-h-screen bg-[#FBF8F9] px-2 py-4 text-[#151923] select-none sm:px-4"
       style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
     >
       <section className="mx-auto flex min-h-[calc(100svh-32px)] w-full max-w-[560px] items-center">
-        <section className="w-full overflow-hidden rounded-[34px] border border-slate-200 bg-white p-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[13px] font-black tracking-[-0.04em] text-blue-700">
-                루루동이 LIVE
-              </p>
-              <h1 className="mt-2 break-keep text-[34px] font-black leading-tight tracking-[-0.08em] text-slate-950">
-                주문은 카카오로 시작해주세요
-              </h1>
-              <p className="mt-3 break-keep text-[15px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
-                카카오 로그인 후 유튜브 닉네임과 배송정보를 확인하고 주문서를 작성합니다.
-              </p>
-            </div>
-
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] bg-blue-50 text-[28px] ring-1 ring-blue-100">
-              🛍️
-            </div>
+        <section
+          className="w-full overflow-hidden rounded-[34px] p-5"
+          style={{ background: "linear-gradient(to bottom, #ffffff, #F5E6EB)", border: "1px solid #D9C5CC", boxShadow: "0 22px 55px rgba(123,45,67,0.13)" }}
+        >
+          {/* R × TALK 로고 칩 — 진입 시안과 동일한 브랜드 표기 */}
+          <div className="mx-auto flex w-fit items-center justify-center gap-3 rounded-full px-4 py-2" style={{ background: "rgba(255,255,255,0.9)", border: "1px solid #D9C5CC" }}>
+            <div className="flex h-9 w-9 items-center justify-center rounded-[13px] text-[17px] font-black text-white" style={{ background: "#7B2D43" }}>R</div>
+            <div className="text-[20px] font-black text-[#bbb]">×</div>
+            <div className="flex h-9 w-9 items-center justify-center rounded-[13px] bg-[#fee500] text-[13px] font-black text-[#241b17]">TALK</div>
           </div>
 
-          <div className="mt-5 rounded-[24px] bg-blue-50 p-4 ring-1 ring-blue-100">
+          <div className="mt-6 text-center">
+            <p className="text-[13px] font-black tracking-[-0.04em]" style={{ color: "#7B2D43" }}>루루동이 LIVE</p>
+            <h1 className="mt-2 break-keep text-[32px] font-black leading-tight tracking-[-0.08em]">
+              <span style={{ color: "#7B2D43" }}>주문은 카카오로</span>
+              <br />
+              <span className="text-slate-950">시작해주세요</span>
+            </h1>
+            <p className="mt-3 break-keep text-[15px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
+              카카오 로그인 후 유튜브 닉네임과 배송정보를 확인하고 주문서를 작성합니다.
+            </p>
+          </div>
+
+          <div className="mt-5 rounded-[24px] p-4" style={{ background: "rgba(255,255,255,0.85)", border: "1px solid #D9C5CC" }}>
             <div className="grid gap-3">
-              <div className="flex items-start gap-3">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[14px] font-black text-blue-700 ring-1 ring-blue-100">
-                  1
-                </span>
-                <p className="break-keep text-[14px] font-black leading-relaxed tracking-[-0.04em] text-slate-800">
-                  카카오 로그인으로 이름, 전화번호, 배송정보를 불러옵니다.
-                </p>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[14px] font-black text-blue-700 ring-1 ring-blue-100">
-                  2
-                </span>
-                <p className="break-keep text-[14px] font-black leading-relaxed tracking-[-0.04em] text-slate-800">
-                  방송에서 사용하는 유튜브 닉네임을 한 번 확인합니다.
-                </p>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[14px] font-black text-blue-700 ring-1 ring-blue-100">
-                  3
-                </span>
-                <p className="break-keep text-[14px] font-black leading-relaxed tracking-[-0.04em] text-slate-800">
-                  주문서에서 상품과 결제금액을 확인하고 제출합니다.
-                </p>
-              </div>
+              {[
+                "카카오 로그인으로 이름, 전화번호, 배송정보를 불러옵니다.",
+                "방송에서 사용하는 유튜브 닉네임을 한 번 확인합니다.",
+                "주문서에서 상품과 결제금액을 확인하고 제출합니다.",
+              ].map((step, index) => (
+                <div key={step} className="flex items-start gap-3">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[14px] font-black text-white" style={{ background: "#7B2D43" }}>
+                    {index + 1}
+                  </span>
+                  <p className="break-keep text-[14px] font-black leading-relaxed tracking-[-0.04em] text-slate-800">{step}</p>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -133,13 +125,11 @@ export default function KakaoStartPage() {
             onClick={startKakaoLogin}
             className="mt-5 flex min-h-[58px] w-full items-center justify-center rounded-[22px] bg-[#fee500] px-4 py-4 text-[18px] font-black tracking-[-0.05em] text-[#241b17] shadow-[0_14px_30px_rgba(234,179,8,0.25)] ring-1 ring-yellow-200 transition active:scale-[0.98]"
           >
-            <span className="mr-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#241b17] text-[11px] font-black text-[#fee500]">
-              TALK
-            </span>
+            <span className="mr-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#241b17] text-[11px] font-black text-[#fee500]">TALK</span>
             카카오로 주문 시작하기
           </button>
 
-          <p className="mt-4 break-keep text-center text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-slate-400">
+          <p className="mt-4 break-keep text-center text-[12px] font-bold leading-relaxed tracking-[-0.04em]" style={{ color: "#A08A92" }}>
             카카오에서 불러온 정보는 주문서 작성과 주문조회에만 사용됩니다.
           </p>
         </section>
