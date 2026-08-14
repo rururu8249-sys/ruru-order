@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/bankda-sync",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/chat-orders-read",
+      "schedule": "* * * * *"
     }
   ]
 }

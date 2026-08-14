@@ -278,7 +278,7 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
             </button>
           </div>
           <div className="mt-1.5 text-[11px] font-bold text-ink-mute">
-            방송 컨트롤타워가 열려 있으면 채팅은 자동으로 읽혀요 — 여기선 켜고 끄기만 하면 됩니다.
+            서버가 자동으로 읽어요 — 창을 켜놓을 필요 없습니다. 여기선 켜고 끄기만 하면 됩니다.
           </div>
 
           {advanced ? (

@@ -68,6 +68,11 @@ export async function readLiveChatOnce(): Promise<ChatReadResult> {
     const sb = getServiceClient();
     if ((await readSetting(sb, SETTING_CHAT_READ_ENABLED)) !== "true")
       return { ok: true, skipped: true, reason: "채팅읽기 OFF" };
+    // 과열 방지 — 서버 cron·관리자 탭·수동 버튼이 겹쳐도 10초에 1번만 실제로 읽는다.
+    const lastMs = Number(await readSetting(sb, "chat_order_last_read_ms")) || 0;
+    if (Date.now() - lastMs < 10000) return { ok: true, skipped: true, reason: "직전 읽기 10초 이내" };
+    await writeSetting(sb, "chat_order_last_read_ms", String(Date.now()));
+
     const testLiveUrl = await readSetting(sb, SETTING_TEST_LIVE_URL);
     if (!testLiveUrl && !(await isBroadcastOn(sb)))
       return { ok: true, skipped: true, reason: "방송 OFF" };
