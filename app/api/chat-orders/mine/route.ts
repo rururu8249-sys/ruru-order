@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     const nick = sqz(body.nick);
     if (ids.length === 0 || !nick) return NextResponse.json({ ok: true });
     const sb = sbAdmin();
-    const { data } = await sb.from("chat_orders").select("id, display_name, claimed_at").in("id", ids);
+    const { data } = await sb.from("chat_orders").select("id, display_name, channel_id, claimed_at").in("id", ids);
     const mine = ((data || []) as Record<string, unknown>[])
       .filter((r) => !r.claimed_at && sqz(r.display_name) === nick)
       .map((r) => Number(r.id));
@@ -97,6 +97,23 @@ export async function POST(request: NextRequest) {
         .update({ claimed_at: new Date().toISOString(), claimed_by: String(body.nick ?? "").slice(0, 60) })
         .in("id", mine);
     }
+    // [사장님 확정 방식 2026-08-14] 닉네임이 확인된 채팅이 주문서에 담긴 순간 = 본인 확인 완료.
+    //   그 채팅의 채널ID를 고객에 1회 자동 저장 → 이후 유튜브 이름이 바뀌어도 채널ID로 평생 매칭.
+    //   (인증번호 채팅 없이. youtube_nickname 컬럼은 무접촉 — 신규 컬럼에만 쓴다.)
+    try {
+      const phone = String(body.phone ?? "").replace(/\D/g, "");
+      const chRow = ((data || []) as Record<string, unknown>[]).find((r) => sqz(r.display_name) === nick && String(r.channel_id ?? "").trim());
+      const ch = String((chRow as Record<string, unknown> | undefined)?.channel_id ?? "").trim();
+      if (phone.length >= 10 && ch) {
+        const { data: cust } = await sb.from("customers")
+          .select("youtube_channel_id").eq("customer_phone", phone).limit(1).maybeSingle();
+        if (cust && !String((cust as Record<string, unknown>).youtube_channel_id ?? "").trim()) {
+          await sb.from("customers")
+            .update({ youtube_channel_id: ch, handle_verified_at: new Date().toISOString() })
+            .eq("customer_phone", phone);
+        }
+      }
+    } catch { /* 자동 학습 실패는 담기 흐름에 영향 없음 */ }
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ ok: true });
