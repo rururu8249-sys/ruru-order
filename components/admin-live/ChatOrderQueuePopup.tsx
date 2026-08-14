@@ -70,6 +70,7 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
   const [enabled, setEnabled] = useState(false);
   const [botEnabled, setBotEnabled] = useState(false);
   const [customerUi, setCustomerUi] = useState(false);
+  const [unsubmitted, setUnsubmitted] = useState<{ name: string; items: string[]; claimed: boolean }[]>([]);
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [broadcastSource, setBroadcastSource] = useState<string>("none");
   const [current, setCurrent] = useState<CurrentProduct>(null);
@@ -94,6 +95,7 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
       if (json.selfCheck && Number(json.selfCheck.wrong) > 0) setSelfCheck(json.selfCheck as SelfCheckResult);
       setBotEnabled(Boolean(json.botEnabled));
       setCustomerUi(Boolean(json.customerUi));
+      setUnsubmitted(Array.isArray(json.unsubmitted) ? json.unsubmitted : []);
     } catch { /* 조회 실패는 화면만 비움 */ }
   }, []);
 
@@ -299,6 +301,20 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
           <div className="mt-1.5 text-[11px] font-bold text-ink-mute">
             서버가 자동으로 읽어요 — 창을 켜놓을 필요 없습니다. 여기선 켜고 끄기만 하면 됩니다.
           </div>
+
+          {unsubmitted.length > 0 ? (
+            <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <div className="text-[12.5px] font-black text-amber-800">📢 호명 리스트 — 채팅주문 후 아직 제출 안 한 손님 {unsubmitted.length}명</div>
+              <div className="mt-1.5 flex flex-col gap-1">
+                {unsubmitted.map((u) => (
+                  <div key={u.name} className="text-[12px] font-bold text-amber-900">
+                    <b>{u.name}</b>님 — {u.items.join(" · ")} {u.claimed ? <span className="text-emerald-700">(담아감 · 제출만 남음)</span> : <span className="text-rose-600">(아직 안 담아감)</span>}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-1 text-[11px] font-bold text-amber-700">방송에서 "○○님 주문서 제출해주세요~" 불러주시면 됩니다. 제출하면 자동으로 사라져요.</div>
+            </div>
+          ) : null}
 
           {advanced ? (
             <div className="mt-2 rounded-xl border border-line bg-surface p-3">

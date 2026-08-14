@@ -32,6 +32,32 @@ export async function GET(request: NextRequest) {
     const scRes = await sb.from("settings").select("value").eq("key", SETTING_SELF_CHECK).limit(1).maybeSingle();
     const botRes = await sb.from("settings").select("value").eq("key", SETTING_BOT_REPLY_ENABLED).limit(1).maybeSingle();
     const cuRes = await sb.from("settings").select("value").eq("key", "chat_order_customer_ui_enabled").limit(1).maybeSingle();
+    // [시안 v5 · 2026-08-14] 📢 호명 리스트 — 최근 12시간 채팅주문(parsed) 중 "제출 주문이 없는" 손님만.
+    //   orders는 select만(읽기 전용). 닉네임 정규화 일치 기준.
+    let unsubmitted: unknown[] = [];
+    try {
+      const since = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+      const { data: co } = await sb.from("chat_orders")
+        .select("display_name, parsed_product_name, parsed_variant, parsed_qty, claimed_at, published_at")
+        .eq("parse_status", "parsed").gte("published_at", since)
+        .order("id", { ascending: false }).limit(200);
+      const { data: ords } = await sb.from("orders")
+        .select("youtube_nickname").gte("created_at", since).limit(2000);
+      const sq = (v: unknown) => String(v ?? "").toLowerCase().replace(/^@/, "").replace(/[^a-z0-9가-힣]/g, "");
+      const submitted = new Set(((ords || []) as Record<string, unknown>[]).map((o) => sq(o.youtube_nickname)).filter(Boolean));
+      const byName = new Map<string, { name: string; items: string[]; claimed: boolean }>();
+      for (const r of (co || []) as Record<string, unknown>[]) {
+        const key = sq(r.display_name);
+        if (!key || submitted.has(key)) continue;
+        const e = byName.get(key) || { name: String(r.display_name ?? "").replace(/^@/, ""), items: [], claimed: false };
+        const what = String(r.parsed_variant || r.parsed_product_name || "").replace(/\(.*?\)/g, "").trim().slice(0, 20);
+        if (what && e.items.length < 5) e.items.push(`${what} ${Math.max(1, Number(r.parsed_qty || 1))}개`);
+        if (r.claimed_at) e.claimed = true;
+        byName.set(key, e);
+      }
+      unsubmitted = Array.from(byName.values()).slice(0, 30);
+    } catch { /* 호명 리스트 실패는 대기열 조회를 막지 않는다 */ }
+
     let selfCheck: unknown = null;
     try { selfCheck = JSON.parse(String((scRes.data as any)?.value || "")); } catch { /* 없으면 null */ }
     return NextResponse.json({
@@ -41,6 +67,7 @@ export async function GET(request: NextRequest) {
       rows: rowsRes.data || [],
       selfCheck,
       botEnabled: String((botRes.data as any)?.value ?? "") === "true",
+      unsubmitted,
       customerUi: String((cuRes.data as any)?.value ?? "") === "true",
     });
   } catch (e: any) {
