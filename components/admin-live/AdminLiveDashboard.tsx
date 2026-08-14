@@ -66,6 +66,7 @@ import AdminLiveProductManagePopup, { type ProductManageTab } from "./AdminLiveP
 import AdminLiveCardPayPopup from "./AdminLiveCardPayPopup";
 import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
 import ChatOrderQueuePopup from "./ChatOrderQueuePopup";
+import ChatOrderReaderLoop from "./ChatOrderReaderLoop";
 import {
   buildAlwaysOrderOptions,
   getAlwaysOrderDateFromFilter,
@@ -1786,6 +1787,9 @@ export default function AdminLiveDashboard() {
               </div>
             </div>
           )}
+
+          {/* 채팅읽기 상주 루프 — 컨트롤타워가 열려 있으면 자동으로 읽는다 (OFF면 서버가 건너뜀) */}
+          <ChatOrderReaderLoop />
 
           {/* 채팅주문 대기열 팝업 — 판정 결과 확인 전용(담기 없음) */}
           {activeMenu === "chatorder" && (
