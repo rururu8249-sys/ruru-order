@@ -377,6 +377,13 @@ export async function postLiveChatMessage(messageText: string, opts?: { forceEve
         return { ok: false, reason: `발송실패 status=${e1.status}${e1.statusText ? "/" + e1.statusText : ""} ${detail}` };
       }
     }
+    // [2026-08-14] 봇 자기 채널 ID 저장 — 채팅 주문 파서가 "봇이 쓴 글"을
+    //   작성자 기준으로 걸러내는 데 쓴다(이모지 차단보다 확실). 실패해도 발송 결과엔 영향 없음.
+    try {
+      const okJson: any = await res.json().catch(() => null);
+      const myChannel = String(okJson?.snippet?.authorChannelId || okJson?.authorDetails?.channelId || "").trim();
+      if (myChannel) await writeSetting(sb, "chat_order_bot_channel_id", myChannel);
+    } catch { /* 무시 */ }
     return { ok: true };
   } catch (e: any) {
     return { ok: false, reason: String(e?.message || e) };
