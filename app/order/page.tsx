@@ -1373,6 +1373,8 @@ export default function OrderPage() {
   const [directInputProductSearchMode, setDirectInputProductSearchMode] = useState(false);
   const [directInputTargetIndex, setDirectInputTargetIndex] = useState(0);
   const [registeredOptionSelectProduct, setRegisteredOptionSelectProduct] = useState<BroadcastProduct | null>(null);
+  // [2026-08-14] 주문서 확인에서 「옵션 변경」 — null이면 새로 담기, 숫자면 그 줄을 교체
+  const [registeredOptionEditIndex, setRegisteredOptionEditIndex] = useState<number | null>(null);
   const [registeredOptionColor, setRegisteredOptionColor] = useState("");
   const [registeredOptionSize, setRegisteredOptionSize] = useState("");
   const [registeredOptionQty, setRegisteredOptionQty] = useState(1);
@@ -3505,6 +3507,20 @@ export default function OrderPage() {
   //   같은 행 중복 담김 방지: 세션 내 ref + 서버 claimed_at(담음 표시, 대기열 소진 아님) 이중.
   // [2026-08-14 사장님 지시] 주문서 확인에서 수량 바로 수정 — 재고캡·1인 구매제한은 담기와 동일 기준으로 캡.
   //   옵션(색상/사이즈) 변경은 삭제 후 다시 담기(가격·재고 검증 경로 보호). 제출·돈 로직 무접촉.
+  // [2026-08-14 사장님 지시] 주문서 확인에서 옵션(색상/사이즈)도 바로 변경 — 기존 옵션 시트 재사용(재고·품절 검증 동일).
+  //   변경 불가 상황엔 반드시 멘트로 안내한다.
+  const openSheetItemOptionEdit = (index: number) => {
+    const it = items[index];
+    if (!it) return;
+    const product = findMatchedBroadcastProduct(it, [...broadcastProducts, ...groupBuyQuickProductsFromCatalog]);
+    if (!product) { showCustomerNotice("지금 판매 목록에 없는 상품이라 옵션 변경이 안 돼요 — 🗑 삭제 후 목록에서 다시 담아주세요."); return; }
+    openRegisteredOptionSelectSheet(product);
+    setRegisteredOptionEditIndex(index);
+    setRegisteredOptionColor(normalizeEmptyProductOptionValue(it.color) || "");
+    setRegisteredOptionSize(normalizeEmptyProductOptionValue(it.size) || "");
+    setRegisteredOptionQty(Math.max(1, toNumber(it.qty) || 1));
+  };
+
   const changeSheetItemQty = (index: number, delta: number) => {
     setItems((prev) => prev.map((it, i) => {
       if (i !== index) return it;
@@ -3604,6 +3620,7 @@ export default function OrderPage() {
   };
 
   const closeRegisteredOptionSelectSheet = () => {
+    setRegisteredOptionEditIndex(null);
     setRegisteredOptionSelectProduct(null);
     setRegisteredOptionColor("");
     setRegisteredOptionSize("");
@@ -3707,6 +3724,10 @@ export default function OrderPage() {
     }
 
     const doAdd = () => {
+      // [옵션 변경] 기존 줄을 빼고 같은 검증 경로로 다시 담는다 — 품절 옵션은 위에서 이미 멘트로 차단됨
+      if (registeredOptionEditIndex !== null) {
+        setItems((prev) => prev.filter((_, i) => i !== registeredOptionEditIndex));
+      }
       addRegisteredProductToOrderItems(product, {
         // [3단] 재고 키와 동일하게 "세부상품 / 색상"으로 담는다(주문서·송장에도 그대로 표시)
         color: registeredOptionStorageColor,
@@ -5475,6 +5496,12 @@ export default function OrderPage() {
                             뭘 담았는지 확인을 못 한다(옵션명 = 조합형 세부상품명이라 특히 김) → 2줄 줄바꿈 */}
                         <div style={{ fontSize: "13px", fontWeight: 600, color: "#1A1A1A", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{item.product_name || "상품명 없음"}</div>
                         <div style={{ fontSize: "11px", color: "#ABA5A0", marginTop: "2px", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{itemHasNoOptions ? "옵션 없음" : `${optionColorText} / ${optionSizeText}`} · 단가 {won(toNumber(item.product_price))}</div>
+                        {itemIsRegisteredProduct && !itemHasNoOptions ? (
+                          <button type="button" onClick={() => openSheetItemOptionEdit(index)}
+                            style={{ marginTop: "5px", padding: "4px 10px", borderRadius: "8px", border: "1px solid #E8D5DD", background: "#fff", color: "#7A1E47", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>
+                            ✎ 옵션 변경
+                          </button>
+                        ) : null}
 
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "6px", gap: "8px" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
