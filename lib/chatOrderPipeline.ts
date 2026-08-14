@@ -169,7 +169,7 @@ export async function parsePendingChatOrders(
     // [5단계] 채팅 계정 인증 "인증 1234" 감지분 — 루프 후 일괄 처리
     const authHits: { code: string; channel: string; name: string }[] = [];
     // [사장님 확정 2026-08-14] 채팅 접수 = 표시용 선점 대상 — 루프 후 cart_reservations에 기록
-    const holdTargets: { key: string; items: { product_id: string; color: string; size: string; qty: number }[] }[] = [];
+    const holdTargets: { key: string; nick: string; channel: string; items: { product_id: string; color: string; size: string; qty: number }[] }[] = [];
     for (const row of pending) {
       const raw = String(row.raw_message ?? "");
       const atMs = new Date(String(row.published_at ?? "")).getTime();
@@ -252,6 +252,8 @@ export async function parsePendingChatOrders(
         const nrm = (v: string | null) => { const t = String(v ?? "").trim(); return t === "없음" ? "" : t; };
         holdTargets.push({
           key: `chat_${authorCh}_${row.id}`,
+          nick: String(row.display_name ?? "").trim().replace(/^@/, "").slice(0, 40),
+          channel: authorCh,
           items: (r.items.length > 0 ? r.items : [{ color: null, size: null, qty: r.qty }]).map((i) => ({
             product_id: String(r.productId), color: nrm(i.color), size: nrm(i.size), qty: Math.max(1, Number(i.qty) || 1),
           })),
@@ -328,8 +330,17 @@ export async function parsePendingChatOrders(
           const { data: ex } = await sb.from("cart_reservations").select("id").eq("session_key", h.key).limit(1);
           if (ex && ex.length > 0) continue; // 이미 선점됨(같은 채팅 행)
           const expiresAt = new Date(Date.now() + holdMin * 60000).toISOString();
+          // [담김현황 표시] 채팅 닉네임을 싣고, 연결된 단골이면 회원 전화번호까지 → "번호 미입력 고객" 대신 이름 표시
+          let holdPhone: string | null = null;
+          try {
+            const { data: cust } = await sb.from("customers")
+              .select("customer_phone").eq("youtube_channel_id", h.channel).limit(1).maybeSingle();
+            const ph = String((cust as Record<string, unknown> | null)?.customer_phone ?? "");
+            if (ph) holdPhone = ph;
+          } catch { /* 미연결 → 익명 홀드 유지 */ }
           await sb.from("cart_reservations").insert(h.items.map((it) => ({
             session_key: h.key, product_id: it.product_id, color: it.color, size: it.size, qty: it.qty, expires_at: expiresAt,
+            nickname: h.nick || null, customer_phone: holdPhone,
           })));
         }
       }
