@@ -157,6 +157,8 @@ export async function parsePendingChatOrders(
     const BOT_NAMES = new Set(["nightbot", "streamlabs", "streamelements", "루루쇼핑", "루루동이주문봇", "주문_폭주"]);
     // 우리 봇 채널 고정값 — 설정 저장이 비어 있어도 항상 차단 (2026-08-14 사장님 확인)
     const KNOWN_BOT_CHANNELS = new Set(["UC8jr9s1rZBEIPPTBPAwYE5A"]);
+    // 본문에 봇 이름이 들어간 채팅("스트롱필은요 주문폭주님")은 봇에게 말 거는 대화 — 주문 아님 (2026-08-14 실채팅 오인)
+    const BOT_CALL_NAMES = ["주문폭주", "루루동이주문봇", "루루쇼핑님", "나이트봇", "nightbot"];
 
     let updated = 0;
     // 봇 안내 대상: (닉네임, 사유) — 판정 후 모아서 상한 안에서 발송
@@ -181,6 +183,13 @@ export async function parsePendingChatOrders(
       ) {
         r = { ...r, status: "not_order", productId: null, productName: null, matchedBy: null,
               variantName: null, candidates: [], reason: "봇 안내 메시지" };
+      }
+
+      // 봇을 부르며 말 건 채팅은 대화이지 주문이 아니다 — 접수도, 접수확인도 하지 않는다.
+      const sqMsg = sqz(raw);
+      if (r.status !== "not_order" && BOT_CALL_NAMES.some((bn) => sqMsg.includes(sqz(bn)))) {
+        r = { ...r, status: "not_order", productId: null, productName: null, matchedBy: null,
+              variantName: null, candidates: [], items: [], reason: "봇에게 말 건 채팅" };
       }
 
       // 자가진단이 찾아낸 "이름 겹침" 문장 패턴은 확신하지 않고 자동 보류한다.
@@ -282,18 +291,19 @@ export async function parsePendingChatOrders(
           if (sentToday < BOT_DAILY_CAP && Date.now() - lastMs >= BOT_CONFIRM_GAP_MS) {
             const item = (t: (typeof fresh)[number]) => {
               const what = (t.variant || t.product).replace(/\(.*?\)/g, "").trim().slice(0, 14);
-              // 색상/사이즈/수량까지 언급 — "차지필로우 검정/235 1개", 멀티면 "블랙/M·화이트/M 각1개"
+              // 수량은 1개여도 항상 붙인다 — "차지필로우 검정/230 1개", 멀티면 "블랙/M 1개·화이트/M 1개" (2026-08-14 사장님 지시)
               const opts = (t.items || [])
                 .map((i) => {
                   const os = [i.color, i.size].filter(Boolean).join("/");
-                  return os ? `${os}${i.qty > 1 ? ` ${i.qty}개` : ""}` : (i.qty > 1 ? `${i.qty}개` : "");
+                  const n = Math.max(1, Number(i.qty) || 1);
+                  return os ? `${os} ${n}개` : `${n}개`;
                 })
                 .filter(Boolean)
                 .slice(0, 4)
                 .join("·");
               const many = (t.items || []).length;
               const tail = many > 4 ? ` 외${many - 4}` : "";
-              return `${t.name}님 ${what}${opts ? ` ${opts}${tail}` : ""}`.trim();
+              return `${t.name}님 ${what} ${opts || `${Math.max(1, t.qty)}개`}${tail}`.trim();
             };
             const shown = fresh.slice(0, 3).map(item).join(" · ");
             const more = fresh.length > 3 ? ` 외 ${fresh.length - 3}건` : "";
