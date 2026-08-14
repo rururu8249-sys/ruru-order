@@ -5447,7 +5447,7 @@ export default function OrderPage() {
                                 const lowOpts = lowStockOptionsOrderProduct(product, (c, s) => Number(reservedByVariant[reservationVariantKey(pidForLow, c, s)] || 0));
                                 if (lowOpts.length > 0) {
                                   // 가장 급한(재고 적은) 순으로 최대 2개만, "외 N" 같은 축약 표현은 헷갈려서 안 씀(사장님 지침)
-                                  const shown = [...lowOpts].sort((a, b) => a.stock - b.stock).slice(0, 2).map((o) => `${o.label} ${o.stock}개`).join(" · ");
+                                  const shown = [...lowOpts].sort((a, b) => a.stock - b.stock).slice(0, 2).map((o) => `${String(o.label).replace(/\s*\/\s*없음\s*/g, "").trim()} ${o.stock}개`).join(" · ");
                                   return <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px" }}>🔥 {shown} 남음</span>;
                                 }
                                 const remain = lowStockRemainOrderProduct(product, Number(reservedByProduct[pidForLow] || 0));
