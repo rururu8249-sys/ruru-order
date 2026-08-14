@@ -168,6 +168,8 @@ export async function parsePendingChatOrders(
     const confirmTargets: { name: string; product: string; variant: string | null; qty: number; atMs: number; items: { color: string | null; size: string | null; qty: number }[] }[] = [];
     // [5단계] 채팅 계정 인증 "인증 1234" 감지분 — 루프 후 일괄 처리
     const authHits: { code: string; channel: string; name: string }[] = [];
+    // [사장님 확정 2026-08-14] 채팅 접수 = 표시용 선점 대상 — 루프 후 cart_reservations에 기록
+    const holdTargets: { key: string; items: { product_id: string; color: string; size: string; qty: number }[] }[] = [];
     for (const row of pending) {
       const raw = String(row.raw_message ?? "");
       const atMs = new Date(String(row.published_at ?? "")).getTime();
@@ -218,6 +220,17 @@ export async function parsePendingChatOrders(
 
       byStatus[r.status] = (byStatus[r.status] || 0) + 1;
 
+      if (r.status === "parsed" && Number.isFinite(atMs) && r.productId && authorCh
+          && Date.now() - atMs <= BOT_CONFIRM_FRESH_MS) {
+        // 신선한 접수만 선점(재파싱으로 옛 기록이 다시 선점되는 것 방지). 행 단위 키 = 중복 선점 방지.
+        const nrm = (v: string | null) => { const t = String(v ?? "").trim(); return t === "없음" ? "" : t; };
+        holdTargets.push({
+          key: `chat_${authorCh}_${row.id}`,
+          items: (r.items.length > 0 ? r.items : [{ color: null, size: null, qty: r.qty }]).map((i) => ({
+            product_id: String(r.productId), color: nrm(i.color), size: nrm(i.size), qty: Math.max(1, Number(i.qty) || 1),
+          })),
+        });
+      }
       if (r.status === "parsed" && Number.isFinite(atMs)) {
         confirmTargets.push({
           name: String(row.display_name ?? "").trim().replace(/^@/, ""),
@@ -277,6 +290,24 @@ export async function parsePendingChatOrders(
         authVerified += 1;
       } catch { /* 인증 실패는 파싱을 막지 않는다 */ }
     }
+
+    // ── [사장님 확정] 채팅 접수 선점 — 기존 담기 선점과 동일 TTL(settings.cart_hold_minutes). ──
+    //    표시 전용(cart_reservations만 기록). 진짜 재고·제출·돈 로직 무접촉. 실패해도 접수 흐름 안 막음.
+    //    손님이 사이트에 와서 자동담김되면 mine POST가 이 선점을 지워 본인 장바구니 홀드로 이어짐(이중 잠김 방지).
+    try {
+      if (holdTargets.length > 0) {
+        const hmRaw = Math.round(Number(await readSetting(sb, "cart_hold_minutes")));
+        const holdMin = Number.isFinite(hmRaw) && hmRaw > 0 ? Math.min(43200, Math.max(10, hmRaw)) : 15;
+        for (const h of holdTargets) {
+          const { data: ex } = await sb.from("cart_reservations").select("id").eq("session_key", h.key).limit(1);
+          if (ex && ex.length > 0) continue; // 이미 선점됨(같은 채팅 행)
+          const expiresAt = new Date(Date.now() + holdMin * 60000).toISOString();
+          await sb.from("cart_reservations").insert(h.items.map((it) => ({
+            session_key: h.key, product_id: it.product_id, color: it.color, size: it.size, qty: it.qty, expires_at: expiresAt,
+          })));
+        }
+      }
+    } catch { /* 선점 실패는 접수/판정을 막지 않는다 */ }
 
     // ── 봇 안내 발송 (설정 ON일 때만, 상한 준수) ──
     let botSent = 0;

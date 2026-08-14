@@ -99,6 +99,13 @@ export async function POST(request: NextRequest) {
         .update({ claimed_at: new Date().toISOString(), claimed_by: String(body.nick ?? "").slice(0, 60) })
         .in("id", mine);
     }
+    // [선점 이어받기] 담아간 채팅의 표시용 선점 해제 — 이제 본인 장바구니 홀드가 대신 잡는다(이중 잠김 방지)
+    try {
+      const keys = ((data || []) as Record<string, unknown>[])
+        .filter((r) => mine.includes(Number(r.id)))
+        .map((r) => `chat_${String(r.channel_id ?? "").trim()}_${r.id}`);
+      if (keys.length > 0) await sb.from("cart_reservations").delete().in("session_key", keys);
+    } catch { /* 해제 실패해도 TTL로 자동 만료됨 */ }
     // [사장님 확정 방식 2026-08-14] 닉네임이 확인된 채팅이 주문서에 담긴 순간 = 본인 확인 완료.
     //   그 채팅의 채널ID를 고객에 1회 자동 저장 → 이후 유튜브 이름이 바뀌어도 채널ID로 평생 매칭.
     //   (인증번호 채팅 없이. youtube_nickname 컬럼은 무접촉 — 신규 컬럼에만 쓴다.)
