@@ -163,7 +163,7 @@ export async function parsePendingChatOrders(
 
     let updated = 0;
     // 봇 안내 대상: (닉네임, 사유) — 판정 후 모아서 상한 안에서 발송
-    const botTargets: { name: string; channel: string; kind: "ambiguous" | "need_product"; cands: string[]; atMs: number; productName: string | null }[] = [];
+    const botTargets: { name: string; channel: string; kind: "ambiguous" | "need_product" | "dup"; cands: string[]; atMs: number; productName: string | null }[] = [];
     // 접수 확인 대상: 알아들은 주문 — 묶어서 한 줄로 확인해준다
     const confirmTargets: { name: string; product: string; variant: string | null; qty: number; atMs: number; items: { color: string | null; size: string | null; qty: number }[] }[] = [];
     // [5단계] 채팅 계정 인증 "인증 1234" 감지분 — 루프 후 일괄 처리
@@ -218,6 +218,32 @@ export async function parsePendingChatOrders(
         }
       }
 
+      // [2026-08-14 사장님 확정] 같은 손님이 10분 안에 같은 상품·같은 옵션을 또 말하면 —
+      //   바로 담지 않고 봇이 "추가 주문 맞아요?"라고 묻는다. 물어본 뒤 한 번 더 적으면 그때 진짜 접수.
+      if (r.status === "parsed" && authorCh && r.productId && Number.isFinite(atMs)) {
+        try {
+          const winIso = new Date(atMs - 10 * 60 * 1000).toISOString();
+          const { data: prevRows } = await sb.from("chat_orders")
+            .select("id, parse_status, parsed_product_id, parsed_variant, parsed_options, parsed_reason")
+            .eq("channel_id", authorCh).gte("published_at", winIso).lt("published_at", new Date(atMs).toISOString())
+            .order("id", { ascending: false }).limit(20);
+          const sameKey = (x: Record<string, unknown>) =>
+            String(x.parsed_product_id ?? "") === String(r.productId) &&
+            String(x.parsed_variant ?? "") === String(r.variantName ?? "") &&
+            String(x.parsed_options ?? "") === r.optionTokens.join(",");
+          const list = (prevRows || []) as Record<string, unknown>[];
+          const accepted = list.find((x) => x.parse_status === "parsed" && sameKey(x));
+          if (accepted) {
+            const asked = list.find((x) => String(x.parsed_reason ?? "").startsWith("중복 의심") && sameKey(x) && Number(x.id) > Number(accepted.id));
+            if (!asked) {
+              botTargets.push({ name: String(row.display_name ?? "").trim(), channel: authorCh, kind: "dup", cands: [], atMs, productName: r.productName });
+              r = { ...r, status: "ambiguous", candidates: [], items: [],
+                    reason: `중복 의심 — 10분 안 같은 주문 접수됨. 추가 주문이면 한 번 더` };
+            }
+            // asked가 있으면 = 봇이 물었고 손님이 또 적은 것 → 추가 주문으로 그대로 접수
+          }
+        } catch { /* 중복확인 실패 시 평소처럼 접수 */ }
+      }
       byStatus[r.status] = (byStatus[r.status] || 0) + 1;
 
       if (r.status === "parsed" && Number.isFinite(atMs) && r.productId && authorCh
@@ -238,7 +264,7 @@ export async function parsePendingChatOrders(
           items: r.items,
         });
       }
-      if ((r.status === "ambiguous" || r.status === "need_product") && Number.isFinite(atMs)) {
+      if ((r.status === "ambiguous" || r.status === "need_product") && Number.isFinite(atMs) && !String(r.reason || "").startsWith("중복 의심")) {
         botTargets.push({
           name: String(row.display_name ?? "").trim(),
           channel: String(row.channel_id ?? ""),
@@ -329,7 +355,9 @@ export async function parsePendingChatOrders(
           seenChannel.add(t.channel);
           const nick = t.name ? `${t.name}님, ` : "";
           // 조합형 종류 미지정(상품은 정해짐): "뉴에라캡은 종류가 여러 가지예요! 예) 1번 피츠버그…"
-          const msg = t.kind === "ambiguous" && t.productName
+          const msg = t.kind === "dup"
+            ? `🤔 ${nick}조금 전 같은 주문이 이미 접수돼 있어요! 추가 주문이 맞으면 같은 내용을 한 번 더 적어주세요`
+            : t.kind === "ambiguous" && t.productName
             ? `🤖 ${nick}${t.productName.replace(/\(.*?\)/g, "").trim().slice(0, 20)}은(는) 종류가 여러 가지예요! 예) ${String(t.cands[0] || "").slice(0, 20)} — 이름이나 번호까지 적어주세요`
             : t.kind === "ambiguous" && t.cands.length > 0
             ? `🤖 ${nick}${t.cands.slice(0, 3).join(" / ")} 중 어느 상품인지 종류와 함께 다시 적어주세요!`
