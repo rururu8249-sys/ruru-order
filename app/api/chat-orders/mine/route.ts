@@ -28,6 +28,25 @@ const FRESH_HOURS = 12; // 이 시간 안의 채팅만 배너 후보 (방송 1�
 
 export async function GET(request: NextRequest) {
   try {
+    // [자동완성] suggest=루루 → 최근 12시간 채팅에 등장한 이름 중 일치 후보 (공개 채팅에 이미 노출된 이름만)
+    const suggestQ = sqz(request.nextUrl.searchParams.get("suggest") || "");
+    if (suggestQ) {
+      const sbS = sbAdmin();
+      const { data: stS } = await sbS.from("settings").select("value").eq("key", SETTING_CUSTOMER_UI_ENABLED).limit(1).maybeSingle();
+      if (String((stS as Record<string, unknown> | null)?.value ?? "") !== "true") return NextResponse.json({ ok: true, names: [] });
+      const sinceS = new Date(Date.now() - FRESH_HOURS * 60 * 60 * 1000).toISOString();
+      const { data: nm } = await sbS.from("chat_orders").select("display_name")
+        .gte("published_at", sinceS).order("id", { ascending: false }).limit(500);
+      const seen = new Map<string, string>();
+      for (const r of (nm || []) as Record<string, unknown>[]) {
+        const d = String(r.display_name ?? "").trim().replace(/^@/, "");
+        if (!d) continue;
+        const key = sqz(d);
+        if (key.includes(suggestQ) && !seen.has(key)) seen.set(key, d);
+        if (seen.size >= 6) break;
+      }
+      return NextResponse.json({ ok: true, names: Array.from(seen.values()) });
+    }
     const nick = sqz(request.nextUrl.searchParams.get("nick") || "");
     const phone = String(request.nextUrl.searchParams.get("phone") || "").replace(/\D/g, "");
     const showAll = request.nextUrl.searchParams.get("all") === "1"; // 손님이 직접 「찾기」 — 담음 처리된 것도 포함(방송 전체 복구)

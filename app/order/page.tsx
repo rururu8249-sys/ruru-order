@@ -3576,8 +3576,23 @@ export default function OrderPage() {
   const chatAltNickRef = useRef("");
   const [chatFindOpen, setChatFindOpen] = useState(false);
   const [chatFindName, setChatFindName] = useState("");
-  const findMyChatOrders = async () => {
-    const alt = chatFindName.trim();
+  const [chatFindSug, setChatFindSug] = useState<string[]>([]);
+  const chatFindSugTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onChatFindNameChange = (v: string) => {
+    setChatFindName(v);
+    if (chatFindSugTimerRef.current) clearTimeout(chatFindSugTimerRef.current);
+    const q = v.trim();
+    if (q.length < 2) { setChatFindSug([]); return; }
+    chatFindSugTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/chat-orders/mine?suggest=${encodeURIComponent(q)}`, { cache: "no-store" });
+        const json = await res.json().catch(() => null);
+        setChatFindSug(json?.ok && Array.isArray(json.names) ? json.names : []);
+      } catch { setChatFindSug([]); }
+    }, 350);
+  };
+  const findMyChatOrders = async (nameArg?: string) => {
+    const alt = String(nameArg ?? chatFindName).trim();
     if (!alt) { showCustomerNotice("채팅에 쓰는 이름을 적어주세요."); return; }
     try {
       const phone = normalizePhone(customerPhone);
@@ -5582,11 +5597,22 @@ export default function OrderPage() {
                     <div style={{ fontSize: "14px", fontWeight: 900, color: "#7A1E47" }}>💬 채팅 주문 찾기</div>
                     <div style={{ fontSize: "12px", fontWeight: 700, color: "#A96E86", margin: "4px 0 9px", lineHeight: 1.6 }}>채팅으로 주문했는데 주문서에 없다면 — 유튜브 채팅에서 쓰시는 이름을 적어주세요. 그 이름으로 주문을 찾아 <b>바로 주문서에 담아드려요.</b></div>
                     <div style={{ display: "flex", gap: "7px" }}>
-                      <input value={chatFindName} onChange={(e) => setChatFindName(e.target.value)} placeholder="유튜브 채팅 이름 (예: 홍길동_23)"
+                      <input value={chatFindName} onChange={(e) => onChatFindNameChange(e.target.value)} placeholder="유튜브 채팅 이름 (예: 홍길동_23)"
                         style={{ flex: 1, minWidth: 0, height: "38px", borderRadius: "10px", border: "1px solid #E8D5DD", padding: "0 12px", fontSize: "14px", fontWeight: 700 }} />
                       <button type="button" onClick={() => void findMyChatOrders()} style={{ flexShrink: 0, height: "38px", padding: "0 15px", border: "none", borderRadius: "10px", background: "#7A1E47", color: "#fff", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}>찾기</button>
                       <button type="button" onClick={() => setChatFindOpen(false)} style={{ flexShrink: 0, height: "38px", padding: "0 9px", border: "none", borderRadius: "10px", background: "transparent", color: "#B08FA0", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>닫기</button>
                     </div>
+                    {chatFindSug.length > 0 ? (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" }}>
+                        {chatFindSug.map((n) => (
+                          <button key={n} type="button"
+                            onClick={() => { setChatFindName(n); setChatFindSug([]); void findMyChatOrders(n); }}
+                            style={{ padding: "7px 12px", border: "1px solid #E8A3C0", borderRadius: "999px", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}>
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 ) : (
                   <button type="button" onClick={() => setChatFindOpen(true)}
