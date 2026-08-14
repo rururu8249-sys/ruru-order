@@ -3503,6 +3503,38 @@ export default function OrderPage() {
   //   손님은 주문서에서 확인하고 수정/삭제하거나 맞으면 바로 제출. 담기는 기존 함수 재사용이라
   //   재고캡·1인 구매제한·조합가 검증 동일 통과. 진짜 재고차감·돈 처리는 제출 RPC 그대로(무접촉).
   //   같은 행 중복 담김 방지: 세션 내 ref + 서버 claimed_at(담음 표시, 대기열 소진 아님) 이중.
+  // [2026-08-14 사장님 지시] 주문서 확인에서 수량 바로 수정 — 재고캡·1인 구매제한은 담기와 동일 기준으로 캡.
+  //   옵션(색상/사이즈) 변경은 삭제 후 다시 담기(가격·재고 검증 경로 보호). 제출·돈 로직 무접촉.
+  const changeSheetItemQty = (index: number, delta: number) => {
+    setItems((prev) => prev.map((it, i) => {
+      if (i !== index) return it;
+      const cur = Math.max(1, toNumber(it.qty) || 1);
+      let next = cur + delta;
+      if (next < 1) next = 1;
+      if (delta > 0) {
+        const normColor2 = (sv: string) => { const t = String(sv ?? "").trim(); return t === "없음" ? "" : t; };
+        const product = findMatchedBroadcastProduct(it, [...broadcastProducts, ...groupBuyQuickProductsFromCatalog]);
+        let maxQty = 999;
+        if (product) {
+          try {
+            const note = typeof product.product_note === "string" ? JSON.parse(product.product_note) : product.product_note;
+            const mgmtOn = (note as any)?.stock_management_enabled === true || (product as any).stock_management_enabled === true;
+            const variants = Array.isArray((note as any)?.stock_variants) ? (note as any).stock_variants : [];
+            if (mgmtOn && variants.length > 0) {
+              const matched = variants.find((v: any) => normColor2(String(v.color ?? "")) === normColor2(it.color) && normColor2(String(v.size ?? "")) === normColor2(it.size));
+              if (matched) maxQty = Number(matched.stock);
+            }
+            if ((note as any)?.purchase_limit_enabled === true) {
+              const lim = Math.floor(Number((note as any)?.purchase_limit_qty || 0));
+              if (Number.isFinite(lim) && lim > 0) maxQty = Math.min(maxQty, lim);
+            }
+          } catch { /* 캡 조회 실패 → 999 (서버가 제출 때 최종 방어) */ }
+        }
+        if (next > maxQty) { next = Math.max(1, maxQty); showCustomerNotice(`최대 ${next}개까지 담을 수 있어요.`); }
+      }
+      return { ...it, qty: String(next) };
+    }));
+  };
   const chatClaimDoneRef = useRef<Set<string>>(new Set());
   // [2026-08-14 사장님 승인] 유튜브 이름 변경 감지 → "사이트 닉네임도 똑같이 바꿀까요?" 팝업 (강제 변경 아님 — 손님 확인 1탭)
   //   닉네임은 자동입금매칭 키라서: 가입 때와 동일한 중복 검사를 통과할 때만 변경, 실패 시 정보수정 안내.
@@ -5445,12 +5477,21 @@ export default function OrderPage() {
                         <div style={{ fontSize: "11px", color: "#ABA5A0", marginTop: "2px", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{itemHasNoOptions ? "옵션 없음" : `${optionColorText} / ${optionSizeText}`} · 단가 {won(toNumber(item.product_price))}</div>
 
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "6px", gap: "8px" }}>
-                          <span style={{ fontSize: "12px", fontWeight: 700, color: toNumber(item.qty) > 0 ? "#6B6460" : "#e74c3c" }}>수량 {toNumber(item.qty)}개</span>
+                          <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+                            <button type="button" onClick={() => changeSheetItemQty(index, -1)} aria-label="수량 줄이기"
+                              style={{ width: "27px", height: "27px", borderRadius: "8px", border: "1px solid #E5E1DC", background: "#fff", color: "#7A1E47", fontSize: "16px", fontWeight: 800, cursor: "pointer", lineHeight: 1 }}>−</button>
+                            <span style={{ fontSize: "13px", fontWeight: 800, color: "#1A1A1A", minWidth: "30px", textAlign: "center" }}>{toNumber(item.qty)}개</span>
+                            <button type="button" onClick={() => changeSheetItemQty(index, 1)} aria-label="수량 늘리기"
+                              style={{ width: "27px", height: "27px", borderRadius: "8px", border: "1px solid #E5E1DC", background: "#fff", color: "#7A1E47", fontSize: "16px", fontWeight: 800, cursor: "pointer", lineHeight: 1 }}>＋</button>
+                          </div>
                           <span style={{ flexShrink: 0, fontSize: "14px", fontWeight: 700, color: "#7A1E47" }}>{won(itemAmount)}</span>
                         </div>
                       </div>
                       <button type="button" onClick={() => removeItem(index)} aria-label="상품 삭제"
-                        style={{ flexShrink: 0, width: "24px", height: "24px", borderRadius: "50%", border: "none", background: "#F0EBE8", color: "#999", fontSize: "13px", cursor: "pointer", lineHeight: 1, alignSelf: "flex-start" }}>✕</button>
+                        style={{ flexShrink: 0, width: "36px", padding: "3px 0", borderRadius: "10px", border: "1px solid #F0DDD9", background: "#FDF6F4", cursor: "pointer", alignSelf: "flex-start", display: "flex", flexDirection: "column", alignItems: "center", gap: "1px" }}>
+                        <span style={{ fontSize: "14px", lineHeight: 1 }}>🗑</span>
+                        <span style={{ fontSize: "9.5px", fontWeight: 800, color: "#C0554A", lineHeight: 1 }}>삭제</span>
+                      </button>
                     </article>
                   );
                 })}
