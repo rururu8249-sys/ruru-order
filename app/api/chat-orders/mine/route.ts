@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
       let items: unknown[] = [];
       try { const p = r.parsed_items ? JSON.parse(String(r.parsed_items)) : []; if (Array.isArray(p)) items = p; } catch { /* 없으면 빈 배열 */ }
       rows.push({
+        _ch: String(r.channel_id ?? "").trim(),
         id: r.id,
         product_id: String(r.parsed_product_id),
         product_name: String(r.parsed_product_name ?? ""),
@@ -72,6 +73,22 @@ export async function GET(request: NextRequest) {
         items,
       });
       if (rows.length >= 5) break;                             // 배너는 최대 5건
+    }
+    // [가로채기 방지] 이미 "다른 회원"에 연결된 채널의 채팅은 닉네임 입력으로 못 가져간다.
+    //   연결된 단골의 주문은 본인(채널 일치)에게만 보인다. 돈은 어차피 각자 결제라 무관 — 이건 표시 보호.
+    if (rows.length > 0) {
+      const chs = Array.from(new Set(rows.map((r) => String(r._ch ?? "")).filter(Boolean)));
+      if (chs.length > 0) {
+        const { data: owners } = await sb.from("customers")
+          .select("youtube_channel_id, customer_phone").in("youtube_channel_id", chs);
+        const foreign = new Set(((owners || []) as Record<string, unknown>[])
+          .filter((o) => String(o.customer_phone ?? "") !== phone)
+          .map((o) => String(o.youtube_channel_id ?? "")));
+        for (let i = rows.length - 1; i >= 0; i -= 1) {
+          if (foreign.has(String(rows[i]._ch ?? ""))) rows.splice(i, 1);
+        }
+      }
+      for (const r of rows) delete r._ch;
     }
     return NextResponse.json({ ok: true, enabled: true, rows, nameChanged: changedName || null });
   } catch {
