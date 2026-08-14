@@ -10,9 +10,9 @@ import {
 import { useEffect, useState } from "react";
 
 // components/home/KakaoStartPage.tsx
-// 목적: 고객 첫 접속 카카오 로그인 시작 화면
+// 목적: 고객 첫 접속 카카오톡 로그인 시작 화면
 // 주의:
-// - UI/카카오 로그인 시작 전용입니다.
+// - UI/카카오톡 로그인 시작 전용입니다.
 // - 주문 저장, 입금, 정산, 배송비, Supabase 로직을 건드리지 않습니다.
 
 export default function KakaoStartPage() {
@@ -53,7 +53,7 @@ export default function KakaoStartPage() {
     const restApiKey = process.env.NEXT_PUBLIC_KAKAO_REST_API_KEY || "";
 
     if (!restApiKey) {
-      showAdminToast("카카오 로그인 설정값이 없습니다. 관리자에게 문의해주세요.");
+      showAdminToast("카카오톡 로그인 설정값이 없습니다. 관리자에게 문의해주세요.");
       return;
     }
 
@@ -73,7 +73,7 @@ export default function KakaoStartPage() {
   }
 
   // [2026-08-14 사장님 지시] 파란색 임시 테마 → 루루동이 브랜드 시안(버건디 #7B2D43 + 핑크,
-  //   OrderEntryGateV2 진입 시안과 동일 계열)으로 표시만 변경. 카카오 로그인 로직·문구·버튼 동작 무변경.
+  //   OrderEntryGateV2 진입 시안과 동일 계열)으로 표시만 변경. 카카오톡 로그인 로직·문구·버튼 동작 무변경.
   return (
     <main
       className="min-h-screen bg-[#FBF8F9] px-2 py-4 text-[#151923] select-none sm:px-4"
@@ -94,19 +94,19 @@ export default function KakaoStartPage() {
           <div className="mt-6 text-center">
             <p className="text-[13px] font-black tracking-[-0.04em]" style={{ color: "#7B2D43" }}>루루동이 LIVE</p>
             <h1 className="mt-2 break-keep text-[32px] font-black leading-tight tracking-[-0.08em]">
-              <span style={{ color: "#7B2D43" }}>주문은 카카오로</span>
+              <span style={{ color: "#7B2D43" }}>주문은 카카오톡으로</span>
               <br />
               <span className="text-slate-950">시작해주세요</span>
             </h1>
             <p className="mt-3 break-keep text-[15px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
-              카카오 로그인 후 유튜브 닉네임과 배송정보를 확인하고 주문서를 작성합니다.
+              카카오톡 로그인 후 유튜브 닉네임과 배송정보를 확인하고 주문서를 작성합니다.
             </p>
           </div>
 
           <div className="mt-5 rounded-[24px] p-4" style={{ background: "rgba(255,255,255,0.85)", border: "1px solid #D9C5CC" }}>
             <div className="grid gap-3">
               {[
-                "카카오 로그인으로 이름, 전화번호, 배송정보를 불러옵니다.",
+                "카카오톡 로그인으로 이름, 전화번호, 배송정보를 불러옵니다.",
                 "방송에서 사용하는 유튜브 닉네임을 한 번 확인합니다.",
                 "주문서에서 상품과 결제금액을 확인하고 제출합니다.",
               ].map((step, index) => (
@@ -126,11 +126,11 @@ export default function KakaoStartPage() {
             className="mt-5 flex min-h-[58px] w-full items-center justify-center rounded-[22px] bg-[#fee500] px-4 py-4 text-[18px] font-black tracking-[-0.05em] text-[#241b17] shadow-[0_14px_30px_rgba(234,179,8,0.25)] ring-1 ring-yellow-200 transition active:scale-[0.98]"
           >
             <span className="mr-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#241b17] text-[11px] font-black text-[#fee500]">TALK</span>
-            카카오로 주문 시작하기
+            카카오톡으로 주문 시작하기
           </button>
 
           <p className="mt-4 break-keep text-center text-[12px] font-bold leading-relaxed tracking-[-0.04em]" style={{ color: "#A08A92" }}>
-            카카오에서 불러온 정보는 주문서 작성과 주문조회에만 사용됩니다.
+            카카오톡에서 불러온 정보는 주문서 작성과 주문조회에만 사용됩니다.
           </p>
         </section>
       </section>
