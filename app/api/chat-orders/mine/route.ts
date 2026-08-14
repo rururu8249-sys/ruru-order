@@ -81,7 +81,8 @@ export async function GET(request: NextRequest) {
     let changedName = ""; // 채널ID로는 본인인데 채팅 이름 ≠ 사이트 닉네임 → 유튜브 이름을 바꾼 것
     for (const r of (data || []) as Record<string, unknown>[]) {
       if (!showAll && r.claimed_at) continue;                  // 자동담김은 새 주문만 / 직접 찾기는 전부
-      const byChannel = verifiedChannel && String(r.channel_id ?? "") === verifiedChannel; // 인증 고객: 채널ID 확정
+      // 직접 찾기(all=1)는 "고른 이름의 주문만" — 채널 매칭은 자동담김 전용 (본인 옛 주문이 딸려오는 혼동 방지)
+      const byChannel = !showAll && verifiedChannel && String(r.channel_id ?? "") === verifiedChannel;
       const byNick = nick.length >= 2 && sqz(r.display_name) === nick;                     // 미인증: 닉 정규화 정확일치
       if (!byChannel && !byNick) continue;
       if (byChannel && !byNick && !changedName) changedName = String(r.display_name ?? "").trim();
