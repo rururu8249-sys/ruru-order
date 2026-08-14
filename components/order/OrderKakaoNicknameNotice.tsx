@@ -1,5 +1,5 @@
 // components/order/OrderKakaoNicknameNotice.tsx
-// 목적: 카카오 로그인 후 유튜브 닉네임 1회 강제 확인 모달
+// 목적: 카카오톡 로그인 후 유튜브 닉네임 1회 강제 확인 모달
 // 주의:
 // - UI/로컬 상태 전용 컴포넌트입니다.
 // - 주문 저장, 고객 병합, 입금매칭, 정산, 배송비 로직을 건드리지 않습니다.
@@ -29,7 +29,7 @@ export default function OrderKakaoNicknameNotice({
         <div style={{ background: "linear-gradient(to bottom, #ffffff, #F5E6EB)", padding: "22px 18px" }}>
           <div style={{ margin: "0 auto 16px", display: "flex", width: "fit-content", alignItems: "center", gap: "8px", borderRadius: "999px", background: "#fee500", padding: "8px 16px", fontSize: "13px", fontWeight: 800, color: "#241b17" }}>
             <span style={{ display: "flex", height: "28px", width: "28px", alignItems: "center", justifyContent: "center", borderRadius: "50%", background: "#241b17", fontSize: "12px", color: "#fee500" }}>TALK</span>
-            카카오 로그인 완료
+            카카오톡 로그인 완료
           </div>
 
           <div style={{ textAlign: "center" }}>

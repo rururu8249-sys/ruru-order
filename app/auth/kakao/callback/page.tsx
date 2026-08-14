@@ -22,7 +22,7 @@ export default function KakaoCallbackPage() {
 
       if (!code) {
         setStatus("error");
-        setMessage("카카오 로그인 코드가 없습니다.");
+        setMessage("카카오톡 로그인 코드가 없습니다.");
         return;
       }
 
