@@ -3561,6 +3561,27 @@ export default function OrderPage() {
     }));
   };
   const chatClaimDoneRef = useRef<Set<string>>(new Set());
+  // [셀프 연결] 유튜브 이름 ≠ 사이트 닉네임 손님 — 채팅에 쓴 이름을 직접 적으면 본인 주문을 찾아 담고,
+  //   담는 순간 서버가 채널ID를 연결(mine POST) → 다음부터는 평생 자동. 관리자 손 안 감.
+  const chatAltNickRef = useRef("");
+  const [chatFindOpen, setChatFindOpen] = useState(false);
+  const [chatFindName, setChatFindName] = useState("");
+  const findMyChatOrders = async () => {
+    const alt = chatFindName.trim();
+    if (!alt) { showCustomerNotice("채팅에 쓰는 이름을 적어주세요."); return; }
+    try {
+      const phone = normalizePhone(customerPhone);
+      const res = await fetch(`/api/chat-orders/mine?nick=${encodeURIComponent(alt)}&phone=${encodeURIComponent(phone)}`, { cache: "no-store" });
+      const json = await res.json().catch(() => null);
+      if (json?.ok && Array.isArray(json.rows) && json.rows.length > 0) {
+        chatAltNickRef.current = alt;
+        setChatFindOpen(false);
+        setChatClaimRows(json.rows); // 자동담기 effect가 담고, 담는 순간 채널ID 연결
+      } else {
+        showCustomerNotice(json?.enabled === false ? "지금은 채팅주문 담기가 꺼져 있어요." : `'${alt}' 이름의 최근 채팅 주문을 못 찾았어요. 채팅에 쓴 이름 그대로 적어주세요.`);
+      }
+    } catch { showCustomerNotice("잠시 후 다시 시도해주세요."); }
+  };
   // [2026-08-14 사장님 승인] 유튜브 이름 변경 감지 → "사이트 닉네임도 똑같이 바꿀까요?" 팝업 (강제 변경 아님 — 손님 확인 1탭)
   //   닉네임은 자동입금매칭 키라서: 가입 때와 동일한 중복 검사를 통과할 때만 변경, 실패 시 정보수정 안내.
   const [chatNameChanged, setChatNameChanged] = useState<string | null>(null);
@@ -3603,7 +3624,7 @@ export default function OrderPage() {
     try {
       void fetch("/api/chat-orders/mine", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: claimedIds, nick: youtubeNickname.trim(), phone: normalizePhone(customerPhone) }),
+        body: JSON.stringify({ ids: claimedIds, nick: (chatAltNickRef.current || youtubeNickname).trim(), phone: normalizePhone(customerPhone) }),
       });
     } catch { /* best-effort */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -5161,6 +5182,27 @@ export default function OrderPage() {
                 <button type="button" disabled={!broadcastYoutubeUrl} onClick={() => openYoutubeApp(broadcastYoutubeUrl)} style={{ flex: 1, height: "40px", border: "none", borderRadius: "11px", background: broadcastYoutubeUrl ? "#FF0033" : "#5A4048", color: "#fff", fontSize: "12.5px", fontWeight: 900, cursor: broadcastYoutubeUrl ? "pointer" : "default", opacity: broadcastYoutubeUrl ? 1 : 0.6 }}>▶ 방송 보러가기</button>
               </div>
             </div>
+          )}
+        </section>
+      ) : null}
+
+      {/* [셀프 연결] 방송 중 + 담긴 채팅주문이 없을 때만 — 눈에 거슬리지 않게 한 줄 */}
+      {hasSavedInfo && isBroadcastOn && chatClaimRows.length === 0 ? (
+        <section style={{ margin: "0 auto", width: "100%", maxWidth: "560px", padding: "0 14px 4px" }}>
+          {chatFindOpen ? (
+            <div style={{ background: "#FFF6FA", border: "1.5px solid #E8A3C0", borderRadius: "14px", padding: "11px 12px" }}>
+              <div style={{ fontSize: "12.5px", fontWeight: 800, color: "#7A1E47", marginBottom: "7px" }}>채팅에서 쓰는 이름을 그대로 적어주세요 (예: Borahae_Ju)</div>
+              <div style={{ display: "flex", gap: "7px" }}>
+                <input value={chatFindName} onChange={(e) => setChatFindName(e.target.value)} placeholder="유튜브 채팅 이름"
+                  style={{ flex: 1, minWidth: 0, height: "40px", borderRadius: "10px", border: "1px solid #E8D5DD", padding: "0 12px", fontSize: "14px", fontWeight: 700 }} />
+                <button type="button" onClick={() => void findMyChatOrders()} style={{ flexShrink: 0, height: "40px", padding: "0 16px", border: "none", borderRadius: "10px", background: "#7A1E47", color: "#fff", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}>찾기</button>
+                <button type="button" onClick={() => setChatFindOpen(false)} style={{ flexShrink: 0, height: "40px", padding: "0 10px", border: "none", borderRadius: "10px", background: "transparent", color: "#B08FA0", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>닫기</button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setChatFindOpen(true)} style={{ width: "100%", height: "36px", border: "1px dashed #E8A3C0", borderRadius: "12px", background: "#FFF9FC", color: "#A96E86", fontSize: "12.5px", fontWeight: 800, cursor: "pointer" }}>
+              💬 채팅으로 주문했는데 안 담겼나요? — 눌러서 찾기
+            </button>
           )}
         </section>
       ) : null}
