@@ -2678,7 +2678,7 @@ export default function OrderPage() {
     const restApiKey = process.env.NEXT_PUBLIC_KAKAO_REST_API_KEY || "";
 
     if (!restApiKey) {
-      showCustomerNotice("카카오 로그인 설정값이 없습니다. 관리자에게 문의해주세요.");
+      showCustomerNotice("카카오톡 로그인 설정값이 없습니다. 관리자에게 문의해주세요.");
       return;
     }
 
@@ -6472,7 +6472,7 @@ export default function OrderPage() {
               {/* [2026-07-29] 카톡 로그인 시 알림이 기본 ON이므로, 켜져 있는 손님에겐 "자동으로 켜졌고 여기서 끌 수 있다"고 알려준다(카카오 채널 정책 대비 고지). */}
               <div style={{ fontSize: "13px", color: "#666", lineHeight: 1.6, marginBottom: "18px" }}>
                 {liveAlertOptin
-                  ? "카카오 로그인을 하시면 방송 시작 알림이 자동으로 켜집니다. 라이브가 시작되면 카카오 알림톡으로 알려드려요. 원하지 않으시면 바로 아래 [알림 끄기] 버튼을 눌러주세요."
+                  ? "카카오톡 로그인을 하시면 방송 시작 알림이 자동으로 켜집니다. 라이브가 시작되면 카카오 알림톡으로 알려드려요. 원하지 않으시면 바로 아래 [알림 끄기] 버튼을 눌러주세요."
                   : "신청하면 라이브 시작 때 카카오 알림톡으로 알려드려요. 신청 시 알림 수신에 동의하며, 언제든 끌 수 있어요."}
               </div>
               {liveAlertOptin ? (
