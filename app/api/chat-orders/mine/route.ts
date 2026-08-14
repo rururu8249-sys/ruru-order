@@ -79,8 +79,14 @@ export async function GET(request: NextRequest) {
       .limit(200);
     const rows: Record<string, unknown>[] = [];
     let changedName = ""; // 채널ID로는 본인인데 채팅 이름 ≠ 사이트 닉네임 → 유튜브 이름을 바꾼 것
+    let claimedMine = 0; // 이미 담아간(회수 포함) 본인 기록 수 — 연결 손님의 찾기 노출 판단용
     for (const r of (data || []) as Record<string, unknown>[]) {
-      if (!showAll && r.claimed_at) continue;                  // 자동담김은 새 주문만 / 직접 찾기는 전부
+      if (!showAll && r.claimed_at) {
+        // 자동담김은 새 주문만 — 단, 본인 것(채널/닉 일치)이면 "되찾을 기록"으로 센다
+        const mineClaimed = (verifiedChannel && String(r.channel_id ?? "") === verifiedChannel) || (nick.length >= 2 && sqz(r.display_name) === nick);
+        if (mineClaimed) claimedMine += 1;
+        continue;
+      }
       // 직접 찾기(all=1)는 "고른 이름의 주문만" — 채널 매칭은 자동담김 전용 (본인 옛 주문이 딸려오는 혼동 방지)
       const byChannel = !showAll && verifiedChannel && String(r.channel_id ?? "") === verifiedChannel;
       const byNick = nick.length >= 2 && sqz(r.display_name) === nick;                     // 미인증: 닉 정규화 정확일치
@@ -116,7 +122,9 @@ export async function GET(request: NextRequest) {
       }
       for (const r of rows) delete r._ch;
     }
-    return NextResponse.json({ ok: true, enabled: true, rows, nameChanged: changedName || null });
+    // 찾기 노출: 미연결 손님 = 항상 / 연결 손님 = 되찾을 기록 있을 때만 (사장님 확정 2026-08-14)
+    const showFind = !verifiedChannel || claimedMine > 0;
+    return NextResponse.json({ ok: true, enabled: true, rows, nameChanged: changedName || null, showFind });
   } catch {
     // 표시 전용 — 실패는 조용히 빈 결과(주문 흐름 무영향)
     return NextResponse.json({ ok: true, enabled: false, rows: [] });

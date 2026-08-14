@@ -3486,6 +3486,7 @@ export default function OrderPage() {
         const json = await res.json().catch(() => null);
         if (!stopped) {
           setChatUiEnabled(Boolean(json?.enabled));
+          if (typeof json?.showFind === "boolean") setChatShowFind(json.showFind);
           setChatClaimRows(json?.ok && Array.isArray(json.rows) ? json.rows : []);
           const nc = String(json?.nameChanged || "").trim();
           if (nc && !chatNameChangeDismissedRef.current) setChatNameChanged(nc);
@@ -3573,6 +3574,7 @@ export default function OrderPage() {
   // [셀프 연결] 유튜브 이름 ≠ 사이트 닉네임 손님 — 채팅에 쓴 이름을 직접 적으면 본인 주문을 찾아 담고,
   //   담는 순간 서버가 채널ID를 연결(mine POST) → 다음부터는 평생 자동. 관리자 손 안 감.
   const [chatUiEnabled, setChatUiEnabled] = useState(false); // 관리자 「채팅 자동담기」 토글 상태 — OFF면 힌트/찾기 전부 숨김
+  const [chatShowFind, setChatShowFind] = useState(true); // 연결된 손님은 되찾을 기록 있을 때만 찾기 노출
   const chatAltNickRef = useRef("");
   const [chatFindOpen, setChatFindOpen] = useState(false);
   const [chatFindName, setChatFindName] = useState("");
@@ -5590,7 +5592,7 @@ export default function OrderPage() {
             )}
 
             {/* [셀프 연결 · 사장님 확정 위치] 주문서 확인 안 — 채팅주문 손님만 여길 보니까 남들에겐 안 거슬림 */}
-            {isBroadcastOn && chatUiEnabled ? (
+            {isBroadcastOn && chatUiEnabled && chatShowFind ? (
               <div style={{ padding: "2px 18px 10px" }}>
                 {chatFindOpen ? (
                   <div style={{ background: "#FFF6FA", border: "1.5px solid #E8A3C0", borderRadius: "12px", padding: "10px 12px" }}>
@@ -6461,7 +6463,7 @@ export default function OrderPage() {
                   //   판도 글씨도 묻혀 안 읽혔다. 판은 오히려 더 연하게(로즈 10%), 글씨는 더 진하게(로즈).
                   //   담겼을 때 뜨는 진한 로즈 불투명 바와 확실히 구분되도록 농도를 낮게 유지한다. 표시 전용.
                   // [셀프 연결 진입로] 방송 중엔 빈 바를 누를 수 있게 — 누르면 주문서가 열리며 채팅주문 찾기 입력칸이 바로 펼쳐짐
-                  isBroadcastOn && chatUiEnabled ? (
+                  isBroadcastOn && chatUiEnabled && chatShowFind ? (
                     <button type="button"
                       onClick={() => { setChatFindOpen(true); setOrderSheetOpen(true); window.setTimeout(() => document.getElementById("orderSheetSection")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}
                       style={{ position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, background: "rgba(255,255,255,0.94)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)", border: "1.5px solid rgba(122,30,71,0.5)", borderRadius: "13px", padding: "12px 14px", textAlign: "center", fontSize: "14.5px", fontWeight: 900, color: "#7A1E47", letterSpacing: "-0.3px", cursor: "pointer", boxShadow: "0 4px 14px rgba(122,30,71,0.15)" }}>
