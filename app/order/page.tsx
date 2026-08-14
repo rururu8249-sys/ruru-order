@@ -3266,6 +3266,12 @@ export default function OrderPage() {
       // [2026-08-11 담기 선착순] 서버 원자 검증 결과 반영 — 먼저 담은 손님이 임자.
       //   거부된 옵션은 남은 수량으로 자동 조정(0이면 제거) + "방금 품절" 안내. 돈/제출 로직 무관.
       const claim = await res.json().catch(() => null);
+      // [2026-08-14 사장님 지시] 관리자가 선점 해제하면 손님 폰에서도 담긴 상품이 사라진다(직접입력 줄은 유지)
+      if (claim?.ok && claim.revoked === true) {
+        setItems((prev) => prev.filter((it) => !(it.product_id && String(it.product_name || "").trim())));
+        showCustomerNotice("⚠️ 방송 운영자가 담긴 상품을 회수했어요 — 주문서가 비워졌습니다. 궁금한 점은 방송 채팅으로 문의해주세요.");
+        return;
+      }
       if (claim?.ok && claim.allOk === false && Array.isArray(claim.results)) {
         const rejected = claim.results.filter((r: any) => r && r.ok === false);
         if (rejected.length > 0) {

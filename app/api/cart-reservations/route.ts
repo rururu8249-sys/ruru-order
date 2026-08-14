@@ -120,6 +120,16 @@ export async function POST(request: NextRequest) {
         qty: Math.max(0, Math.min(MAX_QTY, Number(it?.qty) || 0)),
       }))
       .filter((r: any) => r.productId && r.qty > 0);
+    // [2026-08-14] 관리자 회수 지시 확인 — 있으면 이번 sync를 막고 손님 폰이 장바구니를 비우게 한다(1회성).
+    try {
+      const rk = `cart_revoke_${sessionKey}`.slice(0, 250);
+      const { data: rv } = await supabase.from("settings").select("value").eq("key", rk).limit(1).maybeSingle();
+      if (rv) {
+        await supabase.from("settings").delete().eq("key", rk);
+        await supabase.from("cart_reservations").delete().eq("session_key", sessionKey);
+        return NextResponse.json({ ok: true, revoked: true });
+      }
+    } catch { /* 확인 실패 시 평소처럼 sync */ }
     const holdMinutes = await getHoldMinutes(supabase);
 
     const { data, error } = await supabase.rpc("claim_cart_hold", {

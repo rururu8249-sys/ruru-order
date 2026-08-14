@@ -166,6 +166,14 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseAdmin();
     const { error } = await supabase.from("cart_reservations").delete().eq("session_key", sessionKey);
+    // [2026-08-14 사장님 지시] 해제 = 손님 폰에서도 삭제. 회수 지시를 남기면
+    //   손님 페이지가 다음 하트비트(최대 45초)에 읽고 담긴 상품을 스스로 비운다.
+    try {
+      const rk = `cart_revoke_${sessionKey}`.slice(0, 250);
+      const { data: ex } = await supabase.from("settings").select("key").eq("key", rk).limit(1);
+      if (Array.isArray(ex) && ex.length > 0) await supabase.from("settings").update({ value: new Date().toISOString() }).eq("key", rk);
+      else await supabase.from("settings").insert({ key: rk, value: new Date().toISOString() });
+    } catch { /* 회수 지시 실패해도 해제 자체는 유지 */ }
     if (error) return NextResponse.json({ ok: false, error: { message: error.message } }, { status: 500 });
 
     return NextResponse.json({ ok: true, cleared: true });
