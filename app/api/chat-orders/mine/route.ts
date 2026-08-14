@@ -29,16 +29,25 @@ const FRESH_HOURS = 12; // 이 시간 안의 채팅만 배너 후보 (방송 1�
 export async function GET(request: NextRequest) {
   try {
     const nick = sqz(request.nextUrl.searchParams.get("nick") || "");
-    if (!nick || nick.length < 2) return NextResponse.json({ ok: true, enabled: false, rows: [] });
+    const phone = String(request.nextUrl.searchParams.get("phone") || "").replace(/\D/g, "");
+    if ((!nick || nick.length < 2) && phone.length < 10) return NextResponse.json({ ok: true, enabled: false, rows: [] });
     const sb = sbAdmin();
     const { data: st } = await sb.from("settings").select("value").eq("key", SETTING_CUSTOMER_UI_ENABLED).limit(1).maybeSingle();
     if (String((st as Record<string, unknown> | null)?.value ?? "") !== "true") {
       return NextResponse.json({ ok: true, enabled: false, rows: [] });
     }
+    // [5단계] 인증(채널ID 연결) 고객은 채널ID로 확정 매칭 — 유튜브 이름이 바뀌어도, 닉 표기가 달라도 잡힌다.
+    let verifiedChannel = "";
+    if (phone.length >= 10) {
+      const { data: cust } = await sb.from("customers")
+        .select("youtube_channel_id").eq("customer_phone", phone)
+        .not("youtube_channel_id", "is", null).limit(1).maybeSingle();
+      verifiedChannel = String((cust as Record<string, unknown> | null)?.youtube_channel_id ?? "");
+    }
     const since = new Date(Date.now() - FRESH_HOURS * 60 * 60 * 1000).toISOString();
     const { data } = await sb
       .from("chat_orders")
-      .select("id, display_name, parsed_product_id, parsed_product_name, parsed_variant, parsed_qty, parsed_items, claimed_at, published_at")
+      .select("id, display_name, channel_id, parsed_product_id, parsed_product_name, parsed_variant, parsed_qty, parsed_items, claimed_at, published_at")
       .eq("parse_status", "parsed")
       .gte("published_at", since)
       .order("id", { ascending: false })
@@ -46,7 +55,9 @@ export async function GET(request: NextRequest) {
     const rows: Record<string, unknown>[] = [];
     for (const r of (data || []) as Record<string, unknown>[]) {
       if (r.claimed_at) continue;                              // 이미 담아간 것(표시용)은 숨김
-      if (sqz(r.display_name) !== nick) continue;              // 본인 채팅만 (정규화 정확일치)
+      const byChannel = verifiedChannel && String(r.channel_id ?? "") === verifiedChannel; // 인증 고객: 채널ID 확정
+      const byNick = nick.length >= 2 && sqz(r.display_name) === nick;                     // 미인증: 닉 정규화 정확일치
+      if (!byChannel && !byNick) continue;
       if (!r.parsed_product_id) continue;
       let items: unknown[] = [];
       try { const p = r.parsed_items ? JSON.parse(String(r.parsed_items)) : []; if (Array.isArray(p)) items = p; } catch { /* 없으면 빈 배열 */ }

@@ -3469,9 +3469,13 @@ export default function OrderPage() {
     let stopped = false;
     const load = async () => {
       try {
-        const res = await fetch(`/api/chat-orders/mine?nick=${encodeURIComponent(nick)}`, { cache: "no-store" });
+        const phone = normalizePhone(customerPhone);
+        const res = await fetch(`/api/chat-orders/mine?nick=${encodeURIComponent(nick)}&phone=${encodeURIComponent(phone)}`, { cache: "no-store" });
         const json = await res.json().catch(() => null);
-        if (!stopped) setChatClaimRows(json?.ok && Array.isArray(json.rows) ? json.rows : []);
+        if (!stopped) {
+          setChatUiEnabled(Boolean(json?.enabled));
+          setChatClaimRows(json?.ok && Array.isArray(json.rows) ? json.rows : []);
+        }
       } catch { /* 표시 전용 — 실패해도 주문 흐름 무관 */ }
     };
     void load();
@@ -3481,7 +3485,7 @@ export default function OrderPage() {
     }, 60000);
     return () => { stopped = true; clearInterval(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [broadcast?.status, youtubeNickname, hasSavedInfo]);
+  }, [broadcast?.status, youtubeNickname, hasSavedInfo, customerPhone]);
 
   const chatClaimItemsOf = (row: any): { color: string | null; size: string | null; qty: number }[] => {
     const list = Array.isArray(row?.items) && row.items.length > 0
@@ -3499,6 +3503,56 @@ export default function OrderPage() {
   //   재고캡·1인 구매제한·조합가 검증 동일 통과. 진짜 재고차감·돈 처리는 제출 RPC 그대로(무접촉).
   //   같은 행 중복 담김 방지: 세션 내 ref + 서버 claimed_at(담음 표시, 대기열 소진 아님) 이중.
   const chatClaimDoneRef = useRef<Set<string>>(new Set());
+  // [5단계] 채팅 계정 연결(인증코드 → 채널ID) — 표시 전용. 연결되면 채팅주문이 채널ID로 확정 매칭된다.
+  const [chatUiEnabled, setChatUiEnabled] = useState(false);
+  const [chatAuth, setChatAuth] = useState<{ verified: boolean; code?: string | null } | null>(null);
+  const chatAuthRef = useRef<{ verified: boolean; code?: string | null } | null>(null);
+  const chatAuthNotifiedRef = useRef(false);
+  const loadChatAuth = async () => {
+    const phone = normalizePhone(customerPhone);
+    if (phone.length < 10) return;
+    try {
+      const res = await fetch(`/api/chat-auth?phone=${encodeURIComponent(phone)}`, { cache: "no-store" });
+      const json = await res.json().catch(() => null);
+      if (!json?.ok) return;
+      const next = { verified: Boolean(json.verified), code: (json.code ?? null) as string | null };
+      const prev = chatAuthRef.current;
+      chatAuthRef.current = next;
+      setChatAuth(next);
+      if (next.verified && prev && !prev.verified && !chatAuthNotifiedRef.current) {
+        chatAuthNotifiedRef.current = true;
+        showCustomerNotice("✅ 채팅 계정 연결 완료! 이제 채팅 주문이 더 정확하게 담겨요.", "success");
+      }
+    } catch { /* 표시 전용 */ }
+  };
+  useEffect(() => {
+    const on = String(broadcast?.status || "").toUpperCase() === "ON";
+    if (!on || !hasSavedInfo) return;
+    void loadChatAuth(); // 최초 1회 — 인증 여부 확인 (폴링 아님, 방송 피크 부하 보호)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [broadcast?.status, hasSavedInfo, customerPhone]);
+  useEffect(() => {
+    // 코드 발급 뒤에만 10초 폴링 — "연결 완료"를 감지하면 안내 토스트
+    if (!chatAuth || chatAuth.verified || !chatAuth.code) return;
+    const t = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      void loadChatAuth();
+    }, 10000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatAuth?.code, chatAuth?.verified]);
+  const issueChatAuth = async () => {
+    const phone = normalizePhone(customerPhone);
+    if (phone.length < 10) { showCustomerNotice("전화번호를 먼저 저장해주세요."); return; }
+    try {
+      const res = await fetch("/api/chat-auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone }) });
+      const json = await res.json().catch(() => null);
+      if (json?.ok && json.code) {
+        const next = { verified: false, code: String(json.code) };
+        chatAuthRef.current = next; setChatAuth(next);
+      } else showCustomerNotice("연결 코드를 만들지 못했어요. 잠시 후 다시 시도해주세요.");
+    } catch { showCustomerNotice("연결 코드를 만들지 못했어요. 잠시 후 다시 시도해주세요."); }
+  };
   useEffect(() => {
     if (!hasSavedInfo || chatClaimRows.length === 0) return;
     const pool = [...broadcastProducts, ...groupBuyQuickProductsFromCatalog];
@@ -5077,6 +5131,18 @@ export default function OrderPage() {
                 </button>
                 <button type="button" disabled={!broadcastYoutubeUrl} onClick={() => openYoutubeApp(broadcastYoutubeUrl)} style={{ flex: 1, height: "40px", border: "none", borderRadius: "11px", background: broadcastYoutubeUrl ? "#FF0033" : "#5A4048", color: "#fff", fontSize: "12.5px", fontWeight: 900, cursor: broadcastYoutubeUrl ? "pointer" : "default", opacity: broadcastYoutubeUrl ? 1 : 0.6 }}>▶ 방송 보러가기</button>
               </div>
+              {/* [5단계] 채팅 계정 연결 — 자동담기 ON + 미인증일 때만 한 줄. 인증되면 사라짐 */}
+              {chatUiEnabled && chatAuth && !chatAuth.verified ? (
+                chatAuth.code ? (
+                  <div style={{ marginTop: "10px", background: "rgba(255,255,255,0.12)", borderRadius: "11px", padding: "10px 12px", fontSize: "12.5px", fontWeight: 800, lineHeight: 1.6 }}>
+                    유튜브 채팅에 <b style={{ color: "#FFD9E8" }}>인증 {chatAuth.code}</b> 라고 보내주세요 — 확인되면 자동으로 연결돼요
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => void issueChatAuth()} style={{ marginTop: "10px", width: "100%", height: "38px", border: "1px dashed rgba(255,255,255,0.45)", borderRadius: "11px", background: "transparent", color: "#F5D9E5", fontSize: "12.5px", fontWeight: 800, cursor: "pointer" }}>
+                    🔗 채팅 계정 연결하기 — 채팅 주문이 더 정확하게 자동으로 담겨요
+                  </button>
+                )
+              ) : null}
             </div>
           )}
         </section>

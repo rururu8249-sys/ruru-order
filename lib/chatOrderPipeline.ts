@@ -77,6 +77,7 @@ export type ParsePassResult = {
   productCount: number;
   broadcastSource: "live" | "shop" | "recent" | "none";
   botSent?: number;
+  authVerified?: number; // [5단계] 이번 패스에서 처리한 채팅 계정 인증 건수
   reason?: string;
 };
 
@@ -165,6 +166,8 @@ export async function parsePendingChatOrders(
     const botTargets: { name: string; channel: string; kind: "ambiguous" | "need_product"; cands: string[]; atMs: number; productName: string | null }[] = [];
     // 접수 확인 대상: 알아들은 주문 — 묶어서 한 줄로 확인해준다
     const confirmTargets: { name: string; product: string; variant: string | null; qty: number; atMs: number; items: { color: string | null; size: string | null; qty: number }[] }[] = [];
+    // [5단계] 채팅 계정 인증 "인증 1234" 감지분 — 루프 후 일괄 처리
+    const authHits: { code: string; channel: string; name: string }[] = [];
     for (const row of pending) {
       const raw = String(row.raw_message ?? "");
       const atMs = new Date(String(row.published_at ?? "")).getTime();
@@ -190,6 +193,14 @@ export async function parsePendingChatOrders(
       if (r.status !== "not_order" && BOT_CALL_NAMES.some((bn) => sqMsg.includes(sqz(bn)))) {
         r = { ...r, status: "not_order", productId: null, productName: null, matchedBy: null,
               variantName: null, candidates: [], items: [], reason: "봇에게 말 건 채팅" };
+      }
+
+      // [5단계] 채팅 계정 연결 인증코드("인증 1234") — 주문이 아니고, 봇 재입력 안내로 흘러가도 안 된다.
+      const mAuth = sqz(raw).match(/^인증(?:번호)?(\d{4})$/);
+      if (mAuth && authorCh) {
+        authHits.push({ code: mAuth[1], channel: authorCh, name: String(row.display_name ?? "").trim() });
+        r = { ...r, status: "not_order", productId: null, productName: null, matchedBy: null,
+              variantName: null, candidates: [], items: [], reason: "채팅 계정 인증 코드" };
       }
 
       // 자가진단이 찾아낸 "이름 겹침" 문장 패턴은 확신하지 않고 자동 보류한다.
@@ -240,6 +251,31 @@ export async function parsePendingChatOrders(
         })
         .eq("id", row.id as number);
       if (!upErr) updated += 1;
+    }
+
+    // ── [5단계] 인증코드 처리 — customers의 "신규 3컬럼"에만 쓴다. youtube_nickname(입금매칭 키) 무접촉. ──
+    let authVerified = 0;
+    for (const h of authHits) {
+      try {
+        const nowIso = new Date().toISOString();
+        const { data: codeRow } = await sb.from("chat_auth_codes")
+          .select("id, customer_phone").eq("code", h.code).is("used_at", null).gt("expires_at", nowIso)
+          .order("id", { ascending: false }).limit(1).maybeSingle();
+        if (!codeRow) continue; // 없는/만료/사용된 코드 — 조용히 무시
+        const phone = String((codeRow as Record<string, unknown>).customer_phone ?? "");
+        if (!phone) continue;
+        // 같은 채널이 예전에 다른 고객에 연결돼 있었으면 해제(채널 주인은 한 명)
+        await sb.from("customers").update({ youtube_channel_id: null })
+          .eq("youtube_channel_id", h.channel).neq("customer_phone", phone);
+        await sb.from("customers").update({
+          youtube_channel_id: h.channel,
+          youtube_handle: h.name.replace(/^@/, ""),
+          handle_verified_at: nowIso,
+        }).eq("customer_phone", phone);
+        await sb.from("chat_auth_codes").update({ used_at: nowIso, matched_channel_id: h.channel })
+          .eq("id", Number((codeRow as Record<string, unknown>).id));
+        authVerified += 1;
+      } catch { /* 인증 실패는 파싱을 막지 않는다 */ }
     }
 
     // ── 봇 안내 발송 (설정 ON일 때만, 상한 준수) ──
@@ -325,6 +361,7 @@ export async function parsePendingChatOrders(
       ok: true,
       scanned: pending.length,
       updated,
+      authVerified,
       byStatus,
       productCount: products.length,
       broadcastSource: loaded.source,
