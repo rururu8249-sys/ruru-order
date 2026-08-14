@@ -81,6 +81,7 @@ import PWAInstallBanner from "@/components/PWAInstallBanner";
 
 
 type OrderItem = {
+  chat_source?: string; // [채팅주문] "Y"면 채팅으로 자동 담긴 상품 — 수정·삭제 전 시안 v5 확인창
   product_id?: string;
   product_name: string;
   color: string;
@@ -3367,7 +3368,7 @@ export default function OrderPage() {
 
   const addRegisteredProductToOrderItems = (
     product: BroadcastProduct,
-    options?: { color?: string; size?: string; qty?: number }
+    options?: { color?: string; size?: string; qty?: number; chatSource?: boolean }
   ) => {
     // [조합형 옵션] 단가 = 기본가 + 선택한 세부상품 추가금. 조합형 아니면 comboPlus=0 → 기존과 완전 동일.
     const comboPlus = comboPlusOfOrderProduct(product, options?.color);
@@ -3405,6 +3406,7 @@ export default function OrderPage() {
       product_price: nextProductPrice,
       shipping_type: product.shipping_type || "일반",
       combine_shipping: product.combine_shipping || "Y",
+      ...(options?.chatSource ? { chat_source: "Y" } : {}),
     };
 
     const normColor = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
@@ -3509,6 +3511,13 @@ export default function OrderPage() {
   //   옵션(색상/사이즈) 변경은 삭제 후 다시 담기(가격·재고 검증 경로 보호). 제출·돈 로직 무접촉.
   // [2026-08-14 사장님 지시] 주문서 확인에서 옵션(색상/사이즈)도 바로 변경 — 기존 옵션 시트 재사용(재고·품절 검증 동일).
   //   변경 불가 상황엔 반드시 멘트로 안내한다.
+  // [시안 v5 확인창] 채팅주문으로 담긴 상품의 수정·삭제 전 경고 — "루루언니에게 먼저 여쭤본 뒤"
+  const [chatGuardAction, setChatGuardAction] = useState<{ label: string; verb: string; run: () => void } | null>(null);
+  const guardChatItem = (item: OrderItem, label: string, verb: string, run: () => void) => {
+    if (item?.chat_source === "Y") { setChatGuardAction({ label, verb, run }); return; }
+    run();
+  };
+
   const openSheetItemOptionEdit = (index: number) => {
     const it = items[index];
     if (!it) return;
@@ -3581,7 +3590,7 @@ export default function OrderPage() {
       chatClaimDoneRef.current.add(key);
       for (const it of chatClaimItemsOf(row)) {
         addRegisteredProductToOrderItems(product as BroadcastProduct, {
-          color: it.color || undefined, size: it.size || undefined, qty: it.qty,
+          color: it.color || undefined, size: it.size || undefined, qty: it.qty, chatSource: true,
         });
       }
       claimedIds.push(Number(row.id));
@@ -5494,10 +5503,10 @@ export default function OrderPage() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         {/* [2026-08-13] 주문서 확인에서도 상품명·옵션명이 잘리면 손님이 제출 전에
                             뭘 담았는지 확인을 못 한다(옵션명 = 조합형 세부상품명이라 특히 김) → 2줄 줄바꿈 */}
-                        <div style={{ fontSize: "13px", fontWeight: 600, color: "#1A1A1A", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{item.product_name || "상품명 없음"}</div>
+                        <div style={{ fontSize: "13px", fontWeight: 600, color: "#1A1A1A", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{item.product_name || "상품명 없음"}{item.chat_source === "Y" ? <span style={{ marginLeft: "5px", verticalAlign: "1px", display: "inline-block", padding: "1.5px 6px", borderRadius: "6px", background: "#F9EEF3", color: "#7A1E47", fontSize: "9.5px", fontWeight: 900 }}>채팅주문</span> : null}</div>
                         <div style={{ fontSize: "11px", color: "#ABA5A0", marginTop: "2px", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{itemHasNoOptions ? "옵션 없음" : `${optionColorText} / ${optionSizeText}`} · 단가 {won(toNumber(item.product_price))}</div>
                         {itemIsRegisteredProduct && !itemHasNoOptions ? (
-                          <button type="button" onClick={() => openSheetItemOptionEdit(index)}
+                          <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · 옵션 변경`, "바꿀게요", () => openSheetItemOptionEdit(index))}
                             style={{ marginTop: "5px", padding: "4px 10px", borderRadius: "8px", border: "1px solid #E8D5DD", background: "#fff", color: "#7A1E47", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>
                             ✎ 옵션 변경
                           </button>
@@ -5505,16 +5514,16 @@ export default function OrderPage() {
 
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "6px", gap: "8px" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
-                            <button type="button" onClick={() => changeSheetItemQty(index, -1)} aria-label="수량 줄이기"
+                            <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · ${toNumber(item.qty)}개 → ${Math.max(1, toNumber(item.qty) - 1)}개`, "바꿀게요", () => changeSheetItemQty(index, -1))} aria-label="수량 줄이기"
                               style={{ width: "27px", height: "27px", borderRadius: "8px", border: "1px solid #E5E1DC", background: "#fff", color: "#7A1E47", fontSize: "16px", fontWeight: 800, cursor: "pointer", lineHeight: 1 }}>−</button>
                             <span style={{ fontSize: "13px", fontWeight: 800, color: "#1A1A1A", minWidth: "30px", textAlign: "center" }}>{toNumber(item.qty)}개</span>
-                            <button type="button" onClick={() => changeSheetItemQty(index, 1)} aria-label="수량 늘리기"
+                            <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · ${toNumber(item.qty)}개 → ${toNumber(item.qty) + 1}개`, "바꿀게요", () => changeSheetItemQty(index, 1))} aria-label="수량 늘리기"
                               style={{ width: "27px", height: "27px", borderRadius: "8px", border: "1px solid #E5E1DC", background: "#fff", color: "#7A1E47", fontSize: "16px", fontWeight: 800, cursor: "pointer", lineHeight: 1 }}>＋</button>
                           </div>
                           <span style={{ flexShrink: 0, fontSize: "14px", fontWeight: 700, color: "#7A1E47" }}>{won(itemAmount)}</span>
                         </div>
                       </div>
-                      <button type="button" onClick={() => removeItem(index)} aria-label="상품 삭제"
+                      <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · ${toNumber(item.qty)}개 삭제`, "삭제할게요", () => removeItem(index))} aria-label="상품 삭제"
                         style={{ flexShrink: 0, width: "36px", padding: "3px 0", borderRadius: "10px", border: "1px solid #F0DDD9", background: "#FDF6F4", cursor: "pointer", alignSelf: "flex-start", display: "flex", flexDirection: "column", alignItems: "center", gap: "1px" }}>
                         <span style={{ fontSize: "14px", lineHeight: 1 }}>🗑</span>
                         <span style={{ fontSize: "9.5px", fontWeight: 800, color: "#C0554A", lineHeight: 1 }}>삭제</span>
@@ -5748,6 +5757,22 @@ export default function OrderPage() {
               </span>
             </div>
           )}
+
+          {chatGuardAction ? (
+            <div style={{ position: "fixed", inset: 0, zIndex: 155, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)", padding: "0 24px" }}>
+              <div style={{ width: "330px", maxWidth: "100%", background: "#fff", borderRadius: "22px", padding: "26px 22px", boxShadow: "0 18px 50px rgba(0,0,0,0.28)", textAlign: "center" }}>
+                <div style={{ fontSize: "34px", lineHeight: 1 }}>⚠️</div>
+                <div style={{ marginTop: "10px", fontSize: "19px", fontWeight: 900, color: "#7A1E47" }}>잠깐만요!</div>
+                <div style={{ marginTop: "12px", background: "#F9EEF3", borderRadius: "12px", padding: "10px 12px", fontSize: "13.5px", fontWeight: 800, color: "#7A1E47", wordBreak: "keep-all" }}>{chatGuardAction.label}</div>
+                <div style={{ marginTop: "12px", fontSize: "13.5px", fontWeight: 600, color: "#666", lineHeight: 1.7 }}>임의로 수정·취소하시면<br /><b style={{ color: "#3A2F34" }}>상품이 잘못 가거나 누락될 수 있어요.</b></div>
+                <div style={{ marginTop: "10px", fontSize: "13.5px", fontWeight: 600, color: "#666", lineHeight: 1.7 }}>방송 채팅으로 <b style={{ color: "#3A2F34" }}>루루언니에게 먼저 여쭤본 뒤</b><br />바꿔주세요 🙏</div>
+                <div style={{ marginTop: "18px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <button type="button" onClick={() => setChatGuardAction(null)} style={{ height: "52px", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", fontSize: "15px", fontWeight: 800, color: "#666", cursor: "pointer" }}>닫기</button>
+                  <button type="button" onClick={() => { const a = chatGuardAction; setChatGuardAction(null); a.run(); }} style={{ height: "52px", borderRadius: "14px", border: "none", background: "#7A1E47", fontSize: "15px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>{chatGuardAction.verb}</button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {chatNameChanged ? (
             <div style={{ position: "fixed", inset: 0, zIndex: 150, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", padding: "0 24px" }}>
