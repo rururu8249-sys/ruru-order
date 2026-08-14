@@ -37,15 +37,20 @@ export async function GET(request: NextRequest) {
       const sinceS = new Date(Date.now() - FRESH_HOURS * 60 * 60 * 1000).toISOString();
       const { data: nm } = await sbS.from("chat_orders").select("display_name")
         .gte("published_at", sinceS).order("id", { ascending: false }).limit(500);
-      const seen = new Map<string, string>();
+      // 친 글자로 "시작하는" 이름을 앞에, 그다음 포함 매치 — 최근 채팅 순. 최대 8개.
+      const pre = new Map<string, string>();
+      const inc = new Map<string, string>();
       for (const r of (nm || []) as Record<string, unknown>[]) {
         const d = String(r.display_name ?? "").trim().replace(/^@/, "");
         if (!d) continue;
         const key = sqz(d);
-        if (key.includes(suggestQ) && !seen.has(key)) seen.set(key, d);
-        if (seen.size >= 6) break;
+        if (pre.has(key) || inc.has(key)) continue;
+        if (key.startsWith(suggestQ)) pre.set(key, d);
+        else if (key.includes(suggestQ)) inc.set(key, d);
+        if (pre.size >= 8) break;
       }
-      return NextResponse.json({ ok: true, names: Array.from(seen.values()) });
+      const names = [...pre.values(), ...inc.values()].slice(0, 8);
+      return NextResponse.json({ ok: true, names });
     }
     const nick = sqz(request.nextUrl.searchParams.get("nick") || "");
     const phone = String(request.nextUrl.searchParams.get("phone") || "").replace(/\D/g, "");
