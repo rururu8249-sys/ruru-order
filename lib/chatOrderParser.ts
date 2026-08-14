@@ -633,6 +633,23 @@ export function parseChatOrder(
   currentProductId?: string | null
 ): ParseResult {
   const core = parseChatOrderCore(rawText, products, currentProductId);
+
+  // [2026-08-14 사장님 지침] 조합형(세부상품 있는) 상품은 "종류까지" 말해야 접수.
+  //   "뉴에라 모자 주세요"(17종) 같은 건 접수하지 않고 보류 → 봇이 종류를 물어본다.
+  //   productName은 남겨서 관리자 화면·봇 안내에 어느 상품인지 보이게 한다.
+  if (core.status === "parsed" && !core.variantName && core.productId) {
+    const p0 = products.find((x) => x.id === core.productId);
+    if (p0 && (p0.variants || []).length > 0) {
+      return {
+        ...core,
+        status: "ambiguous",
+        candidates: (p0.variants || []).slice(0, 4),
+        reason: "종류(세부상품) 미지정 — 이름이나 번호까지 적어야 접수",
+        items: [],
+      };
+    }
+  }
+
   let items: ParseResult["items"] = [];
   if (core.status === "parsed") {
     if (core.variantName) {

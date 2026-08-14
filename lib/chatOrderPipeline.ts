@@ -19,7 +19,10 @@ const SETTING_BOT_CONFIRM_LAST_MS = "chat_order_bot_confirm_last_ms";
 const BOT_CONFIRM_GAP_MS = 20000;  // 접수확인은 20초에 1번(즉답 체감), 그 사이 접수분을 묶어서 발송
 const BOT_GAP_MS = 20000;
 const BOT_MAX_PER_PASS = 2;
-const BOT_FRESH_MS = 3 * 60 * 1000;   // 3분 지난 채팅엔 뒷북 안내 금지
+const BOT_FRESH_MS = 3 * 60 * 1000;   // 재입력 안내: 3분 지난 채팅엔 뒷북 금지
+// 접수확인은 넉넉히 — 읽기 공백(배포/장애) 뒤에도 밀린 주문을 묶음 1줄로 확인해준다.
+//   확인이 생략되면 손님이 "주셨어여?" 하고 불안해하는 게 더 큰 사고.
+const BOT_CONFIRM_FRESH_MS = 30 * 60 * 1000;
 
 // ── 자가진단(자동) ──────────────────────────────────────
 //   상품 목록이 바뀌는 순간(방송 중 새 상품 등록 포함) 스스로 돌고,
@@ -157,7 +160,7 @@ export async function parsePendingChatOrders(
 
     let updated = 0;
     // 봇 안내 대상: (닉네임, 사유) — 판정 후 모아서 상한 안에서 발송
-    const botTargets: { name: string; channel: string; kind: "ambiguous" | "need_product"; cands: string[]; atMs: number }[] = [];
+    const botTargets: { name: string; channel: string; kind: "ambiguous" | "need_product"; cands: string[]; atMs: number; productName: string | null }[] = [];
     // 접수 확인 대상: 알아들은 주문 — 묶어서 한 줄로 확인해준다
     const confirmTargets: { name: string; product: string; variant: string | null; qty: number; atMs: number; items: { color: string | null; size: string | null; qty: number }[] }[] = [];
     for (const row of pending) {
@@ -207,6 +210,7 @@ export async function parsePendingChatOrders(
           name: String(row.display_name ?? "").trim(),
           channel: String(row.channel_id ?? ""),
           kind: r.status, cands: r.candidates, atMs,
+          productName: r.productName,
         });
       }
 
@@ -248,7 +252,10 @@ export async function parsePendingChatOrders(
           if (t.channel && seenChannel.has(t.channel)) continue;     // 같은 손님 1회
           seenChannel.add(t.channel);
           const nick = t.name ? `${t.name}님, ` : "";
-          const msg = t.kind === "ambiguous" && t.cands.length > 0
+          // 조합형 종류 미지정(상품은 정해짐): "뉴에라캡은 종류가 여러 가지예요! 예) 1번 피츠버그…"
+          const msg = t.kind === "ambiguous" && t.productName
+            ? `🤖 ${nick}${t.productName.replace(/\(.*?\)/g, "").trim().slice(0, 14)}은(는) 종류가 여러 가지예요! 예) ${String(t.cands[0] || "").slice(0, 20)} — 이름이나 번호까지 적어주세요`
+            : t.kind === "ambiguous" && t.cands.length > 0
             ? `🤖 ${nick}${t.cands.slice(0, 3).join(" / ")} 중 어느 상품인지 종류와 함께 다시 적어주세요!`
             : `🤖 ${nick}상품명(또는 앞번호)과 함께 적어주시면 바로 접수돼요! 예) 3번 주세요`;
           const res = await postLiveChatMessage(msg, { forceEvenIfDisabled: true, liveChatId: botChatId });
@@ -265,7 +272,7 @@ export async function parsePendingChatOrders(
     // ── 접수 확인 발송 (묶음 — 1분에 1번, 여러 건을 한 줄로) ──
     try {
       if ((await readSetting(sb, SETTING_BOT_REPLY_ENABLED)) === "true") {
-        const fresh = confirmTargets.filter((t) => Date.now() - t.atMs <= BOT_FRESH_MS);
+        const fresh = confirmTargets.filter((t) => Date.now() - t.atMs <= BOT_CONFIRM_FRESH_MS);
         if (fresh.length > 0) {
           const day = new Date().toISOString().slice(0, 10);
           const { data: u } = await sb.from("youtube_api_usage")
