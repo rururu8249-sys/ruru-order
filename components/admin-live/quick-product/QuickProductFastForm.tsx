@@ -708,6 +708,35 @@ export default function QuickProductFastForm({
 
   const editingProductId = pickString(initialProduct, ["id", "product_id", "uuid"], "");
   const isEditMode = Boolean(editingProductId);
+  // [2026-08-16 사장님 요청] 재고를 3가지로 나눠 보여준다 — 실재고 / 담김(주문서 제출 전 선점) / 지금 판매가능
+  //   담김은 cart_reservations(표시용 선점)에서 읽는다. 읽기 전용 — 재고·주문·돈 로직 무접촉.
+  const [heldByVariant, setHeldByVariant] = useState<Record<string, number>>({});
+  const [heldTotal, setHeldTotal] = useState(0);
+  useEffect(() => {
+    if (!editingProductId) return;
+    let stop = false;
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/cart-reservations?ids=${encodeURIComponent(editingProductId)}&exclude=none`, { cache: "no-store" });
+        const json = await res.json().catch(() => null);
+        if (stop || !json?.ok) return;
+        const by: Record<string, number> = {};
+        for (const [k, v] of Object.entries(json.byVariant || {})) {
+          const parts = String(k).split("|");
+          by[`${parts[1] || ""}|${parts[2] || ""}`] = Number(v) || 0;
+        }
+        setHeldByVariant(by);
+        setHeldTotal(Number((json.byProduct || {})[editingProductId] || 0));
+      } catch { /* 표시 전용 — 실패해도 재고 편집에 영향 없음 */ }
+    };
+    void load();
+    const t = setInterval(load, 20000);
+    return () => { stop = true; clearInterval(t); };
+  }, [editingProductId]);
+  const heldOf = (color: string, size: string) => {
+    const nm = (v: string) => { const t = String(v ?? "").trim(); return t === "없음" ? "" : t; };
+    return Number(heldByVariant[`${nm(color)}|${nm(size)}`] || 0);
+  };
 
   const orderExposureMode =
     !isVisible ? "hidden" : registeredOrderEnabled ? "card_and_search" : "search_only";
@@ -1598,7 +1627,9 @@ export default function QuickProductFastForm({
 
                           {group.rows.map((row) => {
                             const label = [row.colorOnly, row.size].filter(Boolean).join(" / ");
-                            const soldOut = Number(row.stock || 0) <= 0;
+                            const heldQty = heldOf(String(row.color ?? row.colorOnly ?? ""), String(row.size ?? ""));
+                            const sellable = Math.max(0, Number(row.stock || 0) - heldQty);
+                            const soldOut = sellable <= 0;
                             return (
                               <div key={row.key} style={{ display: "grid", gridTemplateColumns: "1fr 74px 20px", gap: "6px", alignItems: "center", padding: "3px 0 3px " + (group.detail ? "12px" : "2px") }}>
                                 <span style={{ fontSize: "12px", color: soldOut ? "var(--color-danger-tx)" : "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -1606,6 +1637,11 @@ export default function QuickProductFastForm({
                                 </span>
                                 <input style={{ fontSize: "12px", padding: "5px 7px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "100%" }} type="number" min={0} inputMode="numeric" value={row.stock} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => updateVariantStock(row.key, Math.max(0, Number(e.target.value) || 0))} />
                                 <span style={{ fontSize: "10px", fontWeight: 800, color: soldOut ? "var(--color-danger-tx)" : "var(--color-ink-mute)" }}>{soldOut ? "품절" : "개"}</span>
+                                {heldQty > 0 ? (
+                                  <span style={{ gridColumn: "1 / -1", marginTop: "1px", fontSize: "10.5px", fontWeight: 700, color: "#B0793A", paddingLeft: group.detail ? "12px" : "2px" }}>
+                                    담김 {heldQty}개 · 지금 판매가능 <b style={{ color: sellable > 0 ? "#0F6E56" : "#C0392B" }}>{sellable}개</b>
+                                  </span>
+                                ) : null}
                               </div>
                             );
                           })}
@@ -1614,7 +1650,10 @@ export default function QuickProductFastForm({
                     </div>
 
                     <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--color-ink-mute)", display: "flex", justifyContent: "space-between" }}>
-                      <span>총 재고 {totalStock.toLocaleString("ko-KR")}개</span>
+                      <span>
+                        실재고 <b style={{ color: "var(--color-ink)" }}>{totalStock.toLocaleString("ko-KR")}</b>개
+                        {heldTotal > 0 ? <> · 담김 <b style={{ color: "#B0793A" }}>{heldTotal}</b>개 · 판매가능 <b style={{ color: "#0F6E56" }}>{Math.max(0, totalStock - heldTotal).toLocaleString("ko-KR")}</b>개</> : null}
+                      </span>
                       <span>{resolvedVariantRows.filter((row) => Number(row.stock || 0) <= 0).length > 0 ? `품절 ${resolvedVariantRows.filter((row) => Number(row.stock || 0) <= 0).length}개` : ""}</span>
                     </div>
                   </div>
@@ -1623,6 +1662,9 @@ export default function QuickProductFastForm({
                     <span style={{ fontSize: "12px", color: "var(--color-ink)", flex: 1 }}>총 재고 수량</span>
                     <input style={{ fontSize: "12px", padding: "5px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "80px" }} type="number" min={0} inputMode="numeric" value={totalStockText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setTotalStockText(e.target.value)} />
                     <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
+                    {heldTotal > 0 ? (
+                      <span style={{ fontSize: "10.5px", fontWeight: 700, color: "#B0793A", whiteSpace: "nowrap" }}>담김 {heldTotal} · 판매가능 {Math.max(0, (Number(totalStockText) || 0) - heldTotal)}</span>
+                    ) : null}
                   </div>
                 )
               ) : null}
