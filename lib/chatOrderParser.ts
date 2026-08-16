@@ -71,6 +71,44 @@ function categoryHit(sw: string, sp: string): boolean {
   return false;
 }
 
+// [2026-08-15 사장님 지시] 영문 상품명을 한글 발음으로 불러도 인식한다.
+//   "젤NYC" → "젤엔와이씨" / "GLYCERIN MAX" → "글리세린맥스". 등록은 그대로 두고 매칭만 넓힌다.
+const ALPHA_KO: Record<string, string> = {
+  a: "에이", b: "비", c: "씨", d: "디", e: "이", f: "에프", g: "지", h: "에이치", i: "아이",
+  j: "제이", k: "케이", l: "엘", m: "엠", n: "엔", o: "오", p: "피", q: "큐", r: "알",
+  s: "에스", t: "티", u: "유", v: "브이", w: "더블유", x: "엑스", y: "와이", z: "제트",
+};
+const WORD_KO: Record<string, string> = {
+  nyc: "엔와이씨", ny: "엔와이", max: "맥스", wave: "웨이브", gel: "젤", air: "에어", zoom: "줌",
+  pro: "프로", new: "뉴", era: "에라", zip: "집", up: "업", plus: "플러스", mini: "미니",
+  one: "원", two: "투", set: "세트", free: "프리", size: "사이즈", black: "블랙", white: "화이트",
+  blue: "블루", red: "레드", pink: "핑크", gray: "그레이", grey: "그레이", green: "그린",
+  brown: "브라운", beige: "베이지", cream: "크림", silver: "실버", gold: "골드", navy: "네이비",
+  run: "런", city: "시티", star: "스타", club: "클럽", line: "라인", sport: "스포츠",
+  // 브랜드·품목 (영문으로 등록해도 손님이 한글로 부르면 잡히게)
+  nike: "나이키", adidas: "아디다스", puma: "푸마", asics: "아식스", brooks: "브룩스",
+  mizuno: "미즈노", hoka: "호카", salomon: "살로몬", crocs: "크록스", birkenstock: "버켄스탁",
+  lululemon: "룰루레몬", danton: "단톤", newera: "뉴에라", longchamp: "롱샴", gucci: "구찌",
+  chanel: "샤넬", dior: "디올", prada: "프라다", diptyque: "딥티크", jomalone: "조말론",
+  glycerin: "글리세린", prophecy: "프로페시", trail: "트레일", sandal: "샌들", sandals: "샌들",
+  jacket: "자켓", coat: "코트", tweed: "트위드", leather: "레더", denim: "데님", knit: "니트",
+  shirt: "셔츠", pants: "팬츠", bag: "백", tote: "토트", cap: "캡", shoes: "슈즈",
+  perfume: "퍼퓸", candle: "캔들", box: "박스", limited: "리미티드",
+};
+// 이름 안의 영문 덩어리를 한글 발음으로 바꾼 변형들 (단어사전 / 낱자읽기)
+function koreanReadings(name: string): string[] {
+  const chunks = String(name).match(/[a-zA-Z]{1,12}/g);
+  if (!chunks || chunks.length === 0) return [];
+  const byWord = String(name).replace(/[a-zA-Z]{1,12}/g, (m) => WORD_KO[m.toLowerCase()] || m);
+  const bySpell = String(name).replace(/[a-zA-Z]{1,12}/g, (m) =>
+    m.toLowerCase().split("").map((c) => ALPHA_KO[c] || c).join(""));
+  // 사전에 없는 영문이 남으면 그것만 낱자로 읽어 섞은 변형도 만든다 ("NIKE AIR" → "나이키에이아이알")
+  const mixed = byWord.replace(/[a-zA-Z]{1,12}/g, (m) =>
+    m.toLowerCase().split("").map((c) => ALPHA_KO[c] || c).join(""));
+  const out = [byWord, bySpell, mixed].filter((v) => v && v !== name && !/[a-zA-Z]/.test(v));
+  return Array.from(new Set(out));
+}
+
 const COLOR_WORDS = [
   "블랙", "검정", "검은", "깜장", "까망", "까만", "black",
   "화이트", "흰색", "하양", "white",
@@ -214,7 +252,7 @@ function extractQty(text: string): { qty: number; consumed: string[] } {
   return { qty: 1, consumed };
 }
 
-function extractOptionTokens(text: string, consumed: string[], registeredColors: string[] = []): string[] {
+function extractOptionTokens(text: string, consumed: string[], registeredColors: string[] = [], registeredSizes: string[] = []): string[] {
   let rest = text;
   for (const c of consumed) rest = rest.replace(c, " ");
   rest = rest.replace(/(\d{1,3})\s*번/g, " ");   // 상품번호 제거
@@ -245,7 +283,12 @@ function extractOptionTokens(text: string, consumed: string[], registeredColors:
     const m = token0.match(/(\d{2,3})(?:사이즈|미리|mm|밀리|호|요|이요|짜리)?$/);
     if (m) {
       const n = Number(m[1]);
-      if ((m[1].length === 3 && n >= 200 && n <= 310) || (m[1].length === 2 && n >= 44 && n <= 120)) out.push(m[1]);
+      if ((m[1].length === 3 && n >= 200 && n <= 310) || (m[1].length === 2 && n >= 44 && n <= 120)) { out.push(m[1]); continue; }
+    }
+    // [2026-08-15 검수] 말끝까지 다 붙여 쓴 경우("막스코트카멜55저요") — 토큰 안쪽 숫자도 본다.
+    //   오인 방지를 위해 "등록된 사이즈 값과 정확히 같은 숫자"만 인정한다.
+    if (registeredSizes.length > 0) {
+      for (const g of token0.match(/\d{2,3}/g) || []) if (registeredSizes.includes(g)) out.push(g);
     }
   }
   return Array.from(new Set(out));
@@ -445,7 +488,7 @@ function parseChatOrderCore(
 
   const { qty, consumed } = extractQty(text);
   // 등록 색상 전체를 넘겨 "실버블랙"·"카멜" 같은 이름을 통째로 인식하게 한다(쪼개짐·미인식 방지)
-  const optionTokens = extractOptionTokens(text, consumed, products.flatMap((x) => x.colors || []));
+  const optionTokens = extractOptionTokens(text, consumed, products.flatMap((x) => x.colors || []), products.flatMap((x) => (x.sizes || []).map((z) => String(z).trim())));
 
   // 최우선: 손님이 등록 상품명을 그대로 말했으면 그 상품으로 확정한다.
   //   세부상품명이 [상품명 + 세부] 로 등록돼 있어, 부분일치보다 이게 훨씬 정확하다.
@@ -601,7 +644,7 @@ function parseChatOrderCore(
   const squashed = squash(text);
   const scored = products
     .map((p) => {
-      const names = [nameBody(p.name), ...(p.aliases || [])].filter(Boolean);
+      const names = [nameBody(p.name), ...koreanReadings(nameBody(p.name)), ...(p.aliases || [])].filter(Boolean);
       let best = 0;
       let weakOnly = false;
       for (const n of names) {
@@ -611,7 +654,7 @@ function parseChatOrderCore(
         if (s.length >= 2 && squashed.includes(s)) { best = Math.max(best, s.length); continue; }
         // 상품명을 단어로 쪼개, 맞은 조각들의 "글자수 합"으로 점수를 낸다.
         //   "알로 블랙 셔츠스트라이프 셋업"은 조각 3개 합이 커서 일반 "셔츠"를 이긴다.
-        const chatWords = text.split(/[^a-z0-9가-힣]+/).filter((x) => x.length >= 2);
+        const chatWords = text.split(/[^a-z0-9가-힣]+/).filter(Boolean);
         let sum = 0;
         let weakSum = 0; // 상품명에 없는 상위어("신발"→"샌들")로 얻은 점수 — 이것만으로는 확정하지 않는다
         for (const piece of String(n).split(/[\s()[\]{}·・,./\-_~]+/).filter((x) => x.length >= 2)) {
@@ -622,6 +665,11 @@ function parseChatOrderCore(
           if (sp.length >= 2 && squashed.includes(sp)) { sum += sp.length; continue; }
           for (const w of chatWords) {
             const sw = squash(w);
+            // [2026-08-15] 한 글자 이름("젤NYC"의 젤)도 그 상품에만 있는 고유값이면 인정 — 토큰이 정확히 같을 때만
+            if (sw.length === 1) {
+              if (sp.startsWith(sw) && !products.some((o) => o.id !== p.id && squash(nameBody(o.name)).includes(sw))) { sum += 2; break; }
+              continue;
+            }
             if (sw.length < 2) continue;
             if (sp.startsWith(sw)) { sum += sw.length; break; }
             // 뒤에 붙은 이름도 인정 ("코트"→"막스코트"). 약한 근거로 표시해 단독 확정은 신중히.
