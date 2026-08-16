@@ -70,25 +70,78 @@ export function isHeicLikeImage(file: File) {
   return type.includes("heic") || type.includes("heif") || /\.(heic|heif)$/.test(name);
 }
 
-async function convertHeicToJpeg(file: File): Promise<File> {
-  // heic2any는 무거워서(약 1MB) HEIC를 만났을 때만 동적 로드한다.
-  // [2026-08-16] UMD 패키지라 번들러에 따라 default 위치가 달라진다(mod / mod.default / mod.default.default).
-  //   .default 만 믿고 호출하면 "not a function"으로 변환이 통째로 실패했음 → 전부 시도.
-  const mod: any = await import("heic2any");
-  const heic2any =
-    typeof mod === "function"
-      ? mod
-      : typeof mod?.default === "function"
-        ? mod.default
-        : typeof mod?.default?.default === "function"
-          ? mod.default.default
-          : null;
-  if (!heic2any) throw new Error("heic2any 모듈 로드 실패");
-  const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
-  const blob = Array.isArray(converted) ? converted[0] : converted;
-  const base = String(file.name || "product-image").replace(/\.[^.]+$/, "") || "product-image";
+// [2026-08-16] 아이폰 HEIC 변환 — 디코더 2개를 순서대로 시도한다.
+//   1순위 heic-to: libheif 1.22 기반. iPhone 15/16, iOS 18+, 10bit HDR 사진까지 처리.
+//   2순위 heic2any: 옛 libheif. 최신 아이폰 파일에서 실패하는 알려진 버그가 있으나
+//     (github alexcorvi/heic2any #61 #63) 옛 파일에는 잘 동작하므로 폴백으로만 남긴다.
+//   둘 다 실패하면 각각의 실제 원인을 합쳐서 던진다(진단용).
+function describeError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object") {
+    const message = (error as Record<string, unknown>).message;
+    if (message) return String(message);
+    try {
+      return JSON.stringify(error).slice(0, 150);
+    } catch {
+      return "알 수 없는 오류";
+    }
+  }
+  return String(error ?? "알 수 없는 오류");
+}
+
+function toJpegFile(blob: Blob, originalName: string): File {
+  const base = String(originalName || "product-image").replace(/\.[^.]+$/, "") || "product-image";
   return new File([blob], `${base}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
 }
+
+// UMD/ESM 혼재 패키지에서 함수를 찾아낸다(번들러마다 default 위치가 다름).
+function pickFunction(mod: any, name?: string): any {
+  const candidates = [
+    name ? mod?.[name] : null,
+    name ? mod?.default?.[name] : null,
+    mod?.default,
+    mod?.default?.default,
+    mod,
+  ];
+  return candidates.find((candidate) => typeof candidate === "function") || null;
+}
+
+async function convertHeicToJpeg(file: File): Promise<File> {
+  const failures: string[] = [];
+
+  try {
+    // heic-to/next: Next.js/webpack에서 워커가 정상 동작하는 전용 진입점
+    const mod: any = await import("heic-to/next");
+    const heicTo = pickFunction(mod, "heicTo");
+    if (typeof heicTo === "function") {
+      const blob: Blob = await heicTo({ blob: file, type: "image/jpeg", quality: 0.9 });
+      if (blob && blob.size > 0) return toJpegFile(blob, file.name);
+      failures.push("heic-to: 빈 결과");
+    } else {
+      failures.push("heic-to: 함수 없음");
+    }
+  } catch (error) {
+    failures.push("heic-to: " + describeError(error));
+  }
+
+  try {
+    const mod: any = await import("heic2any");
+    const heic2any = pickFunction(mod);
+    if (typeof heic2any === "function") {
+      const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+      const blob: Blob = Array.isArray(converted) ? converted[0] : converted;
+      if (blob && blob.size > 0) return toJpegFile(blob, file.name);
+      failures.push("heic2any: 빈 결과");
+    } else {
+      failures.push("heic2any: 함수 없음");
+    }
+  } catch (error) {
+    failures.push("heic2any: " + describeError(error));
+  }
+
+  throw new Error(failures.join(" / ") || "변환기 없음");
+}
+
 
 export async function compressProductImage(file: File, kind: ProductImageKind) {
   if (typeof window === "undefined") return file;
@@ -100,10 +153,10 @@ export async function compressProductImage(file: File, kind: ProductImageKind) {
     } catch (cause) {
       // 변환 실패 시 원본을 올려봐야 저장소가 거부한다 → 명확한 한국어 에러로 중단.
       //   실제 원인을 뒤에 붙여 다음 장애 때 바로 진단 가능하게 한다.
-      const detail = cause instanceof Error ? cause.message : String(cause ?? "");
+      const detail = describeError(cause);
       console.error("[HEIC 변환 실패]", cause);
       throw new Error(
-        "아이폰 사진(HEIC)을 변환하지 못했습니다. 사진을 JPEG로 저장해 다시 올려주세요." + (detail ? `\n(원인: ${detail.slice(0, 120)})` : ""),
+        "아이폰 사진(HEIC)을 변환하지 못했습니다. 사진을 JPEG로 저장해 다시 올려주세요." + (detail ? `\n(원인: ${detail.slice(0, 200)})` : ""),
       );
     }
   }
