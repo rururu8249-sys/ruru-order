@@ -3299,6 +3299,15 @@ export default function OrderPage() {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, hasSavedInfo]);
+  // [2026-08-16 사고수정] 상품 목록이 준비되면 즉시 다른 고객 선점을 불러온다.
+  //   예전엔 "담긴 상품 변경"과 45초 주기에만 불러서, 새로고침 직후 최대 45초 동안
+  //   선점이 0으로 보였다 → 품절인 옵션이 선택 가능하게 보이는 사고.
+  useEffect(() => {
+    if (!hasSavedInfo || quickGroupBuyProducts.length === 0) return;
+    void fetchCartReservations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasSavedInfo, quickGroupBuyProducts.length]);
+
   // 45초마다: 내 예약 연장(하트비트) + 다른 고객 예약 반영 (탭 보일 때만)
   useEffect(() => {
     if (!hasSavedInfo) return;
@@ -3679,6 +3688,7 @@ export default function OrderPage() {
   }, [youtubeNickname, customerPhone, hasSavedInfo]);
 
   const openRegisteredOptionSelectSheet = (product: BroadcastProduct) => {
+    void fetchCartReservations(); // 담기 직전 — 다른 고객이 방금 담은 것까지 반영해 품절을 정확히 보여준다
     setRegisteredOptionSelectProduct(product);
     setRegisteredOptionColor("");
     setRegisteredOptionSize("");
