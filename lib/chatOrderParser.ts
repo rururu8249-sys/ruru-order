@@ -674,8 +674,15 @@ function parseChatOrderCore(
             if (sp.startsWith(sw)) { sum += sw.length; break; }
             // 뒤에 붙은 이름도 인정 ("코트"→"막스코트"). 약한 근거로 표시해 단독 확정은 신중히.
             if (sw.length >= 2 && sp.length > sw.length && sp.endsWith(sw)) { sum += sw.length; weakSum += sw.length; break; }
+            // [2026-08-15 사장님 지시] 브랜드를 흐리게 써도 뒷부분이 같으면 인정
+            //   ("막땡코트"·"막코트"·"막스마라코트" → 막스코트). 공통 꼬리 2글자 이상, 약한 근거.
+            {
+              let tail = 0;
+              while (tail < sw.length && tail < sp.length && sw[sw.length - 1 - tail] === sp[sp.length - 1 - tail]) tail += 1;
+              if (tail >= 2) { sum += tail; weakSum += tail; break; }
+            }
             if (looseEqual(sw, sp)) { sum += sp.length; break; }   // "딥디크" → "딥티크"
-            if (categoryHit(sw, sp)) { sum += sw.length; if (sw !== sp) weakSum += sw.length; break; }  // "가방" → "토트백"
+            if (categoryHit(sw, sp)) { const add = sw === sp ? sw.length : 1; sum += add; if (sw !== sp) weakSum += add; break; }  // "가방"→"토트백"(약함)
             // 붙여쓰기 대응("룰루가방 주문") — 단어 끝에 붙은 종류 단어도 인정 (2026-08-14 실채팅)
             const catTail = CATEGORY_SYNONYMS.flat().find((g) => sw.length > g.length && sw.endsWith(g));
             if (catTail && categoryHit(catTail, sp)) { sum += catTail.length; if (catTail !== sp) weakSum += catTail.length; break; }
