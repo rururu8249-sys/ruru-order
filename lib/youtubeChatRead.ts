@@ -73,8 +73,17 @@ export async function readLiveChatOnce(): Promise<ChatReadResult> {
     if (Date.now() - lastMs < 10000) return { ok: true, skipped: true, reason: "직전 읽기 10초 이내" };
     await writeSetting(sb, "chat_order_last_read_ms", String(Date.now()));
 
-    const testLiveUrl = await readSetting(sb, SETTING_TEST_LIVE_URL);
-    if (!testLiveUrl && !(await isBroadcastOn(sb)))
+    // [2026-08-16 사고수습] 실제 방송이 켜져 있으면 테스트 URL은 무시한다.
+    //   지난 테스트 URL이 남아 있어 실방송 채팅을 못 읽던 사고 재발 방지(테스트 URL은 자동으로 지운다).
+    let testLiveUrl = await readSetting(sb, SETTING_TEST_LIVE_URL);
+    const liveOn = await isBroadcastOn(sb);
+    if (testLiveUrl && liveOn) {
+      await writeSetting(sb, SETTING_TEST_LIVE_URL, "");
+      await writeSetting(sb, SETTING_CHAT_ID, "");
+      await writeSetting(sb, SETTING_PAGE_TOKEN, "");
+      testLiveUrl = "";
+    }
+    if (!testLiveUrl && !liveOn)
       return { ok: true, skipped: true, reason: "방송 OFF" };
 
     const refreshToken = await readRefreshToken(sb);
