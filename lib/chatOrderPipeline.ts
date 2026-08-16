@@ -107,7 +107,8 @@ export async function parsePendingChatOrders(
     let q = sb
       .from("chat_orders")
       .select("id,raw_message,published_at,parse_status,display_name,channel_id")
-      .order("id", { ascending: true })
+      // [2026-08-16] 재파싱은 최신부터 — 예전엔 오래된 것부터라 방금 들어온 채팅이 갱신되지 않았다.
+      .order("id", { ascending: !opts?.reparseAll })
       .limit(limit);
     if (!opts?.reparseAll) q = q.eq("parse_status", "raw");
     const { data: rows, error } = await q;
