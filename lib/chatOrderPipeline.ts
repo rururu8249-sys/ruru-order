@@ -363,6 +363,11 @@ export async function parsePendingChatOrders(
         let sentToday = Number((u as Record<string, unknown> | null)?.calls || 0);
         let lastMs = Number(await readSetting(sb, SETTING_BOT_LAST_MS)) || 0;
         const seenChannel = new Set<string>();
+        // 안내 예시는 이번 방송 상품으로 (없으면 일반 예시)
+        const ex0 = products[0];
+        const exName = ex0 ? String(ex0.name).replace(/\(.*?\)/g, "").trim().slice(0, 14) : "";
+        const exOpt = ex0 ? [ (ex0.colors || [])[0], (ex0.sizes || [])[0] ].filter(Boolean).join(" ") : "";
+        const exampleOrder = exName ? `${exName}${exOpt ? " " + exOpt : ""}` : "상품명 색상 사이즈";
         for (const t of botTargets) {
           if (botSent >= BOT_MAX_PER_PASS || sentToday >= BOT_DAILY_CAP) break;
           if (Date.now() - t.atMs > BOT_FRESH_MS) continue;          // 뒷북 금지
@@ -377,7 +382,7 @@ export async function parsePendingChatOrders(
           const msg = t.kind === "dup"
             ? `🤔 ${nick}조금 전 같은 주문이 이미 접수돼 있어요! 추가 주문이 맞으면 같은 내용을 한 번 더 적어주세요`
             : rs.includes("미지정 —") && !rs.startsWith("종류")
-            ? `🤖 ${nick}${pn} — ${rs.split(" 미지정")[0]}까지 적어주세요! 예) ${t.cands.slice(0, 3).join(" / ")}`
+            ? `🤖 ${nick}${pn} — ${rs.split(" 미지정")[0]}까지 정확히 말씀해주세요~ 예) ${pn} ${t.cands.slice(0, 2).join(" / ")}`
             : rs.startsWith("한 채팅에 상품이 여러 개")
             ? `🤖 ${nick}한 번에 한 상품씩 적어주세요! (여러 개는 한 줄씩 나눠서)`
             : rs.startsWith("수량이 많아요")
@@ -388,7 +393,7 @@ export async function parsePendingChatOrders(
             ? `🤖 ${nick}${t.productName.replace(/\(.*?\)/g, "").trim().slice(0, 20)}은(는) 종류가 여러 가지예요! 예) ${String(t.cands[0] || "").slice(0, 20)} — 이름이나 번호까지 적어주세요`
             : t.kind === "ambiguous" && t.cands.length > 0
             ? `🤖 ${nick}${t.cands.slice(0, 3).join(" / ")} 중 어느 상품인지 종류와 함께 다시 적어주세요!`
-            : `🤖 ${nick}상품명(또는 앞번호)과 함께 적어주시면 바로 접수돼요! 예) 3번 주세요`;
+            : `🤖 ${nick}상품명(또는 번호)과 옵션(색상·사이즈)까지 정확히 말씀해주세요~ 예) ${exampleOrder}`;
           const res = await postLiveChatMessage(msg, { forceEvenIfDisabled: true, liveChatId: botChatId });
           if (res.ok) {
             botSent += 1; sentToday += 1; lastMs = Date.now();
