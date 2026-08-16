@@ -483,6 +483,10 @@ function parseChatOrderCore(
   // 살 생각이 없다는 말은 주문이 아니다 ("다음에 살게요", "담에 살래요")
   const looksDecline = ["다음에", "담에", "나중에", "안살", "못살", "안사", "못사", "주소", "환불", "교환", "취소", "입금", "송장"].some((w) => text.includes(w));
   if (looksDecline) return { ...base, reason: "주문이 아닌 문의·요청" };
+  // [2026-08-16] "블랙도 해 주세요~~" 같은 건의·요청은 주문이 아니다 (도/또 + 해·만들어·올려·보여 + 주세요)
+  if (/(도|또)\s*(해|하|만들어|만드러|올려|보여|넣어|준비|입어|신어|찍어)\s*주(세|시)?요?/.test(text)) {
+    return { ...base, reason: "건의·요청 (주문 아님)" };
+  }
   if (looksQuestion || looksGreeting) {
     return { ...base, reason: looksQuestion ? "질문으로 보임" : "인사말" };
   }
@@ -782,6 +786,12 @@ function parseChatOrderCore(
     }
   }
 
+  // 상품을 모르는데 "보여주세요·알려주세요" 같은 요청형이면 주문이 아니라 문의다 (봇 안내 소음 방지)
+  const REQUEST_WORDS = ["보여주", "보여줘", "올려주", "알려주", "설명해", "찍어주", "비교해", "입어주", "신어주",
+    "틀어주", "해주세요", "해 주세요", "부탁", "언제해", "다시해"];
+  if (REQUEST_WORDS.some((w) => text.includes(w))) {
+    return { ...base, reason: "문의·요청 (상품 불명)" };
+  }
   return { ...base, status: "need_product", qty, optionTokens, reason: "상품을 말하지 않았고 「지금 이거」도 없음" };
 }
 
