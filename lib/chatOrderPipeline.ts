@@ -186,6 +186,8 @@ export async function parsePendingChatOrders(
         (botChannelId && authorCh === botChannelId) ||
         KNOWN_BOT_CHANNELS.has(authorCh) ||
         BOT_NAMES.has(authorName) ||
+        // 이름에 붙은 이모지·님·공백까지 감안해 "포함"으로도 차단 ("루루실장🌸", "Nightbot ")
+        Array.from(BOT_NAMES).some((bn) => authorName.replace(/\s/g, "").includes(bn)) ||
         /^[🤖🛍📢🎁🧾]/u.test(raw.trim())
       ) {
         r = { ...r, status: "not_order", productId: null, productName: null, matchedBy: null,
