@@ -271,7 +271,9 @@ export async function parsePendingChatOrders(
           items: r.items,
         });
       }
-      if ((r.status === "ambiguous" || r.status === "need_product") && Number.isFinite(atMs) && !String(r.reason || "").startsWith("중복 의심")) {
+      // [2026-08-16 사장님 지시] 봇은 "상품이 확실히 잡힌" 경우에만 말한다.
+      //   상품을 못 알아들은 글(need_product)은 대부분 문의·잡담이라 안내가 소음이 된다 → 조용히 넘긴다.
+      if (r.status === "ambiguous" && r.productName && Number.isFinite(atMs) && !String(r.reason || "").startsWith("중복 의심")) {
         botTargets.push({
           name: String(row.display_name ?? "").trim(),
           channel: String(row.channel_id ?? ""),
