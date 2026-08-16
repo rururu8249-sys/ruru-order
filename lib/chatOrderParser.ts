@@ -482,7 +482,14 @@ function parseChatOrderCore(
   if (looksQuestion || looksGreeting) {
     return { ...base, reason: looksQuestion ? "질문으로 보임" : "인사말" };
   }
-  if (!hasOrderWord && !hasNumberRef && !hasQtyRef && !hasOptionCombo && !hasRegSize) {
+  // [2026-08-15 전수조사] 등록 상품명을 통째로 말했으면 주문 맥락으로 본다 ("막스코트 카멜").
+  //   여기서 바로 접수되는 게 아니라, 옵션이 빠졌으면 아래에서 봇이 되묻는다.
+  const sqText0 = squash(text);
+  const hasExactName = products.some((x) => {
+    const nb = squash(nameBody(x.name));
+    return nb.length >= 4 && sqText0.includes(nb);
+  });
+  if (!hasOrderWord && !hasNumberRef && !hasQtyRef && !hasOptionCombo && !hasRegSize && !hasExactName) {
     return { ...base, reason: "주문 신호 없음" };
   }
 
