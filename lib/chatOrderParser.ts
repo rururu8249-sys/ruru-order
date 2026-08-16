@@ -813,10 +813,27 @@ function parseChatOrderCore(
         return { status: "parsed", productId: p1.id, productName: p1.name, matchedBy: "variant",
           variantName: null, qty, optionTokens, candidates: [], reason: "색상·사이즈로 상품 확정" };
       }
-      if (hit.length >= 2 && !currentProductId) {
+      if (hit.length >= 2) {
+        // 「지금 이거」가 그 색을 가진 상품 중 하나면 그걸로, 아니면 후보를 물어본다
+        const cur = currentProductId ? hit.find((x) => x.id === currentProductId) : null;
+        if (cur) {
+          return { status: "parsed", productId: cur.id, productName: cur.name, matchedBy: "current",
+            variantName: null, qty, optionTokens, candidates: [], reason: "「지금 이거」+색상으로 확정" };
+        }
         return { status: "ambiguous", productId: null, productName: null, matchedBy: null, qty, optionTokens,
           variantName: null, candidates: hit.slice(0, 4).map((x) => x.name),
           reason: "색상만으로는 상품을 몰라요 — 상품명을 함께 적어주세요" };
+      }
+      // 말한 색이 어느 상품에도 없으면(오타·없는 색) 「지금 이거」로 밀어넣지 않는다 — 잘못 담기는 사고 방지
+      if (hit.length === 0 && currentProductId) {
+        const cp = products.find((x) => x.id === currentProductId);
+        const cpColors = (cp?.colors || []).filter((c) => c && !EMPTY_OPTION_WORDS.has(String(c).toLowerCase()));
+        const okOnCur = cpColors.length === 0 || colorToks.some((t) => cpColors.some((c) => sameColorWord(t, String(c)) || squash(c).includes(squash(t))));
+        if (!okOnCur) {
+          return { status: "ambiguous", productId: cp?.id ?? null, productName: cp?.name ?? null, matchedBy: null,
+            qty, optionTokens, variantName: null, candidates: cpColors.slice(0, 4),
+            reason: "색상 미지정 — 색상까지 적어야 접수" };
+        }
       }
     }
   }
