@@ -163,7 +163,7 @@ export async function parsePendingChatOrders(
 
     let updated = 0;
     // 봇 안내 대상: (닉네임, 사유) — 판정 후 모아서 상한 안에서 발송
-    const botTargets: { name: string; channel: string; kind: "ambiguous" | "need_product" | "dup"; cands: string[]; atMs: number; productName: string | null }[] = [];
+    const botTargets: { name: string; channel: string; kind: "ambiguous" | "need_product" | "dup"; cands: string[]; atMs: number; productName: string | null; reason?: string }[] = [];
     // 접수 확인 대상: 알아들은 주문 — 묶어서 한 줄로 확인해준다
     const confirmTargets: { name: string; product: string; variant: string | null; qty: number; atMs: number; items: { color: string | null; size: string | null; qty: number }[] }[] = [];
     // [5단계] 채팅 계정 인증 "인증 1234" 감지분 — 루프 후 일괄 처리
@@ -271,7 +271,7 @@ export async function parsePendingChatOrders(
           name: String(row.display_name ?? "").trim(),
           channel: String(row.channel_id ?? ""),
           kind: r.status, cands: r.candidates, atMs,
-          productName: r.productName,
+          productName: r.productName, reason: String(r.reason || ""),
         });
       }
 
@@ -366,8 +366,19 @@ export async function parsePendingChatOrders(
           seenChannel.add(t.channel);
           const nick = t.name ? `${t.name}님, ` : "";
           // 조합형 종류 미지정(상품은 정해짐): "뉴에라캡은 종류가 여러 가지예요! 예) 1번 피츠버그…"
+          // [2026-08-15] 사유별 안내 — 옵션 미지정 / 상품 여러 개 / 수량 과다 / 상품 불명
+          const rs = String(t.reason || "");
+          const pn = String(t.productName || "").replace(/\(.*?\)/g, "").trim().slice(0, 20);
           const msg = t.kind === "dup"
             ? `🤔 ${nick}조금 전 같은 주문이 이미 접수돼 있어요! 추가 주문이 맞으면 같은 내용을 한 번 더 적어주세요`
+            : rs.includes("미지정 —") && !rs.startsWith("종류")
+            ? `🤖 ${nick}${pn} — ${rs.split(" 미지정")[0]}까지 적어주세요! 예) ${t.cands.slice(0, 3).join(" / ")}`
+            : rs.startsWith("한 채팅에 상품이 여러 개")
+            ? `🤖 ${nick}한 번에 한 상품씩 적어주세요! (여러 개는 한 줄씩 나눠서)`
+            : rs.startsWith("수량이 많아요")
+            ? `🤖 ${nick}${pn} 수량이 많은데 맞으신가요? 맞으면 한 번 더 적어주세요`
+            : rs.startsWith("어느 상품인지")
+            ? `🤖 ${nick}어느 상품인지 상품명을 함께 적어주세요! 예) ${String(t.cands[0] || "").replace(/\(.*?\)/g, "").trim().slice(0, 18)}`
             : t.kind === "ambiguous" && t.productName
             ? `🤖 ${nick}${t.productName.replace(/\(.*?\)/g, "").trim().slice(0, 20)}은(는) 종류가 여러 가지예요! 예) ${String(t.cands[0] || "").slice(0, 20)} — 이름이나 번호까지 적어주세요`
             : t.kind === "ambiguous" && t.cands.length > 0

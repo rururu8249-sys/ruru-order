@@ -59,6 +59,10 @@ const CATEGORY_SYNONYMS: string[][] = [
   ["긴팔", "긴팔티", "긴팔티셔츠"],
   ["향수", "퍼퓸"],
 ];
+// 신발 "상위어" — 상품명에 없는 큰 분류로만 말한 경우("신발 250"). 방송에 신발이 여러 개면 확정하지 않는다.
+const SHOE_TOP_WORDS = new Set(["신발", "운동화", "스니커즈", "슈즈", "슬리퍼", "구두", "부츠", "로퍼", "샌들"]);
+const isShoeSize = (v: string) => /^\d{3}$/.test(String(v).trim()) && Number(v) >= 200 && Number(v) <= 310;
+
 function categoryHit(sw: string, sp: string): boolean {
   for (const g of CATEGORY_SYNONYMS) {
     if (!g.includes(sw)) continue;
@@ -68,7 +72,7 @@ function categoryHit(sw: string, sp: string): boolean {
 }
 
 const COLOR_WORDS = [
-  "블랙", "검정", "검은", "깜장", "black",
+  "블랙", "검정", "검은", "깜장", "까망", "까만", "black",
   "화이트", "흰색", "하양", "white",
   "그레이", "회색", "gray", "grey",
   "네이비", "곤색", "navy",
@@ -93,7 +97,7 @@ const EMPTY_OPTION_WORDS = new Set(["없음", "없슴", "무", "-", "none", "n/a
 
 // 색상 동의어 그룹 — 손님이 "검정"이라 쳐도 등록명이 "블랙"이면 그걸로 매핑
 const COLOR_SYNONYM_GROUPS: string[][] = [
-  ["블랙", "검정", "검은", "깜장", "black"],
+  ["블랙", "검정", "검은", "깜장", "까망", "까만", "black"],
   ["화이트", "흰색", "하양", "white"],
   ["그레이", "회색", "gray", "grey", "챠콜", "차콜"],
   ["네이비", "곤색", "navy"],
@@ -115,6 +119,14 @@ function mapToRegisteredColor(token: string, registered: string[]): string {
     const rr = String(r).trim();
     if (!rr) continue;
     if (sameColorWord(token, rr) || squash(token) === squash(rr) || looseEqual(squash(token), squash(rr))) return rr;
+  }
+  // [2026-08-15 검수] 등록명이 손님 말을 품고 있으면 그 등록명으로 (실버→실버블랙, 그레이→다크그레이).
+  //   재고·송장이 등록명 기준이라 여기서 맞춰두지 않으면 재고 매칭이 어긋난다. 후보가 둘 이상이면 포기(원문 유지).
+  const tk = squash(token);
+  if (tk.length >= 2) {
+    const syn = COLOR_SYNONYM_GROUPS.find((g) => g.includes(token.toLowerCase())) || [token.toLowerCase()];
+    const hit = registered.filter((r) => syn.some((w) => squash(r).includes(squash(w))));
+    if (hit.length === 1) return String(hit[0]).trim();
   }
   return token;
 }
@@ -142,7 +154,9 @@ function expandItems(
     if (isColor) { if (!colorTokens.some((x) => sameColorWord(x, t))) colorTokens.push(t); continue; }
     sizeTokens.push(t);
   }
-  const mappedColors = colorTokens.map((t) => mapToRegisteredColor(t, registeredColors));
+  // [2026-08-15 검수] 등록명으로 맞춘 뒤 중복 제거 — "화이트로고블랙"이 화이트·블랙으로도 잡혀
+  //   같은 색이 여러 건으로 늘어나던 사고 차단.
+  const mappedColors = Array.from(new Set(colorTokens.map((t) => mapToRegisteredColor(t, registeredColors))));
 
   if (wantAllColors && registeredColors.length > 0) {
     return registeredColors.map((c) => ({ color: c, size: sizeTokens[0] ?? null, qty }));
@@ -180,14 +194,14 @@ function nameBody(name: string): string {
 function extractQty(text: string): { qty: number; consumed: string[] } {
   const consumed: string[] = [];
   // 1) "2개", "2 개", "2장", "2벌"
-  const m1 = text.match(/(\d{1,2})\s*(개|장|벌|족|병|세트|셋트)/);
+  const m1 = text.match(/(\d{1,2})\s*(개|장|벌|족|켤레|병|세트|셋트)/);
   if (m1) {
     consumed.push(m1[0]);
     return { qty: Math.max(1, Math.min(99, Number(m1[1]))), consumed };
   }
   // 2) 한글 수사 + 단위 ("두개", "하나요", "세벌")
   for (const [word, n] of Object.entries(KO_NUM)) {
-    const re = new RegExp(word + "\\s*(개|장|벌|족|병|세트)");
+    const re = new RegExp(word + "\\s*(개|장|벌|족|켤레|병|세트)");
     const m = text.match(re);
     if (m) { consumed.push(m[0]); return { qty: n, consumed }; }
   }
@@ -200,17 +214,39 @@ function extractQty(text: string): { qty: number; consumed: string[] } {
   return { qty: 1, consumed };
 }
 
-function extractOptionTokens(text: string, consumed: string[]): string[] {
+function extractOptionTokens(text: string, consumed: string[], registeredColors: string[] = []): string[] {
   let rest = text;
   for (const c of consumed) rest = rest.replace(c, " ");
   rest = rest.replace(/(\d{1,3})\s*번/g, " ");   // 상품번호 제거
   const out: string[] = [];
+  // [2026-08-15 검수·사고방지] 등록 색상명을 먼저 통째로 집어내고 지운다.
+  //   안 그러면 "실버블랙"이 "실버"+"블랙" 두 색으로 쪼개져 주문이 2건으로 늘어난다.
+  //   사전에 없는 등록 색상(카멜·브라이트 등)도 이 경로로 인식된다.
+  for (const rc of [...registeredColors].sort((a, b) => String(b).length - String(a).length)) {
+    const r = String(rc).trim();
+    if (r.length < 2) continue;
+    const rs = squash(r);
+    if (!rs) continue;
+    if (squash(rest).includes(rs)) {
+      out.push(r);
+      // 원문에서 제거 (괄호 등 표기 차이를 감안해 느슨하게)
+      const re = new RegExp(r.split("").map((ch) => ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s*"), "gi");
+      rest = rest.replace(re, " ");
+    }
+  }
   for (const w of COLOR_WORDS) if (rest.includes(w)) out.push(w);
   // 사이즈 단어는 단독 토큰일 때만 (예: "m"이 "메종" 안에 걸리지 않게)
-  for (const token of rest.split(/[^a-z0-9가-힣]+/).filter(Boolean)) {
-    if (SIZE_WORDS.includes(token)) out.push(token);
-    else if (/^\d{3}$/.test(token)) out.push(token);      // 신발 사이즈 230/250
-    else if (/^\d{2}$/.test(token) && Number(token) >= 44 && Number(token) <= 120) out.push(token); // 의류 44/55/66/77
+  for (const token0 of rest.split(/[^a-z0-9가-힣]+/).filter(Boolean)) {
+    // "55사이즈" "250mm" "240미리" "웨이브250이요" — 붙어 있는 숫자를 꺼내 사이즈로 본다
+    const token = token0.replace(/(사이즈|사이즈로|미리|mm|밀리|호|요|이요|짜리)$/g, "") || token0;
+    if (SIZE_WORDS.includes(token)) { out.push(token); continue; }
+    if (/^\d{3}$/.test(token)) { out.push(token); continue; }
+    if (/^\d{2}$/.test(token) && Number(token) >= 44 && Number(token) <= 120) { out.push(token); continue; }
+    const m = token0.match(/(\d{2,3})(?:사이즈|미리|mm|밀리|호|요|이요|짜리)?$/);
+    if (m) {
+      const n = Number(m[1]);
+      if ((m[1].length === 3 && n >= 200 && n <= 310) || (m[1].length === 2 && n >= 44 && n <= 120)) out.push(m[1]);
+    }
   }
   return Array.from(new Set(out));
 }
@@ -371,28 +407,45 @@ function parseChatOrderCore(
 
   const hasOrderWord = ORDER_WORDS.some((w) => text.includes(w));
   const hasNumberRef = /(\d{1,3})\s*번/.test(text);
-  const hasQtyRef = /(\d{1,2})\s*(개|장|벌|족|병|세트)/.test(text) ||
-    Object.keys(KO_NUM).some((w) => new RegExp(w + "\\s*(개|장|벌|족|병|세트)").test(text)) ||
+  const hasQtyRef = /(\d{1,2})\s*(개|장|벌|족|켤레|병|세트)/.test(text) ||
+    Object.keys(KO_NUM).some((w) => new RegExp(w + "\\s*(개|장|벌|족|켤레|병|세트)").test(text)) ||
     /(하나|둘|셋|넷|다섯)\s*요/.test(text);   // 단위 없는 수량 ("하나요")
 
   // 색상+사이즈가 같이 나오면 그 자체로 주문 맥락 ("검정 미디움 하나요")
   const preTokens = extractOptionTokens(text, []);
-  const hasColor = preTokens.some((t) => COLOR_WORDS.includes(t));
+  // [2026-08-15 검수] 등록 색상(카멜·브라이트·실버블랙 등 사전에 없는 이름)도 주문 신호로 인정
+  const textSq0 = squash(text);
+  const regColorsAll = products.flatMap((p) => [...(p.colors || []), ...(p.variants || [])]).map((c) => squash(c));
+  const hasRegColor = regColorsAll.some((c) => c.length >= 2 && textSq0.includes(c));
+  const hasColor = preTokens.some((t) => COLOR_WORDS.includes(t)) || hasRegColor;
   const hasSize = preTokens.some((t) => SIZE_WORDS.includes(t) || /^\d{2,3}$/.test(t));
   const hasOptionCombo = hasColor && hasSize;
+  // [2026-08-15 검수] 등록 사이즈만 말해도 주문 신호 ("웨이브 250", "트위드자켓 55")
+  //   — 등록된 사이즈 값과 정확히 같은 토큰일 때만. 상품명이 안 잡히면 어차피 접수되지 않는다.
+  const regSizesAll = new Set(products.flatMap((p) => (p.sizes || []).map((z) => squash(z))));
+  const hasRegSize = text.split(/[^0-9a-z가-힣]+/).filter(Boolean).some((w) => {
+    const t = squash(w);
+    if (regSizesAll.has(t)) return true;
+    const tail = t.replace(/(사이즈|사이즈로|미리|mm|밀리|요|이요|짜리)$/g, "").match(/(\d{2,3})$/);
+    return Boolean(tail && regSizesAll.has(tail[1]));
+  });
 
   // 질문/인사는 주문 단어가 있어도 제외 ("이거 주문 되나요?")
   const looksQuestion = text.includes("?") || QUESTION_WORDS.some((w) => text.includes(w));
   const looksGreeting = GREETINGS.some((w) => text.startsWith(w));
+  // 살 생각이 없다는 말은 주문이 아니다 ("다음에 살게요", "담에 살래요")
+  const looksDecline = ["다음에", "담에", "나중에", "안살", "못살", "안사", "못사", "주소", "환불", "교환", "취소", "입금", "송장"].some((w) => text.includes(w));
+  if (looksDecline) return { ...base, reason: "주문이 아닌 문의·요청" };
   if (looksQuestion || looksGreeting) {
     return { ...base, reason: looksQuestion ? "질문으로 보임" : "인사말" };
   }
-  if (!hasOrderWord && !hasNumberRef && !hasQtyRef && !hasOptionCombo) {
+  if (!hasOrderWord && !hasNumberRef && !hasQtyRef && !hasOptionCombo && !hasRegSize) {
     return { ...base, reason: "주문 신호 없음" };
   }
 
   const { qty, consumed } = extractQty(text);
-  const optionTokens = extractOptionTokens(text, consumed);
+  // 등록 색상 전체를 넘겨 "실버블랙"·"카멜" 같은 이름을 통째로 인식하게 한다(쪼개짐·미인식 방지)
+  const optionTokens = extractOptionTokens(text, consumed, products.flatMap((x) => x.colors || []));
 
   // 최우선: 손님이 등록 상품명을 그대로 말했으면 그 상품으로 확정한다.
   //   세부상품명이 [상품명 + 세부] 로 등록돼 있어, 부분일치보다 이게 훨씬 정확하다.
@@ -550,6 +603,7 @@ function parseChatOrderCore(
     .map((p) => {
       const names = [nameBody(p.name), ...(p.aliases || [])].filter(Boolean);
       let best = 0;
+      let weakOnly = false;
       for (const n of names) {
         const s = squash(n);
         // 이름 전체가 통째로 들어있으면: 맞은 글자수 = 이름 길이 (배수 없음 —
@@ -559,6 +613,7 @@ function parseChatOrderCore(
         //   "알로 블랙 셔츠스트라이프 셋업"은 조각 3개 합이 커서 일반 "셔츠"를 이긴다.
         const chatWords = text.split(/[^a-z0-9가-힣]+/).filter((x) => x.length >= 2);
         let sum = 0;
+        let weakSum = 0; // 상품명에 없는 상위어("신발"→"샌들")로 얻은 점수 — 이것만으로는 확정하지 않는다
         for (const piece of String(n).split(/[\s()[\]{}·・,./\-_~]+/).filter((x) => x.length >= 2)) {
           const sp = squash(piece);
           // 색상·사이즈 단어는 상품명 증거로 안 친다 — 손님의 "화이트"는 옵션 선택이지
@@ -569,21 +624,37 @@ function parseChatOrderCore(
             const sw = squash(w);
             if (sw.length < 2) continue;
             if (sp.startsWith(sw)) { sum += sw.length; break; }
+            // 뒤에 붙은 이름도 인정 ("코트"→"막스코트"). 약한 근거로 표시해 단독 확정은 신중히.
+            if (sw.length >= 2 && sp.length > sw.length && sp.endsWith(sw)) { sum += sw.length; weakSum += sw.length; break; }
             if (looseEqual(sw, sp)) { sum += sp.length; break; }   // "딥디크" → "딥티크"
-            if (categoryHit(sw, sp)) { sum += sw.length; break; }  // "가방" → "토트백", "모자" → "단톤모자"
+            if (categoryHit(sw, sp)) { sum += sw.length; if (sw !== sp) weakSum += sw.length; break; }  // "가방" → "토트백"
             // 붙여쓰기 대응("룰루가방 주문") — 단어 끝에 붙은 종류 단어도 인정 (2026-08-14 실채팅)
             const catTail = CATEGORY_SYNONYMS.flat().find((g) => sw.length > g.length && sw.endsWith(g));
-            if (catTail && categoryHit(catTail, sp)) { sum += catTail.length; break; }
+            if (catTail && categoryHit(catTail, sp)) { sum += catTail.length; if (catTail !== sp) weakSum += catTail.length; break; }
           }
         }
-        best = Math.max(best, sum);
+        if (sum > best) { best = sum; weakOnly = sum > 0 && weakSum >= sum; }
+        else if (sum === best && sum > 0 && weakSum < sum) weakOnly = false;
       }
-      return { p, score: best };
+      return { p, score: best, weakOnly };
     })
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score);
 
   if (scored.length === 1 || (scored.length > 1 && scored[0].score > scored[1].score)) {
+    // [2026-08-15 검수] "신발 250 주세요" — 큰 분류로만 말했는데 방송에 신발이 여러 개면 확정 금지.
+    //   ("샌들 240"처럼 상품명에 있는 단어를 말했으면 강한 근거라 그대로 접수된다)
+    if (scored[0].weakOnly) {
+      const saidShoeTop = text.split(/[^0-9a-z가-힣]+/).some((w) => SHOE_TOP_WORDS.has(squash(w)));
+      if (saidShoeTop) {
+        const shoes = products.filter((x) => (x.sizes || []).some(isShoeSize));
+        if (shoes.length >= 2) {
+          return { status: "ambiguous", productId: null, productName: null, matchedBy: null, qty, optionTokens,
+            variantName: null, candidates: shoes.slice(0, 5).map((x) => x.name),
+            reason: "어느 상품인지 알 수 없음 — 상품명을 함께 적어주세요" };
+        }
+      }
+    }
     const p = scored[0].p;
     // 상품이 정해졌으면 그 상품의 세부상품 안에서 한 번 더 좁힌다.
     //   예) "미니 샤넬 저요" → 상품=[미니어처 향수] 확정 → 그 안에서 "샤넬"이 든 세부상품 1개면 확정.
@@ -673,6 +744,22 @@ export function parseChatOrder(
     }
   }
 
+  // [2026-08-15 검수] 한 채팅에 서로 다른 상품을 두 개 이상 말했으면 접수하지 않는다.
+  //   ("웨이브 250 샌들 240 주세요" → 한 상품으로 뭉뚱그려져 사이즈 2건으로 담기던 사고)
+  if (core.status === "parsed" && core.productId) {
+    const sqAll = squash(norm(rawText));
+    const piecesOf = (nm: string) => String(nameBody(nm)).split(/[\s()[\]{}·・,./\-_~]+/)
+      .map((x) => squash(x)).filter((x) => x.length >= 2 && !COLOR_WORDS.includes(x) && !SIZE_WORDS.includes(x));
+    const uniqHits = products.filter((p1) => {
+      const others = products.filter((x) => x.id !== p1.id).map((x) => squash(nameBody(x.name)));
+      return piecesOf(p1.name).some((pc) => sqAll.includes(pc) && !others.some((o) => o.includes(pc)));
+    });
+    if (uniqHits.length >= 2) {
+      return { ...core, status: "ambiguous", candidates: uniqHits.slice(0, 4).map((x) => x.name), items: [],
+        reason: "한 채팅에 상품이 여러 개 — 한 번에 한 상품씩 적어주세요" };
+    }
+  }
+
   let items: ParseResult["items"] = [];
   if (core.status === "parsed") {
     if (core.variantName) {
@@ -682,5 +769,31 @@ export function parseChatOrder(
       items = expandItems(norm(rawText), core.optionTokens, core.qty, p);
     }
   }
+
+  // [2026-08-15 검수·사고방지] 등록 옵션이 있는데 손님이 말하지 않았으면 접수하지 않고 봇이 되묻는다.
+  //   빈 옵션으로 담기면 재고 매칭이 안 되고 배송 사고로 이어진다.
+  //   단, 선택지가 하나뿐인 옵션은 자동으로 채운다(물어볼 이유가 없음).
+  if (core.status === "parsed" && core.productId && !core.variantName && items.length > 0) {
+    const pp = products.find((x) => x.id === core.productId);
+    const cs = (pp?.colors || []).map((x) => String(x).trim()).filter((x) => x && !EMPTY_OPTION_WORDS.has(x.toLowerCase()));
+    const zs = (pp?.sizes || []).map((x) => String(x).trim()).filter((x) => x && !EMPTY_OPTION_WORDS.has(x.toLowerCase()));
+    if (cs.length === 1) items = items.map((i) => (i.color ? i : { ...i, color: cs[0] }));
+    if (zs.length === 1) items = items.map((i) => (i.size ? i : { ...i, size: zs[0] }));
+    const needColor = cs.length >= 2 && items.some((i) => !i.color);
+    const needSize = zs.length >= 2 && items.some((i) => !i.size);
+    if (needColor || needSize) {
+      const what = needColor && needSize ? "색상과 사이즈" : needColor ? "색상" : "사이즈";
+      const ex = needColor ? cs.slice(0, 3) : zs.slice(0, 3);
+      return { ...core, status: "ambiguous", candidates: ex, items: [],
+        reason: `${what} 미지정 — ${what}까지 적어야 접수 (예: ${ex.join(" / ")})` };
+    }
+  }
+
+  // 수량이 과하면(10개 초과) 오타일 수 있으니 되묻는다 ("250 99개")
+  if (core.status === "parsed" && items.some((i) => i.qty > 10)) {
+    return { ...core, status: "ambiguous", candidates: [], items: [],
+      reason: "수량이 많아요 — 맞으면 수량을 다시 적어주세요" };
+  }
+
   return { ...core, items };
 }
