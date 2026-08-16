@@ -72,7 +72,18 @@ export function isHeicLikeImage(file: File) {
 
 async function convertHeicToJpeg(file: File): Promise<File> {
   // heic2any는 무거워서(약 1MB) HEIC를 만났을 때만 동적 로드한다.
-  const heic2any = (await import("heic2any")).default;
+  // [2026-08-16] UMD 패키지라 번들러에 따라 default 위치가 달라진다(mod / mod.default / mod.default.default).
+  //   .default 만 믿고 호출하면 "not a function"으로 변환이 통째로 실패했음 → 전부 시도.
+  const mod: any = await import("heic2any");
+  const heic2any =
+    typeof mod === "function"
+      ? mod
+      : typeof mod?.default === "function"
+        ? mod.default
+        : typeof mod?.default?.default === "function"
+          ? mod.default.default
+          : null;
+  if (!heic2any) throw new Error("heic2any 모듈 로드 실패");
   const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
   const blob = Array.isArray(converted) ? converted[0] : converted;
   const base = String(file.name || "product-image").replace(/\.[^.]+$/, "") || "product-image";
@@ -86,9 +97,14 @@ export async function compressProductImage(file: File, kind: ProductImageKind) {
   if (isHeicLikeImage(file)) {
     try {
       file = await convertHeicToJpeg(file);
-    } catch {
+    } catch (cause) {
       // 변환 실패 시 원본을 올려봐야 저장소가 거부한다 → 명확한 한국어 에러로 중단.
-      throw new Error("아이폰 사진(HEIC)을 변환하지 못했습니다. 사진을 JPEG로 저장해 다시 올려주세요.");
+      //   실제 원인을 뒤에 붙여 다음 장애 때 바로 진단 가능하게 한다.
+      const detail = cause instanceof Error ? cause.message : String(cause ?? "");
+      console.error("[HEIC 변환 실패]", cause);
+      throw new Error(
+        "아이폰 사진(HEIC)을 변환하지 못했습니다. 사진을 JPEG로 저장해 다시 올려주세요." + (detail ? `\n(원인: ${detail.slice(0, 120)})` : ""),
+      );
     }
   }
 
