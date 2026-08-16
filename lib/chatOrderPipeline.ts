@@ -155,7 +155,9 @@ export async function parsePendingChatOrders(
     // 봇/시스템 계정 목록 — 이 계정들의 채팅은 절대 주문으로 인식하지 않는다.
     //   ① 우리 봇 계정(발송 시 저장된 채널 ID)  ② Nightbot 등 관리봇(이름 기준)
     const botChannelId = (await readSetting(sb, "chat_order_bot_channel_id")).trim();
-    const BOT_NAMES = new Set(["nightbot", "streamlabs", "streamelements", "루루쇼핑", "루루동이주문봇", "주문_폭주"]);
+    // [2026-08-16 사장님 지시] 관리자 계정(@루루실장 등)의 채팅은 절대 주문으로 인식하지 않는다.
+    const BOT_NAMES = new Set(["nightbot", "streamlabs", "streamelements", "루루쇼핑", "루루동이주문봇", "주문_폭주",
+      "루루실장", "루루동이", "루루사장", "루루언니"]);
     // 우리 봇 채널 고정값 — 설정 저장이 비어 있어도 항상 차단 (2026-08-14 사장님 확인)
     const KNOWN_BOT_CHANNELS = new Set(["UC8jr9s1rZBEIPPTBPAwYE5A"]);
     // 본문에 봇 이름이 들어간 채팅("스트롱필은요 주문폭주님")은 봇에게 말 거는 대화 — 주문 아님 (2026-08-14 실채팅 오인)
