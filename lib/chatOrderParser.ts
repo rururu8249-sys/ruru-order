@@ -280,12 +280,18 @@ function extractOptionTokens(text: string, consumed: string[], registeredColors:
     // "55사이즈" "250mm" "240미리" "웨이브250이요" — 붙어 있는 숫자를 꺼내 사이즈로 본다
     const token = token0.replace(/(사이즈|사이즈로|미리|mm|밀리|호|요|이요|짜리)$/g, "") || token0;
     if (SIZE_WORDS.includes(token)) { out.push(token); continue; }
-    if (/^\d{3}$/.test(token)) { out.push(token); continue; }
-    if (/^\d{2}$/.test(token) && Number(token) >= 44 && Number(token) <= 120) { out.push(token); continue; }
+    // [2026-08-16] 숫자는 "등록된 사이즈"일 때만 사이즈로 본다 — 닉네임 숫자(박시계79)·키·몸무게 오인 방지
+    if (/^\d{2,3}$/.test(token)) {
+      if (registeredSizes.length > 0) { if (registeredSizes.includes(token)) out.push(token); continue; }
+      if (token.length === 3) { out.push(token); continue; }
+      if (Number(token) >= 44 && Number(token) <= 120) { out.push(token); continue; }
+    }
     const m = token0.match(/(\d{2,3})(?:사이즈|미리|mm|밀리|호|요|이요|짜리)?$/);
     if (m) {
       const n = Number(m[1]);
-      if ((m[1].length === 3 && n >= 200 && n <= 310) || (m[1].length === 2 && n >= 44 && n <= 120)) { out.push(m[1]); continue; }
+      // 등록 사이즈가 있으면 그 목록에 있는 값만 (닉네임 뒤 숫자 "박시계79" 오인 방지)
+      if (registeredSizes.length > 0) { if (registeredSizes.includes(m[1])) { out.push(m[1]); continue; } }
+      else if ((m[1].length === 3 && n >= 200 && n <= 310) || (m[1].length === 2 && n >= 44 && n <= 120)) { out.push(m[1]); continue; }
     }
     // [2026-08-15 검수] 말끝까지 다 붙여 쓴 경우("막스코트카멜55저요") — 토큰 안쪽 숫자도 본다.
     //   오인 방지를 위해 "등록된 사이즈 값과 정확히 같은 숫자"만 인정한다.
@@ -479,7 +485,8 @@ function parseChatOrderCore(
   // 물음표가 없어도 "~가요/나요/까요/은지/할까"로 끝나면 질문으로 본다 ("66 총기장이 얼만가요")
   const looksQuestion = text.includes("?") || QUESTION_WORDS.some((w) => text.includes(w)) ||
     /(가요|나요|까요|은지|는지|을까|ㄹ까|던가|겠죠|죠\??)\s*$/.test(text.trim());
-  const looksGreeting = GREETINGS.some((w) => text.startsWith(w));
+  // 인사로 시작해도 뒤에 주문이 붙어 있으면 주문이다 ("안녕하세요 막스마라 카멜 55 주문")
+  const looksGreeting = GREETINGS.some((w) => text.startsWith(w)) && !hasOrderWord && !hasNumberRef && !hasQtyRef;
   // 살 생각이 없다는 말은 주문이 아니다 ("다음에 살게요", "담에 살래요")
   const looksDecline = ["다음에", "담에", "나중에", "안살", "못살", "안사", "못사", "주소", "환불", "교환", "취소", "입금", "송장"].some((w) => text.includes(w));
   if (looksDecline) return { ...base, reason: "주문이 아닌 문의·요청" };
@@ -782,7 +789,39 @@ function parseChatOrderCore(
     return { status: "ambiguous", productId: null, productName: null, matchedBy: null, qty, optionTokens, variantName: null, candidates: scored.slice(0, 5).map((x) => x.p.name), reason: "상품 후보가 여러 개" };
   }
 
-  // 3순위: 「지금 이거」
+  // [2026-08-16 실방송 데이터 반영] 3순위: 색상·사이즈만 말한 주문 ("카멜55주세요", "베이지55저요")
+  //   방송 상품 중 그 색상(+사이즈)을 가진 상품이 **딱 하나면** 그 상품으로 확정한다.
+  //   여러 개면 후보를 봇이 물어본다. 손님이 색+사이즈를 말한 건 주문 맥락이 확실하다.
+  {
+    const colorToks = optionTokens.filter((t) => {
+      if (COLOR_WORDS.includes(t)) return true;
+      return products.some((x) => (x.colors || []).some((c) => squash(c) === squash(t)));
+    });
+    const sizeToks = optionTokens.filter((t) => !colorToks.includes(t));
+    if (colorToks.length > 0) {
+      const hit = products.filter((x) => {
+        const cs = (x.colors || []).filter((c) => c && !EMPTY_OPTION_WORDS.has(String(c).toLowerCase()));
+        if (cs.length === 0) return false;
+        const colorOK = colorToks.some((t) => cs.some((c) => sameColorWord(t, String(c)) || squash(c).includes(squash(t)) || squash(t).includes(squash(c))));
+        if (!colorOK) return false;
+        if (sizeToks.length === 0) return true;
+        const zs = (x.sizes || []).map((z) => squash(z));
+        return sizeToks.some((t) => zs.includes(squash(t)));
+      });
+      if (hit.length === 1) {
+        const p1 = hit[0];
+        return { status: "parsed", productId: p1.id, productName: p1.name, matchedBy: "variant",
+          variantName: null, qty, optionTokens, candidates: [], reason: "색상·사이즈로 상품 확정" };
+      }
+      if (hit.length >= 2 && !currentProductId) {
+        return { status: "ambiguous", productId: null, productName: null, matchedBy: null, qty, optionTokens,
+          variantName: null, candidates: hit.slice(0, 4).map((x) => x.name),
+          reason: "색상만으로는 상품을 몰라요 — 상품명을 함께 적어주세요" };
+      }
+    }
+  }
+
+  // 4순위: 「지금 이거」
   if (currentProductId) {
     const p = products.find((x) => x.id === currentProductId);
     if (p) {

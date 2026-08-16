@@ -273,7 +273,7 @@ export async function parsePendingChatOrders(
       }
       // [2026-08-16 사장님 지시] 봇은 "상품이 확실히 잡힌" 경우에만 말한다.
       //   상품을 못 알아들은 글(need_product)은 대부분 문의·잡담이라 안내가 소음이 된다 → 조용히 넘긴다.
-      if (r.status === "ambiguous" && r.productName && Number.isFinite(atMs) && !String(r.reason || "").startsWith("중복 의심")) {
+      if (r.status === "ambiguous" && (r.productName || r.candidates.length > 0) && Number.isFinite(atMs) && !String(r.reason || "").startsWith("중복 의심")) {
         botTargets.push({
           name: String(row.display_name ?? "").trim(),
           channel: String(row.channel_id ?? ""),
@@ -389,6 +389,8 @@ export async function parsePendingChatOrders(
             ? `🤖 ${nick}한 번에 한 상품씩 적어주세요! (여러 개는 한 줄씩 나눠서)`
             : rs.startsWith("수량이 많아요")
             ? `🤖 ${nick}${pn} 수량이 많은데 맞으신가요? 맞으면 한 번 더 적어주세요`
+            : rs.startsWith("색상만으로는")
+            ? `🤖 ${nick}어느 상품인가요? ${t.cands.slice(0, 3).map((c) => String(c).replace(/\(.*?\)/g, "").trim().slice(0, 12)).join(" / ")} — 상품명도 함께 적어주세요`
             : rs.startsWith("어느 상품인지")
             ? `🤖 ${nick}어느 상품인지 상품명을 함께 적어주세요! 예) ${String(t.cands[0] || "").replace(/\(.*?\)/g, "").trim().slice(0, 18)}`
             : t.kind === "ambiguous" && t.productName
