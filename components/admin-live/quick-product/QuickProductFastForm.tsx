@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import { showAdminToast } from "@/lib/adminToast";
 import { resolveProductImageUrl } from "./productImageUrl";
-import { compressProductImage } from "./compressProductImage";
+import { compressProductImage, isHeicLikeImage } from "./compressProductImage";
 
 type ProductRow = Record<string, unknown>;
 
@@ -424,7 +424,7 @@ function ImagePicker({
   }, []);
 
   const uploadFiles = async (files: FileList | File[]) => {
-    const safeFiles = Array.from(files).filter((file) => file.type.startsWith("image/"));
+    const safeFiles = Array.from(files).filter((file) => file.type.startsWith("image/") || isHeicLikeImage(file));
 
     if (safeFiles.length === 0) {
       showAdminToast("이미지 파일만 등록할 수 있습니다.", "error");

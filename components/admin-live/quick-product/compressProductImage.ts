@@ -60,8 +60,38 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number) 
   });
 }
 
+// [2026-08-13] 아이폰 원본 사진(HEIC/HEIF) 판별.
+//   브라우저가 HEIC를 못 읽어 압축이 실패 → 원본이 그대로 서버로 가고
+//   Supabase 저장소(jpeg/png/webp만 허용)가 거부하던 문제("mime type image/heic is not supported").
+//   일부 환경은 file.type이 빈 값이라 확장자도 함께 본다.
+export function isHeicLikeImage(file: File) {
+  const type = String(file.type || "").toLowerCase();
+  const name = String(file.name || "").toLowerCase();
+  return type.includes("heic") || type.includes("heif") || /\.(heic|heif)$/.test(name);
+}
+
+async function convertHeicToJpeg(file: File): Promise<File> {
+  // heic2any는 무거워서(약 1MB) HEIC를 만났을 때만 동적 로드한다.
+  const heic2any = (await import("heic2any")).default;
+  const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+  const blob = Array.isArray(converted) ? converted[0] : converted;
+  const base = String(file.name || "product-image").replace(/\.[^.]+$/, "") || "product-image";
+  return new File([blob], `${base}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
+}
+
 export async function compressProductImage(file: File, kind: ProductImageKind) {
   if (typeof window === "undefined") return file;
+
+  // 아이폰 HEIC/HEIF → JPEG 변환 후 아래 기존 압축(webp) 경로를 그대로 태운다.
+  if (isHeicLikeImage(file)) {
+    try {
+      file = await convertHeicToJpeg(file);
+    } catch {
+      // 변환 실패 시 원본을 올려봐야 저장소가 거부한다 → 명확한 한국어 에러로 중단.
+      throw new Error("아이폰 사진(HEIC)을 변환하지 못했습니다. 사진을 JPEG로 저장해 다시 올려주세요.");
+    }
+  }
+
   if (!file.type.startsWith("image/")) return file;
 
   const config = CONFIG_BY_KIND[kind] || CONFIG_BY_KIND.detail;

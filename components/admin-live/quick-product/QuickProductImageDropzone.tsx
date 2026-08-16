@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { showAdminToast } from "@/lib/adminToast";
 import { resolveProductImageUrl } from "./productImageUrl";
-import { compressProductImage } from "./compressProductImage";
+import { compressProductImage, isHeicLikeImage } from "./compressProductImage";
 
 type ImageValue = string | string[] | null;
 
@@ -138,7 +138,7 @@ export default function QuickProductImageDropzone({
 
   const handleFiles = async (fileList: FileList | File[]) => {
     const pickedFiles = Array.from(fileList)
-      .filter((file) => file.type.startsWith("image/"))
+      .filter((file) => file.type.startsWith("image/") || isHeicLikeImage(file))
       .slice(0, isMultiple ? slotCount : 1);
 
     if (pickedFiles.length === 0) {
