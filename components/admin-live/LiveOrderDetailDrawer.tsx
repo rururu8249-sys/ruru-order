@@ -115,6 +115,7 @@ function getPaymentStatusClass(order: LiveOrder) {
 export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClose, onAfterStatusChange }: Props) {
   const [cardStatusAction, setCardStatusAction] = useState<"" | "card-paid" | "card-unpaid">("");
   const [paymentCancelAction, setPaymentCancelAction] = useState(false);
+  const [methodChanging, setMethodChanging] = useState(false);
   const [paymentCancelError, setPaymentCancelError] = useState("");
   const [manualConfirmAction, setManualConfirmAction] = useState(false);
 
@@ -504,6 +505,13 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     (orderForView.paymentStatus === "canceled" && Boolean(orderForView.paidAtFull));
 
   const showCardStatusActions = !isCanceled && isCardOrder && (isCardPaid || isCardUnpaid);
+
+  // [2026-08-20 사장님 요청] 결제수단 전환 (무통장 ↔ 카드)
+  //   금액 재계산은 RPC(admin_change_order_payment_method)가 주문 제출 공식과 동일하게 수행.
+  //   [결정 A] 요율은 지금 설정값 / [결정 A] 입금확인·카드결제완료·취소 주문은 RPC가 막는다.
+  //   화면에서도 같은 조건으로 버튼 자체를 숨겨 헛클릭을 없앤다.
+  const canChangePaymentMethod = !isCanceled && !canCancelPaymentConfirm && !isCardPaid;
+  const nextPaymentMethod = isCardOrder ? "무통장입금" : "카드결제";
   const customerAddressText = getCustomerAddress(orderForView);
   const customerDeliveryMemoText = getCustomerDeliveryMemo(orderForView);
 
@@ -512,6 +520,73 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     onAfterStatusChange,
     onClose,
   });
+
+  // 결제수단 전환 — ① dry_run 으로 바뀔 금액을 먼저 계산해 확인창에 보여주고 ② 승인 시 실제 반영.
+  //   RPC 한 트랜잭션이라 중간 실패 시 전부 롤백. 상품/수량/배송비/재고/포인트사용액/입금내역은 무변경.
+  const handleChangePaymentMethod = async () => {
+    if (!canChangePaymentMethod || methodChanging) return;
+
+    const rowIds = items.map((item) => Number(item.id)).filter((id) => Number.isFinite(id) && id > 0);
+    const groupId = String((orderForView as any).groupId || "");
+
+    if (rowIds.length === 0 && !groupId) {
+      showAdminToast("대상 주문 행을 찾지 못했습니다.", "warning");
+      return;
+    }
+
+    setMethodChanging(true);
+    try {
+      const call = async (dryRun: boolean) =>
+        (supabase as any).rpc("admin_change_order_payment_method", {
+          p_order_group_id: groupId || null,
+          p_order_ids: rowIds.length > 0 ? rowIds : null,
+          p_target_method: nextPaymentMethod,
+          p_dry_run: dryRun,
+        });
+
+      const preview = await call(true);
+      if (preview.error) {
+        showAdminToast("결제수단 변경 불가\n\n" + preview.error.message, "error");
+        return;
+      }
+
+      const before = Number(preview.data?.before_total || 0);
+      const after = Number(preview.data?.after_total || 0);
+      const diff = after - before;
+      const rate = Number(preview.data?.customer_card_rate || 0);
+
+      const confirmMessage = [
+        `결제수단을 '${nextPaymentMethod}'(으)로 바꿀까요?`,
+        "",
+        `총 결제금액 ${money(before)} → ${money(after)}`,
+        diff === 0
+          ? "금액 변동 없음"
+          : diff > 0
+            ? `카드 수수료 +${money(diff)} (현재 설정 요율 ${rate}%)`
+            : `카드 수수료 ${money(diff)} 제거`,
+        "",
+        "상품·수량·배송비·재고·사용포인트·입금내역은 그대로입니다.",
+      ].join("\n");
+
+      if (!(await showAdminConfirm(confirmMessage))) return;
+
+      const applied = await call(false);
+      if (applied.error) {
+        showAdminToast("결제수단 변경 실패\n\n" + applied.error.message, "error");
+        return;
+      }
+
+      showAdminToast(
+        `결제수단을 ${nextPaymentMethod}(으)로 변경했습니다.\n총 결제금액 ${money(Number(applied.data?.after_total || after))}`,
+        "success",
+      );
+      await onAfterStatusChange?.();
+    } catch (error: any) {
+      showAdminToast("결제수단 변경 오류\n\n" + (error?.message || String(error)), "error");
+    } finally {
+      setMethodChanging(false);
+    }
+  };
 
   const handlePaymentConfirmCancel = async () => {
     if (!canCancelPaymentConfirm || paymentCancelAction) return;
@@ -1291,6 +1366,17 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 
         {/* 액션 버튼 (목업 B action-btns: 수동입금확인 green / 입금매칭 rose / 취소 red) — 기존 조건/핸들러 그대로 */}
         <div className="mt-4 grid grid-cols-1 gap-2 border-t border-line pt-3">
+          {canChangePaymentMethod ? (
+            <button
+              type="button"
+              onClick={handleChangePaymentMethod}
+              disabled={methodChanging}
+              className="h-10 w-full rounded-xl border border-rose-line bg-rose-soft text-[13px] font-black text-rose-deep shadow-sm hover:bg-rose-line/40 active:scale-[0.99] disabled:bg-surface-2 disabled:text-ink-mute"
+            >
+              {methodChanging ? "계산중..." : `💳 ${nextPaymentMethod}으로 변경`}
+            </button>
+          ) : null}
+
           {!isCanceled && canCancelPaymentConfirm ? (
             <button
               type="button"
