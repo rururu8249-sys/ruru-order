@@ -14,8 +14,8 @@ import { createPortal } from "react-dom";
 import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import { showAdminToast } from "@/lib/adminToast";
 import {
-  autoGuessConfig, buildDraftCores, norm, totalStock,
-  type BulkConfig, type DraftCore, type SheetCell,
+  autoGuessConfig, buildDraftCores, auditDraftCores, norm, totalStock,
+  type AuditReport, type BulkConfig, type DraftCore, type SheetCell,
 } from "@/lib/excelBulkParse";
 
 type Props = { onClose: () => void; onDone?: () => void };
@@ -44,6 +44,7 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
   const [drafts, setDrafts] = useState<DraftProduct[]>([]);
   const [step, setStep] = useState<"pick" | "map" | "done">("pick");
   const [showSizePick, setShowSizePick] = useState(false);
+  const [audit, setAudit] = useState<AuditReport | null>(null);
 
   // 일괄 설정
   const [bulkBadges, setBulkBadges] = useState<string[]>([]);
@@ -128,6 +129,7 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
   // ── 미리보기 만들기 (코어 결과 + 사진 매칭) ──
   const makeDrafts = (s: ParsedSheet, c: BulkConfig): DraftProduct[] => {
     const cores = buildDraftCores(s.rows, c);
+    setAudit(auditDraftCores(s.rows, c, cores));
     const span = c.layout === "block" ? c.blockSize : 1;
     return cores.map((d) => {
       const im =
@@ -347,6 +349,27 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
 
             {/* 미리보기 */}
             <div style={{ flex: 1, overflowY: "auto", padding: "10px 18px" }}>
+              {audit ? (
+                <div style={{ marginBottom: "8px", padding: "9px 12px", borderRadius: "10px", border: `1.5px solid ${audit.totalMismatches.length || audit.missed.length ? "#E8B3A8" : "#CBE3CE"}`, background: audit.totalMismatches.length || audit.missed.length ? "#FFF6F3" : "#F4FBF5", fontSize: "11.5px", fontWeight: 700, color: "#4A3B41", lineHeight: 1.7 }}>
+                  <div style={{ fontWeight: 900, color: audit.totalMismatches.length || audit.missed.length ? "#B03A2E" : "#2E7D46" }}>
+                    🔍 원본 엑셀과 자동 대조 {audit.totalMismatches.length || audit.missed.length ? "— 다른 부분이 있어요, 아래만 확인하세요" : "— 다른 부분 없음"}
+                  </div>
+                  <div>
+                    상품 <b>{audit.productCount}</b>개{audit.numberedCount > 0 ? ` (엑셀 번호 ${audit.numberedCount}개${audit.numberedCount !== audit.productCount ? " ⚠ 개수 다름!" : " ✓"})` : ""} · 재고 총합 <b>{audit.stockSum}</b>개
+                    {audit.totalColFound ? ` · 엑셀 합계열 대조: 일치 ${audit.totalMatch}개${audit.totalMismatches.length ? ` / 불일치 ${audit.totalMismatches.length}개` : " ✓"}` : ""}
+                    {sheet ? ` · 사진 ${sheet.images.length}장 중 ${drafts.filter((d) => d.imageUrl).length}개 상품에 매칭` : ""}
+                  </div>
+                  {audit.totalMismatches.map((m) => (
+                    <div key={`tm-${m.row}`} style={{ color: "#B03A2E" }}>⚠ {m.row}행 「{m.name}」 엑셀 합계 {m.excel}개 ≠ 읽은 재고 {m.parsed}개</div>
+                  ))}
+                  {audit.missed.map((m, i) => (
+                    <div key={`ms-${i}`} style={{ color: "#B03A2E" }}>⚠ {m.where}에 안 읽힌 숫자 {m.value} — {m.note}. 그 칸을 엑셀에서 확인하거나, 위 「사이즈 칸」에서 이 열을 추가하세요</div>
+                  ))}
+                  {audit.unreadOtherCount > 0 ? (
+                    <div style={{ color: "#8A7480" }}>ℹ 그 외 안 읽힌 숫자 {audit.unreadOtherCount}칸 (원가·날짜·품번 등일 수 있음 — 재고와 무관하면 무시)</div>
+                  ) : null}
+                </div>
+              ) : null}
               <div style={{ fontSize: "12px", fontWeight: 800, color: "#5C4B52", marginBottom: "8px" }}>
                 미리보기 {drafts.length}개 · 등록 대상 <b style={{ color: "#7B2D43" }}>{useCount}</b>개
                 {drafts.some((d) => d.warns.length > 0) ? <span style={{ marginLeft: "8px", color: "#C0392B" }}>⚠ 확인 필요 {drafts.filter((d) => d.warns.length > 0).length}개</span> : null}

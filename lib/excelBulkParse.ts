@@ -47,8 +47,8 @@ const ROLE_KEYS: [string, string[]][] = [
   ["price", ["세일가", "판매가", "소비자가", "공급가", "단가", "가격", "금액", "price", "won"]],
   ["color", ["컬러", "색상", "color", "색깔", "색"]],
   ["sizecol", ["사이즈", "싸이즈", "사이스", "size", "치수", "호수", "규격"]],
-  ["qty", ["수량", "재고", "잔량", "입고", "발주", "qty", "stock", "ea", "pcs", "족", "개수"]],
   ["total", ["합계", "총수량", "총계", "total", "소계"]],
+  ["qty", ["수량", "재고", "잔량", "입고", "발주", "qty", "stock", "ea", "pcs", "족", "개수"]],
   ["name", ["품명", "상품명", "제품명", "품목", "상품", "제품", "name", "product", "item"]],
 ];
 
@@ -158,7 +158,8 @@ export function autoGuessConfig(rows: SheetCell[][]): BulkConfig {
 }
 
 // ── 미리보기 행 만들기 ──
-export function buildDraftCores(rows: SheetCell[][], c: BulkConfig): DraftCore[] {
+export function buildDraftCores(rows: SheetCell[][], c: BulkConfig, consumedOut?: Set<string>): DraftCore[] {
+  const mark = (r1: number, c0: number) => { consumedOut?.add(`${r1}|${c0}`); };
   const list: DraftCore[] = [];
   const headerCells = c.headerRow > 0 ? (rows[c.headerRow - 1] || []) : [];
   const firstDataRow = c.headerRow > 0 ? c.headerRow : 0; // 0-base 기준 시작 위치
@@ -188,6 +189,11 @@ export function buildDraftCores(rows: SheetCell[][], c: BulkConfig): DraftCore[]
       if (!rawName && !size && !color) continue;
       const name = rawName || lastName;
       if (!name) continue;
+      mark(r + 1, c.colName);
+      if (c.colPrice >= 0) mark(r + 1, c.colPrice);
+      if (c.colCode >= 0) mark(r + 1, c.colCode);
+      if (c.colColor >= 0) mark(r + 1, c.colColor);
+      if (c.colSize >= 0) mark(r + 1, c.colSize);
       if (!cur || name !== cur.name) {
         cur = {
           row: r + 1, name, price: c.colPrice >= 0 ? num(row[c.colPrice]) : 0,
@@ -201,6 +207,7 @@ export function buildDraftCores(rows: SheetCell[][], c: BulkConfig): DraftCore[]
       if (color && !cur.colors.includes(color)) cur.colors.push(color);
       if (size && !cur.sizes.includes(size)) cur.sizes.push(size);
       if (qty > 0) cur.stocks[`${color}|${size}`] = (cur.stocks[`${color}|${size}`] || 0) + qty;
+      if (c.colQty >= 0) mark(r + 1, c.colQty);
       lastName = name;
     }
   } else {
@@ -221,6 +228,9 @@ export function buildDraftCores(rows: SheetCell[][], c: BulkConfig): DraftCore[]
       const name = norm(row[c.colName]);
       if (!name) continue;
       if (c.headerRow > 0 && r === c.headerRow) continue;
+      mark(r, c.colName);
+      if (c.colPrice >= 0) mark(r, c.colPrice);
+      if (c.colCode >= 0) mark(r, c.colCode);
       const { sizes, colOf } = sizeLabelsFor(r - 1);
       const colors: string[] = [];
       const stocks: Record<string, number> = {};
@@ -228,11 +238,13 @@ export function buildDraftCores(rows: SheetCell[][], c: BulkConfig): DraftCore[]
       if (c.layout === "block") {
         for (let k = 0; k < c.blockSize; k += 1) {
           const rr = rows[r - 1 + k] || [];
+          if (c.colColor >= 0) mark(r + k, c.colColor);
           const color = c.colColor >= 0 ? norm(rr[c.colColor]) : "";
           if (!color) continue;
           if (!colors.includes(color)) colors.push(color);
           for (const sz of sizes) {
             const cell = rr[colOf[sz]];
+            mark(r + k, colOf[sz]);
             if (isSizeLabel(cell) && norm(cell) === sz) continue; // 사이즈 라벨 줄은 수량 아님
             const q = num(cell);
             if (q > 0) stocks[`${color}|${sz}`] = q;
@@ -243,6 +255,7 @@ export function buildDraftCores(rows: SheetCell[][], c: BulkConfig): DraftCore[]
             const rr = rows[r - 1 + k] || [];
             for (const sz of sizes) {
               const cell = rr[colOf[sz]];
+              mark(r + k, colOf[sz]);
               if (isSizeLabel(cell) && norm(cell) === sz) continue;
               const q = num(cell);
               if (q > 0) stocks[`|${sz}`] = (stocks[`|${sz}`] || 0) + q;
@@ -250,14 +263,17 @@ export function buildDraftCores(rows: SheetCell[][], c: BulkConfig): DraftCore[]
           }
         }
       } else {
+        if (c.colColor >= 0) mark(r, c.colColor);
         const color = c.colColor >= 0 ? norm(row[c.colColor]) : "";
         if (color) colors.push(color);
         for (const sz of sizes) {
           const q = num(row[colOf[sz]]);
+          mark(r, colOf[sz]);
           if (q > 0) stocks[`${color}|${sz}`] = q;
         }
         if (sizes.length === 0 && c.colQty >= 0) {
           const q = num(row[c.colQty]);
+          mark(r, c.colQty);
           if (q > 0) stocks[`${color}|`] = q;
         }
       }
@@ -285,4 +301,106 @@ export function buildDraftCores(rows: SheetCell[][], c: BulkConfig): DraftCore[]
 
 export function totalStock(d: DraftCore): number {
   return Object.values(d.stocks).reduce((a, b) => a + b, 0);
+}
+
+// ── 자동 대조(검수) 리포트 ──
+//   원본 셀을 다시 훑어서 "인식 결과와 원본이 다른 부분"만 집어낸다.
+//   1) 합계/총수량 열이 있으면: 상품별 엑셀 합계 vs 읽어낸 재고 합계 대조
+//   2) 사이즈 칸에 숫자가 있는데 어느 상품에도 안 들어간 셀 (예: 색상 칸이 빈 줄)
+//   3) 엑셀 A열 번호 개수 vs 인식된 상품 수
+export type AuditIssue = { where: string; value: string; note: string };
+export type AuditReport = {
+  productCount: number;
+  numberedCount: number;   // A열 번호 개수 (0이면 번호 없음)
+  stockSum: number;
+  totalColFound: boolean;
+  totalMatch: number;      // 합계열 대조 일치 상품 수
+  totalMismatches: { name: string; row: number; excel: number; parsed: number }[];
+  missed: AuditIssue[];       // 어느 상품에도 반영 안 된 "수량스러운" 숫자 (열 단위 묶음)
+  unreadOtherCount: number;   // 안 읽힌 그 외 숫자(원가·날짜 등일 수 있음) 개수
+};
+
+function cellRef(r1: number, c0: number) {
+  let n = c0, s = "";
+  do { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; } while (n >= 0);
+  return `${s}${r1}`;
+}
+
+export function auditDraftCores(rows: SheetCell[][], c: BulkConfig, drafts: DraftCore[]): AuditReport {
+  const consumed = new Set<string>();
+  buildDraftCores(rows, c, consumed); // 같은 설정으로 다시 읽으며 "읽은 셀" 좌표 수집
+
+  // A열 번호 개수
+  let numberedCount = 0;
+  rows.forEach((r) => { if (/^\d{1,3}$/.test(norm((r || [])[0]))) numberedCount += 1; });
+
+  const stockSum = drafts.reduce((a, d) => a + totalStock(d), 0);
+
+  // 합계/총수량 열 찾기 (헤더에서)
+  const headerCells = c.headerRow > 0 ? (rows[c.headerRow - 1] || []) : [];
+  let totalCol = -1;
+  headerCells.forEach((h, i) => { if (totalCol < 0 && guessRole(norm(h)) === "total") totalCol = i; });
+
+  const totalMismatches: AuditReport["totalMismatches"] = [];
+  let totalMatch = 0;
+  if (totalCol >= 0) {
+    const span = c.layout === "block" ? c.blockSize : 1;
+    for (const d of drafts) {
+      let excelTotal = 0;
+      for (let k = 0; k < span; k += 1) {
+        excelTotal += num((rows[d.row - 1 + k] || [])[totalCol]);
+      }
+      if (excelTotal > 0) {
+        if (excelTotal === totalStock(d)) totalMatch += 1;
+        else totalMismatches.push({ name: d.name, row: d.row, excel: excelTotal, parsed: totalStock(d) });
+      }
+    }
+  }
+
+  // ★ 전수 커버리지 검사 — 인식 결과와 무관하게 엑셀의 "모든" 숫자 칸을 훑는다.
+  //   인식기가 열 하나를 통째로 놓쳐도, 그 열의 숫자들은 "안 읽힌 칸"으로 반드시 걸린다.
+  //   - 수량으로 보이는 정수(1~999)가 안 읽혔으면 → 빨간 경고 (열 단위로 묶어서)
+  //   - 그 외 숫자(1000 이상: 원가·날짜 등일 수 있음)는 개수만 알려줌
+  const firstDataRow0 = c.headerRow > 0 ? c.headerRow : 0; // 0-base
+  const missedByCol: Record<number, { count: number; examples: string[] }> = {};
+  let unreadOtherCount = 0;
+  const width = rows.reduce((m, r) => Math.max(m, (r || []).length), 0);
+  for (let r0 = firstDataRow0; r0 < rows.length; r0 += 1) {
+    const row = rows[r0] || [];
+    for (let ci = 0; ci < width; ci += 1) {
+      if (consumed.has(`${r0 + 1}|${ci}`)) continue;
+      if (ci === totalCol) continue;                                   // 합계열은 위에서 별도 대조
+      const v = row[ci];
+      if (v == null || norm(v) === "") continue;
+      const t = norm(v);
+      if (Number.isNaN(Number(t.replace(/[^0-9.-]/g, ""))) || !/\d/.test(t)) continue;
+      if (ci === 0 && /^\d{1,3}$/.test(t) && numberedCount > 0) continue; // A열 번호
+      if (isSizeLabel(t)) continue;                                    // 사이즈 라벨 값
+      const q = num(t);
+      if (q <= 0) continue;
+      if (Number.isInteger(q) && q < 1000) {
+        const g = missedByCol[ci] || (missedByCol[ci] = { count: 0, examples: [] });
+        g.count += 1;
+        if (g.examples.length < 3) g.examples.push(`${cellRef(r0 + 1, ci)}=${q}`);
+      } else {
+        unreadOtherCount += 1;
+      }
+    }
+  }
+  const missed: AuditIssue[] = Object.entries(missedByCol).map(([ci, g]) => ({
+    where: `${cellRef(0, Number(ci)).replace(/\d+$/, "")}열`,
+    value: `${g.count}칸 (${g.examples.join(", ")}${g.count > 3 ? " …" : ""})`,
+    note: "수량으로 보이는 숫자가 어느 상품에도 안 들어감",
+  }));
+
+  return {
+    productCount: drafts.length,
+    numberedCount,
+    stockSum,
+    totalColFound: totalCol >= 0,
+    totalMatch,
+    totalMismatches,
+    missed,
+    unreadOtherCount,
+  };
 }
