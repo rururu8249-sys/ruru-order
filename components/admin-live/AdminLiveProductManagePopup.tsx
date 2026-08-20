@@ -7,6 +7,7 @@ import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import { resolveProductImageUrl } from "./quick-product/productImageUrl";
 import { showAdminToast } from "@/lib/adminToast";
 import { createDraftBroadcast } from "./liveBroadcastController";
+import ExcelBulkImportPopup from "./ExcelBulkImportPopup";
 
 type ProductRow = Record<string, unknown>;
 
@@ -250,6 +251,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   useEffect(() => { setBcListOpen(!isNarrow); }, [isNarrow]); // 데스크톱=열림, 모바일=접힘 기본
   // 위젯 설정(일괄) 화면
   const [widgetSettingsOpen, setWidgetSettingsOpen] = useState(false);
+  // [2026-08-20] 엑셀 대량등록 팝업
+  const [excelImportOpen, setExcelImportOpen] = useState(false);
   const [wsMode, setWsMode] = useState<"rotate" | "pin">("rotate");
   const [wsSelected, setWsSelected] = useState<Set<string>>(new Set());
   const [wsSaving, setWsSaving] = useState(false);
@@ -1466,9 +1469,14 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         {/* 헤더 */}
         <div style={{ display: "flex", alignItems: "center", padding: "14px 18px", borderBottom: "1px solid var(--color-line)" }}>
           <span style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-rose-deep)" }}>📦 상품 관리</span>
-          <button type="button" onClick={openCreate} style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "13px", fontWeight: 800, color: "#fff", background: "#7B2D43", border: "none", borderRadius: "8px", padding: "7px 13px", cursor: "pointer", marginLeft: "auto" }}>+ 상품 등록</button>
+          <button type="button" onClick={() => setExcelImportOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "13px", fontWeight: 800, color: "#7B2D43", background: "#fff", border: "1.5px solid #7B2D43", borderRadius: "8px", padding: "6px 12px", cursor: "pointer", marginLeft: "auto" }}>📄 엑셀 대량등록</button>
+          <button type="button" onClick={openCreate} style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "13px", fontWeight: 800, color: "#fff", background: "#7B2D43", border: "none", borderRadius: "8px", padding: "7px 13px", cursor: "pointer", marginLeft: "8px" }}>+ 상품 등록</button>
           <button type="button" onClick={onClose} style={{ marginLeft: "8px", border: "none", background: "none", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>✕</button>
         </div>
+
+        {excelImportOpen ? (
+          <ExcelBulkImportPopup onClose={() => setExcelImportOpen(false)} onDone={() => { void loadProducts(true); }} />
+        ) : null}
 
         {/* 탭 2개 */}
         <div style={{ display: "flex", gap: "2px", padding: "0 18px", borderBottom: "1px solid var(--color-line)" }}>

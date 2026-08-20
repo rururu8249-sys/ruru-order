@@ -1,0 +1,461 @@
+"use client";
+
+// components/admin-live/ExcelBulkImportPopup.tsx
+// [2026-08-20] 엑셀 대량 상품등록 — 형식이 매번 달라도 되게 설계.
+//   흐름: 파일 선택 → 자동 인식(헤더·구조·열역할) → 사장님이 드롭다운으로 확인/수정
+//        → 미리보기 검수(문제행 빨간 표시) → 일괄설정(배지/배송/진열/카테고리) → [등록]
+//   ⚠️ [등록]을 누르기 전에는 아무것도 저장되지 않는다.
+//   ⚠️ 상품 등록은 기존 경로(adminCatalogWrite products insert)만 사용.
+//      주문·재고차감·입금·정산 로직 무접촉. 이미지 업로드도 기존 API 재사용.
+//   형식 인식 로직은 lib/excelBulkParse.ts (시뮬레이션 검수 가능하도록 UI와 분리)
+
+import { useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
+import { showAdminToast } from "@/lib/adminToast";
+import {
+  autoGuessConfig, buildDraftCores, norm, totalStock,
+  type BulkConfig, type DraftCore, type SheetCell,
+} from "@/lib/excelBulkParse";
+
+type Props = { onClose: () => void; onDone?: () => void };
+
+type SheetImage = { row: number; col: number; ext: string; blob: Blob; url: string };
+type ParsedSheet = { name: string; rows: SheetCell[][]; images: SheetImage[] };
+
+type DraftProduct = DraftCore & {
+  key: string;
+  use: boolean;
+  imageUrl: string;      // blob URL (미리보기 전용)
+  imageBlob: Blob | null;
+};
+
+const EMPTY_CFG: BulkConfig = {
+  headerRow: 0, layout: "row", blockSize: 1,
+  colName: 0, colPrice: -1, colColor: -1, colCode: -1, colSize: -1, colQty: -1, sizeCols: [],
+};
+
+export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [busy, setBusy] = useState("");
+  const [sheets, setSheets] = useState<ParsedSheet[]>([]);
+  const [sheetIdx, setSheetIdx] = useState(0);
+  const [cfg, setCfg] = useState<BulkConfig>(EMPTY_CFG);
+  const [drafts, setDrafts] = useState<DraftProduct[]>([]);
+  const [step, setStep] = useState<"pick" | "map" | "done">("pick");
+  const [showSizePick, setShowSizePick] = useState(false);
+
+  // 일괄 설정
+  const [bulkBadges, setBulkBadges] = useState<string[]>([]);
+  const [bulkCategory, setBulkCategory] = useState("");
+  const [bulkShipping, setBulkShipping] = useState<"normal" | "vendor">("normal");
+  const [bulkPlace, setBulkPlace] = useState<"shop" | "hidden">("shop");
+  const [bulkNamePrefix, setBulkNamePrefix] = useState("");
+  const [bulkPriceAdd, setBulkPriceAdd] = useState(0);
+  const [progress, setProgress] = useState({ done: 0, total: 0, ok: 0, fail: 0 });
+
+  const sheet = sheets[sheetIdx] || null;
+
+  const colOptions = useMemo(() => {
+    if (!sheet) return [] as { i: number; label: string }[];
+    const width = sheet.rows.reduce((m, r) => Math.max(m, (r || []).length), 0);
+    const hs = cfg.headerRow > 0 ? (sheet.rows[cfg.headerRow - 1] || []) : [];
+    const out: { i: number; label: string }[] = [];
+    for (let i = 0; i < width; i += 1) {
+      const h = norm(hs[i]);
+      out.push({ i, label: `${colLetter(i)}열${h ? ` (${h})` : ""}` });
+    }
+    return out;
+  }, [sheet, cfg.headerRow]);
+
+  // ── 파일 읽기 (브라우저에서 파싱 — 서버 부하 0) ──
+  const onFile = async (f: File) => {
+    setBusy("파일 읽는 중…");
+    try {
+      const ExcelJS = (await import("exceljs")).default;
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(await f.arrayBuffer());
+      const out: ParsedSheet[] = [];
+      for (const ws of wb.worksheets) {
+        const rows: SheetCell[][] = [];
+        ws.eachRow({ includeEmpty: true }, (row, rIdx) => {
+          const arr: SheetCell[] = [];
+          row.eachCell({ includeEmpty: true }, (cell, cIdx) => {
+            const v = cell.value as unknown;
+            let cellOut: SheetCell = null;
+            if (v == null) cellOut = null;
+            else if (typeof v === "object") {
+              const o = v as Record<string, unknown>;
+              if ("result" in o) cellOut = (o.result as SheetCell) ?? null;
+              else if ("richText" in o) cellOut = (o.richText as { text: string }[]).map((t) => t.text).join("");
+              else if ("text" in o) cellOut = String(o.text ?? "");
+              else cellOut = null;
+            } else cellOut = v as SheetCell;
+            arr[cIdx - 1] = cellOut;
+          });
+          rows[rIdx - 1] = arr;
+        });
+        const images: SheetImage[] = [];
+        for (const im of ws.getImages() as unknown as Record<string, never>[]) {
+          const anyIm = im as unknown as { imageId: string; range?: { tl?: { nativeRow?: number; nativeCol?: number } } };
+          const media = ((wb as unknown as { model?: { media?: { index: unknown; buffer?: Uint8Array; extension?: string }[] } }).model?.media || [])
+            .find((m) => String(m.index) === String(anyIm.imageId));
+          if (!media?.buffer) continue;
+          const ext = media.extension || "jpeg";
+          const blob = new Blob([media.buffer as BlobPart], { type: `image/${ext === "jpg" ? "jpeg" : ext}` });
+          images.push({
+            row: Math.round(anyIm.range?.tl?.nativeRow ?? 0) + 1,
+            col: Math.round(anyIm.range?.tl?.nativeCol ?? 0) + 1,
+            ext, blob, url: URL.createObjectURL(blob),
+          });
+        }
+        out.push({ name: ws.name, rows, images });
+      }
+      if (out.length === 0) throw new Error("시트를 찾지 못했어요");
+      setSheets(out);
+      setSheetIdx(0);
+      const guessed = autoGuessConfig(out[0].rows);
+      setCfg(guessed);
+      setDrafts(makeDrafts(out[0], guessed));
+      setStep("map");
+    } catch (e) {
+      showAdminToast("엑셀을 읽지 못했어요\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  // ── 미리보기 만들기 (코어 결과 + 사진 매칭) ──
+  const makeDrafts = (s: ParsedSheet, c: BulkConfig): DraftProduct[] => {
+    const cores = buildDraftCores(s.rows, c);
+    const span = c.layout === "block" ? c.blockSize : 1;
+    return cores.map((d) => {
+      const im =
+        s.images.find((x) => x.row === d.row) ||
+        s.images.find((x) => x.row >= d.row && x.row < d.row + span) ||
+        null;
+      const warns = im ? d.warns : [...d.warns, "사진 없음"];
+      return { ...d, warns, key: `${s.name}-${d.row}`, use: true, imageUrl: im?.url || "", imageBlob: im?.blob || null };
+    });
+  };
+
+  const applyCfg = (patch: Partial<BulkConfig>) => {
+    const next = { ...cfg, ...patch };
+    setCfg(next);
+    if (sheet) setDrafts(makeDrafts(sheet, next));
+  };
+
+  const reRead = () => { if (sheet) setDrafts(makeDrafts(sheet, cfg)); };
+  const autoAgain = () => {
+    if (!sheet) return;
+    const guessed = autoGuessConfig(sheet.rows);
+    setCfg(guessed);
+    setDrafts(makeDrafts(sheet, guessed));
+  };
+
+  const useCount = drafts.filter((d) => d.use).length;
+
+  // ── 실제 등록 ──
+  const commit = async () => {
+    const targets = drafts.filter((d) => d.use);
+    if (targets.length === 0) { showAdminToast("등록할 상품이 없어요"); return; }
+    setBusy("등록 중…");
+    setProgress({ done: 0, total: targets.length, ok: 0, fail: 0 });
+    let ok = 0, fail = 0;
+    for (let i = 0; i < targets.length; i += 1) {
+      const d = targets[i];
+      try {
+        // 1) 사진 업로드 (기존 API 재사용)
+        let imageUrl = "";
+        if (d.imageBlob) {
+          try {
+            const fd = new FormData();
+            fd.append("file", new File([d.imageBlob], `${d.code || d.name}.jpg`, { type: d.imageBlob.type || "image/jpeg" }));
+            fd.append("kind", "cover");
+            const res = await fetch("/api/admin-live/product-images/upload", { method: "POST", body: fd });
+            const j = await res.json().catch(() => null);
+            imageUrl = String(j?.url || j?.path || "");
+          } catch { /* 사진 실패해도 상품은 등록 */ }
+        }
+        // 2) 옵션·재고
+        const colors = d.colors.filter(Boolean);
+        const sizes = d.sizes.filter(Boolean);
+        const variants: { color: string; size: string; stock: number }[] = [];
+        if (colors.length > 0 && sizes.length > 0) {
+          for (const c1 of colors) for (const s1 of sizes) variants.push({ color: c1, size: s1, stock: d.stocks[`${c1}|${s1}`] || 0 });
+        } else if (sizes.length > 0) {
+          for (const s1 of sizes) variants.push({ color: "", size: s1, stock: d.stocks[`|${s1}`] || 0 });
+        } else if (colors.length > 0) {
+          for (const c1 of colors) variants.push({ color: c1, size: "", stock: d.stocks[`${c1}|`] || 0 });
+        }
+        const total = variants.length > 0 ? variants.reduce((a, b) => a + b.stock, 0) : totalStock(d);
+        const note: Record<string, unknown> = {
+          stock_management_enabled: true,
+          stock_variants: variants,
+          ...(bulkCategory.trim() ? { category: bulkCategory.trim() } : {}),
+          ...(d.code ? { vendor_code: d.code } : {}),
+          import_batch: new Date().toISOString().slice(0, 10),
+        };
+        const finalName = `${bulkNamePrefix.trim() ? bulkNamePrefix.trim() + " " : ""}${d.name}`.trim();
+        const payload: Record<string, unknown> = {
+          product_name: finalName,
+          price: Math.max(0, d.price + bulkPriceAdd),
+          stock: total,
+          status: bulkPlace === "shop" ? "판매중" : "숨김",
+          // 방송과 무관한 대량등록 → 상시판매(group_buy). 쇼핑몰 진열은 in_shop으로.
+          product_type: "group_buy",
+          badge_types: bulkBadges,
+          badge_type: bulkBadges[0] ?? null,
+          shipping_type: bulkShipping,
+          combine_shipping: bulkShipping === "vendor" ? "N" : "Y",
+          sort_order: 0,
+          is_pinned: false,
+          image_url: imageUrl || null,
+          color_options: colors,
+          size_options: sizes,
+          color_option_enabled: colors.length > 0,
+          size_option_enabled: sizes.length > 0,
+          detail_image_urls: [],
+          is_visible: bulkPlace === "shop",
+          is_soldout: false,
+          in_shop: bulkPlace === "shop",
+          ...(bulkPlace === "shop" ? { mall_sort_order: 999999 } : {}),
+          product_note: JSON.stringify(note),
+        };
+        await insertProductSchemaSafe(payload);
+        ok += 1;
+      } catch (e) {
+        fail += 1;
+        console.error("[엑셀등록 실패]", d.name, e);
+      }
+      setProgress({ done: i + 1, total: targets.length, ok, fail });
+    }
+    setBusy("");
+    setStep("done");
+    showAdminToast(`엑셀 등록 완료\n\n성공 ${ok}개 · 실패 ${fail}개`, fail > 0 ? "error" : "success");
+    onDone?.();
+  };
+
+  const body = (
+    <div style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{ width: "1000px", maxWidth: "100%", height: "700px", maxHeight: "calc(100vh - 32px)", background: "#fff", borderRadius: "14px", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "13px 18px", borderBottom: "1px solid #EDE4E8" }}>
+          <span style={{ fontSize: "16px", fontWeight: 900, color: "#7B2D43" }}>📄 엑셀 대량등록</span>
+          <span style={{ fontSize: "11.5px", fontWeight: 700, color: "#A08A92" }}>[등록] 누르기 전엔 저장되지 않습니다</span>
+          <button type="button" onClick={onClose} style={{ marginLeft: "auto", border: "none", background: "none", fontSize: "20px", color: "#999", cursor: "pointer" }}>✕</button>
+        </div>
+
+        {step === "pick" ? (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "14px" }}>
+            <div style={{ fontSize: "40px" }}>📄</div>
+            <div style={{ fontSize: "15px", fontWeight: 800, color: "#3A2F34" }}>재고 엑셀 파일을 올려주세요</div>
+            <div style={{ fontSize: "12.5px", fontWeight: 600, color: "#A08A92", textAlign: "center", lineHeight: 1.7 }}>
+              형식이 달라도 됩니다 — 올리면 먼저 읽어서 보여드리고,<br />틀린 부분만 골라서 바꾸시면 됩니다. (.xlsx)
+            </div>
+            <input ref={fileRef} type="file" accept=".xlsx,.xlsm" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void onFile(f); e.target.value = ""; }} />
+            <button type="button" onClick={() => fileRef.current?.click()} disabled={Boolean(busy)} style={{ height: "48px", padding: "0 26px", border: "none", borderRadius: "12px", background: "#7B2D43", color: "#fff", fontSize: "15px", fontWeight: 900, cursor: "pointer" }}>
+              {busy || "파일 선택"}
+            </button>
+          </div>
+        ) : null}
+
+        {step === "map" && sheet ? (
+          <>
+            {/* 매핑 바 — 자동인식이 틀렸으면 여기서 바꾼다 */}
+            <div style={{ padding: "10px 18px", borderBottom: "1px solid #EDE4E8", background: "#FBF8F9", display: "flex", flexWrap: "wrap", gap: "7px", alignItems: "center", fontSize: "12px", fontWeight: 700, color: "#5C4B52" }}>
+              <select value={sheetIdx} onChange={(e) => {
+                const i = Number(e.target.value); setSheetIdx(i);
+                const g = autoGuessConfig(sheets[i].rows); setCfg(g); setDrafts(makeDrafts(sheets[i], g));
+              }} style={selStyle}>
+                {sheets.map((s, i) => <option key={s.name} value={i}>{s.name} ({s.rows.length}행)</option>)}
+              </select>
+              <span>제목줄</span>
+              <select value={cfg.headerRow} onChange={(e) => applyCfg({ headerRow: Number(e.target.value) })} style={{ ...selStyle, width: "78px" }}>
+                <option value={0}>없음</option>
+                {Array.from({ length: Math.min(12, sheet.rows.length) }, (_, i) => <option key={i} value={i + 1}>{i + 1}행</option>)}
+              </select>
+              <span>구조</span>
+              <select value={cfg.layout} onChange={(e) => applyCfg({ layout: e.target.value as BulkConfig["layout"] })} style={selStyle}>
+                <option value="row">한 줄 = 한 상품</option>
+                <option value="block">여러 줄 = 한 상품</option>
+                <option value="variant">한 줄 = 한 옵션</option>
+              </select>
+              {cfg.layout === "block" ? (
+                <input type="number" min={2} max={12} value={cfg.blockSize} onChange={(e) => applyCfg({ blockSize: Math.max(2, Number(e.target.value) || 5) })} style={{ ...selStyle, width: "54px" }} />
+              ) : null}
+              <span>상품명</span>
+              <ColSelect value={cfg.colName} options={colOptions} onChange={(v) => applyCfg({ colName: v })} />
+              <span>가격</span>
+              <ColSelect value={cfg.colPrice} options={colOptions} onChange={(v) => applyCfg({ colPrice: v })} allowNone />
+              <span>색상</span>
+              <ColSelect value={cfg.colColor} options={colOptions} onChange={(v) => applyCfg({ colColor: v })} allowNone />
+              {cfg.layout === "variant" ? (
+                <>
+                  <span>사이즈</span>
+                  <ColSelect value={cfg.colSize} options={colOptions} onChange={(v) => applyCfg({ colSize: v })} allowNone />
+                </>
+              ) : null}
+              <span>수량</span>
+              <ColSelect value={cfg.colQty} options={colOptions} onChange={(v) => applyCfg({ colQty: v })} allowNone />
+              <button type="button" onClick={() => setShowSizePick((v) => !v)} style={{ ...selStyle, cursor: "pointer", fontWeight: 800, color: cfg.sizeCols.length ? "#7B2D43" : "#A08A92" }}>
+                사이즈 칸 {cfg.sizeCols.length}개 {showSizePick ? "▲" : "▼"}
+              </button>
+              <button type="button" onClick={autoAgain} style={{ ...selStyle, cursor: "pointer", background: "#fff", fontWeight: 800, color: "#7B2D43" }}>자동인식 다시</button>
+              <button type="button" onClick={reRead} style={{ ...selStyle, cursor: "pointer", background: "#fff", fontWeight: 800, color: "#7B2D43" }}>다시 읽기</button>
+            </div>
+
+            {showSizePick ? (
+              <div style={{ padding: "8px 18px", borderBottom: "1px solid #EDE4E8", background: "#FFFBFC", display: "flex", flexWrap: "wrap", gap: "5px", alignItems: "center" }}>
+                <span style={{ fontSize: "11.5px", fontWeight: 800, color: "#7B2D43", marginRight: "4px" }}>사이즈별 수량이 들어있는 칸을 골라주세요</span>
+                {colOptions.map((o) => {
+                  const on = cfg.sizeCols.includes(o.i);
+                  return (
+                    <button key={o.i} type="button"
+                      onClick={() => applyCfg({ sizeCols: on ? cfg.sizeCols.filter((x) => x !== o.i) : [...cfg.sizeCols, o.i].sort((a, b) => a - b) })}
+                      style={{ padding: "4px 9px", borderRadius: "999px", border: `1.5px solid ${on ? "#7B2D43" : "#E8D5DD"}`, background: on ? "#7B2D43" : "#fff", color: on ? "#fff" : "#7B2D43", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>
+                      {o.label}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            {/* 일괄 설정 */}
+            <div style={{ padding: "9px 18px", borderBottom: "1px solid #EDE4E8", display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center", fontSize: "12px", fontWeight: 700, color: "#5C4B52" }}>
+              <span style={{ color: "#7B2D43", fontWeight: 900 }}>전체 적용</span>
+              {([["new", "✨NEW"], ["hot", "🔥HOT"], ["limit", "⏰한정"], ["pick", "⭐MD픽"], ["direct", "🛒바로구매"], ["overseas", "✈️해외배송"]] as const).map(([v, l]) => {
+                const on = bulkBadges.includes(v);
+                return (
+                  <button key={v} type="button" onClick={() => setBulkBadges((p) => on ? p.filter((x) => x !== v) : [...p, v])}
+                    style={{ padding: "5px 10px", borderRadius: "999px", border: `1.5px solid ${on ? "#7B2D43" : "#E8D5DD"}`, background: on ? "#7B2D43" : "#fff", color: on ? "#fff" : "#7B2D43", fontSize: "11.5px", fontWeight: 800, cursor: "pointer" }}>{l}</button>
+                );
+              })}
+              <select value={bulkShipping} onChange={(e) => setBulkShipping(e.target.value as "normal" | "vendor")} style={selStyle}>
+                <option value="normal">일반배송</option>
+                <option value="vendor">업체발송</option>
+              </select>
+              <select value={bulkPlace} onChange={(e) => setBulkPlace(e.target.value as "shop" | "hidden")} style={selStyle}>
+                <option value="shop">쇼핑몰 진열</option>
+                <option value="hidden">숨김(나중에 진열)</option>
+              </select>
+              <input value={bulkCategory} onChange={(e) => setBulkCategory(e.target.value)} placeholder="카테고리(선택)" style={{ ...selStyle, width: "110px" }} />
+              <input value={bulkNamePrefix} onChange={(e) => setBulkNamePrefix(e.target.value)} placeholder="이름 앞에 붙일 말(선택)" style={{ ...selStyle, width: "150px" }} />
+              <span>가격 조정</span>
+              <input type="number" value={bulkPriceAdd} onChange={(e) => setBulkPriceAdd(Number(e.target.value) || 0)} style={{ ...selStyle, width: "88px" }} />
+              <span style={{ color: "#A08A92" }}>원</span>
+            </div>
+
+            {/* 미리보기 */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "10px 18px" }}>
+              <div style={{ fontSize: "12px", fontWeight: 800, color: "#5C4B52", marginBottom: "8px" }}>
+                미리보기 {drafts.length}개 · 등록 대상 <b style={{ color: "#7B2D43" }}>{useCount}</b>개
+                {drafts.some((d) => d.warns.length > 0) ? <span style={{ marginLeft: "8px", color: "#C0392B" }}>⚠ 확인 필요 {drafts.filter((d) => d.warns.length > 0).length}개</span> : null}
+              </div>
+              {drafts.length === 0 ? (
+                <div style={{ padding: "40px 0", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "#A08A92", lineHeight: 1.8 }}>
+                  읽어낸 상품이 없어요.<br />위에서 <b style={{ color: "#7B2D43" }}>제목줄 · 구조 · 상품명 칸</b>을 바꿔보세요.
+                </div>
+              ) : null}
+              {drafts.map((d, i) => (
+                <div key={d.key} style={{ display: "flex", gap: "10px", alignItems: "flex-start", padding: "8px", borderRadius: "10px", border: `1px solid ${d.warns.length ? "#F0C9C2" : "#EDE4E8"}`, background: d.warns.length ? "#FFF8F6" : "#fff", marginBottom: "6px", opacity: d.use ? 1 : 0.45 }}>
+                  <input type="checkbox" checked={d.use} onChange={(e) => setDrafts((p) => p.map((x, k) => k === i ? { ...x, use: e.target.checked } : x))} style={{ marginTop: "4px", width: "16px", height: "16px" }} />
+                  <div style={{ width: "54px", height: "54px", borderRadius: "8px", background: "#F0EBE8", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", color: "#B0A5A0" }}>
+                    {d.imageUrl ? <img src={d.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "사진없음"}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                      <input value={d.name} onChange={(e) => setDrafts((p) => p.map((x, k) => k === i ? { ...x, name: e.target.value } : x))}
+                        style={{ flex: 1, minWidth: 0, height: "30px", borderRadius: "7px", border: "1px solid #E8D5DD", padding: "0 8px", fontSize: "12.5px", fontWeight: 800, color: "#3A2F34" }} />
+                      <input type="number" value={d.price} onChange={(e) => setDrafts((p) => p.map((x, k) => k === i ? { ...x, price: Number(e.target.value) || 0 } : x))}
+                        style={{ width: "96px", height: "30px", borderRadius: "7px", border: "1px solid #E8D5DD", padding: "0 8px", fontSize: "12.5px", fontWeight: 800, textAlign: "right", color: "#7B2D43" }} />
+                      <span style={{ fontSize: "11px", color: "#A08A92" }}>원</span>
+                    </div>
+                    <div style={{ marginTop: "4px", fontSize: "11.5px", fontWeight: 700, color: "#68575E" }}>
+                      {d.colors.length > 0 ? `색상 ${d.colors.join("·")} · ` : ""}사이즈 {d.sizes.join("·") || "없음"} · 총 {totalStock(d)}개
+                      {d.code ? <span style={{ color: "#B0A5A0" }}> · {d.code}</span> : null}
+                    </div>
+                    {d.warns.length ? <div style={{ marginTop: "3px", fontSize: "11px", fontWeight: 800, color: "#C0392B" }}>⚠ {d.warns.join(" · ")}</div> : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ padding: "12px 18px", borderTop: "1px solid #EDE4E8", display: "flex", gap: "10px", alignItems: "center" }}>
+              <button type="button" onClick={() => setDrafts((p) => p.map((x) => ({ ...x, use: true })))} style={{ ...selStyle, cursor: "pointer" }}>전체 선택</button>
+              <button type="button" onClick={() => setDrafts((p) => p.map((x) => ({ ...x, use: x.warns.length === 0 })))} style={{ ...selStyle, cursor: "pointer" }}>문제없는 것만</button>
+              <span style={{ marginLeft: "auto", fontSize: "12px", fontWeight: 700, color: "#68575E" }}>
+                {busy ? `${progress.done}/${progress.total} 등록 중…` : ""}
+              </span>
+              <button type="button" onClick={() => void commit()} disabled={Boolean(busy) || useCount === 0}
+                style={{ height: "44px", padding: "0 22px", border: "none", borderRadius: "12px", background: useCount ? "#7B2D43" : "#CFC5C9", color: "#fff", fontSize: "14.5px", fontWeight: 900, cursor: useCount ? "pointer" : "default" }}>
+                {busy ? "등록 중…" : `${useCount}개 등록하기`}
+              </button>
+            </div>
+          </>
+        ) : null}
+
+        {step === "done" ? (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px" }}>
+            <div style={{ fontSize: "40px" }}>{progress.fail ? "⚠️" : "✅"}</div>
+            <div style={{ fontSize: "17px", fontWeight: 900, color: "#7B2D43" }}>등록 완료</div>
+            <div style={{ fontSize: "13.5px", fontWeight: 700, color: "#5C4B52" }}>성공 {progress.ok}개 · 실패 {progress.fail}개</div>
+            <button type="button" onClick={onClose} style={{ marginTop: "8px", height: "44px", padding: "0 26px", border: "none", borderRadius: "12px", background: "#7B2D43", color: "#fff", fontSize: "14.5px", fontWeight: 900, cursor: "pointer" }}>닫기</button>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(body, document.body);
+}
+
+// products 스키마에 없는 컬럼이 있으면 그 컬럼만 빼고 재시도 (QuickProductFastForm과 동일 패턴)
+function getMissingColumn(errorMessage: string) {
+  const patterns = [
+    /Could not find the '([^']+)' column/i,
+    /column "([^"]+)" does not exist/i,
+    /Could not find column '([^']+)'/i,
+  ];
+  for (const pattern of patterns) {
+    const match = errorMessage.match(pattern);
+    if (match?.[1]) return match[1];
+  }
+  return null;
+}
+
+async function insertProductSchemaSafe(payload: Record<string, unknown>) {
+  const requiredColumns = new Set(["product_name"]);
+  const workingPayload = { ...payload };
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const { data, error } = await adminCatalogWrite({ table: "products", op: "insert", values: workingPayload, select: "id", single: true });
+    if (!error) return data;
+    const missingColumn = getMissingColumn(error.message || "");
+    if (!missingColumn || !(missingColumn in workingPayload)) throw new Error(error.message);
+    if (requiredColumns.has(missingColumn)) {
+      throw new Error(`products.${missingColumn} 컬럼이 없어 저장할 수 없습니다.`);
+    }
+    delete workingPayload[missingColumn];
+  }
+  throw new Error("products 저장 재시도 횟수를 초과했습니다.");
+}
+
+function ColSelect({ value, options, onChange, allowNone }: { value: number; options: { i: number; label: string }[]; onChange: (v: number) => void; allowNone?: boolean }) {
+  return (
+    <select value={value} onChange={(e) => onChange(Number(e.target.value))} style={{ ...selStyle, maxWidth: "150px" }}>
+      {allowNone ? <option value={-1}>없음</option> : null}
+      {options.map((o) => <option key={o.i} value={o.i}>{o.label}</option>)}
+    </select>
+  );
+}
+
+function colLetter(i: number) {
+  let n = i, s = "";
+  do { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; } while (n >= 0);
+  return s;
+}
+
+const selStyle: React.CSSProperties = {
+  height: "30px", borderRadius: "7px", border: "1px solid #E8D5DD", background: "#fff",
+  padding: "0 8px", fontSize: "11.5px", fontWeight: 700, color: "#5C4B52",
+};
