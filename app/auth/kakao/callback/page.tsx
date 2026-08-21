@@ -12,7 +12,7 @@ const setIfValue = (key: string, value: unknown) => {
 };
 
 export default function KakaoCallbackPage() {
-  const [message, setMessage] = useState("카카오 정보를 확인하고 있습니다.");
+  const [message, setMessage] = useState("카카오톡에서 정보를 받아오고 있어요. 잠시만요!");
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
 
   useEffect(() => {
@@ -80,7 +80,7 @@ export default function KakaoCallbackPage() {
       }
 
       setStatus("success");
-      setMessage("확인 완료. 주문서로 이동합니다.");
+      setMessage("확인 완료! 주문서로 이동합니다.");
 
       // Phase1-2로 중복/타이밍 원인 제거됨 → 1800ms 대기 땜질을 원래값 800ms로 환원.
       setTimeout(() => {
@@ -93,17 +93,30 @@ export default function KakaoCallbackPage() {
 
   const statusIcon = status === "success" ? "✅" : status === "error" ? "⚠️" : "⏳";
   const statusTitle =
-    status === "success" ? "카카오 확인 완료" : status === "error" ? "카카오 확인 실패" : "카카오 확인중";
+    status === "success" ? "카카오톡 확인 완료" : status === "error" ? "카카오톡 확인 실패" : "카카오톡 확인중";
 
+  // [2026-08-21 사장님 지시] 파란 임시 테마 → 루루동이 브랜드 시안(KakaoStartPage 0597a61과 동일 계열:
+  //   버건디 #7B2D43 + 흰→연핑크 그라데이션 카드 + R×TALK 로고 칩)으로 표시만 변경.
+  //   문구도 "카카오" → "카카오톡"으로 통일. 로그인 로직·저장·이동 흐름은 무변경.
   return (
-    <main className="min-h-screen bg-[#f5f8ff] px-2 py-4 text-[#151923] sm:px-4">
+    <main className="min-h-screen bg-[#FBF8F9] px-2 py-4 text-[#151923] sm:px-4">
       <section className="mx-auto flex min-h-[calc(100svh-32px)] w-full max-w-[560px] items-center">
-        <section className="w-full -translate-y-[4vh] overflow-hidden rounded-[34px] border border-slate-200 bg-white p-5 text-center shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] bg-blue-50 text-[32px] ring-1 ring-blue-100">
+        <section
+          className="w-full -translate-y-[4vh] overflow-hidden rounded-[34px] p-5 text-center"
+          style={{ background: "linear-gradient(to bottom, #ffffff, #F5E6EB)", border: "1px solid #D9C5CC", boxShadow: "0 22px 55px rgba(123,45,67,0.13)" }}
+        >
+          {/* R × TALK 로고 칩 — 시작화면과 동일한 브랜드 표기 */}
+          <div className="mx-auto flex w-fit items-center justify-center gap-3 rounded-full px-4 py-2" style={{ background: "rgba(255,255,255,0.9)", border: "1px solid #D9C5CC" }}>
+            <div className="flex h-9 w-9 items-center justify-center rounded-[13px] text-[17px] font-black text-white" style={{ background: "#7B2D43" }}>R</div>
+            <div className="text-[20px] font-black text-[#bbb]">×</div>
+            <div className="flex h-9 w-9 items-center justify-center rounded-[13px] bg-[#fee500] text-[13px] font-black text-[#241b17]">TALK</div>
+          </div>
+
+          <div className="mx-auto mt-6 flex h-16 w-16 items-center justify-center rounded-[24px] text-[32px]" style={{ background: "#F9EDF1", border: "1px solid #E8D5DD" }}>
             {statusIcon}
           </div>
 
-          <p className="mt-5 text-[13px] font-black tracking-[-0.04em] text-blue-700">
+          <p className="mt-5 text-[13px] font-black tracking-[-0.04em]" style={{ color: "#7B2D43" }}>
             루루동이 LIVE
           </p>
 
@@ -116,15 +129,16 @@ export default function KakaoCallbackPage() {
           </p>
 
           {status === "loading" && (
-            <div className="mt-5 overflow-hidden rounded-full bg-slate-100">
-              <div className="h-2 w-2/3 animate-pulse rounded-full bg-blue-600" />
+            <div className="mt-5 overflow-hidden rounded-full" style={{ background: "#F0E4E9" }}>
+              <div className="h-2 w-2/3 animate-pulse rounded-full" style={{ background: "#7B2D43" }} />
             </div>
           )}
 
           {status === "error" && (
             <a
               href="/"
-              className="mt-5 flex min-h-[52px] w-full items-center justify-center rounded-[18px] bg-blue-700 px-4 py-3 text-[16px] font-black tracking-[-0.05em] text-white"
+              className="mt-5 flex min-h-[52px] w-full items-center justify-center rounded-[18px] px-4 py-3 text-[16px] font-black tracking-[-0.05em] text-white"
+              style={{ background: "#7B2D43" }}
             >
               처음 화면으로 돌아가기
             </a>
