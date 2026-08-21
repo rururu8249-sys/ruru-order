@@ -1230,6 +1230,10 @@ export default function OrderPage() {
   const [kakaoNickname, setKakaoNickname] = useState("");
   const [youtubeNicknameError, setYoutubeNicknameError] = useState("");
   const [isKakaoLoginReturn, setIsKakaoLoginReturn] = useState(false);
+  // [2026-08-21 사장님 지시] 카톡 복귀 직후 DB에서 닉네임을 복원하는 동안(비동기 수백ms)
+  //   "닉네임 없음"으로 잠깐 판정돼 닉네임 관문이 깜빡이던 문제 → 복원이 끝날 때까지
+  //   로딩 카드를 보여준다. 렌더 게이트만 추가 — 로그인·복원·저장 로직 무변경.
+  const [kakaoRestoreChecking, setKakaoRestoreChecking] = useState(false);
 
   // [사장님 지침 2026-07-06] 결제수단 기본값 = 미선택("") — 고객이 직접 골라야 제출 가능(validate에서 차단)
   const [paymentMethod, setPaymentMethod] = useState<"무통장입금" | "카드결제" | "">("");
@@ -1871,7 +1875,8 @@ export default function OrderPage() {
         window.history.replaceState(null, "", "/order");
       };
 
-      void handleKakaoReturn();
+      setKakaoRestoreChecking(true);
+      void handleKakaoReturn().finally(() => setKakaoRestoreChecking(false));
       return;
     }
 
@@ -5068,6 +5073,26 @@ export default function OrderPage() {
   //   교체되면서(시트 언마운트) 한글 조합이 끊기고 입력이 불가능해지던 버그 수정.
   //   시트를 닫을 때는 기존 스냅샷 복원/저장 검증이 그대로 동작한다(관문 조건 무변경).
   const mustEnterYoutubeNickname = hasSavedInfo && !youtubeNickname.trim();
+  // [2026-08-21] 카톡 복귀 복원 조회가 도는 동안은 관문 대신 로딩 카드 — 기존 손님 관문 깜빡임 제거.
+  //   복원 결과 닉네임이 정말 없으면(신규/미입력) 조회 종료 후 아래 관문이 그대로 뜬다(조건 무변경).
+  if (kakaoRestoreChecking && !customerInfoEditSheetOpen && !isEditingCustomerInfo) {
+    return (
+      <OrderPageShell>
+        <section
+          className="rounded-[32px] p-8 text-center"
+          style={{ background: "linear-gradient(to bottom, #ffffff, #F5E6EB)", border: "1px solid #D9C5CC", boxShadow: "0 22px 55px rgba(123,45,67,0.13)" }}
+        >
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] text-[32px]" style={{ background: "#F9EDF1", border: "1px solid #E8D5DD" }}>⏳</div>
+          <p className="mt-5 text-[13px] font-black tracking-[-0.04em]" style={{ color: "#7B2D43" }}>루루동이 LIVE</p>
+          <h1 className="mt-2 break-keep text-[26px] font-black leading-tight tracking-[-0.07em] text-slate-950">주문 정보 확인중</h1>
+          <p className="mt-3 break-keep text-[14.5px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">닉네임과 배송지를 불러오고 있어요. 잠시만요!</p>
+          <div className="mt-5 overflow-hidden rounded-full" style={{ background: "#F0E4E9" }}>
+            <div className="h-2 w-2/3 animate-pulse rounded-full" style={{ background: "#7B2D43" }} />
+          </div>
+        </section>
+      </OrderPageShell>
+    );
+  }
   if ((isKakaoLoginReturn || mustEnterYoutubeNickname) && !isAutoLoggedIn && !customerInfoEditSheetOpen && !isEditingCustomerInfo) {
     return (
       <OrderPageShell>
