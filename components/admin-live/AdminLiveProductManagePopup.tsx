@@ -276,6 +276,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [bcPickerSearch, setBcPickerSearch] = useState("");
   // 피커 방송 필터: 특정 지난 방송에 담았던 상품만 보기 (""=전체 창고, ids null=전체)
   const [bcPickerFromBcId, setBcPickerFromBcId] = useState("");
+  // [2026-08-21] 피커 등록일 필터 — "YYYY.MM.DD" (""=사용 안 함). 화면 표시만 거르고 저장 경로 무변경.
+  const [bcPickerDate, setBcPickerDate] = useState("");
   const [bcPickerFromIds, setBcPickerFromIds] = useState<Set<string> | null>(null);
   // 드래그 순서변경
   const [bcDragPid, setBcDragPid] = useState<string | null>(null);
@@ -640,8 +642,32 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     setBcPickerSearch("");
     setBcPickerFromBcId("");
     setBcPickerFromIds(null);
+    setBcPickerDate("");
     setBcPickerOpen(true);
   };
+
+  // [2026-08-21] 상품 등록일(created_at, 로컬 날짜) 문자열 — 피커 등록일 필터용
+  const productRegDate = (p: ProductRow): string => {
+    const t = new Date(String((p as Record<string, unknown>).created_at || ""));
+    if (Number.isNaN(t.getTime())) return "";
+    return `${t.getFullYear()}.${String(t.getMonth() + 1).padStart(2, "0")}.${String(t.getDate()).padStart(2, "0")}`;
+  };
+
+  // 등록일별 상품 수 (삭제 제외, 최신 날짜부터 30일치) — 칩/드롭다운에 개수 표시
+  const bcPickerDateGroups = useMemo(() => {
+    const cnt: Record<string, number> = {};
+    for (const p of products) {
+      if (pickString(p, ["status"], "") === "deleted") continue;
+      const d = productRegDate(p);
+      if (d) cnt[d] = (cnt[d] || 0) + 1;
+    }
+    return Object.entries(cnt).sort((a, b) => (a[0] < b[0] ? 1 : -1)).slice(0, 30);
+  }, [products]);
+
+  const todayStr = (() => { const t = new Date(); return `${t.getFullYear()}.${String(t.getMonth() + 1).padStart(2, "0")}.${String(t.getDate()).padStart(2, "0")}`; })();
+  const yesterdayStr = (() => { const t = new Date(Date.now() - 86400000); return `${t.getFullYear()}.${String(t.getMonth() + 1).padStart(2, "0")}.${String(t.getDate()).padStart(2, "0")}`; })();
+  const todayCount = bcPickerDateGroups.find(([d]) => d === todayStr)?.[1] || 0;
+  const yesterdayCount = bcPickerDateGroups.find(([d]) => d === yesterdayStr)?.[1] || 0;
 
   // 피커 방송 필터 변경: 그 방송의 broadcast_products product_id 로드 (읽기 전용)
   const changeBcPickerFrom = async (bid: string) => {
@@ -2134,14 +2160,44 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               <span style={{ fontSize: "15px", fontWeight: 800, color: "var(--color-rose-deep)" }}>방송에 상품 담기</span>
               <button type="button" onClick={() => setBcPickerOpen(false)} style={{ marginLeft: "auto", border: "none", background: "none", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>✕</button>
             </div>
-            {/* 불러올 범위(전체 창고/지난 방송) + 검색 */}
+            {/* 불러올 범위: 빠른 칩(전체/오늘·어제 등록) + 등록일·지난 방송 상세 선택 + 검색
+                [2026-08-21] 대량등록한 상품을 날짜로 모아 방송에 한 번에 담는 흐름.
+                필터는 화면 표시만 거른다 — 담기 저장 경로(broadcast_products insert)는 기존 그대로. */}
             <div style={{ padding: "12px 18px 8px", display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                {([
+                  ["all", "📦 전체", -1],
+                  ["today", `🗓 오늘 등록 ${todayCount}개`, todayCount],
+                  ["yesterday", `🗓 어제 등록 ${yesterdayCount}개`, yesterdayCount],
+                ] as const).map(([key, label, count]) => {
+                  const active = key === "all" ? (!bcPickerDate && !bcPickerFromBcId) : bcPickerDate === (key === "today" ? todayStr : yesterdayStr);
+                  const disabled = count === 0;
+                  return (
+                    <button key={key} type="button" disabled={disabled}
+                      onClick={() => {
+                        setBcPickerFromBcId(""); setBcPickerFromIds(null);
+                        setBcPickerDate(key === "all" ? "" : (key === "today" ? todayStr : yesterdayStr));
+                      }}
+                      style={{ height: "34px", padding: "0 12px", borderRadius: "999px", fontSize: "12px", fontWeight: 800, cursor: disabled ? "not-allowed" : "pointer", border: "1.5px solid " + (active ? "var(--color-rose-deep)" : "var(--color-rose-line)"), background: active ? "var(--color-rose-deep)" : "var(--color-surface)", color: active ? "#fff" : disabled ? "var(--color-ink-mute)" : "var(--color-rose-deep)", opacity: disabled ? 0.45 : 1 }}>
+                      {label}
+                    </button>
+                  );
+                })}
+                <select
+                  value={bcPickerDate && bcPickerDate !== todayStr && bcPickerDate !== yesterdayStr ? bcPickerDate : ""}
+                  onChange={(e) => { const v = e.target.value; if (!v) return; setBcPickerFromBcId(""); setBcPickerFromIds(null); setBcPickerDate(v); }}
+                  style={{ height: "34px", borderRadius: "999px", border: "1.5px solid " + (bcPickerDate && bcPickerDate !== todayStr && bcPickerDate !== yesterdayStr ? "var(--color-rose-deep)" : "var(--color-rose-line)"), padding: "0 10px", fontSize: "12px", fontWeight: 800, outline: "none", color: "var(--color-rose-deep)", background: "var(--color-surface)", maxWidth: "170px" }}
+                >
+                  <option value="">📅 다른 등록일…</option>
+                  {bcPickerDateGroups.map(([d, n]) => <option key={d} value={d}>🗓 {d} 등록 · {n}개</option>)}
+                </select>
+              </div>
               <select
                 value={bcPickerFromBcId}
-                onChange={(e) => void changeBcPickerFrom(e.target.value)}
+                onChange={(e) => { setBcPickerDate(""); void changeBcPickerFrom(e.target.value); }}
                 style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid var(--color-line)", padding: "0 10px", fontSize: "13px", fontWeight: 700, outline: "none", color: "var(--color-ink)", background: "var(--color-surface)" }}
               >
-                <option value="">📦 전체 창고에서 담기</option>
+                <option value="">📺 지난 방송에서 불러오기…</option>
                 {bcList.filter((b) => b.id !== bcSelId).map((b) => {
                   const d = new Date(b.started_at);
                   const dateLabel = Number.isNaN(d.getTime()) ? "" : ` (${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")})`;
@@ -2157,17 +2213,24 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 const pickList = products.filter((p) => {
                   if (pickString(p, ["status"], "") === "deleted") return false;
                   if (bcPickerFromBcId && bcPickerFromIds && !bcPickerFromIds.has(productId(p))) return false;
+                  if (bcPickerDate && productRegDate(p) !== bcPickerDate) return false;
                   // [2026-07-23] 조합형 세부상품명 검색 허용(평소 상품 무변경)
                   if (q && !productName(p).toLowerCase().includes(q) && !comboNamesMatch(p, bcPickerSearch)) return false;
                   return true;
                 });
                 if (pickList.length === 0) {
-                  return <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>{bcPickerFromBcId ? "그 방송에 담았던 상품이 없습니다." : "상품이 없습니다."}</div>;
+                  return <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>{bcPickerDate ? `${bcPickerDate}에 등록한 상품이 없습니다.` : bcPickerFromBcId ? "그 방송에 담았던 상품이 없습니다." : "상품이 없습니다."}</div>;
                 }
                 const selectableIds = pickList.map((p) => productId(p)).filter((pid) => pid && !bcAddedIds.has(pid));
+                const alreadyCount = pickList.length - selectableIds.length;
                 return (
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                    {bcPickerFromBcId && selectableIds.length > 0 ? (
+                    {bcPickerDate ? (
+                      <div style={{ fontSize: "11.5px", fontWeight: 800, color: "var(--color-ink-soft)" }}>
+                        🗓 {bcPickerDate} 등록 상품 {pickList.length}개{alreadyCount > 0 ? ` · 이미 담김 ${alreadyCount}개` : ""}
+                      </div>
+                    ) : null}
+                    {(bcPickerFromBcId || bcPickerDate) && selectableIds.length > 0 ? (
                       <button type="button" onClick={() => setBcPickerSel((prev) => new Set([...prev, ...selectableIds]))} style={{ alignSelf: "flex-start", fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "7px", padding: "5px 10px", cursor: "pointer" }}>☑ 표시된 {selectableIds.length}개 모두 선택 (담긴 것 제외)</button>
                     ) : null}
                     {pickList.map((p, i) => {
