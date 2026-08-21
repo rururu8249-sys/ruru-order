@@ -28,6 +28,15 @@ export type DraftCore = {
   sizes: string[];
   stocks: Record<string, number>;   // "색상|사이즈" → 수량 (색상/사이즈 없으면 빈 문자열)
   warns: string[];
+  // ── 정규양식에서만 채워지는 선택 필드 ──
+  //   details: 세부상품(하위상세) 축 — DB 저장 시 color 칸에 "세부 / 색상"으로 합쳐지는 기존 규칙 그대로 사용
+  details?: string[];
+  detailPlus?: Record<string, number>;   // 세부상품명 → 추가금(원)
+  badges?: string[];                     // 줄에 직접 쓴 배지 (없으면 화면의 전체 적용 값 사용)
+  category?: string;
+  shipping?: "normal" | "vendor";
+  place?: "shop" | "hidden";
+  isExample?: boolean;                   // (예시) 줄 — 등록 대상에서 자동 제외
 };
 
 export const norm = (v: unknown) => String(v ?? "").replace(/\s+/g, " ").trim();
@@ -403,4 +412,135 @@ export function auditDraftCores(rows: SheetCell[][], c: BulkConfig, drafts: Draf
     missed,
     unreadOtherCount,
   };
+}
+
+// ═══════════════════════════════════════════════════════════
+// 루루동이 정규양식 — 우리 양식이면 추측 없이 100% 그대로 읽는다
+//   양식: public/excel-templates/ruru_form_v1.xlsx (1행 서명, 헤더행에 고정 라벨)
+//   열 순서가 바뀌어도 라벨 이름으로 찾으므로 동작한다.
+// ═══════════════════════════════════════════════════════════
+
+export const OFFICIAL_SIGNATURE = "루루동이 정규양식";
+
+// 헤더행(1-base)을 돌려준다. 0 = 정규양식 아님, -1 = 서명은 있는데 헤더가 훼손됨
+export function detectOfficialForm(rows: SheetCell[][]): number {
+  for (let r = 0; r < Math.min(8, rows.length); r += 1) {
+    const hs = (rows[r] || []).map((c) => norm(c));
+    if (hs.includes("상품명") && hs.includes("수량") && hs.includes("판매가") && hs.includes("세부상품명")) {
+      return r + 1;
+    }
+  }
+  const signed = rows.slice(0, 6).some((r) => (r || []).some((c) => norm(c).includes(OFFICIAL_SIGNATURE)));
+  return signed ? -1 : 0;
+}
+
+// 배지 글자 → 저장값 (엑셀엔 사람 말로 쓰게 하고 여기서 변환)
+const OFFICIAL_BADGES: [string, string[]][] = [
+  ["new", ["new", "신상", "뉴", "✨"]],
+  ["hot", ["hot", "인기", "핫", "🔥"]],
+  ["limit", ["한정", "리밋", "⏰"]],
+  ["pick", ["md픽", "엠디픽", "md", "픽", "⭐"]],
+  ["direct", ["바로구매", "바로", "🛒"]],
+  ["overseas", ["해외배송", "해외", "✈"]],
+];
+
+function parseOfficialBadges(cellText: string, warns: string[]): string[] {
+  const out: string[] = [];
+  for (const raw of cellText.split(/[,·/]+/)) {
+    const token = norm(raw).toLowerCase();
+    if (!token) continue;
+    const hit = OFFICIAL_BADGES.find(([, keys]) => keys.some((k) => token.includes(k)));
+    if (hit) { if (!out.includes(hit[0])) out.push(hit[0]); }
+    else warns.push(`배지 「${norm(raw)}」는 없는 배지예요 (NEW/HOT/한정/MD픽/바로구매/해외배송)`);
+  }
+  return out;
+}
+
+export type OfficialParseResult = { drafts: DraftCore[]; issues: AuditIssue[] };
+
+export function parseOfficialForm(rows: SheetCell[][], headerRow: number): OfficialParseResult {
+  const hs = (rows[headerRow - 1] || []).map((c) => norm(c));
+  const col = (label: string) => hs.indexOf(label);
+  const cName = col("상품명"), cColor = col("색상"), cSize = col("사이즈"), cQty = col("수량"),
+    cPrice = col("판매가"), cDetail = col("세부상품명"), cPlus = col("세부추가금"),
+    cBadge = col("배지"), cCat = col("카테고리"), cShip = col("배송"), cPlace = col("진열"), cCode = col("모델번호");
+
+  const drafts: DraftCore[] = [];
+  const issues: AuditIssue[] = [];
+  let cur: DraftCore | null = null;
+
+  const cellRefLocal = (r1: number, c0: number) => {
+    let n = c0, str = "";
+    do { str = String.fromCharCode(65 + (n % 26)) + str; n = Math.floor(n / 26) - 1; } while (n >= 0);
+    return `${str}${r1}`;
+  };
+
+  for (let r0 = headerRow; r0 < rows.length; r0 += 1) {
+    const row = rows[r0] || [];
+    const get = (ci: number) => (ci >= 0 ? norm(row[ci]) : "");
+    const name = get(cName), color = get(cColor), size = get(cSize), detail = get(cDetail);
+    const qtyText = get(cQty);
+    const qty = qtyText ? Math.max(0, Math.floor(num(row[cQty]))) : 0;
+
+    // 완전히 빈 줄은 통과
+    if (!name && !color && !size && !detail && !qtyText) continue;
+
+    if (name) {
+      cur = {
+        row: r0 + 1, name,
+        price: cPrice >= 0 ? num(row[cPrice]) : 0,
+        code: get(cCode),
+        colors: [], sizes: [], stocks: {}, warns: [],
+        details: [], detailPlus: {},
+        isExample: /^\s*[\(（]\s*예\s*시\s*[\)）]/.test(name),
+      };
+      const badgeText = get(cBadge);
+      if (badgeText) cur.badges = parseOfficialBadges(badgeText, cur.warns);
+      const cat = get(cCat);
+      if (cat) cur.category = cat;
+      const ship = get(cShip);
+      if (ship) cur.shipping = ship.includes("업체") ? "vendor" : "normal";
+      const place = get(cPlace);
+      if (place) cur.place = place.includes("숨") ? "hidden" : "shop";
+      drafts.push(cur);
+    } else if (!cur) {
+      // 상품명 없이 시작된 고아 줄 — 숫자가 있으면 반드시 알린다 (조용히 버리지 않음)
+      if (qty > 0) issues.push({ where: cellRefLocal(r0 + 1, cQty), value: String(qty), note: "위에 상품명이 없는 줄의 수량 — 등록에서 빠졌어요" });
+      continue;
+    }
+
+    // 옵션 줄 공통 처리 (상품 첫 줄 포함)
+    if (detail) {
+      if (detail.includes("/")) cur.warns.push(`세부상품명 「${detail}」에 / 는 쓸 수 없어요`);
+      if (!cur.details!.includes(detail)) cur.details!.push(detail);
+      if (cPlus >= 0 && norm(row[cPlus])) cur.detailPlus![detail] = Math.max(0, Math.floor(num(row[cPlus])));
+      else if (!(detail in cur.detailPlus!)) cur.detailPlus![detail] = 0;
+    }
+    if (color) {
+      if (color.includes("/")) cur.warns.push(`색상 「${color}」에 / 는 쓸 수 없어요`);
+      if (!cur.colors.includes(color)) cur.colors.push(color);
+    }
+    if (size && !cur.sizes.includes(size)) cur.sizes.push(size);
+
+    // 재고 키: DB 규칙 그대로 — 세부+색상이면 "세부 / 색상", 아니면 세부 또는 색상
+    const colorSlot = detail && color ? `${detail} / ${color}` : (detail || color);
+    const key = `${colorSlot}|${size}`;
+    if (colorSlot || size || qtyText) {
+      cur.stocks[key] = (cur.stocks[key] || 0) + qty;
+    }
+    // 가격·모델번호를 첫 줄에 안 쓰고 아래 줄에 썼어도 받아준다
+    if (!cur.price && cPrice >= 0 && num(row[cPrice]) > 0) cur.price = num(row[cPrice]);
+    if (!cur.code && get(cCode)) cur.code = get(cCode);
+  }
+
+  // 경고
+  const seen: Record<string, number> = {};
+  for (const d of drafts) seen[d.name] = (seen[d.name] || 0) + 1;
+  for (const d of drafts) {
+    if (d.isExample) { d.warns.unshift("(예시) 줄 — 등록 대상에서 자동 제외"); continue; }
+    if (!d.price) d.warns.push("가격 없음");
+    if (totalStock(d) === 0) d.warns.push("재고 0 (품절로 등록됨)");
+    if (seen[d.name] > 1) d.warns.push("이름 중복");
+  }
+  return { drafts, issues };
 }

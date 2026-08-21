@@ -15,6 +15,7 @@ import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import { showAdminToast } from "@/lib/adminToast";
 import {
   autoGuessConfig, buildDraftCores, auditDraftCores, norm, totalStock,
+  detectOfficialForm, parseOfficialForm,
   type AuditReport, type BulkConfig, type DraftCore, type SheetCell,
 } from "@/lib/excelBulkParse";
 
@@ -43,6 +44,7 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
   const [cfg, setCfg] = useState<BulkConfig>(EMPTY_CFG);
   const [drafts, setDrafts] = useState<DraftProduct[]>([]);
   const [step, setStep] = useState<"pick" | "map" | "done">("pick");
+  const [official, setOfficial] = useState(false); // 루루동이 정규양식 인식됨 — 열 설정 생략
   const [showSizePick, setShowSizePick] = useState(false);
   const [audit, setAudit] = useState<AuditReport | null>(null);
 
@@ -115,15 +117,49 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
       if (out.length === 0) throw new Error("시트를 찾지 못했어요");
       setSheets(out);
       setSheetIdx(0);
-      const guessed = autoGuessConfig(out[0].rows);
-      setCfg(guessed);
-      setDrafts(makeDrafts(out[0], guessed));
+      loadSheet(out[0]);
       setStep("map");
     } catch (e) {
       showAdminToast("엑셀을 읽지 못했어요\n\n" + (e instanceof Error ? e.message : String(e)), "error");
     } finally {
       setBusy("");
     }
+  };
+
+  // ── 시트 열기: 정규양식이면 열 설정 없이 바로, 아니면 자동인식 ──
+  const loadSheet = (s: ParsedSheet) => {
+    const officialHeader = detectOfficialForm(s.rows);
+    if (officialHeader > 0) {
+      setOfficial(true);
+      setCfg(EMPTY_CFG);
+      setDrafts(makeOfficialDrafts(s, officialHeader));
+      return;
+    }
+    if (officialHeader === -1) {
+      showAdminToast("루루동이 정규양식인데 머리글 줄이 지워진 것 같아요.\n\n양식을 다시 내려받아 옮겨 적어주세요.", "error");
+    }
+    setOfficial(false);
+    const guessed = autoGuessConfig(s.rows);
+    setCfg(guessed);
+    setDrafts(makeDrafts(s, guessed));
+  };
+
+  // 정규양식: 추측 없이 그대로 읽고, 사진은 상품 줄 범위로 매칭
+  const makeOfficialDrafts = (s: ParsedSheet, headerRow: number): DraftProduct[] => {
+    const { drafts: cores, issues } = parseOfficialForm(s.rows, headerRow);
+    setAudit({
+      productCount: cores.filter((d) => !d.isExample).length,
+      numberedCount: 0,
+      stockSum: cores.filter((d) => !d.isExample).reduce((a, d) => a + totalStock(d), 0),
+      totalColFound: false, totalMatch: 0, totalMismatches: [],
+      missed: issues, unreadOtherCount: 0,
+    });
+    return cores.map((d, i) => {
+      const nextRow = cores[i + 1]?.row ?? s.rows.length + 1;
+      const im = s.images.find((x) => x.row >= d.row && x.row < nextRow) || null;
+      const warns = im || d.isExample ? d.warns : [...d.warns, "사진 없음"];
+      return { ...d, warns, key: `${s.name}-${d.row}`, use: !d.isExample, imageUrl: im?.url || "", imageBlob: im?.blob || null };
+    });
   };
 
   // ── 미리보기 만들기 (코어 결과 + 사진 매칭) ──
@@ -180,10 +216,24 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
           } catch { /* 사진 실패해도 상품은 등록 */ }
         }
         // 2) 옵션·재고
+        //    줄별 설정(정규양식에 직접 쓴 값)이 있으면 그게 우선, 없으면 화면의 전체 적용 값
         const colors = d.colors.filter(Boolean);
         const sizes = d.sizes.filter(Boolean);
+        const details = (d.details || []).filter(Boolean);
+        const rowBadges = d.badges && d.badges.length > 0 ? d.badges : bulkBadges;
+        const rowShipping = d.shipping ?? bulkShipping;
+        const rowPlace = d.place ?? bulkPlace;
+        const rowCategory = (d.category || bulkCategory).trim();
         const variants: { color: string; size: string; stock: number }[] = [];
-        if (colors.length > 0 && sizes.length > 0) {
+        if (details.length > 0 || official) {
+          // 정규양식·세부상품: 엑셀에 쓴 조합 그대로 (키가 이미 "세부 / 색상|사이즈" 규칙)
+          // 옵션이 아예 없는 상품(키 "|")은 조합을 만들지 않고 총재고로만 저장 (기존 등록폼과 동일)
+          for (const [key, stock] of Object.entries(d.stocks)) {
+            if (key === "|") continue;
+            const [c1, s1] = key.split("|");
+            variants.push({ color: c1 || "", size: s1 || "", stock });
+          }
+        } else if (colors.length > 0 && sizes.length > 0) {
           for (const c1 of colors) for (const s1 of sizes) variants.push({ color: c1, size: s1, stock: d.stocks[`${c1}|${s1}`] || 0 });
         } else if (sizes.length > 0) {
           for (const s1 of sizes) variants.push({ color: "", size: s1, stock: d.stocks[`|${s1}`] || 0 });
@@ -191,11 +241,32 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
           for (const c1 of colors) variants.push({ color: c1, size: "", stock: d.stocks[`${c1}|`] || 0 });
         }
         const total = variants.length > 0 ? variants.reduce((a, b) => a + b.stock, 0) : totalStock(d);
+        const detailActive = details.length > 0;
+        const needAxes = detailActive && (colors.length > 0 || sizes.length > 0);
         const note: Record<string, unknown> = {
           stock_management_enabled: true,
           stock_variants: variants,
-          ...(bulkCategory.trim() ? { category: bulkCategory.trim() } : {}),
+          ...(rowCategory ? { category: rowCategory } : {}),
           ...(d.code ? { vendor_code: d.code } : {}),
+          // 세부상품(하위상세) — QuickProductFastForm과 동일한 note 키 구성 (조합형 규칙 재사용)
+          ...(detailActive
+            ? {
+                combo_mode: true,
+                option_label: "세부상품",
+                option_pricing: Object.fromEntries(details.map((n) => [n, Math.max(0, Math.floor(d.detailPlus?.[n] ?? 0))])),
+                combo_hidden: [],
+              }
+            : {}),
+          ...(needAxes
+            ? {
+                option_axes: [
+                  { key: "detail", label: "세부상품", values: details },
+                  ...(colors.length > 0 ? [{ key: "color", label: "색상", values: colors }] : []),
+                  ...(sizes.length > 0 ? [{ key: "size", label: "사이즈", values: sizes }] : []),
+                ],
+                combo_detail_values: details,
+              }
+            : {}),
           import_batch: new Date().toISOString().slice(0, 10),
         };
         const finalName = `${bulkNamePrefix.trim() ? bulkNamePrefix.trim() + " " : ""}${d.name}`.trim();
@@ -203,25 +274,26 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
           product_name: finalName,
           price: Math.max(0, d.price + bulkPriceAdd),
           stock: total,
-          status: bulkPlace === "shop" ? "판매중" : "숨김",
+          status: rowPlace === "shop" ? "판매중" : "숨김",
           // 방송과 무관한 대량등록 → 상시판매(group_buy). 쇼핑몰 진열은 in_shop으로.
           product_type: "group_buy",
-          badge_types: bulkBadges,
-          badge_type: bulkBadges[0] ?? null,
-          shipping_type: bulkShipping,
-          combine_shipping: bulkShipping === "vendor" ? "N" : "Y",
+          badge_types: rowBadges,
+          badge_type: rowBadges[0] ?? null,
+          shipping_type: rowShipping,
+          combine_shipping: rowShipping === "vendor" ? "N" : "Y",
           sort_order: 0,
           is_pinned: false,
           image_url: imageUrl || null,
-          color_options: colors,
+          // 세부상품만 쓰면 기존 조합형과 동일: color_options에 세부상품명 (QuickProductFastForm 1229행 규칙)
+          color_options: detailActive && colors.length === 0 ? details : colors,
           size_options: sizes,
-          color_option_enabled: colors.length > 0,
+          color_option_enabled: detailActive ? true : colors.length > 0,
           size_option_enabled: sizes.length > 0,
           detail_image_urls: [],
-          is_visible: bulkPlace === "shop",
+          is_visible: rowPlace === "shop",
           is_soldout: false,
-          in_shop: bulkPlace === "shop",
-          ...(bulkPlace === "shop" ? { mall_sort_order: 999999 } : {}),
+          in_shop: rowPlace === "shop",
+          ...(rowPlace === "shop" ? { mall_sort_order: 999999 } : {}),
           product_note: JSON.stringify(note),
         };
         await insertProductSchemaSafe(payload);
@@ -248,26 +320,57 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
         </div>
 
         {step === "pick" ? (
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "14px" }}>
-            <div style={{ fontSize: "40px" }}>📄</div>
-            <div style={{ fontSize: "15px", fontWeight: 800, color: "#3A2F34" }}>재고 엑셀 파일을 올려주세요</div>
-            <div style={{ fontSize: "12.5px", fontWeight: 600, color: "#A08A92", textAlign: "center", lineHeight: 1.7 }}>
-              형식이 달라도 됩니다 — 올리면 먼저 읽어서 보여드리고,<br />틀린 부분만 골라서 바꾸시면 됩니다. (.xlsx)
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "16px", padding: "0 32px" }}>
+            <div style={{ display: "flex", gap: "12px", width: "100%", maxWidth: "760px" }}>
+              <div style={{ flex: 1, textAlign: "center", padding: "16px 12px", borderRadius: "14px", background: "#FBF3F6" }}>
+                <div style={{ fontSize: "24px" }}>📥</div>
+                <div style={{ fontSize: "13px", fontWeight: 900, color: "#3A2F34", margin: "7px 0 3px" }}>① 정규양식 받기 <span style={{ fontWeight: 700, color: "#A08A92" }}>(선택)</span></div>
+                <div style={{ fontSize: "11.5px", fontWeight: 600, color: "#8A7680", lineHeight: 1.6 }}>우리 양식에 채우면<br />100% 그대로 인식돼요</div>
+                <a href="/excel-templates/ruru_form_v1.xlsx" download="루루동이_정규양식_v1.xlsx"
+                  style={{ display: "inline-flex", alignItems: "center", height: "34px", padding: "0 14px", marginTop: "9px", borderRadius: "10px", border: "1.5px solid #E0C9D2", background: "#fff", color: "#7B2D43", fontSize: "12px", fontWeight: 900, textDecoration: "none" }}>
+                  📥 양식 내려받기
+                </a>
+              </div>
+              <div style={{ flex: 1, textAlign: "center", padding: "16px 12px", borderRadius: "14px", background: "#FBF3F6" }}>
+                <div style={{ fontSize: "24px" }}>📤</div>
+                <div style={{ fontSize: "13px", fontWeight: 900, color: "#3A2F34", margin: "7px 0 3px" }}>② 파일 올리기</div>
+                <div style={{ fontSize: "11.5px", fontWeight: 600, color: "#8A7680", lineHeight: 1.6 }}>거래처 엑셀도 그대로 OK<br />형식이 달라도 읽어드려요</div>
+                <button type="button" onClick={() => fileRef.current?.click()} disabled={Boolean(busy)}
+                  style={{ height: "34px", padding: "0 16px", marginTop: "9px", border: "none", borderRadius: "10px", background: "#7B2D43", color: "#fff", fontSize: "12px", fontWeight: 900, cursor: "pointer" }}>
+                  {busy || "파일 선택"}
+                </button>
+              </div>
+              <div style={{ flex: 1, textAlign: "center", padding: "16px 12px", borderRadius: "14px", background: "#FBF3F6" }}>
+                <div style={{ fontSize: "24px" }}>✅</div>
+                <div style={{ fontSize: "13px", fontWeight: 900, color: "#3A2F34", margin: "7px 0 3px" }}>③ 눈으로 확인 → 등록</div>
+                <div style={{ fontSize: "11.5px", fontWeight: 600, color: "#8A7680", lineHeight: 1.6 }}>읽은 결과를 보여드리고<br />[등록] 눌러야만 저장돼요</div>
+              </div>
+            </div>
+            <div style={{ fontSize: "12px", fontWeight: 600, color: "#A08A92", textAlign: "center", lineHeight: 1.7 }}>
+              .xlsx · 엑셀 안에 있는 사진(끌어다 놓은 그림)도 대표사진으로 자동 등록됩니다
             </div>
             <input ref={fileRef} type="file" accept=".xlsx,.xlsm" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void onFile(f); e.target.value = ""; }} />
-            <button type="button" onClick={() => fileRef.current?.click()} disabled={Boolean(busy)} style={{ height: "48px", padding: "0 26px", border: "none", borderRadius: "12px", background: "#7B2D43", color: "#fff", fontSize: "15px", fontWeight: 900, cursor: "pointer" }}>
-              {busy || "파일 선택"}
-            </button>
           </div>
         ) : null}
 
         {step === "map" && sheet ? (
           <>
-            {/* 매핑 바 — 자동인식이 틀렸으면 여기서 바꾼다 */}
+            {official ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 18px", borderBottom: "1px solid #EDE4E8", background: "#EAF7EE", fontSize: "12.5px", fontWeight: 800, color: "#1E7A3C" }}>
+                ✅ 루루동이 정규양식 인식 — 열 설정 없이 엑셀에 쓴 그대로 읽었어요
+                {sheets.length > 1 ? (
+                  <select value={sheetIdx} onChange={(e) => { const i = Number(e.target.value); setSheetIdx(i); loadSheet(sheets[i]); }} style={{ ...selStyle, marginLeft: "auto" }}>
+                    {sheets.map((sh, i) => <option key={sh.name} value={i}>{sh.name}</option>)}
+                  </select>
+                ) : null}
+              </div>
+            ) : null}
+            {/* 매핑 바 — 자동인식이 틀렸으면 여기서 바꾼다 (정규양식이면 숨김) */}
+            {!official ? (
             <div style={{ padding: "10px 18px", borderBottom: "1px solid #EDE4E8", background: "#FBF8F9", display: "flex", flexWrap: "wrap", gap: "7px", alignItems: "center", fontSize: "12px", fontWeight: 700, color: "#5C4B52" }}>
               <select value={sheetIdx} onChange={(e) => {
                 const i = Number(e.target.value); setSheetIdx(i);
-                const g = autoGuessConfig(sheets[i].rows); setCfg(g); setDrafts(makeDrafts(sheets[i], g));
+                loadSheet(sheets[i]);
               }} style={selStyle}>
                 {sheets.map((s, i) => <option key={s.name} value={i}>{s.name} ({s.rows.length}행)</option>)}
               </select>
@@ -305,8 +408,9 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
               <button type="button" onClick={autoAgain} style={{ ...selStyle, cursor: "pointer", background: "#fff", fontWeight: 800, color: "#7B2D43" }}>자동인식 다시</button>
               <button type="button" onClick={reRead} style={{ ...selStyle, cursor: "pointer", background: "#fff", fontWeight: 800, color: "#7B2D43" }}>다시 읽기</button>
             </div>
+            ) : null}
 
-            {showSizePick ? (
+            {!official && showSizePick ? (
               <div style={{ padding: "8px 18px", borderBottom: "1px solid #EDE4E8", background: "#FFFBFC", display: "flex", flexWrap: "wrap", gap: "5px", alignItems: "center" }}>
                 <span style={{ fontSize: "11.5px", fontWeight: 800, color: "#7B2D43", marginRight: "4px" }}>사이즈별 수량이 들어있는 칸을 골라주세요</span>
                 {colOptions.map((o) => {
@@ -394,9 +498,19 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
                       <span style={{ fontSize: "11px", color: "#A08A92" }}>원</span>
                     </div>
                     <div style={{ marginTop: "4px", fontSize: "11.5px", fontWeight: 700, color: "#68575E" }}>
+                      {d.details && d.details.length > 0 ? `세부 ${d.details.map((n) => (d.detailPlus?.[n] ? `${n}(+${d.detailPlus[n].toLocaleString()}원)` : n)).join("·")} · ` : ""}
                       {d.colors.length > 0 ? `색상 ${d.colors.join("·")} · ` : ""}사이즈 {d.sizes.join("·") || "없음"} · 총 {totalStock(d)}개
                       {d.code ? <span style={{ color: "#B0A5A0" }}> · {d.code}</span> : null}
                     </div>
+                    {d.badges || d.category || d.shipping || d.place ? (
+                      <div style={{ marginTop: "3px", fontSize: "10.5px", fontWeight: 800, color: "#7B2D43" }}>
+                        {(d.badges || []).map((b) => BADGE_LABEL[b] || b).join(" ")}
+                        {d.category ? ` · ${d.category}` : ""}
+                        {d.shipping ? ` · ${d.shipping === "vendor" ? "업체발송" : "일반배송"}` : ""}
+                        {d.place ? ` · ${d.place === "hidden" ? "숨김" : "진열"}` : ""}
+                        <span style={{ color: "#B0A5A0", fontWeight: 700 }}> (엑셀에 쓴 값 — 전체 적용보다 우선)</span>
+                      </div>
+                    ) : null}
                     {d.warns.length ? <div style={{ marginTop: "3px", fontSize: "11px", fontWeight: 800, color: "#C0392B" }}>⚠ {d.warns.join(" · ")}</div> : null}
                   </div>
                 </div>
@@ -477,6 +591,10 @@ function colLetter(i: number) {
   do { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; } while (n >= 0);
   return s;
 }
+
+const BADGE_LABEL: Record<string, string> = {
+  new: "✨NEW", hot: "🔥HOT", limit: "⏰한정", pick: "⭐MD픽", direct: "🛒바로구매", overseas: "✈️해외배송",
+};
 
 const selStyle: React.CSSProperties = {
   height: "30px", borderRadius: "7px", border: "1px solid #E8D5DD", background: "#fff",
