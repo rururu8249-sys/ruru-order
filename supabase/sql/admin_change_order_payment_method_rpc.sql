@@ -41,6 +41,7 @@ declare
   v_after integer := 0;
   v_count integer := 0;
   v_has_actual_fee_col boolean;
+  v_has_point_original_col boolean;
 begin
   if v_target not in ('무통장입금', '카드결제') then
     raise exception '결제수단은 무통장입금 또는 카드결제만 가능합니다. 받은 값: %', v_target;
@@ -165,6 +166,23 @@ begin
     execute format(
       'update public.orders o set actual_card_fee_amount = case when %L then round(coalesce(o.adjusted_product_price, coalesce(o.product_price,0) * greatest(coalesce(o.qty,1),1), 0) * %s / 100.0)::integer else 0 end where o.id = any(%L::bigint[])',
       v_is_card, v_actual_rate, v_ids
+    );
+  end if;
+
+  -- [검수 발견 보완] point_original_amount = "포인트 차감 전 총액" 스냅샷.
+  --   고객 주문내역(MyOrderResultCard) / 관리자 주문상세가 이 값으로 "총액 - 포인트 = 결제금액"을 표시한다.
+  --   총액이 바뀌었는데 이 값만 옛날 값으로 남으면 고객 화면 숫자가 안 맞는다.
+  --   위 update 이후라 vat_amount 는 이미 새 카드수수료 → 상품 + 배송 + 카드수수료 = 새 총액.
+  --   원래 null 이던 주문은 그대로 null 유지(없던 값을 새로 만들지 않는다).
+  select exists (
+    select 1 from information_schema.columns
+     where table_schema = 'public' and table_name = 'orders' and column_name = 'point_original_amount'
+  ) into v_has_point_original_col;
+
+  if v_has_point_original_col then
+    execute format(
+      'update public.orders o set point_original_amount = (coalesce(o.adjusted_product_price, coalesce(o.product_price,0) * greatest(coalesce(o.qty,1),1), 0) + coalesce(o.adjusted_shipping_fee, o.shipping_fee, 0) + coalesce(o.vat_amount, 0))::integer where o.id = any(%L::bigint[]) and o.point_original_amount is not null',
+      v_ids
     );
   end if;
 

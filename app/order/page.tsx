@@ -1170,6 +1170,9 @@ function normalizeOrderProductRow(product: any): BroadcastProduct {
 export default function OrderPage() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [broadcast, setBroadcast] = useState<any | null>(null);
+  // [2026-08-21] 방송정보 조회가 끝났는지. false(로딩중)를 "방송 꺼짐"으로 오판해
+  //   "지금은 방송 전이에요" 배너가 먼저 떴다가 라이브 배너로 바뀌던 깜빡임 방지. 표시 전용.
+  const [broadcastLoaded, setBroadcastLoaded] = useState(false);
   const [broadcastProducts, setBroadcastProducts] = useState<BroadcastProduct[]>([]);
   const [groupBuyQuickProductsFromCatalog, setGroupBuyQuickProductsFromCatalog] = useState<BroadcastProduct[]>([]);
   // 쇼핑몰 열기/닫기(settings.shop_open) — 방송 OFF일 때만 영향. 기본 열림.
@@ -1716,7 +1719,9 @@ export default function OrderPage() {
 
   useEffect(() => {
     loadOrderSettings();
-    loadBroadcast();
+    // [2026-08-21] 어떤 경로로 끝나든(성공/오류/예외) 반드시 로드완료로 표시한다.
+    //   안 그러면 예외 1번에 방송 배너가 영영 안 뜬다. 표시 전용 안전장치.
+    void Promise.resolve(loadBroadcast()).catch(() => {}).finally(() => setBroadcastLoaded(true));
     clearLegacyCustomerSessionIfNeeded();
     loadSavedCustomerInfo();
     // localStorage엔 배송지 목록이 없으므로, 저장된 번호가 있으면 DB에서 shipping_addresses를 채운다.
@@ -2242,16 +2247,19 @@ export default function OrderPage() {
       console.log("방송정보 불러오기 오류", error.message);
       setBroadcast(null);
       setBroadcastProducts([]);
+      setBroadcastLoaded(true);
       return;
     }
 
     if (!data) {
       setBroadcast(null);
       setBroadcastProducts([]);
+      setBroadcastLoaded(true);
       return;
     }
 
     setBroadcast(data);
+    setBroadcastLoaded(true);
     await loadBroadcastProducts(data.id);
   };
 
@@ -5194,7 +5202,7 @@ export default function OrderPage() {
       {/* [2026-08-12 리뉴얼 2단계] P3. 방송 영역 — 영상 임베드 삭제.
           손님이 유튜브 앱에서 방송을 보다 이 페이지로 오면 폰이 알아서 미니플레이어(PIP)를 띄운다.
           우리 페이지는 주문에만 집중: 방송 OFF=예고 배너 / 방송 ON=검은 스트립 2줄. */}
-      {hasSavedInfo ? (
+      {hasSavedInfo && broadcastLoaded ? (
         <section style={{ margin: "8px auto 0", width: "100%", maxWidth: "560px", padding: "0 14px 12px" }}>
           {!isBroadcastOn ? (
             <div style={{ position: "relative", overflow: "hidden", background: "linear-gradient(135deg,#7A1E47,#9A3560)", borderRadius: "18px", padding: "16px", color: "#fff" }}>
@@ -6487,7 +6495,7 @@ export default function OrderPage() {
                   isBroadcastOn && chatUiEnabled && chatShowFind ? (
                     <button type="button"
                       onClick={() => { setChatFindOpen(true); setOrderSheetOpen(true); window.setTimeout(() => document.getElementById("orderSheetSection")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}
-                      style={{ position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, background: "rgba(255,255,255,0.94)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)", border: "1.5px solid rgba(122,30,71,0.5)", borderRadius: "13px", padding: "12px 14px", textAlign: "center", fontSize: "14.5px", fontWeight: 900, color: "#7A1E47", letterSpacing: "-0.3px", cursor: "pointer", boxShadow: "0 4px 14px rgba(122,30,71,0.15)" }}>
+                      style={{ position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, background: "rgba(122,30,71,0.10)", backdropFilter: "blur(2.5px)", WebkitBackdropFilter: "blur(2.5px)", border: "1px solid rgba(122,30,71,0.22)", borderRadius: "12px", padding: "9px 14px", textAlign: "center", fontSize: "12px", fontWeight: 800, color: "#7A1E47", fontFamily: "inherit", cursor: "pointer" }}>
                       🛒 담은 상품이 없어요 · 💬 채팅주문 하셨나요?
                     </button>
                   ) : (
