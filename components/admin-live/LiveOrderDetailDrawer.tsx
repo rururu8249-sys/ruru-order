@@ -850,6 +850,24 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       ? cardPaymentExpectedTotal
       : Math.max(0, totalAmount - (pointUsedAmount > 0 ? pointUsedAmount : 0));
     lines.push(`총 결제금액 ${money(payableTotal)} · ${String(o.paymentMethod || "").trim() || "무통장입금"}`);
+    // [2026-08-22 사장님 지시] 입금 상태를 복사 텍스트에 표기 — 완료면 완료 표시,
+    //   입금 전(무통장)이면 계좌·입금액·확인 소요시간 안내까지 붙인다. (읽기 전용, 데이터 무변경)
+    {
+      const ps = String(o.paymentStatus || "");
+      if (["paid", "auto_paid", "manual_paid", "card_paid"].includes(ps)) {
+        lines.push("");
+        lines.push("✅ 입금확인 완료된 주문이에요. 감사합니다!");
+      } else if (ps === "unpaid" || ps === "manual_match_needed") {
+        lines.push("");
+        // 계좌는 주문서 페이지(app/order/page.tsx BANK_*)와 동일 값 — 계좌 변경 시 함께 수정
+        lines.push("💳 입금계좌: 새마을금고 9002186993725 (유혜원)");
+        lines.push(`입금하실 금액: ${money(payableTotal)}`);
+        lines.push("※ 입금 확인은 보통 10분, 늦어도 30분 안에 완료돼요. 이미 입금하셨다면 조금만 기다려주세요 🙂");
+      } else if (ps === "card_unpaid") {
+        lines.push("");
+        lines.push("💳 카드결제 확인 전 주문이에요.");
+      }
+    }
     if (String(o.deliveryMemo || "").trim()) {
       lines.push("");
       lines.push(`배송메모: ${String(o.deliveryMemo).trim()}`);

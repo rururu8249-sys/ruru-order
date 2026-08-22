@@ -514,7 +514,12 @@ export default function LiveOrderTable({
       ...(waitCnt > 0 ? [`⏳ 입금대기 ${waitCnt}건 · ${money(waitSum)}`] : []),
       `전체 ${list.length}건 · ${money(paidSum + waitSum)}`,
       ...(waitCnt > 0
-        ? ["──────────", `💳 입금계좌: ${COPY_BANK_LINE}`, `입금하실 금액: ${money(waitSum)}`]
+        ? [
+            "──────────",
+            `💳 입금계좌: ${COPY_BANK_LINE}`,
+            `입금하실 금액: ${money(waitSum)}`,
+            "※ 입금 확인은 보통 10분, 늦어도 30분 안에 완료돼요. 이미 입금하셨다면 조금만 기다려주세요 🙂",
+          ]
         : []),
     ].join("\n");
     try {
