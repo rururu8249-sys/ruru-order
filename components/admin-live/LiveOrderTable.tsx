@@ -1197,10 +1197,10 @@ export default function LiveOrderTable({
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", flexWrap: "wrap" }}>
                           <div style={{ display: "flex", gap: "5px", alignItems: "center", flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
                             {statusBadge(order)}
-                            {(customerOrdersCountMap.get(customerCopyKey(order)) || 0) >= 2 ? (
+                            {(customerOrdersCountMap.get(customerCopyKey(order)) || 0) > 0 ? (
                               <button type="button" onClick={() => void copyCustomerOrders(order)}
                                 style={{ fontSize: "10px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "6px", padding: "2px 7px", cursor: "pointer" }}>
-                                📋 {customerOrdersCountMap.get(customerCopyKey(order))}건 복사
+                                📋 {(customerOrdersCountMap.get(customerCopyKey(order)) || 0) >= 2 ? `${customerOrdersCountMap.get(customerCopyKey(order))}건 복사` : "복사"}
                               </button>
                             ) : null}
                             {(order as any).shippingStatus ? (
@@ -1255,16 +1255,21 @@ export default function LiveOrderTable({
                             {order.nickname}
                           </button>
                         </div>
-                        {(customerOrdersCountMap.get(customerCopyKey(order)) || 0) >= 2 ? (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); void copyCustomerOrders(order); }}
-                            title="이 손님이 조회범위에서 낸 주문 전체를 입금상태와 함께 복사"
-                            className="mt-0.5 rounded-md border border-rose-line bg-rose-soft px-1.5 py-0.5 text-[10px] font-black text-rose-deep"
-                          >
-                            📋 {customerOrdersCountMap.get(customerCopyKey(order))}건 복사
-                          </button>
-                        ) : null}
+                        {(() => {
+                          // [2026-08-23 사장님 피드백] 1건 손님도 상세 안 열고 바로 복사 — 모든 줄에 동일 버튼(일관성 우선)
+                          const copyCount = customerOrdersCountMap.get(customerCopyKey(order)) || 0;
+                          if (copyCount === 0) return null;
+                          return (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); void copyCustomerOrders(order); }}
+                              title="이 손님이 조회범위에서 낸 주문 전체를 입금상태·계좌 안내와 함께 복사 (주소 포함 복사는 주문 상세의 고객용 복사)"
+                              className="mt-0.5 rounded-md border border-rose-line bg-rose-soft px-1.5 py-0.5 text-[10px] font-black text-rose-deep"
+                            >
+                              📋 {copyCount >= 2 ? `${copyCount}건 복사` : "복사"}
+                            </button>
+                          );
+                        })()}
                         {(inventoryStatusBadge(order) || testOrderBadge(order) || returnBadge(order)) && (
                           <div className="flex flex-wrap gap-1 mt-0.5">
                             {inventoryStatusBadge(order)}
