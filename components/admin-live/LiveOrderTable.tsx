@@ -89,6 +89,8 @@ function getTotalQty(order: LiveOrder) {
 //   한 방송에서 주문서를 여러 번 낸 손님의 주문을 한 번에 텍스트로 복사(입금완료/입금대기 표시 포함).
 //   표시·클립보드 전용 — 주문/입금/정산 데이터는 일절 변경하지 않는다.
 const PAID_FOR_COPY = new Set(["paid", "auto_paid", "manual_paid", "card_paid"]);
+// 입금 안내용 계좌 — app/order/page.tsx 190~192(BANK_NAME/ACCOUNT/HOLDER)와 동일 값. 계좌 바뀌면 두 곳 함께 수정.
+const COPY_BANK_LINE = "새마을금고 9002186993725 (유혜원)";
 
 function customerCopyKey(o: LiveOrder) {
   const d = String(o.phone || "").replace(/\D/g, "");
@@ -511,6 +513,9 @@ export default function LiveOrderTable({
       ...(paidCnt > 0 ? [`✅ 입금완료 ${paidCnt}건 · ${money(paidSum)}`] : []),
       ...(waitCnt > 0 ? [`⏳ 입금대기 ${waitCnt}건 · ${money(waitSum)}`] : []),
       `전체 ${list.length}건 · ${money(paidSum + waitSum)}`,
+      ...(waitCnt > 0
+        ? ["──────────", `💳 입금계좌: ${COPY_BANK_LINE}`, `입금하실 금액: ${money(waitSum)}`]
+        : []),
     ].join("\n");
     try {
       await navigator.clipboard.writeText(text);
