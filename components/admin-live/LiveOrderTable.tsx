@@ -85,6 +85,21 @@ function getTotalQty(order: LiveOrder) {
   return (order.items || []).reduce((sum, item) => sum + Number(item.qty || 0), 0);
 }
 
+// ── [2026-08-22 사장님 요청] 같은 손님 주문 모아 복사 ──
+//   한 방송에서 주문서를 여러 번 낸 손님의 주문을 한 번에 텍스트로 복사(입금완료/입금대기 표시 포함).
+//   표시·클립보드 전용 — 주문/입금/정산 데이터는 일절 변경하지 않는다.
+const PAID_FOR_COPY = new Set(["paid", "auto_paid", "manual_paid", "card_paid"]);
+
+function customerCopyKey(o: LiveOrder) {
+  const d = String(o.phone || "").replace(/\D/g, "");
+  return d ? `p:${d}` : `n:${o.nickname}:${o.name}`;
+}
+
+function fullOrderText(order: LiveOrder) {
+  const items = (order.items || []).map(buildItemText).filter(Boolean);
+  return items.length > 0 ? items.join(", ") : (order.orderSummary || "-");
+}
+
 function compactOrderSummary(order: LiveOrder) {
   const items = order.items || [];
 
@@ -463,6 +478,46 @@ export default function LiveOrderTable({
     const orderGroupId = o.groupId || o.orderGroupId || o.order_group_id || order.id || "";
     const expectedAmount = Number(order.totalAmount || 0) || Number(order.finalAmount || 0) || 0;
     return { orderIds, orderGroupId, expectedAmount };
+  };
+
+  // [모아 복사] 조회범위(현재 orders) 안에서 손님별 주문 수 — 2건 이상일 때만 버튼 노출
+  const customerOrdersCountMap = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const o of orders) {
+      if (o.paymentStatus === "canceled") continue;
+      const k = customerCopyKey(o);
+      m.set(k, (m.get(k) || 0) + 1);
+    }
+    return m;
+  }, [orders]);
+
+  const copyCustomerOrders = async (target: LiveOrder) => {
+    const key = customerCopyKey(target);
+    const list = orders
+      .filter((o) => customerCopyKey(o) === key && o.paymentStatus !== "canceled")
+      .sort((a, b) => String(a.createdAt || a.submittedAt || "").localeCompare(String(b.createdAt || b.submittedAt || "")));
+    let paidSum = 0, paidCnt = 0, waitSum = 0, waitCnt = 0;
+    const lines = list.map((o, i) => {
+      const paid = PAID_FOR_COPY.has(o.paymentStatus);
+      const amt = Number(o.totalAmount || 0);
+      if (paid) { paidSum += amt; paidCnt += 1; } else { waitSum += amt; waitCnt += 1; }
+      const ship = Number(o.shippingFee || 0);
+      return `${i + 1}. ${fullOrderText(o)} · ${getTotalQty(o)}개 · ${money(amt)}${ship > 0 ? ` (택배비 ${money(ship)} 포함)` : ""} ${paid ? "✅입금완료" : "⏳입금대기"}`;
+    });
+    const text = [
+      `${target.nickname}${target.name ? ` (${target.name})` : ""} 주문내역 ${list.length}건`,
+      ...lines,
+      "──────────",
+      ...(paidCnt > 0 ? [`✅ 입금완료 ${paidCnt}건 · ${money(paidSum)}`] : []),
+      ...(waitCnt > 0 ? [`⏳ 입금대기 ${waitCnt}건 · ${money(waitSum)}`] : []),
+      `전체 ${list.length}건 · ${money(paidSum + waitSum)}`,
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      showAdminToast(`${target.nickname} 주문 ${list.length}건 복사됐어요\n\n카톡 등에 붙여넣기 하세요.`, "success");
+    } catch {
+      showAdminToast("복사에 실패했어요. 한 번 더 눌러주세요.", "error");
+    }
   };
 
   // 선택 입금으로 입금확인 (기존 /api/admin-v2/manual-payment-match 재사용)
@@ -1132,6 +1187,12 @@ export default function LiveOrderTable({
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", flexWrap: "wrap" }}>
                           <div style={{ display: "flex", gap: "5px", alignItems: "center", flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
                             {statusBadge(order)}
+                            {(customerOrdersCountMap.get(customerCopyKey(order)) || 0) >= 2 ? (
+                              <button type="button" onClick={() => void copyCustomerOrders(order)}
+                                style={{ fontSize: "10px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "6px", padding: "2px 7px", cursor: "pointer" }}>
+                                📋 {customerOrdersCountMap.get(customerCopyKey(order))}건 복사
+                              </button>
+                            ) : null}
                             {(order as any).shippingStatus ? (
                               <span className={`inline-flex items-center justify-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10px] font-black leading-none ${String((order as any).shippingStatus) === "출고완료" ? "bg-info-bg text-[var(--color-info-tx)]" : "bg-surface-2 text-ink-soft"}`}>{(order as any).shippingStatus}</span>
                             ) : null}
@@ -1184,6 +1245,16 @@ export default function LiveOrderTable({
                             {order.nickname}
                           </button>
                         </div>
+                        {(customerOrdersCountMap.get(customerCopyKey(order)) || 0) >= 2 ? (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); void copyCustomerOrders(order); }}
+                            title="이 손님이 조회범위에서 낸 주문 전체를 입금상태와 함께 복사"
+                            className="mt-0.5 rounded-md border border-rose-line bg-rose-soft px-1.5 py-0.5 text-[10px] font-black text-rose-deep"
+                          >
+                            📋 {customerOrdersCountMap.get(customerCopyKey(order))}건 복사
+                          </button>
+                        ) : null}
                         {(inventoryStatusBadge(order) || testOrderBadge(order) || returnBadge(order)) && (
                           <div className="flex flex-wrap gap-1 mt-0.5">
                             {inventoryStatusBadge(order)}
