@@ -58,14 +58,14 @@ export async function POST(request: NextRequest) {
     if (!session) return jsonError("관리자 로그인이 필요합니다.", 401);
 
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-    const mode = text(body.mode); // "refund" | "exchange"
+    const mode = text(body.mode); // "refund" | "exchange" | "etc"(기타 — 기록+이슈 등록만, 포인트 회수 없음)
     const refRowId = num(body.refRowId);
     const selectedRowIds = Array.isArray(body.rowIds)
       ? (body.rowIds as unknown[]).map((v) => num(v)).filter((v) => v > 0)
       : [];
     const detail = text(body.detail).slice(0, 1000);
 
-    if (mode !== "refund" && mode !== "exchange") return jsonError("유형(환불/교환)을 선택해주세요.");
+    if (mode !== "refund" && mode !== "exchange" && mode !== "etc") return jsonError("유형(환불/교환/기타)을 선택해주세요.");
     if (!refRowId) return jsonError("기준 주문 행이 없습니다.");
     if (selectedRowIds.length === 0) return jsonError("반품할 상품을 1개 이상 선택해주세요.");
 
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     const nm = text(first.customer_name);
     const phone = digitsOnly(first.customer_phone);
     const orderNo = text(first.order_lookup_code);
-    const modeLabel = mode === "refund" ? "반품(환불)" : "반품(교환)";
+    const modeLabel = mode === "refund" ? "반품(환불)" : mode === "exchange" ? "반품(교환)" : "기타";
     const productSummary = selected.map(rowLabel).join(", ");
 
     // ── 1) return_* 기록 (그룹 전체 행에 동일 기록 — 기존 [+기록] 저장과 같은 방식/컬럼)
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
       .join("\n");
 
     const { error: taskErr } = await sb.from("admin_tasks").insert({
-      task_type: mode === "refund" ? "refund" : "exchange",
+      task_type: mode === "refund" ? "refund" : mode === "exchange" ? "exchange" : "general",
       title: issueTitle,
       body: issueBody,
       customer_name: nm || null,

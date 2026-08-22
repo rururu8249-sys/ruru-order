@@ -140,7 +140,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const [returnSaving, setReturnSaving] = useState(false);
   // [2026-08-13 사장님 요청] 반품 기록 = 유형(환불/교환) 선택 + 상품 체크 + 세부사항(선택).
   //   저장 시 서버(/api/admin-live/order-return)가 기록 + 고객이슈 자동등록 + (환불) 적립 포인트 회수까지 처리.
-  const [returnModeDraft, setReturnModeDraft] = useState<"refund" | "exchange">("refund");
+  const [returnModeDraft, setReturnModeDraft] = useState<"refund" | "exchange" | "etc">("refund");
   const [returnSelectedIds, setReturnSelectedIds] = useState<string[]>([]);
   const [returnReasonDraft, setReturnReasonDraft] = useState("");
 
@@ -723,7 +723,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   // 반품/교환 기록 저장: return_* 컬럼만 update (주문상태/입금/정산/재고/포인트 로직 완전 무관·기록 전용)
   // [2026-08-13 사장님 지시] 진입 버튼 = [반품(환불)] [반품(교환)] 두 개만 상시 노출.
   //   버튼이 곧 유형 선택이므로 편집기 안의 유형 버튼은 없앴고, 접수하면 고객이슈 자동 등록(별도 등록 버튼 삭제).
-  const startEditReturn = (mode: "refund" | "exchange") => {
+  const startEditReturn = (mode: "refund" | "exchange" | "etc") => {
     setReturnModeDraft(mode);
     setReturnSelectedIds(items.map((item) => String(item.id)).filter(Boolean));
     setReturnReasonDraft("");
@@ -1127,6 +1127,14 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 >
                   ⇄ 반품(교환)
                 </button>
+                <button
+                  type="button"
+                  onClick={() => startEditReturn("etc")}
+                  className="rounded-md border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft transition hover:bg-surface-2"
+                  title="오배송·부분보상 등 환불/교환이 아닌 건 — 기록과 고객이슈 등록만 하고 포인트는 건드리지 않아요"
+                >
+                  📝 기타
+                </button>
               </>
             ) : null}
           </div>
@@ -1143,20 +1151,26 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             )
           ) : (
             <div className="rounded-lg border border-line bg-surface-2 p-3">
-              <div className="flex items-center gap-2">
-                <span className={[
-                  "rounded-lg px-3 py-1.5 text-[12px] font-black text-white",
-                  returnModeDraft === "refund" ? "bg-rose-deep" : "bg-slate-800",
-                ].join(" ")}>
-                  {returnModeDraft === "refund" ? "↩ 반품(환불) 접수" : "⇄ 반품(교환) 접수"}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setReturnModeDraft(returnModeDraft === "refund" ? "exchange" : "refund")}
-                  className="rounded-md border border-line bg-surface px-2 py-1 text-[10px] font-black text-ink-mute hover:bg-surface-2"
-                >
-                  {returnModeDraft === "refund" ? "교환으로 전환" : "환불로 전환"}
-                </button>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {([
+                  ["refund", "↩ 반품(환불)"],
+                  ["exchange", "⇄ 반품(교환)"],
+                  ["etc", "📝 기타"],
+                ] as const).map(([modeKey, label]) => (
+                  <button
+                    key={modeKey}
+                    type="button"
+                    onClick={() => setReturnModeDraft(modeKey)}
+                    className={[
+                      "rounded-lg px-3 py-1.5 text-[12px] font-black transition",
+                      returnModeDraft === modeKey
+                        ? modeKey === "refund" ? "bg-rose-deep text-white" : "bg-slate-800 text-white"
+                        : "border border-line bg-surface text-ink-mute hover:bg-surface-2",
+                    ].join(" ")}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
 
               <div className="mt-2 space-y-1 rounded-md border border-line bg-surface p-2">
@@ -1189,7 +1203,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               />
               <div className="mt-2 flex flex-wrap gap-2">
                 <button type="button" disabled={returnSaving} onClick={() => void handleSaveReturn()} className="rounded-md bg-rose-deep px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-50">
-                  {returnSaving ? "접수중…" : returnModeDraft === "refund" ? "환불 접수 (포인트 회수 포함)" : "교환 접수"}
+                  {returnSaving ? "접수중…" : returnModeDraft === "refund" ? "환불 접수 (포인트 회수 포함)" : returnModeDraft === "exchange" ? "교환 접수" : "기타 접수 (기록만)"}
                 </button>
                 <button type="button" onClick={() => setReturnEditing(false)} className="rounded-md border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ink-soft">취소</button>
                 {(order as any).returnStatus ? (
@@ -1199,7 +1213,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 ) : null}
               </div>
               <div className="mt-1 text-[10px] font-bold leading-4 text-ink-mute">
-                ※ 접수하면 고객이슈에 자동 등록됩니다. 환불은 이 주문에서 자동 적립된 포인트를 선택 상품 비율만큼 회수합니다(잔액 부족 시 마이너스).
+                ※ 접수하면 고객이슈에 자동 등록됩니다. 환불은 이 주문에서 자동 적립된 포인트를 선택 상품 비율만큼 회수합니다(잔액 부족 시 마이너스). 교환·기타는 포인트를 건드리지 않습니다.
                 <br />※ 주문상태·입금·정산·재고 숫자는 바뀌지 않습니다.
               </div>
             </div>

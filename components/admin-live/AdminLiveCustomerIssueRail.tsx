@@ -25,6 +25,7 @@ type AdminIssueTask = {
   completed_at?: string | null;
   is_resolved?: boolean | null;
   raw_payload?: Record<string, unknown> | null;
+  related_product?: string | null;
 };
 
 type CustomerIssueCustomerOption = {
@@ -265,11 +266,26 @@ function dateLabel(value: unknown) {
   )}:${pad2(date.getMinutes())}`;
 }
 
+// [2026-08-23 사장님 요청] 접힌 카드에서도 주문번호·대상상품이 보이게 — 클릭(전체 보기) 없이 핵심 파악.
+function extractBodyField(task: AdminIssueTask, prefix: string) {
+  const text = cleanMultiline(task.body);
+  if (!text) return "";
+  const line = text
+    .split(/\n+/)
+    .map((l) => clean(l))
+    .find((l) => l.startsWith(prefix));
+  return line ? line.slice(prefix.length).trim() : "";
+}
+
 function issueRows(task: AdminIssueTask) {
+  const orderNo = extractBodyField(task, "주문번호:");
+  const product = extractBodyField(task, "대상상품:") || clean(task.related_product);
   return [
     ["닉네임", getNickname(task)],
     ["이름", getName(task)],
     ["전화번호", formatPhone(getPhone(task))],
+    ...(orderNo ? [["주문번호", orderNo]] : []),
+    ...(product ? [["대상상품", product]] : []),
     ["메모", getIssueText(task)],
   ];
 }
