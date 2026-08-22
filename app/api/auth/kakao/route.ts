@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
 // app/api/auth/kakao/route.ts
 // 목적: 카카오 로그인 토큰 발급 후 카카오 프로필/전화번호/배송지 조회
@@ -117,6 +118,44 @@ export async function GET(request: Request) {
   const receiverName = String(bestShipping?.receiver_name || "").trim();
   const accountName = String(kakaoAccount?.name || "").trim();
 
+  // ── [2026-08-23 사장님 지시 · 근본 수정] 기존 회원이면 우리 DB 정보 우선 ──
+  //   문제: 카카오가 내려주는 번호(카카오 배송지·계정 번호)가 옛 번호일 수 있는데,
+  //         로그인할 때마다 이 값이 기기·회원 프로필을 덮어써서 고객이 두 명으로 갈라지고
+  //         합배송·입금매칭이 어긋났다(smp미선 건: 병합해도 로그인 한 번에 원복).
+  //   수정: kakao_id로 customers를 조회해 기존 회원이면 우리 DB의 번호·이름·주소를 응답에 사용.
+  //         카카오 값은 "처음 온 손님" 자동입력에만 쓴다.
+  //   안전: 조회 실패 시(환경변수·네트워크 등) 기존 동작 그대로 폴백 — 로그인은 절대 막히지 않는다.
+  //         주문/입금/정산/포인트 로직 무접촉(로그인 응답 값 구성만 변경).
+  let dbPhone = "";
+  let dbName = "";
+  let dbZipcode = "";
+  let dbAddress = "";
+  let dbDetailAddress = "";
+  try {
+    const kakaoIdText = String(userData.id || "").trim();
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (kakaoIdText && supabaseUrl && serviceRoleKey) {
+      const sb = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+      const { data: dbRows } = await sb
+        .from("customers")
+        .select("customer_name, customer_phone, zipcode, address, detail_address")
+        .eq("kakao_id", kakaoIdText)
+        .order("created_at", { ascending: true })
+        .limit(1);
+      const dbCustomer = Array.isArray(dbRows) ? dbRows[0] : null;
+      if (dbCustomer) {
+        dbPhone = String(dbCustomer.customer_phone || "").replace(/[^0-9]/g, "");
+        dbName = String(dbCustomer.customer_name || "").trim();
+        dbZipcode = String(dbCustomer.zipcode || "").trim();
+        dbAddress = String(dbCustomer.address || "").trim();
+        dbDetailAddress = String(dbCustomer.detail_address || "").trim();
+      }
+    }
+  } catch {
+    // 조회 실패 → 카카오 값으로 기존 동작 유지
+  }
+
   return NextResponse.json({
     kakao_id: String(userData.id || ""),
     kakao_nickname: kakaoAccount?.profile?.nickname || "",
@@ -125,11 +164,13 @@ export async function GET(request: Request) {
     kakao_phone: kakaoPhone,
     kakao_phone_needs_agreement: Boolean(kakaoAccount?.phone_number_needs_agreement),
 
-    customer_name: receiverName || accountName || "",
-    customer_phone: shippingPhone || kakaoPhone || "",
-    customer_zipcode: String(bestShipping?.zone_number || bestShipping?.zip_code || "").trim(),
-    customer_address: String(bestShipping?.base_address || "").trim(),
-    customer_detail_address: String(bestShipping?.detail_address || "").trim(),
+    customer_name: dbName || receiverName || accountName || "",
+    customer_phone: dbPhone || shippingPhone || kakaoPhone || "",
+    // 주소는 한 출처로 묶어서 사용 — DB에 주소가 있으면 DB 세트(우편번호·상세 포함), 없으면 카카오 세트.
+    //   (필드별로 섞으면 "DB 우편번호 + 카카오 도로명" 같은 불일치 주소가 생길 수 있다)
+    customer_zipcode: dbAddress ? dbZipcode : String(bestShipping?.zone_number || bestShipping?.zip_code || "").trim(),
+    customer_address: dbAddress || String(bestShipping?.base_address || "").trim(),
+    customer_detail_address: dbAddress ? dbDetailAddress : String(bestShipping?.detail_address || "").trim(),
 
     kakao_shipping_needs_agreement: Boolean(
       shippingData?.shipping_addresses_needs_agreement,
