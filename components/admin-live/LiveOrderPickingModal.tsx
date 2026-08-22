@@ -19,7 +19,8 @@ type Props = { orders: LiveOrder[]; filterLabel: string; onClose: () => void };
 // [2026-07-13 사장님 지침] amount = 주문에 저장된 상품금액(표시 전용, 재계산 안 함)
 type PickItem = { id: string; text: string; qty: number; amount: number };
 type Panel = { key: string; nickname: string; name: string; phone: string; search: string; paid: boolean; when: string; items: PickItem[]; totalQty: number };
-type BatchRow = { text: string; ids: string[]; totalQty: number; pickedQty: number };
+type BatchBuyer = { nickname: string; qty: number; paid: boolean };
+type BatchRow = { text: string; ids: string[]; totalQty: number; pickedQty: number; paidQty: number; buyers: BatchBuyer[] };
 
 const PAID_STATUSES = ["paid", "auto_paid", "manual_paid", "card_paid"];
 const clean = (v: unknown) => String(v ?? "").trim();
@@ -60,6 +61,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   const [paidOnly, setPaidOnly] = useState(true);
   const [unpickedOnly, setUnpickedOnly] = useState(false);
   const [viewMode, setViewMode] = useState<"order" | "batch">("order");
+  // [2026-08-23 상품별 집계 통합] 주문자 칩 표시 토글 — 집계 볼 땐 ON, 물건 집을 땐 OFF
+  const [showBuyers, setShowBuyers] = useState(true);
   const [search, setSearch] = useState("");
   const [resetting, setResetting] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -139,20 +142,38 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   }, [scopedPanels]);
 
   // 상품별 합계(배치 피킹) — 옵션까지 같은 상품을 전 주문에서 합산. 한 종류씩 한 번에 집기.
+  // [2026-08-23 사장님 요청 · 상품별 집계 통합] 별도 「상품별 주문」 팝업 없이 이 탭에서 해결:
+  //   상품(옵션) 줄마다 결제/대기 수량 + 주문자 칩(입금대기 ⏳)까지. 챙김 체크 동작은 기존 그대로.
+  //   검색은 상품명뿐 아니라 닉네임으로도 잡힌다.
   const batchRows = useMemo<BatchRow[]>(() => {
     const m = new Map<string, BatchRow>();
+    const buyersByText = new Map<string, Map<string, BatchBuyer>>();
     const q = search.trim().toLowerCase();
     for (const p of scopedPanels) {
       for (const it of p.items) {
-        if (q && !it.text.toLowerCase().includes(q)) continue;
-        const row = m.get(it.text) || { text: it.text, ids: [], totalQty: 0, pickedQty: 0 };
+        if (q && !it.text.toLowerCase().includes(q) && !p.search.includes(q)) continue;
+        const row = m.get(it.text) || { text: it.text, ids: [], totalQty: 0, pickedQty: 0, paidQty: 0, buyers: [] };
         row.ids.push(it.id);
         row.totalQty += it.qty;
+        if (p.paid) row.paidQty += it.qty;
         if (pickedIds.has(it.id)) row.pickedQty += it.qty;
         m.set(it.text, row);
+        // 같은 닉네임이라도 결제/대기가 다르면 칩 분리(대기분이 묻히지 않게)
+        const buyers = buyersByText.get(it.text) || new Map<string, BatchBuyer>();
+        const bKey = `${p.nickname}|${p.paid ? "1" : "0"}`;
+        const chip = buyers.get(bKey) || { nickname: p.nickname, qty: 0, paid: p.paid };
+        chip.qty += it.qty;
+        buyers.set(bKey, chip);
+        buyersByText.set(it.text, buyers);
       }
     }
     let rows = Array.from(m.values());
+    for (const row of rows) {
+      const buyers = buyersByText.get(row.text);
+      row.buyers = buyers
+        ? [...buyers.values()].sort((a, b) => b.qty - a.qty || a.nickname.localeCompare(b.nickname, "ko"))
+        : [];
+    }
     if (unpickedOnly) rows = rows.filter((r) => r.pickedQty < r.totalQty);
     return rows.sort((a, b) => a.text.localeCompare(b.text, "ko"));
   }, [scopedPanels, pickedIds, search, unpickedOnly]);
@@ -283,6 +304,16 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                 <button type="button" onClick={() => setSortMode("time")} className={`rounded-lg px-2.5 py-1 text-[11px] font-black ${sortMode === "time" ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}>시간순</button>
               </>
             ) : null}
+            {viewMode === "batch" ? (
+              <button
+                type="button"
+                onClick={() => setShowBuyers((v) => !v)}
+                title="상품 줄 아래 주문자 칩(입금대기 ⏳ 포함) 표시를 켜고 끕니다 — 물건 집을 땐 끄면 깔끔해요"
+                className={`rounded-lg px-2.5 py-1 text-[11px] font-black ${showBuyers ? "bg-rose-deep text-white" : "border border-rose-line bg-rose-soft text-rose-deep"}`}
+              >
+                {showBuyers ? "👤 주문자 ✓" : "👤 주문자"}
+              </button>
+            ) : null}
             <button type="button" onClick={resetAll} disabled={resetting} className="rounded-lg border border-danger-tx bg-danger-bg px-2.5 py-1 text-[11px] font-black text-[var(--color-danger-tx)] hover:bg-danger-bg disabled:opacity-50">{resetting ? "초기화중" : "전체 초기화"}</button>
             <button type="button" onClick={runExcel} disabled={exporting} className="rounded-lg bg-slate-950 px-2.5 py-1 text-[11px] font-black text-white hover:bg-rose-deep disabled:opacity-50">{exporting ? "내보내는중" : "엑셀"}</button>
           </div>
@@ -318,13 +349,35 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                     const done = row.ids.every((id) => pickedIds.has(id));
                     const some = !done && row.ids.some((id) => pickedIds.has(id));
                     return (
-                      <button key={row.text} type="button" onClick={() => toggleIds(row.ids)} className={`flex w-full items-center gap-3 rounded-xl border-2 px-3 py-2.5 text-left ${done ? "border-emerald-300 bg-ok-bg" : "border-line bg-surface hover:bg-surface-2"}`}>
-                        <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 text-[12px] font-black ${done ? "border-emerald-500 bg-emerald-500 text-white" : some ? "border-emerald-400 bg-emerald-100 text-emerald-600" : "border-line text-transparent"}`}>{some ? "–" : "✓"}</span>
-                        <span className={`min-w-0 flex-1 truncate text-[14px] font-black ${done ? "text-ink-mute line-through" : "text-ink"}`}>{row.text}</span>
-                        <span className="shrink-0 whitespace-nowrap text-right">
-                          <span className={`text-[16px] font-black ${done ? "text-ink-mute" : "text-rose-deep"}`}>×{row.totalQty}</span>
-                          <span className="ml-1 text-[11px] font-bold text-ink-mute">({row.pickedQty}/{row.totalQty})</span>
+                      <button key={row.text} type="button" onClick={() => toggleIds(row.ids)} className={`w-full rounded-xl border-2 px-3 py-2.5 text-left ${done ? "border-emerald-300 bg-ok-bg" : "border-line bg-surface hover:bg-surface-2"}`}>
+                        <span className="flex w-full items-center gap-3">
+                          <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 text-[12px] font-black ${done ? "border-emerald-500 bg-emerald-500 text-white" : some ? "border-emerald-400 bg-emerald-100 text-emerald-600" : "border-line text-transparent"}`}>{some ? "–" : "✓"}</span>
+                          <span className={`min-w-0 flex-1 truncate text-[14px] font-black ${done ? "text-ink-mute line-through" : "text-ink"}`}>{row.text}</span>
+                          <span className="shrink-0 whitespace-nowrap text-right">
+                            <span className={`text-[16px] font-black ${done ? "text-ink-mute" : "text-rose-deep"}`}>×{row.totalQty}</span>
+                            {!paidOnly && row.totalQty !== row.paidQty ? (
+                              <span className="ml-1 text-[11px] font-black text-warn-tx">대기 {row.totalQty - row.paidQty}</span>
+                            ) : null}
+                            <span className="ml-1 text-[11px] font-bold text-ink-mute">({row.pickedQty}/{row.totalQty})</span>
+                          </span>
                         </span>
+                        {showBuyers && row.buyers.length > 0 ? (
+                          <span
+                            className="mt-1.5 flex flex-wrap gap-1 pl-9"
+                            onClick={(e) => e.stopPropagation()}
+                            title="주문자 목록 — 눌러도 챙김이 바뀌지 않아요"
+                          >
+                            {row.buyers.map((b, i) => (
+                              <span
+                                key={`${b.nickname}-${b.paid}-${i}`}
+                                title={b.paid ? "결제완료" : "입금대기"}
+                                className={`rounded-md px-1.5 py-0.5 text-[11px] font-bold ${b.paid ? "bg-ok-bg text-ok-tx" : "bg-warn-bg text-warn-tx"}`}
+                              >
+                                {b.nickname}{b.qty > 1 ? `×${b.qty}` : ""}{b.paid ? "" : "⏳"}
+                              </span>
+                            ))}
+                          </span>
+                        ) : null}
                       </button>
                     );
                   })}
