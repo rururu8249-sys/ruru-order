@@ -35,15 +35,17 @@ function fittedText(value: string, maxWidth: number, baseSize: number, minimumSi
 }
 
 const ARTWORK_ZOOM: Record<string, number> = {
-  BURBERRY: 2.05,
-  CHANEL: 1.08,
-  DIOR: 1.85,
-  "MIU MIU": 1.9,
-  PRADA: 1.95,
-  GUCCI: 1,
-  HERMES: 1.08,
-  LOEWE: 0.96,
-  "LOUIS VUITTON": 1.12,
+  BURBERRY: 1.68,
+  CHANEL: 0.84,
+  DIOR: 1.5,
+  // MIU MIU는 마지막 U 획이 우측에 붙지 않도록 전용 여백을 둔다.
+  "MIU MIU": 1.58,
+  // PRADA도 긴 워드마크라 양끝 획이 답답해 보이지 않도록 전용 여백을 둔다.
+  PRADA: 1.62,
+  GUCCI: 0.84,
+  HERMES: 0.84,
+  LOEWE: 0.84,
+  "LOUIS VUITTON": 0.86,
   // MONCLER 원본은 정사각 캔버스 안에 긴 워드마크가 들어 있어 공통 확대율이면 M/R 끝이 잘린다.
   MONCLER: 1.58,
   "BRUNELLO CUCINELLI": 1.06,
