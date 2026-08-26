@@ -42,7 +42,7 @@ import { HOWTO_DEFAULT, parseHowtoSteps } from "@/lib/howto";
 import { supabase } from "@/lib/supabase";
 import { isRemoteAreaAddress } from "@/lib/order/shippingAddress";
 import { formatOrderPhone, normalizeOrderPhone } from "@/lib/order/phone";
-import { normalizeBrandKorean } from "@/lib/brandWordmarkThumbnail";
+import { brandWordmarkThumbnail, normalizeBrandKorean } from "@/lib/brandWordmarkThumbnail";
 import {
   CUSTOMER_SESSION_VERSION_KEY,
   YOUTUBE_NICKNAME_CONFIRM_VERSION_KEY,
@@ -5612,10 +5612,11 @@ export default function OrderPage() {
                             ? { position: "relative", width: "100%", aspectRatio: "1 / 1", borderRadius: "10px", background: "#F0EBE8", overflow: "hidden", cursor: img ? "zoom-in" : "default" }
                             : { position: "relative", flexShrink: 0, width: "84px", height: "84px", borderRadius: "10px", background: "#F0EBE8", overflow: "hidden", cursor: img ? "zoom-in" : "default" }}>
                             {brandGroup ? (
-                              <div aria-label={`${brandGroup.brandKo} 브랜드`} style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "5px", background: "linear-gradient(145deg,#fff,#F7EFF2)", color: "#2F2026", textAlign: "center", padding: "8px" }}>
-                                <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: listView === "grid" ? "18px" : "16px", fontWeight: 800, letterSpacing: "0.08em", lineHeight: 1.1 }}>{brandGroup.brandEn || brandGroup.brandKo}</span>
-                                <span style={{ fontSize: "10px", fontWeight: 800, color: "#7A1E47" }}>{brandGroup.brandKo}</span>
-                              </div>
+                              <img
+                                src={brandWordmarkThumbnail(brandGroup.brandEn, brandGroup.brandKo)}
+                                alt={`${brandGroup.brandKo} 브랜드 로고`}
+                                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                              />
                             ) : img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
                             {sold ? (
                               <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", borderRadius: "inherit", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
