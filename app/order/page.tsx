@@ -5670,7 +5670,7 @@ export default function OrderPage() {
                             <div style={listView === "grid"
                               ? { marginTop: "auto", paddingTop: "6px", display: "flex", flexDirection: "column", alignItems: "stretch", gap: "6px" }
                               : { marginTop: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                              <span style={{ fontSize: "17px", fontWeight: 800, color: "#7A1E47" }}>{(() => { const ci = readComboInfoOrderProduct(product); return brandGroup ? `최저가 ${won(Number(product.price || 0))}부터` : ci && ci.maxPlus > 0 ? won(Number(product.price || 0)) + "~" : won(Number(product.price || 0)); })()}</span>
+                              <span style={{ fontSize: "17px", fontWeight: 800, color: "#7A1E47" }}>{(() => { const ci = readComboInfoOrderProduct(product); return brandGroup ? `최저가 ${won(Number(product.price || 0))} 부터 ~` : ci && ci.maxPlus > 0 ? won(Number(product.price || 0)) + "~" : won(Number(product.price || 0)); })()}</span>
                               <button
                                 type="button"
                                 disabled={sold}
@@ -6127,7 +6127,7 @@ export default function OrderPage() {
                           ? (registeredOptionBrandGroup ? registeredOptionDetail.trim() : registeredOptionColor.trim())
                             ? won(registeredOptionUnitPrice)
                             : registeredOptionComboInfo.maxPlus > 0
-                              ? registeredOptionBrandGroup ? `최저가 ${won(registeredOptionPrice)}부터` : won(registeredOptionPrice) + "~"
+                              ? registeredOptionBrandGroup ? `최저가 ${won(registeredOptionPrice)} 부터 ~` : won(registeredOptionPrice) + "~"
                               : won(registeredOptionPrice)
                           : registeredOptionPrice > 0
                             ? won(registeredOptionPrice)

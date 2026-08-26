@@ -190,7 +190,7 @@ function isBrandGroupProduct(p: ProductRow) {
 }
 
 function productPriceLabel(p: ProductRow) {
-  return `${money(productPrice(p))}${isBrandGroupProduct(p) ? "부터" : ""}`;
+  return isBrandGroupProduct(p) ? `최저가 ${money(productPrice(p))} 부터 ~` : money(productPrice(p));
 }
 
 function mainImage(p: ProductRow) {

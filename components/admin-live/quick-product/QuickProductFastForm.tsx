@@ -191,13 +191,7 @@ function pickImageArray(row: ProductRow | null | undefined, keys: string[]) {
   return [];
 }
 
-function parseProductNote(row: ProductRow | null | undefined) {
-  const raw = pickString(row, ["product_note", "note", "memo"], "");
-
-  if (!raw) return null;
-
-  try {
-    return JSON.parse(raw) as {
+type ParsedProductNote = Record<string, unknown> & {
       stock_mode?: "total" | "option";
       stock_variants?: Array<{ color?: string; size?: string; stock?: number }>;
       stock_management_enabled?: boolean;
@@ -216,9 +210,27 @@ function parseProductNote(row: ProductRow | null | undefined) {
       combo_detail_values?: string[]; // 1번 축(세부상품) 노출 값 — 3단일 때 color_options는 색상이 차지하므로 별도 보관
       // [2026-08-11] 세부상품별 대표사진 { 세부상품명: 이미지URL } — 스마트스토어/쿠팡의 옵션별 이미지와 같은 개념
       detail_photos?: Record<string, string>;
+      // 엑셀 브랜드 대표상품은 세부상품 하나에 사진이 여러 장일 수 있다.
+      detail_photo_sets?: Record<string, string[]>;
+      brand_group?: {
+        enabled?: boolean;
+        brand_ko?: string;
+        brand_en?: string;
+        detail_categories?: Record<string, string>;
+        detail_options?: Record<string, unknown>;
+      };
       // [무료나눔 · 2026-07-22] true면 0원 상품(선물). 가격 비움(손님 직접입력)과 구분되는 명시 플래그
       free_product?: boolean;
-    };
+};
+
+function parseProductNote(row: ProductRow | null | undefined): ParsedProductNote | null {
+  if (!row) return null;
+  const raw = row.product_note ?? row.note ?? row.memo;
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) return raw as ParsedProductNote;
+  if (typeof raw !== "string" || !raw.trim()) return null;
+
+  try {
+    return JSON.parse(raw) as ParsedProductNote;
   } catch {
     return null;
   }
@@ -656,6 +668,7 @@ export default function QuickProductFastForm({
   const [detailHidden, setDetailHidden] = useState<string[]>([]);           // 고객에게 숨길 세부상품명
   // [2026-08-11] 세부상품별 대표사진 — 손님이 종류를 고를 때 사진으로 구분할 수 있게(업계 표준: 옵션별 이미지)
   const [detailPhotos, setDetailPhotos] = useState<Record<string, string>>({});
+  const [detailPreviewImage, setDetailPreviewImage] = useState("");
   const [detailPhotoUploading, setDetailPhotoUploading] = useState("");
   const detailPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const detailPhotoTargetRef = useRef("");
@@ -708,6 +721,8 @@ export default function QuickProductFastForm({
 
   const editingProductId = pickString(initialProduct, ["id", "product_id", "uuid"], "");
   const isEditMode = Boolean(editingProductId);
+  const initialProductNote = useMemo(() => parseProductNote(initialProduct), [initialProduct]);
+  const isBrandGroupEdit = initialProductNote?.brand_group?.enabled === true;
   // [2026-08-16 사장님 요청] 재고를 3가지로 나눠 보여준다 — 실재고 / 담김(주문서 제출 전 선점) / 지금 판매가능
   //   담김은 cart_reservations(표시용 선점)에서 읽는다. 읽기 전용 — 재고·주문·돈 로직 무접촉.
   const [heldByVariant, setHeldByVariant] = useState<Record<string, number>>({});
@@ -880,6 +895,16 @@ export default function QuickProductFastForm({
   const details = useMemo(() => unique(splitOptions(detailText)), [detailText]);
   const colors = useMemo(() => unique(splitOptions(colorText)), [colorText]);
   const sizes = useMemo(() => unique(splitOptions(sizeText)), [sizeText]);
+  const brandGroupDetailPhotoSets = useMemo(() => {
+    const raw = initialProductNote?.detail_photo_sets;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {} as Record<string, string[]>;
+    return Object.fromEntries(Object.entries(raw).map(([name, value]) => [
+      name,
+      Array.isArray(value) ? value.map((url) => String(url || "").trim()).filter(Boolean) : [],
+    ]));
+  }, [initialProductNote]);
+  const brandGroupDetailCategories = initialProductNote?.brand_group?.detail_categories || {};
+  const brandGroupDetailPhotoCount = Object.values(brandGroupDetailPhotoSets).reduce((sum, photos) => sum + photos.length, 0);
   // 사용 중인 축 개수(1~3). 0이면 옵션 없는 단일 상품.
   const usedAxisCount = (details.length ? 1 : 0) + (colors.length ? 1 : 0) + (sizes.length ? 1 : 0);
 
@@ -898,8 +923,11 @@ export default function QuickProductFastForm({
 
   const resolvedVariantRows = useMemo(() => {
     if (stockMode !== "option") return [];
+    // 브랜드 대표상품은 세부상품마다 허용 색상·사이즈가 다르다.
+    // 전체 색상×전체 사이즈를 곱하면 존재하지 않는 수천 개 조합이 생기므로 저장된 실제 조합만 사용한다.
+    if (isBrandGroupEdit) return variantRows;
     return buildVariantRows(details, colors, sizes, variantRows);
-  }, [details, colors, sizes, stockMode, variantRows]);
+  }, [details, colors, sizes, stockMode, variantRows, isBrandGroupEdit]);
 
   const totalStock = useMemo(() => {
     if (stockMode === "option") {
@@ -1004,7 +1032,8 @@ export default function QuickProductFastForm({
   });
 
   const updateVariantStock = (targetKey: string, stock: number) => {
-    const nextRows = buildVariantRows(details, colors, sizes, variantRows).map((row) =>
+    const baseRows = isBrandGroupEdit ? variantRows : buildVariantRows(details, colors, sizes, variantRows);
+    const nextRows = baseRows.map((row) =>
       row.key === targetKey ? { ...row, stock } : row,
     );
 
@@ -1015,7 +1044,8 @@ export default function QuickProductFastForm({
   const [bulkStockText, setBulkStockText] = useState("10");
   const applyBulkStock = () => {
     const n = Math.max(0, Math.floor(Number(String(bulkStockText).replace(/[^0-9]/g, "")) || 0));
-    setVariantRows(buildVariantRows(details, colors, sizes, variantRows).map((row) => ({ ...row, stock: n })));
+    const baseRows = isBrandGroupEdit ? variantRows : buildVariantRows(details, colors, sizes, variantRows);
+    setVariantRows(baseRows.map((row) => ({ ...row, stock: n })));
   };
 
   // [2026-08-11] 세부상품 사진 업로드 — 기존 상품사진과 동일한 압축·업로드 API 재사용
@@ -1179,7 +1209,19 @@ export default function QuickProductFastForm({
           ]
         : null;
 
+      // 브랜드 대표상품의 엑셀 전용 구조는 일반 수정폼에서 새로 만들 수 없는 데이터다.
+      // 수정 저장 시 세부상품별 옵션·다중사진·가져오기 식별자를 반드시 보존한다.
+      const preservedBrandNote = isBrandGroupEdit
+        ? {
+            brand_group: initialProductNote?.brand_group,
+            detail_photo_sets: initialProductNote?.detail_photo_sets,
+            ...(initialProductNote?.import_batch ? { import_batch: initialProductNote.import_batch } : {}),
+            ...(initialProductNote?.vendor_code ? { vendor_code: initialProductNote.vendor_code } : {}),
+          }
+        : {};
+
       const productNote = JSON.stringify({
+        ...preservedBrandNote,
         stock_mode: stockMode,
         stock_variants: variantStockPayload,
         stock_management_enabled: stockManagementEnabled,
@@ -1231,7 +1273,10 @@ export default function QuickProductFastForm({
         color_option_enabled: detailActive ? true : colors.length > 0,
         size_option_enabled: sizes.length > 0,
         product_description: normalizeTextareaText(description).trim() || null,
-        detail_image_urls: detailImages,
+        // 브랜드 대표상품은 이 배열에 전체 세부사진이 함께 들어 있다. 일반폼의 5장 제한으로 잘라 저장하지 않는다.
+        detail_image_urls: isBrandGroupEdit
+          ? pickImageArray(initialProduct, ["detail_image_urls", "detail_images", "images"])
+          : detailImages,
         is_visible: isVisible,
         is_soldout: false,
         product_note: productNote,
@@ -1498,15 +1543,22 @@ export default function QuickProductFastForm({
                 <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>값 넣으면 고르기 · 비우면 손님 직접입력</span>
               </div>
 
+              {isBrandGroupEdit ? (
+                <div style={{ padding: "9px 10px", marginBottom: "8px", borderRadius: "8px", background: "#EEF6F3", border: "1px solid #CFE4DB", fontSize: "11.5px", lineHeight: 1.55, color: "#0F6E56" }}>
+                  <b>브랜드 대표상품 · 세부상품 {details.length}개</b><br />
+                  색상과 사이즈는 상품마다 다르게 저장되어 있어요. 아래 목록에는 각 상품에 실제 등록된 옵션만 표시됩니다.
+                </div>
+              ) : null}
+
               {/* 슬롯 1 — 세부상품(라벨 변경 가능). A-1 / A-2 / A-3 처럼 한 상품 안의 여러 상품 */}
-              <div style={optRow}>
+              <div style={isBrandGroupEdit ? { ...optRow, display: "none" } : optRow}>
                 <span style={optLabel}>세부상품</span>
                 <input style={optInput} type="text" placeholder="A-1, A-2, A-3 (쉼표로 구분)" value={detailText} onChange={(e) => setDetailText(e.target.value)} />
                 {!detailText.trim() ? <span style={{ fontSize: "11.5px", fontWeight: 700, color: "var(--color-ink-mute)", whiteSpace: "nowrap" }}>🚫 사용 안 함</span> : null}
               </div>
 
               {/* 슬롯 2 — 색상 */}
-              <div style={optRow}>
+              <div style={isBrandGroupEdit ? { ...optRow, display: "none" } : optRow}>
                 <span style={optLabel}>색상</span>
                 <input style={optInput} type="text" placeholder="화이트, 블랙, 베이지" value={colorText} onChange={(e) => setColorText(e.target.value)} />
                 <div ref={colorPresetRef} style={{ position: "relative", display: "inline-block" }}>
@@ -1531,7 +1583,7 @@ export default function QuickProductFastForm({
               </div>
 
               {/* 슬롯 3 — 사이즈 */}
-              <div style={optRow}>
+              <div style={isBrandGroupEdit ? { ...optRow, display: "none" } : optRow}>
                 <span style={optLabel}>사이즈</span>
                 <input style={optInput} type="text" placeholder="220, 230, 240" value={sizeText} onChange={(e) => setSizeText(e.target.value)} />
                 <div ref={sizePresetRef} style={{ position: "relative", display: "inline-block" }}>
@@ -1554,6 +1606,45 @@ export default function QuickProductFastForm({
                 </div>
                 {optionStateHint(sizeText) ? <span style={{ fontSize: "11.5px", fontWeight: 700, color: optionStateHint(sizeText)!.color, whiteSpace: "nowrap" }}>{optionStateHint(sizeText)!.text}</span> : null}
               </div>
+
+              {/* 엑셀 브랜드 대표상품: 재고관리를 꺼도 세부상품별 사진을 관리자가 바로 확인할 수 있게 한다. */}
+              {isBrandGroupEdit && details.length > 0 ? (
+                <div style={{ marginTop: "10px", borderTop: "1px solid #E8E2DD", paddingTop: "10px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "7px" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>세부상품별 사진</span>
+                    <span style={{ fontSize: "11px", fontWeight: 800, color: "#0F6E56" }}>{details.length}개 상품 · 총 {brandGroupDetailPhotoCount}장</span>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: "6px", maxHeight: "340px", overflowY: "auto", paddingRight: "3px" }}>
+                    {details.map((name) => {
+                      const photos = brandGroupDetailPhotoSets[name] || (detailPhotos[name] ? [detailPhotos[name]] : []);
+                      const thumbnail = photos[0] || detailPhotos[name] || "";
+                      const categoryLabel = String(brandGroupDetailCategories[name] || "").trim();
+                      const plus = Math.max(0, Number(detailPlus[name]) || 0);
+                      const unitPrice = moneyNumber(priceText) + plus;
+                      return (
+                        <div key={`brand-photo-${name}`} style={{ minWidth: 0, display: "grid", gridTemplateColumns: "46px minmax(0, 1fr)", gap: "8px", alignItems: "center", padding: "6px", border: "1px solid #E8E2DD", borderRadius: "8px", background: "var(--color-surface)" }}>
+                          <button
+                            type="button"
+                            disabled={!thumbnail}
+                            onClick={() => thumbnail && setDetailPreviewImage(resolveProductImageUrl(thumbnail))}
+                            title={thumbnail ? "클릭하면 크게 보기" : "등록된 사진 없음"}
+                            style={{ width: "46px", height: "46px", border: "none", borderRadius: "7px", padding: 0, overflow: "hidden", background: "#F1ECE8", cursor: thumbnail ? "zoom-in" : "default", display: "flex", alignItems: "center", justifyContent: "center" }}
+                          >
+                            {thumbnail ? <img src={resolveProductImageUrl(thumbnail)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "10px", color: "var(--color-ink-mute)" }}>사진 없음</span>}
+                          </button>
+                          <span style={{ minWidth: 0 }}>
+                            <span style={{ display: "block", fontSize: "11.5px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+                            <span style={{ display: "block", marginTop: "2px", fontSize: "10.5px", color: "var(--color-ink-mute)" }}>
+                              {[categoryLabel, `사진 ${photos.length}장`, unitPrice > 0 ? `${unitPrice.toLocaleString("ko-KR")}원` : ""].filter(Boolean).join(" · ")}
+                            </span>
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ marginTop: "6px", fontSize: "10.5px", color: "var(--color-ink-mute)" }}>썸네일을 누르면 크게 볼 수 있어요. 세부상품별 전체 사진은 고객 주문서에서 해당 상품을 선택하면 표시됩니다.</div>
+                </div>
+              ) : null}
 
               {usedAxisCount === 0 ? (
                 <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", padding: "2px 2px 0" }}>옵션 없는 단일 상품으로 등록됩니다. 손님은 수량만 고릅니다.</div>
@@ -1626,7 +1717,8 @@ export default function QuickProductFastForm({
                           ) : null}
 
                           {group.rows.map((row) => {
-                            const label = [row.colorOnly, row.size].filter(Boolean).join(" / ");
+                            const displayColor = String(row.colorOnly || "").trim() === "없음" ? "" : row.colorOnly;
+                            const label = [displayColor, row.size].filter(Boolean).join(" / ");
                             const heldQty = heldOf(String(row.color ?? row.colorOnly ?? ""), String(row.size ?? ""));
                             const sellable = Math.max(0, Number(row.stock || 0) - heldQty);
                             const soldOut = sellable <= 0;
@@ -1722,10 +1814,17 @@ export default function QuickProductFastForm({
           {/* 구분선 */}
           <div style={{ height: "1px", background: "#E8E2DD", margin: "12px 0" }} />
 
-          {/* 상세사진 (최대 5장) */}
-          <div style={{ marginBottom: "14px" }}>
-            <ImagePicker label="상세사진 (최대 5장)" value={detailImages} maxFiles={5} uploadKind="detail" mode="detail" onChange={setDetailImages} />
-          </div>
+          {/* 일반 상품 공통 상세사진 / 브랜드 대표상품은 위의 세부상품별 사진 목록으로 확인 */}
+          {!isBrandGroupEdit ? (
+            <div style={{ marginBottom: "14px" }}>
+              <ImagePicker label="상세사진 (최대 5장)" value={detailImages} maxFiles={5} uploadKind="detail" mode="detail" onChange={setDetailImages} />
+            </div>
+          ) : (
+            <div style={{ marginBottom: "14px", padding: "9px 11px", borderRadius: "8px", border: "1px solid #CFE4DB", background: "#EEF6F3", color: "#0F6E56", fontSize: "11.5px", lineHeight: 1.55 }}>
+              세부상품별 사진 <b>{details.length}개 상품 · 총 {brandGroupDetailPhotoCount}장</b>이 등록되어 있습니다.<br />
+              위의 세부상품 목록에서 썸네일과 사진 수를 확인할 수 있어요.
+            </div>
+          )}
 
           {/* 상세설명 */}
           <div style={{ marginBottom: "14px" }}>
@@ -1750,6 +1849,19 @@ export default function QuickProductFastForm({
         </div>
 
       </div>
+
+      {detailPreviewImage ? (
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="확대 사진 닫기"
+          onClick={() => setDetailPreviewImage("")}
+          onKeyDown={(event) => { if (event.key === "Escape" || event.key === "Enter") setDetailPreviewImage(""); }}
+          style={{ position: "fixed", inset: 0, zIndex: 100003, background: "rgba(0,0,0,0.78)", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", cursor: "zoom-out" }}
+        >
+          <img src={detailPreviewImage} alt="세부상품 확대 사진" style={{ maxWidth: "min(92vw, 920px)", maxHeight: "90vh", objectFit: "contain", borderRadius: "12px", background: "#fff", boxShadow: "0 18px 60px rgba(0,0,0,0.4)" }} />
+        </div>
+      ) : null}
     </div>
   );
 }
