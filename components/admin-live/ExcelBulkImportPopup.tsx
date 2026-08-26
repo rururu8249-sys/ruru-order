@@ -238,8 +238,20 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
       const existingCodes = new Set(existingActive.map((row) => productVendorCode(row)).filter(Boolean));
       const nameHits = targetNames.filter((name) => existingNames.has(name));
       const codeHits = targetCodes.filter((code) => existingCodes.has(code));
+      let resumeRows: Array<Record<string, unknown>> = [];
       if (nameHits.length > 0 || codeHits.length > 0) {
-        throw new Error(`이미 등록된 상품: ${[...new Set([...nameHits, ...codeHits])].join(", ")}`);
+        const exactRows = existingActive.filter((row) => targetNames.includes(String(row.product_name || "").trim()));
+        const batches = new Set(exactRows.map((row) => String(productNoteObject(row).import_batch || "")).filter((batch) => batch.startsWith("excel-")));
+        const isCompletePendingBatch =
+          exactRows.length === targets.length &&
+          nameHits.length === targetNames.length &&
+          codeHits.length === targetCodes.length &&
+          batches.size === 1 &&
+          exactRows.every((row) => String(row.status || "") === "숨김" && row.in_shop !== true);
+        if (!isCompletePendingBatch) {
+          throw new Error(`이미 등록된 상품: ${[...new Set([...nameHits, ...codeHits])].join(", ")}`);
+        }
+        resumeRows = exactRows;
       }
 
       if (targetBroadcastId) {
@@ -259,12 +271,14 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
       const importBatch = `excel-${new Date().toISOString()}-${Math.random().toString(36).slice(2, 10)}`;
       const prepared: Array<{
         payload: Record<string, unknown>;
-        desired: { status: string; is_visible: boolean; in_shop: boolean; mall_sort_order?: number };
+        desired: { status: string; in_shop: boolean; mall_sort_order?: number };
         expectedName: string;
         expectedCode: string;
         expectedPrice: number;
+        expectedBadges: string[];
+        expectedDetails: Array<{ name: string; plus: number; photos: number }>;
       }> = [];
-      setBusy("사진 전체 업로드 중…");
+      setBusy(resumeRows.length > 0 ? "숨김 등록분 이어서 검증 중…" : "사진 전체 업로드 중…");
       for (let i = 0; i < targets.length; i += 1) {
         const d = targets[i];
         // 사진은 상품 저장 전에 전부 업로드한다. 한 장이라도 실패하면 상품은 만들지 않는다.
@@ -291,10 +305,10 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
           }
           throw new Error(`${fileName}: 사진 업로드 4회 실패 (${lastMessage})`);
         };
-        if (d.imageBlob && !d.brandGroup) {
+        if (resumeRows.length === 0 && d.imageBlob && !d.brandGroup) {
           imageUrl = await uploadBlob(d.imageBlob, `${d.code || d.name}.jpg`, "cover");
         }
-        for (const detail of d.details || []) {
+        for (const detail of resumeRows.length === 0 ? (d.details || []) : []) {
           const blobs = d.detailImageBlobs?.[detail] || [];
           if (d.brandGroup && blobs.length === 0) throw new Error(`${detail}: 상세사진 없음`);
           for (let photoIndex = 0; photoIndex < blobs.length; photoIndex += 1) {
@@ -375,7 +389,6 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
         const finalName = finalNameOf(d);
         const desired = {
           status: rowPlace === "shop" ? "판매중" : "숨김",
-          is_visible: rowPlace === "shop",
           in_shop: rowPlace === "shop",
           ...(rowPlace === "shop" ? { mall_sort_order: 999999 } : {}),
         };
@@ -400,7 +413,6 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
           color_option_enabled: detailActive ? true : colors.length > 0,
           size_option_enabled: sizes.length > 0,
           detail_image_urls: detailImageUrls,
-          is_visible: false,
           is_soldout: false,
           in_shop: false,
           product_note: JSON.stringify(note),
@@ -411,12 +423,20 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
           expectedName: finalName,
           expectedCode: String(d.code || "").trim(),
           expectedPrice: Math.max(0, d.price + bulkPriceAdd),
+          expectedBadges: rowBadges,
+          expectedDetails: details.map((name) => ({
+            name,
+            plus: Math.max(0, Math.floor(d.detailPlus?.[name] ?? 0)),
+            photos: d.detailImageBlobs?.[name]?.length || 0,
+          })),
         });
         setProgress({ done: i + 1, total: targets.length, ok: 0, fail: 0 });
       }
 
       setBusy("상품 일괄 저장 중…");
-      const insertedRows = await insertProductsSchemaSafe(prepared.map((row) => row.payload));
+      const insertedRows = resumeRows.length > 0
+        ? resumeRows
+        : await insertProductsSchemaSafe(prepared.map((row) => row.payload));
       const inserted = (Array.isArray(insertedRows) ? insertedRows : []) as Array<Record<string, unknown>>;
       if (inserted.length !== prepared.length) {
         throw new Error(`저장 개수 불일치: 요청 ${prepared.length}개 / 저장 ${inserted.length}개`);
@@ -427,7 +447,7 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
       // 저장 직후 실제 DB 값과 중복 여부 재확인. 이 단계까지는 전 상품 숨김 상태다.
       const { data: verifyRows, error: verifyError } = await supabase
         .from("products")
-        .select("id, product_name, price, product_note, status, is_visible, in_shop")
+        .select("id, product_name, price, product_note, status, in_shop, badge_types")
         .in("id", insertedIds);
       if (verifyError) throw new Error(`저장 결과 확인 실패: ${verifyError.message}`);
       const verified = (verifyRows as Array<Record<string, unknown>>) || [];
@@ -437,8 +457,20 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
         if (!found) throw new Error(`${expected.expectedName}: 저장 결과 없음`);
         if (Number(found.price) !== expected.expectedPrice) throw new Error(`${expected.expectedName}: 가격 저장값 불일치`);
         if (productVendorCode(found) !== expected.expectedCode) throw new Error(`${expected.expectedName}: 업체코드 저장값 불일치`);
-        if (String(found.status || "") !== "숨김" || found.is_visible === true || found.in_shop === true) {
+        if (String(found.status || "") !== "숨김" || found.in_shop === true) {
           throw new Error(`${expected.expectedName}: 검증 전 공개 상태 오류`);
+        }
+        const badges = Array.isArray(found.badge_types) ? found.badge_types.map(String) : [];
+        if (badges.length !== expected.expectedBadges.length || expected.expectedBadges.some((badge) => !badges.includes(badge))) {
+          throw new Error(`${expected.expectedName}: 배지 저장값 불일치`);
+        }
+        const savedNote = productNoteObject(found);
+        const pricing = (savedNote.option_pricing || {}) as Record<string, unknown>;
+        const photoSets = (savedNote.detail_photo_sets || {}) as Record<string, unknown>;
+        for (const detail of expected.expectedDetails) {
+          if (Number(pricing[detail.name]) !== detail.plus) throw new Error(`${detail.name}: 추가금 저장값 불일치`);
+          const savedPhotos = Array.isArray(photoSets[detail.name]) ? photoSets[detail.name] as unknown[] : [];
+          if (savedPhotos.length !== detail.photos) throw new Error(`${detail.name}: 사진 저장 개수 불일치`);
         }
       }
       const activeAfter = await loadActiveProductIdentities("등록 후 중복 확인 실패");
@@ -502,13 +534,13 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
 
       const { data: finalRows, error: finalError } = await supabase
         .from("products")
-        .select("id, status, is_visible, in_shop")
+        .select("id, status, in_shop")
         .in("id", insertedIds);
       if (finalError) throw new Error(`최종 상태 확인 실패: ${finalError.message}`);
       const finalById = new Map(((finalRows as Array<Record<string, unknown>>) || []).map((row) => [String(row.id), row]));
       prepared.forEach((row, index) => {
         const actual = finalById.get(insertedIds[index]);
-        if (!actual || String(actual.status || "") !== row.desired.status || actual.is_visible !== row.desired.is_visible || actual.in_shop !== row.desired.in_shop) {
+        if (!actual || String(actual.status || "") !== row.desired.status || actual.in_shop !== row.desired.in_shop) {
           throw new Error(`${row.expectedName}: 최종 공개 상태 불일치`);
         }
       });
@@ -786,15 +818,19 @@ function getMissingColumn(errorMessage: string) {
   return null;
 }
 
-function productVendorCode(row: Record<string, unknown>) {
+function productNoteObject(row: Record<string, unknown>) {
   const raw = row.product_note;
-  if (!raw) return "";
+  if (!raw) return {} as Record<string, unknown>;
   try {
     const note = typeof raw === "string" ? JSON.parse(raw) : raw;
-    return String((note as Record<string, unknown>)?.vendor_code || "").trim();
+    return note && typeof note === "object" ? note as Record<string, unknown> : {};
   } catch {
-    return "";
+    return {} as Record<string, unknown>;
   }
+}
+
+function productVendorCode(row: Record<string, unknown>) {
+  return String(productNoteObject(row).vendor_code || "").trim();
 }
 
 async function loadActiveProductIdentities(errorPrefix: string) {
@@ -804,7 +840,7 @@ async function loadActiveProductIdentities(errorPrefix: string) {
     const from = page * pageSize;
     const { data, error } = await supabase
       .from("products")
-      .select("id, product_name, product_note, status")
+      .select("id, product_name, price, product_note, status, in_shop, badge_types")
       .order("id", { ascending: true })
       .range(from, from + pageSize - 1);
     if (error) throw new Error(`${errorPrefix}: ${error.message}`);
