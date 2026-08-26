@@ -1382,7 +1382,6 @@ export default function OrderPage() {
   const [nicknameCopyDone, setNicknameCopyDone] = useState(false);
   const [paymentGuideOpen, setPaymentGuideOpen] = useState(false);
   const [orderSheetOpen, setOrderSheetOpen] = useState(false);
-  const [finalSubmitConfirmOpen, setFinalSubmitConfirmOpen] = useState(false);
   const [finalSubmitAcknowledged, setFinalSubmitAcknowledged] = useState(false);
   const [customerInfoEditSheetOpen, setCustomerInfoEditSheetOpen] = useState(false);
   const [customerInfoEditInitialScreen, setCustomerInfoEditInitialScreen] = useState<"info" | "shipping_list" | "shipping_form">("info");
@@ -1398,6 +1397,10 @@ export default function OrderPage() {
   const [liveAlertOptin, setLiveAlertOptin] = useState(false);
   const [liveAlertSaving, setLiveAlertSaving] = useState(false);
   const [alertSheetOpen, setAlertSheetOpen] = useState(false);
+
+  useEffect(() => {
+    if (orderSheetOpen) setFinalSubmitAcknowledged(false);
+  }, [orderSheetOpen]);
   const [inquirySheetOpen, setInquirySheetOpen] = useState(false);
   const [noticeSheetOpen, setNoticeSheetOpen] = useState(false);
   // [2026-07-10] 주문 방법 팝업 — 관리자 설정(howto_enabled)이 켜져 있을 때만 뜬다.
@@ -1432,11 +1435,12 @@ export default function OrderPage() {
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxZoom, setLightboxZoom] = useState(1);
+  const [lightboxTitle, setLightboxTitle] = useState("");
   const lightboxTouchStartXRef = useRef<number | null>(null);
   const lightboxPinchRef = useRef<{ distance: number; zoom: number } | null>(null);
   const clampLightboxZoom = (value: number) => Math.min(4, Math.max(1, Math.round(value * 20) / 20));
   const changeLightboxZoom = (step: number) => setLightboxZoom((value) => clampLightboxZoom(value + step));
-  const openLightbox = (image: string, gallery: string[] = []) => {
+  const openLightbox = (image: string, gallery: string[] = [], title = "") => {
     const current = String(image || "").trim();
     if (!current) return;
     const cleanGallery = Array.from(new Set((gallery.length > 0 ? gallery : [current]).map((value) => String(value || "").trim()).filter(Boolean)));
@@ -1445,12 +1449,14 @@ export default function OrderPage() {
     setLightboxIndex(Math.max(0, cleanGallery.indexOf(current)));
     setLightboxImage(current);
     setLightboxZoom(1);
+    setLightboxTitle(String(title || "").trim());
   };
   const closeLightbox = () => {
     setLightboxImage("");
     setLightboxImages([]);
     setLightboxIndex(0);
     setLightboxZoom(1);
+    setLightboxTitle("");
     lightboxPinchRef.current = null;
   };
   const moveLightbox = (step: number) => {
@@ -1466,8 +1472,8 @@ export default function OrderPage() {
       if (event.key === "Escape") closeLightbox();
       if (event.key === "ArrowLeft") moveLightbox(-1);
       if (event.key === "ArrowRight") moveLightbox(1);
-      if (event.key === "+" || event.key === "=") changeLightboxZoom(0.25);
-      if (event.key === "-") changeLightboxZoom(-0.25);
+      if (event.key === "+" || event.key === "=") changeLightboxZoom(0.5);
+      if (event.key === "-") changeLightboxZoom(-0.5);
       if (event.key === "0") setLightboxZoom(1);
     };
     window.addEventListener("keydown", onKeyDown);
@@ -3685,6 +3691,7 @@ export default function OrderPage() {
   const openSheetItemOptionEdit = (index: number) => {
     const it = items[index];
     if (!it) return;
+    setFinalSubmitAcknowledged(false);
     const product = findMatchedBroadcastProduct(it, [...broadcastProducts, ...groupBuyQuickProductsFromCatalog]);
     if (!product) { showCustomerNotice("지금 판매 목록에 없는 상품이라 옵션 변경이 안 돼요 — 🗑 삭제 후 목록에서 다시 담아주세요."); return; }
     openRegisteredOptionSelectSheet(product);
@@ -3695,6 +3702,7 @@ export default function OrderPage() {
   };
 
   const changeSheetItemQty = (index: number, delta: number) => {
+    setFinalSubmitAcknowledged(false);
     setItems((prev) => prev.map((it, i) => {
       if (i !== index) return it;
       const cur = Math.max(1, toNumber(it.qty) || 1);
@@ -4052,6 +4060,7 @@ export default function OrderPage() {
   };
 
   const removeItem = (index: number) => {
+    setFinalSubmitAcknowledged(false);
     setItems((prev) => {
       const next = prev.filter((_, itemIndex) => itemIndex !== index);
       return next.length > 0 ? next : [{ ...emptyItem }];
@@ -4857,11 +4866,11 @@ export default function OrderPage() {
   // [정리 2026-07-06] 입금확인 모달(OrderDepositConfirmModal)은 "띄우지 않는" 죽은 코드였음 → 사용 코드 제거
   const handleSubmitOrderClick = () => {
     if (!validate()) return;
-
-    // 상품·옵션·배송지 스냅샷을 마지막으로 한 번 더 확인한 뒤 제출한다.
-    // 제출 후 회원 기본배송지를 바꿔도 이미 저장된 주문 주소는 바뀌지 않으므로 이 단계에서 명시한다.
-    setFinalSubmitAcknowledged(false);
-    setFinalSubmitConfirmOpen(true);
+    if (!finalSubmitAcknowledged) {
+      showCustomerNotice("상품·옵션·수량과 배송지를 확인한 뒤 마지막 확인에 체크해 주세요.", "warning");
+      return;
+    }
+    void submitOrder();
   };
 
   const selectedItemEntries = items
@@ -5253,11 +5262,13 @@ export default function OrderPage() {
   const registeredOptionColorSelected = registeredOptionColorMode === "none" || Boolean(normalizeEmptyProductOptionValue(registeredOptionColor));
   const registeredOptionSizeSelected = registeredOptionSizeMode === "none" || Boolean(normalizeEmptyProductOptionValue(registeredOptionSize));
   const registeredOptionSelectionReady = registeredOptionDetailSelected && registeredOptionColorSelected && registeredOptionSizeSelected;
-  const registeredOptionBrandCartItems = registeredOptionBrandGroup && registeredOptionSelectProduct
-    ? items.filter((item) => item.product_id === String(registeredOptionSelectProduct.id ?? "") && item.product_name.trim())
+  const registeredOptionBrandCartEntries = registeredOptionBrandGroup && registeredOptionSelectProduct
+    ? items
+        .map((item, itemIndex) => ({ item, itemIndex }))
+        .filter(({ item }) => item.product_id === String(registeredOptionSelectProduct.id ?? "") && item.product_name.trim())
     : [];
-  const registeredOptionBrandCartCount = registeredOptionBrandCartItems
-    .reduce((sum, item) => sum + Math.max(0, Number(item.qty) || 0), 0);
+  const registeredOptionBrandCartCount = registeredOptionBrandCartEntries
+    .reduce((sum, { item }) => sum + Math.max(0, Number(item.qty) || 0), 0);
   const allOptionsSoldOut = registeredOptionSelectProduct ? isSoldOutOrderProduct(registeredOptionSelectProduct) : false;
 
   // [2026-07-16 사장님 지침] 유튜브 닉네임 미입력이면 주문서/담기 진입 자체를 막고 닉네임 입력 모달을 강제한다.
@@ -5675,7 +5686,7 @@ export default function OrderPage() {
                           <div style={listView === "grid"
                             ? { display: "flex", flexDirection: "column", gap: "8px", alignItems: "stretch", flex: 1, minWidth: 0 }
                             : { display: "flex", gap: "12px", alignItems: "center" }}>
-                          <div onClick={() => { if (img) openLightbox(img, [img]); }} style={listView === "grid"
+                          <div onClick={() => { if (img) openLightbox(img, [img], String(product.product_name || "상품")); }} style={listView === "grid"
                             ? { position: "relative", width: "100%", aspectRatio: "1 / 1", borderRadius: "10px", background: "#F0EBE8", overflow: "hidden", cursor: img ? "zoom-in" : "default" }
                             : { position: "relative", flexShrink: 0, width: "84px", height: "84px", borderRadius: "10px", background: "#F0EBE8", overflow: "hidden", cursor: img ? "zoom-in" : "default" }}>
                             {brandGroup ? (
@@ -5767,8 +5778,8 @@ export default function OrderPage() {
 
           {orderSheetOpen && (
           <div style={{ position: "fixed", inset: 0, zIndex: 35, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={(e) => { if (e.target === e.currentTarget) setOrderSheetOpen(false); }}>
-            <div style={{ background: "#fff", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: "430px", maxHeight: "92dvh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-              <div style={{ width: "40px", height: "4px", borderRadius: "2px", background: "#E5E1DC", margin: "12px auto 0", flexShrink: 0 }} />
+            <div data-sheet style={{ background: "#fff", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: "430px", maxHeight: "92dvh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              <SheetGrabber onClose={() => { if (!submitting) setOrderSheetOpen(false); }} threshold={110} style={{ margin: "4px auto -4px", paddingBottom: "8px" }} />
               <div style={{ flexShrink: 0, padding: "12px 18px", borderBottom: "0.5px solid #E5E1DC", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
                 <div style={{ minWidth: 0 }}>
                   <span style={{ fontSize: "17px", fontWeight: 800, color: "#1A1A1A" }}>주문서 확인</span>
@@ -5785,7 +5796,7 @@ export default function OrderPage() {
                 <div style={{ margin: "12px 16px 0", border: "1px solid #E5E1DC", borderRadius: "12px", padding: "12px 14px", background: "#FAF8F6" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                     <span style={{ fontSize: "13px", fontWeight: 800, color: "#1A1A1A" }}>🚚 배송지</span>
-                    <button type="button" onClick={() => openCustomerInfoEditBottomSheet("shipping_list")} style={{ border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", borderRadius: "8px", padding: "4px 12px", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>변경</button>
+                    <button type="button" onClick={() => { setFinalSubmitAcknowledged(false); openCustomerInfoEditBottomSheet("shipping_list"); }} style={{ border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", borderRadius: "8px", padding: "4px 12px", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>변경</button>
                   </div>
                   <div style={{ fontSize: "12px", color: "#444", lineHeight: 1.8 }}>
                     <div>닉네임: {youtubeNickname.trim() || "-"}</div>
@@ -6013,6 +6024,18 @@ export default function OrderPage() {
                   </span>
                 </label>
               )}
+
+              <div style={{ marginTop: "14px", borderRadius: "16px", border: "1px solid #F2D2AE", background: "#FFF3E8", padding: "13px" }}>
+                <strong style={{ display: "block", fontSize: "13px", color: "#9A4B00" }}>⚠️ 제출하기 전에 배송지를 확인해 주세요</strong>
+                <p style={{ marginTop: "5px", fontSize: "11.5px", fontWeight: 700, lineHeight: 1.6, color: "#80522B", wordBreak: "keep-all" }}>
+                  제출 후 내정보에서 배송지를 바꿔도 <b>이미 제출한 이번 주문에는 반영되지 않습니다.</b> 위 배송지를 지금 수정해 주세요.
+                </p>
+              </div>
+
+              <label style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginTop: "12px", borderRadius: "16px", border: finalSubmitAcknowledged ? "1.5px solid #7A1E47" : "1.5px solid #D9C5CC", background: finalSubmitAcknowledged ? "#F9EEF3" : "#fff", padding: "13px", cursor: "pointer" }}>
+                <input type="checkbox" checked={finalSubmitAcknowledged} onChange={(event) => setFinalSubmitAcknowledged(event.target.checked)} style={{ width: "19px", height: "19px", flexShrink: 0, accentColor: "#7A1E47" }} />
+                <span style={{ fontSize: "12.5px", fontWeight: 900, lineHeight: 1.55, color: "#4B3540" }}>상품명·옵션·수량과 위 배송지를 모두 확인했습니다.</span>
+              </label>
             </section>
               </div>
 
@@ -6057,78 +6080,15 @@ export default function OrderPage() {
                 <button
                   type="button"
                   onClick={handleSubmitOrderClick}
-                  disabled={submitting || customerBlockStatus.blocked}
-                  style={{ width: "100%", padding: "14px", background: submitting || customerBlockStatus.blocked ? "#cbd5e1" : "#7A1E47", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: submitting || customerBlockStatus.blocked ? "default" : "pointer" }}
+                  disabled={submitting || customerBlockStatus.blocked || !finalSubmitAcknowledged}
+                  style={{ width: "100%", padding: "14px", background: submitting || customerBlockStatus.blocked || !finalSubmitAcknowledged ? "#cbd5e1" : "#7A1E47", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: submitting || customerBlockStatus.blocked || !finalSubmitAcknowledged ? "default" : "pointer" }}
                 >
-                  {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : `${won(finalPaymentAmount)} · 주문서 제출하기`}
+                  {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : `${won(finalPaymentAmount)} · 주문서 제출`}
                 </button>
               </div>
             </div>
           </div>
           )}
-
-          {finalSubmitConfirmOpen ? (
-            <div role="dialog" aria-modal="true" aria-label="주문서 최종 확인" onClick={(event) => { if (event.target === event.currentTarget && !submitting) setFinalSubmitConfirmOpen(false); }} style={{ position: "fixed", inset: 0, zIndex: 165, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(15,12,13,0.62)" }}>
-              <div style={{ width: "100%", maxWidth: "430px", maxHeight: "90dvh", display: "flex", flexDirection: "column", overflow: "hidden", borderTopLeftRadius: "26px", borderTopRightRadius: "26px", background: "#fff", boxShadow: "0 -20px 60px rgba(0,0,0,0.25)" }}>
-                <div style={{ flexShrink: 0, padding: "14px 18px", borderBottom: "1px solid #EDE6E2" }}>
-                  <div style={{ width: "42px", height: "4px", margin: "0 auto 10px", borderRadius: "999px", background: "#DDD6D2" }} />
-                  <div style={{ fontSize: "12px", fontWeight: 900, color: "#7A1E47" }}>제출 전 마지막 단계</div>
-                  <h2 style={{ marginTop: "3px", fontSize: "20px", fontWeight: 900, color: "#201A1D" }}>상품과 배송지를 확인해 주세요</h2>
-                </div>
-
-                <div style={{ minHeight: 0, flex: 1, overflowY: "auto", padding: "14px 16px" }}>
-                  <section style={{ borderRadius: "15px", border: "1.5px solid #D9C5CC", background: "#FFF9FB", padding: "13px" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
-                      <strong style={{ fontSize: "14px", color: "#2E2026" }}>🚚 이번 주문 배송지</strong>
-                      <button type="button" onClick={() => { setFinalSubmitConfirmOpen(false); openCustomerInfoEditBottomSheet("shipping_list"); }} style={{ border: "1px solid #D9C5CC", borderRadius: "8px", background: "#fff", padding: "5px 10px", color: "#7A1E47", fontSize: "11px", fontWeight: 900, cursor: "pointer" }}>배송지 수정</button>
-                    </div>
-                    <div style={{ marginTop: "8px", fontSize: "12px", fontWeight: 700, lineHeight: 1.7, color: "#4D4448" }}>
-                      <div>{recipientName.trim() || customerName.trim()} · {formatPhone(recipientPhone.trim() || customerPhone)}</div>
-                      <div style={{ fontSize: "13px", fontWeight: 900, color: "#201A1D", wordBreak: "keep-all" }}>{[address.trim(), detailAddress.trim()].filter(Boolean).join(" ") || "주소 미입력"}</div>
-                    </div>
-                  </section>
-
-                  <section style={{ marginTop: "12px", borderRadius: "15px", border: "1px solid #E8E2DD", background: "#fff", overflow: "hidden" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", padding: "11px 12px", background: "#F8F5F3" }}>
-                      <strong style={{ fontSize: "14px", color: "#2E2026" }}>🛒 주문 상품</strong>
-                      <span style={{ fontSize: "11px", fontWeight: 900, color: "#7A1E47" }}>총 {totalQty}개</span>
-                    </div>
-                    <div>
-                      {selectedItemEntries.map(({ item, index }) => {
-                        const colorText = normalizeEmptyProductOptionValue(item.color) || "없음";
-                        const sizeText = normalizeEmptyProductOptionValue(item.size) || "없음";
-                        const qty = Math.max(1, toNumber(item.qty));
-                        return (
-                          <div key={`final-confirm-${index}`} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: "10px", padding: "10px 12px", borderTop: index === 0 ? "none" : "1px solid #F0EAE0" }}>
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ fontSize: "12px", fontWeight: 900, lineHeight: 1.45, color: "#2B2528", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{item.product_name}</div>
-                              <div style={{ marginTop: "2px", fontSize: "11px", fontWeight: 700, color: "#877A80" }}>색상 {colorText} · 사이즈 {sizeText} · 수량 {qty}개</div>
-                            </div>
-                            <strong style={{ alignSelf: "center", fontSize: "12px", color: "#7A1E47" }}>{won(toNumber(item.product_price) * qty)}</strong>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </section>
-
-                  <section style={{ marginTop: "12px", borderRadius: "15px", background: "#FFF3E8", border: "1px solid #F2D2AE", padding: "12px" }}>
-                    <strong style={{ display: "block", fontSize: "13px", color: "#9A4B00" }}>⚠️ 제출 후에는 주소가 자동으로 바뀌지 않습니다</strong>
-                    <p style={{ marginTop: "5px", fontSize: "11.5px", fontWeight: 700, lineHeight: 1.6, color: "#80522B", wordBreak: "keep-all" }}>주문서를 제출한 뒤 내정보에서 배송지를 수정해도 <b>이미 제출한 이번 주문에는 반영되지 않습니다.</b> 변경이 필요하면 카톡채널로 문의해 주세요.</p>
-                  </section>
-
-                  <label style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginTop: "12px", borderRadius: "15px", border: finalSubmitAcknowledged ? "1.5px solid #7A1E47" : "1.5px solid #D9C5CC", background: finalSubmitAcknowledged ? "#F9EEF3" : "#fff", padding: "12px", cursor: "pointer" }}>
-                    <input type="checkbox" checked={finalSubmitAcknowledged} onChange={(event) => setFinalSubmitAcknowledged(event.target.checked)} style={{ width: "19px", height: "19px", flexShrink: 0, accentColor: "#7A1E47" }} />
-                    <span style={{ fontSize: "12.5px", fontWeight: 900, lineHeight: 1.55, color: "#4B3540" }}>상품명·옵션·수량과 위 배송지를 모두 확인했습니다.</span>
-                  </label>
-                </div>
-
-                <div style={{ flexShrink: 0, display: "grid", gridTemplateColumns: "0.8fr 1.2fr", gap: "10px", borderTop: "1px solid #EDE6E2", padding: "12px 16px calc(14px + env(safe-area-inset-bottom))", background: "#fff" }}>
-                  <button type="button" disabled={submitting} onClick={() => setFinalSubmitConfirmOpen(false)} style={{ height: "52px", border: "none", borderRadius: "15px", background: "#F1ECEE", color: "#655B60", fontSize: "14px", fontWeight: 900, cursor: "pointer" }}>돌아가서 수정</button>
-                  <button type="button" disabled={!finalSubmitAcknowledged || submitting} onClick={() => { if (!finalSubmitAcknowledged || submitting) return; setFinalSubmitConfirmOpen(false); void submitOrder(); }} style={{ height: "52px", border: "none", borderRadius: "15px", background: finalSubmitAcknowledged && !submitting ? "#7A1E47" : "#CFC4C8", color: "#fff", fontSize: "14px", fontWeight: 900, cursor: finalSubmitAcknowledged && !submitting ? "pointer" : "default" }}>{submitting ? "제출 중..." : "확인 후 주문서 제출"}</button>
-                </div>
-              </div>
-            </div>
-          ) : null}
 
             <CustomerToastNotice
               open={Boolean(customerNotice.message)}
@@ -6176,11 +6136,11 @@ export default function OrderPage() {
           {/* 상품 이미지 크게 보기 (lightbox) */}
           {lightboxImage ? (
             <div
-              style={{ position: "fixed", inset: 0, zIndex: 150, display: "flex", alignItems: lightboxZoom > 1 ? "flex-start" : "center", justifyContent: "center", background: "rgba(0,0,0,0.9)", padding: lightboxZoom > 1 ? "72px 0 104px" : "20px", overflow: "auto", touchAction: "none" }}
+              style={{ position: "fixed", inset: 0, zIndex: 150, display: lightboxZoom > 1 ? "block" : "flex", alignItems: lightboxZoom > 1 ? undefined : "center", justifyContent: lightboxZoom > 1 ? undefined : "center", background: "rgba(0,0,0,0.9)", padding: lightboxZoom > 1 ? "72px 0 104px" : "72px 20px 104px", overflow: "auto", touchAction: lightboxZoom > 1 ? "pan-x pan-y" : "none" }}
               onClick={closeLightbox}
               onWheel={(event) => {
                 event.preventDefault();
-                changeLightboxZoom(event.deltaY < 0 ? 0.25 : -0.25);
+                changeLightboxZoom(event.deltaY < 0 ? 0.5 : -0.5);
               }}
               onTouchStart={(event) => {
                 if (event.touches.length >= 2) {
@@ -6217,22 +6177,25 @@ export default function OrderPage() {
                 if (Math.abs(distance) >= 45) moveLightbox(distance > 0 ? -1 : 1);
               }}
             >
-              <button type="button" onClick={(event) => { event.stopPropagation(); closeLightbox(); }} aria-label="닫기" style={{ position: "absolute", zIndex: 3, top: "16px", right: "16px", width: "44px", height: "44px", borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.2)", color: "#fff", fontSize: "22px", cursor: "pointer" }}>✕</button>
+              <div onClick={(event) => event.stopPropagation()} style={{ position: "fixed", zIndex: 4, top: "14px", left: "14px", right: "72px", minHeight: "44px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", borderRadius: "12px", background: "rgba(20,16,18,0.72)", padding: "8px 12px", color: "#fff", backdropFilter: "blur(8px)" }}>
+                <strong style={{ minWidth: 0, fontSize: "13px", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{lightboxTitle || "상품 사진"}</strong>
+                {lightboxImages.length > 1 ? <span style={{ flexShrink: 0, borderRadius: "999px", background: "rgba(255,255,255,0.16)", padding: "4px 8px", fontSize: "11px", fontWeight: 900 }}>사진 {lightboxIndex + 1} / {lightboxImages.length}</span> : null}
+              </div>
+              <button type="button" onClick={(event) => { event.stopPropagation(); closeLightbox(); }} aria-label="닫기" style={{ position: "fixed", zIndex: 5, top: "16px", right: "16px", width: "44px", height: "44px", borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.2)", color: "#fff", fontSize: "22px", cursor: "pointer" }}>✕</button>
               {lightboxImages.length > 1 ? (
                 <>
-                  <div style={{ position: "absolute", zIndex: 3, left: "50%", top: "18px", transform: "translateX(-50%)", minWidth: "58px", borderRadius: "999px", background: "rgba(0,0,0,0.48)", padding: "7px 12px", color: "#fff", textAlign: "center", fontSize: "14px", fontWeight: 900 }}>{lightboxIndex + 1} / {lightboxImages.length}</div>
                   <button type="button" aria-label="이전 사진" onClick={(event) => { event.stopPropagation(); moveLightbox(-1); }} style={{ position: "fixed", zIndex: 3, left: "12px", top: "50%", transform: "translateY(-50%)", width: "48px", height: "58px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.26)", background: "rgba(0,0,0,0.38)", color: "#fff", fontSize: "30px", fontWeight: 900, cursor: "pointer" }}>‹</button>
                   <button type="button" aria-label="다음 사진" onClick={(event) => { event.stopPropagation(); moveLightbox(1); }} style={{ position: "fixed", zIndex: 3, right: "12px", top: "50%", transform: "translateY(-50%)", width: "48px", height: "58px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.26)", background: "rgba(0,0,0,0.38)", color: "#fff", fontSize: "30px", fontWeight: 900, cursor: "pointer" }}>›</button>
                 </>
               ) : null}
               <div onClick={(event) => event.stopPropagation()} style={{ position: "fixed", zIndex: 4, left: "50%", bottom: "42px", transform: "translateX(-50%)", display: "flex", alignItems: "center", overflow: "hidden", border: "1px solid rgba(255,255,255,0.28)", borderRadius: "14px", background: "rgba(25,20,22,0.78)", boxShadow: "0 8px 24px rgba(0,0,0,0.28)" }}>
-                <button type="button" aria-label="사진 축소" disabled={lightboxZoom <= 1} onClick={() => changeLightboxZoom(-0.25)} style={{ width: "44px", height: "42px", border: "none", borderRight: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: lightboxZoom <= 1 ? "rgba(255,255,255,0.35)" : "#fff", fontSize: "24px", fontWeight: 900, cursor: lightboxZoom <= 1 ? "default" : "pointer" }}>−</button>
+                <button type="button" aria-label="사진 축소" disabled={lightboxZoom <= 1} onClick={() => changeLightboxZoom(-0.5)} style={{ width: "44px", height: "42px", border: "none", borderRight: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: lightboxZoom <= 1 ? "rgba(255,255,255,0.35)" : "#fff", fontSize: "24px", fontWeight: 900, cursor: lightboxZoom <= 1 ? "default" : "pointer" }}>−</button>
                 <span style={{ minWidth: "66px", color: "#fff", textAlign: "center", fontSize: "13px", fontWeight: 900 }}>{Math.round(lightboxZoom * 100)}%</span>
-                <button type="button" aria-label="사진 확대" disabled={lightboxZoom >= 4} onClick={() => changeLightboxZoom(0.25)} style={{ width: "44px", height: "42px", border: "none", borderLeft: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: lightboxZoom >= 4 ? "rgba(255,255,255,0.35)" : "#fff", fontSize: "22px", fontWeight: 900, cursor: lightboxZoom >= 4 ? "default" : "pointer" }}>＋</button>
-                <button type="button" onClick={() => setLightboxZoom(1)} style={{ height: "42px", padding: "0 13px", border: "none", borderLeft: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: "#fff", fontSize: "12px", fontWeight: 900, cursor: "pointer" }}>원본</button>
+                <button type="button" aria-label="사진 확대" disabled={lightboxZoom >= 4} onClick={() => changeLightboxZoom(0.5)} style={{ width: "44px", height: "42px", border: "none", borderLeft: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: lightboxZoom >= 4 ? "rgba(255,255,255,0.35)" : "#fff", fontSize: "22px", fontWeight: 900, cursor: lightboxZoom >= 4 ? "default" : "pointer" }}>＋</button>
+                <button type="button" onClick={() => setLightboxZoom(1)} style={{ height: "42px", padding: "0 13px", border: "none", borderLeft: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: "#fff", fontSize: "12px", fontWeight: 900, cursor: "pointer" }}>맞춤</button>
               </div>
               <div style={{ position: "fixed", zIndex: 3, left: "50%", bottom: "14px", transform: "translateX(-50%)", color: "rgba(255,255,255,.88)", fontSize: "11px", fontWeight: 700, pointerEvents: "none", whiteSpace: "nowrap" }}>{lightboxImages.length > 1 && lightboxZoom <= 1 ? "좌우로 넘기기 · 두 손가락 확대" : "두 손가락 또는 ＋/−로 확대·축소"}</div>
-              <img src={lightboxImage} alt={`${lightboxIndex + 1}번째 상품 사진`} draggable={false} onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => { e.stopPropagation(); setLightboxZoom((value) => value > 1 ? 1 : 2); }} style={{ width: lightboxZoom > 1 ? `${lightboxZoom * 100}%` : "auto", maxWidth: lightboxZoom > 1 ? "none" : "100%", maxHeight: lightboxZoom > 1 ? "none" : "100%", objectFit: "contain", borderRadius: lightboxZoom > 1 ? "0" : "12px", cursor: lightboxZoom > 1 ? "zoom-out" : "zoom-in", touchAction: "none", userSelect: "none" }} />
+              <img src={lightboxImage} alt={`${lightboxTitle || "상품"} ${lightboxIndex + 1}번째 사진`} draggable={false} onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => { e.stopPropagation(); setLightboxZoom((value) => value > 1 ? 1 : 2); }} style={{ display: "block", width: lightboxZoom > 1 ? `${lightboxZoom * 100}vw` : "auto", height: "auto", maxWidth: lightboxZoom > 1 ? "none" : "calc(100vw - 40px)", maxHeight: lightboxZoom > 1 ? "none" : "calc(100dvh - 176px)", flexShrink: 0, margin: lightboxZoom > 1 ? "0" : "auto", objectFit: "contain", borderRadius: lightboxZoom > 1 ? "0" : "12px", cursor: lightboxZoom > 1 ? "zoom-out" : "zoom-in", touchAction: lightboxZoom > 1 ? "pan-x pan-y" : "none", userSelect: "none" }} />
             </div>
           ) : null}
 
@@ -6292,13 +6255,13 @@ export default function OrderPage() {
 
           {registeredOptionSelectProduct && (
             <div style={{ position: "fixed", inset: 0, zIndex: 128, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(0,0,0,0.45)" }} onClick={(e) => { if (e.target === e.currentTarget) closeRegisteredOptionSelectSheet(); }}>
-              <div data-sheet style={{ width: "100%", maxWidth: "430px", maxHeight: "92dvh", display: "flex", flexDirection: "column", background: "#fff", borderTopLeftRadius: "26px", borderTopRightRadius: "26px", overflow: "hidden" }}>
+              <div data-sheet style={{ width: "100%", maxWidth: "430px", height: "96dvh", maxHeight: "96dvh", display: "flex", flexDirection: "column", background: "#fff", borderTopLeftRadius: "26px", borderTopRightRadius: "26px", overflow: "hidden" }}>
                 <div style={{ flexShrink: 0, borderBottom: "1px solid #F0EAE0", padding: "12px 16px 16px" }}>
                   <SheetGrabber onClose={closeRegisteredOptionSelectSheet} style={{ margin: "0 auto 6px" }} />
                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                     {(() => {
                       const selectedPhoto = registeredOptionBrandDetailPhotos[0] || registeredOptionComboPhotos[registeredOptionDetail] || pickOrderProductImageUrl(registeredOptionSelectProduct);
-                      return <div onClick={() => { if (selectedPhoto) openLightbox(selectedPhoto, registeredOptionAllImages); }} style={{ position: "relative", width: "60px", height: "60px", flexShrink: 0, borderRadius: "12px", overflow: "hidden", background: "#F0EBE8", cursor: selectedPhoto ? "zoom-in" : "default" }}>
+                      return <div onClick={() => { if (selectedPhoto) openLightbox(selectedPhoto, registeredOptionAllImages, registeredOptionPhotoTitle); }} style={{ position: "relative", width: "60px", height: "60px", flexShrink: 0, borderRadius: "12px", overflow: "hidden", background: "#F0EBE8", cursor: selectedPhoto ? "zoom-in" : "default" }}>
                       {selectedPhoto ? (
                         <img src={selectedPhoto} alt={registeredOptionDetail || registeredOptionSelectProduct.product_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       ) : registeredOptionBrandGroup ? (
@@ -6332,7 +6295,7 @@ export default function OrderPage() {
                   {registeredOptionAllImages.length > 1 ? (
                     <div style={{ display: "flex", gap: "6px", marginTop: "10px", overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: "2px" }}>
                       {registeredOptionAllImages.map((img, i) => (
-                        <img key={`thumb-${i}`} src={img} alt={`${i + 1}번째 상품 사진`} onClick={() => openLightbox(img, registeredOptionAllImages)} style={{ width: "46px", height: "46px", flexShrink: 0, borderRadius: "8px", objectFit: "cover", cursor: "zoom-in", border: "1px solid #EEE7E1", background: "#F0EBE8" }} />
+                        <img key={`thumb-${i}`} src={img} alt={`${i + 1}번째 상품 사진`} onClick={() => openLightbox(img, registeredOptionAllImages, registeredOptionPhotoTitle)} style={{ width: "46px", height: "46px", flexShrink: 0, borderRadius: "8px", objectFit: "cover", cursor: "zoom-in", border: "1px solid #EEE7E1", background: "#F0EBE8" }} />
                       ))}
                     </div>
                   ) : null}
@@ -6367,7 +6330,7 @@ export default function OrderPage() {
                               <img
                                 src={registeredOptionBrandDetailPhotos[0] || registeredOptionComboPhotos[registeredOptionDetail]}
                                 alt={`${registeredOptionDetail} 선택 상품`}
-                                onClick={() => openLightbox(registeredOptionBrandDetailPhotos[0] || registeredOptionComboPhotos[registeredOptionDetail], registeredOptionAllImages)}
+                                onClick={() => openLightbox(registeredOptionBrandDetailPhotos[0] || registeredOptionComboPhotos[registeredOptionDetail], registeredOptionAllImages, registeredOptionPhotoTitle)}
                                 style={{ width: "60px", height: "60px", borderRadius: "10px", objectFit: "cover", background: "#F0EBE8", cursor: "zoom-in" }}
                               />
                             ) : <div style={{ width: "60px", height: "60px", borderRadius: "10px", background: "#F0EBE8" }} />}
@@ -6542,7 +6505,7 @@ export default function OrderPage() {
                                 >
                                   {detailCover ? (
                                     <span
-                                      onClick={(event) => { event.stopPropagation(); openLightbox(detailCover, detailGallery); }}
+                                      onClick={(event) => { event.stopPropagation(); openLightbox(detailCover, detailGallery, orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name ?? ""), name)); }}
                                       style={{ position: "relative", width: "48px", height: "48px", borderRadius: "8px", overflow: "hidden", flexShrink: 0, background: "#F0EBE8", opacity: soldOut ? 0.5 : 1, cursor: "zoom-in" }}
                                     >
                                       <img src={detailCover} alt={`${name} 상품 사진`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -6669,7 +6632,7 @@ export default function OrderPage() {
                                 <span style={{ minWidth: 0, fontSize: "13px", fontWeight: 900, lineHeight: 1.35, color: "#4A2634", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{registeredOptionPhotoTitle}</span>
                                 {registeredOptionDetailImages.length > 1 ? <span style={{ flexShrink: 0, borderRadius: "999px", background: "#7A1E47", padding: "3px 8px", color: "#fff", fontSize: "10px", fontWeight: 900 }}>사진 {i + 1} / {registeredOptionDetailImages.length}</span> : null}
                               </div>
-                              <img src={img} alt={`${registeredOptionPhotoTitle} ${i + 1}번째 상세 사진`} onClick={() => openLightbox(img, registeredOptionDetailImages)} style={{ display: "block", width: "100%", objectFit: "cover", cursor: "zoom-in", background: "#F0EBE8" }} />
+                              <img src={img} alt={`${registeredOptionPhotoTitle} ${i + 1}번째 상세 사진`} onClick={() => openLightbox(img, registeredOptionDetailImages, registeredOptionPhotoTitle)} style={{ display: "block", width: "100%", objectFit: "cover", cursor: "zoom-in", background: "#F0EBE8" }} />
                             </div>
                           ))}
                         </div>
@@ -6681,24 +6644,33 @@ export default function OrderPage() {
                   ) : null}
                 </div>
 
-                {registeredOptionBrandCartItems.length > 0 ? (
+                {registeredOptionBrandCartEntries.length > 0 ? (
                   <section style={{ flexShrink: 0, maxHeight: "138px", overflowY: "auto", borderTop: "1px solid #D8EADF", background: "#F3FBF7", padding: "9px 14px" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "6px" }}>
                       <strong style={{ fontSize: "12px", color: "#0F6E56" }}>✓ 이 브랜드에서 담은 상품</strong>
                       <span style={{ borderRadius: "999px", background: "#0F6E56", padding: "2px 8px", color: "#fff", fontSize: "10px", fontWeight: 900 }}>총 {registeredOptionBrandCartCount}개</span>
                     </div>
                     <div style={{ display: "grid", gap: "5px" }}>
-                      {registeredOptionBrandCartItems.map((item, index) => {
+                      {registeredOptionBrandCartEntries.map(({ item, itemIndex }, index) => {
                         const colorText = normalizeEmptyProductOptionValue(item.color) || "없음";
                         const sizeText = normalizeEmptyProductOptionValue(item.size) || "없음";
                         const qty = Math.max(1, Number(item.qty) || 1);
                         return (
-                          <div key={`brand-cart-summary-${index}`} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: "8px", borderRadius: "9px", background: "#fff", padding: "7px 9px", border: "1px solid #DDEEE4" }}>
+                          <div key={`brand-cart-summary-${index}`} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto auto", alignItems: "center", gap: "8px", borderRadius: "9px", background: "#fff", padding: "7px 9px", border: "1px solid #DDEEE4" }}>
                             <div style={{ minWidth: 0 }}>
                               <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 900, color: "#263A31" }}>{item.product_name}</div>
                               <div style={{ marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "10px", fontWeight: 700, color: "#6B8074" }}>색상 {colorText} · 사이즈 {sizeText} · 수량 {qty}개</div>
                             </div>
                             <strong style={{ alignSelf: "center", fontSize: "11px", color: "#0F6E56" }}>{won(toNumber(item.product_price) * qty)}</strong>
+                            <button
+                              type="button"
+                              aria-label={`${item.product_name} 주문서에서 빼기`}
+                              onClick={() => guardChatItem(item, `${item.product_name} · ${qty}개 삭제`, "삭제할게요", () => {
+                                removeItem(itemIndex);
+                                showCustomerNotice(`${item.product_name}을(를) 주문서에서 뺐어요.`, "info");
+                              })}
+                              style={{ minWidth: "42px", height: "28px", borderRadius: "8px", border: "1px solid #E3C6CD", background: "#FFF7F8", padding: "0 7px", color: "#A13A50", fontSize: "10px", fontWeight: 900, cursor: "pointer" }}
+                            >빼기</button>
                           </div>
                         );
                       })}
@@ -6706,25 +6678,37 @@ export default function OrderPage() {
                   </section>
                 ) : null}
 
-                <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "16px 18px" }}>
-                  <span style={{ fontSize: "14px", fontWeight: 800, color: "#333" }}>수량</span>
-                  <div style={{ display: "grid", gridTemplateColumns: "40px 44px 40px", height: "44px", borderRadius: "12px", border: "1px solid #E8E2DD", overflow: "hidden" }}>
-                    <button type="button" onClick={() => setRegisteredOptionQty((c) => Math.max(1, c - 1))} style={{ borderRight: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#555", cursor: "pointer" }}>−</button>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionQty}</div>
-                    <button type="button" onClick={() => {
-                      const maxStock = (() => {
-                        if (!registeredOptionSelectProduct || registeredOptionStockVariants.length === 0) return 999;
-                        const nm2 = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
-                        const matched = registeredOptionStockVariants.find((v: any) => nm2(v.color) === nm2(registeredOptionColor) && nm2(v.size) === nm2(registeredOptionSize));
-                        return matched ? Number(matched.stock) : 999;
-                      })();
-                      setRegisteredOptionQty((c) => Math.min(c + 1, maxStock));
-                    }} style={{ borderLeft: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+</button>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: "11px", fontWeight: 700, color: "#999" }}>선택금액</div>
-                    <div style={{ fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionTotalPrice > 0 ? won(registeredOptionTotalPrice) : "가격 직접입력"}</div>
-                  </div>
+                <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "14px 18px" }}>
+                  {registeredOptionDetailSelected ? (
+                    <>
+                      <span style={{ fontSize: "14px", fontWeight: 800, color: "#333" }}>수량</span>
+                      <div style={{ display: "grid", gridTemplateColumns: "40px 44px 40px", height: "44px", borderRadius: "12px", border: "1px solid #E8E2DD", overflow: "hidden" }}>
+                        <button type="button" onClick={() => setRegisteredOptionQty((c) => Math.max(1, c - 1))} style={{ borderRight: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#555", cursor: "pointer" }}>−</button>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionQty}</div>
+                        <button type="button" onClick={() => {
+                          const maxStock = (() => {
+                            if (!registeredOptionSelectProduct || registeredOptionStockVariants.length === 0) return 999;
+                            const nm2 = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
+                            const matched = registeredOptionStockVariants.find((v: any) => nm2(v.color) === nm2(registeredOptionColor) && nm2(v.size) === nm2(registeredOptionSize));
+                            return matched ? Number(matched.stock) : 999;
+                          })();
+                          setRegisteredOptionQty((c) => Math.min(c + 1, maxStock));
+                        }} style={{ borderLeft: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+</button>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: "11px", fontWeight: 700, color: "#999" }}>선택금액</div>
+                        <div style={{ fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionTotalPrice > 0 ? won(registeredOptionTotalPrice) : "가격 직접입력"}</div>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+                      <div>
+                        <strong style={{ display: "block", fontSize: "13px", color: "#4A3D42" }}>세부상품을 먼저 선택해 주세요</strong>
+                        <span style={{ display: "block", marginTop: "2px", fontSize: "10px", fontWeight: 700, color: "#9A8E93" }}>선택 후 수량과 금액이 표시됩니다</span>
+                      </div>
+                      <span style={{ flexShrink: 0, fontSize: "13px", fontWeight: 900, color: "#B2A9AD" }}>수량 — · 금액 —</span>
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ flexShrink: 0, display: "grid", gridTemplateColumns: "0.85fr 1.15fr", gap: "10px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "14px 18px calc(16px + env(safe-area-inset-bottom))" }}>
