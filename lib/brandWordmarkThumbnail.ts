@@ -44,7 +44,8 @@ const ARTWORK_ZOOM: Record<string, number> = {
   HERMES: 1.08,
   LOEWE: 0.96,
   "LOUIS VUITTON": 1.12,
-  MONCLER: 1.95,
+  // MONCLER 원본은 정사각 캔버스 안에 긴 워드마크가 들어 있어 공통 확대율이면 M/R 끝이 잘린다.
+  MONCLER: 1.58,
   "BRUNELLO CUCINELLI": 1.06,
   CELINE: 1.9,
   CHLOE: 1.05,
