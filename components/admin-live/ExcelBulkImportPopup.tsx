@@ -273,14 +273,23 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
         const detailPhotoSets: Record<string, string[]> = {};
         const detailImageUrls: string[] = [];
         const uploadBlob = async (blob: Blob, fileName: string, kind: "cover" | "detail") => {
-          const fd = new FormData();
-          fd.append("file", new File([blob], fileName, { type: blob.type || "image/jpeg" }));
-          fd.append("kind", kind);
-          const res = await fetch("/api/admin-live/product-images/upload", { method: "POST", body: fd });
-          const json = await res.json().catch(() => null);
-          const url = String(json?.url || json?.path || "");
-          if (!res.ok || !url) throw new Error(json?.message || "사진 업로드 실패");
-          return url;
+          let lastMessage = "사진 업로드 실패";
+          for (let attempt = 1; attempt <= 4; attempt += 1) {
+            try {
+              const fd = new FormData();
+              fd.append("file", new File([blob], fileName, { type: blob.type || "image/jpeg" }));
+              fd.append("kind", kind);
+              const res = await fetch("/api/admin-live/product-images/upload", { method: "POST", body: fd });
+              const json = await res.json().catch(() => null);
+              const url = String(json?.url || json?.path || "");
+              if (res.ok && url) return url;
+              lastMessage = String(json?.message || `HTTP ${res.status}`);
+            } catch (error) {
+              lastMessage = error instanceof Error ? error.message : String(error);
+            }
+            if (attempt < 4) await new Promise((resolve) => window.setTimeout(resolve, attempt * 700));
+          }
+          throw new Error(`${fileName}: 사진 업로드 4회 실패 (${lastMessage})`);
         };
         if (d.imageBlob && !d.brandGroup) {
           imageUrl = await uploadBlob(d.imageBlob, `${d.code || d.name}.jpg`, "cover");
