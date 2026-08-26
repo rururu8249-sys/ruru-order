@@ -327,7 +327,7 @@ export default function CustomerPaymentGuideBottomSheet({
             onClick={onClose}
             style={{ marginTop: "16px", display: "flex", minHeight: "52px", width: "100%", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "none", background: "#7A1E47", padding: "0 16px", fontSize: "16px", fontWeight: 800, letterSpacing: "-0.05em", color: "#fff", cursor: "pointer" }}
           >
-            확인
+            닫기
           </button>
         </div>
       </div>
