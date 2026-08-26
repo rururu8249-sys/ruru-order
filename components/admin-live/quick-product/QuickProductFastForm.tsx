@@ -1618,7 +1618,7 @@ export default function QuickProductFastForm({
                 onClick={() => setExtraOpen(true)}
                 style={{ width: "100%", padding: "9px", border: "1px dashed #D9C5CC", background: "var(--color-surface)", color: "#7B2D43", fontSize: "12px", fontWeight: 800, borderRadius: "8px", cursor: "pointer" }}
               >
-                ＋ 카테고리 · 상품 뱃지 {category.trim() || badgeTypes.length > 0 ? `(${[category.trim(), badgeTypes.length ? `뱃지 ${badgeTypes.length}` : ""].filter(Boolean).join(" · ")})` : "(선택)"}
+                ＋ 카테고리 · 상품 뱃지 {category.trim() || badgeTypes.length > 0 ? `(${[category.trim(), category.trim() && !customerCategoryVisible ? "고객 버튼 숨김" : "", badgeTypes.length ? `뱃지 ${badgeTypes.length}` : ""].filter(Boolean).join(" · ")})` : "(선택)"}
               </button>
             </div>
           ) : null}

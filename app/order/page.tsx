@@ -5483,14 +5483,33 @@ export default function OrderPage() {
               );
             }
             const q = productSearchText.trim();
+            // 카테고리 탭: 현재 상품 중 '고객 카테고리 버튼에 표시'가 켜진 항목만 노출.
+            // 상품 등록 순서와 무관하게 가나다순으로 정돈한다.
+            const presentCats = Array.from(
+              new Set(
+                quickGroupBuyProducts
+                  .filter((p) => {
+                    const note = parseProductSuggestionNote((p as any).product_note);
+                    return (note as any)?.customer_category_visible !== false;
+                  })
+                  .map((p) => {
+                    const note = parseProductSuggestionNote((p as any).product_note);
+                    return String((note as any)?.category ?? (p as any).category ?? (p as any).product_category ?? "").trim();
+                  })
+                  .filter(Boolean)
+              )
+            ).sort((a, b) => a.localeCompare(b, "ko", { numeric: true }));
+            const categoryTabs = ["전체", ...presentCats];
+            // 관리자가 보고 있던 카테고리를 숨긴 순간에도 고객 화면이 빈 목록으로 남지 않게 즉시 '전체'로 대체한다.
+            const effectiveCategoryFilter = categoryFilter === "전체" || presentCats.includes(categoryFilter) ? categoryFilter : "전체";
             const filtered = quickGroupBuyProducts.filter((p) => {
               // [조합형 옵션] 세부상품명(예: "탐다오")으로도 대표상품이 검색되게 — 표시 전용
               if (q && !productMatchesSuggestion(p as BroadcastProduct, q) && !comboNamesMatchOrderProduct(p, q)) return false;
-              if (categoryFilter !== "전체") {
+              if (effectiveCategoryFilter !== "전체") {
                 const note = parseProductSuggestionNote((p as any).product_note);
                 if ((note as any)?.customer_category_visible === false) return false;
                 const cat = String((note as any)?.category ?? (p as any).category ?? (p as any).product_category ?? "").trim();
-                if (cat !== categoryFilter) return false;
+                if (cat !== effectiveCategoryFilter) return false;
               }
               return true;
             });
@@ -5511,23 +5530,6 @@ export default function OrderPage() {
             // 방송/쇼핑몰 상품 목록은 전부 표시(무한스크롤이 일부 기기에서 10개에서 멈추던 문제 해결).
             //   상품 수(방송 담긴분/카탈로그 ≤ 80)라 한 번에 렌더해도 가벼움.
             const visibleItems = sorted;
-            // 카테고리 탭: 현재 상품 중 '고객 카테고리 버튼에 표시'가 켜진 항목만 노출.
-            // 상품 등록 순서와 무관하게 가나다순으로 정돈한다.
-            const presentCats = Array.from(
-              new Set(
-                quickGroupBuyProducts
-                  .filter((p) => {
-                    const note = parseProductSuggestionNote((p as any).product_note);
-                    return (note as any)?.customer_category_visible !== false;
-                  })
-                  .map((p) => {
-                    const note = parseProductSuggestionNote((p as any).product_note);
-                    return String((note as any)?.category ?? (p as any).category ?? (p as any).product_category ?? "").trim();
-                  })
-                  .filter(Boolean)
-              )
-            ).sort((a, b) => a.localeCompare(b, "ko", { numeric: true }));
-            const categoryTabs = ["전체", ...presentCats];
             return (
               <section id="ruru-shop-top" style={{ margin: "12px auto 0", width: "100%", maxWidth: "560px", scrollMarginTop: "70px", paddingBottom: "calc(150px + env(safe-area-inset-bottom))" }}>
                 <input
@@ -5547,7 +5549,7 @@ export default function OrderPage() {
                       className="ruru-cat-scroll"
                     >
                       {categoryTabs.map((cat) => {
-                        const on = categoryFilter === cat;
+                        const on = effectiveCategoryFilter === cat;
                         return (
                           <button key={cat} type="button" onClick={() => { setCategoryFilter(cat); setVisibleProductCount(10); }} style={{ flexShrink: 0, height: "36px", padding: "0 16px", borderRadius: "999px", border: on ? "none" : "1px solid #D9C5CC", background: on ? "#7A1E47" : "#fff", color: on ? "#fff" : "#7A1E47", fontSize: "13px", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>{cat}</button>
                         );
