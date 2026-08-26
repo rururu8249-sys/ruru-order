@@ -139,6 +139,9 @@ type BroadcastProduct = {
 type DoneData = {
   nickname: string;
   name: string;
+  recipientName: string;
+  recipientPhone: string;
+  shippingAddress: string;
   paymentMethod: "무통장입금" | "카드결제";
   items: OrderItem[];
   totalQty: number;
@@ -1379,6 +1382,8 @@ export default function OrderPage() {
   const [nicknameCopyDone, setNicknameCopyDone] = useState(false);
   const [paymentGuideOpen, setPaymentGuideOpen] = useState(false);
   const [orderSheetOpen, setOrderSheetOpen] = useState(false);
+  const [finalSubmitConfirmOpen, setFinalSubmitConfirmOpen] = useState(false);
+  const [finalSubmitAcknowledged, setFinalSubmitAcknowledged] = useState(false);
   const [customerInfoEditSheetOpen, setCustomerInfoEditSheetOpen] = useState(false);
   const [customerInfoEditInitialScreen, setCustomerInfoEditInitialScreen] = useState<"info" | "shipping_list" | "shipping_form">("info");
   const [customerInfoEditSnapshot, setCustomerInfoEditSnapshot] = useState<{
@@ -4466,6 +4471,9 @@ export default function OrderPage() {
       setDone({
         nickname: youtubeNickname.trim(),
         name: customerName.trim(),
+        recipientName: recipientName.trim() || customerName.trim(),
+        recipientPhone: formatPhone(recipientPhone.trim() || customerPhone),
+        shippingAddress: [address.trim(), detailAddress.trim()].filter(Boolean).join(" "),
         paymentMethod: paymentMethod === "카드결제" ? "카드결제" : "무통장입금",
         items: validItems,
         totalQty,
@@ -4850,10 +4858,10 @@ export default function OrderPage() {
   const handleSubmitOrderClick = () => {
     if (!validate()) return;
 
-    // data-ruru-order-submit-direct-with-payment-sheet="v1"
-    // 주문서 제출 전 기존 입금확인 모달은 띄우지 않습니다.
-    // 무통장입금 주문은 저장 성공 후 공통 입금안내 바텀시트로 안내합니다.
-    submitOrder();
+    // 상품·옵션·배송지 스냅샷을 마지막으로 한 번 더 확인한 뒤 제출한다.
+    // 제출 후 회원 기본배송지를 바꿔도 이미 저장된 주문 주소는 바뀌지 않으므로 이 단계에서 명시한다.
+    setFinalSubmitAcknowledged(false);
+    setFinalSubmitConfirmOpen(true);
   };
 
   const selectedItemEntries = items
@@ -5241,11 +5249,15 @@ export default function OrderPage() {
     : "상품";
   const registeredOptionUnitPrice = registeredOptionPrice + registeredOptionComboPlus;
   const registeredOptionTotalPrice = Math.max(1, registeredOptionQty) * (Number.isFinite(registeredOptionUnitPrice) ? registeredOptionUnitPrice : 0);
-  const registeredOptionBrandCartCount = registeredOptionBrandGroup && registeredOptionSelectProduct
-    ? items
-        .filter((item) => item.product_id === String(registeredOptionSelectProduct.id ?? ""))
-        .reduce((sum, item) => sum + Math.max(0, Number(item.qty) || 0), 0)
-    : 0;
+  const registeredOptionDetailSelected = !registeredOptionAxes3 || Boolean(registeredOptionDetail.trim());
+  const registeredOptionColorSelected = registeredOptionColorMode === "none" || Boolean(normalizeEmptyProductOptionValue(registeredOptionColor));
+  const registeredOptionSizeSelected = registeredOptionSizeMode === "none" || Boolean(normalizeEmptyProductOptionValue(registeredOptionSize));
+  const registeredOptionSelectionReady = registeredOptionDetailSelected && registeredOptionColorSelected && registeredOptionSizeSelected;
+  const registeredOptionBrandCartItems = registeredOptionBrandGroup && registeredOptionSelectProduct
+    ? items.filter((item) => item.product_id === String(registeredOptionSelectProduct.id ?? "") && item.product_name.trim())
+    : [];
+  const registeredOptionBrandCartCount = registeredOptionBrandCartItems
+    .reduce((sum, item) => sum + Math.max(0, Number(item.qty) || 0), 0);
   const allOptionsSoldOut = registeredOptionSelectProduct ? isSoldOutOrderProduct(registeredOptionSelectProduct) : false;
 
   // [2026-07-16 사장님 지침] 유튜브 닉네임 미입력이면 주문서/담기 진입 자체를 막고 닉네임 입력 모달을 강제한다.
@@ -5763,6 +5775,11 @@ export default function OrderPage() {
                 </div>
                 <button type="button" onClick={() => setOrderSheetOpen(false)} aria-label="닫기" style={{ flexShrink: 0, width: "28px", height: "28px", borderRadius: "50%", background: "#F5F3F0", border: "none", color: "#888", fontSize: "15px", cursor: "pointer" }}>✕</button>
               </div>
+              <div style={{ flexShrink: 0, padding: "9px 14px", borderBottom: "1px solid #F0EAE0", background: "#FBF5F7", overflowX: "auto" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", minWidth: "360px", color: "#7A1E47", fontSize: "10.5px", fontWeight: 900, whiteSpace: "nowrap" }}>
+                  <span>① 방송 채팅 주문</span><span style={{ color: "#C9A8B5" }}>→</span><span>② 상품 담기</span><span style={{ color: "#C9A8B5" }}>→</span><span>③ 주문서 확인·제출</span><span style={{ color: "#C9A8B5" }}>→</span><span>④ 입금·결제</span>
+                </div>
+              </div>
               <div style={{ overflowY: "auto", flex: 1 }}>
                 {/* 🚚 배송지 카드 */}
                 <div style={{ margin: "12px 16px 0", border: "1px solid #E5E1DC", borderRadius: "12px", padding: "12px 14px", background: "#FAF8F6" }}>
@@ -6043,12 +6060,75 @@ export default function OrderPage() {
                   disabled={submitting || customerBlockStatus.blocked}
                   style={{ width: "100%", padding: "14px", background: submitting || customerBlockStatus.blocked ? "#cbd5e1" : "#7A1E47", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: submitting || customerBlockStatus.blocked ? "default" : "pointer" }}
                 >
-                  {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : `${won(finalPaymentAmount)} 주문서 제출 및 결제 →`}
+                  {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : `${won(finalPaymentAmount)} · 주문서 제출하기`}
                 </button>
               </div>
             </div>
           </div>
           )}
+
+          {finalSubmitConfirmOpen ? (
+            <div role="dialog" aria-modal="true" aria-label="주문서 최종 확인" onClick={(event) => { if (event.target === event.currentTarget && !submitting) setFinalSubmitConfirmOpen(false); }} style={{ position: "fixed", inset: 0, zIndex: 165, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(15,12,13,0.62)" }}>
+              <div style={{ width: "100%", maxWidth: "430px", maxHeight: "90dvh", display: "flex", flexDirection: "column", overflow: "hidden", borderTopLeftRadius: "26px", borderTopRightRadius: "26px", background: "#fff", boxShadow: "0 -20px 60px rgba(0,0,0,0.25)" }}>
+                <div style={{ flexShrink: 0, padding: "14px 18px", borderBottom: "1px solid #EDE6E2" }}>
+                  <div style={{ width: "42px", height: "4px", margin: "0 auto 10px", borderRadius: "999px", background: "#DDD6D2" }} />
+                  <div style={{ fontSize: "12px", fontWeight: 900, color: "#7A1E47" }}>제출 전 마지막 단계</div>
+                  <h2 style={{ marginTop: "3px", fontSize: "20px", fontWeight: 900, color: "#201A1D" }}>상품과 배송지를 확인해 주세요</h2>
+                </div>
+
+                <div style={{ minHeight: 0, flex: 1, overflowY: "auto", padding: "14px 16px" }}>
+                  <section style={{ borderRadius: "15px", border: "1.5px solid #D9C5CC", background: "#FFF9FB", padding: "13px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
+                      <strong style={{ fontSize: "14px", color: "#2E2026" }}>🚚 이번 주문 배송지</strong>
+                      <button type="button" onClick={() => { setFinalSubmitConfirmOpen(false); openCustomerInfoEditBottomSheet("shipping_list"); }} style={{ border: "1px solid #D9C5CC", borderRadius: "8px", background: "#fff", padding: "5px 10px", color: "#7A1E47", fontSize: "11px", fontWeight: 900, cursor: "pointer" }}>배송지 수정</button>
+                    </div>
+                    <div style={{ marginTop: "8px", fontSize: "12px", fontWeight: 700, lineHeight: 1.7, color: "#4D4448" }}>
+                      <div>{recipientName.trim() || customerName.trim()} · {formatPhone(recipientPhone.trim() || customerPhone)}</div>
+                      <div style={{ fontSize: "13px", fontWeight: 900, color: "#201A1D", wordBreak: "keep-all" }}>{[address.trim(), detailAddress.trim()].filter(Boolean).join(" ") || "주소 미입력"}</div>
+                    </div>
+                  </section>
+
+                  <section style={{ marginTop: "12px", borderRadius: "15px", border: "1px solid #E8E2DD", background: "#fff", overflow: "hidden" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", padding: "11px 12px", background: "#F8F5F3" }}>
+                      <strong style={{ fontSize: "14px", color: "#2E2026" }}>🛒 주문 상품</strong>
+                      <span style={{ fontSize: "11px", fontWeight: 900, color: "#7A1E47" }}>총 {totalQty}개</span>
+                    </div>
+                    <div>
+                      {selectedItemEntries.map(({ item, index }) => {
+                        const colorText = normalizeEmptyProductOptionValue(item.color) || "없음";
+                        const sizeText = normalizeEmptyProductOptionValue(item.size) || "없음";
+                        const qty = Math.max(1, toNumber(item.qty));
+                        return (
+                          <div key={`final-confirm-${index}`} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: "10px", padding: "10px 12px", borderTop: index === 0 ? "none" : "1px solid #F0EAE0" }}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: "12px", fontWeight: 900, lineHeight: 1.45, color: "#2B2528", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{item.product_name}</div>
+                              <div style={{ marginTop: "2px", fontSize: "11px", fontWeight: 700, color: "#877A80" }}>색상 {colorText} · 사이즈 {sizeText} · 수량 {qty}개</div>
+                            </div>
+                            <strong style={{ alignSelf: "center", fontSize: "12px", color: "#7A1E47" }}>{won(toNumber(item.product_price) * qty)}</strong>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+
+                  <section style={{ marginTop: "12px", borderRadius: "15px", background: "#FFF3E8", border: "1px solid #F2D2AE", padding: "12px" }}>
+                    <strong style={{ display: "block", fontSize: "13px", color: "#9A4B00" }}>⚠️ 제출 후에는 주소가 자동으로 바뀌지 않습니다</strong>
+                    <p style={{ marginTop: "5px", fontSize: "11.5px", fontWeight: 700, lineHeight: 1.6, color: "#80522B", wordBreak: "keep-all" }}>주문서를 제출한 뒤 내정보에서 배송지를 수정해도 <b>이미 제출한 이번 주문에는 반영되지 않습니다.</b> 변경이 필요하면 카톡채널로 문의해 주세요.</p>
+                  </section>
+
+                  <label style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginTop: "12px", borderRadius: "15px", border: finalSubmitAcknowledged ? "1.5px solid #7A1E47" : "1.5px solid #D9C5CC", background: finalSubmitAcknowledged ? "#F9EEF3" : "#fff", padding: "12px", cursor: "pointer" }}>
+                    <input type="checkbox" checked={finalSubmitAcknowledged} onChange={(event) => setFinalSubmitAcknowledged(event.target.checked)} style={{ width: "19px", height: "19px", flexShrink: 0, accentColor: "#7A1E47" }} />
+                    <span style={{ fontSize: "12.5px", fontWeight: 900, lineHeight: 1.55, color: "#4B3540" }}>상품명·옵션·수량과 위 배송지를 모두 확인했습니다.</span>
+                  </label>
+                </div>
+
+                <div style={{ flexShrink: 0, display: "grid", gridTemplateColumns: "0.8fr 1.2fr", gap: "10px", borderTop: "1px solid #EDE6E2", padding: "12px 16px calc(14px + env(safe-area-inset-bottom))", background: "#fff" }}>
+                  <button type="button" disabled={submitting} onClick={() => setFinalSubmitConfirmOpen(false)} style={{ height: "52px", border: "none", borderRadius: "15px", background: "#F1ECEE", color: "#655B60", fontSize: "14px", fontWeight: 900, cursor: "pointer" }}>돌아가서 수정</button>
+                  <button type="button" disabled={!finalSubmitAcknowledged || submitting} onClick={() => { if (!finalSubmitAcknowledged || submitting) return; setFinalSubmitConfirmOpen(false); void submitOrder(); }} style={{ height: "52px", border: "none", borderRadius: "15px", background: finalSubmitAcknowledged && !submitting ? "#7A1E47" : "#CFC4C8", color: "#fff", fontSize: "14px", fontWeight: 900, cursor: finalSubmitAcknowledged && !submitting ? "pointer" : "default" }}>{submitting ? "제출 중..." : "확인 후 주문서 제출"}</button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
             <CustomerToastNotice
               open={Boolean(customerNotice.message)}
@@ -6258,7 +6338,7 @@ export default function OrderPage() {
                   ) : null}
                 </div>
 
-                <div style={{ minHeight: 0, flex: 1, overflowY: "auto", padding: "16px" }}>
+                <div data-registered-option-scroll="true" style={{ minHeight: 0, flex: 1, overflowY: "auto", padding: "16px" }}>
                   {registeredOptionColorMode === "none" && registeredOptionSizeMode === "none" && !(registeredOptionSelectProduct && (readOrderAxes3(registeredOptionSelectProduct) || readComboInfoOrderProduct(registeredOptionSelectProduct))) ? (
                     <div style={{ padding: "12px 16px 0", fontSize: "12px", color: "#ABA5A0" }}>
                       이 상품은 옵션이 없습니다. 수량만 선택해 주세요.
@@ -6268,6 +6348,39 @@ export default function OrderPage() {
                   {/* [조합형 옵션] 종류 선택 — 검색(8종 초과 시) + 세부상품 목록(추가금·품절·N개 남음 표시) */}
                   {registeredOptionComboInfo ? (
                     <div style={{ marginBottom: "16px" }}>
+                      {registeredOptionAxes3 && registeredOptionDetail.trim() ? (
+                        <section style={{ borderRadius: "16px", border: "1.5px solid #D9C5CC", background: "#FFF9FB", padding: "12px" }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "9px" }}>
+                            <strong style={{ fontSize: "13px", color: "#7A1E47" }}>2단계 · 옵션 선택</strong>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRegisteredOptionDetail("");
+                                setRegisteredOptionColor("");
+                                setRegisteredOptionSize("");
+                              }}
+                              style={{ minHeight: "32px", borderRadius: "9px", border: "1px solid #D9C5CC", background: "#fff", padding: "0 10px", color: "#7A1E47", fontSize: "11px", fontWeight: 900, cursor: "pointer" }}
+                            >다른 상품 고르기</button>
+                          </div>
+                          <div style={{ display: "grid", gridTemplateColumns: "60px minmax(0,1fr) auto", alignItems: "center", gap: "10px" }}>
+                            {registeredOptionBrandDetailPhotos[0] || registeredOptionComboPhotos[registeredOptionDetail] ? (
+                              <img
+                                src={registeredOptionBrandDetailPhotos[0] || registeredOptionComboPhotos[registeredOptionDetail]}
+                                alt={`${registeredOptionDetail} 선택 상품`}
+                                onClick={() => openLightbox(registeredOptionBrandDetailPhotos[0] || registeredOptionComboPhotos[registeredOptionDetail], registeredOptionAllImages)}
+                                style={{ width: "60px", height: "60px", borderRadius: "10px", objectFit: "cover", background: "#F0EBE8", cursor: "zoom-in" }}
+                              />
+                            ) : <div style={{ width: "60px", height: "60px", borderRadius: "10px", background: "#F0EBE8" }} />}
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: "13px", fontWeight: 900, lineHeight: 1.45, color: "#282124", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{registeredOptionDetail}</div>
+                              <div style={{ marginTop: "3px", fontSize: "11px", fontWeight: 700, color: "#8B7D83" }}>{registeredOptionAllImages.length > 0 ? `사진 ${registeredOptionAllImages.length}장 · ` : ""}아래에서 색상·사이즈 선택</div>
+                            </div>
+                            <strong style={{ fontSize: "12px", color: "#7A1E47", whiteSpace: "nowrap" }}>{won(registeredOptionUnitPrice)}</strong>
+                          </div>
+                        </section>
+                      ) : null}
+
+                      <div style={{ display: registeredOptionAxes3 && registeredOptionDetail.trim() ? "none" : "block" }}>
                       {/* [2026-08-12] 제목에 살 수 있는 개수를 먼저 보여준다 — 143가지 중 뭘 살 수 있는지 바로 알게 */}
                       {(() => {
                         const total = registeredOptionComboInfo.names.length;
@@ -6277,7 +6390,7 @@ export default function OrderPage() {
                         }).length;
                         return (
                           <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>
-                            {registeredOptionAxes3 ? registeredOptionAxes3.detailLabel : "종류"} 선택{" "}
+                            {registeredOptionAxes3 ? `1단계 · ${registeredOptionAxes3.detailLabel}` : "종류"} 선택{" "}
                             <span style={{ fontSize: "12px", fontWeight: 700, color: "#ABA5A0" }}>
                               {soldCount > 0 ? `(판매중 ${total - soldCount}가지 · 품절 ${soldCount}가지)` : `(${total}가지)`}
                             </span>
@@ -6390,7 +6503,7 @@ export default function OrderPage() {
                           );
                         }
                         return (
-                          <div style={{ border: "1px solid #F0EAE0", borderRadius: "12px", maxHeight: list.length > 8 ? "min(52vh, 460px)" : "300px", overflowY: "auto", background: "#FFFDFB" }}>
+                          <div style={{ border: "1px solid #F0EAE0", borderRadius: "12px", background: "#FFFDFB" }}>
                             {/* [2026-08-12] 품절은 맨 아래로 — 살 수 있는 것부터 보이게(원래 순서는 그 안에서 유지) */}
                             {[...list]
                               .map((n, i) => ({ n, i, out: (() => { const r = stockOf(n); return r !== null && r <= 0; })() }))
@@ -6417,6 +6530,10 @@ export default function OrderPage() {
                                       setRegisteredOptionDetail((prev) => (prev === name ? "" : name));
                                       setRegisteredOptionColor("");
                                       setRegisteredOptionSize("");
+                                      requestAnimationFrame(() => {
+                                        const scrollArea = document.querySelector<HTMLElement>('[data-registered-option-scroll="true"]');
+                                        scrollArea?.scrollTo({ top: 0, behavior: "smooth" });
+                                      });
                                       return;
                                     }
                                     setRegisteredOptionColor((prev) => (prev === name ? "" : name));
@@ -6451,10 +6568,11 @@ export default function OrderPage() {
                       {!(registeredOptionAxes3 ? registeredOptionDetail : registeredOptionColor).trim()
                         ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>{registeredOptionAxes3 ? registeredOptionAxes3.detailLabel : "종류"}를 선택해주세요</div>
                         : null}
+                      </div>
                     </div>
                   ) : null}
 
-                  {(!registeredOptionComboInfo || registeredOptionAxes3) && registeredOptionColorChoices.length > 0 ? (
+                  {registeredOptionDetailSelected && (!registeredOptionComboInfo || registeredOptionAxes3) && registeredOptionColorChoices.length > 0 ? (
                     <div style={{ marginBottom: "16px", opacity: registeredOptionAxes3 && !registeredOptionDetail.trim() ? 0.45 : 1, pointerEvents: registeredOptionAxes3 && !registeredOptionDetail.trim() ? "none" : "auto" }}>
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>
                         색상
@@ -6489,7 +6607,7 @@ export default function OrderPage() {
 
                   {/* [UI] 옵션 없는 상품의 "없음" 죽은 칸 제거 — 안내 문구가 이미 있음 */}
 
-                  {registeredOptionColorMode === "input" ? (
+                  {registeredOptionDetailSelected && registeredOptionColorMode === "input" ? (
                     <div style={{ marginBottom: "16px" }}>
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>색상</div>
                       <input value={registeredOptionColor} onChange={(e) => setRegisteredOptionColor(e.target.value)} placeholder="색상을 입력해주세요" style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: `1.5px solid ${!registeredOptionColor.trim() ? "#E8B5B0" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
@@ -6497,7 +6615,7 @@ export default function OrderPage() {
                     </div>
                   ) : null}
 
-                  {registeredOptionSizeChoices.length > 0 ? (
+                  {registeredOptionDetailSelected && registeredOptionSizeChoices.length > 0 ? (
                     <div style={{ marginBottom: "16px", opacity: registeredOptionAxes3 && !registeredOptionDetail.trim() ? 0.45 : 1, pointerEvents: registeredOptionAxes3 && !registeredOptionDetail.trim() ? "none" : "auto" }}>
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>
                         사이즈
@@ -6532,7 +6650,7 @@ export default function OrderPage() {
 
                   {/* [UI] 옵션 없는 상품의 "없음" 죽은 칸 제거 — 안내 문구가 이미 있음 */}
 
-                  {registeredOptionSizeMode === "input" ? (
+                  {registeredOptionDetailSelected && registeredOptionSizeMode === "input" ? (
                     <div style={{ marginBottom: "16px" }}>
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>사이즈</div>
                       <input value={registeredOptionSize} onChange={(e) => setRegisteredOptionSize(e.target.value)} placeholder="사이즈를 입력해주세요" style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: `1.5px solid ${!registeredOptionSize.trim() ? "#E8B5B0" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
@@ -6540,7 +6658,7 @@ export default function OrderPage() {
                     </div>
                   ) : null}
 
-                  {registeredOptionDetailImages.length > 0 || registeredOptionDescription ? (
+                  {registeredOptionDetailSelected && (registeredOptionDetailImages.length > 0 || registeredOptionDescription) ? (
                     <div style={{ marginTop: "16px", borderTop: "1px solid #F0EAE0", paddingTop: "14px" }}>
                       <div style={{ marginBottom: "10px", fontSize: "14px", fontWeight: 800, color: "#333" }}>상품 상세</div>
                       {registeredOptionDetailImages.length > 0 ? (
@@ -6563,6 +6681,31 @@ export default function OrderPage() {
                   ) : null}
                 </div>
 
+                {registeredOptionBrandCartItems.length > 0 ? (
+                  <section style={{ flexShrink: 0, maxHeight: "138px", overflowY: "auto", borderTop: "1px solid #D8EADF", background: "#F3FBF7", padding: "9px 14px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "6px" }}>
+                      <strong style={{ fontSize: "12px", color: "#0F6E56" }}>✓ 이 브랜드에서 담은 상품</strong>
+                      <span style={{ borderRadius: "999px", background: "#0F6E56", padding: "2px 8px", color: "#fff", fontSize: "10px", fontWeight: 900 }}>총 {registeredOptionBrandCartCount}개</span>
+                    </div>
+                    <div style={{ display: "grid", gap: "5px" }}>
+                      {registeredOptionBrandCartItems.map((item, index) => {
+                        const colorText = normalizeEmptyProductOptionValue(item.color) || "없음";
+                        const sizeText = normalizeEmptyProductOptionValue(item.size) || "없음";
+                        const qty = Math.max(1, Number(item.qty) || 1);
+                        return (
+                          <div key={`brand-cart-summary-${index}`} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: "8px", borderRadius: "9px", background: "#fff", padding: "7px 9px", border: "1px solid #DDEEE4" }}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 900, color: "#263A31" }}>{item.product_name}</div>
+                              <div style={{ marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "10px", fontWeight: 700, color: "#6B8074" }}>색상 {colorText} · 사이즈 {sizeText} · 수량 {qty}개</div>
+                            </div>
+                            <strong style={{ alignSelf: "center", fontSize: "11px", color: "#0F6E56" }}>{won(toNumber(item.product_price) * qty)}</strong>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ) : null}
+
                 <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "16px 18px" }}>
                   <span style={{ fontSize: "14px", fontWeight: 800, color: "#333" }}>수량</span>
                   <div style={{ display: "grid", gridTemplateColumns: "40px 44px 40px", height: "44px", borderRadius: "12px", border: "1px solid #E8E2DD", overflow: "hidden" }}>
@@ -6581,7 +6724,6 @@ export default function OrderPage() {
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: "11px", fontWeight: 700, color: "#999" }}>선택금액</div>
                     <div style={{ fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionTotalPrice > 0 ? won(registeredOptionTotalPrice) : "가격 직접입력"}</div>
-                    {registeredOptionBrandGroup && registeredOptionBrandCartCount > 0 ? <div style={{ marginTop: "2px", fontSize: "11px", fontWeight: 800, color: "#0F6E56" }}>이 브랜드에서 {registeredOptionBrandCartCount}개 담음</div> : null}
                   </div>
                 </div>
 
@@ -6590,7 +6732,12 @@ export default function OrderPage() {
                   {allOptionsSoldOut ? (
                     <button type="button" disabled style={{ height: "52px", borderRadius: "16px", border: "none", background: "#ccc", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "not-allowed" }}>품절</button>
                   ) : (
-                    <button type="button" onClick={confirmRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#7A1E47", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>{registeredOptionBrandGroup ? "선택상품 담기" : "장바구니 담기"}</button>
+                    <button
+                      type="button"
+                      disabled={!registeredOptionSelectionReady}
+                      onClick={confirmRegisteredOptionSelectSheet}
+                      style={{ height: "52px", borderRadius: "16px", border: "none", background: registeredOptionSelectionReady ? "#7A1E47" : "#CFC4C8", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: registeredOptionSelectionReady ? "pointer" : "default" }}
+                    >{registeredOptionSelectionReady ? (registeredOptionBrandGroup ? "선택상품 담기" : "장바구니 담기") : registeredOptionAxes3 && !registeredOptionDetail.trim() ? "세부상품을 먼저 선택" : "옵션을 선택해 주세요"}</button>
                   )}
                 </div>
               </div>
@@ -7010,6 +7157,9 @@ export default function OrderPage() {
           totalAmount={done?.totalAmount || 0}
           pointUsedAmount={done?.pointUsedAmount || 0}
           finalAmount={done?.finalAmount}
+          recipientName={done?.recipientName}
+          recipientPhone={done?.recipientPhone}
+          shippingAddress={done?.shippingAddress}
           liveAlertOptin={liveAlertOptin}
           liveAlertSaving={liveAlertSaving}
           onLiveAlertRequest={() => { void saveLiveAlertOptin(true); }}

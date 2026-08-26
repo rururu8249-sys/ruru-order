@@ -33,6 +33,9 @@ type CustomerPaymentGuideBottomSheetProps = {
   totalAmount?: number;
   pointUsedAmount?: number;
   finalAmount?: number;
+  recipientName?: string;
+  recipientPhone?: string;
+  shippingAddress?: string;
 
   // [추가] 주문완료 화면에서 다음 방송 알림 신청 + 앱 설치 유도 (표시 전용 — 저장 로직은 부모 콜백)
   liveAlertOptin?: boolean;
@@ -73,6 +76,9 @@ export default function CustomerPaymentGuideBottomSheet({
   totalAmount = 0,
   pointUsedAmount = 0,
   finalAmount,
+  recipientName = "",
+  recipientPhone = "",
+  shippingAddress = "",
   liveAlertOptin = false,
   liveAlertSaving = false,
   onLiveAlertRequest,
@@ -106,6 +112,9 @@ export default function CustomerPaymentGuideBottomSheet({
   const safePointUsedAmount = Math.max(0, Number(pointUsedAmount || 0));
   const safeFinalAmount =
     finalAmount === undefined ? safeTotalAmount : Math.max(0, Number(finalAmount || 0));
+  const safeRecipientName = clean(recipientName) || "받는 분 미확인";
+  const safeRecipientPhone = clean(recipientPhone) || "연락처 미확인";
+  const safeShippingAddress = clean(shippingAddress) || "배송지 미확인";
   const isFullyPaidByPoints = isOrderComplete && safePointUsedAmount > 0 && safeFinalAmount <= 0;
   const showBankGuide =
     !isOrderComplete || (safePaymentMethod === "무통장입금" && !isFullyPaidByPoints);
@@ -241,6 +250,19 @@ export default function CustomerPaymentGuideBottomSheet({
                   <span>{safePointUsedAmount > 0 ? "최종 결제금액" : "결제금액"}</span>
                   <span style={{ color: "#7A1E47" }}>{won(safeFinalAmount)}</span>
                 </div>
+              </div>
+            </section>
+          )}
+
+          {isOrderComplete && (
+            <section style={{ marginTop: "16px", borderRadius: "18px", background: "#FFF9FB", border: "1.5px solid #D9C5CC", padding: "16px" }}>
+              <h3 style={{ fontSize: "16px", fontWeight: 900, color: "#2B2025" }}>🚚 이번 주문 배송지</h3>
+              <div style={{ marginTop: "9px", fontSize: "13px", fontWeight: 700, lineHeight: 1.7, color: "#574C51" }}>
+                <div>{safeRecipientName} · {safeRecipientPhone}</div>
+                <div style={{ fontSize: "14px", fontWeight: 900, color: "#211A1D", wordBreak: "keep-all" }}>{safeShippingAddress}</div>
+              </div>
+              <div style={{ marginTop: "10px", borderRadius: "12px", background: "#FFF3E8", border: "1px solid #F2D2AE", padding: "10px 11px", fontSize: "11.5px", fontWeight: 800, lineHeight: 1.55, color: "#8A4A10", wordBreak: "keep-all" }}>
+                ⚠️ 내정보에서 배송지를 바꿔도 이미 접수된 이 주문에는 반영되지 않습니다. 변경이 필요하면 카톡채널로 문의해 주세요.
               </div>
             </section>
           )}

@@ -94,21 +94,22 @@ export default function KakaoStartPage() {
           <div className="mt-6 text-center">
             <p className="text-[13px] font-black tracking-[-0.04em]" style={{ color: "#7B2D43" }}>루루동이 LIVE</p>
             <h1 className="mt-2 break-keep text-[32px] font-black leading-tight tracking-[-0.08em]">
-              <span style={{ color: "#7B2D43" }}>주문은 카카오톡으로</span>
+              <span style={{ color: "#7B2D43" }}>카카오톡으로</span>
               <br />
-              <span className="text-slate-950">시작해주세요</span>
+              <span className="text-slate-950">간편 로그인해 주세요</span>
             </h1>
             <p className="mt-3 break-keep text-[15px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
-              카카오톡 로그인 후 유튜브 닉네임과 배송정보를 확인하고 주문서를 작성합니다.
+              로그인 후 방송에서 주문한 상품과 배송정보를 확인하고 주문서를 작성합니다.
             </p>
           </div>
 
           <div className="mt-5 rounded-[24px] p-4" style={{ background: "rgba(255,255,255,0.85)", border: "1px solid #D9C5CC" }}>
             <div className="grid gap-3">
               {[
-                "카카오톡 로그인으로 이름, 전화번호, 배송정보를 불러옵니다.",
-                "방송에서 사용하는 유튜브 닉네임을 한 번 확인합니다.",
-                "주문서에서 상품과 결제금액을 확인하고 제출합니다.",
+                "카카오톡 간편 로그인으로 이름, 전화번호, 배송정보를 불러옵니다.",
+                "방송 채팅에서 주문한 상품과 옵션을 주문서에 담습니다.",
+                "상품·수량·배송지·결제금액을 확인하고 주문서를 제출합니다.",
+                "주문 접수 완료 화면의 안내에 따라 입금하거나 결제합니다.",
               ].map((step, index) => (
                 <div key={step} className="flex items-start gap-3">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[14px] font-black text-white" style={{ background: "#7B2D43" }}>
@@ -126,7 +127,7 @@ export default function KakaoStartPage() {
             className="mt-5 flex min-h-[58px] w-full items-center justify-center rounded-[22px] bg-[#fee500] px-4 py-4 text-[18px] font-black tracking-[-0.05em] text-[#241b17] shadow-[0_14px_30px_rgba(234,179,8,0.25)] ring-1 ring-yellow-200 transition active:scale-[0.98]"
           >
             <span className="mr-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#241b17] text-[11px] font-black text-[#fee500]">TALK</span>
-            카카오톡으로 주문 시작하기
+            카카오톡 간편 로그인
           </button>
 
           <p className="mt-4 break-keep text-center text-[12px] font-bold leading-relaxed tracking-[-0.04em]" style={{ color: "#A08A92" }}>
