@@ -5488,6 +5488,7 @@ export default function OrderPage() {
               if (q && !productMatchesSuggestion(p as BroadcastProduct, q) && !comboNamesMatchOrderProduct(p, q)) return false;
               if (categoryFilter !== "전체") {
                 const note = parseProductSuggestionNote((p as any).product_note);
+                if ((note as any)?.customer_category_visible === false) return false;
                 const cat = String((note as any)?.category ?? (p as any).category ?? (p as any).product_category ?? "").trim();
                 if (cat !== categoryFilter) return false;
               }
@@ -5510,20 +5511,23 @@ export default function OrderPage() {
             // 방송/쇼핑몰 상품 목록은 전부 표시(무한스크롤이 일부 기기에서 10개에서 멈추던 문제 해결).
             //   상품 수(방송 담긴분/카탈로그 ≤ 80)라 한 번에 렌더해도 가벼움.
             const visibleItems = sorted;
-            // 카테고리 탭: 기본(의류/신발/잡화) + 상품에 실제로 쓰인 커스텀 카테고리(음식 등) 자동 노출
-            const PRESET_CATS = ["의류", "신발", "잡화"];
+            // 카테고리 탭: 현재 상품 중 '고객 카테고리 버튼에 표시'가 켜진 항목만 노출.
+            // 상품 등록 순서와 무관하게 가나다순으로 정돈한다.
             const presentCats = Array.from(
               new Set(
                 quickGroupBuyProducts
+                  .filter((p) => {
+                    const note = parseProductSuggestionNote((p as any).product_note);
+                    return (note as any)?.customer_category_visible !== false;
+                  })
                   .map((p) => {
                     const note = parseProductSuggestionNote((p as any).product_note);
                     return String((note as any)?.category ?? (p as any).category ?? (p as any).product_category ?? "").trim();
                   })
                   .filter(Boolean)
               )
-            );
-            const extraCats = presentCats.filter((c) => !PRESET_CATS.includes(c)).sort();
-            const categoryTabs = ["전체", ...PRESET_CATS, ...extraCats];
+            ).sort((a, b) => a.localeCompare(b, "ko", { numeric: true }));
+            const categoryTabs = ["전체", ...presentCats];
             return (
               <section id="ruru-shop-top" style={{ margin: "12px auto 0", width: "100%", maxWidth: "560px", scrollMarginTop: "70px", paddingBottom: "calc(150px + env(safe-area-inset-bottom))" }}>
                 <input

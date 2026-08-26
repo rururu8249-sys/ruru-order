@@ -212,6 +212,9 @@ function pickImageArray(row: ProductRow | null | undefined, keys: string[]) {
 }
 
 type ParsedProductNote = Record<string, unknown> & {
+      // 고객 주문서 상단 카테고리 버튼에 이 상품의 카테고리를 노출할지 여부.
+      // false여도 상품 자체는 '전체' 목록에서 정상 노출된다.
+      customer_category_visible?: boolean;
       stock_mode?: "total" | "option";
       stock_variants?: Array<{ color?: string; size?: string; stock?: number }>;
       stock_management_enabled?: boolean;
@@ -645,6 +648,7 @@ export default function QuickProductFastForm({
   onClose,
 }: QuickProductFastFormProps) {
   const [category, setCategory] = useState("");
+  const [customerCategoryVisible, setCustomerCategoryVisible] = useState(true);
   const [badgeTypes, setBadgeTypes] = useState<string[]>([]);
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -846,6 +850,7 @@ export default function QuickProductFastForm({
     setBrandDetailCategoryFilter("전체");
 
     setCategory(normalizeBrandKorean(String((productNote as { category?: unknown } | null)?.category || "")));
+    setCustomerCategoryVisible(productNote?.customer_category_visible !== false);
     const _bt = Array.isArray((initialProduct as any)?.badge_types)
       ? (initialProduct as any).badge_types.filter(Boolean).map((x: any) => String(x))
       : ((initialProduct as any)?.badge_type && (initialProduct as any).badge_type !== "none" ? [String((initialProduct as any).badge_type)] : []);
@@ -1230,6 +1235,7 @@ export default function QuickProductFastForm({
 
   const resetForm = () => {
     setCategory("");
+    setCustomerCategoryVisible(true);
     setProductName("");
     setPriceText("");
     setShippingType("normal");
@@ -1379,6 +1385,7 @@ export default function QuickProductFastForm({
           .map((keyword) => keyword.trim())
           .filter(Boolean),
         category: category.trim(),
+        customer_category_visible: customerCategoryVisible,
         free_product: freeProductEnabled,
         ...(detailActive
           ? {
@@ -1491,7 +1498,7 @@ export default function QuickProductFastForm({
       ...customCategories,
       ...(category && !PRESET_CATEGORIES.includes(category) ? [category] : []),
     ]),
-  );
+  ).sort((a, b) => a.localeCompare(b, "ko", { numeric: true }));
   const confirmAddCategory = () => {
     const name = newCategoryText.trim();
     if (!name) return;
@@ -1665,6 +1672,34 @@ export default function QuickProductFastForm({
                 <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryText(""); }} style={{ padding: "7px 10px", borderRadius: "7px", border: "1px solid #E8E2DD", background: "var(--color-surface)", fontSize: "12px", cursor: "pointer", color: "var(--color-ink-mute)" }}>취소</button>
               </div>
             ) : null}
+            <label
+              style={{
+                marginTop: "10px",
+                padding: "10px 12px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "12px",
+                border: "1px solid #E8E2DD",
+                borderRadius: "9px",
+                background: "#FFFCFD",
+                cursor: "pointer",
+              }}
+            >
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: "block", fontSize: "12px", fontWeight: 800, color: "#49363D" }}>고객 카테고리 버튼에 표시</span>
+                <span style={{ display: "block", marginTop: "2px", fontSize: "11px", lineHeight: 1.45, color: "var(--color-ink-mute)" }}>
+                  꺼도 상품은 ‘전체’ 목록에서 정상적으로 보여요.
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                checked={customerCategoryVisible}
+                onChange={(event) => setCustomerCategoryVisible(event.target.checked)}
+                aria-label="고객 카테고리 버튼에 표시"
+                style={{ width: "20px", height: "20px", flexShrink: 0, accentColor: "#7A1E47", cursor: "pointer" }}
+              />
+            </label>
           </div>
 
           {/* 상품 뱃지 */}
