@@ -24,6 +24,7 @@ type CustomerPaymentGuideBottomSheetProps = {
   onCopyNickname: () => void;
   onCopyBankAccount: () => void;
   onClose: () => void;
+  onOpenOrderLookup?: () => void;
 
   isOrderComplete?: boolean;
   paymentMethod?: "무통장입금" | "카드결제";
@@ -68,6 +69,7 @@ export default function CustomerPaymentGuideBottomSheet({
   onCopyNickname,
   onCopyBankAccount,
   onClose,
+  onOpenOrderLookup,
   isOrderComplete = false,
   paymentMethod = "무통장입금",
   items = [],
@@ -145,7 +147,9 @@ export default function CustomerPaymentGuideBottomSheet({
           {isOrderComplete ? (
             <header>
               <div style={{ fontSize: "13px", color: "#6B6460" }}>✅ 주문 접수됐어요</div>
-              <div style={{ fontSize: "12px", color: "#ABA5A0", marginTop: "3px" }}>아래 안내대로 입금해 주세요</div>
+              <div style={{ fontSize: "12px", color: "#ABA5A0", marginTop: "3px" }}>
+                {isFullyPaidByPoints ? "추가 결제 없이 접수됐어요" : showCardGuide ? "카톡채널 안내에 따라 결제를 진행해 주세요" : "아래 계좌로 입금해 주세요"}
+              </div>
             </header>
           ) : (
             <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
@@ -208,6 +212,16 @@ export default function CustomerPaymentGuideBottomSheet({
                 <button type="button" onClick={onCopyBankAccount} style={{ ...(bankCopyDone ? doneButtonStyle : normalButtonStyle), marginTop: "12px", width: "100%" }}>
                   {bankCopyDone ? "계좌번호 복사완료" : "계좌번호 복사"}
                 </button>              </div>
+
+              {isOrderComplete && (
+                <section style={{ marginTop: "12px", borderRadius: "16px", border: "1px solid #C7EBDD", background: "#F0FBF7", padding: "13px" }}>
+                  <strong style={{ display: "block", fontSize: "14px", fontWeight: 900, color: "#0F6E56" }}>입금 자동 확인은 보통 10~30분 걸려요</strong>
+                  <p style={{ marginTop: "4px", fontSize: "12px", fontWeight: 700, lineHeight: 1.55, color: "#397A68", wordBreak: "keep-all" }}>주문내역에서 입금 상태와 계좌번호를 언제든 다시 확인할 수 있어요.</p>
+                  {onOpenOrderLookup ? (
+                    <button type="button" onClick={onOpenOrderLookup} style={{ marginTop: "10px", minHeight: "42px", width: "100%", borderRadius: "12px", border: "1px solid #9FDAC7", background: "#fff", color: "#0F6E56", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}>주문내역에서 확인</button>
+                  ) : null}
+                </section>
+              )}
             </>
           )}
 

@@ -7133,6 +7133,10 @@ export default function OrderPage() {
           onCopyNickname={copyDepositNickname}
           onCopyBankAccount={copyBankAccount}
           onClose={() => setPaymentGuideOpen(false)}
+          onOpenOrderLookup={() => {
+            setPaymentGuideOpen(false);
+            openOrderLookupBottomSheet();
+          }}
           isOrderComplete={Boolean(done)}
           paymentMethod={done?.paymentMethod || (paymentMethod === "카드결제" ? "카드결제" : "무통장입금")}
           items={done?.items || []}
