@@ -1426,8 +1426,11 @@ export default function OrderPage() {
   const [lightboxImage, setLightboxImage] = useState<string>("");
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
-  const [lightboxZoomed, setLightboxZoomed] = useState(false);
+  const [lightboxZoom, setLightboxZoom] = useState(1);
   const lightboxTouchStartXRef = useRef<number | null>(null);
+  const lightboxPinchRef = useRef<{ distance: number; zoom: number } | null>(null);
+  const clampLightboxZoom = (value: number) => Math.min(4, Math.max(1, Math.round(value * 20) / 20));
+  const changeLightboxZoom = (step: number) => setLightboxZoom((value) => clampLightboxZoom(value + step));
   const openLightbox = (image: string, gallery: string[] = []) => {
     const current = String(image || "").trim();
     if (!current) return;
@@ -1436,20 +1439,21 @@ export default function OrderPage() {
     setLightboxImages(cleanGallery);
     setLightboxIndex(Math.max(0, cleanGallery.indexOf(current)));
     setLightboxImage(current);
-    setLightboxZoomed(false);
+    setLightboxZoom(1);
   };
   const closeLightbox = () => {
     setLightboxImage("");
     setLightboxImages([]);
     setLightboxIndex(0);
-    setLightboxZoomed(false);
+    setLightboxZoom(1);
+    lightboxPinchRef.current = null;
   };
   const moveLightbox = (step: number) => {
     if (lightboxImages.length < 2) return;
     const nextIndex = (lightboxIndex + step + lightboxImages.length) % lightboxImages.length;
     setLightboxIndex(nextIndex);
     setLightboxImage(lightboxImages[nextIndex]);
-    setLightboxZoomed(false);
+    setLightboxZoom(1);
   };
   useEffect(() => {
     if (!lightboxImage) return;
@@ -1457,6 +1461,9 @@ export default function OrderPage() {
       if (event.key === "Escape") closeLightbox();
       if (event.key === "ArrowLeft") moveLightbox(-1);
       if (event.key === "ArrowRight") moveLightbox(1);
+      if (event.key === "+" || event.key === "=") changeLightboxZoom(0.25);
+      if (event.key === "-") changeLightboxZoom(-0.25);
+      if (event.key === "0") setLightboxZoom(1);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -5225,6 +5232,13 @@ export default function OrderPage() {
   const registeredOptionComboPlus = registeredOptionComboInfo
     ? comboPlusOfOrderProduct(registeredOptionSelectProduct, registeredOptionAxes3 ? registeredOptionDetail : registeredOptionColor)
     : 0;
+  const registeredOptionPhotoTitle = registeredOptionSelectProduct
+    ? registeredOptionAxes3 && registeredOptionDetail.trim()
+      ? registeredOptionDetail.trim()
+      : registeredOptionComboInfo && registeredOptionColor.trim()
+        ? orderDetailDisplayName(String(registeredOptionSelectProduct.product_name || ""), registeredOptionColor.trim())
+        : String(registeredOptionSelectProduct.product_name || "상품").trim()
+    : "상품";
   const registeredOptionUnitPrice = registeredOptionPrice + registeredOptionComboPlus;
   const registeredOptionTotalPrice = Math.max(1, registeredOptionQty) * (Number.isFinite(registeredOptionUnitPrice) ? registeredOptionUnitPrice : 0);
   const registeredOptionBrandCartCount = registeredOptionBrandGroup && registeredOptionSelectProduct
@@ -5722,7 +5736,7 @@ export default function OrderPage() {
                                   ? { width: "100%", height: "34px", padding: "0 10px", borderRadius: "8px", border: "none", background: sold ? "#ccc" : "#7A1E47", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: sold ? "default" : "pointer" }
                                   : { flexShrink: 0, height: "32px", padding: "0 16px", borderRadius: "8px", border: "none", background: sold ? "#ccc" : "#7A1E47", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: sold ? "default" : "pointer" }}
                               >
-                                {sold ? "품절" : brandGroup ? "상품 보기" : "🛒 담기"}
+                                {sold ? "품절" : brandGroup ? "상품 선택" : "장바구니 담기"}
                               </button>
                             </div>
                           </div>
@@ -6082,11 +6096,41 @@ export default function OrderPage() {
           {/* 상품 이미지 크게 보기 (lightbox) */}
           {lightboxImage ? (
             <div
-              style={{ position: "fixed", inset: 0, zIndex: 150, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.88)", padding: lightboxZoomed ? "0" : "20px", overflow: "auto", touchAction: lightboxZoomed ? "pinch-zoom" : "pan-y" }}
+              style={{ position: "fixed", inset: 0, zIndex: 150, display: "flex", alignItems: lightboxZoom > 1 ? "flex-start" : "center", justifyContent: "center", background: "rgba(0,0,0,0.9)", padding: lightboxZoom > 1 ? "72px 0 104px" : "20px", overflow: "auto", touchAction: "none" }}
               onClick={closeLightbox}
-              onTouchStart={(event) => { lightboxTouchStartXRef.current = event.touches[0]?.clientX ?? null; }}
+              onWheel={(event) => {
+                event.preventDefault();
+                changeLightboxZoom(event.deltaY < 0 ? 0.25 : -0.25);
+              }}
+              onTouchStart={(event) => {
+                if (event.touches.length >= 2) {
+                  const first = event.touches[0];
+                  const second = event.touches[1];
+                  lightboxPinchRef.current = {
+                    distance: Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY),
+                    zoom: lightboxZoom,
+                  };
+                  lightboxTouchStartXRef.current = null;
+                  return;
+                }
+                lightboxTouchStartXRef.current = event.touches[0]?.clientX ?? null;
+              }}
+              onTouchMove={(event) => {
+                if (event.touches.length < 2 || !lightboxPinchRef.current) return;
+                event.preventDefault();
+                const first = event.touches[0];
+                const second = event.touches[1];
+                const distance = Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY);
+                const startDistance = Math.max(1, lightboxPinchRef.current.distance);
+                setLightboxZoom(clampLightboxZoom(lightboxPinchRef.current.zoom * (distance / startDistance)));
+              }}
               onTouchEnd={(event) => {
-                if (lightboxZoomed || lightboxTouchStartXRef.current === null) return;
+                if (lightboxPinchRef.current) {
+                  if (event.touches.length < 2) lightboxPinchRef.current = null;
+                  lightboxTouchStartXRef.current = null;
+                  return;
+                }
+                if (lightboxZoom > 1 || lightboxTouchStartXRef.current === null) return;
                 const endX = event.changedTouches[0]?.clientX ?? lightboxTouchStartXRef.current;
                 const distance = endX - lightboxTouchStartXRef.current;
                 lightboxTouchStartXRef.current = null;
@@ -6101,8 +6145,14 @@ export default function OrderPage() {
                   <button type="button" aria-label="다음 사진" onClick={(event) => { event.stopPropagation(); moveLightbox(1); }} style={{ position: "fixed", zIndex: 3, right: "12px", top: "50%", transform: "translateY(-50%)", width: "48px", height: "58px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.26)", background: "rgba(0,0,0,0.38)", color: "#fff", fontSize: "30px", fontWeight: 900, cursor: "pointer" }}>›</button>
                 </>
               ) : null}
-              <div style={{ position: "absolute", zIndex: 3, left: "50%", bottom: "18px", transform: "translateX(-50%)", color: "rgba(255,255,255,.88)", fontSize: "12px", fontWeight: 700, pointerEvents: "none", whiteSpace: "nowrap" }}>{lightboxImages.length > 1 ? "좌우로 넘겨 사진 보기 · 두 번 눌러 확대" : "두 번 눌러 확대 · 손가락으로 확대 가능"}</div>
-              <img src={lightboxImage} alt={`${lightboxIndex + 1}번째 상품 사진`} onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => { e.stopPropagation(); setLightboxZoomed((value) => !value); }} style={{ width: lightboxZoomed ? "200%" : "auto", maxWidth: lightboxZoomed ? "none" : "100%", maxHeight: lightboxZoomed ? "none" : "100%", objectFit: "contain", borderRadius: lightboxZoomed ? "0" : "12px", cursor: lightboxZoomed ? "zoom-out" : "zoom-in", touchAction: lightboxZoomed ? "pinch-zoom" : "pan-y", userSelect: "none" }} />
+              <div onClick={(event) => event.stopPropagation()} style={{ position: "fixed", zIndex: 4, left: "50%", bottom: "42px", transform: "translateX(-50%)", display: "flex", alignItems: "center", overflow: "hidden", border: "1px solid rgba(255,255,255,0.28)", borderRadius: "14px", background: "rgba(25,20,22,0.78)", boxShadow: "0 8px 24px rgba(0,0,0,0.28)" }}>
+                <button type="button" aria-label="사진 축소" disabled={lightboxZoom <= 1} onClick={() => changeLightboxZoom(-0.25)} style={{ width: "44px", height: "42px", border: "none", borderRight: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: lightboxZoom <= 1 ? "rgba(255,255,255,0.35)" : "#fff", fontSize: "24px", fontWeight: 900, cursor: lightboxZoom <= 1 ? "default" : "pointer" }}>−</button>
+                <span style={{ minWidth: "66px", color: "#fff", textAlign: "center", fontSize: "13px", fontWeight: 900 }}>{Math.round(lightboxZoom * 100)}%</span>
+                <button type="button" aria-label="사진 확대" disabled={lightboxZoom >= 4} onClick={() => changeLightboxZoom(0.25)} style={{ width: "44px", height: "42px", border: "none", borderLeft: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: lightboxZoom >= 4 ? "rgba(255,255,255,0.35)" : "#fff", fontSize: "22px", fontWeight: 900, cursor: lightboxZoom >= 4 ? "default" : "pointer" }}>＋</button>
+                <button type="button" onClick={() => setLightboxZoom(1)} style={{ height: "42px", padding: "0 13px", border: "none", borderLeft: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: "#fff", fontSize: "12px", fontWeight: 900, cursor: "pointer" }}>원본</button>
+              </div>
+              <div style={{ position: "fixed", zIndex: 3, left: "50%", bottom: "14px", transform: "translateX(-50%)", color: "rgba(255,255,255,.88)", fontSize: "11px", fontWeight: 700, pointerEvents: "none", whiteSpace: "nowrap" }}>{lightboxImages.length > 1 && lightboxZoom <= 1 ? "좌우로 넘기기 · 두 손가락 확대" : "두 손가락 또는 ＋/−로 확대·축소"}</div>
+              <img src={lightboxImage} alt={`${lightboxIndex + 1}번째 상품 사진`} draggable={false} onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => { e.stopPropagation(); setLightboxZoom((value) => value > 1 ? 1 : 2); }} style={{ width: lightboxZoom > 1 ? `${lightboxZoom * 100}%` : "auto", maxWidth: lightboxZoom > 1 ? "none" : "100%", maxHeight: lightboxZoom > 1 ? "none" : "100%", objectFit: "contain", borderRadius: lightboxZoom > 1 ? "0" : "12px", cursor: lightboxZoom > 1 ? "zoom-out" : "zoom-in", touchAction: "none", userSelect: "none" }} />
             </div>
           ) : null}
 
@@ -6177,7 +6227,7 @@ export default function OrderPage() {
                           <span style={{ fontSize: "8px", fontWeight: 800, color: "#7A1E47" }}>{registeredOptionBrandGroup.brandKo}</span>
                         </div>
                       ) : null}
-                      {selectedPhoto && registeredOptionAllImages.length > 1 ? <span style={{ position: "absolute", right: "3px", bottom: "3px", borderRadius: "999px", background: "rgba(0,0,0,0.68)", padding: "2px 5px", color: "#fff", fontSize: "9px", fontWeight: 900 }}>{registeredOptionAllImages.length}장</span> : null}
+                      {selectedPhoto && registeredOptionAllImages.length > 1 ? <span style={{ position: "absolute", right: "3px", bottom: "3px", borderRadius: "999px", background: "rgba(0,0,0,0.68)", padding: "2px 5px", color: "#fff", fontSize: "9px", fontWeight: 900 }}>사진 {registeredOptionAllImages.length}장</span> : null}
                     </div>;
                     })()}
                     <div style={{ minWidth: 0, flex: 1 }}>
@@ -6379,7 +6429,7 @@ export default function OrderPage() {
                                       style={{ position: "relative", width: "48px", height: "48px", borderRadius: "8px", overflow: "hidden", flexShrink: 0, background: "#F0EBE8", opacity: soldOut ? 0.5 : 1, cursor: "zoom-in" }}
                                     >
                                       <img src={detailCover} alt={`${name} 상품 사진`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                      {detailGallery.length > 1 ? <span style={{ position: "absolute", right: "2px", bottom: "2px", borderRadius: "999px", background: "rgba(0,0,0,0.68)", padding: "1px 4px", color: "#fff", fontSize: "8px", fontWeight: 900 }}>{detailGallery.length}장</span> : null}
+                                      {detailGallery.length > 1 ? <span style={{ position: "absolute", right: "2px", bottom: "2px", borderRadius: "999px", background: "rgba(0,0,0,0.68)", padding: "1px 4px", color: "#fff", fontSize: "8px", fontWeight: 900 }}>사진 {detailGallery.length}장</span> : null}
                                     </span>
                                   ) : null}
                                   {/* [2026-08-13 사장님 지적] 이름이 길면 「차량 아쿠아디파르마 무광…」처럼 잘려서
@@ -6496,7 +6546,13 @@ export default function OrderPage() {
                       {registeredOptionDetailImages.length > 0 ? (
                         <div style={{ display: "grid", gap: "8px" }}>
                           {registeredOptionDetailImages.map((img, i) => (
-                            <img key={i} src={img} alt={`${i + 1}번째 상세 사진`} onClick={() => openLightbox(img, registeredOptionDetailImages)} style={{ width: "100%", borderRadius: "10px", objectFit: "cover", cursor: "zoom-in", background: "#F0EBE8" }} />
+                            <div key={i} style={{ overflow: "hidden", border: "1px solid #E9DDD8", borderRadius: "12px", background: "#fff" }}>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", padding: "10px 12px", background: "#FBF5F7" }}>
+                                <span style={{ minWidth: 0, fontSize: "13px", fontWeight: 900, lineHeight: 1.35, color: "#4A2634", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{registeredOptionPhotoTitle}</span>
+                                {registeredOptionDetailImages.length > 1 ? <span style={{ flexShrink: 0, borderRadius: "999px", background: "#7A1E47", padding: "3px 8px", color: "#fff", fontSize: "10px", fontWeight: 900 }}>사진 {i + 1} / {registeredOptionDetailImages.length}</span> : null}
+                              </div>
+                              <img src={img} alt={`${registeredOptionPhotoTitle} ${i + 1}번째 상세 사진`} onClick={() => openLightbox(img, registeredOptionDetailImages)} style={{ display: "block", width: "100%", objectFit: "cover", cursor: "zoom-in", background: "#F0EBE8" }} />
+                            </div>
                           ))}
                         </div>
                       ) : null}
@@ -6534,7 +6590,7 @@ export default function OrderPage() {
                   {allOptionsSoldOut ? (
                     <button type="button" disabled style={{ height: "52px", borderRadius: "16px", border: "none", background: "#ccc", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "not-allowed" }}>품절</button>
                   ) : (
-                    <button type="button" onClick={confirmRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#7A1E47", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>{registeredOptionBrandGroup ? "선택상품 담기" : "주문서에 담기"}</button>
+                    <button type="button" onClick={confirmRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#7A1E47", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>{registeredOptionBrandGroup ? "선택상품 담기" : "장바구니 담기"}</button>
                   )}
                 </div>
               </div>
@@ -6738,7 +6794,7 @@ export default function OrderPage() {
                         onClick={confirmDirectInputSheet}
                         className="h-14 rounded-[22px] bg-rose-deep text-[17px] font-black tracking-[-0.05em] text-white shadow-[0_12px_28px_rgba(216,90,48,0.28)]"
                       >
-                        주문서에 담기
+                        장바구니 담기
                       </button>
                     </div>
                   </div>
