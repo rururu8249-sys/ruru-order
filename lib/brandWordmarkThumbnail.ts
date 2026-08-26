@@ -46,13 +46,11 @@ function otherBrandsBoard() {
     const isLast = index === OTHER_BRAND_MEMBERS.length - 1;
     const x = isLast ? 239 : 68 + (index % 2) * 342;
     const y = 150 + row * 143;
-    const englishFit = fittedText(brand.english, 176, 17, 12);
     return `<g>
       <rect x="${x}" y="${y}" width="322" height="126" rx="22" fill="#fff" stroke="#ead9df" stroke-width="2"/>
-      ${artworkImage(brand.english, x + 14, y + 18, 104, 90)}
-      <line x1="${x + 127}" y1="${y + 20}" x2="${x + 127}" y2="${y + 106}" stroke="#ead9df" stroke-width="2"/>
-      <text x="${x + 220}" y="${y + 48}" text-anchor="middle" dominant-baseline="middle" fill="#2f2026" font-family="Arial,Helvetica,sans-serif" font-size="${englishFit.fontSize}" font-weight="800" letter-spacing="0.5"${englishFit.fit}>${escapeXml(brand.english)}</text>
-      <text x="${x + 220}" y="${y + 83}" text-anchor="middle" dominant-baseline="middle" fill="#7a1e47" font-family="Arial,Noto Sans KR,sans-serif" font-size="18" font-weight="800">${escapeXml(brand.korean)}</text>
+      ${artworkImage(brand.english, x + 24, y + 14, 274, 66)}
+      <line x1="${x + 86}" y1="${y + 84}" x2="${x + 236}" y2="${y + 84}" stroke="#ead9df" stroke-width="2"/>
+      <text x="${x + 161}" y="${y + 103}" text-anchor="middle" dominant-baseline="middle" fill="#7a1e47" font-family="Arial,Noto Sans KR,sans-serif" font-size="18" font-weight="800">${escapeXml(brand.korean)}</text>
     </g>`;
   }).join("");
 
@@ -68,14 +66,22 @@ export function brandWordmarkThumbnail(brandEn: string, brandKo: string) {
   const isOtherBrands = englishKey === "OTHER BRANDS" || rawKorean === "기타브랜드";
   const english = escapeXml(rawEnglish);
   const korean = escapeXml(rawKorean);
+  const artworkContainsName = new Set([
+    "CHANEL", "DIOR", "MIU MIU", "PRADA", "GUCCI", "HERMES", "MONCLER",
+    "BRUNELLO CUCINELLI", "CELINE", "CHLOE", "SAINT LAURENT", "BOTTEGA VENETA", "ZEGNA", "ACNE STUDIOS",
+  ]).has(englishKey);
   const englishFit = fittedText(rawEnglish, 570, 68, 39);
   const koreanFit = fittedText(rawKorean, 520, 43, 31);
-  const mainContent = `<text x="400" y="92" text-anchor="middle" dominant-baseline="middle" fill="#7a1e47" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="800" letter-spacing="6">OFFICIAL BRAND MARK</text>
-    <rect x="145" y="128" width="510" height="260" rx="36" fill="#fff" stroke="#ead9df" stroke-width="2"/>
-    ${artworkImage(rawEnglish, 205, 153, 390, 210)}
-    <text x="400" y="484" text-anchor="middle" dominant-baseline="middle" fill="#2f2026" font-family="Georgia,Times New Roman,serif" font-size="${englishFit.fontSize}" font-weight="700" letter-spacing="2"${englishFit.fit}>${english}</text>
-    <line x1="235" y1="554" x2="565" y2="554" stroke="#7a1e47" stroke-width="4"/>
-    <text x="400" y="625" text-anchor="middle" dominant-baseline="middle" fill="#7a1e47" font-family="Arial,Noto Sans KR,sans-serif" font-size="${koreanFit.fontSize}" font-weight="800" letter-spacing="2"${koreanFit.fit}>${korean}</text>`;
+  const mainContent = artworkContainsName
+    ? `<rect x="110" y="118" width="580" height="340" rx="40" fill="#fff" stroke="#ead9df" stroke-width="2"/>
+      ${artworkImage(rawEnglish, 165, 153, 470, 270)}
+      <line x1="250" y1="522" x2="550" y2="522" stroke="#7a1e47" stroke-width="4"/>
+      <text x="400" y="605" text-anchor="middle" dominant-baseline="middle" fill="#7a1e47" font-family="Arial,Noto Sans KR,sans-serif" font-size="${koreanFit.fontSize}" font-weight="800" letter-spacing="2"${koreanFit.fit}>${korean}</text>`
+    : `<rect x="145" y="100" width="510" height="270" rx="36" fill="#fff" stroke="#ead9df" stroke-width="2"/>
+      ${artworkImage(rawEnglish, 205, 125, 390, 220)}
+      <text x="400" y="458" text-anchor="middle" dominant-baseline="middle" fill="#2f2026" font-family="Georgia,Times New Roman,serif" font-size="${englishFit.fontSize}" font-weight="700" letter-spacing="2"${englishFit.fit}>${english}</text>
+      <line x1="235" y1="530" x2="565" y2="530" stroke="#7a1e47" stroke-width="4"/>
+      <text x="400" y="615" text-anchor="middle" dominant-baseline="middle" fill="#7a1e47" font-family="Arial,Noto Sans KR,sans-serif" font-size="${koreanFit.fontSize}" font-weight="800" letter-spacing="2"${koreanFit.fit}>${korean}</text>`;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
     <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffdfb"/><stop offset="1" stop-color="#f4e9ed"/></linearGradient></defs>
     <rect width="800" height="800" rx="72" fill="url(#bg)"/>
@@ -84,4 +90,3 @@ export function brandWordmarkThumbnail(brandEn: string, brandKo: string) {
   </svg>`;
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
-
