@@ -480,7 +480,7 @@ function ProductDetailSheet({
             <div>
               <div className="text-2xl font-black tracking-[-0.05em] text-gray-950">상품 상세보기</div>
               <div className="mt-1 text-sm font-bold tracking-[-0.04em] text-gray-500">
-                사진과 안내를 확인 후 선택해주세요.
+                사진과 안내를 확인한 후 선택해 주세요.
               </div>
             </div>
 
@@ -711,7 +711,7 @@ export default function GroupBuyQuickSelect({ products, onSelect, getSelectLabel
                 <div>
                   <div className="text-2xl font-black tracking-[-0.05em] text-gray-950">상품 선택하기</div>
                   <div className="mt-1 text-sm font-bold tracking-[-0.04em] text-gray-500">
-                    필요한 상품만 선택해주세요. 목록에 없으면 주문서에 직접 입력하시면 됩니다.
+                    필요한 상품만 선택해 주세요. 목록에 없으면 주문서에 직접 입력하시면 됩니다.
                   </div>
                 </div>
 

@@ -83,7 +83,7 @@ export default function OrderCompletePaymentNotice({
           주문이 접수됐어요
         </h1>
         <p className="mt-2 text-[15px] font-bold tracking-[-0.04em] text-slate-600">
-          아래 안내에 맞춰 입금을 진행해주세요.
+          아래 안내에 맞춰 입금을 진행해 주세요.
         </p>
       </section>
 
@@ -102,7 +102,7 @@ export default function OrderCompletePaymentNotice({
           <div className="rounded-[24px] bg-white p-5 text-[14px] font-black leading-relaxed tracking-[-0.04em] text-emerald-800 ring-1 ring-emerald-100">
             사용 포인트가 주문금액과 같아 추가 입금 없이 주문이 접수됐습니다.
             <br />
-            주문조회에서 접수 내역을 확인해주세요.
+            주문조회에서 접수 내역을 확인해 주세요.
           </div>
         </section>
       ) : paymentMethod === "무통장입금" ? (
@@ -173,7 +173,7 @@ export default function OrderCompletePaymentNotice({
           </div>
 
           <div className="rounded-[24px] bg-white p-5 text-[14px] font-black leading-relaxed tracking-[-0.04em] text-coral-800 ring-1 ring-coral-100">
-            카드결제는 카톡채널로 문의해주세요.
+            카카오톡으로 전송되는 결제링크에서 결제를 완료해 주세요.
             <br />
             관리자 확인 후 결제 링크를 보내드립니다.
           </div>

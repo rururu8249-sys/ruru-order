@@ -33,7 +33,7 @@ export default function CustomerManualAddressPanel({ open, defaultValue = "", on
             주소 직접 입력
           </h2>
           <p className="mt-2 break-keep text-[14px] font-bold leading-relaxed text-slate-500">
-            주소검색창이 안 뜨는 경우에만 직접 입력해주세요.
+            주소검색창이 안 뜨는 경우에만 직접 입력해 주세요.
           </p>
         </div>
 

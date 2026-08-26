@@ -341,7 +341,7 @@ export default function CustomerInfoEditBottomSheet({
             <span style={{ fontSize: "20px", fontWeight: 800, color: "#7A1E47" }}>정보수정</span>
             <span style={{ fontSize: "13px", color: "#ABA5A0", fontWeight: 600 }}>배송정보 확인</span>
           </div>
-          <div style={{ fontSize: "12px", color: "#ABA5A0", marginTop: "4px" }}>주문 전 닉네임, 연락처, 주소가 맞는지 확인해주세요.</div>
+          <div style={{ fontSize: "12px", color: "#ABA5A0", marginTop: "4px" }}>주문 전 닉네임, 연락처, 주소가 맞는지 확인해 주세요.</div>
         </div>
 
         {/* 본문 */}

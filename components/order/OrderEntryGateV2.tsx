@@ -33,11 +33,11 @@ export default function OrderEntryGateV2({ onKakaoLogin }: OrderEntryGateV2Props
 
         <div style={{ marginTop: "28px", textAlign: "center" }}>
           <h1 style={{ wordBreak: "keep-all", fontSize: "35px", fontWeight: 800, lineHeight: 1.08, letterSpacing: "-0.085em", color: "#151923" }}>
-            <span style={{ color: "#7B2D43" }}>주문은</span>
-            <span style={{ color: "#151923" }}> 카카오톡으로 시작</span>
+            <span style={{ color: "#7B2D43" }}>카카오톡으로</span>
+            <span style={{ color: "#151923" }}> 간편 로그인</span>
           </h1>
           <p style={{ marginTop: "16px", wordBreak: "keep-all", fontSize: "20px", fontWeight: 800, lineHeight: 1.6, letterSpacing: "-0.06em", color: "#666" }}>
-            카카오톡 로그인 후 주문서를 작성합니다.
+            로그인 후 방송에서 주문한 상품을 확인하고 주문서를 작성합니다.
           </p>
         </div>
 
@@ -51,7 +51,7 @@ export default function OrderEntryGateV2({ onKakaoLogin }: OrderEntryGateV2Props
               TALK
             </span>
             <span style={{ minWidth: 0, flex: 1, textAlign: "center", fontSize: "20px", fontWeight: 800, letterSpacing: "-0.055em" }}>
-              카카오톡으로 주문 시작하기
+              카카오톡 간편 로그인
             </span>
             <span style={{ marginLeft: "12px", fontSize: "28px", fontWeight: 800, lineHeight: 1 }}>›</span>
           </button>

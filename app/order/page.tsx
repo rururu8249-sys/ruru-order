@@ -2828,7 +2828,7 @@ export default function OrderPage() {
     const restApiKey = process.env.NEXT_PUBLIC_KAKAO_REST_API_KEY || "";
 
     if (!restApiKey) {
-      showCustomerNotice("카카오톡 로그인 설정값이 없습니다. 관리자에게 문의해주세요.");
+      showCustomerNotice("카카오톡 로그인 설정값이 없습니다. 관리자에게 문의해 주세요.");
       return;
     }
 
@@ -2997,12 +2997,12 @@ export default function OrderPage() {
     const cleanPhone = normalizePhone(loginPhone);
 
     if (!cleanName) {
-      showCustomerNotice("이름을 입력해주세요.");
+      showCustomerNotice("이름을 입력해 주세요.");
       return;
     }
 
     if (cleanPhone.length < 10) {
-      showCustomerNotice("전화번호를 정확히 입력해주세요.");
+      showCustomerNotice("전화번호를 정확히 입력해 주세요.");
       return;
     }
 
@@ -3019,7 +3019,7 @@ export default function OrderPage() {
       const customer = data?.[0];
 
       if (!customer) {
-        showCustomerNotice("일치하는 고객정보가 없습니다.\n이름과 전화번호를 확인해주세요.");
+        showCustomerNotice("일치하는 고객정보가 없습니다.\n이름과 전화번호를 확인해 주세요.");
         return;
       }
 
@@ -3070,22 +3070,22 @@ export default function OrderPage() {
     const cleanPhone = normalizePhone(customerPhone);
 
     if (!youtubeNickname.trim()) {
-      showCustomerNotice("유튜브 닉네임을 입력해주세요.");
+      showCustomerNotice("유튜브 닉네임을 입력해 주세요.");
       return;
     }
 
     if (!customerName.trim()) {
-      showCustomerNotice("이름을 입력해주세요.");
+      showCustomerNotice("이름을 입력해 주세요.");
       return;
     }
 
     if (cleanPhone.length < 10) {
-      showCustomerNotice("전화번호를 정확히 입력해주세요.");
+      showCustomerNotice("전화번호를 정확히 입력해 주세요.");
       return;
     }
 
     if (!address.trim()) {
-      showCustomerNotice("주소를 입력해주세요.");
+      showCustomerNotice("주소를 입력해 주세요.");
       return;
     }
 
@@ -3107,7 +3107,7 @@ export default function OrderPage() {
     const cleanAddress = nextAddress.trim();
 
     if (!cleanAddress) {
-      showCustomerNotice("주소를 입력해주세요.", "warning");
+      showCustomerNotice("주소를 입력해 주세요.", "warning");
       return;
     }
 
@@ -3419,7 +3419,7 @@ export default function OrderPage() {
       // [2026-08-14 사장님 지시] 관리자가 선점 해제하면 손님 폰에서도 담긴 상품이 사라진다(직접입력 줄은 유지)
       if (claim?.ok && claim.revoked === true) {
         setItems((prev) => prev.filter((it) => !(it.product_id && String(it.product_name || "").trim())));
-        showCustomerNotice("⚠️ 방송 운영자가 담긴 상품을 회수했어요 — 주문서가 비워졌습니다. 궁금한 점은 방송 채팅으로 문의해주세요.");
+        showCustomerNotice("⚠️ 방송 운영자가 담긴 상품을 회수했어요 — 주문서가 비워졌습니다. 궁금한 점은 방송 채팅으로 문의해 주세요.");
         return;
       }
       if (claim?.ok && claim.allOk === false && Array.isArray(claim.results)) {
@@ -3437,7 +3437,7 @@ export default function OrderPage() {
               return avail > 0 ? { ...it, qty: String(avail) } : { ...it, __removeBySoldout: true } as any;
             })
             .filter((it: any) => !it.__removeBySoldout));
-          showCustomerNotice("앗, 방금 다른 손님이 먼저 담아서 일부 상품이 품절됐어요. 주문서 수량을 확인해주세요!");
+          showCustomerNotice("앗, 방금 다른 손님이 먼저 담아서 일부 상품이 품절됐어요. 주문서 수량을 확인해 주세요!");
         }
       }
     } catch { /* 실패해도 주문 흐름 무영향 */ }
@@ -3693,7 +3693,7 @@ export default function OrderPage() {
     if (!it) return;
     setFinalSubmitAcknowledged(false);
     const product = findMatchedBroadcastProduct(it, [...broadcastProducts, ...groupBuyQuickProductsFromCatalog]);
-    if (!product) { showCustomerNotice("지금 판매 목록에 없는 상품이라 옵션 변경이 안 돼요 — 🗑 삭제 후 목록에서 다시 담아주세요."); return; }
+    if (!product) { showCustomerNotice("지금 판매 목록에 없는 상품이라 옵션 변경이 안 돼요 — 🗑 삭제 후 목록에서 다시 담아 주세요."); return; }
     openRegisteredOptionSelectSheet(product);
     setRegisteredOptionEditIndex(index);
     setRegisteredOptionColor(normalizeEmptyProductOptionValue(it.color) || "");
@@ -3758,7 +3758,7 @@ export default function OrderPage() {
   };
   const findMyChatOrders = async (nameArg?: string, selfMode?: boolean) => {
     const alt = selfMode ? youtubeNickname.trim() : String(nameArg ?? chatFindName).trim();
-    if (!selfMode && !alt) { showCustomerNotice("채팅에 쓰는 이름을 적어주세요."); return; }
+    if (!selfMode && !alt) { showCustomerNotice("채팅에 쓰는 이름을 적어 주세요."); return; }
     try {
       const phone = normalizePhone(customerPhone);
       const res = await fetch(`/api/chat-orders/mine?nick=${encodeURIComponent(alt)}&phone=${encodeURIComponent(phone)}&all=1${selfMode ? "&self=1" : ""}`, { cache: "no-store" });
@@ -3777,9 +3777,9 @@ export default function OrderPage() {
         showCustomerNotice(`💬 '${alt}'님의 채팅 주문 ${fresh.length}건을 찾았어요 — 주문서에 담아드릴게요!`, "success");
         setChatClaimRows(fresh); // 자동담기 effect가 담고, 담는 순간 채널ID 연결
       } else {
-        showCustomerNotice(json?.enabled === false ? "지금은 채팅주문 담기가 꺼져 있어요." : `'${alt}' 이름의 최근 채팅 주문을 못 찾았어요. 채팅에 쓴 이름 그대로 적어주세요.`);
+        showCustomerNotice(json?.enabled === false ? "지금은 채팅주문 담기가 꺼져 있어요." : `'${alt}' 이름의 최근 채팅 주문을 못 찾았어요. 채팅에 쓴 이름 그대로 적어 주세요.`);
       }
-    } catch { showCustomerNotice("잠시 후 다시 시도해주세요."); }
+    } catch { showCustomerNotice("잠시 후 다시 시도해 주세요."); }
   };
   // [2026-08-14 사장님 승인] 유튜브 이름 변경 감지 → "사이트 닉네임도 똑같이 바꿀까요?" 팝업 (강제 변경 아님 — 손님 확인 1탭)
   //   닉네임은 자동입금매칭 키라서: 가입 때와 동일한 중복 검사를 통과할 때만 변경, 실패 시 정보수정 안내.
@@ -3791,11 +3791,11 @@ export default function OrderPage() {
     chatNameChangeDismissedRef.current = true;
     if (!newNick) return;
     const dupMsg = await getDuplicateYoutubeNicknameMessage(newNick, customerPhone);
-    if (dupMsg) { showCustomerNotice("이미 사용 중인 닉네임이라 자동으로 바꿀 수 없어요. 상단 [정보수정]에서 직접 바꿔주세요."); return; }
+    if (dupMsg) { showCustomerNotice("이미 사용 중인 닉네임이라 자동으로 바꿀 수 없어요. 상단 [정보수정]에서 직접 바꿔 주세요."); return; }
     setYoutubeNickname(newNick);
     try { localStorage.setItem("ruru_youtube_nickname", newNick); } catch { /* 표시용 */ }
     void syncYoutubeNicknameToServer(newNick);
-    showCustomerNotice(`닉네임을 '${newNick}'(으)로 바꿨어요! 입금하실 때도 이 이름으로 해주세요.`, "success");
+    showCustomerNotice(`닉네임을 '${newNick}'(으)로 바꿨어요! 입금하실 때도 이 이름으로 해 주세요.`, "success");
   };
   useEffect(() => {
     if (!hasSavedInfo || chatClaimRows.length === 0) return;
@@ -3818,7 +3818,7 @@ export default function OrderPage() {
     if (claimedIds.length === 0) return;
     setChatClaimRows((prev) => prev.filter((r) => !claimedIds.includes(Number(r.id))));
     setCartAddedOpen(false); // 개별 담김 팝업 대신 아래 요약 안내 한 번만
-    showCustomerNotice(`💬 채팅으로 주문하신 ${claimedIds.length}건을 주문서에 담아뒀어요 — 확인하고 제출해주세요!`, "success");
+    showCustomerNotice(`💬 채팅으로 주문하신 ${claimedIds.length}건을 주문서에 담아뒀어요 — 확인하고 제출해 주세요!`, "success");
     // "담음" 표시(대기열 소진 아님 — 관리자 확인용). 실패해도 무시.
     try {
       void fetch("/api/chat-orders/mine", {
@@ -3922,7 +3922,7 @@ export default function OrderPage() {
     // [2026-08-10 3단] 세부상품(1번 축)을 먼저 골라야 한다.
     const axes3ForAdd = readOrderAxes3(product);
     if (axes3ForAdd && !registeredOptionDetail.trim()) {
-      showCustomerNotice(`${axes3ForAdd.detailLabel}을(를) 선택해주세요.`);
+      showCustomerNotice(`${axes3ForAdd.detailLabel} 선택이 필요합니다.`);
       return;
     }
 
@@ -3930,10 +3930,10 @@ export default function OrderPage() {
     if (colorMode !== "none" && !normalizeEmptyProductOptionValue(registeredOptionColor)) {
       showCustomerNotice(
         readComboInfoOrderProduct(product)
-          ? "종류를 선택해주세요."
+          ? "종류를 선택해 주세요."
           : colorMode === "input"
-            ? "색상을 입력해주세요."
-            : "색상을 선택해주세요."
+            ? "색상을 입력해 주세요."
+            : "색상을 선택해 주세요."
       );
       return;
     }
@@ -3941,8 +3941,8 @@ export default function OrderPage() {
     if (sizeMode !== "none" && !normalizeEmptyProductOptionValue(registeredOptionSize)) {
       showCustomerNotice(
         sizeMode === "input"
-          ? "사이즈를 입력해주세요."
-          : "사이즈를 선택해주세요."
+          ? "사이즈를 입력해 주세요."
+          : "사이즈를 선택해 주세요."
       );
       return;
     }
@@ -4174,29 +4174,29 @@ export default function OrderPage() {
     const cleanPhone = normalizePhone(customerPhone);
 
     if (!youtubeNickname.trim()) {
-      showCustomerNotice("유튜브 닉네임을 입력해주세요.");
+      showCustomerNotice("유튜브 닉네임을 입력해 주세요.");
       return false;
     }
 
     if (!customerName.trim()) {
-      showCustomerNotice("이름을 입력해주세요.");
+      showCustomerNotice("이름을 입력해 주세요.");
       return false;
     }
 
     if (cleanPhone.length < 10) {
-      showCustomerNotice("전화번호를 정확히 입력해주세요.");
+      showCustomerNotice("전화번호를 정확히 입력해 주세요.");
       return false;
     }
 
     // [검증 강화 2026-07-06] 01X 시작 10~11자리만 허용 — 잘못된 번호는 입금매칭·알림톡·배송 연락 전부 깨짐
     if (!/^01[016789][0-9]{7,8}$/.test(cleanPhone)) {
-      showCustomerNotice("휴대폰 번호를 확인해주세요. 01로 시작하는 10~11자리만 가능합니다.");
+      showCustomerNotice("휴대폰 번호를 확인해 주세요. 01로 시작하는 10~11자리만 가능합니다.");
       return false;
     }
 
 
     if (!address.trim()) {
-      showCustomerNotice("주소를 입력해주세요.");
+      showCustomerNotice("주소를 입력해 주세요.");
       return false;
     }
 
@@ -4214,20 +4214,20 @@ export default function OrderPage() {
     );
 
     if (validItems.length === 0) {
-      showCustomerNotice("상품명을 입력해주세요.");
+      showCustomerNotice("상품명을 입력해 주세요.");
       return false;
     }
 
     for (const item of validItems) {
       if (!item.product_name.trim()) {
-        showCustomerNotice("상품명을 입력해주세요.");
+        showCustomerNotice("상품명을 입력해 주세요.");
         return false;
       }
 
       // 색상/사이즈는 옵션이 없는 상품도 있어 빈값 제출을 허용합니다.
 
       if (!toNumber(item.qty)) {
-        showCustomerNotice("수량을 입력해주세요.");
+        showCustomerNotice("수량을 입력해 주세요.");
         return false;
       }
 
@@ -4240,12 +4240,12 @@ export default function OrderPage() {
       if (freeMatched && String(item.product_price).trim() === "0") continue;
 
       if (!toNumber(item.product_price)) {
-        showCustomerNotice("금액을 입력해주세요.");
+        showCustomerNotice("금액을 입력해 주세요.");
         return false;
       }
 
       if (toNumber(item.product_price) < 1) {
-        showCustomerNotice("금액을 1원 이상으로 입력해주세요.");
+        showCustomerNotice("금액을 1원 이상으로 입력해 주세요.");
         return false;
       }
     }
@@ -4257,18 +4257,18 @@ export default function OrderPage() {
       if (!matchedProduct) continue;
 
       if (getRegisteredOptionMode(matchedProduct, "color") === "input" && !normalizeEmptyProductOptionValue(item.color)) {
-        showCustomerNotice("색상을 입력해주세요.");
+        showCustomerNotice("색상을 입력해 주세요.");
         return false;
       }
 
       if (getRegisteredOptionMode(matchedProduct, "size") === "input" && !normalizeEmptyProductOptionValue(item.size)) {
-        showCustomerNotice("사이즈를 입력해주세요.");
+        showCustomerNotice("사이즈를 입력해 주세요.");
         return false;
       }
     }
 
     if (!paymentMethod) {
-      showCustomerNotice("결제 방법을 선택해주세요. (무통장입금 또는 카드결제)");
+      showCustomerNotice("결제 방법을 선택해 주세요. (무통장입금 또는 카드결제)");
       return false;
     }
 
@@ -4832,7 +4832,7 @@ export default function OrderPage() {
         dateText: ruruOrderLookupDateText(head?.created_at),
         statusLabel: status.filterKey,
         statusDisplayText: status.displayText,
-        deliveryLabel: status.filterKey === "출고완료" ? "출고완료" : "확인중",
+        deliveryLabel: status.filterKey === "출고완료" ? "출고완료" : "확인 중",
         paymentMethodLabel: ruruOrderLookupPaymentMethod(head),
         // [송장 표시] 그룹 내 첫 송장 등록 행 기준 (읽기 전용)
         trackingNumber: (() => { const r = rows.find((o: any) => String(o?.tracking_number || "").trim()); return r ? String((r as any).tracking_number).trim() : ""; })(),
@@ -5006,33 +5006,33 @@ export default function OrderPage() {
     const targetItem = items[directInputTargetIndex];
 
     if (!targetItem) {
-      showCustomerNotice("직접입력 상품 정보를 다시 확인해주세요.", "warning");
+      showCustomerNotice("직접입력 상품 정보를 다시 확인해 주세요.", "warning");
       return;
     }
 
     // 빈 칸이 어디인지 바로 알 수 있게 한 칸씩 안내하고, 비어 있으면 담기를 막는다.
     if (!targetItem.product_name.trim()) {
-      showCustomerNotice("상품명을 입력해주세요.", "warning");
+      showCustomerNotice("상품명을 입력해 주세요.", "warning");
       return;
     }
 
     if (!normalizeEmptyProductOptionValue(targetItem.color)) {
-      showCustomerNotice("색상을 입력해주세요.", "warning");
+      showCustomerNotice("색상을 입력해 주세요.", "warning");
       return;
     }
 
     if (!normalizeEmptyProductOptionValue(targetItem.size)) {
-      showCustomerNotice("사이즈를 입력해주세요.", "warning");
+      showCustomerNotice("사이즈를 입력해 주세요.", "warning");
       return;
     }
 
     if (!toNumber(targetItem.qty)) {
-      showCustomerNotice("수량을 입력해주세요.", "warning");
+      showCustomerNotice("수량을 입력해 주세요.", "warning");
       return;
     }
 
     if (!toNumber(targetItem.product_price)) {
-      showCustomerNotice("금액을 입력해주세요.", "warning");
+      showCustomerNotice("금액을 입력해 주세요.", "warning");
       return;
     }
 
@@ -5292,7 +5292,7 @@ export default function OrderPage() {
         >
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] text-[32px]" style={{ background: "#F9EDF1", border: "1px solid #E8D5DD" }}>⏳</div>
           <p className="mt-5 text-[13px] font-black tracking-[-0.04em]" style={{ color: "#7B2D43" }}>루루동이 LIVE</p>
-          <h1 className="mt-2 break-keep text-[26px] font-black leading-tight tracking-[-0.07em] text-slate-950">주문 정보 확인중</h1>
+          <h1 className="mt-2 break-keep text-[26px] font-black leading-tight tracking-[-0.07em] text-slate-950">주문 정보 확인 중</h1>
           <p className="mt-3 break-keep text-[14.5px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">닉네임과 배송지를 불러오고 있어요. 잠시만요!</p>
           <div className="mt-5 overflow-hidden rounded-full" style={{ background: "#F0E4E9" }}>
             <div className="h-2 w-2/3 animate-pulse rounded-full" style={{ background: "#7B2D43" }} />
@@ -5502,7 +5502,7 @@ export default function OrderPage() {
         <>
           {customerInfoMissing && (
             <section className="mt-3 rounded-[18px] border border-orange-200 bg-orange-50 p-3 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-orange-800">
-              배송정보 확인이 필요합니다. 상단 [정보수정]에서 이름, 전화번호, 주소를 먼저 저장해주세요.
+              배송정보 확인이 필요합니다. 상단 [정보수정]에서 이름, 전화번호, 주소를 먼저 저장해 주세요.
             </section>
           )}
 
@@ -5514,7 +5514,7 @@ export default function OrderPage() {
                 <section style={{ margin: "12px auto 0", width: "100%", maxWidth: "560px" }}>
                   <div style={{ padding: "44px 26px", textAlign: "center", color: "#7A1E47", fontSize: "16px", fontWeight: 800, border: "1px solid #D9C5CC", borderRadius: "16px", background: "#fff", lineHeight: 1.8 }}>
                     🛍 쇼핑몰 준비 중입니다
-                    <div style={{ marginTop: "6px", fontSize: "13px", fontWeight: 600, color: "#ABA5A0" }}>잠시 후 다시 찾아주세요.</div>
+                    <div style={{ marginTop: "6px", fontSize: "13px", fontWeight: 600, color: "#ABA5A0" }}>잠시 후 다시 찾아 주세요.</div>
                   </div>
                 </section>
               );
@@ -5621,7 +5621,7 @@ export default function OrderPage() {
                   </div>
                 </div>
                 {visibleItems.length === 0 ? (
-                  <div style={{ marginTop: "14px", padding: "26px", textAlign: "center", color: "#999", fontSize: "14px", fontWeight: 700 }}>찾는 상품이 없어요. 아래 직접 입력으로 담아주세요.</div>
+                  <div style={{ marginTop: "14px", padding: "26px", textAlign: "center", color: "#999", fontSize: "14px", fontWeight: 700 }}>찾는 상품이 없어요. 아래 직접 입력으로 담아 주세요.</div>
                 ) : (
                   <div style={listView === "grid"
                     ? { marginTop: "10px", display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px", alignItems: "stretch" }
@@ -5788,7 +5788,7 @@ export default function OrderPage() {
               </div>
               <div style={{ flexShrink: 0, padding: "9px 14px", borderBottom: "1px solid #F0EAE0", background: "#FBF5F7", overflowX: "auto" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", minWidth: "360px", color: "#7A1E47", fontSize: "10.5px", fontWeight: 900, whiteSpace: "nowrap" }}>
-                  <span>① 방송 채팅 주문</span><span style={{ color: "#C9A8B5" }}>→</span><span>② 상품 담기</span><span style={{ color: "#C9A8B5" }}>→</span><span>③ 주문서 확인·제출</span><span style={{ color: "#C9A8B5" }}>→</span><span>④ 입금·결제</span>
+                  <span>상품 담기 완료 ✓</span><span style={{ color: "#C9A8B5" }}>→</span><span>주문서 확인·제출 (현재)</span><span style={{ color: "#C9A8B5" }}>→</span><span>입금·결제</span>
                 </div>
               </div>
               <div style={{ overflowY: "auto", flex: 1 }}>
@@ -5808,7 +5808,7 @@ export default function OrderPage() {
             {selectedItemEntries.length === 0 ? (
               <div style={{ padding: "40px 18px", textAlign: "center" }}>
                 <p style={{ fontSize: "14px", fontWeight: 800, color: "#1A1A1A" }}>아직 담은 상품이 없습니다.</p>
-                <p style={{ marginTop: "6px", fontSize: "12px", fontWeight: 600, color: "#ABA5A0", lineHeight: 1.6 }}>상품목록에서 [담기]를 누르거나 [직접 입력]으로 담아주세요.</p>
+                <p style={{ marginTop: "6px", fontSize: "12px", fontWeight: 600, color: "#ABA5A0", lineHeight: 1.6 }}>상품목록에서 [담기]를 누르거나 [직접 입력]으로 담아 주세요.</p>
               </div>
             ) : (
               <div>
@@ -5929,7 +5929,7 @@ export default function OrderPage() {
                       {method === "카드결제" ? `카드결제 (+${cardRateForCustomer}%)` : method}
                     </span>
                     <span style={{ marginTop: "4px", display: "block", fontSize: "11px", fontWeight: 800, lineHeight: 1.3, color: paymentMethod === method ? "#7A1E47" : "#999" }}>
-                      {method === "무통장입금" ? "입금자명·금액 확인" : "카톡채널 결제 문의"}
+                      {method === "무통장입금" ? "입금자명·금액 확인" : "제출 후 카카오톡으로 결제링크 전송"}
                     </span>
                   </button>
                 ))}
@@ -5939,7 +5939,9 @@ export default function OrderPage() {
                 <div style={{ marginTop: "12px", borderRadius: "16px", border: "1px solid #E5E1DC", background: "#F9EEF3", padding: "12px", fontSize: "13px", fontWeight: 800, lineHeight: 1.6, color: "#7A1E47" }}>
                   ⓘ 카드결제는 택배비 포함 {cardPaymentMinAmount.toLocaleString()}원 이상 구매 시 가능합니다.
                   <br />
-                  주문서 제출 후 카톡채널로 문의 남겨주세요.
+                  주문서를 제출하면 카카오톡으로 결제링크를 보내드립니다.
+                  <br />
+                  링크에서 결제를 완료해 주세요.
                 </div>
               )}
 
@@ -5950,7 +5952,7 @@ export default function OrderPage() {
                 <textarea
                   value={requestMemo}
                   onChange={(event) => setRequestMemo(event.target.value)}
-                  placeholder="예) 문 앞에 놓아주세요 / 배송 전 연락주세요"
+                  placeholder="예) 문 앞에 놓아 주세요 / 배송 전 연락 주세요"
                   className="min-h-[88px] w-full resize-none rounded-[20px] border border-slate-200 bg-slate-50 p-4 text-[15px] font-bold leading-relaxed tracking-[-0.04em] outline-none focus:border-rose-deep"
                 />
               </label>
@@ -5968,7 +5970,7 @@ export default function OrderPage() {
                   결제금액 확인
                 </h2>
                 <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
-                  상품금액, 배송비, 포인트 사용 금액을 확인해주세요.
+                  상품금액, 배송비, 포인트 사용 금액을 확인해 주세요.
                 </p>
               </div>
 
@@ -6028,7 +6030,7 @@ export default function OrderPage() {
               <div style={{ marginTop: "14px", borderRadius: "16px", border: "1px solid #F2D2AE", background: "#FFF3E8", padding: "13px" }}>
                 <strong style={{ display: "block", fontSize: "13px", color: "#9A4B00" }}>⚠️ 제출하기 전에 배송지를 확인해 주세요</strong>
                 <p style={{ marginTop: "5px", fontSize: "11.5px", fontWeight: 700, lineHeight: 1.6, color: "#80522B", wordBreak: "keep-all" }}>
-                  제출 후 내정보에서 배송지를 바꿔도 <b>이미 제출한 이번 주문에는 반영되지 않습니다.</b> 위 배송지를 지금 수정해 주세요.
+                  제출 후 내정보에서 배송지를 바꿔도 <b>이미 제출한 이번 주문에는 반영되지 않습니다.</b> 배송지가 다르면 위 [변경]에서 수정한 뒤 제출해 주세요.
                 </p>
               </div>
 
@@ -6216,7 +6218,7 @@ export default function OrderPage() {
                 <div style={{ marginTop: "10px", fontSize: "19px", fontWeight: 900, color: "#7A1E47" }}>잠깐만요!</div>
                 <div style={{ marginTop: "12px", background: "#F9EEF3", borderRadius: "12px", padding: "10px 12px", fontSize: "13.5px", fontWeight: 800, color: "#7A1E47", wordBreak: "keep-all" }}>{chatGuardAction.label}</div>
                 <div style={{ marginTop: "12px", fontSize: "13.5px", fontWeight: 600, color: "#666", lineHeight: 1.7 }}>임의로 수정·취소하시면<br /><b style={{ color: "#3A2F34" }}>상품이 잘못 가거나 누락될 수 있어요.</b></div>
-                <div style={{ marginTop: "10px", fontSize: "13.5px", fontWeight: 600, color: "#666", lineHeight: 1.7 }}>방송 채팅으로 <b style={{ color: "#3A2F34" }}>루루언니에게 먼저 여쭤본 뒤</b><br />바꿔주세요 🙏</div>
+                <div style={{ marginTop: "10px", fontSize: "13.5px", fontWeight: 600, color: "#666", lineHeight: 1.7 }}>방송 채팅으로 <b style={{ color: "#3A2F34" }}>루루언니에게 먼저 여쭤본 뒤</b><br />바꿔 주세요 🙏</div>
                 <div style={{ marginTop: "18px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                   <button type="button" onClick={() => setChatGuardAction(null)} style={{ height: "52px", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", fontSize: "15px", fontWeight: 800, color: "#666", cursor: "pointer" }}>닫기</button>
                   <button type="button" onClick={() => { const a = chatGuardAction; setChatGuardAction(null); a.run(); }} style={{ height: "52px", borderRadius: "14px", border: "none", background: "#7A1E47", fontSize: "15px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>{chatGuardAction.verb}</button>
@@ -6528,9 +6530,6 @@ export default function OrderPage() {
                           </div>
                         );
                       })()}
-                      {!(registeredOptionAxes3 ? registeredOptionDetail : registeredOptionColor).trim()
-                        ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>{registeredOptionAxes3 ? registeredOptionAxes3.detailLabel : "종류"}를 선택해주세요</div>
-                        : null}
                       </div>
                     </div>
                   ) : null}
@@ -6564,7 +6563,7 @@ export default function OrderPage() {
                           })}
                         </div>
                       )}
-                      {!registeredOptionColor.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>색상을 선택해주세요</div> : null}
+                      {!registeredOptionColor.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>색상을 선택해 주세요</div> : null}
                     </div>
                   ) : null}
 
@@ -6573,8 +6572,8 @@ export default function OrderPage() {
                   {registeredOptionDetailSelected && registeredOptionColorMode === "input" ? (
                     <div style={{ marginBottom: "16px" }}>
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>색상</div>
-                      <input value={registeredOptionColor} onChange={(e) => setRegisteredOptionColor(e.target.value)} placeholder="색상을 입력해주세요" style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: `1.5px solid ${!registeredOptionColor.trim() ? "#E8B5B0" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
-                      {!registeredOptionColor.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>색상을 입력해주세요</div> : null}
+                      <input value={registeredOptionColor} onChange={(e) => setRegisteredOptionColor(e.target.value)} placeholder="색상을 입력해 주세요" style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: `1.5px solid ${!registeredOptionColor.trim() ? "#E8B5B0" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
+                      {!registeredOptionColor.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>색상을 입력해 주세요</div> : null}
                     </div>
                   ) : null}
 
@@ -6607,7 +6606,7 @@ export default function OrderPage() {
                           })}
                         </div>
                       )}
-                      {!registeredOptionSize.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>사이즈를 선택해주세요</div> : null}
+                      {!registeredOptionSize.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>사이즈를 선택해 주세요</div> : null}
                     </div>
                   ) : null}
 
@@ -6616,23 +6615,23 @@ export default function OrderPage() {
                   {registeredOptionDetailSelected && registeredOptionSizeMode === "input" ? (
                     <div style={{ marginBottom: "16px" }}>
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>사이즈</div>
-                      <input value={registeredOptionSize} onChange={(e) => setRegisteredOptionSize(e.target.value)} placeholder="사이즈를 입력해주세요" style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: `1.5px solid ${!registeredOptionSize.trim() ? "#E8B5B0" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
-                      {!registeredOptionSize.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>사이즈를 입력해주세요</div> : null}
+                      <input value={registeredOptionSize} onChange={(e) => setRegisteredOptionSize(e.target.value)} placeholder="사이즈를 입력해 주세요" style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: `1.5px solid ${!registeredOptionSize.trim() ? "#E8B5B0" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
+                      {!registeredOptionSize.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>사이즈를 입력해 주세요</div> : null}
                     </div>
                   ) : null}
 
-                  {registeredOptionDetailSelected && (registeredOptionDetailImages.length > 0 || registeredOptionDescription) ? (
+                  {registeredOptionDetailSelected && (registeredOptionAllImages.length > 0 || registeredOptionDescription) ? (
                     <div style={{ marginTop: "16px", borderTop: "1px solid #F0EAE0", paddingTop: "14px" }}>
                       <div style={{ marginBottom: "10px", fontSize: "14px", fontWeight: 800, color: "#333" }}>상품 상세</div>
-                      {registeredOptionDetailImages.length > 0 ? (
+                      {registeredOptionAllImages.length > 0 ? (
                         <div style={{ display: "grid", gap: "8px" }}>
-                          {registeredOptionDetailImages.map((img, i) => (
+                          {registeredOptionAllImages.map((img, i) => (
                             <div key={i} style={{ overflow: "hidden", border: "1px solid #E9DDD8", borderRadius: "12px", background: "#fff" }}>
                               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", padding: "10px 12px", background: "#FBF5F7" }}>
                                 <span style={{ minWidth: 0, fontSize: "13px", fontWeight: 900, lineHeight: 1.35, color: "#4A2634", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{registeredOptionPhotoTitle}</span>
-                                {registeredOptionDetailImages.length > 1 ? <span style={{ flexShrink: 0, borderRadius: "999px", background: "#7A1E47", padding: "3px 8px", color: "#fff", fontSize: "10px", fontWeight: 900 }}>사진 {i + 1} / {registeredOptionDetailImages.length}</span> : null}
+                                {registeredOptionAllImages.length > 1 ? <span style={{ flexShrink: 0, borderRadius: "999px", background: "#7A1E47", padding: "3px 8px", color: "#fff", fontSize: "10px", fontWeight: 900 }}>사진 {i + 1} / {registeredOptionAllImages.length}</span> : null}
                               </div>
-                              <img src={img} alt={`${registeredOptionPhotoTitle} ${i + 1}번째 상세 사진`} onClick={() => openLightbox(img, registeredOptionDetailImages, registeredOptionPhotoTitle)} style={{ display: "block", width: "100%", objectFit: "cover", cursor: "zoom-in", background: "#F0EBE8" }} />
+                              <img src={img} alt={`${registeredOptionPhotoTitle} ${i + 1}번째 상세 사진`} onClick={() => openLightbox(img, registeredOptionAllImages, registeredOptionPhotoTitle)} style={{ display: "block", width: "100%", objectFit: "cover", cursor: "zoom-in", background: "#F0EBE8" }} />
                             </div>
                           ))}
                         </div>
@@ -6703,7 +6702,6 @@ export default function OrderPage() {
                   ) : registeredOptionBrandGroup && registeredOptionBrandCartCount > 0 ? (
                     <div style={{ width: "100%" }}>
                       <strong style={{ display: "block", fontSize: "13px", color: "#0F6E56" }}>이 브랜드에서 총 {registeredOptionBrandCartCount}개 담았어요</strong>
-                      <span style={{ display: "block", marginTop: "2px", fontSize: "10px", fontWeight: 700, color: "#6B8074" }}>더 담으려면 위에서 상품을 선택하거나, 선택을 완료해 주세요</span>
                     </div>
                   ) : (
                     <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
@@ -6718,7 +6716,7 @@ export default function OrderPage() {
 
                 <div style={{ flexShrink: 0, display: "grid", gridTemplateColumns: registeredOptionBrandGroup && !registeredOptionSelectionReady && registeredOptionBrandCartCount > 0 ? "1fr" : "0.85fr 1.15fr", gap: "10px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "14px 18px calc(16px + env(safe-area-inset-bottom))" }}>
                   {registeredOptionBrandGroup && !registeredOptionSelectionReady && registeredOptionBrandCartCount > 0 ? (
-                    <button type="button" onClick={closeRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#7A1E47", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>선택 완료 · 총 {registeredOptionBrandCartCount}개 담음</button>
+                    <button type="button" onClick={closeRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#7A1E47", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>상품 선택 완료 · 총 {registeredOptionBrandCartCount}개</button>
                   ) : (
                     <>
                     <button type="button" onClick={closeRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#F1ECEE", fontSize: "16px", fontWeight: 800, color: "#666", cursor: "pointer" }}>닫기</button>
@@ -6803,7 +6801,7 @@ export default function OrderPage() {
                               setDirectInputProductSearchMode(false);
                             }
                           }}
-                          placeholder="상품명을 입력해주세요"
+                          placeholder="상품명을 입력해 주세요"
                           className="h-13 min-w-0 w-full rounded-[18px] border border-rose-deep bg-white px-4 text-[17px] font-black tracking-[-0.05em] text-slate-950 outline-none focus:border-rose-deep"
                         />
                       </label>
@@ -6816,7 +6814,7 @@ export default function OrderPage() {
 
                           {filteredBroadcastProducts.length === 0 ? (
                             <div className="px-3 py-4 text-[13px] font-bold leading-5 text-slate-500">
-                              추천 상품명이 없어요. 방송에서 안내한 상품명 그대로 입력해주세요.
+                              추천 상품명이 없어요. 방송에서 안내한 상품명 그대로 입력해 주세요.
                             </div>
                           ) : (
                             <div className="space-y-1">
@@ -7075,13 +7073,13 @@ export default function OrderPage() {
               {/* [2026-07-29] 카톡 로그인 시 알림이 기본 ON이므로, 켜져 있는 손님에겐 "자동으로 켜졌고 여기서 끌 수 있다"고 알려준다(카카오 채널 정책 대비 고지). */}
               <div style={{ fontSize: "13px", color: "#666", lineHeight: 1.6, marginBottom: "18px" }}>
                 {liveAlertOptin
-                  ? "카카오톡 로그인을 하시면 방송 시작 알림이 자동으로 켜집니다. 라이브가 시작되면 카카오 알림톡으로 알려드려요. 원하지 않으시면 바로 아래 [알림 끄기] 버튼을 눌러주세요."
+                  ? "카카오톡 로그인을 하시면 방송 시작 알림이 자동으로 켜집니다. 라이브가 시작되면 카카오 알림톡으로 알려드려요. 원하지 않으시면 바로 아래 [알림 끄기] 버튼을 눌러 주세요."
                   : "신청하면 라이브 시작 때 카카오 알림톡으로 알려드려요. 신청 시 알림 수신에 동의하며, 언제든 끌 수 있어요."}
               </div>
               {liveAlertOptin ? (
                 <button type="button" disabled={liveAlertSaving} onClick={() => saveLiveAlertOptin(false)} style={{ width: "100%", padding: "13px", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", fontSize: "15px", fontWeight: 700, cursor: "pointer" }}>알림 끄기</button>
               ) : (
-                <button type="button" disabled={liveAlertSaving} onClick={() => saveLiveAlertOptin(true)} style={{ width: "100%", padding: "13px", borderRadius: "10px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "15px", fontWeight: 700, cursor: "pointer" }}>{liveAlertSaving ? "처리중..." : "방송 알림 받기"}</button>
+                <button type="button" disabled={liveAlertSaving} onClick={() => saveLiveAlertOptin(true)} style={{ width: "100%", padding: "13px", borderRadius: "10px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "15px", fontWeight: 700, cursor: "pointer" }}>{liveAlertSaving ? "처리 중..." : "방송 알림 받기"}</button>
               )}
             </div>
           </div>

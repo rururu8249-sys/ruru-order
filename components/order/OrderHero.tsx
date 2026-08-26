@@ -24,7 +24,7 @@ export default function OrderHero({ broadcastTitle }: OrderHeroProps) {
       <p className="mt-3 break-keep text-[15px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
         방송에서 루루언니에게 접수하신 후,
         <br />
-        주문서 작성 및 입금을 진행해주세요.
+        주문서 작성 및 입금을 진행해 주세요.
       </p>
 
       {broadcastTitle && (

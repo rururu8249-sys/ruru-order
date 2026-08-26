@@ -32,8 +32,8 @@ export default function OrderCustomerInfoIntro({
 
           <p className="mt-2 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
             {isEdit
-              ? "닉네임, 이름, 전화번호, 주소를 확인하고 저장해주세요."
-              : "주문 전 닉네임, 이름, 전화번호, 배송지를 확인해주세요."}
+              ? "닉네임, 이름, 전화번호, 주소를 확인하고 저장해 주세요."
+              : "주문 전 닉네임, 이름, 전화번호, 배송지를 확인해 주세요."}
           </p>
         </div>
       </div>

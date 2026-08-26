@@ -32,7 +32,7 @@ export default function OrderCustomerEntryPanel({
             <input
               value={loginName}
               onChange={(event) => onLoginNameChange(event.target.value)}
-              placeholder="이름을 입력해주세요"
+              placeholder="이름을 입력해 주세요"
               className="h-14 w-full rounded-2xl border border-coral-100 bg-white px-4 text-[16px] font-bold outline-none transition placeholder:text-slate-400 focus:border-coral-500"
             />
           </label>
@@ -42,7 +42,7 @@ export default function OrderCustomerEntryPanel({
             <input
               value={loginPhone}
               onChange={(event) => onLoginPhoneChange(event.target.value)}
-              placeholder="- 없이 숫자만 입력해주세요"
+              placeholder="- 없이 숫자만 입력해 주세요"
               inputMode="numeric"
               className="h-14 w-full rounded-2xl border border-coral-100 bg-white px-4 text-[16px] font-bold outline-none transition placeholder:text-slate-400 focus:border-coral-500"
             />

@@ -95,7 +95,7 @@ export default function CustomerAccessBlockGuard() {
       checking: true,
       blocked: false,
       phone,
-      message: "고객정보 확인중입니다.",
+      message: "고객정보 확인 중입니다.",
     });
 
     const checkBlocked = async () => {

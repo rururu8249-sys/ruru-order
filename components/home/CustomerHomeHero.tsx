@@ -34,7 +34,7 @@ export default function CustomerHomeHero({
           <p className="mt-4 break-keep text-[16px] font-bold leading-relaxed tracking-[-0.04em] text-white/95">
             방송에서 접수 후
             <br />
-            방송·공구상품 주문서 작성 및 입금을 진행해주세요
+            방송·공구상품 주문서 작성 및 입금을 진행해 주세요
           </p>
         </div>
 

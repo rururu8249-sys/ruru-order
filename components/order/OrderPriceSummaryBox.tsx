@@ -67,7 +67,7 @@ export default function OrderPriceSummaryBox({
 
         {customerPointLoading ? (
           <div style={{ marginTop: "16px", borderRadius: "14px", background: "rgba(255,255,255,0.7)", border: "1px solid #D9C5CC", padding: "12px 16px", fontSize: "13px", fontWeight: 800, color: "#7B2D43" }}>
-            포인트 확인중...
+            포인트 확인 중...
           </div>
         ) : showPointUse ? (
           <div style={{ marginTop: "16px", borderTop: "1px solid #D9C5CC", paddingTop: "16px" }}>

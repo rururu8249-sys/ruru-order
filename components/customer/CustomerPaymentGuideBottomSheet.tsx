@@ -134,6 +134,7 @@ export default function CustomerPaymentGuideBottomSheet({
       role="dialog"
       aria-modal="true"
       aria-label={isOrderComplete ? "주문 접수 완료 및 입금 안내" : "입금 안내"}
+      onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
     >
       <style>{`
   @keyframes point-right {
@@ -149,7 +150,7 @@ export default function CustomerPaymentGuideBottomSheet({
             <header>
               <div style={{ fontSize: "13px", color: "#6B6460" }}>✅ 주문 접수됐어요</div>
               <div style={{ fontSize: "12px", color: "#ABA5A0", marginTop: "3px" }}>
-                {isFullyPaidByPoints ? "추가 결제 없이 접수됐어요" : showCardGuide ? "카톡채널 안내에 따라 결제를 진행해 주세요" : "아래 계좌로 입금해 주세요"}
+                {isFullyPaidByPoints ? "추가 결제 없이 접수됐어요" : showCardGuide ? "카카오톡으로 전송되는 결제링크에서 결제해 주세요" : "아래 계좌로 입금해 주세요"}
               </div>
             </header>
           ) : (
@@ -157,7 +158,7 @@ export default function CustomerPaymentGuideBottomSheet({
               <div style={{ minWidth: 0 }}>
                 <p style={{ fontSize: "12px", fontWeight: 800, letterSpacing: "-0.04em", color: "#7B2D43" }}>루루동이 LIVE</p>
                 <h2 style={{ marginTop: "4px", fontSize: "26px", fontWeight: 800, lineHeight: 1.2, letterSpacing: "-0.07em", color: "#222" }}>입금 안내</h2>
-                <p style={{ marginTop: "8px", wordBreak: "keep-all", fontSize: "14px", fontWeight: 700, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#666" }}>현재 보이는 닉네임으로 입금해주세요.</p>
+                <p style={{ marginTop: "8px", wordBreak: "keep-all", fontSize: "14px", fontWeight: 700, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#666" }}>현재 보이는 닉네임으로 입금해 주세요.</p>
               </div>
               <div style={{ display: "flex", height: "48px", width: "48px", flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: "16px", background: "#F5E6EB", border: "1px solid #D9C5CC", fontSize: "25px" }}>💙</div>
             </header>
@@ -181,7 +182,7 @@ export default function CustomerPaymentGuideBottomSheet({
                 <div style={{ display: "flex", height: "44px", width: "44px", flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: "14px", background: "#fff", fontSize: "23px" }}>💳</div>
                 <div style={{ minWidth: 0 }}>
                   <h3 style={{ fontSize: "18px", fontWeight: 800, letterSpacing: "-0.06em", color: "#7A1E47" }}>카드결제 안내</h3>
-                  <p style={{ marginTop: "4px", wordBreak: "keep-all", fontSize: "13px", fontWeight: 700, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#7A1E47" }}>카드결제는 카톡채널 안내에 따라 진행해주세요.</p>
+                  <p style={{ marginTop: "4px", wordBreak: "keep-all", fontSize: "13px", fontWeight: 700, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#7A1E47" }}>카카오톡으로 결제링크를 보내드립니다. 링크에서 결제를 완료해 주세요.</p>
                 </div>
               </div>
             </section>
@@ -197,7 +198,7 @@ export default function CustomerPaymentGuideBottomSheet({
                 </div>
                 <div style={{ fontSize: "11px", color: "#854F0B", marginTop: "6px" }}>⚠️ 반드시 이 닉네임으로 입금해 주세요</div>
                 <button type="button" onClick={onCopyNickname} style={{ ...(nicknameCopyDone ? doneButtonStyle : normalButtonStyle), marginTop: "12px", width: "100%" }}>
-                  {nicknameCopyDone ? "고객 닉네임 복사완료" : "입금자명(닉네임) 복사"}
+                  {nicknameCopyDone ? "고객 닉네임 복사 완료" : "입금자명(닉네임) 복사"}
                 </button>              </div>
 
               <div style={{ textAlign: "center", fontSize: "18px", color: "#ABA5A0", margin: "8px 0" }}>↓</div>
@@ -211,7 +212,7 @@ export default function CustomerPaymentGuideBottomSheet({
                 </div>
                 <div style={{ fontSize: "15px", fontWeight: 700, color: "#555", marginTop: "3px" }}>예금주 {safeBankHolder}</div>
                 <button type="button" onClick={onCopyBankAccount} style={{ ...(bankCopyDone ? doneButtonStyle : normalButtonStyle), marginTop: "12px", width: "100%" }}>
-                  {bankCopyDone ? "계좌번호 복사완료" : "계좌번호 복사"}
+                  {bankCopyDone ? "계좌번호 복사 완료" : "계좌번호 복사"}
                 </button>              </div>
 
               {isOrderComplete && (

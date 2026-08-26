@@ -68,7 +68,7 @@ export default function OrderDepositConfirmModal({
             <h2 className="mt-4 break-keep text-[28px] font-black leading-[1.15] tracking-[-0.08em] text-[#151923] sm:text-[31px]">
               입금 전 꼭
               <br />
-              확인해주세요
+              확인해 주세요
             </h2>
 
             <p className="mt-3 break-keep text-[15px] font-black leading-relaxed tracking-[-0.04em] text-slate-600">

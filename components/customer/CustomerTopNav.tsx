@@ -91,7 +91,7 @@ export default function CustomerTopNav({
             <p className={isCompact ? "mt-1 truncate text-[13px] font-extrabold tracking-[-0.04em] text-slate-700" : "mt-1 truncate text-[17px] font-black tracking-[-0.06em] text-[#151923]"}>
               {isLoggedIn
                 ? `${greetingName || "고객"}님 안녕하세요`
-                : "주문 전 정보를 확인해주세요"}
+                : "주문 전 정보를 확인해 주세요"}
             </p>
           )}
         </Link>

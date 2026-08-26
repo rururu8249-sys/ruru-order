@@ -33,7 +33,7 @@ export default function OrderCustomerTopNav({
           <p className="mt-1 truncate text-[17px] font-black tracking-[-0.06em] text-[#151923]">
             {isLoggedIn
               ? `${greetingName || "고객"}님 안녕하세요`
-              : "주문 전 정보를 확인해주세요"}
+              : "주문 전 정보를 확인해 주세요"}
           </p>
         
 </div>

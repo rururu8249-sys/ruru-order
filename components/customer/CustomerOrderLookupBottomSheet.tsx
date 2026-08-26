@@ -105,6 +105,7 @@ export default function CustomerOrderLookupBottomSheet({
       role="dialog"
       aria-modal="true"
       aria-label="주문조회"
+      onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
     >
       <section data-sheet style={{ width: "100%", maxWidth: "560px", margin: "0 auto", overflow: "hidden", borderTopLeftRadius: "28px", borderTopRightRadius: "28px", background: "#fff", boxShadow: "0 -22px 70px rgba(15,23,42,0.22)" }}>
         <SheetGrabber onClose={onClose} style={{ paddingTop: "8px", paddingBottom: 0 }} />
@@ -224,7 +225,7 @@ export default function CustomerOrderLookupBottomSheet({
             ) : (
               <div style={{ borderRadius: "16px", background: "#FAF6F2", padding: "20px", textAlign: "center", border: "1px solid #E8E2DD" }}>
                 <p style={{ fontSize: "15px", fontWeight: 800, letterSpacing: "-0.05em", color: "#555" }}>선택한 상태의 주문내역이 없습니다.</p>
-                <p style={{ marginTop: "4px", fontSize: "12px", fontWeight: 700, color: "#999" }}>다른 상태를 눌러 확인해주세요.</p>
+                <p style={{ marginTop: "4px", fontSize: "12px", fontWeight: 700, color: "#999" }}>다른 상태를 눌러 확인해 주세요.</p>
               </div>
             )}
           </div>

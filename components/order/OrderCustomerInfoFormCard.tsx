@@ -97,7 +97,7 @@ export default function OrderCustomerInfoFormCard({
             <input
               value={address}
               onChange={(event) => onAddressChange(event.target.value)}
-              placeholder="주소를 검색해주세요"
+              placeholder="주소를 검색해 주세요"
               className="h-12 min-w-0 rounded-[18px] border border-coral-100 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none transition placeholder:text-slate-400 focus:border-coral-500"
             />
 

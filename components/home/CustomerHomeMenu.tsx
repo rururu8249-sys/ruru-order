@@ -62,7 +62,7 @@ export default function CustomerHomeMenu() {
             카톡채널 문의
           </p>
           <p className="mt-1 break-keep text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-[#5f4a17]">
-            입금·배송·주문 문의는 카톡채널로 남겨주세요.
+            입금·배송·주문 문의는 카톡채널로 남겨 주세요.
           </p>
         </div>
 

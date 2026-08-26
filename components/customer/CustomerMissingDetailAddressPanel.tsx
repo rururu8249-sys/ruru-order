@@ -32,7 +32,7 @@ export default function CustomerMissingDetailAddressPanel({ open, onClose, onCon
 
             <p className="mt-3 break-keep text-[14px] font-bold leading-relaxed text-slate-600">
               아파트, 빌라, 오피스텔은 동·호수 누락 시 배송이 지연되거나 반송될 수 있습니다.
-              정말 상세주소 없이 제출할 때만 아래 버튼을 눌러주세요.
+              정말 상세주소 없이 제출할 때만 아래 버튼을 눌러 주세요.
             </p>
           </div>
         </div>

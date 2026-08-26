@@ -8,6 +8,7 @@
 import {
   useRef,
   type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type TouchEvent as ReactTouchEvent,
 } from "react";
@@ -88,6 +89,12 @@ export default function SheetGrabber({ onClose, threshold = 72, style }: Props) 
     move(touch.clientY);
   };
 
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    onClose();
+  };
+
   return (
     <div
       onPointerDown={onPointerDown}
@@ -98,8 +105,11 @@ export default function SheetGrabber({ onClose, threshold = 72, style }: Props) 
       onTouchMove={onTouchMove}
       onTouchEnd={end}
       onTouchCancel={end}
+      onClick={onClose}
+      onKeyDown={onKeyDown}
       role="button"
-      aria-label="아래로 끌어 닫기"
+      tabIndex={0}
+      aria-label="아래로 끌거나 눌러 닫기"
       style={{
         display: "flex",
         justifyContent: "center",
