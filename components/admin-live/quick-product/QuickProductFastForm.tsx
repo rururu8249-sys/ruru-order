@@ -688,6 +688,8 @@ export default function QuickProductFastForm({
   const [brandGroupDetailCategories, setBrandGroupDetailCategories] = useState<Record<string, string>>({});
   const [brandGroupDetailOptions, setBrandGroupDetailOptions] = useState<Record<string, BrandDetailOptionConfig>>({});
   const [brandDetailEditDraft, setBrandDetailEditDraft] = useState<BrandDetailEditDraft | null>(null);
+  const [brandDetailSearch, setBrandDetailSearch] = useState("");
+  const [brandDetailCategoryFilter, setBrandDetailCategoryFilter] = useState("전체");
   const [detailPhotoUploading, setDetailPhotoUploading] = useState("");
   const detailPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const detailPhotoTargetRef = useRef("");
@@ -822,6 +824,8 @@ export default function QuickProductFastForm({
     setBrandGroupDetailCategories(productNote?.brand_group?.detail_categories && typeof productNote.brand_group.detail_categories === "object" ? productNote.brand_group.detail_categories : {});
     setBrandGroupDetailOptions(productNote?.brand_group?.detail_options && typeof productNote.brand_group.detail_options === "object" ? productNote.brand_group.detail_options : {});
     setBrandDetailEditDraft(null);
+    setBrandDetailSearch("");
+    setBrandDetailCategoryFilter("전체");
 
     setCategory(String((productNote as { category?: unknown } | null)?.category || ""));
     const _bt = Array.isArray((initialProduct as any)?.badge_types)
@@ -925,6 +929,19 @@ export default function QuickProductFastForm({
   const colors = useMemo(() => unique(splitOptions(colorText)), [colorText]);
   const sizes = useMemo(() => unique(splitOptions(sizeText)), [sizeText]);
   const brandGroupDetailPhotoCount = Object.values(brandGroupDetailPhotoSets).reduce((sum, photos) => sum + photos.length, 0);
+  const brandDetailCategories = useMemo(
+    () => unique(details.map((name) => String(brandGroupDetailCategories[name] || "").trim()).filter(Boolean)),
+    [details, brandGroupDetailCategories],
+  );
+  const filteredBrandDetails = useMemo(() => {
+    const query = brandDetailSearch.trim().toLocaleLowerCase("ko-KR");
+    return details.filter((name) => {
+      const detailCategory = String(brandGroupDetailCategories[name] || "").trim();
+      if (brandDetailCategoryFilter !== "전체" && detailCategory !== brandDetailCategoryFilter) return false;
+      if (!query) return true;
+      return `${name} ${detailCategory}`.toLocaleLowerCase("ko-KR").includes(query);
+    });
+  }, [details, brandGroupDetailCategories, brandDetailCategoryFilter, brandDetailSearch]);
   // 사용 중인 축 개수(1~3). 0이면 옵션 없는 단일 상품.
   const usedAxisCount = (details.length ? 1 : 0) + (colors.length ? 1 : 0) + (sizes.length ? 1 : 0);
 
@@ -1213,6 +1230,8 @@ export default function QuickProductFastForm({
     setBrandGroupDetailCategories({});
     setBrandGroupDetailOptions({});
     setBrandDetailEditDraft(null);
+    setBrandDetailSearch("");
+    setBrandDetailCategoryFilter("전체");
     setBulkStockText("10");
   };
 
@@ -1729,11 +1748,35 @@ export default function QuickProductFastForm({
               {isBrandGroupEdit && details.length > 0 ? (
                 <div style={{ marginTop: "10px", borderTop: "1px solid #E8E2DD", paddingTop: "10px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "7px" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>세부상품별 사진</span>
+                    <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>세부상품 관리</span>
                     <span style={{ fontSize: "11px", fontWeight: 800, color: "#0F6E56" }}>{details.length}개 상품 · 총 {brandGroupDetailPhotoCount}장</span>
                   </div>
+                  <input
+                    aria-label="세부상품 검색"
+                    value={brandDetailSearch}
+                    onChange={(event) => setBrandDetailSearch(event.target.value)}
+                    placeholder="상품코드·상품명·구분 검색"
+                    style={{ ...fieldInput, marginBottom: "7px", padding: "7px 10px", fontSize: "11.5px" }}
+                  />
+                  {brandDetailCategories.length > 0 ? (
+                    <div style={{ display: "flex", gap: "5px", overflowX: "auto", paddingBottom: "7px" }}>
+                      {["전체", ...brandDetailCategories].map((detailCategory) => {
+                        const selected = brandDetailCategoryFilter === detailCategory;
+                        return (
+                          <button
+                            key={`brand-detail-filter-${detailCategory}`}
+                            type="button"
+                            onClick={() => setBrandDetailCategoryFilter(detailCategory)}
+                            style={{ flexShrink: 0, border: `1px solid ${selected ? "#7B2D43" : "#E1D5D9"}`, borderRadius: "999px", padding: "4px 8px", background: selected ? "#7B2D43" : "#fff", color: selected ? "#fff" : "var(--color-ink-soft)", fontSize: "10.5px", fontWeight: 800, cursor: "pointer" }}
+                          >
+                            {detailCategory}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
                   <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: "6px", maxHeight: "340px", overflowY: "auto", paddingRight: "3px" }}>
-                    {details.map((name) => {
+                    {filteredBrandDetails.map((name) => {
                       const photos = brandGroupDetailPhotoSets[name] || (detailPhotos[name] ? [detailPhotos[name]] : []);
                       const thumbnail = photos[0] || detailPhotos[name] || "";
                       const categoryLabel = String(brandGroupDetailCategories[name] || "").trim();
@@ -1760,6 +1803,11 @@ export default function QuickProductFastForm({
                         </div>
                       );
                     })}
+                    {filteredBrandDetails.length === 0 ? (
+                      <div style={{ gridColumn: "1 / -1", padding: "18px 10px", textAlign: "center", color: "var(--color-ink-mute)", fontSize: "11.5px", border: "1px dashed #D9C5CC", borderRadius: "8px" }}>
+                        조건에 맞는 세부상품이 없습니다.
+                      </div>
+                    ) : null}
                   </div>
                   <div style={{ marginTop: "6px", fontSize: "10.5px", color: "var(--color-ink-mute)" }}>카드를 누르면 상품명·구분·추가금·색상·사이즈를 수정할 수 있어요. 썸네일은 클릭하면 크게 보입니다.</div>
                 </div>
@@ -1977,6 +2025,28 @@ export default function QuickProductFastForm({
               <button type="button" onClick={() => setBrandDetailEditDraft(null)} style={{ border: "none", background: "transparent", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer" }}>×</button>
             </div>
             <div style={{ overflowY: "auto", padding: "14px 16px" }}>
+              {(() => {
+                const photos = brandGroupDetailPhotoSets[brandDetailEditDraft.originalName] || [];
+                if (photos.length === 0) return null;
+                return (
+                  <div style={{ marginBottom: "12px" }}>
+                    <div style={{ marginBottom: "6px", fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>등록사진 {photos.length}장 · 클릭하면 확대</div>
+                    <div style={{ display: "flex", gap: "7px", overflowX: "auto", paddingBottom: "3px" }}>
+                      {photos.map((photo, index) => (
+                        <button
+                          key={`brand-edit-photo-${index}-${photo}`}
+                          type="button"
+                          onClick={() => setDetailPreviewImage(resolveProductImageUrl(photo))}
+                          title="사진 크게 보기"
+                          style={{ flex: "0 0 76px", width: "76px", height: "76px", overflow: "hidden", padding: 0, border: "1px solid #E1D5D9", borderRadius: "9px", background: "#F1ECE8", cursor: "zoom-in" }}
+                        >
+                          <img src={resolveProductImageUrl(photo)} alt={`${brandDetailEditDraft.name} 사진 ${index + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 150px", gap: "10px" }}>
                 <label style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>상품명
                   <input value={brandDetailEditDraft.name} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, name: event.target.value } : prev)} style={{ ...fieldInput, marginTop: "4px" }} />
