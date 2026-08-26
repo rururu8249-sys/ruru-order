@@ -1521,7 +1521,15 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         </div>
 
         {excelImportOpen ? (
-          <ExcelBulkImportPopup onClose={() => setExcelImportOpen(false)} onDone={() => { void loadProducts(true); }} />
+          <ExcelBulkImportPopup
+            onClose={() => setExcelImportOpen(false)}
+            onDone={() => {
+              void loadProducts(true);
+              if (bcSelId) void reloadBcProducts(bcSelId);
+            }}
+            targetBroadcastId={tab === "broadcast" ? bcSelId : null}
+            targetBroadcastTitle={tab === "broadcast" ? (bcList.find((broadcast) => broadcast.id === bcSelId)?.title || "") : ""}
+          />
         ) : null}
 
         {/* 탭 2개 */}

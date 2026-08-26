@@ -12,6 +12,7 @@
 import { useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
+import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import {
   autoGuessConfig, buildDraftCores, auditDraftCores, norm, totalStock,
@@ -19,7 +20,12 @@ import {
   type AuditReport, type BulkConfig, type DraftCore, type SheetCell,
 } from "@/lib/excelBulkParse";
 
-type Props = { onClose: () => void; onDone?: () => void };
+type Props = {
+  onClose: () => void;
+  onDone?: (productIds: string[]) => void;
+  targetBroadcastId?: string | null;
+  targetBroadcastTitle?: string;
+};
 
 type SheetImage = { row: number; col: number; ext: string; blob: Blob; url: string };
 type ParsedSheet = { name: string; rows: SheetCell[][]; images: SheetImage[] };
@@ -37,7 +43,7 @@ const EMPTY_CFG: BulkConfig = {
   colName: 0, colPrice: -1, colColor: -1, colCode: -1, colSize: -1, colQty: -1, sizeCols: [],
 };
 
-export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
+export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastId, targetBroadcastTitle }: Props) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState("");
   const [sheets, setSheets] = useState<ParsedSheet[]>([]);
@@ -202,16 +208,66 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
   const useCount = drafts.filter((d) => d.use).length;
 
   // ── 실제 등록 ──
+  // 안전 순서:
+  //   1) 기존 상품명·업체코드 중복 사전 차단
+  //   2) 모든 사진 업로드 완료(실패 시 상품은 0개 생성)
+  //   3) 모든 상품을 숨김 상태로 한 번의 INSERT로 저장(부분 등록 차단)
+  //   4) 저장 직후 중복·가격·개수 재대조
+  //   5) 대상 방송 연결 후에만 원래 진열 상태로 공개
   const commit = async () => {
     const targets = drafts.filter((d) => d.use);
     if (targets.length === 0) { showAdminToast("등록할 상품이 없어요"); return; }
-    setBusy("등록 중…");
+    if (targets.some((d) => d.warns.length > 0)) {
+      showAdminToast("확인 필요 표시가 있는 상품은 등록할 수 없어요.\n\n문제없는 것만 선택하거나 엑셀을 수정해주세요.", "error");
+      return;
+    }
+    setBusy("중복 확인 중…");
     setProgress({ done: 0, total: targets.length, ok: 0, fail: 0 });
-    let ok = 0, fail = 0;
-    for (let i = 0; i < targets.length; i += 1) {
-      const d = targets[i];
-      try {
-        // 1) 사진 업로드 (기존 API 재사용)
+    try {
+      const finalNameOf = (d: DraftProduct) => `${bulkNamePrefix.trim() ? bulkNamePrefix.trim() + " " : ""}${d.name}`.trim();
+      const targetNames = targets.map(finalNameOf);
+      const targetCodes = targets.map((d) => String(d.code || "").trim()).filter(Boolean);
+      const repeatedNames = targetNames.filter((name, i) => targetNames.indexOf(name) !== i);
+      const repeatedCodes = targetCodes.filter((code, i) => targetCodes.indexOf(code) !== i);
+      if (repeatedNames.length > 0 || repeatedCodes.length > 0) {
+        throw new Error(`엑셀 내부 중복: ${[...new Set([...repeatedNames, ...repeatedCodes])].join(", ")}`);
+      }
+
+      const existingActive = await loadActiveProductIdentities("기존 상품 중복 확인 실패");
+      const existingNames = new Set(existingActive.map((row) => String(row.product_name || "").trim()).filter(Boolean));
+      const existingCodes = new Set(existingActive.map((row) => productVendorCode(row)).filter(Boolean));
+      const nameHits = targetNames.filter((name) => existingNames.has(name));
+      const codeHits = targetCodes.filter((code) => existingCodes.has(code));
+      if (nameHits.length > 0 || codeHits.length > 0) {
+        throw new Error(`이미 등록된 상품: ${[...new Set([...nameHits, ...codeHits])].join(", ")}`);
+      }
+
+      if (targetBroadcastId) {
+        const { data: broadcast, error: broadcastError } = await supabase
+          .from("broadcasts")
+          .select("id, public_title, is_deleted")
+          .eq("id", targetBroadcastId)
+          .maybeSingle();
+        if (broadcastError) throw new Error(`대상 방송 확인 실패: ${broadcastError.message}`);
+        if (!broadcast || (broadcast as Record<string, unknown>).is_deleted === true) throw new Error("대상 방송을 찾을 수 없어요.");
+        const actualTitle = String((broadcast as Record<string, unknown>).public_title || "").trim();
+        if (targetBroadcastTitle && actualTitle !== targetBroadcastTitle.trim()) {
+          throw new Error(`대상 방송명이 달라졌어요: ${actualTitle || "제목 없음"}`);
+        }
+      }
+
+      const importBatch = `excel-${new Date().toISOString()}-${Math.random().toString(36).slice(2, 10)}`;
+      const prepared: Array<{
+        payload: Record<string, unknown>;
+        desired: { status: string; is_visible: boolean; in_shop: boolean; mall_sort_order?: number };
+        expectedName: string;
+        expectedCode: string;
+        expectedPrice: number;
+      }> = [];
+      setBusy("사진 전체 업로드 중…");
+      for (let i = 0; i < targets.length; i += 1) {
+        const d = targets[i];
+        // 사진은 상품 저장 전에 전부 업로드한다. 한 장이라도 실패하면 상품은 만들지 않는다.
         let imageUrl = "";
         const detailPhotoUrls: Record<string, string> = {};
         const detailPhotoSets: Record<string, string[]> = {};
@@ -227,9 +283,7 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
           return url;
         };
         if (d.imageBlob && !d.brandGroup) {
-          try {
-            imageUrl = await uploadBlob(d.imageBlob, `${d.code || d.name}.jpg`, "cover");
-          } catch { /* 사진 실패해도 상품은 등록 */ }
+          imageUrl = await uploadBlob(d.imageBlob, `${d.code || d.name}.jpg`, "cover");
         }
         for (const detail of d.details || []) {
           const blobs = d.detailImageBlobs?.[detail] || [];
@@ -242,7 +296,7 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
             detailImageUrls.push(url);
           }
         }
-        // 2) 옵션·재고
+        // 옵션·재고
         //    줄별 설정(정규양식에 직접 쓴 값)이 있으면 그게 우선, 없으면 화면의 전체 적용 값
         const colors = d.colors.filter(Boolean);
         const sizes = d.sizes.filter(Boolean);
@@ -307,14 +361,21 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
                 },
               }
             : {}),
-          import_batch: new Date().toISOString().slice(0, 10),
+          import_batch: importBatch,
         };
-        const finalName = `${bulkNamePrefix.trim() ? bulkNamePrefix.trim() + " " : ""}${d.name}`.trim();
+        const finalName = finalNameOf(d);
+        const desired = {
+          status: rowPlace === "shop" ? "판매중" : "숨김",
+          is_visible: rowPlace === "shop",
+          in_shop: rowPlace === "shop",
+          ...(rowPlace === "shop" ? { mall_sort_order: 999999 } : {}),
+        };
         const payload: Record<string, unknown> = {
           product_name: finalName,
           price: Math.max(0, d.price + bulkPriceAdd),
           stock: total,
-          status: rowPlace === "shop" ? "판매중" : "숨김",
+          // 검증·방송 연결이 끝날 때까지 고객에게 공개하지 않는다.
+          status: "숨김",
           // 방송과 무관한 대량등록 → 상시판매(group_buy). 쇼핑몰 진열은 in_shop으로.
           product_type: d.brandGroup ? "broadcast" : "group_buy",
           badge_types: rowBadges,
@@ -330,24 +391,136 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
           color_option_enabled: detailActive ? true : colors.length > 0,
           size_option_enabled: sizes.length > 0,
           detail_image_urls: detailImageUrls,
-          is_visible: rowPlace === "shop",
+          is_visible: false,
           is_soldout: false,
-          in_shop: rowPlace === "shop",
-          ...(rowPlace === "shop" ? { mall_sort_order: 999999 } : {}),
+          in_shop: false,
           product_note: JSON.stringify(note),
         };
-        await insertProductSchemaSafe(payload);
-        ok += 1;
-      } catch (e) {
-        fail += 1;
-        console.error("[엑셀등록 실패]", d.name, e);
+        prepared.push({
+          payload,
+          desired,
+          expectedName: finalName,
+          expectedCode: String(d.code || "").trim(),
+          expectedPrice: Math.max(0, d.price + bulkPriceAdd),
+        });
+        setProgress({ done: i + 1, total: targets.length, ok: 0, fail: 0 });
       }
-      setProgress({ done: i + 1, total: targets.length, ok, fail });
+
+      setBusy("상품 일괄 저장 중…");
+      const insertedRows = await insertProductsSchemaSafe(prepared.map((row) => row.payload));
+      const inserted = (Array.isArray(insertedRows) ? insertedRows : []) as Array<Record<string, unknown>>;
+      if (inserted.length !== prepared.length) {
+        throw new Error(`저장 개수 불일치: 요청 ${prepared.length}개 / 저장 ${inserted.length}개`);
+      }
+      const insertedIds = inserted.map((row) => String(row.id || "")).filter(Boolean);
+      if (insertedIds.length !== prepared.length) throw new Error("저장된 상품 ID를 전부 확인하지 못했어요.");
+
+      // 저장 직후 실제 DB 값과 중복 여부 재확인. 이 단계까지는 전 상품 숨김 상태다.
+      const { data: verifyRows, error: verifyError } = await supabase
+        .from("products")
+        .select("id, product_name, price, product_note, status, is_visible, in_shop")
+        .in("id", insertedIds);
+      if (verifyError) throw new Error(`저장 결과 확인 실패: ${verifyError.message}`);
+      const verified = (verifyRows as Array<Record<string, unknown>>) || [];
+      if (verified.length !== prepared.length) throw new Error(`저장 결과 누락: ${prepared.length - verified.length}개`);
+      for (const expected of prepared) {
+        const found = verified.find((row) => String(row.product_name || "").trim() === expected.expectedName);
+        if (!found) throw new Error(`${expected.expectedName}: 저장 결과 없음`);
+        if (Number(found.price) !== expected.expectedPrice) throw new Error(`${expected.expectedName}: 가격 저장값 불일치`);
+        if (productVendorCode(found) !== expected.expectedCode) throw new Error(`${expected.expectedName}: 업체코드 저장값 불일치`);
+        if (String(found.status || "") !== "숨김" || found.is_visible === true || found.in_shop === true) {
+          throw new Error(`${expected.expectedName}: 검증 전 공개 상태 오류`);
+        }
+      }
+      const activeAfter = await loadActiveProductIdentities("등록 후 중복 확인 실패");
+      for (const expected of prepared) {
+        const sameName = activeAfter.filter((row) => String(row.product_name || "").trim() === expected.expectedName).length;
+        const sameCode = expected.expectedCode
+          ? activeAfter.filter((row) => productVendorCode(row) === expected.expectedCode).length
+          : 1;
+        if (sameName !== 1 || sameCode !== 1) throw new Error(`${expected.expectedName}: 등록 후 중복 감지`);
+      }
+
+      if (targetBroadcastId) {
+        setBusy("방송에 상품 연결 중…");
+        const { data: lastLinks, error: lastLinkError } = await supabase
+          .from("broadcast_products")
+          .select("sort_order")
+          .eq("broadcast_id", targetBroadcastId)
+          .order("sort_order", { ascending: false })
+          .limit(1);
+        if (lastLinkError) throw new Error(`방송 진열 순서 확인 실패: ${lastLinkError.message}`);
+        const startSort = Math.max(-1, Number((lastLinks as Array<Record<string, unknown>>)?.[0]?.sort_order ?? -1)) + 1;
+        const links = insertedIds.map((productId, index) => ({
+          broadcast_id: targetBroadcastId,
+          product_id: productId,
+          sort_order: startSort + index,
+          is_visible: true,
+        }));
+        const { error: linkError } = await adminCatalogWrite({ table: "broadcast_products", op: "insert", values: links });
+        if (linkError) throw new Error(`방송 상품 연결 실패: ${linkError.message}`);
+        const { data: linkedRows, error: linkedError } = await supabase
+          .from("broadcast_products")
+          .select("product_id")
+          .eq("broadcast_id", targetBroadcastId)
+          .in("product_id", insertedIds);
+        if (linkedError) throw new Error(`방송 연결 확인 실패: ${linkedError.message}`);
+        if (((linkedRows as Array<Record<string, unknown>>) || []).length !== insertedIds.length) {
+          throw new Error("방송에 연결된 상품 개수가 맞지 않아요.");
+        }
+      }
+
+      // 모든 검증과 방송 연결이 끝난 뒤 원래 진열 상태로 공개한다.
+      const activationGroups = new Map<string, { values: Record<string, unknown>; ids: string[] }>();
+      prepared.forEach((row, index) => {
+        const key = JSON.stringify(row.desired);
+        const group: { values: Record<string, unknown>; ids: string[] } = activationGroups.get(key) || {
+          values: row.desired,
+          ids: [],
+        };
+        group.ids.push(insertedIds[index]);
+        activationGroups.set(key, group);
+      });
+      for (const group of activationGroups.values()) {
+        const { error: activateError } = await adminCatalogWrite({
+          table: "products",
+          op: "update",
+          values: group.values,
+          filters: [{ type: "in", col: "id", val: group.ids }],
+        });
+        if (activateError) throw new Error(`최종 공개 전환 실패: ${activateError.message}`);
+      }
+
+      const { data: finalRows, error: finalError } = await supabase
+        .from("products")
+        .select("id, status, is_visible, in_shop")
+        .in("id", insertedIds);
+      if (finalError) throw new Error(`최종 상태 확인 실패: ${finalError.message}`);
+      const finalById = new Map(((finalRows as Array<Record<string, unknown>>) || []).map((row) => [String(row.id), row]));
+      prepared.forEach((row, index) => {
+        const actual = finalById.get(insertedIds[index]);
+        if (!actual || String(actual.status || "") !== row.desired.status || actual.is_visible !== row.desired.is_visible || actual.in_shop !== row.desired.in_shop) {
+          throw new Error(`${row.expectedName}: 최종 공개 상태 불일치`);
+        }
+      });
+
+      setProgress({ done: targets.length, total: targets.length, ok: targets.length, fail: 0 });
+      setStep("done");
+      showAdminToast(
+        `안전 등록 완료\n\n상품 ${targets.length}개 · 중복 0개${targetBroadcastTitle ? ` · ${targetBroadcastTitle} 연결 완료` : ""}`,
+        "success",
+      );
+      onDone?.(insertedIds);
+    } catch (e) {
+      console.error("[엑셀 안전등록 실패]", e);
+      setProgress((prev) => ({ ...prev, fail: Math.max(1, prev.total - prev.ok) }));
+      showAdminToast(
+        "안전 등록 중단\n\n" + (e instanceof Error ? e.message : String(e)) + "\n\n검증이 끝나지 않은 상품은 공개하지 않았습니다.",
+        "error",
+      );
+    } finally {
+      setBusy("");
     }
-    setBusy("");
-    setStep("done");
-    showAdminToast(`엑셀 등록 완료\n\n성공 ${ok}개 · 실패 ${fail}개`, fail > 0 ? "error" : "success");
-    onDone?.();
   };
 
   const body = (
@@ -560,6 +733,9 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
             <div style={{ padding: "12px 18px", borderTop: "1px solid #EDE4E8", display: "flex", gap: "10px", alignItems: "center" }}>
               <button type="button" onClick={() => setDrafts((p) => p.map((x) => ({ ...x, use: true })))} style={{ ...selStyle, cursor: "pointer" }}>전체 선택</button>
               <button type="button" onClick={() => setDrafts((p) => p.map((x) => ({ ...x, use: x.warns.length === 0 })))} style={{ ...selStyle, cursor: "pointer" }}>문제없는 것만</button>
+              {targetBroadcastTitle ? (
+                <span style={{ fontSize: "11.5px", fontWeight: 900, color: "#1E7A3C" }}>📺 등록 후 {targetBroadcastTitle}에 자동 연결</span>
+              ) : null}
               <span style={{ marginLeft: "auto", fontSize: "12px", fontWeight: 700, color: "#68575E" }}>
                 {busy ? `${progress.done}/${progress.total} 등록 중…` : ""}
               </span>
@@ -601,18 +777,55 @@ function getMissingColumn(errorMessage: string) {
   return null;
 }
 
-async function insertProductSchemaSafe(payload: Record<string, unknown>) {
+function productVendorCode(row: Record<string, unknown>) {
+  const raw = row.product_note;
+  if (!raw) return "";
+  try {
+    const note = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return String((note as Record<string, unknown>)?.vendor_code || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+async function loadActiveProductIdentities(errorPrefix: string) {
+  const pageSize = 1000;
+  const rows: Array<Record<string, unknown>> = [];
+  for (let page = 0; page < 100; page += 1) {
+    const from = page * pageSize;
+    const { data, error } = await supabase
+      .from("products")
+      .select("id, product_name, product_note, status")
+      .order("id", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(`${errorPrefix}: ${error.message}`);
+    const batch = (data as Array<Record<string, unknown>>) || [];
+    rows.push(...batch);
+    if (batch.length < pageSize) break;
+    if (page === 99) throw new Error(`${errorPrefix}: 상품 수가 안전 확인 한도를 초과했어요.`);
+  }
+  return rows.filter((row) => String(row.status || "") !== "deleted");
+}
+
+async function insertProductsSchemaSafe(payloads: Record<string, unknown>[]) {
+  if (payloads.length === 0) return [];
   const requiredColumns = new Set(["product_name"]);
-  const workingPayload = { ...payload };
+  const workingPayloads = payloads.map((payload) => ({ ...payload }));
   for (let attempt = 0; attempt < 12; attempt += 1) {
-    const { data, error } = await adminCatalogWrite({ table: "products", op: "insert", values: workingPayload, select: "id", single: true });
+    // 배열 INSERT 한 번으로 보내므로 DB 문장 단위로 전부 성공하거나 전부 실패한다.
+    const { data, error } = await adminCatalogWrite({
+      table: "products",
+      op: "insert",
+      values: workingPayloads,
+      select: "id, product_name, price, product_note",
+    });
     if (!error) return data;
     const missingColumn = getMissingColumn(error.message || "");
-    if (!missingColumn || !(missingColumn in workingPayload)) throw new Error(error.message);
+    if (!missingColumn || !workingPayloads.some((payload) => missingColumn in payload)) throw new Error(error.message);
     if (requiredColumns.has(missingColumn)) {
       throw new Error(`products.${missingColumn} 컬럼이 없어 저장할 수 없습니다.`);
     }
-    delete workingPayload[missingColumn];
+    workingPayloads.forEach((payload) => { delete payload[missingColumn]; });
   }
   throw new Error("products 저장 재시도 횟수를 초과했습니다.");
 }
