@@ -225,6 +225,26 @@ function productCreatedAt(p: ProductRow) {
   const t = new Date(String((p as Record<string, unknown>).created_at || "")).getTime();
   return Number.isFinite(t) ? t : 0;
 }
+
+const PRODUCT_CREATED_AT_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+function productCreatedAtLabel(p: ProductRow) {
+  const raw = String((p as Record<string, unknown>).created_at || "").trim();
+  if (!raw) return "";
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = PRODUCT_CREATED_AT_FORMATTER.formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value || "";
+  return `${get("year")}.${get("month")}.${get("day")} ${get("hour")}:${get("minute")}`;
+}
 function sortProductRows(rows: ProductRow[], key: ProductSortKey) {
   if (key === "manual") return rows;
   const copy = [...rows];
@@ -1937,6 +1957,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     const img = mainImage(p);
                     const state = widgetState(p);
                     const busy = busyId === id;
+                    const createdAtLabel = productCreatedAtLabel(p);
                     const widgetStyle: React.CSSProperties =
                       state === "rotating"
                         ? { background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", border: "1px solid var(--color-rose-line)" }
@@ -1959,6 +1980,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
                           <div style={{ marginTop: "3px", fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{money(productPrice(p))}</div>
+                          {createdAtLabel ? (
+                            <div style={{ marginTop: "3px", fontSize: "10.5px", fontWeight: 700, color: "var(--color-ink-mute)", fontVariantNumeric: "tabular-nums" }}>
+                              등록일시 {createdAtLabel}
+                            </div>
+                          ) : null}
                           <div style={{ marginTop: "5px", display: "flex", gap: "4px", flexWrap: "wrap" }}>
                             <span style={{ fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: "var(--color-info-bg)", color: "var(--color-info-tx)" }}>{shippingLabel(p)}</span>
                             {productCategory(p) ? <span style={{ fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: "var(--color-surface-3)", color: "var(--color-ink-soft)" }}>{productCategory(p)}</span> : null}
