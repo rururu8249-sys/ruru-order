@@ -29,6 +29,7 @@ type DraftProduct = DraftCore & {
   use: boolean;
   imageUrl: string;      // blob URL (미리보기 전용)
   imageBlob: Blob | null;
+  detailImageBlobs: Record<string, Blob[]>;
 };
 
 const EMPTY_CFG: BulkConfig = {
@@ -156,9 +157,16 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
     });
     return cores.map((d, i) => {
       const nextRow = cores[i + 1]?.row ?? s.rows.length + 1;
-      const im = s.images.find((x) => x.row >= d.row && x.row < nextRow) || null;
+      const productImages = s.images.filter((x) => x.row >= d.row && x.row < nextRow);
+      const im = productImages[0] || null;
+      const detailImageBlobs: Record<string, Blob[]> = {};
+      for (const [detail, detailRows] of Object.entries(d.detailRows || {})) {
+        const rowSet = new Set(detailRows);
+        const matches = productImages.filter((image) => rowSet.has(image.row));
+        if (matches.length > 0) detailImageBlobs[detail] = matches.map((image) => image.blob);
+      }
       const warns = im || d.isExample ? d.warns : [...d.warns, "사진 없음"];
-      return { ...d, warns, key: `${s.name}-${d.row}`, use: !d.isExample, imageUrl: im?.url || "", imageBlob: im?.blob || null };
+      return { ...d, warns, key: `${s.name}-${d.row}`, use: !d.isExample, imageUrl: im?.url || "", imageBlob: im?.blob || null, detailImageBlobs };
     });
   };
 
@@ -173,7 +181,7 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
         s.images.find((x) => x.row >= d.row && x.row < d.row + span) ||
         null;
       const warns = im ? d.warns : [...d.warns, "사진 없음"];
-      return { ...d, warns, key: `${s.name}-${d.row}`, use: true, imageUrl: im?.url || "", imageBlob: im?.blob || null };
+      return { ...d, warns, key: `${s.name}-${d.row}`, use: true, imageUrl: im?.url || "", imageBlob: im?.blob || null, detailImageBlobs: {} };
     });
   };
 
@@ -205,15 +213,34 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
       try {
         // 1) 사진 업로드 (기존 API 재사용)
         let imageUrl = "";
-        if (d.imageBlob) {
+        const detailPhotoUrls: Record<string, string> = {};
+        const detailPhotoSets: Record<string, string[]> = {};
+        const detailImageUrls: string[] = [];
+        const uploadBlob = async (blob: Blob, fileName: string, kind: "cover" | "detail") => {
+          const fd = new FormData();
+          fd.append("file", new File([blob], fileName, { type: blob.type || "image/jpeg" }));
+          fd.append("kind", kind);
+          const res = await fetch("/api/admin-live/product-images/upload", { method: "POST", body: fd });
+          const json = await res.json().catch(() => null);
+          const url = String(json?.url || json?.path || "");
+          if (!res.ok || !url) throw new Error(json?.message || "사진 업로드 실패");
+          return url;
+        };
+        if (d.imageBlob && !d.brandGroup) {
           try {
-            const fd = new FormData();
-            fd.append("file", new File([d.imageBlob], `${d.code || d.name}.jpg`, { type: d.imageBlob.type || "image/jpeg" }));
-            fd.append("kind", "cover");
-            const res = await fetch("/api/admin-live/product-images/upload", { method: "POST", body: fd });
-            const j = await res.json().catch(() => null);
-            imageUrl = String(j?.url || j?.path || "");
+            imageUrl = await uploadBlob(d.imageBlob, `${d.code || d.name}.jpg`, "cover");
           } catch { /* 사진 실패해도 상품은 등록 */ }
+        }
+        for (const detail of d.details || []) {
+          const blobs = d.detailImageBlobs?.[detail] || [];
+          if (d.brandGroup && blobs.length === 0) throw new Error(`${detail}: 상세사진 없음`);
+          for (let photoIndex = 0; photoIndex < blobs.length; photoIndex += 1) {
+            const url = await uploadBlob(blobs[photoIndex], `${detail}-${photoIndex + 1}.jpg`, "detail");
+            if (!detailPhotoUrls[detail]) detailPhotoUrls[detail] = url;
+            if (!detailPhotoSets[detail]) detailPhotoSets[detail] = [];
+            detailPhotoSets[detail].push(url);
+            detailImageUrls.push(url);
+          }
         }
         // 2) 옵션·재고
         //    줄별 설정(정규양식에 직접 쓴 값)이 있으면 그게 우선, 없으면 화면의 전체 적용 값
@@ -244,7 +271,7 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
         const detailActive = details.length > 0;
         const needAxes = detailActive && (colors.length > 0 || sizes.length > 0);
         const note: Record<string, unknown> = {
-          stock_management_enabled: true,
+          stock_management_enabled: d.stockManagementEnabled ?? true,
           stock_variants: variants,
           ...(rowCategory ? { category: rowCategory } : {}),
           ...(d.code ? { vendor_code: d.code } : {}),
@@ -255,6 +282,8 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
                 option_label: "세부상품",
                 option_pricing: Object.fromEntries(details.map((n) => [n, Math.max(0, Math.floor(d.detailPlus?.[n] ?? 0))])),
                 combo_hidden: [],
+                ...(Object.keys(detailPhotoUrls).length > 0 ? { detail_photos: detailPhotoUrls } : {}),
+                ...(Object.keys(detailPhotoSets).length > 0 ? { detail_photo_sets: detailPhotoSets } : {}),
               }
             : {}),
           ...(needAxes
@@ -267,6 +296,17 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
                 combo_detail_values: details,
               }
             : {}),
+          ...(d.brandGroup
+            ? {
+                brand_group: {
+                  enabled: true,
+                  brand_ko: d.brandKo || d.name,
+                  brand_en: d.brandEn || "",
+                  detail_categories: d.detailCategories || {},
+                  detail_options: d.detailOptions || {},
+                },
+              }
+            : {}),
           import_batch: new Date().toISOString().slice(0, 10),
         };
         const finalName = `${bulkNamePrefix.trim() ? bulkNamePrefix.trim() + " " : ""}${d.name}`.trim();
@@ -276,20 +316,20 @@ export default function ExcelBulkImportPopup({ onClose, onDone }: Props) {
           stock: total,
           status: rowPlace === "shop" ? "판매중" : "숨김",
           // 방송과 무관한 대량등록 → 상시판매(group_buy). 쇼핑몰 진열은 in_shop으로.
-          product_type: "group_buy",
+          product_type: d.brandGroup ? "broadcast" : "group_buy",
           badge_types: rowBadges,
           badge_type: rowBadges[0] ?? null,
           shipping_type: rowShipping,
           combine_shipping: rowShipping === "vendor" ? "N" : "Y",
           sort_order: 0,
           is_pinned: false,
-          image_url: imageUrl || null,
+          image_url: d.brandGroup ? null : imageUrl || null,
           // 세부상품만 쓰면 기존 조합형과 동일: color_options에 세부상품명 (QuickProductFastForm 1229행 규칙)
           color_options: detailActive && colors.length === 0 ? details : colors,
           size_options: sizes,
           color_option_enabled: detailActive ? true : colors.length > 0,
           size_option_enabled: sizes.length > 0,
-          detail_image_urls: [],
+          detail_image_urls: detailImageUrls,
           is_visible: rowPlace === "shop",
           is_soldout: false,
           in_shop: rowPlace === "shop",

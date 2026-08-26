@@ -1004,6 +1004,85 @@ function readComboPhotosOrderProduct(product: unknown): Record<string, string> {
   return out;
 }
 
+type BrandGroupDetailOption = {
+  colors: string[];
+  sizes: string[];
+  variants: Array<{ color: string; size: string }>;
+};
+
+type BrandGroupMeta = {
+  enabled: boolean;
+  brandKo: string;
+  brandEn: string;
+  detailCategories: Record<string, string>;
+  detailOptions: Record<string, BrandGroupDetailOption>;
+  detailPhotoSets: Record<string, string[]>;
+};
+
+// [해외원정 의류] 한 브랜드를 대표 카드 1개로 보여주고, 실제 상품은 세부상품으로 고르는 구조.
+// 기존 조합형 상품에는 brand_group 키가 없으므로 아무 변화가 없다.
+function readBrandGroupOrderProduct(product: unknown): BrandGroupMeta | null {
+  const note = readOrderNoteObject(product) as Record<string, unknown> | null;
+  const raw = note?.brand_group;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const record = raw as Record<string, unknown>;
+  if (record.enabled !== true) return null;
+
+  const detailCategoriesRaw = record.detail_categories;
+  const detailCategories: Record<string, string> = {};
+  if (detailCategoriesRaw && typeof detailCategoriesRaw === "object" && !Array.isArray(detailCategoriesRaw)) {
+    for (const [name, category] of Object.entries(detailCategoriesRaw as Record<string, unknown>)) {
+      const key = String(name || "").trim();
+      const value = String(category || "").trim();
+      if (key && value) detailCategories[key] = value;
+    }
+  }
+
+  const detailOptionsRaw = record.detail_options;
+  const detailOptions: Record<string, BrandGroupDetailOption> = {};
+  if (detailOptionsRaw && typeof detailOptionsRaw === "object" && !Array.isArray(detailOptionsRaw)) {
+    for (const [name, optionValue] of Object.entries(detailOptionsRaw as Record<string, unknown>)) {
+      if (!optionValue || typeof optionValue !== "object" || Array.isArray(optionValue)) continue;
+      const optionRecord = optionValue as Record<string, unknown>;
+      const cleanList = (value: unknown) => Array.isArray(value)
+        ? Array.from(new Set(value.map((item) => String(item ?? "").trim()).filter(Boolean)))
+        : [];
+      const variants = Array.isArray(optionRecord.variants)
+        ? optionRecord.variants
+            .filter((item) => item && typeof item === "object")
+            .map((item) => {
+              const variant = item as Record<string, unknown>;
+              return { color: String(variant.color ?? "").trim(), size: String(variant.size ?? "").trim() };
+            })
+        : [];
+      detailOptions[String(name || "").trim()] = {
+        colors: cleanList(optionRecord.colors),
+        sizes: cleanList(optionRecord.sizes),
+        variants,
+      };
+    }
+  }
+
+  const detailPhotoSetsRaw = note?.detail_photo_sets;
+  const detailPhotoSets: Record<string, string[]> = {};
+  if (detailPhotoSetsRaw && typeof detailPhotoSetsRaw === "object" && !Array.isArray(detailPhotoSetsRaw)) {
+    for (const [name, value] of Object.entries(detailPhotoSetsRaw as Record<string, unknown>)) {
+      if (!Array.isArray(value)) continue;
+      const photos = Array.from(new Set(value.map((item) => String(item ?? "").trim()).filter(Boolean)));
+      if (photos.length > 0) detailPhotoSets[String(name || "").trim()] = photos;
+    }
+  }
+
+  return {
+    enabled: true,
+    brandKo: String(record.brand_ko || "").trim(),
+    brandEn: String(record.brand_en || "").trim(),
+    detailCategories,
+    detailOptions,
+    detailPhotoSets,
+  };
+}
+
 // 담기/시트 단가용: 선택된 세부상품의 추가금(조합형 아니면 항상 0 → 기존 상품 경로 무영향)
 function comboPlusOfOrderProduct(product: unknown, color?: string): number {
   const info = readComboInfoOrderProduct(product);
@@ -1344,6 +1423,8 @@ export default function OrderPage() {
     return () => clearTimeout(t);
   }, [cartAddedOpen, cartAddedItem]);
   const [lightboxImage, setLightboxImage] = useState<string>("");
+  const [lightboxZoomed, setLightboxZoomed] = useState(false);
+  useEffect(() => { if (!lightboxImage) setLightboxZoomed(false); }, [lightboxImage]);
   const [orderLookupOrders, setOrderLookupOrders] = useState<any[]>([]);
   const [orderLookupFilter, setOrderLookupFilter] = useState<CustomerOrderLookupFilter>("전체");
   const [orderLookupPage, setOrderLookupPage] = useState(1);
@@ -1388,6 +1469,8 @@ export default function OrderPage() {
   const [registeredOptionQty, setRegisteredOptionQty] = useState(1);
   // [조합형 옵션] 세부상품이 많을 때(예: 미니어처 143종) 옵션 시트 안 검색어 — 표시 전용
   const [registeredOptionComboSearch, setRegisteredOptionComboSearch] = useState("");
+  // [해외원정 의류] 브랜드 안에서 전체/상의/하의/세트/아우터를 바로 좁히는 표시 필터.
+  const [registeredOptionDetailCategory, setRegisteredOptionDetailCategory] = useState("전체");
   // [2026-08-12 리뉴얼 2단계] 다음 방송 일시 — settings.next_live_text 를 그대로 보여준다(없으면 안 뜸).
   const [nextLiveText, setNextLiveText] = useState("");
   // [2026-08-10 3단] 세부상품(1번 축) 선택값. 3단이 아닌 상품에서는 사용하지 않음(기존 동작 무변경).
@@ -3396,10 +3479,10 @@ export default function OrderPage() {
 
   const addRegisteredProductToOrderItems = (
     product: BroadcastProduct,
-    options?: { color?: string; size?: string; qty?: number; chatSource?: boolean }
+    options?: { color?: string; size?: string; qty?: number; chatSource?: boolean; displayName?: string; priceKey?: string }
   ) => {
     // [조합형 옵션] 단가 = 기본가 + 선택한 세부상품 추가금. 조합형 아니면 comboPlus=0 → 기존과 완전 동일.
-    const comboPlus = comboPlusOfOrderProduct(product, options?.color);
+    const comboPlus = comboPlusOfOrderProduct(product, options?.priceKey ?? options?.color);
     const productPrice = Number(product.price || 0) + comboPlus;
     // [무료나눔] 0원 상품은 "0"으로 담는다(빈값=손님 직접입력 취급 방지). 그 외 0/음수는 기존대로 빈값.
     const nextProductPrice = Number.isFinite(productPrice) && productPrice > 0
@@ -3427,7 +3510,7 @@ export default function OrderPage() {
 
     const nextItem: OrderItem = {
       product_id: String(product.id ?? ""),
-      product_name: product.product_name,
+      product_name: options?.displayName?.trim() || product.product_name,
       color: options?.color ?? normalizeEmptyProductOptionValue(fallbackColor),
       size: options?.size ?? normalizeEmptyProductOptionValue(fallbackSize),
       qty: String(Math.max(1, Number(options?.qty || 1))),
@@ -3470,7 +3553,7 @@ export default function OrderPage() {
           ? "[" + pnm + "] 1인당 최대 " + limitQty + "개까지 구매할 수 있어요."
           : "[" + pnm + "] 재고가 부족해요. 최대 " + cap + "개까지 담을 수 있어요.";
       const addQty = Number(nextItem.qty) || 1;
-      const sameIndex = nextItem.product_id ? prev.findIndex((item) => item.product_id === nextItem.product_id && normColor(item.color) === normColor(nextItem.color) && normColor(item.size) === normColor(nextItem.size) && item.product_name.trim() !== "") : -1;
+      const sameIndex = nextItem.product_id ? prev.findIndex((item) => item.product_id === nextItem.product_id && item.product_name.trim() === nextItem.product_name.trim() && normColor(item.color) === normColor(nextItem.color) && normColor(item.size) === normColor(nextItem.size)) : -1;
       if (sameIndex >= 0) {
         const existingQty = Number(prev[sameIndex].qty) || 1;
         const newQty = Math.min(existingQty + addQty, effMax);
@@ -3708,6 +3791,7 @@ export default function OrderPage() {
     setRegisteredOptionDetail("");
     setRegisteredOptionQty(1);
     setRegisteredOptionComboSearch("");
+    setRegisteredOptionDetailCategory("전체");
   };
 
   const closeRegisteredOptionSelectSheet = () => {
@@ -3718,6 +3802,7 @@ export default function OrderPage() {
     setRegisteredOptionDetail("");
     setRegisteredOptionQty(1);
     setRegisteredOptionComboSearch("");
+    setRegisteredOptionDetailCategory("전체");
   };
 
   // 동일 상품 + 동일 옵션(색상/사이즈)으로 이미 제출된 주문이 있는지 확인.
@@ -3771,8 +3856,12 @@ export default function OrderPage() {
     const product = registeredOptionSelectProduct;
     if (!product) return;
 
-    const colorMode = getRegisteredOptionMode(product, "color");
-    const sizeMode = getRegisteredOptionMode(product, "size");
+    const brandGroup = readBrandGroupOrderProduct(product);
+    const selectedDetailConfig = brandGroup?.detailOptions[registeredOptionDetail] || null;
+    const detailHasNoColor = Boolean(selectedDetailConfig && selectedDetailConfig.colors.every((value) => normalizeEmptyProductOptionValue(value) === ""));
+    const detailHasNoSize = Boolean(selectedDetailConfig && selectedDetailConfig.sizes.every((value) => normalizeEmptyProductOptionValue(value) === ""));
+    const colorMode = detailHasNoColor ? "none" : getRegisteredOptionMode(product, "color");
+    const sizeMode = detailHasNoSize ? "none" : getRegisteredOptionMode(product, "size");
 
     // [2026-08-10 3단] 세부상품(1번 축)을 먼저 골라야 한다.
     const axes3ForAdd = readOrderAxes3(product);
@@ -3820,18 +3909,32 @@ export default function OrderPage() {
         setItems((prev) => prev.filter((_, i) => i !== registeredOptionEditIndex));
       }
       addRegisteredProductToOrderItems(product, {
-        // [3단] 재고 키와 동일하게 "세부상품 / 색상"으로 담는다(주문서·송장에도 그대로 표시)
-        color: registeredOptionStorageColor,
+        // 브랜드 대표상품은 주문서 상품명을 실제 세부상품명으로 저장한다.
+        // 색상은 세부상품명과 섞지 않아 고객·송장 화면에서 정확한 색상만 보이게 한다.
+        color: brandGroup ? (registeredOptionColor.trim() || "없음") : registeredOptionStorageColor,
         size: registeredOptionSize,
         qty: registeredOptionQty,
+        ...(brandGroup
+          ? { displayName: registeredOptionDetail, priceKey: registeredOptionDetail }
+          : {}),
       });
-      closeRegisteredOptionSelectSheet();
+      if (brandGroup && registeredOptionEditIndex === null) {
+        // 같은 브랜드에서 여러 상품을 연달아 담을 수 있게 상세창을 유지한다.
+        setRegisteredOptionDetail("");
+        setRegisteredOptionColor("");
+        setRegisteredOptionSize("");
+        setRegisteredOptionQty(1);
+        setRegisteredOptionComboSearch("");
+      } else {
+        closeRegisteredOptionSelectSheet();
+      }
     };
 
     const isDuplicate = await checkDuplicateOrder({
-      productId: String(product.id ?? ""),
-      productName: product.product_name,
-      color: registeredOptionStorageColor,
+      // 브랜드 묶음은 여러 실제 상품이 같은 대표 product_id를 공유하므로 상품명으로 구분한다.
+      productId: brandGroup ? "" : String(product.id ?? ""),
+      productName: brandGroup ? registeredOptionDetail : product.product_name,
+      color: brandGroup ? (registeredOptionColor.trim() || "없음") : registeredOptionStorageColor,
       size: registeredOptionSize,
     });
     if (isDuplicate) {
@@ -4794,6 +4897,12 @@ export default function OrderPage() {
     const itemRecord = item as unknown as Record<string, unknown>;
     const sourceRecord = findSourceProductForItem(item);
 
+    if (sourceRecord) {
+      const detailPhotos = readComboPhotosOrderProduct(sourceRecord);
+      const exactDetailPhoto = detailPhotos[item.product_name.trim()];
+      if (exactDetailPhoto) return exactDetailPhoto;
+    }
+
     return getImageUrlFromRecord(itemRecord) || getImageUrlFromRecord(sourceRecord);
   };
 
@@ -5001,13 +5110,21 @@ export default function OrderPage() {
   // [상세UI] 상단 썸네일 스트립용: 대표(커버) + 상세사진 통합(중복 제거). Baymard: 숨은 썸네일은 노출로 신호.
   // [2026-08-11] 세부상품별 사진 — 고른 세부상품의 사진이 있으면 맨 앞(대표)으로 올린다.
   const registeredOptionComboPhotos = registeredOptionSelectProduct ? readComboPhotosOrderProduct(registeredOptionSelectProduct) : {};
+  const registeredOptionBrandGroup = registeredOptionSelectProduct ? readBrandGroupOrderProduct(registeredOptionSelectProduct) : null;
+  const registeredOptionSelectedDetailConfig = registeredOptionBrandGroup?.detailOptions[registeredOptionDetail] || null;
+  const registeredOptionBrandDetailPhotos = registeredOptionBrandGroup?.detailPhotoSets[registeredOptionDetail] || [];
   const registeredOptionAllImages = registeredOptionSelectProduct
-    ? Array.from(new Set([
-        registeredOptionComboPhotos[String(registeredOptionDetail || registeredOptionColor).trim()] || "",
-        pickOrderProductImageUrl(registeredOptionSelectProduct),
-        ...Object.values(registeredOptionComboPhotos),
-        ...registeredOptionDetailImages,
-      ].filter(Boolean)))
+    ? registeredOptionBrandGroup
+      ? Array.from(new Set([
+          ...registeredOptionBrandDetailPhotos,
+          registeredOptionComboPhotos[registeredOptionDetail] || "",
+        ].filter(Boolean)))
+      : Array.from(new Set([
+          registeredOptionComboPhotos[String(registeredOptionDetail || registeredOptionColor).trim()] || "",
+          pickOrderProductImageUrl(registeredOptionSelectProduct),
+          ...Object.values(registeredOptionComboPhotos),
+          ...registeredOptionDetailImages,
+        ].filter(Boolean)))
     : [];
   const registeredOptionStockVariants: { color: string; size: string; stock: number }[] = (() => {
     if (!registeredOptionSelectProduct) return [];
@@ -5023,7 +5140,7 @@ export default function OrderPage() {
   // [2026-08-10 3단] 이 상품이 3단인지 + 재고 조회에 쓸 실제 color 키("세부상품 / 색상")
   const registeredOptionAxes3 = registeredOptionSelectProduct ? readOrderAxes3(registeredOptionSelectProduct) : null;
   const joinAxisColor = (colorValue: string) =>
-    registeredOptionAxes3
+    registeredOptionAxes3 && !registeredOptionBrandGroup
       ? [registeredOptionDetail, colorValue].map((v) => String(v ?? "").trim()).filter(Boolean).join(ORDER_AXIS_JOIN)
       : colorValue;
   // 담기·재고매칭·중복확인에 쓰는 최종 color 값 (3단이 아니면 기존 그대로)
@@ -5041,18 +5158,31 @@ export default function OrderPage() {
         return Number(v.stock) - Math.max(0, reserved) <= 0;
       });
   };
-  const registeredOptionColorChoices = registeredOptionSelectProduct
-    ? getSelectableRegisteredOptions(registeredOptionSelectProduct, "color")
-    : [];
-  const registeredOptionSizeChoices = registeredOptionSelectProduct
-    ? getSelectableRegisteredOptions(registeredOptionSelectProduct, "size")
-    : [];
-  const registeredOptionColorMode = registeredOptionSelectProduct
-    ? getRegisteredOptionMode(registeredOptionSelectProduct, "color")
-    : "none";
-  const registeredOptionSizeMode = registeredOptionSelectProduct
-    ? getRegisteredOptionMode(registeredOptionSelectProduct, "size")
-    : "none";
+  const registeredOptionColorChoices = registeredOptionSelectedDetailConfig
+    ? registeredOptionSelectedDetailConfig.colors
+        .map((value) => normalizeEmptyProductOptionValue(value))
+        .filter(Boolean)
+    : registeredOptionSelectProduct
+      ? getSelectableRegisteredOptions(registeredOptionSelectProduct, "color")
+      : [];
+  const registeredOptionSizeChoices = registeredOptionSelectedDetailConfig
+    ? Array.from(new Set(registeredOptionSelectedDetailConfig.variants
+        .filter((variant) => !registeredOptionColor.trim() || normalizeEmptyProductOptionValue(variant.color) === normalizeEmptyProductOptionValue(registeredOptionColor))
+        .map((variant) => normalizeEmptyProductOptionValue(variant.size))
+        .filter(Boolean)))
+    : registeredOptionSelectProduct
+      ? getSelectableRegisteredOptions(registeredOptionSelectProduct, "size")
+      : [];
+  const registeredOptionColorMode = registeredOptionSelectedDetailConfig && registeredOptionColorChoices.length === 0
+    ? "none"
+    : registeredOptionSelectProduct
+      ? getRegisteredOptionMode(registeredOptionSelectProduct, "color")
+      : "none";
+  const registeredOptionSizeMode = registeredOptionSelectedDetailConfig && registeredOptionSizeChoices.length === 0
+    ? "none"
+    : registeredOptionSelectProduct
+      ? getRegisteredOptionMode(registeredOptionSelectProduct, "size")
+      : "none";
   const registeredOptionPrice = registeredOptionSelectProduct ? Number(registeredOptionSelectProduct.price || 0) : 0;
   // [조합형 옵션] 시트 표시/선택금액 — 선택한 세부상품 추가금 반영(조합형 아니면 plus=0 → 기존 동일)
   const registeredOptionComboInfo = registeredOptionSelectProduct ? readComboInfoOrderProduct(registeredOptionSelectProduct) : null;
@@ -5061,6 +5191,11 @@ export default function OrderPage() {
     : 0;
   const registeredOptionUnitPrice = registeredOptionPrice + registeredOptionComboPlus;
   const registeredOptionTotalPrice = Math.max(1, registeredOptionQty) * (Number.isFinite(registeredOptionUnitPrice) ? registeredOptionUnitPrice : 0);
+  const registeredOptionBrandCartCount = registeredOptionBrandGroup && registeredOptionSelectProduct
+    ? items
+        .filter((item) => item.product_id === String(registeredOptionSelectProduct.id ?? ""))
+        .reduce((sum, item) => sum + Math.max(0, Number(item.qty) || 0), 0)
+    : 0;
   const allOptionsSoldOut = registeredOptionSelectProduct ? isSoldOutOrderProduct(registeredOptionSelectProduct) : false;
 
   // [2026-07-16 사장님 지침] 유튜브 닉네임 미입력이면 주문서/담기 진입 자체를 막고 닉네임 입력 모달을 강제한다.
@@ -5414,6 +5549,7 @@ export default function OrderPage() {
                     : { marginTop: "8px", display: "flex", flexDirection: "column" }}>
                     {visibleItems.map((product) => {
                       const img = pickOrderProductImageUrl(product);
+                      const brandGroup = readBrandGroupOrderProduct(product);
                       const pinned = isPinnedOrderProduct(product);
                       const sold = (() => {
                         if (isSoldOutOrderProduct(product)) return true;
@@ -5474,7 +5610,12 @@ export default function OrderPage() {
                           <div onClick={() => { if (img) setLightboxImage(img); }} style={listView === "grid"
                             ? { position: "relative", width: "100%", aspectRatio: "1 / 1", borderRadius: "10px", background: "#F0EBE8", overflow: "hidden", cursor: img ? "zoom-in" : "default" }
                             : { position: "relative", flexShrink: 0, width: "84px", height: "84px", borderRadius: "10px", background: "#F0EBE8", overflow: "hidden", cursor: img ? "zoom-in" : "default" }}>
-                            {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
+                            {brandGroup ? (
+                              <div aria-label={`${brandGroup.brandKo} 브랜드`} style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "5px", background: "linear-gradient(145deg,#fff,#F7EFF2)", color: "#2F2026", textAlign: "center", padding: "8px" }}>
+                                <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: listView === "grid" ? "18px" : "16px", fontWeight: 800, letterSpacing: "0.08em", lineHeight: 1.1 }}>{brandGroup.brandEn || brandGroup.brandKo}</span>
+                                <span style={{ fontSize: "10px", fontWeight: 800, color: "#7A1E47" }}>{brandGroup.brandKo}</span>
+                              </div>
+                            ) : img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
                             {sold ? (
                               <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", borderRadius: "inherit", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
                                 <span style={{ color: "white", fontSize: "11px", fontWeight: 800, letterSpacing: "0.1em" }}>SOLD OUT</span>
@@ -5519,7 +5660,7 @@ export default function OrderPage() {
                             <div style={listView === "grid"
                               ? { marginTop: "auto", paddingTop: "6px", display: "flex", flexDirection: "column", alignItems: "stretch", gap: "6px" }
                               : { marginTop: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                              <span style={{ fontSize: "17px", fontWeight: 800, color: "#7A1E47" }}>{(() => { const ci = readComboInfoOrderProduct(product); return ci && ci.maxPlus > 0 ? won(Number(product.price || 0)) + "~" : won(Number(product.price || 0)); })()}</span>
+                              <span style={{ fontSize: "17px", fontWeight: 800, color: "#7A1E47" }}>{(() => { const ci = readComboInfoOrderProduct(product); return brandGroup ? `${won(Number(product.price || 0))}부터` : ci && ci.maxPlus > 0 ? won(Number(product.price || 0)) + "~" : won(Number(product.price || 0)); })()}</span>
                               <button
                                 type="button"
                                 disabled={sold}
@@ -5528,7 +5669,7 @@ export default function OrderPage() {
                                   ? { width: "100%", height: "34px", padding: "0 10px", borderRadius: "8px", border: "none", background: sold ? "#ccc" : "#7A1E47", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: sold ? "default" : "pointer" }
                                   : { flexShrink: 0, height: "32px", padding: "0 16px", borderRadius: "8px", border: "none", background: sold ? "#ccc" : "#7A1E47", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: sold ? "default" : "pointer" }}
                               >
-                                {sold ? "품절" : "🛒 담기"}
+                                {sold ? "품절" : brandGroup ? "상품 보기" : "🛒 담기"}
                               </button>
                             </div>
                           </div>
@@ -5887,9 +6028,10 @@ export default function OrderPage() {
 
           {/* 상품 이미지 크게 보기 (lightbox) */}
           {lightboxImage ? (
-            <div style={{ position: "fixed", inset: 0, zIndex: 150, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.85)", padding: "20px" }} onClick={() => setLightboxImage("")}>
+            <div style={{ position: "fixed", inset: 0, zIndex: 150, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.85)", padding: lightboxZoomed ? "0" : "20px", overflow: "auto", touchAction: "pinch-zoom" }} onClick={() => setLightboxImage("")}>
               <button type="button" onClick={() => setLightboxImage("")} aria-label="닫기" style={{ position: "absolute", top: "16px", right: "16px", width: "44px", height: "44px", borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.2)", color: "#fff", fontSize: "22px", cursor: "pointer" }}>✕</button>
-              <img src={lightboxImage} alt="" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: "12px" }} />
+              <div style={{ position: "absolute", left: "50%", bottom: "18px", transform: "translateX(-50%)", color: "rgba(255,255,255,.82)", fontSize: "12px", fontWeight: 700, pointerEvents: "none" }}>두 번 눌러 확대 · 손가락으로 확대 가능</div>
+              <img src={lightboxImage} alt="" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => { e.stopPropagation(); setLightboxZoomed((value) => !value); }} style={{ width: lightboxZoomed ? "200%" : "auto", maxWidth: lightboxZoomed ? "none" : "100%", maxHeight: lightboxZoomed ? "none" : "100%", objectFit: "contain", borderRadius: lightboxZoomed ? "0" : "12px", cursor: lightboxZoomed ? "zoom-out" : "zoom-in", touchAction: "pinch-zoom" }} />
             </div>
           ) : null}
 
@@ -5953,20 +6095,29 @@ export default function OrderPage() {
                 <div style={{ flexShrink: 0, borderBottom: "1px solid #F0EAE0", padding: "12px 16px 16px" }}>
                   <SheetGrabber onClose={closeRegisteredOptionSelectSheet} style={{ margin: "0 auto 6px" }} />
                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <div onClick={() => { const u = pickOrderProductImageUrl(registeredOptionSelectProduct); if (u) setLightboxImage(u); }} style={{ width: "60px", height: "60px", flexShrink: 0, borderRadius: "12px", overflow: "hidden", background: "#F0EBE8", cursor: pickOrderProductImageUrl(registeredOptionSelectProduct) ? "zoom-in" : "default" }}>
-                      {pickOrderProductImageUrl(registeredOptionSelectProduct) ? (
-                        <img src={pickOrderProductImageUrl(registeredOptionSelectProduct)} alt={registeredOptionSelectProduct.product_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    {(() => {
+                      const selectedPhoto = registeredOptionBrandDetailPhotos[0] || registeredOptionComboPhotos[registeredOptionDetail] || pickOrderProductImageUrl(registeredOptionSelectProduct);
+                      return <div onClick={() => { if (selectedPhoto) setLightboxImage(selectedPhoto); }} style={{ width: "60px", height: "60px", flexShrink: 0, borderRadius: "12px", overflow: "hidden", background: "#F0EBE8", cursor: selectedPhoto ? "zoom-in" : "default" }}>
+                      {selectedPhoto ? (
+                        <img src={selectedPhoto} alt={registeredOptionDetail || registeredOptionSelectProduct.product_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ) : registeredOptionBrandGroup ? (
+                        <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "3px", background: "linear-gradient(145deg,#fff,#F7EFF2)", color: "#2F2026", textAlign: "center", padding: "5px" }}>
+                          <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: "10px", fontWeight: 800, letterSpacing: "0.04em", lineHeight: 1.05 }}>{registeredOptionBrandGroup.brandEn || registeredOptionBrandGroup.brandKo}</span>
+                          <span style={{ fontSize: "8px", fontWeight: 800, color: "#7A1E47" }}>{registeredOptionBrandGroup.brandKo}</span>
+                        </div>
                       ) : null}
-                    </div>
+                    </div>;
+                    })()}
                     <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: "16px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{registeredOptionSelectProduct.product_name}</div>
+                      <div style={{ fontSize: "16px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{registeredOptionDetail || registeredOptionSelectProduct.product_name}</div>
+                      {registeredOptionBrandGroup && registeredOptionDetail ? <div style={{ marginTop: "2px", fontSize: "11px", fontWeight: 700, color: "#8A8A8A" }}>{registeredOptionBrandGroup.brandKo}</div> : null}
                       <div style={{ marginTop: "3px", fontSize: "15px", fontWeight: 800, color: "#7A1E47" }}>
                         {/* [조합형 옵션] 선택 전엔 "기본가~", 선택하면 그 세부상품 단가 표시 / [무료나눔] 0원 표기 */}
                         {registeredOptionComboInfo
-                          ? registeredOptionColor.trim()
+                          ? (registeredOptionBrandGroup ? registeredOptionDetail.trim() : registeredOptionColor.trim())
                             ? won(registeredOptionUnitPrice)
                             : registeredOptionComboInfo.maxPlus > 0
-                              ? won(registeredOptionPrice) + "~"
+                              ? registeredOptionBrandGroup ? `${won(registeredOptionPrice)}부터` : won(registeredOptionPrice) + "~"
                               : won(registeredOptionPrice)
                           : registeredOptionPrice > 0
                             ? won(registeredOptionPrice)
@@ -6011,6 +6162,24 @@ export default function OrderPage() {
                           </div>
                         );
                       })()}
+                      {registeredOptionBrandGroup ? (() => {
+                        const preferred = ["전체", "상의", "하의", "세트", "아우터"];
+                        const present = Array.from(new Set(registeredOptionComboInfo.names
+                          .map((name) => registeredOptionBrandGroup.detailCategories[name])
+                          .filter(Boolean)));
+                        const categories = preferred.filter((category) => category === "전체" || present.includes(category));
+                        for (const category of present) if (!categories.includes(category)) categories.push(category);
+                        return categories.length > 2 ? (
+                          <div style={{ position: "relative", marginBottom: "8px" }}>
+                            <div style={{ display: "flex", gap: "6px", overflowX: "auto", paddingRight: "22px", scrollbarWidth: "none" }}>
+                              {categories.map((category) => {
+                                const selected = registeredOptionDetailCategory === category;
+                                return <button key={`detail-cat-${category}`} type="button" onClick={() => { setRegisteredOptionDetailCategory(category); setRegisteredOptionDetail(""); setRegisteredOptionColor(""); setRegisteredOptionSize(""); }} style={{ flexShrink: 0, minHeight: "36px", padding: "0 14px", borderRadius: "999px", border: selected ? "none" : "1px solid #D9C5CC", background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#7A1E47", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}>{category}</button>;
+                              })}
+                            </div>
+                          </div>
+                        ) : null;
+                      })() : null}
                       {registeredOptionComboInfo.names.length > 8 ? (
                         <div style={{ position: "relative", marginBottom: "8px" }}>
                           <input
@@ -6065,6 +6234,7 @@ export default function OrderPage() {
                         const query = normalizeSuggestionText(registeredOptionComboSearch);
                         // 이름에 없어도 브랜드가 맞으면 걸리게 한다(예: "입생" 검색 → "입생로랑" 상품도 포함)
                         const list = info.names.filter((n) => {
+                          if (registeredOptionBrandGroup && registeredOptionDetailCategory !== "전체" && registeredOptionBrandGroup.detailCategories[n] !== registeredOptionDetailCategory) return false;
                           if (!query) return true;
                           if (normalizeSuggestionText(n).includes(query)) return true;
                           const b = orderBrandOfDetailName(n);
@@ -6130,7 +6300,8 @@ export default function OrderPage() {
                                     <img
                                       src={registeredOptionComboPhotos[name]}
                                       alt=""
-                                      style={{ width: "40px", height: "40px", borderRadius: "8px", objectFit: "cover", flexShrink: 0, background: "#F0EBE8", opacity: soldOut ? 0.5 : 1 }}
+                                      onClick={(event) => { event.stopPropagation(); setLightboxImage(registeredOptionComboPhotos[name]); }}
+                                      style={{ width: "48px", height: "48px", borderRadius: "8px", objectFit: "cover", flexShrink: 0, background: "#F0EBE8", opacity: soldOut ? 0.5 : 1, cursor: "zoom-in" }}
                                     />
                                   ) : null}
                                   {/* [2026-08-13 사장님 지적] 이름이 길면 「차량 아쿠아디파르마 무광…」처럼 잘려서
@@ -6142,7 +6313,7 @@ export default function OrderPage() {
                                   ) : remain !== null && remain <= 5 ? (
                                     <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "#C0392B", background: selected ? "#fff" : "#FBEAE7", borderRadius: "5px", padding: "2px 6px" }}>{remain}개 남음</span>
                                   ) : null}
-                                  <span style={{ flexShrink: 0, fontSize: "13px", fontWeight: 800, color: selected ? "#F5D9E5" : plus > 0 ? "#7A1E47" : "#B5AAA4" }}>{plus > 0 ? `+${won(plus)}` : "+0원"}</span>
+                                  <span style={{ flexShrink: 0, fontSize: "13px", fontWeight: 800, color: selected ? "#F5D9E5" : "#7A1E47" }}>{plus > 0 ? `+${won(plus)}` : "+0원"}</span>
                                 </button>
                               );
                             })}
@@ -6169,7 +6340,7 @@ export default function OrderPage() {
                             const selected = registeredOptionColor === option;
                             const soldOut = isSoldOutColorSize(option, registeredOptionSize);
                             return (
-                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionColor((prev) => prev === option ? "" : option); }} style={{ height: "44px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
+                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionColor((prev) => prev === option ? "" : option); setRegisteredOptionSize(""); }} style={{ height: "44px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
                             );
                           })}
                         </div>
@@ -6179,7 +6350,7 @@ export default function OrderPage() {
                             const selected = registeredOptionColor === option;
                             const soldOut = isSoldOutColorSize(option, registeredOptionSize);
                             return (
-                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionColor((prev) => prev === option ? "" : option); }} style={{ height: "34px", borderRadius: "999px", padding: "0 14px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "13px", fontWeight: 700, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
+                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionColor((prev) => prev === option ? "" : option); setRegisteredOptionSize(""); }} style={{ height: "34px", borderRadius: "999px", padding: "0 14px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "13px", fontWeight: 700, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
                             );
                           })}
                         </div>
@@ -6276,6 +6447,7 @@ export default function OrderPage() {
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: "11px", fontWeight: 700, color: "#999" }}>선택금액</div>
                     <div style={{ fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionTotalPrice > 0 ? won(registeredOptionTotalPrice) : "가격 직접입력"}</div>
+                    {registeredOptionBrandGroup && registeredOptionBrandCartCount > 0 ? <div style={{ marginTop: "2px", fontSize: "11px", fontWeight: 800, color: "#0F6E56" }}>이 브랜드에서 {registeredOptionBrandCartCount}개 담음</div> : null}
                   </div>
                 </div>
 
@@ -6284,7 +6456,7 @@ export default function OrderPage() {
                   {allOptionsSoldOut ? (
                     <button type="button" disabled style={{ height: "52px", borderRadius: "16px", border: "none", background: "#ccc", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "not-allowed" }}>품절</button>
                   ) : (
-                    <button type="button" onClick={confirmRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#7A1E47", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>주문서에 담기</button>
+                    <button type="button" onClick={confirmRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#7A1E47", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>{registeredOptionBrandGroup ? "선택상품 담기" : "주문서에 담기"}</button>
                   )}
                 </div>
               </div>

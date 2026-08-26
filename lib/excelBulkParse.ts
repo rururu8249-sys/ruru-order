@@ -32,6 +32,13 @@ export type DraftCore = {
   //   details: 세부상품(하위상세) 축 — DB 저장 시 color 칸에 "세부 / 색상"으로 합쳐지는 기존 규칙 그대로 사용
   details?: string[];
   detailPlus?: Record<string, number>;   // 세부상품명 → 추가금(원)
+  detailRows?: Record<string, number[]>; // 세부상품명 → 사진이 놓인 엑셀 행(1-base)
+  detailCategories?: Record<string, string>;
+  detailOptions?: Record<string, { colors: string[]; sizes: string[]; variants: Array<{ color: string; size: string }> }>;
+  brandKo?: string;
+  brandEn?: string;
+  brandGroup?: boolean;
+  stockManagementEnabled?: boolean;
   badges?: string[];                     // 줄에 직접 쓴 배지 (없으면 화면의 전체 적용 값 사용)
   category?: string;
   shipping?: "normal" | "vendor";
@@ -463,7 +470,8 @@ export function parseOfficialForm(rows: SheetCell[][], headerRow: number): Offic
   const col = (label: string) => hs.indexOf(label);
   const cName = col("상품명"), cColor = col("색상"), cSize = col("사이즈"), cQty = col("수량"),
     cPrice = col("판매가"), cDetail = col("세부상품명"), cPlus = col("세부추가금"),
-    cBadge = col("배지"), cCat = col("카테고리"), cShip = col("배송"), cPlace = col("진열"), cCode = col("모델번호");
+    cBadge = col("배지"), cCat = col("카테고리"), cShip = col("배송"), cPlace = col("진열"), cCode = col("모델번호"),
+    cBrandKo = col("브랜드한글"), cBrandEn = col("브랜드영문"), cDetailCat = col("상품구분"), cStockManage = col("재고관리");
 
   const drafts: DraftCore[] = [];
   const issues: AuditIssue[] = [];
@@ -491,7 +499,7 @@ export function parseOfficialForm(rows: SheetCell[][], headerRow: number): Offic
         price: cPrice >= 0 ? num(row[cPrice]) : 0,
         code: get(cCode),
         colors: [], sizes: [], stocks: {}, warns: [],
-        details: [], detailPlus: {},
+        details: [], detailPlus: {}, detailRows: {}, detailCategories: {}, detailOptions: {},
         isExample: /^\s*[\(（]\s*예\s*시\s*[\)）]/.test(name),
       };
       const badgeText = get(cBadge);
@@ -502,6 +510,20 @@ export function parseOfficialForm(rows: SheetCell[][], headerRow: number): Offic
       if (ship) cur.shipping = ship.includes("업체") ? "vendor" : "normal";
       const place = get(cPlace);
       if (place) cur.place = place.includes("숨") ? "hidden" : "shop";
+      const brandKo = get(cBrandKo), brandEn = get(cBrandEn);
+      if (brandKo || brandEn) {
+        cur.brandKo = brandKo || name;
+        cur.brandEn = brandEn;
+        cur.brandGroup = true;
+      }
+      const stockManage = get(cStockManage).toLowerCase();
+      if (stockManage) {
+        const explicitlyOff = ["사용 안 함", "사용안함", "미사용", "관리 안 함", "관리안함", "off", "no", "false", "0"]
+          .some((token) => stockManage.includes(token));
+        cur.stockManagementEnabled = explicitlyOff
+          ? false
+          : ["y", "yes", "on", "사용", "관리", "true", "1"].some((token) => stockManage.includes(token));
+      }
       drafts.push(cur);
     } else if (!cur) {
       // 상품명 없이 시작된 고아 줄 — 숫자가 있으면 반드시 알린다 (조용히 버리지 않음)
@@ -513,6 +535,18 @@ export function parseOfficialForm(rows: SheetCell[][], headerRow: number): Offic
     if (detail) {
       if (detail.includes("/")) cur.warns.push(`세부상품명 「${detail}」에 / 는 쓸 수 없어요`);
       if (!cur.details!.includes(detail)) cur.details!.push(detail);
+      if (!cur.detailRows![detail]) cur.detailRows![detail] = [];
+      cur.detailRows![detail].push(r0 + 1);
+      const detailCategory = get(cDetailCat);
+      if (detailCategory) cur.detailCategories![detail] = detailCategory;
+      const option = cur.detailOptions![detail] || (cur.detailOptions![detail] = { colors: [], sizes: [], variants: [] });
+      const normalizedColor = color || "없음";
+      const normalizedSize = size || "없음";
+      if (!option.colors.includes(normalizedColor)) option.colors.push(normalizedColor);
+      if (!option.sizes.includes(normalizedSize)) option.sizes.push(normalizedSize);
+      if (!option.variants.some((variant) => variant.color === normalizedColor && variant.size === normalizedSize)) {
+        option.variants.push({ color: normalizedColor, size: normalizedSize });
+      }
       if (cPlus >= 0 && norm(row[cPlus])) cur.detailPlus![detail] = Math.max(0, Math.floor(num(row[cPlus])));
       else if (!(detail in cur.detailPlus!)) cur.detailPlus![detail] = 0;
     }
@@ -539,7 +573,7 @@ export function parseOfficialForm(rows: SheetCell[][], headerRow: number): Offic
   for (const d of drafts) {
     if (d.isExample) { d.warns.unshift("(예시) 줄 — 등록 대상에서 자동 제외"); continue; }
     if (!d.price) d.warns.push("가격 없음");
-    if (totalStock(d) === 0) d.warns.push("재고 0 (품절로 등록됨)");
+    if (totalStock(d) === 0 && d.stockManagementEnabled !== false) d.warns.push("재고 0 (품절로 등록됨)");
     if (seen[d.name] > 1) d.warns.push("이름 중복");
   }
   return { drafts, issues };
