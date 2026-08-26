@@ -3,6 +3,8 @@
 //   UI(팝업)와 분리한 이유: 형식별 시뮬레이션 검수를 코드로 돌릴 수 있게 하려고.
 //   ⚠️ 여기는 계산만 한다. 저장·주문·재고차감·입금·정산 로직과 무관.
 
+import { normalizeBrandKorean } from "./brandWordmarkThumbnail";
+
 export type SheetCell = string | number | null;
 export type BulkLayout = "row" | "block" | "variant";
 
@@ -486,7 +488,8 @@ export function parseOfficialForm(rows: SheetCell[][], headerRow: number): Offic
   for (let r0 = headerRow; r0 < rows.length; r0 += 1) {
     const row = rows[r0] || [];
     const get = (ci: number) => (ci >= 0 ? norm(row[ci]) : "");
-    const name = get(cName), color = get(cColor), size = get(cSize), detail = get(cDetail);
+    const name = normalizeBrandKorean(get(cName));
+    const color = get(cColor), size = get(cSize), detail = normalizeBrandKorean(get(cDetail));
     const qtyText = get(cQty);
     const qty = qtyText ? Math.max(0, Math.floor(num(row[cQty]))) : 0;
 
@@ -504,13 +507,13 @@ export function parseOfficialForm(rows: SheetCell[][], headerRow: number): Offic
       };
       const badgeText = get(cBadge);
       if (badgeText) cur.badges = parseOfficialBadges(badgeText, cur.warns);
-      const cat = get(cCat);
+      const cat = normalizeBrandKorean(get(cCat));
       if (cat) cur.category = cat;
       const ship = get(cShip);
       if (ship) cur.shipping = ship.includes("업체") ? "vendor" : "normal";
       const place = get(cPlace);
       if (place) cur.place = place.includes("숨") ? "hidden" : "shop";
-      const brandKo = get(cBrandKo), brandEn = get(cBrandEn);
+      const brandKo = normalizeBrandKorean(get(cBrandKo)), brandEn = get(cBrandEn);
       if (brandKo || brandEn) {
         cur.brandKo = brandKo || name;
         cur.brandEn = brandEn;
@@ -537,7 +540,7 @@ export function parseOfficialForm(rows: SheetCell[][], headerRow: number): Offic
       if (!cur.details!.includes(detail)) cur.details!.push(detail);
       if (!cur.detailRows![detail]) cur.detailRows![detail] = [];
       cur.detailRows![detail].push(r0 + 1);
-      const detailCategory = get(cDetailCat);
+      const detailCategory = normalizeBrandKorean(get(cDetailCat));
       if (detailCategory) cur.detailCategories![detail] = detailCategory;
       const option = cur.detailOptions![detail] || (cur.detailOptions![detail] = { colors: [], sizes: [], variants: [] });
       const normalizedColor = color || "없음";

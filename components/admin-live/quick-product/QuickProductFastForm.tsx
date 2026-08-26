@@ -6,7 +6,7 @@ import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import { showAdminToast } from "@/lib/adminToast";
 import { resolveProductImageUrl } from "./productImageUrl";
 import { compressProductImage, isHeicLikeImage } from "./compressProductImage";
-import { brandWordmarkThumbnail } from "@/lib/brandWordmarkThumbnail";
+import { brandWordmarkThumbnail, normalizeBrandKorean } from "@/lib/brandWordmarkThumbnail";
 
 type ProductRow = Record<string, unknown>;
 
@@ -91,6 +91,11 @@ function splitOptions(value: string) {
 
 function unique(values: string[]) {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+function normalizeBrandRecordKeys<T>(source: Record<string, T> | null | undefined) {
+  if (!source || typeof source !== "object" || Array.isArray(source)) return {} as Record<string, T>;
+  return Object.fromEntries(Object.entries(source).map(([key, value]) => [normalizeBrandKorean(key), value]));
 }
 
 function normalizePresetOptions(preset: string) {
@@ -813,26 +818,39 @@ export default function QuickProductFastForm({
     if (!initialProduct) return;
 
     const productNote = parseProductNote(initialProduct);
-    const noteVariants = productNote?.stock_variants || [];
+    const noteVariants = (productNote?.stock_variants || []).map((row) => ({
+      ...row,
+      color: normalizeBrandKorean(String(row.color || "")),
+      size: normalizeBrandKorean(String(row.size || "")),
+    }));
+    const normalizedPhotoSets = normalizeBrandRecordKeys<string[]>(
+      productNote?.detail_photo_sets && typeof productNote.detail_photo_sets === "object" ? productNote.detail_photo_sets : {},
+    );
+    const normalizedDetailCategories = normalizeBrandRecordKeys<string>(
+      productNote?.brand_group?.detail_categories && typeof productNote.brand_group.detail_categories === "object" ? productNote.brand_group.detail_categories : {},
+    );
+    const normalizedDetailOptions = normalizeBrandRecordKeys<BrandDetailOptionConfig>(
+      productNote?.brand_group?.detail_options && typeof productNote.brand_group.detail_options === "object" ? productNote.brand_group.detail_options : {},
+    );
     setStockManagementEnabled(productNote?.stock_management_enabled !== false);
     setPurchaseLimitEnabled(productNote?.purchase_limit_enabled === true);
     setPurchaseLimitText(String(productNote?.purchase_limit_qty && productNote.purchase_limit_qty > 0 ? productNote.purchase_limit_qty : 1));
     setRegisteredOrderEnabled(productNote?.registered_order_enabled !== false);
     setNameSuggestionEnabled(productNote?.name_suggestion_enabled !== false);
     setSuggestionKeywordsText(Array.isArray(productNote?.suggestion_keywords) ? productNote.suggestion_keywords.join(", ") : "");
-    setBrandGroupDetailPhotoSets(productNote?.detail_photo_sets && typeof productNote.detail_photo_sets === "object" ? productNote.detail_photo_sets : {});
-    setBrandGroupDetailCategories(productNote?.brand_group?.detail_categories && typeof productNote.brand_group.detail_categories === "object" ? productNote.brand_group.detail_categories : {});
-    setBrandGroupDetailOptions(productNote?.brand_group?.detail_options && typeof productNote.brand_group.detail_options === "object" ? productNote.brand_group.detail_options : {});
+    setBrandGroupDetailPhotoSets(normalizedPhotoSets);
+    setBrandGroupDetailCategories(normalizedDetailCategories);
+    setBrandGroupDetailOptions(normalizedDetailOptions);
     setBrandDetailEditDraft(null);
     setBrandDetailSearch("");
     setBrandDetailCategoryFilter("전체");
 
-    setCategory(String((productNote as { category?: unknown } | null)?.category || ""));
+    setCategory(normalizeBrandKorean(String((productNote as { category?: unknown } | null)?.category || "")));
     const _bt = Array.isArray((initialProduct as any)?.badge_types)
       ? (initialProduct as any).badge_types.filter(Boolean).map((x: any) => String(x))
       : ((initialProduct as any)?.badge_type && (initialProduct as any).badge_type !== "none" ? [String((initialProduct as any).badge_type)] : []);
     setBadgeTypes(_bt);
-    setProductName(pickString(initialProduct, ["product_name", "name", "title"], ""));
+    setProductName(normalizeBrandKorean(pickString(initialProduct, ["product_name", "name", "title"], "")));
     setPriceText(formatNumberWithComma(pickNumber(initialProduct, ["price", "sale_price", "selling_price"], 0)));
     setShippingType(pickString(initialProduct, ["shipping_type", "delivery_type"], "normal"));
     // is_visible 컬럼이 schema-safe로 빠진 경우에도 status("숨김"/"판매중")로 정확히 복원
@@ -840,8 +858,8 @@ export default function QuickProductFastForm({
     setIsPinned(pickBoolean(initialProduct, ["is_pinned", "pinned"], false));
     setCoverImages(pickImageArray(initialProduct, ["image_url", "cover_image_url", "main_image_url"]).slice(0, 1));
     setDetailImages(pickImageArray(initialProduct, ["detail_image_urls", "detail_images", "images"]).slice(0, 5));
-    setColorText(pickArray(initialProduct, ["color_options", "colors"]).join(", "));
-    setSizeText(pickArray(initialProduct, ["size_options", "sizes"]).join(", "));
+    setColorText(pickArray(initialProduct, ["color_options", "colors"]).map(normalizeBrandKorean).join(", "));
+    setSizeText(pickArray(initialProduct, ["size_options", "sizes"]).map(normalizeBrandKorean).join(", "));
     setDescription(normalizeTextareaText(pickString(initialProduct, ["product_description", "description", "detail_description"], "")));
 
     if (noteVariants.length > 0) {
@@ -871,10 +889,13 @@ export default function QuickProductFastForm({
     setFreeProductEnabled(productNote?.free_product === true);
 
     // [2026-08-10 옵션 통합] 수정 모드 복원 — 축(세부상품/색상/사이즈) 되살리기
-    const pricing = (productNote?.option_pricing && typeof productNote.option_pricing === "object")
-      ? (productNote.option_pricing as Record<string, unknown>) : {};
+    const pricing = normalizeBrandRecordKeys<unknown>(
+      productNote?.option_pricing && typeof productNote.option_pricing === "object"
+        ? (productNote.option_pricing as Record<string, unknown>)
+        : {},
+    );
     const hiddenList = Array.isArray(productNote?.combo_hidden)
-      ? productNote.combo_hidden.map((x) => String(x ?? "").trim()) : [];
+      ? productNote.combo_hidden.map((x) => normalizeBrandKorean(String(x ?? "").trim())) : [];
     const axes = Array.isArray(productNote?.option_axes) ? productNote.option_axes : null;
 
     let restoredDetails: string[] = [];
@@ -884,11 +905,11 @@ export default function QuickProductFastForm({
       const dv = find("detail");
       const cv = find("color");
       const sv = find("size");
-      restoredDetails = Array.isArray(dv?.values) ? dv!.values.map((x) => String(x ?? "").trim()).filter(Boolean) : [];
+      restoredDetails = Array.isArray(dv?.values) ? dv!.values.map((x) => normalizeBrandKorean(String(x ?? "").trim())).filter(Boolean) : [];
       setDetailText(restoredDetails.join(", "));
       setDetailLabel(String(dv?.label || DETAIL_LABEL_FIXED));
-      setColorText(Array.isArray(cv?.values) ? cv!.values.join(", ") : "");
-      setSizeText(Array.isArray(sv?.values) ? sv!.values.join(", ") : "");
+      setColorText(Array.isArray(cv?.values) ? cv!.values.map((x) => normalizeBrandKorean(String(x ?? ""))).join(", ") : "");
+      setSizeText(Array.isArray(sv?.values) ? sv!.values.map((x) => normalizeBrandKorean(String(x ?? ""))).join(", ") : "");
     } else if (productNote?.combo_mode === true) {
       // 옛 조합형 — 세부상품명이 color_options / stock_variants.color 에 들어있다
       const stockNames: string[] = [];
@@ -915,8 +936,11 @@ export default function QuickProductFastForm({
     }
     setDetailPlus(nextPlus);
     setDetailHidden(hiddenList.filter((n) => restoredDetails.includes(n)));
-    const photosRaw = (productNote?.detail_photos && typeof productNote.detail_photos === "object")
-      ? (productNote.detail_photos as Record<string, unknown>) : {};
+    const photosRaw = normalizeBrandRecordKeys<unknown>(
+      productNote?.detail_photos && typeof productNote.detail_photos === "object"
+        ? (productNote.detail_photos as Record<string, unknown>)
+        : {},
+    );
     const nextPhotos: Record<string, string> = {};
     for (const name of restoredDetails) {
       const url = String(photosRaw[name] ?? "").trim();
@@ -1330,6 +1354,7 @@ export default function QuickProductFastForm({
         ? {
             brand_group: {
               ...(initialProductNote?.brand_group || {}),
+              brand_ko: normalizeBrandKorean(String(initialProductNote?.brand_group?.brand_ko || name)),
               detail_categories: brandGroupDetailCategories,
               detail_options: brandGroupDetailOptions,
             },

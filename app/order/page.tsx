@@ -42,6 +42,7 @@ import { HOWTO_DEFAULT, parseHowtoSteps } from "@/lib/howto";
 import { supabase } from "@/lib/supabase";
 import { isRemoteAreaAddress } from "@/lib/order/shippingAddress";
 import { formatOrderPhone, normalizeOrderPhone } from "@/lib/order/phone";
+import { normalizeBrandKorean } from "@/lib/brandWordmarkThumbnail";
 import {
   CUSTOMER_SESSION_VERSION_KEY,
   YOUTUBE_NICKNAME_CONFIRM_VERSION_KEY,
@@ -1075,7 +1076,7 @@ function readBrandGroupOrderProduct(product: unknown): BrandGroupMeta | null {
 
   return {
     enabled: true,
-    brandKo: String(record.brand_ko || "").trim(),
+    brandKo: normalizeBrandKorean(String(record.brand_ko || "")),
     brandEn: String(record.brand_en || "").trim(),
     detailCategories,
     detailOptions,
