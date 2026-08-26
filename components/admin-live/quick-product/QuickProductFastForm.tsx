@@ -6,6 +6,7 @@ import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import { showAdminToast } from "@/lib/adminToast";
 import { resolveProductImageUrl } from "./productImageUrl";
 import { compressProductImage, isHeicLikeImage } from "./compressProductImage";
+import { brandWordmarkThumbnail } from "@/lib/brandWordmarkThumbnail";
 
 type ProductRow = Record<string, unknown>;
 
@@ -22,6 +23,20 @@ type VariantStockRow = {
   stock: number;
   detail: string;  // 표시용 — 1번 축(세부상품) 값
   colorOnly: string; // 표시용 — 2번 축(색상) 값
+};
+
+type BrandDetailOptionConfig = {
+  colors: string[];
+  sizes: string[];
+  variants: Array<{ color: string; size: string }>;
+};
+
+type BrandDetailEditDraft = {
+  originalName: string;
+  name: string;
+  category: string;
+  plus: string;
+  variants: Array<{ color: string; size: string }>;
 };
 
 // [2026-08-11 사장님 지침] 라벨 드롭다운(맛/용량/브랜드) 제거 — 실제로 쓸 일이 없고 방송 중 고를 게 하나 더 늘 뿐.
@@ -217,7 +232,7 @@ type ParsedProductNote = Record<string, unknown> & {
         brand_ko?: string;
         brand_en?: string;
         detail_categories?: Record<string, string>;
-        detail_options?: Record<string, unknown>;
+        detail_options?: Record<string, BrandDetailOptionConfig>;
       };
       // [무료나눔 · 2026-07-22] true면 0원 상품(선물). 가격 비움(손님 직접입력)과 구분되는 명시 플래그
       free_product?: boolean;
@@ -669,6 +684,10 @@ export default function QuickProductFastForm({
   // [2026-08-11] 세부상품별 대표사진 — 손님이 종류를 고를 때 사진으로 구분할 수 있게(업계 표준: 옵션별 이미지)
   const [detailPhotos, setDetailPhotos] = useState<Record<string, string>>({});
   const [detailPreviewImage, setDetailPreviewImage] = useState("");
+  const [brandGroupDetailPhotoSets, setBrandGroupDetailPhotoSets] = useState<Record<string, string[]>>({});
+  const [brandGroupDetailCategories, setBrandGroupDetailCategories] = useState<Record<string, string>>({});
+  const [brandGroupDetailOptions, setBrandGroupDetailOptions] = useState<Record<string, BrandDetailOptionConfig>>({});
+  const [brandDetailEditDraft, setBrandDetailEditDraft] = useState<BrandDetailEditDraft | null>(null);
   const [detailPhotoUploading, setDetailPhotoUploading] = useState("");
   const detailPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const detailPhotoTargetRef = useRef("");
@@ -723,6 +742,12 @@ export default function QuickProductFastForm({
   const isEditMode = Boolean(editingProductId);
   const initialProductNote = useMemo(() => parseProductNote(initialProduct), [initialProduct]);
   const isBrandGroupEdit = initialProductNote?.brand_group?.enabled === true;
+  const brandWordmarkImage = isBrandGroupEdit
+    ? brandWordmarkThumbnail(
+        String(initialProductNote?.brand_group?.brand_en || ""),
+        String(initialProductNote?.brand_group?.brand_ko || productName || "브랜드"),
+      )
+    : "";
   // [2026-08-16 사장님 요청] 재고를 3가지로 나눠 보여준다 — 실재고 / 담김(주문서 제출 전 선점) / 지금 판매가능
   //   담김은 cart_reservations(표시용 선점)에서 읽는다. 읽기 전용 — 재고·주문·돈 로직 무접촉.
   const [heldByVariant, setHeldByVariant] = useState<Record<string, number>>({});
@@ -793,6 +818,10 @@ export default function QuickProductFastForm({
     setRegisteredOrderEnabled(productNote?.registered_order_enabled !== false);
     setNameSuggestionEnabled(productNote?.name_suggestion_enabled !== false);
     setSuggestionKeywordsText(Array.isArray(productNote?.suggestion_keywords) ? productNote.suggestion_keywords.join(", ") : "");
+    setBrandGroupDetailPhotoSets(productNote?.detail_photo_sets && typeof productNote.detail_photo_sets === "object" ? productNote.detail_photo_sets : {});
+    setBrandGroupDetailCategories(productNote?.brand_group?.detail_categories && typeof productNote.brand_group.detail_categories === "object" ? productNote.brand_group.detail_categories : {});
+    setBrandGroupDetailOptions(productNote?.brand_group?.detail_options && typeof productNote.brand_group.detail_options === "object" ? productNote.brand_group.detail_options : {});
+    setBrandDetailEditDraft(null);
 
     setCategory(String((productNote as { category?: unknown } | null)?.category || ""));
     const _bt = Array.isArray((initialProduct as any)?.badge_types)
@@ -895,15 +924,6 @@ export default function QuickProductFastForm({
   const details = useMemo(() => unique(splitOptions(detailText)), [detailText]);
   const colors = useMemo(() => unique(splitOptions(colorText)), [colorText]);
   const sizes = useMemo(() => unique(splitOptions(sizeText)), [sizeText]);
-  const brandGroupDetailPhotoSets = useMemo(() => {
-    const raw = initialProductNote?.detail_photo_sets;
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {} as Record<string, string[]>;
-    return Object.fromEntries(Object.entries(raw).map(([name, value]) => [
-      name,
-      Array.isArray(value) ? value.map((url) => String(url || "").trim()).filter(Boolean) : [],
-    ]));
-  }, [initialProductNote]);
-  const brandGroupDetailCategories = initialProductNote?.brand_group?.detail_categories || {};
   const brandGroupDetailPhotoCount = Object.values(brandGroupDetailPhotoSets).reduce((sum, photos) => sum + photos.length, 0);
   // 사용 중인 축 개수(1~3). 0이면 옵션 없는 단일 상품.
   const usedAxisCount = (details.length ? 1 : 0) + (colors.length ? 1 : 0) + (sizes.length ? 1 : 0);
@@ -1048,6 +1068,76 @@ export default function QuickProductFastForm({
     setVariantRows(baseRows.map((row) => ({ ...row, stock: n })));
   };
 
+  const openBrandDetailEditor = (name: string) => {
+    const config = brandGroupDetailOptions[name] || { colors: [], sizes: [], variants: [] };
+    const variants = Array.isArray(config.variants) && config.variants.length > 0
+      ? config.variants.map((variant) => ({ color: String(variant.color || "없음"), size: String(variant.size || "없음") }))
+      : [{ color: "없음", size: "없음" }];
+    setBrandDetailEditDraft({
+      originalName: name,
+      name,
+      category: String(brandGroupDetailCategories[name] || ""),
+      plus: String(Math.max(0, Number(detailPlus[name]) || 0)),
+      variants,
+    });
+  };
+
+  const applyBrandDetailEditor = () => {
+    if (!brandDetailEditDraft) return;
+    const oldName = brandDetailEditDraft.originalName;
+    const nextName = brandDetailEditDraft.name.trim();
+    if (!nextName) {
+      showAdminToast("세부상품명을 입력해주세요.", "error");
+      return;
+    }
+    if (nextName !== oldName && details.includes(nextName)) {
+      showAdminToast("같은 세부상품명이 이미 있어요.", "error");
+      return;
+    }
+    const nextVariants = brandDetailEditDraft.variants.map((variant) => ({
+      color: String(variant.color || "").trim() || "없음",
+      size: String(variant.size || "").trim() || "없음",
+    }));
+    const duplicateKey = nextVariants.map((variant) => `${variant.color}|${variant.size}`);
+    if (new Set(duplicateKey).size !== duplicateKey.length) {
+      showAdminToast("같은 색상·사이즈 조합이 두 번 들어가 있어요.", "error");
+      return;
+    }
+
+    const moveKey = <T,>(source: Record<string, T>, value: T | undefined) => {
+      const next = { ...source };
+      delete next[oldName];
+      if (value !== undefined) next[nextName] = value;
+      return next;
+    };
+    const colors = unique(nextVariants.map((variant) => variant.color));
+    const sizes = unique(nextVariants.map((variant) => variant.size));
+    setDetailText(details.map((name) => name === oldName ? nextName : name).join(", "));
+    setDetailPlus((prev) => moveKey(prev, String(Math.max(0, Number(brandDetailEditDraft.plus) || 0))));
+    setDetailPhotos((prev) => moveKey(prev, prev[oldName]));
+    setBrandGroupDetailPhotoSets((prev) => moveKey(prev, prev[oldName] || []));
+    setBrandGroupDetailCategories((prev) => moveKey(prev, brandDetailEditDraft.category.trim()));
+    setBrandGroupDetailOptions((prev) => moveKey(prev, { colors, sizes, variants: nextVariants }));
+    setDetailHidden((prev) => prev.map((name) => name === oldName ? nextName : name));
+
+    const previousRows = variantRows.filter((row) => row.detail === oldName);
+    const remainingRows = variantRows.filter((row) => row.detail !== oldName);
+    const editedRows = nextVariants.map((variant) => {
+      const previous = previousRows.find((row) => String(row.colorOnly || "없음") === variant.color && String(row.size || "없음") === variant.size);
+      const storedColor = [nextName, variant.color].filter(Boolean).join(AXIS_JOIN);
+      return {
+        key: `${storedColor || "__EMPTY_COLOR__"}__${variant.size || "__EMPTY_SIZE__"}`,
+        color: storedColor,
+        size: variant.size === "없음" ? "" : variant.size,
+        stock: Number(previous?.stock || 0),
+        detail: nextName,
+        colorOnly: variant.color,
+      };
+    });
+    setVariantRows([...remainingRows, ...editedRows]);
+    setBrandDetailEditDraft(null);
+  };
+
   // [2026-08-11] 세부상품 사진 업로드 — 기존 상품사진과 동일한 압축·업로드 API 재사용
   const pickDetailPhoto = (name: string) => {
     detailPhotoTargetRef.current = name;
@@ -1119,6 +1209,10 @@ export default function QuickProductFastForm({
     setDetailPlus({});
     setDetailHidden([]);
     setDetailPhotos({});
+    setBrandGroupDetailPhotoSets({});
+    setBrandGroupDetailCategories({});
+    setBrandGroupDetailOptions({});
+    setBrandDetailEditDraft(null);
     setBulkStockText("10");
   };
 
@@ -1200,12 +1294,14 @@ export default function QuickProductFastForm({
 
       // 축 정의는 "세부상품 + (색상 또는 사이즈)" 3단 이상일 때만 기록 →
       //   기존 축1·축2 상품의 note 키 구성이 지금과 100% 동일하게 유지된다.
-      const needAxes = detailActive && (colors.length > 0 || sizes.length > 0);
+      const brandColors = unique(Object.values(brandGroupDetailOptions).flatMap((config) => config.colors || []));
+      const brandSizes = unique(Object.values(brandGroupDetailOptions).flatMap((config) => config.sizes || []));
+      const needAxes = detailActive && (isBrandGroupEdit || colors.length > 0 || sizes.length > 0);
       const optionAxesPayload = needAxes
         ? [
             { key: "detail" as const, label: detailLabel, values: details },
-            ...(colors.length > 0 ? [{ key: "color" as const, label: "색상", values: colors }] : []),
-            ...(sizes.length > 0 ? [{ key: "size" as const, label: "사이즈", values: sizes }] : []),
+            ...((isBrandGroupEdit ? brandColors : colors).length > 0 ? [{ key: "color" as const, label: "색상", values: isBrandGroupEdit ? brandColors : colors }] : []),
+            ...((isBrandGroupEdit ? brandSizes : sizes).length > 0 ? [{ key: "size" as const, label: "사이즈", values: isBrandGroupEdit ? brandSizes : sizes }] : []),
           ]
         : null;
 
@@ -1213,8 +1309,12 @@ export default function QuickProductFastForm({
       // 수정 저장 시 세부상품별 옵션·다중사진·가져오기 식별자를 반드시 보존한다.
       const preservedBrandNote = isBrandGroupEdit
         ? {
-            brand_group: initialProductNote?.brand_group,
-            detail_photo_sets: initialProductNote?.detail_photo_sets,
+            brand_group: {
+              ...(initialProductNote?.brand_group || {}),
+              detail_categories: brandGroupDetailCategories,
+              detail_options: brandGroupDetailOptions,
+            },
+            detail_photo_sets: brandGroupDetailPhotoSets,
             ...(initialProductNote?.import_batch ? { import_batch: initialProductNote.import_batch } : {}),
             ...(initialProductNote?.vendor_code ? { vendor_code: initialProductNote.vendor_code } : {}),
           }
@@ -1266,16 +1366,21 @@ export default function QuickProductFastForm({
         sort_order: 0,
         is_pinned: isPinned,
         pinned_at: nextPinnedAt,
+        // 브랜드 대표 썸네일은 화면에서 워드마크로 대체하되, 기존 상품사진 URL은 다른 화면과의 호환을 위해 보존한다.
         image_url: coverImages[0] || null,
         // color_options: 3단이면 "색상" 목록, 세부상품만 쓰면 노출 세부상품명(= 기존 조합형과 동일)
-        color_options: detailActive && colors.length === 0 ? exposedDetails : colors,
-        size_options: sizes,
-        color_option_enabled: detailActive ? true : colors.length > 0,
-        size_option_enabled: sizes.length > 0,
+        color_options: isBrandGroupEdit
+          ? exposedDetails
+          : (detailActive && colors.length === 0 ? exposedDetails : colors),
+        size_options: isBrandGroupEdit ? brandSizes : sizes,
+        color_option_enabled: isBrandGroupEdit ? true : (detailActive ? true : colors.length > 0),
+        size_option_enabled: isBrandGroupEdit
+          ? brandSizes.some((value) => value !== "없음")
+          : sizes.length > 0,
         product_description: normalizeTextareaText(description).trim() || null,
         // 브랜드 대표상품은 이 배열에 전체 세부사진이 함께 들어 있다. 일반폼의 5장 제한으로 잘라 저장하지 않는다.
         detail_image_urls: isBrandGroupEdit
-          ? pickImageArray(initialProduct, ["detail_image_urls", "detail_images", "images"])
+          ? Array.from(new Set(Object.values(brandGroupDetailPhotoSets).flat().filter(Boolean)))
           : detailImages,
         is_visible: isVisible,
         is_soldout: false,
@@ -1403,7 +1508,20 @@ export default function QuickProductFastForm({
           {/* .top-row : 사진(120) + 필드 */}
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "120px 1fr", gap: "14px", marginBottom: "14px" }}>
             <div style={{ width: "120px" }}>
-              <ImagePicker label="" value={coverImages} maxFiles={1} uploadKind="cover" mode="cover" onChange={setCoverImages} triggerRef={coverUploadRef} />
+              {isBrandGroupEdit ? (
+                <div>
+                  <img
+                    src={brandWordmarkImage}
+                    alt={`${String(initialProductNote?.brand_group?.brand_ko || productName || "브랜드")} 대표 썸네일`}
+                    style={{ width: "120px", height: "120px", display: "block", objectFit: "cover", borderRadius: "10px", border: "1px solid #E1D5D9", background: "#FFFDFB" }}
+                  />
+                  <div style={{ marginTop: "5px", textAlign: "center", fontSize: "10px", lineHeight: 1.25, fontWeight: 800, color: "#7B2D43" }}>
+                    브랜드 대표 썸네일<br />자동 적용
+                  </div>
+                </div>
+              ) : (
+                <ImagePicker label="" value={coverImages} maxFiles={1} uploadKind="cover" mode="cover" onChange={setCoverImages} triggerRef={coverUploadRef} />
+              )}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <div>
@@ -1622,11 +1740,11 @@ export default function QuickProductFastForm({
                       const plus = Math.max(0, Number(detailPlus[name]) || 0);
                       const unitPrice = moneyNumber(priceText) + plus;
                       return (
-                        <div key={`brand-photo-${name}`} style={{ minWidth: 0, display: "grid", gridTemplateColumns: "46px minmax(0, 1fr)", gap: "8px", alignItems: "center", padding: "6px", border: "1px solid #E8E2DD", borderRadius: "8px", background: "var(--color-surface)" }}>
+                        <div key={`brand-photo-${name}`} onClick={() => openBrandDetailEditor(name)} style={{ minWidth: 0, display: "grid", gridTemplateColumns: "46px minmax(0, 1fr) auto", gap: "8px", alignItems: "center", padding: "6px", border: "1px solid #E8E2DD", borderRadius: "8px", background: "var(--color-surface)", cursor: "pointer" }}>
                           <button
                             type="button"
                             disabled={!thumbnail}
-                            onClick={() => thumbnail && setDetailPreviewImage(resolveProductImageUrl(thumbnail))}
+                            onClick={(event) => { event.stopPropagation(); if (thumbnail) setDetailPreviewImage(resolveProductImageUrl(thumbnail)); }}
                             title={thumbnail ? "클릭하면 크게 보기" : "등록된 사진 없음"}
                             style={{ width: "46px", height: "46px", border: "none", borderRadius: "7px", padding: 0, overflow: "hidden", background: "#F1ECE8", cursor: thumbnail ? "zoom-in" : "default", display: "flex", alignItems: "center", justifyContent: "center" }}
                           >
@@ -1638,11 +1756,12 @@ export default function QuickProductFastForm({
                               {[categoryLabel, `사진 ${photos.length}장`, unitPrice > 0 ? `${unitPrice.toLocaleString("ko-KR")}원` : ""].filter(Boolean).join(" · ")}
                             </span>
                           </span>
+                          <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#7B2D43", whiteSpace: "nowrap" }}>수정 ›</span>
                         </div>
                       );
                     })}
                   </div>
-                  <div style={{ marginTop: "6px", fontSize: "10.5px", color: "var(--color-ink-mute)" }}>썸네일을 누르면 크게 볼 수 있어요. 세부상품별 전체 사진은 고객 주문서에서 해당 상품을 선택하면 표시됩니다.</div>
+                  <div style={{ marginTop: "6px", fontSize: "10.5px", color: "var(--color-ink-mute)" }}>카드를 누르면 상품명·구분·추가금·색상·사이즈를 수정할 수 있어요. 썸네일은 클릭하면 크게 보입니다.</div>
                 </div>
               ) : null}
 
@@ -1849,6 +1968,57 @@ export default function QuickProductFastForm({
         </div>
 
       </div>
+
+      {brandDetailEditDraft ? (
+        <div style={{ position: "fixed", inset: 0, zIndex: 100002, background: "rgba(39,28,33,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "18px" }}>
+          <div role="dialog" aria-modal="true" aria-label="세부상품 수정" style={{ width: "min(620px, 94vw)", maxHeight: "88vh", display: "flex", flexDirection: "column", borderRadius: "14px", overflow: "hidden", background: "var(--color-surface)", boxShadow: "0 22px 70px rgba(0,0,0,0.28)" }}>
+            <div style={{ padding: "13px 16px", borderBottom: "1px solid #E8E2DD", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#F7F5F3" }}>
+              <span style={{ fontSize: "14px", fontWeight: 900, color: "var(--color-ink)" }}>세부상품 수정</span>
+              <button type="button" onClick={() => setBrandDetailEditDraft(null)} style={{ border: "none", background: "transparent", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer" }}>×</button>
+            </div>
+            <div style={{ overflowY: "auto", padding: "14px 16px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 150px", gap: "10px" }}>
+                <label style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>상품명
+                  <input value={brandDetailEditDraft.name} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, name: event.target.value } : prev)} style={{ ...fieldInput, marginTop: "4px" }} />
+                </label>
+                <label style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>상품구분
+                  <input value={brandDetailEditDraft.category} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, category: event.target.value } : prev)} placeholder="상의, 하의, 세트…" style={{ ...fieldInput, marginTop: "4px" }} />
+                </label>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "10px", marginTop: "10px" }}>
+                <label style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>기본가 대비 추가금
+                  <div style={{ position: "relative", marginTop: "4px" }}>
+                    <input value={formatNumberWithComma(brandDetailEditDraft.plus)} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, plus: onlyNumber(event.target.value) } : prev)} inputMode="numeric" style={{ ...fieldInput, paddingRight: "28px" }} />
+                    <span style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", color: "var(--color-ink-mute)", fontSize: "12px" }}>원</span>
+                  </div>
+                </label>
+                <div style={{ padding: "20px 11px 0", fontSize: "12px", color: "#7B2D43", fontWeight: 900 }}>
+                  판매가 {(moneyNumber(priceText) + Math.max(0, Number(brandDetailEditDraft.plus) || 0)).toLocaleString("ko-KR")}원
+                </div>
+              </div>
+
+              <div style={{ marginTop: "14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-ink)" }}>실제 색상·사이즈 조합</span>
+                <button type="button" onClick={() => setBrandDetailEditDraft((prev) => prev ? { ...prev, variants: [...prev.variants, { color: "없음", size: "없음" }] } : prev)} style={{ border: "1px solid #D9C5CC", borderRadius: "7px", background: "#fff", color: "#7B2D43", padding: "5px 9px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>+ 조합 추가</button>
+              </div>
+              <div style={{ marginTop: "7px", display: "grid", gap: "6px", maxHeight: "280px", overflowY: "auto" }}>
+                {brandDetailEditDraft.variants.map((variant, index) => (
+                  <div key={`edit-variant-${index}`} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 34px", gap: "6px", alignItems: "center" }}>
+                    <input aria-label={`색상 ${index + 1}`} value={variant.color} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, variants: prev.variants.map((item, itemIndex) => itemIndex === index ? { ...item, color: event.target.value } : item) } : prev)} placeholder="색상 없음이면 없음" style={fieldInput} />
+                    <input aria-label={`사이즈 ${index + 1}`} value={variant.size} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, variants: prev.variants.map((item, itemIndex) => itemIndex === index ? { ...item, size: event.target.value } : item) } : prev)} placeholder="사이즈 없음이면 없음" style={fieldInput} />
+                    <button type="button" disabled={brandDetailEditDraft.variants.length <= 1} onClick={() => setBrandDetailEditDraft((prev) => prev ? { ...prev, variants: prev.variants.filter((_, itemIndex) => itemIndex !== index) } : prev)} style={{ height: "34px", border: "none", borderRadius: "7px", background: "#FBEAE7", color: "#C0392B", cursor: brandDetailEditDraft.variants.length <= 1 ? "default" : "pointer", opacity: brandDetailEditDraft.variants.length <= 1 ? 0.4 : 1 }}>×</button>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: "7px", fontSize: "10.5px", color: "var(--color-ink-mute)" }}>색상이나 사이즈가 없는 상품은 `없음`으로 두세요. 존재하는 조합만 한 줄씩 등록됩니다.</div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", padding: "11px 16px", borderTop: "1px solid #E8E2DD", background: "#F7F5F3" }}>
+              <button type="button" onClick={() => setBrandDetailEditDraft(null)} style={{ padding: "8px 14px", border: "1px solid #E8E2DD", borderRadius: "8px", background: "#fff", color: "var(--color-ink)", cursor: "pointer" }}>취소</button>
+              <button type="button" onClick={applyBrandDetailEditor} style={{ padding: "8px 15px", border: "none", borderRadius: "8px", background: "#0F6E56", color: "#fff", fontWeight: 900, cursor: "pointer" }}>변경내용 적용</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {detailPreviewImage ? (
         <div

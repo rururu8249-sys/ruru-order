@@ -8,6 +8,7 @@ import { resolveProductImageUrl } from "./quick-product/productImageUrl";
 import { showAdminToast } from "@/lib/adminToast";
 import { createDraftBroadcast } from "./liveBroadcastController";
 import ExcelBulkImportPopup from "./ExcelBulkImportPopup";
+import { brandWordmarkThumbnail } from "@/lib/brandWordmarkThumbnail";
 
 type ProductRow = Record<string, unknown>;
 
@@ -194,6 +195,11 @@ function productPriceLabel(p: ProductRow) {
 }
 
 function mainImage(p: ProductRow) {
+  const group = parseProductNote(p).brand_group;
+  if (group && typeof group === "object" && !Array.isArray(group) && (group as Record<string, unknown>).enabled === true) {
+    const record = group as Record<string, unknown>;
+    return brandWordmarkThumbnail(String(record.brand_en || ""), String(record.brand_ko || productName(p)));
+  }
   const direct = pickString(p, ["image_url", "cover_image_url", "main_image_url", "thumbnail_url"], "");
   if (direct) return resolveProductImageUrl(direct);
   const images = pickArray(p, ["images", "image_urls", "detail_image_urls"]);
