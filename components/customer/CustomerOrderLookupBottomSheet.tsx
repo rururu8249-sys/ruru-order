@@ -3,6 +3,7 @@
 // 주의: UI 전용. DB, API, 주문저장, 입금매칭, 정산, 배송 로직 없음. (시안 딥로즈 #7B2D43 인라인)
 
 import { useEffect, useRef, type CSSProperties } from "react";
+import SheetGrabber from "@/components/customer/SheetGrabber";
 
 export type CustomerOrderLookupFilter = "전체" | "결제대기" | "결제완료" | "출고완료" | "주문취소";
 
@@ -105,8 +106,8 @@ export default function CustomerOrderLookupBottomSheet({
       aria-modal="true"
       aria-label="주문조회"
     >
-      <section style={{ width: "100%", maxWidth: "560px", margin: "0 auto", overflow: "hidden", borderTopLeftRadius: "28px", borderTopRightRadius: "28px", background: "#fff", boxShadow: "0 -22px 70px rgba(15,23,42,0.22)" }}>
-        <div style={{ margin: "12px auto 0", height: "5px", width: "52px", borderRadius: "3px", background: "#E8E2DD" }} />
+      <section data-sheet style={{ width: "100%", maxWidth: "560px", margin: "0 auto", overflow: "hidden", borderTopLeftRadius: "28px", borderTopRightRadius: "28px", background: "#fff", boxShadow: "0 -22px 70px rgba(15,23,42,0.22)" }}>
+        <SheetGrabber onClose={onClose} style={{ paddingTop: "8px", paddingBottom: 0 }} />
 
         <div style={{ display: "flex", maxHeight: "88dvh", flexDirection: "column" }}>
           <header style={{ flexShrink: 0, padding: "16px 16px 8px" }}>

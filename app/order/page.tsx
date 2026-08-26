@@ -5779,7 +5779,7 @@ export default function OrderPage() {
           {orderSheetOpen && (
           <div style={{ position: "fixed", inset: 0, zIndex: 35, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={(e) => { if (e.target === e.currentTarget) setOrderSheetOpen(false); }}>
             <div data-sheet style={{ background: "#fff", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: "430px", maxHeight: "92dvh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-              <SheetGrabber onClose={() => { if (!submitting) setOrderSheetOpen(false); }} threshold={110} style={{ margin: "4px auto -4px", paddingBottom: "8px" }} />
+              <SheetGrabber onClose={() => { if (!submitting) setOrderSheetOpen(false); }} style={{ margin: "4px auto -4px", paddingBottom: "8px" }} />
               <div style={{ flexShrink: 0, padding: "12px 18px", borderBottom: "0.5px solid #E5E1DC", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
                 <div style={{ minWidth: 0 }}>
                   <span style={{ fontSize: "17px", fontWeight: 800, color: "#1A1A1A" }}>주문서 확인</span>
@@ -6664,13 +6664,13 @@ export default function OrderPage() {
                             <strong style={{ alignSelf: "center", fontSize: "11px", color: "#0F6E56" }}>{won(toNumber(item.product_price) * qty)}</strong>
                             <button
                               type="button"
-                              aria-label={`${item.product_name} 주문서에서 빼기`}
+                              aria-label={`${item.product_name} 주문서에서 삭제`}
                               onClick={() => guardChatItem(item, `${item.product_name} · ${qty}개 삭제`, "삭제할게요", () => {
                                 removeItem(itemIndex);
-                                showCustomerNotice(`${item.product_name}을(를) 주문서에서 뺐어요.`, "info");
+                                showCustomerNotice(`${item.product_name}을(를) 주문서에서 삭제했어요.`, "info");
                               })}
                               style={{ minWidth: "42px", height: "28px", borderRadius: "8px", border: "1px solid #E3C6CD", background: "#FFF7F8", padding: "0 7px", color: "#A13A50", fontSize: "10px", fontWeight: 900, cursor: "pointer" }}
-                            >빼기</button>
+                            >삭제</button>
                           </div>
                         );
                       })}
@@ -6700,6 +6700,11 @@ export default function OrderPage() {
                         <div style={{ fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionTotalPrice > 0 ? won(registeredOptionTotalPrice) : "가격 직접입력"}</div>
                       </div>
                     </>
+                  ) : registeredOptionBrandGroup && registeredOptionBrandCartCount > 0 ? (
+                    <div style={{ width: "100%" }}>
+                      <strong style={{ display: "block", fontSize: "13px", color: "#0F6E56" }}>이 브랜드에서 총 {registeredOptionBrandCartCount}개 담았어요</strong>
+                      <span style={{ display: "block", marginTop: "2px", fontSize: "10px", fontWeight: 700, color: "#6B8074" }}>더 담으려면 위에서 상품을 선택하거나, 선택을 완료해 주세요</span>
+                    </div>
                   ) : (
                     <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
                       <div>
@@ -6711,17 +6716,23 @@ export default function OrderPage() {
                   )}
                 </div>
 
-                <div style={{ flexShrink: 0, display: "grid", gridTemplateColumns: "0.85fr 1.15fr", gap: "10px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "14px 18px calc(16px + env(safe-area-inset-bottom))" }}>
-                  <button type="button" onClick={closeRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#F1ECEE", fontSize: "16px", fontWeight: 800, color: "#666", cursor: "pointer" }}>닫기</button>
-                  {allOptionsSoldOut ? (
-                    <button type="button" disabled style={{ height: "52px", borderRadius: "16px", border: "none", background: "#ccc", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "not-allowed" }}>품절</button>
+                <div style={{ flexShrink: 0, display: "grid", gridTemplateColumns: registeredOptionBrandGroup && !registeredOptionSelectionReady && registeredOptionBrandCartCount > 0 ? "1fr" : "0.85fr 1.15fr", gap: "10px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "14px 18px calc(16px + env(safe-area-inset-bottom))" }}>
+                  {registeredOptionBrandGroup && !registeredOptionSelectionReady && registeredOptionBrandCartCount > 0 ? (
+                    <button type="button" onClick={closeRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#7A1E47", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>선택 완료 · 총 {registeredOptionBrandCartCount}개 담음</button>
                   ) : (
+                    <>
+                    <button type="button" onClick={closeRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#F1ECEE", fontSize: "16px", fontWeight: 800, color: "#666", cursor: "pointer" }}>닫기</button>
+                    {allOptionsSoldOut ? (
+                    <button type="button" disabled style={{ height: "52px", borderRadius: "16px", border: "none", background: "#ccc", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "not-allowed" }}>품절</button>
+                    ) : (
                     <button
                       type="button"
                       disabled={!registeredOptionSelectionReady}
                       onClick={confirmRegisteredOptionSelectSheet}
                       style={{ height: "52px", borderRadius: "16px", border: "none", background: registeredOptionSelectionReady ? "#7A1E47" : "#CFC4C8", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: registeredOptionSelectionReady ? "pointer" : "default" }}
                     >{registeredOptionSelectionReady ? (registeredOptionBrandGroup ? "선택상품 담기" : "장바구니 담기") : registeredOptionAxes3 && !registeredOptionDetail.trim() ? "세부상품을 먼저 선택" : "옵션을 선택해 주세요"}</button>
+                    )}
+                    </>
                   )}
                 </div>
               </div>
@@ -6731,13 +6742,14 @@ export default function OrderPage() {
           {directInputOpen && directInputItem && (
             <div className="fixed inset-0 z-[130] bg-slate-950/55 backdrop-blur-[2px]">
               <div
+                data-sheet
                 data-ruru-direct-input-shell="direct-input-shell-v2"
                 className={directInputProductSearchMode ? "absolute inset-x-0 bottom-0 mx-auto max-h-[95dvh] w-full max-w-[430px] overflow-hidden rounded-t-[30px] bg-white shadow-[0_-24px_80px_rgba(15,23,42,0.25)]" : "absolute inset-x-0 bottom-0 mx-auto max-h-[90dvh] w-full max-w-[430px] overflow-hidden rounded-t-[30px] bg-white shadow-[0_-24px_80px_rgba(15,23,42,0.25)]"}
                 style={{
                   bottom: directInputProductSearchMode ? "0px" : directInputKeyboardInset > 0 ? `${directInputKeyboardInset}px` : "0px",
                 }}
               >
-                <div className="mx-auto mt-2.5 h-1.5 w-16 rounded-full bg-slate-200" />
+                <SheetGrabber onClose={closeDirectInputSheet} style={{ paddingTop: "8px", paddingBottom: 0 }} />
 
                 <div className="max-h-[calc(95dvh-18px)] overflow-x-hidden overflow-y-auto px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-4">
                   <div data-ruru-direct-input-no-top-close="enabled" className="mb-3">
@@ -7009,8 +7021,8 @@ export default function OrderPage() {
             style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
             onClick={(e) => { if (e.target === e.currentTarget) setHowToOpen(false); }}
           >
-            <div style={{ background: "#fff", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: "430px", paddingBottom: "24px", maxHeight: "92dvh", overflowY: "auto" }}>
-              <div style={{ width: "40px", height: "4px", borderRadius: "2px", background: "#E5E1DC", margin: "12px auto 18px" }} />
+            <div data-sheet style={{ background: "#fff", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: "430px", paddingBottom: "24px", maxHeight: "92dvh", overflowY: "auto" }}>
+              <SheetGrabber onClose={() => setHowToOpen(false)} style={{ paddingTop: "8px", paddingBottom: "4px" }} />
               <div style={{ fontSize: "18px", fontWeight: 800, color: "#1A1A1A", padding: "0 20px", marginBottom: "18px" }}>📌 주문 방법</div>
 
               {/* [2026-07-10] 3단계 내용은 관리자 설정(howto_steps)에서 수정. 설정이 없으면 기본 문구. */}
@@ -7054,8 +7066,8 @@ export default function OrderPage() {
 
         {alertSheetOpen ? (
           <div onClick={() => setAlertSheetOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 60, display: "flex", alignItems: "flex-end" }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: "#fff", borderTopLeftRadius: "24px", borderTopRightRadius: "24px", padding: "20px 18px 26px" }}>
-              <div style={{ width: "40px", height: "4px", borderRadius: "2px", background: "#E0DAD3", margin: "2px auto 12px" }} />
+            <div data-sheet onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: "#fff", borderTopLeftRadius: "24px", borderTopRightRadius: "24px", padding: "8px 18px 26px" }}>
+              <SheetGrabber onClose={() => setAlertSheetOpen(false)} style={{ paddingTop: 0, paddingBottom: "4px" }} />
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px", marginBottom: "8px" }}>
                 <span style={{ fontSize: "17px", fontWeight: 800, color: "#7B2D43" }}>{liveAlertOptin ? "🔔 방송 시작 알림을 받고 있어요" : "🔔 방송 시작 알림을 받으시겠어요?"}</span>
                 <button type="button" onClick={() => setAlertSheetOpen(false)} aria-label="닫기" style={{ border: "none", background: "none", fontSize: "20px", color: "#999", cursor: "pointer", flexShrink: 0, lineHeight: 1 }}>✕</button>
@@ -7077,8 +7089,8 @@ export default function OrderPage() {
 
         {inquirySheetOpen ? (
           <div onClick={() => setInquirySheetOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 60, display: "flex", alignItems: "flex-end" }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: "#fff", borderTopLeftRadius: "24px", borderTopRightRadius: "24px", padding: "18px" }}>
-              <div style={{ width: "40px", height: "4px", borderRadius: "2px", background: "#E0DAD3", margin: "2px auto 12px" }} />
+            <div data-sheet onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: "#fff", borderTopLeftRadius: "24px", borderTopRightRadius: "24px", padding: "8px 18px 18px" }}>
+              <SheetGrabber onClose={() => setInquirySheetOpen(false)} style={{ paddingTop: 0, paddingBottom: "4px" }} />
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
                 <span style={{ fontSize: "16px", fontWeight: 800, color: "#7B2D43" }}>문의하기</span>
                 <button type="button" onClick={() => setInquirySheetOpen(false)} aria-label="닫기" style={{ border: "none", background: "none", fontSize: "20px", color: "#999", cursor: "pointer" }}>✕</button>
@@ -7111,8 +7123,8 @@ export default function OrderPage() {
 
         {noticeSheetOpen ? (
           <div onClick={() => setNoticeSheetOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 60, display: "flex", alignItems: "flex-end" }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: "#fff", borderTopLeftRadius: "24px", borderTopRightRadius: "24px", padding: "18px", maxHeight: "70vh", overflowY: "auto" }}>
-              <div style={{ width: "40px", height: "4px", borderRadius: "2px", background: "#E0DAD3", margin: "2px auto 12px" }} />
+            <div data-sheet onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: "#fff", borderTopLeftRadius: "24px", borderTopRightRadius: "24px", padding: "8px 18px 18px", maxHeight: "70vh", overflowY: "auto" }}>
+              <SheetGrabber onClose={() => setNoticeSheetOpen(false)} style={{ paddingTop: 0, paddingBottom: "4px" }} />
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
                 <span style={{ fontSize: "16px", fontWeight: 800, color: "#7B2D43" }}>📢 공지사항</span>
                 <button type="button" onClick={() => setNoticeSheetOpen(false)} aria-label="닫기" style={{ border: "none", background: "none", fontSize: "20px", color: "#999", cursor: "pointer" }}>✕</button>

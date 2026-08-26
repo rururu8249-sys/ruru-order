@@ -6,6 +6,7 @@
 // 주의: UI 전용. DB/API/주문/입금/정산 로직 없음.
 
 import { useEffect, useState, type CSSProperties } from "react";
+import SheetGrabber from "@/components/customer/SheetGrabber";
 
 type ShippingAddress = {
   name: string;
@@ -330,11 +331,9 @@ export default function CustomerInfoEditBottomSheet({
   // ── 정보수정 시트 (기본 화면) ──
   return (
     <div style={sheetStyle} role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
-      <div style={panelStyle}>
+      <div data-sheet style={panelStyle}>
         {/* 핸들 */}
-        <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 0", background: "#fff" }}>
-          <div style={{ width: "36px", height: "4px", borderRadius: "2px", background: "#D9C5CC" }} />
-        </div>
+        <SheetGrabber onClose={handleClose} style={{ paddingTop: "8px", paddingBottom: 0, background: "#fff" }} />
 
         {/* 헤더 */}
         <div style={{ padding: "12px 20px 10px", borderBottom: "1px solid #F0EBE6", background: "#fff", flexShrink: 0 }}>
