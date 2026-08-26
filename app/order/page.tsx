@@ -5656,11 +5656,21 @@ export default function OrderPage() {
                             {/* 바로구매 부가설명 유지(사장님 지침: 배지만으론 신규 고객이 뜻을 모름) + 가격 위계 강화 15→17px */}
                             {badges.includes("direct") ? (<div style={{ fontSize: 11, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>방송 접수 없이 지금 바로 구매 가능</div>) : null}
                             {/* [조합형 옵션] 세부상품 개수 안내 — 표시 전용 */}
-                            {(() => { const ci = readComboInfoOrderProduct(product); return ci && ci.names.length > 1 ? (<div style={{ fontSize: 11, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>종류 {ci.names.length}가지 · 눌러서 선택</div>) : null; })()}
+                            {(() => {
+                              const ci = readComboInfoOrderProduct(product);
+                              if (!ci || ci.names.length <= 1) return null;
+                              return (
+                                <div style={{ fontSize: 11, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>
+                                  {brandGroup
+                                    ? `세부상품 ${ci.names.length}가지 · 상품별 금액이 달라요`
+                                    : `종류 ${ci.names.length}가지 · 눌러서 선택`}
+                                </div>
+                              );
+                            })()}
                             <div style={listView === "grid"
                               ? { marginTop: "auto", paddingTop: "6px", display: "flex", flexDirection: "column", alignItems: "stretch", gap: "6px" }
                               : { marginTop: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                              <span style={{ fontSize: "17px", fontWeight: 800, color: "#7A1E47" }}>{(() => { const ci = readComboInfoOrderProduct(product); return brandGroup ? `${won(Number(product.price || 0))}부터` : ci && ci.maxPlus > 0 ? won(Number(product.price || 0)) + "~" : won(Number(product.price || 0)); })()}</span>
+                              <span style={{ fontSize: "17px", fontWeight: 800, color: "#7A1E47" }}>{(() => { const ci = readComboInfoOrderProduct(product); return brandGroup ? `최저가 ${won(Number(product.price || 0))}부터` : ci && ci.maxPlus > 0 ? won(Number(product.price || 0)) + "~" : won(Number(product.price || 0)); })()}</span>
                               <button
                                 type="button"
                                 disabled={sold}
@@ -6117,7 +6127,7 @@ export default function OrderPage() {
                           ? (registeredOptionBrandGroup ? registeredOptionDetail.trim() : registeredOptionColor.trim())
                             ? won(registeredOptionUnitPrice)
                             : registeredOptionComboInfo.maxPlus > 0
-                              ? registeredOptionBrandGroup ? `${won(registeredOptionPrice)}부터` : won(registeredOptionPrice) + "~"
+                              ? registeredOptionBrandGroup ? `최저가 ${won(registeredOptionPrice)}부터` : won(registeredOptionPrice) + "~"
                               : won(registeredOptionPrice)
                           : registeredOptionPrice > 0
                             ? won(registeredOptionPrice)

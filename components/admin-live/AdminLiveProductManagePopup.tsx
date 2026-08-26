@@ -183,6 +183,16 @@ function money(value: number) {
   return `${Number(value || 0).toLocaleString("ko-KR")}원`;
 }
 
+function isBrandGroupProduct(p: ProductRow) {
+  const note = parseProductNote(p);
+  const group = note.brand_group;
+  return Boolean(group && typeof group === "object" && !Array.isArray(group) && (group as Record<string, unknown>).enabled === true);
+}
+
+function productPriceLabel(p: ProductRow) {
+  return `${money(productPrice(p))}${isBrandGroupProduct(p) ? "부터" : ""}`;
+}
+
 function mainImage(p: ProductRow) {
   const direct = pickString(p, ["image_url", "cover_image_url", "main_image_url", "thumbnail_url"], "");
   if (direct) return resolveProductImageUrl(direct);
@@ -1800,7 +1810,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           </span>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
-                            <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)", marginTop: "2px" }}>{money(productPrice(p))}</div>
+                            <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)", marginTop: "2px" }}>{productPriceLabel(p)}</div>
                           </div>
                           {/* [2026-07-10] 방송 중 "이 상품만 위젯에 띄우기". 고정 중이면 눌러서 해제(=다시 순환). */}
                           {!bcCopyMode ? (
@@ -1902,7 +1912,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         </span>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
-                          <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)", marginTop: "2px" }}>{money(productPrice(p))}</div>
+                          <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)", marginTop: "2px" }}>{productPriceLabel(p)}</div>
                           {productCategory(p) ? <span style={{ display: "inline-block", marginTop: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: "var(--color-surface-3)", color: "var(--color-ink-soft)" }}>{productCategory(p)}</span> : null}
                         </div>
                         <button type="button" onClick={() => editProduct(p)} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }}>수정</button>
@@ -1987,7 +1997,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         {/* 정보 */}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
-                          <div style={{ marginTop: "3px", fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{money(productPrice(p))}</div>
+                          <div style={{ marginTop: "3px", fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{productPriceLabel(p)}</div>
                           {createdAtLabel ? (
                             <div style={{ marginTop: "3px", fontSize: "10.5px", fontWeight: 700, color: "var(--color-ink-mute)", fontVariantNumeric: "tabular-nums" }}>
                               등록일시 {createdAtLabel}
@@ -2139,7 +2149,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         </span>
                         <span style={{ flex: 1, minWidth: 0 }}>
                           <span style={{ display: "block", fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</span>
-                          <span style={{ fontSize: "11px", color: "var(--color-ink-soft)" }}>{money(productPrice(p))}</span>
+                          <span style={{ fontSize: "11px", color: "var(--color-ink-soft)" }}>{productPriceLabel(p)}</span>
                         </span>
                       </label>
                     );
@@ -2280,7 +2290,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           </span>
                           <span style={{ flex: 1, minWidth: 0 }}>
                             <span style={{ display: "block", fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</span>
-                            <span style={{ fontSize: "11px", color: "var(--color-ink-soft)" }}>{money(productPrice(p))}{already ? " · 담김" : ""}</span>
+                            <span style={{ fontSize: "11px", color: "var(--color-ink-soft)" }}>{productPriceLabel(p)}{already ? " · 담김" : ""}</span>
                           </span>
                         </label>
                       );
@@ -2342,7 +2352,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           </span>
                           <span style={{ flex: 1, minWidth: 0 }}>
                             <span style={{ display: "block", fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</span>
-                            <span style={{ fontSize: "11px", color: "var(--color-ink-soft)" }}>{money(productPrice(p))}{already ? " · 진열됨" : ""}</span>
+                            <span style={{ fontSize: "11px", color: "var(--color-ink-soft)" }}>{productPriceLabel(p)}{already ? " · 진열됨" : ""}</span>
                           </span>
                         </label>
                       );
