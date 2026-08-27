@@ -4,6 +4,7 @@ import { ChangeEvent, type CSSProperties, DragEvent, type MouseEvent as ReactMou
 import { supabase } from "@/lib/supabase";
 import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import { showAdminToast } from "@/lib/adminToast";
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import { resolveProductImageUrl } from "./productImageUrl";
 import { compressProductImage, isHeicLikeImage } from "./compressProductImage";
 import { brandWordmarkThumbnail, normalizeBrandKorean } from "@/lib/brandWordmarkThumbnail";
@@ -36,6 +37,7 @@ type BrandDetailEditDraft = {
   name: string;
   category: string;
   plus: string;
+  hidden: boolean;
   variants: Array<{ color: string; size: string }>;
 };
 
@@ -1124,6 +1126,7 @@ export default function QuickProductFastForm({
       name,
       category: String(brandGroupDetailCategories[name] || ""),
       plus: String(Math.max(0, Number(detailPlus[name]) || 0)),
+      hidden: detailHidden.includes(name),
       variants,
     });
   };
@@ -1164,7 +1167,12 @@ export default function QuickProductFastForm({
     setBrandGroupDetailPhotoSets((prev) => moveKey(prev, prev[oldName] || []));
     setBrandGroupDetailCategories((prev) => moveKey(prev, brandDetailEditDraft.category.trim()));
     setBrandGroupDetailOptions((prev) => moveKey(prev, { colors, sizes, variants: nextVariants }));
-    setDetailHidden((prev) => prev.map((name) => name === oldName ? nextName : name));
+    setDetailHidden((prev) => {
+      const withoutEdited = prev.filter((name) => name !== oldName && name !== nextName);
+      return brandDetailEditDraft.hidden
+        ? [...withoutEdited, nextName]
+        : withoutEdited;
+    });
 
     const previousRows = variantRows.filter((row) => row.detail === oldName);
     const remainingRows = variantRows.filter((row) => row.detail !== oldName);
@@ -1225,6 +1233,53 @@ export default function QuickProductFastForm({
 
   const toggleDetailHidden = (name: string) => {
     setDetailHidden((prev) => (prev.includes(name) ? prev.filter((x) => x !== name) : [...prev, name]));
+  };
+
+  const deleteBrandDetail = async () => {
+    if (!brandDetailEditDraft) return;
+
+    const target = brandDetailEditDraft.originalName;
+
+    if (details.length <= 1) {
+      showAdminToast(
+        "마지막 세부상품은 삭제할 수 없어요.\\n대표상품 자체의 숨김 기능을 사용해주세요.",
+        "warning",
+      );
+      return;
+    }
+
+    const ok = await showAdminConfirm(
+      `"${target}" 세부상품을 삭제할까요?\\n\\n고객 상품선택에서는 제거되지만 기존 주문내역은 삭제하지 않습니다.\\n등록된 원본 사진 파일도 안전을 위해 물리 삭제하지 않습니다.`,
+      {
+        title: "세부상품 삭제",
+        confirmText: "삭제",
+        cancelText: "취소",
+        tone: "danger",
+      },
+    );
+
+    if (!ok) return;
+
+    const removeKey = <T,>(source: Record<string, T>) => {
+      const next = { ...source };
+      delete next[target];
+      return next;
+    };
+
+    setDetailText(details.filter((name) => name !== target).join(", "));
+    setDetailPlus((prev) => removeKey(prev));
+    setDetailPhotos((prev) => removeKey(prev));
+    setBrandGroupDetailPhotoSets((prev) => removeKey(prev));
+    setBrandGroupDetailCategories((prev) => removeKey(prev));
+    setBrandGroupDetailOptions((prev) => removeKey(prev));
+    setDetailHidden((prev) => prev.filter((name) => name !== target));
+    setVariantRows((prev) => prev.filter((row) => row.detail !== target));
+    setBrandDetailEditDraft(null);
+
+    showAdminToast(
+      `"${target}" 삭제 내용을 편집화면에 반영했습니다.\\n상품 수정창 아래의 '저장' 버튼을 눌러야 최종 반영됩니다.`,
+      "warning",
+    );
   };
 
   // 세부상품별로 조합 행을 묶어서 보여주기 위한 그룹 (세부상품 미사용이면 단일 그룹)
@@ -1859,7 +1914,25 @@ export default function QuickProductFastForm({
                               {[categoryLabel, `사진 ${photos.length}장`, unitPrice > 0 ? `${unitPrice.toLocaleString("ko-KR")}원` : ""].filter(Boolean).join(" · ")}
                             </span>
                           </span>
-                          <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#7B2D43", whiteSpace: "nowrap" }}>수정 ›</span>
+                          <span style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "5px", whiteSpace: "nowrap" }}>
+                            {detailHidden.includes(name) ? (
+                              <span
+                                title="고객 주문서에서 숨김 상태"
+                                style={{
+                                  padding: "3px 6px",
+                                  borderRadius: "999px",
+                                  background: "#F1ECE8",
+                                  color: "#75676D",
+                                  border: "1px solid #E1D5D9",
+                                  fontSize: "9.5px",
+                                  fontWeight: 900,
+                                }}
+                              >
+                                숨김
+                              </span>
+                            ) : null}
+                            <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#7B2D43" }}>수정 ›</span>
+                          </span>
                         </div>
                       );
                     })}
@@ -2142,9 +2215,67 @@ export default function QuickProductFastForm({
               </div>
               <div style={{ marginTop: "7px", fontSize: "10.5px", color: "var(--color-ink-mute)" }}>색상이나 사이즈가 없는 상품은 `없음`으로 두세요. 존재하는 조합만 한 줄씩 등록됩니다.</div>
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", padding: "11px 16px", borderTop: "1px solid #E8E2DD", background: "#F7F5F3" }}>
-              <button type="button" onClick={() => setBrandDetailEditDraft(null)} style={{ padding: "8px 14px", border: "1px solid #E8E2DD", borderRadius: "8px", background: "#fff", color: "var(--color-ink)", cursor: "pointer" }}>취소</button>
-              <button type="button" onClick={applyBrandDetailEditor} style={{ padding: "8px 15px", border: "none", borderRadius: "8px", background: "#0F6E56", color: "#fff", fontWeight: 900, cursor: "pointer" }}>변경내용 적용</button>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", padding: "11px 16px", borderTop: "1px solid #E8E2DD", background: "#F7F5F3", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => void deleteBrandDetail()}
+                style={{
+                  padding: "8px 12px",
+                  border: "1px solid #F0C8C1",
+                  borderRadius: "8px",
+                  background: "#fff",
+                  color: "#C0392B",
+                  fontSize: "11.5px",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                삭제
+              </button>
+
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "7px", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setBrandDetailEditDraft((prev) =>
+                      prev ? { ...prev, hidden: !prev.hidden } : prev
+                    )
+                  }
+                  title={
+                    brandDetailEditDraft.hidden
+                      ? "고객 주문서에 다시 노출"
+                      : "데이터는 유지하고 고객 주문서에서만 숨김"
+                  }
+                  style={{
+                    padding: "8px 12px",
+                    border: "1px solid #D9C5CC",
+                    borderRadius: "8px",
+                    background: brandDetailEditDraft.hidden ? "#F1ECE8" : "#fff",
+                    color: brandDetailEditDraft.hidden ? "#75676D" : "#7B2D43",
+                    fontSize: "11.5px",
+                    fontWeight: 900,
+                    cursor: "pointer",
+                  }}
+                >
+                  {brandDetailEditDraft.hidden ? "숨김 해제" : "숨김"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBrandDetailEditDraft(null)}
+                  style={{ padding: "8px 14px", border: "1px solid #E8E2DD", borderRadius: "8px", background: "#fff", color: "var(--color-ink)", cursor: "pointer" }}
+                >
+                  취소
+                </button>
+
+                <button
+                  type="button"
+                  onClick={applyBrandDetailEditor}
+                  style={{ padding: "8px 15px", border: "none", borderRadius: "8px", background: "#0F6E56", color: "#fff", fontWeight: 900, cursor: "pointer" }}
+                >
+                  변경내용 적용
+                </button>
+              </div>
             </div>
           </div>
         </div>
