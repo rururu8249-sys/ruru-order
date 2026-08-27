@@ -802,7 +802,7 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
               type="file"
               accept=".xlsx,.xlsm"
               aria-label="엑셀 파일 선택"
-              style={{ position: "fixed", left: 0, bottom: 0, width: "1px", height: "1px", opacity: 0.01 }}
+              style={{ position: "fixed", left: "50vw", top: "50vh", zIndex: 70, width: "2px", height: "2px", opacity: 0.01 }}
               onChange={(e) => { const f = e.target.files?.[0]; if (f) void onFile(f); e.target.value = ""; }}
             />
           </div>
