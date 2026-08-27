@@ -5,7 +5,7 @@
 //   흐름: 파일 선택 → 자동 인식(헤더·구조·열역할) → 사장님이 드롭다운으로 확인/수정
 //        → 미리보기 검수(문제행 빨간 표시) → 일괄설정(배지/배송/진열/카테고리) → [등록]
 //   ⚠️ [등록]을 누르기 전에는 아무것도 저장되지 않는다.
-//   ⚠️ 상품 등록은 기존 경로(adminCatalogWrite products insert)만 사용.
+//   ⚠️ 상품 등록은 기존 경로(adminCatalogWrite products insert/update)만 사용.
 //      주문·재고차감·입금·정산 로직 무접촉. 이미지 업로드도 기존 API 재사용.
 //   형식 인식 로직은 lib/excelBulkParse.ts (시뮬레이션 검수 가능하도록 UI와 분리)
 
@@ -14,6 +14,7 @@ import { createPortal } from "react-dom";
 import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
+import { mergeBrandGroupProduct } from "@/lib/brandGroupMerge";
 import {
   autoGuessConfig, buildDraftCores, auditDraftCores, norm, totalStock,
   detectOfficialForm, parseOfficialForm,
@@ -207,6 +208,187 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
 
   const useCount = drafts.filter((d) => d.use).length;
 
+  const commitExistingBrandGroups = async (
+    targets: DraftProduct[],
+    existingRows: Array<Record<string, unknown>>,
+    finalNameOf: (draft: DraftProduct) => string,
+  ) => {
+    const importBatch = `excel-merge-${new Date().toISOString()}-${Math.random().toString(36).slice(2, 10)}`;
+    const plans: Array<{
+      id: string;
+      name: string;
+      values: Record<string, unknown>;
+      backup: Record<string, unknown>;
+      addedDetails: string[];
+      finalDetails: string[];
+      finalPhotoCount: number;
+      finalVariantCount: number;
+    }> = [];
+    const uploadBlob = async (blob: Blob, fileName: string) => {
+      let lastMessage = "사진 업로드 실패";
+      for (let attempt = 1; attempt <= 4; attempt += 1) {
+        try {
+          const fd = new FormData();
+          fd.append("file", new File([blob], fileName, { type: blob.type || "image/jpeg" }));
+          fd.append("kind", "detail");
+          const res = await fetch("/api/admin-live/product-images/upload", { method: "POST", body: fd });
+          const json = await res.json().catch(() => null);
+          const url = String(json?.url || json?.path || "");
+          if (res.ok && url) return url;
+          lastMessage = String(json?.message || `HTTP ${res.status}`);
+        } catch (error) {
+          lastMessage = error instanceof Error ? error.message : String(error);
+        }
+        if (attempt < 4) await new Promise((resolve) => window.setTimeout(resolve, attempt * 700));
+      }
+      throw new Error(`${fileName}: 사진 업로드 4회 실패 (${lastMessage})`);
+    };
+
+    setBusy("신규 세부상품 사진 전체 업로드 중…");
+    for (let index = 0; index < targets.length; index += 1) {
+      const draft = targets[index];
+      const name = finalNameOf(draft);
+      const existing = existingRows.find((row) => String(row.product_name || "").trim() === name);
+      if (!existing) throw new Error(`${name}: 기존 대표상품을 찾지 못했어요.`);
+      const details = (draft.details || []).filter(Boolean);
+      const existingNote = productNoteObject(existing);
+      const existingPricing = (existingNote.option_pricing || {}) as Record<string, unknown>;
+      const existingCodes = new Set(Object.keys(existingPricing).map(detailCodeFromName).filter(Boolean));
+      const collisions = details.filter((detail) => {
+        const code = detailCodeFromName(detail);
+        return detail in existingPricing || Boolean(code && existingCodes.has(code));
+      });
+      if (collisions.length > 0) throw new Error(`${name}: 이미 등록된 세부상품 ${collisions.join(", ")}`);
+      const detailPhotoUrls: Record<string, string> = {};
+      const detailPhotoSets: Record<string, string[]> = {};
+      const detailImageUrls: string[] = [];
+      for (const detail of details) {
+        const blobs = draft.detailImageBlobs?.[detail] || [];
+        if (blobs.length === 0) throw new Error(`${detail}: 상세사진 없음`);
+        for (let photoIndex = 0; photoIndex < blobs.length; photoIndex += 1) {
+          const url = await uploadBlob(blobs[photoIndex], `${detail}-${photoIndex + 1}.jpg`);
+          if (!detailPhotoUrls[detail]) detailPhotoUrls[detail] = url;
+          if (!detailPhotoSets[detail]) detailPhotoSets[detail] = [];
+          detailPhotoSets[detail].push(url);
+          detailImageUrls.push(url);
+        }
+      }
+      const variants = Object.entries(draft.stocks)
+        .filter(([key]) => key !== "|")
+        .map(([key, stock]) => {
+          const [color, size] = key.split("|");
+          return { color: color || "", size: size || "", stock };
+        });
+      const colors = draft.colors.filter(Boolean);
+      const sizes = draft.sizes.filter(Boolean);
+      const incomingNote = {
+        stock_management_enabled: draft.stockManagementEnabled ?? false,
+        stock_variants: variants,
+        combo_mode: true,
+        option_label: "세부상품",
+        option_pricing: Object.fromEntries(details.map((detail) => [detail, Math.max(0, Math.floor(draft.detailPlus?.[detail] ?? 0))])),
+        combo_hidden: [],
+        detail_photos: detailPhotoUrls,
+        detail_photo_sets: detailPhotoSets,
+        option_axes: [
+          { key: "detail", label: "세부상품", values: details },
+          ...(colors.length > 0 ? [{ key: "color", label: "색상", values: colors }] : []),
+          ...(sizes.length > 0 ? [{ key: "size", label: "사이즈", values: sizes }] : []),
+        ],
+        combo_detail_values: details,
+        brand_group: {
+          enabled: true,
+          brand_ko: draft.brandKo || name,
+          brand_en: draft.brandEn || "",
+          detail_categories: draft.detailCategories || {},
+          detail_options: draft.detailOptions || {},
+        },
+        import_batch: importBatch,
+      };
+      const incomingPayload = {
+        product_name: name,
+        price: Math.max(0, draft.price + bulkPriceAdd),
+        stock: variants.reduce((sum, variant) => sum + Number(variant.stock || 0), 0),
+        color_options: details,
+        size_options: sizes,
+        detail_image_urls: detailImageUrls,
+        product_note: JSON.stringify(incomingNote),
+      };
+      const merged = mergeBrandGroupProduct(existing, incomingPayload, importBatch);
+      plans.push({
+        id: String(existing.id || ""),
+        name,
+        values: merged.values,
+        backup: {
+          price: existing.price,
+          stock: existing.stock,
+          color_options: existing.color_options,
+          size_options: existing.size_options,
+          detail_image_urls: existing.detail_image_urls,
+          product_note: existing.product_note,
+        },
+        addedDetails: merged.addedDetails,
+        finalDetails: merged.finalDetails,
+        finalPhotoCount: merged.finalPhotoCount,
+        finalVariantCount: merged.finalVariantCount,
+      });
+      setProgress({ done: index + 1, total: targets.length, ok: 0, fail: 0 });
+    }
+
+    const updated: typeof plans = [];
+    setBusy("기존 브랜드 대표상품에 신규 세부상품 추가 중…");
+    try {
+      for (const plan of plans) {
+        const { error } = await adminCatalogWrite({
+          table: "products",
+          op: "update",
+          values: plan.values,
+          filters: [{ type: "eq", col: "id", val: plan.id }],
+        });
+        if (error) throw new Error(`${plan.name}: 저장 실패 (${error.message})`);
+        updated.push(plan);
+      }
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, product_name, product_note")
+        .in("id", plans.map((plan) => plan.id));
+      if (error) throw new Error(`등록 결과 확인 실패: ${error.message}`);
+      const verified = (data as Array<Record<string, unknown>>) || [];
+      for (const plan of plans) {
+        const row = verified.find((item) => String(item.id) === plan.id);
+        if (!row) throw new Error(`${plan.name}: 저장 결과 없음`);
+        const note = productNoteObject(row);
+        const pricing = (note.option_pricing || {}) as Record<string, unknown>;
+        const photoSets = (note.detail_photo_sets || {}) as Record<string, unknown>;
+        const variants = Array.isArray(note.stock_variants) ? note.stock_variants : [];
+        if (Object.keys(pricing).length !== plan.finalDetails.length) throw new Error(`${plan.name}: 세부상품 개수 불일치`);
+        if (variants.length !== plan.finalVariantCount) throw new Error(`${plan.name}: 색상·사이즈 조합 개수 불일치`);
+        const photoCount = Object.values(photoSets).reduce<number>((sum, urls) => sum + (Array.isArray(urls) ? urls.length : 0), 0);
+        if (photoCount !== plan.finalPhotoCount) throw new Error(`${plan.name}: 사진 개수 불일치`);
+        for (const detail of plan.addedDetails) {
+          if (!(detail in pricing)) throw new Error(`${detail}: 저장 누락`);
+          if (!Array.isArray(photoSets[detail]) || (photoSets[detail] as unknown[]).length === 0) throw new Error(`${detail}: 사진 저장 누락`);
+        }
+      }
+    } catch (error) {
+      for (const plan of updated.reverse()) {
+        await adminCatalogWrite({
+          table: "products",
+          op: "update",
+          values: plan.backup,
+          filters: [{ type: "eq", col: "id", val: plan.id }],
+        });
+      }
+      throw error;
+    }
+
+    const addedCount = plans.reduce((sum, plan) => sum + plan.addedDetails.length, 0);
+    setProgress({ done: targets.length, total: targets.length, ok: targets.length, fail: 0 });
+    setStep("done");
+    showAdminToast(`추가 등록 완료\n\n대표상품 ${plans.length}개 · 신규 세부상품 ${addedCount}개 · 중복 0개`, "success");
+    onDone?.(plans.map((plan) => plan.id));
+  };
+
   // ── 실제 등록 ──
   // 안전 순서:
   //   1) 기존 상품명·업체코드 중복 사전 차단
@@ -238,6 +420,18 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
       const existingCodes = new Set(existingActive.map((row) => productVendorCode(row)).filter(Boolean));
       const nameHits = targetNames.filter((name) => existingNames.has(name));
       const codeHits = targetCodes.filter((code) => existingCodes.has(code));
+      const existingBrandRows = targets.map((draft) =>
+        existingActive.find((row) => String(row.product_name || "").trim() === finalNameOf(draft)),
+      );
+      const mergeExistingBrandGroups = targets.every((draft, index) => {
+        const row = existingBrandRows[index];
+        const brandGroup = row ? (productNoteObject(row).brand_group as Record<string, unknown> | undefined) : undefined;
+        return draft.brandGroup === true && Boolean(row) && brandGroup?.enabled === true;
+      });
+      if (mergeExistingBrandGroups) {
+        await commitExistingBrandGroups(targets, existingBrandRows.filter(Boolean) as Array<Record<string, unknown>>, finalNameOf);
+        return;
+      }
       let resumeRows: Array<Record<string, unknown>> = [];
       if (nameHits.length > 0 || codeHits.length > 0) {
         const exactRows = existingActive.filter((row) => targetNames.includes(String(row.product_name || "").trim()));
@@ -833,6 +1027,11 @@ function productVendorCode(row: Record<string, unknown>) {
   return String(productNoteObject(row).vendor_code || "").trim();
 }
 
+function detailCodeFromName(name: string) {
+  const matched = name.trim().match(/^([A-Z]+)\([^)]*\)-([^\s]+)/i);
+  return matched ? `${matched[1].toUpperCase()}-${matched[2].toUpperCase()}` : "";
+}
+
 async function loadActiveProductIdentities(errorPrefix: string) {
   const pageSize = 1000;
   const rows: Array<Record<string, unknown>> = [];
@@ -840,7 +1039,7 @@ async function loadActiveProductIdentities(errorPrefix: string) {
     const from = page * pageSize;
     const { data, error } = await supabase
       .from("products")
-      .select("id, product_name, price, product_note, status, in_shop, badge_types")
+      .select("id, product_name, price, stock, color_options, size_options, detail_image_urls, product_note, status, in_shop, badge_types")
       .order("id", { ascending: true })
       .range(from, from + pageSize - 1);
     if (error) throw new Error(`${errorPrefix}: ${error.message}`);
