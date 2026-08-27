@@ -758,29 +758,6 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
     }
   };
 
-  // 첨부된 '삼촌 의류.xlsx' 2PAGE 검수 완료분을 관리자 세션으로 한 번만 병합한다.
-  // 일반 엑셀 등록과 같은 중복 차단·전체 롤백·저장 후 재검증을 서버에서 수행한다.
-  const commitVerified2Page = async () => {
-    if (busy) return;
-    setBusy("2PAGE 사진·옵션 안전등록 중…");
-    try {
-      const response = await fetch("/api/admin-live/import-2page", { method: "POST" });
-      const json = await response.json().catch(() => null);
-      if (!response.ok || !json?.ok) throw new Error(String(json?.message || `HTTP ${response.status}`));
-      const ids = Array.isArray(json.productIds) ? json.productIds.map(String) : [];
-      showAdminToast(
-        `2PAGE 등록 완료\n\n신규 세부상품 ${Number(json.added || 0)}개 · MC-51M 중복 제외 · 저장 후 재검증 완료`,
-        "success",
-      );
-      onDone?.(ids);
-      onClose();
-    } catch (error) {
-      showAdminToast(`2PAGE 등록 중단\n\n${error instanceof Error ? error.message : String(error)}`, "error");
-    } finally {
-      setBusy("");
-    }
-  };
-
   const body = (
     <div style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{ width: "1000px", maxWidth: "100%", height: "700px", maxHeight: "calc(100vh - 32px)", background: "#fff", borderRadius: "14px", overflow: "hidden", display: "flex", flexDirection: "column" }}>
@@ -820,18 +797,6 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
             <div style={{ fontSize: "12px", fontWeight: 600, color: "#A08A92", textAlign: "center", lineHeight: 1.7 }}>
               .xlsx · 엑셀 안에 있는 사진(끌어다 놓은 그림)도 대표사진으로 자동 등록됩니다
             </div>
-            <button
-              type="button"
-              onClick={() => void commitVerified2Page()}
-              disabled={Boolean(busy)}
-              style={{
-                minWidth: "360px", height: "44px", padding: "0 18px", border: "none", borderRadius: "12px",
-                background: "#176D57", color: "#fff", fontSize: "13px", fontWeight: 900,
-                cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1,
-              }}
-            >
-              {busy || "검수 완료 · 삼촌 의류 2PAGE 안전등록"}
-            </button>
             <input
               ref={fileRef}
               type="file"
