@@ -797,7 +797,14 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
             <div style={{ fontSize: "12px", fontWeight: 600, color: "#A08A92", textAlign: "center", lineHeight: 1.7 }}>
               .xlsx · 엑셀 안에 있는 사진(끌어다 놓은 그림)도 대표사진으로 자동 등록됩니다
             </div>
-            <input ref={fileRef} type="file" accept=".xlsx,.xlsm" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void onFile(f); e.target.value = ""; }} />
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx,.xlsm"
+              aria-label="엑셀 파일 선택"
+              style={{ position: "fixed", left: 0, bottom: 0, width: "1px", height: "1px", opacity: 0.01 }}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) void onFile(f); e.target.value = ""; }}
+            />
           </div>
         ) : null}
 
