@@ -724,13 +724,18 @@ function registeredProductNeedsOptionSelect(product: BroadcastProduct): boolean 
 }
 
 function findMatchedBroadcastProduct(item: OrderItem, products: BroadcastProduct[]): BroadcastProduct | null {
+  const itemProductId = String(item.product_id ?? "").trim();
   const itemName = normalizeSuggestionText(item.product_name);
 
-  if (!itemName) {
+  if (!itemProductId && !itemName) {
     return null;
   }
 
   return (
+    // 브랜드 대표상품은 주문서에 실제 세부상품명을 저장하지만 product_id는
+    // 대표상품 ID를 유지한다. 따라서 이름보다 ID를 먼저 대조해야 옵션 변경 시
+    // 방금 담은 상품을 "판매 목록에 없음"으로 오판하지 않는다.
+    products.find((product) => itemProductId && String(product.id ?? "").trim() === itemProductId) ||
     products.find((product) => normalizeSuggestionText(product.product_name) === itemName) ||
     products.find((product) => normalizeSuggestionText(product.product_name).includes(itemName)) ||
     null
@@ -3695,6 +3700,12 @@ export default function OrderPage() {
     const product = findMatchedBroadcastProduct(it, [...broadcastProducts, ...groupBuyQuickProductsFromCatalog]);
     if (!product) { showCustomerNotice("지금 판매 목록에 없는 상품이라 옵션 변경이 안 돼요 — 🗑 삭제 후 목록에서 다시 담아 주세요."); return; }
     openRegisteredOptionSelectSheet(product);
+    const brandGroup = readBrandGroupOrderProduct(product);
+    if (brandGroup?.detailOptions[it.product_name]) {
+      // 브랜드 묶음은 대표상품을 다시 연 뒤, 주문서에 저장된 실제 세부상품까지
+      // 곧바로 복원해야 고객이 같은 상품의 옵션만 수정할 수 있다.
+      setRegisteredOptionDetail(it.product_name);
+    }
     setRegisteredOptionEditIndex(index);
     setRegisteredOptionColor(normalizeEmptyProductOptionValue(it.color) || "");
     setRegisteredOptionSize(normalizeEmptyProductOptionValue(it.size) || "");
