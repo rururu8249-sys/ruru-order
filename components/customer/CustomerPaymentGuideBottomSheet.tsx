@@ -53,9 +53,17 @@ const toNumber = (value: string | number | undefined) => {
 const won = (value: number) => `${Number(value || 0).toLocaleString()}원`;
 const clean = (value: unknown) => String(value || "").trim();
 
+// [2026-08-28 P0-3] 옵션값 전용 정리 — 저장상 "없음/-" 등 빈 옵션 센티널을 손님 화면에 찍지 않는다.
+// clean()은 상품명·닉네임 등에도 쓰이므로 건드리지 않고 옵션에만 이 함수를 쓴다.
+const EMPTY_OPTION_VALUES = ["없음", "없슴", "색상없음", "사이즈없음", "옵션없음", "x", "-", "none", "n/a", "na"];
+const cleanOption = (value: unknown) => {
+  const text = clean(value);
+  return EMPTY_OPTION_VALUES.includes(text.toLowerCase()) ? "" : text;
+};
+
 const itemTitle = (item: CustomerPaymentGuideOrderItem) => {
   const name = clean(item.product_name) || "상품명 확인";
-  const optionText = [clean(item.color), clean(item.size)].filter(Boolean).join(" / ");
+  const optionText = [cleanOption(item.color), cleanOption(item.size)].filter(Boolean).join(" / ");
   return optionText ? `${name} (${optionText})` : name;
 };
 

@@ -5349,6 +5349,53 @@ export default function OrderPage() {
     .reduce((sum, { item }) => sum + Math.max(0, Number(item.qty) || 0), 0);
   const allOptionsSoldOut = registeredOptionSelectProduct ? isSoldOutOrderProduct(registeredOptionSelectProduct) : false;
 
+  // [2026-08-28 P0-5] 고를 수 있는 값이 하나뿐인 색상/사이즈는 자동으로 선택한다.
+  //   손님이 누를 선택지가 하나뿐인데도 "색상을 선택해 주세요" 빨간 문구가 뜨고 클릭을 한 번 더 요구하던 문제.
+  //   채워 넣는 값은 손님이 그 버튼을 직접 눌렀을 때와 완전히 같은 값이라 재고키·주문저장에 차이가 없다.
+  //   직접입력(input) 모드에는 절대 자동으로 채우지 않는다(손님이 써야 하는 값이라서).
+  //   3단 상품은 세부상품을 고르기 전에는 색상 목록이 전체 브랜드 값이라 자동선택하지 않는다.
+  const registeredOptionAutoFillBlocked = Boolean(registeredOptionAxes3) && !registeredOptionDetail.trim();
+  const registeredOptionSingleColor =
+    !registeredOptionAutoFillBlocked && registeredOptionColorMode === "select" && registeredOptionColorChoices.length === 1
+      ? registeredOptionColorChoices[0]
+      : "";
+  const registeredOptionSingleSize =
+    !registeredOptionAutoFillBlocked && registeredOptionSizeMode === "select" && registeredOptionSizeChoices.length === 1
+      ? registeredOptionSizeChoices[0]
+      : "";
+  useEffect(() => {
+    if (!registeredOptionSelectProduct) return;
+    if (registeredOptionSingleColor && !normalizeEmptyProductOptionValue(registeredOptionColor)) {
+      setRegisteredOptionColor(registeredOptionSingleColor);
+    }
+  }, [registeredOptionSelectProduct, registeredOptionSingleColor, registeredOptionColor]);
+  useEffect(() => {
+    if (!registeredOptionSelectProduct) return;
+    if (registeredOptionSingleSize && !normalizeEmptyProductOptionValue(registeredOptionSize)) {
+      setRegisteredOptionSize(registeredOptionSingleSize);
+    }
+  }, [registeredOptionSelectProduct, registeredOptionSingleSize, registeredOptionSize]);
+
+  // [2026-08-28 P0-4] 손님이 아무것도 하기 전부터 빨간 에러가 떠 있던 문제.
+  //   담기 버튼을 눌러 본 뒤에만 빨간색으로 바꾼다(그 전에는 회색 안내 문구).
+  const [registeredOptionAttempted, setRegisteredOptionAttempted] = useState(false);
+  useEffect(() => {
+    setRegisteredOptionAttempted(false);
+  }, [registeredOptionSelectProduct?.id, registeredOptionDetail]);
+
+  // [2026-08-28 P0-2] 손님이 "새 상품을 고르는 중"인지 판단한다.
+  //   고르는 중인데 하단 주 버튼이 "상품 선택 완료"로 바뀌면, 고르던 상품이 담기지 않은 채 시트가 닫혔다.
+  const registeredOptionPickingNew =
+    Boolean(registeredOptionDetail.trim()) ||
+    Boolean(normalizeEmptyProductOptionValue(registeredOptionColor)) ||
+    Boolean(normalizeEmptyProductOptionValue(registeredOptionSize)) ||
+    Boolean(normalizeCustomerDetailName(registeredOptionCustomerDetail));
+  const registeredOptionShowBrandDoneOnly =
+    Boolean(registeredOptionBrandGroup) &&
+    !registeredOptionSelectionReady &&
+    registeredOptionBrandCartCount > 0 &&
+    !registeredOptionPickingNew;
+
   // [2026-07-16 사장님 지침] 유튜브 닉네임 미입력이면 주문서/담기 진입 자체를 막고 닉네임 입력 모달을 강제한다.
   //   기존엔 isKakaoLoginReturn(카톡복귀)일 때만 모달을 띄워, 재로그인으로 이름/주소만 복원돼 hasSavedInfo=true가
   //   된 케이스(닉네임만 빈)에서 관문을 건너뛰고 담기가 됐다(중복계정·미입력 사고의 A 원인).
@@ -5896,9 +5943,14 @@ export default function OrderPage() {
                   const imageUrl = matchedRegisteredProduct
                     ? pickOrderProductImageUrl(matchedRegisteredProduct)
                     : getOrderItemImageUrl(item);
-                  const optionColorText = normalizeEmptyProductOptionValue(item.color) || "없음";
-                  const optionSizeText = normalizeEmptyProductOptionValue(item.size) || "없음";
-                  const itemHasNoOptions = optionColorText === "없음" && optionSizeText === "없음";
+                  // [2026-08-28 P0-3] 손님 화면에 "없음"을 찍지 않는다. 값이 있는 옵션만 이어붙인다.
+                  // item.color/item.size 저장값은 그대로 — 재고키·주문저장·송장 로직 무변경(표시 전용).
+                  const optionColorText = normalizeEmptyProductOptionValue(item.color);
+                  const optionSizeText = normalizeEmptyProductOptionValue(item.size);
+                  const itemHasNoOptions = !optionColorText && !optionSizeText;
+                  const optionSummaryText = itemHasNoOptions
+                    ? "옵션 없음"
+                    : [optionColorText, optionSizeText].filter(Boolean).join(" / ");
                   const canInlineChangeQty = itemIsRegisteredProduct && itemHasNoOptions;
                   const itemSourceLabel = itemIsRegisteredProduct ? "선택상품" : "직접입력";
                   const itemAmount = toNumber(item.product_price) * toNumber(item.qty);
@@ -5920,7 +5972,7 @@ export default function OrderPage() {
                         {/* [2026-08-13] 주문서 확인에서도 상품명·옵션명이 잘리면 손님이 제출 전에
                             뭘 담았는지 확인을 못 한다(옵션명 = 조합형 세부상품명이라 특히 김) → 2줄 줄바꿈 */}
                         <div style={{ fontSize: "13px", fontWeight: 600, color: "#1A1A1A", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{item.product_name || "상품명 없음"}{item.chat_source === "Y" ? <span style={{ marginLeft: "5px", verticalAlign: "1px", display: "inline-block", padding: "1.5px 6px", borderRadius: "6px", background: "#F9EEF3", color: "#7A1E47", fontSize: "9.5px", fontWeight: 900 }}>채팅주문</span> : null}</div>
-                        <div style={{ fontSize: "11px", color: "#ABA5A0", marginTop: "2px", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{itemHasNoOptions ? "옵션 없음" : `${optionColorText} / ${optionSizeText}`} · 단가 {won(toNumber(item.product_price))}</div>
+                        <div style={{ fontSize: "11px", color: "#ABA5A0", marginTop: "2px", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{optionSummaryText} · 단가 {won(toNumber(item.product_price))}</div>
                         {itemIsRegisteredProduct && !itemHasNoOptions ? (
                           <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · 옵션 변경`, "바꿀게요", () => openSheetItemOptionEdit(index))}
                             style={{ marginTop: "5px", padding: "4px 10px", borderRadius: "8px", border: "1px solid #E8D5DD", background: "#fff", color: "#7A1E47", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>
@@ -6112,7 +6164,9 @@ export default function OrderPage() {
                 </p>
               </div>
 
-              <label style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginTop: "12px", borderRadius: "16px", border: finalSubmitAcknowledged ? "1.5px solid #7A1E47" : "1.5px solid #D9C5CC", background: finalSubmitAcknowledged ? "#F9EEF3" : "#fff", padding: "13px", cursor: "pointer" }}>
+              {/* [2026-08-28 P0-1] 제출 버튼이 이 체크박스 때문에 회색인데, 체크박스가 스크롤 아래라 손님이 이유를 몰랐다.
+                  → 제출 버튼을 누르면 이 자리로 스크롤되도록 표식을 붙인다. */}
+              <label data-final-confirm="true" style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginTop: "12px", borderRadius: "16px", border: finalSubmitAcknowledged ? "1.5px solid #7A1E47" : "1.5px solid #D9C5CC", background: finalSubmitAcknowledged ? "#F9EEF3" : "#fff", padding: "13px", cursor: "pointer" }}>
                 <input type="checkbox" checked={finalSubmitAcknowledged} onChange={(event) => setFinalSubmitAcknowledged(event.target.checked)} style={{ width: "19px", height: "19px", flexShrink: 0, accentColor: "#7A1E47" }} />
                 <span style={{ fontSize: "12.5px", fontWeight: 900, lineHeight: 1.55, color: "#4B3540" }}>상품명·옵션·수량과 위 배송지를 모두 확인했습니다.</span>
               </label>
@@ -6157,11 +6211,27 @@ export default function OrderPage() {
                     </span>
                   </label>
                 ) : null}
+                {!finalSubmitAcknowledged && !customerBlockStatus.blocked && !submitting ? (
+                  <div style={{ marginBottom: "8px", padding: "8px 10px", borderRadius: "10px", background: "#FFF3E8", border: "1px solid #F2D2AE", fontSize: "12px", fontWeight: 800, lineHeight: 1.5, color: "#8A4B0B", textAlign: "center", wordBreak: "keep-all" }}>
+                    마지막 확인 한 칸이 남았어요 · 아래 버튼을 누르면 그 자리로 이동합니다
+                  </div>
+                ) : null}
                 <button
                   type="button"
-                  onClick={handleSubmitOrderClick}
-                  disabled={submitting || customerBlockStatus.blocked || !finalSubmitAcknowledged}
-                  style={{ width: "100%", padding: "14px", background: submitting || customerBlockStatus.blocked || !finalSubmitAcknowledged ? "#cbd5e1" : "#7A1E47", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: submitting || customerBlockStatus.blocked || !finalSubmitAcknowledged ? "default" : "pointer" }}
+                  aria-disabled={!finalSubmitAcknowledged}
+                  onClick={() => {
+                    // [2026-08-28 P0-1] 확인 체크가 안 되어 있으면 막기만 하지 말고 그 자리로 데려간다.
+                    if (submitting || customerBlockStatus.blocked) return;
+                    if (!finalSubmitAcknowledged) {
+                      const target = document.querySelector<HTMLElement>('[data-final-confirm="true"]');
+                      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      showCustomerNotice("주문서 아래 [상품명·옵션·수량과 위 배송지를 모두 확인했습니다]에 체크해 주세요.", "warning");
+                      return;
+                    }
+                    handleSubmitOrderClick();
+                  }}
+                  disabled={submitting || customerBlockStatus.blocked}
+                  style={{ width: "100%", padding: "14px", background: submitting || customerBlockStatus.blocked || !finalSubmitAcknowledged ? "#cbd5e1" : "#7A1E47", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: submitting || customerBlockStatus.blocked ? "default" : "pointer" }}
                 >
                   {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : `${won(finalPaymentAmount)} · 주문서 제출`}
                 </button>
@@ -6686,7 +6756,8 @@ export default function OrderPage() {
                           })}
                         </div>
                       )}
-                      {!registeredOptionColor.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>색상을 선택해 주세요</div> : null}
+                      {/* [2026-08-28 P0-4] 문구가 사라질 때 아래 버튼이 위로 밀려 오클릭이 나던 문제 → 자리를 항상 잡아둔다 */}
+                      <div data-order-option-missing={!registeredOptionColor.trim() ? "true" : undefined} style={{ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" }}>{!registeredOptionColor.trim() ? "색상을 선택해 주세요" : ""}</div>
                     </div>
                   ) : null}
 
@@ -6696,7 +6767,8 @@ export default function OrderPage() {
                     <div style={{ marginBottom: "16px" }}>
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>색상</div>
                       <input value={registeredOptionColor} onChange={(e) => setRegisteredOptionColor(e.target.value)} placeholder="색상을 입력해 주세요" style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: `1.5px solid ${!registeredOptionColor.trim() ? "#E8B5B0" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
-                      {!registeredOptionColor.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>색상을 입력해 주세요</div> : null}
+                      {/* [2026-08-28 P0-4] 문구가 사라질 때 아래 버튼이 위로 밀려 오클릭이 나던 문제 → 자리를 항상 잡아둔다 */}
+                      <div data-order-option-missing={!registeredOptionColor.trim() ? "true" : undefined} style={{ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" }}>{!registeredOptionColor.trim() ? "색상을 입력해 주세요" : ""}</div>
                     </div>
                   ) : null}
 
@@ -6729,7 +6801,8 @@ export default function OrderPage() {
                           })}
                         </div>
                       )}
-                      {!registeredOptionSize.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>사이즈를 선택해 주세요</div> : null}
+                      {/* [2026-08-28 P0-4] 문구가 사라질 때 아래 버튼이 위로 밀려 오클릭이 나던 문제 → 자리를 항상 잡아둔다 */}
+                      <div data-order-option-missing={!registeredOptionSize.trim() ? "true" : undefined} style={{ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" }}>{!registeredOptionSize.trim() ? "사이즈를 선택해 주세요" : ""}</div>
                     </div>
                   ) : null}
 
@@ -6739,7 +6812,8 @@ export default function OrderPage() {
                     <div style={{ marginBottom: "16px" }}>
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>사이즈</div>
                       <input value={registeredOptionSize} onChange={(e) => setRegisteredOptionSize(e.target.value)} placeholder="사이즈를 입력해 주세요" style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: `1.5px solid ${!registeredOptionSize.trim() ? "#E8B5B0" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
-                      {!registeredOptionSize.trim() ? <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#C0392B" }}>사이즈를 입력해 주세요</div> : null}
+                      {/* [2026-08-28 P0-4] 문구가 사라질 때 아래 버튼이 위로 밀려 오클릭이 나던 문제 → 자리를 항상 잡아둔다 */}
+                      <div data-order-option-missing={!registeredOptionSize.trim() ? "true" : undefined} style={{ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" }}>{!registeredOptionSize.trim() ? "사이즈를 입력해 주세요" : ""}</div>
                     </div>
                   ) : null}
 
@@ -6774,14 +6848,20 @@ export default function OrderPage() {
                     </div>
                     <div style={{ display: "grid", gap: "5px" }}>
                       {registeredOptionBrandCartEntries.map(({ item, itemIndex }, index) => {
-                        const colorText = normalizeEmptyProductOptionValue(item.color) || "없음";
-                        const sizeText = normalizeEmptyProductOptionValue(item.size) || "없음";
+                        // [2026-08-28 P0-3] "색상 없음"을 손님에게 보여주지 않는다(표시 전용).
+                        const colorText = normalizeEmptyProductOptionValue(item.color);
+                        const sizeText = normalizeEmptyProductOptionValue(item.size);
                         const qty = Math.max(1, Number(item.qty) || 1);
+                        const optionSummary = [
+                          colorText ? `색상 ${colorText}` : "",
+                          sizeText ? `사이즈 ${sizeText}` : "",
+                          `수량 ${qty}개`,
+                        ].filter(Boolean).join(" · ");
                         return (
                           <div key={`brand-cart-summary-${index}`} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto auto", alignItems: "center", gap: "8px", borderRadius: "9px", background: "#fff", padding: "7px 9px", border: "1px solid #DDEEE4" }}>
                             <div style={{ minWidth: 0 }}>
                               <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 900, color: "#263A31" }}>{item.product_name}</div>
-                              <div style={{ marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "10px", fontWeight: 700, color: "#6B8074" }}>색상 {colorText} · 사이즈 {sizeText} · 수량 {qty}개</div>
+                              <div style={{ marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "10px", fontWeight: 700, color: "#6B8074" }}>{optionSummary}</div>
                             </div>
                             <strong style={{ alignSelf: "center", fontSize: "11px", color: "#0F6E56" }}>{won(toNumber(item.product_price) * qty)}</strong>
                             <button
@@ -6845,8 +6925,8 @@ export default function OrderPage() {
                   )}
                 </div>
 
-                <div style={{ flexShrink: 0, display: "grid", gridTemplateColumns: registeredOptionBrandGroup && !registeredOptionSelectionReady && registeredOptionBrandCartCount > 0 ? "1fr" : "0.85fr 1.15fr", gap: "10px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "14px 18px calc(16px + env(safe-area-inset-bottom))" }}>
-                  {registeredOptionBrandGroup && !registeredOptionSelectionReady && registeredOptionBrandCartCount > 0 ? (
+                <div style={{ flexShrink: 0, display: "grid", gridTemplateColumns: registeredOptionShowBrandDoneOnly ? "1fr" : "0.85fr 1.15fr", gap: "10px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "14px 18px calc(16px + env(safe-area-inset-bottom))" }}>
+                  {registeredOptionShowBrandDoneOnly ? (
                     <button type="button" onClick={closeRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#7A1E47", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>상품 선택 완료 · 총 {registeredOptionBrandCartCount}개</button>
                   ) : (
                     <>
@@ -6856,16 +6936,31 @@ export default function OrderPage() {
                     ) : (
                     <button
                       type="button"
-                      disabled={!registeredOptionSelectionReady}
-                      onClick={confirmRegisteredOptionSelectSheet}
-                      style={{ height: "52px", borderRadius: "16px", border: "none", background: registeredOptionSelectionReady ? "#7A1E47" : "#CFC4C8", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: registeredOptionSelectionReady ? "pointer" : "default" }}
+                      aria-disabled={!registeredOptionSelectionReady}
+                      onClick={() => {
+                        // [2026-08-28 P0-4] 비활성으로 막아두면 눌러도 아무 반응이 없어 손님이 이유를 모른 채 이탈했다.
+                        //   → 누르면 무엇이 빠졌는지 빨간색으로 알려주고 그 자리로 스크롤한다.
+                        if (!registeredOptionSelectionReady) {
+                          setRegisteredOptionAttempted(true);
+                          requestAnimationFrame(() => {
+                            document.querySelector<HTMLElement>('[data-order-option-missing="true"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
+                          });
+                          return;
+                        }
+                        confirmRegisteredOptionSelectSheet();
+                      }}
+                      style={{ height: "52px", borderRadius: "16px", border: "none", background: registeredOptionSelectionReady ? "#7A1E47" : "#CFC4C8", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "pointer" }}
                     >{registeredOptionSelectionReady
                       ? (registeredOptionBrandGroup ? "선택상품 담기" : "장바구니 담기")
                       : registeredOptionCustomerDetailRequired && !normalizeCustomerDetailName(registeredOptionCustomerDetail)
                         ? "세부상품명을 입력해 주세요"
                         : registeredOptionAxes3 && !registeredOptionDetail.trim()
                           ? "세부상품을 먼저 선택"
-                          : "옵션을 선택해 주세요"}</button>
+                          : !registeredOptionColorSelected
+                            ? (registeredOptionColorMode === "input" ? "색상을 입력해 주세요" : "색상을 선택해 주세요")
+                            : !registeredOptionSizeSelected
+                              ? (registeredOptionSizeMode === "input" ? "사이즈를 입력해 주세요" : "사이즈를 선택해 주세요")
+                              : "옵션을 선택해 주세요"}</button>
                     )}
                     </>
                   )}
