@@ -2,6 +2,8 @@ import { NextRequest, NextResponse, after } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 import { assertValidCustomerPointPhone } from "@/lib/customerPoints";
+import { registeredProductPriceMode, registeredProductSubmittedPriceValid } from "@/lib/registeredProductPricePolicy";
+import { buildYoutubeOrderAnnouncementMessages } from "@/lib/orderYoutubeAnnouncement";
 
 export const dynamic = "force-dynamic";
 
@@ -312,16 +314,16 @@ async function assertRegisteredProductPrices(
     const basePrice = Math.max(0, Math.floor(Number(product?.price) || 0));
     const surcharge = submitComboSurcharge(product?.product_note, text(t.row?.color));
     const expected = basePrice + surcharge;
-
-    // 기대가격 0 = 「가격 비움(손님 직접입력)」 상품 · 무료나눔 → 검증하지 않음(기존 동작 유지)
-    if (expected <= 0) continue;
-
     const rawUnit = t.row?.adjusted_product_price ?? t.row?.product_price;
     const unitPrice = Math.floor(Number(rawUnit) || 0);
+    const note = readSubmitNoteObject(product?.product_note);
+    const priceMode = registeredProductPriceMode(expected, note?.free_product === true);
 
-    const minAllowed = Math.floor(expected * MIN_PRICE_RATIO);
-    if (unitPrice < minAllowed) {
+    if (!registeredProductSubmittedPriceValid(priceMode, unitPrice, expected, MIN_PRICE_RATIO)) {
       const pname = text(product?.product_name) || text(t.row?.product_name) || "상품";
+      if (priceMode === "free") throw new Error(`${pname}은(는) 무료나눔 상품이에요. 페이지를 새로고침한 뒤 다시 담아주세요.`);
+      if (priceMode === "direct") throw new Error(`${pname} 상품 금액을 1원 이상 입력해 주세요.`);
+      const minAllowed = Math.floor(expected * MIN_PRICE_RATIO);
       console.warn(
         `상품 금액 검증 차단: product_id=${t.pid} ${pname} 낸금액=${unitPrice} 카탈로그=${expected} 하한=${minAllowed}`,
       );
@@ -670,27 +672,18 @@ export async function POST(request: NextRequest) {
     after(async () => {
       try {
         const rows = normalizedSubmit.orderRows;
-        // 상품명 + 옵션(색상/사이즈). "없음" 계열은 옵션에서 제외(어댑터 표기와 동일).
-        const labelOf = (r: AnyRow) => {
-          const name = text(r?.product_name);
-          const opts = [text(r?.color), text(r?.size)].filter((v) => v && v !== "없음").join("/");
-          return opts ? `${name}(${opts})` : name;
-        };
-        const labels = rows.filter((r) => text(r?.product_name)).map(labelOf);
-        // 2건까지는 전부 정확히 표시, 3건 이상이면 첫 상품 + "외 N건".
-        const itemsSummary =
-          labels.length === 0 ? "" : labels.length <= 2 ? labels.join(", ") : `${labels[0]} 외 ${labels.length - 1}건`;
-        const amount = rows.reduce(
-          (sum, r) => sum + toWon(r?.final_amount ?? r?.adjusted_total_price ?? r?.total_price),
-          0,
-        );
-        const { buildOrderMessage, postLiveChatMessage } = await import("@/lib/youtube");
-        const msg = await buildOrderMessage({
+        // YouTube 실시간 채팅은 메시지당 200자 제한. 180자로 여유를 두고 분할한다.
+        // 모든 상품/옵션/색상/사이즈/수량/상품별 금액을 생략 없이 보낸다("외 N개" 축약 금지).
+        const messages = buildYoutubeOrderAnnouncementMessages({
           nickname: youtubeNickname || customerName,
-          itemsSummary,
-          amount,
+          rows,
+          maxChars: 180,
         });
-        await postLiveChatMessage(msg);
+        const { postLiveChatMessage } = await import("@/lib/youtube");
+        for (let i = 0; i < messages.length; i += 1) {
+          await postLiveChatMessage(messages[i]);
+          if (i < messages.length - 1) await new Promise((resolve) => setTimeout(resolve, 3000));
+        }
       } catch {
         /* 유튜브 게시 실패는 주문과 완전히 무관하게 무시 */
       }

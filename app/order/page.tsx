@@ -79,6 +79,9 @@ import CustomerManualAddressPanel from "@/components/customer/CustomerManualAddr
 import CustomerMissingDetailAddressPanel from "@/components/customer/CustomerMissingDetailAddressPanel";
 import GroupBuyQuickSelect, { type GroupBuyQuickSelectProduct } from "@/components/order/GroupBuyQuickSelect";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
+import { resolveDesignGroups, detailCode, detailPricePresentation } from "@/lib/productDetailModel";
+import { registeredProductEditManualPrice, registeredProductPriceMode } from "@/lib/registeredProductPricePolicy";
+import { buildCartHoldSnapshotItem } from "@/lib/cartHoldDetail";
 
 
 type OrderItem = {
@@ -1526,6 +1529,7 @@ export default function OrderPage() {
   const [registeredOptionColor, setRegisteredOptionColor] = useState("");
   const [registeredOptionSize, setRegisteredOptionSize] = useState("");
   const [registeredOptionQty, setRegisteredOptionQty] = useState(1);
+  const [registeredOptionManualPrice, setRegisteredOptionManualPrice] = useState(0);
   // [조합형 옵션] 세부상품이 많을 때(예: 미니어처 143종) 옵션 시트 안 검색어 — 표시 전용
   const [registeredOptionComboSearch, setRegisteredOptionComboSearch] = useState("");
   // [해외원정 의류] 브랜드 안에서 전체/상의/하의/세트/아우터를 바로 좁히는 표시 필터.
@@ -3402,7 +3406,7 @@ export default function OrderPage() {
       if (!key) return;
       const payload = items
         .filter((it) => it.product_id && String(it.product_name || "").trim())
-        .map((it) => ({ productId: String(it.product_id), color: String(it.color || ""), size: String(it.size || ""), qty: Math.max(0, Math.min(99, Number(it.qty) || 0)) }))
+        .map((it) => buildCartHoldSnapshotItem(it as unknown as Record<string, unknown>))
         .filter((r) => r.qty > 0);
       const res = await fetch("/api/cart-reservations", {
         method: "POST",
@@ -3538,11 +3542,13 @@ export default function OrderPage() {
 
   const addRegisteredProductToOrderItems = (
     product: BroadcastProduct,
-    options?: { color?: string; size?: string; qty?: number; chatSource?: boolean; displayName?: string; priceKey?: string }
+    options?: { color?: string; size?: string; qty?: number; chatSource?: boolean; displayName?: string; priceKey?: string; unitPrice?: number }
   ) => {
     // [조합형 옵션] 단가 = 기본가 + 선택한 세부상품 추가금. 조합형 아니면 comboPlus=0 → 기존과 완전 동일.
     const comboPlus = comboPlusOfOrderProduct(product, options?.priceKey ?? options?.color);
-    const productPrice = Number(product.price || 0) + comboPlus;
+    const configuredProductPrice = Number(product.price || 0) + comboPlus;
+    const overrideUnitPrice = Number(options?.unitPrice);
+    const productPrice = Number.isFinite(overrideUnitPrice) && overrideUnitPrice > 0 ? overrideUnitPrice : configuredProductPrice;
     // [무료나눔] 0원 상품은 "0"으로 담는다(빈값=손님 직접입력 취급 방지). 그 외 0/음수는 기존대로 빈값.
     const nextProductPrice = Number.isFinite(productPrice) && productPrice > 0
       ? String(Math.round(productPrice))
@@ -3857,6 +3863,7 @@ export default function OrderPage() {
     setRegisteredOptionSize("");
     setRegisteredOptionDetail("");
     setRegisteredOptionQty(1);
+    setRegisteredOptionManualPrice(0);
     setRegisteredOptionComboSearch("");
     setRegisteredOptionDetailCategory("전체");
   };
@@ -3868,6 +3875,7 @@ export default function OrderPage() {
     setRegisteredOptionSize("");
     setRegisteredOptionDetail("");
     setRegisteredOptionQty(1);
+    setRegisteredOptionManualPrice(0);
     setRegisteredOptionComboSearch("");
     setRegisteredOptionDetailCategory("전체");
   };
@@ -3970,6 +3978,11 @@ export default function OrderPage() {
       }
     }
 
+    if (registeredOptionNeedsManualPrice && registeredOptionManualPrice < 1) {
+      showCustomerNotice("상품 금액을 입력해 주세요.");
+      return;
+    }
+
     const doAdd = () => {
       // [옵션 변경] 기존 줄을 빼고 같은 검증 경로로 다시 담는다 — 품절 옵션은 위에서 이미 멘트로 차단됨
       if (registeredOptionEditIndex !== null) {
@@ -3984,6 +3997,7 @@ export default function OrderPage() {
         ...(brandGroup
           ? { displayName: registeredOptionDetail, priceKey: registeredOptionDetail }
           : {}),
+        ...(registeredOptionNeedsManualPrice ? { unitPrice: registeredOptionManualPrice } : {}),
       });
       if (brandGroup && registeredOptionEditIndex === null) {
         // 같은 브랜드에서 여러 상품을 연달아 담을 수 있게 상세창을 유지한다.
@@ -3991,6 +4005,7 @@ export default function OrderPage() {
         setRegisteredOptionColor("");
         setRegisteredOptionSize("");
         setRegisteredOptionQty(1);
+        setRegisteredOptionManualPrice(0);
         setRegisteredOptionComboSearch("");
       } else {
         closeRegisteredOptionSelectSheet();
@@ -5267,12 +5282,22 @@ export default function OrderPage() {
         ? orderDetailDisplayName(String(registeredOptionSelectProduct.product_name || ""), registeredOptionColor.trim())
         : String(registeredOptionSelectProduct.product_name || "상품").trim()
     : "상품";
-  const registeredOptionUnitPrice = registeredOptionPrice + registeredOptionComboPlus;
+  const registeredOptionConfiguredPrice = registeredOptionPrice + registeredOptionComboPlus;
+  const registeredOptionPriceMode = registeredOptionSelectProduct ? registeredProductPriceMode(registeredOptionConfiguredPrice, isFreeOrderProduct(registeredOptionSelectProduct)) : "fixed";
+  const registeredOptionNeedsManualPrice = registeredOptionPriceMode === "direct";
+  const registeredOptionUnitPrice = registeredOptionNeedsManualPrice ? registeredOptionManualPrice : registeredOptionConfiguredPrice;
   const registeredOptionTotalPrice = Math.max(1, registeredOptionQty) * (Number.isFinite(registeredOptionUnitPrice) ? registeredOptionUnitPrice : 0);
+  const registeredOptionDesignGroups = registeredOptionSelectProduct ? resolveDesignGroups(registeredOptionSelectProduct as unknown as Record<string, unknown>) : [];
   const registeredOptionDetailSelected = !registeredOptionAxes3 || Boolean(registeredOptionDetail.trim());
   const registeredOptionColorSelected = registeredOptionColorMode === "none" || Boolean(normalizeEmptyProductOptionValue(registeredOptionColor));
   const registeredOptionSizeSelected = registeredOptionSizeMode === "none" || Boolean(normalizeEmptyProductOptionValue(registeredOptionSize));
-  const registeredOptionSelectionReady = registeredOptionDetailSelected && registeredOptionColorSelected && registeredOptionSizeSelected;
+  const registeredOptionSelectionReady = registeredOptionDetailSelected && registeredOptionColorSelected && registeredOptionSizeSelected && (!registeredOptionNeedsManualPrice || registeredOptionManualPrice > 0);
+  useEffect(() => {
+    if (registeredOptionEditIndex === null || registeredOptionPriceMode !== "direct") return;
+    const editItem = items[registeredOptionEditIndex];
+    if (!editItem) return;
+    setRegisteredOptionManualPrice(registeredProductEditManualPrice(registeredOptionPriceMode, editItem.product_price));
+  }, [registeredOptionEditIndex, registeredOptionPriceMode]);
   const registeredOptionBrandCartEntries = registeredOptionBrandGroup && registeredOptionSelectProduct
     ? items
         .map((item, itemIndex) => ({ item, itemIndex }))
@@ -6478,65 +6503,72 @@ export default function OrderPage() {
                             </div>
                           );
                         }
+                        const sortedNames = [...list]
+                          .map((n, i) => ({ n, i, out: (() => { const r = stockOf(n); return r !== null && r <= 0; })() }))
+                          .sort((a, b) => (a.out === b.out ? a.i - b.i : a.out ? 1 : -1))
+                          .map(({ n }) => n);
+                        const groupByMember = new Map<string, (typeof registeredOptionDesignGroups)[number]>();
+                        for (const group of registeredOptionDesignGroups) for (const member of group.members) groupByMember.set(member.detailName, group);
+                        const seenGroups = new Set<string>();
+                        const entries: Array<{ type: "group"; group: (typeof registeredOptionDesignGroups)[number] } | { type: "single"; name: string }> = [];
+                        for (const name of sortedNames) {
+                          const group = groupByMember.get(name);
+                          if (group) { if (!seenGroups.has(group.id)) { seenGroups.add(group.id); entries.push({ type: "group", group }); } }
+                          else entries.push({ type: "single", name });
+                        }
+                        const chooseDetail = (name: string, soldOut: boolean) => {
+                          if (soldOut) return;
+                          if (registeredOptionAxes3) {
+                            setRegisteredOptionDetail((prev) => (prev === name ? "" : name));
+                            setRegisteredOptionColor(""); setRegisteredOptionSize("");
+                            requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-registered-option-scroll="true"]')?.scrollTo({ top: 0, behavior: "smooth" }));
+                          } else setRegisteredOptionColor((prev) => (prev === name ? "" : name));
+                        };
+                        const metaOf = (name: string) => {
+                          const selected = (registeredOptionAxes3 ? registeredOptionDetail : registeredOptionColor) === name;
+                          const remain = stockOf(name), soldOut = remain !== null && remain <= 0;
+                          const plus = Math.max(0, Math.floor(Number(info.pricing[name] || 0)));
+                          const gallery = Array.from(new Set([...(registeredOptionBrandGroup?.detailPhotoSets[name] || []), registeredOptionComboPhotos[name] || ""].filter(Boolean)));
+                          const cfg = registeredOptionBrandGroup?.detailOptions[name];
+                          const knownColor = (cfg?.colors || []).map(v=>normalizeEmptyProductOptionValue(v)).find(Boolean) || "";
+                          const priceView = detailPricePresentation(registeredOptionPrice, plus);
+                          return { selected, remain, soldOut, plus, priceView, gallery, cover: gallery[0] || "", knownColor, code: detailCode(name) };
+                        };
                         return (
-                          <div style={{ border: "1px solid #F0EAE0", borderRadius: "12px", background: "#FFFDFB" }}>
-                            {/* [2026-08-12] 품절은 맨 아래로 — 살 수 있는 것부터 보이게(원래 순서는 그 안에서 유지) */}
-                            {[...list]
-                              .map((n, i) => ({ n, i, out: (() => { const r = stockOf(n); return r !== null && r <= 0; })() }))
-                              .sort((a, b) => (a.out === b.out ? a.i - b.i : a.out ? 1 : -1))
-                              .map(({ n }) => n)
-                              .map((name) => {
-                              const selected = (registeredOptionAxes3 ? registeredOptionDetail : registeredOptionColor) === name;
-                              const remain = stockOf(name);
-                              const soldOut = remain !== null && remain <= 0;
-                              const plus = Math.max(0, Math.floor(Number(info.pricing[name] || 0)));
-                              const detailGallery = Array.from(new Set([
-                                ...(registeredOptionBrandGroup?.detailPhotoSets[name] || []),
-                                registeredOptionComboPhotos[name] || "",
-                              ].filter(Boolean)));
-                              const detailCover = detailGallery[0] || "";
-                              return (
-                                <button
-                                  key={`combo-${name}`}
-                                  type="button"
-                                  onClick={() => {
-                                    if (soldOut) return;
-                                    if (registeredOptionAxes3) {
-                                      // 세부상품을 바꾸면 그 아래 색상/사이즈 선택은 초기화(다른 재고 조합이라)
-                                      setRegisteredOptionDetail((prev) => (prev === name ? "" : name));
-                                      setRegisteredOptionColor("");
-                                      setRegisteredOptionSize("");
-                                      requestAnimationFrame(() => {
-                                        const scrollArea = document.querySelector<HTMLElement>('[data-registered-option-scroll="true"]');
-                                        scrollArea?.scrollTo({ top: 0, behavior: "smooth" });
-                                      });
-                                      return;
-                                    }
-                                    setRegisteredOptionColor((prev) => (prev === name ? "" : name));
-                                  }}
-                                  style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", textAlign: "left", padding: "12px 14px", border: "none", borderBottom: "1px solid #F6EFE9", background: selected ? "#7A1E47" : "transparent", cursor: soldOut ? "default" : "pointer", opacity: soldOut ? 0.45 : 1 }}
-                                >
-                                  {detailCover ? (
-                                    <span
-                                      onClick={(event) => { event.stopPropagation(); openLightbox(detailCover, detailGallery, orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name ?? ""), name)); }}
-                                      style={{ position: "relative", width: "48px", height: "48px", borderRadius: "8px", overflow: "hidden", flexShrink: 0, background: "#F0EBE8", opacity: soldOut ? 0.5 : 1, cursor: "zoom-in" }}
-                                    >
-                                      <img src={detailCover} alt={`${name} 상품 사진`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                      {detailGallery.length > 1 ? <span style={{ position: "absolute", right: "2px", bottom: "2px", borderRadius: "999px", background: "rgba(0,0,0,0.68)", padding: "1px 4px", color: "#fff", fontSize: "8px", fontWeight: 900 }}>사진 {detailGallery.length}장</span> : null}
-                                    </span>
-                                  ) : null}
-                                  {/* [2026-08-13 사장님 지적] 이름이 길면 「차량 아쿠아디파르마 무광…」처럼 잘려서
-                                      뒷부분(구분 정보)이 안 보였다. Baymard 리스트 원칙대로 말줄임 대신 2줄 줄바꿈
-                                      (line-clamp 2 — 2줄 넘는 극단적 이름만 말줄임). 표시 전용. */}
-                                  <span style={{ minWidth: 0, flex: 1, fontSize: "14px", fontWeight: 700, lineHeight: 1.35, color: selected ? "#fff" : "#333", textDecoration: soldOut ? "line-through" : "none", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name ?? ""), name)}</span>
-                                  {soldOut ? (
-                                    <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "#fff", background: "#B5A1A8", borderRadius: "5px", padding: "2px 6px" }}>품절</span>
-                                  ) : remain !== null && remain <= 5 ? (
-                                    <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "#C0392B", background: selected ? "#fff" : "#FBEAE7", borderRadius: "5px", padding: "2px 6px" }}>{remain}개 남음</span>
-                                  ) : null}
-                                  <span style={{ flexShrink: 0, fontSize: "13px", fontWeight: 800, color: selected ? "#F5D9E5" : "#7A1E47" }}>{plus > 0 ? `+${won(plus)}` : "+0원"}</span>
-                                </button>
-                              );
+                          <div style={{ display: "grid", gap: "9px" }}>
+                            {entries.map((entry) => {
+                              if (entry.type === "group") {
+                                const members = entry.group.members.map(m=>m.detailName).filter(name=>list.includes(name));
+                                if (members.length < 2) {
+                                  const name = members[0]; if (!name) return null; const m=metaOf(name);
+                                  return <button key={name} type="button" onClick={()=>chooseDetail(name,m.soldOut)} disabled={m.soldOut} style={{display:"flex",alignItems:"center",gap:"8px",width:"100%",padding:"9px",border:"1px solid #E8E2DD",borderRadius:"12px",background:m.selected?"#7A1E47":"#fff",opacity:m.soldOut?.45:1}}>{m.cover?<img src={m.cover} alt="" style={{width:"48px",height:"48px",objectFit:"cover",borderRadius:"8px",flexShrink:0}}/>:null}<span style={{flex:1,minWidth:0,textAlign:"left",fontSize:"13px",fontWeight:800,color:m.selected?"#fff":"#333",overflow:"hidden",textOverflow:"ellipsis"}}>{orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name??""),name)}</span><span style={{flexShrink:0,textAlign:"right",lineHeight:1.15}}><b style={{display:"block",fontSize:"12px",fontWeight:900,color:m.selected?"#F5D9E5":"#7A1E47"}}>{m.priceView.actualLabel}</b><span style={{display:"block",marginTop:3,fontSize:"9px",fontWeight:800,color:m.selected?"#F1CBDC":"#9D697C"}}>{m.priceView.surchargeLabel}</span></span></button>;
+                                }
+                                const selected = members.some(n=>metaOf(n).selected);
+                                return (
+                                  <div key={entry.group.id} style={{border:`1.5px solid ${selected?"#7A1E47":"#E7D8DE"}`,borderRadius:"12px",padding:"7px",background:selected?"#FFF8FA":"#fff"}}>
+                                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"8px",marginBottom:"5px"}}>
+                                      <div style={{minWidth:0}}><div style={{fontSize:"12px",fontWeight:900,color:"#382B30",overflow:"hidden",textOverflow:"ellipsis"}}>{entry.group.title}</div><div style={{fontSize:"10px",fontWeight:800,color:"#8B7D83",marginTop:"2px"}}>같은 디자인 · 색상/옵션만 선택</div></div>
+                                      <span style={{flexShrink:0,fontSize:"10px",fontWeight:900,color:"#7A1E47"}}>{members.length}개 옵션</span>
+                                    </div>
+                                    <div style={{display:"grid",gap:"5px"}}>
+                                      {members.map((name,idx)=>{const m=metaOf(name); const label=m.knownColor?`${m.code} · ${m.knownColor}`:`옵션 ${idx+1} · ${m.code}`; return <button key={name} type="button" disabled={m.soldOut} onClick={()=>chooseDetail(name,m.soldOut)} style={{display:"flex",alignItems:"center",gap:"8px",width:"100%",minWidth:0,padding:"6px",borderRadius:"10px",border:`1.5px solid ${m.selected?"#7A1E47":"#E9E1E4"}`,background:m.selected?"#FFF0F5":"#FFFDFB",opacity:m.soldOut?.45:1,textAlign:"left"}}>
+                                        <span onClick={e=>{if(m.gallery.length>1){e.stopPropagation();openLightbox(m.cover,m.gallery,orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name??""),name));}}} style={{position:"relative",width:44,height:44,flexShrink:0,borderRadius:8,overflow:"hidden",background:"#F0EBE8",cursor:m.gallery.length>1?"zoom-in":"default"}}>
+                                          {m.cover?<img src={m.cover} alt={`${name} ${label}`} style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"9px",fontWeight:900,color:"#A99CA1"}}>사진 없음</span>}
+                                          <span style={{position:"absolute",left:2,right:2,bottom:2,borderRadius:5,background:"rgba(34,25,29,.76)",padding:"2px 3px",color:"#fff",fontSize:"8px",fontWeight:900,textAlign:"center",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{m.knownColor||m.code}</span>
+                                          {m.gallery.length>1?<span style={{position:"absolute",right:2,top:2,borderRadius:999,background:"rgba(0,0,0,.7)",padding:"1px 3px",color:"#fff",fontSize:"7px",fontWeight:900}}>{m.gallery.length}장</span>:null}
+                                        </span>
+                                        <span style={{flex:1,minWidth:0}}>
+                                          <span style={{display:"block",fontSize:"11.5px",fontWeight:900,color:"#3F3438",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{label}</span>
+                                          {m.soldOut?<span style={{display:"block",marginTop:3,fontSize:"9px",fontWeight:900,color:"#C0392B"}}>품절</span>:m.remain!==null&&m.remain<=5?<span style={{display:"block",marginTop:3,fontSize:"9px",fontWeight:900,color:"#C0392B"}}>{m.remain}개 남음</span>:null}
+                                        </span>
+                                        <span style={{flexShrink:0,textAlign:"right",lineHeight:1.15}}><b style={{display:"block",fontSize:"12px",fontWeight:900,color:"#7A1E47"}}>{m.priceView.actualLabel}</b><span style={{display:"block",marginTop:3,fontSize:"9px",fontWeight:800,color:"#9D697C"}}>{m.priceView.surchargeLabel}</span></span>
+                                      </button>})}
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              const name=entry.name, m=metaOf(name);
+                              return <button key={name} type="button" onClick={()=>chooseDetail(name,m.soldOut)} disabled={m.soldOut} style={{display:"flex",alignItems:"center",gap:"8px",width:"100%",padding:"9px",border:"1px solid #F0EAE0",borderRadius:"12px",background:m.selected?"#7A1E47":"#FFFDFB",opacity:m.soldOut?.45:1}}>{m.cover?<span onClick={e=>{e.stopPropagation();openLightbox(m.cover,m.gallery,orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name??""),name));}} style={{position:"relative",width:48,height:48,flexShrink:0}}><img src={m.cover} alt="" style={{width:48,height:48,objectFit:"cover",borderRadius:8}}/>{m.gallery.length>1?<span style={{position:"absolute",right:2,bottom:2,borderRadius:999,background:"rgba(0,0,0,.68)",padding:"1px 4px",color:"#fff",fontSize:"8px",fontWeight:900}}>사진 {m.gallery.length}장</span>:null}</span>:null}<span style={{flex:1,minWidth:0,textAlign:"left",fontSize:"13px",fontWeight:800,color:m.selected?"#fff":"#333",overflow:"hidden",textOverflow:"ellipsis"}}>{orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name??""),name)}</span><span style={{flexShrink:0,textAlign:"right",lineHeight:1.15}}><b style={{display:"block",fontSize:"12px",fontWeight:900,color:m.selected?"#F5D9E5":"#7A1E47"}}>{m.priceView.actualLabel}</b><span style={{display:"block",marginTop:3,fontSize:"9px",fontWeight:800,color:m.selected?"#F1CBDC":"#9D697C"}}>{m.priceView.surchargeLabel}</span></span></button>;
                             })}
                           </div>
                         );
@@ -6686,6 +6718,14 @@ export default function OrderPage() {
                       })}
                     </div>
                   </section>
+                ) : null}
+
+                {registeredOptionDetailSelected && registeredOptionNeedsManualPrice ? (
+                  <div style={{ flexShrink: 0, borderTop: "1px solid #F0EAE0", background: "#FFF8FA", padding: "12px 18px" }}>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: 900, color: "#7A1E47", marginBottom: "6px" }}>상품 금액</label>
+                    <input inputMode="numeric" value={registeredOptionManualPrice > 0 ? registeredOptionManualPrice.toLocaleString("ko-KR") : ""} onChange={(e) => setRegisteredOptionManualPrice(Math.max(0, Number(e.target.value.replace(/[^0-9]/g, "")) || 0))} placeholder="금액을 입력해 주세요" style={{ width: "100%", height: "46px", boxSizing: "border-box", borderRadius: "12px", border: `1.5px solid ${registeredOptionManualPrice > 0 ? "#D9C5CC" : "#E8B5B0"}`, padding: "0 13px", fontSize: "16px", fontWeight: 900, color: "#222", background: "#fff", outline: "none" }} />
+                    {registeredOptionManualPrice < 1 ? <div style={{ marginTop: "5px", fontSize: "11px", fontWeight: 800, color: "#C0392B" }}>이 상품은 고객이 금액을 직접 입력하는 상품입니다.</div> : null}
+                  </div>
                 ) : null}
 
                 <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "14px 18px" }}>

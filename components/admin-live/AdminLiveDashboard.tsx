@@ -68,6 +68,7 @@ import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
 import ChatOrderQueuePopup from "./ChatOrderQueuePopup";
 import ChatOrderReaderLoop from "./ChatOrderReaderLoop";
 import {
+  alwaysOrderFilterValue,
   buildAlwaysOrderOptions,
   getAlwaysOrderDateFromFilter,
   getAlwaysOrderDateKey,
@@ -1154,6 +1155,17 @@ export default function AdminLiveDashboard() {
     [broadcasts]
   );
 
+  const shopOrderCalendar = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const order of orders as any[]) {
+      if (!isAlwaysOrderLike(order)) continue;
+      const dateKey = getAlwaysOrderDateKey(order.createdAt || order.created_at || "");
+      if (!dateKey) continue;
+      counts.set(dateKey, (counts.get(dateKey) || 0) + 1);
+    }
+    return [...counts.entries()].sort(([a],[b]) => b.localeCompare(a)).map(([dateKey,count]) => ({ id: alwaysOrderFilterValue(dateKey), dateKey, label: `${dateKey.replace(/-/g,".")} · ${count}건`, count }));
+  }, [orders]);
+
   const filteredOrders = useMemo(() => {
     const keyword = normalizeText(filters.keyword);
 
@@ -1628,6 +1640,7 @@ export default function AdminLiveDashboard() {
                     filters={filters}
                     broadcastOptions={broadcastOptions}
                     broadcastCalendar={broadcastCalendar}
+                    shopOrderCalendar={shopOrderCalendar}
                     broadcastStartedAt={activeBroadcast?.started_at || activeBroadcast?.created_at || null}
                     onSelectOrder={(order) => {
                       // 사이드 패널 단일 슬롯: 주문상세 열 때 입금매칭은 닫음

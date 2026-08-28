@@ -38,6 +38,7 @@ type BrandDetailEditDraft = {
   category: string;
   plus: string;
   hidden: boolean;
+  photos: string[];
   variants: Array<{ color: string; size: string }>;
 };
 
@@ -702,6 +703,8 @@ export default function QuickProductFastForm({
   const [brandDetailSearch, setBrandDetailSearch] = useState("");
   const [brandDetailCategoryFilter, setBrandDetailCategoryFilter] = useState("전체");
   const [detailPhotoUploading, setDetailPhotoUploading] = useState("");
+  const [brandDetailPhotoUploading, setBrandDetailPhotoUploading] = useState(false);
+  const brandDetailPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const detailPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const detailPhotoTargetRef = useRef("");
 
@@ -755,6 +758,7 @@ export default function QuickProductFastForm({
   const isEditMode = Boolean(editingProductId);
   const initialProductNote = useMemo(() => parseProductNote(initialProduct), [initialProduct]);
   const isBrandGroupEdit = initialProductNote?.brand_group?.enabled === true;
+  const brandDesignGroups = Array.isArray(initialProductNote?.design_groups) ? initialProductNote.design_groups as Array<{ id?: string; members: string[] }> : [];
   const brandWordmarkImage = isBrandGroupEdit
     ? brandWordmarkThumbnail(
         String(initialProductNote?.brand_group?.brand_en || ""),
@@ -950,7 +954,9 @@ export default function QuickProductFastForm({
     );
     const nextPhotos: Record<string, string> = {};
     for (const name of restoredDetails) {
-      const url = String(photosRaw[name] ?? "").trim();
+      const directUrl = String(photosRaw[name] ?? "").trim();
+      const setUrl = Array.isArray(normalizedPhotoSets[name]) ? String(normalizedPhotoSets[name][0] || "").trim() : "";
+      const url = directUrl || setUrl;
       if (url) nextPhotos[name] = url;
     }
     setDetailPhotos(nextPhotos);
@@ -1127,6 +1133,7 @@ export default function QuickProductFastForm({
       category: String(brandGroupDetailCategories[name] || ""),
       plus: String(Math.max(0, Number(detailPlus[name]) || 0)),
       hidden: detailHidden.includes(name),
+      photos: [...(brandGroupDetailPhotoSets[name] || (detailPhotos[name] ? [detailPhotos[name]] : []))],
       variants,
     });
   };
@@ -1163,8 +1170,8 @@ export default function QuickProductFastForm({
     const sizes = unique(nextVariants.map((variant) => variant.size));
     setDetailText(details.map((name) => name === oldName ? nextName : name).join(", "));
     setDetailPlus((prev) => moveKey(prev, String(Math.max(0, Number(brandDetailEditDraft.plus) || 0))));
-    setDetailPhotos((prev) => moveKey(prev, prev[oldName]));
-    setBrandGroupDetailPhotoSets((prev) => moveKey(prev, prev[oldName] || []));
+    setDetailPhotos((prev) => moveKey(prev, brandDetailEditDraft.photos[0] || undefined));
+    setBrandGroupDetailPhotoSets((prev) => moveKey(prev, brandDetailEditDraft.photos.length ? [...brandDetailEditDraft.photos] : undefined));
     setBrandGroupDetailCategories((prev) => moveKey(prev, brandDetailEditDraft.category.trim()));
     setBrandGroupDetailOptions((prev) => moveKey(prev, { colors, sizes, variants: nextVariants }));
     setDetailHidden((prev) => {
@@ -1216,6 +1223,7 @@ export default function QuickProductFastForm({
       const url = String(payload?.url || payload?.publicUrl || payload?.path || "").trim();
       if (!url) throw new Error("이미지 주소를 받지 못했어요");
       setDetailPhotos((prev) => ({ ...prev, [name]: url }));
+      setBrandGroupDetailPhotoSets((prev) => { const existing=Array.isArray(prev[name])?prev[name]:[]; return { ...prev, [name]: [url, ...existing.filter((item)=>item!==url)] }; });
     } catch (error) {
       showAdminToast("세부상품 사진 업로드 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
     } finally {
@@ -1224,11 +1232,28 @@ export default function QuickProductFastForm({
   };
 
   const removeDetailPhoto = (name: string) => {
-    setDetailPhotos((prev) => {
-      const next = { ...prev };
-      delete next[name];
-      return next;
-    });
+    const current = String(detailPhotos[name] || "").trim();
+    const remaining = (brandGroupDetailPhotoSets[name] || []).filter((url) => url && url !== current);
+    setBrandGroupDetailPhotoSets((prev) => { const next={...prev}; if(remaining.length)next[name]=remaining; else delete next[name]; return next; });
+    setDetailPhotos((prev) => { const next={...prev}; if(remaining[0])next[name]=remaining[0]; else delete next[name]; return next; });
+  };
+
+  const handleBrandDetailPhotoFiles = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []); event.target.value = "";
+    if (!brandDetailEditDraft || files.length === 0) return;
+    setBrandDetailPhotoUploading(true);
+    try {
+      const urls: string[] = [];
+      for (const file of files) {
+        const optimizedFile = await compressProductImage(file, "detail");
+        const formData = new FormData(); formData.append("file", optimizedFile); formData.append("kind", "detail");
+        const response = await fetch("/api/admin-live/product-images/upload", { method: "POST", body: formData });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || payload?.ok === false) throw new Error(payload?.message || "이미지 업로드 실패");
+        const url = String(payload?.url || payload?.publicUrl || payload?.path || "").trim(); if (!url) throw new Error("이미지 주소를 받지 못했어요"); urls.push(url);
+      }
+      setBrandDetailEditDraft(prev => prev ? { ...prev, photos: Array.from(new Set([...prev.photos, ...urls])) } : prev);
+    } catch (error) { showAdminToast("세부상품 상세사진 업로드 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error"); } finally { setBrandDetailPhotoUploading(false); }
   };
 
   const toggleDetailHidden = (name: string) => {
@@ -1897,6 +1922,8 @@ export default function QuickProductFastForm({
                       const categoryLabel = String(brandGroupDetailCategories[name] || "").trim();
                       const plus = Math.max(0, Number(detailPlus[name]) || 0);
                       const unitPrice = moneyNumber(priceText) + plus;
+                      const sameDesignGrouped = brandDesignGroups.some((group) => Array.isArray(group.members) && group.members.includes(name));
+                      const hasKnownColor = (brandGroupDetailOptions[name]?.colors || []).some((value) => { const normalized=String(value||"").trim().toLowerCase(); return normalized!=="" && !["없음","없슴","무","-","none","n/a","na"].includes(normalized); });
                       return (
                         <div key={`brand-photo-${name}`} onClick={() => openBrandDetailEditor(name)} style={{ minWidth: 0, display: "grid", gridTemplateColumns: "46px minmax(0, 1fr) auto", gap: "8px", alignItems: "center", padding: "6px", border: "1px solid #E8E2DD", borderRadius: "8px", background: "var(--color-surface)", cursor: "pointer" }}>
                           <button
@@ -1915,6 +1942,7 @@ export default function QuickProductFastForm({
                             </span>
                           </span>
                           <span style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "5px", whiteSpace: "nowrap" }}>
+                            {sameDesignGrouped && !hasKnownColor ? <span title="같은 디자인 그룹이지만 색상명이 등록되지 않았습니다. 고객 화면에서는 옵션 번호와 상품코드로 구분됩니다." style={{ padding:"3px 6px",borderRadius:"999px",background:"#FFF4D6",color:"#8A5A00",border:"1px solid #F0D28A",fontSize:"9px",fontWeight:900 }}>⚠ 색상명 미기재</span> : null}
                             {detailHidden.includes(name) ? (
                               <span
                                 title="고객 주문서에서 숨김 상태"
@@ -2158,28 +2186,11 @@ export default function QuickProductFastForm({
               <button type="button" onClick={() => setBrandDetailEditDraft(null)} style={{ border: "none", background: "transparent", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer" }}>×</button>
             </div>
             <div style={{ overflowY: "auto", padding: "14px 16px" }}>
-              {(() => {
-                const photos = brandGroupDetailPhotoSets[brandDetailEditDraft.originalName] || [];
-                if (photos.length === 0) return null;
-                return (
-                  <div style={{ marginBottom: "12px" }}>
-                    <div style={{ marginBottom: "6px", fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>등록사진 {photos.length}장 · 클릭하면 확대</div>
-                    <div style={{ display: "flex", gap: "7px", overflowX: "auto", paddingBottom: "3px" }}>
-                      {photos.map((photo, index) => (
-                        <button
-                          key={`brand-edit-photo-${index}-${photo}`}
-                          type="button"
-                          onClick={() => setDetailPreviewImage(resolveProductImageUrl(photo))}
-                          title="사진 크게 보기"
-                          style={{ flex: "0 0 76px", width: "76px", height: "76px", overflow: "hidden", padding: 0, border: "1px solid #E1D5D9", borderRadius: "9px", background: "#F1ECE8", cursor: "zoom-in" }}
-                        >
-                          <img src={resolveProductImageUrl(photo)} alt={`${brandDetailEditDraft.name} 사진 ${index + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
+              <div style={{ marginBottom: "12px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "6px" }}><div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>상세사진 {brandDetailEditDraft.photos.length}장 · 첫 사진이 대표사진</div><button type="button" disabled={brandDetailPhotoUploading} onClick={() => brandDetailPhotoInputRef.current?.click()} style={{ border:"1px solid #D9C5CC",borderRadius:7,background:"#fff",color:"#7B2D43",padding:"5px 9px",fontSize:"11px",fontWeight:900,cursor:"pointer" }}>{brandDetailPhotoUploading ? "업로드 중…" : "+ 상세사진 추가"}</button></div>
+                <input ref={brandDetailPhotoInputRef} type="file" accept="image/*" multiple onChange={handleBrandDetailPhotoFiles} style={{ display:"none" }} />
+                {brandDetailEditDraft.photos.length ? <div style={{ display:"flex",gap:7,overflowX:"auto",paddingBottom:3 }}>{brandDetailEditDraft.photos.map((photo,index)=><div key={`${photo}-${index}`} style={{flex:"0 0 88px"}}><button type="button" onClick={()=>setDetailPreviewImage(resolveProductImageUrl(photo))} style={{width:88,height:88,padding:0,border:"1px solid #E1D5D9",borderRadius:9,overflow:"hidden",background:"#F1ECE8",cursor:"zoom-in"}}><img src={resolveProductImageUrl(photo)} alt={`${brandDetailEditDraft.name} 사진 ${index+1}`} style={{width:"100%",height:"100%",objectFit:"cover"}}/></button><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:3,marginTop:4}}><button type="button" disabled={index===0} onClick={()=>setBrandDetailEditDraft(prev=>{if(!prev)return prev;const a=[...prev.photos];[a[index-1],a[index]]=[a[index],a[index-1]];return{...prev,photos:a}})} style={{fontSize:10}}>←</button><button type="button" disabled={index===brandDetailEditDraft.photos.length-1} onClick={()=>setBrandDetailEditDraft(prev=>{if(!prev)return prev;const a=[...prev.photos];[a[index],a[index+1]]=[a[index+1],a[index]];return{...prev,photos:a}})} style={{fontSize:10}}>→</button><button type="button" onClick={()=>setBrandDetailEditDraft(prev=>prev?{...prev,photos:prev.photos.filter((_,i)=>i!==index)}:prev)} style={{fontSize:10,color:"#C0392B"}}>×</button></div></div>)}</div> : <div style={{fontSize:"11px",color:"var(--color-ink-mute)"}}>등록된 상세사진이 없습니다.</div>}
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 150px", gap: "10px" }}>
                 <label style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>상품명
                   <input value={brandDetailEditDraft.name} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, name: event.target.value } : prev)} style={{ ...fieldInput, marginTop: "4px" }} />

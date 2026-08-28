@@ -82,16 +82,16 @@ export type ParsePassResult = {
 };
 
 // 「지금 이거」 변경 이력. 메시지가 쓰인 시각으로 되감아 찾는다.
-type CurrentRow = { product_id: string | null; cleared: boolean; setMs: number };
+type CurrentRow = { product_id: string | null; detail_name: string | null; cleared: boolean; setMs: number };
 
 // ISO 문자열 비교는 소수점 자릿수(.5 vs 없음)에 따라 어긋날 수 있어 실제 시각(ms)으로 비교한다.
-function resolveCurrentAt(history: CurrentRow[], atMs: number): string | null {
+function resolveCurrentAt(history: CurrentRow[], atMs: number): { productId: string; detailName: string } | null {
   // history 는 setMs 내림차순. atMs 이하 중 첫 행이 그 시각의 상태.
   for (const row of history) {
     if (row.setMs <= atMs) {
       if (row.cleared) return null;
       const id = String(row.product_id ?? "").trim();
-      return id || null;
+      return id ? { productId: id, detailName: String(row.detail_name || "").trim() } : null;
     }
   }
   return null;
@@ -142,12 +142,13 @@ export async function parsePendingChatOrders(
 
     const { data: histRows } = await sb
       .from("chat_current_product")
-      .select("product_id,cleared,set_at")
+      .select("product_id,detail_name,cleared,set_at")
       .order("set_at", { ascending: false })
       .limit(200);
     const history = ((histRows || []) as Record<string, unknown>[])
       .map((r) => ({
         product_id: r.product_id == null ? null : String(r.product_id),
+        detail_name: r.detail_name == null ? null : String(r.detail_name),
         cleared: r.cleared === true,
         setMs: new Date(String(r.set_at ?? "")).getTime(),
       }))
@@ -176,8 +177,9 @@ export async function parsePendingChatOrders(
     for (const row of pending) {
       const raw = String(row.raw_message ?? "");
       const atMs = new Date(String(row.published_at ?? "")).getTime();
-      const currentId = resolveCurrentAt(history, Number.isFinite(atMs) ? atMs : Date.now());
-      let r = parseChatOrder(raw, products, currentId);
+      const current = resolveCurrentAt(history, Number.isFinite(atMs) ? atMs : Date.now());
+      let r = parseChatOrder(raw, products, current?.productId || null);
+      if (current?.detailName && r.status === "parsed" && r.matchedBy === "current") r = { ...r, variantName: current.detailName };
 
       // 봇·시스템 계정의 글은 주문이 아니다 — 작성자 기준(확실) + 이모지 접두(백업) 이중 차단.
       //   봇이 자기 글에 다시 반응하는 무한루프를 원천 차단한다.

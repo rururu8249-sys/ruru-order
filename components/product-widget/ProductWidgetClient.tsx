@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { resolveProductImageUrl } from "@/components/admin-live/quick-product/productImageUrl";
 import { getActiveBroadcast, loadAdminLiveBroadcasts } from "@/components/admin-live/liveBroadcastController";
+import { expandForWidget } from "@/lib/productDetailModel";
 
 type AnyProduct = Record<string, any>;
 
@@ -104,6 +105,7 @@ function sizeTextOf(p: AnyProduct | null): string {
 type ComboWidgetInfo = { label: string; count: number; maxPlus: number };
 function comboInfoOf(p: AnyProduct | null): ComboWidgetInfo | null {
   if (!p) return null;
+  if (String(p.__detail_name || "").trim()) return null;
   let note: any = p.product_note;
   if (typeof note === "string") {
     try {
@@ -312,15 +314,15 @@ export default function ProductWidgetClient() {
             .order("sort_order", { ascending: true });
           ids = ((links as { product_id: unknown }[]) || []).map((r) => String(r.product_id));
           const byId = new Map(list.map((x) => [String(x?.id ?? x?.product_id), x]));
-          const rot = ids.map((id) => byId.get(id)).filter(Boolean) as AnyProduct[];
+          const rot = ids.flatMap((id) => { const parent = byId.get(id); return parent ? (expandForWidget(parent) as AnyProduct[]) : []; }).filter((item) => !isSoldOutWidgetProduct(item));
           if (alive) setRotation(rot);
-        } else if (alive) {
-          setRotation([]);
-        }
 
-        const p = list.find((x) => x?.is_pinned === true || x?.pinned === true) || null;
-        const pinnedInActive = p && ids.includes(String(p?.id ?? p?.product_id)) ? p : null;
-        if (alive) setPinned(pinnedInActive);
+          const pinMode = String((active as AnyProduct | null)?.widget_pin_mode || "auto");
+          const pinProductId = String((active as AnyProduct | null)?.widget_pin_product_id ?? "");
+          const pinDetailName = String((active as AnyProduct | null)?.widget_pin_detail_name || "").trim();
+          const pinnedInActive = pinMode === "pin" && pinProductId ? rot.find((item) => { const parentId=String(item?.__parent_product_id ?? item?.id ?? item?.product_id ?? ""); const detail=String(item?.__detail_name || "").trim(); return parentId===pinProductId && (!pinDetailName || detail===pinDetailName); }) || null : null;
+          if (alive) setPinned(pinnedInActive);
+        } else if (alive) { setRotation([]); setPinned(null); }
       } catch {
         /* 로드 실패해도 위젯은 빈 화면 유지 */
       }
@@ -458,7 +460,7 @@ export default function ProductWidgetClient() {
   //   로드가 한 번 실패하면 재시도 없이 빈 카드로 남던 문제. 실패 시 1.5초 간격 자동 재시도(최대 6회),
   //   재시도마다 캐시 우회 쿼리(wr=n)로 강제 재요청. 상품이 바뀌면 카운터 리셋. 표시 전용.
   const [imgRetry, setImgRetry] = useState(0);
-  const currentKey = String(current?.id ?? current?.product_id ?? "");
+  const currentKey = `${String(current?.id ?? current?.product_id ?? "")}|${String(current?.__detail_name ?? "")}`;
   useEffect(() => {
     setImgRetry(0);
   }, [currentKey]);

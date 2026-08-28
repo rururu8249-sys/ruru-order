@@ -14,6 +14,9 @@ export type AdminLiveBroadcast = {
   is_deleted?: boolean | null;
   // [2026-07-12] 위젯 상품카드 표시 여부 (null/undefined면 true 취급 — 기존 방송 호환)
   widget_card_enabled?: boolean | null;
+  widget_pin_mode?: "auto" | "pin" | string | null;
+  widget_pin_product_id?: string | number | null;
+  widget_pin_detail_name?: string | null;
 };
 
 export type StartBroadcastInput = {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import { resolveProductImageUrl } from "./quick-product/productImageUrl";
+import { adminDetailSearch } from "@/lib/productDetailModel";
 
 type ProductRow = Record<string, unknown>;
 
@@ -755,7 +756,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
         .join(" ")
         .toLowerCase();
 
-      return haystack.includes(keyword);
+      return haystack.includes(keyword) || adminDetailSearch(product, keyword).length > 0;
     });
   }, [listFilter, listSearchText, products]);
 
@@ -1042,6 +1043,18 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                           수정
                         </button>
                       </div>
+                      {listSearchText.trim() && adminDetailSearch(product, listSearchText).length > 0 ? (
+                        <div className="col-span-6 ml-[68px] mt-1 grid gap-1.5">
+                          {adminDetailSearch(product, listSearchText).map((detail) => (
+                            <div key={`${detail.parentId}-${detail.detailName}`} className="grid grid-cols-[40px_minmax(0,1fr)_90px_auto] items-center gap-2 rounded-xl border border-line bg-surface-2 p-2">
+                              <div className="h-10 w-10 overflow-hidden rounded-lg bg-white ring-1 ring-line">{detail.image ? <img src={resolveProductImageUrl(detail.image)} alt="" className="h-full w-full object-cover" /> : null}</div>
+                              <div className="min-w-0"><div className="truncate text-[11px] font-black text-ink">{detail.detailName}{detail.hidden ? <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] text-amber-700">숨김</span> : null}</div><div className="mt-0.5 truncate text-[10px] font-bold text-ink-mute">{[detail.colors.length ? `색상 ${detail.colors.join(",")}` : "색상 미기재", detail.sizes.length ? `사이즈 ${detail.sizes.join(",")}` : "사이즈 없음"].join(" · ")}</div></div>
+                              <div className="text-right text-[11px] font-black text-rose-deep">{money(detail.price)}</div>
+                              <button type="button" onClick={() => openQuickProductEdit(product)} className="h-7 rounded-lg bg-white px-2 text-[10px] font-black text-ink-soft ring-1 ring-line">수정</button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   );
                 })}

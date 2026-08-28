@@ -1,0 +1,4 @@
+export type RegisteredProductPriceMode = "fixed"|"direct"|"free";
+export function registeredProductPriceMode(configuredPrice:unknown,freeProduct:boolean):RegisteredProductPriceMode{const n=Number(configuredPrice); if(Number.isFinite(n)&&n>0)return "fixed"; return freeProduct?"free":"direct";}
+export function registeredProductEditManualPrice(mode:RegisteredProductPriceMode,existingProductPrice:unknown){if(mode!=="direct")return 0; const n=Number(String(existingProductPrice??"").replace(/[^0-9]/g,"")); return Number.isFinite(n)&&n>0?Math.floor(n):0;}
+export function registeredProductSubmittedPriceValid(mode:RegisteredProductPriceMode,submittedPrice:unknown,configuredPrice=0,minRatio=.5){const s=Math.floor(Number(submittedPrice)||0); if(mode==="free")return s===0; if(mode==="direct")return s>=1; const c=Math.max(0,Math.floor(Number(configuredPrice)||0)); return s>=Math.floor(c*Math.max(0,Number(minRatio)||.5));}

@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const now = await getCurrentProductAt(sb, new Date().toISOString());
     const { data: history } = await sb
       .from("chat_current_product")
-      .select("id,product_id,product_name,cleared,set_at")
+      .select("id,product_id,product_name,detail_name,cleared,set_at")
       .order("set_at", { ascending: false })
       .limit(10);
     return NextResponse.json({ ok: true, current: now, history: history || [] });
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     if (!productId) {
       return NextResponse.json({ ok: false, error: { message: "productId가 필요합니다." } }, { status: 400 });
     }
-    await setCurrentProduct(sb, { productId, productName: String(body.productName ?? "") });
+    await setCurrentProduct(sb, { productId, productName: String(body.productName ?? ""), detailName: String(body.detailName ?? "") });
     return NextResponse.json({ ok: true, current: await getCurrentProductAt(sb, new Date().toISOString()) });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: { message: String(e?.message || e) } }, { status: 500 });

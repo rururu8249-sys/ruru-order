@@ -409,6 +409,7 @@ type Props = {
   onFiltersChange: (filters: LiveOrderFilters) => void;
   broadcastOptions: BroadcastOption[];
   broadcastCalendar?: BroadcastCalendarItem[];
+  shopOrderCalendar?: BroadcastCalendarItem[];
   broadcastStartedAt?: string | null;
   deposits?: readonly any[];
   onMatched?: () => void | Promise<void>;
@@ -431,6 +432,7 @@ export default function LiveOrderTable({
   onFiltersChange,
   broadcastOptions,
   broadcastCalendar = [],
+  shopOrderCalendar = [],
   broadcastStartedAt,
   deposits,
   onMatched,
@@ -1095,6 +1097,14 @@ export default function LiveOrderTable({
             items={broadcastCalendar}
             value={filters.broadcast}
             onPick={(broadcastId) => onFiltersChange({ ...filters, scope: "broadcast", broadcast: broadcastId })}
+          />
+        )}
+        {filters.scope === "shop" && (
+          <BroadcastCalendarPicker
+            items={shopOrderCalendar}
+            value={filters.broadcast}
+            allLabel="쇼핑몰 전체"
+            onPick={(dateFilter) => onFiltersChange({ ...filters, scope: "shop", broadcast: dateFilter })}
           />
         )}
 

@@ -9,6 +9,8 @@ import { showAdminToast } from "@/lib/adminToast";
 import { createDraftBroadcast } from "./liveBroadcastController";
 import ExcelBulkImportPopup from "./ExcelBulkImportPopup";
 import { brandWordmarkThumbnail } from "@/lib/brandWordmarkThumbnail";
+import { adminDetailSearch, buildDesignGroupChatText, buildDetailChatLine, detailProducts, resolveDesignGroups, type DetailProduct } from "@/lib/productDetailModel";
+import { savedWidgetAutoMatches, savedWidgetPinMatches, widgetPinTargetBroadcastId } from "@/lib/widgetPinState";
 
 type ProductRow = Record<string, unknown>;
 
@@ -195,12 +197,13 @@ function productPriceLabel(p: ProductRow) {
 }
 
 function mainImage(p: ProductRow) {
+  const direct = pickString(p, ["image_url", "cover_image_url", "main_image_url", "thumbnail_url"], "");
+  if (direct) return resolveProductImageUrl(direct);
   const group = parseProductNote(p).brand_group;
   if (group && typeof group === "object" && !Array.isArray(group) && (group as Record<string, unknown>).enabled === true) {
     const record = group as Record<string, unknown>;
     return brandWordmarkThumbnail(String(record.brand_en || ""), String(record.brand_ko || productName(p)));
   }
-  const direct = pickString(p, ["image_url", "cover_image_url", "main_image_url", "thumbnail_url"], "");
   if (direct) return resolveProductImageUrl(direct);
   const images = pickArray(p, ["images", "image_urls", "detail_image_urls"]);
   if (images[0]) return resolveProductImageUrl(images[0]);
@@ -289,7 +292,6 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [widgetSettingsOpen, setWidgetSettingsOpen] = useState(false);
   // [2026-08-20] 엑셀 대량등록 팝업
   const [excelImportOpen, setExcelImportOpen] = useState(false);
-  const [wsMode, setWsMode] = useState<"rotate" | "pin">("rotate");
   const [wsSelected, setWsSelected] = useState<Set<string>>(new Set());
   const [wsSaving, setWsSaving] = useState(false);
 
@@ -299,6 +301,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [bcProducts, setBcProducts] = useState<ProductRow[]>([]);
   const [bcLoading, setBcLoading] = useState(false);
   const [bcBusy, setBcBusy] = useState(false);
+  const [bcPinBusy, setBcPinBusy] = useState(false);
+  const [bcWidgetPin, setBcWidgetPin] = useState<{ mode: "auto" | "pin"; productId: string; detailName: string }>({ mode: "auto", productId: "", detailName: "" });
+  const [bcExpanded, setBcExpanded] = useState<Set<string>>(new Set());
   // 새 방송 만들기 모달
   const [newBcOpen, setNewBcOpen] = useState(false);
   const [newBcTitle, setNewBcTitle] = useState("");
@@ -389,7 +394,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const nameMatch = (p: ProductRow) =>
     !search.trim() ||
     productName(p).toLowerCase().includes(search.trim().toLowerCase()) ||
-    comboNamesMatch(p, search);
+    comboNamesMatch(p, search) ||
+    adminDetailSearch(p, search).length > 0;
 
   // 모바일(≤640) 감지 — 방송상품 탭 2단→세로 스택
   useEffect(() => {
@@ -560,32 +566,25 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
-  // 현재 위젯에 고정된 상품 id ("" 이면 순환 중). products 로드 시 동기화 + 고정/해제 시 즉시 반영.
-  const [pinnedId, setPinnedId] = useState<string>("");
-  useEffect(() => {
-    const pinned = products.find((p) => pickBoolean(p, ["is_pinned", "pinned"], false));
-    setPinnedId(pinned ? productId(pinned) : "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products]);
+  const loadBcWidgetPin = async (broadcastId: string) => {
+    if (!broadcastId) { setBcWidgetPin({ mode: "auto", productId: "", detailName: "" }); return; }
+    const { data } = await supabase.from("broadcasts").select("widget_pin_mode,widget_pin_product_id,widget_pin_detail_name").eq("id", broadcastId).maybeSingle();
+    const row = (data || {}) as Record<string, unknown>;
+    setBcWidgetPin({
+      mode: String(row.widget_pin_mode || "auto") === "pin" ? "pin" : "auto",
+      productId: String(row.widget_pin_product_id ?? ""),
+      detailName: String(row.widget_pin_detail_name ?? "").trim(),
+    });
+  };
 
-  // [2026-08-13 사장님 요청] 목록 정렬 드롭다운 — 화면 표시 순서만 바꾼다(저장 데이터 무변경).
-  //   「진열 순서」일 때만 드래그로 순서를 바꿀 수 있고, 다른 정렬에서는 잠근다.
-  //   (가격순으로 보고 있을 때 끌어놓으면 무엇을 의도한 건지 알 수 없어 엉키기 때문)
   const [bcSort, setBcSort] = useState<ProductSortKey>("manual");
-
-  // [2026-07-10] 고정(📌)한 상품을 방송 상품 목록 맨 위로 올려 보여준다(표시 순서만).
-  //   ⚠ 실제 진열 순서(sort_order)는 안 바뀐다.
-  //   [2026-08-13] 드래그를 순번(i)이 아니라 **상품 ID** 기준으로 바꿔서(reorderBcByPid),
-  //     고정으로 목록이 재배치돼 있어도 순서 변경이 정확하다 → 고정 중 드래그 잠금 해제.
   const bcProductsView = useMemo(() => {
     if (bcSort !== "manual") return sortProductRows(bcProducts, bcSort);
-    if (!pinnedId) return bcProducts;
-    const idx = bcProducts.findIndex((p) => productId(p) === pinnedId);
-    if (idx <= 0) return bcProducts; // 없거나 이미 맨 위
-    const copy = [...bcProducts];
-    const [top] = copy.splice(idx, 1);
-    return [top, ...copy];
-  }, [bcProducts, pinnedId, bcSort]);
+    if (bcWidgetPin.mode !== "pin" || !bcWidgetPin.productId) return bcProducts;
+    const idx = bcProducts.findIndex((p) => productId(p) === bcWidgetPin.productId);
+    if (idx <= 0) return bcProducts;
+    const copy = [...bcProducts]; const [top] = copy.splice(idx, 1); return [top, ...copy];
+  }, [bcProducts, bcWidgetPin.mode, bcWidgetPin.productId, bcSort]);
 
   // [2026-08-13] 드래그 허용 조건 — 「진열 순서」 + 검색 안 함 + 복사모드 아님 + 저장 중 아님.
   //   (고정 여부는 더 이상 조건이 아니다 — ID 기준 순서변경이라 안 엉킴)
@@ -611,6 +610,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   useEffect(() => {
     if (tab !== "broadcast") return;
     void reloadBcProducts(bcSelId);
+    void loadBcWidgetPin(bcSelId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, bcSelId, products]);
 
@@ -1009,8 +1009,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         const s = lowStockOf(p);
         if (s === null || s > 3) return false;
       }
-      // [2026-07-23] 조합형이면 세부상품명 매칭도 허용(평소 상품은 comboNamesMatch가 항상 false → 기존과 동일)
-      if (q && !productName(p).toLowerCase().includes(q) && !comboNamesMatch(p, search)) return false;
+      // 관리자 검색은 숨김 세부상품까지 포함해 정확한 상세상품명을 찾는다.
+      // 대표상품명이 직접 검색된 경우는 대표카드만 보여주고, 세부상품명이 검색된 경우만 아래에서 자동 펼친다.
+      if (q && !productName(p).toLowerCase().includes(q) && adminDetailSearch(p, search).length === 0) return false;
       return true;
     });
     // 정렬: 재고 적은순(재고관리 상품 우선, 미관리·재고없음은 뒤로)
@@ -1029,12 +1030,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       };
       return list.sort((a, b) => ts(b) - ts(a));
     }
-    // 기본: 고정(is_pinned) 상품을 배열 앞으로 (true → 0, false → 1)
-    return list.sort(
-      (a, b) =>
-        (pickBoolean(a, ["is_pinned", "pinned"], false) ? 0 : 1) -
-        (pickBoolean(b, ["is_pinned", "pinned"], false) ? 0 : 1),
-    );
+    // 기본: 저장된 상품 순서를 그대로 유지한다.
+    return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products, search, category, lowOnly, sortKey]);
 
@@ -1181,44 +1178,92 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     }
   };
 
-  // --- 위젯 단건 액션 (기존 addToRotation / pinSelected 로직 재사용) ---
-  const widgetState = (p: ProductRow): "rotating" | "pinned" | "none" => {
-    if (pickBoolean(p, ["is_pinned", "pinned"], false)) return "pinned";
-    if (rotationIds.has(productId(p))) return "rotating";
-    return "none";
+  const broadcastPinKey = (productIdValue: string, detailName = "") => `${productIdValue}|${detailName}`;
+  const isBroadcastPinned = (productIdValue: string, detailName = "") => bcWidgetPin.mode === "pin" && bcWidgetPin.productId === String(productIdValue) && bcWidgetPin.detailName === String(detailName || "").trim();
+  const clearBroadcastPin = async () => {
+    const targetBroadcastId = widgetPinTargetBroadcastId(bcSelId, activeBroadcastId);
+    if (!targetBroadcastId || bcPinBusy) {
+      if (!targetBroadcastId) showAdminToast("위젯 고정은 현재 진행 중인 방송에서만 변경할 수 있습니다.", "warning");
+      return;
+    }
+    setBcPinBusy(true);
+    try {
+      const { data, error } = await adminCatalogWrite({
+        table: "broadcasts",
+        op: "update",
+        values: { widget_pin_mode: "auto", widget_pin_product_id: null, widget_pin_detail_name: null },
+        filters: [{ type: "eq", col: "id", val: targetBroadcastId }],
+        select: "id,widget_pin_mode,widget_pin_product_id,widget_pin_detail_name",
+        single: true,
+      });
+      if (error) throw error;
+      if (!savedWidgetAutoMatches(data as Record<string, unknown> | null)) throw new Error("DB 고정 해제값 확인에 실패했습니다.");
+      setBcWidgetPin({ mode: "auto", productId: "", detailName: "" });
+      window.dispatchEvent(new Event("ruru-live-product-updated"));
+      showAdminToast("위젯 고정을 해제했습니다. 다시 자동 순환합니다.", "success");
+    } catch (e) {
+      await loadBcWidgetPin(targetBroadcastId);
+      showAdminToast("고정 해제 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally {
+      setBcPinBusy(false);
+    }
   };
+  const pinBroadcastProduct = async (p: ProductRow, detail?: DetailProduct) => {
+    const pid = productId(p);
+    const targetBroadcastId = widgetPinTargetBroadcastId(bcSelId, activeBroadcastId);
+    if (!pid || !targetBroadcastId || bcPinBusy) {
+      if (!targetBroadcastId) showAdminToast("위젯 고정은 현재 진행 중인 방송에서만 변경할 수 있습니다.", "warning");
+      return;
+    }
+    const detailName = detail?.detailName || "";
+    if (isBroadcastPinned(pid, detailName)) { await clearBroadcastPin(); return; }
+    setBcPinBusy(true);
+    try {
+      const { data, error } = await adminCatalogWrite({
+        table: "broadcasts",
+        op: "update",
+        values: { widget_pin_mode: "pin", widget_pin_product_id: pid, widget_pin_detail_name: detailName || null },
+        filters: [{ type: "eq", col: "id", val: targetBroadcastId }],
+        select: "id,widget_pin_mode,widget_pin_product_id,widget_pin_detail_name",
+        single: true,
+      });
+      if (error) throw error;
+      if (!savedWidgetPinMatches(data as Record<string, unknown> | null, { productId: pid, detailName })) throw new Error("DB에 고정값이 저장되지 않았습니다. 다시 눌러주세요.");
+      setBcWidgetPin({ mode: "pin", productId: pid, detailName });
+      window.dispatchEvent(new Event("ruru-live-product-updated"));
+      showAdminToast(`${detail?.detailName || productName(p)} 위젯 고정 완료`, "success");
+    } catch (e) {
+      await loadBcWidgetPin(targetBroadcastId);
+      showAdminToast("상품 고정 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally {
+      setBcPinBusy(false);
+    }
+  };
+  const copyTextToClipboard = async (text:string) => { if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(text);return;} const ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta); };
+  const setChatCurrentAndCopy = async (p:ProductRow, detail?:DetailProduct) => { const pid=productId(p);if(!pid)return;const detailName=detail?.detailName||"";const line=detail?buildDetailChatLine(detail):buildChatAnnounceText(p).replace(/[\r\n]+/g," ").trim();const text=`✅ 현재상품 ✅ ${line}`; try{const res=await fetch("/api/chat-orders/current",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({productId:pid,productName:productName(p),detailName})});const j=await res.json().catch(()=>null);if(!res.ok||j?.ok===false)throw new Error(j?.error?.message||"현재상품 저장 실패");await copyTextToClipboard(text);showAdminToast(`채팅 현재상품 지정 + 복사 완료\n\n${text}`,"success");}catch(e){showAdminToast("채팅 현재상품 지정/복사 실패\n\n"+(e instanceof Error?e.message:String(e)),"error");} };
+  const copyDesignGroupChat = async (group: ReturnType<typeof resolveDesignGroups>[number]) => { const text=buildDesignGroupChatText(group); if(!text)return; try{await copyTextToClipboard(text);showAdminToast(`현재상품 한 번에 채팅복사 완료\n\n${text}`,"success");}catch(e){showAdminToast("그룹 채팅 문구 복사 실패\n\n"+(e instanceof Error?e.message:String(e)),"error");} };
+
+  // --- 전체상품 탭 위젯 액션 ---
+  // 여기서는 방송 순환 포함/제외만 관리한다. 정확한 고정은 방송 상품 탭의 세부행에서
+  // broadcasts.widget_pin_*에만 저장한다. products.is_pinned는 더 이상 사용하지 않는다.
+  const widgetState = (p: ProductRow): "rotating" | "none" => rotationIds.has(productId(p)) ? "rotating" : "none";
 
   const addRotationSingle = async (p: ProductRow) => {
     const id = productId(p);
     if (!id) return;
-    if (!activeBroadcastId) {
-      showAdminToast("진행 중인 방송이 없습니다.\n\n방송을 먼저 시작한 뒤 순환에 담아주세요.", "warning");
-      return;
-    }
+    if (!activeBroadcastId) { showAdminToast("진행 중인 방송이 없습니다.\n\n방송을 먼저 시작한 뒤 순환에 담아주세요.", "warning"); return; }
     setBusyId(id);
     try {
-      // 기존 addToRotation과 동일: 고정 해제 후 순환에 추가(중복 제외)
-      await adminCatalogWrite({ table: "products", op: "update", values: { is_pinned: false }, filters: [{ type: "eq", col: "is_pinned", val: true }] });
-      const { data: existing } = await supabase
-        .from("broadcast_products")
-        .select("product_id")
-        .eq("broadcast_id", activeBroadcastId)
-        .eq("product_id", id);
+      const { data: existing } = await supabase.from("broadcast_products").select("product_id").eq("broadcast_id", activeBroadcastId).eq("product_id", id);
       if (!existing || existing.length === 0) {
-        const { error } = await adminCatalogWrite({
-          table: "broadcast_products",
-          op: "insert",
-          values: { broadcast_id: activeBroadcastId, product_id: id, sort_order: 0 },
-        });
+        const { error } = await adminCatalogWrite({ table: "broadcast_products", op: "insert", values: { broadcast_id: activeBroadcastId, product_id: id, sort_order: 0 } });
         if (error) throw error;
       }
+      setRotationIds((prev) => new Set(prev).add(id));
       window.dispatchEvent(new Event("ruru-live-product-updated"));
       showAdminToast("방송 순환에 담았어요.", "success");
-    } catch (e) {
-      showAdminToast("순환 담기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
-    } finally {
-      setBusyId("");
-    }
+    } catch (e) { showAdminToast("순환 담기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error"); }
+    finally { setBusyId(""); }
   };
 
   const removeRotationSingle = async (p: ProductRow) => {
@@ -1226,75 +1271,16 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     if (!id || !activeBroadcastId) return;
     setBusyId(id);
     try {
-      const { error } = await adminCatalogWrite({
-        table: "broadcast_products",
-        op: "delete",
-        filters: [
-          { type: "eq", col: "broadcast_id", val: activeBroadcastId },
-          { type: "eq", col: "product_id", val: id },
-        ],
-      });
+      const { error } = await adminCatalogWrite({ table: "broadcast_products", op: "delete", filters: [{ type: "eq", col: "broadcast_id", val: activeBroadcastId }, { type: "eq", col: "product_id", val: id }] });
       if (error) throw error;
+      setRotationIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
       window.dispatchEvent(new Event("ruru-live-product-updated"));
       showAdminToast("순환에서 뺐어요.", "success");
-    } catch (e) {
-      showAdminToast("순환 해제 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
-    } finally {
-      setBusyId("");
-    }
+    } catch (e) { showAdminToast("순환 해제 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error"); }
+    finally { setBusyId(""); }
   };
 
-  const unpinSingle = async (p: ProductRow) => {
-    const id = productId(p);
-    if (!id) return;
-    // 즉시 반영(optimistic): 화면부터 고정 해제. DB쓰기는 그대로, 실패 시 서버상태로 재동기화.
-    setProducts((prev) => prev.map((row) => (productId(row) === id ? { ...row, is_pinned: false, pinned: false } : row)));
-    setPinnedId("");
-    setBusyId(id);
-    try {
-      // 기존 pinSelected와 동일 테이블/컬럼: is_pinned 해제
-      const { error } = await adminCatalogWrite({ table: "products", op: "update", values: { is_pinned: false }, filters: [{ type: "eq", col: "id", val: id }] });
-      if (error) throw error;
-      window.dispatchEvent(new Event("ruru-live-product-updated"));
-      showAdminToast("고정을 해제했어요. 위젯이 다시 순환합니다.", "success");
-    } catch (e) {
-      window.dispatchEvent(new Event("ruru-live-product-updated"));
-      showAdminToast("고정 해제 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
-    } finally {
-      setBusyId("");
-    }
-  };
-
-  // [2026-07-10] 방송 상품 탭에서 바로 "이 상품만 위젯 고정".
-  //   기존 pinSelected(일괄 고정)와 완전히 동일한 방식 — 전체 고정 해제 후 이 상품만 is_pinned=true.
-  //   위젯(ProductWidgetClient)은 is_pinned 상품이 있으면 그것만 띄우고, 없으면 순환한다.
-  const pinSingle = async (p: ProductRow) => {
-    const id = productId(p);
-    if (!id) return;
-    // 즉시 반영(optimistic): 느린 회선에서도 화면부터 고정 표시. DB쓰기는 그대로, 실패 시 서버상태로 재동기화.
-    setProducts((prev) => prev.map((row) => { const rid = productId(row); return { ...row, is_pinned: rid === id, pinned: rid === id }; }));
-    setPinnedId(id);
-    setBusyId(id);
-    try {
-      await adminCatalogWrite({ table: "products", op: "update", values: { is_pinned: false }, filters: [{ type: "eq", col: "is_pinned", val: true }] });
-      const { error } = await adminCatalogWrite({ table: "products", op: "update", values: { is_pinned: true }, filters: [{ type: "eq", col: "id", val: id }] });
-      if (error) throw error;
-      window.dispatchEvent(new Event("ruru-live-product-updated"));
-      showAdminToast("이 상품만 위젯에 고정했어요.", "success");
-    } catch (e) {
-      window.dispatchEvent(new Event("ruru-live-product-updated"));
-      showAdminToast("상품 고정 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
-    } finally {
-      setBusyId("");
-    }
-  };
-
-  const onWidgetClick = (p: ProductRow) => {
-    const state = widgetState(p);
-    if (state === "rotating") return void removeRotationSingle(p);
-    if (state === "pinned") return void unpinSingle(p);
-    return void addRotationSingle(p);
-  };
+  const onWidgetClick = (p: ProductRow) => widgetState(p) === "rotating" ? void removeRotationSingle(p) : void addRotationSingle(p);
 
   // --- 등록/수정/삭제 (기존 이벤트/로직 재사용) ---
   const openCreate = () => {
@@ -1316,7 +1302,6 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     delete copy.uuid;
     delete copy.created_at;
     delete copy.updated_at;
-    copy.is_pinned = false;
     copy.pinned = false;
     const newName = `${productName(p)} 복사`;
     copy.product_name = newName;
@@ -1426,96 +1411,38 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   };
 
   const openWidgetSettings = () => {
-    // 고정 상품 있으면 고정모드 자동 진입(+초기선택), 없으면 순환모드
-    const hasPinned = products.some((p) => pickBoolean(p, ["is_pinned", "pinned"], false));
-    wsSetMode(hasPinned ? "pin" : "rotate");
+    setWsSelected(new Set());
     setWidgetSettingsOpen(true);
   };
-
-  // 모드 전환: 고정모드 진입 시 현재 고정(is_pinned) 상품을 초기선택
-  const wsSetMode = (mode: "rotate" | "pin") => {
-    setWsMode(mode);
-    if (mode === "pin") {
-      const pinned = products.filter((p) => pickBoolean(p, ["is_pinned", "pinned"], false)).map(productId).filter(Boolean);
-      setWsSelected(new Set(pinned));
-    } else {
-      setWsSelected(new Set());
-    }
-  };
-
-  // 일괄 전체선택/개별선택 (고정모드는 단일 선택)
   const wsToggle = (id: string) => {
     if (!id) return;
-    setWsSelected((prev) => {
-      if (wsMode === "pin") {
-        return prev.has(id) ? new Set<string>() : new Set<string>([id]);
-      }
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setWsSelected((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   };
   const wsAllIds = useMemo(() => products.map(productId).filter(Boolean), [products]);
   const wsAllChecked = wsAllIds.length > 0 && wsAllIds.every((id) => wsSelected.has(id));
-  const wsToggleAll = () => setWsSelected((prev) => (prev.size >= wsAllIds.length ? new Set() : new Set(wsAllIds)));
+  const wsToggleAll = () => setWsSelected((prev) => prev.size >= wsAllIds.length ? new Set() : new Set(wsAllIds));
 
-  // 순환 일괄 담기 (기존 addToRotation 로직 재사용)
   const wsAddToRotation = async () => {
     const ids = [...wsSelected].filter(Boolean);
     if (ids.length === 0) return;
-    if (!activeBroadcastId) {
-      showAdminToast("진행 중인 방송이 없습니다.\n\n방송을 먼저 시작한 뒤 순환에 담아주세요.", "warning");
-      return;
-    }
+    if (!activeBroadcastId) { showAdminToast("진행 중인 방송이 없습니다.", "warning"); return; }
     setWsSaving(true);
     try {
-      await adminCatalogWrite({ table: "products", op: "update", values: { is_pinned: false }, filters: [{ type: "eq", col: "is_pinned", val: true }] });
-      const { data: existing } = await supabase
-        .from("broadcast_products")
-        .select("product_id")
-        .eq("broadcast_id", activeBroadcastId);
-      const existingSet = new Set(((existing as { product_id: unknown }[]) || []).map((r) => String(r.product_id)));
-      const toInsert = ids
-        .filter((id) => !existingSet.has(String(id)))
-        .map((id) => ({ broadcast_id: activeBroadcastId, product_id: id, sort_order: 0 }));
-      if (toInsert.length > 0) {
-        const { error } = await adminCatalogWrite({ table: "broadcast_products", op: "insert", values: toInsert });
+      const { data: existingRows } = await supabase.from("broadcast_products").select("product_id").eq("broadcast_id", activeBroadcastId);
+      const existing = new Set(((existingRows as Array<{ product_id: unknown }> | null) || []).map((r) => String(r.product_id)));
+      const toInsert = ids.filter((id) => !existing.has(id));
+      for (const id of toInsert) {
+        const { error } = await adminCatalogWrite({ table: "broadcast_products", op: "insert", values: { broadcast_id: activeBroadcastId, product_id: id, sort_order: 0 } });
         if (error) throw error;
       }
+      setRotationIds((prev) => { const next = new Set(prev); ids.forEach((id) => next.add(id)); return next; });
       window.dispatchEvent(new Event("ruru-live-product-updated"));
-      const skipped = ids.length - toInsert.length;
-      showAdminToast(`방송 순환에 ${toInsert.length}개 담았어요.${skipped > 0 ? ` (이미 담긴 ${skipped}개 제외)` : ""}`, "success");
-      setWsSelected(new Set());
-      setWidgetSettingsOpen(false);
-    } catch (e) {
-      showAdminToast("순환 담기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
-    } finally {
-      setWsSaving(false);
-    }
+      showAdminToast(`방송 순환에 ${toInsert.length}개 담았어요.${ids.length - toInsert.length > 0 ? ` (이미 담긴 ${ids.length - toInsert.length}개 제외)` : ""}`, "success");
+      setWsSelected(new Set()); setWidgetSettingsOpen(false);
+    } catch (e) { showAdminToast("순환 담기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error"); }
+    finally { setWsSaving(false); }
   };
-
-  // 고정 일괄 (기존 pinSelected 로직 재사용)
-  const wsPinSelected = async () => {
-    const ids = [...wsSelected].filter(Boolean);
-    if (ids.length === 0) return;
-    setWsSaving(true);
-    try {
-      await adminCatalogWrite({ table: "products", op: "update", values: { is_pinned: false }, filters: [{ type: "eq", col: "is_pinned", val: true }] });
-      const { error } = await adminCatalogWrite({ table: "products", op: "update", values: { is_pinned: true }, filters: [{ type: "in", col: "id", val: ids }] });
-      if (error) throw error;
-      window.dispatchEvent(new Event("ruru-live-product-updated"));
-      showAdminToast(`${ids.length}개 상품을 고정(지금 띄움)했어요.`, "success");
-      setWsSelected(new Set());
-      setWidgetSettingsOpen(false);
-    } catch (e) {
-      showAdminToast("상품 고정 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
-    } finally {
-      setWsSaving(false);
-    }
-  };
-
-  const wsConfirm = () => (wsMode === "pin" ? void wsPinSelected() : void wsAddToRotation());
+  const wsConfirm = () => void wsAddToRotation();
 
   if (typeof document === "undefined") return null;
 
@@ -1691,7 +1618,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>· {bcList.find((b) => b.id === bcSelId)?.title ?? "방송 선택"}</span>
                   ) : null}
                 </span>
-                <button type="button" disabled={bcBusy} onClick={() => { setNewBcTitle(""); setNewBcCopyIds(null); setNewBcOpen(true); }} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "7px", padding: "4px 9px", cursor: bcBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>+ 새 방송</button>
+                <button type="button" disabled={bcBusy} onClick={() => { setNewBcTitle(""); setNewBcCopyIds(null); setNewBcOpen(true); }} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "7px", padding: "4px 9px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>+ 새 방송</button>
               </div>
               {(!isNarrow || bcListOpen) && (
               <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
@@ -1746,7 +1673,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   </select>
                 ) : null}
                 {bcSelId && bcProducts.length > 0 ? (
-                  <button type="button" disabled={bcBusy} onClick={() => { setBcCopyMode((v) => !v); setBcCopySel(new Set()); }} style={{ fontSize: "11px", fontWeight: 800, color: bcCopyMode ? "var(--color-ink-soft)" : "var(--color-rose-deep)", background: bcCopyMode ? "var(--color-surface)" : "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "7px", padding: "5px 11px", cursor: bcBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>{bcCopyMode ? "✕ 선택 취소" : "☑ 선택 복사"}</button>
+                  <button type="button" disabled={bcBusy} onClick={() => { setBcCopyMode((v) => !v); setBcCopySel(new Set()); }} style={{ fontSize: "11px", fontWeight: 800, color: bcCopyMode ? "var(--color-ink-soft)" : "var(--color-rose-deep)", background: bcCopyMode ? "var(--color-surface)" : "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "7px", padding: "5px 11px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>{bcCopyMode ? "✕ 선택 취소" : "☑ 선택 복사"}</button>
                 ) : null}
               </div>
               <div style={{ padding: "8px 12px 0" }}>
@@ -1771,6 +1698,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   <button type="button" disabled={bcCopySel.size === 0 || bcBusy} onClick={openNewBcWithCopy} style={{ marginLeft: "auto", fontSize: "12px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "7px", padding: "6px 12px", cursor: bcCopySel.size === 0 || bcBusy ? "not-allowed" : "pointer", opacity: bcCopySel.size === 0 || bcBusy ? 0.5 : 1 }}>선택 {bcCopySel.size}개 → 새 방송으로 복사</button>
                 </div>
               ) : null}
+              <div style={{ margin: "0 12px 8px", padding: "7px 10px", borderRadius: "8px", background: bcWidgetPin.mode === "pin" ? "var(--color-rose-soft)" : "var(--color-surface-2)", color: bcWidgetPin.mode === "pin" ? "var(--color-rose-deep)" : "var(--color-ink-soft)", fontSize: "11px", fontWeight: 900 }}>{bcWidgetPin.mode === "pin" ? `📌 위젯 고정 중 · ${bcWidgetPin.detailName || productName(bcProducts.find((row) => productId(row) === bcWidgetPin.productId) || {})}` : "↻ 자동 순환 중"}</div>
               <div
                 ref={bcScrollRef}
                 onDragOver={handleBcDragAutoScroll}
@@ -1788,74 +1716,33 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     {bcProductsView.filter(nameMatch).map((p, i) => {
                       const img = mainImage(p);
                       const pid = productId(p);
-                      const isPinnedRow = pinnedId === pid;
+                      const allDetails = detailProducts(p, { includeHidden: false });
+                      const matchedDetails = search.trim() ? adminDetailSearch(p, search) : [];
+                      const isBrandFolder = allDetails.length > 0;
+                      const expanded = isBrandFolder && (bcExpanded.has(pid) || matchedDetails.length > 0);
+                      const detailRows = matchedDetails.length > 0 ? matchedDetails.filter((detail) => !detail.hidden) : allDetails;
+                      const designGroups = isBrandFolder ? resolveDesignGroups(p) : [];
+                      const visibleDesignGroups = matchedDetails.length > 0 ? designGroups.filter((group) => group.members.some((member) => matchedDetails.some((detail) => detail.detailName === member.detailName))) : designGroups;
+                      const parentPinned = !isBrandFolder && isBroadcastPinned(pid, "");
                       return (
-                        <div
-                          key={pid || i}
-                          draggable={bcDragEnabled}
+                        <div key={pid || i} draggable={bcDragEnabled}
                           onClick={bcCopyMode && pid ? () => toggleBcCopyPick(pid) : undefined}
                           onDragStart={() => { setBcDragPid(pid); setBcDragOver(i); }}
                           onDragOver={(e) => { e.preventDefault(); if (bcDragOver !== i) setBcDragOver(i); }}
                           onDrop={(e) => { e.preventDefault(); if (bcDragPid) reorderBcByPid(bcDragPid, pid); setBcDragPid(null); setBcDragOver(null); }}
                           onDragEnd={() => { setBcDragPid(null); setBcDragOver(null); }}
-                          style={{ display: "flex", alignItems: "center", gap: "10px", border: isPinnedRow ? "2px solid var(--color-rose-deep)" : bcCopyMode && bcCopySel.has(pid) ? "1px solid var(--color-rose-deep)" : "1px solid var(--color-line)", borderRadius: "9px", padding: "8px", background: isPinnedRow ? "var(--color-rose-soft)" : bcCopyMode && bcCopySel.has(pid) ? "var(--color-rose-soft)" : bcDragPid !== null && bcDragOver === i && bcDragPid !== pid ? "var(--color-warn-bg)" : "var(--color-surface)", opacity: bcDragPid === pid ? 0.4 : 1, boxShadow: bcDragPid !== null && bcDragOver === i && bcDragPid !== pid ? "inset 0 2px 0 var(--color-rose-deep)" : undefined, cursor: bcCopyMode ? "pointer" : !bcDragEnabled ? "default" : "grab" }}
-                        >
-                          {/* 선택 복사 모드: 체크박스 / 평소: 드래그 핸들 */}
-                          {bcCopyMode ? (
-                            <input type="checkbox" checked={bcCopySel.has(pid)} onChange={() => toggleBcCopyPick(pid)} onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, width: "16px", height: "16px", accentColor: "var(--color-rose-deep)", cursor: "pointer" }} />
-                          ) : (
-                            <span style={{ flexShrink: 0, fontSize: "14px", color: bcDragEnabled ? "var(--color-ink-mute)" : "var(--color-line)", userSelect: "none" }} title={bcDragEnabled ? "드래그로 순서 변경" : "「진열 순서」로 두면 순서를 바꿀 수 있어요"}>⠿</span>
-                          )}
-                          <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", width: "20px", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
-                          <span
-                            onClick={(e) => { e.stopPropagation(); if (img) setLightbox(img); }}
-                            title={img ? "클릭하면 크게 보기" : undefined}
-                            style={{ width: "48px", height: "48px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: img ? "zoom-in" : "default" }}
-                          >
-                            {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "18px" }}>🖼</span>}
-                          </span>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
-                            <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)", marginTop: "2px" }}>{productPriceLabel(p)}</div>
+                          style={{ border: bcCopyMode && bcCopySel.has(pid) ? "1px solid var(--color-rose-deep)" : "1px solid var(--color-line)", borderRadius: "10px", background: bcCopyMode && bcCopySel.has(pid) ? "var(--color-rose-soft)" : bcDragPid !== null && bcDragOver === i && bcDragPid !== pid ? "var(--color-warn-bg)" : "var(--color-surface)", opacity: bcDragPid === pid ? 0.4 : 1, overflow: "hidden", cursor: bcCopyMode ? "pointer" : !bcDragEnabled ? "default" : "grab" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px" }}>
+                            {bcCopyMode ? <input type="checkbox" checked={bcCopySel.has(pid)} onChange={() => toggleBcCopyPick(pid)} onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, width: "16px", height: "16px", accentColor: "var(--color-rose-deep)", cursor: "pointer" }} /> : <span style={{ flexShrink: 0, fontSize: "14px", color: bcDragEnabled ? "var(--color-ink-mute)" : "var(--color-line)", userSelect: "none" }}>⠿</span>}
+                            <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", width: "20px", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
+                            <span onClick={(e) => { e.stopPropagation(); if (img) setLightbox(img); }} style={{ width: "48px", height: "48px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: img ? "zoom-in" : "default" }}>{img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "18px" }}>🖼</span>}</span>
+                            <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div><div style={{ fontSize: "11px", fontWeight: 800, color: isBrandFolder ? "var(--color-ink-soft)" : "var(--color-rose-deep)", marginTop: "2px" }}>{isBrandFolder ? `브랜드 그룹 · 세부상품 ${allDetails.length}개` : productPriceLabel(p)}</div></div>
+                            {isBrandFolder && !bcCopyMode ? <button type="button" onClick={(e) => { e.stopPropagation(); setBcExpanded((prev) => { const next = new Set(prev); if (next.has(pid)) next.delete(pid); else next.add(pid); return next; }); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }}>{expanded ? "접기" : "세부상품"}</button> : null}
+                            {!isBrandFolder && !bcCopyMode ? <><button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void pinBroadcastProduct(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, borderRadius: "6px", padding: "6px 10px", cursor: bcPinBusy ? "wait" : "pointer", color: parentPinned ? "#fff" : "var(--color-ink-soft)", background: parentPinned ? "var(--color-rose-deep)" : "var(--color-surface-2)", border: `1px solid ${parentPinned ? "var(--color-rose-deep)" : "var(--color-line)"}` }}>{parentPinned ? "📌 고정중" : "📌 고정"}</button><button type="button" onClick={(e) => { e.stopPropagation(); void setChatCurrentAndCopy(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }}>📢 채팅</button></> : null}
+                            <button type="button" onClick={(e) => { e.stopPropagation(); editProduct(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }}>수정</button>
+                            <button type="button" disabled={bcBusy} onClick={(e) => { e.stopPropagation(); void removeBcProduct(pid); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", border: "none", borderRadius: "6px", padding: "6px 10px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcBusy ? 0.6 : 1 }}>빼기</button>
                           </div>
-                          {/* [2026-07-10] 방송 중 "이 상품만 위젯에 띄우기". 고정 중이면 눌러서 해제(=다시 순환). */}
-                          {!bcCopyMode ? (
-                            <button
-                              type="button"
-                              disabled={busyId === pid}
-                              onClick={(e) => { e.stopPropagation(); void (pinnedId === pid ? unpinSingle(p) : pinSingle(p)); }}
-                              title={pinnedId === pid ? "고정 해제 — 위젯이 다시 순환합니다" : "이 상품만 위젯에 고정합니다"}
-                              style={{
-                                flexShrink: 0, fontSize: "11px", fontWeight: 800, borderRadius: "6px", padding: "6px 10px",
-                                cursor: busyId === pid ? "wait" : "pointer", opacity: busyId === pid ? 0.6 : 1,
-                                color: pinnedId === pid ? "#fff" : "var(--color-ink-soft)",
-                                background: pinnedId === pid ? "var(--color-rose-deep)" : "var(--color-surface-2)",
-                                border: "1px solid " + (pinnedId === pid ? "var(--color-rose-deep)" : "var(--color-line)"),
-                              }}
-                            >
-                              {pinnedId === pid ? "📌 고정중" : "📌 고정"}
-                            </button>
-                          ) : null}
-                          {/* [2026-08-13] 📢 채팅 — 유튜브 채팅에 붙여넣을 상품 안내 문구 복사(200자 요약). 읽기 전용. */}
-                          {!bcCopyMode ? (
-                            <button
-                              type="button"
-                              title="유튜브 채팅창에 붙여넣을 상품 안내 문구를 복사합니다"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const text = buildChatAnnounceText(p);
-                                const done = () => showAdminToast(`채팅 문구 복사됨 (${text.length}자)\n\n${text}\n\n→ 유튜브 채팅창에 붙여넣으세요`, "success");
-                                const fail = () => showAdminToast("복사 실패 — 브라우저가 클립보드를 막았어요", "error");
-                                if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done, fail);
-                                else {
-                                  try { const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); done(); } catch { fail(); }
-                                }
-                              }}
-                              style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }}
-                            >📢 채팅</button>
-                          ) : null}
-                          <button type="button" onClick={(e) => { e.stopPropagation(); editProduct(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }}>수정</button>
-                          <button type="button" disabled={bcBusy} onClick={(e) => { e.stopPropagation(); void removeBcProduct(pid); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", border: "none", borderRadius: "6px", padding: "6px 10px", cursor: bcBusy ? "wait" : "pointer", opacity: bcBusy ? 0.6 : 1 }}>빼기</button>
+                          {isBrandFolder && expanded ? <div style={{ borderTop: "1px solid var(--color-line)", padding: "8px", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", gap: "6px" }}>{visibleDesignGroups.length > 0 ? <div style={{ display:"flex",flexDirection:"column",gap:5,marginBottom:2 }}>{visibleDesignGroups.map((group)=><div key={`group-copy-${pid}-${group.id}`} style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) auto",gap:8,alignItems:"center",border:"1px dashed var(--color-rose)",borderRadius:8,padding:"6px 8px",background:"var(--color-rose-soft)"}}><div style={{minWidth:0}}><div style={{fontSize:11,fontWeight:900,color:"var(--color-ink)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{group.title}</div><div style={{fontSize:10,fontWeight:800,color:"var(--color-ink-soft)",marginTop:1}}>색상 옵션 · {group.members.length}개</div></div><button type="button" onClick={()=>void copyDesignGroupChat(group)} style={{fontSize:11,fontWeight:900,color:"var(--color-rose-deep)",background:"#fff",border:"1px solid var(--color-rose)",borderRadius:6,padding:"6px 9px",cursor:"pointer",whiteSpace:"nowrap"}}>📋 한 번에 채팅복사</button></div>)}</div> : null}{detailRows.map((detail) => { const pinned=isBroadcastPinned(pid,detail.detailName); const optionText=[detail.colors.length?`색상 ${detail.colors.join(",")}`:"",detail.sizes.length?`사이즈 ${detail.sizes.join(",")}`:""].filter(Boolean).join(" · ")||"옵션 없음"; return <div key={broadcastPinKey(pid,detail.detailName)} style={{ display:"grid",gridTemplateColumns:"44px minmax(0,1fr) auto auto",gap:"8px",alignItems:"center",border:pinned?"2px solid var(--color-rose-deep)":"1px solid var(--color-line)",borderRadius:"8px",padding:"7px",background:pinned?"var(--color-rose-soft)":"var(--color-surface)" }}><button type="button" onClick={()=>detail.image&&setLightbox(detail.image)} style={{width:42,height:42,border:0,borderRadius:7,overflow:"hidden",padding:0,background:"var(--color-surface-2)"}}>{detail.image?<img src={detail.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🖼"}</button><div style={{minWidth:0}}><div style={{fontSize:"12px",fontWeight:900,color:"var(--color-ink)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{detail.detailName}</div><div style={{fontSize:"11px",fontWeight:800,color:"var(--color-rose-deep)",marginTop:2}}>{detail.price.toLocaleString("ko-KR")}원</div><div style={{fontSize:"10px",fontWeight:700,color:"var(--color-ink-soft)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{optionText}{detail.stockManaged&&detail.stock!==null?` · 재고 ${detail.stock}`:""}</div></div><button type="button" disabled={bcPinBusy} onClick={()=>void pinBroadcastProduct(p,detail)} style={{fontSize:"11px",fontWeight:900,borderRadius:6,padding:"6px 9px",color:pinned?"#fff":"var(--color-ink-soft)",background:pinned?"var(--color-rose-deep)":"var(--color-surface-2)",border:`1px solid ${pinned?"var(--color-rose-deep)":"var(--color-line)"}`}}>{pinned?"📌 고정중":"📌 고정"}</button><button type="button" onClick={()=>void setChatCurrentAndCopy(p,detail)} style={{fontSize:"11px",fontWeight:900,color:"var(--color-ink-soft)",background:"var(--color-surface-2)",border:"1px solid var(--color-line)",borderRadius:6,padding:"6px 9px"}}>📢 채팅</button></div>})}</div> : null}
                         </div>
                       );
                     })}
@@ -1962,7 +1849,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 onChange={(e) => setSortKey(e.target.value as "default" | "latest" | "stock_low")}
                 style={{ marginLeft: "auto", height: "28px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 800, padding: "0 8px", cursor: "pointer" }}
               >
-                <option value="default">기본순 (고정 우선)</option>
+                <option value="default">기본순</option>
                 <option value="latest">최신 등록순</option>
                 <option value="stock_low">재고 적은순</option>
               </select>
@@ -1982,15 +1869,16 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     const state = widgetState(p);
                     const busy = busyId === id;
                     const createdAtLabel = productCreatedAtLabel(p);
-                    const widgetStyle: React.CSSProperties =
-                      state === "rotating"
-                        ? { background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", border: "1px solid var(--color-rose-line)" }
-                        : state === "pinned"
-                          ? { background: "var(--color-ok-bg)", color: "var(--color-ok-tx)", border: "1px solid var(--color-ok-tx)" }
-                          : { background: "var(--color-rose-deep)", color: "#fff", border: "none" };
-                    const widgetText = state === "rotating" ? "▶ 순환 해제" : state === "pinned" ? "📌 고정 해제" : "▶ 순환 추가";
+                    const widgetStyle: React.CSSProperties = state === "rotating"
+                      ? { background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", border: "1px solid var(--color-rose-line)" }
+                      : { background: "var(--color-rose-deep)", color: "#fff", border: "none" };
+                    const widgetText = state === "rotating" ? "▶ 순환 해제" : "▶ 순환 추가";
+                    const normalizedQuery = normalizeSearchText(search);
+                    const parentNameMatched = normalizedQuery ? normalizeSearchText(productName(p)).includes(normalizedQuery) : false;
+                    const matchedDetails = normalizedQuery && !parentNameMatched ? adminDetailSearch(p, search) : [];
                     return (
-                      <div key={id || productName(p)} style={{ display: "flex", gap: "12px", alignItems: "center", border: "1px solid var(--color-line)", borderRadius: "12px", padding: "10px" }}>
+                      <div key={id || productName(p)} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <div style={{ display: "flex", gap: "12px", alignItems: "center", border: "1px solid var(--color-line)", borderRadius: "12px", padding: "10px" }}>
                         {/* 사진 88px 클릭 확대 */}
                         <button
                           type="button"
@@ -2085,6 +1973,28 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           <button type="button" onClick={() => void deleteProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", border: "none", borderRadius: "6px", padding: "6px 11px", cursor: "pointer" }}>삭제</button>
                         </div>
                       </div>
+                      {matchedDetails.length > 0 ? (
+                        <div style={{ marginLeft: "100px", border: "1px solid var(--color-rose-line)", borderRadius: "10px", overflow: "hidden", background: "var(--color-surface)" }}>
+                          <div style={{ padding: "6px 9px", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", fontSize: "10.5px", fontWeight: 900 }}>🔎 세부상품 검색결과 {matchedDetails.length}개</div>
+                          {matchedDetails.map((detail) => (
+                            <div key={detail.detailName} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "7px 9px", borderTop: "1px solid var(--color-line)" }}>
+                              <button type="button" onClick={() => detail.image && setLightbox(detail.image)} style={{ width: "54px", height: "54px", flexShrink: 0, border: "none", borderRadius: "8px", overflow: "hidden", padding: 0, background: "var(--color-surface-2)", cursor: detail.image ? "zoom-in" : "default" }}>
+                                {detail.image ? <img src={detail.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "18px" }}>🖼</span>}
+                              </button>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "5px", flexWrap: "wrap" }}>
+                                  <span style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-ink)" }}>{detail.detailName}</span>
+                                  {detail.hidden ? <span style={{ padding: "1px 5px", borderRadius: "5px", background: "var(--color-danger-bg)", color: "var(--color-danger-tx)", fontSize: "9px", fontWeight: 900 }}>숨김</span> : null}
+                                </div>
+                                <div style={{ marginTop: "2px", fontSize: "12px", fontWeight: 900, color: "var(--color-rose-deep)" }}>{money(detail.price)}</div>
+                                {(detail.colors.length > 0 || detail.sizes.length > 0) ? <div style={{ marginTop: "2px", fontSize: "10px", fontWeight: 700, color: "var(--color-ink-soft)" }}>{detail.colors.length > 0 ? `색상: ${detail.colors.join(", ")}` : ""}{detail.colors.length > 0 && detail.sizes.length > 0 ? " · " : ""}{detail.sizes.length > 0 ? `사이즈: ${detail.sizes.join(", ")}` : ""}</div> : null}
+                              </div>
+                              <button type="button" onClick={() => editProduct(p)} style={{ flexShrink: 0, fontSize: "10px", fontWeight: 800, color: "var(--color-info-tx)", background: "var(--color-info-bg)", border: "none", borderRadius: "6px", padding: "5px 8px", cursor: "pointer" }}>세부관리</button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                      </div>
                     );
                   })}
                   {/* 무한스크롤 sentinel */}
@@ -2113,19 +2023,14 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               <button type="button" onClick={() => setWidgetSettingsOpen(false)} style={{ marginLeft: "auto", border: "none", background: "none", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>✕</button>
             </div>
 
-            {/* 순환 / 고정 모드 */}
-            <div style={{ display: "flex", gap: "6px", padding: "12px 18px 6px" }}>
-              <button type="button" onClick={() => wsSetMode("rotate")} style={{ flex: 1, height: "36px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (wsMode === "rotate" ? "var(--color-rose-deep)" : "var(--color-line)"), background: wsMode === "rotate" ? "var(--color-rose-deep)" : "var(--color-surface)", color: wsMode === "rotate" ? "#fff" : "var(--color-ink-soft)" }}>🔁 순환모드</button>
-              <button type="button" onClick={() => wsSetMode("pin")} style={{ flex: 1, height: "36px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (wsMode === "pin" ? "var(--color-rose-deep)" : "var(--color-line)"), background: wsMode === "pin" ? "var(--color-rose-deep)" : "var(--color-surface)", color: wsMode === "pin" ? "#fff" : "var(--color-ink-soft)" }}>📌 고정모드</button>
-            </div>
             <div style={{ padding: "0 18px 8px", fontSize: "11px", color: "var(--color-ink-mute)", fontWeight: 700 }}>
-              {wsMode === "rotate" ? "선택 상품을 방송 순환목록에 담습니다." : "선택 상품을 지금 띄운 상품으로 고정합니다."}
+              선택 상품을 방송 순환목록에 담습니다. 정확한 위젯 고정은 방송상품의 세부상품 행에서 합니다.
             </div>
 
             {/* 전체선택 (고정모드는 단일 선택이라 비활성) */}
             <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 18px", borderTop: "1px solid var(--color-surface-2)", borderBottom: "1px solid var(--color-surface-2)" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: 800, color: wsMode === "pin" ? "var(--color-ink-mute)" : "var(--color-ink-soft)", cursor: wsMode === "pin" ? "default" : "pointer" }}>
-                <input type="checkbox" checked={wsMode === "pin" ? false : wsAllChecked} disabled={wsMode === "pin"} onChange={wsToggleAll} />
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: 800, color: "var(--color-ink-soft)", cursor: "pointer" }}>
+                <input type="checkbox" checked={wsAllChecked} onChange={wsToggleAll} />
                 전체선택
               </label>
               <span style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)" }}>✓ {wsSelected.size}개 선택</span>
@@ -2137,13 +2042,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 <div style={{ textAlign: "center", padding: "30px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>상품이 없습니다.</div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-                  {[...products]
-                    .sort(
-                      (a, b) =>
-                        (pickBoolean(a, ["is_pinned", "pinned"], false) ? 0 : 1) -
-                        (pickBoolean(b, ["is_pinned", "pinned"], false) ? 0 : 1),
-                    )
-                    .map((p) => {
+                  {products.map((p) => {
                     const id = productId(p);
                     const img = mainImage(p);
                     const checked = wsSelected.has(id);
@@ -2171,7 +2070,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 {copied ? "복사됐어요!" : "🔗 위젯 주소 복사"}
               </button>
               <button type="button" disabled={wsSaving || wsSelected.size === 0} onClick={wsConfirm} style={{ flex: 1, height: "38px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: wsSaving || wsSelected.size === 0 ? "default" : "pointer", border: "none", background: wsSaving || wsSelected.size === 0 ? "var(--color-rose-line)" : "var(--color-rose-deep)", color: "#fff" }}>
-                {wsSaving ? "처리중…" : wsMode === "rotate" ? `선택 ${wsSelected.size}개 순환 담기` : `선택 ${wsSelected.size}개 고정`}
+                {wsSaving ? "처리중…" : `선택 ${wsSelected.size}개 순환 담기`}
               </button>
             </div>
           </div>

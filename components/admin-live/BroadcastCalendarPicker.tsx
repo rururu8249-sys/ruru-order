@@ -5,12 +5,14 @@ export type BroadcastCalendarItem = {
   id: string;
   dateKey: string; // "YYYY-MM-DD" (KST 기준, 부모에서 변환해서 전달)
   label: string;
+  count?: number;
 };
 
 interface Props {
   items: BroadcastCalendarItem[];
   value: string; // 선택된 방송 id 또는 "all"
   onPick: (broadcastId: string) => void; // 방송 선택(부모가 scope=broadcast로 맞춤)
+  allLabel?: string;
 }
 
 const ROSE = "#7B2D43";
@@ -21,7 +23,7 @@ function pad2(n: number) {
   return String(n).padStart(2, "0");
 }
 
-export default function BroadcastCalendarPicker({ items, value, onPick }: Props) {
+export default function BroadcastCalendarPicker({ items, value, onPick, allLabel = "방송 전체" }: Props) {
   const [open, setOpen] = useState(false);
   const [dayPick, setDayPick] = useState<string>(""); // 하루에 방송 여러개일 때 고르는 중인 날짜키
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -73,7 +75,7 @@ export default function BroadcastCalendarPicker({ items, value, onPick }: Props)
 
   const currentLabel =
     value === "all"
-      ? "방송 전체"
+      ? allLabel
       : items.find((it) => it.id === value)?.label || "날짜로 방송 고르기";
 
   const firstWeekday = new Date(view.year, view.month - 1, 1).getDay();
@@ -144,7 +146,7 @@ export default function BroadcastCalendarPicker({ items, value, onPick }: Props)
               background: value === "all" ? ROSE : "#fff",
               color: value === "all" ? "#fff" : ROSE,
             }}>
-            전체 방송 보기
+            {allLabel}
           </button>
 
           {/* 요일 */}
@@ -177,8 +179,8 @@ export default function BroadcastCalendarPicker({ items, value, onPick }: Props)
                   {has && !selectedHere && (
                     <span style={{ position: "absolute", bottom: 4, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, borderRadius: "50%", background: ROSE }} />
                   )}
-                  {has && list.length > 1 && (
-                    <span style={{ position: "absolute", top: 2, right: 3, fontSize: 9, fontWeight: 800, color: selectedHere ? "#fff" : ROSE }}>{list.length}</span>
+                  {has && (list.length > 1 || Number(list[0]?.count || 0) > 0) && (
+                    <span style={{ position: "absolute", top: 2, right: 3, fontSize: 8.5, fontWeight: 900, color: selectedHere ? "#fff" : ROSE }}>{list.length > 1 ? list.length : `${Number(list[0]?.count || 0)}건`}</span>
                   )}
                 </button>
               );
