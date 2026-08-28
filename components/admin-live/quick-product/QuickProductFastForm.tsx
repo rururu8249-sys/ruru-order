@@ -223,6 +223,9 @@ type ParsedProductNote = Record<string, unknown> & {
       stock_management_enabled?: boolean;
       registered_order_enabled?: boolean;
       name_suggestion_enabled?: boolean;
+      // 일반 등록상품에서 손님이 주문 시 세부상품명을 한 줄 직접 입력하는 모드.
+      // 기존 combo/brand_group 상품은 orders.product_name이 재고 식별자라 이 플래그를 사용하지 않는다.
+      customer_detail_input_enabled?: boolean;
       suggestion_keywords?: string[];
       purchase_limit_enabled?: boolean;
       purchase_limit_qty?: number;
@@ -672,6 +675,7 @@ export default function QuickProductFastForm({
   const [isPinned, setIsPinned] = useState(false);
   const [registeredOrderEnabled, setRegisteredOrderEnabled] = useState(true);
   const [nameSuggestionEnabled, setNameSuggestionEnabled] = useState(true);
+  const [customerDetailInputEnabled, setCustomerDetailInputEnabled] = useState(false);
   // 개인당 구매제한(카톡 계정=전화번호 기준 누적, OFF할 때까지 방송 무관 계속 적용). 재고와 별개.
   const [purchaseLimitEnabled, setPurchaseLimitEnabled] = useState(false);
   const [purchaseLimitText, setPurchaseLimitText] = useState("1");
@@ -847,6 +851,7 @@ export default function QuickProductFastForm({
     setPurchaseLimitText(String(productNote?.purchase_limit_qty && productNote.purchase_limit_qty > 0 ? productNote.purchase_limit_qty : 1));
     setRegisteredOrderEnabled(productNote?.registered_order_enabled !== false);
     setNameSuggestionEnabled(productNote?.name_suggestion_enabled !== false);
+    setCustomerDetailInputEnabled(productNote?.customer_detail_input_enabled === true);
     setSuggestionKeywordsText(Array.isArray(productNote?.suggestion_keywords) ? productNote.suggestion_keywords.join(", ") : "");
     setBrandGroupDetailPhotoSets(normalizedPhotoSets);
     setBrandGroupDetailCategories(normalizedDetailCategories);
@@ -965,6 +970,7 @@ export default function QuickProductFastForm({
   const details = useMemo(() => unique(splitOptions(detailText)), [detailText]);
   const colors = useMemo(() => unique(splitOptions(colorText)), [colorText]);
   const sizes = useMemo(() => unique(splitOptions(sizeText)), [sizeText]);
+  const customerDetailInputUnavailable = details.length > 0 || isBrandGroupEdit;
   const brandGroupDetailPhotoCount = Object.values(brandGroupDetailPhotoSets).reduce((sum, photos) => sum + photos.length, 0);
   const brandDetailCategories = useMemo(
     () => unique(details.map((name) => String(brandGroupDetailCategories[name] || "").trim()).filter(Boolean)),
@@ -1331,6 +1337,7 @@ export default function QuickProductFastForm({
     setDescription("");
     setFreeProductEnabled(false);
     setStockManagementEnabled(true);
+    setCustomerDetailInputEnabled(false);
     setDetailText("");
     setDetailLabel(DETAIL_LABEL_FIXED);
     setDetailPlus({});
@@ -1458,6 +1465,9 @@ export default function QuickProductFastForm({
         purchase_limit_enabled: purchaseLimitEnabled,
         purchase_limit_qty: purchaseLimitEnabled ? Math.max(1, Number(purchaseLimitText) || 1) : 0,
         registered_order_enabled: registeredOrderEnabled,
+        // 고객 세부상품명 직접입력은 일반 상품 전용.
+        // 기존 세부상품 조합형/브랜드 대표상품은 product_name이 재고 식별자라 저장 단계에서도 강제로 OFF한다.
+        customer_detail_input_enabled: !detailActive && !isBrandGroupEdit && customerDetailInputEnabled,
         // [조합형] 직접입력 추천 제외(추가금 누락 방지) / [무료나눔] 추천 제외(직접입력 경로는 0원 금지 정책이라 혼선 방지)
         name_suggestion_enabled: detailActive || freeProductEnabled ? false : nameSuggestionEnabled,
         suggestion_keywords: suggestionKeywordsText
@@ -2119,6 +2129,29 @@ export default function QuickProductFastForm({
                 <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "1px" }}>손님 주문 페이지에 표시</div>
               </div>
               <div onClick={() => setIsVisible((v) => !v)} style={tgStyle(isVisible)}><span style={tgKnob(isVisible)} /></div>
+            </div>
+
+            <div style={{ ...toggleRow, opacity: customerDetailInputUnavailable ? 0.55 : 1 }}>
+              <div style={{ minWidth: 0, paddingRight: "10px" }}>
+                <div style={{ fontSize: "13px", color: "var(--color-ink)", fontWeight: 800 }}>세부상품명 고객 직접입력</div>
+                <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "1px", lineHeight: 1.45 }}>
+                  {customerDetailInputUnavailable
+                    ? "등록된 세부상품 선택형에는 사용할 수 없음"
+                    : customerDetailInputEnabled
+                      ? "손님이 주문할 때 세부상품명을 직접 입력 · 주문서/송장/물건챙기기에 함께 표시"
+                      : "(끄면 세부상품명 직접입력 칸 없음)"}
+                </div>
+              </div>
+              <div
+                onClick={() => {
+                  if (customerDetailInputUnavailable) {
+                    showAdminToast("이미 등록된 세부상품을 고르는 상품에는 고객 직접입력을 함께 사용할 수 없어요.", "warning");
+                    return;
+                  }
+                  setCustomerDetailInputEnabled((v) => !v);
+                }}
+                style={tgStyle(!customerDetailInputUnavailable && customerDetailInputEnabled)}
+              ><span style={tgKnob(!customerDetailInputUnavailable && customerDetailInputEnabled)} /></div>
             </div>
 
             {/* 개인당 구매제한 (카톡 계정=전화번호 기준, 끌 때까지 계속 적용) */}

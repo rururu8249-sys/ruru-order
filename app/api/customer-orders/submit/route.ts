@@ -4,6 +4,10 @@ import { createClient } from "@supabase/supabase-js";
 import { assertValidCustomerPointPhone } from "@/lib/customerPoints";
 import { registeredProductPriceMode, registeredProductSubmittedPriceValid } from "@/lib/registeredProductPricePolicy";
 import { buildYoutubeOrderAnnouncementMessages } from "@/lib/orderYoutubeAnnouncement";
+import {
+  canonicalCustomerDetailProductName,
+  customerDetailInputEnabled,
+} from "@/lib/customerDetailProductName";
 
 export const dynamic = "force-dynamic";
 
@@ -309,6 +313,17 @@ async function assertRegisteredProductPrices(
       throw new Error(
         `주문하신 상품을 찾을 수 없어요.${text(t.row?.product_name) ? `\n(${text(t.row?.product_name)})` : ""}\n페이지를 새로고침한 뒤 상품 목록에서 다시 담아주세요.`,
       );
+    }
+
+    if (customerDetailInputEnabled(product?.product_note)) {
+      const baseName = text(product?.product_name);
+      const canonicalName = canonicalCustomerDetailProductName(baseName, t.row?.product_name);
+      if (!canonicalName) {
+        throw new Error(`${baseName || "상품"} 세부상품명을 입력해 주세요.`);
+      }
+      // 고객 자유입력은 주문표시용 product_name에만 합성한다.
+      // product_id/color/size는 그대로 두므로 가격·재고·구매제한·선점 로직은 기존 경로를 그대로 사용한다.
+      t.row.product_name = canonicalName;
     }
 
     const basePrice = Math.max(0, Math.floor(Number(product?.price) || 0));

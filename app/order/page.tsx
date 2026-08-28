@@ -82,6 +82,13 @@ import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { resolveDesignGroups, detailCode, detailPricePresentation } from "@/lib/productDetailModel";
 import { registeredProductEditManualPrice, registeredProductPriceMode } from "@/lib/registeredProductPricePolicy";
 import { buildCartHoldSnapshotItem } from "@/lib/cartHoldDetail";
+import {
+  CUSTOMER_DETAIL_NAME_MAX_LENGTH,
+  buildCustomerDetailProductName,
+  customerDetailInputEnabled,
+  extractCustomerDetailName,
+  normalizeCustomerDetailName,
+} from "@/lib/customerDetailProductName";
 
 
 type OrderItem = {
@@ -1528,6 +1535,7 @@ export default function OrderPage() {
   const [registeredOptionEditIndex, setRegisteredOptionEditIndex] = useState<number | null>(null);
   const [registeredOptionColor, setRegisteredOptionColor] = useState("");
   const [registeredOptionSize, setRegisteredOptionSize] = useState("");
+  const [registeredOptionCustomerDetail, setRegisteredOptionCustomerDetail] = useState("");
   const [registeredOptionQty, setRegisteredOptionQty] = useState(1);
   const [registeredOptionManualPrice, setRegisteredOptionManualPrice] = useState(0);
   // [조합형 옵션] 세부상품이 많을 때(예: 미니어처 143종) 옵션 시트 안 검색어 — 표시 전용
@@ -3712,6 +3720,9 @@ export default function OrderPage() {
       // 곧바로 복원해야 고객이 같은 상품의 옵션만 수정할 수 있다.
       setRegisteredOptionDetail(it.product_name);
     }
+    if (customerDetailInputEnabled(product.product_note)) {
+      setRegisteredOptionCustomerDetail(extractCustomerDetailName(product.product_name, it.product_name));
+    }
     setRegisteredOptionEditIndex(index);
     setRegisteredOptionColor(normalizeEmptyProductOptionValue(it.color) || "");
     setRegisteredOptionSize(normalizeEmptyProductOptionValue(it.size) || "");
@@ -3861,6 +3872,7 @@ export default function OrderPage() {
     setRegisteredOptionSelectProduct(product);
     setRegisteredOptionColor("");
     setRegisteredOptionSize("");
+    setRegisteredOptionCustomerDetail("");
     setRegisteredOptionDetail("");
     setRegisteredOptionQty(1);
     setRegisteredOptionManualPrice(0);
@@ -3873,6 +3885,7 @@ export default function OrderPage() {
     setRegisteredOptionSelectProduct(null);
     setRegisteredOptionColor("");
     setRegisteredOptionSize("");
+    setRegisteredOptionCustomerDetail("");
     setRegisteredOptionDetail("");
     setRegisteredOptionQty(1);
     setRegisteredOptionManualPrice(0);
@@ -3932,11 +3945,21 @@ export default function OrderPage() {
     if (!product) return;
 
     const brandGroup = readBrandGroupOrderProduct(product);
+    const requiresCustomerDetail = customerDetailInputEnabled(product.product_note);
+    const normalizedCustomerDetail = normalizeCustomerDetailName(registeredOptionCustomerDetail);
+    const customerDetailDisplayName = requiresCustomerDetail
+      ? buildCustomerDetailProductName(product.product_name, normalizedCustomerDetail)
+      : "";
     const selectedDetailConfig = brandGroup?.detailOptions[registeredOptionDetail] || null;
     const detailHasNoColor = Boolean(selectedDetailConfig && selectedDetailConfig.colors.every((value) => normalizeEmptyProductOptionValue(value) === ""));
     const detailHasNoSize = Boolean(selectedDetailConfig && selectedDetailConfig.sizes.every((value) => normalizeEmptyProductOptionValue(value) === ""));
     const colorMode = detailHasNoColor ? "none" : getRegisteredOptionMode(product, "color");
     const sizeMode = detailHasNoSize ? "none" : getRegisteredOptionMode(product, "size");
+
+    if (requiresCustomerDetail && !normalizedCustomerDetail) {
+      showCustomerNotice("세부상품명을 입력해 주세요.");
+      return;
+    }
 
     // [2026-08-10 3단] 세부상품(1번 축)을 먼저 골라야 한다.
     const axes3ForAdd = readOrderAxes3(product);
@@ -3996,7 +4019,9 @@ export default function OrderPage() {
         qty: registeredOptionQty,
         ...(brandGroup
           ? { displayName: registeredOptionDetail, priceKey: registeredOptionDetail }
-          : {}),
+          : requiresCustomerDetail
+            ? { displayName: customerDetailDisplayName }
+            : {}),
         ...(registeredOptionNeedsManualPrice ? { unitPrice: registeredOptionManualPrice } : {}),
       });
       if (brandGroup && registeredOptionEditIndex === null) {
@@ -4013,9 +4038,13 @@ export default function OrderPage() {
     };
 
     const isDuplicate = await checkDuplicateOrder({
-      // 브랜드 묶음은 여러 실제 상품이 같은 대표 product_id를 공유하므로 상품명으로 구분한다.
-      productId: brandGroup ? "" : String(product.id ?? ""),
-      productName: brandGroup ? registeredOptionDetail : product.product_name,
+      // 브랜드 묶음/고객 세부상품명 직접입력은 같은 대표 product_id 아래 실제 주문명을 상품명으로 구분한다.
+      productId: brandGroup || requiresCustomerDetail ? "" : String(product.id ?? ""),
+      productName: brandGroup
+        ? registeredOptionDetail
+        : requiresCustomerDetail
+          ? customerDetailDisplayName
+          : product.product_name,
       color: brandGroup ? (registeredOptionColor.trim() || "없음") : registeredOptionStorageColor,
       size: registeredOptionSize,
     });
@@ -4281,6 +4310,14 @@ export default function OrderPage() {
     for (const item of validItems) {
       const matchedProduct = findMatchedBroadcastProduct(item, broadcastProducts);
       if (!matchedProduct) continue;
+
+      if (customerDetailInputEnabled(matchedProduct.product_note)) {
+        const customerDetail = extractCustomerDetailName(matchedProduct.product_name, item.product_name);
+        if (!customerDetail) {
+          showCustomerNotice(`${matchedProduct.product_name} 세부상품명을 입력해 주세요.`);
+          return false;
+        }
+      }
 
       if (getRegisteredOptionMode(matchedProduct, "color") === "input" && !normalizeEmptyProductOptionValue(item.color)) {
         showCustomerNotice("색상을 입력해 주세요.");
@@ -5288,10 +5325,15 @@ export default function OrderPage() {
   const registeredOptionUnitPrice = registeredOptionNeedsManualPrice ? registeredOptionManualPrice : registeredOptionConfiguredPrice;
   const registeredOptionTotalPrice = Math.max(1, registeredOptionQty) * (Number.isFinite(registeredOptionUnitPrice) ? registeredOptionUnitPrice : 0);
   const registeredOptionDesignGroups = registeredOptionSelectProduct ? resolveDesignGroups(registeredOptionSelectProduct as unknown as Record<string, unknown>) : [];
+  const registeredOptionCustomerDetailRequired = registeredOptionSelectProduct
+    ? customerDetailInputEnabled(registeredOptionSelectProduct.product_note)
+    : false;
+  const registeredOptionCustomerDetailReady =
+    !registeredOptionCustomerDetailRequired || Boolean(normalizeCustomerDetailName(registeredOptionCustomerDetail));
   const registeredOptionDetailSelected = !registeredOptionAxes3 || Boolean(registeredOptionDetail.trim());
   const registeredOptionColorSelected = registeredOptionColorMode === "none" || Boolean(normalizeEmptyProductOptionValue(registeredOptionColor));
   const registeredOptionSizeSelected = registeredOptionSizeMode === "none" || Boolean(normalizeEmptyProductOptionValue(registeredOptionSize));
-  const registeredOptionSelectionReady = registeredOptionDetailSelected && registeredOptionColorSelected && registeredOptionSizeSelected && (!registeredOptionNeedsManualPrice || registeredOptionManualPrice > 0);
+  const registeredOptionSelectionReady = registeredOptionCustomerDetailReady && registeredOptionDetailSelected && registeredOptionColorSelected && registeredOptionSizeSelected && (!registeredOptionNeedsManualPrice || registeredOptionManualPrice > 0);
   useEffect(() => {
     if (registeredOptionEditIndex === null || registeredOptionPriceMode !== "direct") return;
     const editItem = items[registeredOptionEditIndex];
@@ -6347,6 +6389,44 @@ export default function OrderPage() {
                   ) : null}
 
                   {/* [조합형 옵션] 종류 선택 — 검색(8종 초과 시) + 세부상품 목록(추가금·품절·N개 남음 표시) */}
+                  {registeredOptionCustomerDetailRequired ? (
+                    <div style={{ marginBottom: "16px" }}>
+                      <div style={{ marginBottom: "7px", fontSize: "13px", fontWeight: 900, color: "#333" }}>
+                        세부상품명 <span style={{ color: "#C0392B" }}>*</span>
+                      </div>
+                      <input
+                        value={registeredOptionCustomerDetail}
+                        maxLength={CUSTOMER_DETAIL_NAME_MAX_LENGTH}
+                        onChange={(e) => setRegisteredOptionCustomerDetail(e.target.value)}
+                        placeholder="세부상품명을 입력해 주세요"
+                        autoComplete="off"
+                        style={{
+                          height: "46px",
+                          width: "100%",
+                          boxSizing: "border-box",
+                          borderRadius: "14px",
+                          border: `1.5px solid ${normalizeCustomerDetailName(registeredOptionCustomerDetail) ? "#D9C5CC" : "#E8B5B0"}`,
+                          background: "#fff",
+                          padding: "0 14px",
+                          fontSize: "15px",
+                          fontWeight: 700,
+                          color: "#222",
+                          outline: "none",
+                        }}
+                      />
+                      <div style={{ marginTop: "5px", display: "flex", justifyContent: "space-between", gap: "8px", fontSize: "11px", fontWeight: 700 }}>
+                        <span style={{ color: normalizeCustomerDetailName(registeredOptionCustomerDetail) ? "#7A1E47" : "#C0392B" }}>
+                          {normalizeCustomerDetailName(registeredOptionCustomerDetail)
+                            ? "입력한 세부상품명이 주문서·송장·물건챙기기에 함께 표시됩니다."
+                            : "세부상품명을 입력해 주세요."}
+                        </span>
+                        <span style={{ flexShrink: 0, color: "#A49A9E" }}>
+                          {normalizeCustomerDetailName(registeredOptionCustomerDetail).length}/{CUSTOMER_DETAIL_NAME_MAX_LENGTH}
+                        </span>
+                      </div>
+                    </div>
+                  ) : null}
+
                   {registeredOptionComboInfo ? (
                     <div style={{ marginBottom: "16px" }}>
                       {registeredOptionAxes3 && registeredOptionDetail.trim() ? (
@@ -6779,7 +6859,13 @@ export default function OrderPage() {
                       disabled={!registeredOptionSelectionReady}
                       onClick={confirmRegisteredOptionSelectSheet}
                       style={{ height: "52px", borderRadius: "16px", border: "none", background: registeredOptionSelectionReady ? "#7A1E47" : "#CFC4C8", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: registeredOptionSelectionReady ? "pointer" : "default" }}
-                    >{registeredOptionSelectionReady ? (registeredOptionBrandGroup ? "선택상품 담기" : "장바구니 담기") : registeredOptionAxes3 && !registeredOptionDetail.trim() ? "세부상품을 먼저 선택" : "옵션을 선택해 주세요"}</button>
+                    >{registeredOptionSelectionReady
+                      ? (registeredOptionBrandGroup ? "선택상품 담기" : "장바구니 담기")
+                      : registeredOptionCustomerDetailRequired && !normalizeCustomerDetailName(registeredOptionCustomerDetail)
+                        ? "세부상품명을 입력해 주세요"
+                        : registeredOptionAxes3 && !registeredOptionDetail.trim()
+                          ? "세부상품을 먼저 선택"
+                          : "옵션을 선택해 주세요"}</button>
                     )}
                     </>
                   )}
