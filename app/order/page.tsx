@@ -1389,6 +1389,8 @@ export default function OrderPage() {
     }
   };
   const [manualAddressOpen, setManualAddressOpen] = useState(false);
+  // [2026-08-30] 하단 메뉴 「공지·쪽지」의 안 읽은 개수 — 쪽지함 컴포넌트가 이벤트로 알려준다.
+  const [noteUnread, setNoteUnread] = useState(0);
   const [addressSearchOpen, setAddressSearchOpen] = useState(false);
   const addressPickedHandlerRef = useRef<((addr: string, zipcode: string) => void) | null>(null);
   const [missingDetailAddressConfirmOpen, setMissingDetailAddressConfirmOpen] = useState(false);
@@ -3126,6 +3128,16 @@ export default function OrderPage() {
       showCustomerNotice("고객정보 저장 오류: " + error.message);
     }
   };
+
+  // 쪽지함(CustomerSiteAlertPopup)이 안 읽은 개수를 알려오면 하단 메뉴 배지에 반영한다.
+  useEffect(() => {
+    const onCount = (e: Event) => {
+      const n = Number((e as CustomEvent).detail);
+      setNoteUnread(Number.isFinite(n) && n > 0 ? n : 0);
+    };
+    window.addEventListener("ruru-note-unread", onCount as EventListener);
+    return () => window.removeEventListener("ruru-note-unread", onCount as EventListener);
+  }, []);
 
   const applyManualAddress = (nextAddress: string) => {
     const cleanAddress = nextAddress.trim();
@@ -7336,7 +7348,8 @@ export default function OrderPage() {
             <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 40, height: "calc(68px + env(safe-area-inset-bottom))", paddingBottom: "env(safe-area-inset-bottom)", background: "#fff", borderTop: "1px solid #EFE6DE", display: "grid", gridTemplateColumns: "repeat(5,1fr)" }}>
               {[
                 { key: "home", label: "홈", icon: "🏠", onClick: () => window.scrollTo({ top: 0, behavior: "smooth" }) },
-                { key: "notice", label: "공지", icon: "📢", onClick: () => setNoticeSheetOpen(true) },
+                // [2026-08-30 사장님 요청] 하단에 쪽지함 진입점. 공지와 쪽지를 한 곳에서 본다.
+                { key: "notice", label: "공지·쪽지", icon: "📬", badge: noteUnread, onClick: () => { try { window.dispatchEvent(new Event("ruru-open-notice-box")); } catch { setNoticeSheetOpen(true); } } },
                 { key: "orders", label: "주문내역", icon: "📦", onClick: () => openOrderLookupBottomSheet() },
                 { key: "inquiry", label: "문의", icon: "💬", onClick: () => setInquirySheetOpen(true) },
                 { key: "me", label: "내정보", icon: "👤", onClick: () => openCustomerInfoEditBottomSheet() },
@@ -7347,7 +7360,14 @@ export default function OrderPage() {
                   onClick={tab.onClick}
                   style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "3px", border: "none", background: "none", padding: 0, cursor: "pointer", fontSize: "10px", fontWeight: 800, color: "#B0A6A0" }}
                 >
-                  <span style={{ fontSize: "19px", lineHeight: 1 }}>{tab.icon}</span>
+                  <span style={{ position: "relative", fontSize: "19px", lineHeight: 1 }}>
+                    {tab.icon}
+                    {Number((tab as { badge?: number }).badge) > 0 ? (
+                      <span style={{ position: "absolute", top: "-5px", right: "-9px", minWidth: "15px", height: "15px", padding: "0 4px", borderRadius: "999px", background: "#E23B3B", color: "#fff", fontSize: "9.5px", fontWeight: 900, lineHeight: "15px", textAlign: "center" }}>
+                        {Number((tab as { badge?: number }).badge) > 9 ? "9+" : Number((tab as { badge?: number }).badge)}
+                      </span>
+                    ) : null}
+                  </span>
                   {tab.label}
                 </button>
               ))}

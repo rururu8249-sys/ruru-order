@@ -67,6 +67,8 @@ export default function CustomerSiteAlertPopup() {
           setNotices(nots);
           setUnread(Number(j2.unread) || 0);
           setHasAny(list.length > 0 || nots.length > 0);
+          // 주문서 하단 메뉴 배지에 반영
+          try { window.dispatchEvent(new CustomEvent("ruru-note-unread", { detail: Number(j2.unread) || 0 })); } catch { /* 무시 */ }
         }
       } catch { /* 쪽지함은 보조 기능 */ }
     };
