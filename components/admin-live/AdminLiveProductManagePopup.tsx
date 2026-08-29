@@ -1725,7 +1725,66 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   <button type="button" disabled={bcCopySel.size === 0 || bcBusy} onClick={openNewBcWithCopy} style={{ marginLeft: "auto", fontSize: "12px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "7px", padding: "6px 12px", cursor: bcCopySel.size === 0 || bcBusy ? "not-allowed" : "pointer", opacity: bcCopySel.size === 0 || bcBusy ? 0.5 : 1 }}>선택 {bcCopySel.size}개 → 새 방송으로 복사</button>
                 </div>
               ) : null}
-              <div style={{ margin: "0 12px 8px", padding: "7px 10px", borderRadius: "8px", background: bcWidgetPin.mode === "pin" ? "var(--color-rose-soft)" : "var(--color-surface-2)", color: bcWidgetPin.mode === "pin" ? "var(--color-rose-deep)" : "var(--color-ink-soft)", fontSize: "11px", fontWeight: 900 }}>{bcWidgetPin.mode === "pin" ? `📌 위젯 고정 중 · ${bcWidgetPin.detailName || productName(bcProducts.find((row) => productId(row) === bcWidgetPin.productId) || {})}` : "↻ 자동 순환 중"}</div>
+              {/* [2026-08-29 사장님 지시] 고정 중일 때 글씨로만 알려주니, 해제하려면 검색어를 다시 쳐서
+                  그 상품을 찾아 내려가야 했다. → 고정된 상품을 여기에 그대로 보여주고
+                  [📢 채팅] [📌 해제] 를 바로 누를 수 있게 한다. 검색 중이어도 항상 보인다. */}
+              {(() => {
+                if (bcWidgetPin.mode !== "pin") {
+                  return (
+                    <div style={{ margin: "0 12px 8px", padding: "7px 10px", borderRadius: "8px", background: "var(--color-surface-2)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 900 }}>
+                      ↻ 자동 순환 중
+                    </div>
+                  );
+                }
+                const pinnedRow = bcProducts.find((row) => productId(row) === bcWidgetPin.productId);
+                const pinnedDetail = pinnedRow && bcWidgetPin.detailName
+                  ? detailProducts(pinnedRow, { includeHidden: true }).find((d) => d.detailName === bcWidgetPin.detailName)
+                  : undefined;
+                const pinnedImg = pinnedDetail?.image || (pinnedRow ? mainImage(pinnedRow) : "");
+                const pinnedTitle = pinnedDetail?.detailName || bcWidgetPin.detailName || (pinnedRow ? productName(pinnedRow) : "고정된 상품");
+                const pinnedPrice = pinnedDetail
+                  ? `${pinnedDetail.price.toLocaleString("ko-KR")}원`
+                  : pinnedRow ? productPriceLabel(pinnedRow) : "";
+                const pinnedOption = pinnedDetail
+                  ? [pinnedDetail.colors.length ? `색상 ${pinnedDetail.colors.join(",")}` : "", pinnedDetail.sizes.length ? `사이즈 ${pinnedDetail.sizes.join(",")}` : ""].filter(Boolean).join(" · ")
+                  : "";
+                return (
+                  <div style={{ margin: "0 12px 8px", border: "2px solid var(--color-rose-deep)", borderRadius: "10px", background: "var(--color-rose-soft)", overflow: "hidden" }}>
+                    <div style={{ padding: "5px 10px", fontSize: "10.5px", fontWeight: 900, color: "var(--color-rose-deep)", borderBottom: "1px solid var(--color-rose-line)" }}>
+                      📌 위젯 고정 중 — 손님 화면에 이 상품만 보입니다
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "9px", padding: "8px" }}>
+                      <span
+                        onClick={() => { if (pinnedImg) setLightbox(pinnedImg); }}
+                        style={{ width: "46px", height: "46px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface)", display: "flex", alignItems: "center", justifyContent: "center", cursor: pinnedImg ? "zoom-in" : "default" }}
+                      >
+                        {pinnedImg ? <img src={pinnedImg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "17px" }}>🖼</span>}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: "13px", fontWeight: 900, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pinnedTitle}</div>
+                        {pinnedPrice ? <div style={{ fontSize: "11.5px", fontWeight: 900, color: "var(--color-rose-deep)", marginTop: "2px" }}>{pinnedPrice}</div> : null}
+                        {pinnedOption ? <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-ink-soft)", marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pinnedOption}</div> : null}
+                        {!pinnedRow ? <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-ink-soft)", marginTop: "1px" }}>이 방송 진열 목록에 없는 상품입니다</div> : null}
+                      </div>
+                      {pinnedRow ? (
+                        <button
+                          type="button"
+                          onClick={() => void setChatCurrentAndCopy(pinnedRow, pinnedDetail)}
+                          title="이 상품 안내글을 복사합니다"
+                          style={{ flexShrink: 0, fontSize: "11px", fontWeight: 900, color: "var(--color-ink-soft)", background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }}
+                        >📢 채팅</button>
+                      ) : null}
+                      <button
+                        type="button"
+                        disabled={bcPinBusy}
+                        onClick={() => void clearBroadcastPin()}
+                        title="고정을 풀고 다시 자동 순환합니다"
+                        style={{ flexShrink: 0, fontSize: "11px", fontWeight: 900, color: "#fff", background: "var(--color-rose-deep)", border: "1px solid var(--color-rose-deep)", borderRadius: "6px", padding: "6px 10px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcPinBusy ? 0.6 : 1 }}
+                      >{bcPinBusy ? "해제중…" : "📌 해제"}</button>
+                    </div>
+                  </div>
+                );
+              })()}
               <div
                 ref={bcScrollRef}
                 onDragOver={handleBcDragAutoScroll}
