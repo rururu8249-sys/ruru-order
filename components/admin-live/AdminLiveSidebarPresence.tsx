@@ -286,6 +286,12 @@ export default function AdminLiveSidebarPresence() {
                   ))}
                 </div>
 
+                {/* [2026-08-30 사장님 지적] "방문자 99명인데 방송중 144명이 무슨 말이냐"
+                    → 방문자는 '사람 수', 방송중/쇼핑몰은 '방문 횟수'로 단위가 달랐다. 그 차이를 명시한다. */}
+                <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--color-line)", background: "var(--color-surface-2)", fontSize: "10.5px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.6 }}>
+                  <b>방문자 = 사람 수</b> · <b>방문 = 들어온 횟수</b> (같은 사람이 30분 넘게 끊겼다 다시 오면 1회 더)
+                </div>
+
                 <div style={{ minHeight: 0, flex: 1, overflowY: "auto", padding: "12px 16px 16px" }}>
                   {statsTab === "date" ? (
                     (stats.daily || []).length === 0 ? (
@@ -294,7 +300,7 @@ export default function AdminLiveSidebarPresence() {
                       <table style={{ width: "100%", borderCollapse: "collapse" }}>
                         <thead>
                           <tr>
-                            {["날짜", "방문자", "방송중", "쇼핑몰"].map((h, i) => (
+                            {["날짜", "방문자", "방송중 방문", "쇼핑몰 방문"].map((h, i) => (
                               <th key={h} style={{ textAlign: i === 0 ? "left" : "right", fontSize: "10.5px", fontWeight: 900, color: "var(--color-ink-mute)", padding: "0 6px 8px", whiteSpace: "nowrap" }}>{h}</th>
                             ))}
                           </tr>
@@ -311,9 +317,9 @@ export default function AdminLiveSidebarPresence() {
                                 <span style={{ marginRight: "5px", fontSize: "10px", color: "var(--color-ink-mute)" }}>{openRows[`d:${d.date}`] ? "▾" : "▸"}</span>
                                 {d.date}
                               </td>
-                              <td style={{ padding: "9px 6px", textAlign: "right", fontSize: "13.5px", fontWeight: 900, color: "var(--color-rose-deep)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{d.visitors.toLocaleString("ko-KR")}</td>
-                              <td style={{ padding: "9px 6px", textAlign: "right", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-soft)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{d.live.toLocaleString("ko-KR")}</td>
-                              <td style={{ padding: "9px 6px", textAlign: "right", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-soft)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{d.shop.toLocaleString("ko-KR")}</td>
+                              <td style={{ padding: "9px 6px", textAlign: "right", fontSize: "13.5px", fontWeight: 900, color: "var(--color-rose-deep)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{d.visitors.toLocaleString("ko-KR")}<span style={{ fontSize: "10px", fontWeight: 800, opacity: 0.75 }}>명</span></td>
+                              <td style={{ padding: "9px 6px", textAlign: "right", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-soft)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{d.live.toLocaleString("ko-KR")}<span style={{ fontSize: "10px", fontWeight: 800, opacity: 0.7 }}>회</span></td>
+                              <td style={{ padding: "9px 6px", textAlign: "right", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-soft)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{d.shop.toLocaleString("ko-KR")}<span style={{ fontSize: "10px", fontWeight: 800, opacity: 0.7 }}>회</span></td>
                             </tr>
                             {openRows[`d:${d.date}`] ? nameList(d.names, d.namesCapped, 4) : null}
                             </Fragment>
@@ -350,7 +356,7 @@ export default function AdminLiveSidebarPresence() {
                               </div>
                               <div style={{ marginTop: "2px", fontSize: "10.5px", fontWeight: 700, color: "var(--color-ink-mute)" }}>{String(b.startedAt).slice(0, 16).replace("T", " ")}</div>
                             </td>
-                            <td style={{ padding: "9px 6px", textAlign: "right", fontSize: "13.5px", fontWeight: 900, color: "var(--color-rose-deep)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{b.visitors.toLocaleString("ko-KR")}명</td>
+                            <td style={{ padding: "9px 6px", textAlign: "right", fontSize: "13.5px", fontWeight: 900, color: "var(--color-rose-deep)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{b.visitors.toLocaleString("ko-KR")}명<div style={{ marginTop: "2px", fontSize: "10px", fontWeight: 700, color: "var(--color-ink-mute)" }}>방문 {b.visits.toLocaleString("ko-KR")}회</div></td>
                           </tr>
                           {openRows[`b:${b.broadcastId}`] ? nameList(b.names, b.namesCapped, 2) : null}
                           </Fragment>
