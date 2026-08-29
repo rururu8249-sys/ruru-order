@@ -36,6 +36,8 @@ export default function CustomerSiteAlertPopup() {
   const [unread, setUnread] = useState(0);
   const [hasAny, setHasAny] = useState(false);
   const [notices, setNotices] = useState<NoticeItem[]>([]);
+  // [2026-08-30] 접속 공지 팝업이 떠 있으면 쪽지 팝업은 기다린다(팝업 두 개 겹침 방지).
+  const [noticePopupOpen, setNoticePopupOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined" || window.location.pathname.startsWith("/admin")) return;
@@ -77,13 +79,20 @@ export default function CustomerSiteAlertPopup() {
     const onFocus = () => void load();
     // 접속 팝업 공지의 [📬 공지 · 쪽지 전체보기] 에서 열 수 있게
     const onOpenBox = () => { setBoxOpen(true); void load(); };
+    // 접속 공지 팝업이 떠 있는지 — 떠 있으면 쪽지 팝업을 미룬다
+    const onNoticePopup = (e: Event) => setNoticePopupOpen(Boolean((e as CustomEvent).detail));
+    try {
+      setNoticePopupOpen(Boolean((window as unknown as Record<string, unknown>).__ruruNoticePopupOpen));
+    } catch { /* 무시 */ }
     window.addEventListener("focus", onFocus);
     window.addEventListener("ruru-open-notice-box", onOpenBox);
+    window.addEventListener("ruru-notice-popup", onNoticePopup as EventListener);
     return () => {
       stopped = true;
       window.clearInterval(timer);
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("ruru-open-notice-box", onOpenBox);
+      window.removeEventListener("ruru-notice-popup", onNoticePopup as EventListener);
     };
   }, []);
 
@@ -111,7 +120,7 @@ export default function CustomerSiteAlertPopup() {
     <>
       {/* [2026-08-30] 쪽지함 버튼 — 팝업을 실수로 닫아도 여기서 다시 본다.
           일반 쇼핑몰의 알림함과 같은 자리(오른쪽 아래 떠 있는 버튼). */}
-      {hasAny && !alert ? (
+      {hasAny && !alert && !noticePopupOpen ? (
         <button
           type="button"
           onClick={() => setBoxOpen(true)}
@@ -189,8 +198,9 @@ export default function CustomerSiteAlertPopup() {
         </div>
       ) : null}
 
-      {/* 새 쪽지 팝업 — 접속하면 바로, 접속 중에 오면 15초 안에 뜬다 */}
-      {alert ? (
+      {/* 새 쪽지 팝업 — 접속하면 바로, 접속 중에 오면 15초 안에 뜬다.
+          단, 접속 공지 팝업이 떠 있으면 기다린다(팝업 두 개가 연달아 뜨지 않게). */}
+      {alert && !noticePopupOpen ? (
         <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/55 px-5" role="dialog" aria-modal="true" aria-label="쪽지 알림">
           <div className="w-full max-w-[420px] overflow-hidden rounded-[26px] bg-white shadow-2xl">
             <div className="px-6 pb-3 pt-6 text-center">

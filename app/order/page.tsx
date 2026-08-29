@@ -3129,6 +3129,23 @@ export default function OrderPage() {
     }
   };
 
+  // [2026-08-30 사고수정] 접속 공지 팝업과 쪽지 팝업이 연달아 두 번 떴다(실측: 사장님 테스트 화면).
+  //   손님 입장에선 팝업을 두 번 닫아야 해서 짜증만 난다.
+  //   → 공지 팝업이 떠 있는 동안에는 쪽지 팝업이 기다린다. 공지를 닫으면 그때 뜬다.
+  useEffect(() => {
+    const open = popupOpen && hasSavedInfo;
+    const tell = (v: boolean) => {
+      try {
+        (window as unknown as Record<string, unknown>).__ruruNoticePopupOpen = v;
+        window.dispatchEvent(new CustomEvent("ruru-notice-popup", { detail: v }));
+      } catch { /* 무시 */ }
+    };
+    tell(open);
+    // 이 화면을 벗어나면 반드시 "공지 팝업 없음"으로 되돌린다.
+    // (안 그러면 깃발이 켜진 채 남아서 쪽지 팝업이 영영 안 뜬다)
+    return () => { if (open) tell(false); };
+  }, [popupOpen, hasSavedInfo]);
+
   // 쪽지함(CustomerSiteAlertPopup)이 안 읽은 개수를 알려오면 하단 메뉴 배지에 반영한다.
   useEffect(() => {
     const onCount = (e: Event) => {
