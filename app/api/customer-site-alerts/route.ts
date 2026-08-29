@@ -44,8 +44,28 @@ export async function GET(request: NextRequest) {
   try {
     const sessionKey = cleanSessionKey(request.nextUrl.searchParams.get("sessionKey"));
     const phone = cleanPhone(request.nextUrl.searchParams.get("phone"));
-    if (!sessionKey && !phone) return NextResponse.json({ ok: true, alert: null });
+    if (!sessionKey && !phone) return NextResponse.json({ ok: true, alert: null, box: [], unread: 0 });
     const sb = getSupabaseAdmin();
+
+    // [2026-08-30 사장님 요청] 쪽지함 — 팝업을 실수로 닫아도 다시 볼 수 있게.
+    //   mode=box 면 최근 쪽지 목록을 준다(닫은 것 포함). 팝업 조회와 분리해서 가볍게 유지.
+    if (request.nextUrl.searchParams.get("mode") === "box") {
+      const { data: rows, error: boxError } = await matchTarget(
+        sb
+          .from("customer_site_alerts")
+          .select("id,kind,title,message,created_at,expires_at,seen_at,dismissed_at") as any,
+        sessionKey,
+        phone,
+      )
+        .gt("expires_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+        .order("created_at", { ascending: false })
+        .limit(30);
+
+      if (boxError) return NextResponse.json({ ok: false, error: boxError.message }, { status: 500 });
+      const box = (rows || []) as Array<Record<string, unknown>>;
+      const unread = box.filter((r) => !r.seen_at).length;
+      return NextResponse.json({ ok: true, box, unread });
+    }
     const { data, error } = await matchTarget(
       sb
         .from("customer_site_alerts")

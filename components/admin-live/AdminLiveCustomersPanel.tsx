@@ -456,6 +456,10 @@ function CustomerDetailDrawer({
   const [fNewPhone, setFNewPhone] = useState("");
   const [fUnifyOrders, setFUnifyOrders] = useState(true);
   const [phoneSaving, setPhoneSaving] = useState(false);
+  // [2026-08-30 사장님 요청] 사이트 안 쪽지 보내기 (카톡·웹푸시 제약 없이 접속만 하면 보인다)
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteText, setNoteText] = useState("");
+  const [noteSending, setNoteSending] = useState(false);
 
   if (!customer) return null;
 
@@ -473,6 +477,33 @@ function CustomerDetailDrawer({
     setFUnifyOrders(true);
     setPhoneEditOpen(false);
     setEditOpen(true);
+  };
+
+  // 쪽지 보내기 — 손님이 사이트에 들어오면 팝업으로 뜨고, 놓쳐도 쪽지함에 남는다.
+  const sendCustomerNote = async () => {
+    const targetPhone = digitsOnly(customer?.phone || profile?.customer_phone || "");
+    const msg = clean(noteText);
+    if (!targetPhone) { showAdminToast("이 손님 전화번호를 찾지 못했습니다.", "warning"); return; }
+    if (!msg) { showAdminToast("보낼 내용을 적어주세요.", "warning"); return; }
+
+    setNoteSending(true);
+    try {
+      const res = await fetch("/api/admin-live/customer-note", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ phone: targetPhone, message: msg, hours: 12 }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j?.ok) throw new Error(j?.message || `요청 실패(${res.status})`);
+      showAdminToast("쪽지를 보냈습니다. 손님이 사이트에 들어오면 바로 뜹니다.", "success");
+      setNoteText("");
+      setNoteOpen(false);
+    } catch (e) {
+      showAdminToast("쪽지 발송 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally {
+      setNoteSending(false);
+    }
   };
 
   // 전화번호 변경 — 서버 API 가 중복 검사 · 회원 변경 · 주문 통일을 한 번에 처리한다.
@@ -772,6 +803,40 @@ function CustomerDetailDrawer({
                       disabled={phoneSaving}
                       style={{ width: "100%", height: "40px", borderRadius: "10px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "13.5px", fontWeight: 900, cursor: phoneSaving ? "not-allowed" : "pointer", opacity: phoneSaving ? 0.6 : 1 }}
                     >{phoneSaving ? "변경 중…" : "📞 전화번호 변경하기"}</button>
+                  </div>
+                ) : null}
+              </div>
+
+              {/* 쪽지 보내기 — 사이트 안 알림. 접속만 하면 카톡 인앱브라우저·아이폰 모두 보인다. */}
+              <div style={{ margin: "10px 0", border: "1px solid var(--color-line)", borderRadius: "10px", background: "var(--color-surface)", padding: "10px 11px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)" }}>📩 쪽지 보내기</span>
+                  <button
+                    type="button"
+                    onClick={() => { setNoteOpen((v) => !v); setNoteText(""); }}
+                    style={{ marginLeft: "auto", height: "30px", padding: "0 11px", borderRadius: "8px", border: "1px solid var(--color-line)", background: noteOpen ? "var(--color-surface-2)" : "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "11.5px", fontWeight: 900, cursor: "pointer" }}
+                  >{noteOpen ? "취소" : "쓰기"}</button>
+                </div>
+                {noteOpen ? (
+                  <div style={{ marginTop: "9px" }}>
+                    <textarea
+                      value={noteText}
+                      onChange={(e) => setNoteText(e.target.value)}
+                      placeholder="예) 주문서 제출만 하시면 됩니다! 마감 임박이에요 🙏"
+                      rows={3}
+                      style={{ width: "100%", borderRadius: "9px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "9px 11px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none", boxSizing: "border-box", resize: "none", lineHeight: 1.6 }}
+                    />
+                    <div style={{ fontSize: "10.5px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.7, margin: "6px 0 8px" }}>
+                      · 손님이 사이트에 들어오면 팝업으로 뜹니다<br />
+                      · 이미 보고 있으면 15초 안에 뜹니다<br />
+                      · 놓쳐도 손님 화면 🔔 쪽지함에 12시간 남습니다
+                    </div>
+                    <button
+                      type="button"
+                      onClick={sendCustomerNote}
+                      disabled={noteSending || !clean(noteText)}
+                      style={{ width: "100%", height: "40px", borderRadius: "10px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "13.5px", fontWeight: 900, cursor: noteSending ? "not-allowed" : "pointer", opacity: noteSending || !clean(noteText) ? 0.5 : 1 }}
+                    >{noteSending ? "보내는 중…" : "📩 쪽지 보내기"}</button>
                   </div>
                 ) : null}
               </div>
