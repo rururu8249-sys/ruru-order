@@ -533,7 +533,16 @@ export default function AdminLiveEventRoulettePanel({
         showAdminToast(`${nick}의 전화번호를 어디서도 찾지 못해 자동지급을 건너뜁니다.`, "warning");
         return;
       }
-      const payload = await requestJson<{ ok: boolean; message?: string }>("/api/admin-live/customer-points", {
+      // [2026-08-30] 중복지급 근본 차단 — 이 이벤트의 당첨자 줄 하나당 평생 1회.
+      //   winnerId 를 알면 그걸로, 아직 모르면 eventId 로 키를 만든다(둘 다 1이벤트 1당첨자 전제).
+      const rouletteWinnerId = evId ? winnerIdByEventRef.current.get(evId) : "";
+      const rouletteSourceKey = rouletteWinnerId
+        ? `event_winner:${rouletteWinnerId}`
+        : evId
+          ? `event_pick:${evId}`
+          : "";
+
+      const payload = await requestJson<{ ok: boolean; message?: string; duplicate?: boolean }>("/api/admin-live/customer-points", {
         method: "POST",
         body: JSON.stringify({
           phone,
@@ -542,10 +551,15 @@ export default function AdminLiveEventRoulettePanel({
           reason: reason || "이벤트 당첨",
           youtube_nickname: nickname,
           customer_visible: true,
+          ...(rouletteSourceKey ? { source_key: rouletteSourceKey } : {}),
         }),
       });
       if (!payload.ok) throw new Error(payload.message || "포인트 지급 실패");
-      showAdminToast(`${nickname}님에게 ${amount.toLocaleString("ko-KR")}P 자동지급 완료.`, "success");
+      if (payload.duplicate) {
+        showAdminToast(`${nickname}님은 이미 지급된 건이라 다시 지급하지 않았습니다.`, "info");
+      } else {
+        showAdminToast(`${nickname}님에게 ${amount.toLocaleString("ko-KR")}P 자동지급 완료.`, "success");
+      }
 
       // 지급 성공 → 해당 당첨자 레코드 is_reward_done=true (영구 중복지급 게이트). 기존 mark_reward_done API 재사용.
       //   winnerId는 spin 응답이 직접 줌(winnerIdByEventRef) → 재조회(race/RLS) 불필요. 없을 때만 event_id로 재조회(최대 3회).
@@ -658,7 +672,10 @@ export default function AdminLiveEventRoulettePanel({
           continue;
         }
 
-        const payload = await requestJson<{ ok: boolean; message?: string }>("/api/admin-live/customer-points", {
+        // [2026-08-30] 중복지급 근본 차단 — 당첨자 줄(winnerId) 하나당 평생 1회.
+        //   화면 잠금(is_reward_done)이 실패해도 서버가 두 번째 지급을 거부한다.
+        //   (2026-08-29 쩡이 2,000P 중복 사고의 실제 원인이 그 잠금 실패였다)
+        const payload = await requestJson<{ ok: boolean; message?: string; duplicate?: boolean }>("/api/admin-live/customer-points", {
           method: "POST",
           body: JSON.stringify({
             phone,
@@ -667,9 +684,20 @@ export default function AdminLiveEventRoulettePanel({
             reason: reason || "서바이벌 생존",
             youtube_nickname: nick,
             customer_visible: true,
+            source_key: `event_winner:${winnerId}`,
           }),
         });
         if (!payload.ok) throw new Error(payload.message || "포인트 지급 실패");
+        if (payload.duplicate) {
+          // 서버가 막았다 = 이미 나간 건. 잠금만 맞춰주고 넘어간다(돈 무변동).
+          grantedWinnerIdsRef.current.add(winnerId);
+          skipped.push(nick);
+          void requestJson("/api/admin-live/event-roulette", {
+            method: "POST",
+            body: JSON.stringify({ action: "mark_reward_done", winnerId, isRewardDone: true }),
+          }).catch(() => undefined);
+          continue;
+        }
 
         // 지급 성공 → 그 당첨자 행만 지급완료로 잠금(영구 중복지급 게이트)
         //   [2026-07-10] 마킹 실패 = 중복지급 위험 → 3회 재시도(룰렛과 동일 정책)

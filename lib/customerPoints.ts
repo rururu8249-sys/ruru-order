@@ -125,6 +125,23 @@ export function sanitizeCustomerPointText(value: unknown, maxLength = 300): stri
     .slice(0, maxLength);
 }
 
+/**
+ * [2026-08-30] 중복지급 차단 키.
+ *   같은 출처(예: 이벤트 당첨자 한 줄)로는 포인트가 한 번만 나가게 하는 열쇠다.
+ *   DB 의 부분 유니크 인덱스(customer_point_ledger_source_key_uidx)가 실제로 막는다.
+ *   비어 있으면(NULL) 제한 없음 — 수동지급·주문 자동적립은 예전 그대로 동작한다.
+ */
+export function buildPointSourceKey(kind: string, id: unknown): string {
+  const k = String(kind ?? "").trim().replace(/[^a-z0-9_]/gi, "");
+  const v = String(id ?? "").trim();
+  if (!k || !v) return "";
+  return `${k}:${v}`.slice(0, 200);
+}
+
+export function normalizePointSourceKey(raw: unknown): string {
+  return String(raw ?? "").trim().slice(0, 200);
+}
+
 export function buildCustomerPointLedgerPayload(input: {
   id: string;
   phone: string;
@@ -135,6 +152,7 @@ export function buildCustomerPointLedgerPayload(input: {
   adminMemo?: unknown;
   customerVisible?: unknown;
   createdBy?: unknown;
+  sourceKey?: unknown;
 }) {
   const customerVisible = input.customerVisible === false ? false : true;
 
@@ -153,6 +171,8 @@ export function buildCustomerPointLedgerPayload(input: {
     customer_visible: customerVisible,
     customer_seen_at: null,
     created_by: sanitizeCustomerPointText(input.createdBy, 80) || "admin",
+    // 없으면 NULL — 유니크 인덱스가 NULL 을 제외하므로 기존 지급 흐름에 영향이 없다.
+    source_key: normalizePointSourceKey(input.sourceKey) || null,
   };
 }
 
