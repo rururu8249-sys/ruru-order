@@ -720,52 +720,41 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       showAdminToast("고객/배송 정보가 저장됐습니다.", "success");
       setEditingCustomer(false);
 
-      // [2026-08-30 사고 재발 방지] 여기서는 orders 만 바뀐다.
-      //   회원(customers)의 번호는 그대로라서, 손님이 다시 로그인하면
-      //   /api/auth/kakao 가 회원 번호를 내려줘 주문서에 옛 번호가 다시 채워졌다.
-      //   (루루짱929·히무0 실제 사례 — 사장님이 고칠 때마다 원복됐다)
-      //   → 번호가 바뀌었으면 회원 번호도 함께 바꿀지 그 자리에서 물어본다.
+      // [2026-08-30] 번호를 고쳤으면 회원정보까지 그냥 같이 바꾼다.
+      //   왜 안 묻나: 사장님 지적 — "손님이 번호가 바껴서 바꾼건데 왜 또 물어보냐".
+      //   맞는 말이다. 여기서 번호를 고치는 이유는 그 번호가 틀렸기 때문뿐이다.
+      //   예전엔 orders 만 바뀌어서, 손님이 다시 로그인하면 회원정보의 옛 번호가
+      //   주문서에 다시 채워졌다(루루짱929·히무0 실제 사례 — 고칠 때마다 원복).
+      //   ⚠️ 실패해도 주문 저장은 이미 끝난 상태다. 실패 사실만 정확히 알린다.
       const beforePhone = originalPhoneRef.current;
       if (beforePhone && phoneDigits && beforePhone !== phoneDigits) {
-        // [2026-08-30 사장님 지시] "난독증 환자도 이해되게" — 짧은 말로 바꿨다.
-        //   이 창은 관리자 화면에만 뜬다(손님에게 안 보임).
-        const dash = (d: string) =>
-          d.length === 11 ? `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`
-          : d.length === 10 ? `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`
-          : d;
+        try {
+          const res = await fetch("/api/admin-live/customer-phone-change", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            cache: "no-store",
+            body: JSON.stringify({ currentPhone: beforePhone, newPhone: phoneDigits, unifyOrders: true }),
+          });
+          const j = await res.json().catch(() => ({}));
 
-        const syncOk = await showAdminConfirm(
-          [
-            "이 손님 회원정보도 새 번호로 바꿀까요?",
-            "",
-            `${dash(beforePhone)}   →   ${dash(phoneDigits)}`,
-            "",
-            "안 바꾸면 손님이 다음에 로그인할 때",
-            "옛날 번호가 다시 나타납니다.",
-          ].join("\n"),
-          { title: "전화번호", confirmText: "같이 바꾸기", cancelText: "이 주문만" },
-        );
-
-        if (syncOk) {
-          try {
-            const res = await fetch("/api/admin-live/customer-phone-change", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              cache: "no-store",
-              body: JSON.stringify({ currentPhone: beforePhone, newPhone: phoneDigits, unifyOrders: true }),
-            });
-            const j = await res.json().catch(() => ({}));
-            if (!res.ok || !j?.ok) {
-              showAdminToast("회원 번호 변경 실패\n\n" + (j?.message || `요청 실패(${res.status})`), "error");
-            } else {
-              showAdminToast(
-                `회원 번호도 바꿨습니다.` + (j.ordersUpdated ? ` (주문 ${j.ordersUpdated}건 통일)` : ""),
-                "success",
-              );
-            }
-          } catch (e) {
-            showAdminToast("회원 번호 변경 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+          if (!res.ok || !j?.ok) {
+            showAdminToast(
+              "이 주문은 저장됐습니다.\n\n회원정보 번호는 못 바꿨습니다:\n" +
+                (j?.message || `요청 실패(${res.status})`) +
+                "\n\n그대로 두면 손님이 다시 로그인할 때 옛 번호가 나타납니다.",
+              "error",
+            );
+          } else if (j.ordersUpdated) {
+            showAdminToast(`회원정보와 지난 주문 ${j.ordersUpdated}건도 새 번호로 바꿨습니다.`, "success");
+          } else {
+            showAdminToast("회원정보도 새 번호로 바꿨습니다.", "success");
           }
+        } catch (e) {
+          showAdminToast(
+            "이 주문은 저장됐습니다.\n\n회원정보 번호는 못 바꿨습니다:\n" +
+              (e instanceof Error ? e.message : String(e)),
+            "error",
+          );
         }
         originalPhoneRef.current = phoneDigits;
       }
