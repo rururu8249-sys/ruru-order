@@ -52,6 +52,15 @@ function displayNickname(value: string) {
   return String(value || "").trim() || "비회원";
 }
 
+// 한국시간으로 "08-29 22:58" — 접속 기록 표에서 마지막 접속 시각을 보여준다.
+function seoulStamp(iso: string) {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return "-";
+  const d = new Date(t + 9 * 60 * 60 * 1000);
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  return `${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())} ${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}`;
+}
+
 function agoText(iso: string) {
   const t = Date.parse(iso);
   if (!Number.isFinite(t)) return "";
@@ -130,40 +139,84 @@ export default function AdminLiveSidebarPresence() {
   const visitors = data.visitors ?? [];
   const more = Math.max(0, total - listed);
 
-  // 날짜/방송 줄 아래에 펼쳐지는 "누가 왔었나" 목록
+  // [2026-08-29 사장님 지시] 칩(알약)으로 흩뿌려 놓으니 지저분하다 → 엑셀표처럼 정렬한다.
+  //   날짜/방송 줄 아래에 펼쳐지는 "누가 왔었나" 표
   const nameList = (people: VisitPerson[] | undefined, capped: boolean | undefined, colSpan: number) => (
     <tr>
-      <td colSpan={colSpan} style={{ padding: "0 6px 12px" }}>
+      <td colSpan={colSpan} style={{ padding: "0 6px 14px" }}>
         {!people || people.length === 0 ? (
-          <div style={{ padding: "10px", borderRadius: "10px", background: "var(--color-surface-2)", fontSize: "11.5px", fontWeight: 700, color: "var(--color-ink-mute)", textAlign: "center" }}>
+          <div style={{ padding: "12px", borderRadius: "10px", background: "var(--color-surface-2)", fontSize: "11.5px", fontWeight: 700, color: "var(--color-ink-mute)", textAlign: "center" }}>
             이름이 남은 방문자가 없습니다.
           </div>
         ) : (
-          <>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
-              {people.map((p, i) => (
-                <span
-                  key={`${p.name}-${i}`}
-                  title={`${p.name} · ${p.visits}번 방문 · 마지막 ${String(p.lastAt).slice(0, 16).replace("T", " ")}`}
-                  style={{
-                    display: "inline-flex", alignItems: "center", gap: "4px",
-                    borderRadius: "999px", padding: "4px 9px",
-                    fontSize: "11.5px", fontWeight: 800, whiteSpace: "nowrap",
-                    background: p.live ? "var(--color-rose-soft)" : "var(--color-surface-2)",
-                    color: p.live ? "var(--color-rose-deep)" : "var(--color-ink-soft)",
-                    border: "1px solid " + (p.live ? "var(--color-rose-line)" : "var(--color-line)"),
-                  }}
-                >
-                  {p.live ? "🔴" : ""}{p.name}
-                  {p.visits > 1 ? <b style={{ fontSize: "10px", opacity: 0.75 }}>×{p.visits}</b> : null}
-                </span>
-              ))}
+          <div style={{ border: "1px solid var(--color-line)", borderRadius: "10px", overflow: "hidden", background: "var(--color-surface)" }}>
+            <div style={{ maxHeight: "300px", overflowY: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+                <colgroup>
+                  <col style={{ width: "34px" }} />
+                  <col />
+                  <col style={{ width: "58px" }} />
+                  <col style={{ width: "96px" }} />
+                </colgroup>
+                <thead>
+                  <tr style={{ background: "var(--color-surface-2)" }}>
+                    {[
+                      { label: "#", align: "center" as const },
+                      { label: "닉네임", align: "left" as const },
+                      { label: "방문", align: "right" as const },
+                      { label: "마지막 접속", align: "right" as const },
+                    ].map((h) => (
+                      <th
+                        key={h.label}
+                        style={{
+                          position: "sticky", top: 0, zIndex: 1,
+                          background: "var(--color-surface-2)",
+                          textAlign: h.align, padding: "7px 8px",
+                          fontSize: "10.5px", fontWeight: 900, whiteSpace: "nowrap",
+                          color: "var(--color-ink-mute)",
+                          borderBottom: "1px solid var(--color-line)",
+                        }}
+                      >{h.label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {people.map((p, i) => (
+                    <tr
+                      key={`${p.name}-${i}`}
+                      style={{ background: i % 2 === 1 ? "var(--color-surface-2)" : "transparent" }}
+                      title={`${p.name} · ${p.visits}번 방문 · 마지막 ${seoulStamp(p.lastAt)}`}
+                    >
+                      <td style={{ padding: "6px 8px", textAlign: "center", fontSize: "10.5px", fontWeight: 700, color: "var(--color-ink-mute)", fontVariantNumeric: "tabular-nums" }}>
+                        {i + 1}
+                      </td>
+                      <td style={{ padding: "6px 8px", fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <span
+                          title={p.live ? "방송 중 접속" : "쇼핑몰 모드 접속"}
+                          style={{
+                            display: "inline-block", width: "6px", height: "6px", borderRadius: "50%",
+                            marginRight: "6px", verticalAlign: "middle",
+                            background: p.live ? "var(--color-rose-deep)" : "var(--color-line)",
+                          }}
+                        />
+                        {p.name}
+                      </td>
+                      <td style={{ padding: "6px 8px", textAlign: "right", fontSize: "11.5px", fontWeight: 800, color: p.visits > 1 ? "var(--color-ink)" : "var(--color-ink-mute)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+                        {p.visits}
+                      </td>
+                      <td style={{ padding: "6px 8px", textAlign: "right", fontSize: "11.5px", fontWeight: 700, color: "var(--color-ink-soft)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+                        {seoulStamp(p.lastAt)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div style={{ marginTop: "7px", fontSize: "10px", fontWeight: 700, color: "var(--color-ink-mute)" }}>
-              🔴 = 방송 중 접속 · ×N = 그날 여러 번 들어옴
-              {capped ? " · 최근 120명까지만 표시" : ""}
+            <div style={{ padding: "7px 9px", borderTop: "1px solid var(--color-line)", background: "var(--color-surface-2)", fontSize: "10px", fontWeight: 700, color: "var(--color-ink-mute)" }}>
+              총 {people.length.toLocaleString("ko-KR")}명 · 최근 접속 순 · 빨간 점 = 방송 중 접속
+              {capped ? " · 최근 120명까지만" : ""}
             </div>
-          </>
+          </div>
         )}
       </td>
     </tr>
@@ -183,7 +236,7 @@ export default function AdminLiveSidebarPresence() {
             aria-modal="true"
             aria-label="접속 기록"
             style={{
-              width: "min(560px, 96vw)", maxHeight: "82vh", display: "flex", flexDirection: "column",
+              width: "min(680px, 96vw)", maxHeight: "84vh", display: "flex", flexDirection: "column",
               borderRadius: "16px", overflow: "hidden", background: "var(--color-surface)",
               boxShadow: "0 22px 70px rgba(0,0,0,0.3)",
             }}
