@@ -78,7 +78,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
       [
         "유튜브 채팅에 이렇게 올릴까요?",
         "",
-        `💳 ${order.nickname}님 카카오톡으로 카드결제 링크 보내드렸어요! 📩 확인하시고 결제 부탁드립니다 🙏`,
+        `💳 ${order.nickname}님 카카오톡으로 카드결제 링크 보내드렸어요! 📩 확인 부탁드려요 🙏`,
         "",
         "※ 금액·전화번호는 공개 채팅이라 넣지 않습니다.",
       ].join("\n"),

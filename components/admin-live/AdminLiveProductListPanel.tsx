@@ -879,7 +879,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                 }}
                 className="h-9 rounded-xl bg-rose-deep px-4 text-xs font-black text-white shadow-sm hover:bg-rose-deep"
               >
-                + 빠른등록
+                + 이름·금액만 등록
               </button>
 
               <button
@@ -973,7 +973,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
               <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-line bg-surface-2 px-5 text-center text-xs font-bold leading-5 text-ink-mute">
                 {listSearchText.trim() ? "검색 결과가 없습니다." : "등록된 상품이 없습니다."}
                 <br />
-                {listSearchText.trim() ? "검색어를 지우거나 전체상품에서 다시 확인하세요." : "+ 빠른등록으로 상품을 먼저 추가하세요."}
+                {listSearchText.trim() ? "검색어를 지우거나 전체상품에서 다시 확인하세요." : "위 [+ 상품등록]으로 상품을 먼저 추가하세요."}
               </div>
             ) : (
               <div className="divide-y divide-line">
@@ -1110,7 +1110,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
           <div className="w-full max-w-2xl overflow-hidden rounded-3xl bg-surface shadow-2xl ring-1 ring-line">
             <div className="flex items-center justify-between border-b border-line px-5 py-4">
               <div>
-                <h3 className="text-lg font-black text-ink">빠른 상품등록</h3>
+                <h3 className="text-lg font-black text-ink">이름·금액만 등록 <span className="text-[11px] font-bold text-ink-mute">(사진·옵션은 [+ 상품등록]에서)</span></h3>
                 <p className="mt-1 text-xs font-bold text-ink-soft">상품명만 넣어도 등록됩니다. 금액은 고객이 주문서에서 직접 입력할 수 있습니다.</p>
               </div>
 
@@ -1202,7 +1202,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                   {simpleFastNoneOptionEnabled ? "없음입력 ON" : "없음입력 OFF"}
                 </button>
                 <span className="text-xs font-bold text-ink-soft">
-                  ON이면 빠른등록 상품 선택 시 색상/사이즈가 없음으로 자동입력됩니다.
+                  ON이면 이 화면에서 등록한 상품 선택 시 색상/사이즈가 없음으로 자동입력됩니다.
                 </span>
               </div>
 
@@ -1229,7 +1229,7 @@ export default function AdminLiveProductListPanel(props: AdminLiveProductListPan
                 onClick={() => void saveSimpleFastProducts()}
                 className="h-12 rounded-2xl bg-rose-deep text-sm font-black text-white shadow-sm hover:bg-rose-deep disabled:opacity-50"
               >
-                {simpleFastSaving ? "저장 중..." : "빠른등록 저장"}
+                {simpleFastSaving ? "저장 중..." : "저장"}
               </button>
             </div>
           </div>

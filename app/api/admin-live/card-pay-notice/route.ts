@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
 
     // 문구 — 서버 고정. 금액·전화번호는 넣지 않는다(공개 채팅).
     const shortNick = nickname.slice(0, 20);
-    const message = `💳 ${shortNick}님 카카오톡으로 카드결제 링크 보내드렸어요! 📩 확인하시고 결제 부탁드립니다 🙏`;
+    const message = `💳 ${shortNick}님 카카오톡으로 카드결제 링크 보내드렸어요! 📩 확인 부탁드려요 🙏`;
 
     const botChatId = await readSetting(sb, "chat_order_chat_id");
     const result = await postLiveChatMessage(message, { forceEvenIfDisabled: true, liveChatId: botChatId });
